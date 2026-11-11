@@ -110,11 +110,17 @@ names may change before the mesher's public API.
   `domain="regions"` every other component is a region (a multi-region PLC);
   with `domain="parity"` the components an odd number of facets away from the
   outside form one region (the even-odd domain of closed surfaces; a face shared by
-  two touching shells counts twice). Errors are typed, all `ValueError`: `InvalidPLC`
+  two touching shells counts twice). In regions mode, `region_points` names the regions:
+  `(point, name)` pairs, where the bounded component that holds a point is region `name`
+  (components may share a name) and `name=None` marks a hole that is not meshed. Every
+  bounded component then needs a point, each point must lie strictly inside one (decided
+  exactly, against the unrounded points), and regions are numbered in the order the
+  names first appear. Errors are typed, all `ValueError`: `InvalidPLC`
   from the input check with its witness, `NotClosed` in parity mode with witness type 6
   (an elementary segment on the boundary of an odd number of facets, such as an edge
-  with three facets), `RecoveryError`, `RoundingError`, and `MeshError` for anything
-  else. Points on
+  with three facets), `RecoveryError`, `RoundingError`, `RegionError` (a region point
+  outside every region or on a facet, two names in one region, or a region without a
+  point), and `MeshError` for anything else. Points on
   segments are rounded once to the nearest double, input points are kept bit for bit,
   unused points are dropped, and every tetrahedron is certified with exact
   `orient3d > 0` on the output doubles. Tetrahedra that rounding makes flat or

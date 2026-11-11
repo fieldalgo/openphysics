@@ -391,11 +391,14 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// "regions" (every bounded component a region) or "parity" (the even-odd domain of
 /// closed surfaces). Returns (nodes N x 3 doubles, tetrahedra, regions, boundary
 /// facet per face, boundary faces, interface region pairs, interface faces, node
-/// sources, region count) as bytes, and counters.
+/// sources, region count) as bytes, and counters. `seed_coords` (k x 3 doubles) and
+/// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
-#[pyo3(signature = (coords, segments, facets, domain, max_depth))]
+#[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None))]
+#[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
-                 facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32)
+                 facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
+                 seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
@@ -412,15 +415,31 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     let facets: Vec<Vec<Vec<u32>>> = facets.iter()
         .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
         .collect::<PyResult<_>>()?;
+    let sp = match seed_coords { Some(b) => self::points(b.as_bytes())?, None => Vec::new() };
+    let sl: Vec<i64> = match seed_labels {
+        Some(b) => {
+            let b = b.as_bytes();
+            if b.len() % 8 != 0 {
+                return Err(PyValueError::new_err("seed labels must be int64"));
+            }
+            b.chunks_exact(8).map(|c| i64::from_le_bytes(c.try_into().unwrap())).collect()
+        }
+        None => Vec::new(),
+    };
+    if sp.len() != sl.len() {
+        return Err(PyValueError::new_err("one label per region seed"));
+    }
+    let seeds: Vec<mesh::Seed> = sp.into_iter().zip(sl).map(|(p, label)| mesh::Seed { p, label }).collect();
     let plc = plc::Plc { points, segments, facets };
-    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "Internal", message, ids)
+    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "Internal", message, ids)
     let (m, b) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
         let b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
-        let m = mesh::build(&plc.points, &b, domain).map_err(|e| match &e {
+        let m = mesh::build(&plc.points, &b, domain, &seeds).map_err(|e| match &e {
             mesh::MeshError::NotClosed { segment, facets } => {
                 ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
             }
             mesh::MeshError::Rounding(_) => ("RoundingFail", e.to_string(), vec![]),
+            mesh::MeshError::Seed(_) => ("RegionSeed", e.to_string(), vec![]),
             mesh::MeshError::Internal(_) => ("Internal", e.to_string(), vec![]),
         })?;
         Ok((m, b.stats))
