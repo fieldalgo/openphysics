@@ -198,8 +198,9 @@ Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다.
 **설치 시험** (`tools/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
 sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 아홉 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
-`tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
-`packages/` 아래는 복사하지 않습니다. 복사한 파일의 해시는
+`tests/`, `examples/`, `docs/` 아래의 추적 파일, 단위 배치의 고정 문서(`tools/units_batch/fixtures/`,
+시험이 읽는 JSON 데이터)와 루트 `pyproject.toml`만 복사하고 `packages/` 아래와 `tools/`의 다른
+파일은 복사하지 않습니다. 복사한 파일의 해시는
 `suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
 실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가

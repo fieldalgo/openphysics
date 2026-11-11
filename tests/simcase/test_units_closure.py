@@ -31,10 +31,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import simcase
 from physmat import units
 
 ROOT = Path(__file__).resolve().parents[2]
 FROZEN_V02 = ROOT / "tools" / "units_batch" / "fixtures" / "v02"
+#: the Studio files of the imported simcase package (the installed wheel in the installed-package run)
+STATIC = Path(simcase.__file__).resolve().parent / "studio" / "static"
 SUFFIXED = re.compile(r"_(k|m)$")
 #: containers whose keys are names a document chooses, not keys of the format
 NAMED = {"materials", "physics", "components", "parameters", "selections"}
@@ -98,7 +101,7 @@ def _python_literals(path: Path):
 
 def _studio_starters() -> dict:
     """The geometry lab's starters: the JSON literals of ``geometry-lab-starters.mjs``."""
-    text = (ROOT / "packages/simcase/src/simcase/studio/static/geometry-lab-starters.mjs").read_text(encoding="utf-8")
+    text = (STATIC / "geometry-lab-starters.mjs").read_text(encoding="utf-8")
     found = dict(re.findall(r"^\s*(\w+):(\{.*\}),?$", text, re.M))
     return {name: json.loads(literal) for name, literal in found.items()}
 
