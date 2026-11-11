@@ -162,8 +162,10 @@ without a motion, and numbers for k0 and n_target.
 - Degenerate modes keep exact values and get NaN derivatives and a
   `DegenerateModeWarning`, as for material derivatives (decision 2026-11-11). A
   sorted mode has no derivative where two modes cross: on a square silicon core
-  the upper mode's one-sided slopes in the width are 2.28 and 5.70 µm⁻¹ (measured
-  with this solver and an independent finite-difference mode solver).
+  the upper mode's one-sided slopes in the width are 2.28 and 5.70 µm⁻¹ (a
+  0.3 × 0.3 µm silicon core in silica, λ = 1.55 µm, a 3 × 3 µm PEC window, mesh
+  size 0.02 µm, second-order one-sided differences; the finite-difference mode
+  solver modesolverpy gave 2.25 and 5.63 on a 0.01 µm grid).
 - `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
   positions.
 
@@ -219,7 +221,7 @@ Each refusal names the reason:
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
   thermal-expansion, reference-temperature, body-force, traction, heat-capacity,
-  initial-temperature, permittivity, permeability or wavenumber values together
+  initial-temperature, permittivity, permeability, wavenumber or `n_target` values together
   with a motion: t is the one live input of such a call;
 - a temperature snapshot of another mesh, including the moved one: the snapshot
   belongs to the mesh as given;
@@ -339,7 +341,7 @@ the same versions.
 | W2 hollow PEC guide, TE10 | width a stretched; dn/da = λ²/(4a³ n_eff); nx = 8, 16, 32; observed order ≥ 1.0, finest within 1e-2 | 1.3e-2, 3.4e-3, 8.4e-4 (order 2.0 and 2.0) |
 | W3 independent mode solver | strip width derivative against stored modesolverpy 0.4.4 values (finite differences, grid 0.005 µm), within 3% | 9.8e-3 |
 | W4 rigid translation | dn_eff/dt = 0 within 1e-10 · \|n_eff\| | pass |
-| W5 uniform scaling | X(t) = (1 + t) X₀ gives dn_eff/dt = k0 ∂n_eff/∂k0 (the k0 derivative path), relative 1e-8 | 4.2e-16 |
+| W5 uniform scaling | X(t) = (1 + t) X₀ gives dn_eff/dt = k0 ∂n_eff/∂k0 (the k0 derivative path), relative 1e-8 | 4.2e-16 (JAX), 2.1e-15 (PyTorch) |
 | W6 degenerate modes | on a mesh with the square's symmetry the fundamental pair gets NaN and a warning; the non-degenerate mode of the same call stays finite | pass |
 | W7 unchanged | without `motion` the result equals the previous code | sha256 of n_eff, et and ez equal to main `e6c5826` for a real and a lossy core (measured); `motion=None` equals no keyword (test) |
 | W8 refusals | as listed above | pass |
@@ -347,7 +349,7 @@ the same versions.
 W1: the pre-registration named the plain central difference at h = 1e-4. For the
 imaginary part of the lossy mode 0 its truncation error is 1.5e-6 (the second
 derivative is large); a sweep of h from 1e-2 to 1e-4 converges to the derivative,
-and its Richardson extrapolation from h and h/2 agrees to 5e-10. The test uses the
+and its Richardson extrapolation from h and h/2 agrees to 6.1e-10. The test uses the
 extrapolated difference for every case (plain difference: 7.1e-9 to 1.5e-6); the
 criterion is unchanged. This deviation is recorded here and in the HQ record. W3's
 stored value was measured before the registration (it records that measurement;
