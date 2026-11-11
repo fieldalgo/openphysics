@@ -136,6 +136,10 @@ last index and all13 field descriptors: full shape, unit, location, axis,
 available_views, initial_available and ui_supported. Only T/q/H/V are initial UI
 fields. Frame carries one captured row; H/V frame shape is scalar[], page shape
 [rows], vector page shape[rows,M,2]. Static mesh is not repeated per frame.
+The summary's `diagnostics` and `resolved_inputs` grow with the document and count
+against the 4 MiB manifest; the rest of the summary stays within the 64 KiB summary
+metadata limit. The validation reply likewise keeps the document's diagnostics within
+4 MiB and everything else within 64 KiB.
 
 Frame/history require result_id and exact integer index or range. Run counters
 client_revision/request_seq remain separate from view frame_seq. Only matching
