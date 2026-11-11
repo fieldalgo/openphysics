@@ -9,8 +9,9 @@ kind's commit converts it, a kind is compared in identity mode (its 0.2 document
 sides), which is P2-3.
 
 - ``test_the_harness_is_not_shipped`` runs everywhere, the installed-package run included.
-- The other checks need the ``tools/`` folder, which the installed-package run does not copy
-  (and where a skip would fail the run), so they are defined in a source checkout only. The
+- The other checks need the harness code in ``tools/units_batch``, which the installed-package
+  run does not copy (it copies the fixture documents only, and a skip would fail the run), so
+  they are defined only where that code is present. The
   harness self-checks run every time: a one-ulp change is detected, layout maps are applied
   and closed, and the converter reproduces the converted examples of the specification.
 - ``test_units_batch_equivalence`` runs only when ``OPENPHYSICS_BATCH_BASELINE`` names the
@@ -71,7 +72,7 @@ def test_the_harness_is_not_shipped():
     assert all(origin is None or "units_batch" not in origin for origin in found.values()), found
 
 
-if HARNESS.is_dir():
+if (HARNESS / "compare.py").is_file():
 
     def _module(name):
         spec = importlib.util.spec_from_file_location(f"_units_batch_{name}", HARNESS / f"{name}.py")

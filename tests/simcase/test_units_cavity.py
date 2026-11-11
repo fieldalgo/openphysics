@@ -21,6 +21,7 @@ import numpy as np
 import pytest
 
 import physmat
+import simcase
 from physmat import units
 from simcase import Document, DocumentError, examples, run
 from simcase.cavity import FIELDS, kernel_inputs
@@ -30,7 +31,8 @@ galerkin = pytest.importorskip("galerkin")
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_FILES = ROOT / "examples" / "simcase"
 FIXTURES = ROOT / "tools" / "units_batch" / "fixtures" / "v03"
-SIMCASE = ROOT / "packages" / "simcase" / "src" / "simcase"
+#: the imported simcase package: the source tree here, the installed wheel in the installed-package run
+SIMCASE = Path(simcase.__file__).resolve().parent
 P = "physics.em1."
 TC = "exp(-i omega t)"
 CAVITIES = ("cavity_box", "cavity_lossy_slab", "gallery_box_cavity")
