@@ -153,7 +153,7 @@ def test_uniform_region_document_matches_the_rectangle_document():
     """One material everywhere: same answer as the rectangle path to discretization error."""
     data = wall_document(1., dt=1., end=20.)
     data['materials']['insulation'] = dict(data['materials']['steel'])
-    data['physics']['heat1']['heat_source_density'] = '1e5 W/m^3' 
+    data['physics']['heat1']['heat_source_density'] = '1e5 W/m^3'
     r = run(Document.from_dict(data), verbose=False)
     # the rectangle form reads format 0.3 (units batch C5a); the same values with their units
     rect = {'openphysics': '0.3', 'name': 'rectangle',
