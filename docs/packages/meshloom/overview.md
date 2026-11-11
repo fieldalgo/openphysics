@@ -119,8 +119,12 @@ names may change before the mesher's public API.
   unused points are dropped, and every tetrahedron is certified with exact
   `orient3d > 0` on the output doubles. Tetrahedra that rounding makes flat or
   inverted are repaired by 2-3 flips and edge removals (rings of three to seven
-  tetrahedra), which never remove a facet face or a segment edge and are applied only
-  when every new tetrahedron is positive and every face stays in at most two. It returns `nodes`, `tetrahedra`, `regions`,
+  tetrahedra, with one consistent fan), by edge removals inside one facet that
+  re-triangulate the facet there, and otherwise by refilling a small cavity around the
+  tetrahedron as a cone from one of its vertices or from one new point inside the domain
+  (`node_source` −1). None removes a segment edge or uncovers a facet. The result is
+  certified: every tetrahedron positive, every face in at most two tetrahedra with
+  opposite windings, and the faces used once exactly the domain's boundary. It returns `nodes`, `tetrahedra`, `regions`,
   `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
   outward), and `interfaces` by region pair (wound from the lower region to the
   higher). There is no refinement: the mesh has the input points and the points
@@ -185,11 +189,14 @@ See [third-party software](../../third-party.md).
 ## Limits
 
 - No refinement or quality improvement yet: `mesh_plc` returns the boundary-conforming
-  mesh of the input and recovery points only. A tetrahedron that rounding to doubles
-  makes flat or inverted and that no flip repairs raises `ValueError`; flips cannot
-  repair an inversion against a facet face itself (in a synthetic test with points
-  snapped to a coarse grid, every interior inversion was repaired and inversions at
-  the fixed boundary were refused). No meshing test has needed a repair yet. A cavity without a constrained Delaunay filling
+  mesh of the input and recovery points (and the few points repair adds) only. A
+  tetrahedron that rounding to doubles makes flat or inverted and that repair cannot fix
+  raises `RoundingError`. Near-coplanar facets meeting at a segment are the hard case: in
+  a seeded test of rotated prisms with points within 1e-13 of a facet, 42 of 60 inputs
+  mesh and 18 raise `RoundingError` (before this repair: 18 and 42); every mesh returned
+  passes V1–V4. Until 2026-11-11 the repair never ran inside `mesh_plc` (it was given a
+  label per tetrahedron, which forbade every flip) and its edge removal could orient a
+  fan inconsistently; both are fixed. A cavity without a constrained Delaunay filling
   (none so far in the tests) is an error, not yet repaired with extra points. The
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
