@@ -478,6 +478,7 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     d.set_item("facet_points", rs.facet_points)?;
     d.set_item("volume_points", rs.volume_points)?;
     d.set_item("rejected_points", rs.rejected)?;
+    d.set_item("minimal_cavities", rs.minimal)?;
     d.set_item("inverted_after_rounding", m.repair.inverted)?;
     d.set_item("flips23", m.repair.flips23)?;
     d.set_item("flips32", m.repair.flips32)?;

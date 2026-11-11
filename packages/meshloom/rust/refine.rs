@@ -47,6 +47,8 @@ pub struct RefineStats {
     pub facet_points: u32,
     pub volume_points: u32,
     pub rejected: u32,
+    /// insertions that fell back to the minimal cavity (the tetrahedra holding the point)
+    pub minimal: u32,
 }
 
 struct State<'a> {
@@ -293,8 +295,100 @@ impl State<'_> {
                 grown = true;
             }
         }
+        // ... and shrink it where it cannot grow: a tetrahedron (not a seed, which holds p)
+        // with a boundary face p does not see strictly leaves the cavity (e.g. p on the
+        // hull's plane, beyond a coplanar hull face); repeat, since that exposes its other
+        // faces. What remains is star-shaped from p unless a seed is blocked, which the
+        // insertion then refuses.
+        let seedset: std::collections::HashSet<u32> = seeds.iter().copied().collect();
+        loop {
+            let mut drop: Vec<u32> = Vec::new();
+            for &t in &list {
+                if seedset.contains(&t) {
+                    continue;
+                }
+                let v = self.cx.tets[t as usize];
+                let blocked = (0..4).any(|i| {
+                    let f = face(&v, i);
+                    let k = key(f);
+                    if f.contains(&p) || plane.contains(&k) {
+                        return false;
+                    }
+                    let u = self.cx.neighbor(t, &k);
+                    if u != NONE && inc.contains_key(&u) {
+                        return false;
+                    }
+                    // after the growth above, only hull faces, constraints and faces of
+                    // tetrahedra this loop removed can be left unseen
+                    self.orient([f[0], f[1], f[2], p]) <= 0
+                });
+                if blocked {
+                    drop.push(t);
+                }
+            }
+            if drop.is_empty() {
+                break;
+            }
+            for t in drop {
+                inc.remove(&t);
+            }
+            list.retain(|t| inc.contains_key(t));
+        }
         list.sort_unstable();
         list
+    }
+
+    /// Inserts p into its minimal cavity, when the Delaunay one is not star-shaped: the
+    /// tetrahedra whose closed region holds p (found from `seeds`, which do), with the
+    /// subfacets among their faces that p lies on as the 2D cavity. Every boundary face of
+    /// that cavity is then seen by p (a face through p is shared by two of its tetrahedra,
+    /// or is a hull face p splits), so the cone is valid; it is not Delaunay there, which
+    /// later splits and flips may improve.
+    fn insert_minimal(&mut self, p: u32, seeds: &[u32]) -> Result<bool, String> {
+        self.stats.minimal += 1;
+        let holds = |st: &mut Self, t: u32| {
+            let v = st.cx.tets[t as usize];
+            (0..4).all(|i| {
+                let f = face(&v, i);
+                st.orient([f[0], f[1], f[2], p]) >= 0
+            })
+        };
+        let mut inc: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        let mut stack: Vec<u32> = Vec::new();
+        for &s in seeds {
+            if self.cx.alive[s as usize] && holds(self, s) && inc.insert(s) {
+                stack.push(s);
+            }
+        }
+        while let Some(t) = stack.pop() {
+            let v = self.cx.tets[t as usize];
+            for i in 0..4 {
+                let f = face(&v, i);
+                if self.orient([f[0], f[1], f[2], p]) != 0 {
+                    continue; // p is not on this face: its neighbour does not hold p
+                }
+                let u = self.cx.neighbor(t, &key(f));
+                if u != NONE && !inc.contains(&u) && holds(self, u) {
+                    inc.insert(u);
+                    stack.push(u);
+                }
+            }
+        }
+        let mut cav: Vec<u32> = inc.iter().copied().collect();
+        cav.sort_unstable();
+        let mut plane: Vec<[u32; 3]> = Vec::new();
+        for &t in &cav {
+            let v = self.cx.tets[t as usize];
+            for i in 0..4 {
+                let f = face(&v, i);
+                let k = key(f);
+                if self.sub.contains_key(&k) && !plane.contains(&k) && self.orient([f[0], f[1], f[2], p]) == 0 {
+                    plane.push(k);
+                }
+            }
+        }
+        plane.sort_unstable();
+        self.insert(p, &cav, &plane)
     }
 
     /// The constraint faces and edges on the boundary of a cavity that p encroaches.
@@ -356,7 +450,21 @@ impl State<'_> {
                     continue;
                 }
                 let tet = [f[0], f[1], f[2], p];
-                if self.orient(tet) <= 0 {
+                let o = self.orient(tet);
+                if o == 0 && u == NONE && (0..3).any(|j| self.g.collinear(f[j], f[(j + 1) % 3], p)) {
+                    // a hull face with p on one of its edges (the subsegment p splits): p splits
+                    // it into two hull faces, which are faces of the tetrahedra joining p to the
+                    // neighbouring boundary faces; it is not joined to p itself
+                    continue;
+                }
+                if o <= 0 {
+                    if std::env::var_os("MESHLOOM_DEBUG_REFINE").is_some() {
+                        let fl = self.sub.get(&k).cloned();
+                        let segs: Vec<bool> = (0..3).map(|j| self.seg.contains_key(&ekey(k[j], k[(j + 1) % 3]))).collect();
+                        let col: Vec<bool> = (0..3).map(|j| self.g.collinear(k[j], k[(j + 1) % 3], p)).collect();
+                        eprintln!("DEBUG p {p} face {k:?} orient {o} sub {fl:?} segs {segs:?} collinear {col:?} cav {} plane {} u {}",
+                                  cav.len(), plane.len(), u);
+                    }
                     return Ok(false);
                 }
                 new.push((tet, label));
@@ -482,7 +590,7 @@ impl State<'_> {
             .filter(|k| k.contains(&e.0) && k.contains(&e.1) && self.sub.contains_key(k)).collect();
         let plane = self.plane_cavity(p, &start);
         let cav = self.cavity(p, &seeds, &plane);
-        if !self.insert(p, &cav, &plane)? {
+        if !self.insert(p, &cav, &plane)? && !self.insert_minimal(p, &seeds)? {
             self.drop_point(p);
             return Err(format!("refinement: the cavity of segment point {p} is not star-shaped"));
         }
@@ -558,7 +666,7 @@ impl State<'_> {
             self.stats.rejected += 1;
             return self.split_segment(e);
         }
-        if !self.insert(p, &cav, &plane)? {
+        if !self.insert(p, &cav, &plane)? && !self.insert_minimal(p, &seeds)? {
             self.drop_point(p);
             self.stats.rejected += 1;
             return Err(format!("refinement: the cavity of facet point {p} is not star-shaped"));
@@ -629,7 +737,7 @@ impl State<'_> {
             }
             return self.split_subfacet(fs[0]);
         }
-        if !self.insert(p, &cav, &[])? {
+        if !self.insert(p, &cav, &[])? && !self.insert_minimal(p, &[found])? {
             self.drop_point(p);
             self.stats.rejected += 1;
             return Ok(());
