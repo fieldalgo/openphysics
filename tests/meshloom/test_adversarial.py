@@ -67,8 +67,12 @@ class Builder:
         return np.array(self.points, dtype=float), self.facets
 
 
-def check(m, points, facets, volumes, exact, euler=True):
-    """V1-V4 from the arrays (Fraction), returns the sorted region volumes."""
+def check(m, points, facets, volumes, exact, euler=True, inner_cover=True):
+    """V1-V4 from the arrays (Fraction), returns the sorted region volumes.
+
+    inner_cover: V3(a) also counts the faces in a facet's plane and box that are not
+    tagged to it (interfaces, and the even-odd domain continuing across touching shells);
+    False counts the faces tagged to the facet only, for single shells."""
     nodes, tets, regions = m["nodes"], m["tetrahedra"], m["regions"]
     q = [[F(x) for x in p] for p in nodes.tolist()]
 
@@ -134,10 +138,10 @@ def check(m, points, facets, volumes, exact, euler=True):
         # faces where the even-odd domain continues across it (touching shells)
         lo = [min(P[i][c] for i in loop) for c in range(3)]
         hi = [max(P[i][c] for i in loop) for c in range(3)]
-        cover = {tuple(sorted(f)) for f in faces.tolist()} | {
+        cover = {tuple(sorted(f)) for f in faces.tolist()} | ({
             f for f in owners
             if all(sum(ni * di for ni, di in zip(n, sub(q[x], o))) == 0 and
-                   all(lo[c] <= q[x][c] <= hi[c] for c in range(3)) for x in f)}
+                   all(lo[c] <= q[x][c] <= hi[c] for c in range(3)) for x in f)} if inner_cover else set())
         cover = [list(f) for f in cover]
         area_out = sum(abs(float(sum(ni * ci for ni, ci in zip(n, cross(sub(q[f[1]], q[f[0]]), sub(q[f[2]], q[f[0]]))))))
                        for f in cover)

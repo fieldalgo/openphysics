@@ -182,13 +182,18 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
     ``domain="parity"`` makes the even-odd domain of closed surfaces one region. S points
-    are rounded once to the nearest double and every tetrahedron is certified with
-    exact ``orient3d > 0`` on the output doubles (no flip repair yet: a tetrahedron
-    that rounding inverts raises ``ValueError``). Returns the fields of the plan's
-    output contract: ``nodes``, ``tetrahedra``, ``regions``, ``region_names``,
-    ``boundary_faces`` and ``boundary_nodes`` by facet index (faces wound outward),
-    ``interfaces`` keyed by region pairs (a < b, wound from a to b), and ``node_source``
-    (each node's global point index: input points first, then S points).
+    are rounded once to the nearest double. Tetrahedra that rounding makes flat or
+    inverted are repaired: flips (2-3, edge removal), edge removals inside one facet that
+    re-triangulate it there, and, failing those, a cavity around the tetrahedron refilled
+    as a cone from one of its vertices or from one new point inside the domain. Every
+    tetrahedron is then certified with exact ``orient3d > 0`` on the output doubles, every
+    face lies in at most two tetrahedra with opposite windings, and the faces used once
+    are the domain's boundary; what repair cannot fix raises ``RoundingError``. Returns
+    the fields of the plan's output contract: ``nodes``, ``tetrahedra``, ``regions``,
+    ``region_names``, ``boundary_faces`` and ``boundary_nodes`` by facet index (faces
+    wound outward), ``interfaces`` keyed by region pairs (a < b, wound from a to b), and
+    ``node_source`` (each node's global point index: input points first, then S points;
+    -1 for a point the repair added), with ``stats`` counting the repair's operations.
 
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
     witness type 6), ``RecoveryError``, ``RoundingError``, or ``MeshError`` for an
