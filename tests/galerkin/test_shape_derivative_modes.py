@@ -103,13 +103,17 @@ def strip():
     return _strip(0.08)
 
 
+# a real problem has a real n_eff, so its imaginary part is checked for the lossy core only (the
+# installed-wheel run refuses skipped tests, so the combination is not generated at all)
+W1_CASES = [(material, functional) for material in ("real", "lossy")
+            for functional in ("n_eff_real", "n_eff_imag", "field")
+            if not (material == "real" and functional == "n_eff_imag")]
+
+
 @pytest.mark.parametrize("name", BACKENDS)
-@pytest.mark.parametrize("material", ["real", "lossy"])
 @pytest.mark.parametrize("mode", [0, 1])
-@pytest.mark.parametrize("functional", ["n_eff_real", "n_eff_imag", "field"])
+@pytest.mark.parametrize("material, functional", W1_CASES)
 def test_w1_matches_moved_mesh_central_difference(strip, name, material, mode, functional):
-    if material == "real" and functional == "n_eff_imag":
-        pytest.skip("a real problem has a real n_eff")
     xp = _xp(name)
     mesh, W, core = strip
     eps = _eps(core, N_CORE ** 2 if material == "real" else N_CORE ** 2 - 0.05j)
