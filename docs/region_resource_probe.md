@@ -68,7 +68,7 @@ The expected outcomes are fixed in the tool; a different outcome fails the run.
 | Covered crossings, 126 teeth (crossings hidden under 4 rects) | `validate:geometry_limit_exceeded` |
 | Collinear overlaps: a 512-point polygon split along two lines, 47 rects on the same lines and 16 identical circles | `done` |
 | 16 isolated circles, then 16 crossing 32-point stars | `validate:geometry_limit_exceeded` |
-| One 511-point sawtooth with tips of about 1 degree | `job:solver_failed` |
+| One 511-point sawtooth with tips of about 1 degree | `job:mesh_limit_exceeded` |
 | The sawtooth with 10-degree tips, jittered, 60 crossing rects, `min_angle` 33 | `job:mesh_limit_exceeded` |
 | 7 concentric rings 0.3 mm apart, sized 0.15 mm, `min_angle` 33 | `job:solver_failed` |
 | Transient example, 9 times, mesh size 0.2 mm | `done` |
@@ -82,30 +82,33 @@ the three crossing documents now stop before `Document.from_dict`. Touching
 boundaries and collinear overlaps (shared edges, identical circles) are not
 boundary crossings, so `max_boundary_crossings` does not count them, but they
 still make the shapes' booleans costlier: the two workloads built from them are
-the slowest validations below. The strip, film and 10-degree sawtooth workloads
-need meshes far finer than the node cap and show what an over-fine refusal in the
-job costs. The 1-degree sawtooth needs one too, but meshine refuses its boundary
-first ("cannot resolve", fail-closed) on the micrometre copy simcase meshes, so
-it ends as `solver_failed` within a second. Its outcome was first fixed as
-`job:mesh_limit_exceeded`, since meshed in millimetres it reaches the node cap,
-and was changed to `job:solver_failed` after the first run on micrometre meshes
-failed on it; the expectation as first fixed fails. The cause is the factor
-1000 from millimetres to micrometres, not the scale: on the copy, meshine
-inserts two points at the same place, or within 7e-12 µm, at the midpoints of
-56 tooth sides, which the triangulation cannot separate; the document with every
-length multiplied by 0.001, 0.5, 2, 3, 7, 10, 100, 999, 1001, 1024 or 1e6 and
-meshed as written reaches the node cap, and multiplied by 1000 it fails in the
-same way. simcase's own run of the document, without limits or Studio, raises
-the same error. The concentric rings show another way a job ends: meshine's
-refinement does not converge within its 80 rounds before the node cap stops it,
-and the job ends as `solver_failed`.
+the slowest validations below. The strip, film and both sawtooth workloads need
+meshes far finer than the node cap and show what an over-fine refusal in the
+job costs. The 1-degree sawtooth's expected outcome changed twice. It was first
+fixed as `job:mesh_limit_exceeded`. When simcase began to mesh a micrometre copy
+of region documents, every length times 1000, meshine refused that copy's
+boundary first ("cannot resolve", fail-closed) and the job ended as
+`solver_failed` within a second, so the expectation became `job:solver_failed`.
+The cause was the floating-point product, not the scale: on the copy, meshine
+inserted two points at the same place, or within 7e-12 µm, at the midpoints of
+56 tooth sides, which the triangulation could not separate; the document with
+every length multiplied by 0.001, 0.5, 2, 3, 7, 10, 100, 999, 1001, 1024 or 1e6
+and meshed as written reached the node cap. Since flat shape numbers reach the
+mesher on the 1 pm grid (units and naming batch), the copy holds each number's
+grid value, 504 of its 515 points moved by at most 0.5 pm, meshine no longer
+refuses the boundary, and the job reaches the node cap again after about 3 s:
+the expectation is `job:mesh_limit_exceeded` once more. simcase's own run of the
+document, without limits or Studio, ends with meshine's "refinement did not
+converge in 80 rounds" (about 40 s in one local run). The concentric rings show
+another way a job ends: meshine's refinement does not converge within its 80
+rounds before the node cap stops it, and the job ends as `solver_failed`.
 
 ## One local run
 
 Measured once on Linux (Python 3.12.3, numpy 2.5.4, scipy 1.18.1, shapely 2.2.0
 with GEOS 3.14.1, 4 CPUs, native threads 1) on 2026-10-27, with this tool, these
 fixtures and these packages; 147 s for all nineteen workloads. Every outcome was
-the expected one. Times are client wall times in seconds: validation is the
+the one expected on that date. Times are client wall times in seconds: validation is the
 validate request, run the run request (which validates again), job from the
 accepted run to the terminal status, and capability the slowest capability answer
 during either. Memory is in MiB, idle being VmRSS after the capability request
