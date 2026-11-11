@@ -29,6 +29,14 @@ from concurrent.futures import ThreadPoolExecutor
 from probe_transient_studio_resources import Observer, finite_json, MIB
 
 
+# the 13 public getters of a completed transient capture (transient_thermal_api.SPEC); the parent
+# reads the child's counts without importing simcase, the child checks this list against SPEC
+CAPTURE_GETTERS = ('node_coordinates', 'triangles', 'time', 'temperature', 'heat_flux',
+                   'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
+                   'residual_heat_rate_per_depth', 'heat_storage_rate_per_depth', 'stored_heat_per_depth',
+                   'thermal_energy_functional_per_depth', 'prescribed_node_ids', 'prescribed_temperature')
+
+
 def memory():
     result = {"traced_live_bytes": tracemalloc.get_traced_memory()[0],
               "traced_phase_peak_bytes": tracemalloc.get_traced_memory()[1],
@@ -66,6 +74,8 @@ def child(args):
         from simcase.studio import server
         from simcase.studio import thermal_api as common
         from simcase.studio import transient_thermal_api as transient
+        if set(transient.SPEC) != set(CAPTURE_GETTERS):
+            raise AssertionError('CAPTURE_GETTERS must name the result spec: '+json.dumps(sorted(transient.SPEC)))
         counts, events = {}, []
         lock = threading.RLock()
         def hook(owner, name, label):
@@ -267,7 +277,7 @@ def parent(args):
                 'limitations':['not an exhaustive producer allocation inventory',
                                'native coverage and eviction/disconnect lifecycle proof remain separate']}
             after=rpc(process,'snapshot')['snapshot']
-            getter_counts={k:after['counts'].get('getter:'+k,0) for k in transient.SPEC}
+            getter_counts={k:after['counts'].get('getter:'+k,0) for k in CAPTURE_GETTERS}
             report['completed_capture_getters']=getter_counts
             if any(v!=1 for v in getter_counts.values()):
                 raise ValueError('each13 completed-capture getter must have count1')
