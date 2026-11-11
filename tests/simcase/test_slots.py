@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 from physmat import units
 
+import simcase
 from simcase import registry, slots
 from simcase.resolve import resolve_text
 from simcase.schema import Document
@@ -28,6 +29,8 @@ import units_toy_kind as toy
 
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools" / "units_batch"
+#: the Studio files of the imported simcase package (the installed wheel in the installed-package run)
+STATIC = Path(simcase.__file__).resolve().parent / "studio" / "static"
 KIND_PATHS = (("physics",), ("study", "tracking"), ("results", "mode_overlap"))
 
 
@@ -127,8 +130,9 @@ def _check_closure(tree, table, label, skip=KIND_PATHS):
     return count
 
 
-if HARNESS.is_dir():
-    # tools/ is not copied to the installed-package run, where a skip would fail it
+if (HARNESS / "convert_v02.py").is_file():
+    # the installed-package run copies the fixture documents but not the harness code (here the
+    # converter), and a skip would fail that run
 
     def _converter():
         spec = importlib.util.spec_from_file_location("_units_batch_convert_v02_for_slots", HARNESS / "convert_v02.py")
@@ -187,7 +191,8 @@ def _studio_documents() -> dict:
         dump = Path(folder) / "builders.json"
         done = subprocess.run([node, "--test", str(ROOT / "tests" / "simcase" / "studio_document_builders.cjs")],
                               capture_output=True, text=True, encoding="utf-8", cwd=ROOT,
-                              env={**os.environ, "OPENPHYSICS_STUDIO_BUILDER_DUMP": str(dump)})
+                              env={**os.environ, "OPENPHYSICS_STUDIO_BUILDER_DUMP": str(dump),
+                                   "OPENPHYSICS_STUDIO_STATIC": str(STATIC)})
         assert done.returncode == 0, done.stdout + done.stderr
         return {label: json.loads(text) for label, text in json.loads(dump.read_text(encoding="utf-8")).items()}
 

@@ -21,8 +21,8 @@ producer first.
 Subprocesses do not see the root ``conftest.py``, so the package ``src/``
 folders are passed on ``PYTHONPATH``, in the same order the conftest puts them
 on ``sys.path``. This file runs from the source tree only:
-``tools/run_installed_tests.py`` copies ``tests/``, ``examples/`` and ``docs/``
-and runs ``tests/``, not ``tools/tests/``.
+``tools/run_installed_tests.py`` copies ``tests/``, ``examples/``, ``docs/`` and
+the units batch's fixture documents and runs ``tests/``, not ``tools/tests/``.
 """
 from pathlib import Path
 import os

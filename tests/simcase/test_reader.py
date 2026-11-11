@@ -39,6 +39,14 @@ FIXTURES = ROOT / "tools" / "units_batch" / "fixtures" / "v02"
 FIXTURES_03 = ROOT / "tools" / "units_batch" / "fixtures" / "v03"
 
 
+def _corpus(folder: Path) -> list[Path]:
+    """The fixture documents of a folder; an empty corpus fails collection instead of turning the
+    tests over it into a skip (the installed-package run copies the fixtures too)."""
+    paths = sorted(folder.glob("*.json"))
+    assert paths, f"no fixture documents in {folder}"
+    return paths
+
+
 @pytest.fixture
 def toy_kind():
     with toy.registered():
@@ -346,7 +354,7 @@ def test_no_example_is_a_format_0_2_document():
     assert EXAMPLES and EXAMPLES_02 == []
 
 
-@pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.json")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("path", _corpus(FIXTURES), ids=lambda p: p.stem)
 def test_a_format_0_2_document_is_refused_by_name(path):
     raw = path.read_bytes()
     assert not declares_v03(raw)
@@ -400,19 +408,16 @@ def test_canonical_json_equals_json_dumps_for_every_built_in_example(name, data)
     _check_canonical(data, name)
 
 
-if FIXTURES.is_dir():
-    # tools/ is not copied to the installed-package run, where a skip would fail it
-
-    @pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.json")) + sorted(FIXTURES_03.glob("*.json")),
-                             ids=lambda p: f"{p.parent.name}/{p.stem}")
-    def test_canonical_json_equals_json_dumps_for_every_fixture(path):
-        if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
-            # a converted form: its 0.2 fixture is read by the baseline code only
-            with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule|"
-                                                    "mechanics|em.modes2d|em.cavity3d) documents are not read"):
-                Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
-            return
-        _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)
+@pytest.mark.parametrize("path", _corpus(FIXTURES) + _corpus(FIXTURES_03),
+                         ids=lambda p: f"{p.parent.name}/{p.stem}")
+def test_canonical_json_equals_json_dumps_for_every_fixture(path):
+    if path.parent == FIXTURES and (FIXTURES_03 / path.name).is_file():
+        # a converted form: its 0.2 fixture is read by the baseline code only
+        with pytest.raises(DocumentError, match="format 0.2 (rectangle heat|region heat|electric and Joule|"
+                                                "mechanics|em.modes2d|em.cavity3d) documents are not read"):
+            Document.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        return
+    _check_canonical(json.loads(path.read_text(encoding="utf-8")), path.name)
 
 
 def test_diagnostic_list_only_grows():

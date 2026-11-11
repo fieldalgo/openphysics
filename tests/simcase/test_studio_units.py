@@ -33,6 +33,7 @@ import pytest
 pytest.importorskip("fastapi", reason="install the Studio extra: pip install 'simcase[studio]'")
 from fastapi.testclient import TestClient  # noqa: E402
 
+import simcase  # noqa: E402
 from simcase import evaluate_geometry, parse_geometry, reader  # noqa: E402
 from simcase.studio import server  # noqa: E402
 
@@ -172,7 +173,8 @@ def _builder_documents(tmp_path):
     if node is None:
         pytest.skip("node is not installed; the cjs suite runs the builders itself")
     dump = tmp_path / "builders.json"
-    env = {**os.environ, "OPENPHYSICS_STUDIO_BUILDER_DUMP": str(dump)}
+    static = Path(simcase.__file__).resolve().parent / "studio" / "static"     # the imported package's
+    env = {**os.environ, "OPENPHYSICS_STUDIO_BUILDER_DUMP": str(dump), "OPENPHYSICS_STUDIO_STATIC": str(static)}
     done = subprocess.run([node, "--test", str(ROOT / "tests" / "simcase" / "studio_document_builders.cjs")],
                           capture_output=True, text=True, encoding="utf-8", env=env, cwd=ROOT)
     assert done.returncode == 0, done.stdout + done.stderr

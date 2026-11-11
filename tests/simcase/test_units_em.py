@@ -18,13 +18,15 @@ import numpy as np
 import pytest
 
 import physmat
+import simcase
 from physmat import units
 from simcase import Document, DocumentError, build_mesh, examples, run
 from simcase.runner import FIELDS
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tools" / "units_batch" / "fixtures" / "v03"
-SIMCASE = ROOT / "packages" / "simcase" / "src" / "simcase"
+#: the imported simcase package: the source tree here, the installed wheel in the installed-package run
+SIMCASE = Path(simcase.__file__).resolve().parent
 EXAMPLE_FILES = ROOT / "examples" / "simcase"
 TEXTUAL = ("resolved_inputs", "defaults_applied", "diagnostics", "extent", "timing")
 P = "physics.em1."
@@ -605,7 +607,9 @@ def test_p2_15_only_the_boundary_functions_conjugate_on_the_simcase_surface():
     of KERNEL_FRAME run in the kernel frame and are exempt by name; on every other module a
     conjugation or a sign flip of an imaginary part occurs only inside BOUNDARY."""
     found = []
-    for path in sorted(SIMCASE.rglob("*.py")):
+    modules = sorted(SIMCASE.rglob("*.py"))
+    assert {"cavity.py", "runner.py", *KERNEL_FRAME} <= {p.name for p in modules}, SIMCASE   # the scan reads the package
+    for path in modules:
         if path.name in KERNEL_FRAME:
             continue
         text = path.read_text(encoding="utf-8")

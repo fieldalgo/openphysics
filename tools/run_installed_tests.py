@@ -5,8 +5,10 @@
 
 Builds every package (each wheel from its sdist) and installs the wheels, with
 all of their extras, into a fresh venv in a temporary directory outside the
-checkout. The tracked files under tests/, examples/ and docs/ and the root
-pyproject.toml are copied next to it; nothing under packages/ is copied.
+checkout. The tracked files under tests/, examples/ and docs/, the units
+batch's fixture documents (tools/units_batch/fixtures/, JSON data the tests
+read) and the root pyproject.toml are copied next to it; nothing under
+packages/ and no other file under tools/ is copied.
 pytest then runs every test with `python -I`, so only the installed packages
 can be imported. No test is selected by name: a test that cannot run against
 the installed packages fails here.
@@ -36,7 +38,8 @@ from packaging.utils import parse_wheel_filename
 import check_distributions as distributions
 
 ROOT = distributions.ROOT
-COPIED_ROOTS = ("tests/", "examples/", "docs/")
+# tools/units_batch/fixtures/ holds JSON documents only; the harness code beside it stays behind.
+COPIED_ROOTS = ("tests/", "examples/", "docs/", "tools/units_batch/fixtures/")
 
 
 def wheel_extras(wheel):
@@ -48,7 +51,8 @@ def wheel_extras(wheel):
 
 
 def copied_sources():
-    """Tracked files the installed run needs: tests, examples, docs and the pytest config."""
+    """Tracked files the installed run needs: tests, examples, docs, the units batch's fixture
+    documents and the pytest config."""
     return ["pyproject.toml", *sorted(p for p in distributions.tracked_repository()
                                       if p.startswith(COPIED_ROOTS))]
 
@@ -140,7 +144,8 @@ def main():
         distributions.run(sys.executable, ROOT / "tools" / "check_licenses.py", "--python", python,
                           "--report", output / "licenses-installed.json", cwd=ROOT)
 
-        # Tests, examples and docs come from this checkout's tracked files; no package code.
+        # Tests, examples, docs and fixture documents come from this checkout's tracked files;
+        # no package code.
         suite = work / "suite"
         copied = {}
         for relative in copied_sources():

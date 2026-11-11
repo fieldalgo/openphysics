@@ -223,8 +223,10 @@ wheel from its sdist, and checks the archives with the same rules as the
 distribution check. All nine wheels are installed, each with every extra its
 metadata declares, into a fresh environment in a temporary directory outside the
 checkout. Next to it, the script copies the tracked files under `tests/`,
-`examples/` and `docs/` and the root `pyproject.toml`, but nothing under
-`packages/`; their hashes are recorded in `suite-file-hashes.json`. Every
+`examples/` and `docs/`, the units batch's fixture documents
+(`tools/units_batch/fixtures/`, JSON data the tests read) and the root
+`pyproject.toml`, but nothing under `packages/` and no other file under `tools/`;
+their hashes are recorded in `suite-file-hashes.json`. Every
 Python test in `tests/` then runs with `python -I -m pytest`; no test is
 selected by name. Besides any failing test, the run fails if a first-party
 module does not load from the installed environment, if any test is skipped or

@@ -321,3 +321,8 @@ that does not leaves P2-1 with its reason.
 
 `make_fixtures.py` records how `fixtures/v02/` was built: it imports the test builders of 627eb28, so it runs only
 against a checkout of that commit. The fixtures are frozen and are not regenerated.
+
+Tests under `tests/simcase/` read the fixtures as well (the format 0.2 refusals and the format 0.3
+checks of each kind). `tools/run_installed_tests.py` therefore copies `fixtures/` next to the
+tests it runs against the installed wheels; the harness code in this folder is not copied, and
+the tests that import it are defined only where it is present.

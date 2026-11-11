@@ -6,9 +6,13 @@
 // editor and the thermal pages edit documents the server sends and build none. With
 // OPENPHYSICS_STUDIO_BUILDER_DUMP set, the documents are written there as one JSON object
 // {label: the document's JSON text as the page sends it}; tests/simcase/test_studio_units.py runs
-// this file and validates each text.
+// this file and validates each text. OPENPHYSICS_STUDIO_STATIC names the Studio static folder to
+// import the builders from (the Python tests pass the imported simcase package's, which is the
+// installed wheel in the installed-package run); without it, the source tree's.
 const {test,before}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');
-const STATIC='../../packages/simcase/src/simcase/studio/static/';
+const {pathToFileURL}=require('node:url');
+const STATIC=process.env.OPENPHYSICS_STUDIO_STATIC?pathToFileURL(process.env.OPENPHYSICS_STUDIO_STATIC).href+'/'
+ :'../../packages/simcase/src/simcase/studio/static/';
 let H,O,M,STARTERS,PROJECT,RECOVERY;
 before(async()=>{
  H=await import(STATIC+'workspace-heat.mjs');O=await import(STATIC+'workspace-optical.mjs');

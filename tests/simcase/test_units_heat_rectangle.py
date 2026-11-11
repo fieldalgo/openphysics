@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import simcase
 from physmat import units
 from simcase import Document, DocumentError, examples, run
 
@@ -352,8 +353,8 @@ def test_p2_19_studio_heat_builder_output_validates():
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed; the cjs suite runs the builder itself")
-    module = (Path(__file__).resolve().parents[2]/"packages"/"simcase"/"src"/"simcase"/"studio"/"static"
-              /"workspace-heat.mjs").as_uri()
+    # the builder of the imported simcase package (the installed wheel in the installed-package run)
+    module = (Path(simcase.__file__).resolve().parent/"studio"/"static"/"workspace-heat.mjs").as_uri()
     script = (f"const H=await import({json.dumps(module)});"
               "const plate=(sides,extra={})=>({...H.DEFAULT_THERMAL,...extra,sides:{...H.DEFAULT_THERMAL.sides,...sides}});"
               "console.log(JSON.stringify([H.heatDocument(H.DEFAULT_THERMAL),"
