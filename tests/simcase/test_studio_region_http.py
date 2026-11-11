@@ -466,6 +466,75 @@ def test_s8_oversized_material_text_is_refused_at_validation(client, monkeypatch
     assert_idle(server._thermal_jobs)
 
 
+# ---- S8b: the summary's document lists count against the result limit ------------------
+
+def lists_document(kind):
+    """A 128-gon computed in millimetres: its coordinates lie off the 1 pm grid, so the summary
+    copies about 250 rounding diagnostics and 270 resolved inputs, more than metadata_bytes."""
+    doc = fx.with_shapes([fx.polygon('p0', fx.regular_polygon(20.0, 10.0, 6.0, 128))])
+    if kind == transient.KIND:          # the same geometry on the transient example's physics
+        moving = fx.transient_example()
+        moving['geometry'] = doc['geometry']
+        moving['materials'] = {name: dict(material, volumetric_heat_capacity='3600000 J/(m^3 K)')
+                               for name, material in doc['materials'].items()}
+        heat = moving['physics']['heat1']
+        heat['heat_source_density'], heat['prescribed_temperature'] = '0 W/m^3', {'bottom': '300 K'}
+        doc = moving
+    return doc
+
+
+def document_lists(doc):
+    """The document's diagnostics and resolved inputs as a summary writes them."""
+    read = Document.from_dict(json.loads(json.dumps(doc)))
+    return [d.as_dict() for d in read.diagnostics], thermal.json_value(read.resolved_inputs())
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s8b_document_lists_beyond_metadata_bytes_reach_the_result(client, kind):
+    doc = lists_document(kind)
+    diagnostics, inputs = document_lists(doc)
+    limits = server._thermal_jobs.limits
+    assert len(thermal.encode_json({'diagnostics': diagnostics, 'resolved_inputs': inputs}, 1 << 30)) \
+        > limits.metadata_bytes
+    response = post(client, doc, 'validate')
+    assert response.status_code == 200, response.text
+    assert response.json()['ok'] is True and response.json()['diagnostics'] == diagnostics
+    identity, status = finished(client, doc)
+    assert status['status'] == 'done', status
+    result = client.get('/api/jobs/'+identity['job']+'/result')
+    assert result.status_code == 200
+    summary = result.json()['summary']
+    assert summary['diagnostics'][:len(diagnostics)] == diagnostics
+    assert len(summary['diagnostics']) == len(diagnostics)
+    assert summary['resolved_inputs'] == inputs
+    rest = {key: value for key, value in summary.items() if key not in thermal.DOCUMENT_LISTS}
+    assert len(thermal.encode_json(rest, 1 << 30)) <= limits.metadata_bytes
+    assert len(thermal.encode_json(summary, 1 << 30)) > limits.metadata_bytes
+
+
+@pytest.mark.parametrize('kind', [thermal.KIND, transient.KIND])
+def test_s8b_document_lists_over_the_result_limit_are_refused_at_validation(client, monkeypatch, kind):
+    forbid(monkeypatch, server, 'run')
+    doc = lists_document(kind)
+    diagnostics, inputs = document_lists(doc)
+    size = len(thermal.encode_json({'diagnostics': diagnostics, 'resolved_inputs': inputs}, 1 << 30))
+    if kind == thermal.KIND:
+        server._thermal_jobs.limits = dataclasses.replace(server._thermal_jobs.limits, payload_bytes=size-1)
+        name = 'payload_bytes'
+    else:
+        monkeypatch.setattr(transient, 'ENCODED_BYTES', size-1)
+        name = 'manifest_bytes'
+    for action in ('validate', 'run'):
+        response = post(client, doc, action)
+        assert response.status_code == 413, response.text
+        error = response.json()['error']
+        assert error['code'] == 'payload_limit_exceeded'
+        assert error['message'] == (f"the result summary copies the document's {len(diagnostics)} diagnostics "
+                                    f"and {len(inputs)} resolved inputs, which encode to more than {name}={size-1}")
+    assert not server._thermal_jobs._records
+    assert_idle(server._thermal_jobs)
+
+
 # ---- S9 / S10: job-time node, triangle and history caps --------------------------------
 
 def mesh_counts(doc):

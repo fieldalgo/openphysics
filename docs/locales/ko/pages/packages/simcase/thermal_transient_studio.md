@@ -122,6 +122,9 @@ Manifest에는staticmesh·최상위time·length_unit·immutable summary·기본�
 ui_supported)가있습니다. 초기UIfield는T/q/HV만입니다.
 Frame은캡처행하나,H/Vframe은scalarshape[],page는[rows],vectorpage는[rows,M,2].
 Staticmesh를매frame복제하지않습니다.
+Summary의 `diagnostics`와 `resolved_inputs`는 문서와 함께 커지므로 4 MiB manifest에 세고, summary의
+나머지는 64 KiB summary metadata 한도 안에 있습니다. 검증 응답도 같은 방식으로 문서의 진단은 4 MiB,
+나머지는 64 KiB 안에 둡니다.
 
 Frame/history는result_id와정확정수index/range가필수입니다.
 Run counterclient_revision/request_seq와view frame_seq는별개입니다.

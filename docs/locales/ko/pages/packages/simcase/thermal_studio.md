@@ -159,7 +159,9 @@ Localhost/auth/CORS 동작이 다중 사용자 격리 서비스로 강화되는 
 요청1 MiB, N<=10201절점, M<=20000요소, 인코딩결과16 MiB,
 활성 열 작업1개, terminal 열 기록 최대2개·합계32 MiB,
 terminal 최대 보존300 s입니다. Log상한64 KiB·error4 KiB·summary metadata64 KiB·
-status encoding128 KiB도 적용합니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
+status encoding128 KiB도 적용합니다. Summary metadata는 `diagnostics`와 `resolved_inputs`를 뺀
+결과 summary입니다. 이 두 목록은 문서와 함께 커지므로 인코딩한 결과(16 MiB, 과도 manifest는 4 MiB)에
+셉니다. 최종 capabilities는 실제 설정 정책을 공개해야 합니다.
 필수 정책이 미설정이면 열 run은 비활성 상태를 유지합니다.
 신규 admission/publication에 count/byte 공간이 필요하면 가장 오래된 terminal
 기록(done **또는** error)을 회수하며 활성 열 작업과 모든 광학 작업은 보존합니다.
@@ -237,6 +239,7 @@ job이 끝난 뒤 거절합니다(형식과 쌍이 새것이므로).
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | 도형 boolean 뒤 루프 꼭짓점 2048개 이하(`simcase.check_mesh_limits`) | `geometry_limit_exceeded`(413), 경로 `geometry.shapes` |
 | Worker thread | 문서의 이름·재료·열원이 64 KiB(`metadata_bytes`) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413), 경로 `materials` |
+| Worker thread | 문서의 진단과 해석한 입력이 결과 한도(`payload_bytes` 16 MiB, 과도 manifest는 `manifest_bytes` 4 MiB) 안에 인코딩됨; summary가 이들을 복사함 | `payload_limit_exceeded`(413); 메시지에 두 개수와 한도 이름이 있음 |
 | Job, 해석 전 | 메시 생성은 절점 10201개(`max_nodes`)를 넘으면 멈추고, 이어서 정확한 절점·요소 수를 10201·20000과 비교 | Job 오류 `mesh_limit_exceeded` |
 | Job | 메시 생성 뒤 드러나는 문서 오류(예: 뒤 도형이 완전히 덮은 도형의 열원) | Job 오류 `invalid_document` |
 | Job | 그 밖의 실행 실패(예: meshine이 풀지 못하는 형상, meshine의 80 round 안에 수렴하지 않는 세분) | Job 오류 `solver_failed` |
@@ -304,8 +307,11 @@ worker thread에서 돌므로 긴 형상 계산이 event loop를 막지 않습�
 - 루프 꼭짓점 수는 메시 생성기가 T자 접점에서 루프를 나누기 전에 세므로, 생성기는
   센 것보다 조금 더 많은 점을 처리할 수 있습니다.
 - 영역 결과에는 항상 배열 14개가 있으며 D=0도 유효합니다.
-- Summary는 쓰지 않는 재료와 그 `source` 문구까지 재료 표 전체를 복사하며 64 KiB 안에
-  들어가야 합니다. 확실한 초과는 검증에서 거절하고 나머지는 job 오류로 끝납니다.
+- Summary는 쓰지 않는 재료와 그 `source` 문구까지 재료 표 전체를 복사하며, 진단과 해석한 입력을
+  빼고 64 KiB 안에 들어가야 합니다. 이 두 목록은 문서와 함께 커지고(1 pm 격자를 벗어난 다각형
+  좌표마다 약 250바이트의 반올림 진단과 약 80바이트의 해석한 입력) 결과 한도에 셉니다. 512점 다각형과
+  도형 63개가 더 있는 문서의 summary는 약 415 kB입니다. 확실한 초과는 검증에서 거절하고 나머지는
+  job 오류로 끝납니다. 거절마다 넘은 한도의 이름을 밝힙니다.
 - meshine은 예각 별 모양 다각형, 경계가 거의 겹치는 교차 다각형, 끝 각이 1도인 톱니 같은 입력에서
   "cannot resolve"로 안전하게 실패할 수 있습니다(`solver_failed`). 이 톱니는 simcase가 메시하는
   마이크로미터 사본에서만 실패하고, 밀리미터나 다른 배율에서는 대신 절점 한도에 닿습니다

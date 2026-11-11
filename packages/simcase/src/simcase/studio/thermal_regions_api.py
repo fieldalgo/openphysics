@@ -210,6 +210,14 @@ def _summary_floor(doc, limits):
             path="materials") from exc
 
 
+def result_limit(kind, limits):
+    """``(bytes, capability name)`` of the result a summary's diagnostics and resolved inputs count
+    against: the steady payload, or the transient manifest."""
+    if kind == common.KIND:
+        return limits.payload_bytes, "payload_bytes"
+    return transient.ENCODED_BYTES, "manifest_bytes"
+
+
 def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
     """Worker-thread validation; every failure becomes a tagged ThermalAPIError. ``raw`` holds the
     doubles of the authored numbers (the caps read these); the document reads ``exact``, the tree
@@ -226,6 +234,7 @@ def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
                                          400 if for_run else 200)
         count = check_mesh_limits(doc, max_input_vertices=rlimits.max_input_vertices)
         _summary_floor(doc, limits)
+        common.check_document_lists(doc, *result_limit(kind, limits))
         run_doc = None
         if for_run:
             run_doc = doc.copy()        # copy() resets the scale; validate() restores it
@@ -415,7 +424,7 @@ def capture_steady(result, identity, limits, rlimits, spec):
     _require(isinstance(result, ThermalRunResult), "expected public ThermalRunResult")
     summary = common.json_value(result.summary())
     _require(isinstance(summary, dict), "thermal summary must be an object")
-    common.encode_json(summary, limits.metadata_bytes)
+    common.check_summary(summary, limits)
     pair = (result.result_format, result.field_layout)
     _require(pair == STEADY_PAIR and summary.get("physics_type") == common.KIND,
              "unsupported public thermal region result/layout pair")
@@ -494,7 +503,7 @@ def capture_steady(result, identity, limits, rlimits, spec):
         "length_unit": unit, "display_length_in_m": length_in_m,
         "summary": summary, "arrays": {key: arrays[key].tolist() for key in fields},
     }
-    return common.encode_json(payload, limits.payload_bytes)
+    return common.encode_json(payload, limits.payload_bytes, name="payload_bytes")
 
 
 def capture_transient(result, identity, limits, rlimits, spec):
@@ -506,7 +515,7 @@ def capture_transient(result, identity, limits, rlimits, spec):
     require(isinstance(result, TransientThermalRunResult), "public transient result required")
     original = document.canonical_json()
     summary = common.json_value(result.summary())
-    common.encode_json(summary, limits.metadata_bytes)
+    common.check_summary(summary, limits)
     pair = (result.result_format, result.field_layout)
     require(isinstance(summary, dict) and summary.get("physics_type") == transient.KIND
             and pair == TRANSIENT_PAIR
@@ -609,5 +618,5 @@ def capture_transient(result, identity, limits, rlimits, spec):
                             +"&field={field}&time_index={time_index}&frame_seq={frame_seq}",
                "history_url": "/api/jobs/"+job+"/history?result_id="+rid
                               +"&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}"}
-    encoded = common.encode_json(payload, transient.ENCODED_BYTES)
+    encoded = common.encode_json(payload, transient.ENCODED_BYTES, name="manifest_bytes")
     return encoded, MappingProxyType(captured), scale

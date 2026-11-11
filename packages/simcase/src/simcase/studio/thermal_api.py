@@ -112,26 +112,59 @@ def capabilities(limits):
     }
 
 
-def encode_json(value, limit, *, exact=False):
+def encode_json(value, limit, *, exact=False, name=None):
     """Count complete encoded bytes, including metadata and JSON punctuation. ``exact`` writes a
     tree that holds a document's ``Decimal`` numbers with ``simcase.reader.dumps`` (their digits as
-    written); a reply without a document streams through ``json``."""
+    written); a reply without a document streams through ``json``. ``name`` is the limit's
+    capability name, which the refusal then states with its value."""
+    message = ("encoded thermal data exceeds its byte limit" if name is None
+               else f"encoded thermal data exceeds its byte limit {name}={limit}")
     if exact:
         try:
             data = reader.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
         except ValueError as exc:
             raise ThermalAPIError("invalid_result", "a JSON number is finite") from exc
         if len(data) > limit:
-            raise ThermalAPIError("payload_limit_exceeded", "encoded thermal data exceeds its byte limit", 413)
+            raise ThermalAPIError("payload_limit_exceeded", message, 413)
         return data
     out = bytearray()
     encoder = json.JSONEncoder(ensure_ascii=False, allow_nan=False, separators=(",", ":"))
     for fragment in encoder.iterencode(value):
         chunk = fragment.encode("utf-8")
         if len(out)+len(chunk) > limit:
-            raise ThermalAPIError("payload_limit_exceeded", "encoded thermal data exceeds its byte limit", 413)
+            raise ThermalAPIError("payload_limit_exceeded", message, 413)
         out.extend(chunk)
     return bytes(out)
+
+
+#: The two summary lists that grow with the document: one entry per diagnostic and per resolved
+#: input. They count against the result's own byte limit (``payload_bytes`` for a steady result,
+#: the transient manifest's ``manifest_bytes``); ``metadata_bytes`` bounds the rest of the summary.
+DOCUMENT_LISTS = ("diagnostics", "resolved_inputs")
+
+
+def check_summary(summary, limits):
+    """Bound a result summary without its ``DOCUMENT_LISTS`` by ``metadata_bytes``. The lists are
+    bounded with the whole result, whose encoding (summary included) the caller checks against
+    ``payload_bytes`` or ``manifest_bytes``."""
+    rest = ({key: value for key, value in summary.items() if key not in DOCUMENT_LISTS}
+            if isinstance(summary, dict) else summary)
+    encode_json(rest, limits.metadata_bytes, name="metadata_bytes")
+
+
+def check_document_lists(doc, limit, name):
+    """At validation: refuse a document whose diagnostics and resolved inputs alone, which every
+    result summary copies, encode to more than the result limit they count against. Region
+    documents call it (their lists grow with the geometry); a rectangle document's lists are
+    fixed by its few slots."""
+    diagnostics = [d.as_dict() for d in doc.diagnostics]
+    inputs = doc.resolved_inputs()
+    try:
+        encode_json(json_value({"diagnostics": diagnostics, "resolved_inputs": inputs}), limit)
+    except ThermalAPIError as exc:
+        raise ThermalAPIError(
+            "payload_limit_exceeded", f"the result summary copies the document's {len(diagnostics)} diagnostics "
+            f"and {len(inputs)} resolved inputs, which encode to more than {name}={limit}", 413) from exc
 
 
 def _parse(data: bytes):
@@ -284,7 +317,7 @@ def document_body(doc):
 
 def validation_payload(spec, limits):
     body = {"ok": True, **document_body(spec.doc), "summary": spec.doc.summary(), **spec.tags()}
-    return encode_json(body, limits.payload_bytes, exact=True)
+    return encode_json(body, limits.payload_bytes, exact=True, name="payload_bytes")
 
 
 def geometry_block(doc):
@@ -335,7 +368,7 @@ def capture_result(result, identity, limits):
     _require(result.doc.si is not None, "expected a format 0.3 rectangle result")
     summary = json_value(result.summary())
     _require(isinstance(summary, dict), "thermal summary must be an object")
-    encode_json(summary, limits.metadata_bytes)
+    check_summary(summary, limits)
     public_format = result.result_format
     public_layout = result.field_layout
     pair = (public_format, public_layout)
@@ -416,7 +449,7 @@ def capture_result(result, identity, limits):
         "length_unit": unit, "display_length_in_m": float(length_in_m),
         "summary": summary, "arrays": {key: arrays[key].tolist() for key in keys},
     }
-    return encode_json(payload, limits.payload_bytes)
+    return encode_json(payload, limits.payload_bytes, name="payload_bytes")
 
 
 def bounded_log(values, limit):
