@@ -528,9 +528,11 @@ Limitations of the formulations as implemented:
   absorption and radiation.
 - Fields have relative amplitude: no power normalisation, no orthogonality or
   completeness guarantee, and no identity assignment within a degenerate pair.
-- Derivatives exist with respect to `eps_r`, `mu_r` and `k0` only; not with
-  respect to coordinates, PML parameters, `n_target`, node positions or PEC
-  sets, and not through a `Field`.
+- Derivatives exist with respect to `eps_r`, `mu_r` and `k0`, and with respect to
+  node positions along a design motion (`motion=`,
+  [shape derivatives](shape_derivative.md#waveguide-modes)); not with respect to
+  coordinate factors, PML parameters, `n_target` or PEC sets, and not through a
+  `Field`.
 - The scalar path is exact for the invariant-axis TE slab polarisation only.
 - `sipi` is quasi-static and non-magnetic (`mu = mu0` in `L`), with no
   full-wave dispersion, and its per-unit-length loss model is separate from the

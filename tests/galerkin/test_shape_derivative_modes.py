@@ -127,7 +127,7 @@ def test_w1_matches_moved_mesh_central_difference(strip, name, material, mode, f
     # Deviation from the pre-registered plain central difference (HQ record 2026-11-11): the reference
     # is its Richardson extrapolation from h = 1e-4 and h/2 (fourth order). The plain one at h = 1e-4
     # has truncation error 1.5e-6 for Im n_eff of the lossy mode 0, whose second derivative is large;
-    # its h sweep (1e-2 .. 1e-4) converges to the AD value, and the extrapolated one agrees to 5e-10.
+    # its h sweep (1e-2 .. 1e-4) converges to the AD value, and the extrapolated one agrees to 6.1e-10.
     # The criterion (1e-6) is unchanged.
     h = 1e-4
 
