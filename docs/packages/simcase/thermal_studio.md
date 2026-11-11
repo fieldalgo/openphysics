@@ -174,7 +174,9 @@ All limits remain **candidate settings, not measured capacity**:
 request 1 MiB; N<=10201 nodes; M<=20000 cells; encoded result 16 MiB;
 one active thermal job; at most two terminal thermal records and 32 MiB total;
 terminal retention at most 300 s. Logs are capped at 64 KiB, errors at 4 KiB,
-summary metadata at 64 KiB and status encoding at 128 KiB. Final capabilities must expose the actual configured
+summary metadata at 64 KiB and status encoding at 128 KiB. The summary metadata is the result summary
+without its `diagnostics` and `resolved_inputs`: those two lists grow with the document and count
+against the encoded result (16 MiB; a transient manifest's 4 MiB). Final capabilities must expose the actual configured
 policy. Thermal run stays disabled if required policy is not configured.
 Admission/publication reclaim the oldest terminal records (done **or** error)
 when count/byte space is needed, preserving active thermal and all optical jobs.
@@ -260,6 +262,7 @@ nothing is published.
 | Worker thread | `Document.from_dict` | `invalid_document` |
 | Worker thread | At most 2048 loop vertices after the shapes' booleans (`simcase.check_mesh_limits`) | `geometry_limit_exceeded` (413), path `geometry.shapes` |
 | Worker thread | The document's name, materials and heat sources encode within 64 KiB (`metadata_bytes`); the summary copies them | `payload_limit_exceeded` (413), path `materials` |
+| Worker thread | The document's diagnostics and resolved inputs encode within the result's limit (`payload_bytes`, 16 MiB; a transient manifest's `manifest_bytes`, 4 MiB); the summary copies them | `payload_limit_exceeded` (413); the message gives both counts and names the limit |
 | Job, before the solve | Meshing stops past 10201 nodes (`max_nodes`); the exact node and cell counts are then compared with 10201 and 20000 | Job error `mesh_limit_exceeded` |
 | Job | A document error found after meshing, such as a heat source on a shape that later shapes cover completely | Job error `invalid_document` |
 | Job | Any other run failure, such as a geometry meshine cannot resolve or a refinement that does not converge within meshine's 80 rounds | Job error `solver_failed` |
@@ -340,8 +343,13 @@ the crossing cap.
   so the mesher can process somewhat more points than counted.
 - Region results always carry 14 arrays; D=0 is legal.
 - The summary copies the whole materials table, including unused materials and
-  their `source` text, and must fit in 64 KiB. Certain overflows are refused at
-  validation; the rest end as a job error.
+  their `source` text, and must fit in 64 KiB without its diagnostics and
+  resolved inputs. Those two lists grow with the document (each polygon
+  coordinate off the 1 pm grid adds a rounding diagnostic of about 250 bytes
+  and a resolved input of about 80) and count against the result's limit: a
+  512-point polygon with 63 more shapes gives a summary of about 415 kB.
+  Certain overflows are refused at validation; the rest end as a job error.
+  Each refusal names the limit it exceeds.
 - meshine can fail closed with "cannot resolve" (`solver_failed`), for example
   for acute star polygons, crossing polygons with near-coincident boundaries or
   a sawtooth with 1-degree tips. That sawtooth fails only on the micrometre

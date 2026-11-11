@@ -115,9 +115,13 @@ async def read_request(request, limits, *, for_run, region=None):
 
 
 def validation_payload(spec, limits):
-    return common.encode_json({"ok": True, "kind": KIND, **spec.tags(),
-                               **common.document_body(spec.doc), "summary": spec.doc.summary()},
-                              limits.metadata_bytes, exact=True)
+    """The validation reply: within ``metadata_bytes`` without the document's diagnostics, which
+    grow with the document and count, as in the result summary, against ``manifest_bytes``."""
+    body = {"ok": True, "kind": KIND, **spec.tags(), **common.document_body(spec.doc),
+            "summary": spec.doc.summary()}
+    common.encode_json({key: value for key, value in body.items() if key != "diagnostics"},
+                       limits.metadata_bytes, exact=True, name="metadata_bytes")
+    return common.encode_json(body, ENCODED_BYTES, exact=True, name="manifest_bytes")
 
 
 def runtime_available(limits):
@@ -152,7 +156,7 @@ def capture_result(result, identity, limits, document):
     require(document.si is not None, "a format 0.3 rectangle document required")
     original = document.canonical_json(separators=(",", ":"))
     summary = common.json_value(result.summary())
-    common.encode_json(summary, limits.metadata_bytes)
+    common.check_summary(summary, limits)
     require(isinstance(summary, dict) and summary.get("physics_type") == KIND
             and (summary.get("result_format"), summary.get("field_layout")) == PAIR,
             "unsupported transient summary/result pair")
@@ -252,7 +256,7 @@ def capture_result(result, identity, limits, document):
                             +"&field={field}&time_index={time_index}&frame_seq={frame_seq}",
                "history_url": "/api/jobs/"+job+"/history?result_id="+rid
                               +"&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}"}
-    encoded = common.encode_json(payload, ENCODED_BYTES)
+    encoded = common.encode_json(payload, ENCODED_BYTES, name="manifest_bytes")
     return encoded, MappingProxyType(captured), scale
 
 
