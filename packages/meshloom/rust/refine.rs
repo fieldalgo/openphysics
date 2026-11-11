@@ -260,6 +260,39 @@ impl State<'_> {
                 }
             }
         }
+        // Star-shaped from p: a boundary face that p does not see strictly (p in its plane,
+        // e.g. on its circumcircle with the perturbation leaving it outside) would make a
+        // flat or inverted tetrahedron. Grow the cavity across such faces while they are not
+        // constraints; the insertion still checks every new tetrahedron.
+        let mut grown = true;
+        let mut rounds = 0;
+        while grown && rounds < 64 {
+            grown = false;
+            rounds += 1;
+            let mut add: Vec<u32> = Vec::new();
+            for &t in &list {
+                let v = self.cx.tets[t as usize];
+                for i in 0..4 {
+                    let f = face(&v, i);
+                    let k = key(f);
+                    if f.contains(&p) || plane.contains(&k) || self.sub.contains_key(&k) {
+                        continue;
+                    }
+                    let u = self.cx.neighbor(t, &k);
+                    if u == NONE || inc.contains_key(&u) || add.contains(&u) {
+                        continue;
+                    }
+                    if self.orient([f[0], f[1], f[2], p]) <= 0 {
+                        add.push(u);
+                    }
+                }
+            }
+            for u in add {
+                inc.insert(u, ());
+                list.push(u);
+                grown = true;
+            }
+        }
         list.sort_unstable();
         list
     }
