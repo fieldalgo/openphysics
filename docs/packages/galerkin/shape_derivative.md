@@ -10,9 +10,10 @@ heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09), steady electric
 conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10), linear
 elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10),
 thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
-`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10) and
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10),
 transient Cartesian heat (`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10). The other
+2026-11-10) and waveguide modes (`galerkin.waveguide.solve_modes`, 2026-11-11). The
+other
 solvers follow the same frame later.
 
 ## What is differentiated
@@ -141,6 +142,31 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
   live time-dependent h.) Callbacks of coordinates are refused, as everywhere.
 - `checkpoint_every` is refused with a motion: every step is kept.
 
+## Waveguide modes
+
+`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(W, t))` takes eps_r
+and mu_r as scalars or per-element arrays (real or complex), PEC nodes and edges as
+without a motion, and numbers for k0 and n_target.
+- The NumPy eigensolve runs on the moved mesh.
+- Each mode then takes the bordered Newton step of the live-input path
+  ([waveguide modes](differentiation.md#waveguide-modes-eigenvalues-fields-and-degenerate-modes)).
+  Its A(t) and B(t) are assembled from X₀ + t·W: the Nédélec curl-curl, mass and
+  coupling blocks and the P1 stiffness and mass.
+- `n_eff`, `et` and `ez` carry d/dt. The fields keep the same gauge (unit 2-norm,
+  largest entry real and positive), so gauge-free quantities have gauge-free
+  derivatives. The returned space belongs to the moved mesh.
+- `eval_edge_field(space, et[i])` uses the space's NumPy geometry, so with a
+  motion the centroid field carries only the coefficients' part of the
+  derivative, not the moving basis functions'. Differentiate quantities of the
+  coefficients (n_eff, overlaps built from et and ez) instead.
+- Degenerate modes keep exact values and get NaN derivatives and a
+  `DegenerateModeWarning`, as for material derivatives (decision 2026-11-11). A
+  sorted mode has no derivative where two modes cross: on a square silicon core
+  the upper mode's one-sided slopes in the width are 2.28 and 5.70 µm⁻¹ (measured
+  with this solver and an independent finite-difference mode solver).
+- `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
+  positions.
+
 ## The mesh velocity
 
 Nodes on the geometry's curves move as the design moves them. For a version 1
@@ -192,12 +218,13 @@ Each refusal names the reason:
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
-  thermal-expansion, reference-temperature, body-force, traction, heat-capacity or
-  initial-temperature values together with a motion: t is the one live input of
-  such a call;
+  thermal-expansion, reference-temperature, body-force, traction, heat-capacity,
+  initial-temperature, permittivity, permeability or wavenumber values together
+  with a motion: t is the one live input of such a call;
 - a temperature snapshot of another mesh, including the moved one: the snapshot
   belongs to the mesh as given;
 - `coordinate_system="axisymmetric"`; `checkpoint_every` in transient heat;
+  `coordinate_factors` in waveguide modes;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
   ([refused](differentiation.md#refused-not-approximated)).
@@ -301,3 +328,27 @@ measured that day with the same versions.
 | H6 heat balance | d(Σ reaction)/dt = d(Σ storage − Σ load + Σ outward)/dt at the final step, relative 1e-10 | pass |
 | H7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `3afaaa6` (measured); `motion=None` equals no keyword (test) |
 | H8 refusals | as listed above | pass |
+
+`tests/galerkin/test_shape_derivative_modes.py` holds checks W1–W8 for waveguide
+modes, pre-registered on 2026-11-11 with W2's mesh levels, and measured that day with
+the same versions.
+
+| Check | Criterion | Result |
+|---|---|---|
+| W1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for n_eff (real part, and imaginary part for a lossy core) and a gauge-free field share of the two lowest modes of a silicon strip; relative 1e-6, JAX and PyTorch | 3.0e-12 to 6.1e-10 against the Richardson-extrapolated difference (below) |
+| W2 hollow PEC guide, TE10 | width a stretched; dn/da = λ²/(4a³ n_eff); nx = 8, 16, 32; observed order ≥ 1.0, finest within 1e-2 | 1.3e-2, 3.4e-3, 8.4e-4 (order 2.0 and 2.0) |
+| W3 independent mode solver | strip width derivative against stored modesolverpy 0.4.4 values (finite differences, grid 0.005 µm), within 3% | 9.8e-3 |
+| W4 rigid translation | dn_eff/dt = 0 within 1e-10 · \|n_eff\| | pass |
+| W5 uniform scaling | X(t) = (1 + t) X₀ gives dn_eff/dt = k0 ∂n_eff/∂k0 (the k0 derivative path), relative 1e-8 | 4.2e-16 |
+| W6 degenerate modes | on a mesh with the square's symmetry the fundamental pair gets NaN and a warning; the non-degenerate mode of the same call stays finite | pass |
+| W7 unchanged | without `motion` the result equals the previous code | sha256 of n_eff, et and ez equal to main `e6c5826` for a real and a lossy core (measured); `motion=None` equals no keyword (test) |
+| W8 refusals | as listed above | pass |
+
+W1: the pre-registration named the plain central difference at h = 1e-4. For the
+imaginary part of the lossy mode 0 its truncation error is 1.5e-6 (the second
+derivative is large); a sweep of h from 1e-2 to 1e-4 converges to the derivative,
+and its Richardson extrapolation from h and h/2 agrees to 5e-10. The test uses the
+extrapolated difference for every case (plain difference: 7.1e-9 to 1.5e-6); the
+criterion is unchanged. This deviation is recorded here and in the HQ record. W3's
+stored value was measured before the registration (it records that measurement;
+the independent check with a criterion fixed beforehand is W2).

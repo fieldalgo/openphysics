@@ -8,7 +8,7 @@
 (`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 Cartesian 열(`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10)을 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+2026-11-10), 도파관 모드(`galerkin.waveguide.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -100,6 +100,23 @@ outward flux와 convection(변과 함께 움직임), Dirichlet 값을 받습니�
   어디서나처럼 거부합니다.
 - motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
 
+## 도파관 모드
+
+`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(W, t))`는 스칼라 또는 요소별 배열(실수·복소)인 eps_r·mu_r,
+motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습니다.
+- NumPy 고유값 풀이를 옮겨진 메시에서 합니다.
+- 그 뒤 모드마다 live 입력 경로의 경계 Newton 한 번을 합니다
+  ([도파관 모드](differentiation.md#도파관-모드-고유값-필드-축퇴-모드)). A(t)와 B(t)는 X₀ + t·W에서 조립합니다: Nédélec
+  curl-curl·질량·결합 블록과 P1 강성·질량.
+- `n_eff`, `et`, `ez`가 d/dt를 나릅니다. 장은 같은 게이지(2-노름 1, 가장 큰 성분이 양의 실수)를 지키므로 게이지와 무관한
+  양은 게이지와 무관한 미분을 가집니다. 돌려주는 공간은 옮겨진 메시의 것입니다.
+- `eval_edge_field(space, et[i])`는 공간의 NumPy 기하를 쓰므로, motion이 있으면 무게중심 장은 계수 쪽 미분만 나르고
+  움직이는 기저 함수 쪽 미분은 빠집니다. 계수의 양(n_eff, et·ez로 만든 겹침 등)을 미분하십시오.
+- 축퇴 모드는 재료 미분처럼 값은 정확히 주고 미분은 NaN과 `DegenerateModeWarning`입니다(2026-11-11 결정). 두 모드가
+  교차하는 곳에서 정렬된 모드는 미분이 없습니다. 정사각 실리콘 코어에서 위쪽 모드의 폭에 대한 한쪽 기울기는 2.28과
+  5.70 µm⁻¹입니다(이 솔버와 독립 유한차분 모드 solver로 측정).
+- `coordinate_factors`(PML, 굽힘)는 노드 위치에 따라 달라지므로 motion과 함께 거부합니다.
+
 ## 메시 속도
 
 형상의 곡선 위 노드는 설계가 움직이는 대로 움직입니다. 버전 1 형상 문서라면 `simcase.geometry_velocity.design_velocity(document,
@@ -134,10 +151,10 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - 열원·outward flux·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
   `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받습니다.
 - 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
-- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도 값:
+- motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수 값:
   그런 호출에서 live 입력은 t 하나입니다.
 - 다른 메시(옮겨진 메시 포함)의 온도 스냅샷: 스냅샷은 주어진 메시의 것입니다.
-- `coordinate_system="axisymmetric"`; 과도 열의 `checkpoint_every`.
+- `coordinate_system="axisymmetric"`; 과도 열의 `checkpoint_every`; 도파관 모드의 `coordinate_factors`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
   ([거부 목록](differentiation.md#근사하지-않고-거부하는-것)).
@@ -226,3 +243,22 @@ h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값 d(ΣR_y)/
 | H6 열수지 | 최종 스텝 d(Σ 반력)/dt = d(Σ 저장 − Σ 하중 + Σ outward)/dt, 상대 1e-10 | 통과 |
 | H7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `3afaaa6`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | H8 거부 | 위 목록대로 | 통과 |
+
+`tests/galerkin/test_shape_derivative_modes.py`에 도파관 모드의 검사 W1–W8이 있습니다. 2026-11-11에 W2의 메시 단계까지
+사전 등록하고 같은 날 같은 버전으로 측정했습니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| W1 이산 일관성 | 실리콘 띠 도파관의 가장 낮은 두 모드에서 n_eff(실부, 흡수 코어는 허부도)와 게이지 무관 장 비율의 미분 vs 옮긴 메시 중심차분(h = 1e-4); 상대 1e-6, JAX·PyTorch | Richardson 외삽 차분 대비 3.0e-12 ~ 6.1e-10(아래) |
+| W2 빈 PEC 도파관 TE10 | 폭 a 늘림; dn/da = λ²/(4a³ n_eff); nx = 8, 16, 32; 관측 차수 ≥ 1.0, 최세 1e-2 이내 | 1.3e-2, 3.4e-3, 8.4e-4(차수 2.0, 2.0) |
+| W3 독립 모드 solver | 띠 폭 미분을 저장한 modesolverpy 0.4.4 값(유한차분, 격자 0.005 µm)과 비교, 3% 이내 | 9.8e-3 |
+| W4 강체 이동 | dn_eff/dt = 0, 1e-10 · \|n_eff\| 이내 | 통과 |
+| W5 균일 축척 | X(t) = (1 + t) X₀이면 dn_eff/dt = k0 ∂n_eff/∂k0(k0 미분 경로), 상대 1e-8 | 4.2e-16 |
+| W6 축퇴 모드 | 정사각 대칭 메시에서 기본 짝은 NaN과 경고; 같은 호출의 비축퇴 모드는 유한 | 통과 |
+| W7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 실수·흡수 코어에서 n_eff·et·ez sha256이 main `e6c5826`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
+| W8 거부 | 위 목록대로 | 통과 |
+
+W1: 사전 등록은 h = 1e-4의 단순 중심차분을 정했습니다. 흡수 모드 0의 허부에서는 그 절단 오차가 1.5e-6입니다(2계 미분이
+큼). h를 1e-2에서 1e-4로 줄이면 미분으로 수렴하고, h와 h/2의 Richardson 외삽은 5e-10으로 맞습니다. 시험은 모든 경우에
+외삽 차분을 씁니다(단순 차분: 7.1e-9 ~ 1.5e-6). 기준은 그대로입니다. 이 차이는 여기와 HQ 기록에 적었습니다. W3의 저장값은
+등록 전에 측정한 것입니다(그 측정의 기록이며, 기준을 미리 정한 독립 검사는 W2입니다).
