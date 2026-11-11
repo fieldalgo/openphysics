@@ -165,7 +165,7 @@ without a motion, and numbers for k0 and n_target.
   the upper mode's one-sided slopes in the width are 2.28 and 5.70 µm⁻¹ (a
   0.3 × 0.3 µm silicon core in silica, λ = 1.55 µm, a 3 × 3 µm PEC window, mesh
   size 0.02 µm, second-order one-sided differences; the finite-difference mode
-  solver modesolverpy gave 2.25 and 5.63 on a 0.01 µm grid).
+  solver modesolverpy gave 2.25 and 5.53 on a 0.01 µm grid).
 - `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
   positions.
 
