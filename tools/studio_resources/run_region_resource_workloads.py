@@ -88,13 +88,14 @@ def workloads(fx, max_boundary_crossings):
         ('covered_crossings_over_cap', steady, fx.covered_crossings, 'validate:geometry_limit_exceeded'),
         ('collinear_overlaps', steady, fx.collinear_overlaps, 'done'),
         ('crossing_stars_after_circles', steady, fx.crossing_stars, 'validate:geometry_limit_exceeded'),
-        # Fixed first as job:mesh_limit_exceeded (meshed in millimetres it reaches the
-        # node cap) and changed after the first run on micrometre meshes failed: on the
-        # micrometre copy simcase meshes, every length times 1000, meshine refuses this
-        # boundary ("cannot resolve" on its teeth, fail-closed) before the node cap.
-        # Only that factor does it; the same document scaled by 0.001 to 1e6 otherwise
-        # reaches the cap (docs/region_resource_probe.md).
-        ('sawtooth_1deg_tips', steady, fx.sawtooth, 'job:solver_failed'),
+        # Fixed first as job:mesh_limit_exceeded (it needs a mesh finer than the node
+        # cap), then changed to job:solver_failed when simcase meshed a micrometre copy
+        # of every length times 1000: meshine refused that copy's boundary ("cannot
+        # resolve" on its teeth) before the node cap. Only the floating-point product
+        # did it, and since flat shape numbers reach the mesher on the 1 pm grid the
+        # copy holds grid values and reaches the node cap again, as the document
+        # scaled by the other factors tried did (docs/region_resource_probe.md).
+        ('sawtooth_1deg_tips', steady, fx.sawtooth, 'job:mesh_limit_exceeded'),
         ('sawtooth_10deg_jitter_60_rects_angle33', steady,
          lambda: fx.sawtooth(tip_angle_deg=10, jitter=0.1, crossing_rects=60, min_angle=33),
          'job:mesh_limit_exceeded'),
