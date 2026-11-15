@@ -729,8 +729,39 @@ def region_inputs(doc, mesh, region_materials, heat=None, names=None):
     flux = {tag: float(v) for tag, v in heat.outward_flux.items()}
     convection = {tag: (float(h), float(ambient)) for tag, (h, ambient) in heat.convection.items()}
     _refuse_doubled_edges(mesh, path, flux, convection, heat.dirichlet, key)
+    # every connected part needs a fixed temperature or a positive convection coefficient
+    # (galerkin.thermal refuses it by component number; here the regions are named)
+    held = set(prescribed)
+    for tag, (h, _) in convection.items():
+        if h > 0:
+            held.update(int(n) for n in np.asarray(mesh.boundary_edges[tag]).ravel())
+    floating = unheld_regions(mesh, held)
+    if floating:
+        raise DocumentError(f'{path}.{key("dirichlet_temperature_k")}: a part with regions {floating} has no '
+                            f'fixed temperature and no {key("convection")} with a positive coefficient (it is '
+                            'surrounded by void); give one of its boundaries a temperature or a convection')
     return dict(conductivity=conductivity, dirichlet=dict(sorted(prescribed.items())),
                 heat_source=source, outward_flux=flux, convection=convection)
+
+
+def unheld_regions(mesh, held):
+    """The region names, sorted, of the connected parts of ``mesh`` (triangles that share a
+    node) that contain no node of ``held``."""
+    t = np.asarray(mesh.triangles)
+    parent = np.arange(len(mesh.nodes))
+
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    for a, b, c in t:
+        for u, v in ((a, b), (b, c)):
+            ru, rv = root(int(u)), root(int(v))
+            if ru != rv:
+                parent[ru] = rv
+    anchored = {root(int(n)) for n in held}
+    return sorted({mesh.region_names[int(r)] for tri, r in zip(t, mesh.regions) if root(int(tri[0])) not in anchored})
 
 
 def _refuse_doubled_edges(mesh, path, flux, convection, dirichlet, key=lambda k: k):
