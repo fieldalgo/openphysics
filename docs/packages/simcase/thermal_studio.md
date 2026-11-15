@@ -161,6 +161,12 @@ Errors distinguish malformed input (400), logical validation failure
 success. Network/non-JSON errors require an explicit current retry; expiration
 must not automatically solve again. No partial result or stale optical fallback
 is published after a failed job. Error strings are displayed as plain text.
+A refusal written for users (a document, geometry or limit refusal, meshine's
+explanation of an input it cannot mesh, and every coded refusal above) keeps its
+message. Any other failure of a request, a job or a view replies with its usual
+code and status and the fixed message "Studio failed unexpectedly; the details
+are in the server log": the exception's type, text and traceback go to the
+server log (logger `simcase.studio`), never to the client.
 
 Revision/sequence/job/result tags select which response may update this view;
 they are not authentication. Same-revision retries and field-render changes

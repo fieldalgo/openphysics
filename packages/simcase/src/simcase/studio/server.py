@@ -38,7 +38,8 @@ from pydantic import BaseModel
 import physmat
 from simcase import __version__, Document, DocumentError, SubspaceSweepResult, build_mesh, examples, run
 from simcase import quantities, reader
-from .bodies import RequestRefused, diagnostics as _diagnostics, exact_json, read_envelope
+from .bodies import (RequestRefused, UNEXPECTED, USER_FACING, diagnostics as _diagnostics, exact_json,
+                     read_envelope, reply_text)
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
@@ -316,7 +317,7 @@ def _mesh_reply(tree: dict, found: list) -> dict:
         _require_studio_physics(doc)
         model = build_mesh(doc)
     except (DocumentError, ValueError, RuntimeError) as exc:
-        raise HTTPException(400, str(exc))
+        raise HTTPException(400, reply_text(exc, "mesh preview"))
     tm, region_materials = model.tri, model.region_materials
     return {"node_coordinates": tm.nodes.tolist(), "field_units": {"node_coordinates": "m"},
             "display": _display(doc), "triangles": tm.triangles.tolist(), "regions": tm.regions.tolist(),
@@ -376,10 +377,11 @@ def _run_job(job_id: str, doc: Document):
             payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:
             _jobs[job_id].update(status="done", result=payload)
-    except Exception as exc:  # report anything to the browser; the traceback stays in the server log
+    except Exception as exc:  # a refusal for users keeps its text; the traceback stays in the server log
         _log.warning("optical job %s failed", job_id, exc_info=True)
         with _jobs_lock:
-            _jobs[job_id].update(status="error", error=f"{type(exc).__name__}: {exc}")
+            _jobs[job_id].update(status="error",
+                                 error=f"{type(exc).__name__}: {exc}" if isinstance(exc, USER_FACING) else UNEXPECTED)
             diagnostic = getattr(exc, "diagnostics", getattr(exc.__cause__, "diagnostics", None))
             if diagnostic is not None:
                 _jobs[job_id]["open_boundary"] = diagnostic
@@ -471,7 +473,7 @@ async def validate_thermal(body: Request):
         return _thermal_error(exc)
     except Exception as exc:
         return _thermal_error(thermal.ThermalAPIError(
-            "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
+            "invalid_document", reply_text(exc, "thermal validation"), 400, tags=spec.tags() if spec else None))
     finally:
         if permit is not None:
             permit.release()
@@ -528,6 +530,9 @@ async def start_thermal_run(body: Request):
         _start_thermal_thread(_run_thermal_job, (jobs, lease, doc))
         return JSONResponse(identity, headers={"Cache-Control": "no-store"})
     except Exception as exc:
+        if not isinstance(exc, thermal.ThermalAPIError):   # one refusal for the job and the reply
+            exc = thermal.ThermalAPIError("thread_start_failed" if lease is not None else "invalid_document",
+                                          reply_text(exc, "thermal run request"), 500 if lease is not None else 400)
         if lease is not None:
             try:
                 jobs.fail(lease, exc, "thread_start_failed")
@@ -535,13 +540,8 @@ async def start_thermal_run(body: Request):
                 pass  # final release is independent of error-publication success
             finally:
                 jobs.release(lease)
-        if isinstance(exc, thermal.ThermalAPIError):
-            exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
-            return _thermal_error(exc)
-        return _thermal_error(thermal.ThermalAPIError(
-            "thread_start_failed" if lease is not None else "invalid_document",
-            str(exc), 500 if lease is not None else 400,
-            tags={**(spec.tags() if spec else {}), **identity}))
+        exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
+        return _thermal_error(exc)
     finally:
         if permit is not None:
             permit.release()
@@ -636,7 +636,7 @@ async def validate_transient(body: Request):
         return _transient_error(exc)
     except Exception as exc:
         return _transient_error(thermal.ThermalAPIError(
-            "invalid_document", str(exc), 400, tags=spec.tags() if spec else None))
+            "invalid_document", reply_text(exc, "transient validation"), 400, tags=spec.tags() if spec else None))
     finally:
         if permit is not None:
             permit.release()
@@ -714,6 +714,9 @@ async def start_transient(body: Request):
         _start_thermal_thread(_run_transient_job, (jobs, lease, doc))
         return JSONResponse(identity, headers={"Cache-Control": "no-store"})
     except Exception as exc:
+        if not isinstance(exc, thermal.ThermalAPIError):   # one refusal for the job and the reply
+            exc = thermal.ThermalAPIError("thread_start_failed" if lease is not None else "invalid_document",
+                                          reply_text(exc, "transient run request"), 500 if lease is not None else 400)
         if lease is not None:
             try:
                 jobs.fail(lease, exc, "thread_start_failed")
@@ -721,13 +724,8 @@ async def start_transient(body: Request):
                 pass
             finally:
                 jobs.release(lease)
-        if isinstance(exc, thermal.ThermalAPIError):
-            exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
-            return _transient_error(exc)
-        return _transient_error(thermal.ThermalAPIError(
-            "thread_start_failed" if lease is not None else "invalid_document",
-            str(exc), 500 if lease is not None else 400,
-            tags={**(spec.tags() if spec else {}), **identity}))
+        exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
+        return _transient_error(exc)
     finally:
         if permit is not None:
             permit.release()
@@ -750,7 +748,7 @@ def _transient_view(job_id, request, *, history):
         if permit is not None:
             permit.release()
         if not isinstance(exc, thermal.ThermalAPIError):
-            exc = thermal.ThermalAPIError("view_failed", str(exc), 500)
+            exc = thermal.ThermalAPIError("view_failed", reply_text(exc, "transient view"), 500)
         exc.tags = {**identity, **exc.tags}
         if not identity:
             exc.tags.setdefault("requested_job", thermal.limited_text(job_id, 128))

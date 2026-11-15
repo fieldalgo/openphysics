@@ -147,6 +147,10 @@ HTTP200만으로 검증 성공이 아닙니다. Network/non-JSON 오류는 현�
 명시적 재시도가 필요하며 만료가 자동 재해석을 유발하면 안 됩니다.
 실패 작업 후 부분 결과나 이전 광학 fallback을 게시하지 않습니다.
 오류 문자열은 plain text로 표시합니다.
+사용자에게 쓴 거절(문서·형상·한도 거절, 메시할 수 없는 입력에 대한 meshine의 설명, 위의
+코드가 있는 모든 거절)은 메시지를 그대로 둡니다. 그 밖의 요청·job·view 실패는 원래 코드와 상태에 고정 메시지 "Studio failed
+unexpectedly; the details are in the server log"로 응답합니다. 예외의 종류, 문구,
+traceback은 클라이언트가 아니라 서버 로그(logger `simcase.studio`)에 남습니다.
 
 Revision/sequence/job/result tag는 현재 view를 갱신할 응답을 선택하며 인증이
 아닙니다. 같은 revision 재시도·field-render 변경도 연산 소유권이 필요합니다.
