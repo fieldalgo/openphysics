@@ -213,7 +213,9 @@ Pinned+retained+reservation이안맞으면oversubscribe대신429입니다.
 
 Errorecho는검증safe counter·권위acceptedidentity만사용합니다.
 UntrustedstaleID가acceptedID를대체하지않고unknown404는이를만들지않습니다.
-오류는제한plaintext입니다. 만료/viewretry/clientabort가globaljob삭제나
+오류는제한plaintext입니다. 예상하지 못한 실패(unexpected500 등)는 고정 메시지 "Studio
+failed unexpectedly; the details are in the server log"를 보내고, 예외 문구와 traceback은
+서버 로그에 남습니다. 만료/viewretry/clientabort가globaljob삭제나
 다중사용자인증/격리권한을주지않습니다.
 Headless저장은별도:옵션실행전/document snapshot결속/새caller소유경로/
 incomplete marker·summary마지막/적대적race·crashrollback보장없음.

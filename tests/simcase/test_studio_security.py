@@ -361,7 +361,10 @@ def test_failed_job_status_has_no_traceback(client, monkeypatch):
         if status["status"] != "running":
             break
         threading.Event().wait(0.02)
-    assert status["status"] == "error" and status["error"] == "RuntimeError: solver exploded"
+    # an unexpected failure gets the fixed message; its type, text and traceback stay in the server log
+    assert status["status"] == "error"
+    assert status["error"] == "Studio failed unexpectedly; the details are in the server log"
+    assert "RuntimeError" not in str(status) and "solver exploded" not in str(status)
     assert "traceback" not in status and "File \"" not in str(status)
 
 

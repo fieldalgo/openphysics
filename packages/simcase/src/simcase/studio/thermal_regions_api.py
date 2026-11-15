@@ -35,6 +35,7 @@ from simcase import (Document, DocumentError, MeshLimitError, ThermalRunResult,
 
 from . import thermal_api as common
 from . import transient_thermal_api as transient
+from .bodies import reply_text
 
 # Region documents are format 0.3: arrays under registry names, SI values (units batch C5b).
 STEADY_PAIR = ("thermal.steady2d-regions-result-v2", "thermal2d-p1-node-cell-regions-v2")
@@ -227,7 +228,8 @@ def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
         try:
             doc = Document.from_dict(raw if exact is None else exact)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
-            raise common.ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
+            raise common.ThermalAPIError("invalid_document", reply_text(exc, "region document"),
+                                         400 if for_run else 200) from exc
         if getattr(doc, "is_version_1", False) and doc.component.dimension == "axisymmetric":
             raise common.ThermalAPIError("invalid_document", "Studio shows Cartesian region results only; an "
                                          "axisymmetric component has no Studio payload yet (run it with simcase)",
@@ -245,7 +247,8 @@ def _accept(raw, kind, limits, rlimits, nt, tags, for_run, exact=None):
     except MeshLimitError as exc:
         raise _geometry_limit(str(exc)) from exc
     except Exception as exc:
-        raise common.ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
+        raise common.ThermalAPIError("invalid_document", reply_text(exc, "region validation"),
+                                     400 if for_run else 200) from exc
 
 
 class Route:

@@ -235,8 +235,11 @@ and HTTP buffers remain extra memory. Bounded frame transfer is not streaming.
 
 Error echoes use only validated safe counters and authoritative accepted identity.
 Untrusted stale IDs never replace accepted IDs; unknown404 does not invent them.
-Errors are bounded plain text. Expiry, view retries and client abort do not delete
-global jobs or grant multi-tenant authentication/isolation.
+Errors are bounded plain text; an unexpected failure (such as unexpected500) carries
+the fixed message "Studio failed unexpectedly; the details are in the server log",
+and its exception text and traceback stay in the server log. Expiry, view retries
+and client abort do not delete global jobs or grant multi-tenant
+authentication/isolation.
 Headless saving remains separate: options before run, document snapshot bound,
 fresh caller-owned target, incomplete marker/summary-last, no hostile race or
 crash rollback guarantee. See the headless guide; no Studio save API is added.

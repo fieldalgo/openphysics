@@ -39,6 +39,11 @@ OpenPhysics는 개발 중입니다. 보안 수정은 `main`에서 진행하며 �
   작업은 최근 16개만 남기고 더 오래된 것은 메모리에서 지웁니다(지운 작업은 404로
   답하며, workspace의 Resume 버튼도 마찬가지입니다). 실패한 작업은 오류
   메시지만 알려 주고 traceback은 서버 로그에만 남깁니다.
+- **오류 응답.** 사용자에게 쓴 거절(문서·형상·메시 한도·모드 탐색 거절, meshine의
+  `MeshingError`나 `MeshInputError`, 열전도 경로의 코드가 있는 거절)은 메시지를 그대로 둡니다. 그 밖의 광학·열전도 요청, 작업, view 실패는
+  상태와 코드를 그대로 두고 고정 메시지 "Studio failed unexpectedly; the details are in
+  the server log"로 응답합니다. 예외의 종류, 문구, traceback은 서버 로그(logger
+  `simcase.studio`)에만 남습니다.
 - **페이지.** 서버 경로의 응답과 거부 응답 모두에 Content-Security-Policy를 붙입니다. 스크립트는 서버 자신과
   고전 편집기의 해시된 인라인 스크립트 하나만 허용하고, 플러그인과 프레임 삽입은
   막으며(`frame-ancestors 'none'`, `X-Frame-Options: DENY`), 네트워크 요청은 같은
