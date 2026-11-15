@@ -3,7 +3,7 @@
 :root {
  color-scheme:light; --bg:#e8edf3; --panel:#fff; --surface:#f4f6f9;
  --line:#cfd6df; --text:#27364b; --muted:#617086; --accent:#285db1;
- --plot-height:clamp(240px,calc(100dvh - 540px),520px); --selected:#e7effc; --warning:#925b13; --radius:3px;
+ --plot-height:clamp(240px,calc(100dvh - 540px),520px); --optical-plot-height:clamp(200px,calc(100dvh - 600px),440px); --selected:#e7effc; --warning:#925b13; --radius:3px;
  --port-power:#b95066; --port-temperature:#b47a20; --port-geometry:#6d65b3;
  --port-optical:#356eb6; --port-voltage:#a37720;
 }
@@ -177,6 +177,8 @@ footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;paddin
 .layout-help{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 0;font-size:11px;color:var(--muted)}
 .layout-help button{font-size:11px}
 #job-panel{padding:8px 16px;background:#edf4ff;border-bottom:1px solid #c2d6f2;flex:none}
+#job-panel button:disabled{display:none}
+#job-panel:not(:has(button:not(:disabled))){padding-block:4px}
 #job-input{font-weight:600}
 #job-storage:not(:empty),.validation-warning{color:var(--warning)}
 #input-problems{padding:10px 16px;background:#fff3e7;border-bottom:1px solid #e3c5a2;font-size:12px;max-height:160px;overflow:auto;flex:none}
@@ -200,7 +202,8 @@ input[aria-invalid=true],textarea[aria-invalid=true]{border-color:#bd5b41;outlin
 .canvas>.toolbar label{display:flex;align-items:center;gap:8px;margin:4px 0}
 .canvas>.toolbar label select{margin:0;width:auto}
 .field-result .toolbar{padding:8px 0;background:transparent}
-.field-result label{margin:4px 0}
+.field-result label{display:flex;align-items:center;gap:6px;margin:4px 0}
+.field-result .toolbar select{margin:0;width:auto}
 .heat-plot{background:#eef3f6;border:1px solid #c9d3e0;border-radius:2px;padding:4px}
 .heat-side{border:1px solid var(--line);border-radius:2px;margin:12px 0;padding:4px 12px}
 .heat-side legend{font-size:11px;padding:0 4px;color:var(--muted)}
@@ -263,7 +266,7 @@ dialog::backdrop{background:#162a4b66}
  .graph-summary{grid-template-columns:1fr}.graph-summary>section+section{border-left:0;border-top:1px solid var(--line)}
 }
 @media(max-width:1000px){
- body{height:auto;min-height:100dvh;overflow:auto;--plot-height:360px}
+ body{height:auto;min-height:100dvh;overflow:auto;--plot-height:360px;--optical-plot-height:340px}
  main{flex:none;overflow:visible;grid-template-columns:minmax(160px,1fr) minmax(220px,2fr);gap:1px}
  main>.workspace{grid-column:1/-1;min-height:550px}
  .tree,.settings-pane{max-height:360px}.panel-divider{display:none}
