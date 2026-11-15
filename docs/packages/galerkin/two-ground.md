@@ -73,3 +73,6 @@ Run `python -m pytest -q tests/galerkin/two_ground` from the repository root.
 The stored data and reference identifiers are in that directory under `evidence/`.
 Source and installed-wheel checks must retain the exact artifact identity;
 one platform does not establish another platform.
+
+The separate [straight-edge API](two-ground-edges.md) exposes conductor-edge
+current factors while retaining this whole-surface result.

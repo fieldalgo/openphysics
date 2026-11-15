@@ -1,0 +1,101 @@
+{
+  "method": "Independent scikit-fem P2 potential and volume-energy shape derivative, two interior harmonic extensions and quadrature orders 8/10; original finite meshes retained.",
+  "references": "Recorded independent results; replay tests do not rerun the independent field solve. Mesh and result identifiers are archival hashes, not repository paths.",
+  "isolated_field_process": "Original combined and isolated runs that hit the memory cap remain failed. Selected symmetric-field results load unchanged meshes and completed velocities. P2 equations, MMD_AT_PLUS_A ordering, residual/energy/quadrature checks and 8 GiB address-space cap remain the same; explicit SuperLU diag_pivot_thresh=0 and SymmetricMode=True are used, with positive pivots and equal row/column permutations checked. The analytical anchor and all three successful coarse references are compared at 1e-10 without a floor before the refined solve.",
+  "original_resource_failures": [
+    {
+      "case": "pair-asymmetric",
+      "level": "medium",
+      "type": "MemoryError",
+      "sha256": "b62b798869378ab7892fc4f6b119d77ddcc30687e4b6ccb9e4b8a04462ada2c4"
+    },
+    {
+      "case": "pair-asymmetric",
+      "level": "medium",
+      "phase": "original helper in isolated process",
+      "type": "MemoryError",
+      "sha256": "0769da9a8e41d789c10c1a808f729af9469ff98c6ae8173f60157fd596fa3008"
+    },
+    {
+      "case": "pair-close",
+      "level": "medium",
+      "type": "MemoryError",
+      "sha256": "b62b798869378ab7892fc4f6b119d77ddcc30687e4b6ccb9e4b8a04462ada2c4"
+    }
+  ],
+  "original_helper_sha256": "a9ebe02c0084d46f841d073b93197ae8a244839ad23124f9fd4168129fa0d86f",
+  "base_P2_helper_changes": [
+    "P4 to P2 element",
+    "function name",
+    "docstring"
+  ],
+  "symmetric_solver_variant": {
+    "helper_sha256": "0e956590d8ba194a50db4c87247fab88722255dedef82beb41e181c89712d6ca",
+    "permc_spec": "MMD_AT_PLUS_A",
+    "diag_pivot_thresh": 0.0,
+    "SymmetricMode": true,
+    "extra_checks": [
+      "positive U diagonal",
+      "equal row/column permutations"
+    ],
+    "physical_equations_unchanged": true
+  },
+  "analytical_anchor": "2 mm by 1 mm parallel plate: C0=epsilon0*width/height and each moving-wall unit-current Gram=1/width, checked at 1e-10 for two interior extensions.",
+  "reference_versions": {
+    "Python": "3.12",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "scikit-fem": "12.0.2"
+  },
+  "bounds": {
+    "face_reference_relative": 0.02,
+    "capacitance_reference_relative": 0.0005,
+    "last_panel_face_entry_change": 0.01,
+    "last_mesh_face_entry_change": 0.01,
+    "two_finite_outer_changes": 0.01,
+    "denominator_floor": false
+  },
+  "limitations": "Selected finite rectangular sections only; no absolute accuracy, arbitrary geometry, material, measurement, platform or release qualification. Original 128-ground-mode scalar 32mm refusal is preserved; outer data use a separate complete 256-mode series.",
+  "hashes": {
+    "scalar-offset/panel-64.json": "255c5a829fc66340ed6c07e94da75c127e950e22c2d4e7912b2aad3b05a06810",
+    "scalar-offset/panel-128.json": "ca4ebd5f58c9e11db07b3cff5f2ea7b66de57c2818a8f77c17d8dc2003e997a7",
+    "scalar-offset/panel-256.json": "e19f0eb65fa56dfbcf07ed15053de802161bcaec5a52c63e4ead472824c20c01",
+    "scalar-offset/reference-coarse.json": "cbcbf5b60d42197ab9d1340efdb2614cfe3ffb99dd81cd4b1bc6f952b12bc436",
+    "scalar-offset/reference-medium.json": "e1173c951ddae842202f5ebd98612bae352aadaaaaea6e7a18e56a4ea8d08e28",
+    "scalar-offset/outer-8.json": "7b6e1f7bbb1c5084308fb4befcb2ab4033592596379de3fd371a1ffbc93313c7",
+    "scalar-offset/outer-16.json": "13e663bc24c6adee30d3976aca7be2f662668a6f13f98e5487fe8533cfb8cd6e",
+    "scalar-offset/outer-32.json": "ab9bf5b7b66ea1b2c06436369f7ce6f531f989fa76339c0c3b851c09dfdb7bf4",
+    "pair-asymmetric/panel-64.json": "5079d911c91968446670d0310c5f0ee409c29ad39fb67bf405105609c48ba08a",
+    "pair-asymmetric/panel-128.json": "6560d7229924cdeca10a5c97a409e409c2d67a75b1d4164a0ed16c076654e346",
+    "pair-asymmetric/panel-256.json": "a9efdc07dcc198ef8f69b60f2eaf53ed2708710e0860d32ec8ce04cab40f822f",
+    "pair-asymmetric/reference-coarse.json": "21d9149d0dbdf3006643ef794c313111e6efaa585d6b831f28e0e8d663492a9f",
+    "pair-asymmetric/reference-medium.json": "a6276dc048ced93c7a09dca876305ed07121e3f3d019c7fd103841c497986cc5",
+    "pair-asymmetric/outer-8.json": "fc267dd4cc3fdf2506df85fc476a44a9af3302c349e1ada40b2d3875686e9946",
+    "pair-asymmetric/outer-16.json": "67a3960f5b1f4a6024cee95c88498bfad6d2c348c53b5f392327ba709864e774",
+    "pair-asymmetric/outer-32.json": "7a98df9ba49769100ca1544db00d337700b03b7b28219f94c4ae34680444d637",
+    "pair-close/panel-64.json": "a2257c4dbc4d62ec13cbf7aa8b23ce4dc9de7de526c85d6dca2f006f8a531d05",
+    "pair-close/panel-128.json": "21b5bb48cb22bec2d02400d8a158975d7a8ea991b7b2ee346e131822d5507db6",
+    "pair-close/panel-256.json": "c8fc6e164d3f0fb7bc3b775f825435bd0bd04734cebb8e995d3aea0b107a255d",
+    "pair-close/reference-coarse.json": "5cc3fdeaaf01dd40e5151a4b43d6cac236f8284981de01136c7362a9812b10cf",
+    "pair-close/reference-medium.json": "9ad1f92b89d8f7cd222b4195e5dbb053ca07ef3f9f600c8f41a0271552669c33",
+    "pair-close/outer-8.json": "92aabdc64bbffb223196ede8105811a9db46e741e3bfa5bdb4efcc3a78f462aa",
+    "pair-close/outer-16.json": "dfce324574bb1996ac51c86863e747a4896eed885bd2261c622b62a3bce00fdc",
+    "pair-close/outer-32.json": "4a170bf2eade337bd06eadcf44b2c1a82ca8b002744d15cd53a6a01946bb977b",
+    "contract.json": "f1582c223aa1b73ba953b25640a9803fd22c9d6cb53dfd7d9034652547a713c6",
+    "outer-256-contract.json": "c3a44ecd0a78503773836d13b921cea5518a0a0900a6f721b041718a590a8731",
+    "source-manifest.json": "b3b9b6c515f3418315c9dbe8a3a609d0c0960429b9a7ecbf3ff4fc39a12909a3",
+    "quadratic_reference.py": "3901a4650a244df7688dba1fc9f5ee7ef67e50d4aff2a8dd5af3d732b0419b88",
+    "reference-task.py": "a412798fced93944d8e14e1987c9c5a3e6e6227ef2d1649b44109bd3433559dc",
+    "panel-partition.py": "22745fb1d4498cedf97dbae8b950f6083f3d8cb278b1260420f6a13ae8a9381e",
+    "compare-reference.py": "6edf23674cfeb82487c6b56c5fa26e5dcbf763ffb94f069ab42a40f5f6447891",
+    "compare-outer.py": "aa48d32f5032561f91d4c16f3f86429a5b1b7b53c3a164567101cff95d681708",
+    "field-phase.py": "4b06cfe39b4378ebd38292f6ccbbc63c9b5c190b0c46c202e96462cafe2e34e8",
+    "field-phase-contract.json": "f3efb38e617ff0fbf59ea5fa1a151a994be2fb29c63f110ee956684897e1e18d",
+    "qualified-reference-index.json": "66a98b4c7608cd25a53167ffa675b9b98daae4f508f3111b882e10e98fcc68a4",
+    "compare-field-references.py": "4424e9a62f28b32c5f0fab4c53195fd2eab616d1957f2baf93f852824e4679f8",
+    "quadratic_reference_symmetric.py": "0e956590d8ba194a50db4c87247fab88722255dedef82beb41e181c89712d6ca",
+    "symmetric-field.py": "7655ff653606759d594aa7355d31ff5e05bd4f2e5ddcba2066d6fa7f4fe007e6",
+    "symmetric-field-contract.json": "70165dfd19696ed05ad7539e00f36b9a0853c7fa3659bdecf16c5b3a423d42a5",
+    "symmetric-helper.diff": "56f427daa09a46612cc723cc4d659874c620fec63f44878e8dec053125c05d04"
+  }
+}
