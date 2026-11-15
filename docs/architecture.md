@@ -190,7 +190,10 @@ grid-to-mesh projection waits for a second engine
    failure evidence of the temperature-dependent Joule workflow
    ([`simcase/cli.py`](../packages/simcase/src/simcase/cli.py)); a kind whose
    failures carry structured evidence adds it there. Python-only physics stays
-   out of documents until it is registered.
+   out of documents until it is registered. A kind from another distribution
+   comes through a provider: an entry point in the group `openphysics.providers`
+   whose provider returns the kinds and a data-only manifest
+   ([physics providers](packages/simcase/providers.md), unstable in 0.x).
 
 Keep English and Korean pages together, and keep numerical thresholds as
 validated ([contributing](../CONTRIBUTING.md)).
@@ -206,4 +209,6 @@ The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml)
 [physics registry](../packages/simcase/src/simcase/registry.py): each physics family
 registers its contract validation, runner, summary and result types there, so a new
 physics does not edit the runner or the schema ([adding a physics](#adding-a-physics)).
+The registry's kinds come from [providers](packages/simcase/providers.md): simcase's
+own kinds are the built-in provider `openphysics-fem`, loaded first.
 This architecture page adds no new implementation or numerical validation claim.
