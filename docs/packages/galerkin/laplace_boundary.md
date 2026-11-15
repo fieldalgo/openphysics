@@ -116,3 +116,20 @@ At a fixed 4 m × 2 m rectangle with three 64-sided circular conductors, the
 default degree is deliberately refused: the 8→10 change is about `2.35e-10`.
 Explicit degrees 12/14/16 agree to `1e-10`, including every surface Gram matrix.
 This is refinement at unchanged geometry, not a relaxed tolerance or a larger box.
+
+## Short-panel integration
+
+Unequal-panel logarithmic integrals retain their original evaluation when its
+32/64-point check passes. Failed entries retry the same quadrature in normalized
+local coordinates before evaluating the source primitive. This avoids rounding away
+the motion along a short target by first adding a large coordinate origin.
+The existing 32/64-point agreement criterion remains
+`1e-12 * max(1, abs(mean_log_distance))`; unresolved integrals still fail.
+
+Stored independent checks cover one short/long geometric pair in both source
+orders, using mpmath 1.3.0 at 60 and 80 decimal digits. Direct two-dimensional
+log-distance integration agrees between those precisions within `1e-30`
+relative. Tests also check endpoint reversal, translation to the origin,
+reflection and exact power-of-two scaling. These checks isolate arithmetic
+stability; they do not qualify a new grading, interpolation order or arbitrary
+conductor-loss accuracy. Existing public defaults and admission limits remain.
