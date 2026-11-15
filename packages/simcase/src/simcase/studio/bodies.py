@@ -12,16 +12,22 @@ it at its path); a leading UTF-8 byte order mark is accepted.
 A reply that returns the document writes it with ``reader.dumps`` (``exact_json``), so an
 unchanged authored document comes back byte for byte apart from whitespace and the spelling of
 string escapes (``"\\u00b5"`` comes back as ``"µ"``).
+
+A refusal written for users (``USER_FACING``) replies with its own text. Any other exception that
+reaches a reply is an unexpected failure: the reply says ``UNEXPECTED``, and its type, text and
+traceback go to the server log (logger ``simcase.studio``), never to the client (``reply_text``).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import logging
 import re
 
 from fastapi.responses import Response
 
-from simcase import reader
+from meshine import MeshInputError, MeshingError
+from simcase import DocumentError, GeometryError, MeshLimitError, ModeSelectionError, ModeTrackingError, reader
 
 #: a reader message that names its object: ``"x" appears more than once in doc.geometry; ...``
 _IN_OBJECT = re.compile(r'^("(?:[^"\\]|\\.)*" appears more than once in )(.*?)(; .*)$', re.S)
@@ -84,3 +90,26 @@ def read_envelope(raw: bytes, *, optional=()) -> tuple[dict, list]:
     if not isinstance(tree["doc"], dict):
         raise RequestRefused("doc: a document is a JSON object")
     return tree, [d for d in inside if d is not None]
+
+
+_log = logging.getLogger("simcase.studio")
+
+#: The refusals written for users: a document or geometry refusal (with its code and path), a mesh
+#: limit, a mode search that cannot keep the requested modes, and meshine's explanation of an
+#: input it cannot mesh (``MeshingError``, ``MeshInputError``). A reply carries their text.
+USER_FACING = (DocumentError, GeometryError, MeshLimitError, ModeSelectionError, ModeTrackingError,
+               MeshingError, MeshInputError)
+
+#: The message of an unexpected failure, in place of its exception's text.
+UNEXPECTED = "Studio failed unexpectedly; the details are in the server log"
+
+
+def unexpected(exc: BaseException, what: str) -> str:
+    """Log ``exc`` with its traceback as an unexpected failure of ``what``; return ``UNEXPECTED``."""
+    _log.warning("%s failed unexpectedly", what, exc_info=exc)
+    return UNEXPECTED
+
+
+def reply_text(exc: BaseException, what: str) -> str:
+    """The reply text of ``exc``: its own text for a ``USER_FACING`` refusal, else ``unexpected``."""
+    return str(exc) if isinstance(exc, USER_FACING) else unexpected(exc, what)

@@ -17,6 +17,7 @@ import time
 import numpy as np
 from simcase import Document, DocumentError, ThermalRunResult
 from simcase import reader
+from .bodies import USER_FACING, reply_text, unexpected
 
 KIND = "thermal.steady2d"
 # Rectangle documents are format 0.3: arrays under registry names, SI values.
@@ -283,7 +284,8 @@ async def read_request(request, limits, *, for_run, preflight=None, runtime_chec
         try:
             doc = Document.from_dict(exact)
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
-            raise ThermalAPIError("invalid_document", str(exc), 400 if for_run else 200) from exc
+            raise ThermalAPIError("invalid_document", reply_text(exc, "thermal document"),
+                                  400 if for_run else 200) from exc
         return ThermalInput(doc, **tags)
     except ThermalAPIError as exc:
         exc.tags = dict(tags)
@@ -668,8 +670,10 @@ class ThermalJobs:
     def fail(self, lease, exc, code="solver_failed"):
         if isinstance(exc, ThermalAPIError):
             code, message = exc.code, exc.message
-        else:
+        elif isinstance(exc, USER_FACING):
             message = type(exc).__name__+": "+limited_text(exc, self.limits.error_bytes//8)
+        else:
+            message = unexpected(exc, f"thermal job {lease.job} ({code})")
         error = {"code": limited_text(code, 64),
                  "message": limited_text(message, self.limits.error_bytes//8)}
         # Escaping overhead is counted; the conservative text bound is not raw-only.
