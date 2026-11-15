@@ -217,9 +217,14 @@ def axisymmetric(raw):
     del comp["depth"]                                    # an axisymmetric component has none
 
 
+MODEL = {"model": "linear_resistivity", "reference_conductivity": "2 S/m", "reference_temperature": "300 K",
+                     "resistivity_temperature_coefficient": "0.004 1/K", "valid": {"temperature": ["250 K", "600 K"]}}
+
+
 @pytest.mark.parametrize("change, message, code, path", [
-    (lambda raw: raw["physics"]["j"].update(type="joule.temperature2d"), "joule.temperature2d: region geometry",
-     "E-CONTRACT", "physics.j.type"),
+    # a conductivity model is read by region joule.temperature2d only (simcase.joule_temperature_regions)
+    (lambda raw: raw["materials"]["B"].update(electrical_conductivity=MODEL), "only joule.temperature2d",
+     "E-CONTRACT", "materials.B.electrical_conductivity"),
     (lambda raw: raw["physics"]["j"].update(heat_source_density="1 W/m^3"), "heated by its current only",
      "E-CONTRACT", "physics.j.heat_source_density"),
     (lambda raw: raw["physics"]["j"].update(electrical_conductivity="1 S/m"),

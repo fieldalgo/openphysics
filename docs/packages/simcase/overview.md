@@ -25,7 +25,7 @@ not an import or distribution name. Format `"0.3"` (values with units, registry
 quantity names, a `length_unit` per geometry component, coded diagnostics) is read for heat
 (`thermal.steady2d` and `thermal.transient2d`: rectangles, material regions, version 1 blocks and
 the axisymmetric forms) and for electric conduction and Joule heating (`electric.steady2d`,
-`joule.steady2d` and `joule.temperature2d`: rectangles, and material regions for the first two)
+`joule.steady2d` and `joule.temperature2d`: rectangles and material regions)
 and for mechanics (`mechanics.elasticity2d` and `mechanics.thermoelastic2d`: rectangles and
 material regions) and for waveguide modes (`em.modes2d`: flat shapes and version 1 blocks, scalar,
 vector, PML, bends, tracked and subspace sweeps) and for rectangular cavities (`em.cavity3d`: the
@@ -491,8 +491,8 @@ integer cell data `triangle_regions` and the saved steady flux/convection arrays
 for units, the region-name mapping and an example. Electric conduction and Joule
 results (`electric-joule2d-p1-v2`, the layout of `electric.steady2d`,
 `joule.steady2d` and `joule.temperature2d`; the region layouts
-`electric2d-p1-node-cell-regions-v2` and `electric-joule2d-p1-node-cell-regions-v2` add
-`triangle_regions`) export point data `electric_potential` with the nodal
+`electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2` and
+`electric-joule2d-temperature-p1-node-cell-regions-v2` add `triangle_regions`) export point data `electric_potential` with the nodal
 `joule_power_per_depth`, `reaction_current_per_depth`,
 `outward_prescribed_current_per_depth` and `residual_current_per_depth` arrays, and cell
 data `electric_field`, `current_density`, `electrical_conductivity` and

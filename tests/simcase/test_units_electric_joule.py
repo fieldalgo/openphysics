@@ -391,7 +391,7 @@ REFUSALS = [
     ("joule_temperature", E+"electrical_conductivity", "2 S/m", "E-VALUE-FORM", None),
     ("joule_rectangle", E+"electrical_conductivity", {"model": "linear_resistivity"}, "E-CONTRACT", None),
     ("electric_rectangle", E+"electrical_conductivity", {"model": "linear_resistivity"}, "E-CONTRACT", None),
-    ("joule_j1_series", "materials.A.electrical_conductivity", {"model": "linear_resistivity"}, "E-VALUE-FORM", None),
+    ("joule_j1_series", "materials.A.electrical_conductivity", {"model": "linear_resistivity"}, "E-CONTRACT", None),
     ("joule_temperature", E+"electrical_conductivity.reference_resistivity", "0.5 ohm m", "E-CONTRACT", None),
     ("joule_temperature", E+"electrical_conductivity.valid.outside", "clamp", "E-KEY-UNKNOWN", None),
     ("joule_rectangle", E+"inward_current", {"top": "1 A/m"}, "E-CONTRACT", None),

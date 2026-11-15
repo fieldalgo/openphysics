@@ -17,13 +17,14 @@ from dataclasses import asdict
 import numpy as np
 
 from .schema import DocumentError
+from .slots import linear_resistivity_slots
 from .steady_boundary_contract import SIDES, boundary_kwargs, natural_conditions_03, rect_geometry_03, rectangle_03
 from .thermal import _OwnedOutput, _authored, model_bytes_03, log_lines_03
 from . import results_common, views
 from .registry import PhysicsKind, register
-from .electric_regions import (FIELD_LAYOUT as REGION_FIELD_LAYOUT, is_region_electric, refuse_region_joule,
-                               region_summary, run_region_electric, validate_region_electric)
-from . import joule_regions
+from .electric_regions import (FIELD_LAYOUT as REGION_FIELD_LAYOUT, is_region_electric, region_summary,
+                               run_region_electric, validate_region_electric)
+from . import joule_regions, joule_temperature_regions
 
 TYPES = {'electric.steady2d', 'joule.steady2d', 'joule.temperature2d'}
 FIELD_LAYOUT = 'electric-joule2d-p1-v2'
@@ -99,8 +100,9 @@ def is_electric_joule(data):
 
 
 def is_region_document(data):
-    """An electric or steady Joule document on named material regions."""
-    return is_region_electric(data) or joule_regions.is_region_joule(data)
+    """An electric or Joule document on named material regions."""
+    return (is_region_electric(data) or joule_regions.is_region_joule(data)
+            or joule_temperature_regions.is_region_joule_temperature(data))
 
 
 def _refuse(message, path=None, code='E-CONTRACT'):
@@ -147,22 +149,11 @@ def electric_slots():
                         'E-KEY-UNKNOWN')]
         if kind == 'joule.temperature2d':
             m = 'electrical_conductivity'
-            out += [q(m, 'electrical_conductivity', ('MODEL',), 'material_property', required=True),
-                    {'pattern': f'{p}.{m}.model', 'kind': 'enum', 'values': ['linear_resistivity'], 'required': True},
-                    q(f'{m}.reference_conductivity', 'reference_conductivity', required=True),
-                    q(f'{m}.reference_temperature', 'reference_temperature', required=True),
-                    q(f'{m}.resistivity_temperature_coefficient', 'resistivity_temperature_coefficient',
-                      required=True),
-                    obj(f'{m}.valid', required=True),
-                    q(f'{m}.valid.temperature', 'temperature', ('SL',), required=True, range=True),
-                    refused(f'{m}.reference_resistivity', 'linear_resistivity takes reference_conductivity; '
-                            'reference_resistivity is not read'),
-                    refused(f'{m}.alpha', '"alpha" is not a key of linear_resistivity; write '
-                            'resistivity_temperature_coefficient (the slope of the resistivity, 1/K)',
-                            'E-KEY-UNKNOWN'),
-                    refused(f'{m}.conductivity_temperature_coefficient', '"conductivity_temperature_coefficient" '
-                            'is not a key of linear_resistivity, which takes resistivity_temperature_coefficient '
-                            '(the slope of the resistivity)', 'E-KEY-UNKNOWN'),
+            # neither required nor limited to the model form by the table: a rectangle requires the
+            # model (validate_rectangle_03), a region document refuses either form by name and
+            # takes it from materials.<m>
+            out += [q(m, 'electrical_conductivity', ('QS', 'AV', 'MODEL'), 'material_property'),
+                    *linear_resistivity_slots(f'{p}.{m}'),
                     q('initial_temperature', 'initial_temperature', required=True),
                     obj('iteration', required=True),
                     q('iteration.relaxation_factor', 'relaxation_factor', ('BD', 'AV'), default=0.5,
@@ -186,7 +177,8 @@ def electric_slots():
                     refused('heat_source_density', 'a Joule document is heated by its current only; an '
                             'additional heat source is not supported')]
     reads = {'electric.steady2d': ['electrical_conductivity'],
-             'joule.steady2d': ['electrical_conductivity', 'thermal_conductivity'], 'joule.temperature2d': []}
+             'joule.steady2d': ['electrical_conductivity', 'thermal_conductivity'],
+             'joule.temperature2d': ['electrical_conductivity', 'thermal_conductivity']}
     results = {'save_fields': True, 'plots': False}
     out += [{'pattern': 'materials.*', 'kind': 'override', 'library': 'none', 'reads': reads},
             {'pattern': 'name', 'kind': 'override', 'default': 'untitled',
@@ -212,6 +204,19 @@ def conductivity_model_03(spec):
     alpha = spec['resistivity_temperature_coefficient']
     lo, hi = spec['valid']['temperature']
     return ConductivityModel(lambda t: sigma/(1.+alpha*(t-reference)), (lo, hi))
+
+
+#: the temperature range of a constant conductivity's model: galerkin refuses an infinite range,
+#: and every finite temperature from 0 K up lies in this one, so it never binds
+CONSTANT_MODEL_RANGE = (0.0, float(np.finfo(float).max))
+
+
+def constant_conductivity_model_03(sigma):
+    """galerkin's ``ConductivityModel`` of a constant conductivity (S/m) on regions of a
+    ``joule.temperature2d`` document: sigma(T) = sigma on ``CONSTANT_MODEL_RANGE``."""
+    from galerkin.temperature_joule_heating import ConductivityModel
+    sigma = float(sigma)
+    return ConductivityModel(lambda t: np.full(np.shape(t), sigma), CONSTANT_MODEL_RANGE)
 
 
 def _model_checks(spec, path):
@@ -323,33 +328,47 @@ def validate_rectangle_03(doc):
     default_boundaries_03(doc, name, p, SIDES)
     if kind == 'joule.temperature2d':
         spec = p['electrical_conductivity']
+        if not isinstance(spec, dict):
+            _refuse(f'{path}.electrical_conductivity: joule.temperature2d on a rectangle takes a model object here '
+                    '(linear_resistivity), not one value', f'{path}.electrical_conductivity', 'E-VALUE-FORM')
         _model_checks(spec, path)
-        lo, hi = spec['valid']['temperature']
-        given = [('initial_temperature', p['initial_temperature']),
-                 *((f'prescribed_temperature.{tag}', t) for tag, t in temperatures.items()),
-                 *((f'convection.{tag}.ambient_temperature', c['ambient_temperature'])
-                   for tag, c in p.get('convection', {}).items())]
-        for where, t in given:
-            if not lo <= t <= hi:
-                _refuse(f'{where}: {t!r} K lies outside the conductivity model\'s valid.temperature [{lo!r}, {hi!r}] K',
-                        f'{path}.{where}', 'E-OUTSIDE-VALID')
-        iteration = p['iteration']
-        if not iteration['relaxation_factor'] <= 1:
-            _refuse('relaxation_factor: this kind takes 0 < relaxation_factor <= 1', f'{path}.iteration.relaxation_factor',
-                    'E-DOMAIN')
-        if not iteration['iteration_limit'] >= 1:
-            _refuse('iteration_limit: expected at least one iteration', f'{path}.iteration.iteration_limit', 'E-DOMAIN')
+        temperatures_in_range_03(p, path, *spec['valid']['temperature'], "the conductivity model's")
+        iteration_checks_03(p, path)
+
+
+def temperatures_in_range_03(p, path, lo, hi, owner):
+    """``initial_temperature``, every prescribed temperature and every ambient temperature lie in
+    ``[lo, hi]`` K (``E-OUTSIDE-VALID`` at the value; ``owner`` names whose valid range it is)."""
+    given = [('initial_temperature', p['initial_temperature']),
+             *((f'prescribed_temperature.{tag}', t) for tag, t in p.get('prescribed_temperature', {}).items()),
+             *((f'convection.{tag}.ambient_temperature', c['ambient_temperature'])
+               for tag, c in p.get('convection', {}).items())]
+    for where, t in given:
+        if not lo <= t <= hi:
+            _refuse(f'{where}: {t!r} K lies outside {owner} valid.temperature [{lo!r}, {hi!r}] K',
+                    f'{path}.{where}', 'E-OUTSIDE-VALID')
+
+
+def iteration_checks_03(p, path):
+    """The Picard iteration options of ``joule.temperature2d`` beyond the registry ranges."""
+    iteration = p['iteration']
+    if not iteration['relaxation_factor'] <= 1:
+        _refuse('relaxation_factor: this kind takes 0 < relaxation_factor <= 1', f'{path}.iteration.relaxation_factor',
+                'E-DOMAIN')
+    if not iteration['iteration_limit'] >= 1:
+        _refuse('iteration_limit: expected at least one iteration', f'{path}.iteration.iteration_limit', 'E-DOMAIN')
 
 
 def validate_electric_joule(doc):
     """Format 0.3 rectangles and regions. A format 0.2 document is refused by name."""
     if doc.si is None:
         raise DocumentError(_FORMAT_02, path='openphysics', code='E-FORMAT')
-    refuse_region_joule(doc)
     if is_region_electric(doc.data):
         validate_region_electric(doc)
     elif joule_regions.is_region_joule(doc.data):
         joule_regions.validate_region_joule(doc)
+    elif joule_temperature_regions.is_region_joule_temperature(doc.data):
+        joule_temperature_regions.validate_region_joule_temperature(doc)
     else:
         validate_rectangle_03(doc)
 
@@ -395,6 +414,8 @@ def document_summary(doc):
         return region_summary(doc)
     if joule_regions.is_region_joule(doc.data):
         return joule_regions.region_summary(doc)
+    if joule_temperature_regions.is_region_joule_temperature(doc.data):
+        return joule_temperature_regions.region_summary(doc)
     return rectangle_summary_03(doc)
 
 
@@ -578,11 +599,19 @@ class RegionJouleRunResult(ElectricJouleRunResult):
     FIELD_LAYOUT = joule_regions.FIELD_LAYOUT
 
 
+class RegionJouleTemperatureRunResult(ElectricJouleRunResult):
+    """Owned numeric evidence of a region temperature-dependent Joule run
+    (``joule.temperature2d-regions-result-v2``)."""
+    FIELD_LAYOUT = joule_temperature_regions.FIELD_LAYOUT
+
+
 def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     if is_region_electric(doc.data):
         return run_region_electric(doc, verbose, mesh_limits=mesh_limits)
     if joule_regions.is_region_joule(doc.data):
         return joule_regions.run_region_joule(doc, verbose, mesh_limits=mesh_limits)
+    if joule_temperature_regions.is_region_joule_temperature(doc.data):
+        return joule_temperature_regions.run_region_joule_temperature(doc, verbose, mesh_limits=mesh_limits)
     from galerkin import rectangle_mesh
     from galerkin.electric import solve_steady_electric
     from galerkin.joule_heating import solve_steady_joule_heat
@@ -644,14 +673,9 @@ def _slots():
     return electric_slots()
 
 
-def _refuse_03(tree):
-    from .electric_regions import region_joule_refusal
-    return region_joule_refusal(tree)
-
-
 register(PhysicsKind(
     name='electric_joule', types=frozenset(TYPES), precedence=10,
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
     result_types=(ElectricJouleRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics',
-    accepts_mesh_limits=is_region_document, slots=_slots(), refuse_03=_refuse_03))
+    accepts_mesh_limits=is_region_document, slots=_slots()))

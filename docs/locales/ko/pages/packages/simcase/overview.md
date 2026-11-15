@@ -15,7 +15,7 @@ python -m simcase run model.json                          # -> model_results/
 python -m simcase geometry model.json                     # 버전 1 형상 블록의 영역 복합체
 ```
 
-패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형, 앞의 둘은 재료 영역도), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역), 도파 모드(`em.modes2d`: 평면 형상과 버전 1 블록, 스칼라, 벡터, PML, 굽힘, 추적·부분공간 sweep), 직육면체 공진기(`em.cavity3d`: 진공 PEC 상자, 상자 재료, 도체 벽)에서 읽습니다. 이제 어떤 종류도 형식 0.2를 읽지 않습니다. 0.2 문서는 무엇을 대신 써야 하는지와 함께 이름을 밝혀 거부합니다(`E-FORMAT`): [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
+패키지와 CLI의 이름은 `simcase`입니다. JSON 버전 필드는 `"openphysics": "0.3"`이며 import나 배포판 이름이 아닙니다. 형식 `"0.3"`(단위를 함께 쓴 값, 등록부 물리량 이름, 형상 구성 요소마다의 `length_unit`, 코드가 붙은 진단)은 열(`thermal.steady2d`, `thermal.transient2d`: 직사각형, 재료 영역, 버전 1 블록, 축대칭 형식)과 전기 전도·Joule 가열(`electric.steady2d`, `joule.steady2d`, `joule.temperature2d`: 직사각형과 재료 영역), 역학(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`: 직사각형과 재료 영역), 도파 모드(`em.modes2d`: 평면 형상과 버전 1 블록, 스칼라, 벡터, PML, 굽힘, 추적·부분공간 sweep), 직육면체 공진기(`em.cavity3d`: 진공 PEC 상자, 상자 재료, 도체 벽)에서 읽습니다. 이제 어떤 종류도 형식 0.2를 읽지 않습니다. 0.2 문서는 무엇을 대신 써야 하는지와 함께 이름을 밝혀 거부합니다(`E-FORMAT`): [문서 형식 0.3](document_format.md). 별도의 `openphysics` 배포판은 0.0.2부터 완제품으로, OpenPhysics 패키지들을 Studio와 함께 설치하고 `openphysics` 명령을 제공합니다. PyPI의 0.0.1은 빈 이름 예약입니다. 전체 개발 설치는 [저장소 설치 안내](https://github.com/fieldalgo/openphysics/blob/main/docs/locales/ko/pages/overview.md)를 참조하세요. 위 편집 가능 경로에는 모노레포 checkout이 필요합니다. 개별 sdist에는 형제 패키지나 저장소 루트가 없습니다. 내려받은 배포물을 설치할 때는 형제 의존 패키지의 로컬 배포물 경로도 함께 pip에 전달하세요.
 
 `model_results/`에는 `summary.json`(단위를 붙인 SI 값: study 지점별 진공 파장과 유효 굴절률, 군굴절률, 메시 통계, 시간, 진단), `fields.npz`(미터 단위 절점 좌표와 모드 장), `results.png`(메시·모드·sweep), `log.txt`, 작성한 그대로의 문서(`model.json`)가 생성됩니다.
 
@@ -243,8 +243,8 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
 `triangle_regions`와 저장된 정상 flux/대류 배열을 포함합니다. 단위·영역 이름 대응·예제는
 [영역 내보내기](thermal_regions2d.md#vtu와-pvd-내보내기)를 참고하세요. 전기 전도·Joule 결과
 (`electric-joule2d-p1-v2`, `electric.steady2d`·`joule.steady2d`·`joule.temperature2d`의 배치; 영역
-배치 `electric2d-p1-node-cell-regions-v2`와 `electric-joule2d-p1-node-cell-regions-v2`는
-`triangle_regions`를 더함)는 점 데이터 `electric_potential`과 절점 `joule_power_per_depth`,
+배치 `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`,
+`electric-joule2d-temperature-p1-node-cell-regions-v2`는 `triangle_regions`를 더함)는 점 데이터 `electric_potential`과 절점 `joule_power_per_depth`,
 `reaction_current_per_depth`, `outward_prescribed_current_per_depth`, `residual_current_per_depth`
 배열, 셀 데이터 `electric_field`, `current_density`, `electrical_conductivity`,
 `joule_power_density`를 모두 SI로, FieldData `units`·`conventions` 블록과 함께 내보냅니다. Joule
