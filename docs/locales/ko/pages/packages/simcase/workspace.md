@@ -11,6 +11,32 @@
 
 처음이면 [빠른 시작](workspace_quickstart.md)부터 따라 하세요. 빌드 검토와 첫 사용자 점검에는 [수용 점검표](workspace_acceptance.md)를 사용하세요.
 
+## 작업 공간 배치와 디자인 규칙
+
+모델 트리는 설정·물리·스터디로 묶습니다. **Connections**는 가열 도파관
+설정을 입출력 물리량이 표시된 인터페이스 카드로 보여 줍니다. 카드나 트리의
+물리 항목을 선택하면 연결 화면을 유지하며 속성을 확인합니다. 포함 여부
+체크박스는 기존 단방향 설정을 바꿉니다. 포트를 드래그하는 편집기는 아니며
+연성 계산은 아직 지원하지 않습니다. 제외한 물리는 **Not included**로 표시합니다.
+
+**Save session**, **Open session**, 실행 취소/다시 실행, 현재 스터디 실행은
+주 도구 모음에 있습니다. **More file actions**에 입력 전용 파일·브라우저
+초안·Reset design을 묶었습니다. 연결/복구와 Reset layout은 스터디 순서 아래에
+있습니다. 넓은 화면에서는 트리·캔버스·속성이 독립적으로 스크롤되며 좁은
+화면에서는 속성창이 캔버스 아래로 이동합니다.
+
+로컬 CSS는 의미별 색상과 간격 토큰을 사용합니다. 본문 15 px, 보조 설명 13 px,
+화면 제목 24 px, 4/8 px 간격 체계, 기본 조작부 높이 40 px입니다. 트리/속성창
+기본 폭은 240/320 px이며 기존 저장 폭은 유지합니다. Reset layout으로 기본값을
+복원합니다. 포커스 테두리, Skip to workspace 링크, 색과 함께 표시하는 상태
+문구, 동작 줄이기 환경 설정을 지원합니다. 시스템 글꼴과 기본 컨트롤을 사용해
+추가 의존성 없이 오프라인으로 동작합니다.
+[Carbon 글자 위계](https://www.carbondesignsystem.com/building-blocks/foundations/typography/overview),
+[Carbon 간격](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview),
+[Material 글자 역할](https://m3.material.io/styles/typography/applying-type)을 참고한
+Studio 전용 소규모 CSS 체계이며 두 컴포넌트 라이브러리를 도입한 것은 아닙니다.
+토큰은 `workspace.css`의 Studio foundations 구역 시작 부분에 있습니다.
+
 ## 첫 광학 해석
 
 1. **Applications → Optical waveguide**를 선택합니다. 가열 도파관 카드는 설정

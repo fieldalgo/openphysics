@@ -15,7 +15,7 @@ test('saved layout roundtrip and width limits preserve a usable center viewport'
 });
 test('corrupt, missing, nonnumeric and unknown layouts safely restore independent defaults',()=>{
  for(const text of [null,'{','null','{}','{"version":2}','{"version":1,"tree":"240","inspector":280}'])assert.deepEqual(readLayout(text),DEFAULT_LAYOUT);
- const d=readLayout('{}');d.tree=300;assert.equal(DEFAULT_LAYOUT.tree,220);
+ const d=readLayout('{}');d.tree=300;assert.equal(DEFAULT_LAYOUT.tree,240);
  assert.throws(()=>clampWidth('tree',NaN));assert.throws(()=>clampWidth('other',200));
 });
 test('keyboard moves the separator physically, clamps, and supports limits and larger steps',()=>{
