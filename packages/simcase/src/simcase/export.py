@@ -53,8 +53,9 @@ Supported layouts:
 - electric conduction and Joule heating, format 0.3 (``electric-joule2d-p1-v2``, the
   layout of ``electric.steady2d``, ``joule.steady2d`` and ``joule.temperature2d``; and
   ``electric2d-p1-node-cell-regions-v2`` of region ``electric.steady2d`` and
-  ``electric-joule2d-p1-node-cell-regions-v2`` of region ``joule.steady2d``, which add
-  the static integer cell data ``triangle_regions``): point data
+  ``electric-joule2d-p1-node-cell-regions-v2`` of region ``joule.steady2d`` and
+  ``electric-joule2d-temperature-p1-node-cell-regions-v2`` of region ``joule.temperature2d``,
+  which add the static integer cell data ``triangle_regions``): point data
   ``electric_potential`` and the nodal ``joule_power_per_depth``,
   ``reaction_current_per_depth``, ``outward_prescribed_current_per_depth`` and
   ``residual_current_per_depth``; cell data ``electric_field``, ``current_density``,
@@ -162,7 +163,9 @@ _CAVITY_COMPLEX = "cavity3d-edge-complex-v2"
 _ELECTRIC_JOULE = "electric-joule2d-p1-v2"
 _ELECTRIC_REGIONS = "electric2d-p1-node-cell-regions-v2"   # electric.steady2d on material regions
 _JOULE_REGIONS = "electric-joule2d-p1-node-cell-regions-v2"   # joule.steady2d on material regions
-_ELECTRIC_LAYOUTS = (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS)
+# joule.temperature2d on material regions: the region Joule arrays plus evaluation_temperature
+_JOULE_TEMPERATURE_REGIONS = "electric-joule2d-temperature-p1-node-cell-regions-v2"
+_ELECTRIC_LAYOUTS = (_ELECTRIC_JOULE, _ELECTRIC_REGIONS, _JOULE_REGIONS, _JOULE_TEMPERATURE_REGIONS)
 _MODES = "em-modes2d-p1-node-centroid-v2"
 _MODES_SUBSPACE = "em-modes2d-subspace-raw-v2"
 # mechanics (format 0.3): arrays under registry names, SI, with VTU unit metadata
@@ -174,7 +177,8 @@ _REGION_LAYOUTS = (_STEADY_REGIONS, _TRANSIENT_REGIONS, _AXISYMMETRIC_REGIONS, _
 # the order of SUPPORTED_LAYOUTS is pinned by tests: new layouts go at the end
 SUPPORTED_LAYOUTS = (_STEADY, _STEADY_BOUNDARY, _TRANSIENT, _CAVITY, _STEADY_REGIONS, _TRANSIENT_REGIONS,
                      _ELECTRIC_JOULE, _CAVITY_COMPLEX, _TRANSIENT_BOUNDARY, _MODES, *_MECHANICS_LAYOUTS,
-                     _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS, _ELECTRIC_REGIONS, _JOULE_REGIONS)
+                     _AXISYMMETRIC_REGIONS, _TRANSIENT_AXISYMMETRIC_REGIONS, _ELECTRIC_REGIONS, _JOULE_REGIONS,
+                     _JOULE_TEMPERATURE_REGIONS)
 #: nodal arrays of the format 0.3 heat layouts; the steps rates start at the second stored time
 _RATES_03 = ("generated_heat_rate", "reaction_heat_rate", "residual_heat_rate", "heat_storage_rate",
              "outward_prescribed_heat_rate", "ambient_convective_heat_rate", "outward_convective_heat_rate",
@@ -284,7 +288,7 @@ def _unit_metadata(names, complex_names=()):
 
 def _region_cell_data(data, layout):
     """Static dimensionless region IDs, without renumbering or interpolation."""
-    if layout not in (*_REGION_LAYOUTS, _ELECTRIC_REGIONS, _JOULE_REGIONS):
+    if layout not in (*_REGION_LAYOUTS, _ELECTRIC_REGIONS, _JOULE_REGIONS, _JOULE_TEMPERATURE_REGIONS):
         return {}
     regions = np.asarray(data.get("triangle_regions"))
     if (regions.shape != (len(data["triangles"]),) or regions.dtype.kind not in "iu"

@@ -138,6 +138,10 @@ def test_e6_a_rectangle_document_keeps_the_rectangle_path():
     assert result.summary()["result_format"] == "electric.steady2d-result-v2"
 
 
+MODEL = {"model": "linear_resistivity", "reference_conductivity": "2 S/m", "reference_temperature": "300 K",
+                     "resistivity_temperature_coefficient": "0.004 1/K", "valid": {"temperature": ["250 K", "600 K"]}}
+
+
 @pytest.mark.parametrize("change, message, code, path", [
     (lambda raw: raw["physics"]["e"].update(prescribed_electric_potential={"left": "1 V", "iface": "0.5 V"}),
      "selection 'iface' lies on an interface between two regions", "E-CONTRACT",
@@ -157,8 +161,9 @@ def test_e6_a_rectangle_document_keeps_the_rectangle_path():
      "at least one boundary potential is required", "E-CONTRACT", "physics.e.prescribed_electric_potential"),
     (lambda raw: raw["physics"]["e"].update(prescribed_electric_potential={"nowhere": "1 V"}),
      "nowhere", "E-SELECTION-UNKNOWN", "physics.e.prescribed_electric_potential.nowhere"),
-    (lambda raw: raw["physics"]["e"].update(type="joule.temperature2d"),
-     "joule.temperature2d: region geometry", "E-CONTRACT", "physics.e.type"),
+    # a conductivity model is read by region joule.temperature2d only (simcase.joule_temperature_regions)
+    (lambda raw: raw["materials"]["B"].update(electrical_conductivity=MODEL), "only joule.temperature2d",
+     "E-CONTRACT", "materials.B.electrical_conductivity"),
 ])
 def test_e7_refusals_name_what_is_wrong(change, message, code, path):
     raw = strip([RIGHT_HALF], potentials(left=1.0, right=0.0),

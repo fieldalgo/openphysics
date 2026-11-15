@@ -544,6 +544,10 @@ class _Walker:
     def leaf_material_property(self, slot, value, path):
         return self.leaf_quantity(slot, value, path)
 
+    def _physics_types(self) -> set:
+        physics = self.tree.get("physics") if isinstance(self.tree.get("physics"), dict) else {}
+        return {p.get("type") for p in physics.values() if isinstance(p, dict)}
+
     def leaf_quantity(self, slot, value, path, *, record: bool = True):
         forms = set(slot.get("forms", ()))
         name = slot["quantity"]
@@ -613,6 +617,10 @@ class _Walker:
         if isinstance(value, dict):
             if "model" in value and "MODEL" not in forms and slot.get("model_message"):
                 self.error("E-CONTRACT", path, slot["model_message"])          # a model refused by name
+                return None
+            if "model" in value and "MODEL" in forms and slot.get("model_types") is not None \
+                    and not self._physics_types() & set(slot["model_types"]):
+                self.error("E-CONTRACT", path, slot["model_message"])          # a model this run does not read
                 return None
             if "model" in value and "MODEL" in forms:
                 out = self.obj(slot, value, path)

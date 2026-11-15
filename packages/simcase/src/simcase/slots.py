@@ -17,7 +17,9 @@ Entry fields: ``pattern``, ``kind`` (``SLOT_KINDS``), ``quantity`` (a registry n
 ``forms`` (value forms, see ``FORMS``), ``values`` (an enum), ``required``, ``default``
 with ``default_reason`` and ``default_if`` (a sibling key that must be present), ``code``
 and ``message`` (a refused key), ``nullable``, ``model_message`` (a quantity slot that refuses a
-model object by name). ``physics_kind`` marks an entry a physics
+model object by name), ``model_types`` (with ``model_message``: a slot whose ``MODEL`` form only
+documents with a physics entry of one of these types may use; any other document's model is
+refused by name, before its keys are read). ``physics_kind`` marks an entry a physics
 kind brings (``PhysicsKind.slots``); it applies to that kind's documents only. A kind entry
 of kind ``override`` changes ``default``, ``required`` and the material policy fields
 (``reads``, ``library``) of the shared slot with the same pattern, for that kind.
@@ -90,10 +92,19 @@ NOT_READ_PROPERTIES = ("shear_modulus", "bulk_modulus", "elasticity_tensor", "me
                        "reference_resistivity")
 #: material properties of a record and their value forms
 MATERIAL_PROPERTIES = {
-    "thermal_conductivity": LENGTH, "volumetric_heat_capacity": LENGTH, "electrical_conductivity": LENGTH,
+    "thermal_conductivity": LENGTH, "volumetric_heat_capacity": LENGTH,
+    "electrical_conductivity": ("QS", "AV", "MODEL"),
     "youngs_modulus": LENGTH, "poisson_ratio": ("BD", "AV"), "linear_expansion_coefficient": LENGTH,
     "mass_density": LENGTH, "refractive_index": ("BD", "NK", "MODEL"), "relative_permittivity": ("BD", "CX"),
     "relative_permeability": ("BD", "CX"),
+}
+
+#: material properties whose model form only some physics types read (``model_types``)
+MATERIAL_MODELS = {
+    "electrical_conductivity": {
+        "model_types": ["joule.temperature2d"],
+        "model_message": "a conductivity model needs an evaluation temperature, which only joule.temperature2d "
+                         "has; give one constant value such as \"2 S/m\""},
 }
 
 
@@ -182,7 +193,8 @@ def _materials() -> list[dict]:
            _obj(m), _leaf(f"{m}.source", "string"),
            _refused(f"{m}.base", "E-KEY-UNKNOWN", "material overrides (base) are not supported in this release; "
                                                   "write the whole record")]
-    out += [_q(f"{m}.{name}", name, forms, kind="material_property") for name, forms in MATERIAL_PROPERTIES.items()]
+    out += [_q(f"{m}.{name}", name, forms, kind="material_property", **MATERIAL_MODELS.get(name, {}))
+            for name, forms in MATERIAL_PROPERTIES.items()]
     out += [_refused(f"{m}.{name}", "E-CONTRACT", f"{name} is a registry property that this release does not read; "
                                                   "give the property the physics reads") for name in NOT_READ_PROPERTIES]
     out += [_leaf(f"{n}.model", "enum", values=["sellmeier"], required=True,
@@ -197,7 +209,28 @@ def _materials() -> list[dict]:
             _leaf(f"{n}.reference_medium", "enum", values=["vacuum"], required=True,
                   object_message="a reference medium other than vacuum (such as {\"air\": ...}) is not implemented "
                                  "in this release")]
+    out += linear_resistivity_slots(f"{m}.electrical_conductivity")
     return out
+
+
+def linear_resistivity_slots(m: str) -> list[dict]:
+    """The ``linear_resistivity`` conductivity model at ``m``: on the physics entry of a rectangle
+    ``joule.temperature2d`` and on a material record (read by region ``joule.temperature2d``
+    only; the other electric kinds refuse it by name)."""
+    return [_leaf(f"{m}.model", "enum", values=["linear_resistivity"], required=True),
+            _q(f"{m}.reference_conductivity", "reference_conductivity", required=True),
+            _q(f"{m}.reference_temperature", "reference_temperature", required=True),
+            _q(f"{m}.resistivity_temperature_coefficient", "resistivity_temperature_coefficient", required=True),
+            _obj(f"{m}.valid", required=True),
+            _q(f"{m}.valid.temperature", "temperature", ("SL",), required=True, range=True),
+            _refused(f"{m}.reference_resistivity", "E-CONTRACT", "linear_resistivity takes reference_conductivity; "
+                                                                 "reference_resistivity is not read"),
+            _refused(f"{m}.alpha", "E-KEY-UNKNOWN", '"alpha" is not a key of linear_resistivity; write '
+                                                    'resistivity_temperature_coefficient (the slope of the '
+                                                    'resistivity, 1/K)'),
+            _refused(f"{m}.conductivity_temperature_coefficient", "E-KEY-UNKNOWN",
+                     '"conductivity_temperature_coefficient" is not a key of linear_resistivity, which takes '
+                     'resistivity_temperature_coefficient (the slope of the resistivity)')]
 
 
 def _mesh() -> list[dict]:

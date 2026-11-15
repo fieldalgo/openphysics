@@ -372,11 +372,11 @@ def region_origin_03(doc, base) -> np.ndarray:
 class ElectricInputs:
     """Electric-stage inputs in SI, as written.
 
-    ``conductivity`` (S/m) is a number on a rectangle (None for ``joule.temperature2d``) and
-    {material name: number} on regions. ``dirichlet`` maps boundary names to V,
+    ``conductivity`` (S/m) is a number on a rectangle and {material name: number} on regions
+    (None for ``joule.temperature2d``). ``dirichlet`` maps boundary names to V,
     ``outward_current`` to A/m^2. ``joule.temperature2d`` adds its conductivity model
-    (``galerkin.temperature_joule_heating.ConductivityModel``), its initial temperature (K)
-    and its iteration options, keyed as galerkin takes them.
+    (``galerkin.temperature_joule_heating.ConductivityModel``; on regions {material name:
+    model}), its initial temperature (K) and its iteration options, keyed as galerkin takes them.
     """
     conductivity: object
     dirichlet: dict
@@ -396,16 +396,37 @@ def rectangle_electric(doc) -> ElectricInputs:
         from .electric_joule import conductivity_model_03
         model = conductivity_model_03(p["electrical_conductivity"])
         initial = p["initial_temperature"]
-        names = {"relaxation_factor": "relaxation", "relative_tolerance": "relative_tolerance",
-                 "iteration_limit": "max_iterations"}
-        iteration = p["iteration"]
-        # the order galerkin received before the units batch: the tolerance last
-        options = {names[k]: v for k, v in iteration.items() if k != "temperature_tolerance"}
-        options["temperature_atol"] = iteration["temperature_tolerance"]
+        options = _iteration_options(p["iteration"])
     return ElectricInputs(conductivity=p.get("electrical_conductivity") if model is None else None,
                           dirichlet=dict(p["prescribed_electric_potential"]),
                           outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()},
                           conductivity_model=model, initial_temperature=initial, iteration=options)
+
+
+def _iteration_options(iteration) -> dict:
+    """The ``iteration`` options of ``joule.temperature2d`` keyed as galerkin takes them, in the
+    order galerkin received before the units batch: the tolerance last."""
+    names = {"relaxation_factor": "relaxation", "relative_tolerance": "relative_tolerance",
+             "iteration_limit": "max_iterations"}
+    options = {names[k]: v for k, v in iteration.items() if k != "temperature_tolerance"}
+    options["temperature_atol"] = iteration["temperature_tolerance"]
+    return options
+
+
+def region_joule_temperature(doc) -> ElectricInputs:
+    """joule.temperature2d on format 0.3 regions, validated: ``conductivity_model`` is
+    {material name: ConductivityModel} over the materials that give ``electrical_conductivity``
+    (a constant is a model of constant value, ``electric_joule.constant_conductivity_model_03``);
+    ``conductivity`` is None; the initial temperature (K) and the iteration options as on a
+    rectangle; ``inward_current_density`` handed over as the outward current ``0.0 - value`` (H1)."""
+    from .electric_joule import conductivity_model_03, constant_conductivity_model_03
+    _, p = next(iter(doc.si["physics"].items()))
+    models = {m: conductivity_model_03(v) if isinstance(v, dict) else constant_conductivity_model_03(v)
+              for m, v in _material_values_03(doc, "electrical_conductivity").items()}
+    return ElectricInputs(conductivity=None, dirichlet=dict(p["prescribed_electric_potential"]),
+                          outward_current={tag: 0.0 - v for tag, v in p.get("inward_current_density", {}).items()},
+                          conductivity_model=models, initial_temperature=p["initial_temperature"],
+                          iteration=_iteration_options(p["iteration"]))
 
 
 def region_electric(doc) -> ElectricInputs:
