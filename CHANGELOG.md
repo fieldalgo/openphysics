@@ -64,9 +64,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
+- Studio: rebuild the workspace as a light CAE workbench with a command ribbon, adjacent model/settings panes, Graphics, a study/message dock, paired dimension fields and accessible panel resizing. Existing solver, file and connection behavior is retained.
 
-- Studio workspace: readable type/spacing tokens, grouped model tree, selectable connection cards, compact file actions and independently scrolling desktop panels. Coupled execution remains unavailable.
+- Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
 
 - `simcase`: **physics providers** (multiphysics contract D1; the protocol is unstable in 0.x). A distribution adds physics kinds through one entry point in the group `openphysics.providers` naming a callable that returns a provider with `name`, `version`, `protocol` (1), `kinds()` (`registry.PhysicsKind`s, unchanged) and `manifest()`: JSON data with each kind's `types`, `field`, `engine`, `process` (`in_process` or `worker`), `ports` (`name`, `direction`, a physmat registry `quantity`, its SI `unit`, `location` `node`/`element`/`grid`/`scalar` and, for inputs, `combine` `single`/`sum`) and optional data-only `ui` hints. simcase's own kinds are the built-in provider `openphysics-fem`, registered by simcase's own entry point; documents, results and numbers are unchanged (every shipped example document saves the same `fields.npz` arrays, `summary.json` apart from wall times, and `model.json`). An error of the built-in provider is raised. The first registry lookup loads the built-in provider, then the others in entry-point name order; a provider that fails to import, raises, has unreadable metadata, declares another protocol, returns an invalid manifest or claims a type or kind name that another provider holds is listed as unavailable with its error, its kinds are left out, and the others still load. `simcase.providers.providers()` lists every provider (name, version, distribution, protocol, status, error, manifest); `check_manifest` checks a manifest and names the bad entry. The built-in kinds declare output ports only: no built-in kind reads another kind's field yet. [Physics providers](docs/packages/simcase/providers.md).
 - `simcase`: a steady heat region document with a connected part that has no fixed temperature and no convection with a positive coefficient (for example an island inside a void ring) is refused by the names of its regions (`physics.<name>.prescribed_temperature: a part with regions ['island'] …`); before, galerkin's "each connected component requires Dirichlet or positive Robin data; missing [0]" reached the user with a component number. The heat stages of region Joule and thermoelastic documents use the same check; the electric region check shares its helper and keeps its message. [Documentation](docs/packages/simcase/thermal_regions2d.md).
@@ -288,7 +288,6 @@ What each package implements, and its limits, is in the
 - Add headless rectangle electric and constant/temperature-dependent Joule JSON/CLI documents, SI result snapshots and failed-iteration evidence; reuse the existing solvers.
 
 - Scalar/full-vector modal PML and constant-radius bends, with complex candidate diagnostics, physical-window tracking, total attenuation, Studio controls and independent slab/cylindrical validation.
-
 
 - Add temperature-dependent 2D steady Joule heating with bounded material models,
   relaxed Picard iteration, failure histories and independent reference tests.
