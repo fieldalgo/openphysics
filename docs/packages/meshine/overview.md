@@ -337,3 +337,21 @@ unit, so `length_unit` is required. See
 Apache License 2.0 - see [LICENSE](../../../packages/meshine/LICENSE) and [NOTICE](../../../packages/meshine/NOTICE).
 
 Copyright 2026 Yongha Kim (FieldAlgo)
+
+## Scalar lengths in the small-angle lattice
+
+The four scalar two-dimensional lengths used by treated-apex propagation and
+lattice placement use Python's `math.hypot`. They do not use a BLAS dot
+reduction. A one-ULP CPU-dispatch difference in a scalar norm can select a
+different power-of-two lattice distance and change later refinement.
+The helper is checked against independently rounded Decimal-80 lengths under
+sign, axis and power-of-two scale transformations. Existing small-angle,
+resource-limit, scale and candidate-order tests remain required.
+
+This change does not round coordinates or change the `legacy`/`stable`
+selection contracts, Delaunay triangulation, circumcenters, vector norms,
+mesh controls or acceptance thresholds. It does not guarantee identical
+meshes across all numerical libraries or platforms. Cocircular diagonals,
+subsequent coordinate construction and insertion order remain separate
+sources of platform differences. Requalify each consuming field model;
+a passing length or mesh test is not field-accuracy certification.

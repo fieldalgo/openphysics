@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Use scalar `math.hypot` in the planar small-angle lattice to avoid CPU-dependent BLAS reductions while preserving mesh controls and selection contracts.
+
 - `galerkin`: explicit two-ground homogeneous Laplace panels, with separate top/bottom current Gram factors, immutable results and bounded geometry/refinement gates. Existing bottom-ground defaults are unchanged. [Contract and finite-domain validation](docs/packages/galerkin/two-ground.md).
 
 - `galerkin`: grounded-rectangle boundary panels accept an explicit interpolation degree (10/12/14/16), retaining degree 10 and its refusal behavior by default. Higher degrees keep the same refinement tolerance and outer geometry.
