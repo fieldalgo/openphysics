@@ -46,6 +46,10 @@ simcase = "simcase.cli:main"
 simcase-studio = "simcase.studio.server:main"
 simcase-run = "simcase.cli:main"
 
+# The built-in physics provider (simcase.providers): simcase's own kinds, loaded first.
+[project.entry-points."openphysics.providers"]
+openphysics-fem = "simcase.providers:builtin_provider"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["simcase*"]

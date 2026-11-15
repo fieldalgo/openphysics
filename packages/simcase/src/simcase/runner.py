@@ -900,7 +900,8 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
                                mean_effective_index=mean, mean_group_index=mean_group)
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name="em.modes2d", types=frozenset({"em.modes2d"}), precedence=100,
     validate=modes_document.validate, run=_run_em_modes2d, summary=modes_document.summary,
     result_types=(RunResult,), fallback=True, slots=modes_document.modes_slots(),

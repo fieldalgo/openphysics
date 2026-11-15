@@ -629,7 +629,8 @@ class CavityRunResult:
         return outdir
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name="em.cavity3d", types=frozenset({TYPE}), precedence=40,
     validate=validate_cavity, run=run_cavity, summary=cavity_summary,
     result_types=(CavityRunResult,),
