@@ -161,6 +161,9 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
    의존 Joule workflow의 실패 증거, 두 경우를 이름으로 다룹니다
    ([`simcase/cli.py`](../../../../packages/simcase/src/simcase/cli.py)). 실패에 구조화된 증거가
    있는 종류는 그곳에 더합니다. 등록하기 전까지 Python 전용 물리는 문서 기능이 되지 않습니다.
+   다른 배포판의 종류는 공급자로 들어옵니다. entry point 그룹 `openphysics.providers`에 등록한
+   공급자가 종류와 데이터만 담은 manifest를 돌려줍니다([물리 공급자](packages/simcase/providers.md),
+   0.x 동안 불안정).
 
 영어와 한국어 문서는 함께 고치고, 수치 기준은 검증한 대로 유지합니다([기여 안내](contributing.md)).
 
@@ -174,4 +177,6 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
 `simcase`는 [물리 등록표](../../../../packages/simcase/src/simcase/registry.py)로 문서를 물리
 타입별로 나눠 보냅니다. 물리마다 계약 검증·실행기·요약·결과 형식을 그곳에 등록하므로, 새 물리를
 더할 때 실행기나 스키마를 고치지 않습니다([새 물리 추가하기](#새-물리-추가하기)).
+등록표의 종류는 [공급자](packages/simcase/providers.md)에서 옵니다. simcase 자신의 종류는 먼저
+불러오는 내장 공급자 `openphysics-fem`입니다.
 이 문서 추가가 새 구현이나 수치 검증 결과를 의미하지는 않습니다.
