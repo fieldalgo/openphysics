@@ -1,0 +1,18 @@
+{
+  "files": {
+    "dual-ground-panel-holdouts-20261115/inputs.json": "5dbfbc63b36243d2ef7e8806e324e1d0a683cee24abd4b388683b1db0dd1c9f4",
+    "dual-ground-panel-holdouts-20261115/scalar-offset/panel-256.json": "9f55edf6c585c39274f565f16785386759b2379e4aeabc15386af8d8dad51197",
+    "dual-ground-panel-holdouts-20261115/scalar-offset/reference-fine.json": "0ceca5c2deff75bd5d3edfcf2fa9946f33793127bdf9722ea439730512cadfe8",
+    "dual-ground-panel-holdouts-isolated-20261115/pair-asymmetric/panel-256.json": "6146f008d58b4efe3332bd928b8a147a899038dfcbf68052e8ebb336d49f531b",
+    "dual-ground-panel-holdouts-reserved-20261115/pair-asymmetric/reference-fine.json": "25baab26caf2851461392d139bb6266408b5f5cbf8bab8972a6775a708d205ff",
+    "dual-ground-panel-holdouts-20261115/pair-close/panel-256.json": "1e66e4239e801023bd2761ce9854f9b338afde236dedc2374ea36e439a39e52e",
+    "dual-ground-panel-holdouts-reserved-20261115/pair-close/reference-fine.json": "82dce9cf9867526ffa64f26db660d1cf50b90a2e48af5974f1127c6b61aa10e4",
+    "quadratic-corner-family-20261114/corner-1250nm-input.json": "b66146b78836daf927890dded40b3ffd8fb0dab890c2a9bb2b8e218dc915eb16",
+    "quartic-outer-20261115/comparison.json": "da8fe8da24290cb09fe7ec3061e5133406c0c8c465ad12b5a26a09716aa44bb5",
+    "quartic-residual-correction-20261115/comparison.json": "1620a44a92f2223006736f661f05df57e2af938e694c8be2e4fe39add79eb5fb",
+    "dual-ground-panel-wide-20261115/box-8/panels-256.json": "619ccc50a70e47513b7a17bce67f7af39a1ca967d3172e8773f87a5221779cc5",
+    "dual-ground-panel-wide-20261115/box-16/panels-256.json": "94121b4fecbdb3a9a68d6adc69fbb6c12d7c0b1b66063df2c1ecf57c7846206e",
+    "dual-ground-panel-wide-20261115/box-32/panels-256.json": "43a33004cfcb4f98d095a6a1386eb7d17b6ef6982bc6fba58d266dbed37e528a"
+  },
+  "scope": "Saved finite comparisons, not a new independent solve. Wide references at 16/32 mm use coarse P4; remaining references use finest registered P4. No absolute accuracy claim. Reference identifiers are archival labels, not repository paths. Raw record hashes are unchanged."
+}
