@@ -382,7 +382,8 @@ def _accepts_mesh_limits(data):
     return is_transient_region_thermal(data)
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name='thermal.transient2d', types=frozenset({PHYSICS}), precedence=20,
     validate=_validate, run=run_transient_thermal, summary=transient_thermal_summary,
     result_types=(TransientThermalRunResult,), fresh_output=True,

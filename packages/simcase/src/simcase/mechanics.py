@@ -714,7 +714,8 @@ def _accepts_mesh_limits(data):
     return is_region_mechanics(data)
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name='mechanics', types=frozenset(TYPES), precedence=15,
     validate=validate_mechanics, run=run_mechanics, summary=document_summary,
     result_types=(MechanicsRunResult,), fresh_output=True,

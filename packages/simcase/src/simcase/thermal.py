@@ -784,7 +784,8 @@ def _forms():
     return FORMS_03
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
     validate=_validate, run=run_thermal, summary=_summary,
     result_types=(ThermalRunResult,), fresh_output=True,

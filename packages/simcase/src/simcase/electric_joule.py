@@ -673,7 +673,8 @@ def _slots():
     return electric_slots()
 
 
-register(PhysicsKind(
+#: the kind this module registers; the built-in provider openphysics-fem reads it here
+KIND = register(PhysicsKind(
     name='electric_joule', types=frozenset(TYPES), precedence=10,
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
     result_types=(ElectricJouleRunResult,), fresh_output=True,

@@ -13,6 +13,11 @@ A document belongs to the first kind, in ``precedence`` order, that claims the
 type of any of its physics entries. A document no kind claims -- an unknown or
 missing type, or a malformed ``physics`` section -- goes to the fallback kind,
 whose validator reports what is wrong with it.
+
+The kinds come from providers (``simcase.providers``): simcase's own kinds are the built-in
+provider ``openphysics-fem``, and an installed distribution can add kinds through an entry
+point in the group ``openphysics.providers``. The first lookup loads the providers, the
+built-in one first; a provider that fails is listed as unavailable and leaves the others.
 """
 
 from __future__ import annotations
@@ -22,7 +27,8 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 #: Modules that register the built-in kinds when imported. Imported on first
-#: lookup, not here: they import ``schema``, which uses this module.
+#: lookup, not here: they import ``schema``, which uses this module. The built-in
+#: provider ``openphysics-fem`` (``simcase.providers``) is these modules' kinds.
 BUILTIN_MODULES = ("electric_joule", "mechanics", "transient_thermal", "thermal", "cavity", "runner")
 
 
@@ -69,6 +75,8 @@ class PhysicsKind:
 
 
 _KINDS: dict[str, PhysicsKind] = {}
+#: kind name -> the name of the provider that added it (``simcase.providers``)
+_OWNERS: dict[str, str] = {}
 _loaded = False
 
 
@@ -87,11 +95,11 @@ def register(kind: PhysicsKind) -> PhysicsKind:
 
 
 def _load_builtin() -> None:
+    """Load the providers once: the built-in kinds, then every installed provider's."""
     global _loaded
     if not _loaded:
         _loaded = True
-        for module in BUILTIN_MODULES:
-            importlib.import_module(f"{__package__}.{module}")
+        importlib.import_module(f"{__package__}.providers")._load()
 
 
 def kinds() -> tuple[PhysicsKind, ...]:
