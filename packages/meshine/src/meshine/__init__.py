@@ -18,11 +18,11 @@ Constrained Delaunay refinement (Ruppert) built on scipy; depends on numpy and s
 
 from . import shapes
 from .extrude import extrude
-from .geometry import Circle, Domain, box_sides, rectangle
+from .geometry import Circle, Domain, MeshInputError, box_sides, rectangle
 from .mesh import TriMesh
 from .mesh3d import MeshCheckError, TetMesh, check, write_msh
-from .refine import MeshSizeLimitError, generate
+from .refine import MeshingError, MeshSizeLimitError, generate
 
 __version__ = "0.0.2"
 __all__ = ["Domain", "Circle", "TriMesh", "TetMesh", "MeshCheckError", "check", "write_msh", "extrude", "generate",
-           "MeshSizeLimitError", "box_sides", "rectangle", "shapes", "__version__"]
+           "MeshingError", "MeshInputError", "MeshSizeLimitError", "box_sides", "rectangle", "shapes", "__version__"]
