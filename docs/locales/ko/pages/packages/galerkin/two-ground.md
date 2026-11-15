@@ -50,3 +50,6 @@ BSD-3-Clause scikit-fem을 사용한다. 정확한 설치 버전·wheel 해시·
 저장소 루트에서 `python -m pytest -q tests/galerkin/two_ground`로 검사한다.
 저장 기준값과 참조 식별자는 해당 디렉터리의 `evidence/`에 있다. 소스·설치본
 검사에는 정확한 산출물 식별이 필요하며 한 OS 검사는 다른 OS의 근거가 아니다.
+
+별도 [직선 모서리 API](two-ground-edges.md)는 이 전체 표면 결과를 유지하며
+도체 모서리별 전류 계수를 제공한다.

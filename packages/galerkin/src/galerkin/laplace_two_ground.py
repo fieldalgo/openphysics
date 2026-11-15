@@ -228,6 +228,12 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
     do not establish panel or outer-domain convergence. Callers must compare
     resolutions and finite outer dimensions for their geometry and quantity.
     """
+    return _rectangle_result(polygons, width=width, height=height,
+        panels_per_edge=panels_per_edge, ground_modes=ground_modes,
+        interpolation_degree=interpolation_degree)[0]
+
+def _rectangle_result(polygons, *, width, height, panels_per_edge, ground_modes, interpolation_degree):
+    """One original checked solve; retain charges for optional edge output."""
     width, height = (_positive(width, 'width'), _positive(height, 'height'))
     modes = _integer(ground_modes, 'ground_modes', 64, 4096)
     try:
@@ -252,7 +258,82 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
     if minimum < -1e-10:
         raise ValueError('boundary current Gram must be positive semidefinite')
     checks = raw['checks']
-    return TwoGroundRectangleResult(raw['capacitance_per_permittivity'], parts, integrated, raw['panels'], checks['condition'], max(checks['raw_matrix_reciprocity'], checks['capacitance_reciprocity']), checks['residual'], current_error, checks['matrix_error'], ground_error, minimum)
+    return TwoGroundRectangleResult(raw['capacitance_per_permittivity'], parts, integrated, raw['panels'], checks['condition'], max(checks['raw_matrix_reciprocity'], checks['capacitance_reciprocity']), checks['residual'], current_error, checks['matrix_error'], ground_error, minimum), raw
+
+@dataclass(frozen=True)
+class TwoGroundRectangleEdgesResult:
+    """Whole surfaces and their straight conductor-edge decomposition.
+
+    Edges follow conductor order and its admitted CCW boundary. A clockwise
+    input is reversed; the first vertex is not otherwise canonicalized.
+    Endpoints are in metres, Gram entries in 1/metre, and signed integrals
+    dimensionless for unit total conductor currents. Grounded planes are
+    retained separately as the last two surfaces of ``whole``.
+    """
+    whole: TwoGroundRectangleResult
+    edge_owners: np.ndarray
+    edge_starts: np.ndarray
+    edge_ends: np.ndarray
+    edge_current_gram: np.ndarray
+    edge_current_integrals: np.ndarray
+    partition_error: float
+
+    def __post_init__(self):
+        for name in ('edge_owners', 'edge_starts', 'edge_ends',
+                     'edge_current_gram', 'edge_current_integrals'):
+            dtype = np.int64 if name == 'edge_owners' else float
+            value = np.asarray(getattr(self, name), dtype=dtype)
+            frozen = np.frombuffer(value.tobytes(), dtype=dtype).reshape(value.shape)
+            object.__setattr__(self, name, frozen)
+
+def solve_two_ground_rectangle_edges(polygons, *, width, height,
+        panels_per_edge=32, ground_modes=128, interpolation_degree=12):
+    """Add straight-edge currents to one original checked rectangle solve.
+
+    The domain, admission rules, defaults and all whole-surface checks are
+    those of :func:`solve_two_ground_rectangle`. Each edge Gram is integrated
+    directly from its panel currents; no normal-flux finite difference or
+    material weighting is used. Edge sums must reproduce each whole conductor
+    at entrywise relative 1e-10, without a diagonal floor. Signed sums and
+    scaled PSD/reciprocity checks also use 1e-10. Failure raises ValueError,
+    without fallback. These consistency checks are not convergence estimates:
+    independently refine panels and outer bounds for each edge quantity.
+    """
+    whole, raw = _rectangle_result(polygons, width=width, height=height,
+        panels_per_edge=panels_per_edge, ground_modes=ground_modes,
+        interpolation_degree=interpolation_degree)
+    n = len(whole.capacitance_per_permittivity)
+    count = panels_per_edge  # Already admitted by the original solve.
+    q = raw['panel_charge_per_permittivity'] @ np.linalg.inv(
+        raw['capacitance_per_permittivity'])
+    a, b = raw['normalized_panel_starts'], raw['normalized_panel_ends']
+    unit = raw['length_unit_m']
+    lengths = np.linalg.norm(b-a, axis=1) * unit
+    owners = raw['owners'][::count]
+    grams, currents = [], []
+    for first in range(0, len(a), count):
+        selected = slice(first, first+count)
+        edge_q = q[selected]
+        grams.append(edge_q.T @ (edge_q / lengths[selected, None]))
+        currents.append(edge_q.sum(axis=0))
+    grams, currents = np.asarray(grams), np.asarray(currents)
+    if not np.isfinite(grams).all() or not np.isfinite(currents).all():
+        raise ValueError('edge currents must be finite')
+    combined = np.asarray([grams[owners == i].sum(axis=0) for i in range(n)])
+    integrated = np.asarray([currents[owners == i].sum(axis=0) for i in range(n)])
+    partition = _entrywise_relative(combined, whole.current_gram[:n])
+    current_error = float(np.max(abs(integrated-whole.current_integrals[:n])))
+    if partition > 1e-10 or current_error > 1e-10:
+        raise ValueError('edge partition does not preserve whole-surface currents')
+    symmetry = _entrywise_relative(grams, grams.swapaxes(-1, -2))
+    scale = np.max(abs(grams), axis=(-1, -2))
+    eigenvalues = np.linalg.eigvalsh(grams)
+    scaled = np.divide(eigenvalues, scale[:, None], out=np.zeros_like(eigenvalues),
+                       where=scale[:, None] != 0)
+    if symmetry > 1e-10 or np.min(scaled) < -1e-10:
+        raise ValueError('edge current Gram must be reciprocal and positive semidefinite')
+    return TwoGroundRectangleEdgesResult(whole, owners, a[::count]*unit,
+        b[count-1::count]*unit, grams, currents, partition)
 
 def _entrywise_relative(a, b):
     """No diagonal floor: each finite entry retains its own relative scale."""
