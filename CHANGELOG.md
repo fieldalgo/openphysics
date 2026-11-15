@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: explicit two-ground homogeneous Laplace panels, with separate top/bottom current Gram factors, immutable results and bounded geometry/refinement gates. Existing bottom-ground defaults are unchanged. [Contract and finite-domain validation](docs/packages/galerkin/two-ground.md).
+
 - `galerkin`: grounded-rectangle boundary panels accept an explicit interpolation degree (10/12/14/16), retaining degree 10 and its refusal behavior by default. Higher degrees keep the same refinement tolerance and outer geometry.
 
 - `galerkin`: opt-in homogeneous Laplace boundary panels in a bottom-grounded rectangle, with reciprocal energy assembly, unit-current surface Gram factors and explicit geometry/resource/refinement checks. [Contract and validation](docs/packages/galerkin/laplace_boundary.md).
