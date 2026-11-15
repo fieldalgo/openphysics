@@ -13,6 +13,35 @@ remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is nee
 
 New to the workspace? Start with the [quick start](workspace_quickstart.md). For build reviews and first-user checks, use the [acceptance checklist](workspace_acceptance.md).
 
+## Workspace layout and visual foundations
+
+The model tree groups setup, physics and study. **Connections** shows the
+heated-waveguide setup as interface cards with labeled input/output quantities.
+Select a card or a physics item in the tree to inspect it without leaving the
+connection view. The inclusion checkboxes retain the existing one-way setup
+behavior; these are not draggable ports, and coupled calculations remain
+unavailable. Disabled interfaces are labeled **Not included**.
+
+**Save session**, **Open session**, undo/redo and the current study action stay
+in the main toolbar. **More file actions** contains input-only files, browser
+drafts and Reset design. Connection/recovery controls and Reset layout are
+below the study sequence. On wide screens, tree, canvas and properties scroll
+independently; at narrower widths the properties move below the canvas.
+
+The local CSS uses semantic color and spacing tokens: a 15 px body, 13 px helper
+text, 24 px view titles, a 4/8 px spacing scale and 40 px standard controls.
+Default tree/properties widths are 240/320 px; existing saved widths are kept.
+Use Reset layout to restore defaults. Focus outlines, a Skip to workspace link,
+text labels beside status colors and reduced-motion preferences are supported.
+System fonts and native controls keep the workspace offline-capable without
+new dependencies. The information hierarchy and spacing are informed by
+[Carbon typography](https://www.carbondesignsystem.com/building-blocks/foundations/typography/overview),
+[Carbon spacing](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
+and [Material type roles](https://m3.material.io/styles/typography/applying-type);
+this is a small Studio-specific CSS system, not an implementation of either
+component library. Tokens are at the start of the Studio foundations layer in
+`workspace.css`.
+
 ## First optical study
 
 1. Choose **Applications → Optical waveguide**. The heated-waveguide card is
