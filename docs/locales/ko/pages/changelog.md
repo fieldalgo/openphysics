@@ -68,6 +68,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- Studio 연결 보기: 색상 포트와 곡선 연결선이 있는 공간적 노드, 읽기 쉬운 포트 문구, 패널 크기를 따라가는 연결선, 그래프 아래 스터디·검사 패널.
+
 - Studio 작업 공간: 글자·간격 토큰, 그룹별 모델 트리, 선택 가능한 연결 카드, 파일 작업 메뉴, 데스크톱 패널 독립 스크롤. 연성 계산 지원 범위는 그대로입니다.
 
 - `galerkin`: **형상 motion은 실수 float64 스칼라가 아닌 `t`를 이름을 밝혀 거부합니다**(dtype을 밝힌 `TypeError`). `motion=`을 받는 모든 풀이기(정상 열, 정상 전기 전도, 탄성, 열탄성 두 경로, 과도 열, 도파관 모드의 `solve_waveguide_modes`와 커널)가 그렇습니다. 전에는 복소 JAX·PyTorch `t`의 허수부가 말없이 버려졌고(0.5+0.25j를 0.5에서 풀었음), PyTorch float32·float16·bfloat16 `t`(또는 `jax_enable_x64`를 켠 JAX의 float32)는 float64로 승격되었습니다. `jax_enable_x64`가 꺼진 JAX는 원래의 거부와 메시지를 그대로 받습니다. float64 `t`의 결과와 미분은 전과 같습니다. [형상 미분](packages/galerkin/shape_derivative.md#거부).
