@@ -32,7 +32,6 @@ from .thermal_regions import (_refuse, boundary_names, build_region_mesh, compon
 PHYSICS = 'electric.steady2d'
 RESULT_FORMAT = 'electric.steady2d-regions-result-v2'
 FIELD_LAYOUT = 'electric2d-p1-node-cell-regions-v2'
-NONLINEAR_JOULE = 'joule.temperature2d'
 #: the physics-entry keys of a region electric document
 ELECTRIC_KEYS = ('prescribed_electric_potential', 'inward_current_density')
 
@@ -40,27 +39,6 @@ ELECTRIC_KEYS = ('prescribed_electric_potential', 'inward_current_density')
 def is_region_electric(data):
     """A steady electric conduction document that declares region geometry."""
     return has_region_geometry(data, PHYSICS)
-
-
-def region_joule_refusal(tree):
-    """``(path, message)`` refusing a temperature-dependent Joule document with region geometry
-    (it takes the rectangle path only; ``joule.steady2d`` on regions is
-    :mod:`simcase.joule_regions`), or None. It reads the raw tree, so the reader refuses the
-    form by name before it asks for the kind's keys (``PhysicsKind.refuse_03``)."""
-    if not has_region_geometry(tree, NONLINEAR_JOULE):
-        return None
-    name = next(n for n, p in tree['physics'].items() if isinstance(p, dict) and p.get('type') == NONLINEAR_JOULE)
-    path = f'physics.{name}.type'
-    return path, (f'{path}: {NONLINEAR_JOULE}: region geometry (named material regions) is supported for {PHYSICS} '
-                  'and joule.steady2d only; a temperature-dependent Joule document takes the rectangle form')
-
-
-def refuse_region_joule(doc):
-    """The same refusal on a read document."""
-    refusal = region_joule_refusal(doc.data)
-    if refusal is not None:
-        path, message = refusal
-        _refuse(message, path)
 
 
 def region_entry_03(doc, label, refused):
@@ -81,7 +59,9 @@ def region_entry_03(doc, label, refused):
 
 
 def positive_conductivities_03(doc, used, keys):
-    """``electrical_conductivity`` may be 0 in the registry; a conductor needs it positive."""
+    """``electrical_conductivity`` may be 0 in the registry; a conductor needs it positive. (A
+    material's conductivity model never reaches here: the reader refuses it by name for every
+    physics but ``joule.temperature2d``, ``slots.MATERIAL_MODELS``.)"""
     materials = doc.si.get('materials') or {}
     for mname in used:
         for key in keys:
@@ -131,8 +111,9 @@ def validate_region_electric(doc):
     single_study_03(doc, PHYSICS)
 
 
-def summary_lines_03(doc, label, keys):
-    """The summary text of a format 0.3 region electric or Joule document, up to its boundary data."""
+def summary_lines_03(doc, label, keys, material_line=None):
+    """The summary text of a format 0.3 region electric or Joule document, up to its boundary data
+    (``material_line(doc, name, spec)`` writes a material's line, when given)."""
     from .thermal import _authored
     from .thermal_regions import _plain
     h = handoff_03(doc)
@@ -146,6 +127,9 @@ def summary_lines_03(doc, label, keys):
     out += [f'  region {r["name"]}: {r["type"]}, {r["material"] if r["material"] is not None else "void (hole)"}'
             for r in h.regions()]
     for mname, spec in doc.si['materials'].items():
+        if material_line is not None:
+            out.append(material_line(doc, mname, spec))
+            continue
         props = ', '.join(f'{k} {_authored(doc, f"materials.{mname}.{k}")}' for k in spec if k != 'source')
         out.append(f'  material {mname}: {props}')
     for key in keys:
@@ -171,11 +155,13 @@ def region_summary(doc):
 
 def region_inputs(doc, mesh, region_materials, electric=None):
     """solve_steady_electric keyword arguments for a meshed region document (from its internal SI
-    view, ``simcase.views.region_electric``), and the boundary name that fixes each fixed node."""
+    view, ``simcase.views.region_electric``), and the boundary name that fixes each fixed node.
+    ``conductivity`` is None when the view has none (``views.region_joule_temperature``)."""
     name, _ = doc.sole_physics()
     path = f'physics.{name}'
     electric = views.region_electric(doc) if electric is None else electric
-    conductivity = {r: float(electric.conductivity[m]) for r, m in region_materials.items()}
+    conductivity = (None if electric.conductivity is None      # joule.temperature2d: a model per material
+                    else {r: float(electric.conductivity[m]) for r, m in region_materials.items()})
     for label, table, given in (('prescribed_electric_potential', mesh.boundary, electric.dirichlet),
                                 ('inward_current_density', mesh.boundary_edges, electric.outward_current)):
         for tag in given:

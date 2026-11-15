@@ -9,7 +9,7 @@ contracts define the numerical solves and unchanged acceptance tolerances.
 
 ## Scope and input
 
-This section is the rectangle form; `electric.steady2d` and `joule.steady2d` also take
+This section is the rectangle form; all three kinds also take
 [material regions](#material-regions-electric-steady-conduction).
 The documents are [format 0.3](document_format.md): every value carries its unit
 (`"2 S/m"`, `"1 V"`, `"300 K"`) and keys are registry quantity names. A format 0.2 electric or
@@ -35,7 +35,7 @@ The physics entry:
 | `inward_heat_flux.<side>` | Joule | optional, positive into the body (the 0.2 `outward_flux_w_m2` negated); added to convection on the same side |
 | `convection.<side>` | Joule | `{"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "300 K"}` |
 | `heat_source_density` | Joule | refused by name: the current is the only heat source |
-| `electrical_conductivity` (model) | `joule.temperature2d` | required, see below; a constant here is `E-VALUE-FORM` |
+| `electrical_conductivity` (model) | `joule.temperature2d` | required on a rectangle, see below; a constant here is `E-VALUE-FORM` |
 | `initial_temperature` | `joule.temperature2d` | required, above 0 K and inside `valid.temperature` |
 | `iteration` | `joule.temperature2d` | required, see below |
 
@@ -116,7 +116,8 @@ material, or flat `background` and `shapes`) uses the geometry, mesh and boundar
   its conductivity; every material a region uses needs it (`E-PROPERTY-MISSING`). The same
   materials table may also hold heat properties (`thermal_conductivity`,
   `volumetric_heat_capacity`); a property this run does not read is reported as
-  `I-UNUSED-PROPERTY`. A material's model form is refused. Library materials (`physmat:...`)
+  `I-UNUSED-PROPERTY`. A material's model form is refused by name (only region
+  `joule.temperature2d` reads it). Library materials (`physmat:...`)
   carry no electrical conductivity for this physics yet and are refused by name. The physics
   entry takes no `electrical_conductivity`.
 - `prescribed_electric_potential` and `inward_current_density` take the domain sides, the
@@ -143,9 +144,9 @@ the body**: the 0.2 `diagnostics.terminal_reaction_current_a_per_m`, positive in
 node fixed by two boundaries counts for the first in name order). Two potential names on the
 same mesh edges and a conductor part with no fixed potential are refused by name. A region
 result exports to VTU like the rectangle one, plus the cell data `triangle_regions`. Steady
-Joule heating on regions is the [next section](#material-regions-steady-joule-heating);
-`joule.temperature2d` keeps the rectangle form and refuses region geometry by name, before
-the reader asks for its keys.
+Joule heating on regions is the [next section](#material-regions-steady-joule-heating), and
+temperature-dependent Joule heating on regions the
+[section after it](#material-regions-temperature-dependent-joule-heating).
 
 Independent checks (`tests/simcase/test_electric_regions.py`, pre-registered E1 to E7):
 
@@ -180,7 +181,8 @@ outward heat equals the Joule power. The result format is
 `triangle_regions`, and in the summary `regions.<region>.{material, electrical_conductivity,
 thermal_conductivity}`, `mesh.minimum_triangle_angle` and the terminal currents. It exports to
 VTU like the rectangle Joule result, plus `triangle_regions`. Temperature-dependent
-conductivity (`joule.temperature2d`) on regions is not supported yet.
+conductivity on regions is the
+[next section](#material-regions-temperature-dependent-joule-heating).
 
 Independent checks (`tests/simcase/test_joule_regions.py`, pre-registered J1 to J7). The
 error is the largest nodal temperature error over the temperature rise:
@@ -206,6 +208,52 @@ unchanged; the sequence is one step finer.
 Since the units and naming batch these checks run on format 0.3 documents converted from the
 0.2 ones; the 0.2 documents on the code before the batch and the converted documents give the
 same solver inputs and saved bytes (`tools/units_batch`), so every number above is unchanged.
+
+## Material regions (temperature-dependent Joule heating)
+
+A `joule.temperature2d` document whose geometry has regions takes the geometry, mesh and
+boundary names of [region steady Joule heating](#material-regions-steady-joule-heating), and
+`initial_temperature` and `iteration` exactly as the rectangle form:
+
+- every material a region uses needs `thermal_conductivity` (a constant) and
+  `electrical_conductivity`, either a constant (`"2 S/m"`) or the `linear_resistivity` model of
+  the rectangle form (the same keys and checks: a positive `reference_conductivity`,
+  `reference_temperature` inside `valid.temperature`, a positive finite conductivity at both
+  ends of the range). The physics entry takes neither conductivity, a constant or a model
+  (refused by name), and no `heat_source_density`. Every other physics refuses a model in a
+  material by name when the document is read (`E-CONTRACT`, on every material, used or not,
+  before its keys are read): none has an evaluation temperature.
+- `initial_temperature`, every prescribed temperature and every ambient temperature must lie
+  inside the `valid.temperature` of every model material, that is inside their intersection
+  (`E-OUTSIDE-VALID` at the value). Ranges with no common temperature are refused at the first
+  material whose range empties the intersection. A constant material imposes no range: galerkin
+  receives it as a model of constant value on [0 K, largest double] (galerkin refuses an
+  infinite range, and no finite temperature reaches that bound).
+- An axisymmetric component and a void background are refused; the region mesh limits apply.
+  The iteration is Picard, with the rectangle options and convergence tests; a failed
+  iteration raises the solver's `JouleConvergenceError` with its history (the CLI prints the
+  same failure evidence as for a rectangle).
+
+The solver evaluates each region's conductivity at the element-mean temperature of the iterate
+(the saved `evaluation_temperature`). The result format is
+`joule.temperature2d-regions-result-v2` with field layout
+`electric-joule2d-temperature-p1-node-cell-regions-v2`: the region Joule fields plus
+`evaluation_temperature`. The summary adds `regions.<region>.{material,
+electrical_conductivity, thermal_conductivity}` (a constant as a value object; a model as
+`{model, reference_conductivity, reference_temperature, resistivity_temperature_coefficient,
+valid: {temperature: [lo, hi]}}` of value objects), `mesh.minimum_triangle_angle`, the
+terminal currents and `iterations`. It exports to VTU like the region Joule result, plus the
+point data `evaluation_temperature`.
+
+Independent checks (`tests/simcase/test_joule_temperature_regions.py`, pre-registered T1 to T7):
+
+| Check | Reference | Result |
+|---|---|---|
+| Two `linear_resistivity` materials in series (a = +4e-3 and -3e-3 1/K), 0.2 V, ends at 300 and 320 K | per material theta = 1 + a (T - T_ref) obeys theta'' = -(a J^2 rho0 / k) theta (trigonometric or hyperbolic), with continuous T and k dT/dx; J by a bracketed root of V = J sum rho0 integral theta | temperature 8.5e-3, 2.0e-3, 4.6e-4 of the rise at mesh size 0.25, 0.125, 0.0625 mm (order 2.1); terminal current 4.1e-4, 9.4e-5, 2.3e-5 relative |
+| Direct galerkin call | `solve_temperature_joule_heat` on the same mesh and inputs | bit for bit |
+| Power | supplied, Joule and outward heat | agree to 4e-14 relative |
+| Zero coefficients, and constant materials | region `joule.steady2d` on the same document | temperature and potential equal (difference 0) |
+| Rectangle documents | results before this change | `joule_rectangle`, `joule_temperature` saved arrays, summary (without timings) and model hashes equal to the commit before (checked when this was written) |
 
 ## Run and save
 
@@ -297,8 +345,8 @@ depth totals, the refusals and the result names are checked in
 `tests/simcase/test_units_electric_joule.py`. Existing solver independent
 reference-tool comparisons remain in force; this adapter adds no discretization.
 
-Only the above rectangle and region subsets with a single study are exposed. Region
-geometry for temperature-dependent Joule documents, interface potentials, axisymmetric conduction, arbitrary
+Only the above rectangle and region subsets with a single study are exposed. Newton
+iteration on documents, interface potentials, axisymmetric conduction, arbitrary
 sigma callbacks, gauge-only currents, terminal totals, transient physics, 3D, Studio
 and release publishing are outside this contract. Saved fields can be viewed in
 ParaView through `simcase.export` ([Viewing in ParaView](overview.md#viewing-in-paraview));

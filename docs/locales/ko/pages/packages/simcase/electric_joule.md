@@ -9,7 +9,7 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 
 ## 범위·입력
 
-이 절은 직사각형 형식이다. `electric.steady2d`와 `joule.steady2d`는
+이 절은 직사각형 형식이다. 세 종류 모두
 [재료 영역](#재료-영역-전기-정상-전도)도 받는다.
 문서는 [형식 0.3](document_format.md)이다. 모든 값이 단위를 함께 쓰고(`"2 S/m"`, `"1 V"`,
 `"300 K"`) 키는 레지스트리 물리량 이름이다. 형식 0.2 전기·Joule 문서는 이름을 밝혀
@@ -34,7 +34,7 @@ physics 항목:
 | `inward_heat_flux.<side>` | Joule | 선택, 몸체로 들어가는 쪽이 양수(0.2 `outward_flux_w_m2`의 부호를 뒤집은 값). 같은 변의 대류와 더해진다 |
 | `convection.<side>` | Joule | `{"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "300 K"}` |
 | `heat_source_density` | Joule | 이름을 밝혀 거부: 전류가 유일한 열원이다 |
-| `electrical_conductivity`(모델) | `joule.temperature2d` | 필수, 아래 참조. 여기서 상수는 `E-VALUE-FORM` |
+| `electrical_conductivity`(모델) | `joule.temperature2d` | 직사각형에서 필수, 아래 참조. 여기서 상수는 `E-VALUE-FORM` |
 | `initial_temperature` | `joule.temperature2d` | 필수, 0 K보다 크고 `valid.temperature` 안 |
 | `iteration` | `joule.temperature2d` | 필수, 아래 참조 |
 
@@ -103,7 +103,7 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 
 - **전도도**
   - `materials.<name>.electrical_conductivity`(양수, 예: `"58 MS/m"`)가 각 영역의 전도도다. 영역이 쓰는 모든 재료에 있어야 한다(`E-PROPERTY-MISSING`).
-  - 같은 재료 표에 열 물성(`thermal_conductivity`, `volumetric_heat_capacity`)을 함께 둘 수 있다. 이 실행이 읽지 않는 물성은 `I-UNUSED-PROPERTY`로 보고한다. 재료의 모델 형식은 거부한다.
+  - 같은 재료 표에 열 물성(`thermal_conductivity`, `volumetric_heat_capacity`)을 함께 둘 수 있다. 이 실행이 읽지 않는 물성은 `I-UNUSED-PROPERTY`로 보고한다. 재료의 모델 형식은 이름을 밝혀 거부한다(영역 `joule.temperature2d`만 읽는다).
   - 라이브러리 재료(`physmat:...`)는 아직 이 물리의 전기전도도를 주지 않으므로 이름을 밝혀 거부한다. physics 항목에는 `electrical_conductivity`를 두지 않는다.
 - **경계 데이터**
   - `prescribed_electric_potential`과 `inward_current_density`는 도메인 변, 형상이 선언한 외부 태그(`boundary_tags` 이름, 빈 공간 feature 경계의 `outer`), 외부 경계 선택을 받는다.
@@ -121,7 +121,7 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 - 같은 메시 변에 전위 이름 둘을 주거나, 고정 전위가 하나도 없는 도체 부분이 있으면 이름을 밝혀 거부한다.
 - 영역 결과도 직사각형 결과처럼 VTU로 내보내며, 셀 데이터 `triangle_regions`가 더해진다.
 
-영역 위의 정상 Joule 가열은 [다음 절](#재료-영역-정상-joule-가열)에 있다. `joule.temperature2d`는 직사각형 형식을 유지하며, 영역 형상은 리더가 그 키를 요구하기 전에 이름을 밝혀 거부한다.
+영역 위의 정상 Joule 가열은 [다음 절](#재료-영역-정상-joule-가열)에, 영역 위의 온도 의존 Joule 가열은 [그다음 절](#재료-영역-온도-의존-joule-가열)에 있다.
 
 독립 검증(`tests/simcase/test_electric_regions.py`, 미리 등록한 E1–E7):
 
@@ -153,7 +153,7 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 - 결과 형식은 `joule.steady2d-regions-result-v2`, 필드 layout은 `electric-joule2d-p1-node-cell-regions-v2`이다.
 - 필드는 직사각형 Joule 필드에 `triangle_regions`를 더한 것이다. 요약에는 `regions.<region>.{material, electrical_conductivity, thermal_conductivity}`, `mesh.minimum_triangle_angle`, 단자 전류가 들어간다.
 - 직사각형 Joule 결과처럼 VTU로 내보내며 `triangle_regions`가 더해진다.
-- 영역 위의 온도 의존 전도도(`joule.temperature2d`)는 아직 지원하지 않는다.
+- 영역 위의 온도 의존 전도도는 [다음 절](#재료-영역-온도-의존-joule-가열)에 있다.
 
 독립 검증(`tests/simcase/test_joule_regions.py`, 미리 등록한 J1–J7). 오차는 절점 온도 오차의 최댓값을 온도 상승으로 나눈 값이다.
 
@@ -170,6 +170,36 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 단위·이름 일괄 변경 이후 이 검증은 0.2 문서를 변환한 형식 0.3 문서로 돈다. 변경 전 코드의 0.2
 문서와 변환한 문서는 같은 솔버 입력과 같은 저장 바이트를 내므로(`tools/units_batch`) 위 숫자는
 모두 그대로다.
+
+## 재료 영역 (온도 의존 Joule 가열)
+
+형상에 영역이 있는 `joule.temperature2d` 문서는 [영역 정상 Joule 가열](#재료-영역-정상-joule-가열)과
+같은 형상·메시·경계 이름을 쓰고, `initial_temperature`와 `iteration`은 직사각형 형식과 똑같이 받는다.
+
+- **전도도**
+  - 영역이 쓰는 모든 재료에 `thermal_conductivity`(상수)와 `electrical_conductivity`가 있어야 한다. `electrical_conductivity`는 상수(`"2 S/m"`)이거나 직사각형 형식의 `linear_resistivity` 모델이다. 키와 검사는 같다: 양수 `reference_conductivity`, `valid.temperature` 안의 `reference_temperature`, 범위 양 끝에서 양수이고 유한한 전도도.
+  - physics 항목에는 두 전도도를 상수든 모델이든 두지 않고(이름을 밝혀 거부) `heat_source_density`도 두지 않는다. 다른 모든 물리는 평가 온도가 없으므로 재료의 모델을 문서를 읽을 때 이름을 밝혀 거부한다(`E-CONTRACT`, 쓰이든 안 쓰이든 모든 재료에서, 그 키를 읽기 전에).
+- **온도 범위**
+  - `initial_temperature`, 모든 고정 온도, 모든 주위 온도는 모든 모델 재료의 `valid.temperature` 안, 곧 그 교집합 안에 있어야 한다(그 값에서 `E-OUTSIDE-VALID`). 공통 온도가 없는 범위는 교집합을 비게 만드는 첫 재료에서 거부한다.
+  - 상수 재료는 범위를 두지 않는다. galerkin은 이를 [0 K, 가장 큰 double] 위의 상수 모델로 받는다(galerkin은 무한 범위를 거부하고, 유한한 온도는 그 끝에 닿지 않는다).
+- **그 밖**: 축대칭 구성 요소와 빈 공간 배경은 거부하며, 영역 메시 한도가 적용된다. 반복은 Picard이며 직사각형과 같은 옵션·수렴 판정을 쓴다. 반복이 실패하면 솔버의 `JouleConvergenceError`가 이력과 함께 그대로 나간다(CLI는 직사각형과 같은 실패 증거를 출력한다).
+
+솔버는 각 영역의 전도도를 반복값의 요소 평균 온도(저장되는 `evaluation_temperature`)에서 평가한다.
+
+**결과**
+- 결과 형식은 `joule.temperature2d-regions-result-v2`, 필드 layout은 `electric-joule2d-temperature-p1-node-cell-regions-v2`이다.
+- 필드는 영역 Joule 필드에 `evaluation_temperature`를 더한 것이다. 요약에는 `regions.<region>.{material, electrical_conductivity, thermal_conductivity}`(상수는 값 객체, 모델은 값 객체로 된 `{model, reference_conductivity, reference_temperature, resistivity_temperature_coefficient, valid: {temperature: [lo, hi]}}`), `mesh.minimum_triangle_angle`, 단자 전류, `iterations`가 들어간다.
+- 영역 Joule 결과처럼 VTU로 내보내며 절점 데이터 `evaluation_temperature`가 더해진다.
+
+독립 검증(`tests/simcase/test_joule_temperature_regions.py`, 미리 등록한 T1–T7):
+
+| 확인 | 기준 | 결과 |
+|---|---|---|
+| 직렬 두 `linear_resistivity` 재료(a = +4e-3, −3e-3 1/K), 0.2 V, 양 끝 300 K와 320 K | 재료마다 θ = 1 + a (T − T_ref)가 θ'' = −(a J² ρ0 / k) θ(삼각 또는 쌍곡)를 따르고 T와 k dT/dx가 연속; J는 V = J Σ ρ0 ∫θ의 구간 근 | 메시 0.25, 0.125, 0.0625 mm에서 온도 오차가 상승의 8.5e-3, 2.0e-3, 4.6e-4(차수 2.1), 단자 전류 상대 4.1e-4, 9.4e-5, 2.3e-5 |
+| galerkin 직접 호출 | 같은 메시·입력의 `solve_temperature_joule_heat` | 비트 단위로 같음 |
+| 전력 | 공급, Joule, 바깥으로 나가는 열 | 상대 4e-14까지 같음 |
+| 계수 0, 그리고 상수 재료 | 같은 문서의 영역 `joule.steady2d` | 온도·전위가 같음(차이 0) |
+| 직사각형 문서 | 이 변경 전 결과 | `joule_rectangle`, `joule_temperature`의 저장 배열·요약(시간 제외)·모델 해시가 직전 커밋과 같음(작성 때 확인) |
 
 ## 실행·저장
 
@@ -254,7 +284,7 @@ redirect해 보존한다.
 `tests/simcase/test_units_electric_joule.py`가 검사한다. 기존 솔버의 독립 도구 비교는 유지하며
 새로운 이산화는 추가하지 않는다.
 
-이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 온도 의존 Joule 문서의 영역 형상,
+이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 문서에서의 Newton 반복,
 경계면 전위, 축대칭 전도, 임의 σ 함수, 기준 전위만 주는 전류 조건, 단자 총량, 과도, 3D,
 Studio, 릴리스는 제외한다. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수 있다
 ([ParaView로 보기](overview.md#paraview로-보기)). 그 내보내기는 저장된 배열을 복사하고 FieldData
