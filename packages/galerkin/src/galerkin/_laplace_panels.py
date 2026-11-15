@@ -96,23 +96,34 @@ def _unequal_panel_integral(a, b, c, d):
     def primitive(u, h):
         return 0.5 * xlogy(u, u * u + h * h) - u + h * np.arctan2(u, h)
 
-    def integrate(order):
+    def integrate(order, *, local=False):
         nodes, weights = leggauss(order)
         result = np.zeros(len(aa))
         for t, weight in zip((nodes + 1) / 2, weights / 2):
             p, q = (t ** 3, (1 - t) ** 3)
             u = p / (p + q)
             jacobian = 3 * t * t * (1 - t) ** 2 / (p + q) ** 2
-            target = aa + u * (bb - aa)
-            offset = (cc - target) / length[:, None]
+            if local:
+                # Avoid rounding short target motion at a large world origin.
+                offset = (cc - aa) / length[:, None] - u * ((bb - aa) / length[:, None])
+            else:
+                target = aa + u * (bb - aa)
+                offset = (cc - target) / length[:, None]
             longitudinal = np.einsum('ij,ij->i', offset, direction)
             height = abs(offset[:, 0] * direction[:, 1] - offset[:, 1] * direction[:, 0])
             mean = np.log(length) + primitive(longitudinal + 1, height) - primitive(longitudinal, height)
             result += weight * jacobian * mean
         return result
     coarse, fine = (integrate(32), integrate(64))
-    if np.any(abs(fine - coarse) > 1e-12 * np.maximum(1.0, abs(fine))):
-        raise ValueError('unequal-panel quadrature did not converge')
+    unresolved = abs(fine - coarse) > 1e-12 * np.maximum(1.0, abs(fine))
+    if np.any(unresolved):
+        # Preserve already accepted entries exactly. Retry only failed entries
+        # with a better coordinate evaluation, retaining the original gate.
+        local_coarse, local_fine = integrate(32, local=True), integrate(64, local=True)
+        if np.any(abs(local_fine[unresolved] - local_coarse[unresolved]) >
+                  1e-12 * np.maximum(1.0, abs(local_fine[unresolved]))):
+            raise ValueError('unequal-panel quadrature did not converge')
+        fine[unresolved] = local_fine[unresolved]
     return fine
 
 def exact_double_log(a, b, c, d):
