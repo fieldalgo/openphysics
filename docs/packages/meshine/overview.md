@@ -144,16 +144,16 @@ These apply to every input:
   splits and the first triangulation, so an input with more points is refused
   before any refinement work; building the domain, which is O(V²) in its
   vertices (see Limits), still comes first. The error is `MeshSizeLimitError`,
-  a `RuntimeError` subclass exported by `meshine`; its message starts with
-  `more than <max_points> points`.
+  a `MeshingError` (and so a `RuntimeError`) exported by `meshine`; its message
+  starts with `more than <max_points> points`.
 - A boundary point the triangulation cannot resolve is refused at once. Qhull
   leaves a point out when two boundaries come closer than double precision
   separates at the domain's extent: a vertex a hair off another edge, a sliver
   edge, or the two sides of a sharp corner with a curved side that kept
   splitting each other toward the apex (see [Limits](#limits)). A segment
   through that point can never be recovered, so
-  `generate` raises a `RuntimeError` that names the point and the distance,
-  instead of splitting the segment forever.
+  `generate` raises a `MeshingError` (a `RuntimeError`) that names the point and
+  the distance, instead of splitting the segment forever.
 - An input edge shorter than `SNAP_EPS` (3e-8 of the domain diagonal, below
   the shortest edge the earlier meshine meshed, 4.5e-8) is dropped where that
   is safe. When one end vertex has exactly two segments with the same owners
@@ -191,6 +191,24 @@ These apply to every input:
   `tests/meshine/test_refine_cost.py` builds these inputs, bounds the query
   sizes, and checks the queries against a brute force and the corners and
   meshes against the old implementations.
+
+## Errors
+
+A refusal that explains why an input cannot be meshed has a public class, with
+the builtin base it always had, so code that catches `RuntimeError` or
+`ValueError` keeps working; the messages are the ones above:
+
+- `meshine.MeshingError`, a `RuntimeError`: meshing cannot finish. Refinement
+  that has not finished in `max_rounds` rounds, a boundary point the
+  triangulation cannot resolve, and `MeshSizeLimitError`, the point cap.
+- `meshine.MeshInputError`, a `ValueError`: `Domain.build` or `generate`
+  refuses the domain's geometry. A loop with fewer than 3 vertices, a domain
+  without regions or without extent, a zero-length edge, a segment shared by
+  more than two regions, and an empty mesh (degenerate triangles, or regions
+  that enclose no area).
+
+Argument checks stay plain `ValueError`: a `Circle` radius or vertex count, an
+unknown `candidate_order`, `min_angle` above 33.
 
 ## Layered tetrahedral meshes
 
