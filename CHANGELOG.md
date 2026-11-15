@@ -74,6 +74,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Studio results: fit optical plots to the available desktop height and hide inactive job actions after completion.
+
 - Studio: rebuild the workspace as a light CAE workbench with a command ribbon, adjacent model/settings panes, Graphics, a study/message dock, paired dimension fields and accessible panel resizing. Existing solver, file and connection behavior is retained.
 
 - Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
