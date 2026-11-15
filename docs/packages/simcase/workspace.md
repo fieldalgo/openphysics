@@ -15,38 +15,39 @@ New to the workspace? Start with the [quick start](workspace_quickstart.md). For
 
 ## Workspace layout and visual foundations
 
-The model tree groups setup, physics and study. **Connections** shows the
-heated-waveguide setup as spatial nodes with colored input/output ports and curved wires.
-Select a node, a port or a physics item in the tree to inspect it without leaving the
-connection view. The inclusion checkboxes retain the existing one-way setup
-behavior; these are not draggable ports, and coupled calculations remain
-unavailable. Disabled interfaces are labeled **Not included**, and their dependent wires disappear.
-Heat-source wires are rose, temperature wires amber, and geometry updates use
-a dashed lavender wire. Ports have explicit quantity labels; color alone is
-not the identifier. Study order and capability checks sit below the graph.
-On small screens the graph scrolls horizontally to keep its labels readable.
-Wires follow socket positions when panel widths change. Port selection opens
-properties; arbitrary port wiring and dragging are not implemented.
+The workbench has a command ribbon, a model builder and adjacent Settings panel
+on the left, a large Graphics workspace on the right, and a Study/Messages dock
+below. The ribbon groups Project, Edit, Model setup and Compute. **Geometry**,
+**Materials**, **Mesh** and **Study** open the same settings as the model tree.
+The optical workflow strip shows the current step without hiding the model.
 
-**Save session**, **Open session**, undo/redo and the current study action stay
-in the main toolbar. **More file actions** contains input-only files, browser
-drafts and Reset design. Connection/recovery controls and Reset layout are
-below the study sequence. On wide screens, tree, canvas and properties scroll
-independently; at narrower widths the properties move below the canvas.
+**Save** and **Open** keep their session semantics, including completed optical
+runs and comparisons. **More** contains input-only files, browser drafts and
+Reset design. **Workspace tools** in the bottom status bar contains connection,
+recovery and Reset layout. Heat results remain in the current tab only.
 
-The local CSS uses semantic color and spacing tokens: a 14 px body, 13 px port
-labels, 12 px port units, 20 px view titles, a 4/8 px spacing scale and 40 px standard controls.
-Default tree/properties widths are 240/320 px; existing saved widths are kept.
-Use Reset layout to restore defaults. Focus outlines, a Skip to workspace link,
-text labels beside status colors and reduced-motion preferences are supported.
-System fonts and native controls keep the workspace offline-capable without
-new dependencies. The information hierarchy and spacing are informed by
-[Carbon typography](https://www.carbondesignsystem.com/building-blocks/foundations/typography/overview),
-[Carbon spacing](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
-and [Material type roles](https://m3.material.io/styles/typography/applying-type);
-this is a small Studio-specific CSS system, not an implementation of either
-component library. Tokens are at the start of the Studio foundations layer in
-`workspace.css`.
+Settings and Graphics scroll independently on wide screens. The default
+Model builder/Settings widths are 240/320 px; saved widths are retained. Drag
+either divider right to widen its panel, or focus it and use Left/Right;
+Shift uses larger steps and Home/End reach the limits. At narrower widths,
+the settings and tree appear above Graphics; on phones the panels stack.
+Position and size inputs are paired to keep the core dimensions visible.
+
+The local CSS uses light neutral surfaces, blue selection, system fonts and
+compact square controls: 13 px base text, 13 px input labels, 18–20 px view
+headings and 32 px numeric inputs. Small ribbon/status labels have separate
+roles. Tokens live at the top of `workspace.css`. Focus outlines, a skip link,
+textual statuses and native form controls are retained. The shell and line
+icons are authored locally, with no new runtime dependency, font download or CDN.
+
+**Connections** retains the one-way setup diagram with labeled ports and curved
+wires. Selecting a node, port or physics tree item opens its settings. Heat-source
+wires are rose, temperature wires amber and geometry updates use dashed purple
+wires. Excluded interfaces lose their dependent wires, and wires follow the
+ports when panels resize. Small screens scroll the graph horizontally.
+Ports inspect settings; arbitrary wiring, field transfer and coupled execution
+remain unavailable. Single-physics optical and heat studies retain their existing
+solver contracts.
 
 ## First optical study
 

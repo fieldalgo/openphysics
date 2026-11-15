@@ -68,9 +68,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
-- Studio 연결 보기: 색상 포트와 곡선 연결선이 있는 공간적 노드, 읽기 쉬운 포트 문구, 패널 크기를 따라가는 연결선, 그래프 아래 스터디·검사 패널.
+- Studio: 명령 리본, 인접한 모델/설정 패널, Graphics, 스터디/메시지 영역, 두 열 치수 입력과 키보드 패널 크기 조절을 갖춘 밝은 CAE 작업대로 재설계했습니다. 기존 솔버·파일·연결 동작은 유지합니다.
 
-- Studio 작업 공간: 글자·간격 토큰, 그룹별 모델 트리, 선택 가능한 연결 카드, 파일 작업 메뉴, 데스크톱 패널 독립 스크롤. 연성 계산 지원 범위는 그대로입니다.
+- Studio 연결 보기: 색상 포트와 곡선 연결선이 있는 공간적 노드, 읽기 쉬운 포트 문구, 패널 크기를 따라가는 연결선, 그래프 아래 스터디·검사 패널.
 
 - `galerkin`: **형상 motion은 실수 float64 스칼라가 아닌 `t`를 이름을 밝혀 거부합니다**(dtype을 밝힌 `TypeError`). `motion=`을 받는 모든 풀이기(정상 열, 정상 전기 전도, 탄성, 열탄성 두 경로, 과도 열, 도파관 모드의 `solve_waveguide_modes`와 커널)가 그렇습니다. 전에는 복소 JAX·PyTorch `t`의 허수부가 말없이 버려졌고(0.5+0.25j를 0.5에서 풀었음), PyTorch float32·float16·bfloat16 `t`(또는 `jax_enable_x64`를 켠 JAX의 float32)는 float64로 승격되었습니다. `jax_enable_x64`가 꺼진 JAX는 원래의 거부와 메시지를 그대로 받습니다. float64 `t`의 결과와 미분은 전과 같습니다. [형상 미분](packages/galerkin/shape_derivative.md#거부).
 - `simcase`: **`joule.temperature2d` 문서가 Newton 방법을 고릅니다.** 선택 키 `iteration.method`(`"picard"` 또는 `"newton"`)이며 직사각형과 이름 붙은 재료 영역 모두에서 씁니다. 없으면 전처럼 `"picard"`입니다. slot 표 기본값이 없으므로 이 키가 없는 문서는 전과 바이트 단위로 같게 검증·실행·저장됩니다(`defaults_applied`도 그대로). `"newton"`은 galerkin `solve_temperature_joule_heat`를 `method="newton"`과 같은 수렴 검사로 부릅니다. `"newton"` 옆에 쓴 `relaxation_factor`는 이름을 밝혀 거부하고(`E-CONTRACT`; Newton은 완화를 쓰지 않음), `method`의 다른 값은 `E-VALUE-FORM`입니다. Newton 요약은 `iterations` 앞에 `iteration_method: "newton"`을 더하고, Picard 요약에는 이 키가 없습니다. Studio의 Joule route는 Newton 문서를 이름을 밝혀 거부합니다(`unsupported_iteration_method`). 반복 상한이 Picard 걸음을 세기 때문입니다. 검사 N1–N8(`tests/simcase/test_joule_temperature_newton.py`): 출하 예제에서 Newton은 Picard의 26번 대신 3번 반복하고 9.0e-12 K 안에서 같습니다. 기본 Picard가 100번에서 멈추는 galerkin 서미스터(7 1/K)에서 Newton은 4번에 수렴하고, 두 재료 띠는 닫힌 해 차수 2.1을 유지합니다([계약](packages/simcase/electric_joule.md#문서에서의-newton-반복)).

@@ -1,90 +1,34 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OpenPhysics Studio · Multiphysics workspace</title>
-<link rel="stylesheet" href="/workspace-assets/workspace.css">
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenPhysics Studio</title><link rel="stylesheet" href="/workspace-assets/workspace.css"></head>
 <body>
 <a class="skip-link" href="#canvas">Skip to workspace</a>
-<header>
-<strong class="brand">
-<span class="brand-mark" aria-hidden="true">◈</span> OpenPhysics <span>Studio</span>
-</strong>
-<span id="project">Thermo-mechanical waveguide / Untitled</span>
-<span class="badge">LOCAL WORKSPACE</span>
-</header>
-<nav aria-label="Workspace pages" class="page-nav">
-<button data-page="Applications">Applications</button>
-<button data-page="Model">Model</button>
-<button data-page="Connections">Connections</button>
-<button data-page="Results">Results</button>
-<button data-page="Compare">Compare</button>
-</nav>
-<div class="project-actions">
-<button id="undo-edit" title="Undo input edit (Ctrl/Cmd+Z outside text fields)" aria-keyshortcuts="Control+Z Meta+Z" disabled>Undo</button>
-<button id="redo-edit" title="Redo input edit (Ctrl/Cmd+Shift+Z or Ctrl+Y outside text fields)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" disabled>Redo</button>
-<button id="save-session" class="primary-save" title="Save inputs, completed runs, names, pins and the comparison to one file." aria-description="Saves inputs, completed runs, names, pins and the comparison to one file.">Save session</button>
-<button id="open-session" title="Open a saved session file with its runs and comparison." aria-description="Opens a saved session file with its runs and comparison.">Open session</button>
-<details class="file-menu">
-<summary>More file actions</summary>
-<div class="file-menu-items">
-<button id="save-project" title="Save the model inputs only. Computed results are not included." aria-description="Saves the model inputs only. Computed results are not included.">Save inputs only</button>
-<button id="open-project" title="Open a file of model inputs. Run history is kept." aria-description="Opens a file of model inputs. Run history is kept.">Open inputs file</button>
-<button id="save-draft" title="Keep the inputs in this browser only." aria-description="Keeps the inputs in this browser only.">Save draft</button>
-<button id="restore-draft">Restore draft</button>
-<input id="project-file" type="file" accept=".json,application/json" hidden>
-<button id="reset" class="end">Reset design</button>
-<input type="file" id="run-import-file" accept=".json,application/json" hidden>
-<input type="file" id="session-file" accept=".json,application/json" hidden>
+<header class="titlebar"><strong class="brand"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2 26 9v10l-12 7L2 19V9Z M2 9l12 7 12-7 M14 16v10 M8 6l12 7v10"/></svg>OpenPhysics <span>Studio</span></strong><span id="project">Untitled model</span><span class="badge"><i></i>Local workspace</span></header>
+<nav aria-label="Workspace pages" class="page-nav"><button data-page="Applications">Applications</button><button data-page="Model">Model</button><button data-page="Connections">Connections</button><button data-page="Results">Results</button><button data-page="Compare">Compare</button></nav>
+<div class="project-actions" role="toolbar" aria-label="Workbench commands">
+<div class="ribbon-group"><div class="ribbon-commands"><button id="open-session" aria-description="Opens a saved session file with its runs and comparison." title="Open a saved session with its runs and comparison" aria-label="Open session"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M3 7h6l2 2h10l-3 11H3V7zm0 2V4h7l2 3h7v2"/></svg><span>Open</span></button><button id="save-session" aria-description="Saves inputs, completed optical runs, names, pins and the comparison to one file." title="Save inputs, completed runs and comparison to one file" aria-label="Save session"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M4 3h14l3 3v15H3V3h1zm3 0v6h10V3M7 21v-8h10v8"/></svg><span>Save</span></button>
+<details class="file-menu"><summary aria-label="More file actions"><span class="more-icon" aria-hidden="true">···</span>More</summary><div class="file-menu-items">
+<button id="save-project" aria-description="Saves the model inputs only. Computed results are not included.">Save inputs only</button><button id="open-project" aria-description="Opens a file of model inputs. Run history is kept.">Open inputs file</button><button id="save-draft" aria-description="Keeps the inputs in this browser only. Computed results are not included.">Save browser draft</button><button id="restore-draft">Restore browser draft</button><button id="reset">Reset design</button>
+<input id="project-file" type="file" accept=".json,application/json" hidden><input type="file" id="run-import-file" accept=".json,application/json" hidden><input type="file" id="session-file" accept=".json,application/json" hidden></div></details>
+</div><span class="ribbon-label">Project</span></div>
+<div class="ribbon-group"><div class="ribbon-commands"><button id="undo-edit" title="Undo input edit (Ctrl/Cmd+Z outside text fields)" aria-keyshortcuts="Control+Z Meta+Z" disabled><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M9 5L3 11l6 6M3 11h11a6 6 0 016 6"/></svg><span>Undo</span></button><button id="redo-edit" title="Redo input edit (Ctrl/Cmd+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" disabled><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M15 5l6 6-6 6m6-6H10a6 6 0 00-6 6"/></svg><span>Redo</span></button></div><span class="ribbon-label">Edit</span></div>
+<div class="ribbon-group model-commands"><div class="ribbon-commands"><button data-command-node="Geometry"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M12 2L3 7v10l9 5 9-5V7L12 2zM3 7l9 5 9-5M12 12v10"/></svg><span>Geometry</span></button><button data-command-node="Materials"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M12 3L2 8l10 5 10-5-10-5zM2 12l10 5 10-5M2 16l10 5 10-5"/></svg><span>Materials</span></button><button data-command-node="Mesh"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M3 3h18v18H3V3zm0 0l18 18M3 12h18M12 3v18M3 21L21 3"/></svg><span>Mesh</span></button><button data-command-node="Study"><svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon"><path d="M8 3h8v3h4v16H4V6h4M8 3v5h8V3M8 13h8M8 17h5"/></svg><span>Study</span></button></div><span class="ribbon-label">Model setup</span></div>
+<div class="ribbon-group solve-commands"><div class="ribbon-commands"><button id="run-optical" disabled>Run optical study</button><button id="run-heat" hidden disabled>Run heat study</button><button id="run-joule" hidden disabled>Run Joule heating study</button></div><span class="ribbon-label">Compute</span></div>
 </div>
-</details>
-<span class="action-spacer">
-</span>
-<button id="run-optical" disabled>Run optical study</button>
-<button id="run-heat" hidden disabled>Run heat study</button>
-<button id="run-joule" hidden disabled>Run Joule heating study</button>
-</div>
-<section id="job-panel" class="layout-help" hidden>
-<span id="job-input">
-</span>
-<span id="job-message" role="status">
-</span>
-<span id="job-storage" role="status">
-</span>
-<button id="stop-waiting" disabled>Stop waiting</button>
-<button id="resume-job" disabled>Resume job</button>
-<button id="forget-job" disabled>Detach job</button>
-</section>
-<section id="input-problems" role="alert" hidden>
-</section>
-<nav id="workflow" aria-label="Optical workflow" hidden>
-</nav>
+<section id="job-panel" class="layout-help" hidden><span id="job-input"></span><span id="job-message" role="status"></span><span id="job-storage" role="status"></span><button id="stop-waiting" disabled>Stop waiting</button><button id="resume-job" disabled>Resume job</button><button id="forget-job" disabled>Detach job</button></section>
+<section id="input-problems" role="alert" hidden></section>
+<nav id="workflow" aria-label="Optical workflow" hidden></nav>
 <main aria-label="Model workspace">
-<aside class="tree" id="tree">
-</aside>
-<section class="workspace">
-<div class="toolbar">
-<span id="breadcrumb">
-</span>
-<button data-view="Perspective">Perspective</button>
-<button data-view="Section">Section</button>
-</div>
-<div class="canvas" id="canvas" tabindex="-1">
-</div>
-<div class="note">Conceptual geometry only · no CAD kernel, mesh or computed deformation</div>
-</section>
-<aside class="inspector" id="inspector">
-</aside>
+<aside class="tree" id="tree" aria-label="Model builder"></aside>
+<section class="settings-pane"><div class="pane-title"><span>Settings</span><span class="pane-detail">Selected object</span></div><aside class="inspector" id="inspector" aria-label="Selected object settings"></aside></section>
+<section class="workspace"><div class="document-tab"><span class="document-icon" aria-hidden="true">▧</span><strong id="view-title">Graphics</strong><span id="view-detail">Model view</span></div>
+<div class="toolbar"><span id="breadcrumb"></span><button data-view="Perspective">Perspective</button><button data-view="Section">Section</button></div>
+<div class="canvas" id="canvas" tabindex="-1"></div><div class="note">Conceptual geometry only · no CAD kernel, mesh or computed deformation</div></section>
 </main>
-<section class="bottom">
-<span class="muted">STUDY SEQUENCE</span>
-<div class="sequence" id="sequence">
-</div>
-</section>
-<details id="workspace-tools">
-<summary>Connection, recovery & layout</summary>
+<section class="bottom" aria-label="Study and messages"><div class="dock-title"><strong>Study sequence</strong><span>Explicit calculation · input snapshot retained</span></div><div class="sequence" id="sequence"></div><div class="message-line"><span class="message-label">Messages</span><span id="file-status" role="status">Choose a model to begin. Save session keeps inputs, optical runs and the comparison.</span></div></section>
+<footer><span id="status" role="status">Design inputs · no solver executed</span><span id="autosave-status" role="status">Checking recovery…</span><details id="workspace-tools">
+<summary>Workspace tools</summary><div class="workspace-tools-content"><p id="notebook-status" role="status"></p><p><a href="/" target="_blank" rel="noopener">Classic optical and thermal Studio ↗</a></p>
 <div class="layout-help">
 <span id="notebook-recovery-detail" role="status">Recent completed sessions are recovered from this browser only. Save session for a portable file.</span>
 <button id="recover-notebook" disabled>Recover last session</button>
@@ -108,26 +52,6 @@
 </span>
 </div>
 <button id="reset-layout">Reset layout</button>
-</details>
-<details id="installed-physics">
-<summary>Installed physics</summary>
-<div class="layout-help">
-<div id="provider-list">Open to list the physics providers installed with Studio.</div>
-</div>
-</details>
-<div id="file-status" role="status" >Save session keeps inputs, runs and the comparison. Save inputs only and drafts keep no results.</div>
-<footer>
-<span id="autosave-status" role="status">Checking browser recovery…</span>
-<span id="notebook-status" role="status">
-</span>
-<span id="status" role="status">Design inputs · no solver executed</span>
-<span>
-<a href="/" target="_blank" rel="noopener">Classic optical and thermal Studio ↗</a>
-</span>
+</div></details><details id="installed-physics"><summary>Installed physics</summary><div class="layout-help"><div id="provider-list">Open to list the physics providers installed with Studio.</div></div></details>
 </footer>
-<script src="/static/thermal.js">
-</script>
-<script type="module" src="/workspace-assets/workspace-app.mjs">
-</script>
-</body>
-</html>
+<script src="/static/thermal.js"></script><script type="module" src="/workspace-assets/workspace-app.mjs"></script></body></html>

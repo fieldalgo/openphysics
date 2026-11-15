@@ -67,7 +67,7 @@ export function installViewport(host, camera, { fit = () => camera.fit(), fitSha
   };
   const button = (label, key) => {
     const el = document.createElement('button'); el.type = 'button';
-    el.textContent = label; el.onclick = () => { keys[key](); refresh(); };
+    el.setAttribute('aria-label',label); el.title=label; el.textContent = ({'Zoom out':'−','Zoom in':'+','Pan left':'←','Pan right':'→','Pan up':'↑','Pan down':'↓'})[label]||label; el.onclick = () => { keys[key](); refresh(); };
     bar.append(el); return el;
   };
   const zoomOut = button('Zoom out', '-'), zoomIn = button('Zoom in', '+');

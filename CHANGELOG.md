@@ -74,9 +74,9 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
-- Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
+- Studio: rebuild the workspace as a light CAE workbench with a command ribbon, adjacent model/settings panes, Graphics, a study/message dock, paired dimension fields and accessible panel resizing. Existing solver, file and connection behavior is retained.
 
-- Studio workspace: readable type/spacing tokens, grouped model tree, selectable connection cards, compact file actions and independently scrolling desktop panels. Coupled execution remains unavailable.
+- Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
 
 - `galerkin`: **a shape motion refuses a `t` that is not a real float64 scalar** by name (`TypeError` with its dtype), on every solver that takes `motion=`: steady heat, steady electric conduction, elasticity, both thermoelasticity paths, transient heat and the waveguide modes (`solve_waveguide_modes` and the kernel). Before, a complex JAX or PyTorch `t` lost its imaginary part without a word (0.5+0.25j was solved at 0.5), and a PyTorch float32, float16 or bfloat16 `t` (or a JAX float32 with `jax_enable_x64` on) was promoted to float64. JAX without `jax_enable_x64` keeps its refusal and message. A float64 `t` gives the same results and derivatives as before. [Shape derivatives](docs/packages/galerkin/shape_derivative.md#refused).
 - `simcase`: **`joule.temperature2d` documents choose Newton's method** with the optional key `iteration.method` (`"picard"` or `"newton"`), on a rectangle and on named material regions. Absent means `"picard"`, as before; the key has no slot-table default, so a document without it validates, runs and saves byte for byte as before (`defaults_applied` unchanged). `"newton"` calls galerkin's `solve_temperature_joule_heat` with `method="newton"` and the same convergence tests. A `relaxation_factor` written beside `"newton"` is refused by name (`E-CONTRACT`; Newton takes no relaxation), another value of `method` is `E-VALUE-FORM`. A Newton summary adds `iteration_method: "newton"` before `iterations`; a Picard summary has no such key. Studio's Joule routes refuse a Newton document by name (`unsupported_iteration_method`): their iteration cap counts Picard steps. Checks N1 to N8 (`tests/simcase/test_joule_temperature_newton.py`): on the shipped example Newton takes 3 iterations against Picard's 26 and agrees within 9.0e-12 K; on galerkin's thermistor at 7 1/K, where the default Picard stops at 100 iterations, Newton converges in 4; the two-material strip keeps its closed-form order 2.1 ([contract](docs/packages/simcase/electric_joule.md#newton-iteration-on-documents)).
@@ -328,7 +328,6 @@ What each package implements, and its limits, is in the
 - Add headless rectangle electric and constant/temperature-dependent Joule JSON/CLI documents, SI result snapshots and failed-iteration evidence; reuse the existing solvers.
 
 - Scalar/full-vector modal PML and constant-radius bends, with complex candidate diagnostics, physical-window tracking, total attenuation, Studio controls and independent slab/cylindrical validation.
-
 
 - Add temperature-dependent 2D steady Joule heating with bounded material models,
   relaxed Picard iteration, failure histories and independent reference tests.
