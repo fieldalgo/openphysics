@@ -27,7 +27,8 @@ from . import views
 from .schema import DocumentError
 from .thermal_regions import (_refuse, boundary_names, build_region_mesh, component_03, covered_shapes, depth_03,
                               exterior_sides, handoff_03, has_region_geometry, mesh_controls_03, mesh_diagnostics_03,
-                              region_geometry_03, region_materials_table_03, region_mesh_settings_03)
+                              region_geometry_03, region_materials_table_03, region_mesh_settings_03,
+                              unheld_regions)
 
 PHYSICS = 'electric.steady2d'
 RESULT_FORMAT = 'electric.steady2d-regions-result-v2'
@@ -228,21 +229,7 @@ def region_inputs(doc, mesh, region_materials, electric=None):
 def _refuse_floating_parts(mesh, fixed, path):
     """Every connected part of the conductor needs a fixed potential; a document cannot set the
     reference potential that a floating part would need."""
-    t = np.asarray(mesh.triangles)
-    parent = np.arange(len(mesh.nodes))
-
-    def root(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-    for a, b, c in t:
-        for u, v in ((a, b), (b, c)):
-            ru, rv = root(int(u)), root(int(v))
-            if ru != rv:
-                parent[ru] = rv
-    anchored = {root(n) for n in fixed}
-    floating = sorted({mesh.region_names[int(r)] for tri, r in zip(t, mesh.regions) if root(int(tri[0])) not in anchored})
+    floating = unheld_regions(mesh, fixed)
     if floating:
         raise DocumentError(f'{path}.prescribed_electric_potential: a conductor part with regions {floating} touches '
                             'no fixed potential (it is surrounded by void); give one of its boundaries a potential')

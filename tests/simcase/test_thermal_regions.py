@@ -218,6 +218,36 @@ def test_source_on_a_fully_covered_region_is_refused_at_meshing():
         run(Document.from_dict(data), verbose=False)
 
 
+def island(**physics):
+    """A version 1 heat document: an island of B inside a void ring, in a 2 x 1 mm strip of A
+    held at left and right."""
+    ring = {'name': 'ring', 'type': 'circle', 'cx': 1., 'cy': .5, 'r': .4, 'material': None}
+    core = {'name': 'island', 'type': 'circle', 'cx': 1., 'cy': .5, 'r': .2, 'material': 'B'}
+    comp = {'dimension': '2d', 'length_unit': 'mm', 'depth': None,
+            'domain': {'xmin': 0., 'xmax': 2., 'ymin': 0., 'ymax': 1.},
+            'background': {'material': 'A'}, 'features': [ring, core]}
+    heat = {'type': 'thermal.steady2d', 'prescribed_temperature': {'left': '400 K', 'right': '300 K'},
+            'heat_source_density': {'island': '1e6 W/m^3'}, **physics}
+    return {'openphysics': '0.3', 'name': 'island', 'geometry': {'version': 1, 'components': {'xs': comp}},
+            'materials': {'A': {'thermal_conductivity': '2 W/(m K)'}, 'B': {'thermal_conductivity': '5 W/(m K)'}},
+            'physics': {'heat1': heat}, 'mesh': {'element_size': '0.1 mm'}, 'study': {'type': 'single'},
+            'results': {'save_fields': False, 'plots': False}}
+
+
+def test_a_part_with_no_fixed_temperature_is_refused_by_region_name():
+    # galerkin refuses it by component number ("missing [0]"); the document names the regions
+    with pytest.raises(DocumentError, match=r"prescribed_temperature: a part with regions \['island'\] has no "
+                                            "fixed temperature and no convection with a positive coefficient"):
+        run(Document.from_dict(island()), verbose=False)
+    zero = {'outer': {'heat_transfer_coefficient': '0 W/(m^2 K)', 'ambient_temperature': '300 K'}}
+    with pytest.raises(DocumentError, match=r"regions \['island'\]"):
+        run(Document.from_dict(island(convection=zero)), verbose=False)
+    # a positive convection on the void border holds the island: the document runs and balances
+    held = {'outer': {'heat_transfer_coefficient': '10 W/(m^2 K)', 'ambient_temperature': '300 K'}}
+    summary = run(Document.from_dict(island(convection=held)), verbose=False).summary()
+    assert summary['relative_conservation_residual']['value'] < 1e-10
+
+
 @pytest.mark.parametrize('shape', [
     {'name': 'spreader', 'type': 'rect', 'x': 5., 'y': 11000., 'w': 30., 'h': 1., 'material': 'steel'},
     {'name': 'speck', 'type': 'circle', 'cx': 15., 'cy': 2., 'r': 1e-6, 'material': 'steel'}])

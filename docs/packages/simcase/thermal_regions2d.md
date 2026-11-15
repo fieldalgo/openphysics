@@ -238,6 +238,10 @@ boundary that is **insulated unless named** (HQ decision 2026-11-08). A side
 that borders a void feature only has no mesh edge and is refused by name when
 data is given to it. One mesh edge takes one flux and one convection entry: a
 side tag and a selection on the same edges, both given data, are refused.
+A connected part with no fixed temperature and no convection with a positive
+coefficient, such as an island inside a void ring, is refused when the
+document runs, by the names of its regions; a convection on `outer`, the void
+border, holds it.
 Every boundary selection's edges, interior ones included, are on the galerkin
 mesh as `mesh.selection_edges` (the contract's `provenance_edges` read for
 selections); nothing else reads them yet.
