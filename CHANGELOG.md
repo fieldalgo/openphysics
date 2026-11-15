@@ -74,6 +74,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Studio connections: spatial nodes with colored sockets and curved wires, readable port labels, resize-aware endpoints and study/check panels below the graph.
+
 - Studio workspace: readable type/spacing tokens, grouped model tree, selectable connection cards, compact file actions and independently scrolling desktop panels. Coupled execution remains unavailable.
 
 - `galerkin`: **a shape motion refuses a `t` that is not a real float64 scalar** by name (`TypeError` with its dtype), on every solver that takes `motion=`: steady heat, steady electric conduction, elasticity, both thermoelasticity paths, transient heat and the waveguide modes (`solve_waveguide_modes` and the kernel). Before, a complex JAX or PyTorch `t` lost its imaginary part without a word (0.5+0.25j was solved at 0.5), and a PyTorch float32, float16 or bfloat16 `t` (or a JAX float32 with `jax_enable_x64` on) was promoted to float64. JAX without `jax_enable_x64` keeps its refusal and message. A float64 `t` gives the same results and derivatives as before. [Shape derivatives](docs/packages/galerkin/shape_derivative.md#refused).
