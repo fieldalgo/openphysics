@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const LAYOUT_KEY='openphysics.studio.layout.v1';
-export const DEFAULT_LAYOUT=Object.freeze({tree:220,inspector:280});
+export const DEFAULT_LAYOUT=Object.freeze({tree:240,inspector:320});
 export const LIMITS=Object.freeze({tree:Object.freeze([160,300]),inspector:Object.freeze([220,380])});
 export function clampWidth(side,value){
  if(!Object.hasOwn(LIMITS,side)||!Number.isFinite(value))throw new Error('Invalid panel width.');
