@@ -514,6 +514,11 @@ def _halving_compatible(L1: float, L2: float, width: float) -> bool:
     return frac <= band or frac >= 1.0 - band
 
 
+def _length2(delta: np.ndarray) -> float:
+    """Scalar 2D length without a platform-dependent BLAS dot reduction."""
+    return math.hypot(float(delta[0]), float(delta[1]))
+
+
 def _treated_apices(P: np.ndarray, corners: dict[int, list[_Corner]], theta: float
                     ) -> tuple[dict[tuple[int, int], dict[int, int]], dict[int, float]]:
     """The trigger of the small-angle rules: (apex tags, unit).
@@ -535,8 +540,8 @@ def _treated_apices(P: np.ndarray, corners: dict[int, list[_Corner]], theta: flo
     def first_piece(v: int, x: int) -> float:
         """Length of the piece at v of side v-x once the lattice of a treated x is in."""
         if x in unit and v in sides[x]:
-            return float(np.linalg.norm(_lattice_point(P[x], P[v], unit[x]) - P[v]))
-        return float(np.linalg.norm(P[x] - P[v]))
+            return float(_length2(_lattice_point(P[x], P[v], unit[x]) - P[v]))
+        return float(_length2(P[x] - P[v]))
 
     while True:
         new = []
@@ -550,7 +555,7 @@ def _treated_apices(P: np.ndarray, corners: dict[int, list[_Corner]], theta: flo
         if not new:
             break
         for v in new:
-            unit[v] = min(float(np.linalg.norm(P[x] - P[v])) for x in sides[v])
+            unit[v] = min(float(_length2(P[x] - P[v])) for x in sides[v])
     unit = {v: unit[v] for v in corners if v in unit}           # in the order of the corners
     tags: dict[tuple[int, int], dict[int, int]] = {}
     for v in unit:
@@ -562,7 +567,7 @@ def _treated_apices(P: np.ndarray, corners: dict[int, list[_Corner]], theta: flo
 def _lattice_point(apex: np.ndarray, other: np.ndarray, unit: float) -> np.ndarray:
     """The point of segment apex-other at distance ``unit * 2**k`` from the apex, for the
     largest k that keeps it below half the segment's length: in [L/4, L/2) of length L."""
-    length = float(np.linalg.norm(other - apex))
+    length = float(_length2(other - apex))
     d = math.ldexp(unit, math.floor(math.log2(length / unit)) - 1)
     if d >= 0.5 * length:
         d *= 0.5
