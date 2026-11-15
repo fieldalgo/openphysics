@@ -57,6 +57,12 @@ PARAM_EPS = 1e-9
 SNAP_EPS = 3e-8
 
 
+class MeshInputError(ValueError):
+    """``Domain.build`` or ``generate`` refuses the domain's geometry; the message says where and
+    why. A ``ValueError``, so a caller that catches ``ValueError`` still catches it. Argument
+    checks (``Circle`` radius and vertex count, ``generate``'s options) stay plain ``ValueError``."""
+
+
 class Circle:
     """Circular loop. Starts as an ``n``-gon; every vertex the mesher later inserts
     on one of its segments is projected back onto the true circle."""
@@ -124,7 +130,7 @@ class Domain:
     def _loop_vertices(name: str, lp) -> np.ndarray:
         verts = lp.vertices() if isinstance(lp, Circle) else np.asarray(lp, dtype=float)
         if verts.ndim != 2 or verts.shape[1] != 2 or len(verts) < 3:
-            raise ValueError(f"region {name!r}: a loop needs >= 3 vertices with 2 coordinates")
+            raise MeshInputError(f"region {name!r}: a loop needs >= 3 vertices with 2 coordinates")
         return verts
 
     def extent(self) -> float:
@@ -154,10 +160,10 @@ class Domain:
               ) -> tuple[np.ndarray, list[Segment], list[Region]]:
         """Resolve shared edges and T-junctions; return points, segments, regions."""
         if not self._pending:
-            raise ValueError("no regions added")
+            raise MeshInputError("no regions added")
         diag = self.extent()
         if not np.isfinite(diag) or diag <= 0.0:
-            raise ValueError(
+            raise MeshInputError(
                 "Domain.build: the input has no extent: the bounding box of every region "
                 "vertex has a zero diagonal, so every vertex is the same point. A domain "
                 "needs a finite extent before any tolerance here means anything.")
@@ -204,7 +210,7 @@ class Domain:
             if len(seg.owners) == 1:
                 seg.name = name(seg.a, seg.b)
             elif len(seg.owners) > 2:
-                raise ValueError("a segment is shared by more than two regions; regions overlap")
+                raise MeshInputError("a segment is shared by more than two regions; regions overlap")
         return pts, list(segs.values()), self.regions
 
     def _drop_short_edges(self, pts: np.ndarray, segs: dict[tuple[int, int], Segment],
@@ -273,7 +279,7 @@ class Domain:
         d = pb - pa
         L2 = float(d @ d)
         if L2 == 0:
-            raise ValueError(
+            raise MeshInputError(
                 f"Domain.build: region {region!r} has a zero-length edge. Two consecutive "
                 f"vertices fell within the merge distance {self.point_tol:g} "
                 f"({self.merge_eps:g} of the {self.extent():g}-unit domain diagonal) and became "
