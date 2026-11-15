@@ -16,11 +16,17 @@ New to the workspace? Start with the [quick start](workspace_quickstart.md). For
 ## Workspace layout and visual foundations
 
 The model tree groups setup, physics and study. **Connections** shows the
-heated-waveguide setup as interface cards with labeled input/output quantities.
-Select a card or a physics item in the tree to inspect it without leaving the
+heated-waveguide setup as spatial nodes with colored input/output ports and curved wires.
+Select a node, a port or a physics item in the tree to inspect it without leaving the
 connection view. The inclusion checkboxes retain the existing one-way setup
 behavior; these are not draggable ports, and coupled calculations remain
-unavailable. Disabled interfaces are labeled **Not included**.
+unavailable. Disabled interfaces are labeled **Not included**, and their dependent wires disappear.
+Heat-source wires are rose, temperature wires amber, and geometry updates use
+a dashed lavender wire. Ports have explicit quantity labels; color alone is
+not the identifier. Study order and capability checks sit below the graph.
+On small screens the graph scrolls horizontally to keep its labels readable.
+Wires follow socket positions when panel widths change. Port selection opens
+properties; arbitrary port wiring and dragging are not implemented.
 
 **Save session**, **Open session**, undo/redo and the current study action stay
 in the main toolbar. **More file actions** contains input-only files, browser
@@ -28,8 +34,8 @@ drafts and Reset design. Connection/recovery controls and Reset layout are
 below the study sequence. On wide screens, tree, canvas and properties scroll
 independently; at narrower widths the properties move below the canvas.
 
-The local CSS uses semantic color and spacing tokens: a 15 px body, 13 px helper
-text, 24 px view titles, a 4/8 px spacing scale and 40 px standard controls.
+The local CSS uses semantic color and spacing tokens: a 14 px body, 13 px port
+labels, 12 px port units, 20 px view titles, a 4/8 px spacing scale and 40 px standard controls.
 Default tree/properties widths are 240/320 px; existing saved widths are kept.
 Use Reset layout to restore defaults. Focus outlines, a Skip to workspace link,
 text labels beside status colors and reduced-motion preferences are supported.

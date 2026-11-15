@@ -60,6 +60,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- Studio 연결 보기: 색상 포트와 곡선 연결선이 있는 공간적 노드, 읽기 쉬운 포트 문구, 패널 크기를 따라가는 연결선, 그래프 아래 스터디·검사 패널.
+
 - Studio 작업 공간: 글자·간격 토큰, 그룹별 모델 트리, 선택 가능한 연결 카드, 파일 작업 메뉴, 데스크톱 패널 독립 스크롤. 연성 계산 지원 범위는 그대로입니다.
 
 - `simcase`: **물리 공급자**(다중물리 계약 D1. 프로토콜은 0.x 동안 불안정). 배포판은 entry point 그룹 `openphysics.providers`에 entry point 하나를 등록해 물리 종류를 더합니다. 그 entry point는 `name`, `version`, `protocol`(1), `kinds()`(바뀌지 않은 `registry.PhysicsKind`들), `manifest()`를 가진 공급자를 돌려주는 함수를 가리킵니다. manifest는 종류마다 `types`, `field`, `engine`, `process`(`in_process` 또는 `worker`), `ports`(`name`, `direction`, physmat 레지스트리의 `quantity`, 그 SI `unit`, `location` `node`/`element`/`grid`/`scalar`, 입력에는 `combine` `single`/`sum`), 데이터만 담은 선택 사항 `ui`를 적은 JSON 데이터입니다. simcase 자신의 종류는 simcase가 직접 등록하는 내장 공급자 `openphysics-fem`입니다. 문서·결과·숫자는 바뀌지 않습니다(배포된 예제 문서가 모두 같은 `fields.npz` 배열, 실행 시간을 뺀 같은 `summary.json`, 같은 `model.json`을 저장). 내장 공급자의 오류는 그대로 냅니다. 레지스트리를 처음 찾을 때 내장 공급자를, 그다음 나머지를 entry point 이름 순서로 불러옵니다. import에 실패하거나, 예외를 내거나, 메타데이터를 읽지 못하거나, 다른 프로토콜을 밝히거나, manifest가 잘못됐거나, 다른 공급자의 type 또는 종류 이름을 주장하는 공급자는 오류와 함께 쓸 수 없음으로 표시되고, 그 종류는 빠지며, 나머지는 그대로 불러옵니다. `simcase.providers.providers()`는 공급자를 모두(이름, 버전, 배포판, 프로토콜, 상태, 오류, manifest) 나열하고, `check_manifest`는 manifest를 검사해 잘못된 항목을 밝힙니다. 내장 종류는 출력 포트만 밝힙니다. 다른 종류의 필드를 읽는 내장 종류는 아직 없습니다. [물리 공급자](packages/simcase/providers.md).

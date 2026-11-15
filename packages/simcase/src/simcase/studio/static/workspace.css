@@ -66,7 +66,7 @@ svg[data-geometry-view=physical] text{font-size:calc(10px * var(--view-scale,1))
  --accent-surface:#253f39; --warning:#f1cb89;
  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
  --space-5:24px; --space-6:32px; --radius:8px;
- --font-body:15px; --font-small:13px; --font-title:24px;
+ --font-body:14px; --font-small:13px; --font-title:20px;
  --control-height:40px;
 }
 body {font:var(--font-body)/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.01em}
@@ -80,7 +80,7 @@ button:disabled {opacity:.5;cursor:not-allowed}
 [hidden] {display:none!important}
 .skip-link {position:absolute;top:-80px;left:16px;z-index:20;background:var(--panel);padding:12px}
 .skip-link:focus {top:8px}
-header {min-height:72px;padding:16px 24px;gap:24px;background:var(--panel)}
+header {min-height:56px;padding:10px 20px;gap:24px;background:var(--panel)}
 header .brand {display:flex;align-items:center;gap:8px;font-size:18px;white-space:nowrap;font-weight:650;letter-spacing:-.025em}
 header .brand-mark {color:var(--accent);font-size:28px;margin-right:4px;line-height:1}
 header .brand>span:last-child {color:var(--text);font-weight:400}
@@ -88,11 +88,11 @@ header .brand>span:last-child {color:var(--text);font-weight:400}
 .badge,.setup-badge {font-size:12px;line-height:1.5;letter-spacing:.04em;border-radius:5px;padding:5px 9px;white-space:nowrap}
 .badge {color:var(--muted)}
 .setup-badge {border:1px solid #8a7047;color:var(--warning);display:inline-block;align-self:start;background:#30291f}
-.page-nav {background:var(--panel);padding:0 24px;gap:24px;min-height:52px;align-items:stretch}
-.page-nav button {border:0;border-bottom:3px solid transparent;border-radius:0;padding:12px 4px;color:var(--muted)}
+.page-nav {background:var(--panel);padding:0 24px;gap:24px;min-height:42px;align-items:stretch}
+.page-nav button {border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 4px;color:var(--muted)}
 .page-nav button[aria-pressed=true] {border-bottom-color:var(--accent);background:transparent;color:var(--text)}
 .page-nav button:hover {background:var(--surface-raised);color:var(--text)}
-.project-actions {padding:12px 24px;gap:8px;align-items:center;background:var(--bg)}
+.project-actions {padding:8px 20px;gap:8px;align-items:center;background:var(--bg)}
 .action-spacer {flex:1}
 .project-actions .primary-save {background:var(--panel);border-color:var(--line);font-weight:500}
 .project-actions #run-optical,.project-actions #run-heat {margin-left:0;background:var(--accent);color:#142b25;border-color:var(--accent);font-weight:650;padding-inline:20px}
@@ -109,22 +109,22 @@ header .brand>span:last-child {color:var(--text);font-weight:400}
 .workflow-step span {font-size:13px;line-height:1.4;margin-top:4px}
 .workflow-step[aria-current=step] {background:var(--accent-surface)}
 main {min-height:650px}
-aside {padding:24px 16px;min-width:0}
+aside {padding:16px 12px;min-width:0}
 .tree {background:var(--panel)}
 .panel-heading {padding:0 8px 16px;border-bottom:1px solid var(--line)}
 .eyebrow,.tree small {font-size:12px;letter-spacing:.08em;font-weight:600;color:var(--muted)}
 .panel-heading h2 {font-size:18px;line-height:1.4;margin:8px 0 0;font-weight:600}
-.tree-group {margin-top:24px}
+.tree-group {margin-top:16px}
 .tree-group h3 {font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 8px 8px;font-weight:600}
-.tree button {display:flex;align-items:center;gap:10px;margin:4px 0;padding:10px 8px;min-height:42px;line-height:1.45}
+.tree button {display:flex;align-items:center;gap:10px;margin:4px 0;padding:7px 8px;min-height:36px;line-height:1.45}
 .tree-node-mark {flex-shrink:0;width:8px;height:8px;border:1px solid var(--muted);border-radius:2px}
 .tree [aria-pressed=true] .tree-node-mark {background:var(--accent);border-color:var(--accent)}
 .capability-card {margin:24px 4px 0;padding:16px 12px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px}
 .capability-card strong {font-weight:550}
 .capability-card p {margin:8px 0 0}
 .capability-dot {display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
-.inspector {padding:24px;background:var(--panel)}
-.inspector>h2 {font-size:22px;line-height:1.3;margin:8px 0 24px;font-weight:600;letter-spacing:-.02em}
+.inspector {padding:18px;background:var(--panel)}
+.inspector>h2 {font-size:18px;line-height:1.3;margin:8px 0 24px;font-weight:600;letter-spacing:-.02em}
 .inspector>.muted:first-child {font-size:12px;letter-spacing:.08em;font-weight:600}
 .inspector h3 {font-size:15px;font-weight:600;margin-top:24px}
 .inspector p,.inspector .pair {font-size:13px;line-height:1.65}
@@ -163,31 +163,6 @@ input[type=range] {min-height:24px}
 #job-panel {padding:12px 24px}
 #file-status {padding:12px 24px;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)}
 footer {padding:12px 24px;font-size:12px;line-height:1.6;background:var(--bg)}
-.view-heading {display:flex;justify-content:space-between;gap:16px;margin-bottom:28px;align-items:start}
-.view-heading h2 {margin:8px 0}
-.connection-map {display:grid;grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr);gap:0;align-items:center;margin:24px 0}
-.physics-node {background:var(--panel);border:1px solid #53616c;border-radius:var(--radius);min-width:0;overflow:hidden}
-.node-category {padding:12px 16px 0;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.node-category>span {color:var(--accent)}
-.physics-node>button {display:flex;width:100%;justify-content:space-between;gap:8px;border:0;border-radius:0;text-align:left;padding:8px 16px 16px;font-size:17px;font-weight:600;color:var(--text)}
-.physics-node>button span {color:var(--muted);font-weight:400}
-.physics-node dl {margin:0;padding:0 16px 16px;font-size:13px}
-.physics-node dl>div {border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
-.physics-node dt {color:var(--muted);font-size:12px}
-.physics-node dd {margin:2px 0 0;overflow-wrap:anywhere}
-.physics-node.inactive {border-style:dashed;border-color:var(--line)}
-.physics-node.inactive .node-category>span {color:var(--muted)}
-.connection-route {color:var(--muted);font-size:12px;line-height:1.5;text-align:center;padding:8px 2px;overflow-wrap:anywhere}
-.connection-route>span {display:block;font-size:24px;color:var(--accent)}
-.connection-branch {grid-column:1/-1;padding:16px 0;color:var(--muted);font-size:13px;text-align:center}
-.connection-branch::before {content:'↓';display:block;font-size:22px;color:var(--accent)}
-.connection-options {padding:20px 24px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin:24px 0}
-.connection-options h3 {margin:0 0 12px}
-.connection-options label {margin:12px 0;color:var(--text);display:flex;align-items:center;gap:8px}
-.connection-options input {flex-shrink:0}
-.setup-notice {border-left:3px solid var(--warning);padding:4px 0 4px 16px;margin:24px 0 0;font-size:13px}
-.setup-notice strong {color:var(--warning);font-weight:550}
-.setup-notice p {margin:8px 0 0}
 main.choosing .canvas {padding:48px 32px;max-width:1240px}
 .choosing .canvas>h2 {font-size:32px;margin-bottom:12px}
 .choosing .canvas>.cards {grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:32px 0}
@@ -213,8 +188,6 @@ main.choosing .canvas {padding:48px 32px;max-width:1240px}
 @media(max-width:1200px){
  .canvas {padding:24px}
  .inspector {padding:20px}
- .connection-map {grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr)}
- .connection-route {font-size:0}.connection-route>span {font-size:24px}
  header {flex-wrap:wrap;gap:12px 20px}.badge {margin-left:auto}
 }
 @media(max-width:1000px){
@@ -238,26 +211,72 @@ main.choosing .canvas {padding:48px 32px;max-width:1240px}
  .tree-group button {display:inline-flex;width:auto;margin:4px}
  .capability-card {margin:16px 0 0}
  .canvas,main.choosing .canvas {padding:24px 16px}
- .connection-map {grid-template-columns:minmax(0,1fr)}
- .connection-route {font-size:13px}
- .connection-route>span {transform:rotate(90deg)}
- .connection-branch {grid-column:auto}
  .file-menu-items {left:auto;right:0}
- .view-heading {flex-wrap:wrap}
  .action-spacer {display:none}
  .project-actions #run-optical,.project-actions #run-heat {flex-basis:100%;margin-top:4px}
  .toolbar {flex-wrap:wrap}
 }
 @media(prefers-reduced-motion:reduce){button {transition:none}}
-/* Ports align side by side; quantities can wrap without squeezing the cards. */
-.physics-node dl {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.physics-node dl>div {margin:0}
-@media(max-width:1200px){.physics-node dl {display:block}.physics-node dl>div+div {margin-top:8px}}
 @media(min-width:1001px){
- main:not(.choosing) {height:calc(100dvh - 190px);min-height:580px}
+ main:not(.choosing) {height:calc(100dvh - 154px);min-height:580px}
  main:not(.choosing)>.tree,main:not(.choosing)>.inspector,main:not(.choosing)>.workspace {overflow:auto;scrollbar-width:thin;scrollbar-color:#52616c transparent}
 }
-.physics-node:has(>button[aria-pressed=true]) {border-color:var(--accent)}
-.physics-node>button[aria-pressed=true] {background:var(--accent-surface);color:var(--accent)}
 /* Let long canvases grow inside the scroll panel, keeping the note below content. */
 .canvas {flex:1 0 auto}
+
+/* Node canvas: preserve spatial relationships, colored sockets and curved wires. */
+:root {--port-power:#ed8798;--port-temperature:#efb876;--port-geometry:#a8b9e7;--port-optical:#a8b9e7;--port-voltage:#efb876}
+.connecting .canvas {padding:0;background:none}
+.graph-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.graph-heading h2 {font-size:16px;letter-spacing:0;margin:0}
+.graph-heading .setup-badge {font-size:12px;padding:3px 8px}
+.graph-intro {max-width:none!important;font-size:13px;padding:10px 18px;margin:0!important;color:var(--muted);border-bottom:1px solid var(--line)}
+.graph-scroll {overflow:auto;scrollbar-width:thin;scrollbar-color:#52616c transparent}
+.graph-stage {position:relative;height:430px;min-width:860px;background-color:#1b252d;background-image:radial-gradient(#49606b55 .8px,transparent .8px);background-size:20px 20px}
+.graph-node {position:absolute;width:250px;z-index:1;background:#232f38;border:1px solid #40515d;border-radius:5px;box-shadow:0 3px 10px #0002}
+.graph-node.selected {border-color:var(--accent);box-shadow:0 0 0 3px #9ee6cf15}
+.graph-node.excluded {border-style:dashed;opacity:.65}
+.node-electric {top:28px;left:24px}
+.node-heat {top:154px;left:calc(50% - 125px)}
+.node-optical {top:28px;right:24px}
+.node-mechanical {top:282px;right:24px}
+.graph-node-title {display:block;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--line);border-radius:4px 4px 0 0;text-align:left;font-size:14px;line-height:1.45;font-weight:600;min-height:0}
+.graph-node-title[aria-pressed=true] {color:var(--text);background:transparent}
+.graph-node-title:hover {background:#30404b}
+.graph-node-title small {display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:3px}
+.graph-ports {display:grid;grid-template-columns:1fr 1fr;padding:8px 0;gap:8px 4px}
+.graph-port {border:0;border-radius:0;min-height:38px;position:relative;font-size:13px;line-height:1.4;padding:0 12px;color:var(--text);display:flex;align-items:center;text-align:left}
+.graph-port:hover {background:#30404b}
+.graph-port small {display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.graph-port.output,.graph-port.right-port {text-align:right;justify-content:flex-end}
+.graph-port.right-port {grid-column:2}
+.graph-port.right-port .port-dot {left:auto;right:-6px}
+.port-dot {position:absolute;width:11px;height:11px;border:2px solid currentColor;border-radius:50%;background:#232f38;left:-6px;top:calc(50% - 5.5px);color:var(--port-color)}
+.output .port-dot {left:auto;right:-6px;background:var(--port-color)}
+.power {--port-color:var(--port-power)}
+.temperature {--port-color:var(--port-temperature)}
+.geometry {--port-color:var(--port-geometry)}
+.optical {--port-color:var(--port-optical)}
+.voltage {--port-color:var(--port-voltage)}
+.graph-wires {position:absolute;inset:0;width:100%;height:100%;max-height:none!important;pointer-events:none;overflow:visible}
+.graph-wires path {fill:none;stroke:var(--port-color);stroke-width:2.25}
+.graph-wires path.geometry {stroke-dasharray:5 4}
+.graph-key {position:absolute;left:20px;bottom:16px;display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.graph-key span {color:var(--port-color)}
+.graph-summary {display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border-top:1px solid var(--line)}
+.graph-summary>section {padding:14px 18px;min-width:0}
+.graph-summary>section+section {border-left:1px solid var(--line)}
+.graph-summary h3 {font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600}
+.graph-summary ol {list-style:none;counter-reset:study;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
+.graph-summary li {counter-increment:study;border:1px solid var(--line);padding:5px 8px;border-radius:3px;font-size:12px}
+.graph-summary li::before {content:counter(study);color:var(--accent);font-weight:600;margin-right:8px}
+.graph-summary p {font-size:13px;margin:6px 0;line-height:1.5}
+.graph-summary .setup-badge {font-size:11px;padding:2px 6px;margin-right:6px}
+.graph-options {background:var(--panel);border-top:1px solid var(--line);padding:10px 18px;font-size:13px}
+.graph-options summary {cursor:pointer;color:var(--muted)}
+.graph-options>div {display:flex;flex-wrap:wrap;gap:8px 20px;padding-top:8px}
+.graph-options label {font-size:13px;margin:6px 0;display:flex;align-items:center}
+body:has(main.connecting)>.bottom {display:none}
+.connecting .workspace>.note {font-size:12px;padding:8px 18px}
+@media(max-width:1200px){.graph-heading {flex-wrap:wrap}.graph-summary {grid-template-columns:1fr}.graph-summary>section+section {border-left:0;border-top:1px solid var(--line)}}
+@media(max-width:600px){.graph-heading {padding:12px}.graph-intro {padding:10px 12px}.graph-key {gap:10px}}
