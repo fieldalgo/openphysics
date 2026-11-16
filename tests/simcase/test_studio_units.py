@@ -183,8 +183,9 @@ def _builder_documents(tmp_path):
 
 def test_every_js_builder_output_validates_in_python(tmp_path):
     docs = _builder_documents(tmp_path)
-    # the heat plate (3), the optical study (3) and the geometry lab (new, 2 starters, 2 edits)
-    assert len(docs) == 11, sorted(docs)
+    # the heat plate (3), the Joule regions (2), the optical study (3) and the geometry lab (new,
+    # 2 starters, 2 edits)
+    assert len(docs) == 13, sorted(docs)
     for label, text in docs.items():
         doc, found = reader.check(text)                    # the text as the page sends it
         errors = [d for d in found if d.severity == "error"]

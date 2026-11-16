@@ -89,7 +89,8 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   Recover the last session, an earlier one, or open a session file.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
-- Input and session files are version 6. Files saved by a Studio from before the units
+- Input and session files are version 7 (the Joule heating inputs added); version 6 files are
+  still read. Files saved by a Studio from before the units
   and naming batch (versions 1 to 5) are refused with a message that names their version,
   and a browser draft from that Studio is not offered: enter the design again and save it.
 
@@ -105,4 +106,6 @@ for these steps yet**; earlier Windows checks are listed in the
 batch moved the file versions and the capability check to version 6, steps 4 and 5, a restart
 and the recovery were checked again on Linux with
 `tools/studio_browser/studio_workspace_browser.mjs` against an installed simcase wheel
-(headless Chrome), not through the `openphysics` installation above.
+(headless Chrome), not through the `openphysics` installation above. On 2026-11-16, with the
+files and the capability check at version 7, the same script passed on Linux against the source
+tree (headless Chromium, Python 3.13), not an installed wheel.

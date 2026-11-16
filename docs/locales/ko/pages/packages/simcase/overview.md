@@ -39,7 +39,7 @@ python -m simcase geometry model.json                     # 버전 1 형상 블�
 | `thermal.transient2d` | 균질 직사각형 과도 열전도: 후진 Euler, 명시 시간, 상수 또는 표본 변 Dirichlet, 단열, 상수 외향 열유속·대류 | `transient_thermal_uniform`, `transient_thermal_boundary` | [과도 열전도](thermal_transient2d.md) |
 | 영역이 있는 `thermal.transient2d` | 이름 있는 재료 영역의 과도 열전도, 재료별 열전도율·열용량 | `transient_thermal_regions` | [영역 문서](thermal_regions2d.md) |
 
-Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료 영역이 있는(Studio 영역 한도 안의) 정상·과도 열전도 문서의 전용 화면을 제공하고, 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서를 Joule route에서 실행하며([Studio](electric_joule.md#studio-영역-문서), 작업 공간 양식은 아직 없음), 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
+Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료 영역이 있는(Studio 영역 한도 안의) 정상·과도 열전도 문서의 전용 화면을 제공하고, 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서를 Joule route에서 실행하며([Studio](electric_joule.md#studio-영역-문서), 작업 공간의 [Joule 가열 애플리케이션](workspace.md#이름-붙은-영역의-joule-가열)), 공진기 문서는 거절합니다. 연성·다중 물리 실행, 형상·메시·재료 sweep, 기계해석 문서는 지원하지 않습니다. `em.cavity3d`는 손실 직육면체 재료를 받습니다.
 
 ## 문서
 

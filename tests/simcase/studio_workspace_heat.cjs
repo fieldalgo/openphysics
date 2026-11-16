@@ -34,10 +34,10 @@ test('the solver document uses mm and K and adds natural-condition keys only whe
  assert.equal(H.sideText({type:'flux',inward_heat_flux:500}),'inward q = 500 W/m²');
  assert.equal(H.sideText({type:'convection',h:10,ambient:290}),'h = 10 W/(m²·K), T∞ = 290 K');assert.equal(H.thermalSummary(H.DEFAULT_THERMAL),'30 × 20 mm · k 12.5 W/(m·K)');
 });
-test('projects (version 6) store the heat plate with the inward heat flux; heat alone is a valid application',()=>{
+test('projects (version 7) store the heat plate with the inward heat flux; heat alone is a valid application',()=>{
  const state={width:500,voltage:1,electric:false,heat:true,structure:false,optics:false,thermal:plate({top:{type:'convection',h:10,ambient:290}},{width:40})};
  const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''};
- const doc=snapshot(state,setup);assert.equal(doc.version,6);assert.equal(doc.units.thermal_length,'mm');
+ const doc=snapshot(state,setup);assert.equal(doc.version,7);assert.equal(doc.units.thermal_length,'mm');
  const loaded=parseProject(JSON.stringify(doc));assert.equal(loaded.model.thermal.width,40);assert.deepEqual(loaded.model.thermal.sides.top,{type:'convection',h:10,ambient:290});
  const flux=snapshot({...state,thermal:plate({left:{type:'flux',inward_heat_flux:250}})},setup);
  assert.deepEqual(parseProject(JSON.stringify(flux)).model.thermal.sides.left,{type:'flux',inward_heat_flux:250});

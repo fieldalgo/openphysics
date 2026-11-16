@@ -144,11 +144,48 @@ clicked point. A result keeps the inputs it was computed with; after an edit it 
 labelled as an earlier snapshot and **Restore run inputs** brings them back.
 
 Heat inputs are saved in input files, drafts, browser input recovery and undo
-history (project version 6, plate lengths in mm, a flux side as its inward heat flux). Heat results stay in the tab:
+history (project version 7, plate lengths in mm, a flux side as its inward heat flux). Heat results stay in the tab:
 sessions, run history, comparison and browser notebook recovery remain optical-only.
 Transient heat, region-wise or temperature-dependent materials and arbitrary
-geometry are not part of this application; the classic page keeps the JSON
+geometry are not part of this application (region-wise materials with Joule heating are
+the [Joule heating application](#joule-heating-on-named-regions)); the classic page keeps the JSON
 interfaces for them.
+
+## Joule heating on named regions
+
+Choose **Applications → Joule heating** to set up steady Joule heating on named
+material regions without JSON. The domain is a rectangle in mm with its lower-left
+corner at (0, 0) and a background material; **Geometry** adds up to eight
+rectangles, circles or polygons (later shapes win where they overlap), each a named
+region of one material. **Materials** holds up to six named materials, each with a
+thermal conductivity k [W/(m·K)] and an electrical conductivity that is either a
+constant σ [S/m] or the linear resistivity model σ(T) = σ₀ / (1 + α (T − T₀)) with
+its reference conductivity, reference temperature, coefficient α [1/K] and valid
+temperature range. **Electric currents** gives each side an insulating boundary, a
+fixed potential [V] or an inward current density [A/m²]; **Heat transfer** an
+insulated boundary, a fixed temperature [K], an inward heat flux [W/m²] or
+convection. **Mesh** sets the element size in mm. When a used material has the
+model, the study is `joule.temperature2d` and **Study** sets the Picard iteration:
+initial temperature and the documented defaults (relaxation 0.5, relative tolerance
+1e-10, 100 iterations, at most Studio's 500) with a temperature tolerance the form
+starts at 1e-9 K; with constant materials it is `joule.steady2d`. The default model is
+the two-material strip of the [region Joule checks](electric_joule.md#material-regions-temperature-dependent-joule-heating).
+
+Run is enabled when a side fixes the potential, a side fixes the temperature or has
+convection with h > 0, and every given temperature lies in the valid range of every
+model material; the reason is shown otherwise. **Run Joule heating study** builds the
+document (shown under **Study**), validates it and runs it on Studio's
+[Joule routes](electric_joule.md#studio-region-documents), with their region and mesh
+limits; a refusal (for example two potentials at one corner, a mesh over the node
+cap, an iteration that does not converge) is shown with its text. Results show
+temperature and electric potential (P1) or current density |J|, Joule power density
+and heat flux |q| (per triangle, with optional arrows) on the actual mesh with
+region boundaries, the balances (supplied electric power, Joule power, outward heat,
+temperature range and the current through each fixed side, per metre of depth),
+the Picard history and the value at a clicked point. A result keeps its inputs;
+**Restore run inputs** brings them back. Joule inputs are saved in input files,
+sessions, drafts, recovery and undo history (version 7); Joule results stay in the
+tab, as heat results do.
 
 ## Results and files
 
@@ -169,7 +206,10 @@ and session indicators compare against the last save/open snapshot or download
 request; an unchanged indicator does not certify download completion. Browser
 recovery reports its own committed storage state separately.
 
-Input files are version 6, written since the units and naming batch. They record the
+Input files are version 7: version 6 (the units and naming batch) plus the Joule heating
+inputs (`model.joule`, lengths in mm, `units.joule_length`). A version 6 file is still read,
+with the default Joule inputs; a project whose only interfaces are electric currents and
+heat opens in the Joule heating application. They record the
 core height, wavelength, core mesh size and shape list in nm and the heat plate in mm,
 each with its unit, and a flux side of the heat plate as its inward heat flux (version 5
 stored the outward flux). Input files of versions 1 to 5 are refused by version with a
@@ -185,7 +225,8 @@ its SI value: `core_width [m]` and `core_height [m]` (single-rectangle designs),
 completion time, `core_material`, a `shapes` column describing every shape (in nm, as the
 page shows it) and the candidate number carry no unit.
 
-Session files are version 6, written since the units and naming batch: the workspace
+Session files are version 7, whose input is an input file of version 7 (a version 6
+session is still read, its input as a version 6 input file); version 6 was written since the units and naming batch: the workspace
 builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
 under their exact `physmat:` names) and each run record keeps the result's
 `effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in
@@ -194,9 +235,10 @@ results under the earlier names and the document length unit; the workspace refu
 by version with a message instead of reading them under another meaning. Enter the design
 again, run it and save a new session.
 
-The workspace checks `/api/workspace/capabilities/v6` before enabling Run. Contract
-version 6 (the content of version 5, for a workspace that saves input and session files of
-version 6 and reads the coded `diagnostics` of a document check) and adapter
+The workspace checks `/api/workspace/capabilities/v7` before enabling Run. Contract
+version 7 (the content of version 6, for a workspace that saves input and session files of
+version 7; version 6 is the content of version 5 for files of version 6 and the coded
+`diagnostics` of a document check) and adapter
 `optical-shapes-v7` declare the window in nm, at most eight
 shapes and twelve polygon vertices, the shape types and the ten materials with their
 `physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
@@ -204,7 +246,7 @@ strings), the fixed window, boundary and candidate settings (`mode_count`),
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
-The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v5`) remain
+The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v6`) remain
 available at the same paths and schema versions;
 because every adapter now writes format 0.3 documents and reads the new result names, each
 names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,

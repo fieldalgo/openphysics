@@ -234,8 +234,8 @@ Studio의 `max_iterations`(500)를 넘는 `joule.temperature2d` 문서는 작업
 검사(`tests/simcase/test_studio_joule_regions.py`, 사전 등록 J-S1–J-S4): 위의 두 재료 띠의 payload가
 같은 문서의 `simcase.run`과 배열마다 비트 단위로 같고 요약도 실행 시간 밖에서 같다(두 종류 모두). 위의
 거부, 형상·절점 상한과 공유 작업 자리, 요약과 어긋나는 결과. 약 8,400 절점의 띠는 Linux 한 대에서
-8초에 4.9 MB payload를 냈다(payload 한도 16 MiB). 작업 공간에는 아직 Joule 양식이 없다. 직접 만든
-클라이언트에서 이 route를 쓴다.
+8초에 4.9 MB payload를 냈다(payload 한도 16 MiB). 작업 공간의
+[Joule 가열 애플리케이션](workspace.md#이름-붙은-영역의-joule-가열)이 이 문서를 만들어 실행한다.
 
 ## 실행·저장
 

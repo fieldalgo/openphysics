@@ -208,6 +208,16 @@ def list_providers():
     return Response(body, media_type="application/json", headers={"Cache-Control": "no-store"})
 
 
+# Version 7: the contract of a workspace that saves project version 7 and session version 7 (the
+# Joule heating application's inputs added; its runs use /api/joule/*). Its optical content is
+# version 6's.
+@app.get("/api/workspace/capabilities/v7")
+def workspace_capabilities_v7():
+    caps = json.loads(workspace_capabilities_v6().body)
+    caps.update(schema_version=7)
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()

@@ -298,8 +298,8 @@ of the two-material strip above equals `simcase.run` on the same document array 
 bit for bit, and its summary apart from wall times, for both kinds; the refusals above; the
 shape and node caps and the shared job slot; and results that disagree with their summary.
 A strip at about 8,400 nodes gave a 4.9 MB payload in 8 s on one Linux machine (the payload
-limit is 16 MiB). The workspace has no Joule form yet: use these routes from a client of
-your own.
+limit is 16 MiB). The workspace's [Joule heating application](workspace.md#joule-heating-on-named-regions)
+builds and runs these documents.
 
 ## Run and save
 
