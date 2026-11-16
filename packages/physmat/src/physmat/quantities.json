@@ -702,9 +702,21 @@
    "domain": {"min": "0"},
    "band": null,
    "places": ["document", "api", "result"],
+   "qualifiers": {"role": ["initial"]},
    "symbols": ["t"],
    "hint": true,
    "description": {"en": "Physical time.", "ko": "물리 시간."}
+  },
+  "decay_rate": {
+   "dimension": {"T": -1},
+   "unit": "1/s",
+   "menu": ["1/s"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api", "result"],
+   "description": {"en": "Decay rate lambda of an exponential mode exp(-lambda t), as a generalized eigenvalue of the stiffness and capacity matrices of transient heat.", "ko": "지수 모드 exp(-lambda t)의 감쇠율 lambda. 과도 열전도의 강성 행렬과 열용량 행렬의 일반화 고윳값."}
   },
   "time_step": {
    "dimension": {"T": 1},
@@ -974,7 +986,7 @@
    "domain": null,
    "band": null,
    "places": ["document", "api", "result"],
-   "qualifiers": {"role": ["prescribed"]},
+   "qualifiers": {"role": ["reference", "prescribed"]},
    "symbols": ["phi", "voltage"],
    "hint": true,
    "description": {"en": "Electric potential.", "ko": "전위."}
@@ -1553,6 +1565,17 @@
    "family": "spectral",
    "description": {"en": "Frequency.", "ko": "주파수."}
   },
+  "angular_frequency": {
+   "dimension": {"T": -1},
+   "unit": "rad/s",
+   "menu": ["rad/s"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Angular frequency omega = 2 pi f of a periodic excitation.", "ko": "주기 가진의 각진동수 omega = 2 pi f."}
+  },
   "target_frequency": {
    "dimension": {"T": -1},
    "unit": "Hz",
@@ -1893,6 +1916,17 @@
    "qualifiers": {"component": ["xx", "yy", "zz", "xy", "yz", "xz", "rr", "rz", "hoop"]},
    "description": {"en": "Strain (tensor components; a shear component is gamma/2).", "ko": "변형률(텐서 성분. 전단 성분은 gamma/2)."}
   },
+  "displacement_gradient": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "ordinary",
+   "rank": ["tensor"],
+   "domain": null,
+   "band": null,
+   "places": ["api", "result"],
+   "description": {"en": "Displacement gradient du_i/dx_j (row i, column j) of an affine displacement field.", "ko": "아핀 변위장의 변위 기울기 du_i/dx_j(행 i, 열 j)."}
+  },
   "elastic_strain": {
    "dimension": {},
    "unit": "1",
@@ -2146,6 +2180,17 @@
    "band": null,
    "places": ["result"],
    "description": {"en": "Elastic strain energy.", "ko": "탄성 변형 에너지."}
+  },
+  "strain_energy_density": {
+   "dimension": {"M": 1, "L": -1, "T": -2},
+   "unit": "J/m^3",
+   "menu": ["J/m^3"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min": "0"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Elastic strain energy per unit volume.", "ko": "단위 부피당 탄성 변형 에너지."}
   },
   "strain_energy_per_depth": {
    "dimension": {"M": 1, "L": 1, "T": -2},
@@ -2786,6 +2831,39 @@
    "band": null,
    "places": ["document", "api"],
    "description": {"en": "Bend radius.", "ko": "굽힘 반지름."}
+  },
+  "thickness": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Thickness of a layer; a stack of layers gives one value per layer.", "ko": "층의 두께. 여러 층이면 층마다 값 하나."}
+  },
+  "curvature": {
+   "dimension": {"L": -1},
+   "unit": "1/m",
+   "menu": ["1/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["api", "result"],
+   "description": {"en": "Curvature 1/R of a bent strip or beam axis; its sign is stated where it is returned.", "ko": "휜 띠나 보 축의 곡률 1/R. 부호는 값을 돌려주는 곳에서 밝힘."}
+  },
+  "design_velocity": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["api", "result"],
+   "description": {"en": "Node velocity W of a shape motion X(t) = X0 + t W: metres of node motion per unit of the dimensionless design parameter t.", "ko": "형상 운동 X(t) = X0 + t W의 절점 속도 W. 무차원 설계 매개변수 t 한 단위당 절점이 움직이는 미터."}
   },
   "bend_origin": {
    "dimension": {"L": 1},

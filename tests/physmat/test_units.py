@@ -1215,17 +1215,25 @@ PHASE2_OUTPUT_ONLY = {
     "field_overlap": "m^2", "unnormalized_electric_field": "1", "unnormalized_electric_field_line_integral": "m",
     "mass_normalized_electric_field": "1/m^(3/2)", "mass_normalized_electric_field_line_integral": "1/m^(1/2)",
 }
+# Phase-3 registry additions of landing L2 (galerkin step spec 4.1 and rule R(3); L2 commit 5), written
+# from the commit's table, not read from quantities.json: inputs with their menus, and output-only entries
+# with their canonical unit. The role words reference (electric_potential) and initial (time) add no base.
+PHASE3_MENUS = {
+    "design_velocity": L_MENU, "thickness": L_MENU, "angular_frequency": ("rad/s",), "curvature": ("1/m",),
+    "decay_rate": ("1/s",), "displacement_gradient": BARE,
+}
+PHASE3_OUTPUT_ONLY = {"strain_energy_density": "J/m^3"}
 
 
 def test_r11_every_menu_equals_the_design_table():
-    tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY)
+    tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY)
     assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
-    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS}.items():
+    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
         assert units.quantity(base).unit == unit and unit not in DESIGN_MENUS[base], base
-    for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY}.items():
+    for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY, **PHASE3_OUTPUT_ONLY}.items():
         assert units.menu(base) == (unit,) and units.quantity(base).places == ("result",) or base in (
             "conductance_per_depth",), base
 
@@ -1467,7 +1475,40 @@ def test_p2_names_are_legal_with_their_unit_and_places():
                  "maximum_maximum_displacement", "outward_ambient_convective_heat_rate", "node_count", "element_count",
                  "joule_heat_rate_per_depth", "minimum_principal_squared", "near_element_size"):
         assert name not in names, name                      # spec section 6, "not added"
-    assert len(units._ENTRIES) == 242 and len(names) == 367
+    # registry pin follows the addition: 242 entries and 367 names until L2 commit 5 of the galerkin step
+    # added the 7 bases and 2 role names of P3_L2_NAMES
+    assert len(units._ENTRIES) == 249 and len(names) == 376
+
+
+P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
+    "reference_electric_potential": ("V", ("document", "api", "result")),
+    "initial_time": ("s", ("document", "api", "result")),
+    "design_velocity": ("m", ("api", "result")),
+    "angular_frequency": ("rad/s", ("api",)),
+    "curvature": ("1/m", ("api", "result")),
+    "decay_rate": ("1/s", ("api", "result")),
+    "thickness": ("m", ("api",)),
+    "displacement_gradient": ("1", ("api", "result")),
+    "strain_energy_density": ("J/m^3", ("result",)),
+}
+
+
+def test_p3_l2_names_are_legal_with_their_unit_and_places():
+    names = set(units.names())
+    for name, (unit, places) in P3_L2_NAMES.items():
+        assert name in names, name
+        qo = units.quantity(name)
+        assert (qo.unit, qo.places) == (unit, places), (name, qo.unit, qo.places)
+    assert units.quantity("reference_electric_potential").base == "electric_potential"
+    assert units.quantity("initial_time").base == "time" and units.quantity("initial_time").kind == "ordinary"
+    assert units.quantity("design_velocity").rank == ("vector",) and units.quantity("thickness").rank == ("scalar",)
+    assert units.quantity("displacement_gradient").rank == ("tensor",)
+    for name in ("reference_time", "initial_electric_potential", "radius", "inner_radius", "energy_density",
+                 "heat_flux_rate", "inward_heat_flux_rate", "electric_potential_difference"):
+        assert name not in names, name                      # not added in L2 commit 5
+    assert q("2 ms", "initial_time") == 0.002 and q("1 mV", "reference_electric_potential") == 1e-3
+    assert q("3 um", "thickness") == 3e-6 and convert("0 m", "thickness").error.code == "E-DOMAIN"
+    assert q("4 rad/s", "angular_frequency") == 4.0 and q("0.5 1/s", "decay_rate") == 0.5
 
 
 def test_p2_r2_r5_temperatures_and_potentials():
