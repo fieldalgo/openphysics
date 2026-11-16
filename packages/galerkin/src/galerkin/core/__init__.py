@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """The shared layer under galerkin's physics modules.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Input checks (``checks``), P1 triangle mesh checks and element data
 (``triangles``), P1 tetrahedron element data (``tets``), edge numbering and
 orientation for the Nédélec spaces (``spaces``), scalar or region-table materials (``materials``, public as

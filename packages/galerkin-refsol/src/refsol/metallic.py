@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import numpy as np
 
+__all__ = ["rect_waveguide_cutoffs", "rect_cavity_resonances", "coax_potential",
+           "coax_field_magnitude"]
+
 
 def rect_waveguide_cutoffs(a: float, b: float, n_max: int = 5,
                            include_tm: bool = False) -> list[tuple[float, str]]:

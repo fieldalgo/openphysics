@@ -78,6 +78,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import brentq
 
+__all__ = ["SlabTemperature", "ConvectiveSlab", "FluxSlab", "PeriodicAmbientSlab", "RampedFluxSlab"]
+
 
 def _finite_scalar(value, name, positive=False, nonnegative=False):
     a = np.asarray(value)

@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Closed-form element kernels for the lowest-order spaces.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Each kernel returns element matrices ``(T, i, j)`` or vectors ``(T, i)`` in the
 array library of its coefficient (NumPy for Python scalars), ready for
 ``galerkin.core.forms.matrix`` or ``vector``; ``p1_joule`` also takes a field

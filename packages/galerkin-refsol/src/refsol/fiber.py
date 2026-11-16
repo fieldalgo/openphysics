@@ -35,6 +35,9 @@ import numpy as np
 from scipy.optimize import brentq
 from scipy.special import jv, kve, jn_zeros
 
+__all__ = ["Mode", "v_number", "lp_modes", "lp_cutoff_v", "num_lp_modes", "vector_modes",
+           "fundamental_neff", "vector_group_index", "vector_mode_field", "mode_l"]
+
 
 @dataclass(frozen=True)
 class Mode:

@@ -44,6 +44,8 @@ import math
 
 from . import slab as _slab
 
+__all__ = ["characteristic", "residual", "mode"]
+
 
 def _mpmath():
     try:

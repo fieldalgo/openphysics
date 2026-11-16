@@ -25,6 +25,9 @@ from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 from .thermal import scalar_boundary_system
 
+__all__ = ["METHODS", "ConductivityModel", "JouleIteration", "TemperatureJouleHeatResult",
+           "JouleConvergenceError", "solve_temperature_joule_heat"]
+
 METHODS = ("picard", "newton")
 # Difference step for dsigma/dT, relative to max(1 K, |T|): eps**(1/3), about
 # 1.8e-3 K at 300 K. The relative truncation error grows as (step/L)**2, with L

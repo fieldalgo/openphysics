@@ -43,6 +43,8 @@ from .core.triangles import triangle_geometry
 from .postprocess import element_gradient
 from .thermal import scalar_boundary_system
 
+__all__ = ["TransientHeatStepError", "TransientHeatResult", "solve_transient_heat"]
+
 
 class TransientHeatStepError(ValueError):
     """A chained sampling/solve/history failure; no successful partial result."""

@@ -8,6 +8,9 @@ stress/E Pa; force density N/m^3; physical energy density J/m^3.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["ThermoelasticState", "state_from_3d", "ThermoelasticField", "uniform_free",
+           "uniform_constrained", "linear_temperature", "sine_manufactured"]
+
 
 def _real(value,name):
     a=np.asarray(value)

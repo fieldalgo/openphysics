@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """A sparse linear solve that JAX and PyTorch can differentiate.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 ``solve(A, b)`` solves ``A x = b`` for a square ``CooMatrix`` with SciPy's
 sparse LU on every array library, so the forward result is the NumPy one. JAX
 and PyTorch cannot differentiate SciPy, so the derivative is supplied by hand

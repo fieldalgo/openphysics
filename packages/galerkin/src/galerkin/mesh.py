@@ -21,6 +21,9 @@ from __future__ import annotations
 
 import numpy as np
 
+__all__ = ["Mesh", "rectangle_mesh", "annulus_mesh", "disk_mesh", "layered_rectangle_mesh",
+           "layered_annulus_mesh"]
+
 
 class Mesh:
     def __init__(self, nodes: np.ndarray, triangles: np.ndarray,

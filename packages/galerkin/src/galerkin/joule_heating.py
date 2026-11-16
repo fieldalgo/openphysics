@@ -12,6 +12,8 @@ from .electric import SteadyElectricResult
 from .heat_source import MESH_MISMATCH, ElementHeatSource
 from .thermal import SteadyHeatResult, solve_steady_heat
 
+__all__ = ["SteadyJouleHeatResult", "solve_steady_joule_heat"]
+
 
 @dataclass
 class SteadyJouleHeatResult:

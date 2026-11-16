@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Fields bound to one 2D P1 triangle mesh, and their same-mesh transfer."""
+"""Fields bound to one 2D P1 triangle mesh, and their same-mesh transfer.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 
 import numpy as np

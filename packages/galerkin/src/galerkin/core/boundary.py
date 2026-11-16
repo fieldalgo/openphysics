@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Natural boundary conditions on exterior edges of P1 triangle meshes."""
+"""Natural boundary conditions on exterior edges of P1 triangle meshes.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from typing import Mapping
 
 import numpy as np

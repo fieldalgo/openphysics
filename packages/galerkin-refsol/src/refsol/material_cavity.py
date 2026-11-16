@@ -27,6 +27,9 @@ from numbers import Complex, Real
 
 from .cavity import C0
 
+__all__ = ["quality_factor", "complex_frequency_from_eigenvalue", "uniformly_filled_eigenvalue",
+           "dielectric_loss_quality_factor", "SlabCavityMode", "slab_loaded_cavity_modes"]
+
 
 def _positive(value, name):
     if (isinstance(value, bool) or not isinstance(value, Real)

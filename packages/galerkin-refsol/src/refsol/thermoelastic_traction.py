@@ -9,6 +9,9 @@ The polynomial family uses a fixed 1m square, not a general CAD solution.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["TractionState", "parent_state", "traction_from_stress", "uniform_combined",
+           "polynomial_manufactured"]
+
 
 def _real(value, name):
     a = np.asarray(value)

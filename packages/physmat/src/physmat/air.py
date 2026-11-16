@@ -3,6 +3,9 @@
 
 """Refractive index of moist air: the equations of Ciddor (1996).
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 P. E. Ciddor, "Refractive index of air: new equations for the visible and near
 infrared", Appl. Opt. 35, 1566-1573 (1996), implemented from the published
 equations (Appendices A and B). The procedure is

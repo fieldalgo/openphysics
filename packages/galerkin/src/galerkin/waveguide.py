@@ -99,6 +99,8 @@ from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 from .core.spaces import TRI_LOCAL_EDGES
 
+__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning"]
+
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
 #: cutoff of the PEC box: <= 1.2e-14.

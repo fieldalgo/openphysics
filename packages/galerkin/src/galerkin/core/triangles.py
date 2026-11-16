@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Checks and element data for conforming P1 triangle meshes.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 ``triangle_geometry`` keeps its validated output in a small cache keyed by the
 mesh content (see ``GEOMETRY_CACHE_ENTRIES``), so the solvers that check the
 same mesh repeatedly validate it once.

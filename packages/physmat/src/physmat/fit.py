@@ -3,6 +3,9 @@
 
 """Fit measured n,k data to a Drude-Lorentz model.
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 Time-domain solvers and broadband frequency sweeps need permittivity as a sum
 of a few poles rather than a table. ``fit_drude_lorentz`` finds Rakic-form
 parameters (eps_inf, wp, f0, G0, (f_j, w_j, G_j)...) that reproduce eps(w)

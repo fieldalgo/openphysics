@@ -15,6 +15,8 @@ from itertools import product
 import math
 from numbers import Real
 
+__all__ = ["C0", "AnalyticCavityMode", "rectangular_cavity_modes"]
+
 
 C0 = 299_792_458.0  # exact SI speed of light, metres / second
 

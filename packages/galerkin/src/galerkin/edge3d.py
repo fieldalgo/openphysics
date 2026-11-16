@@ -3,6 +3,9 @@
 
 """Lowest-order Nedelec (Whitney) edge elements on tetrahedra — 3D H(curl).
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 The same idea as edge.py one dimension up, and the same reason for existing: the
 electric field is only tangentially continuous across a material interface, so
 its degrees of freedom belong on edges, not nodes.

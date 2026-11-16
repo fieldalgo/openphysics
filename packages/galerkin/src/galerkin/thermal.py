@@ -32,6 +32,8 @@ from .core import solve as core_solve
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 
+__all__ = ["scalar_boundary_system", "SteadyHeatResult", "solve_steady_heat", "ElementHeatSource"]
+
 
 def _numbers(matrix):
     """A NumPy snapshot of a CooMatrix as SciPy CSR, for checks."""

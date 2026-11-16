@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """The one module that dispatches on the array library.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 galerkin computes through the array API (``array_api_compat``), so the same
 code runs on NumPy, JAX and PyTorch arrays. Everything those libraries do
 differently, and that the shared code needs, lives here so it can be tested in
