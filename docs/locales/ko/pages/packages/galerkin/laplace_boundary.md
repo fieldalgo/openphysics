@@ -513,3 +513,27 @@ rho<=1/4에서 나머지 상한16*rho^101/(101*(1-rho))를 사용합니다. 기�
 이 기준은 같은 수학적 Duffy 분할을 사용하지만 유한 Gauss-Jacobi 대신 적응형 적분을
 쓰며 독립 전체 장 솔버가 아닙니다. 교환·반사·기하 배율·상수 모드 호환·결과 불변성도
 따로 검사합니다. 기존 전류 솔버 기본값·물리 기하·수락 조건은 바꾸지 않습니다.
+### 선형 블록 참조의 재현 가능한 출처
+
+[원거리 기록](../../../../../../tests/galerkin/reference_values/mpmath/linear_far_log.json)과
+[공유 꼭짓점 기록](../../../../../../tests/galerkin/reference_values/mpmath/linear_vertex_log.json)은
+stored-reference v1 계약을 사용합니다. 명시적 소비자는 이 기록에서 입력을 만들고,
+모든 binary64 값이 기존 raw fixture와 같은지 확인한 뒤 원래의 무차원 원시 기준을
+적용합니다. 기존 fixture·시험·요청 차수 거부는 그대로 유지합니다.
+
+같은 디렉토리의 해시 고정 mpmath 1.3.0 requirements는 참조 재현 전용이며 런타임
+의존성이 아닙니다. 수정하지 않은 BSD-3-Clause wheel을 제품 모듈을 불러오지 않는
+별도 환경에서 실행합니다. 비교 전용 스크립트는 60·80자리에서 모든 항을 다시
+계산하고 배열별 차이를 출력한 뒤 임시 출력을 지웁니다. fixture를 덮어쓰는 기능은
+없습니다. 참조 환경에서 저장소 루트를 기준으로 실행합니다.
+
+```bash
+python tests/galerkin/reference_values/mpmath/compare_linear_logs.py far
+python tests/galerkin/reference_values/mpmath/compare_linear_logs.py vertex
+```
+
+새 기록의 시간은 기존 생성 시각이 아닌 이번 재현 측정입니다. 기록하지 않은 CPU
+모델·컴파일 시간·상주 메모리는 이유와 함께 null로 둡니다. 저장값 소비자는 현재
+참조 실행 시간을 주장하지 않습니다. 이는 수학 원시 비교이며, 꼭짓점 참조는 Duffy
+항등식을 공유합니다. 어느 기록도 장 수렴·물리 정확도·다른 플랫폼 지원의 근거가
+아닙니다.
