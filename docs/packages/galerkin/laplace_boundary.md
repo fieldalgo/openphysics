@@ -731,3 +731,33 @@ come from product geometry. The adjacent compare-only generator preserves the
 record; unknown generation costs remain explicit. Existing unpartitioned
 refusals, raw fixtures, tolerances and solvers remain unchanged. This primitive
 does not establish full-field convergence or other-platform accuracy.
+
+### Two-mode corner half-space assembly
+
+`galerkin.laplace_corner_linear_assembly.assemble_linear_corner_half_space`
+returns raw dimensionless image-minus-real Green matrices for convex conductor
+boundaries above the grounded line y=0. It reuses the existing rectangular
+geometry admission in metres; upper-plane and side-wall fields are absent.
+The supplied rectangle bounds admit and normalize geometry only.
+
+Each physical panel has two interleaved density modes: index2*i has mass1,
+and2*i+1 is the zero-mass linear mode. Exact self, shared-origin, separated,
+and explicitly partitioned mixed blocks preserve physical weights. Reversing
+a unit-power source endpoint flips its linear mode; nonunit singularities are
+not reversed. There is no failure-triggered retry of the old mixed method.
+Both pair directions are evaluated, and raw reciprocity/refinement retain
+1e-10 checks before any caller's symmetry averaging. Outputs and the geometry
+snapshot are immutable. Even16..512 edge subdivisions still give n-6 physical
+panels per edge, but this dense method admits at most512 physical panels
+(1024 density modes) and refuses excess before allocation.
+
+Tests preserve the P0 subspace, positive Green energy, physical scale,
+horizontal reflection and conductor ordering for square, triangle and unequal
+trapezoid cases. The [seven-block stored reference](../../../tests/galerkin/reference_values/mpmath/linear_half_space.json)
+includes a shared regular endpoint with its linear source sign. Separate
+mpmath1.3.0/BSD-3-Clause generation compares48/64-point and60/80-digit direct
+integrals. Stored admitted geometry derives from the product; self, source
+and Duffy identities share mathematics. The compare-only generator retains
+all reference values. Matrix checks do not establish complete two-ground
+fields, current convergence or other-platform behavior; existing solvers and
+numerical criteria are unchanged.
