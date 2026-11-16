@@ -544,3 +544,36 @@ and tail bound16*rho^101/(101*(1-rho)) for rho<=1/4. The reference tool is unshi
 References include unequal exponents/lengths, endpoint powers and orientations;
 structural tests retain admission, immutability, exchange, reflection and scaling.
 Existing constant-power, half-space and field paths remain unchanged.
+
+## Hierarchical linear shared-vertex interactions
+
+`power_panel_linear_shared_vertex_log` uses the same two modes and immutable
+fine/coarse block result as the far primitive. Both vectors start at the shared
+origin, are measured in metres and must define nonoverlapping rays. The length
+ratio is at most64 and each exponent lies in(0.5,1]. This complements the self
+and far blocks; disjoint near-panel interactions and a full linear field solver
+remain separate work.
+
+For r,s in{0,1}, the Duffy split yields the weighted moment after scaling the
+vectors by their maximum length:
+
+`J_rs - M*log(scale) = (p*E_q[v^s*log|a-v*b|] + q*E_p[u^r*log|u*a-b|] - M)/T`,
+where `T=p+q+r+s` and `M=p*q/((p+r)*(q+s))`.
+
+The radial logarithm is integrated analytically. The normalized Gauss-Jacobi
+rules integrate the remaining angular functions without computed-mass
+normalization. Apply the two mode polynomials to the four moments and add
+log(scale) only to00, using analytic masses[1,0]. Each n/2n pair (n=4..64) must
+meet the same dimensionless1e-12*max(1,abs(fine)) entrywise quadrature criterion.
+A geometrically admissible input can be unresolved at a requested order;
+there is no automatic retry or fallback. The retained length-ratio64 example
+fails at32/64 and passes when the caller explicitly selects64/128.
+
+The equal opposite collinear p=q=1 case has independent closed form
+`[[log(h)+2log(2)-3/2, 2sqrt(3)*(1-log(2))/3], [same, 5/4-2log(2)]]`.
+Six stored60/80-digit adaptive angular references also check unequal powers,
+lengths and angles. They share the mathematical Duffy split but use adaptive
+integration rather than this finite Gauss-Jacobi implementation; they are not
+an independent full-field solver. Exchange, reflection, geometric scaling,
+constant-mode compatibility and immutable results are checked separately.
+No current-solver defaults, physical geometry or existing acceptance gates change.
