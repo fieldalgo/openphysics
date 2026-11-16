@@ -1,0 +1,520 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "partitioned-linear-power-constant-log",
+  "physics": "2D Laplace logarithmic panel moments",
+  "comparison": "structure-oracle",
+  "role": "High-precision adaptive target comparison for localized mixed blocks. Exact source identity shares mathematics; two admitted panel inputs come from the product. Not complete field validation.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "exact conversion of binary64 input",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "analytic-source and adaptive flattened-target integral",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "coordinate": "target u=t^(1/p)",
+        "breakpoints": "source endpoint projection and distance multiples1/8/64, then mapped to t=u^p; not product dyadic cuts"
+      },
+      "arrays": [
+        "block_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": true
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_linear_partitioned.py",
+    "sha256": "c6416aec62676a9ad7a3365ac30d7f3a8835a61965e94e0882eb3f4568b5ebbd",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_linear_partitioned.py",
+    "product_commit": "c59d878ef58f8db874dbee775f5a268410b8cc6f",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T21:39:50.524080+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 39.79517505300464,
+    "wall_time_s": 39.81017344497377,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import cost, compilation timing, CPU model and peak resident memory were not captured."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "name": "assembly-16",
+        "a": [
+          -0.0015625000000000003,
+          -0.0
+        ],
+        "b": [
+          -0.0003133585164835182,
+          0.0003133585164835161
+        ],
+        "offset": [
+          -0.0002232142857142869,
+          0.0002232142857142854
+        ],
+        "p": 0.5714285714285711
+      },
+      {
+        "name": "assembly-32",
+        "a": [
+          -0.00012718023255813956,
+          -0.0
+        ],
+        "b": [
+          -2.1272530243829244e-05,
+          2.1272530243829102e-05
+        ],
+        "offset": [
+          -1.816860465116289e-05,
+          1.8168604651162767e-05
+        ],
+        "p": 0.5714285714285711
+      },
+      {
+        "name": "localized-0.015625-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.015625-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.015625-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      }
+    ],
+    "quadrature_order": 64,
+    "maximum_subintervals": 128
+  },
+  "matched": [
+    "Same physical input vectors, power exponent, analytic basis masses[1,0] and source unit power.",
+    "Two admitted assembly interactions and nine independently specified localized-source cases."
+  ],
+  "not_matched": [
+    "Reference uses arbitrary-precision adaptive integration and flattened target coordinate; product uses double-precision cubic rules on bounded dyadic parameter intervals.",
+    "Exact source moment mathematics is shared; two admitted input vectors derive from product geometry.",
+    "No whole-field discretization, panel/outer convergence, measurement or other-platform qualification."
+  ],
+  "reference_self_check": [
+    "60/80-digit absolute difference below1e-40 for all11 blocks.",
+    "Separate product-free process reproduces allbinary64 arrays and leaves the fixture unchanged."
+  ],
+  "failed_or_discarded": [
+    "Initial unpartitioned assembly interactions are refused by the unchanged original primitive.",
+    "Partitioned32/64 and ungraded64/128 research variants refused two physical-mass checks; the density-graded variant preserves those checks."
+  ],
+  "not_run": [
+    "Independent full-field solve and physical measurement."
+  ],
+  "values": [
+    {
+      "name": "block_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -7.504033840153373,
+          0.12840242839645835
+        ],
+        [
+          0.29643970866476804,
+          -0.13119446301729484
+        ]
+      ]
+    },
+    {
+      "name": "block_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -10.04864534840213,
+          0.10868422543081346
+        ],
+        [
+          0.3305744850236297,
+          -0.11714042209302751
+        ]
+      ]
+    },
+    {
+      "name": "block_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5543465130615948,
+          0.0038524972656298704
+        ],
+        [
+          -0.24245839946401296,
+          -0.01361084618271726
+        ]
+      ]
+    },
+    {
+      "name": "block_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5569444237094119,
+          0.0038601923723541693
+        ],
+        [
+          -0.2433904835781951,
+          -0.013647125460554693
+        ]
+      ]
+    },
+    {
+      "name": "block_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5569706495154025,
+          0.0038602700255937713
+        ],
+        [
+          -0.2433999071670574,
+          -0.01364749186714447
+        ]
+      ]
+    },
+    {
+      "name": "block_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5605571367522202,
+          0.00024210443165451114
+        ],
+        [
+          -0.22033302079356407,
+          -0.0008786090778155048
+        ]
+      ]
+    },
+    {
+      "name": "block_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5631675973369186,
+          0.00024260647530718982
+        ],
+        [
+          -0.2212061259799323,
+          -0.0008809517951087706
+        ]
+      ]
+    },
+    {
+      "name": "block_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5631939497892984,
+          0.00024261154179004295
+        ],
+        [
+          -0.22121495390653456,
+          -0.0008809754553962682
+        ]
+      ]
+    },
+    {
+      "name": "block_08",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5609344135130643,
+          2.418301187581395e-05
+        ],
+        [
+          -0.2189631950178582,
+          -8.790630574396169e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_09",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5635456569837787,
+          2.4233276331283068e-05
+        ],
+        [
+          -0.21983264766650437,
+          -8.814070805198433e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_10",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5635720173368297,
+          2.423378358740653e-05
+        ],
+        [
+          -0.21984143870428635,
+          -8.814307539808587e-05
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_linear_partitioned.py"
+  ],
+  "provenance_status": "reconstructed",
+  "not_recorded": {
+    "environment.numpy": "Not imported or installed in the isolated reproduction; see the separate-process generator imports.",
+    "environment.cpu": "CPU model was not captured by the reproduction receipt; only platform.machine was recorded.",
+    "cost.compile_s": "No separate compile timer in the pure-Python reproduction.",
+    "cost.peak_rss_mb": "No resident-memory sampler in the reproduction."
+  },
+  "regeneration": [],
+  "reproduction_note": "This receipt describes only the new11-block reproduction; earlier failed research records are retained separately.",
+  "reproduction": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "7.5986798420268e-62",
+      "3.0178600985368e-61",
+      "2.3708949742905e-62",
+      "4.1364433392142e-63",
+      "6.3917424240582e-62",
+      "1.7799083248794e-62",
+      "5.7740385943061e-62",
+      "5.916120151727e-62",
+      "2.525702035019e-60",
+      "5.6176911379101e-61",
+      "6.9784554608349e-61"
+    ],
+    "temporary_numeric_sha256": "0db21acdc224236f6c593630a5fe315d02276757bfe58cf9ac83541a0cfe1926"
+  },
+  "values_sha256": "be227d7d3244ee8f559160219f1b81a8eb38d5c59d5c6e78cda06a3dbe45d435",
+  "content_sha256": "85b8c38670c777d72c5f70d868fe66fb9f7b483c5bbdbf8908e0b8cb402be813"
+}

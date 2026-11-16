@@ -702,3 +702,32 @@ It introduces no denominator floor or numeric clipping. The adjacent compare-
 only generator uses the same hash-pinned mpmath1.3.0 reference environment.
 The new receipt measures only this reproduction; uncaptured CPU/RSS/compile
 metadata remain null. No runtime, raw fixture, old test or criterion changes.
+
+### Partitioned mixed linear-power blocks
+
+`galerkin.laplace_corner_partitioned.power_panel_linear_constant_log_partitioned`
+is an explicit alternative for a power target and unit-power source, each with
+constant-mass and zero-mass linear modes. It keeps the existing `(0.5, 1]`
+exponent range, length ratio at most1e6, and exact binary-input intersection
+admission. It does not retry the unpartitioned method or change that method.
+
+Source endpoint projections select integration cuts in the target parameter.
+Dyadic distance cuts and upper/lower<=2 grading away from the singular origin
+limit density variation. At most128 subintervals use fixed64/128 double-ended
+cubic rules; the first interval integrates the exact power measure, and other
+intervals retain the physical power density. No geometry, physical weights or
+returned moments are normalized, snapped or clipped. Analytic masses[1,0] and
+entrywise coarse/fine differences retain1e-12 checks; an over-budget or
+unresolved interaction fails explicitly. Result fields include immutable
+`mean_log_distance`, `coarse_mean_log_distance`, `quadrature_order`,
+`subintervals`, and `mass_error`.
+
+The [stored adaptive reference](../../../tests/galerkin/reference_values/mpmath/linear_partitioned_log.json)
+contains two admitted assembly interactions and nine localized short-source
+cases. Separate mpmath1.3.0/BSD-3-Clause generation uses a flattened target
+coordinate with adaptive integration at60/80 digits, not the product dyadic
+partition. Exact source identities share mathematics, and the first two inputs
+come from product geometry. The adjacent compare-only generator preserves the
+record; unknown generation costs remain explicit. Existing unpartitioned
+refusals, raw fixtures, tolerances and solvers remain unchanged. This primitive
+does not establish full-field convergence or other-platform accuracy.

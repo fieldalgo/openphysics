@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add bounded physical-density partitioning for mixed linear-power logarithmic blocks, with adaptive reference provenance and unchanged unpartitioned behavior.
+
 - Preserve self-log and squared-density reference values with explicit reproducible provenance and unchanged strict relative/analytic-zero checks.
 
 - Add explicit two-mode power/constant endpoint interactions, analytic source moments, retained fixed-rule refusal and stored adaptive references.

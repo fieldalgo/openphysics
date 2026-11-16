@@ -621,3 +621,27 @@ adaptive 대상 적분을 사용합니다. 처음 z=-.3+.01j에서 구간을 나
 mpmath1.3.0 참조 환경을 사용합니다. 새 측정 기록은 이번 재현만 설명하고, 기록하지
 않은 CPU·RSS·컴파일 메타데이터는 null로 둡니다. 런타임·raw fixture·기존 시험·
 판정 기준은 바뀌지 않습니다.
+
+### 분할 혼합 선형 power 블록
+
+`galerkin.laplace_corner_partitioned.power_panel_linear_constant_log_partitioned`는
+power 표적과 단위 지수 원천의 질량1·질량0 선형 모드를 적분하는 명시적 별도 방식입니다.
+기존 `(0.5, 1]` 지수, 최대1e6 길이비, binary 입력의 정확한 교차 판정을 유지하며,
+기존 비분할 방식의 실패를 재시도하거나 그 방식을 수정하지 않습니다.
+
+원천 끝점의 투영은 표적 매개변수 적분 구간만 정합니다. 거리의 두 배 간격과
+특이 원점 밖 upper/lower<=2 세분으로 밀도 변화를 제한합니다. 최대128구간에 고정
+64/128 양끝 cubic 규칙을 사용하며 첫 구간은 정확한 power 측도, 나머지는 물리적
+power 밀도를 유지합니다. 기하·물리적 가중치·결과 모멘트를 정규화·스냅·클리핑하지
+않습니다. 해석적 질량[1,0]과 항별 coarse/fine 차이의1e-12 검사를 유지하고 예산 초과나
+미해결 상호작용은 명시적으로 거절합니다. 결과는 변경 불가능한
+`mean_log_distance`, `coarse_mean_log_distance`, `quadrature_order`,
+`subintervals`, `mass_error`를 제공합니다.
+
+[저장 adaptive 참조](../../../../../../tests/galerkin/reference_values/mpmath/linear_partitioned_log.json)는
+승인된 패널 기하 상호작용 두 개와 국소 짧은 원천 아홉 사례를 포함합니다.
+별도 mpmath1.3.0/BSD-3-Clause 과정은 제품 dyadic 구간 대신 측도를 평탄화한 표적
+좌표에서60/80자리 adaptive 적분을 수행합니다. 정확한 원천 항등식은 수학을 공유하고
+첫 두 입력은 제품 기하에서 왔습니다. 인접 비교 전용 생성기는 기록을 덮어쓰지 않으며
+미측정 비용을 명시합니다. 기존 비분할 거절·raw fixture·기준·솔버는 바뀌지 않습니다.
+이 원시 계산만으로 전체장 수렴이나 다른 플랫폼 정확도를 입증하지 않습니다.
