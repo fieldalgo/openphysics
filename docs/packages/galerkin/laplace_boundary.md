@@ -644,3 +644,48 @@ Exchange, signed-axis transformations, physical scaling, constant-mode
 compatibility, overlap with the far API, immutable outputs and explicit refusal
 are checked separately. These primitive blocks do not yet supply a full linear
 boundary field solver, current partition or validated fixed-ground adapter.
+
+### Linear power/constant endpoint interactions
+
+`power_panel_linear_constant_log(a, b, offset, exponent)` provides a 2x2 block
+between a power target and a unit-power source. The target runs from zero to a,
+the source from offset to offset+b, in planar metres. Each has two physical
+modes; source modes are1 andsqrt(3)*(2v-1) in normalized coordinates. Target
+powers lie in(0.5,1], length ratio is at most1e6. Exact binary-input topology
+admits disjoint panels and common endpoints, refusing overlap and interior
+crossings. Normalized directions and source coordinates must remain representable.
+Self interactions use the separate exact self API.
+
+The source's first polynomial moment is
+`F(z)=Re[z+1/2-z*(z+1)*(log(z+1)-log(z))]`, with F(0)=1/2 and F(-1)=-1/2.
+For |z|>2,48 terms of
+`sum_k>=1 (-1)^(k+1)/((k+1)*(k+2)*z^k)` avoid cancellation; the omitted
+absolute tail is below1.5e-18. Multiply bysqrt(3) for the physical source mode.
+The existing exact constant-source logarithmic integral supplies mode0.
+
+Fixed cubic-coordinate64/128 rules integrate the target. Analytic masses[1,0]
+place log(source_length) only in00; subtract the source moment at the target
+origin before integrating each zero-mass target mode. Computed quadrature
+weights are never renormalized. Target mass errors and each normalized
+fine/coarse difference retain their1e-12 primitive criteria. Short sources
+opposite target interiors can remain unresolved: the registered target[0,1],
+source starting at(.5,.001) with lengths1/64,1e-3 or1e-4 is refused. No retry
+or implication of universal near-interaction accuracy is provided.
+
+The [stored adaptive record](../../../tests/galerkin/reference_values/mpmath/linear_power_constant_log.json)
+checks11 source first moments by direct80-digit quadrature and7 full blocks
+at60/80 digits. The source identity is shared mathematics; the full reference
+uses separate adaptive target integration after flattening the power measure.
+Its initial unsplit source quadrature at z=-.3+.01j failed the1e-50 identity
+criterion; splitting around the closest projected point resolved it without
+changing that criterion. The compare-only generator preserves this history and
+requires the adjacent hash-pinned mpmath1.3.0 environment.
+
+Source reversal changes the sign of only the source's linear mode. Target
+reversal has the analogous rule only for unit target power; reversing a general
+power panel would move its singularity and is not an equivalent input.
+Independent endpoint identities, shared-vertex/far overlaps, constant-mode
+compatibility, signed-coordinate transformations, scaling, reciprocity for
+unit powers, immutable outputs and unresolved-input refusal are tested.
+No full linear field assembly, fixed-ground accuracy or platform support follows
+from these primitive checks.
