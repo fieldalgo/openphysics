@@ -7,14 +7,16 @@ The singular endpoint is s=0. These explicit numerical primitives do not
 alter any constant-panel solver or establish field/mesh convergence.
 """
 from dataclasses import dataclass
+from fractions import Fraction
 import math
 import numpy as np
-from scipy.special import digamma
+from scipy.special import digamma, xlogy
 from scipy.linalg import eigh_tridiagonal
 
 __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_gram', 'power_panel_self_log',
-           'power_panel_shared_vertex_log', 'power_panel_separated_log']
+           'power_panel_shared_vertex_log', 'power_panel_separated_log',
+           'power_panel_constant_log']
 
 
 def _scalar(value, name):
@@ -201,4 +203,89 @@ def power_panel_separated_log(first,second,offset,first_exponent,second_exponent
     coarse,fine=evaluate(n),evaluate(2*n)
     if not math.isfinite(coarse) or not math.isfinite(fine) or abs(fine-coarse)>1e-12*max(1,abs(fine)):
         raise ValueError('power-panel quadrature did not converge')
+    return PowerPanelLogResult(fine,coarse,n)
+
+
+def _graded_power_rule(power,order):
+    """Cubic-coordinate rule for p*u**(p-1); no weight-sum rescaling."""
+    p=_power(power);n=_order(order,128);alpha=2.;beta=3*p-1.;s=alpha+beta
+    k=np.arange(n,dtype=float);diag=np.empty(n);diag[0]=(beta-alpha)/(s+2)
+    diag[1:]=(beta*beta-alpha*alpha)/((2*k[1:]+s)*(2*k[1:]+s+2))
+    k=k[1:];off=2/(2*k+s)*np.sqrt(k*(k+alpha)*(k+beta)*(k+s)/((2*k+s-1)*(2*k+s+1)))
+    nodes,vectors=eigh_tridiagonal(diag,off,lapack_driver='stev');t=(nodes+1)/2
+    denominator=t**3+(1-t)**3
+    x=t**3/denominator
+    weights=vectors[0]**2*2/((3*p+1)*(3*p+2))/denominator**(p+1)
+    return x,weights
+
+def _constant_segment_log(z):
+    """Mean log|z+t| for a constant unit segment, avoiding far cancellation."""
+    z=np.asarray(z,dtype=complex);out=np.empty(z.shape);far=abs(z)>2
+    # Integral of log(1+t/z) = sum (-1)^(k+1)/(k*(k+1)*z^k).
+    # |1/z| < 1/2: after 48 terms the absolute tail is < 1.5e-18.
+    # Complex log1p can lose small real parts before multiplication by z.
+    reciprocal=1/z[far]
+    series=np.zeros(reciprocal.shape,dtype=complex)
+    for k in range(48,0,-1):
+        series=reciprocal*(((-1.)**(k+1))/(k*(k+1))+series)
+    out[far]=np.log(z[far]).real+series.real
+    if np.any(~far):
+        u=z[~far].real;h=abs(z[~far].imag)
+        def primitive(x):return .5*xlogy(x,x*x+h*h)-x+h*np.arctan2(x,h)
+        out[~far]=primitive(u+1)-primitive(u)
+    return out
+
+def _require_disjoint_or_endpoint(a,b,o):
+    """Exact topology of binary input vectors; no normalized-coordinate snap."""
+    a,b,o=[[Fraction(float(x)) for x in v] for v in (a,b,o)]
+    def cross(x,y):return x[0]*y[1]-x[1]*y[0]
+    determinant=cross(a,b)
+    if determinant:
+        t,v=cross(o,b)/determinant,cross(o,a)/determinant
+        if 0<=t<=1 and 0<=v<=1 and not (t in (0,1) and v in (0,1)):
+            raise ValueError('crossing or overlapping panels')
+    elif cross(a,o)==0:
+        axis=0 if a[0] else 1
+        s,t=o[axis]/a[axis],(o[axis]+b[axis])/a[axis]
+        if max(0,min(s,t))<min(1,max(s,t)):
+            raise ValueError('overlapping panels')
+
+def power_panel_constant_log(a, b, offset, exponent):
+    """Double log mean between one power panel and one constant panel.
+
+    The power panel runs from zero to a; the constant panel runs from offset
+    to offset+b, in metres. Exponent lies in (0.5,1]. Allow only disjoint
+    panels or a common endpoint; refuse overlap and interior intersections.
+    The length ratio is at most 1e6. The analytic constant-source mean and a
+    cubic target-coordinate rule use fixed orders 64/128, with unchanged
+    1e-12 normalized refinement and target-normalization gates. There is no
+    adaptive fallback and no field-solve or current-convergence guarantee.
+    """
+    p = _power(exponent)
+    n = 64
+    vectors = []
+    for value in (a,b,offset):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():
+            raise ValueError('finite planar vectors required')
+        vectors.append(np.asarray(raw,dtype=float))
+    a,b,o=vectors;la,lb,lo=[math.hypot(*v) for v in vectors]
+    if not all(math.isfinite(x) for x in (la,lb,lo)) or min(la,lb)<=0:
+        raise ValueError('unrepresentable geometry')
+    size=max(la,lb)
+    if min(la,lb)/size<1e-6:raise ValueError('length ratio exceeds 1e6')
+    if lo/4<size:
+        _require_disjoint_or_endpoint(a,b,o)
+    scale=max(size,lo);a,b,o=a/scale,b/scale,o/scale
+    direction=complex(*b)
+    def evaluate(order):
+        x,w=_graded_power_rule(p,order)
+        if abs(w.sum()-1)>1e-12:raise ValueError('target normalization failed')
+        delta=o-x[:,None]*a
+        z=(delta[:,0]+1j*delta[:,1])/direction
+        if not np.isfinite(z).all():raise ValueError('source coordinates not representable')
+        return float(math.log(lb)+w@_constant_segment_log(z))
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not math.isfinite(coarse) or not math.isfinite(fine) or abs(fine-coarse)>1e-12*max(1,abs(fine)):
+        raise ValueError('power-constant quadrature did not converge')
     return PowerPanelLogResult(fine,coarse,n)

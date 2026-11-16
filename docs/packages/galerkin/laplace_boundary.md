@@ -225,3 +225,43 @@ gates; they also check positive-weight distance bounds, the exact separation
 admission boundary, explicit refusal, density orientation and representable
 length scales. General near pairs, other endpoint contacts and an assembled
 weighted field solver remain outside this API.
+
+### Power panel against a constant panel
+
+`power_panel_constant_log(a, b, offset, p)` evaluates the weighted log mean
+between the power panel `0 -> a` and the constant panel `offset -> offset+b`.
+Vectors are in metres, `0.5 < p <= 1`, and the length ratio is at most `1e6`.
+Disjoint panels and contact at one common endpoint are allowed; overlaps,
+interior intersections, nonfinite inputs and unrepresentable coordinates are
+rejected. Intersection predicates use exact rational representations of the
+input floats, without coordinate snapping. Reversing the constant panel
+preserves its density; reversing the power panel generally does not.
+
+The constant-source integral is analytic. Its far-distance series has an
+absolute truncation bound below `1.5e-18` for the normalized log mean.
+The power target uses the cubic coordinate `u=t^3/(t^3+(1-t)^3)` with Jacobi
+parameters `(2, 3*p-1)` and analytic density normalization. Computed weights
+are not divided by their sum. Only the fixed 64/128 comparison is supported;
+require both the weight-sum error and normalized refinement error to be at
+most `1e-12`. Unresolved near pairs raise `ValueError`, without an adaptive
+fallback. `PowerPanelLogResult` retains both means and coarse order 64.
+
+```python
+from galerkin.laplace_corner import power_panel_constant_log
+
+pair = power_panel_constant_log(
+    [1e-3, 0.], [1e-3, 0.], [1e-3, 0.], .625,
+)
+print(pair.mean_log_distance, pair.refinement_error)
+```
+
+Five independent direct 2D references cover origin/end contact, near parallel
+panels and length ratios 4000:1 and 1:4000. Four direct 1D references cover
+complex source coordinates. Stored 60/80-digit mpmath results agree to
+`1e-30`; runtime reference and transformation checks retain `1e-12`.
+The records are `tests/galerkin/two_ground/evidence/power-constant-integrals.json`
+and `constant-segment-log.json` in the same directory. Tests also check
+analytic density moments, closed-form constant integrals, rotation/reflection,
+source reversal, length scaling, one-ULP gap/overlap distinction and actual
+near-pair refusal. These primitives do not establish weighted field or
+current-loss convergence and do not change existing boundary solvers.
