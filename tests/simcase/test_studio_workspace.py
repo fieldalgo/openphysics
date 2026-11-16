@@ -133,6 +133,19 @@ def test_capability_v6_is_v5_for_project_and_session_version_6(client):
                                                                          if k != 'schema_version'}
 
 
+def test_capability_v7_is_v6_for_project_and_session_version_7(client):
+    """The Joule heating application: /v7 is the contract of a workspace that saves project and
+    session version 7 (Joule inputs added); its optical content and adapter are v6's."""
+    v6 = client.get('/api/workspace/capabilities/v6').json()
+    response = client.get('/api/workspace/capabilities/v7')
+    caps = response.json()
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    assert caps['schema_version'] == 7 and caps['adapter'] == 'optical-shapes-v7'
+    assert {k: v for k, v in caps.items() if k != 'schema_version'} == {k: v for k, v in v6.items()
+                                                                         if k != 'schema_version'}
+
+
 def test_workspace_instance_is_stable_for_server_lifetime(client):
     caps = client.get('/api/workspace/capabilities/v2').json()
     assert re.fullmatch(r'[a-f0-9]{32}', caps['server_instance'])

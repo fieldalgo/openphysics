@@ -26,11 +26,13 @@ import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
 import {renderApplications,templatePhysics} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
+import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
+import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
 // A reload always opens the start page, so a restored scroll position would hide its top.
 if('scrollRestoration' in history)history.scrollRestoration='manual';
-const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
@@ -40,11 +42,14 @@ function select(name){pick.boundary=null;ui.selection=name;ui.page=name==='Coupl
 
 const isOptical=()=>state.electric===false&&!state.heat&&!state.structure&&state.optics;
 const isHeat=()=>state.electric===false&&state.heat&&!state.structure&&!state.optics;
+// Electric currents and heat alone: the Joule heating application (workspace-joule-view.mjs).
+const isJoule=()=>state.electric!==false&&state.heat&&!state.structure&&!state.optics;
 function setShape(index,shape){state.shapes=state.shapes.map((s,i)=>i===index?shape:s);}
 function selectedShape(){ui.shape=Math.min(Math.max(0,ui.shape|0),state.shapes.length-1);return state.shapes[ui.shape];}
 function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installShapeEditor($('canvas'),{shape:selectedShape(),index:ui.shape,snap:ui.snap,blocked:()=>numericDrafts.invalid,commit:(shape,label)=>{edits.endGroup();setShape(ui.shape,shape);trackEdit();edits.endGroup();render();notice(label+'. Run explicitly to compute new results.');}});}
 function geom(){
 if(isHeat())return heatSvg();
+if(isJoule())return jouleView.svg();
 if(isOptical())return sectionSvg(state.shapes,{selected:ui.shape,selectedEdge:pick.boundary,mode:pick.mode});
 const w=state.width/500;
 const attrs=body=>`data-pick-body="${body}" role="button" tabindex="0" aria-label="Select ${body} body" stroke="${ui.body===body?'#fff0a8':'#7a939f'}" stroke-width="${ui.body===body?3:1}"`;
@@ -85,8 +90,9 @@ function active(){return ['Electric currents',...(state.heat?['Heat transfer']:[
 // ---- Steady heat plate: a form over the public thermal.steady2d routes (thermal.js controller). ----
 const HEAT_NODES=['Geometry','Materials','Heat transfer','Mesh','Study'];
 const heatDrafts=new Map();let heatSide='left',heatField='temperature',heatArrows=true,heatRun=null,heatState={supported:false,busy:false,error:null,result:null},heatProbe=null,heatResize=null;
+async function studioRequest(method,url,body){const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat and Joule calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;}
 const heatController=globalThis.ThermalStudio?.createController({
- request:async(method,url,body)=>{const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;},
+ request:studioRequest,
  onState:next=>{heatState=next;refreshHeatControls();},
  onResult:payload=>{heatRun={input:JSON.parse(JSON.stringify(heatCapture)),signature:JSON.stringify(heatCapture),payload,completedAt:new Date().toISOString()};heatProbe=null;ui.page='Results';render();notice('Heat calculation complete. Result retains its input snapshot; it is kept in this tab only.');}
 })||null;
@@ -139,8 +145,15 @@ function heatSvg(){
  return `<svg data-geometry-view="heat" viewBox="0 0 600 350" role="group" aria-label="Heat plate, ${escapeHtml(thermalSummary(t))}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#5b3f36" stroke="none"/><g stroke="#e2c9a6" stroke-opacity=".35" stroke-width=".6">${grid}</g>${sides}<text x="300" y="22" text-anchor="middle" fill="#e2e9ed" font-size="11">${escapeHtml(thermalSummary(t))} · ${t.nx} × ${t.ny} divisions</text><text x="${x0}" y="${y0+h+30}" fill="#a2b2bd" font-size="10">(0, 0)</text><text x="${x0+w}" y="${y0-20}" text-anchor="end" fill="#a2b2bd" font-size="10">(${t.width}, ${t.height}) mm</text></svg>`;
 }
 function bindHeatSides(){document.querySelectorAll('[data-heat-side]').forEach(el=>{const choose=()=>{heatSide=el.dataset.heatSide;ui.selection='Heat transfer';render();document.querySelector(`[data-side-box="${heatSide}"] select`)?.focus();};el.onclick=choose;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};});}
+// Joule heating: names used before their declaration are wrapped, so creating the view reads none of them.
+function setJoule(next,message){
+ let checked;try{checked=validateJoule(next);}catch(error){notice(error.message);return false;}
+ state.joule=checked;edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
+}
+const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),notice:text=>notice(text),getJoule:()=>state.joule,commit:setJoule,render:()=>render(),
+ request:studioRequest,active:()=>isJoule(),beforeRun:()=>edits.record(current())});
 function refreshHeatControls(){
- const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat();if(!isHeat())return;
+ const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat()||isJoule();if(!isHeat())return;
  const block=heatBlock();button.disabled=!!block||heatState.busy;button.textContent=heatState.busy?'Computing…':'Run heat study';
  if(numericDrafts.invalid||heatDrafts.size)$('status').textContent='Input errors · correct or restore the last valid values';
  else $('status').textContent=heatState.busy?'Heat calculation running':block?'Heat input not ready · '+block:'Heat solver ready · explicit Run required';
@@ -191,7 +204,7 @@ function renderHeat(){
  if(ui.page==='Connections'){$('canvas').innerHTML='<h2>Heat-only model</h2><p>This application solves steady heat conduction only. No electric, mechanical or optical coupling is configured.</p>';}
  bindHeatSides();refreshHeatControls();
 }
-function render(){const focused=document.activeElement,focusId=focused?.id;const focusData=['node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+(isHeat()?HEAT_NODES:names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n))).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>'+(isHeat()?'Steady heat solver available · coupling pending':'Optical adapter available · coupled solvers pending')+'</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function render(){const focused=document.activeElement,focusId=focused?.id;const focusData=['node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;$('tree').innerHTML='<small>Model explorer</small><h3>Component 1</h3>'+(isHeat()?HEAT_NODES:isJoule()?JOULE_NODES:names.filter(n=>!isOptical()||!['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(n))).map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}">${n}</button>`).join('')+'<small>Capability</small><p>'+(isHeat()?'Steady heat solver available · coupling pending':isJoule()?'Joule heating solver on named regions':'Optical adapter available · coupled solvers pending')+'</p>';$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -201,7 +214,7 @@ else if(ui.selection==='Solid mechanics')inspector+=pair('Load','Thermal strain'
 else if(ui.selection==='Heat transfer')inspector+=pair('Source','Joule heat')+pair('Heat loss','Not assigned')+pair('Output','Temperature [K]');
 else if(ui.selection==='Optical modes')inspector+=pair('Wavelength',state.wavelength+' nm')+pair('Inputs',isOptical()?'Material at '+state.wavelength+' nm, geometry':'n(T), geometry')+pair('Output','Modes / effective index');
 else inspector+=pair('Status','Not executed')+'<p>Settings and validation will be implemented behind package APIs.</p>';
-if(isHeat())inspector=heatInspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();
+if(isHeat())inspector=heatInspector();else if(isJoule())inspector=jouleView.inspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();if(isJoule())jouleView.bindInspector();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML='<h2>Physics connections</h2><p>One-way sequence · design configuration</p><div class="flow"><button data-select="Electric currents"><strong>Electric currents</strong>Voltage → current density</button><label><input data-toggle="heat" type="checkbox" '+(state.heat?'checked':'')+'> Joule heating → Heat transfer</label><div class="arrow">Q [W/m³] → T [K]</div><label><input data-toggle="structure" type="checkbox" '+(state.structure?'checked':'')+' '+(!state.heat?'disabled':'')+'> Thermal expansion → Solid mechanics</label><div class="arrow">T [K] → displacement [m]</div><label><input data-toggle="optics" type="checkbox" '+(state.optics?'checked':'')+'> Optical modes · material / geometry update</label></div><p>Field mapping, deformed mesh and material laws are pending. Two-way feedback is not configured.</p>';
 else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer());
@@ -209,7 +222,7 @@ else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>';
 const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
-document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
+document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
@@ -227,7 +240,7 @@ function refreshInputIssues(){
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
  else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
- refreshPersistence();
+ refreshPersistence();jouleView.refreshControls();
 }
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
@@ -330,7 +343,7 @@ function refreshPersistence(){
   // Results not in a session file outrank a clean input snapshot: saving inputs only
   // must not read as saved while completed runs would be lost.
   const runsUnsaved=runs.length>0&&savedRunsState!==runsStamp();
-  $('project').textContent=(isOptical()?'Optical waveguide':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):runsUnsaved?'Results not saved · use Save session':(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
+  $('project').textContent=(isOptical()?'Optical waveguide':isHeat()?'Steady heat':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+(numericDrafts.invalid?'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved'):runsUnsaved?'Results not saved · use Save session':(clean?'Input snapshot unchanged':'Unsaved inputs'))+' · Revision '+edits.revision;
   refreshNotebook();refreshWorkflow();
 }
 function refreshWorkflow(){
@@ -345,9 +358,10 @@ function refreshWorkflow(){
 }
 function rejectInvalidInput(){
   numericDrafts.assertValid();if(heatDrafts.size)throw new Error('Correct or restore the highlighted heat inputs before saving or opening files.');
+  if(jouleView.hasDrafts())throw new Error('Correct or restore the highlighted Joule inputs before saving or opening files.');
 }
 function applyProject(doc,{saved=true,resetHistory=false}={}){
-  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();
+  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.invalidate();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
@@ -410,7 +424,7 @@ $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)request
 function updateHistory(){ $('undo-edit').disabled=!edits.canUndo;$('redo-edit').disabled=!edits.canRedo; }
 function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before)checkpointRecovery();updateHistory();refreshPersistence();}
 function restoreEdit(doc,label){
- numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();
+ numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.invalidate();
  Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
 }
@@ -818,7 +832,7 @@ $('run-optical').onclick=async()=>{
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
- try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v6'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v6';}
+ try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v7'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v6';}
  catch(error){
   // no answer at all: say so and keep checking; any other failure is shown and checking stops
   if(connectionFailure(error)==='unreachable'){connection.message=UNREACHABLE_MESSAGE;scheduleReconnect();}
@@ -839,7 +853,7 @@ function scheduleReconnect(){
  reconnectTimer=setTimeout(async()=>{
   reconnectTimer=null;reconnecting=true;let reachable=true;
   try{
-   try{await solverApi('/api/workspace/capabilities/v6');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
+   try{await solverApi('/api/workspace/capabilities/v7');}catch(error){reachable=connectionFailure(error)!=='unreachable';}
    if(reachable)await connectWorkspace();
   }finally{reconnecting=false;}
   if(connection.ready){notice(RECONNECTED_MESSAGE);if($('job-message').textContent===UNREACHABLE_MESSAGE)$('job-message').textContent=RECONNECTED_MESSAGE;}
@@ -849,6 +863,7 @@ function scheduleReconnect(){
 $('connect-workspace').onclick=connectWorkspace;
 installProviderList($('installed-physics'),$('provider-list'),solverApi);
 $('run-heat').onclick=()=>{runHeat().catch(error=>notice('Heat run failed: '+error.message));};heatController?.loadCapability();
-const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
+$('run-joule').onclick=()=>{jouleView.run();};jouleView.loadCapability();
+const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
 
 installLayout(document.querySelector('main'),document.getElementById('reset-layout'),document.getElementById('layout-status'));

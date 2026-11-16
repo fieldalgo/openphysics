@@ -6,9 +6,11 @@ import {readOpticalField,fieldScalars,FIELD_METADATA} from './workspace-field.mj
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
-// Session format 6 (units and naming batch): run records under the section 5.3.4 names
-// (effective_index, node_coordinates in m), settings and view coordinates as quantity strings.
-export const SESSION_VERSION=6;
+// Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
+// unchanged, and a version 6 session is read with its input as a version 6 project. Format 6
+// (units and naming batch): run records under the section 5.3.4 names (effective_index,
+// node_coordinates in m), settings and view coordinates as quantity strings.
+export const SESSION_VERSION=7;
 export const OPTICAL_ADAPTER='optical-shapes-v7';
 export const WINDOW_UM=Object.freeze({xmin:-1.5,xmax:1.5,ymin:-1.2,ymax:1.2});
 const um=value=>value+' um';
@@ -117,7 +119,7 @@ export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format!=='openphysics-studio-session'||doc.version!==SESSION_VERSION||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
+ if(doc?.format!=='openphysics-studio-session'||![6,SESSION_VERSION].includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
  const input=validateProject(doc.input),runs=doc.runs.map(r=>{const run=validateRun(r,true);if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');

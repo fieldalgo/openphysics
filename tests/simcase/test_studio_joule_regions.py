@@ -126,6 +126,40 @@ def test_js1_payload_equals_simcase_run_bit_for_bit(client, kind):
         assert summary["iterations"] == []
 
 
+#: the workspace Joule application's default document (workspace-joule.mjs jouleDocument(DEFAULT_JOULE);
+#: studio_workspace_joule.cjs asserts the builder writes exactly this): the strip above with the
+#: documented iteration defaults written out
+WORKSPACE_DEFAULT = {
+    "openphysics": "0.3", "name": "Workspace Joule heating",
+    "geometry": {"version": 1, "components": {"xs": {
+        "dimension": "2d", "length_unit": "mm", "depth": None, "domain": {"xmin": 0, "xmax": 2, "ymin": 0, "ymax": 1},
+        "background": {"material": "A"}, "features": [{"name": "b", "type": "rect", "x": 1, "y": 0, "w": 1, "h": 1,
+                                                       "material": "B"}]}}},
+    "materials": {m: {"electrical_conductivity": {
+        "model": "linear_resistivity", "reference_conductivity": sigma, "reference_temperature": "300 K",
+        "resistivity_temperature_coefficient": alpha, "valid": {"temperature": ["250 K", "600 K"]}},
+        "thermal_conductivity": k} for m, sigma, alpha, k in (("A", "2000 S/m", "0.004 1/K", "1.5 W/(m K)"),
+                                                              ("B", "500 S/m", "-0.003 1/K", "0.25 W/(m K)"))},
+    "physics": {"j": {"type": "joule.temperature2d", "prescribed_electric_potential": {"left": "0.2 V", "right": "0 V"},
+                      "prescribed_temperature": {"left": "300 K", "right": "320 K"}, "initial_temperature": "300 K",
+                      "iteration": {"relaxation_factor": 0.5, "temperature_tolerance": "1e-9 K",
+                                    "relative_tolerance": 1e-10, "iteration_limit": 100}}},
+    "mesh": {"element_size": "0.125 mm"}, "study": {"type": "single"},
+    "results": {"save_fields": True, "plots": False}}
+
+
+def test_js1_the_workspace_default_document_runs_as_simcase_runs_it(client):
+    identity, status = finished(client, copy.deepcopy(WORKSPACE_DEFAULT))
+    assert status["status"] == "done", status
+    payload = client.get("/api/jobs/"+identity["job"]+"/result").json()
+    fields = run(Document.from_dict(WORKSPACE_DEFAULT), verbose=False).fields
+    for key, value in fields.items():
+        assert np.array_equal(np.array(payload["arrays"][key], dtype=value.dtype), value), key
+    # the defaults written out change nothing: the strip without them gives the same temperatures
+    strip_fields = run(Document.from_dict(strip()), verbose=False).fields
+    assert fields["temperature"].tobytes() == strip_fields["temperature"].tobytes()
+
+
 def test_js1_validation_returns_the_document_and_its_summary(client):
     reply = client.post("/api/joule/validate", json=envelope(strip()))
     assert reply.status_code == 200

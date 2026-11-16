@@ -30,9 +30,9 @@ test('numeric drafts report the editable ranges with units',()=>{
  assert.deepEqual(parseNumeric('wavelength','1600'),{ok:true,value:1600});assert.deepEqual(parseNumeric('coreMesh','20'),{ok:true,value:20});
  assert.match(parseNumeric('wavelength','1300').message,/1400–1700 nm/);assert.match(parseNumeric('coreMesh','10').message,/20–60 nm/);
 });
-test('projects (version 6) carry wavelength and core mesh; earlier versions are refused by name',()=>{
+test('projects (version 7) carry wavelength and core mesh; earlier versions are refused by name',()=>{
  const doc=snapshot(model({wavelength:1625,coreMesh:40}),setup());
- assert.equal(doc.version,6);assert.equal(doc.units.wavelength,'nm');assert.equal(doc.units.core_mesh,'nm');
+ assert.equal(doc.version,7);assert.equal(doc.units.wavelength,'nm');assert.equal(doc.units.core_mesh,'nm');
  const loaded=parseProject(JSON.stringify(doc));assert.equal(loaded.model.wavelength,1625);assert.equal(loaded.model.coreMesh,40);
  const v2=JSON.parse(JSON.stringify(doc));v2.version=2;for(const k of ['wavelength','coreMesh','shapes','thermal'])delete v2.model[k];for(const k of ['wavelength','core_mesh','shapes','thermal_length'])delete v2.units[k];
  assert.throws(()=>parseProject(JSON.stringify(v2)),/version 2\) was saved before the units and naming batch/);
@@ -43,7 +43,7 @@ test('projects (version 6) carry wavelength and core mesh; earlier versions are 
 test('runs keep the captured wavelength and core mesh; mismatched provenance is rejected',()=>{
  const input=snapshot(model({wavelength:1600,coreMesh:45}),setup()),r=run(input);
  assert.equal(r.settings.adapter,'optical-shapes-v7');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.vacuum_wavelength,'1600 nm');assert.equal(r.settings.core_element_size,'45 nm');
- const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,6);
+ const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,7);
  const restored=parseSession(JSON.stringify(session));assert.equal(restored.runs[0].input.model.wavelength,1600);assert.equal(restored.runs[0].settings.core_element_size,'45 nm');
  for(const change of [d=>d.runs[0].settings.vacuum_wavelength='1550 nm',d=>d.runs[0].settings.core_element_size='30 nm',d=>d.runs[0].settings.vacuum_wavelength=1600,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){
   const d=JSON.parse(JSON.stringify(session));change(d);assert.throws(()=>parseSession(JSON.stringify(d)));

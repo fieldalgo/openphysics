@@ -39,9 +39,12 @@ test('application availability agrees with actual execution gates',async()=>{
  for(const app of APPLICATIONS){
   const model={width:500,...templatePhysics(app.id)},heat=await import('../../packages/simcase/src/simcase/studio/static/workspace-heat.mjs');
   const heatOnly=model.heat&&!model.electric&&!model.structure&&!model.optics;
-  const runnable=heatOnly?heat.thermalBlock(heat.validateThermal(heat.DEFAULT_THERMAL))==='':opticalBlock(model,setup)==='';
+  // electric currents and heat alone are the Joule heating application (workspace-joule.mjs)
+  const jouleOnly=model.heat&&model.electric&&!model.structure&&!model.optics,joule=await import('../../packages/simcase/src/simcase/studio/static/workspace-joule.mjs');
+  const runnable=heatOnly?heat.thermalBlock(heat.validateThermal(heat.DEFAULT_THERMAL))==='':jouleOnly?joule.jouleBlock(joule.validateJoule(joule.DEFAULT_JOULE))==='':opticalBlock(model,setup)==='';
   assert.equal(runnable,app.available,app.id);
   if(heatOnly)assert.equal(heat.heatDocument(heat.DEFAULT_THERMAL).physics.heat1.type,'thermal.steady2d');
+  if(jouleOnly)assert.equal(joule.jouleDocument(joule.DEFAULT_JOULE).physics.j.type,'joule.temperature2d');
   if(!app.available)assert.throws(()=>opticalDocument(model,setup));
  }
  const a=templatePhysics('optical');a.heat=true;assert.equal(templatePhysics('optical').heat,false);

@@ -3,11 +3,14 @@
 
 import {validateShapes,legacyCoreShape} from './workspace-shapes.mjs';
 import {validateThermal,DEFAULT_THERMAL} from './workspace-heat.mjs';
+import {validateJoule,DEFAULT_JOULE} from './workspace-joule.mjs';
 
 export const MAX_BYTES = 65536;
-// Project version 6 (units and naming batch): the heat plate stores the inward heat flux under its
-// registry name (inward_heat_flux), as the solver document does; versions 1-5 are refused by name.
-export const PROJECT_VERSION = 6;
+// Project version 7 adds the Joule heating application's inputs (model.joule, lengths in mm,
+// units.joule_length); a version 6 project is read with the default Joule inputs. Version 6 (units
+// and naming batch) stores the heat plate's inward heat flux under its registry name; versions 1-5
+// are refused by name.
+export const PROJECT_VERSION = 7;
 export const DRAFT_KEY = 'openphysics.studio.workspace.v2';
 const choices = (value, values, name) => {
   if (!values.includes(value)) throw new Error(`Invalid ${name}.`);
@@ -23,13 +26,14 @@ const bool = (value, name) => {
 };
 export function validateProject(doc) {
   if (doc?.format === 'openphysics-studio-workspace' && [1,2,3,4,5].includes(doc.version)) throw new Error(`This project (version ${doc.version}) was saved before the units and naming batch and is not read. Enter its inputs again and save a new project.`);
-  if (!doc || doc.format !== 'openphysics-studio-workspace' || doc.version !== PROJECT_VERSION) throw new Error('Unsupported project format or version.');
+  if (!doc || doc.format !== 'openphysics-studio-workspace' || ![6, PROJECT_VERSION].includes(doc.version)) throw new Error('Unsupported project format or version.');
   const s = doc.model, c = doc.setup;
   if (!s || !c || !c.materials) throw new Error('Project inputs are missing.');
   if(doc.units?.height!=='nm')throw new Error('Invalid height units.');
   if(doc.units?.wavelength!=='nm'||doc.units?.core_mesh!=='nm')throw new Error('Invalid optical study units.');
   if(doc.units?.shapes!=='nm')throw new Error('Invalid shape units.');
   if(doc.units?.thermal_length!=='mm')throw new Error('Invalid heat plate units.');
+  if(doc.version===PROJECT_VERSION&&doc.units?.joule_length!=='mm')throw new Error('Invalid Joule heating units.');
   const model = {
     height: number(s.height,100,500,'core height'),
     wavelength: number(s.wavelength,1400,1700,'wavelength'),
@@ -43,6 +47,7 @@ export function validateProject(doc) {
   };
   model.shapes = validateShapes(s.shapes);
   model.thermal = validateThermal(s.thermal);
+  model.joule = validateJoule(doc.version === 6 ? DEFAULT_JOULE : s.joule);
   // Heat alone is the steady heat application; heat with other physics still needs the electric source.
   if (model.heat && !model.electric && (model.structure || model.optics)) throw new Error('This prototype requires electric currents for Joule heating.');
   const materials = {};
@@ -54,7 +59,7 @@ export function validateProject(doc) {
     fixed: choices(c.fixed, ['', 'Left end fixed', 'Both ends fixed'], 'fixed support'),
     terminal: choices(c.terminal, ['', 'Heater start / heater end'], 'terminal pair'),
   };
-  return {format: 'openphysics-studio-workspace', version: PROJECT_VERSION, units: {height:'nm',width: 'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm', voltage: 'V', temperature: 'K'}, model, setup};
+  return {format: 'openphysics-studio-workspace', version: PROJECT_VERSION, units: {height:'nm',width: 'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm',joule_length:'mm', voltage: 'V', temperature: 'K'}, model, setup};
 }
 export function parseProject(text) {
   if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('Project exceeds 64 KiB.');
@@ -64,5 +69,5 @@ export function parseProject(text) {
   return validateProject(doc);
 }
 export function snapshot(state, setup) {
-  return validateProject({format:'openphysics-studio-workspace',version:PROJECT_VERSION,units:{height:'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm'},model:{height:220,wavelength:1550,coreMesh:30,thermal:DEFAULT_THERMAL,...state,shapes:state.shapes??[legacyCoreShape(state.width,state.height??220,setup.materials.Core)],electric:state.electric!==false},setup});
+  return validateProject({format:'openphysics-studio-workspace',version:PROJECT_VERSION,units:{height:'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm',joule_length:'mm'},model:{height:220,wavelength:1550,coreMesh:30,thermal:DEFAULT_THERMAL,joule:DEFAULT_JOULE,...state,shapes:state.shapes??[legacyCoreShape(state.width,state.height??220,setup.materials.Core)],electric:state.electric!==false},setup});
 }

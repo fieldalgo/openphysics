@@ -1,7 +1,8 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 // P2-19 (units and naming batch): the output of every JS document builder, for the Python check.
-// The builders are the workspace heat plate (heatDocument), the workspace optical study
+// The builders are the workspace heat plate (heatDocument), the workspace Joule heating regions
+// (jouleDocument), the workspace optical study
 // (opticalDocument), and the geometry lab's new document, starters and parameter edits; the classic
 // editor and the thermal pages edit documents the server sends and build none. With
 // OPENPHYSICS_STUDIO_BUILDER_DUMP set, the documents are written there as one JSON object
@@ -13,9 +14,9 @@ const {test,before}=require('node:test');const assert=require('node:assert/stric
 const {pathToFileURL}=require('node:url');
 const STATIC=process.env.OPENPHYSICS_STUDIO_STATIC?pathToFileURL(process.env.OPENPHYSICS_STUDIO_STATIC).href+'/'
  :'../../packages/simcase/src/simcase/studio/static/';
-let H,O,M,STARTERS,PROJECT,RECOVERY;
+let H,J,O,M,STARTERS,PROJECT,RECOVERY;
 before(async()=>{
- H=await import(STATIC+'workspace-heat.mjs');O=await import(STATIC+'workspace-optical.mjs');
+ H=await import(STATIC+'workspace-heat.mjs');J=await import(STATIC+'workspace-joule.mjs');O=await import(STATIC+'workspace-optical.mjs');
  M=await import(STATIC+'geometry-lab-model.mjs');({STARTERS}=await import(STATIC+'geometry-lab-starters.mjs'));
  PROJECT=await import(STATIC+'workspace-project.mjs');RECOVERY=await import(STATIC+'workspace-recovery.mjs');
 });
@@ -28,6 +29,11 @@ function documents(){
  docs['heat default']=H.heatDocument(H.DEFAULT_THERMAL);
  docs['heat inward flux, convection and source']=H.heatDocument(plate({left:{type:'flux',inward_heat_flux:500},top:{type:'convection',h:10,ambient:290}},{source:1e5}));
  docs['heat fractional plate']=H.heatDocument(plate({right:{type:'flux',inward_heat_flux:-250.5},bottom:{type:'convection',h:0.125,ambient:301.15}},{width:12.5,height:7.25,conductivity:0.03,nx:7,ny:3}));
+ docs['joule default']=J.jouleDocument(J.DEFAULT_JOULE);
+ const constant=JSON.parse(JSON.stringify(J.DEFAULT_JOULE));for(const m of constant.materials)m.sigma={model:'constant',value:1250.5};
+ constant.shapes.push({name:'disc',type:'circle',material:'A',cx:0.5,cy:0.5,r:0.2},{name:'tri',type:'polygon',material:'B',points:[[1.1,0.1],[1.6,0.1],[1.3,0.6]]});
+ constant.sides.top={electric:{type:'current',current:-2.5},thermal:{type:'convection',h:15,ambient:293.15}};constant.sides.bottom.thermal={type:'flux',flux:120};
+ docs['joule constant materials, current, flux and convection']=J.jouleDocument(constant);
  docs['optical default core']=O.opticalDocument({width:700,...optical},setup);
  docs['optical study inputs']=O.opticalDocument({width:450,height:300,wavelength:1625,coreMesh:45,...optical},{materials:{Core:'Silicon nitride',Oxide:'Silica'}});
  docs['optical shapes']=O.opticalDocument({width:500,wavelength:1480.5,coreMesh:22.5,...optical,shapes:[rect('Slab',-1500,0,3000,90),{name:'Rod',type:'circle',material:'Silicon nitride',cx:0,cy:500,r:150},{name:'Wedge',type:'polygon',material:'Air',points:[[-900,-600],[-300,-600],[-600,-200]]}]},setup);
@@ -44,6 +50,6 @@ test('every document builder writes format 0.3 documents (dumped for the Python 
  if(target)fs.writeFileSync(target,JSON.stringify(Object.fromEntries(Object.entries(docs).map(([label,doc])=>[label,JSON.stringify(doc)]))),'utf8');
 });
 test('the browser keeps projects under version 2 storage keys (units and naming batch)',()=>{
- assert.equal(PROJECT.PROJECT_VERSION,6);
+ assert.equal(PROJECT.PROJECT_VERSION,7);
  assert.equal(PROJECT.DRAFT_KEY,'openphysics.studio.workspace.v2');assert.equal(RECOVERY.RECOVERY_KEY,'openphysics.studio.recovery.v2');
 });
