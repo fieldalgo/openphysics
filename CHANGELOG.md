@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Assemble bounded two-mode corner half-space Green matrices with explicit partitioned mixed interactions, raw numerical refusals and preserved P0/energy/reference checks.
+
 - Add bounded physical-density partitioning for mixed linear-power logarithmic blocks, with adaptive reference provenance and unchanged unpartitioned behavior.
 
 - Preserve self-log and squared-density reference values with explicit reproducible provenance and unchanged strict relative/analytic-zero checks.

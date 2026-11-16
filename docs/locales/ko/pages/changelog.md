@@ -28,6 +28,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- 명시적 분할 혼합 상호작용으로 두 모드 모서리 half-space Green 행렬을 조립하고 원행렬 거절 및 P0·에너지·참조 검사를 유지했습니다.
+
 - 혼합 선형 power 로그 블록에 유한 물리 밀도 분할과 adaptive 참조 출처를 추가하고 기존 비분할 동작을 유지했습니다.
 
 - 자기 로그·제곱 밀도 참조에 재현 가능한 출처를 추가하고 원래의 엄격한 상대·해석적 영값 검사를 유지했습니다.
