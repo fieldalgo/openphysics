@@ -8,6 +8,9 @@ are k*b at x=0 and Q*L-k*b at x=L. All temperatures are mathematical K.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["BoundarySlab", "dirichlet_robin_slab", "robin_only_slab", "sine_temperature",
+           "sine_flux", "sine_source"]
+
 
 @dataclass(frozen=True)
 class BoundarySlab:

@@ -3,6 +3,9 @@
 
 """Thermal conductivity of pure metals versus temperature: Hust and Lankford (1984).
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 J. G. Hust and A. B. Lankford, "Thermal conductivity of aluminum, copper, iron,
 and tungsten for temperatures from 1 K to the melting point", NBSIR 84-3007,
 National Bureau of Standards, Boulder (1984), https://doi.org/10.6028/NBS.IR.84-3007.

@@ -3,6 +3,9 @@
 
 """P1 (linear tetrahedron) assembly: stiffness and mass.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 The 3D counterpart of assembly.py. On a linear tetrahedron the barycentric
 gradients are constant, so both element matrices are closed forms:
 

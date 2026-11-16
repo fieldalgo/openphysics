@@ -18,6 +18,8 @@ from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
 
+__all__ = ["WorkflowStageError", "SteadyThermoelasticResult", "solve_steady_thermoelasticity"]
+
 
 class WorkflowStageError(ValueError):
     """Failure of input, heat, transfer, mechanics, or manifest; cause retained."""

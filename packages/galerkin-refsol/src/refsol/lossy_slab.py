@@ -86,6 +86,9 @@ from scipy.optimize import root
 
 from . import slab as _slab
 
+__all__ = ["BRANCHES", "exterior_root", "characteristic", "residual", "solve", "continued_root",
+           "three_layer_modes", "substrate_leaky_mode", "field"]
+
 BRANCHES = ("decay", "outgoing")
 
 

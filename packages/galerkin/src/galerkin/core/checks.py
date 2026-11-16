@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Numeric input checks shared by the physics modules.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 ``real_array`` and ``finite_scalar`` return NumPy numbers, so they refuse JAX
 and PyTorch arrays rather than silently cutting a derivative. A solver that
 differentiates uses ``real_value``, which runs the same checks on a snapshot

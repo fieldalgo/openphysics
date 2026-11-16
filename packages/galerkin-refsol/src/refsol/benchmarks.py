@@ -37,6 +37,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+__all__ = ["CITATION", "RibWaveguide", "RIB_WAVEGUIDES", "DielectricCorner", "DIELECTRIC_CORNERS",
+           "rib_neff"]
+
 
 CITATION = ("G. R. Hadley, J. Lightwave Technol. 20(7), 1210-1218 (2002), "
             "doi:10.1109/JLT.2002.800370")

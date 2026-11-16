@@ -31,6 +31,8 @@ import math
 
 from .cavity import C0
 
+__all__ = ["MU0", "WALLS", "WallLossMode", "wall_loss_modes", "pozar_te101_quality_factor"]
+
 MU0 = 1.25663706212e-6  # vacuum permeability (CODATA 2018), H/m
 WALLS = ("x0", "x1", "y0", "y1", "z0", "z1")
 

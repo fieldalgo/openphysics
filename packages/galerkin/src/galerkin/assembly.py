@@ -3,6 +3,9 @@
 
 """P1 (linear triangle) element assembly: stiffness, mass, boundary, load.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Model problem (electrostatics):
     div(eps grad V) = -rho   in Omega,   V = g  on Gamma_D
 

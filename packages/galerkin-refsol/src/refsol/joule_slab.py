@@ -73,6 +73,9 @@ import numpy as np
 from scipy.optimize import brentq, minimize_scalar
 from scipy.special import dawsn, erf, erfcx
 
+__all__ = ["JouleSlab", "constant_conductivity", "voltage_driven", "drop_scale", "fold_current",
+           "current_driven"]
+
 _ROOT_PI_HALF = math.sqrt(math.pi) / 2
 
 

@@ -26,6 +26,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+__all__ = ["LayeredHeatFields", "layered_slab", "composite_cylinder"]
+
 
 @dataclass
 class LayeredHeatFields:

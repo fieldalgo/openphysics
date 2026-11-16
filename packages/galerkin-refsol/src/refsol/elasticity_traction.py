@@ -8,6 +8,9 @@ Strain uses (exx, eyy, gamma_xy), gamma_xy=2*exy.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["TractionFields", "traction_from_stress", "uniaxial", "shear", "polynomial_manufactured",
+           "polynomial_traction", "polynomial_resultants"]
+
 
 def _real(value, shape, name):
     a = np.asarray(value)

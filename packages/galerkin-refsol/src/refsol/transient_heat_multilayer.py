@@ -27,6 +27,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+__all__ = ["LayeredTransientFields", "LayeredWall"]
+
 
 @dataclass
 class LayeredTransientFields:

@@ -1,0 +1,5 @@
+{
+  "schema": "openphysics.api-units-removed/1",
+  "description": "Appendix B of the phase-3 units spec: names removed from the public API, asserted absent from every public module of their package that has no allowlist entries. kind 'name' is a module attribute or __all__ name, 'parameter' a parameter of any public callable, 'member' a 'Class.attribute'. It starts empty; the commit that removes a name adds it here.",
+  "entries": []
+}

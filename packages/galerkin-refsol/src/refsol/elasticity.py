@@ -8,6 +8,8 @@ Strain ordering is (exx, eyy, gamma_xy), with engineering shear gamma_xy=2*exy.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["stress_from_strain", "ElasticityFields", "affine", "sine_manufactured"]
+
 
 def _parameters(young_modulus, poisson_ratio, plane):
     e, nu = np.asarray(young_modulus), np.asarray(poisson_ratio)

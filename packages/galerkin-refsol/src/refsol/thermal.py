@@ -4,6 +4,8 @@
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["HeatFields", "slab", "sine_manufactured"]
+
 
 def _scalar(value, name, positive=False):
     a = np.asarray(value)

@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Assembling element contributions into global matrices and vectors.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 An element kernel (``galerkin.core.kernels``, or a physics module's own)
 returns one small matrix or vector per cell, in the caller's array library,
 with no loop over cells. These functions place them:

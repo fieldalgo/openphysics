@@ -18,6 +18,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+__all__ = ["HeatFields3D", "sine_product", "layered_slab"]
+
 
 @dataclass
 class HeatFields3D:

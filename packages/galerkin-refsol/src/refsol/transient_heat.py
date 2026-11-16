@@ -8,6 +8,9 @@ seconds, Kelvin. Dense matrix/mode helpers are for small reference meshes.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["TransientHeatFields", "uniform_insulated", "moving_affine", "sine_manufactured",
+           "p1_matrices", "smallest_dirichlet_mode", "backward_euler_amplitude"]
+
 
 def _real(value, name):
     a = np.asarray(value)

@@ -30,6 +30,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import brentq
 
+__all__ = ["modes", "num_modes_symmetric", "field_te"]
+
 
 def _residual(neff, m, pol, n_f, n_s, n_c, d, k0):
     kappa = k0 * np.sqrt(n_f ** 2 - neff ** 2)

@@ -3,6 +3,9 @@
 
 """Material = a name, an optical dispersion model, and a bag of other physical properties.
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 Only the optical part is populated in depth for now; the ``properties`` slot
 is where thermal and mechanical data (thermal conductivity, specific heat,
 Young's modulus, ...) go as the solver grows into other physics. Each property

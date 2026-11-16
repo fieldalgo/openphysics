@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Edge numbering for the lowest-order Nédélec (Whitney) spaces.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 An edge-element degree of freedom is an oriented mesh edge. ``EdgeSpace``
 numbers the edges of a triangle mesh and ``EdgeSpace3D`` those of a
 tetrahedron mesh; each records, per element, the global id of every local edge

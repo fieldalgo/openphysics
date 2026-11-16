@@ -3,6 +3,9 @@
 
 """Cylindrical (radial) PML via complex coordinate stretching (Collino & Monk).
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Idea: for r > R0, stretch the radius into the complex plane:
     r~(r) = r + (i/k) int_{R0}^{r} sigma(s) ds,     s(r) = dr~/dr = 1 + (i/k) sigma(r)
 
