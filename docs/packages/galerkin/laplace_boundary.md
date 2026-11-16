@@ -520,3 +520,27 @@ a two-signal plus fixed-ground case failed whole reflection. Neither is in
 this solver's supported scope. Heterogeneous interface corners, finite-metal
 diffusion, material laws, other platforms and browser memory limits require
 separate work. The implementation helpers are internal package modules.
+
+## Hierarchical linear far interactions
+
+`galerkin.laplace_corner.power_panel_linear_far_log` returns immutable fine/coarse
+2×2 log-distance blocks for the same `phi0` and `phi1` as the linear self/Gram
+primitives. The first panel starts at zero and the second at the explicit offset;
+vector lengths are metres. Exponents must lie in (0.5,1], length ratio at most64,
+and the origin offset must be at least four times the sum of panel lengths.
+This is a bounded far-interaction primitive; near/touching blocks and a full
+linear current solver remain outside its scope.
+
+Analytic mode masses are [1,0]. Centered `log1p` differences avoid carrying
+`log(scale)` into zero-mass rows or columns; physical quadrature weights are
+not rescaled. Orders n/2n (n=4..64) must agree entrywise within
+1e-12*max(1,abs(fine)), a dimensionless quadrature criterion. Only entry00
+changes by log(scale) under common geometric scaling. Exchange transposes the
+block. Neither identity establishes current-field convergence.
+
+Eight independent 100-term complex Taylor references use analytic moments
+mu0(r)=p/(p+r), mu1(r)=sqrt(p(p+2))*r/((p+r)*(p+r+1)), mpmath1.3.0 at60/80 digits,
+and tail bound16*rho^101/(101*(1-rho)) for rho<=1/4. The reference tool is unshipped.
+References include unequal exponents/lengths, endpoint powers and orientations;
+structural tests retain admission, immutability, exchange, reflection and scaling.
+Existing constant-power, half-space and field paths remain unchanged.
