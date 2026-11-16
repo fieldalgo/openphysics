@@ -342,3 +342,45 @@ assert r[0, 0] == -1.0
 행렬 대조는 작은 단위 검사와 별도로 기록한다. 잔차는 조건수나 해 오차,
 장 수렴의 보증이 아니다. 기존 솔버·검사는 바꾸지 않으며 이 원시요소만으로
 보정된 장 또는 다른 플랫폼의 검증 완료를 뜻하지 않는다.
+
+## 정규화된 power/constant 반공간 적분
+
+`galerkin.laplace_half_space.power_constant_half_space(first, second, offset,
+exponent, height=...)`는 정규 power target 밀도 `p*u**(p-1)`와 constant
+source 밀도에 대해 바닥 접지 Green kernel `log(image_distance / distance)`의
+평균을 계산합니다. `1/(2*pi)` 인자는 포함하지 않습니다. Target은
+`(0,height) + u*first`, source는 `(0,height) + offset + v*second`이며
+`u,v` 범위는 `[0,1]`입니다. 벡터와 높이 단위는 m입니다.
+불변 `HalfSpacePanelIntegral`은 `green_mean`, `coarse_green_mean`,
+`quadrature_order`, `refinement_error`를 보존합니다.
+
+```python
+from galerkin.laplace_half_space import power_constant_half_space
+
+mean = power_constant_half_space(
+    [0.001, 0.0], [0.001, 0.0], [0.001, 0.0], 0.625, height=0.002,
+)
+assert mean.refinement_error <= 1e-12
+```
+
+지수는 `(0.5,1]`, 길이비는 최대 `1e6`이고 모든 끝점은 접지 위에 있어야 합니다.
+분리된 선분이나 끝점 접촉만 받으며, 정확한 이진 입력의 위상으로 겹침과 내부
+교차를 거부하고 좌표를 맞춰 붙이지 않습니다. 최대 길이·offset/image norm·시작
+높이를 scale로 삼고, 각 패널 길이와 끝점 높이는 그 scale의
+`128*binary64_epsilon` 이상이어야 합니다. 실수가 아니거나 유한하지 않거나
+표현할 수 없는 입력도 거부합니다.
+
+Constant source는 해석적으로 적분합니다. 고정 target 차수 64/128은
+`1e-12*max(1,abs(fine))` 이내에서 일치해야 하며 각 규칙의 mass 오차는
+`1e-12` 이하여야 합니다. 정확한 0차 moment를
+`f(0) + sum(w*(f(u)-f(0)))`로 분리하며 가중치를 재조정하지 않습니다.
+먼 image/source 로그에는 안정적인 log-ratio와 유계 급수의 차를 사용합니다.
+이 영역의 정확한 Green kernel은 엄밀히 양수이므로 상쇄로 0이나 음수가 나온
+평균은 거부합니다. Fallback·clipping은 없으며 작은 평균의 상대 정확도를
+보장하지 않습니다.
+
+mpmath 1.3.0(BSD-3-Clause)의 독립 직접2D 적분을 60/80자리로 확인한 고정 참조
+6개는 끝점 접촉·근접·경사·양방향 길이비 4000을 포함합니다. 반사·source 반전·
+물리 배율·constant 밀도 상호성·접지에서의 이동·가중치 보존·입력 거부를 별도로
+검사합니다. 적분 원시요소의 검사이며 완전한 장 해·메시/외곽 수렴·다른 플랫폼·
+실측 검증을 뜻하지 않습니다.
