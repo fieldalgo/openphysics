@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 정규 power/constant 바닥접지 Green 평균에 해석 상수 moment·고정 구적·위상/해상도/양수성 거부를 추가했습니다. 독립 직접2D 참조와 물리 불변식으로 원시요소를 검증하며 기존 장 솔버는 바꾸지 않습니다.
+
 - `galerkin`: 정규화된 모서리 power-panel 구적, 해석적 self 항, 공통 꼭짓점·분리 패널·power-to-constant 로그 적분을 추가했습니다. 불변 캐시 규칙은 구적 산술과 가중치를 그대로 보존합니다. 독립 고정밀 참조와 기하 불변식으로 명시한 길이·분리 범위를 검사했습니다.
 - `galerkin`: 허용된 볼록 도체의 불변 매개변수 모서리 패널 기하와 보정 상대좌표를 사용하는 바닥 접지 반공간 행렬을 추가했습니다. 적분 원시요소이며 위쪽·옆쪽 경계 보정이나 완전한 장 해를 제공하지 않습니다.
 - `galerkin`: `bounded_dense_residual`은 보정 곱·합으로 범위가 제한된 binary64 밀집 잔차를 계산하며 정확한 이진 유리수 참조로 검사했습니다. 기존 솔버 기본값은 바꾸지 않습니다. 모서리 원시요소와 잔차 계산기는 Linux 소스·설치 각각 관련 검사 517개를 통과했으며 완전한 장 모델이나 다른 플랫폼을 수락한 것은 아닙니다. [계약과 한계](packages/galerkin/laplace_boundary.md).
