@@ -14,7 +14,7 @@ from scipy.linalg import eigh_tridiagonal
 
 __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_gram', 'power_panel_self_log',
-           'power_panel_shared_vertex_log']
+           'power_panel_shared_vertex_log', 'power_panel_separated_log']
 
 
 def _scalar(value, name):
@@ -150,3 +150,55 @@ def power_panel_shared_vertex_log(first, second, first_exponent,
             abs(fine-coarse) > 1e-12*max(1., abs(fine))):
         raise ValueError('power-panel quadrature did not converge')
     return PowerPanelLogResult(fine, coarse, n)
+
+
+def _separated_distance(a,b,offset):
+    """Minimum segment distance after bounded coordinate normalization."""
+    def cross(x,y):return x[0]*y[1]-x[1]*y[0]
+    def distance(point,start,direction):
+        t=np.clip((point-start)@direction/(direction@direction),0.,1.)
+        return math.hypot(*(point-start-t*direction))
+    if cross(a,b)!=0:
+        c,d=cross(a,offset),cross(a,offset+b)
+        e,f=cross(b,-offset),cross(b,a-offset)
+        if ((c<=0<=d or d<=0<=c) and (e<=0<=f or f<=0<=e)):
+            return 0.
+    return min(distance(np.zeros(2),offset,b),distance(a,offset,b),
+               distance(offset,np.zeros(2),a),distance(offset+b,np.zeros(2),a))
+
+def power_panel_separated_log(first,second,offset,first_exponent,second_exponent,*,quadrature_order=32):
+    """Weighted double log distance between explicitly separated power panels.
+
+    First panel starts at zero with displacement first. Second starts at
+    offset with displacement second. All vectors are in metres; each power
+    density is singular at its specified start. Length ratio is at most 64;
+    minimum segment distance must be at least half the longer panel length.
+    Positive tensor Gauss-Jacobi compares n and 2*n with the unchanged 1e-12
+    normalized log gate. No proximity fallback or field solve is performed.
+    """
+    p,q=_power(first_exponent),_power(second_exponent);n=_order(quadrature_order,64)
+    vectors=[]
+    for value in (first,second,offset):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():
+            raise ValueError('vectors must be finite real planar pairs')
+        vectors.append(np.asarray(raw,dtype=float))
+    a,b,o=vectors;la,lb,lo=[math.hypot(*v) for v in vectors]
+    if not all(math.isfinite(x) for x in (la,lb,lo)) or min(la,lb)<=0:
+        raise ValueError('panel lengths and offset norm must be representable')
+    size=max(la,lb)
+    if min(la,lb)/size<1/64:raise ValueError('panel length ratio must not exceed 64')
+    if lo/4<size and _separated_distance(a/size,b/size,o/size)<.5:
+        raise ValueError('panel separation must be at least half the longer length')
+    scale=max(size,lo);a,b,o=a/scale,b/scale,o/scale
+    def evaluate(order):
+        u,w=power_panel_quadrature(p,order);v,z=power_panel_quadrature(q,order)
+        delta=u[:,None,None]*a-o-v[None,:,None]*b
+        distance=np.hypot(delta[:,:,0],delta[:,:,1])
+        if not np.isfinite(distance).all() or np.any(distance<=0):
+            raise ValueError('panel distance is not representable')
+        return float(math.log(scale)+w@np.log(distance)@z)
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not math.isfinite(coarse) or not math.isfinite(fine) or abs(fine-coarse)>1e-12*max(1,abs(fine)):
+        raise ValueError('power-panel quadrature did not converge')
+    return PowerPanelLogResult(fine,coarse,n)
