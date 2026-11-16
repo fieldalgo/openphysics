@@ -172,8 +172,10 @@ starts at 1e-9 K; with constant materials it is `joule.steady2d`. The default mo
 the two-material strip of the [region Joule checks](electric_joule.md#material-regions-temperature-dependent-joule-heating).
 
 Run is enabled when a side fixes the potential, a side fixes the temperature or has
-convection with h > 0, and every given temperature lies in the valid range of every
-model material; the reason is shown otherwise. **Run Joule heating study** builds the
+convection with h > 0, adjacent fixed sides agree at their corner (potential and
+temperature), every given temperature lies in the valid range of every model material,
+and no heat job holds Studio's one job slot (heat waits for a Joule job the same way); the
+reason is shown otherwise. **Run Joule heating study** builds the
 document (shown under **Study**), validates it and runs it on Studio's
 [Joule routes](electric_joule.md#studio-region-documents), with their region and mesh
 limits; a refusal (for example two potentials at one corner, a mesh over the node
@@ -185,7 +187,10 @@ temperature range and the current through each fixed side, per metre of depth),
 the Picard history and the value at a clicked point. A result keeps its inputs;
 **Restore run inputs** brings them back. Joule inputs are saved in input files,
 sessions, drafts, recovery and undo history (version 7); Joule results stay in the
-tab, as heat results do.
+tab, as heat results do. A run that ends after you switch to another application waits in
+the Joule application; undo keeps following a running job, and opening a file discards its
+result. In the multiphysics preview the interface boxes cannot leave electric currents and
+heat alone: that combination is the Joule heating application.
 
 ## Results and files
 

@@ -42,14 +42,20 @@ test('only used materials reach the document, so an unused model cannot change t
  const steady=inputs(j=>{for(const m of j.materials)m.sigma={model:'constant',value:7};j.materials.push({name:'Spare',k:1,sigma:{model:'linear_resistivity',reference_conductivity:1,reference_temperature:300,coefficient:0,tmin:200,tmax:400}});});
  assert.equal(J.jouleDocument(steady).physics.j.type,'joule.steady2d');assert.deepEqual(Object.keys(J.jouleDocument(steady).materials),['A','B']);
 });
-test('structural checks refuse bad values, names, ranges and shapes outside the domain',()=>{
- for(const change of [j=>j.width=0,j=>j.height=NaN,j=>j.elementSize=2,j=>j.background='C',j=>j.materials[0].k=0,j=>j.materials[1].name='A',
-  j=>j.materials[0].name='physmatSi',j=>j.materials[0].sigma={model:'constant',value:-1},j=>j.materials[0].sigma.tmin=700,
-  j=>j.materials[0].sigma.reference_temperature=700,j=>j.materials[0].sigma.coefficient=-0.01,j=>j.shapes[0].x=1.5,j=>j.shapes[0].name='background',
-  j=>j.shapes[0].material='C',j=>j.shapes.push({...j.shapes[0]}),j=>j.shapes[0]={name:'p',type:'polygon',material:'A',points:[[0,0],[1,1],[1,0],[0,1]]},
-  j=>j.sides.left.electric={type:'ground'},j=>j.sides.top.thermal={type:'convection',h:-1,ambient:300},j=>j.iteration.relaxation_factor=0,
-  j=>j.iteration.iteration_limit=J.MAX_ITERATIONS+1,j=>j.iteration.iteration_limit=1.5,j=>j.materials=[]])
-  assert.throws(()=>J.validateJoule(inputs(change)));
+test('structural checks refuse bad values, names, ranges and shapes outside the domain, each by its reason',()=>{
+ for(const [change,reason] of [[j=>j.width=0,/domain width/],[j=>j.height=NaN,/domain height/],[j=>j.elementSize=2,/element size/],[j=>j.background='C',/background material/],
+  [j=>j.materials[0].k=0,/A thermal conductivity/],[j=>j.materials[1].name='A',/names must be different/],
+  [j=>{j.materials[0].name='physmatSi';j.background='physmatSi';},/Material 1: name/],[j=>j.materials[0].sigma={model:'constant',value:-1},/A electrical conductivity/],
+  [j=>j.materials[0].sigma.tmin=700,/lowest < highest/],[j=>j.materials[0].sigma.tmin=0,/A lowest valid temperature/],
+  [j=>j.materials[0].sigma.reference_temperature=700,/reference temperature must lie/],[j=>j.materials[0].sigma.coefficient=-0.01,/resistivity must stay positive/],
+  [j=>j.shapes[0].x=1.5,/must stay inside the domain/],[j=>j.shapes[0].name='background',/not be "background"/],[j=>j.shapes[0].name='b c',/Shape 1: name/],
+  [j=>j.shapes[0].material='C',/choose one of the defined materials/],[j=>j.shapes.push({...j.shapes[0]}),/Shape names must be different/],
+  [j=>j.shapes[0]={name:'p',type:'polygon',material:'A',points:[[0,0],[1,1],[1,0],[0,1]]},/edges 1 and 3 cross/],
+  [j=>j.shapes[0]={name:'p',type:'polygon',material:'A',points:[[0,0],[1,0],[1,0],[0,1]]},/vertex is repeated/],
+  [j=>j.sides.left.electric={type:'ground'},/electric condition for the left side/],[j=>j.sides.top.thermal={type:'convection',h:-1,ambient:300},/top heat transfer coefficient/],
+  [j=>j.iteration.relaxation_factor=0,/relaxation factor/],[j=>j.iteration.iteration_limit=J.MAX_ITERATIONS+1,/iteration limit/],[j=>j.iteration.iteration_limit=1.5,/iteration limit/],
+  [j=>j.materials=[],/Define 1–6 materials/]])
+  assert.throws(()=>J.validateJoule(inputs(change)),reason);
 });
 test('readiness: a potential, a temperature level and model ranges that hold every given temperature',()=>{
  const block=change=>J.jouleBlock(J.validateJoule(inputs(change)));
@@ -60,6 +66,9 @@ test('readiness: a potential, a temperature level and model ranges that hold eve
  assert.match(block(j=>j.sides.right.thermal.temperature=200),/right temperature 200 K/);
  assert.match(block(j=>{j.materials[1].sigma.tmin=610;j.materials[1].sigma.tmax=700;j.materials[1].sigma.reference_temperature=650;}),/do not overlap/);
  assert.equal(block(j=>{for(const m of j.materials)m.sigma={model:'constant',value:1};j.iteration.initial_temperature=5000;}),'');
+ assert.match(block(j=>j.sides.bottom.thermal={type:'temperature',temperature:310}),/left and bottom sides meet at a corner with two different fixed temperatures/);
+ assert.match(block(j=>j.sides.top.electric={type:'potential',potential:0.1}),/left and top sides meet at a corner with two different fixed potentials/);
+ assert.equal(block(j=>{j.sides.bottom.thermal={type:'temperature',temperature:300};j.sides.right.thermal={type:'insulated'};}),'');
  assert.match(J.jouleBlock(J.validateJoule(inputs(j=>j.shapes.push({name:'c',type:'circle',material:'A',cx:1,cy:0.5,r:0.1}))),{max_shapes:1}),/allows 1/);
 });
 test('projects of version 7 round-trip the Joule inputs; version 6 projects load with the defaults',()=>{

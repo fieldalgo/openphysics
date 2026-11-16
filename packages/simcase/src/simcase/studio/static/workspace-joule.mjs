@@ -43,7 +43,7 @@ function validateSigma(raw,where){
  const m={model:'linear_resistivity',reference_conductivity:number(raw.reference_conductivity,`${where} reference conductivity [S/m]`,{positive:true,max:1e12}),
   reference_temperature:number(raw.reference_temperature,`${where} reference temperature [K]`,{positive:true,max:1e5}),
   coefficient:number(raw.coefficient,`${where} resistivity temperature coefficient [1/K]`,{min:-1,max:1}),
-  tmin:number(raw.tmin,`${where} lowest valid temperature [K]`,{min:0,max:1e5}),tmax:number(raw.tmax,`${where} highest valid temperature [K]`,{positive:true,max:1e5})};
+  tmin:number(raw.tmin,`${where} lowest valid temperature [K]`,{positive:true,max:1e5}),tmax:number(raw.tmax,`${where} highest valid temperature [K]`,{positive:true,max:1e5})};
  if(!(m.tmin<m.tmax))throw new Error(`${where}: the valid temperature range needs lowest < highest.`);
  if(m.reference_temperature<m.tmin||m.reference_temperature>m.tmax)throw new Error(`${where}: the reference temperature must lie in the valid range.`);
  for(const t of [m.tmin,m.tmax])if(!(1+m.coefficient*(t-m.reference_temperature)>0))throw new Error(`${where}: the resistivity must stay positive over the valid range (check the coefficient).`);
@@ -69,6 +69,7 @@ export function validateJouleShape(raw,index,domain,materials){
   if(!Array.isArray(raw.points)||raw.points.length<3||raw.points.length>MAX_JOULE_POINTS)throw new Error(`${raw.name}: a polygon needs 3–${MAX_JOULE_POINTS} vertices.`);
   const points=raw.points.map((p,i)=>{if(!Array.isArray(p)||p.length!==2)throw new Error(`${raw.name}: vertex ${i+1} needs x and y.`);return [number(p[0],`${raw.name} vertex ${i+1} x`),number(p[1],`${raw.name} vertex ${i+1} y`)];});
   const n=points.length;
+  if(new Set(points.map(p=>p.join(','))).size!==n)throw new Error(`${raw.name}: a polygon vertex is repeated.`);
   for(let i=0;i<n;i++)for(let j=i+2;j<n;j++){if(i===0&&j===n-1)continue;if(properCross(points[i],points[(i+1)%n],points[j],points[(j+1)%n]))throw new Error(`${raw.name}: polygon edges ${i+1} and ${j+1} cross.`);}
   if(!(polygonArea(points)>0))throw new Error(`${raw.name}: the polygon has no area.`);
   shape={name:raw.name,type:'polygon',material:raw.material,points};
@@ -125,6 +126,10 @@ export function jouleKind(j){return usedMaterials(j).some(m=>m.sigma.model==='li
 export function jouleBlock(j,limits=null){
  if(!SIDES.some(s=>j.sides[s].electric.type==='potential'))return 'Fix the potential of a side; otherwise the electric potential is undetermined.';
  if(!SIDES.some(s=>j.sides[s].thermal.type==='temperature'||(j.sides[s].thermal.type==='convection'&&j.sides[s].thermal.h>0)))return 'Fix the temperature of a side or add convection with h > 0; otherwise the temperature level is undetermined.';
+ // adjacent sides that both fix a value meet at a corner node, which can hold one value only
+ for(const [kind,type,key,what] of [['electric','potential','potential','potentials'],['thermal','temperature','temperature','temperatures']])
+  for(const a of ['left','right'])for(const b of ['bottom','top']){const x=j.sides[a][kind],y=j.sides[b][kind];
+   if(x.type===type&&y.type===type&&x[key]!==y[key])return `The ${a} and ${b} sides meet at a corner with two different fixed ${what}.`;}
  const models=usedMaterials(j).filter(m=>m.sigma.model==='linear_resistivity');
  if(models.length){
   const lo=Math.max(...models.map(m=>m.sigma.tmin)),hi=Math.min(...models.map(m=>m.sigma.tmax));
