@@ -121,7 +121,9 @@ docstring에 "Internal module, consistent units"라고 적습니다. 패키지�
 `api_units_allowlist.json`은 지금 있는 위반을 적어 둡니다. 항목은 지우기만 할 수 있습니다.
 새 위반도, 더는 어떤 위반과도 맞지 않는 항목도 실패합니다. physmat의 허용 목록은 비어 있으므로
 제거된 이름 목록의 모든 이름이 없는지 확인하고, 공개 물리량 매개변수에 `str`을 주면 반드시
-`TypeError`가 나야 합니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the
+`TypeError`가 나야 합니다. galerkin과 refsol에서는 공개 모듈마다 허용 목록 항목이 없어지는 때부터
+이 두 조항이 적용됩니다. `galerkin.kernels`와 `physmat.kernels`는 simcase와 sipi를 위해 일관 단위의
+커널을 다시 내보내는 내부 이름공간입니다. 어떤 공개 이름도 그 이름과 같지 않고, 그 객체도 아닙니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the
 materials step" 범주(`datum_temperature` 같은 physmat 레코드 인수)는 그 항목을 끝낼 조건도 적습니다.
 
 ## 검사 실행
@@ -393,7 +395,8 @@ python -m twine check --strict .validation/simcase/*
 배포판 아홉 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
 `packages/<name>/pyproject.toml`과 각 import 패키지의 `__version__`, meshloom의 `Cargo.toml`을 바꾸고, 우리 배포판
 사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두되 `simcase`는 내부
-`physmat.kernels`를 부르므로 `physmat`을 정확한 버전(`physmat==0.0.2`)으로 고정하고,
+`physmat.kernels`와 `galerkin.kernels`를 부르므로 `physmat`과 `galerkin`을, `sipi`는 내부 `galerkin.kernels`를
+부르므로 `galerkin`을 정확한 버전(`physmat==0.0.2`, `galerkin==0.0.2`)으로 고정하고,
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
 릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
 또 패키지 README와 문서 페이지(변경 기록 제외)에 "아직 PyPI에 없다"는 문구가 남아 있으면

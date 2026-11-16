@@ -15,14 +15,16 @@ library is absent (the CI job that installs both checks that they import).
 import numpy as np
 import pytest
 
-from galerkin import (EdgeSpace, EdgeSpace3D, annulus_mesh, assemble_boundary_mass, assemble_curlcurl,
-                      assemble_curlcurl_3d, assemble_edge_grad, assemble_edge_grad_3d, assemble_edge_mass,
-                      assemble_edge_mass_3d, assemble_load, assemble_mass, assemble_mass_3d,
-                      assemble_stiffness, assemble_stiffness_3d, box_mesh, rectangle_mesh)
+from galerkin import (EdgeSpace, EdgeSpace3D, annulus_mesh, assemble_curlcurl, assemble_curlcurl_3d,
+                      assemble_edge_grad, assemble_edge_grad_3d, assemble_edge_mass,
+                      assemble_edge_mass_3d, box_mesh, rectangle_mesh)
+from galerkin.kernels import (assemble_boundary_mass, assemble_load, assemble_mass,
+                              assemble_mass_3d, assemble_stiffness, assemble_stiffness_3d,
+                              stiffness_and_stress)
 from galerkin.core import forms, kernels
 from galerkin.core.backend import namespace
 from galerkin.core.triangles import triangle_geometry, vector_strain
-from galerkin.elasticity import constitutive_matrix, stiffness_and_stress
+from galerkin.elasticity import constitutive_matrix
 
 RNG = np.random.default_rng(11)
 

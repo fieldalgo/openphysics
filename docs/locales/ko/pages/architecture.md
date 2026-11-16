@@ -126,9 +126,11 @@ flowchart TB
 | physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널을 직접 또는 공개 함수를 거쳐), 풀이, 결과 dataclass. |
 | coupling | [`galerkin.coupling`](../../../../packages/galerkin/src/galerkin/coupling/__init__.py) | 한 메시 위의 절점·요소 `Field`(SI 단위), 같은 메시 `transfer`, `OneWayChain` 드라이버. 드라이버는 넘겨받은 단계를 실행할 뿐 물리 모듈을 import하지 않습니다. Joule와 열→역학 workflow가 이 층 위에서 돕니다. [커널 인터페이스](packages/galerkin/coupling.md)는 다른 solver가 결과를 받아 쓰려면 한 solver가 무엇을 내놓아야 하는지 정합니다. |
 
-요소 공식은 `core.kernels`의 닫힌 식 커널로 한 벌만 있습니다. 공개 조립 함수(`assemble_stiffness`,
+요소 공식은 `core.kernels`의 닫힌 식 커널로 한 벌만 있습니다. 조립 함수(`assemble_stiffness`,
 `assemble_curlcurl_3d` 등)는 이 커널을 `core.forms`로 조립해 SciPy 행렬을 돌려줍니다. NumPy 값을 받고
-JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널을 입력이 속한 배열 라이브러리에서 조립하며,
+JAX·PyTorch 값은 거부합니다. 전자기가 아닌 조립 함수, Dirichlet 풀이, 물리 모듈의 도우미는
+`galerkin.kernels`로 씁니다. 이것은 모든 층 위에 있는 내부 이름공간(일관 단위, 공개 API 아님)으로,
+simcase와 sipi를 위해 다시 내보내기만 합니다. 미분하는 물리 모듈은 같은 커널을 입력이 속한 배열 라이브러리에서 조립하며,
 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다([미분](packages/galerkin/differentiation.md)).
 커널은 모든 계수 형태에서 정확한 적분과 비교합니다([요소 정의](reference-comparisons.md#요소-정의)).
 

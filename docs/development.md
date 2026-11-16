@@ -132,7 +132,10 @@ units" in its docstring. Each package's `api_units_allowlist.json` lists the vio
 that exist today. Entries may only be removed: a new violation fails, and so does an
 entry that no longer matches one. physmat's allowlist is empty, so every name of its
 removed-name list is asserted absent and a `str` given to any of its public quantity
-parameters must raise `TypeError`. A structural name added after the list was frozen
+parameters must raise `TypeError`; for galerkin and refsol these two clauses apply to each
+public module once it has no allowlist entry. `galerkin.kernels` and `physmat.kernels` are
+internal namespaces that re-export kernels in consistent units for simcase and sipi: no
+public name equals one of their names, and no public name is one of their objects. A structural name added after the list was frozen
 carries a reviewer note; the category "deferred to the materials step" (physmat's record
 arguments, such as `datum_temperature`) also names the condition that ends it.
 
@@ -455,7 +458,8 @@ All nine distributions release together under one version. A version change
 sets it in every `packages/<name>/pyproject.toml` and in each import package's
 `__version__`, and meshloom's `Cargo.toml`, keeps the requirements between our own distributions inside that
 minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x), except that `simcase` pins
-`physmat` to the exact version (`physmat==0.0.2`) because it calls the internal `physmat.kernels`, and renames the
+`physmat` and `galerkin`, and `sipi` pins `galerkin`, to the exact version (`physmat==0.0.2`,
+`galerkin==0.0.2`) because they call the internal `physmat.kernels` and `galerkin.kernels`, and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
 release, and also refuses package READMEs and documentation pages (other than

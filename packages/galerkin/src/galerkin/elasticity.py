@@ -32,10 +32,10 @@ from .core.constraints import vector_dirichlet
 from .core.quadrature import triangle_product_rule
 from .core.triangles import triangle_geometry, vector_strain
 
-__all__ = ["PLANES", "lame", "constitutive", "constitutive_matrix", "element_materials",
-           "element_constitutive", "stiffness_and_stress", "stress_of", "body_load",
-           "check_solution", "displacement", "at_fixed", "vector_stiffness", "ElasticityResult",
-           "solve_elasticity"]
+# Public names. The helpers lame, constitutive, element_materials, element_constitutive,
+# stiffness_and_stress, stress_of, body_load, check_solution, displacement, at_fixed and
+# vector_stiffness are internal: galerkin.kernels re-exports them.
+__all__ = ["PLANES", "constitutive_matrix", "ElasticityResult", "solve_elasticity"]
 
 
 PLANES = ("stress", "strain")

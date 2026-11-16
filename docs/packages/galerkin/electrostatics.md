@@ -152,8 +152,8 @@ second order. A local pass does not establish CI or macOS/Windows acceptance.
 - 2D per-unit-length only; no 3D, no axisymmetry, no finite-thickness along z.
 - Free charge is a prescribed density: no space-charge transport, no
   semiconductor or electrolyte physics, no nonlinear permittivity.
-- Anisotropic permittivity is not accepted here (the tensor path of
-  `assemble_stiffness` remains available to callers assembling by hand).
+- Anisotropic permittivity is not accepted here (the tensor path of the internal
+  `galerkin.kernels.assemble_stiffness` remains available to callers assembling by hand).
 - P1 element fields are not an equilibrated flux: conductor charges come from the
   assembled reactions, not from integrating `D.n` along edges.
 - `sipi` line parameters (`C`, `C0`, `L`, `G`) keep using `sipi.capacitance_matrix`.

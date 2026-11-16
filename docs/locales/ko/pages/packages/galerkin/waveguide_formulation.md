@@ -398,7 +398,7 @@ live 값을 거부합니다. 검사 목록은 [미분](differentiation.md#검증
 | sipi 모듈 | galerkin 구성요소 |
 |---|---|
 | `sipi/crosssection.py` (`CrossSection.mesh`) | meshine 삼각분할에 대한 `galerkin.Mesh`, `galerkin.from_mesher` |
-| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.assemble_stiffness`(실수 또는 복소 `eps_r`의 P1 `K`), `galerkin.solve_dirichlet` |
+| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.kernels.assemble_stiffness`(실수 또는 복소 `eps_r`의 P1 `K`), `galerkin.kernels.solve_dirichlet` |
 | `sipi/conductor.py` (표면 임피던스 손실) | 완전도체 외부장에 대한 `assemble_stiffness`, `solve_dirichlet` |
 | `sipi/conductor_diffusion.py` (DC/AC 전류 확산) | P1 `A_z` 확산 시스템의 `assemble_stiffness`, `assemble_mass`, `assemble_load` |
 | `sipi/plane.py` (전원면 IR drop) | `galerkin.electric.solve_steady_electric` |

@@ -641,7 +641,8 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     from .thermal_regions import is_region_thermal, run_region_thermal
     if is_region_thermal(doc.data):
         return run_region_thermal(doc, verbose=verbose, mesh_limits=mesh_limits)
-    from galerkin import rectangle_mesh, assemble_stiffness
+    from galerkin import rectangle_mesh
+    from galerkin.kernels import assemble_stiffness
     try:
         from galerkin.thermal import solve_steady_heat
     except ImportError as exc:

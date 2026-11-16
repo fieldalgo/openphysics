@@ -19,7 +19,8 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse.linalg as spla
 
-from galerkin import Mesh, EdgeSpace, assemble_mass, assemble_stiffness, solve_modes, eval_edge_field
+from galerkin import Mesh, EdgeSpace, solve_modes, eval_edge_field
+from galerkin.kernels import assemble_mass, assemble_stiffness
 
 from .fields import VectorField
 

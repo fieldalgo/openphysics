@@ -11,9 +11,9 @@ absorbing boundary.
 import numpy as np
 import pytest
 
-from galerkin import (rectangle_mesh, annulus_mesh, assemble_stiffness,
-                      assemble_mass, assemble_boundary_mass, solve_dirichlet,
-                      l2_error, radial_pml_coeffs)
+from galerkin import rectangle_mesh, annulus_mesh, l2_error, radial_pml_coeffs
+from galerkin.kernels import (assemble_stiffness, assemble_mass, assemble_boundary_mass,
+                              solve_dirichlet)
 from conftest import assert_second_order, rate
 
 L, H, K_WAVE = 1.0, 0.5, 4.0 * np.pi

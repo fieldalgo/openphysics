@@ -142,7 +142,8 @@ def _duffy_rule(n=5):
 
 
 def _poisson_errors(m):
-    from galerkin import assemble_stiffness_3d, from_mesher, solve_dirichlet
+    from galerkin import from_mesher
+    from galerkin.kernels import assemble_stiffness_3d, solve_dirichlet
     mesh = from_mesher(m)
     lam, wq = _duffy_rule()
     p = mesh.nodes[mesh.tets]                                           # (T, 4, 3)
@@ -193,7 +194,8 @@ def test_poisson_on_the_extruded_cube_converges():
 # -- V22: layered conduction, reproduced exactly by P1 ---------------------
 
 def test_layered_conduction_matches_the_one_dimensional_solution():
-    from galerkin import assemble_stiffness_3d, from_mesher, solve_dirichlet
+    from galerkin import from_mesher
+    from galerkin.kernels import assemble_stiffness_3d, solve_dirichlet
     m = chip(size=1.25, layer_size=0.5)
     kappa = {"substrate": 1.0, "die": 0.01, "mold_low": 0.01, "mold_high": 1.0}
     mesh = from_mesher(m)

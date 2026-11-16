@@ -10,18 +10,18 @@ Milestones:
     M3prep  Lowest-order Nedelec edge elements, waveguide eigenmodes
     M3a     Dielectric waveguide modes (mixed edge/nodal vector formulation)
     M3b     3D Maxwell: tetrahedral Nedelec elements, cavity eigenmodes
+
+The non-electromagnetic assembly and solve functions (``assemble_stiffness``,
+``assemble_mass``, ``assemble_boundary_mass``, ``assemble_load``, their 3D
+counterparts, ``tet_gradients`` and ``solve_dirichlet``) and the physics modules'
+helpers are in ``galerkin.kernels``: internal, consistent units, not part of this API.
 """
 
 from .mesh import Mesh, rectangle_mesh, annulus_mesh, disk_mesh
 from .mesh3d import Mesh3D, box_mesh
-from .assembly import (assemble_stiffness, assemble_mass,
-                       assemble_boundary_mass, assemble_load)
-from .solver import solve_dirichlet
 from .pml import radial_pml_coeffs
 from .edge import (EdgeSpace, assemble_curlcurl, assemble_edge_mass,
                    assemble_edge_grad, eval_edge_field)
-from .assembly3d import (tet_gradients, assemble_stiffness_3d,
-                         assemble_mass_3d)
 from .edge3d import (EdgeSpace3D, assemble_curlcurl_3d,
                      assemble_edge_mass_3d, assemble_edge_grad_3d,
                      eval_edge_field_3d)
@@ -41,13 +41,12 @@ from .mode_overlap import (vector_power, vector_cross_power, vector_field_overla
                            scalar_coupling_efficiency, scalar_confinement_factor,
                            scalar_effective_area)
 
-# The public names: those imported above, then the submodules those imports bind, so that
-# ``from galerkin import *`` gives the same names as before this list existed.
+# The public names: those imported above, then the submodules those imports bind. The kernels
+# re-exported by galerkin.kernels are not among them (``from galerkin import *`` gave them
+# before the galerkin step of the units convention).
 __all__ = ["Mesh", "rectangle_mesh", "annulus_mesh", "disk_mesh", "Mesh3D", "box_mesh",
-           "assemble_stiffness", "assemble_mass", "assemble_boundary_mass", "assemble_load",
-           "solve_dirichlet", "radial_pml_coeffs", "EdgeSpace", "assemble_curlcurl",
-           "assemble_edge_mass", "assemble_edge_grad", "eval_edge_field", "tet_gradients",
-           "assemble_stiffness_3d", "assemble_mass_3d", "EdgeSpace3D", "assemble_curlcurl_3d",
+           "radial_pml_coeffs", "EdgeSpace", "assemble_curlcurl", "assemble_edge_mass",
+           "assemble_edge_grad", "eval_edge_field", "EdgeSpace3D", "assemble_curlcurl_3d",
            "assemble_edge_mass_3d", "assemble_edge_grad_3d", "eval_edge_field_3d", "read_msh",
            "write_msh", "from_mesher", "assemble_mode_system", "solve_modes", "CavityResult",
            "solve_cavity", "solve_cavity_box", "CavityMaterialRegion", "MaterialCavityResult",
@@ -58,8 +57,8 @@ __all__ = ["Mesh", "rectangle_mesh", "annulus_mesh", "disk_mesh", "Mesh3D", "box
            "centroid_field", "interpolate_vector_field", "effective_area", "scalar_power",
            "scalar_overlap", "normalize_scalar", "scalar_coupling_efficiency",
            "scalar_confinement_factor", "scalar_effective_area",
-           "assembly", "assembly3d", "cavity", "core", "coupling", "edge", "edge3d", "electrostatics",
-           "gmsh", "interop", "material_cavity", "materials", "mesh", "mesh3d", "mode_overlap", "pml",
-           "postprocess", "solver", "waveguide"]
+           "assembly", "cavity", "core", "coupling", "edge", "edge3d", "electrostatics", "gmsh",
+           "interop", "material_cavity", "materials", "mesh", "mesh3d", "mode_overlap", "pml",
+           "postprocess", "waveguide"]
 
 __version__ = "0.0.2"

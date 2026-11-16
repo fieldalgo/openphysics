@@ -20,8 +20,9 @@ TypeError.
 import numpy as np
 import pytest
 
-from galerkin import (EdgeSpace3D, assemble_mode_system, assemble_stiffness, box_mesh, eval_edge_field_3d,
-                      l2_error, radial_pml_coeffs, rectangle_mesh, solve_dirichlet, solve_material_cavity_box)
+from galerkin import (EdgeSpace3D, assemble_mode_system, box_mesh, eval_edge_field_3d, l2_error,
+                      radial_pml_coeffs, rectangle_mesh, solve_material_cavity_box)
+from galerkin.kernels import assemble_stiffness, solve_dirichlet
 from galerkin.material_cavity import CavityMaterialRegion
 from galerkin.mesh import Mesh
 from galerkin.mode_coordinates import mode_coordinates, scalar_coordinate_system, solve_scalar_coordinates

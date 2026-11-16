@@ -139,9 +139,12 @@ flowchart TB
 | coupling | [`galerkin.coupling`](../packages/galerkin/src/galerkin/coupling/__init__.py) | Node and element `Field`s on one mesh with an SI unit, same-mesh `transfer` and the `OneWayChain` driver, which runs stages handed to it and imports no physics. The Joule and heat-to-mechanics workflows run on it. The [kernel interface](packages/galerkin/coupling.md) states what a solver must expose for another solver to consume its result. |
 
 Each element formula lives once, as a closed-form kernel in `core.kernels`. The
-public assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
+assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
 assemble those kernels with `core.forms` and return SciPy matrices; they take
-NumPy values and refuse JAX or PyTorch ones. Physics modules that differentiate
+NumPy values and refuse JAX or PyTorch ones. The non-electromagnetic ones, the
+Dirichlet solve and the physics modules' helpers are reached through `galerkin.kernels`,
+an internal namespace (consistent units, not part of the public API) above every layer
+that only re-exports them for simcase and sipi. Physics modules that differentiate
 assemble the same kernels in the input's array library, and through that route
 seven solvers differentiate on JAX and PyTorch
 ([derivatives](packages/galerkin/differentiation.md)). The kernels are checked

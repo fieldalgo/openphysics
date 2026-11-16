@@ -443,7 +443,7 @@ but not with the mode solver. From galerkin it uses
 | sipi module | galerkin pieces |
 |---|---|
 | `sipi/crosssection.py` (`CrossSection.mesh`) | `galerkin.Mesh`, `galerkin.from_mesher` on a meshine triangulation |
-| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.assemble_stiffness` (P1 `K` with real or complex `eps_r`), `galerkin.solve_dirichlet` |
+| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.kernels.assemble_stiffness` (P1 `K` with real or complex `eps_r`), `galerkin.kernels.solve_dirichlet` |
 | `sipi/conductor.py` (surface-impedance loss) | `assemble_stiffness`, `solve_dirichlet` on the perfect-conductor exterior field |
 | `sipi/conductor_diffusion.py` (DC/AC current diffusion) | `assemble_stiffness`, `assemble_mass`, `assemble_load` for the P1 `A_z` diffusion system |
 | `sipi/plane.py` (power-plane IR drop) | `galerkin.electric.solve_steady_electric` |

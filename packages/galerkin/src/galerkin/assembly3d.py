@@ -22,7 +22,7 @@ import scipy.sparse as sp
 
 from .core import forms, kernels
 from .core.checks import refuse_live
-from .core.tets import tet_gradients  # noqa: F401 (public here)
+from .core.tets import tet_gradients  # noqa: F401 (re-exported here and by galerkin.kernels)
 from .mesh3d import Mesh3D
 
 

@@ -25,7 +25,8 @@ from simcase import Document, DocumentError, MechanicsRunResult, run, build_mesh
 from simcase.cli import main
 from simcase import mechanics
 from galerkin import rectangle_mesh
-from galerkin.elasticity import lame, solve_elasticity
+from galerkin.elasticity import solve_elasticity
+from galerkin.kernels import lame
 from galerkin.thermal import solve_steady_heat
 from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
 from refsol import elasticity_traction as refsol

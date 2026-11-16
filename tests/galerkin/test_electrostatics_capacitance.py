@@ -19,8 +19,9 @@ import numpy as np
 import pytest
 from scipy.constants import epsilon_0
 
-from galerkin import (ElementPermittivity, annulus_mesh, assemble_stiffness, capacitance_matrix,
-                      rectangle_mesh, solve_electrostatics)
+from galerkin import (ElementPermittivity, annulus_mesh, capacitance_matrix, rectangle_mesh,
+                      solve_electrostatics)
+from galerkin.kernels import assemble_stiffness
 from galerkin.mesh import layered_rectangle_mesh
 from conftest import rate
 

@@ -35,7 +35,8 @@ print("  tags:", sorted(mesh.boundary_faces), " interfaces:", sorted(mesh.interf
 print(f"  min dihedral {mesh.min_dihedral():.1f} deg, mean quality {mesh.quality().mean():.3f}")
 
 try:
-    from galerkin import assemble_stiffness_3d, from_mesher, solve_dirichlet
+    from galerkin import from_mesher
+    from galerkin.kernels import assemble_stiffness_3d, solve_dirichlet
 except ImportError:
     print("galerkin not installed: skipping the heat solve")
 else:

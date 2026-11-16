@@ -20,7 +20,7 @@ references and fixed thresholds.
 
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
-| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `radial_pml_coeffs`; the internal `galerkin.kernels` (`assemble_stiffness`, `solve_dirichlet`) | [Milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
 | 2D electrostatics with conductors as node sets, free charge and insulated exterior; Maxwell capacitance matrix checked by the energy and charge routes, real or lossy complex permittivity | `solve_electrostatics`, `capacitance_matrix` | [Contract and gates](../../docs/packages/galerkin/electrostatics.md) | — |
 | Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Eigenspace reliability](../../docs/packages/galerkin/eigenspace_reliability.md), [milestone validation](../../docs/packages/galerkin/milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | Mode power (Faraday-route Poynting integral), field overlaps, normalisation, coupling efficiency, confinement factor and effective area of vector and scalar modes | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, scalar twins | [Contract and validation](../../docs/packages/galerkin/mode_overlap.md) | — |
@@ -86,6 +86,7 @@ src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
+  kernels.py      # Internal: re-exports the non-em assembly kernels, the Dirichlet solve and the physics helpers (consistent units)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling

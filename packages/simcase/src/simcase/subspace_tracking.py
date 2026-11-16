@@ -29,7 +29,8 @@ import math
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from galerkin import EdgeSpace, assemble_edge_mass, assemble_mass
+from galerkin import EdgeSpace, assemble_edge_mass
+from galerkin.kernels import assemble_mass
 
 from .fields import VectorField
 from .tracking import ModeTrackingError

@@ -14,8 +14,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 
-from galerkin import (annulus_mesh, rectangle_mesh, assemble_stiffness,
-                      assemble_load, solve_dirichlet, element_gradient)
+from galerkin import annulus_mesh, rectangle_mesh, element_gradient
+from galerkin.kernels import assemble_stiffness, assemble_load, solve_dirichlet
 from coax_convergence import A, B, exact, solve_on
 
 INK = "#1a1f2e"

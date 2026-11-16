@@ -12,9 +12,12 @@ and returns the current and the heating with their load. Mesh geometry is static
 computed with NumPy; only coefficients may be live, so a JAX or PyTorch
 coefficient carries its derivative into the element matrices.
 
-The public assembly functions (galerkin.assembly, assembly3d, edge, edge3d)
-assemble these kernels with ``forms``; each kernel names the function built
-from it. The edge kernels take an ``EdgeSpace`` or ``EdgeSpace3D`` from
+The assembly functions (galerkin.assembly, assembly3d, edge, edge3d) assemble
+these kernels with ``forms``; each kernel names the function built from it.
+This module is not ``galerkin.kernels``: that internal namespace re-exports the
+assembly and solve functions built from these element matrices, with the physics
+modules' helpers, for callers outside galerkin; this one holds the element
+matrices themselves, for galerkin's own modules. The edge kernels take an ``EdgeSpace`` or ``EdgeSpace3D`` from
 ``core.spaces``. tests/galerkin/test_crosscheck_symfem_coefficients.py checks them
 against exact integrals for every coefficient form those functions accept.
 

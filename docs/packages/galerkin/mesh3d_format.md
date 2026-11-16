@@ -27,7 +27,7 @@ normative description of the shape they share. Index arrays are 0-based.
 A `Mesh3D` may also carry node sets alone (`boundary`), as `box_mesh` did before
 faces were added and as `galerkin.read_msh` does for a file without surface
 physical groups. Everything that selects walls by tag (`solve_cavity`,
-`solve_material_cavity`, `thermal3d.dirichlet_from_faces`) needs the faces.
+`solve_material_cavity`, `galerkin.kernels.dirichlet_from_faces`) needs the faces.
 
 ## Rules
 
