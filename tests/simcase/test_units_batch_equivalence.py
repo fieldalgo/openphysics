@@ -6,7 +6,9 @@ Check P2-1 of the batch: every shipped example and every frozen fixture, as a 0.
 the baseline code, gives the same solver and mesher inputs and the same saved bytes as its
 0.3 twin on this code, under the closed transforms of ``tools/units_batch/compare.py``. Until a
 kind's commit converts it, a kind is compared in identity mode (its 0.2 documents on both
-sides), which is P2-3.
+sides), which is P2-3. Check P3-1 of the galerkin step (phase 3): the same 0.3 documents on the
+baseline and on this code give bit-identical saved bytes, and every recorded call, bound to its
+parameter names, is equal under the closed rule kinds of ``tools/units_batch/phase3_rules.json``.
 
 - ``test_the_harness_is_not_shipped`` runs everywhere, the installed-package run included.
 - The other checks need the harness code in ``tools/units_batch``, which the installed-package
@@ -14,10 +16,12 @@ sides), which is P2-3.
   they are defined only where that code is present. The
   harness self-checks run every time: a one-ulp change is detected, layout maps are applied
   and closed, and the converter reproduces the converted examples of the specification.
-- ``test_units_batch_equivalence`` runs only when ``OPENPHYSICS_BATCH_BASELINE`` names the
-  baseline commit (the merge base with main); otherwise it is skipped and reported as not run.
-  The dispatch-only ``units-batch-equivalence`` job of ``.github/workflows/validate.yml`` sets it.
-  ``OPENPHYSICS_BATCH_REPORT`` names a folder for the comparison report and both manifests.
+- ``test_units_batch_equivalence`` (P2-1) and ``test_units_batch_phase3_identity`` (P3-1) run
+  only when ``OPENPHYSICS_BATCH_BASELINE`` names the baseline commit (the merge base with main);
+  otherwise they are skipped and reported as not run. ``OPENPHYSICS_BATCH_PHASE`` selects which
+  one: ``2`` (the default) or ``3``. The dispatch-only ``units-batch-equivalence`` job of
+  ``.github/workflows/validate.yml`` sets both, with phase 3. ``OPENPHYSICS_BATCH_REPORT`` names
+  a folder for the comparison report and both manifests.
 """
 
 from __future__ import annotations
@@ -39,6 +43,9 @@ HARNESS = ROOT / "tools" / "units_batch"
 IMPORT_PACKAGES = ("galerkin", "refsol", "meshine", "meshloom", "gmshio", "physmat", "simcase", "sipi")
 HARNESS_MODULES = ("units_batch", "record", "compare", "convert_v02", "tools.units_batch.record",
                    "tools.units_batch.compare", "tools.units_batch.convert_v02")
+#: which baseline comparison runs (README "Phase 3"): "2", P2-1 of the units batch (the default),
+#: or "3", P3-1 of the galerkin step
+PHASE = os.environ.get("OPENPHYSICS_BATCH_PHASE", "2")
 
 
 def _package_dirs():
@@ -624,6 +631,7 @@ if (HARNESS / "compare.py").is_file():
     @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE"),
                         reason="not run: P2-2 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
                                "(the merge base with main); see tools/units_batch/README.md")
+    @pytest.mark.skipif(PHASE != "2", reason="not run: OPENPHYSICS_BATCH_PHASE selects phase 3; P2-2 is phase 2")
     def test_converted_documents_resolve_to_the_converter_output():
         """P2-2: every document compared in layout mode, as committed, resolves to the SI tree (float.hex
         of every value, pm of every shape number) of convert_v02 of its 0.2 source: the example at the
@@ -765,6 +773,7 @@ if (HARNESS / "compare.py").is_file():
     @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE"),
                         reason="not run: P2-1 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
                                "(the merge base with main); see tools/units_batch/README.md")
+    @pytest.mark.skipif(PHASE != "2", reason="not run: OPENPHYSICS_BATCH_PHASE selects phase 3; P2-1 is phase 2")
     def test_units_batch_equivalence(tmp_path):
         baseline = _git("rev-parse", "--verify", os.environ["OPENPHYSICS_BATCH_BASELINE"] + "^{commit}")
         head = _git("rev-parse", "HEAD")
@@ -838,6 +847,409 @@ if (HARNESS / "compare.py").is_file():
                         for where, target, rule in lmap.exceptions:
                             if where == "summary" and compare.match(target, path) is not None:
                                 assert path[:2] == EM_EXCEPTION_FAMILIES[rule["kind"]], (d["id"], path)
+        finally:
+            subprocess.run(["git", "worktree", "remove", "--force", str(base)], cwd=ROOT, capture_output=True)
+            subprocess.run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)
+
+    # -- phase 3: the galerkin step (README "Phase 3") ------------------------------------------
+
+    #: P3-1's corpus: the examples and the fixtures/v03 documents, read by both sides
+    PHASE3_CORPUS_SIZE = 87
+
+    def test_the_batch_phase_is_known():
+        assert PHASE in ("2", "3"), f"OPENPHYSICS_BATCH_PHASE={PHASE!r}: expected 2 or 3"
+
+    def test_the_rule_kinds_are_the_closed_table_of_the_specification():
+        """Nine kinds, each with its fields; the committed rules load; an entry of another kind, an
+        unknown field, an open transform or a target mapped twice is refused."""
+        compare = _module("compare")
+        assert sorted(compare.RULE_KINDS) == list(range(1, 10))
+        assert compare.VALUE_TRANSFORMS == ("neg", "to_kernel")
+        compare.Phase3Rules.load(HARNESS / "phase3_rules.json")
+
+        def rules(*entries):
+            return compare.Phase3Rules({"format": compare.RULES_FORMAT, "entries": list(entries)}, "test")
+        for kind in (0, 10, "1", True, None):
+            with pytest.raises(ValueError, match="closed table"):
+                rules({"kind": kind, "old": "a", "new": "b"})
+        with pytest.raises(ValueError, match="unknown fields"):
+            rules({"kind": 1, "old": "a", "new": "b", "f": "neg"})
+        with pytest.raises(ValueError, match="missing fields"):
+            rules({"kind": 2, "function": "f", "old": "a"})
+        with pytest.raises(ValueError, match="transform"):
+            rules({"kind": 3, "function": "f", "keyword": "k", "transform": "conj"})
+        with pytest.raises(ValueError, match="transform"):
+            rules({"kind": 5, "class": "c", "old": None, "new": "b", "transform": "neg"})
+        with pytest.raises(ValueError, match="exactly one"):
+            rules({"kind": 8, "function": "f", "keyword": "k"})
+        with pytest.raises(ValueError, match="mapped by"):
+            rules({"kind": 1, "old": "a", "new": "b"}, {"kind": 7, "old": "a", "wrapper": "c", "kernel": "d"})
+        with pytest.raises(ValueError, match="format"):
+            compare.Phase3Rules({"format": "other", "entries": []}, "test")
+        unused = rules({"kind": 4, "old": "m.A", "new": "m.B"})
+        assert unused.unused() and "applies to nothing" in unused.unused()[0]
+
+    def test_each_tree_declares_its_targets(tmp_path):
+        """The head's targets.json is its declaration, a tree without one is recorded at
+        UNDECLARED_TARGETS (f693ae3a and every commit before the phase-3 mode), and a
+        malformed declaration is refused."""
+        record = _module("record")
+        targets, source = record.load_targets(ROOT)
+        assert source == "tools/units_batch/targets.json"
+        assert {"physmat.dispersion:Dispersion.index", "physmat.dispersion:Dispersion.eps"} <= set(targets["methods"])
+        assert not [m for m in targets["methods"] if m.startswith("physmat.material:")]
+        assert record.load_targets(tmp_path) == (record.UNDECLARED_TARGETS, "UNDECLARED_TARGETS")
+        with pytest.raises(ValueError, match="module:Class.method"):
+            record.check_targets({**record.UNDECLARED_TARGETS, "methods": ["physmat.material:Material"]}, "test")
+        with pytest.raises(ValueError, match="keys"):
+            record.check_targets({**record.UNDECLARED_TARGETS, "classes": []}, "test")
+
+    class _Toy:
+        """Calls recorded by the harness's own recorder, as its wrappers record them."""
+
+        def __init__(self, record, results=()):
+            self.record, self.recorder = record, record.Recorder()
+            record.RESULTS_RECORDED = frozenset(results)
+            self.recorder.reset()
+
+        def __call__(self, name, function, *args, **kwargs):
+            return self.recorder.call(name, function, args, kwargs)
+
+        def method(self, name, obj, function, *args, **kwargs):
+            return self.recorder.call(name, function, args, kwargs, bound_self=obj)
+
+        def recording(self) -> dict:
+            return {"calls": self.recorder.calls, "transforms": self.recorder.finish()}
+
+    def _recorded(record, calls, results=()):
+        toy = _Toy(record, results)
+        calls(toy)
+        return toy.recording()
+
+    def _mesh():
+        import types
+        import numpy as np
+        return types.SimpleNamespace(nodes=np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]))
+
+    def _to_kernel(x):
+        """galerkin's conventions rule, as the recorder's transform table computes it."""
+        import numpy as np
+        if np.ndim(x) == 0:
+            return complex(x.real, 0.0 - x.imag)
+        out = np.empty(np.shape(x), dtype=complex)
+        out.real, out.imag = np.real(x), 0.0 - np.imag(x)
+        return out
+
+    def _phase3_case(kind):
+        """(old recording, new recording, old targets, new targets, entries, negative variants):
+        a synthetic recording whose two sides differ by exactly what rule ``kind`` maps.
+        A negative variant is (description, new recording or None, entries) and must fail."""
+        import dataclasses
+        import numpy as np
+        record = _module("record")
+        mesh = _mesh()
+
+        if kind == 1:                                           # function rename
+            def solve(mesh, *, conductivity):
+                return conductivity
+            old = _recorded(record, lambda r: r("toy.heat.solve_heat", solve, mesh, conductivity=2.0))
+            new = _recorded(record, lambda r: r("toy.heat.solve_steady_heat", solve, mesh, conductivity=2.0))
+            return (old, new, ["toy.heat.solve_heat"], ["toy.heat.solve_steady_heat"],
+                    [{"kind": 1, "old": "toy.heat.solve_heat", "new": "toy.heat.solve_steady_heat"}], [])
+
+        if kind == 2:                                           # keyword rename; bound time sampling
+            times = np.array([0.0, 0.5, 1.0])
+
+            def old_fn(mesh, *, time_s, initial_temperature_k, boundary):
+                return [initial_temperature_k(mesh.nodes), boundary["left"](time_s[1])]
+
+            def new_fn(mesh, *, time, initial_temperature, boundary):
+                return [initial_temperature(mesh.nodes), boundary["left"](time[1])]
+            boundary = {"left": lambda t: 300.0 + t}
+            start = lambda points: 290.0 + points[:, 0]          # noqa: E731
+            old = _recorded(record, lambda r: r("galerkin.toy.solve_transient", old_fn, mesh, time_s=times,
+                                                initial_temperature_k=start, boundary=boundary))
+            new = _recorded(record, lambda r: r("galerkin.toy.solve_transient", new_fn, mesh, time=times,
+                                                initial_temperature=start, boundary=boundary))
+            for recording, name in ((old, "time_s"), (new, "time")):
+                (call,) = recording["calls"]
+                assert name in call["bound"]
+                sampled = call["bound"]["boundary"][2][0][1][2]   # the callback of "left", sampled
+                assert [s[1] for s in sampled if s[0] == "time"] == [float.hex(t) for t in times], name
+            entries = [{"kind": 2, "function": "galerkin.toy.solve_transient", "old": "time_s", "new": "time"},
+                       {"kind": 2, "function": "galerkin.toy.solve_transient", "old": "initial_temperature_k",
+                        "new": "initial_temperature"}]
+            return (old, new, ["galerkin.toy.solve_transient"], ["galerkin.toy.solve_transient"], entries,
+                    [("without the time_s rename", None, entries[1:]),
+                     ("without the initial_temperature_k rename", None, entries[:1])])
+
+        if kind == 3:                                           # neg and to_kernel on keywords
+            def solve(mesh, *, flux, load, permittivity, permeability):
+                return None
+            inward = {"right": 2.0, "top": -0.0, "bottom": 0.0}
+            load = np.array([1.5, -0.0, 0.0, -2.25])
+            public = np.array([4.0 + 0.04j, 1.0 + 0.0j, 2.0 - 0.0j])
+            mu = 1.5 + 0.01j
+
+            def old_calls(negate):
+                return lambda r: r("toy.solve", solve, mesh, flux={k: negate(v) for k, v in inward.items()},
+                                   load=negate(load), permittivity=_to_kernel(public), permeability=_to_kernel(mu))
+            old = _recorded(record, old_calls(lambda x: 0.0 - x))
+            new = _recorded(record, lambda r: r("toy.solve", solve, mesh, flux=inward, load=load,
+                                                permittivity=public, permeability=mu))
+            minus = _recorded(record, old_calls(np.negative))   # -x: the signed zeros differ from 0.0 - x
+            entries = [{"kind": 3, "function": "toy.solve", "keyword": k, "transform": t}
+                       for k, t in (("flux", "neg"), ("load", "neg"), ("permittivity", "to_kernel"),
+                                    ("permeability", "to_kernel"))]
+            wrong = [dict(e, transform="to_kernel" if e["transform"] == "neg" else "neg") for e in entries]
+            return (old, new, ["toy.solve"], ["toy.solve"], entries,
+                    [("the other transform", None, wrong), ("-x instead of 0.0 - x", ("old", minus), entries)])
+
+        if kind == 4:                                           # class rename (self, arguments, exceptions)
+            def model(module):
+                cls = dataclasses.make_dataclass("Sellmeier", [("B", list), ("C", list)])
+                error = type("OutOfRange", (ValueError,), {})
+                cls.__module__ = error.__module__ = module
+                return cls, error
+
+            def calls(module):
+                cls, error = model(module)
+
+                def eps(self, wavelength_um, strict=True):
+                    if wavelength_um > 2.0:
+                        raise error("wavelength outside validity range")
+                    return np.array([2.25 + 0j])
+
+                def run(r):
+                    m = cls([1.0], [0.01])
+                    r.method("toy.optics.Model.eps", m, eps, 1.55)
+                    r("toy.optics.describe", lambda model: None, m)
+                    with pytest.raises(ValueError):
+                        r.method("toy.optics.Model.eps", m, eps, 3.0)
+                return run
+            old = _recorded(record, calls("toy.dispersion"), results=("toy.optics.Model.eps",))
+            new = _recorded(record, calls("toy._dispersion"), results=("toy.optics.Model.eps",))
+            entries = [{"kind": 4, "old": "toy.dispersion.Sellmeier", "new": "toy._dispersion.Sellmeier"},
+                       {"kind": 4, "old": "toy.dispersion.OutOfRange", "new": "toy._dispersion.OutOfRange"}]
+            targets = ["toy.optics.Model.eps", "toy.optics.describe"]
+            return (old, new, targets, targets, entries, [("without the exception's rename", None, entries[:1])])
+
+        if kind == 5:                                           # dataclass fields
+            Old = dataclasses.make_dataclass("Snapshot", ["time_s", "temperature_k", "nodal_heat_rate_unit",
+                                                          "outward"])
+            New = dataclasses.make_dataclass("Snapshot", ["time", "temperature", "units", "inward"])
+            Old.__module__ = New.__module__ = "toy.snapshots"
+            temperature, inward = np.array([300.0, 301.5]), np.array([0.0, -2.0, 3.5])
+            old_value = Old(1.0, temperature, "W/m", 0.0 - inward)
+            new_value = New(1.0, temperature, {"temperature": "K"}, inward)
+            old = _recorded(record, lambda r: r("toy.freeze", lambda snapshot: old_value, old_value),
+                            results=("toy.freeze",))
+            new = _recorded(record, lambda r: r("toy.freeze", lambda snapshot: new_value, new_value),
+                            results=("toy.freeze",))
+            entries = [{"kind": 5, "class": "toy.snapshots.Snapshot", "old": "time_s", "new": "time"},
+                       {"kind": 5, "class": "toy.snapshots.Snapshot", "old": "temperature_k", "new": "temperature"},
+                       {"kind": 5, "class": "toy.snapshots.Snapshot", "old": "nodal_heat_rate_unit", "new": None},
+                       {"kind": 5, "class": "toy.snapshots.Snapshot", "old": None, "new": "units"},
+                       {"kind": 5, "class": "toy.snapshots.Snapshot", "old": "outward", "new": "inward",
+                        "transform": "neg"}]
+            return (old, new, ["toy.freeze"], ["toy.freeze"], entries,
+                    [(f"without entries[{i}]", None, entries[:i] + entries[i + 1:]) for i in range(len(entries))])
+
+        if kind == 6:                                           # transform inside an object's fields
+            Region = dataclasses.make_dataclass("CavityMaterialRegion", ["lower", "relative_permittivity",
+                                                                         "relative_permeability"])
+            Region.__module__ = "toy.cavity"
+
+            def calls(convert):
+                return lambda r: r("toy.solve_cavity", lambda regions: None,
+                                   [Region((0.0, 0.0, 0.0), convert(4.0 + 0.04j),
+                                           convert(np.array([1.5 + 0.01j, 1.0 + 0.0j])))])
+            old = _recorded(record, calls(_to_kernel))
+            new = _recorded(record, calls(lambda x: x))
+            entries = [{"kind": 6, "class": "toy.cavity.CavityMaterialRegion",
+                        "fields": ["relative_permittivity", "relative_permeability"], "transform": "to_kernel"}]
+            half = [dict(entries[0], fields=["relative_permittivity"])]
+            return (old, new, ["toy.solve_cavity"], ["toy.solve_cavity"], entries, [("one field only", None, half)])
+
+        if kind == 7:                                           # compare at the kernel frame
+            inward = np.array([0.0, -2.0, 3.5])
+
+            def old_calls(r):
+                def solve(mesh, *, outward):                   # the baseline's body, outward
+                    return r("toy.assembly.assemble", lambda mesh, values: values, mesh, outward)
+                r("toy.heat.solve_heat", solve, mesh, outward=0.0 - inward)    # simcase's call
+                r("toy.heat.solve_heat", solve, mesh, outward=0.0 - inward)    # an internal caller's
+
+            def new_calls(r):
+                def kernel(mesh, *, outward):                  # the head's private body
+                    return r("toy.assembly.assemble", lambda mesh, values: values, mesh, outward)
+
+                def public(mesh, *, inward):                   # the thin public wrapper
+                    return r("toy.heat._solve_heat", kernel, mesh, outward=0.0 - inward)
+                r("toy.heat.solve_heat", public, mesh, inward=inward)
+                r("toy.heat._solve_heat", kernel, mesh, outward=0.0 - inward)
+            old, new = _recorded(record, old_calls), _recorded(record, new_calls)
+            assert [c["depth"] for c in new["calls"]] == [0, 1, 2, 0, 1]
+            entries = [{"kind": 7, "old": "toy.heat.solve_heat", "wrapper": "toy.heat.solve_heat",
+                        "kernel": "toy.heat._solve_heat"}]
+            return (old, new, ["toy.assembly.assemble", "toy.heat.solve_heat"],
+                    ["toy.assembly.assemble", "toy.heat._solve_heat", "toy.heat.solve_heat"], entries,
+                    [("a kind 1 rename instead", None, [{"kind": 1, "old": "toy.heat.solve_heat",
+                                                         "new": "toy.heat._solve_heat"}])])
+
+        if kind == 8:                                           # a removed keyword default
+            def old_fn(mesh, *, temperature_tolerance=1e-8, iteration_limit=100):
+                return None
+
+            def new_fn(mesh, *, temperature_tolerance, iteration_limit=100):
+                return None
+            old = _recorded(record, lambda r: r("toy.joule", old_fn, mesh))
+            new = _recorded(record, lambda r: r("toy.joule", new_fn, mesh, temperature_tolerance=1e-8))
+            other = _recorded(record, lambda r: r("toy.joule", new_fn, mesh, temperature_tolerance=1e-9))
+            entries = [{"kind": 8, "function": "toy.joule", "keyword": "temperature_tolerance", "value": 1e-8}]
+            return (old, new, ["toy.joule"], ["toy.joule"], entries,
+                    [("the new call passes another value", ("new", other), entries)])
+
+        if kind == 9:                                           # positional <-> keyword
+            def freeze(mesh, temperature):
+                return None
+            old = _recorded(record, lambda r: r("toy.freeze_temperature", freeze, mesh, np.array([300.0, 301.0])))
+            new = _recorded(record, lambda r: r("toy.freeze_temperature", freeze, mesh,
+                                                temperature=np.array([300.0, 301.0])))
+            moved = _recorded(record, lambda r: r("toy.freeze_temperature", freeze, mesh,
+                                                  temperature=np.array([300.0, 301.5])))
+            entries = [{"kind": 9, "function": "toy.freeze_temperature", "keyword": "temperature"}]
+            return (old, new, ["toy.freeze_temperature"], ["toy.freeze_temperature"], entries,
+                    [("the moved value changes too", ("new", moved), entries)])
+        raise AssertionError(kind)
+
+    def _phase3_findings(compare, old, new, old_targets, new_targets, entries) -> list:
+        rules = compare.Phase3Rules({"format": compare.RULES_FORMAT, "entries": entries}, "test")
+        result = compare.Result("synthetic", "phase3")
+        problems = rules.check_targets(old_targets, new_targets)
+        compare.compare_calls_phase3(old, new, rules, result)
+        return result.failures + problems + rules.unused()
+
+    @pytest.mark.parametrize("kind", range(1, 10))
+    def test_every_rule_kind_on_a_synthetic_recording(kind):
+        """Phase-3 self-check (specification §6): each kind applied to a recording made by the
+        recorder itself. With its entries the two sides compare equal; without them (kinds 1 to 8)
+        or in each negative variant the check fails. Kind 9 needs no entry once calls are bound,
+        and an entry must not hide a changed value; compared as written (positions and
+        keywords), the move itself would fail."""
+        compare = _module("compare")
+        old, new, old_targets, new_targets, entries, negatives = _phase3_case(kind)
+        assert _phase3_findings(compare, old, new, old_targets, new_targets, entries) == []
+        missing = _phase3_findings(compare, old, new, old_targets, new_targets, [])
+        if kind == 9:
+            assert missing == []
+            raw = compare.Result("synthetic", "identity")
+            compare.compare_calls(old, new, raw)
+            assert not raw.equal, "the move compares equal as written"
+        else:
+            assert missing, f"kind {kind}: the difference passes without its entry"
+        for description, replaced, variant in negatives:
+            a, b = old, new
+            if replaced is not None:
+                a, b = (replaced[1], new) if replaced[0] == "old" else (old, replaced[1])
+            found = _phase3_findings(compare, a, b, old_targets, new_targets, variant)
+            assert found, f"kind {kind}, {description}: passes"
+
+    def test_phase3_compares_a_repeat_and_detects_a_one_ulp_change(slab_recording):
+        """compare.py --phase3 with the committed rules: two recordings of this checkout are equal
+        and declare the same targets; a one-ulp conductivity fails at the bound solver call."""
+        manifest = json.loads((slab_recording / "rec_a" / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["install"]["targets_source"] == "tools/units_batch/targets.json"
+        assert not manifest["install"]["targets_missing"] and not manifest["install"]["targets_shadowed"]
+        same = _compare(slab_recording / "rec_a", slab_recording / "rec_b", "--phase3")
+        assert same.returncode == 0, same.stdout + same.stderr
+        assert "1 documents compared: 1 equal, 0 different; 0 other problems" in same.stdout
+        nudged = _compare(slab_recording / "rec_a", slab_recording / "rec_ulp", "--phase3")
+        assert nudged.returncode == 1, nudged.stdout
+        assert "galerkin.thermal.solve_steady_heat.bound" in nudged.stdout
+        assert "fields.npz temperature" in nudged.stdout
+
+    def _phase3_documents() -> list[str]:
+        """P3-1's corpus as ``id=path``: every example and every fixtures/v03 twin of this checkout,
+        read by both sides (their bytes equal the baseline's, which the test checks first)."""
+        examples = sorted((ROOT / "examples" / "simcase").glob("*.json"))
+        fixtures = sorted((HARNESS / "fixtures" / "v03").glob("*.json"))
+        return [f"{p.stem}={p}" for p in examples + fixtures]
+
+    #: run under ``python -I`` against one root: its built-in documents (``simcase.examples``) and
+    #: whether each equals its ``examples/simcase`` twin there
+    BUILTINS = ("import json, pathlib, sys\n"
+                "root = pathlib.Path(sys.argv[1]).resolve()\n"
+                "sys.path[:0] = [str(p) for p in sorted((root / 'packages').glob('*/src'))]\n"
+                "import simcase.examples as e\n"
+                "assert pathlib.Path(e.__file__).resolve().is_relative_to(root), e.__file__\n"
+                "docs = {p.stem: json.loads(p.read_text(encoding='utf-8'))"
+                " for p in (root / 'examples' / 'simcase').glob('*.json')}\n"
+                "print(json.dumps({'count': len(e.EXAMPLES),"
+                " 'unequal': sorted(n for n, d in e.EXAMPLES.items() if docs.get(n) != d)}))\n")
+
+    @pytest.mark.skipif(not os.environ.get("OPENPHYSICS_BATCH_BASELINE") or PHASE != "3",
+                        reason="not run: P3-1 runs only when OPENPHYSICS_BATCH_BASELINE names the baseline commit "
+                               "(the merge base with main) and OPENPHYSICS_BATCH_PHASE=3; see "
+                               "tools/units_batch/README.md")
+    def test_units_batch_phase3_identity(tmp_path):
+        """P3-1: the 87 documents, the same bytes on both sides, give bit-identical saved arrays,
+        summary leaves, VTU arrays and messages on the baseline and on this code, and every
+        recorded call compares equal by parameter name under phase3_rules.json."""
+        baseline = _git("rev-parse", "--verify", os.environ["OPENPHYSICS_BATCH_BASELINE"] + "^{commit}")
+        head = _git("rev-parse", "HEAD")
+        paths = ("examples/simcase/*.json", "tools/units_batch/fixtures")
+        changed = _git("diff", "--name-only", baseline, head, "--", *paths)
+        assert changed == "", f"phase 3 compares unchanged documents; changed since the baseline:\n{changed}"
+        local = _git("status", "--porcelain", "--untracked-files=all", "--", *paths)
+        assert local == "", f"the checkout's documents differ from HEAD:\n{local}"
+        documents = _phase3_documents()
+        assert len(documents) == PHASE3_CORPUS_SIZE, len(documents)
+        (tmp_path / "documents.txt").write_text("\n".join(documents) + "\n", encoding="utf-8")
+        base = tmp_path / "base"
+        _git("worktree", "add", "--detach", str(base), baseline)
+        try:
+            builtins = []
+            for root in (base, ROOT):
+                done = subprocess.run([sys.executable, "-I", "-c", BUILTINS, str(root)], capture_output=True,
+                                      text=True, encoding="utf-8", env=_env(), check=True)
+                builtins.append(json.loads(done.stdout))
+            assert builtins[0] == builtins[1] and builtins[0]["unequal"] == [], builtins
+            for side, root in (("old", base), ("new", ROOT)):
+                done = subprocess.run([sys.executable, "-I", str(HARNESS / "record.py"), "--root", str(root),
+                                       "--out", str(tmp_path / f"rec_{side}"), "--docs",
+                                       str(tmp_path / "documents.txt")],
+                                      capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                      env=_env(), timeout=4 * 3600)
+                print(done.stdout)
+                assert done.returncode == 0, done.stdout + done.stderr
+            report = tmp_path / "report.json"
+            result = _compare(tmp_path / "rec_old", tmp_path / "rec_new", "--phase3", report=report)
+            sources = [json.loads((tmp_path / f"rec_{side}" / "manifest.json").read_text(encoding="utf-8"))
+                       ["install"]["targets_source"] for side in ("old", "new")]
+            rules = json.loads((HARNESS / "phase3_rules.json").read_text(encoding="utf-8"))["entries"]
+            print(f"baseline {baseline}, head {head}, {len(documents)} documents, {builtins[1]['count']} built-in "
+                  f"documents equal to their examples on both sides; targets: old {sources[0]}, new {sources[1]}; "
+                  f"{len(rules)} rule entries")
+            print(result.stdout)
+            evidence = os.environ.get("OPENPHYSICS_BATCH_REPORT")
+            if evidence:
+                folder = Path(evidence)
+                folder.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(report, folder / "report.json")
+                shutil.copy2(tmp_path / "documents.txt", folder / "documents.txt")
+                for side in ("old", "new"):
+                    shutil.copy2(tmp_path / f"rec_{side}" / "manifest.json", folder / f"manifest_{side}.json")
+                (folder / "compare.txt").write_text(f"baseline {baseline}\nhead {head}\n" + result.stdout,
+                                                    encoding="utf-8")
+            data = json.loads(report.read_text(encoding="utf-8"))
+            assert not data["problems"], data["problems"]
+            different = sorted(d["id"] for d in data["documents"] if d["status"] != "equal")
+            assert different == [], result.stdout
+            total = len(data["documents"])
+            assert total == PHASE3_CORPUS_SIZE
+            assert f"{total} documents compared: {total} equal, 0 different; 0 other problems" in result.stdout
+            assert result.returncode == 0, result.stdout + result.stderr
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(base)], cwd=ROOT, capture_output=True)
             subprocess.run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)

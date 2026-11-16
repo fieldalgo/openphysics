@@ -13,17 +13,21 @@ The recorder puts ``<root>/packages/*/src`` first on ``sys.path`` and checks tha
 editable install could otherwise serve another checkout). It imports every
 submodule of the four packages (``simcase.studio`` excepted), then replaces each
 module attribute that is one of the recorded callables with a recording wrapper,
-so ``from x import f`` bindings are caught as well. For each document it runs
-``simcase.run(Document.load(path))``, ``result.save()`` and the VTU export of
-exportable layouts, and writes ``<out>/<id>/record.json`` beside the saved files.
+so ``from x import f`` bindings are caught as well. Which callables are recorded is
+the recorded tree's own declaration: ``<root>/tools/units_batch/targets.json``, or
+``UNDECLARED_TARGETS`` for a tree that has none (every commit before that file).
+For each document it runs ``simcase.run(Document.load(path))``, ``result.save()``
+and the VTU export of exportable layouts, and writes ``<out>/<id>/record.json``
+beside the saved files.
 
 Every recorded call is stored in a canonical form: arrays as ``(dtype, shape,
 sha256 of the bytes)``, floats as ``float.hex`` with their Python type noted,
 mappings as ordered item lists, a meshine ``Domain`` as its pending regions and
 loops, callables of position or time sampled at fixed points, and every call
-the solver makes to a callback folded into a digest. ``compare.py`` compares two
-recordings. The harness is part of the repository tools: no package imports it
-and nothing here ships.
+the solver makes to a callback folded into a digest. Each call is stored twice
+over: as written (positions and keywords) and bound to the callee's own parameter
+names. ``compare.py`` compares two recordings. The harness is part of the
+repository tools: no package imports it and nothing here ships.
 """
 
 from __future__ import annotations
@@ -57,53 +61,110 @@ ORDER_FREE = frozenset({("galerkin.mesh.Mesh", "provenance_edges"), ("galerkin.m
 GRID = 17                  # samples per axis of a callable's domain box
 SIGMA_SAMPLES = 65         # samples across a conductivity model's valid range
 
-#: (module, attribute) of every recorded function. Every module attribute in the four
-#: packages that is the same object is replaced, so the binding a caller looks up is the
-#: wrapper wherever it came from.
-FUNCTIONS = (
-    ("meshine.refine", "generate"),
-    ("galerkin.mesh", "rectangle_mesh"),
-    ("galerkin.thermal", "solve_steady_heat"),
-    ("galerkin.transient_heat", "solve_transient_heat"),
-    ("galerkin.electric", "solve_steady_electric"),
-    ("galerkin.joule_heating", "solve_steady_joule_heat"),
-    ("galerkin.temperature_joule_heating", "solve_temperature_joule_heat"),
-    ("galerkin.elasticity", "solve_elasticity"),
-    ("galerkin.thermoelasticity", "freeze_temperature"),
-    ("galerkin.thermoelasticity", "solve_thermoelasticity"),
-    ("simcase.physics_em_modes2d", "solve"),
-    ("galerkin.waveguide", "solve_modes"),
-    ("galerkin.waveguide", "assemble_mode_system"),
-    ("galerkin.mode_coordinates", "mode_coordinates"),
-    ("galerkin.mode_coordinates", "solve_scalar_coordinates"),
-    ("galerkin.mode_coordinates", "scalar_coordinate_system"),
-    ("galerkin.assembly", "assemble_stiffness"),
-    ("galerkin.assembly", "assemble_mass"),
-    ("galerkin.cavity", "solve_cavity_box"),
-    ("galerkin.material_cavity", "solve_material_cavity_box"),
-    ("simcase.tracking", "tracking_settings"),
-    ("simcase.subspace_tracking", "subspace_settings"),
-)
-#: every public function defined in these modules is recorded too
-FUNCTION_MODULES = ("galerkin.mode_overlap",)
-#: (module, class, method): recorded on the class, so every instance is covered
-METHODS = (
-    ("physmat.material", "Material", "eps"),
-    ("physmat.material", "Material", "index"),
-    ("simcase.tracking", "ModeTracker", "__init__"),
-    ("simcase.subspace_tracking", "SubspaceTracker", "__init__"),
-)
-#: scipy eigensolvers, recorded where galerkin and simcase bind them
-EIGENSOLVERS = ("eigs", "eigsh")
-#: calls whose result is recorded too: the meshers (their output is the next stage's input),
-#: the tracking settings and the material values physmat hands back. A solver's own result is
-#: compared through the saved arrays instead: the unselected candidates of an eigensolve (a
-#: near-null spurious mode and its neighbours) change in their last bits from run to run on the
-#: same inputs (measured on the em_gaussian_overlap_vector fixture: 6 runs, 6 different candidate
-#: arrays, identical saved arrays), so a recorded solver result would fail an identical rerun.
-RESULTS_RECORDED = frozenset({"meshine.refine.generate", "galerkin.mesh.rectangle_mesh",
-                              "simcase.tracking.tracking_settings", "simcase.subspace_tracking.subspace_settings",
-                              "physmat.material.Material.eps", "physmat.material.Material.index"})
+TARGETS_FORMAT = "openphysics-units-batch-targets-v1"
+#: where a source tree declares the callables it is recorded at (relative to its root)
+TARGETS_FILE = "tools/units_batch/targets.json"
+#: The recorded callables of a tree that declares none in TARGETS_FILE: every commit before
+#: the phase-3 mode, f693ae3a and the phase-2 baseline 627eb28 included (README "Phase 3").
+#: The same shape as TARGETS_FILE:
+#:
+#: - ``functions``: ``module:attribute``. Every module attribute in the four packages that is
+#:   the same object is replaced, so the binding a caller looks up is the wrapper wherever it
+#:   came from;
+#: - ``function_modules``: every public function defined in these modules is recorded too;
+#: - ``methods``: ``module:Class.method``, recorded on the class, so every instance is covered.
+#:   physmat is recorded one level down, at the optical model's evaluation
+#:   (``Dispersion.index`` and ``.eps``; every model class inherits them, and the install
+#:   reports a subclass that overrides one), not at ``Material.eps``/``.index``;
+#: - ``eigensolvers``: scipy eigensolvers, recorded where galerkin and simcase bind them;
+#: - ``results``: calls whose result is recorded too: the meshers (their output is the next
+#:   stage's input), the tracking settings and the material values physmat hands back. A
+#:   solver's own result is compared through the saved arrays instead: the unselected
+#:   candidates of an eigensolve (a near-null spurious mode and its neighbours) change in their
+#:   last bits from run to run on the same inputs (measured on the em_gaussian_overlap_vector
+#:   fixture: 6 runs, 6 different candidate arrays, identical saved arrays), so a recorded
+#:   solver result would fail an identical rerun.
+UNDECLARED_TARGETS = {
+    "format": TARGETS_FORMAT,
+    "functions": [
+        "meshine.refine:generate",
+        "galerkin.mesh:rectangle_mesh",
+        "galerkin.thermal:solve_steady_heat",
+        "galerkin.transient_heat:solve_transient_heat",
+        "galerkin.electric:solve_steady_electric",
+        "galerkin.joule_heating:solve_steady_joule_heat",
+        "galerkin.temperature_joule_heating:solve_temperature_joule_heat",
+        "galerkin.elasticity:solve_elasticity",
+        "galerkin.thermoelasticity:freeze_temperature",
+        "galerkin.thermoelasticity:solve_thermoelasticity",
+        "simcase.physics_em_modes2d:solve",
+        "galerkin.waveguide:solve_modes",
+        "galerkin.waveguide:assemble_mode_system",
+        "galerkin.mode_coordinates:mode_coordinates",
+        "galerkin.mode_coordinates:solve_scalar_coordinates",
+        "galerkin.mode_coordinates:scalar_coordinate_system",
+        "galerkin.assembly:assemble_stiffness",
+        "galerkin.assembly:assemble_mass",
+        "galerkin.cavity:solve_cavity_box",
+        "galerkin.material_cavity:solve_material_cavity_box",
+        "simcase.tracking:tracking_settings",
+        "simcase.subspace_tracking:subspace_settings",
+    ],
+    "function_modules": ["galerkin.mode_overlap"],
+    "methods": [
+        "physmat.dispersion:Dispersion.index",
+        "physmat.dispersion:Dispersion.eps",
+        "simcase.tracking:ModeTracker.__init__",
+        "simcase.subspace_tracking:SubspaceTracker.__init__",
+    ],
+    "eigensolvers": ["eigs", "eigsh"],
+    "results": [
+        "meshine.refine.generate",
+        "galerkin.mesh.rectangle_mesh",
+        "simcase.tracking.tracking_settings",
+        "simcase.subspace_tracking.subspace_settings",
+        "physmat.dispersion.Dispersion.index",
+        "physmat.dispersion.Dispersion.eps",
+    ],
+}
+#: the recorded call names whose result is recorded too (set by ``install`` from the targets)
+RESULTS_RECORDED = frozenset(UNDECLARED_TARGETS["results"])
+#: the parameter a recorded call's times are read from, once bound: ``time_s`` on the code
+#: before the galerkin step, ``time`` after it (the first one the call binds is read)
+TIME_PARAMETERS = ("time_s", "time")
+
+
+def check_targets(data, source: str) -> dict:
+    """A target declaration, checked: the keys of UNDECLARED_TARGETS, each a list of names."""
+    if not isinstance(data, dict) or data.get("format") != TARGETS_FORMAT:
+        raise ValueError(f"{source}: format must be {TARGETS_FORMAT!r}")
+    keys = set(UNDECLARED_TARGETS)
+    if set(data) - {"description"} != keys:
+        raise ValueError(f"{source}: keys must be {sorted(keys)} (and a description), not {sorted(data)}")
+    for key in keys - {"format"}:
+        names = data[key]
+        if not isinstance(names, list) or not all(isinstance(n, str) and n for n in names) \
+                or len(set(names)) != len(names):
+            raise ValueError(f"{source}: {key} must be a list of distinct names")
+    for name in data["functions"]:
+        if name.count(":") != 1 or "." in name.split(":")[1]:
+            raise ValueError(f"{source}: function {name!r} is not 'module:attribute'")
+    for name in data["methods"]:
+        if name.count(":") != 1 or name.split(":")[1].count(".") != 1:
+            raise ValueError(f"{source}: method {name!r} is not 'module:Class.method'")
+    return data
+
+
+def load_targets(root: Path, path: Path | None = None) -> tuple[dict, str]:
+    """The targets a tree is recorded at: ``path`` when given, else the tree's own
+    TARGETS_FILE, else UNDECLARED_TARGETS. Returns the declaration and where it came from."""
+    if path is None and (root / TARGETS_FILE).is_file():
+        path, source = root / TARGETS_FILE, TARGETS_FILE
+    elif path is not None:
+        source = path.name
+    else:
+        return check_targets(UNDECLARED_TARGETS, "UNDECLARED_TARGETS"), "UNDECLARED_TARGETS"
+    return check_targets(json.loads(path.read_text(encoding="utf-8")), source), source
 
 
 # -- canonical forms ---------------------------------------------------------------------------
@@ -120,6 +181,37 @@ def dumps(obj) -> str:
 def _qualname(obj) -> str:
     t = obj if isinstance(obj, type) else type(obj)
     return f"{t.__module__}.{t.__qualname__}"
+
+
+#: The value transforms of phase-3 rule kinds 3, 5 and 6 (compare.py), per canonical array form
+#: of the current document: ``{dumps(form): {"neg": form, "to_kernel": form}}``. An array is
+#: stored by its digest, so the comparator cannot transform it; the recorder stores the forms of
+#: ``0.0 - x`` and of ``to_kernel(x)`` (``out.real = x.real; out.imag = 0.0 - x.imag``, galerkin's
+#: conventions rule) beside it. None while a callback stream folds its calls into a digest.
+_TRANSFORMS: dict | None = None
+
+
+def _array_form(obj) -> list:
+    import numpy as np
+    return ["array", obj.dtype.str, list(obj.shape), _sha(np.ascontiguousarray(obj).tobytes())]
+
+
+def _note_transforms(obj, form: list) -> None:
+    import numpy as np
+    key = dumps(form)
+    if _TRANSFORMS is None or key in _TRANSFORMS:
+        return
+    kernel = np.empty(obj.shape, dtype=complex)
+    kernel.real = obj.real
+    kernel.imag = 0.0 - obj.imag
+    _TRANSFORMS[key] = {"neg": _array_form(0.0 - obj), "to_kernel": _array_form(kernel)}
+
+
+def _is_material(obj) -> bool:
+    """A physmat ``Material`` (``physmat.material`` today; any physmat module, so that a moved
+    class keeps its form)."""
+    t = type(obj)
+    return t.__name__ == "Material" and t.__module__.split(".")[0] == "physmat"
 
 
 def _number(x, type_name: str):
@@ -287,7 +379,10 @@ def canon(obj, ctx: Context = EMPTY, depth: int = 0, stack: frozenset = frozense
     if isinstance(obj, np.ndarray):
         if obj.dtype.kind == "O":
             return ["object-array", list(obj.shape), [canon(v, ctx, depth + 1, stack) for v in obj.ravel()]]
-        return ["array", obj.dtype.str, list(obj.shape), _sha(np.ascontiguousarray(obj).tobytes())]
+        form = _array_form(obj)
+        if obj.dtype.kind in "iufc":
+            _note_transforms(obj, form)
+        return form
     if depth > MAX_DEPTH:
         return ["deep", _qualname(obj)]
     if id(obj) in stack:
@@ -318,7 +413,7 @@ def canon(obj, ctx: Context = EMPTY, depth: int = 0, stack: frozenset = frozense
         return _domain(obj)
     if _qualname(obj) == "meshine.geometry.Circle":
         return ["circle", [float.hex(float(c)) for c in obj.center], float.hex(obj.radius), int(obj.n)]
-    if _qualname(obj) == "physmat.material.Material":
+    if _is_material(obj):
         # what the optical model receives; the record's metadata (source, datum) is not an input
         return ["physmat.Material", obj.name, canon(getattr(obj, "optical", None), ctx, depth + 1, inner)]
     if _is_conductivity_model(obj):
@@ -353,10 +448,12 @@ def _sorted_mapping(form):
 # -- recording -------------------------------------------------------------------------------
 
 class Stream:
-    """Every call a solver makes to one callback, folded into a digest."""
+    """Every call a solver makes to one callback, folded into a digest. ``path`` is where the
+    callback was passed as written (``args[1]``, ``kwargs['flux']['top']``); ``bound`` is the
+    same place by parameter name, ``(parameter, rest)``, or None when the call did not bind."""
 
-    def __init__(self, path: str):
-        self.path, self.calls, self._hash = path, 0, hashlib.sha256()
+    def __init__(self, path: str, bound=None):
+        self.path, self.bound, self.calls, self._hash = path, bound, 0, hashlib.sha256()
 
     def wrap(self, function):
         @functools.wraps(function)             # keeps the signature galerkin inspects
@@ -366,45 +463,122 @@ class Stream:
             except Exception as exc:
                 self._fold(args, kwargs, ["raises", _qualname(exc)])
                 raise
-            self._fold(args, kwargs, canon(result))
+            self._fold(args, kwargs, None, result)
             return result
         recorded.__units_batch_original__ = function
         return recorded
 
-    def _fold(self, args, kwargs, result):
-        self.calls += 1
-        self._hash.update(dumps([canon(list(args)), canon(kwargs), result]).encode("ascii"))
-        self._hash.update(b"\n")
+    def _fold(self, args, kwargs, form, result=None):
+        global _TRANSFORMS
+        table, _TRANSFORMS = _TRANSFORMS, None          # a digest cannot be transformed
+        try:
+            if form is None:
+                form = canon(result)
+            self.calls += 1
+            self._hash.update(dumps([canon(list(args)), canon(kwargs), form]).encode("ascii"))
+            self._hash.update(b"\n")
+        finally:
+            _TRANSFORMS = table
 
     def record(self):
         return [self.path, self.calls, self._hash.hexdigest()]
 
+    def bound_record(self):
+        return [*self.bound, self.calls, self._hash.hexdigest()]
 
-def _wrap_callbacks(obj, path: str, streams: list, depth: int = 0):
+
+def _wrap_callbacks(obj, path: str, streams: list, depth: int = 0, bound=None):
     """``obj`` with every callback inside plain containers replaced by a stream recorder."""
     import numpy as np
+    below = (lambda part: None if bound is None else (bound[0], bound[1] + part))   # noqa: E731
     if depth > 6:
         return obj
     if isinstance(obj, (types.FunctionType, types.MethodType, functools.partial)) and not isinstance(obj, np.ufunc):
-        stream = Stream(path)
+        stream = Stream(path, bound)
         streams.append(stream)
         return stream.wrap(obj)
     if type(obj) is dict:
-        new = {k: _wrap_callbacks(v, f"{path}[{k!r}]", streams, depth + 1) for k, v in obj.items()}
+        new = {k: _wrap_callbacks(v, f"{path}[{k!r}]", streams, depth + 1, below(f"[{k!r}]")) for k, v in obj.items()}
         return new if any(new[k] is not obj[k] for k in obj) else obj
     if type(obj) in (list, tuple):
-        new = [_wrap_callbacks(v, f"{path}[{i}]", streams, depth + 1) for i, v in enumerate(obj)]
+        new = [_wrap_callbacks(v, f"{path}[{i}]", streams, depth + 1, below(f"[{i}]")) for i, v in enumerate(obj)]
         return obj if all(a is b for a, b in zip(new, obj)) else type(obj)(new)
     if _is_conductivity_model(obj):
         changes = {}
         for name in ("evaluate", "derivative"):
             value = getattr(obj, name, None)
             if value is not None and callable(value):
-                stream = Stream(f"{path}.{name}")
+                stream = Stream(f"{path}.{name}", below(f".{name}"))
                 streams.append(stream)
                 changes[name] = stream.wrap(value)
         return dataclasses.replace(obj, **changes)
     return obj
+
+
+class Binding:
+    """A call's arguments by parameter name, through the callee's own signature on its side
+    (phase 3): moving an argument between a position and a keyword leaves it unchanged.
+
+    ``places`` maps each place an argument was written at, ``("args", i)`` or
+    ``("kwargs", key)``, to ``(parameter, rest)``: ``rest`` is ``""``, or ``[j]`` and ``['key']``
+    inside ``*args`` and ``**kwargs``. Arguments not passed are not bound (no defaults are
+    applied; a removed default is rule kind 8). ``reason`` says why a call did not bind."""
+
+    def __init__(self, callee, args, kwargs, has_self=False):
+        self.parameters, self.places, self.reason = [], {}, None
+        try:
+            signature = inspect.signature(callee)
+        except (TypeError, ValueError) as exc:
+            self.reason = f"no signature ({_qualname(exc)})"
+            return
+        marks = [("args", i) for i in range(len(args))]
+        named = {key: ("kwargs", key) for key in kwargs}
+        try:
+            bound = signature.bind(*((None,) if has_self else ()), *marks, **named)
+        except TypeError as exc:
+            self.reason = f"does not bind: {exc}"
+            return
+        for i, (parameter, value) in enumerate(bound.arguments.items()):
+            if has_self and i == 0:
+                continue
+            kind = signature.parameters[parameter].kind
+            self.parameters.append((parameter, kind, value))
+            if kind is inspect.Parameter.VAR_POSITIONAL:
+                self.places.update({mark: (parameter, f"[{j}]") for j, mark in enumerate(value)})
+            elif kind is inspect.Parameter.VAR_KEYWORD:
+                self.places.update({mark: (parameter, f"[{key!r}]") for key, mark in value.items()})
+            else:
+                self.places[value] = (parameter, "")
+
+    @property
+    def ok(self) -> bool:
+        return self.reason is None
+
+    def _each(self, parameter_kind, value, at):
+        if parameter_kind is inspect.Parameter.VAR_POSITIONAL:
+            return "tuple", [at(mark) for mark in value]
+        if parameter_kind is inspect.Parameter.VAR_KEYWORD:
+            return "dict", {key: at(mark) for key, mark in value.items()}
+        return None, at(value)
+
+    def values(self, args, kwargs) -> dict:
+        """{parameter: value} of the call (a tuple for ``*args``, a dict for ``**kwargs``)."""
+        at = lambda mark: args[mark[1]] if mark[0] == "args" else kwargs[mark[1]]          # noqa: E731
+        out = {}
+        for parameter, kind, value in self.parameters:
+            shape, item = self._each(kind, value, at)
+            out[parameter] = tuple(item) if shape == "tuple" else item
+        return out
+
+    def forms(self, args_forms, kwargs_forms) -> dict:
+        """{parameter: canonical form}, from the forms of the arguments as written."""
+        at = lambda mark: args_forms[mark[1]] if mark[0] == "args" else kwargs_forms[mark[1]]  # noqa: E731
+        out = {}
+        for parameter, kind, value in self.parameters:
+            shape, item = self._each(kind, value, at)
+            out[parameter] = (["tuple", item] if shape == "tuple" else
+                              ["dict", "dict", [[k, v] for k, v in item.items()]] if shape == "dict" else item)
+        return out
 
 
 class Recorder:
@@ -412,24 +586,43 @@ class Recorder:
         self.calls: list = []
         self.depth = 0
         self.mesher_outputs: list = []
+        self.transforms: dict = {}
 
     def reset(self):
-        self.calls, self.depth, self.mesher_outputs = [], 0, []
+        global _TRANSFORMS
+        self.calls, self.depth, self.mesher_outputs, self.transforms = [], 0, [], {}
+        _TRANSFORMS = self.transforms
+
+    def finish(self) -> dict:
+        """The transform table of the calls; the exports and saved files that follow add none."""
+        global _TRANSFORMS
+        _TRANSFORMS = None
+        return self.transforms
 
     # every recorded call goes through here
-    def call(self, name, function, args, kwargs, *, bound_self=None):
-        ctx = _context(name, args, kwargs)
+    def call(self, name, function, args, kwargs, *, bound_self=None, callee=None, has_self=False):
+        """Record one call of ``function``. ``callee`` is the function whose signature the call is
+        bound to (``function`` itself unless given); ``has_self`` drops its first parameter."""
+        binding = Binding(function if callee is None else callee, args, kwargs, has_self or bound_self is not None)
+        values = binding.values(args, kwargs) if binding.ok else None
+        ctx = _context(name, args, kwargs, values)
         entry = {"seq": len(self.calls), "depth": self.depth, "function": name}
         if bound_self is not None:
             entry["self"] = canon(bound_self, ctx)
-        entry["args"] = canon(list(args), ctx)
-        entry["kwargs"] = canon(kwargs, ctx)
+        # each argument at depth 1, as inside canon(list(args)) and canon(kwargs)
+        args_forms = [canon(a, ctx, 1) for a in args]
+        kwargs_forms = {k: canon(v, ctx, 1) for k, v in kwargs.items()}
+        entry["args"] = ["list", args_forms]
+        entry["kwargs"] = ["dict", "dict", [[k, v] for k, v in kwargs_forms.items()]]
+        entry["bound"] = binding.forms(args_forms, kwargs_forms) if binding.ok else ["unbound", binding.reason]
         if name == "meshine.refine.generate":
             entry["samples"] = {}
         self.calls.append(entry)
         streams: list = []
-        args = tuple(_wrap_callbacks(a, f"args[{i}]", streams) for i, a in enumerate(args))
-        kwargs = {k: _wrap_callbacks(v, f"kwargs[{k!r}]", streams) for k, v in kwargs.items()}
+        place = binding.places.get
+        args = tuple(_wrap_callbacks(a, f"args[{i}]", streams, bound=place(("args", i))) for i, a in enumerate(args))
+        kwargs = {k: _wrap_callbacks(v, f"kwargs[{k!r}]", streams, bound=place(("kwargs", k)))
+                  for k, v in kwargs.items()}
         self.depth += 1
         try:
             result = function(*(() if bound_self is None else (bound_self,)), *args, **kwargs)
@@ -439,17 +632,19 @@ class Recorder:
         finally:
             self.depth -= 1
             entry["callbacks"] = [s.record() for s in streams]
+            entry["bound_callbacks"] = (sorted(s.bound_record() for s in streams) if binding.ok else None)
         if name == "meshine.refine.generate":
-            entry["samples"] = _mesher_samples(args, kwargs, result)
+            entry["samples"] = _mesher_samples(args, kwargs, result, values or {})
             self.mesher_outputs.append((entry["seq"], result))
         if name in RESULTS_RECORDED:
             entry["result"] = canon(result, ctx)
         return result
 
 
-def _context(name, args, kwargs) -> Context:
+def _context(name, args, kwargs, values=None) -> Context:
     """Galerkin calls sample their callbacks on the mesh nodes, a grid of the mesh box and the
-    call's times; other calls take no position samples."""
+    call's times; other calls take no position samples. The times are the bound time parameter
+    (TIME_PARAMETERS), whatever its name on the recorded side and however it was passed."""
     import numpy as np
     if not (name.startswith("galerkin.") or name.startswith("simcase.")):
         return EMPTY
@@ -457,18 +652,20 @@ def _context(name, args, kwargs) -> Context:
     nodes = getattr(first, "nodes", None)
     if nodes is None:
         nodes = getattr(getattr(first, "mesh", None), "nodes", None)
-    times = kwargs.get("time_s")
+    given = kwargs if values is None else values
+    times = next((given[p] for p in TIME_PARAMETERS if p in given), None)
     times = () if times is None else [float(t) for t in np.asarray(times, dtype=float).ravel()]
     return Context(None if nodes is None else _sample_points(nodes), times)
 
 
-def _mesher_samples(args, kwargs, result):
+def _mesher_samples(args, kwargs, result, values):
     """The namer at every input-loop segment midpoint and output boundary-edge midpoint; the size
     function on a 17 x 17 grid of the domain box and at the output nodes (originals, not wrappers)."""
     import numpy as np
-    domain = args[0] if args else kwargs["domain"]
-    namer = args[1] if len(args) > 1 else kwargs.get("boundary_names", "outer")
-    size_fn = kwargs.get("size_fn")
+    domain = values["domain"] if "domain" in values else (args[0] if args else kwargs["domain"])
+    namer = values["boundary_names"] if "boundary_names" in values else \
+        (args[1] if len(args) > 1 else kwargs.get("boundary_names", "outer"))
+    size_fn = values.get("size_fn", kwargs.get("size_fn"))
     namer, size_fn = _original(namer), _original(size_fn)
     loops = []
     for _name, region_loops, _size in domain._pending:
@@ -517,7 +714,8 @@ def _method_wrapper(name, original):
     if name.endswith(".__init__"):
         @functools.wraps(original)
         def recorded(self, *args, **kwargs):
-            return RECORDER.call(name, lambda *a, **k: original(self, *a, **k), args, kwargs)
+            return RECORDER.call(name, lambda *a, **k: original(self, *a, **k), args, kwargs,
+                                 callee=original, has_self=True)
     else:
         @functools.wraps(original)
         def recorded(self, *args, **kwargs):
@@ -543,12 +741,17 @@ def _package_modules():
                   if module is not None and name.split(".")[0] in PACKAGES)
 
 
-def install(root: Path) -> dict:
-    """Import the four packages from ``root``, then install the recording wrappers."""
+def install(root: Path, targets: dict | None = None, source: str = "UNDECLARED_TARGETS") -> dict:
+    """Import the four packages from ``root``, then install the recording wrappers of
+    ``targets`` (a checked declaration; UNDECLARED_TARGETS when None)."""
+    global RESULTS_RECORDED
+    targets = check_targets(UNDECLARED_TARGETS if targets is None else targets, source)
+    RESULTS_RECORDED = frozenset(targets["results"])
     sys.dont_write_bytecode = True             # -I ignores PYTHONDONTWRITEBYTECODE; leave the tree as it is
     for src in sorted((root / "packages").glob("*/src")):
         sys.path.insert(0, str(src))
-    report = {"import_failures": [], "targets_missing": [], "bindings": []}
+    report = {"import_failures": [], "targets_missing": [], "targets_shadowed": [], "bindings": [],
+              "targets_source": source, "targets": []}
     for top in PACKAGES:
         package = importlib.import_module(top)
         for info in pkgutil.walk_packages(package.__path__, top + "."):
@@ -570,8 +773,8 @@ def install(root: Path) -> dict:
     report["origins"] = origins
 
     replacements = {}                          # id(original) -> wrapper
-    names = list(FUNCTIONS)
-    for module_name in FUNCTION_MODULES:
+    names = [tuple(name.split(":")) for name in targets["functions"]]
+    for module_name in targets["function_modules"]:
         module = sys.modules.get(module_name)
         if module is None:
             report["targets_missing"].append(module_name)
@@ -586,11 +789,13 @@ def install(root: Path) -> dict:
             report["targets_missing"].append(f"{module_name}.{attr}")
             continue
         replacements[id(original)] = (original, _function_wrapper(f"{module_name}.{attr}", original))
+        report["targets"].append(f"{module_name}.{attr}")
     import scipy.sparse.linalg as spla
     eig_wrappers = {name: _function_wrapper(f"scipy.sparse.linalg.{name}", getattr(spla, name))
-                    for name in EIGENSOLVERS}
-    for name in EIGENSOLVERS:
+                    for name in targets["eigensolvers"]}
+    for name in targets["eigensolvers"]:
         replacements[id(getattr(spla, name))] = (getattr(spla, name), eig_wrappers[name])
+        report["targets"].append(f"scipy.sparse.linalg.{name}")
     proxy = _ModuleProxy(spla, eig_wrappers)
     for module_name, module in _package_modules():
         for attr, value in list(vars(module).items()):
@@ -601,7 +806,9 @@ def install(root: Path) -> dict:
             elif value is spla:
                 setattr(module, attr, proxy)
                 report["bindings"].append(f"{module_name}.{attr} (scipy.sparse.linalg)")
-    for module_name, cls_name, method in METHODS:
+    for target in targets["methods"]:
+        module_name, rest = target.split(":")
+        cls_name, method = rest.split(".")
         cls = getattr(sys.modules.get(module_name), cls_name, None)
         original = getattr(cls, method, None) if cls is not None else None
         if original is None:
@@ -609,8 +816,24 @@ def install(root: Path) -> dict:
             continue
         setattr(cls, method, _method_wrapper(f"{module_name}.{cls_name}.{method}", original))
         report["bindings"].append(f"{module_name}.{cls_name}.{method}")
+        report["targets"].append(f"{module_name}.{cls_name}.{method}")
+        # a subclass that defines the method itself would bypass the wrapper on the class
+        report["targets_shadowed"] += [f"{_qualname(sub)}.{method}" for sub in _subclasses(cls)
+                                       if method in sub.__dict__]
     report["bindings"].sort()
+    report["targets"].sort()
+    report["targets_shadowed"].sort()
     return report
+
+
+def _subclasses(cls) -> list:
+    out, todo = [], list(cls.__subclasses__())
+    while todo:
+        sub = todo.pop()
+        if sub not in out:
+            out.append(sub)
+            todo += sub.__subclasses__()
+    return out
 
 
 def leaked_bindings() -> list:
@@ -763,6 +986,7 @@ def record_document(doc_id: str, path: Path, out: Path, root: Path) -> dict:
         entry["run"] = {"status": "ok", "result_type": _qualname(result), "after": _diagnostics(doc)}
     entry["calls"] = RECORDER.calls
     entry["leaked_bindings"] = leaked_bindings()
+    entry["transforms"] = RECORDER.finish()
     if entry["run"]["status"] == "ok":
         result_dir = folder / "result"
         try:
@@ -811,9 +1035,12 @@ def main(argv=None) -> int:
     parser.add_argument("--root", type=Path, required=True, help="checkout whose packages/*/src are recorded")
     parser.add_argument("--out", type=Path, required=True, help="new or empty output directory")
     parser.add_argument("--docs", type=Path, help="a text file with one document (path or id=path) per line")
+    parser.add_argument("--targets", type=Path, help="the recorded callables (format "
+                        f"{TARGETS_FORMAT}); default: the root's {TARGETS_FILE}, else UNDECLARED_TARGETS")
     parser.add_argument("documents", nargs="*", help="documents to record: path or id=path")
     args = parser.parse_args(argv)
     root, out = args.root.resolve(), args.out.resolve()
+    targets, source = load_targets(root, args.targets)
     items = list(args.documents)
     if args.docs:
         items += [line.strip() for line in args.docs.read_text(encoding="utf-8").splitlines()
@@ -826,7 +1053,7 @@ def main(argv=None) -> int:
     if out.is_relative_to(root):
         parser.error("the output directory must be outside the recorded tree")
     out.mkdir(parents=True, exist_ok=True)
-    report = install(root)
+    report = install(root, targets, source)
     import numpy, scipy
     versions = {"python": sys.version, "implementation": platform.python_implementation(),
                 "platform": platform.platform(), "machine": platform.machine(), "numpy": numpy.__version__,
