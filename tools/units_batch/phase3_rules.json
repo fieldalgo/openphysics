@@ -1,0 +1,5 @@
+{
+ "format": "openphysics-units-batch-phase3-rules-v1",
+ "description": "The rule entries of the phase-3 comparison (README \"Phase 3\"): how each recorded call of the baseline maps to the head's, by the closed kinds 1-9. Entries describe the baseline (the merge base with main) against the head, so a landing starts with an empty list and each commit appends the entries it needs, listed in its commit message by kind.",
+ "entries": []
+}

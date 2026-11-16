@@ -283,14 +283,18 @@ benchmark guides.
 
 **Units-batch equivalence (manual dispatch only).** The `units-batch-equivalence`
 job runs `tests/simcase/test_units_batch_equivalence.py` with
-`OPENPHYSICS_BATCH_BASELINE` set to the merge base with `main`, on Ubuntu 24.04,
-macOS 15 and Windows 2022, one platform at a time. It records every
-`examples/simcase` document and frozen fixture on the baseline and on the
-dispatched commit and requires the same solver and mesher inputs and saved bytes,
-under the transforms of the [units-batch harness](../tools/units_batch/README.md).
-Only a manual dispatch runs it (`gh workflow run validate.yml --ref <branch>`);
-pushes and pull requests skip it. It is not part of `tests`, so each platform's
-result is read on its own, from the run of the commit it is claimed for.
+`OPENPHYSICS_BATCH_BASELINE` set to the merge base with `main` and
+`OPENPHYSICS_BATCH_PHASE=3`, on Ubuntu 24.04, macOS 15 and Windows 2022, one
+platform at a time. It records every `examples/simcase` document and frozen
+fixture, the same documents, on the baseline and on the dispatched commit and
+requires the same saved bytes and the same solver and mesher inputs, compared by
+parameter name under the rule entries of the
+[units-batch harness](../tools/units_batch/README.md#phase-3-the-galerkin-step)
+(check P3-1 of the galerkin step). Phase 2 of the harness, the units batch's own
+check, needs that batch's baseline and runs locally. Only a manual dispatch runs
+the job (`gh workflow run validate.yml --ref <branch>`); pushes and pull requests
+skip it. It is not part of `tests`, so each platform's result is read on its own,
+from the run of the commit it is claimed for.
 
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
@@ -345,7 +349,8 @@ Each job uploads its artifacts, even after a failure:
   `numeric-runtime.json`.
 - Units-batch equivalence (manual dispatch only):
   `units-batch-equivalence-<os>-<run_id>` with the comparison report (a SHA-256
-  table per document and array), the plan and both recording manifests.
+  table per document and array, and the rule entries applied), the document list
+  and both recording manifests.
 
 Some stages store the stdout of passing tests in JUnit `system-out`
 (`-o junit_logging=all -o junit_log_passing_tests=true`). This keeps numerical

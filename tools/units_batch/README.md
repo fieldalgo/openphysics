@@ -7,7 +7,9 @@ that nothing else moves: every shipped example and every frozen fixture, as a 0.
 on the baseline code, must hand the solvers and the mesher the same inputs and save the same
 bytes as its 0.3 twin on the new code, under a closed list of transforms (check P2-1 of the
 batch). Compared with itself (the same 0.2 documents on both sides), it is the identity check
-of a refactor (P2-3), and the later galerkin step re-runs it with the batch head as baseline.
+of a refactor (P2-3). The galerkin step runs it in phase 3 (check P3-1, [below](#phase-3-the-galerkin-step)):
+the same 0.3 documents on both sides, every saved byte equal and every recorded call equal by
+parameter name under a closed table of rule kinds.
 
 Nothing here ships. No package under `packages/` imports these files;
 `tests/simcase/test_units_batch_equivalence.py` asserts it, and the folder has no
@@ -20,6 +22,8 @@ Nothing here ships. No package under `packages/` imports these files;
 | `convert_v02.py` | Converts a 0.2 document to 0.3 (the converted corpus) |
 | `maps/corpus.json` | How each physics type is compared: `identity` or `layout` |
 | `maps/<old field layout>.json` | One map per saved layout, added by the commit that converts that kind |
+| `targets.json` | The callables `record.py` records in this tree; each tree declares its own (phase 3) |
+| `phase3_rules.json` | The phase-3 rule entries: how the baseline's recorded calls map to the head's, by kind |
 | `fixtures/v02/` | Frozen 0.2 documents for forms no example covers, taken from the tests; read only by the baseline code |
 | `fixtures/v03/` | Their 0.3 twins, added by the commit that converts each kind |
 
@@ -54,17 +58,25 @@ tree. Run both sides on one machine with the same interpreter and wheels, one BL
 test sets them. Bit equality is claimed only between two runs on the same machine.
 
 **CI.** The `units-batch-equivalence` job of `.github/workflows/validate.yml` runs this test
-on Ubuntu 24.04, macOS 15 and Windows 2022, one at a time, with the merge base as baseline. It
-runs only on manual dispatch (`gh workflow run validate.yml --ref <branch>`), is not part of
-the required `tests` check, and each platform is reported on its own. Record the run's
-`github.sha` with the result: it must be the commit the result is claimed for.
+on Ubuntu 24.04, macOS 15 and Windows 2022, one at a time, with the merge base as baseline and
+`OPENPHYSICS_BATCH_PHASE=3` (phase 3, below). It runs only on manual dispatch (`gh workflow run
+validate.yml --ref <branch>`), is not part of the required `tests` check, and each platform is
+reported on its own. Record the run's `github.sha` with the result: it must be the commit the
+result is claimed for. Phase 2 needs the units batch's own baseline, `627eb28`, and runs locally:
+since the batch landed, the merge base reads no 0.2 document, so phase 2 against it compares
+nothing (measured on `f693ae3a` against itself: 87 documents different, the P2-2 check failing
+as well).
 
 ## What is recorded
 
 `record.py` puts `<root>/packages/*/src` first on `sys.path` and stops unless `simcase`,
 `galerkin`, `meshine` and `physmat` were imported from there. It imports every submodule of
 those four packages (`simcase.studio` excepted) and replaces each module attribute that is
-one of these callables with a recording wrapper:
+one of the recorded callables with a recording wrapper. Which callables those are is the
+recorded tree's own declaration, `<root>/tools/units_batch/targets.json`; a tree without one
+(every commit before the phase-3 mode, `f693ae3a` and `627eb28` included) is recorded at the
+recorder's `UNDECLARED_TARGETS` (the list declared when the phase-3 mode was added), and
+`--targets <file>` names another. Today they are:
 
 - `meshine.generate`; `galerkin.rectangle_mesh`;
 - the galerkin solvers `solve_steady_heat`, `solve_transient_heat`, `solve_steady_electric`,
@@ -76,12 +88,21 @@ one of these callables with a recording wrapper:
   `assemble_stiffness`, `assemble_mass` and every public function of `galerkin.mode_overlap`;
   scipy's `eigs` and `eigsh` where galerkin and simcase bind them (shift, start vector and
   operator included);
-- physmat `Material.eps` and `Material.index`; the tracking settings
-  (`tracking_settings`, `subspace_settings`) and the `ModeTracker` and `SubspaceTracker`
-  arguments (settings, solver mesh, physical weights).
+- physmat one level below `Material`: the optical model's evaluation, `index` and `eps` of
+  `physmat.dispersion.Dispersion`, which every model class inherits (a subclass that defines
+  its own is reported as `targets_shadowed` and fails the comparison); `eps` calls `index`,
+  so both are recorded, nested. The tracking settings (`tracking_settings`,
+  `subspace_settings`) and the `ModeTracker` and `SubspaceTracker` arguments (settings, solver
+  mesh, physical weights).
 
 Each call is stored with its nesting depth, its arguments before the call and the callbacks
-it made. The result is stored for the meshers, the tracking settings and physmat's material
+it made, twice over: as written (`args`, `kwargs`, `callbacks` by position) and bound to the
+callee's own parameter names through its `inspect.signature` on its own side (`bound`, and
+`bound_callbacks` as `[parameter, place inside it, calls, digest]`). Arguments a call does not
+pass are not bound (no default is filled in); `*args` and `**kwargs` bind as a tuple and a
+mapping; a call that does not bind keeps the reason (`["unbound", reason]`). A callback's
+times are read from the bound time parameter, `time_s` or `time`, however it was passed.
+The result is stored for the meshers, the tracking settings and physmat's model
 values; a solver's own result is compared through the saved arrays instead, because the
 unselected candidates of an eigensolve (a near-null spurious mode and its neighbours) change in
 their last bits from run to run on identical inputs (measured on `em_gaussian_overlap_vector`:
@@ -108,7 +129,12 @@ six runs, six different candidate arrays, identical saved arrays). The canonical
 - a temperature-dependent conductivity model as its valid range in `float.hex`, its values
   at 65 temperatures across that range, and the digest of every evaluation the solver made;
 - physmat materials as their name and optical model (the record's citation and datum are
-  metadata, not inputs).
+  metadata, not inputs), a `Material` of any physmat module; an optical model as the object it
+  is (its class and fields);
+- beside each record, a transform table: for every integer, real or complex array of the
+  calls, the forms of `0.0 - x` and of `to_kernel(x)` (`out.real = x.real; out.imag = 0.0 -
+  x.imag`), which phase 3 needs because an array is stored by its digest. The calls a
+  callback receives are folded into its digest without one.
 
 Then the recorder saves the result (`result.save`), tries all three VTU exports
 (`export_fields`, `export_time_series`, `export_sweep`; a refusal is recorded with its
@@ -119,9 +145,11 @@ failed temperature-dependent Joule solve, and any binding the wrappers missed.
 ## What is compared
 
 `compare.py --identity` compares every document of two recordings as equal documents;
-`--plan plan.json` gives each document `identity` or `layout`. A document passes when:
+`--plan plan.json` gives each document `identity` or `layout`; `--phase3` is the galerkin
+step's mode ([below](#phase-3-the-galerkin-step)). A document passes when:
 
-- the call sequences are equal entry by entry;
+- the call sequences are equal entry by entry, as written (the identity and layout modes do
+  not read the bound form);
 - every `fields.npz` array has the same dtype, shape and bytes (after its map rule);
 - every `summary.json`, `metadata_json` and failure-evidence leaf is equal under
   `float.hex`; `timings_s`, `timing` and `software_versions` are excluded, as are `log.txt`
@@ -252,6 +280,93 @@ the summary and `metadata_json`), the subdivision echo is compared with
 `resolved_inputs.["mesh.subdivision_count"].value`, and the background material
 (`vacuum` against `physmat:vacuum`) is an identifier. The cavity maps have no exception: every
 array, summary leaf, VTU array and solver call compares bitwise.
+
+## Phase 3: the galerkin step
+
+The galerkin step (phase-3 specification: galerkin, refsol and the physmat library in SI)
+changes no document and no saved byte, so its check P3-1 is an identity of documents and
+outputs with a closed set of differences in the recorded calls:
+
+- **Documents.** Both sides read the same 87 format 0.3 documents of this checkout: the 32
+  `examples/simcase/*.json` and the 55 `fixtures/v03/*.json` (an identity document map). The
+  test first requires `git diff <baseline>..HEAD -- 'examples/simcase/*.json'
+  tools/units_batch/fixtures` to be empty and those paths to be unmodified in the checkout, and
+  each record keeps the SHA-256 of the document it read, which must be equal. The 25 built-in
+  documents (`simcase.examples.EXAMPLES`) must equal their example twins on both sides.
+- **Outputs.** Every document must compare equal byte for byte, as in identity mode: every
+  `fields.npz` array, `summary.json` and `model.json` leaf (the same exclusions), VTU array
+  and PVD step, the load and run diagnostics, every run error message and failure evidence;
+  no layout identifier is renamed.
+- **Calls.** Every recorded call compares equal by parameter name (`depth`, `function`,
+  `self`, `bound`, `bound_callbacks`, `samples`, `result`, `raised`; not the positions) under
+  the entries of `phase3_rules.json`, whose kinds are the closed table below. Each side's
+  recorded targets are its own declaration (the manifest's `install.targets`): a target
+  recorded on one side only must be mapped by a kind 1 or kind 7 entry, and every name such an
+  entry maps must be recorded on its side.
+
+The assertion is separate from phase 2: `test_units_batch_phase3_identity` requires all 87
+documents equal and no other problem; `test_units_batch_equivalence` keeps asserting phase 2's
+79 equal and the 8 nanometre and metre documents different.
+
+**Selecting it.** `OPENPHYSICS_BATCH_PHASE=3` with `OPENPHYSICS_BATCH_BASELINE`: the phase-2
+tests skip and the phase-3 test runs; unset or `2`, phase 2 runs as before. The CI job sets 3.
+
+```bash
+OPENPHYSICS_BATCH_BASELINE=$(git merge-base HEAD origin/main) OPENPHYSICS_BATCH_PHASE=3 \
+  python -m pytest -q -ra tests/simcase/test_units_batch_equivalence.py
+```
+
+By hand, from the repository root, with one document per line in `<tmp>/documents.txt` (every
+`examples/simcase/*.json` and `tools/units_batch/fixtures/v03/*.json` of this checkout):
+
+```bash
+git worktree add --detach <tmp>/base <baseline>
+python -I tools/units_batch/record.py --root <tmp>/base --out <tmp>/old --docs <tmp>/documents.txt
+python -I tools/units_batch/record.py --root . --out <tmp>/new --docs <tmp>/documents.txt
+python tools/units_batch/compare.py --old <tmp>/old --new <tmp>/new --phase3 --report <tmp>/report.json
+git worktree remove --force <tmp>/base
+```
+
+**Rule kinds.** `phase3_rules.json` (format `openphysics-units-batch-phase3-rules-v1`) holds
+`entries`, each with a `kind`, the fields of its kind and an optional `note`. Names of recorded
+functions are the recorder's (`galerkin.thermal.solve_steady_heat`,
+`physmat.dispersion.Dispersion.eps`); `function` and `class` name the new side's. Renames act on
+the baseline's record and value transforms on the head's values: the baseline's value must
+equal the transform of the head's (`neg` turns the head's inward value into the baseline's
+outward one, `to_kernel` its exp(-iωt) value into the kernel's exp(+iωt) one).
+
+| Kind | Fields | What it maps |
+|---|---|---|
+| 1 function rename | `old`, `new` | the baseline's calls of `old` are compared with the head's calls of `new`; maps both targets |
+| 2 keyword rename | `function`, `old`, `new` | the baseline's argument `old` (and the callbacks inside it) is compared as `new` |
+| 3 value transform | `function`, `keyword`, `transform`: `neg` or `to_kernel` | the head's argument under `0.0 - x` or `complex(x.real, 0.0 - x.imag)` |
+| 4 class rename | `old`, `new` | a qualified class name in the baseline's objects, arguments, results and exceptions |
+| 5 dataclass field | `class`, `old`, `new` (one may be `null`), `transform`: `=` (default), `neg` or `to_kernel` | a field renamed (`old` to `new`), removed (`new` null: left out of the baseline's objects), added (`old` null: left out of the head's) or replaced (renamed, the head's value transformed) |
+| 6 transform inside an object | `class`, `fields`, `transform` | the listed fields of the head's objects of `class`, transformed |
+| 7 kernel frame | `old`, `wrapper`, `kernel` | the head's `wrapper` frames are dropped (the calls beneath move up one level) and the baseline's calls of `old` are compared with the head's calls of `kernel` |
+| 8 removed default | `function`, `keyword`, `value` (a JSON scalar) or `form` (a canonical form) | the baseline's call passed nothing; the head's argument, equal to that old default (numbers by value), is left out |
+| 9 positional/keyword move | `function`, `keyword` | nothing: after binding a move needs no entry; an entry only records it and must not hide a changed value |
+
+They apply in this order: 7, 1, 4, 5 and 6, 2, then per aligned pair of calls 8, 3 and 9. A
+transform recomputes a scalar from its recorded type and double, looks an array up in the
+head's transform table, maps a list, tuple or mapping item by item and a callback by its
+samples (a refusal stays one). It does not reach the digest of the calls a callback receives,
+so a callback whose calls change is compared at the kernel frame (kind 7). An entry of another
+kind, an unknown field, another transform, a name mapped by two entries, or a kind 2, 3, 8 or 9
+entry whose function the head does not record is refused, and an entry that applies to nothing
+is a problem: the entries describe the baseline (the merge base) against the head, so a landing
+starts with an empty list and each commit appends the entries it needs and lists them in its
+message by kind. Any other difference fails.
+
+**Self-checks.** `test_every_rule_kind_on_a_synthetic_recording` applies every kind to calls
+recorded by the recorder itself: with its entries the two sides are equal; without them, and
+in each negative variant (the other transform, `-x` for `0.0 - x`, a kind 1 rename where the
+wrapper needs kind 7, a changed default, a changed moved value, each field entry left out),
+the check fails; kind 9 passes without an entry while the comparison as written fails.
+`test_phase3_compares_a_repeat_and_detects_a_one_ulp_change` runs `compare.py --phase3` on two
+recordings of `thermal_slab` and on its one-ulp twin, and the phase-3 identity of the base
+commit `f693ae3a` against the commit that added this mode, with no entry, is recorded in that
+commit's message.
 
 ## The converter
 
