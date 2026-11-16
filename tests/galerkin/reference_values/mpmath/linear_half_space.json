@@ -1,0 +1,490 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "linear-power-half-space-green-blocks",
+  "physics": "2D Laplace half-space Green panel moments",
+  "comparison": "structure-oracle",
+  "role": "High-precision selected image-minus-real blocks including source endpoint orientation. Stored admitted geometry comes from the product; shared mathematical identities preclude an independent-field claim.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "tensor_orders": [
+          48,
+          64
+        ],
+        "input_conversion": "binary64 geometry converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "direct tensor, analytic source with adaptive target, Duffy vertex and exact self integrals",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "tensor_orders": [
+          48,
+          64
+        ],
+        "target_breakpoints": [
+          0,
+          0.25,
+          0.75,
+          1
+        ]
+      },
+      "arrays": [
+        "block_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": true
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_linear_half_space.py",
+    "sha256": "3f9d6adb7318ee63ac3556ec737de5e0e73946bc40638d557e5a7865af6cec7e",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_linear_half_space.py",
+    "product_commit": "f11ce9f6af8a40073cf5716203d6141dcb05c18d",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T22:05:46.667125+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 7.570694712980185,
+    "wall_time_s": 7.578513527987525,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import cost, compilation timing, CPU model and peak resident memory were not captured."
+    ]
+  },
+  "inputs": {
+    "polygons": [
+      [
+        [
+          0.0038,
+          0.0008
+        ],
+        [
+          0.0042,
+          0.0008
+        ],
+        [
+          0.0042,
+          0.0012
+        ],
+        [
+          0.0038,
+          0.0012
+        ]
+      ]
+    ],
+    "width": 0.008,
+    "height": 0.002,
+    "panels_per_edge": 16,
+    "entries": [
+      {
+        "indices": [
+          0,
+          0
+        ],
+        "kind": "self",
+        "first": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "second": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "image_offset": [
+          0.0,
+          -0.2
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.6666666666666666
+      },
+      {
+        "indices": [
+          5,
+          5
+        ],
+        "kind": "self",
+        "first": [
+          -0.009001865671641778,
+          -0.0
+        ],
+        "second": [
+          -0.009001865671641778,
+          -0.0
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "image_offset": [
+          0.0,
+          -0.2
+        ],
+        "p": 1.0,
+        "q": 1.0
+      },
+      {
+        "indices": [
+          0,
+          39
+        ],
+        "kind": "vertex",
+        "first": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "second": [
+          -0.0,
+          0.0017857142857142852
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "image_offset": [
+          0.0,
+          -0.2
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.6666666666666666
+      },
+      {
+        "indices": [
+          0,
+          10
+        ],
+        "kind": "separated",
+        "first": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "second": [
+          0.0,
+          0.0017857142857142852
+        ],
+        "offset": [
+          0.04999999999999993,
+          0.0
+        ],
+        "image_offset": [
+          0.04999999999999993,
+          -0.2
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.6666666666666666
+      },
+      {
+        "indices": [
+          5,
+          15
+        ],
+        "kind": "mixed",
+        "first": [
+          -0.009001865671641778,
+          -0.0
+        ],
+        "second": [
+          -0.0,
+          -0.009001865671641789
+        ],
+        "offset": [
+          0.01599813432835819,
+          0.03400186567164178
+        ],
+        "image_offset": [
+          0.01599813432835819,
+          -0.2340018656716418
+        ],
+        "p": 1.0,
+        "q": 1.0
+      },
+      {
+        "indices": [
+          0,
+          1
+        ],
+        "kind": "mixed",
+        "first": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "second": [
+          0.0025068681318681286,
+          0.0
+        ],
+        "offset": [
+          0.0017857142857142833,
+          0.0
+        ],
+        "image_offset": [
+          0.0017857142857142833,
+          -0.2
+        ],
+        "p": 0.6666666666666666,
+        "q": 1.0
+      },
+      {
+        "indices": [
+          4,
+          5
+        ],
+        "kind": "mixed",
+        "first": [
+          0.009001865671641778,
+          0.0
+        ],
+        "second": [
+          -0.009001865671641778,
+          -0.0
+        ],
+        "offset": [
+          0.018003731343283556,
+          0.0
+        ],
+        "image_offset": [
+          0.018003731343283556,
+          -0.2
+        ],
+        "p": 1.0,
+        "q": 1.0
+      }
+    ]
+  },
+  "matched": [
+    "Exact binary64 admitted panel directions, real/image displacements and power exponents.",
+    "Interleaved constant-mass/zero-mass linear modes; seven selected 2x2 image-minus-real blocks."
+  ],
+  "not_matched": [
+    "Reference uses direct high-precision quadrature and identities instead of product double-precision centered evaluations.",
+    "Geometry admission is product-derived; self, source and Duffy identities share mathematics.",
+    "No complete field, upper plane, side-wall, physical measurement or other-platform validation."
+  ],
+  "reference_self_check": [
+    "Tensor48/64 difference below1e-25;60/80-digit difference below1e-40 for all seven blocks.",
+    "Separate process loads no product packages and leaves the stored record unchanged."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Complete independent field solve, physical measurement and other-platform execution."
+  ],
+  "values": [
+    {
+      "name": "block_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          6.227487295029593,
+          -0.19999869553042074
+        ],
+        [
+          -0.19999869553042074,
+          0.7999928254374223
+        ]
+      ]
+    },
+    {
+      "name": "block_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          4.601054265464697,
+          2.7024559526463985e-88
+        ],
+        [
+          3.016147025078923e-87,
+          0.7498312825417318
+        ]
+      ]
+    },
+    {
+      "name": "block_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          5.372023409290918,
+          -0.4551624150646358
+        ],
+        [
+          -0.45781932456948704,
+          0.28433970631904687
+        ]
+      ]
+    },
+    {
+      "name": "block_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.433417176486748,
+          0.0023371837721728704
+        ],
+        [
+          0.010271226642345251,
+          -8.095572708476945e-07
+        ]
+      ]
+    },
+    {
+      "name": "block_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.85849373924715,
+          0.048210670774189404
+        ],
+        [
+          -0.04042035625606403,
+          -0.004881737014257904
+        ]
+      ]
+    },
+    {
+      "name": "block_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          4.556600288010111,
+          -0.3700482497987105
+        ],
+        [
+          0.297924574112624,
+          -0.12611150639947852
+        ]
+      ]
+    },
+    {
+      "name": "block_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          3.215770778363131,
+          0.35373995881437015
+        ],
+        [
+          0.35373995881437015,
+          0.13646205808612735
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_linear_half_space.py"
+  ],
+  "provenance_status": "reconstructed",
+  "not_recorded": {
+    "environment.numpy": "Not imported or installed in the isolated reproduction; see the separate-process generator imports.",
+    "environment.cpu": "CPU model was not captured by the reproduction receipt; only platform.machine was recorded.",
+    "cost.compile_s": "No separate compile timer in the pure-Python reproduction.",
+    "cost.peak_rss_mb": "No resident-memory sampler in the reproduction."
+  },
+  "regeneration": [],
+  "reproduction_note": "New receipt describes only reproduction of the seven registered selected-block values; original research results are retained separately.",
+  "reproduction": {
+    "machine": "x86_64",
+    "precision_differences": [
+      {
+        "order": "1.2446030555722e-60",
+        "precision": "3.0682193996501e-60"
+      },
+      {
+        "order": "0.0",
+        "precision": "1.8484466219422e-61"
+      },
+      {
+        "order": "1.2446030555722e-60",
+        "precision": "2.5744546091094e-60"
+      },
+      {
+        "order": "1.2446030555722e-60",
+        "precision": "3.0092215735664e-60"
+      },
+      {
+        "order": "0.0",
+        "precision": "1.5845185331456e-61"
+      },
+      {
+        "order": "0.0",
+        "precision": "3.5288102329939e-62"
+      },
+      {
+        "order": "0.0",
+        "precision": "1.000345819931e-61"
+      }
+    ],
+    "temporary_numeric_sha256": "fe5e3f8bebac8dac916448c6e9415f34b5058854430e2352566a5836729083be"
+  },
+  "values_sha256": "c3e480257648fa4a2f88ffa333942896a97a1c4124a89f47f24838722cc76efe",
+  "content_sha256": "8ad0c3067c1c476a3766cbf4fed474ef30fff3f74c9099d3f1eea7ac8311b6f3"
+}
