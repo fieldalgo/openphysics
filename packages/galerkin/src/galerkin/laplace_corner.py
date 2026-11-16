@@ -20,7 +20,7 @@ __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_constant_log', 'power_panel_linear_gram',
            'power_panel_linear_self_log', 'PowerPanelLinearLogResult',
            'power_panel_linear_far_log', 'power_panel_linear_shared_vertex_log',
-           'power_panel_linear_separated_log']
+           'power_panel_linear_separated_log', 'power_panel_linear_constant_log']
 
 
 def _scalar(value, name):
@@ -499,4 +499,59 @@ def power_panel_linear_separated_log(first,second,offset,first_exponent,second_e
     coarse,fine=evaluate(n),evaluate(2*n)
     if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):
         raise ValueError('linear separated-panel quadrature did not converge')
+    return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
+
+
+def _constant_linear_segment_log(z):
+    """Integral of (2t-1)*log|z+t| on[0,1], before sqrt(3)."""
+    z=np.asarray(z,dtype=complex);out=np.empty(z.shape);far=abs(z)>2
+    reciprocal=1/z[far];series=np.zeros(reciprocal.shape,dtype=complex)
+    for k in range(48,0,-1):series=reciprocal*((-1.)**(k+1)/((k+1)*(k+2))+series)
+    out[far]=series.real
+    near=~far;values=z[near];entry=np.empty(values.shape);zero=values==0;one=values==-1
+    entry[zero]=.5;entry[one]=-.5;regular=~(zero|one);x=values[regular]
+    entry[regular]=(x+.5-x*(x+1)*(np.log(x+1)-np.log(x))).real
+    out[near]=entry;return out
+
+def power_panel_linear_constant_log(a,b,offset,exponent):
+    """Two physical linear modes on a power target and a constant source.
+
+    The target runs from zero to a; source from offset to offset+b, in
+    planar metres. Use phi0/phi1 of power_panel_linear_self_log, target
+    exponent in(0.5,1] and source exponent1. Allow disjoint panels and
+    common endpoints, length ratio<=1e6; refuse overlap and interior
+    intersections using exact binary-input topology. Normalized directions
+    and source coordinates must remain representable.
+
+    Integrate both source polynomial modes analytically and the target
+    with fixed cubic-coordinate64/128 rules. Keep physical weights and
+    analytic masses[1,0]; center target zero-mass entries before summing.
+    Original dimensionless1e-12 target-mass and entrywise refinement checks
+    are explicit: unresolved near interactions raise without retries.
+    This primitive does not establish field, panel or current convergence.
+    """
+    p=_power(exponent);n=64;vectors=[]
+    for value in (a,b,offset):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():raise ValueError('finite planar vectors required')
+        vectors.append(np.asarray(raw,dtype=float))
+    a,b,o=vectors;la,lb,lo=[math.hypot(*v) for v in vectors]
+    if not all(math.isfinite(x) for x in (la,lb,lo)) or min(la,lb)<=0:raise ValueError('unrepresentable geometry')
+    size=max(la,lb)
+    if min(la,lb)/size<1e-6:raise ValueError('length ratio exceeds1e6')
+    if lo/4<size:_require_disjoint_or_endpoint(a,b,o)
+    scale=max(size,lo);a,b,o=a/scale,b/scale,o/scale;direction=complex(*b)
+    if direction==0 or not np.any(a):raise ValueError('unrepresentable normalized direction')
+    z0=complex(*o)/direction
+    anchor0=float(_constant_segment_log(z0));anchor1=float(_constant_linear_segment_log(z0))
+    def evaluate(order):
+        u,w=_graded_power_rule(p,order);psi=math.sqrt(p*(p+2))*((p+1)/p*u-1);wp=w*psi
+        if max(abs(math.fsum(w)-1),abs(math.fsum(wp)))>1e-12:raise ValueError('target mass unresolved')
+        delta=o-u[:,None]*a;z=(delta[:,0]+1j*delta[:,1])/direction
+        if not np.isfinite(z).all():raise ValueError('source coordinates unrepresentable')
+        k0=_constant_segment_log(z);k1=_constant_linear_segment_log(z)
+        return np.array([[math.log(lb)+math.fsum(w*k0),math.sqrt(3)*math.fsum(w*k1)],
+                         [math.fsum(wp*(k0-anchor0)),math.sqrt(3)*math.fsum(wp*(k1-anchor1))]])
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):raise ValueError('linear power-constant quadrature did not converge')
     return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
