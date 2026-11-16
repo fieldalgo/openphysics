@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Stability in 0.x
 
+- Add hierarchical linear-power shared-vertex logarithmic blocks with analytic radial integration and explicit unresolved-order refusal.
+
 - Add bounded hierarchical linear-power far logarithmic interactions with analytic zero-mass centering and retained quadrature comparisons.
 
 0.x releases are alphas.

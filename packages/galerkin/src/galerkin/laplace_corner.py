@@ -19,7 +19,7 @@ __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_shared_vertex_log', 'power_panel_separated_log',
            'power_panel_constant_log', 'power_panel_linear_gram',
            'power_panel_linear_self_log', 'PowerPanelLinearLogResult',
-           'power_panel_linear_far_log']
+           'power_panel_linear_far_log', 'power_panel_linear_shared_vertex_log']
 
 
 def _scalar(value, name):
@@ -399,4 +399,45 @@ def power_panel_linear_far_log(first,second,offset,first_exponent,second_exponen
     coarse,fine=evaluate(n),evaluate(2*n)
     if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):
         raise ValueError('linear far-panel quadrature did not converge')
+    return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
+
+
+def power_panel_linear_shared_vertex_log(first,second,first_exponent,second_exponent,*,quadrature_order=32):
+    """Linear power log block for panels meeting only at their origins.
+
+    Use the same phi0/phi1 and mode ordering as power_panel_linear_far_log.
+    Displacements are planar metres with length ratio at most64, nonoverlapping
+    rays and exponents in (0.5,1]. A Duffy split integrates the radial log
+    analytically; unchanged normalized Gauss-Jacobi rules integrate the angular
+    factors. Analytic masses [1,0] add log(scale) only to entry00.
+
+    Retain n/2n entrywise comparisons (n=4..64) at the dimensionless criterion
+    1e-12*max(1,abs(fine)). Failure is explicit without retries or fallback.
+    Some admitted geometries need a larger explicit order; this is not a
+    guarantee that every allowed order resolves every input. The result does
+    not establish full current-field or boundary-mesh convergence, and does
+    not provide disjoint near-panel interactions or a linear field solver.
+    """
+    p,q=_power(first_exponent),_power(second_exponent);n=_order(quadrature_order,64)
+    vectors=[]
+    for value in (first,second):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():raise ValueError('finite real planar vectors required')
+        vectors.append(raw.astype(float))
+    a,b=vectors;la,lb=math.hypot(*a),math.hypot(*b)
+    if not math.isfinite(max(la,lb)) or min(la,lb)<=0:raise ValueError('positive representable lengths required')
+    scale=max(la,lb)
+    if min(la,lb)/scale<1/64:raise ValueError('length ratio must not exceed64')
+    a,b=a/scale,b/scale;cross=a[0]*b[1]-a[1]*b[0]
+    if float(a@b)>=0 and abs(cross)<=128*np.finfo(float).eps*(la/scale)*(lb/scale):raise ValueError('rays must not overlap')
+    lp,lq=math.sqrt(p*(p+2)),math.sqrt(q*(q+2))
+    left=np.array([[1.,0.],[-lp,lp*(p+1)/p]]);right=np.array([[1.,0.],[-lq,lq*(q+1)/q]])
+    def evaluate(k):
+        u,w=power_panel_quadrature(p,k);v,z=power_panel_quadrature(q,k)
+        loga=np.log(np.hypot(*(a-v[:,None]*b).T));logb=np.log(np.hypot(*(u[:,None]*a-b).T))
+        J=np.array([[(p*math.fsum(z*v**s*loga)+q*math.fsum(w*u**r*logb)-p*q/((p+r)*(q+s)))/(p+q+r+s) for s in range(2)] for r in range(2)])
+        out=np.array([[math.fsum(left[i,r]*right[j,s]*J[r,s] for r in range(2) for s in range(2)) for j in range(2)] for i in range(2)])
+        out[0,0]+=math.log(scale);return out
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):raise ValueError('linear vertex quadrature did not converge')
     return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
