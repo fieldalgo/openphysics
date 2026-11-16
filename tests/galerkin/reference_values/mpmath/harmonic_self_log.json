@@ -1,0 +1,347 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-wedge-harmonic-self-log",
+  "physics": "2D Laplace static wedge current self logarithmic moments",
+  "comparison": "structure-oracle",
+  "role": "Direct mathematical self integral for the same declared physical basis. Partial mathematical independence: shares a Duffy/radial decomposition, not product series or special-function evaluation. Not a field, mesh-convergence or measurement comparison.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "analytic Duffy radial integration and numerical flattened angular density integrals",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "angular_coordinate": "t=u^a for each a=p,2p",
+        "angular_breakpoints": [
+          0,
+          0.5,
+          0.9,
+          1
+        ],
+        "evaluated_kernel": "log1p(-t^(1/a)); no digamma, zeta or product series"
+      },
+      "arrays": [
+        "self_log_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false,
+        "shared_math": "Duffy/radial integral decomposition; no product implementation, series or special-function evaluation."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_harmonic_self_log.py",
+    "sha256": "c37216a2db13cebc12e2264cbd7c71b88ad482ef966fe8b8a00f68a55ac1796a",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_harmonic_self_log.py",
+    "product_commit": "1094c4996b5be25a79769e5ab761ec83cc23facb",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T23:14:41.565009+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 4.18124170799274,
+    "wall_time_s": null,
+    "peak_rss_mb": 16.5625,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured by the generation wrapper."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "exponent": 0.55,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.55,
+        "length": 0.0007
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 0.0007
+      },
+      {
+        "exponent": 0.8,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.8,
+        "length": 0.0007
+      },
+      {
+        "exponent": 0.9999990463256836,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.9999990463256836,
+        "length": 0.0007
+      },
+      {
+        "exponent": 0.9999999999999999,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.9999999999999999,
+        "length": 0.0007
+      },
+      {
+        "exponent": 1.0,
+        "length": 1.0
+      },
+      {
+        "exponent": 1.0,
+        "length": 0.0007
+      }
+    ],
+    "entry_order": [
+      "00",
+      "01",
+      "11"
+    ],
+    "basis": "rho_a=a/h*(s/h)^(a-1); phi0=rho_p; phi1=sqrt(3)*(rho_(2p)-rho_p)"
+  },
+  "matched": [
+    "Exact binary64 exponents/lengths and declared physical density basis, mass [1,0], one-metre logarithmic reference."
+  ],
+  "not_matched": [
+    "Reference uses separately evaluated normalized angular quadrature; product uses a positive analytic series.",
+    "Shared Duffy/radial mathematical identity is not independently derived by the reference.",
+    "No field, material, device, mesh-convergence or measurement validation."
+  ],
+  "reference_self_check": [
+    "60/80-digit strict nonzero-entry relative agreement below 1e-40; uniform cross entries absolute below1e-40.",
+    "Independent pure-mpmath process loaded no product packages.",
+    "Compare-only reproduction must leave the stored values unchanged and remove temporary output."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Interactions, matrices, field solving and fixed-guard qualification.",
+    "Other operating systems, browsers and portable executables."
+  ],
+  "values": [
+    {
+      "name": "self_log_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.5685291415320863,
+        0.2921262504192448,
+        -0.8576588556856425
+      ]
+    },
+    {
+      "name": "self_log_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.832959364452956,
+        0.2921262504192448,
+        -0.8576588556856425
+      ]
+    },
+    {
+      "name": "self_log_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.5089812491149444,
+        0.18117214741215912,
+        -0.8112006357657822
+      ]
+    },
+    {
+      "name": "self_log_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.773411472035814,
+        0.18117214741215912,
+        -0.8112006357657822
+      ]
+    },
+    {
+      "name": "self_log_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.4872070981953944,
+        0.09176634993951506,
+        -0.7785560194796147
+      ]
+    },
+    {
+      "name": "self_log_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.751637321116263,
+        0.09176634993951506,
+        -0.7785560194796147
+      ]
+    },
+    {
+      "name": "self_log_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.4999998617803738,
+        3.551036747596534e-07,
+        -0.7500001001988128
+      ]
+    },
+    {
+      "name": "self_log_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.764430084701242,
+        3.551036747596534e-07,
+        -0.7500001001988128
+      ]
+    },
+    {
+      "name": "self_log_08",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.5,
+        4.133947152422475e-17,
+        -0.75
+      ]
+    },
+    {
+      "name": "self_log_09",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.76443022292087,
+        4.133947152422475e-17,
+        -0.75
+      ]
+    },
+    {
+      "name": "self_log_10",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -1.5,
+        0.0,
+        -0.75
+      ]
+    },
+    {
+      "name": "self_log_11",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.76443022292087,
+        2.9215395937797414e-80,
+        -0.75
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_harmonic_self_log.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath reference process did not import NumPy; generator imports and process receipt were checked.",
+    "environment.cpu": "platform.machine was captured but CPU model was not; generation receipt consulted.",
+    "cost.compile_s": "No separate compilation timer in the pure-Python generation wrapper.",
+    "cost.wall_time_s": "Generation wrapper starts timer after imports; no end-to-end process timing captured."
+  },
+  "regeneration": [],
+  "values_sha256": "26bbda9028a552aa9b0b50fe3b655a8b0ae97f891b0f6e60ca389e4eb1b2431a",
+  "content_sha256": "40c07705a6afd573fe5607fc4b41f785352974b295c4566d0e38501e90f196f2",
+  "generation_details": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "1.55314808106914235663954425423e-60",
+      "5.04102388857218601535810920993e-60",
+      "1.83746833305678438003028654552e-61",
+      "9.07360943323783096307182499159e-60",
+      "2.65578913529811143523839504471e-60",
+      "1.50393469373165342853440874678e-59",
+      "8.28292575077702568575761773674e-56",
+      "1.60049567582514580863354587036e-54",
+      "2.4036893868818407357088368828e-45",
+      "4.11464420575773294251615516436e-45",
+      "1.0371692129768569511906773423e-61",
+      "1.03716921297685694984127600556e-61"
+    ]
+  }
+}

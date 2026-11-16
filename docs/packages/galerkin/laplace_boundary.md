@@ -805,3 +805,5 @@ new method; a small residual or one passing comparison is insufficient.
 Every requested line quantity still needs its own material admission and finite
 panel/outer checks. This static API alone is not a frequency-dependent line,
 physical measurement, fixed-ground, three-active-conductor or platform claim.
+
+[Static wedge harmonic self integrals](laplace_corner_harmonic.md) provide a separate two-mode Gram and logarithmic self contract; they do not change this solver.
