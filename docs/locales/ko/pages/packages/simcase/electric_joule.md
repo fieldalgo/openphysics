@@ -211,8 +211,12 @@ Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서
 (`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`, `max_input_vertices`)를
 문서를 읽기 전에 검사하고, 작업은 절점·삼각형 상한(`max_nodes`, `max_triangles`)으로 실행하므로 너무
 조밀한 메시는 메시 생성 뒤, 풀이 전에 실패한다. 열전도와 Joule 작업은 열전도 route의 활성 작업 한
-자리, 바이트 예산, 결과 보존을 함께 쓴다. 작업 실행 시간 한도는 없다. `/api/capabilities`에는 종류마다
-블록(`run`, `validate`, `geometry: "regions"`, 결과·payload 형식, 영역 한도)이 있다.
+자리, 바이트 예산, 결과 보존을 함께 쓴다. 작업 실행 시간 한도는 없다. 작업 비용은 메시 비용 × Picard 반복 수이므로 `iteration.iteration_limit`이
+Studio의 `max_iterations`(500)를 넘는 `joule.temperature2d` 문서는 작업 전에 거부한다
+(`iteration_limit_exceeded`, 413). 반복 기록(하나에 약 1 kB)은 64 KiB `metadata_bytes`가 아니라 결과의
+`payload_bytes`에 센다. `/api/capabilities`에는 종류마다
+블록(`run`, `validate`, `geometry: "regions"`, 결과·payload 형식, 영역 한도, `joule.temperature2d`에는
+`max_iterations`)이 있다.
 
 끝난 작업의 결과(`GET /api/jobs/<job>/result`)는 payload `studio-joule-regions-v1`이다. 공개 결과의
 모든 배열을 등록부 이름으로(SI, `triangle_regions` 포함, `joule.temperature2d`에는
@@ -223,7 +227,8 @@ Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서
 
 오류: 문서·형상·한도 거부는 자기 문장을 유지한다(모델의 `valid.temperature` 밖 온도, 전위 누락, 어떤
 전위에도 닿지 않는 도체 부분을 영역 이름으로). 수렴하지 않은 Picard 반복은 반복 횟수와 솔버의 이유를
-담은 작업 오류 `not_converged`이다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
+담은 작업 오류 `not_converged`이다(반복 한도, 또는 반복 값이 재료 모델의 유효 범위를 벗어남). 반복 안의
+다른 오류는 고정 문장을 받는다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
 남긴다([보안](../../security.md#브라우저-studio)).
 
 검사(`tests/simcase/test_studio_joule_regions.py`, 사전 등록 J-S1–J-S4): 위의 두 재료 띠의 payload가

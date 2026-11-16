@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+import re
 
 import numpy as np
 from simcase import (Document, DocumentError, ElectricJouleRunResult, JouleConvergenceError, MeshLimitError,
@@ -49,6 +50,12 @@ STRUCTURAL = ("triangles", "triangle_regions", "electric_prescribed_node_ids", "
 REQUIRED = ("node_coordinates", "triangles", "triangle_regions", "electric_potential", "current_density",
             "joule_power_density", "temperature", "heat_flux", "electric_prescribed_node_ids",
             "thermal_prescribed_node_ids")
+#: Studio's cap on a joule.temperature2d document's ``iteration.iteration_limit``: a job's cost is
+#: its mesh's cost times its Picard iterations, and its records (about 1 kB each) go to the result
+MAX_ITERATIONS = 500
+#: the one galerkin refusal inside a Picard iteration that is written for users: a material
+#: model's valid temperature range left by an iterate
+_RANGE_LEFT = re.compile(r"material '[^']*': temperature \[[^\]]*\] K outside \[[^\]]*\] K")
 FORMAT_03 = ('Joule Studio reads format 0.3 region documents ("openphysics": "0.3", values with their units, '
              'element_size quantities)')
 RECTANGLE = ("Studio runs Joule heating on named material regions only (geometry with shapes or background, or a "
@@ -99,7 +106,8 @@ def capability(kind, limits, rlimits):
     return {"supported": True, "run_enabled": runtime_available(), "validate": "/api/joule/validate",
             "run": "/api/joule/run", "input": "json", "geometry": "regions",
             "result_formats": [PAIRS[kind][0]], "field_layouts": [PAIRS[kind][1]], "payload_formats": [PAYLOAD],
-            "resource_policy": "candidate-unmeasured", "limits": asdict(rlimits)}
+            "resource_policy": "candidate-unmeasured",
+            "limits": {**asdict(rlimits), **({"max_iterations": MAX_ITERATIONS} if kind == TEMPERATURE else {})}}
 
 
 def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
@@ -111,6 +119,13 @@ def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
         except (DocumentError, ValueError, TypeError, OverflowError) as exc:
             raise common.ThermalAPIError("invalid_document", reply_text(exc, "Joule region document"),
                                          400 if for_run else 200) from exc
+        if kind == TEMPERATURE:
+            name, p = next(iter(doc.si["physics"].items()))
+            limit = p["iteration"]["iteration_limit"]
+            if limit > MAX_ITERATIONS:
+                raise common.ThermalAPIError(
+                    "iteration_limit_exceeded", f"physics.{name}.iteration.iteration_limit is {limit}, more than "
+                    f"Studio's limit max_iterations={MAX_ITERATIONS}", 413, path=f"physics.{name}.iteration.iteration_limit")
         count = check_mesh_limits(doc, max_input_vertices=rlimits.max_input_vertices)
         regions._summary_floor(doc, limits)
         common.check_document_lists(doc, limits.payload_bytes, "payload_bytes")
@@ -152,10 +167,11 @@ def job_error(exc, plan):
         return mapped
     if isinstance(exc, JouleConvergenceError):
         cause = exc.__cause__
-        # the solver's own reasons (iteration count, a material range left) are for users; an
-        # exception the iteration wrapped from elsewhere is an unexpected failure
-        reason = (str(exc.reason) if cause is None or type(cause) is ValueError
-                  else unexpected(exc, "Joule iteration"))
+        # the solver's own reasons are for users: the iteration count (no cause) and a material
+        # range left by an iterate; any other exception the iteration wrapped is unexpected
+        reason = str(exc.reason)
+        if cause is not None and not (type(cause) is ValueError and _RANGE_LEFT.fullmatch(reason)):
+            reason = unexpected(exc, "Joule iteration")
         return common.ThermalAPIError("not_converged", f"the Picard iteration did not converge after "
                                       f"{len(exc.history)} iterations: {reason}", 422)
     return None
@@ -201,7 +217,10 @@ def capture(result, identity, limits, rlimits, spec):
     _require(isinstance(result, ElectricJouleRunResult), "expected a public ElectricJouleRunResult")
     summary = common.json_value(result.summary())
     _require(isinstance(summary, dict), "Joule summary must be an object")
-    common.check_summary(summary, limits)
+    # the iteration records grow with the run (at most MAX_ITERATIONS) and count against the
+    # payload, like the document lists; metadata_bytes bounds the rest
+    common.check_summary({k: v for k, v in summary.items() if k != "iterations"}
+                         if isinstance(summary, dict) else summary, limits)
     pair = PAIRS[spec.kind]
     _require((result.result_format, result.field_layout) == pair and summary.get("physics_type") == spec.kind,
              "unsupported public Joule region result/layout pair")
