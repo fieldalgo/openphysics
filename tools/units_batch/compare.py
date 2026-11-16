@@ -30,6 +30,15 @@ closed rules (README "The em.modes2d commit"): alternatives (exactly one new nam
 the VTU transform ``imag-conj`` and the ``collection`` transform. Exit status 0 when
 every document is equal, 1 otherwise. ``--report`` writes the per-document, per-array SHA-256
 table as JSON.
+
+    python tools/units_batch/compare.py --old <recording> --new <recording> --phase3 [--rules phase3_rules.json]
+
+``--phase3`` is the galerkin step's mode (README "Phase 3"): both sides read the same documents,
+every saved array, summary leaf, VTU array and message must be identical, and the recorded calls
+are compared by parameter name (the ``bound`` form of each call) under the rule entries of
+``phase3_rules.json``, whose kinds are the closed table RULE_KINDS. Each side's recorded targets
+are its own declaration; a target recorded on one side only must be mapped by a kind 1 or kind
+7 entry, an entry of an unknown kind is refused, and an entry that applies nowhere is a problem.
 """
 
 from __future__ import annotations
@@ -461,6 +470,12 @@ def _apply_call_rules(calls: list, rules: dict, local_materials) -> list:
         local = set(local_materials) & set(D24_RENAMES)
         if local:
             out = [_d24_material_names(c, local) for c in out]
+            for call in out:
+                # physmat is recorded at the optical model's evaluation (README "Phase 3"), whose
+                # object is the model a local material builds, labelled with the material's name
+                if call.get("function", "").startswith("physmat.") and "self" in call:
+                    for old in sorted(local):
+                        call["self"] = _d24_label(call["self"], old, D24_RENAMES[old])
     for rule in rules.get("arguments", []):
         for call in out:
             args = call.get("args")
@@ -474,12 +489,15 @@ def _apply_call_rules(calls: list, rules: dict, local_materials) -> list:
 
 
 def compare_calls(old: dict, new: dict, result: Result, rules: dict | None = None, local_materials=()):
+    """The identity and layout modes: every call as written (positions and keywords); the
+    phase-3 fields (the call bound to parameter names) are not compared here."""
     a, b = _apply_call_rules(old.get("calls", []), rules or {}, local_materials), new.get("calls", [])
     if len(a) != len(b):
         result.fail(f"calls: {len(a)} recorded on the old side, {len(b)} on the new side")
     for i, (x, y) in enumerate(zip(a, b)):
         result.counts["calls"] += 1
-        x, y = dict(x), dict(y)
+        x = {k: v for k, v in x.items() if k not in PHASE3_ONLY_FIELDS}
+        y = {k: v for k, v in y.items() if k not in PHASE3_ONLY_FIELDS}
         found = diff_forms(x, y, f"calls[{i}] {x.get('function')}", result)
         if found:
             result.fail(found)
@@ -831,7 +849,405 @@ def _compare_vtu_layout(old_path: Path, new_path: Path, lmap: LayoutMap, rel: st
                 result.fail(f"export {rel} {kind}:{name}: added and not on the map's added list")
 
 
-def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps: Path) -> Result:
+# -- phase 3: the same documents on both sides; calls by parameter name under closed rule kinds ---
+
+RULES_FORMAT = "openphysics-units-batch-phase3-rules-v1"
+#: The closed table of rule kinds (phase-3 specification §6): kind -> (what it does, required
+#: fields, optional fields). Names of recorded functions are the recorder's (``module.name``,
+#: ``module.Class.method``); ``function`` and ``class`` name the new side's (after kinds 1, 4
+#: and 7). Renames act on the old side's record, value transforms on the new side's values:
+#: the old value must equal the transform of the new one (``0.0 - x`` turns the head's inward
+#: value into the baseline's outward one, ``to_kernel`` its exp(-i omega t) value into the
+#: kernel's exp(+i omega t) one).
+RULE_KINDS = {
+    1: ("function rename", ("old", "new"), ()),
+    2: ("keyword rename", ("function", "old", "new"), ()),
+    3: ("value transform on a keyword", ("function", "keyword", "transform"), ()),
+    4: ("class rename", ("old", "new"), ()),
+    5: ("dataclass field rename, removal or replacement", ("class", "old", "new"), ("transform",)),
+    6: ("transform inside the fields of an object", ("class", "fields", "transform"), ()),
+    7: ("compare at the kernel frame", ("old", "wrapper", "kernel"), ()),
+    8: ("removed keyword default", ("function", "keyword"), ("value", "form")),
+    9: ("positional/keyword move", ("function", "keyword"), ()),
+}
+#: the value transforms of kinds 3, 5 and 6: ``0.0 - x``, and ``complex(x.real, 0.0 - x.imag)``
+#: (elementwise for arrays, through the recorder's transform table)
+VALUE_TRANSFORMS = ("neg", "to_kernel")
+#: what phase 3 compares of a call: its arguments bound to parameter names, never their positions
+PHASE3_CALL_FIELDS = ("depth", "function", "self", "bound", "bound_callbacks", "samples", "result", "raised")
+PHASE3_ONLY_FIELDS = frozenset({"bound", "bound_callbacks"})
+#: canonical forms whose second item is a class's qualified name (where kind 4 renames it)
+QUALNAME_TAGS = frozenset({"object", "type", "opaque", "deep", "cycle", "raises", "linear-operator",
+                           "conductivity-model"})
+
+
+def _dumps(obj) -> str:
+    """record.dumps: the key of a canonical form in a recording's transform table."""
+    return json.dumps(obj, sort_keys=False, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+
+
+def _value_form(value):
+    """The canonical form of a JSON scalar (kind 8 ``value``)."""
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return ["bool", value]
+    if isinstance(value, int) and abs(value) <= 2 ** 53:
+        return ["num", "int", float.hex(float(value))]
+    if isinstance(value, float):
+        return ["num", "float", float.hex(value)]
+    raise ValueError(f"value {value!r} is not a JSON scalar; give its canonical form as 'form'")
+
+
+def map_forms(form, fn):
+    """``form`` rebuilt with ``fn`` applied to every canonical form in it, innermost first,
+    following record.canon's grammar (a leaf such as an array form is passed to ``fn`` whole)."""
+    if not isinstance(form, list) or not form or not isinstance(form[0], str):
+        return form
+    tag = form[0]
+    if tag in ("object", "dict") and len(form) == 3 and isinstance(form[2], list):
+        form = [tag, form[1], [[map_forms(k, fn) if tag == "dict" else k, map_forms(v, fn)] for k, v in form[2]]]
+    elif tag == "object-array" and len(form) == 3:
+        form = [tag, form[1], [map_forms(v, fn) for v in form[2]]]
+    elif tag == "physmat.Material" and len(form) == 3:
+        form = [tag, form[1], map_forms(form[2], fn)]
+    elif tag == "callable" and len(form) == 3 and isinstance(form[2], list):
+        form = [tag, form[1], [[*s[:-1], map_forms(s[-1], fn)] for s in form[2]]]
+    elif tag == "linear-operator" and len(form) == 5:
+        form = [*form[:4], map_forms(form[4], fn)]
+    elif tag == "conductivity-model" and len(form) == 5:
+        form = [*form[:3], map_forms(form[3], fn), map_forms(form[4], fn)]
+    elif tag == "sparse" and len(form) == 5:
+        form = [*form[:4], [[k, map_forms(v, fn)] for k, v in form[4]]]
+    elif len(form) == 2 and isinstance(form[1], list):                 # a list, tuple or set
+        form = [tag, [map_forms(v, fn) for v in form[1]]]
+    return fn(form)
+
+
+def _scalar(form):
+    """The Python or NumPy scalar a number form was recorded from (its type, its double)."""
+    import numpy as np
+    if form[0] == "num":
+        if form[2].startswith("int:"):
+            raise ValueError("an integer beyond 2**53 has no value transform")
+        value = float.fromhex(form[2])
+        make = {"int": int, "float": float}.get(form[1]) or getattr(np, form[1], None)
+    else:
+        value = complex(float.fromhex(form[2]), float.fromhex(form[3]))
+        make = {"complex": complex}.get(form[1]) or getattr(np, form[1], None)
+    if make is None:
+        raise ValueError(f"no scalar type {form[1]!r}")
+    return make(value)
+
+
+def _scalar_form(x) -> list:
+    import numpy as np
+    if isinstance(x, (complex, np.complexfloating)):
+        return ["complex", type(x).__name__, float.hex(float(x.real)), float.hex(float(x.imag))]
+    return ["num", type(x).__name__, float.hex(float(x))]
+
+
+def transform_form(form, how: str, table: dict):
+    """A canonical value under ``neg`` (``0.0 - x``) or ``to_kernel`` (``complex(x.real, 0.0 -
+    x.imag)``): scalars are recomputed from their recorded type and double, arrays are looked up in
+    the recording's transform table, containers and callback samples are transformed item by item
+    (a refusal stays a refusal) and None stays None. Anything else raises ValueError."""
+    if how not in VALUE_TRANSFORMS:
+        raise ValueError(f"transform {how!r} is not in {VALUE_TRANSFORMS}")
+    if form is None:
+        return None
+    if not isinstance(form, list) or not form:
+        raise ValueError(f"{how} of {json.dumps(form)[:60]}")
+    tag = form[0]
+    if tag in ("num", "complex"):
+        x = _scalar(form)
+        return _scalar_form(0.0 - x if how == "neg" else complex(x.real, 0.0 - x.imag))
+    if tag == "array" and len(form) == 4:
+        entry = table.get(_dumps(form))
+        if entry is None:
+            raise ValueError(f"no {how} of the array {form[3][:12]} in the recording's transform table")
+        return entry[how]
+    if tag == "dict" and len(form) == 3:
+        return [tag, form[1], [[k, transform_form(v, how, table)] for k, v in form[2]]]
+    if tag == "callable" and len(form) == 3:
+        return [tag, form[1], [[*s[:-1], s[-1] if isinstance(s[-1], list) and s[-1][:1] == ["raises"]
+                                else transform_form(s[-1], how, table)] for s in form[2]]]
+    if tag in ("list", "tuple", "object-array") and isinstance(form[-1], list):
+        return [*form[:-1], [transform_form(v, how, table) for v in form[-1]]]
+    raise ValueError(f"{how} of a {tag!r} form (an object's fields take kind 6)")
+
+
+class Phase3Rules:
+    """The entries of ``phase3_rules.json``, checked against RULE_KINDS, and how often each one
+    applied (an entry that applies nowhere is reported by ``unused``)."""
+
+    def __init__(self, data: dict, source: str):
+        if not isinstance(data, dict) or data.get("format") != RULES_FORMAT:
+            raise ValueError(f"{source}: format must be {RULES_FORMAT!r}")
+        extra = set(data) - {"format", "description", "entries"}
+        if extra or not isinstance(data.get("entries", []), list):
+            raise ValueError(f"{source}: keys are format, description and entries (a list); not {sorted(extra)}")
+        self.source = source
+        self.entries = [self._checked(i, e) for i, e in enumerate(data.get("entries", []))]
+        self.used = [0] * len(self.entries)
+        # the targets each kind 1 and kind 7 entry maps, on each side; one entry per name
+        self.maps_old, self.maps_new = {}, {}
+        for i, e in enumerate(self.entries):
+            if e["kind"] not in (1, 7):
+                continue
+            news = [e["new"]] if e["kind"] == 1 else [e["wrapper"], e["kernel"]]
+            for side, names in ((self.maps_old, [e["old"]]), (self.maps_new, news)):
+                for name in names:
+                    if name in side:
+                        raise ValueError(f"{source} entries[{i}]: {name} is mapped by entries[{side[name]}] too")
+                    side[name] = i
+
+    @classmethod
+    def load(cls, path: Path) -> "Phase3Rules":
+        return cls(_load_json(path), path.name)
+
+    def _checked(self, i: int, entry) -> dict:
+        where = f"{self.source} entries[{i}]"
+        if not isinstance(entry, dict):
+            raise ValueError(f"{where}: an entry is an object")
+        kind = entry.get("kind")
+        if isinstance(kind, bool) or kind not in RULE_KINDS:
+            raise ValueError(f"{where}: kind {kind!r} is not in the closed table of rule kinds 1-9")
+        _what, required, optional = RULE_KINDS[kind]
+        missing = [f for f in required if f not in entry]
+        unknown = sorted(set(entry) - {"kind", "note", *required, *optional})
+        if missing or unknown:
+            raise ValueError(f"{where} (kind {kind}): missing fields {missing}, unknown fields {unknown}")
+        e = dict(entry)
+        if not isinstance(e.get("note", ""), str):
+            raise ValueError(f"{where}: note is a string")
+        for f in required:
+            if f in ("fields", "transform"):
+                continue
+            if not (isinstance(e[f], str) and e[f]) and not (kind == 5 and f in ("old", "new") and e[f] is None):
+                raise ValueError(f"{where}: {f} must be a non-empty string")
+        if kind in (1, 2, 4) and e["old"] == e["new"]:
+            raise ValueError(f"{where}: old and new are the same")
+        if kind == 5:
+            e.setdefault("transform", "=")
+            if e["old"] is None and e["new"] is None:
+                raise ValueError(f"{where}: a field rule names the old field, the new one or both")
+            if e["transform"] not in ("=",) + VALUE_TRANSFORMS:
+                raise ValueError(f"{where}: transform {e['transform']!r} is not '=' or one of {VALUE_TRANSFORMS}")
+            if e["transform"] != "=" and (e["old"] is None or e["new"] is None):
+                raise ValueError(f"{where}: a transformed field names both its old and its new name")
+        if kind in (3, 6) and e["transform"] not in VALUE_TRANSFORMS:
+            raise ValueError(f"{where}: transform {e['transform']!r} is not one of {VALUE_TRANSFORMS}")
+        if kind == 6 and not (isinstance(e["fields"], list) and e["fields"]
+                              and all(isinstance(f, str) and f for f in e["fields"])):
+            raise ValueError(f"{where}: fields is a non-empty list of field names")
+        if kind == 7 and e["wrapper"] == e["kernel"]:
+            raise ValueError(f"{where}: the wrapper and the kernel are different targets")
+        if kind == 8:
+            if ("value" in e) == ("form" in e):
+                raise ValueError(f"{where}: give exactly one of value (a JSON scalar) and form")
+            e["form"] = e["form"] if "form" in e else _value_form(e["value"])
+        return e
+
+    def of(self, *kinds):
+        return [(i, e) for i, e in enumerate(self.entries) if e["kind"] in kinds]
+
+    def check_targets(self, old_targets, new_targets) -> list[str]:
+        """Each side's recorded targets are its own declaration: a target on one side only must be
+        mapped by a kind 1 or kind 7 entry, and every name such an entry maps must be declared on
+        its side."""
+        old, new = set(old_targets), set(new_targets)
+        problems = []
+        for side, names, maps in (("old", old, self.maps_old), ("new", new, self.maps_new)):
+            for name, i in sorted(maps.items()):
+                if name not in names:
+                    problems.append(f"rule entries[{i}] (kind {self.entries[i]['kind']}) maps {name}, which the "
+                                    f"{side} side does not record")
+        for side, only, maps in (("old", old - new, self.maps_old), ("new", new - old, self.maps_new)):
+            for name in sorted(only):
+                if name in maps:
+                    self.used[maps[name]] += 1
+                else:
+                    problems.append(f"target {name} is recorded on the {side} side only and no kind 1 or kind 7 "
+                                    "entry maps it")
+        for i, e in self.of(2, 3, 8, 9):
+            if e["function"] not in new:
+                problems.append(f"rule entries[{i}] (kind {e['kind']}) names {e['function']}, which the new side "
+                                "does not record")
+        return problems
+
+    def unused(self) -> list[str]:
+        return [f"rule entries[{i}] (kind {e['kind']}, {RULE_KINDS[e['kind']][0]}) applies to nothing recorded"
+                for i, e in enumerate(self.entries) if not self.used[i]]
+
+    # -- applying the entries to one document's calls --------------------------------------------
+
+    def apply(self, old_calls: list, new_calls: list, table: dict, result: Result) -> tuple[list, list]:
+        """The two call lists made comparable: kind 7 drops the listed wrapper frames on the new
+        side and maps the old frame to the kernel beneath; kinds 1 and 4 rename functions and
+        classes on the old side; kind 5 renames, drops or transforms fields; kind 6 transforms
+        fields of new objects; kind 2 renames old keywords; per aligned pair of calls, kind 8 drops
+        a new argument that equals the removed default the old call relied on, kind 3 transforms a
+        new argument and kind 9 counts the arguments bound on both sides."""
+        old = [{k: copy.deepcopy(c[k]) for k in PHASE3_CALL_FIELDS if k in c} for c in old_calls]
+        new = [{k: copy.deepcopy(c[k]) for k in PHASE3_CALL_FIELDS if k in c} for c in new_calls]
+        wrappers = {e["wrapper"]: i for i, e in self.of(7)}
+        if wrappers:
+            new = self._drop_frames(new, wrappers)
+        renames = {e["old"]: (i, e["kernel"]) for i, e in self.of(7)}
+        renames.update({e["old"]: (i, e["new"]) for i, e in self.of(1)})
+        for call in old:
+            hit = renames.get(call.get("function"))
+            if hit is not None:
+                call["function"] = hit[1]
+                self.used[hit[0]] += 1
+        classes = {e["old"]: (i, e["new"]) for i, e in self.of(4)}
+        fields_old = [(i, e) for i, e in self.of(5) if e["old"] is not None]
+        fields_new = [(i, e) for i, e in self.of(5) if e["old"] is None or e["transform"] != "="] + self.of(6)
+        for side, edit in ((old, lambda f: self._old_form(f, classes, fields_old)),
+                           (new, lambda f: self._new_form(f, fields_new, table, result))):
+            if not (classes or fields_old) and side is old or not fields_new and side is new:
+                continue
+            for call in side:
+                for key in ("self", "result"):
+                    if key in call:
+                        call[key] = map_forms(call[key], edit)
+                if isinstance(call.get("bound"), dict):
+                    call["bound"] = {k: map_forms(v, edit) for k, v in call["bound"].items()}
+                if side is old and isinstance(call.get("raised"), list) and call["raised"][0] in classes:
+                    i, name = classes[call["raised"][0]]
+                    call["raised"] = [name, *call["raised"][1:]]
+                    self.used[i] += 1
+        keywords = self.of(2)
+        for call in old:
+            for i, e in keywords:
+                if call.get("function") == e["function"] and isinstance(call.get("bound"), dict) \
+                        and e["old"] in call["bound"] and e["new"] not in call["bound"]:
+                    call["bound"] = {e["new"] if k == e["old"] else k: v for k, v in call["bound"].items()}
+                    if call.get("bound_callbacks"):
+                        call["bound_callbacks"] = sorted([e["new"] if p == e["old"] else p, *rest]
+                                                         for p, *rest in call["bound_callbacks"])
+                    self.used[i] += 1
+        pair_rules = self.of(3, 8, 9)
+        if pair_rules:
+            for x, y in zip(old, new):
+                if x.get("function") == y.get("function") and isinstance(x.get("bound"), dict) \
+                        and isinstance(y.get("bound"), dict):
+                    self._pair(x, y, pair_rules, table, result)
+        return old, new
+
+    @staticmethod
+    def _drop_frames(calls: list, wrappers: dict) -> list:
+        out, open_depths = [], []          # depths of the dropped frames still open
+        for call in calls:
+            while open_depths and call["depth"] <= open_depths[-1]:
+                open_depths.pop()
+            if call.get("function") in wrappers:
+                open_depths.append(call["depth"])
+                continue
+            out.append({**call, "depth": call["depth"] - len(open_depths)})
+        return out
+
+    def _old_form(self, form, classes, fields):
+        if form[0] in QUALNAME_TAGS and len(form) >= 2 and form[1] in classes:
+            i, name = classes[form[1]]
+            form = [form[0], name, *form[2:]]
+            self.used[i] += 1
+        if form[0] == "object" and len(form) == 3 and fields:
+            items = form[2]
+            for i, e in fields:
+                if form[1] != e["class"] or not any(k == e["old"] for k, _ in items):
+                    continue
+                items = [[e["new"], v] if k == e["old"] else [k, v] for k, v in items if k != e["old"] or e["new"]]
+                self.used[i] += 1
+            form = [form[0], form[1], items]
+        return form
+
+    def _new_form(self, form, rules, table, result: Result):
+        if form[0] != "object" or len(form) != 3:
+            return form
+        items = form[2]
+        for i, e in rules:
+            if form[1] != e["class"]:
+                continue
+            if e["kind"] == 5 and e["old"] is None:                   # a field the new class added
+                if any(k == e["new"] for k, _ in items):
+                    items = [[k, v] for k, v in items if k != e["new"]]
+                    self.used[i] += 1
+                continue
+            names = {e["new"]} if e["kind"] == 5 else set(e["fields"])
+            out = []
+            for k, v in items:
+                if k in names:
+                    try:
+                        v = transform_form(v, e["transform"], table)
+                        self.used[i] += 1
+                    except ValueError as exc:
+                        result.fail(f"rule entries[{i}] (kind {e['kind']}) on {form[1]}.{k}: {exc}")
+                out.append([k, v])
+            items = out
+        return [form[0], form[1], items]
+
+    def _pair(self, x: dict, y: dict, rules, table, result: Result):
+        for i, e in rules:
+            if x["function"] != e["function"]:
+                continue
+            key = e["keyword"]
+            if e["kind"] == 8:
+                callbacks = [c for c in y.get("bound_callbacks") or [] if c[0] == key]
+                if key not in x["bound"] and key in y["bound"] and not callbacks \
+                        and _untyped(y["bound"][key]) == _untyped(e["form"]):
+                    del y["bound"][key]
+                    self.used[i] += 1
+            elif e["kind"] == 3:
+                if key in y["bound"]:
+                    try:
+                        y["bound"][key] = transform_form(y["bound"][key], e["transform"], table)
+                        self.used[i] += 1
+                    except ValueError as exc:
+                        result.fail(f"rule entries[{i}] (kind 3) on {e['function']} {key}: {exc}")
+            elif key in x["bound"] and key in y["bound"]:                # kind 9: nothing to change
+                self.used[i] += 1
+
+
+def _untyped(form):
+    """A form with the Python type of its numbers left out (int and float compare by value, H8)."""
+    if isinstance(form, list):
+        if len(form) == 3 and form[0] == "num":
+            return ["num", form[2]]
+        if len(form) == 4 and form[0] == "complex":
+            return ["complex", form[2], form[3]]
+        return [_untyped(v) for v in form]
+    return form
+
+
+def compare_calls_phase3(old: dict, new: dict, rules: Phase3Rules, result: Result):
+    """Every recorded call, bound to its parameter names, under the rule entries."""
+    a, b = rules.apply(old.get("calls", []), new.get("calls", []), new.get("transforms", {}), result)
+    if len(a) != len(b):
+        result.fail(f"calls: {len(a)} recorded on the old side, {len(b)} on the new side (after the rule entries)")
+    for i, (x, y) in enumerate(zip(a, b)):
+        result.counts["calls"] += 1
+        for side, call in (("old", x), ("new", y)):
+            if not isinstance(call.get("bound"), dict):
+                result.fail(f"calls[{i}] {call.get('function')}: the {side} call does not bind: {call.get('bound')}")
+        if set(x) != set(y):
+            result.fail(f"calls[{i}] {x.get('function')}: fields {sorted(x)} != {sorted(y)}")
+            continue
+        for key in PHASE3_CALL_FIELDS:
+            if key not in x:
+                continue
+            if key == "bound" and isinstance(x[key], dict) and isinstance(y[key], dict) and x[key].keys() != y[key].keys():
+                result.fail(f"calls[{i}] {x.get('function')}.bound: parameters only on the old side "
+                            f"{sorted(set(x[key]) - set(y[key]))}, only on the new side {sorted(set(y[key]) - set(x[key]))}")
+                continue
+            found = diff_forms(x[key], y[key], f"calls[{i}] {x.get('function')}.{key}", result)
+            if found:
+                result.fail(found)
+
+
+def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps: Path,
+                     rules: Phase3Rules | None = None) -> Result:
     result = Result(doc_id, mode)
     old, new = _load_json(old_dir / "record.json"), _load_json(new_dir / "record.json")
     for side, record in (("old", old), ("new", new)):
@@ -847,23 +1263,29 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
             result.fail(f"{side} side: picometre rounding on a corpus document: {roundings[:3]}")
     if not result.equal:
         return result
-    if mode == "identity":
+    identical = mode in ("identity", "phase3")
+    if mode == "phase3" and old.get("document") != new.get("document"):
+        result.fail(f"the two sides read different documents: {old.get('document')} != {new.get('document')}")
+    if identical:
         for key in ("load",):
             found = diff_forms(old.get(key), new.get(key), key, result)
             if found:
                 result.fail(found)
-    rules, local, lmap = None, (), None
+    call_rules, local, lmap = None, (), None
     if mode == "layout":
         lmap = _map_for(old_dir, maps, result)
         if lmap is None:
             return result
-        rules = lmap.calls
+        call_rules = lmap.calls
         model = old_dir / "result" / "model.json"
         if model.is_file():
             local = tuple((_load_json(model).get("materials") or {}))
-    compare_calls(old, new, result, rules, local)
+    if mode == "phase3":
+        compare_calls_phase3(old, new, rules, result)
+    else:
+        compare_calls(old, new, result, call_rules, local)
     run_a, run_b = old.get("run", {}), new.get("run", {})
-    if mode == "identity" and run_a.get("after") != run_b.get("after"):
+    if identical and run_a.get("after") != run_b.get("after"):
         result.fail(f"diagnostics after the run differ: {run_a.get('after')} != {run_b.get('after')}")
     if run_a.get("status") != run_b.get("status"):
         result.fail(f"run status {run_a.get('status')} != {run_b.get('status')}")
@@ -871,13 +1293,13 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
     if run_a.get("status") == "error":
         if run_a["exception"][0] != run_b["exception"][0]:
             result.fail(f"run error {run_a['exception']} != {run_b['exception']}")
-        if mode == "identity" and run_a["exception"] != run_b["exception"]:
+        if identical and run_a["exception"] != run_b["exception"]:
             result.fail(f"run error message {run_a['exception'][1]!r} != {run_b['exception'][1]!r}")
         evidence_a, evidence_b = run_a.get("failure_evidence"), run_b.get("failure_evidence")
         if (evidence_a is None) != (evidence_b is None):
             result.fail("failure evidence recorded on one side only")
         elif evidence_a is not None:
-            if mode == "identity":
+            if identical:
                 compare_trees_identity(evidence_a, evidence_b, "failure_evidence", result)
             else:
                 compare_trees_layout(evidence_a, evidence_b, lmap, old, "failure_evidence", result)
@@ -896,13 +1318,15 @@ def compare_document(doc_id: str, old_dir: Path, new_dir: Path, mode: str, maps:
     summary_b = _load_json(new_dir / "result" / "summary.json")
     arrays_a = _npz(old_dir / "result" / "fields.npz") if (old_dir / "result" / "fields.npz").exists() else {}
     arrays_b = _npz(new_dir / "result" / "fields.npz") if (new_dir / "result" / "fields.npz").exists() else {}
-    if mode == "identity":
+    if identical:
         compare_trees_identity(summary_a, summary_b, "summary.json", result)
         if "model.json" in files_a & files_b:
             compare_trees_identity(_load_json(old_dir / "result" / "model.json"),
                                    _load_json(new_dir / "result" / "model.json"), "model.json", result)
         compare_arrays_identity(arrays_a, arrays_b, result)
-        compare_exports(old, new, old_dir, new_dir, None, result, layout_renames(maps))
+        # phase 3 renames no identifier: both sides write today's layouts
+        compare_exports(old, new, old_dir, new_dir, None, result,
+                        layout_renames(maps) if mode == "identity" else None)
     else:
         compare_trees_layout(summary_a, summary_b, lmap, old, "summary.json", result, (arrays_a, arrays_b))
         compare_arrays_layout(arrays_a, arrays_b, lmap, old, old_dir, result)
@@ -924,7 +1348,10 @@ def _map_for(old_dir: Path, maps: Path, result: Result):
         return None
 
 
-def compare(old: Path, new: Path, plan: dict | None, maps: Path) -> tuple[list[Result], list[str]]:
+def compare(old: Path, new: Path, plan: dict | None, maps: Path,
+            rules: Phase3Rules | None = None) -> tuple[list[Result], list[str]]:
+    """Every document of two recordings: ``plan`` None compares them as identical documents;
+    ``rules`` (phase 3, ``plan`` None) compares the calls by parameter name under its entries."""
     manifest_a, manifest_b = _load_json(old / "manifest.json"), _load_json(new / "manifest.json")
     ids_a = [d["id"] for d in manifest_a["documents"]]
     ids_b = [d["id"] for d in manifest_b["documents"]]
@@ -936,17 +1363,24 @@ def compare(old: Path, new: Path, plan: dict | None, maps: Path) -> tuple[list[R
         install = manifest.get("install", {})
         if install.get("targets_missing"):
             problems.append(f"{side} side: recorded functions missing: {install['targets_missing']}")
+        if install.get("targets_shadowed"):
+            problems.append(f"{side} side: recorded methods a subclass overrides: {install['targets_shadowed']}")
         if not manifest.get("isolated"):
             problems.append(f"{side} side: the recorder did not run with python -I")
     if plan is not None and set(plan) - set(ids_a):
         problems.append(f"plan names documents not recorded: {sorted(set(plan) - set(ids_a))}")
+    if rules is not None:
+        problems += rules.check_targets(manifest_a.get("install", {}).get("targets", []),
+                                        manifest_b.get("install", {}).get("targets", []))
     results = []
     for doc_id in [d for d in ids_a if d in set(ids_b)]:
-        mode = "identity" if plan is None else plan.get(doc_id)
-        if mode not in ("identity", "layout"):
+        mode = "phase3" if rules is not None else "identity" if plan is None else plan.get(doc_id)
+        if mode not in ("identity", "layout", "phase3"):
             problems.append(f"{doc_id}: the plan gives no mode (identity or layout)")
             continue
-        results.append(compare_document(doc_id, old / doc_id, new / doc_id, mode, maps))
+        results.append(compare_document(doc_id, old / doc_id, new / doc_id, mode, maps, rules))
+    if rules is not None:
+        problems += rules.unused()
     return results, problems
 
 
@@ -957,11 +1391,16 @@ def main(argv=None) -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--identity", action="store_true", help="compare every document with the identity map")
     group.add_argument("--plan", type=Path, help="JSON {document id: 'identity' | 'layout'}")
+    group.add_argument("--phase3", action="store_true",
+                       help="the galerkin step: the same documents, calls by parameter name under --rules")
+    parser.add_argument("--rules", type=Path, default=Path(__file__).resolve().parent / "phase3_rules.json",
+                        help="the phase-3 rule entries (default: phase3_rules.json beside this script)")
     parser.add_argument("--maps", type=Path, default=Path(__file__).resolve().parent / "maps")
     parser.add_argument("--report", type=Path, help="write the findings and the SHA-256 tables as JSON")
     args = parser.parse_args(argv)
-    plan = None if args.identity else _load_json(args.plan)
-    results, problems = compare(args.old, args.new, plan, args.maps)
+    plan = None if args.identity or args.phase3 else _load_json(args.plan)
+    rules = Phase3Rules.load(args.rules) if args.phase3 else None
+    results, problems = compare(args.old, args.new, plan, args.maps, rules)
     equal = sum(r.equal for r in results)
     for r in results:
         types = f", {len(r.type_differences)} type differences" if r.type_differences else ""
@@ -981,6 +1420,8 @@ def main(argv=None) -> int:
         report = {"old": {k: manifests["old"].get(k) for k in ("root_commit", "root_dirty", "versions")},
                   "new": {k: manifests["new"].get(k) for k in ("root_commit", "root_dirty", "versions")},
                   "problems": problems, "documents": [r.as_dict() for r in results]}
+        if rules is not None:
+            report["rules"] = {"source": rules.source, "entries": rules.entries, "applied": rules.used}
         args.report.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     return 0 if results and equal == len(results) and not problems else 1
 

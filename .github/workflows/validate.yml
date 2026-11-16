@@ -280,11 +280,13 @@ jobs:
           test "$PLATFORM_RESULT" = success
 
   units-batch-equivalence:
-    # Check P2-1 of the units and naming batch (tools/units_batch/README.md): every example and
-    # frozen fixture, as an old document on the merge-base code, against its twin on this
-    # commit, bit for bit, on each OS in turn. Manual dispatch only
-    # (gh workflow run validate.yml --ref <branch>), so pushes and pull requests allocate no
-    # runner for it; outside the tests gate, so each platform is reported on its own.
+    # Check P3-1 of the galerkin step (tools/units_batch/README.md, "Phase 3"): every example
+    # and frozen fixture, the same document on the merge-base code and on this commit, bit for
+    # bit, with every recorded call equal by parameter name under phase3_rules.json, on each OS
+    # in turn. Phase 2 (P2-1 of the units batch) needs that batch's own baseline and runs
+    # locally. Manual dispatch only (gh workflow run validate.yml --ref <branch>), so pushes and
+    # pull requests allocate no runner for it; outside the tests gate, so each platform is
+    # reported on its own.
     if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
@@ -300,6 +302,7 @@ jobs:
       OPENBLAS_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
+      OPENPHYSICS_BATCH_PHASE: "3"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

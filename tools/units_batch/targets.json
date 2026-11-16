@@ -1,0 +1,49 @@
+{
+ "format": "openphysics-units-batch-targets-v1",
+ "description": "The callables tools/units_batch/record.py records in this tree (README \"Phase 3\"). Each tree declares its own; a commit that renames, moves, wraps or adds a recorded callable changes this file, and the phase-3 comparison requires every target recorded on one side only to be mapped by a rule of kind 1 or 7 (phase3_rules.json).",
+ "functions": [
+  "meshine.refine:generate",
+  "galerkin.mesh:rectangle_mesh",
+  "galerkin.thermal:solve_steady_heat",
+  "galerkin.transient_heat:solve_transient_heat",
+  "galerkin.electric:solve_steady_electric",
+  "galerkin.joule_heating:solve_steady_joule_heat",
+  "galerkin.temperature_joule_heating:solve_temperature_joule_heat",
+  "galerkin.elasticity:solve_elasticity",
+  "galerkin.thermoelasticity:freeze_temperature",
+  "galerkin.thermoelasticity:solve_thermoelasticity",
+  "simcase.physics_em_modes2d:solve",
+  "galerkin.waveguide:solve_modes",
+  "galerkin.waveguide:assemble_mode_system",
+  "galerkin.mode_coordinates:mode_coordinates",
+  "galerkin.mode_coordinates:solve_scalar_coordinates",
+  "galerkin.mode_coordinates:scalar_coordinate_system",
+  "galerkin.assembly:assemble_stiffness",
+  "galerkin.assembly:assemble_mass",
+  "galerkin.cavity:solve_cavity_box",
+  "galerkin.material_cavity:solve_material_cavity_box",
+  "simcase.tracking:tracking_settings",
+  "simcase.subspace_tracking:subspace_settings"
+ ],
+ "function_modules": [
+  "galerkin.mode_overlap"
+ ],
+ "methods": [
+  "physmat.dispersion:Dispersion.index",
+  "physmat.dispersion:Dispersion.eps",
+  "simcase.tracking:ModeTracker.__init__",
+  "simcase.subspace_tracking:SubspaceTracker.__init__"
+ ],
+ "eigensolvers": [
+  "eigs",
+  "eigsh"
+ ],
+ "results": [
+  "meshine.refine.generate",
+  "galerkin.mesh.rectangle_mesh",
+  "simcase.tracking.tracking_settings",
+  "simcase.subspace_tracking.subspace_settings",
+  "physmat.dispersion.Dispersion.index",
+  "physmat.dispersion.Dispersion.eps"
+ ]
+}
