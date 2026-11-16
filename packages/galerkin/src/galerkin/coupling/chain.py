@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""One-way chains of named stages with stage-labelled failures."""
+"""One-way chains of named stages with stage-labelled failures.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from contextlib import contextmanager
 
 

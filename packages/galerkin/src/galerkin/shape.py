@@ -38,6 +38,11 @@ from .core.materials import is_per_region, region_property
 from .core.sparse import CooMatrix
 from .mesh import Mesh
 
+__all__ = ["MeshMotion", "ElementInversion", "admissible_interval", "extend_velocity",
+           "solve_steady_heat_moving", "solve_steady_electric_moving", "solve_elasticity_moving",
+           "MotionStep", "motion_step", "live_triangle_geometry", "solve_transient_heat_moving",
+           "solve_thermoelasticity_moving", "solve_steady_thermoelasticity_moving"]
+
 _EDGE_MASS = np.array([[2.0, 1.0], [1.0, 2.0]]) / 6.0
 
 

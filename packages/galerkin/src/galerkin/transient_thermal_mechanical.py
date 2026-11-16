@@ -19,6 +19,9 @@ from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
                               freeze_temperature, solve_thermoelasticity)
 from .transient_heat import TransientHeatResult
 
+__all__ = ["TransientThermoelasticError", "TransientThermoelasticStep",
+           "TransientThermoelasticResult", "solve_transient_thermoelasticity"]
+
 
 class TransientThermoelasticError(ValueError):
     """Atomic input/transfer/mechanics failure, retaining the original cause."""

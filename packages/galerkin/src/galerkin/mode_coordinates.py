@@ -1,7 +1,11 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Cartesian modal PML and constant-radius coordinates, exp(+i omega t)."""
+"""Cartesian modal PML and constant-radius coordinates, exp(+i omega t).
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import numpy as np
 import scipy.sparse.linalg as spla

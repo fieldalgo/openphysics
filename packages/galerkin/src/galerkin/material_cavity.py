@@ -37,6 +37,9 @@ from ._cavity_common import (C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, ca
                              normalized_mesh, refuse_live_mesh_inputs, search_parameters)
 from .core.checks import positive_integer, positive_real, refuse_live, triple
 
+__all__ = ["WALLS", "CavityMaterialRegion", "MaterialCavityResult", "solve_material_cavity_box",
+           "solve_material_cavity"]
+
 _INDEPENDENCE_LIMIT = 1e-6
 _BIORTHOGONALITY_LIMIT = 1e-7
 _SEPARATION = 1e-6

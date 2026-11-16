@@ -24,6 +24,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import jv, jvp, hankel1, h1vp
 
+__all__ = ["incident", "scattered", "total", "scattering_width"]
+
 
 def _polar(x, y):
     x = np.asarray(x, dtype=float); y = np.asarray(y, dtype=float)

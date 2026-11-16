@@ -3,6 +3,9 @@
 
 """Built-in materials with their sources.
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 Optical models are taken from the refractiveindex.info database (CC0 1.0), which
 cites the original measurements; the citation of each record is kept in
 ``Material.source``. The one exception is ``standard_air``, computed from the

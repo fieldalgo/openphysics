@@ -25,6 +25,10 @@ from .core.checks import one_of, real_array, real_value, require_finite
 from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
+__all__ = ["ISOTROPIC_STRAIN", "TemperatureSnapshot", "freeze_temperature", "verify_snapshot",
+           "thermal_coefficient", "physical_energy", "ThermoelasticResult",
+           "solve_thermoelasticity"]
+
 # (exx, eyy, gamma_xy) of a unit isotropic in-plane strain; shared with galerkin.shape
 ISOTROPIC_STRAIN = np.array([1., 1., 0.])
 

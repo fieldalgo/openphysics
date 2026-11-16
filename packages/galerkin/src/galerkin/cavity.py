@@ -48,6 +48,8 @@ from .core.checks import contains_live, positive_integer, positive_real, real_va
 from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
 from .core.sparse import CooMatrix
 
+__all__ = ["CavityResult", "solve_cavity_box", "solve_cavity", "DegenerateModeWarning"]
+
 _ORTHOGONALITY_LIMIT = 1e-7
 
 

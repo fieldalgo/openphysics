@@ -110,6 +110,17 @@ python -m pytest -q tests/gmshio/test_msh.py       # 파일 하나
 node --test tests/simcase/*.cjs                    # Studio JavaScript 검사
 ```
 
+**API 단위 검사.** `tests/galerkin`, `tests/refsol`, `tests/physmat`은 각각
+`test_api_units_scan_<package>.py`를 돌려, 공개 API(공개 모듈의 `__all__`)의 모든 매개변수를
+단위 규칙에 비추어 봅니다. 매개변수는 `api` 자리가 있는 `physmat.units` 등록부 이름이면서
+키워드 전용이고 차원 있는 기본값이 없거나, 구조 이름이어야 하며, 어떤 이름도 단위 토큰으로 끝나지
+않아야 합니다. 공개 메서드에는 `__call__`도 들어가며, solver가 돌려주는 결과 클래스의 생성자는
+검사하지 않습니다. 공통 논리와 데이터는 `tests/_support/`에 있습니다. `api_scan.py`, 공개·내부
+모듈 목록, 닫힌 구조 이름 목록과 결과 클래스 목록, 제거된 이름 목록입니다. 그 밖의 모듈은 모두 내부 모듈이며
+docstring에 "Internal module, consistent units"라고 적습니다. 패키지마다의
+`api_units_allowlist.json`은 지금 있는 위반을 적어 둡니다. 항목은 지우기만 할 수 있습니다.
+새 위반도, 더는 어떤 위반과도 맞지 않는 항목도 실패합니다.
+
 ## 검사 실행
 
 ```bash

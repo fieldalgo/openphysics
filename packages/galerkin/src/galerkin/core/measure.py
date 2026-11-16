@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Static integration measures for scalar P1 problems on 2D meshes.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Cartesian coordinates use unit thickness. Axisymmetric coordinates are (r,z)
 in metres and integrate the full revolution, with volume/surface weight 2*pi*r.
 The symmetry axis is not a physical boundary: finite P1 trial functions and

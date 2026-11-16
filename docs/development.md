@@ -119,6 +119,19 @@ python -m pytest -q tests/gmshio/test_msh.py       # one file
 node --test tests/simcase/*.cjs                    # Studio JavaScript checks
 ```
 
+**API units scan.** `tests/galerkin`, `tests/refsol` and `tests/physmat` each run
+`test_api_units_scan_<package>.py`, which checks every parameter of the public API (the
+`__all__` of the public modules) against the units convention. A parameter is either a
+`physmat.units` registry name with an `api` place, keyword-only and without a dimensional
+default, or a structural name, and no name ends in a unit token. Public methods include
+`__call__`; the constructors of the result classes that solvers return are not scanned.
+The shared logic and its data are in `tests/_support/`: `api_scan.py`, the public and
+internal module lists, the closed lists of structural names and result classes, and the
+removed names. Every other module is internal and says "Internal module, consistent
+units" in its docstring. Each package's `api_units_allowlist.json` lists the violations
+that exist today. Entries may only be removed: a new violation fails, and so does an
+entry that no longer matches one.
+
 ## Running the checks
 
 ```bash

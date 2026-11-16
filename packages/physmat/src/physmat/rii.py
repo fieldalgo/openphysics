@@ -24,6 +24,8 @@ import numpy as np
 
 from .dispersion import Composite, Dispersion, RIIFormula, Tabulated
 
+__all__ = ["CITATION", "GITHUB_ZIP", "Record", "load_record", "Entry", "Database", "strip_html"]
+
 CITATION = ('M. N. Polyanskiy, "Refractiveindex.info database of optical constants", '
             "Sci. Data 11, 94 (2024). https://doi.org/10.1038/s41597-023-02898-2")
 GITHUB_ZIP = "https://github.com/polyanskiy/refractiveindex.info-database/archive/refs/heads/main.zip"

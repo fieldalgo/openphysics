@@ -39,6 +39,9 @@ alpha2 > alpha1.
 from dataclasses import dataclass
 import numpy as np
 
+__all__ = ["BimetalCurvature", "curvature", "timoshenko_curvature", "villarceau_curvature",
+           "stoney_uniaxial_curvature", "StripFields", "strip_fields", "end_traction"]
+
 
 @dataclass(frozen=True)
 class BimetalCurvature:

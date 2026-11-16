@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Run a NumPy solver on the numbers of JAX or PyTorch inputs, then add derivatives.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 A solver that differentiates this way first calls its unchanged NumPy body on
 ``numbers(...)`` of every input, with each callback wrapped in ``Recorded``:
 the NumPy body sees NumPy numbers and runs all its checks; the wrapper keeps

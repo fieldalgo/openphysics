@@ -24,6 +24,8 @@ from .core.checks import readonly_copy, real_value
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 
+__all__ = ["ElementConductivity", "SteadyElectricResult", "solve_steady_electric"]
+
 
 _MESH_MISMATCH = "element conductivity mesh geometry, ordering or regions do not match"
 

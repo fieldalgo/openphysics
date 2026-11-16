@@ -35,6 +35,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import brentq
 
+__all__ = ["ConvectionRectangle", "PublishedTarget", "NAFEMS_T4", "NAFEMS_T4_TARGET", "eigenvalues",
+           "ConvectionFields", "series"]
+
 
 @dataclass(frozen=True)
 class ConvectionRectangle:

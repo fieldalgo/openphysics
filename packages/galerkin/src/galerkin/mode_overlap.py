@@ -3,6 +3,9 @@
 
 """Power, overlap, normalisation, coupling efficiency and confinement of modes.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Post-processing for the fields that ``galerkin.waveguide.solve_modes`` returns
 (edge line integrals ``et`` of E_t and nodal ``ez`` with E_z = 1j * ez, in the
 phasor exp(+i omega t - i beta z), arbitrary amplitude) and for scalar P1 mode

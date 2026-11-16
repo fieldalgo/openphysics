@@ -41,4 +41,25 @@ from .mode_overlap import (vector_power, vector_cross_power, vector_field_overla
                            scalar_coupling_efficiency, scalar_confinement_factor,
                            scalar_effective_area)
 
+# The public names: those imported above, then the submodules those imports bind, so that
+# ``from galerkin import *`` gives the same names as before this list existed.
+__all__ = ["Mesh", "rectangle_mesh", "annulus_mesh", "disk_mesh", "Mesh3D", "box_mesh",
+           "assemble_stiffness", "assemble_mass", "assemble_boundary_mass", "assemble_load",
+           "solve_dirichlet", "radial_pml_coeffs", "EdgeSpace", "assemble_curlcurl",
+           "assemble_edge_mass", "assemble_edge_grad", "eval_edge_field", "tet_gradients",
+           "assemble_stiffness_3d", "assemble_mass_3d", "EdgeSpace3D", "assemble_curlcurl_3d",
+           "assemble_edge_mass_3d", "assemble_edge_grad_3d", "eval_edge_field_3d", "read_msh",
+           "write_msh", "from_mesher", "assemble_mode_system", "solve_modes", "CavityResult",
+           "solve_cavity", "solve_cavity_box", "CavityMaterialRegion", "MaterialCavityResult",
+           "solve_material_cavity", "solve_material_cavity_box", "element_gradient", "l2_error",
+           "ElementPermittivity", "ElectrostaticsResult", "solve_electrostatics",
+           "capacitance_matrix", "vector_power", "vector_cross_power", "vector_field_overlap",
+           "normalize_vector", "coupling_efficiency", "confinement_factor", "overlap_matrix",
+           "centroid_field", "interpolate_vector_field", "effective_area", "scalar_power",
+           "scalar_overlap", "normalize_scalar", "scalar_coupling_efficiency",
+           "scalar_confinement_factor", "scalar_effective_area",
+           "assembly", "assembly3d", "cavity", "core", "coupling", "edge", "edge3d", "electrostatics",
+           "gmsh", "interop", "material_cavity", "materials", "mesh", "mesh3d", "mode_overlap", "pml",
+           "postprocess", "solver", "waveguide"]
+
 __version__ = "0.0.2"
