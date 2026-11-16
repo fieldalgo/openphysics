@@ -133,3 +133,60 @@ relative. Tests also check endpoint reversal, translation to the origin,
 reflection and exact power-of-two scaling. These checks isolate arithmetic
 stability; they do not qualify a new grading, interpolation order or arbitrary
 conductor-loss accuracy. Existing public defaults and admission limits remain.
+
+## Explicit corner power-panel integrals
+
+`galerkin.laplace_corner` provides numerical building blocks for a normalized
+power density, `phi(s) = p/h * (s/h)**(p-1)` on `0 < s < h`. Length `h` is in
+metres and the singular endpoint is `s=0`. Require `0.5 < p <= 1`; the integral
+of squared current diverges at `p=0.5`. For a homogeneous exterior Laplace wedge
+around a convex metal corner of interior angle `alpha`, the leading exponent
+is `p = pi/(2*pi-alpha)`. This relation does not cover dielectric junctions,
+anisotropic corner laws or finite conductivity diffusion.
+
+```python
+from galerkin.laplace_corner import (
+    power_panel_gram, power_panel_self_log, power_panel_shared_vertex_log,
+)
+
+gram_per_m = power_panel_gram(1e-3, 2/3)
+self_log = power_panel_self_log(1e-3, 2/3)
+pair = power_panel_shared_vertex_log(
+    [1e-3, 0.], [0., 1e-3], 2/3, 2/3,
+)
+print(gram_per_m, self_log, pair.mean_log_distance, pair.refinement_error)
+```
+
+The exact self moments are `p**2 / ((2*p-1)*h)` and
+`log(h/1 metre) - 1/(2*p) - digamma(p+1) - EulerGamma`.
+At `p=1`, these reduce to `1/h` and `log(h/1 metre)-1.5`.
+`power_panel_quadrature(p, order)` returns immutable nodes and positive weights
+for the normalized measure `p*u**(p-1) du` on `[0,1]`. Orders 4–128 use the
+Golub–Welsch Jacobi tridiagonal matrix and squared first eigenvector components;
+computed weights are not divided by their sum.
+
+`power_panel_shared_vertex_log(a, b, p, q)` accepts finite, nonzero planar
+displacement vectors from a common vertex, in metres. The panels must meet only
+at that vertex, with length ratio at most 64. Overlapping rays are rejected.
+The result is the double weighted mean of `log(distance/1 metre)`. A Duffy split
+integrates the radial logarithm exactly and applies Gauss–Jacobi to the angular
+terms. The explicit coarse order is 4–64, default 32; its doubled order supplies
+the result. Require `abs(fine-coarse) <= 1e-12*max(1,abs(fine))`, otherwise raise
+`ValueError`. The returned frozen record retains both values and the coarse
+order; `refinement_error` reports this normalized difference. Nonfinite inputs,
+unrepresentable Gram values and unresolved quadrature are rejected.
+
+Validation uses exact polynomial moments through degree `2*order-1`, constant
+panel reductions, current scaling, and four stored independent 60/80-digit
+direct two-dimensional mpmath integrals with swaps, rotations, reflections and
+length scaling. The stored reference is
+`tests/galerkin/two_ground/evidence/corner-panel-integrals.json`; the runtime
+does not import mpmath. Quadrature and reference gates are `1e-12`; the two
+reference precisions must agree to `1e-30`.
+
+These functions are explicit primitives, not a complete weighted-panel field
+solver. Existing boundary solvers, defaults and constant-panel results remain
+unchanged. A future field composition must independently verify its assembled
+operator, currents, material assumptions, and panel/outer-domain convergence.
+No general corner-field, small-mutual-loss or platform accuracy follows from
+the integral checks alone.
