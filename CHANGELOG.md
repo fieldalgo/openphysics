@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add explicit separated linear-power logarithmic blocks with unchanged quadrature gates, independent parallel closed forms and stored high-precision direct-integral provenance.
+
 - Add reproducible provenance records for existing linear logarithmic references without changing their numerical values or acceptance criteria.
 
 - `galerkin`: an explicit two-ground corner-power field for one or two all-active convex conductors, with immutable edge/whole current factors, independent P3 references and separate panel, outer and reflection checks. Existing solvers are unchanged; fixed-ground trace reduction is outside this method.

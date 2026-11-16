@@ -1,0 +1,321 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "linear-power-separated-log-primitives",
+  "physics": "2D Laplace logarithmic panel moments",
+  "comparison": "structure-oracle",
+  "role": "Primitive direct integral comparison with a separate high-precision implementation of the same Gaussian family; independent parallel unit-power closed forms remain separate. Not a field solver or convergence result.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "orders": [
+          48,
+          64
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "direct tensor log-distance integration with mpmath Gauss-Jacobi rules",
+        "orders": [
+          48,
+          64
+        ],
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "weight_conversion": "analytic p/2^p after x=2u-1; no computed-mass normalization"
+      },
+      "arrays": [
+        "case_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_linear_separated.py",
+    "sha256": "87cf7acdfb1931b4b62d55f9e020b9d55164e0cc5f4ece0ab60c8da0ba0c2b03",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_linear_separated.py",
+    "product_commit": "257830b515197e10c680b43efadfa865160e562a",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T20:36:34.779353+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 6.269135937036481,
+    "wall_time_s": 6.282269709045067,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import cost, compilation timing, CPU model and peak resident memory were not captured."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          0.5
+        ],
+        "p": 0.5001,
+        "q": 0.5001
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          1.0
+        ],
+        "offset": [
+          1.5,
+          0.0
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.875
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          -0.015625,
+          0.0
+        ],
+        "offset": [
+          1.515625,
+          0.0
+        ],
+        "p": 1.0,
+        "q": 0.5001
+      },
+      {
+        "first": [
+          0.3,
+          0.4
+        ],
+        "second": [
+          -0.4,
+          0.3
+        ],
+        "offset": [
+          0.6,
+          0.8
+        ],
+        "p": 0.6,
+        "q": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          2.0
+        ],
+        "p": 0.875,
+        "q": 0.6
+      }
+    ],
+    "mode_order": [
+      0,
+      1
+    ],
+    "quadrature_order": 32
+  },
+  "matched": [
+    "Exact binary64 vectors and exponents; physical two-mode basis and integral normalization.",
+    "Same Gauss-Jacobi family, independently implemented at high precision and separately checked in order."
+  ],
+  "not_matched": [
+    "Reference integrates the direct tensor logarithm, without product zero-mass centering.",
+    "No field PDE, mesh, material law or physical measurement."
+  ],
+  "reference_self_check": [
+    "48/64-point rules at60 digits agree below1e-25 for every entry.",
+    "64-point rules at60/80 digits agree below1e-45 for every entry.",
+    "Analytic normalized-weight mass agrees within10^(-(digits-10)); weights are not rescaled by their computed sum.",
+    "Separate reference process did not load product modules; temporary output removed."
+  ],
+  "failed_or_discarded": [
+    "Requested low product orders may be unresolved and must be refused without retries."
+  ],
+  "not_run": [
+    "Full linear field assembly and physical/device validation.",
+    "Other operating systems and browser/portable execution."
+  ],
+  "values": [
+    {
+      "name": "case_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.47808632056207584,
+          0.06043241893573858
+        ],
+        [
+          0.06043241893573858,
+          -0.17705488105512496
+        ]
+      ]
+    },
+    {
+      "name": "case_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.1755984615173688,
+          0.10540520825632181
+        ],
+        [
+          -0.23831865194315566,
+          0.05081977810948582
+        ]
+      ]
+    },
+    {
+      "name": "case_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.03387141074225088,
+          -0.005063226649545011
+        ],
+        [
+          -0.3014055057808404,
+          -0.0015582049268960988
+        ]
+      ]
+    },
+    {
+      "name": "case_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.1637277089420818,
+          0.05202793525845796
+        ],
+        [
+          -0.17374531327164797,
+          0.018998551863904267
+        ]
+      ]
+    },
+    {
+      "name": "case_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.7151227122025964,
+          -0.001498918586789596
+        ],
+        [
+          0.0074219514039868695,
+          -0.020497604026652808
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_linear_separated_logs.py"
+  ],
+  "provenance_status": "reconstructed",
+  "not_recorded": {
+    "environment.numpy": "Not imported or installed in the isolated reproduction; see the separate-process generator imports.",
+    "environment.cpu": "CPU model was not captured by the reproduction receipt; only platform.machine was recorded.",
+    "cost.compile_s": "No separate compile timer in the pure-Python reproduction.",
+    "cost.peak_rss_mb": "No resident-memory sampler in the reproduction."
+  },
+  "regeneration": [],
+  "reproduction": {
+    "machine": "x86_64",
+    "order_differences": [
+      "1.1876225713269e-43",
+      "8.8678687019059e-49",
+      "2.4215308199977e-57",
+      "7.0008921875938e-61",
+      "7.3898306424601e-61"
+    ],
+    "precision_differences": [
+      "8.0857894644665e-61",
+      "6.5701011890494e-61",
+      "3.8051903191932e-61",
+      "2.398675044593e-61",
+      "1.581517510321e-60"
+    ],
+    "temporary_numeric_sha256": "2de74c5824e1726030b13829c078f52d2739a780357d15d2c6a381b9304fac38"
+  },
+  "values_sha256": "a82d51ffe048811053f929ee91db5791ef59ec63bf12a24ac79f625032c925bf",
+  "content_sha256": "de5d7540a0d11d7583c6a8186fdf63a4edbead444f3228936166c0b22507df8d"
+}
