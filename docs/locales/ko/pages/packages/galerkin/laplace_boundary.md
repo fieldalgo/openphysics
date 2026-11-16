@@ -204,3 +204,40 @@ print(pair.mean_log_distance, pair.refinement_error)
 따른 거리 범위, 정확한 분리거리 허용 경계, 명시적 거부, 밀도 방향과 표현
 가능한 길이 스케일도 검사한다. 일반 가까운 쌍, 다른 끝점 접촉 형태와
 조립된 가중 장 솔버는 이 API 범위에 포함하지 않는다.
+
+### Power 패널과 상수 패널 사이의 적분
+
+`power_panel_constant_log(a, b, offset, p)`는 power 패널 `0 -> a`와 상수
+패널 `offset -> offset+b` 사이의 가중 로그 평균을 구한다. 벡터 단위는
+미터이며 `0.5 < p <= 1`, 길이비는 최대 `1e6`이다. 떨어진 패널과 하나의
+공통 끝점 접촉을 허용한다. 중첩·내부 교차·비유한 입력·표현 불가능한
+좌표는 거부한다. 교차 판정에는 입력 float의 정확한 유리수 표현을
+사용하며 좌표를 임의로 맞추지 않는다. 상수 패널의 방향을 뒤집어도
+밀도는 같지만 power 패널의 방향을 뒤집으면 일반적으로 밀도가 달라진다.
+
+상수 source 선적분은 해석식으로 계산한다. 먼 거리 급수의 정규 로그
+평균 절단오차 상한은 `1.5e-18` 미만이다. Power target에는 cubic 좌표
+`u=t^3/(t^3+(1-t)^3)`, Jacobi 인자 `(2, 3*p-1)`과 해석적 밀도 정규화를
+사용한다. 계산한 가중치 합으로 다시 나누지 않는다. 고정 64/128차 비교만
+지원하며 가중치 합 오차와 정규 세분 오차를 모두 `1e-12` 이하로 요구한다.
+미수렴 근접쌍은 자동 대체 없이 `ValueError`로 거부한다.
+`PowerPanelLogResult`는 두 평균값과 낮은 차수 64를 보존한다.
+
+```python
+from galerkin.laplace_corner import power_panel_constant_log
+
+pair = power_panel_constant_log(
+    [1e-3, 0.], [1e-3, 0.], [1e-3, 0.], .625,
+)
+print(pair.mean_log_distance, pair.refinement_error)
+```
+
+독립 직접 2D 참조 5건은 시작/끝점 접촉, 근접 평행, 길이비 4000:1 및
+1:4000을 다룬다. 직접 1D 참조 4건은 복소 source 좌표를 다룬다.
+저장한 mpmath 60/80자리 결과는 `1e-30` 이내로 일치하며 실행 시 참조·변환
+검사는 `1e-12`를 유지한다. 기록은
+`tests/galerkin/two_ground/evidence/power-constant-integrals.json` 및 같은
+디렉터리의 `constant-segment-log.json`이다. 해석적 밀도 모멘트, 상수 적분
+닫힌식, 회전·반사·source 역방향·길이 배율, 1 ULP 간격/중첩 구분과 실제
+근접쌍 미수렴 거부도 검사한다. 이 원시 적분만으로 가중 field 또는 전류
+손실의 수렴을 입증하지 않으며 기존 경계 솔버를 변경하지 않는다.
