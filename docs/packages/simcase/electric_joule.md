@@ -21,7 +21,8 @@ in that unit. `mesh` is `subdivision_count: [nx, ny]` (positive integers), `mate
 There are no shapes, sweeps, remeshing or implicit extra heat sources. Unknown keys
 (`E-KEY-UNKNOWN`), non-finite numbers, booleans as numbers and conflicting corners are
 refused. At most 200,000 triangles are accepted before allocation. `results` defaults to
-`save_fields: true, plots: false`; plots and Studio execution are unsupported.
+`save_fields: true, plots: false`; plots are unsupported, and Studio runs region documents only
+([Studio](#studio-region-documents)).
 
 The physics entry:
 
@@ -255,6 +256,45 @@ Independent checks (`tests/simcase/test_joule_temperature_regions.py`, pre-regis
 | Zero coefficients, and constant materials | region `joule.steady2d` on the same document | temperature and potential equal (difference 0) |
 | Rectangle documents | results before this change | `joule_rectangle`, `joule_temperature` saved arrays, summary (without timings) and model hashes equal to the commit before (checked when this was written) |
 
+## Studio (region documents)
+
+Studio validates and runs `joule.steady2d` and `joule.temperature2d` documents with material
+regions on `POST /api/joule/validate` and `POST /api/joule/run`, with the request envelope of
+the heat routes (`{"doc", "client_revision", "request_seq"}`). A rectangle electric document,
+an `electric.steady2d` document and any other physics are refused by name
+(`unsupported_geometry`, `unsupported_physics`). The routes take the
+[Studio region path](thermal_studio.md#region-documents) step by step: the same region limits
+(`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`,
+`max_input_vertices`) are checked before the document is read, and the job runs with the node
+and triangle caps (`max_nodes`, `max_triangles`), so an over-fine mesh fails after meshing and
+before the solve. Heat and Joule jobs share the one active job slot, the byte budget and the
+result retention of the heat routes; there is no wall-clock limit on a job. `/api/capabilities`
+has a block for each kind (`run`, `validate`, `geometry: "regions"`, the result and payload
+formats and the region limits).
+
+A finished job's result (`GET /api/jobs/<job>/result`) is the payload
+`studio-joule-regions-v1`: every array of the public result under its registry name (SI;
+`triangle_regions` included, `evaluation_temperature` for `joule.temperature2d`), the
+producer's summary (balances, terminal currents, regions and, for `joule.temperature2d`, the
+Picard iteration records), `length_unit` and `display_length_in_m`. Before publishing, Studio
+checks the result/layout pair, each array's shape and unit against the summary, the
+connectivity and orientation, the prescribed node IDs, the mesh counts, and each region's
+material and thermal conductivity against the document (`invalid_result` otherwise).
+
+Errors: document, geometry and limit refusals keep their text (a temperature outside a
+model's `valid.temperature`, a missing potential, a conductor part named by its regions that
+touches no potential). A Picard iteration that does not converge is the job error
+`not_converged` with the iteration count and the solver's reason. Any other failure replies with
+Studio's fixed message and logs its traceback ([Security](../../security.md#browser-studio)).
+
+Checks (`tests/simcase/test_studio_joule_regions.py`, pre-registered J-S1 to J-S4): the payload
+of the two-material strip above equals `simcase.run` on the same document array for array and
+bit for bit, and its summary apart from wall times, for both kinds; the refusals above; the
+shape and node caps and the shared job slot; and results that disagree with their summary.
+A strip at about 8,400 nodes gave a 4.9 MB payload in 8 s on one Linux machine (the payload
+limit is 16 MiB). The workspace has no Joule form yet: use these routes from a client of
+your own.
+
 ## Run and save
 
 ```sh
@@ -348,7 +388,7 @@ reference-tool comparisons remain in force; this adapter adds no discretization.
 Only the above rectangle and region subsets with a single study are exposed. Newton
 iteration on documents, interface potentials, axisymmetric conduction, arbitrary
 sigma callbacks, gauge-only currents, terminal totals, transient physics, 3D, Studio
-and release publishing are outside this contract. Saved fields can be viewed in
+execution of rectangle documents and release publishing are outside this contract. Saved fields can be viewed in
 ParaView through `simcase.export` ([Viewing in ParaView](overview.md#viewing-in-paraview));
 that export copies the saved arrays, adds the FieldData `units` and `conventions` blocks and
 nothing else to this contract. A model can be structurally valid yet fail numerically;

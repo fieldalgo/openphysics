@@ -334,6 +334,8 @@ def test_r2_capabilities_without_nested_regions(client):
     caps = client.get('/api/capabilities').json()
     for kind in (thermal.KIND, transient.KIND):
         caps[kind].pop('regions', None)
+    for kind in ('joule.steady2d', 'joule.temperature2d'):   # region documents only (test_studio_joule_regions)
+        assert caps.pop(kind)['geometry'] == 'regions'
     assert caps == CAPABILITIES
     assert list(caps) == list(CAPABILITIES)
     for kind, block in CAPABILITIES.items():

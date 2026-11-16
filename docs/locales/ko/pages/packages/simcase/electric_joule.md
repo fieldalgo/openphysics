@@ -19,8 +19,8 @@ JSON/CLI 규범 원본은 위 영문 문서다. 이 페이지는 같은 계약�
 숫자인 네 `domain` 경계가 있다. `mesh`는 양의 정수 `subdivision_count:[nx,ny]`, `materials`는
 `{}`다. 형상 목록·sweep·재메시·추가 열원은 지원하지 않는다. 알 수 없는 키(`E-KEY-UNKNOWN`),
 비유한 수, 숫자 대신 boolean, 모서리의 상충 조건은 거부한다. 할당 전 최대 200,000 삼각형을
-검사한다. results 기본값은 `save_fields:true,plots:false`이며 plot과 Studio 실행은 지원하지
-않는다.
+검사한다. results 기본값은 `save_fields:true,plots:false`이며 plot은 지원하지 않고, Studio는 영역 문서만
+실행한다([Studio](#studio-영역-문서)).
 
 physics 항목:
 
@@ -201,6 +201,37 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 | 계수 0, 그리고 상수 재료 | 같은 문서의 영역 `joule.steady2d` | 온도·전위가 같음(차이 0) |
 | 직사각형 문서 | 이 변경 전 결과 | `joule_rectangle`, `joule_temperature`의 저장 배열·요약(시간 제외)·모델 해시가 직전 커밋과 같음(작성 때 확인) |
 
+## Studio (영역 문서)
+
+Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서를 `POST /api/joule/validate`와
+`POST /api/joule/run`에서 열전도 route와 같은 요청 봉투(`{"doc", "client_revision", "request_seq"}`)로
+검증·실행한다. 직사각형 전기 문서, `electric.steady2d` 문서, 다른 물리는 이름을 밝혀 거부한다
+(`unsupported_geometry`, `unsupported_physics`). 이 route는
+[Studio 영역 경로](thermal_studio.md#영역-문서)를 단계마다 그대로 따른다. 같은 영역 한도
+(`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`, `max_input_vertices`)를
+문서를 읽기 전에 검사하고, 작업은 절점·삼각형 상한(`max_nodes`, `max_triangles`)으로 실행하므로 너무
+조밀한 메시는 메시 생성 뒤, 풀이 전에 실패한다. 열전도와 Joule 작업은 열전도 route의 활성 작업 한
+자리, 바이트 예산, 결과 보존을 함께 쓴다. 작업 실행 시간 한도는 없다. `/api/capabilities`에는 종류마다
+블록(`run`, `validate`, `geometry: "regions"`, 결과·payload 형식, 영역 한도)이 있다.
+
+끝난 작업의 결과(`GET /api/jobs/<job>/result`)는 payload `studio-joule-regions-v1`이다. 공개 결과의
+모든 배열을 등록부 이름으로(SI, `triangle_regions` 포함, `joule.temperature2d`에는
+`evaluation_temperature`), 생산자 요약(수지, 단자 전류, 영역, `joule.temperature2d`의 Picard 반복
+기록), `length_unit`, `display_length_in_m`을 담는다. 게시 전에 결과/배치 쌍, 각 배열의 형상과 단위를
+요약과, 연결과 방향, 고정 절점 ID, 메시 개수, 각 영역의 재료와 열전도율을 문서와 대조한다(어긋나면
+`invalid_result`).
+
+오류: 문서·형상·한도 거부는 자기 문장을 유지한다(모델의 `valid.temperature` 밖 온도, 전위 누락, 어떤
+전위에도 닿지 않는 도체 부분을 영역 이름으로). 수렴하지 않은 Picard 반복은 반복 횟수와 솔버의 이유를
+담은 작업 오류 `not_converged`이다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
+남긴다([보안](../../security.md#브라우저-studio)).
+
+검사(`tests/simcase/test_studio_joule_regions.py`, 사전 등록 J-S1–J-S4): 위의 두 재료 띠의 payload가
+같은 문서의 `simcase.run`과 배열마다 비트 단위로 같고 요약도 실행 시간 밖에서 같다(두 종류 모두). 위의
+거부, 형상·절점 상한과 공유 작업 자리, 요약과 어긋나는 결과. 약 8,400 절점의 띠는 Linux 한 대에서
+8초에 4.9 MB payload를 냈다(payload 한도 16 MiB). 작업 공간에는 아직 Joule 양식이 없다. 직접 만든
+클라이언트에서 이 route를 쓴다.
+
 ## 실행·저장
 
 ```sh
@@ -286,7 +317,7 @@ redirect해 보존한다.
 
 이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 문서에서의 Newton 반복,
 경계면 전위, 축대칭 전도, 임의 σ 함수, 기준 전위만 주는 전류 조건, 단자 총량, 과도, 3D,
-Studio, 릴리스는 제외한다. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수 있다
+직사각형 문서의 Studio 실행, 릴리스는 제외한다. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수 있다
 ([ParaView로 보기](overview.md#paraview로-보기)). 그 내보내기는 저장된 배열을 복사하고 FieldData
 `units`와 `conventions` 블록을 더할 뿐 이 계약에 다른 것을 더하지 않는다. 입력 검증 통과는
 실제 수치 수렴 보장이 아니다.
