@@ -48,3 +48,5 @@ zeta 함수는 평가하지 않는다. 비영 성분은 바닥값 없는 상대 
 이 적분만으로 실측 또는 다른 실행 환경의 검증을 주장하지 않는다.
 
 기존 상수·선형 밀도 계열과 별도 계약은 [경계 패널](laplace_boundary.md)을 참고한다.
+
+Far, 공통 원점, separated, mixed-source 블록은 별도 [상호작용 계약](laplace_corner_harmonic_interactions.md)을 참고한다.
