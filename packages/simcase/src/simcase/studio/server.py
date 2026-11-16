@@ -42,6 +42,7 @@ from .bodies import (RequestRefused, UNEXPECTED, USER_FACING, diagnostics as _di
                      read_envelope, reply_text, unexpected)
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
+from . import joule_regions_api as joule
 from . import transient_thermal_api as transient
 from . import security
 from . import geometry_api
@@ -479,6 +480,8 @@ def studio_capabilities():
     caps[transient.KIND] = transient.capabilities(_thermal_jobs.limits)
     for kind in (thermal.KIND, transient.KIND):
         caps[kind]["regions"] = regions.capability(kind, _thermal_jobs.limits, _region_limits)
+    for kind in joule.KINDS:     # region documents only
+        caps[kind] = joule.capability(kind, _thermal_jobs.limits, _region_limits)
     return caps
 
 
@@ -566,6 +569,87 @@ async def start_thermal_run(body: Request):
                 jobs.release(lease)
         exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
         return _thermal_error(exc)
+    finally:
+        if permit is not None:
+            permit.release()
+
+
+def _joule_error(exc):
+    return _thermal_error(exc)
+
+
+@app.post("/api/joule/validate")
+async def validate_joule(body: Request):
+    jobs, permit, spec = _thermal_jobs, None, None
+    try:
+        permit = jobs.ingress.acquire()
+        spec = await thermal.read_request(body, jobs.limits, for_run=False, preflight=joule.rectangle_preflight,
+                                          region=joule.Route(jobs.limits, _region_limits))
+        payload = thermal.validation_payload(spec, jobs.limits)
+        return Response(payload, media_type="application/json", headers={"Cache-Control": "no-store"})
+    except thermal.ThermalAPIError as exc:
+        return _joule_error(exc)
+    except Exception as exc:
+        return _joule_error(thermal.ThermalAPIError(
+            "invalid_document", reply_text(exc, "Joule validation"), 400, tags=spec.tags() if spec else None))
+    finally:
+        if permit is not None:
+            permit.release()
+
+
+def _run_joule_job(jobs, lease, spec, rlimits):
+    """A Joule region document, bounded by the job's node and triangle caps and the loop-vertex
+    limit, so an over-fine mesh fails before the solve."""
+    stage = "solver_failed"
+    try:
+        try:
+            result = run(spec.run_doc, verbose=False, max_nodes=spec.plan.n_cap,
+                         max_triangles=spec.plan.m_cap, max_input_vertices=rlimits.max_input_vertices)
+        except Exception as exc:
+            mapped = joule.job_error(exc, spec.plan)
+            if mapped is None:
+                raise
+            raise mapped from exc
+        stage = "invalid_result"
+        encoded = joule.capture(result, jobs.identity(lease), jobs.limits, rlimits, spec)
+        stage = "publication_failed"
+        jobs.complete(lease, encoded, [])     # an electric/Joule result has no public log
+    except Exception as exc:
+        try:
+            jobs.fail(lease, exc, stage)
+        except Exception:
+            pass
+    finally:
+        jobs.release(lease)
+
+
+@app.post("/api/joule/run")
+async def start_joule_run(body: Request):
+    jobs, permit, spec, lease = _thermal_jobs, None, None, None
+    identity = {}
+    try:
+        permit = jobs.ingress.acquire()
+        rlimits = _region_limits
+        spec = await thermal.read_request(body, jobs.limits, for_run=True, preflight=joule.rectangle_preflight,
+                                          region=joule.Route(jobs.limits, rlimits))
+        lease = jobs.reserve()
+        token = uuid.uuid4().hex
+        identity = jobs.attach(lease, "thermal-joule-"+token, "result-"+token, spec)
+        _start_thermal_thread(_run_joule_job, (jobs, lease, spec, rlimits))
+        return JSONResponse(identity, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        if not isinstance(exc, thermal.ThermalAPIError):   # one refusal for the job and the reply
+            exc = thermal.ThermalAPIError("thread_start_failed" if lease is not None else "invalid_document",
+                                          reply_text(exc, "Joule run request"), 500 if lease is not None else 400)
+        if lease is not None:
+            try:
+                jobs.fail(lease, exc, "thread_start_failed")
+            except Exception:
+                pass
+            finally:
+                jobs.release(lease)
+        exc.tags = {**(spec.tags() if spec else exc.tags), **identity}
+        return _joule_error(exc)
     finally:
         if permit is not None:
             permit.release()

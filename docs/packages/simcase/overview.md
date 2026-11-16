@@ -68,7 +68,9 @@ prints a supplied example.
 
 Studio edits and runs 2D optical models and has dedicated views for steady and
 transient heat documents, rectangular or with material regions (the latter
-within Studio's region limits); it rejects cavity documents. Coupled or
+within Studio's region limits), and runs `joule.steady2d` and `joule.temperature2d` documents with
+material regions on its Joule routes ([Studio](electric_joule.md#studio-region-documents); no
+workspace form yet); it rejects cavity documents. Coupled or
 multiple-physics runs, geometry, mesh and material sweeps and mechanics
 documents are not
 supported; `em.cavity3d` accepts lossy box materials.
