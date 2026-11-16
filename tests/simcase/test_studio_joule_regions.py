@@ -141,7 +141,9 @@ def test_js1_capabilities_name_the_routes_and_the_region_limits(client):
         assert block["validate"] == "/api/joule/validate" and block["run"] == "/api/joule/run"
         assert block["run_enabled"] is True and block["geometry"] == "regions"
         assert block["result_formats"] == [joule.PAIRS[kind][0]]
-        assert block["limits"] == caps["thermal.steady2d"]["regions"]["limits"]
+        limits = dict(block["limits"])
+        assert limits.pop("max_iterations", None) == (joule.MAX_ITERATIONS if kind == joule.TEMPERATURE else None)
+        assert limits == caps["thermal.steady2d"]["regions"]["limits"]
 
 
 # ---- J-S2: refusals for users and unexpected failures ------------------------------------------
@@ -215,6 +217,28 @@ def test_js2_a_wrapped_unexpected_failure_inside_the_iteration_is_not_shown(clie
     assert MARKER in caplog.text
 
 
+def test_js2_an_iterate_leaving_a_model_range_is_reported_with_the_solver_text(client):
+    doc = strip()
+    doc["physics"]["j"]["prescribed_electric_potential"]["left"] = "2 V"
+    message = job_error(client, doc, "not_converged")
+    assert "K outside [250.0, 600.0] K" in message and FIXED not in message
+
+
+def test_js2_another_plain_value_error_inside_the_iteration_is_not_shown(client, monkeypatch, caplog):
+    from galerkin import temperature_joule_heating as tj
+
+    def fail(*args, **kwargs):
+        try:
+            raise ValueError(MARKER)
+        except ValueError as exc:
+            raise tj.JouleConvergenceError(str(exc), (), np.zeros(1)) from exc
+    monkeypatch.setattr(tj, "solve_temperature_joule_heat", fail)
+    with caplog.at_level(logging.WARNING, logger="simcase.studio"):
+        _, status = finished(client, strip())
+    assert MARKER not in status["error"]["message"] and FIXED in status["error"]["message"]
+    assert MARKER in caplog.text
+
+
 def test_js2_rectangle_and_other_physics_are_refused_by_name(client):
     rectangle = {"openphysics": "0.3", "name": "rect", "geometry": {"length_unit": "mm", "depth": None,
                  "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}}, "materials": {},
@@ -254,17 +278,53 @@ def test_js3_a_mesh_over_the_node_cap_fails_before_the_solve(client, monkeypatch
     assert f"max_nodes={nodes-1}" in message
 
 
-def test_js3_heat_and_joule_share_the_one_active_job(client, monkeypatch):
+HEAT = {"openphysics": "0.3", "name": "heat control",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0., "xmax": 1., "ymin": 0., "ymax": 1.}},
+        "materials": {}, "physics": {"heat1": {
+            "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)", "heat_source_density": "0 W/m^3",
+            "prescribed_temperature": {"left": "300 K", "right": "293 K"}}},
+        "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
+        "results": {"save_fields": True, "plots": False}}
+
+
+@pytest.mark.parametrize("first,second", [("joule", "heat"), ("heat", "joule")])
+def test_js3_heat_and_joule_share_the_one_active_job(client, monkeypatch, first, second):
     held = []
     monkeypatch.setattr(server, "_start_thermal_thread", lambda target, args: held.append((target, args)))
-    first = client.post("/api/joule/run", json=envelope(strip()))
-    assert first.status_code == 200
-    second = client.post("/api/joule/run", json=envelope(strip()))
-    assert second.status_code == 429 and second.json()["error"]["code"] == "capacity_exceeded"
+    routes = {"joule": ("/api/joule/run", strip()), "heat": ("/api/thermal/run", HEAT)}
+    accepted = client.post(routes[first][0], json=envelope(routes[first][1]))
+    assert accepted.status_code == 200, accepted.text
+    refused = client.post(routes[second][0], json=envelope(routes[second][1]))
+    assert refused.status_code == 429 and refused.json()["error"]["code"] == "capacity_exceeded"
     target, args = held.pop()
     target(*args)
-    assert client.get("/api/jobs/"+first.json()["job"]).json()["status"] == "done"
+    assert client.get("/api/jobs/"+accepted.json()["job"]).json()["status"] == "done"
     assert_idle(server._thermal_jobs)
+
+
+def test_js3_iteration_limit_over_studio_cap_is_refused_before_a_job(client):
+    doc = strip()
+    doc["physics"]["j"]["iteration"]["iteration_limit"] = joule.MAX_ITERATIONS+1
+    for action in ("validate", "run"):
+        reply = client.post("/api/joule/"+action, json=envelope(doc))
+        assert reply.status_code == 413, reply.text
+        error = reply.json()["error"]
+        assert error["code"] == "iteration_limit_exceeded" and f"max_iterations={joule.MAX_ITERATIONS}" in error["message"]
+        assert error["path"] == "physics.j.iteration.iteration_limit"
+    doc["physics"]["j"]["iteration"]["iteration_limit"] = joule.MAX_ITERATIONS
+    assert client.post("/api/joule/validate", json=envelope(doc)).json()["ok"] is True
+    assert_idle(server._thermal_jobs)
+
+
+def test_js3_a_long_iteration_fits_the_result(client):
+    # relaxation 0.2 needs more Picard steps than the 64 KiB metadata budget would hold records for
+    doc = strip(size=0.25)
+    doc["physics"]["j"]["iteration"]["relaxation_factor"] = 0.2
+    identity, status = finished(client, doc)
+    assert status["status"] == "done", status
+    payload = client.get("/api/jobs/"+identity["job"]+"/result").json()
+    assert len(payload["summary"]["iterations"]) > 60
+    assert len(payload["summary"]["iterations"]) == len(run(Document.from_dict(doc), verbose=False).summary()["iterations"])
 
 
 # ---- J-S4: result checks -----------------------------------------------------------------------
@@ -293,8 +353,9 @@ def pair(result):
     result._metadata["field_layout"] = "electric-joule2d-p1-node-cell-regions-v2"
 
 
-@pytest.mark.parametrize("change", [shape, names, pair])
-def test_js4_a_result_that_disagrees_is_refused(client, monkeypatch, caplog, change):
+@pytest.mark.parametrize("change,expected", [
+    (shape, "temperature: wrong metadata shape"), (names, "summary regions disagree with the names"),
+    (pair, "unsupported public Joule region result/layout pair")])
+def test_js4_a_result_that_disagrees_is_refused(client, monkeypatch, change, expected):
     monkeypatch.setattr(server.joule, "capture", tampered(change))
-    message = job_error(client, strip(), "invalid_result")
-    assert message != FIXED
+    assert job_error(client, strip(), "invalid_result") == expected

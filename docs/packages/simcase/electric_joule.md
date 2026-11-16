@@ -268,9 +268,13 @@ an `electric.steady2d` document and any other physics are refused by name
 `max_input_vertices`) are checked before the document is read, and the job runs with the node
 and triangle caps (`max_nodes`, `max_triangles`), so an over-fine mesh fails after meshing and
 before the solve. Heat and Joule jobs share the one active job slot, the byte budget and the
-result retention of the heat routes; there is no wall-clock limit on a job. `/api/capabilities`
+result retention of the heat routes; there is no wall-clock limit on a job. A job's cost is its
+mesh's times its Picard iterations, so a `joule.temperature2d` document whose
+`iteration.iteration_limit` exceeds Studio's `max_iterations` (500) is refused before a job
+(`iteration_limit_exceeded`, 413); the iteration records (about 1 kB each) count against the
+result's `payload_bytes`, not the 64 KiB `metadata_bytes`. `/api/capabilities`
 has a block for each kind (`run`, `validate`, `geometry: "regions"`, the result and payload
-formats and the region limits).
+formats and the region limits, with `max_iterations` for `joule.temperature2d`).
 
 A finished job's result (`GET /api/jobs/<job>/result`) is the payload
 `studio-joule-regions-v1`: every array of the public result under its registry name (SI;
@@ -284,7 +288,9 @@ material and thermal conductivity against the document (`invalid_result` otherwi
 Errors: document, geometry and limit refusals keep their text (a temperature outside a
 model's `valid.temperature`, a missing potential, a conductor part named by its regions that
 touches no potential). A Picard iteration that does not converge is the job error
-`not_converged` with the iteration count and the solver's reason. Any other failure replies with
+`not_converged` with the iteration count and the solver's reason (the iteration limit, or a
+material model's valid range left by an iterate); another error inside the iteration gets the
+fixed message. Any other failure replies with
 Studio's fixed message and logs its traceback ([Security](../../security.md#browser-studio)).
 
 Checks (`tests/simcase/test_studio_joule_regions.py`, pre-registered J-S1 to J-S4): the payload
