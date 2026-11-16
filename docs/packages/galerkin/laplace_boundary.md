@@ -377,3 +377,48 @@ permutations and inclusive boundary checks verify the arithmetic. An actual
 A residual is neither a condition estimate nor a forward-error or field-
 convergence certificate. Existing solvers and their checks remain unchanged;
 this primitive alone does not qualify a corrected field or another platform.
+
+## Normalized power/constant half-space integral
+
+`galerkin.laplace_half_space.power_constant_half_space(first, second, offset,
+exponent, height=...)` averages the bottom-ground Green kernel
+`log(image_distance / distance)` over one normalized power target density
+`p*u**(p-1)` and one constant source density. It omits the `1/(2*pi)` factor.
+The target is `(0,height) + u*first`; the source is
+`(0,height) + offset + v*second`, for `u,v` in `[0,1]`. Vectors and height
+are in metres. `HalfSpacePanelIntegral` retains immutable `green_mean`,
+`coarse_green_mean`, `quadrature_order` and `refinement_error`.
+
+```python
+from galerkin.laplace_half_space import power_constant_half_space
+
+mean = power_constant_half_space(
+    [0.001, 0.0], [0.001, 0.0], [0.001, 0.0], 0.625, height=0.002,
+)
+assert mean.refinement_error <= 1e-12
+```
+
+The exponent must lie in `(0.5,1]`, the length ratio must not exceed `1e6`,
+and all endpoints must be above ground. Segments may be disjoint or touch
+at endpoints; exact binary-input topology refuses overlap and interior
+intersections without snapping. The largest length, offset/image norm or
+start height defines a scale: each panel length and endpoint height must
+be at least `128*binary64_epsilon` times that scale. Non-real, nonfinite
+or unrepresentable inputs are refused.
+
+The constant source is integrated analytically. Fixed target orders 64/128
+must agree within `1e-12*max(1,abs(fine))`; each rule's mass must be within
+`1e-12` of one. The exact zeroth moment is separated as
+`f(0) + sum(w*(f(u)-f(0)))`, without rescaling any weights. Far image/source
+logarithms share a stable log-ratio and bounded series difference. A zero
+or negative mean from cancellation is refused because the exact Green
+kernel is strictly positive here. There is no fallback, clipping or
+relative-accuracy guarantee for a small mean.
+
+Six stored direct two-dimensional mpmath 1.3.0 (BSD-3-Clause) references,
+each agreeing at 60/80 decimal digits, cover endpoint contact, near and
+oblique panels and length ratios of 4000 in both directions. Reflection,
+source reversal, physical scaling, constant-density reciprocity, ground
+translation, unchanged weights and input refusal are checked separately.
+These are primitive integration checks, not a complete field solution,
+mesh/outer convergence, another platform or a physical measurement.
