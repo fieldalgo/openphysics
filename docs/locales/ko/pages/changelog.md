@@ -28,6 +28,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- 자기 로그·제곱 밀도 참조에 재현 가능한 출처를 추가하고 원래의 엄격한 상대·해석적 영값 검사를 유지했습니다.
+
 - 해석적 소스 모멘트·기존 고정 구적 거부·저장 adaptive 참조를 갖춘 명시적 두 모드 power/constant 끝점 상호작용을 추가했습니다.
 
 - 기존 구적 기준·독립 평행 폐형식·고정밀 직접적분 출처를 갖춘 명시적 분리 선형 power 로그 블록을 추가했습니다.
