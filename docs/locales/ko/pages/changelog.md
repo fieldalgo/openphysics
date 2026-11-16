@@ -1,5 +1,7 @@
 # 변경 기록
 
+- 정적 쐐기 기저의 자기 적분과 Gram을 명시적 API로 추가했다. 균일 모드 근처의 비영 성분과 독립 적분 근거를 검증하며 기존 장 솔버는 그대로 유지한다.
+
 [English](../../../../CHANGELOG.md) | **한국어**
 
 OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmshio`,
