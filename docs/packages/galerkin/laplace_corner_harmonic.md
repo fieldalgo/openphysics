@@ -53,3 +53,5 @@ execution-platform qualification follows from this primitive.
 
 See [corner panel primitives](laplace_boundary.md) for the existing
 constant and linear density families and their separate contracts.
+
+See the separate [harmonic interaction contracts](laplace_corner_harmonic_interactions.md) for explicit far, shared-origin, separated and mixed-source blocks.
