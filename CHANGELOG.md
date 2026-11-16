@@ -1,5 +1,7 @@
 # Changelog
 
+- Add explicit static wedge-harmonic self/Gram primitives with stable near-uniform moments, independent integral provenance and unchanged field solvers.
+
 All eight OpenPhysics distributions (`galerkin`, `galerkin-refsol`, `meshine`,
 `gmshio`, `physmat`, `simcase`, `sipi` and the `openphysics` meta distribution) release
 together under one version number. This file records what each release changes.
