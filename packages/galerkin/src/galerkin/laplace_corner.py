@@ -8,6 +8,7 @@ alter any constant-panel solver or establish field/mesh convergence.
 """
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import lru_cache
 import math
 import numpy as np
 from scipy.special import digamma, xlogy
@@ -62,6 +63,11 @@ def power_panel_quadrature(exponent, order=32):
     """
     p = _power(exponent)
     n = _order(order, 128)
+    return _cached_power_rule(p, n)
+
+
+@lru_cache(maxsize=128)
+def _cached_power_rule(p, n):
     # Golub-Welsch for the already normalized Jacobi measure. Avoid a
     # derivative-based weight formula and any computed-sum normalization.
     beta = p-1.
@@ -208,7 +214,13 @@ def power_panel_separated_log(first,second,offset,first_exponent,second_exponent
 
 def _graded_power_rule(power,order):
     """Cubic-coordinate rule for p*u**(p-1); no weight-sum rescaling."""
-    p=_power(power);n=_order(order,128);alpha=2.;beta=3*p-1.;s=alpha+beta
+    p=_power(power);n=_order(order,128)
+    return _cached_graded_rule(p,n)
+
+
+@lru_cache(maxsize=128)
+def _cached_graded_rule(p,n):
+    alpha=2.;beta=3*p-1.;s=alpha+beta
     k=np.arange(n,dtype=float);diag=np.empty(n);diag[0]=(beta-alpha)/(s+2)
     diag[1:]=(beta*beta-alpha*alpha)/((2*k[1:]+s)*(2*k[1:]+s+2))
     k=k[1:];off=2/(2*k+s)*np.sqrt(k*(k+alpha)*(k+beta)*(k+s)/((2*k+s-1)*(2*k+s+1)))
@@ -216,7 +228,7 @@ def _graded_power_rule(power,order):
     denominator=t**3+(1-t)**3
     x=t**3/denominator
     weights=vectors[0]**2*2/((3*p+1)*(3*p+2))/denominator**(p+1)
-    return x,weights
+    return _frozen(x),_frozen(weights)
 
 def _constant_segment_log(z):
     """Mean log|z+t| for a constant unit segment, avoiding far cancellation."""
