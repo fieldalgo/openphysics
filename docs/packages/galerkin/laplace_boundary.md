@@ -605,3 +605,42 @@ with reasons. A stored consumer reports no current reference execution time.
 These are mathematical primitive comparisons: the vertex reference shares the
 Duffy identity, and neither record establishes field convergence, physical
 accuracy or support on another platform.
+
+### Separated hierarchical linear-power blocks
+
+`power_panel_linear_separated_log(first, second, offset, p, q,
+quadrature_order=32)` covers two disjoint segments with minimum separation at
+least half the longer length, powers in(0.5,1] and length ratio at most64.
+The first segment runs from zero to `first`; the second from `offset` to
+`offset+second`, in metres. Normalized directions must remain representable.
+This is an explicit additional API, with the same immutable fine/coarse 2x2
+result and physical modes as the self, vertex and far blocks. It does not
+replace their admission rules or choose methods automatically.
+
+Each zero-mass mode uses an anchored logarithmic difference. For base vector b
+and increment d, evaluate the log-distance difference through
+`log1p((2*b.dot(d)+d.dot(d))/(|b|*(|b+d|+|b|)))`.
+The mixed block subtracts the corresponding single-variable anchor before
+integration. Physical quadrature weights are unchanged; analytic masses[1,0]
+place log(scale) only in00. Explicit n/2n rules, n=4..64, retain the dimensionless
+entrywise1e-12*max(1,abs(fine)) comparison; an unresolved requested order raises
+without retries. Segments closer than the stated limit and touching at other
+endpoints still need separate contracts.
+
+For parallel equal unit-power segments separated by h times their length,
+independent difference-coordinate convolution gives
+`I00=log(length)+J0-J1`, `I01=I10=0`, `I11=J0-3*J1+2*J3`, where
+`Jk=integral_0^1 t^k*log(t^2+h^2) dt`. Closed antiderivatives for k=0,1,3
+check h=.5/1/2 and lengths2^-15/1/2^15.
+The [stored direct-integral record](../../../tests/galerkin/reference_values/mpmath/linear_separated_log.json)
+checks five unequal-power, length and angle cases. Its mpmath1.3.0 implementation
+uses direct tensor Gauss-Jacobi integration at48/64 points and60/80 digits:
+it shares the Gaussian family but does not use product centering or import
+product code. Order agreement below1e-25 and precision agreement below1e-45
+are reference self-checks, not field-convergence evidence. The adjacent
+compare-only generator and hash-pinned requirements reproduce all five arrays.
+
+Exchange, signed-axis transformations, physical scaling, constant-mode
+compatibility, overlap with the far API, immutable outputs and explicit refusal
+are checked separately. These primitive blocks do not yet supply a full linear
+boundary field solver, current partition or validated fixed-ground adapter.

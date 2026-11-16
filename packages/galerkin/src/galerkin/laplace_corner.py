@@ -19,7 +19,8 @@ __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_shared_vertex_log', 'power_panel_separated_log',
            'power_panel_constant_log', 'power_panel_linear_gram',
            'power_panel_linear_self_log', 'PowerPanelLinearLogResult',
-           'power_panel_linear_far_log', 'power_panel_linear_shared_vertex_log']
+           'power_panel_linear_far_log', 'power_panel_linear_shared_vertex_log',
+           'power_panel_linear_separated_log']
 
 
 def _scalar(value, name):
@@ -440,4 +441,62 @@ def power_panel_linear_shared_vertex_log(first,second,first_exponent,second_expo
         out[0,0]+=math.log(scale);return out
     coarse,fine=evaluate(n),evaluate(2*n)
     if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):raise ValueError('linear vertex quadrature did not converge')
+    return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
+
+
+def power_panel_linear_separated_log(first,second,offset,first_exponent,second_exponent,*,quadrature_order=32):
+    """Linear-power log block for two sufficiently separated finite panels.
+
+    The first panel runs from zero to first, the second from offset to
+    offset+second, in planar metres. Use the same physical phi0/phi1 modes
+    as power_panel_linear_self_log, with analytic masses[1,0]. Require
+    exponents in(0.5,1], length ratio<=64 and segment separation at least
+    half the longer length. Normalized panel directions must remain
+    representable. This separate API does not replace the far primitive.
+
+    Center zero-mass entries using log-distance differences, retain physical
+    quadrature weights and add log(scale) only to00. Compare requested
+    n/2n rules (n=4..64) entrywise at1e-12*max(1,abs(fine)); unresolved
+    inputs are refused without retries. This dimensionless primitive check
+    is not a field error bound. Closer/touching panels, assembly and current
+    solving need separate contracts and verification.
+    """
+    p,q=_power(first_exponent),_power(second_exponent);n=_order(quadrature_order,64)
+    vectors=[]
+    for value in (first,second,offset):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():
+            raise ValueError('vectors must be finite real planar pairs')
+        vectors.append(np.asarray(raw,dtype=float))
+    a,b,o=vectors;la,lb,lo=[math.hypot(*v) for v in vectors]
+    if not all(math.isfinite(x) for x in (la,lb,lo)) or min(la,lb,lo)<=0:
+        raise ValueError('panel lengths and offset must be positive and representable')
+    size=max(la,lb)
+    if min(la,lb)/size<1/64:raise ValueError('panel length ratio must not exceed 64')
+    if lo/4<size and _separated_distance(a/size,b/size,o/size)<.5:
+        raise ValueError('panel separation must be at least half the longer length')
+    scale=max(size,lo);a,b,o=a/scale,b/scale,o/scale
+    if not np.any(a) or not np.any(b):raise ValueError('normalized panel direction is not representable')
+    def evaluate(order):
+        u,w=power_panel_quadrature(p,order);v,z=power_panel_quadrature(q,order)
+        ua=u[:,None]*a;vb=v[:,None]*b
+        # log|base+delta|-log|base| without subtracting large logarithms.
+        def difference(base,delta):
+            old=np.hypot(base[...,0],base[...,1]);new=base+delta
+            distance=np.hypot(new[...,0],new[...,1])
+            change=2*np.sum(base*delta,axis=-1)+np.sum(delta*delta,axis=-1)
+            return np.log1p(change/(old*(distance+old)))
+        L=.5*np.log(np.sum((ua[:,None]-o-vb[None])**2,axis=-1))
+        left=difference(-o-vb[None],ua[:,None])
+        right=difference(ua[:,None]-o,-vb[None])
+        left_zero=difference(-o,ua)[:,None]
+        mixed=left-left_zero
+        wp=w*math.sqrt(p*(p+2))*((p+1)/p*u-1)
+        zq=z*math.sqrt(q*(q+2))*((q+1)/q*v-1)
+        def total(x,y,matrix):return math.fsum((x[:,None]*matrix*y[None]).ravel())
+        return np.array([[math.log(scale)+total(w,z,L),total(w,zq,right)],
+                         [total(wp,z,left),total(wp,zq,mixed)]])
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):
+        raise ValueError('linear separated-panel quadrature did not converge')
     return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
