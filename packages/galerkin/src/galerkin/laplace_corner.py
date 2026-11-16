@@ -18,7 +18,8 @@ __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_gram', 'power_panel_self_log',
            'power_panel_shared_vertex_log', 'power_panel_separated_log',
            'power_panel_constant_log', 'power_panel_linear_gram',
-           'power_panel_linear_self_log']
+           'power_panel_linear_self_log', 'PowerPanelLinearLogResult',
+           'power_panel_linear_far_log']
 
 
 def _scalar(value, name):
@@ -339,3 +340,63 @@ def power_panel_linear_self_log(length, exponent):
     cross = scale*(1-p)/(2*p*(p+1))
     linear = -(p+2)/(2*(p+1))
     return _frozen([[zero,cross],[cross,linear]]).reshape(2,2)
+
+
+@dataclass(frozen=True)
+class PowerPanelLinearLogResult:
+    """Read-only fine/coarse 2x2 far-log blocks returned by the explicit rule."""
+    mean_log_distance: np.ndarray
+    coarse_mean_log_distance: np.ndarray
+    quadrature_order: int
+
+
+def power_panel_linear_far_log(first,second,offset,first_exponent,second_exponent,*,quadrature_order=32):
+    """Far log-distance block for constant-mass and zero-mass linear modes.
+
+    Use phi0=p/h*u**(p-1) and phi1=sqrt(p*(p+2))*((p+1)/p*u-1)*phi0,
+    each singular at its panel origin. Rows belong to the first panel and
+    columns to the second, whose origin is offset from the first. All vectors
+    are planar metres; length ratio is at most64 and |offset| must be at least
+    four times the sum of panel lengths. Exponents lie in (0.5,1].
+
+    The dimensionless logarithm uses one metre as reference. Only entry00
+    changes under common geometric scaling. Analytic masses [1,0], centered
+    log1p differences and unchanged Gauss-Jacobi weights avoid subtracting
+    scale constants in zero-mass modes. Compare n and 2*n (n=4..64) entrywise
+    at 1e-12*max(1,abs(fine)); this is a primitive quadrature criterion, not
+    a field error bound. Near/touching interactions and field solving are
+    outside this explicit far contract. No fallback or weight rescaling.
+    """
+    p,q=_power(first_exponent),_power(second_exponent);n=_order(quadrature_order,64)
+    vectors=[]
+    for value in (first,second,offset):
+        raw=np.asarray(value)
+        if raw.shape!=(2,) or raw.dtype.kind not in 'fiu' or not np.isfinite(raw).all():
+            raise ValueError('vectors must be finite real planar pairs')
+        vectors.append(np.asarray(raw,dtype=float))
+    a,b,o=vectors;la,lb,lo=[math.hypot(*v) for v in vectors]
+    if not all(math.isfinite(x) for x in (la,lb,lo)) or min(la,lb,lo)<=0:
+        raise ValueError('panel lengths and offset must be positive and representable')
+    if min(la,lb)/max(la,lb)<1/64:raise ValueError('panel length ratio must not exceed 64')
+    if la/lo+lb/lo>.25:raise ValueError('offset must be at least four times the sum of panel lengths')
+    a,b,o=a/lo,b/lo,o/lo
+    def evaluate(order):
+        u,w=power_panel_quadrature(p,order);v,z=power_panel_quadrature(q,order)
+        ua=u[:,None]*a;vb=v[:,None]*b
+        # log|base+delta|-log|base| without subtracting large logarithms.
+        def difference(base,delta):
+            return .5*np.log1p((2*np.sum(base*delta,axis=-1)+np.sum(delta*delta,axis=-1))/np.sum(base*base,axis=-1))
+        L=.5*np.log(np.sum((ua[:,None]-o-vb[None])**2,axis=-1))
+        left=difference(-o-vb[None],ua[:,None])
+        right=difference(ua[:,None]-o,-vb[None])
+        left_zero=difference(-o,ua)[:,None]
+        mixed=left-left_zero
+        wp=w*math.sqrt(p*(p+2))*((p+1)/p*u-1)
+        zq=z*math.sqrt(q*(q+2))*((q+1)/q*v-1)
+        def total(x,y,matrix):return math.fsum((x[:,None]*matrix*y[None]).ravel())
+        return np.array([[math.log(lo)+total(w,z,L),total(w,zq,right)],
+                         [total(wp,z,left),total(wp,zq,mixed)]])
+    coarse,fine=evaluate(n),evaluate(2*n)
+    if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):
+        raise ValueError('linear far-panel quadrature did not converge')
+    return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
