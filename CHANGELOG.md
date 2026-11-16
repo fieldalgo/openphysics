@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add an explicit two-mode corner field for one or two all-active conductors, preserving physical current moments and separate numerical, panel, outer and analytic checks.
+
 - Assemble bounded two-mode corner half-space Green matrices with explicit partitioned mixed interactions, raw numerical refusals and preserved P0/energy/reference checks.
 
 - Add bounded physical-density partitioning for mixed linear-power logarithmic blocks, with adaptive reference provenance and unchanged unpartitioned behavior.
