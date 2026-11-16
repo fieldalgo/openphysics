@@ -1,0 +1,851 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-wedge-harmonic-far-log",
+  "physics": "2D Laplace static wedge current interaction moments",
+  "comparison": "structure-oracle",
+  "role": "Primitive mathematical comparison with explicitly shared mathematics. Not a field, mesh-convergence, material or measurement reference.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "Exact physical power moments; reference evaluates a complex Taylor expansion, not product quadrature or centered modulus identities.",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "taylor_terms": 80,
+        "radius_bound": 0.25,
+        "tail_expression": "4*rho^81/(81*(1-rho))"
+      },
+      "arrays": [
+        "block_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false,
+        "shared_math": "Exact physical power moments; reference evaluates a complex Taylor expansion, not product quadrature or centered modulus identities."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_harmonic_far_log.py",
+    "sha256": "923629fedcd721ce63f13fc7851e8d2ef9c44021ec99db1d9f7b3ddee9adcc10",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_harmonic_far_log.py",
+    "product_commit": "ee20f5fd40d884dc745aae172fd5fefe97ecf102",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T23:49:28.680541+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 6.691079823009204,
+    "wall_time_s": null,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured. Cumulative process RSS includes previous reference families and is not assigned to this family."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 0.55,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 0.55,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 0.55,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 0.6666666666666666,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 0.6666666666666666,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 0.6666666666666666,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 1.0,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 1.0,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 1.0,
+        "second_exponent": 1.0
+      },
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 0.9999999999999999,
+        "second_exponent": 0.55
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 0.9999999999999999,
+        "second_exponent": 0.55
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 0.9999999999999999,
+        "second_exponent": 0.55
+      },
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 0.5000000000000001,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 0.5000000000000001,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 0.5000000000000001,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          0.1,
+          0.03
+        ],
+        "second": [
+          0.07,
+          -0.02
+        ],
+        "offset": [
+          1.0,
+          0.3
+        ],
+        "first_exponent": 0.8,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          0.001,
+          0.0
+        ],
+        "second": [
+          1.2e-05,
+          1.6e-05
+        ],
+        "offset": [
+          0.008,
+          0.002
+        ],
+        "first_exponent": 0.8,
+        "second_exponent": 0.8
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          5.0,
+          1.0
+        ],
+        "first_exponent": 0.8,
+        "second_exponent": 0.8
+      }
+    ],
+    "mode_order": [
+      0,
+      1
+    ],
+    "basis": "rho_a=a/h*(s/h)^(a-1); phi0=rho_p; phi1=sqrt(3)*(rho_(2p)-rho_p)",
+    "quadrature_order": 32
+  },
+  "matched": [
+    "Exact binary64 geometry, exponents, physical mass [1,0], mode ordering and one-metre logarithmic reference."
+  ],
+  "not_matched": [
+    "Exact physical power moments; reference evaluates a complex Taylor expansion, not product quadrature or centered modulus identities.",
+    "No complete field, mesh-convergence, physical measurement, material or execution-platform comparison."
+  ],
+  "reference_self_check": [
+    "Separate hash-pinned mpmath1.3.0 process imports no product modules.",
+    "Compare-only replay must reproduce binary64 arrays without writing the reference and must remove temporary numeric output.",
+    "60/80-digit strict nonzero-entry relative agreement below1e-40.",
+    "Conservative Taylor remainder is below1e-45 for every input."
+  ],
+  "failed_or_discarded": [
+    "Six original research input vectors were outside the length-ratio64 contract and were refused before far evaluation; this separately registered set retains exact ratio64 cases and uses ratio50 for the corrected vectors.",
+    "Original complex-log1p real-part evaluation failed strict relative comparison; its results are preserved separately. The new kernel uses the exact real log-modulus identity."
+  ],
+  "not_run": [
+    "Full harmonic matrices, field solving, fixed-guard convergence and physical measurement validation.",
+    "Other operating systems, browsers and portable executable qualification."
+  ],
+  "values": [
+    {
+      "name": "block_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.03323809035501386,
+          0.01773707550542787
+        ],
+        [
+          -0.02972894208008981,
+          0.0005355029438971152
+        ]
+      ]
+    },
+    {
+      "name": "block_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.840336558605405,
+          0.000587564497490765
+        ],
+        [
+          -0.03604800611254127,
+          2.5831724543097164e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.5580553076054673,
+          0.0009536614716373374
+        ],
+        [
+          -0.06093363150616805,
+          5.5976924336147785e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.03201344217938682,
+          0.01735051570614342
+        ],
+        [
+          -0.03013742785176557,
+          0.0005310440713209266
+        ]
+      ]
+    },
+    {
+      "name": "block_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.845767900858827,
+          0.0005767124827625503
+        ],
+        [
+          -0.036675164533059336,
+          2.5730358033075216e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.5488922416182096,
+          0.0009380381545089258
+        ],
+        [
+          -0.062124483853971346,
+          5.5892981847147896e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.021884911883521953,
+          0.017528604161437245
+        ],
+        [
+          -0.02948630401481,
+          0.0005229255186583532
+        ]
+      ]
+    },
+    {
+      "name": "block_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.858090212612995,
+          0.0005853287668688864
+        ],
+        [
+          -0.03591248517162319,
+          2.544698555274654e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_08",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.5280557136750026,
+          0.0009567161480142229
+        ],
+        [
+          -0.06115187666498653,
+          5.562025456284159e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_09",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.01303903339975494,
+          0.017830177920220194
+        ],
+        [
+          -0.029751188279055922,
+          0.0005337767221933429
+        ]
+      ]
+    },
+    {
+      "name": "block_10",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.8583845690353655,
+          0.0005934618408979003
+        ],
+        [
+          -0.035925284554118295,
+          2.580493989934335e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_11",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.527574481642374,
+          0.0009702129513808081
+        ],
+        [
+          -0.061179861261693495,
+          5.6418779406363276e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_12",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.03541220876494989,
+          0.01769810313706577
+        ],
+        [
+          -0.029288606050097955,
+          0.0005269321909102388
+        ]
+      ]
+    },
+    {
+      "name": "block_13",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.837701924272558,
+          0.0005856906703064613
+        ],
+        [
+          -0.03550867177984306,
+          2.5397591349123048e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_14",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.5624913573068908,
+          0.0009496198483055423
+        ],
+        [
+          -0.05996326168732563,
+          5.497210223328363e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_15",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.02415534128462222,
+          0.017900327063551068
+        ],
+        [
+          -0.030236153102733764,
+          0.000547592343935519
+        ]
+      ]
+    },
+    {
+      "name": "block_16",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -4.85134690356185,
+          0.0005954279759495565
+        ],
+        [
+          -0.03668790673804473,
+          2.651096189171683e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_17",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          1.539476602676421,
+          0.0009706659016227844
+        ],
+        [
+          -0.06228774220959528,
+          5.7748116973896406e-05
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_harmonic_interactions.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath generator imports no NumPy; generator and process receipt checked.",
+    "environment.cpu": "CPU model was not captured; platform.machine is recorded in generation_details.",
+    "cost.compile_s": "No compilation timer in the pure-Python generator.",
+    "cost.wall_time_s": "Initial generation timer starts after module imports; no end-to-end process timer.",
+    "cost.peak_rss_mb": "Cumulative process peak includes earlier reference families; generation receipt retained but no per-family peak attributed."
+  },
+  "regeneration": [],
+  "values_sha256": "f03cda23cb215571462a7a6f04df6a00592fa802b300ad25b757a649cb459849",
+  "content_sha256": "f9c6d46b87a69bee02d47280a35af187fe4a4acfaf1c0de3fccad2008cb8d499",
+  "generation_details": {
+    "machine": "x86_64",
+    "self_checks": [
+      {
+        "index": 0,
+        "precision_difference": "2.5680875016809058059319414076e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 1,
+        "precision_difference": "1.6933769781692811822245872085e-60",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 2,
+        "precision_difference": "1.00059158613148461229019721736e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      },
+      {
+        "index": 3,
+        "precision_difference": "2.62472988400984120425266615138e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 4,
+        "precision_difference": "1.28641089815396417880304651525e-60",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 5,
+        "precision_difference": "1.61636344719281317797427659529e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      },
+      {
+        "index": 6,
+        "precision_difference": "4.36694408428638477997559384933e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 7,
+        "precision_difference": "1.05389582146218338494789521389e-60",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 8,
+        "precision_difference": "2.69999337891948782391714166317e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      },
+      {
+        "index": 9,
+        "precision_difference": "7.34438783199981070284277541536e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 10,
+        "precision_difference": "1.75684575729260971137170769226e-60",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 11,
+        "precision_difference": "2.75401683392093899049366677362e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      },
+      {
+        "index": 12,
+        "precision_difference": "2.56530697975021187739619508341e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 13,
+        "precision_difference": "1.13718529022349631881618801389e-60",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 14,
+        "precision_difference": "1.83160291246056388760030169701e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      },
+      {
+        "index": 15,
+        "precision_difference": "4.39063202611278547790691754736e-60",
+        "tail_bound": "2.42644599513761302760344614108e-64"
+      },
+      {
+        "index": 16,
+        "precision_difference": "6.16306628429802793043368159881e-61",
+        "tail_bound": "1.70185174118507257260982700144e-75"
+      },
+      {
+        "index": 17,
+        "precision_difference": "1.93329512107832114434479270466e-60",
+        "tail_bound": "1.06911324033770463702915474941e-58"
+      }
+    ],
+    "cumulative_process_peak_rss_kib": 15256
+  }
+}

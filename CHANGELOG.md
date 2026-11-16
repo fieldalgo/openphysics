@@ -1,5 +1,7 @@
 # Changelog
 
+- Add explicit bounded harmonic interaction blocks with physical mass checks, immutable refinement evidence and separately documented integral references.
+
 - Add explicit static wedge-harmonic self/Gram primitives with stable near-uniform moments, independent integral provenance and unchanged field solvers.
 
 All eight OpenPhysics distributions (`galerkin`, `galerkin-refsol`, `meshine`,

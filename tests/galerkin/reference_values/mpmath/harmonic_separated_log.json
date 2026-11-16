@@ -1,0 +1,330 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-wedge-harmonic-separated-log",
+  "physics": "2D Laplace static wedge current interaction moments",
+  "comparison": "structure-oracle",
+  "role": "Primitive mathematical comparison with explicitly shared mathematics. Not a field, mesh-convergence, material or measurement reference.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "Normalized Jacobi measure family; reference uses separate multiprecision nodes and direct uncentered tensor kernels.",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "quadrature_orders": [
+          48,
+          64
+        ],
+        "kernel": "direct log modulus without product centering"
+      },
+      "arrays": [
+        "block_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": true,
+        "shared_math": "Normalized Jacobi measure family; reference uses separate multiprecision nodes and direct uncentered tensor kernels."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_harmonic_separated_log.py",
+    "sha256": "d30eb7de5f42491d85c163e21de4004240976840be36a6f113b02467ba12cbc2",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_harmonic_separated_log.py",
+    "product_commit": "ee20f5fd40d884dc745aae172fd5fefe97ecf102",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T23:49:46.377451+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 13.63831717800349,
+    "wall_time_s": null,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured. Cumulative process RSS includes previous reference families and is not assigned to this family."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          0.5
+        ],
+        "p": 0.5001,
+        "q": 0.5001
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          1.0
+        ],
+        "offset": [
+          1.5,
+          0.0
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.875
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          -0.015625,
+          0.0
+        ],
+        "offset": [
+          1.515625,
+          0.0
+        ],
+        "p": 1.0,
+        "q": 0.5001
+      },
+      {
+        "first": [
+          0.3,
+          0.4
+        ],
+        "second": [
+          -0.4,
+          0.3
+        ],
+        "offset": [
+          0.6,
+          0.8
+        ],
+        "p": 0.6,
+        "q": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          2.0
+        ],
+        "p": 0.875,
+        "q": 0.6
+      }
+    ],
+    "mode_order": [
+      0,
+      1
+    ],
+    "basis": "rho_a=a/h*(s/h)^(a-1); phi0=rho_p; phi1=sqrt(3)*(rho_(2p)-rho_p)",
+    "quadrature_order": 32
+  },
+  "matched": [
+    "Exact binary64 geometry, exponents, physical mass [1,0], mode ordering and one-metre logarithmic reference.",
+    "Physical input geometries are reused from existing primitive test inputs; harmonic reference values are newly computed."
+  ],
+  "not_matched": [
+    "Normalized Jacobi measure family; reference uses separate multiprecision nodes and direct uncentered tensor kernels.",
+    "No complete field, mesh-convergence, physical measurement, material or execution-platform comparison."
+  ],
+  "reference_self_check": [
+    "Separate hash-pinned mpmath1.3.0 process imports no product modules.",
+    "Compare-only replay must reproduce binary64 arrays without writing the reference and must remove temporary numeric output.",
+    "48/64-node absolute agreement below1e-25;60/80-digit absolute agreement below1e-45."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Full harmonic matrices, field solving, fixed-guard convergence and physical measurement validation.",
+    "Other operating systems, browsers and portable executable qualification."
+  ],
+  "values": [
+    {
+      "name": "block_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.47808632056207584,
+          0.0444406224350287
+        ],
+        [
+          0.0444406224350287,
+          -0.16709593285402888
+        ]
+      ]
+    },
+    {
+      "name": "block_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.1755984615173688,
+          0.10449665237282832
+        ],
+        [
+          -0.23325238172348428,
+          0.048339224308388204
+        ]
+      ]
+    },
+    {
+      "name": "block_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.03387141074225088,
+          -0.0048999257644101344
+        ],
+        [
+          -0.3014055057808404,
+          -0.0015071737093193692
+        ]
+      ]
+    },
+    {
+      "name": "block_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.1637277089420818,
+          0.05202793525845796
+        ],
+        [
+          -0.16898972215503238,
+          0.018053394564589372
+        ]
+      ]
+    },
+    {
+      "name": "block_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          0.7151227122025964,
+          -0.0029182727905512533
+        ],
+        [
+          0.007039243227476576,
+          -0.020111212157941157
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_harmonic_interactions.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath generator imports no NumPy; generator and process receipt checked.",
+    "environment.cpu": "CPU model was not captured; platform.machine is recorded in generation_details.",
+    "cost.compile_s": "No compilation timer in the pure-Python generator.",
+    "cost.wall_time_s": "Initial generation timer starts after module imports; no end-to-end process timer.",
+    "cost.peak_rss_mb": "Cumulative process peak includes earlier reference families; generation receipt retained but no per-family peak attributed."
+  },
+  "regeneration": [],
+  "values_sha256": "3e079b8011705f6b9fe94dd63a0d33e3cb608a78bdd9d56fc499f0ed4259280b",
+  "content_sha256": "ec7704d13465b9ded6105453978dd0527a6d757d5ff3355eb4169c7b1b3ce385",
+  "generation_details": {
+    "machine": "x86_64",
+    "self_checks": [
+      {
+        "index": 0,
+        "precision_difference": "8.08578946446651729487946091315e-61",
+        "order_difference": "1.28255813956943642923941216039e-43"
+      },
+      {
+        "index": 1,
+        "precision_difference": "5.35077386602062998392468511875e-61",
+        "order_difference": "1.05748072763159099584450418397e-48"
+      },
+      {
+        "index": 2,
+        "precision_difference": "1.96495945698932563142832739411e-61",
+        "order_difference": "6.87079227444099992672209147138e-58"
+      },
+      {
+        "index": 3,
+        "precision_difference": "2.39867504459300540747725219173e-61",
+        "order_difference": "1.08902767362569979875021120941e-60"
+      },
+      {
+        "index": 4,
+        "precision_difference": "1.58151751032099850513001805984e-60",
+        "order_difference": "2.14827724680069686862834633107e-60"
+      }
+    ],
+    "cumulative_process_peak_rss_kib": 26776
+  }
+}

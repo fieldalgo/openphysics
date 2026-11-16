@@ -1,0 +1,827 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-wedge-harmonic-mixed-log",
+  "physics": "2D Laplace static wedge current interaction moments",
+  "comparison": "structure-oracle",
+  "role": "Primitive mathematical comparison with explicitly shared mathematics. Not a field, mesh-convergence, material or measurement reference.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "Exact uniform-source identity; target integral uses adaptive flattened coordinates rather than product cubic measures or dyadic partitions.",
+        "decimal_precisions": [
+          60,
+          80
+        ]
+      },
+      "arrays": [
+        "block_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": true,
+        "shared_math": "Exact uniform-source identity; target integral uses adaptive flattened coordinates rather than product cubic measures or dyadic partitions."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_harmonic_mixed_log.py",
+    "sha256": "b42833076c6e57a16835f0015fbdd1c92071ebc31595c16acb8c4fe5b4e26263",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_harmonic_mixed_log.py",
+    "product_commit": "ee20f5fd40d884dc745aae172fd5fefe97ecf102",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T23:50:00.018045+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 81.94157612702111,
+    "wall_time_s": null,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured. Cumulative process RSS includes previous reference families and is not assigned to this family."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "name": "assembly-16",
+        "a": [
+          -0.0015625000000000003,
+          -0.0
+        ],
+        "b": [
+          -0.0003133585164835182,
+          0.0003133585164835161
+        ],
+        "offset": [
+          -0.0002232142857142869,
+          0.0002232142857142854
+        ],
+        "p": 0.5714285714285711
+      },
+      {
+        "name": "assembly-32",
+        "a": [
+          -0.00012718023255813956,
+          -0.0
+        ],
+        "b": [
+          -2.1272530243829244e-05,
+          2.1272530243829102e-05
+        ],
+        "offset": [
+          -1.816860465116289e-05,
+          1.8168604651162767e-05
+        ],
+        "p": 0.5714285714285711
+      },
+      {
+        "name": "localized-0.015625-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.015625-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.015625-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.015625,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.001-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-0.001",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          0.001
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-1e-05",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-05
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "localized-0.0001-1e-08",
+        "a": [
+          1,
+          0
+        ],
+        "b": [
+          0.0001,
+          0
+        ],
+        "offset": [
+          0.5,
+          1e-08
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "mixed-0",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          1.0,
+          0.0
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "mixed-1",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          -1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "p": 0.6666666666666666
+      },
+      {
+        "name": "mixed-2",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          0.0,
+          1.0
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "p": 0.5001
+      },
+      {
+        "name": "mixed-3",
+        "a": [
+          0.3,
+          0.4
+        ],
+        "b": [
+          -0.4,
+          0.3
+        ],
+        "offset": [
+          0.0,
+          0.0
+        ],
+        "p": 0.6
+      },
+      {
+        "name": "mixed-4",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          0.0,
+          0.5
+        ],
+        "p": 0.875
+      },
+      {
+        "name": "mixed-5",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          0.015625,
+          0.0
+        ],
+        "offset": [
+          1.0,
+          0.0
+        ],
+        "p": 1.0
+      },
+      {
+        "name": "mixed-6",
+        "a": [
+          1.0,
+          0.0
+        ],
+        "b": [
+          1.0,
+          0.0
+        ],
+        "offset": [
+          8.0,
+          1.0
+        ],
+        "p": 0.6666666666666666
+      }
+    ],
+    "mode_order": [
+      0,
+      1
+    ],
+    "basis": "rho_a=a/h*(s/h)^(a-1); phi0=rho_p; phi1=sqrt(3)*(rho_(2p)-rho_p)",
+    "quadrature_order": 64
+  },
+  "matched": [
+    "Exact binary64 geometry, exponents, physical mass [1,0], mode ordering and one-metre logarithmic reference.",
+    "Physical input geometries are reused from existing primitive test inputs; harmonic reference values are newly computed."
+  ],
+  "not_matched": [
+    "Exact uniform-source identity; target integral uses adaptive flattened coordinates rather than product cubic measures or dyadic partitions.",
+    "No complete field, mesh-convergence, physical measurement, material or execution-platform comparison."
+  ],
+  "reference_self_check": [
+    "Separate hash-pinned mpmath1.3.0 process imports no product modules.",
+    "Compare-only replay must reproduce binary64 arrays without writing the reference and must remove temporary numeric output.",
+    "60/80-digit absolute agreement below1e-40."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Full harmonic matrices, field solving, fixed-guard convergence and physical measurement validation.",
+    "Other operating systems, browsers and portable executable qualification."
+  ],
+  "values": [
+    {
+      "name": "block_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -7.504033840153373,
+          0.12840242839645835
+        ],
+        [
+          0.25682499859939806,
+          -0.12934380333395368
+        ]
+      ]
+    },
+    {
+      "name": "block_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -10.04864534840213,
+          0.10868422543081346
+        ],
+        [
+          0.28999215893609215,
+          -0.11652872107521135
+        ]
+      ]
+    },
+    {
+      "name": "block_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5543465130615948,
+          0.0038524972656298704
+        ],
+        [
+          -0.3183812371383089,
+          -0.012453483251073686
+        ]
+      ]
+    },
+    {
+      "name": "block_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5569444237094119,
+          0.0038601923723541693
+        ],
+        [
+          -0.3196076848317945,
+          -0.012483760944558395
+        ]
+      ]
+    },
+    {
+      "name": "block_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5569706495154025,
+          0.0038602700255937713
+        ],
+        [
+          -0.3196200845048768,
+          -0.012484066653313714
+        ]
+      ]
+    },
+    {
+      "name": "block_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5605571367522202,
+          0.00024210443165451114
+        ],
+        [
+          -0.2981131720063555,
+          -0.0008069735992466512
+        ]
+      ]
+    },
+    {
+      "name": "block_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5631675973369186,
+          0.00024260647530718982
+        ],
+        [
+          -0.29929032148194296,
+          -0.0008089385000403473
+        ]
+      ]
+    },
+    {
+      "name": "block_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5631939497892984,
+          0.00024261154179004295
+        ],
+        [
+          -0.299302223401454,
+          -0.00080895833903396
+        ]
+      ]
+    },
+    {
+      "name": "block_08",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5609344135130643,
+          2.418301187581395e-05
+        ],
+        [
+          -0.2968549440004165,
+          -8.075811399627016e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_09",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5635456569837787,
+          2.4233276331283068e-05
+        ],
+        [
+          -0.29802902971321155,
+          -8.095477423139532e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_10",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.5635720173368297,
+          2.423378358740653e-05
+        ],
+        [
+          -0.2980409006988679,
+          -8.095675984712951e-05
+        ]
+      ]
+    },
+    {
+      "name": "block_11",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.0034910858387772127,
+          0.31611591060545013
+        ],
+        [
+          -0.33609030744962026,
+          0.119663538155255
+        ]
+      ]
+    },
+    {
+      "name": "block_12",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.2572026370115131,
+          0.4201126649297746
+        ],
+        [
+          0.40930780773920034,
+          -0.17982934408751097
+        ]
+      ]
+    },
+    {
+      "name": "block_13",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.5689412572636368,
+          0.47114555506523526
+        ],
+        [
+          0.34809268938766497,
+          -0.2549393757503049
+        ]
+      ]
+    },
+    {
+      "name": "block_14",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.2108028388342,
+          0.4309667561523684
+        ],
+        [
+          0.35021100800320365,
+          -0.24349607902004705
+        ]
+      ]
+    },
+    {
+      "name": "block_15",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.4785118965019021,
+          0.019201414488634393
+        ],
+        [
+          -0.011646621335551685,
+          -0.1733593426421969
+        ]
+      ]
+    },
+    {
+      "name": "block_16",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.9557494437670869,
+          0.022552711276722114
+        ],
+        [
+          -0.8157397137667157,
+          0.02401746411232048
+        ]
+      ]
+    },
+    {
+      "name": "block_17",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          2.09815602165665,
+          0.0351740982185286
+        ],
+        [
+          -0.036340715978841885,
+          0.0012646968577142413
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_harmonic_interactions.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath generator imports no NumPy; generator and process receipt checked.",
+    "environment.cpu": "CPU model was not captured; platform.machine is recorded in generation_details.",
+    "cost.compile_s": "No compilation timer in the pure-Python generator.",
+    "cost.wall_time_s": "Initial generation timer starts after module imports; no end-to-end process timer.",
+    "cost.peak_rss_mb": "Cumulative process peak includes earlier reference families; generation receipt retained but no per-family peak attributed."
+  },
+  "regeneration": [],
+  "values_sha256": "92abc8c78b52f66ec8715c6ff08098d448fdcb655bbc28f6af30ff28d145d17f",
+  "content_sha256": "e74fb86f36e7bdbe8b34ba9316a38c1fda8facb3e640d01a9d7762887778d668",
+  "generation_details": {
+    "machine": "x86_64",
+    "self_checks": [
+      {
+        "index": 0,
+        "precision_difference": "7.59867984202676983928728790916e-62"
+      },
+      {
+        "index": 1,
+        "precision_difference": "3.01786009853675820098391826709e-61"
+      },
+      {
+        "index": 2,
+        "precision_difference": "2.37089497429050880980585646944e-62"
+      },
+      {
+        "index": 3,
+        "precision_difference": "1.46253895506273637963693087692e-62"
+      },
+      {
+        "index": 4,
+        "precision_difference": "6.39174242405821444281490556282e-62"
+      },
+      {
+        "index": 5,
+        "precision_difference": "2.56702392044353933409865152144e-62"
+      },
+      {
+        "index": 6,
+        "precision_difference": "5.77403859430610825054821866849e-62"
+      },
+      {
+        "index": 7,
+        "precision_difference": "5.91612015172700178070137022529e-62"
+      },
+      {
+        "index": 8,
+        "precision_difference": "2.63722137020160471108819066131e-60"
+      },
+      {
+        "index": 9,
+        "precision_difference": "5.61769113791006112925239663128e-61"
+      },
+      {
+        "index": 10,
+        "precision_difference": "7.5275945279846323654330441831e-61"
+      },
+      {
+        "index": 11,
+        "precision_difference": "9.38608348615636624599299928097e-63"
+      },
+      {
+        "index": 12,
+        "precision_difference": "1.7713197040278612092739757746e-62"
+      },
+      {
+        "index": 13,
+        "precision_difference": "7.03502020292404515950869043678e-62"
+      },
+      {
+        "index": 14,
+        "precision_difference": "3.42861234129068908156143559274e-62"
+      },
+      {
+        "index": 15,
+        "precision_difference": "6.71236762282053917332549873441e-63"
+      },
+      {
+        "index": 16,
+        "precision_difference": "3.43700912470012090389087710574e-62"
+      },
+      {
+        "index": 17,
+        "precision_difference": "1.37547852287913758165006867565e-61"
+      }
+    ],
+    "cumulative_process_peak_rss_kib": 99296
+  }
+}
