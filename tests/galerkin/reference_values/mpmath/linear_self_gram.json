@@ -1,0 +1,286 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "linear-power-self-log-and-gram",
+  "physics": "2D Laplace self logarithmic moments and squared-density Gram",
+  "comparison": "structure-oracle",
+  "role": "Direct mathematical self and squared-density integrals for the same physical basis; not field, mesh convergence or physical measurement evidence.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "direct density-removed Gram integral and two Duffy triangles for self log integral",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "gram_coordinate": "u=x^(1/(2p-1))",
+        "self_coordinates": "radial=x^(1/(2p)), angular=y^(1/p)",
+        "evaluated_kernel": "log(h)+log(radial)+log1p(-angular), no closed self-integral expression"
+      },
+      "arrays": [
+        "gram_*",
+        "self_log_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_linear_self_gram.py",
+    "sha256": "d3b5ac46869a62ab9479a7efd68379df0b8c606f0f3c9072ddc4c76eb105158f",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_linear_self_gram.py",
+    "product_commit": "257830b515197e10c680b43efadfa865160e562a",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T21:00:15.018034+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 202.90234935900662,
+    "wall_time_s": 202.9179365360178,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import cost, compilation timing, CPU model and peak resident memory were not captured."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "exponent": 0.5001,
+        "length": 0.001
+      },
+      {
+        "exponent": 0.6,
+        "length": 0.001
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 0.001
+      },
+      {
+        "exponent": 0.875,
+        "length": 0.001
+      },
+      {
+        "exponent": 1.0,
+        "length": 0.001
+      }
+    ],
+    "entry_order": [
+      "00",
+      "01",
+      "11"
+    ]
+  },
+  "matched": [
+    "Exact binary64 exponent and physical length, same normalized constant-mass and zero-mass linear power modes.",
+    "All ten arrays reproduce the original raw fixture binary64 values exactly."
+  ],
+  "not_matched": [
+    "Product uses closed integral expressions; reference directly integrates the physical basis after density-removing coordinate transformations.",
+    "No field discretization, material model, full PDE or measurement."
+  ],
+  "reference_self_check": [
+    "60/80-digit maximum relative difference using max(1,abs(reference)) is below1e-30 in every case.",
+    "The existing consumer retains strict nonzero-entry relative1e-12 checks and exact uniform-mode zeros; tiny reference cross moments are preserved rather than clipped.",
+    "No product imports, no fixture writes, temporary numeric output removed."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Full linear field assembly and physical/device validation.",
+    "Other operating systems and browser/portable execution."
+  ],
+  "values": [
+    {
+      "name": "gram_00",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        1250500.0500001376,
+        -1397430.6445269228,
+        1563031.2843742347
+      ]
+    },
+    {
+      "name": "self_log_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.521354433930554,
+        0.37254882055433963,
+        -0.8333111125924938
+      ]
+    },
+    {
+      "name": "gram_01",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        1800.0000000000002,
+        -1248.99959967968,
+        2127.2727272727275
+      ]
+    },
+    {
+      "name": "self_log_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.44435172999048,
+        0.26020824993326663,
+        -0.8125
+      ]
+    },
+    {
+      "name": "gram_02",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        1333.3333333333335,
+        -666.6666666666669,
+        1523.809523809524
+      ]
+    },
+    {
+      "name": "self_log_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.416736528097081,
+        0.20000000000000004,
+        -0.8
+      ]
+    },
+    {
+      "name": "gram_03",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        1020.8333333333333,
+        -132.17268271301583,
+        1067.2348484848485
+      ]
+    },
+    {
+      "name": "self_log_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.395239586621688,
+        0.06042179781166438,
+        -0.7666666666666667
+      ]
+    },
+    {
+      "name": "gram_04",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        1000.0,
+        -9.699124334782262e-86,
+        1000.0
+      ]
+    },
+    {
+      "name": "self_log_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        3
+      ],
+      "data": [
+        -8.407755278982137,
+        -2.8489676632048742e-84,
+        -0.75
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_linear_self_gram.py"
+  ],
+  "provenance_status": "reconstructed",
+  "not_recorded": {
+    "environment.numpy": "Not imported or installed in the isolated reproduction; see the separate-process generator imports.",
+    "environment.cpu": "CPU model was not captured by the reproduction receipt; only platform.machine was recorded.",
+    "cost.compile_s": "No separate compile timer in the pure-Python reproduction.",
+    "cost.peak_rss_mb": "No resident-memory sampler in the reproduction."
+  },
+  "regeneration": [],
+  "preserved_raw_reference": {
+    "path": "tests/galerkin/two_ground/evidence/linear-corner-integrals.json",
+    "sha256": "a4e0f492d36cf9f685cecfb3ba4dbb7dfa7a5c225b27e1ebc429f34e8fbb1679"
+  },
+  "reproduction_note": "New measured reproduction of existing values. Original raw fixture and historical generation are unchanged; this timestamp/cost describes only the new comparison process.",
+  "reproduction": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "4.0843908893387e-61",
+      "8.7409647861553e-62",
+      "8.5761998630341e-62",
+      "5.219246498937e-61",
+      "1.5930900333468e-61"
+    ],
+    "temporary_numeric_sha256": "ef13ff203b20b55ad86a76ef6bc12e82716aed81a837961b14543337b480ee27"
+  },
+  "values_sha256": "288fc81acef4b4a973cb027c699605d2c117204a544828373baaded038ab546b",
+  "content_sha256": "13ac5ab967b1acc1769146b1c10c237804fc5659af679eaddce772240d69b368"
+}
