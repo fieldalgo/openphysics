@@ -43,7 +43,7 @@ k = 2 W/(m K), 균일 열원 10³ W/m³, 왼쪽 변 350 K이며 따로 말하지
   해당 사례의 계수로 같은 mesh에 `assemble_stiffness`, `assemble_mass`,
   `assemble_load`를 호출한 시간(`stiffness_nonzeros`가 행렬 크기를 기록합니다).
 - `dirichlet_solve_seconds`: 그 강성 행렬과 하중에 왼쪽 변을 고정한
-  `galerkin.solve_dirichlet`: 대류·검사·후처리 없는 희소 factorization과 풀이 한 번.
+  `galerkin.kernels.solve_dirichlet`: 대류·검사·후처리 없는 희소 factorization과 풀이 한 번.
 - `solver_call_seconds`: 자체 assembly, 경계 시스템, 입력 검사, 잔차·수지 검사와
   결과 구성을 포함한 전체 `solve_steady_heat` 또는 `solve_transient_heat` 호출.
   과도 사례에서는 `seconds_per_step`이 이를 단계 수로 나눈 값이고 `history_bytes`는

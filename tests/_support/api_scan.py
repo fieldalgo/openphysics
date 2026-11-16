@@ -83,9 +83,10 @@ DEFERRED = "deferred to the materials step"
 # The phrase every internal module's docstring carries.
 INTERNAL_DOCSTRING = "Internal module, consistent units"
 
-# Allowlist counts: galerkin and refsol on openphysics main f693ae3a, when the scan landed; physmat after
-# L1 commit 3, which emptied it (107 on f693ae3a). They never grow.
-BASELINE_COUNTS = {"galerkin": 301, "physmat": 0, "refsol": 549}
+# Allowlist counts: refsol on openphysics main f693ae3a, when the scan landed; physmat after L1 commit 3,
+# which emptied it (107 on f693ae3a); galerkin after L2 commit 4, which moved its assembly kernels and
+# helpers to galerkin.kernels (301 on f693ae3a). They never grow.
+BASELINE_COUNTS = {"galerkin": 191, "physmat": 0, "refsol": 549}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 

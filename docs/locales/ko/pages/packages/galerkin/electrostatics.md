@@ -142,7 +142,7 @@ python -m pytest -q -s tests/galerkin/test_electrostatics_capacitance.py
 - 2D 단위 길이당만 지원합니다. 3D·축대칭·z 방향 유한 두께는 없습니다.
 - 자유 전하는 주어진 밀도입니다. 공간 전하 수송, 반도체·전해질 물리, 비선형
   유전율은 없습니다.
-- 이방성 유전율은 받지 않습니다(`assemble_stiffness`의 텐서 경로는 직접 조립하는
+- 이방성 유전율은 받지 않습니다(내부 `galerkin.kernels.assemble_stiffness`의 텐서 경로는 직접 조립하는
   호출자에게 남아 있습니다).
 - P1 요소 장은 평형 유속이 아닙니다. 도체 전하는 변을 따라 `D.n`을 적분하지 않고
   조립 반력에서 얻습니다.

@@ -16,8 +16,8 @@ Expected outcome:
 
 import numpy as np
 
-from galerkin import (annulus_mesh, assemble_stiffness, assemble_mass,
-                      solve_dirichlet, radial_pml_coeffs)
+from galerkin import annulus_mesh, radial_pml_coeffs
+from galerkin.kernels import assemble_stiffness, assemble_mass, solve_dirichlet
 from cylinder_scattering import (u_inc, u_scat_exact, solve as solve_abc,
                                  A_CYL, K_WAVE)
 

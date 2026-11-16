@@ -21,7 +21,8 @@ q.n = 0 on every other face (insulation, the natural condition)
 ```python
 from meshine import Domain, box_sides, extrude, generate, rectangle
 from galerkin import from_mesher
-from galerkin.thermal3d import dirichlet_from_faces, solve_steady_heat_3d
+from galerkin.kernels import dirichlet_from_faces
+from galerkin.thermal3d import solve_steady_heat_3d
 
 d = Domain(size=0.1)
 d.add_region("chip", rectangle(0, 0, 1.0, 0.8))
@@ -43,7 +44,7 @@ result = solve_steady_heat_3d(
 | heat_source | Q W/m^3, `{영역 이름: Q}`, 또는 읽기 전용 `(T, 3)` 사면체 중심 좌표를 받아 `(T,)` 값을 돌려주는 callable; 기본 0 |
 
 `dirichlet_from_faces(mesh, {면 태그: T})`는 태그를 절점 맵으로 바꾸고, 두 태그가 다른
-온도로 두려는 절점을 거부합니다.
+온도로 두려는 절점을 거부합니다. 공개 API가 아니라 내부 `galerkin.kernels`의 도우미입니다(일관 단위: 여기서는 켈빈).
 
 | 결과 필드 | 의미와 단위 |
 | --- | --- |

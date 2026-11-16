@@ -15,7 +15,7 @@
 
 | 문제 | 진입점 | 계약·검증 | 예제 |
 |---|---|---|---|
-| 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `radial_pml_coeffs`; 내부 `galerkin.kernels`(`assemble_stiffness`, `solve_dirichlet`) | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
 | 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기; 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬, 실수 또는 손실 복소 유전율 | `solve_electrostatics`, `capacitance_matrix` | [계약과 기준](electrostatics.md) | — |
 | 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [도파관 정식화](waveguide_formulation.md), [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
 | 벡터·스칼라 모드의 전력(Faraday 경로 Poynting 적분), 장 중첩, 정규화, 결합 효율, 구속 계수, 유효 면적 | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, 스칼라 쌍 | [계약과 검증](mode_overlap.md) | — |
@@ -76,6 +76,7 @@ src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
+  kernels.py      # Internal: re-exports the non-em assembly kernels, the Dirichlet solve and the physics helpers (consistent units)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling

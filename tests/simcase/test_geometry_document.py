@@ -310,7 +310,8 @@ def test_layer_cells_take_an_explicit_region_name():
 # ----------------------------------------------------------------- S1-6: analytic checks
 
 def _heat_flow(mesh, kappa_of_region):
-    from galerkin import assemble_stiffness_3d, from_mesher, solve_dirichlet
+    from galerkin import from_mesher
+    from galerkin.kernels import assemble_stiffness_3d, solve_dirichlet
     g = from_mesher(mesh)
     kappa = np.array([kappa_of_region[n] for n in mesh.region_names])[mesh.regions]
     K = assemble_stiffness_3d(g, eps=kappa)

@@ -41,7 +41,7 @@ def free_residual(residual, fixed):
 
 def assembly_breakdown(mesh, conductivity):
     """Public assembly functions and the Dirichlet-only linear solve on the same mesh."""
-    from galerkin import assemble_load, assemble_mass, assemble_stiffness, solve_dirichlet
+    from galerkin.kernels import assemble_load, assemble_mass, assemble_stiffness, solve_dirichlet
 
     stiffness, k_seconds = harness.timed(assemble_stiffness, mesh, conductivity)
     _, m_seconds = harness.timed(assemble_mass, mesh, CAPACITY)

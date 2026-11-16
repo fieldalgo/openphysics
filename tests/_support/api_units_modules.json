@@ -90,6 +90,7 @@
       "galerkin.edge",
       "galerkin.edge3d",
       "galerkin.heat_source",
+      "galerkin.kernels",
       "galerkin.materials",
       "galerkin.mode_coordinates",
       "galerkin.mode_overlap",

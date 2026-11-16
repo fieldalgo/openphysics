@@ -4,7 +4,9 @@
 
 simcase is an ordinary consumer of galerkin. ``galerkin.core`` is the layer
 galerkin builds its physics on and its underscore names are private, so galerkin
-can reorganize both without editing simcase only if simcase stays off them. Read
+can reorganize both without editing simcase only if simcase stays off them.
+``galerkin.kernels``, the internal namespace of assembly kernels, is allowed: it is
+the inter-package contract for which simcase pins galerkin to one version. Read
 from the source, so a new reach fails here rather than at the next galerkin change.
 The one allowed reach is listed in ``ALLOWED`` with its closing condition.
 
@@ -147,7 +149,9 @@ def test_each_form_of_reaching_galerkin_internals_is_seen(code, target):
 
 
 @pytest.mark.parametrize("code", [
-    "from galerkin import Mesh, assemble_mass",
+    "from galerkin import Mesh, rectangle_mesh",
+    "from galerkin.kernels import assemble_mass, assemble_stiffness",
+    "import galerkin.kernels as k\nk.solve_dirichlet",
     "from galerkin import Mesh\nMesh.__name__",
     "from galerkin.waveguide import solve_modes",
     "from galerkin.temperature_joule_heating import JouleConvergenceError",

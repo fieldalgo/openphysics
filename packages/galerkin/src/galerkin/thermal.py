@@ -32,7 +32,8 @@ from .core import solve as core_solve
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 
-__all__ = ["scalar_boundary_system", "SteadyHeatResult", "solve_steady_heat", "ElementHeatSource"]
+# Public names. scalar_boundary_system is internal: galerkin.kernels re-exports it.
+__all__ = ["SteadyHeatResult", "solve_steady_heat", "ElementHeatSource"]
 
 
 def _numbers(matrix):
@@ -66,9 +67,9 @@ def scalar_boundary_system(samples, n, labels, anchors, constrained):
     in place: a component without Dirichlet support is anchored at the ambient
     temperature of its first positive h sample. The shifted load integrates
     h*(ambient - offset of the component). H is SciPy CSR on NumPy and a CooMatrix
-    of the live library otherwise; the loads are arrays of that library. Public so
+    of the live library otherwise; the loads are arrays of that library. Shared so
     that the Newton step of galerkin.temperature_joule_heating linearizes the
-    operator this heat solve uses.
+    operator this heat solve uses; internal (galerkin.kernels re-exports it).
     """
     # Pick a useful absolute offset for Robin-only components. Any positive
     # sampled h anchors discretely; no unit-dependent artificial cutoff.

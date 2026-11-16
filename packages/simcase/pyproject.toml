@@ -25,7 +25,7 @@ dependencies = [
   "numpy>=1.26", "scipy>=1.11.2", "shapely>=2.0.2", "matplotlib>=3.8",
   "meshine>=0.0.2,<0.1",
   "physmat==0.0.2",      # exact: simcase calls the internal physmat.kernels (phase-3 decision F2)
-  "galerkin>=0.0.2,<0.1",
+  "galerkin==0.0.2",     # exact: simcase calls the internal galerkin.kernels (phase-3 decision F2)
 ]
 
 [project.urls]

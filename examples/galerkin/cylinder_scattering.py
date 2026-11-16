@@ -25,8 +25,9 @@ this limitation).
 import numpy as np
 from scipy.special import jv, hankel1
 
-from galerkin import (annulus_mesh, assemble_stiffness, assemble_mass,
-                      assemble_boundary_mass, solve_dirichlet)
+from galerkin import annulus_mesh
+from galerkin.kernels import (assemble_stiffness, assemble_mass, assemble_boundary_mass,
+                              solve_dirichlet)
 
 A_CYL = 1.0        # scatterer radius
 R_OUT = 4.0        # absorbing-boundary radius

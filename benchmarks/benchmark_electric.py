@@ -38,7 +38,8 @@ def free_residual(residual, fixed):
 
 def conduction(n, relaxation):
     import numpy as np
-    from galerkin import assemble_stiffness, rectangle_mesh, solve_dirichlet
+    from galerkin import rectangle_mesh
+    from galerkin.kernels import assemble_stiffness, solve_dirichlet
     from galerkin.electric import solve_steady_electric
 
     mesh, mesh_seconds = harness.timed(rectangle_mesh, WIDTH, HEIGHT, 2 * n, n)

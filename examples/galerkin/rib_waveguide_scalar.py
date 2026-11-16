@@ -33,7 +33,8 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import Mesh, assemble_mass, assemble_stiffness, from_mesher
+from galerkin import Mesh, from_mesher
+from galerkin.kernels import assemble_mass, assemble_stiffness
 from meshine import TriMesh, generate, shapes
 from refsol import benchmarks
 

@@ -21,8 +21,9 @@ import numpy as np
 import pytest
 
 from crosscheck import Stopwatch, emit, make_record, observable, relative_difference, require_tool
-from galerkin import (annulus_mesh, assemble_boundary_mass, assemble_mass, assemble_stiffness,
-                      solve_dirichlet)
+from galerkin import annulus_mesh
+from galerkin.kernels import (assemble_boundary_mass, assemble_mass, assemble_stiffness,
+                              solve_dirichlet)
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import rectangle_mesh
 from galerkin.thermal import solve_steady_heat
@@ -370,7 +371,7 @@ def test_helmholtz_p1_absorbing_boundary_same_mesh(skfem):
         stopwatch=clock,
         physics="2D Helmholtz scattering off a sound-soft cylinder (k = pi, a = 1 m, R = 4 m), "
                 "curvature-corrected first-order absorbing boundary",
-        api="galerkin.assemble_stiffness, assemble_mass, assemble_boundary_mass, solve_dirichlet",
+        api="galerkin.kernels.assemble_stiffness, assemble_mass, assemble_boundary_mass, solve_dirichlet",
         discretization="P1 Lagrange triangles; absorbing term -(ik - 1/(2R)) B on the outer edges",
         tool="scikit-fem", tool_discretization="ElementTriP1, FacetBasis boundary mass on the same edges",
         matched=["same nodes and triangles (annulus_mesh 1 m to 4 m, 10 x 40)",

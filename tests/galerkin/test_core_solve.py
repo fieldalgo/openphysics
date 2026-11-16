@@ -321,8 +321,8 @@ def test_torch_solve_keeps_no_factor_on_the_graph():
 
 
 def test_a_singular_numpy_block_raises_and_the_public_solve_still_warns():
-    """The physics solvers' NumPy path raises for an exactly singular block; the public
-    galerkin.solve_dirichlet keeps SciPy's spsolve, which warns and returns NaN."""
+    """The physics solvers' NumPy path raises for an exactly singular block; the kernel
+    galerkin.kernels.solve_dirichlet keeps SciPy's spsolve, which warns and returns NaN."""
     from scipy.sparse.linalg import MatrixRankWarning
 
     from galerkin.core.solve import solve_dirichlet

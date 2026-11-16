@@ -45,8 +45,8 @@ V = ln(3/r)/ln 3입니다. 스크립트는 P1 요소로 메시 네 개에서 풀
 요소 크기에 대한 L2 오차를 그립니다. 오차는 2.4 × 10⁻²에서 4.1 × 10⁻⁴로 줄고 마지막
 수렴 차수는 1.99로, 기대한 2차와 맞습니다.
 
-- 입력: Python API(`annulus_mesh`, `assemble_stiffness`, `solve_dirichlet`,
-  `l2_error`), [`coax_convergence.py`](../../../../examples/galerkin/coax_convergence.py)와 같은 방식.
+- 입력: Python API(`annulus_mesh`, `l2_error`와 내부 커널
+  `galerkin.kernels.assemble_stiffness`, `solve_dirichlet`), [`coax_convergence.py`](../../../../examples/galerkin/coax_convergence.py)와 같은 방식.
 - 검증: [솔버 검증](packages/galerkin/milestone_validation.md)의 M1.
 
 ## 3D 직육면체 공진기 모드

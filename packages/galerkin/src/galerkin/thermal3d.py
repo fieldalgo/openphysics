@@ -31,7 +31,8 @@ from .core.tets import tet_gradients
 from .mesh3d import Mesh3D
 from .solver import solve_dirichlet
 
-__all__ = ["SteadyHeat3DResult", "source_load_3d", "dirichlet_from_faces", "solve_steady_heat_3d"]
+# Public names. source_load_3d and dirichlet_from_faces are internal: galerkin.kernels re-exports them.
+__all__ = ["SteadyHeat3DResult", "solve_steady_heat_3d"]
 
 _RESIDUAL_TOLERANCE = 1e-10
 _BALANCE_TOLERANCE = 1e-10

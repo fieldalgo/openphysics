@@ -19,8 +19,9 @@ The theoretical P1 convergence rate is again second order.
 
 import numpy as np
 
-from galerkin import (rectangle_mesh, assemble_stiffness, assemble_mass,
-                      assemble_boundary_mass, solve_dirichlet, l2_error)
+from galerkin import rectangle_mesh, l2_error
+from galerkin.kernels import (assemble_stiffness, assemble_mass, assemble_boundary_mass,
+                              solve_dirichlet)
 
 L, H = 1.0, 0.5
 K_WAVE = 4.0 * np.pi  # wavelength lambda = 0.5 -> two wavelengths per domain

@@ -16,7 +16,7 @@ import numpy as np
 from scipy.constants import epsilon_0, mu_0
 from scipy.sparse.linalg import splu
 
-from galerkin import assemble_load, assemble_mass, assemble_stiffness
+from galerkin.kernels import assemble_load, assemble_mass, assemble_stiffness
 from .network import _frequencies, _scalar, rlgc_network
 
 __all__ = ['ConductorDiffusion', 'conductor_impedance']

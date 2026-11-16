@@ -15,7 +15,8 @@ import numpy as np
 import pytest
 
 from galerkin import Mesh3D, box_mesh, from_mesher
-from galerkin.thermal3d import dirichlet_from_faces, solve_steady_heat_3d, source_load_3d
+from galerkin.kernels import dirichlet_from_faces, source_load_3d
+from galerkin.thermal3d import solve_steady_heat_3d
 
 meshine = pytest.importorskip("meshine")
 refsol = pytest.importorskip("refsol")

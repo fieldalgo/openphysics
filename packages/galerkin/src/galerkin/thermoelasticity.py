@@ -25,8 +25,9 @@ from .core.checks import one_of, real_array, real_value, require_finite
 from .core.triangles import triangle_geometry, vector_strain
 from .materials import is_per_region, region_property
 
-__all__ = ["ISOTROPIC_STRAIN", "TemperatureSnapshot", "freeze_temperature", "verify_snapshot",
-           "thermal_coefficient", "physical_energy", "ThermoelasticResult",
+# Public names. The helpers verify_snapshot, thermal_coefficient and physical_energy are
+# internal: galerkin.kernels re-exports them.
+__all__ = ["ISOTROPIC_STRAIN", "TemperatureSnapshot", "freeze_temperature", "ThermoelasticResult",
            "solve_thermoelasticity"]
 
 # (exx, eyy, gamma_xy) of a unit isotropic in-plane strain; shared with galerkin.shape

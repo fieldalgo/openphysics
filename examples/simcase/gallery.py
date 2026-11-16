@@ -34,8 +34,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
 
-from galerkin import (annulus_mesh, assemble_load, assemble_stiffness,  # noqa: E402
-                      l2_error, solve_dirichlet)
+from galerkin import annulus_mesh, l2_error  # noqa: E402
+from galerkin.kernels import assemble_load, assemble_stiffness, solve_dirichlet  # noqa: E402
 from simcase import Document, run  # noqa: E402
 from simcase.export import export_time_series  # noqa: E402
 

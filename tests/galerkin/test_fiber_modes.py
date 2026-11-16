@@ -75,7 +75,7 @@ def test_scalar_solver_cannot_split_lp11(refsol):
     """Same fibre, scalar Helmholtz operator on the same engine: one degenerate
     LP11 where the vector solver resolves three distinct modes."""
     import scipy.sparse.linalg as spla
-    from galerkin import assemble_stiffness, assemble_mass
+    from galerkin.kernels import assemble_stiffness, assemble_mass
 
     mesh = disk_mesh((A, 2 * A, R_DOM), (8, 8, 32), 64)
     eps = mesh.by_region([N1 ** 2, N2 ** 2, N2 ** 2])

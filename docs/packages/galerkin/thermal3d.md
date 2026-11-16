@@ -23,7 +23,8 @@ extensions, and the solver behind the layered conduction check of
 ```python
 from meshine import Domain, box_sides, extrude, generate, rectangle
 from galerkin import from_mesher
-from galerkin.thermal3d import dirichlet_from_faces, solve_steady_heat_3d
+from galerkin.kernels import dirichlet_from_faces
+from galerkin.thermal3d import solve_steady_heat_3d
 
 d = Domain(size=0.1)
 d.add_region("chip", rectangle(0, 0, 1.0, 0.8))
@@ -45,7 +46,8 @@ result = solve_steady_heat_3d(
 | heat_source | Q in W/m^3, `{region name: Q}`, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default zero |
 
 `dirichlet_from_faces(mesh, {face tag: T})` turns tags into the node map and
-refuses a node that two tags would set to different temperatures.
+refuses a node that two tags would set to different temperatures. It is a helper of
+the internal `galerkin.kernels` (consistent units: kelvin here), not of the public API.
 
 | Result field | Meaning and units |
 | --- | --- |

@@ -375,6 +375,29 @@ both sides. simcase builds its local models as kernels from its own micrometre d
 evaluates every material through `material.optical` with `strict` passed as before, so the
 calls bind the same parameters, and that commit needs no rule entry.
 
+**galerkin.kernels (L2 commit 4).** The assembly kernels and the physics modules' helpers stay
+defined in their modules and are re-exported unchanged by the internal `galerkin.kernels`;
+simcase imports `assemble_stiffness` and `assemble_mass` from there instead of from the top
+level. The recorded targets `galerkin.assembly.assemble_stiffness` and `.assemble_mass` are the
+same objects under the same names on both sides (the recorder replaces every binding of one,
+`galerkin.kernels`' included), so that commit needs no rule entry either.
+
+**P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
+check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
+names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter
+with that tree's `packages/*/src` on `PYTHONPATH`, from a fresh working directory holding a copy
+of the scripts, and keeps the exit code, stdout, stderr and every file in that directory;
+`compare` requires the same exit codes, stdout bytes and files, byte for byte (stderr after
+each side's paths are replaced by placeholders).
+
+```bash
+git worktree add --detach <tmp>/base <baseline>
+python tools/units_batch/sipi_outputs_check.py run --root <tmp>/base --out <tmp>/sipi-old
+python tools/units_batch/sipi_outputs_check.py run --root . --out <tmp>/sipi-new
+python tools/units_batch/sipi_outputs_check.py compare --old <tmp>/sipi-old --new <tmp>/sipi-new
+git worktree remove --force <tmp>/base
+```
+
 **P3-7, physmat's SI API against the baseline.** `physmat_si_check.py` is the landing check
 of the physmat commit. The baseline's micrometre API no longer exists on the head, so it runs
 in two processes and is not a test: `baseline` with the baseline's packages on `PYTHONPATH`
