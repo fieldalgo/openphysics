@@ -1,0 +1,44 @@
+{
+  "method": "Independent P3 potential and volume-energy shape derivative, no panel surface flux input. Two interior velocity extensions for each face and whole boundary; exact triangle bubble condensation and symmetric SuperLU factorization with positive pivots/equal row-column permutations. Analytical parallel-plate capacitance and shape-current Gram checked at 1e-10.",
+  "versions": {
+    "Python": "3.12",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "scikit_fem": "12.0.2"
+  },
+  "license": "BSD-3-Clause reference tool, not shipped",
+  "bounds": {
+    "numerics_partition": 1e-10,
+    "extension": 0.001,
+    "reference_mesh": 0.01,
+    "capacitance_reference": 0.0005,
+    "face_reference": 0.02,
+    "whole_reference": 0.01,
+    "panel_outer": 0.01,
+    "reflection": 1e-10,
+    "denominator_floor": false
+  },
+  "limits": "One rectangle and one unequal tapered pair; all voltage bases active. No fixed-ground trace reduction, three-conductor qualification, heterogeneous corner, measurement, other-platform or general accuracy claim.",
+  "retained_failures": [
+    {
+      "case": "unequal-pair",
+      "comparison": "coarse 441197 DOF to medium 746444 DOF",
+      "whole_mesh_change": 0.011278080768,
+      "gate": 0.01,
+      "accepted": false,
+      "next_separate_comparison": "medium 746444 to fine 914228 DOF, unchanged 125000-node/1100000-DOF/14-GiB caps"
+    },
+    {
+      "case": "three-active conductors",
+      "whole_reference_mesh_change": 0.044839329857,
+      "gate": 0.01,
+      "accepted": false
+    },
+    {
+      "case": "two active conductors and fixed-ground guard",
+      "whole_reflection_change": 1.784453977508e-10,
+      "gate": 1e-10,
+      "accepted": false
+    }
+  ]
+}

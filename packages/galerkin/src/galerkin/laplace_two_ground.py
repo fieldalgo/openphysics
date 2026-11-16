@@ -342,3 +342,39 @@ def _entrywise_relative(a, b):
     if not np.isfinite(difference).all():
         return float('inf')
     return float(np.max(np.divide(difference, scale, out=np.zeros_like(difference), where=scale != 0)))
+
+
+def solve_two_ground_corner_rectangle_edges(polygons, *, width, height,
+        panels_per_edge=128, ground_modes=256, interpolation_degree=24):
+    """Explicit corner-power field for one or two all-active convex conductors.
+
+    Coordinates are metres. The homogeneous static rectangle has grounded
+    bottom/top planes and zero side normal flux. Geometry admission is the
+    same as the original rectangle solver; this separate method accepts only
+    1..2 conductor voltage/current bases and no fixed-ground trace reduction.
+    Require even cubic subdivisions 16..512, merged to n-6 panels per edge,
+    at most 4096 panels. Corner density is p*u**(p-1), with
+    p=pi/(2*pi-interior_angle); interior panels are constant. The normalized
+    densities' analytic squared-current moments are integrated per edge.
+
+    Interpolation degree is fixed at 24, checked against 20. ground_modes is
+    the actual fine Fourier count (even 64..4096), compared with half that
+    count; power quadrature compares 16/32. Two fixed portable residual
+    corrections precede unit-current normalization. Internal refinement,
+    reciprocity, conservation, energy, edge partition and PSD checks retain
+    1e-10 and condition <1e10. Failure raises ValueError, with no fallback.
+    These gates do not estimate discretization or outer-domain error: refine
+    panels and outer dimensions independently for every requested quantity.
+
+    Return the immutable whole/edge result contract of the existing solver.
+    A corner exponent is valid here only in a homogeneous exterior medium;
+    this does not model metal/dielectric interface corners or finite-metal
+    diffusion. Existing solvers, resolutions and defaults remain unchanged.
+    """
+    from ._laplace_corner_field import solve
+    try:
+        return solve(polygons, width=width, height=height,
+            panels_per_edge=panels_per_edge, ground_modes=ground_modes,
+            interpolation_degree=interpolation_degree)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError('corner boundary system must be positive definite and nonsingular') from exc
