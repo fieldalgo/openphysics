@@ -437,12 +437,15 @@ Import runs는 계속 현재 모델 입력을 유지합니다.
 `ImportError: No module named 'my_physics'`). 다른 공급자와 내장 물리는 계속 동작합니다.
 목록은 패널을 열 때 `GET /api/providers`에서 읽습니다.
 
-목록은 데이터일 뿐입니다. 공급자가 준 문자열은 모두 텍스트로 표시하며, Studio는
-공급자의 코드(JavaScript나 HTML)를 절대 불러오지 않습니다. 이 경로는 위 항목과 종류
-이름만 보내고, 그 밖의 manifest 내용·entry point 대상·파일 경로는 보내지 않습니다.
-목록 자체를 읽지 못하면 패널에 그렇게 표시하고 자세한 내용은 서버 로그에 남깁니다.
+목록은 데이터일 뿐입니다. 공급자가 준 문자열은 모두 텍스트로 표시하며(2000자보다
+긴 문자열은 표시할 때 자릅니다), 페이지는 공급자의 코드(JavaScript나 HTML)를 절대
+불러오지 않습니다. 이 경로는 위 항목과 종류 이름만 보내고, 그 밖의 manifest 내용과
+entry point 대상은 보내지 않습니다. 오류 텍스트는 `providers()`가 보고한 그대로
+보내므로 가져오기에 실패한 모듈 같은 파일 이름이 들어 있을 수 있습니다. Studio는
+기본적으로 이 컴퓨터에만 제공됩니다([패키지 개요](overview.md) 참고). 목록 자체를 읽지
+못하면 패널에 그렇게 표시하고 자세한 내용은 서버 로그에 남깁니다.
 작업공간 capability 계약은 바뀌지 않습니다(`/api/workspace/capabilities/v6`).
 설치된 공급자를 아직 작업공간의 물리로 제공하지는 않으며, 이 목록은 설치 상태만 보여 줍니다.
 
 검사: `tests/simcase/test_studio_providers.py`(내장 공급자만, 주입한 공급자, 사용 불가
-공급자, 목록 실패)와 `tests/simcase/studio_workspace_providers.cjs`(이스케이프와 응답 계약).
+공급자, 목록 실패, 빈·긴·악의적 문자열이 든 경로 출력을 배포된 페이지 모듈이 읽는지)와 `tests/simcase/studio_workspace_providers.cjs`(이스케이프와 응답 계약).

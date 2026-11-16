@@ -6,6 +6,7 @@ The listing is compared with ``simcase.providers.providers()`` itself, for the b
 provider alone, with a fake provider injected the way test_providers.py injects one, and
 with a provider that fails to load. The escaping of what the workspace shows is checked by
 studio_workspace_providers.cjs."""
+import json
 import logging
 
 import pytest
@@ -103,3 +104,52 @@ def test_a_failing_listing_replies_with_the_fixed_message(client, monkeypatch, c
 def test_the_route_keeps_the_host_check(client):
     assert client.get("/api/providers", headers={"Host": "evil.example"}).status_code == 403
     assert client.post("/api/providers").status_code == 405
+
+
+def test_a_lone_surrogate_in_an_error_still_lists(client, fresh):
+    """An error text read with surrogateescape (a non-UTF-8 path) is still valid JSON."""
+    _inject(fresh, FakeEntryPoint("odd", ImportError("bad path /tmp/\udcff/x"), dist="odd-dist"))
+    response = client.get("/api/providers")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    odd = response.json()["providers"][1]
+    assert odd["status"] == "unavailable" and odd["error"] == "ImportError: bad path /tmp/\udcff/x"
+
+
+_SHOW = """
+const [module, listing] = process.argv.slice(1);
+const {readProviders, providersHtml} = await import(module);
+const list = readProviders(JSON.parse(listing));
+process.stdout.write(JSON.stringify({count: list.length, html: providersHtml(list)}));
+"""
+
+
+def test_the_workspace_reads_every_listing_the_route_sends(client, fresh):
+    """Route output with empty, long and odd-but-valid entries is shown by workspace-providers.mjs
+    as it ships (installed or source), not refused; skipped without node."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed; studio_workspace_providers.cjs runs in the cjs suite")
+    from pathlib import Path
+    import simcase.studio
+    module = (Path(simcase.studio.__file__).parent / "static" / "workspace-providers.mjs").as_uri()
+    long = "x" * 5000
+    _inject(fresh, FakeEntryPoint("", ImportError("empty name"), dist="empty-dist"),
+            FakeEntryPoint("long", ImportError(long), dist="long-dist"),
+            FakeEntryPoint("version", lambda: FakeProvider(name="version", version=long), dist="v-dist"),
+            FakeEntryPoint("huge", lambda: FakeProvider(name="huge", protocol=2 ** 60), dist="huge-dist"),
+            FakeEntryPoint("hostile", ImportError("<img src=x onerror=alert(1)>"), dist="<b>dist</b>"),
+            FakeEntryPoint("test-echo", FakeProvider))
+    reply = client.get("/api/providers")
+    listing = reply.json()["providers"]
+    assert len(listing) == 7 and listing[0]["name"] == "openphysics-fem"
+    done = subprocess.run([node, "--input-type=module", "-e", _SHOW, module, reply.text],
+                          capture_output=True, text=True, encoding="utf-8")
+    assert done.returncode == 0, done.stdout + done.stderr
+    shown = json.loads(done.stdout)
+    assert shown["count"] == 7
+    assert "openphysics-fem" in shown["html"] and "test-echo" in shown["html"]
+    assert "&lt;img src=x onerror=alert(1)&gt;" in shown["html"] and "<img" not in shown["html"]
+    assert "&lt;b&gt;dist&lt;/b&gt;" in shown["html"] and "<b>" not in shown["html"]

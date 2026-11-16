@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // The workspace's list of installed physics providers: a provider's strings are text, never markup.
 const {test,before}=require('node:test');const assert=require('node:assert/strict');
-let escapeHtml,readProviders,providersHtml,installProviderList,MAX_PROVIDERS;
-before(async()=>({escapeHtml,readProviders,providersHtml,installProviderList,MAX_PROVIDERS}=await import('../../packages/simcase/src/simcase/studio/static/workspace-providers.mjs')));
+let escapeHtml,readProviders,providersHtml,installProviderList,MAX_SHOWN;
+before(async()=>({escapeHtml,readProviders,providersHtml,installProviderList,MAX_SHOWN}=await import('../../packages/simcase/src/simcase/studio/static/workspace-providers.mjs')));
 const builtin=()=>({name:'openphysics-fem',version:'0.1.0',distribution:'simcase',protocol:1,status:'available',error:null,kinds:['electric_joule','em.modes2d']});
 const hostile='<img src=x onerror=alert(1)>';
 // Every tag the rendered table may hold; anything else would be markup a provider supplied.
@@ -30,13 +30,24 @@ test('the table lists name, version, distribution, status, kinds and the error o
  assert.match(providersHtml([]),/No physics providers are installed/);
 });
 test('a reply that is not a provider list is refused',()=>{
- const changes=[d=>d.providers=null,d=>delete d.providers,d=>d.providers={},d=>d.providers[0]=null,d=>d.providers[0]=[],d=>d.providers[0].name='',d=>d.providers[0].name=7,d=>delete d.providers[0].name,
+ const changes=[d=>d.providers=null,d=>delete d.providers,d=>d.providers={},d=>d.providers[0]=null,d=>d.providers[0]=[],d=>d.providers[0].name=7,d=>d.providers[0].name=null,d=>delete d.providers[0].name,
   d=>d.providers[0].version=1,d=>d.providers[0].distribution={},d=>d.providers[0].protocol='1',d=>d.providers[0].protocol=1.5,d=>d.providers[0].status='ok',d=>d.providers[0].error='x',
-  d=>d.providers[0].kinds='em.modes2d',d=>d.providers[0].kinds=[1],d=>d.providers[0].name='x'.repeat(4097),
-  d=>{d.providers[0].status='unavailable';},d=>d.providers=Array.from({length:MAX_PROVIDERS+1},builtin)];
+  d=>d.providers[0].kinds='em.modes2d',d=>d.providers[0].kinds=[1],d=>{d.providers[0].status='unavailable';}];
  for(const change of changes){const d={providers:[builtin()]};change(d);assert.throws(()=>readProviders(d));}
  assert.throws(()=>readProviders(null));
  assert.deepEqual(readProviders({providers:[builtin()]}),[builtin()]);
+});
+test('odd but valid strings are shown, and long ones are cut for display, not refused',()=>{
+ const long='x'.repeat(5000);
+ const list=readProviders({providers:[builtin(),{name:'',version:long,distribution:null,protocol:2**60,status:'unavailable',error:'ImportError: '+long+'<b>',kinds:[]},{name:'k',version:'1',distribution:'d',protocol:1,status:'available',error:null,kinds:['']}]});
+ assert.equal(list.length,3);
+ const html=providersHtml(list);
+ assert.match(html,/openphysics-fem/);
+ assert.match(html,/unnamed/);
+ assert.match(html,/\(unnamed\)/);
+ assert.ok(html.includes('x'.repeat(MAX_SHOWN)+'…'));
+ assert.ok(!html.includes('x'.repeat(MAX_SHOWN+1)));
+ assert.ok(!html.includes('<b>'));
 });
 test('the list loads when the panel opens and a failure is shown as text',async()=>{
  const listeners=[];const details={open:false,addEventListener:(type,fn)=>{assert.equal(type,'toggle');listeners.push(fn);}};

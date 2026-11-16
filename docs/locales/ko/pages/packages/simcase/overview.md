@@ -346,6 +346,7 @@ Studio는 `http://127.0.0.1:<port>`나 `http://localhost:<port>`로 여세요. �
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | 예제 문서 |
 | GET | `/api/quantities` | 문서가 쓰는 모든 레지스트리 양의 표준 단위와 단위 메뉴(`simcase.quantities`), 길이 단위 |
+| GET | `/api/providers` | 설치된 물리 공급자(`simcase.providers.providers()`): 이름·버전·배포판·프로토콜·상태·오류·종류 이름 |
 | GET | `/api/materials` | 정확한 `physmat:` 이름의 physmat 내장 재료: 유효 진공 파장(m), 출처 |
 | POST | `/api/materials/preview` | 미터 단위 진공 파장 구간에서 `physmat:` 재료의 n, k |
 | POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` 또는 `{ok: false, error, diagnostics}`; `doc`는 보낸 그대로의 문서이며 모든 숫자가 쓴 자릿수를 유지 |
