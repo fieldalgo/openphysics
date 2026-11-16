@@ -413,3 +413,57 @@ self 행렬은 `[[log(h)-1.5, 0], [0, -0.75]]`입니다. 기존 스칼라 함수
 대상입니다. Uniform 교차항의 정확한 0을 보존하고, 0이 아닌 참조항은
 분모 floor 없이 비교합니다. 물리 배율·양정 Gram 에너지·모드 moment·uniform
 정확 분할도 검사합니다.
+
+## 두 접지면 사이의 명시 all-active corner 장 계산
+
+`galerkin.laplace_two_ground.solve_two_ground_corner_rectangle_edges`는
+**모든 도체가 활성 전압/전류 기저인 볼록 도체 1~2개**의 별도 균일매질 정적 솔버입니다.
+기존 불변 `TwoGroundRectangleEdgesResult`를 반환합니다. 정전용량/유전율은 무차원,
+직선 edge current Gram은 `1/metre`, 부호 있는 적분은 단위 전류 기준이며 아래·위
+접지면을 따로 유지합니다. 기존 솔버를 대체하거나 고정접지 도체 선택기를 추가하지 않습니다.
+
+```python
+from galerkin.laplace_two_ground import solve_two_ground_corner_rectangle_edges
+
+result = solve_two_ground_corner_rectangle_edges(
+    [[[0.00385, 0.0008], [0.00445, 0.0008],
+      [0.00445, 0.00087], [0.00385, 0.00087]]],
+    width=0.008, height=0.002, panels_per_edge=128, ground_modes=256,
+)
+```
+
+사각 영역의 아래·위는 Dirichlet 접지, 옆은 Neumann 경계입니다. 기존 볼록·비접촉·내부
+기하 및 cluster-옆벽 간격 조건을 유지합니다. 짝수 분할 `16..512`에서 각 끝의 cubic
+구간 4개를 하나의 corner-power 패널로 합쳐 edge당 `n-6`개, 전체 최대 4096개를 씁니다.
+모서리 지수는 `pi/(2*pi-interior_angle)`, 나머지 패널은 상수입니다. 해석 밀도 Gram이
+적분 가능한 모서리 특이성을 유지합니다.
+
+국소 상대좌표·안정적 근접 source 적분·정확 상수 moment·유계 배치로 바닥접지 행렬을
+구성합니다. 위/옆 경계의 smooth 보정은 degree20/24를 비교하므로 `interpolation_degree`는
+24만 받습니다. 고정 2회의 보정 잔차 계산 뒤 전류를 정규화하고 edge/whole Gram을 직접
+계산합니다. 구적 가중치 재정규화나 대각 성분 기반 분모 floor는 없습니다.
+`ground_modes`는 **실제 fine 모드 수**인 짝수 `64..4096`이며 절반의 모드 수와 비교하고
+power 구적16/32도 비교합니다. 기존 솔버의 coarse 모드 수 의미와 다릅니다. 수치세분·상반성·
+에너지·보존·partition·PSD는 `1e-10`, condition bound는 `1e10` 미만이며 미해결 입력은
+`ValueError`로 거부합니다. 새 기하의 panel/outer 수렴은 별도로 확인해야 합니다.
+
+독립 scikit-fem12.0.2(BSD-3-Clause, 비배포) P3 volume-energy 참조는 각 기하의 두 mesh,
+정확 triangle-bubble condensation, 내부 velocity extension 두 개, 구적8/10을 사용합니다.
+평행판 해석 anchor의 정전용량/shape-current Gram은 `1e-10`으로 검사했습니다.
+저장 참조·출처는 `tests/galerkin/two_ground/evidence/corner-field-*.json`에 있으며 replay
+시험이 독립 솔버를 다시 실행하지는 않습니다. 작은 부호 있는 교차항도 각 항 그대로 비교합니다.
+
+| 선택 기하, 영역8×2mm | 독립 참조 DOF | 최종 panel whole 변화 | whole 반사 변화 | fine 참조 whole 차이 |
+|---|---:|---:|---:|---:|
+| 편심 사각 하나 | 265878 / 422727 | 0.009256% | 6.98e-16 | 0.006748% |
+| 비대칭 사다리꼴 쌍 | 746444 / 914228 | 0.098622% | 2.12e-11 | 0.265163% |
+
+등록 기준은 참조 mesh·최종 panel `256→512` 변화1%, 외곽폭 `8→16→32mm`의 각 변화1%,
+정전용량 참조0.05%, edge 참조2%, whole 참조1%, 반사`1e-10`입니다. 외곽 경우의 fine
+Fourier 모드는 각각256/512/1024개입니다. 쌍의 이전441197→746444DOF 참조는 whole mesh
+1.127808%로 1% 기준에 실패했습니다. 그 실패는 후속 참조 mesh 쌍 수락과 구분하여 보존합니다.
+
+제한된 수치 근거이며 일반 정확도·실측 수락이 아닙니다. 3활성도체는 whole 참조 mesh 수렴,
+2신호+고정접지도체는 whole 반사에 실패하여 이 솔버의 지원범위에 포함하지 않습니다.
+이종매질 경계 모서리·유한금속 확산·재료법칙·다른 플랫폼·브라우저 메모리 한계는 별도입니다.
+구현 helper 모듈은 패키지 내부용입니다.

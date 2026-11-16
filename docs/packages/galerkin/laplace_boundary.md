@@ -455,3 +455,68 @@ digits (mpmath 1.3.0, BSD-3-Clause) cover five exponents including `0.5001`
 and the uniform limit. Tests retain exact uniform zero cross terms, compare
 nonzero reference entries without a denominator floor, check physical
 scaling, positive Gram energy, mode moments and exact uniform subdivision.
+
+## Explicit all-active corner field between two grounds
+
+`galerkin.laplace_two_ground.solve_two_ground_corner_rectangle_edges` is a
+separate homogeneous static solver for **one or two all-active convex
+conductors**. It returns the existing immutable `TwoGroundRectangleEdgesResult`
+contract: dimensionless capacitance/permittivity, straight-edge current Gram
+in `1/metre`, signed unit-current integrals, and separate bottom/top grounds.
+It does not replace an existing solver or add a fixed-ground conductor selector.
+
+```python
+from galerkin.laplace_two_ground import solve_two_ground_corner_rectangle_edges
+
+result = solve_two_ground_corner_rectangle_edges(
+    [[[0.00385, 0.0008], [0.00445, 0.0008],
+      [0.00445, 0.00087], [0.00385, 0.00087]]],
+    width=0.008, height=0.002, panels_per_edge=128, ground_modes=256,
+)
+```
+
+The rectangle has Dirichlet bottom/top grounds and Neumann side walls.
+The original convex/disjoint/interior admission and cluster-clearance rules
+apply. Even subdivisions `16..512` merge four cubic intervals at each end
+into a corner-power panel, leaving `n-6` panels per edge and at most 4096
+panels. Corner powers are `pi/(2*pi-interior_angle)`; other panels are constant.
+The analytic density Gram retains the integrable corner singularity.
+
+Local relative coordinates, stable near-source integration, exact constant
+moments and bounded vectorized pairs form the bottom-ground matrix. The
+smooth upper/side correction uses degrees 20/24; `interpolation_degree` must
+be 24. Two fixed compensated residual corrections precede current
+normalization and direct per-edge/whole Gram products. No quadrature weight
+rescaling or diagonal floor is used. `ground_modes` is the **actual fine count**,
+even `64..4096`, compared with half that count, with power quadrature 16/32;
+this differs from the original solver's coarse-count convention. Numerical
+refinement, reciprocity, energy, conservation, partition and PSD checks use
+`1e-10`, with condition bound below `1e10`; unresolved cases raise `ValueError`.
+These checks do not establish panel or outer convergence for a new geometry.
+
+Two independent scikit-fem 12.0.2 (BSD-3-Clause, unshipped) P3 volume-energy
+references per case use exact triangle-bubble condensation, two interior
+velocity extensions and quadrature 8/10. A parallel-plate analytical anchor
+checks capacitance and shape-current Gram at `1e-10`. Stored references and
+provenance are in `tests/galerkin/two_ground/evidence/corner-field-*.json`;
+replay tests do not rerun the independent solver. All comparisons retain each
+nonzero entry, including small signed cross terms.
+
+| Selected case, 8 by 2 mm domain | Independent reference DOFs | Last panel whole change | Whole reflection change | Fine reference whole difference |
+|---|---:|---:|---:|---:|
+| One offset rectangle | 265878 / 422727 | 0.009256% | 6.98e-16 | 0.006748% |
+| Unequal tapered pair | 746444 / 914228 | 0.098622% | 2.12e-11 | 0.265163% |
+
+The declared gates are: reference mesh and final panel `256→512` change
+`1%`, each outer width `8→16→32 mm` change `1%`, capacitance reference
+`0.05%`, edge reference `2%`, whole reference `1%`, and reflection `1e-10`.
+Outer cases use 256/512/1024 fine Fourier modes respectively. The pair's
+prior 441197→746444-DOF reference failed the 1% whole-mesh gate at 1.127808%;
+that failure remains distinct from the later qualified mesh pair.
+
+This is bounded numerical evidence, not general accuracy or measurement
+qualification. A three-active-conductor reference failed whole-mesh convergence;
+a two-signal plus fixed-ground case failed whole reflection. Neither is in
+this solver's supported scope. Heterogeneous interface corners, finite-metal
+diffusion, material laws, other platforms and browser memory limits require
+separate work. The implementation helpers are internal package modules.

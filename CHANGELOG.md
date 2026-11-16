@@ -24,6 +24,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: an explicit two-ground corner-power field for one or two all-active convex conductors, with immutable edge/whole current factors, independent P3 references and separate panel, outer and reflection checks. Existing solvers are unchanged; fixed-ground trace reduction is outside this method.
+
 - `galerkin`: closed-form two-mode current Gram and self-log matrices on normalized power panels, with exact mode masses, independent direct-integral references and a uniform Legendre limit. These primitives do not replace a field solver.
 
 - `galerkin`: checked normalized power/constant bottom-ground Green means with analytic constant moments, fixed quadrature and explicit topology, resolution and positivity refusal. Independent direct 2D references and physical invariants validate the primitive; existing field solvers are unchanged.
