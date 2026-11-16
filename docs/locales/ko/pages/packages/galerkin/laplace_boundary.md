@@ -118,3 +118,57 @@ mpmath 1.3.0의 60자리 및 80자리 직접 2차원 로그 거리 적분은 상
 스케일도 검사합니다. 이 검증은 산술 안정성에 한정하며 새로운 분할 방식,
 보간 차수 또는 임의 도체 손실 정확도를 수락하지 않습니다. 기존 공개
 기본값과 입력 제한을 유지합니다.
+
+## 명시적 모서리 멱함수 패널 적분
+
+`galerkin.laplace_corner`는 `0 < s < h`에서 정규 밀도
+`phi(s) = p/h * (s/h)**(p-1)`의 수치 구성 요소를 제공한다. 길이 `h`의
+단위는 m이고 특이 끝점은 `s=0`이다. 제곱 전류 적분이 발산하는 `p=0.5`를
+제외하여 `0.5 < p <= 1`을 요구한다. 내부각 `alpha`인 볼록 금속 모서리의
+균질 외부 Laplace 쐐기에서는 선도 지수가 `p = pi/(2*pi-alpha)`이다.
+이 관계는 유전체 접합, 이방성 모서리 법칙, 유한 도전율 내부 확산을 포함하지 않는다.
+
+```python
+from galerkin.laplace_corner import (
+    power_panel_gram, power_panel_self_log, power_panel_shared_vertex_log,
+)
+
+gram_per_m = power_panel_gram(1e-3, 2/3)
+self_log = power_panel_self_log(1e-3, 2/3)
+pair = power_panel_shared_vertex_log(
+    [1e-3, 0.], [0., 1e-3], 2/3, 2/3,
+)
+print(gram_per_m, self_log, pair.mean_log_distance, pair.refinement_error)
+```
+
+정확한 자기 모멘트는 `p**2 / ((2*p-1)*h)`와
+`log(h/1 metre) - 1/(2*p) - digamma(p+1) - EulerGamma`이다.
+`p=1`이면 `1/h`, `log(h/1 metre)-1.5`로 환원된다.
+`power_panel_quadrature(p, order)`는 `[0,1]`의 정규 측도
+`p*u**(p-1) du`에 대한 불변 절점·양의 가중치를 반환한다. 4–128차에서
+Golub–Welsch Jacobi 삼대각 행렬과 고유벡터 첫 성분의 제곱을 사용하며,
+계산된 가중치 합으로 다시 나누지 않는다.
+
+`power_panel_shared_vertex_log(a, b, p, q)`는 공통 꼭짓점으로부터의 유한하고
+길이가 양수인 평면 변위 벡터를 m 단위로 받는다. 두 패널은 그 꼭짓점에서만
+만나야 하며 길이비는 64 이하이다. 겹치는 반직선은 거부한다. 결과는
+`log(distance/1 metre)`의 이중 가중 평균이다. Duffy 분할로 반지름 방향의
+로그 적분을 정확히 처리하고 각도 항에 Gauss–Jacobi 적분을 적용한다.
+명시적 성긴 차수는 4–64, 기본값은 32이며 두 배 차수의 값을 반환한다.
+`abs(fine-coarse) <= 1e-12*max(1,abs(fine))`를 요구하고 미달하면
+`ValueError`를 발생시킨다. 불변 결과는 두 값과 성긴 차수를 보존하며
+`refinement_error`가 정규화 차이를 나타낸다. 비유한 입력, 표현 불가능한
+Gram 값, 수렴하지 않은 적분을 거부한다.
+
+검증은 `2*order-1`차까지의 정확한 다항 모멘트, 상수 패널 환원, 전류 스케일,
+독립 mpmath 60/80자리 직접 이중 적분 네 사례와 순서 교환·회전·반사·길이
+스케일을 사용한다. 저장 기준은
+`tests/galerkin/two_ground/evidence/corner-panel-integrals.json`이며 런타임은
+mpmath를 가져오지 않는다. 적분·참조 대조 기준은 `1e-12`, 두 참조 정밀도 간
+일치 기준은 `1e-30`이다.
+
+이 함수들은 명시적 적분 구성 요소이며 완성된 가중 패널 장 솔버가 아니다.
+기존 경계 솔버·기본값·상수 패널 결과는 그대로 유지한다. 후속 장 구성은
+조립 연산자, 전류, 재료 가정, 패널·외곽 수렴을 독립 검증해야 한다.
+이 적분 검사만으로 일반 모서리 장, 작은 상호 손실 항, 다른 플랫폼의
+정확도가 확보된 것은 아니다.
