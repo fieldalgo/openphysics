@@ -426,3 +426,23 @@ Export profile PNG에는 축·정규화·후보·단면 위치·작업 ID·형�
 결과 수·Undo 동작을 표시합니다. 확인 시 작업공간 상태를 다시 검사하므로 검토 중
 계산이 완료돼도 오래된 확인창으로 새 결과를 조용히 버리지 않습니다.
 Import runs는 계속 현재 모델 입력을 유지합니다.
+
+## 설치된 물리
+
+연결·복구 도움말 아래의 **Installed physics**(설치된 물리)는 Studio와 함께 설치된
+물리 공급자([물리 공급자](providers.md))를 나열합니다. 각 공급자의 이름·버전·배포판·상태·
+물리 종류를 보여 주며 내장 공급자(`openphysics-fem`, 배포판 `simcase`)가 맨 앞에 옵니다.
+불러오지 못한 공급자는 *Unavailable*(사용 불가)로 표시하고, 그 오류를
+`simcase.providers.providers()`가 보고한 그대로 보여 줍니다(예:
+`ImportError: No module named 'my_physics'`). 다른 공급자와 내장 물리는 계속 동작합니다.
+목록은 패널을 열 때 `GET /api/providers`에서 읽습니다.
+
+목록은 데이터일 뿐입니다. 공급자가 준 문자열은 모두 텍스트로 표시하며, Studio는
+공급자의 코드(JavaScript나 HTML)를 절대 불러오지 않습니다. 이 경로는 위 항목과 종류
+이름만 보내고, 그 밖의 manifest 내용·entry point 대상·파일 경로는 보내지 않습니다.
+목록 자체를 읽지 못하면 패널에 그렇게 표시하고 자세한 내용은 서버 로그에 남깁니다.
+작업공간 capability 계약은 바뀌지 않습니다(`/api/workspace/capabilities/v6`).
+설치된 공급자를 아직 작업공간의 물리로 제공하지는 않으며, 이 목록은 설치 상태만 보여 줍니다.
+
+검사: `tests/simcase/test_studio_providers.py`(내장 공급자만, 주입한 공급자, 사용 불가
+공급자, 목록 실패)와 `tests/simcase/studio_workspace_providers.cjs`(이스케이프와 응답 계약).

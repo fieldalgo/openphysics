@@ -8,8 +8,8 @@ can use the same endpoints. Everything is JSON; arrays are sent as
 plain lists (fine for the mesh sizes a 2D study uses).
 
 Imports from simcase are absolute and limited to ``simcase.__all__`` and the public modules
-``simcase.reader`` and ``simcase.quantities`` on purpose: this file is written as an ordinary
-consumer of the engine, not as a part of it.
+``simcase.reader``, ``simcase.quantities`` and ``simcase.providers`` on purpose: this file is
+written as an ordinary consumer of the engine, not as a part of it.
 
 Every route that takes a document (``/api/validate``, ``/api/mesh``, ``/api/run`` and the thermal
 routes) reads the request's raw bytes with ``simcase.reader``: numbers keep their written digits,
@@ -37,9 +37,9 @@ from pydantic import BaseModel
 
 import physmat
 from simcase import __version__, Document, DocumentError, SubspaceSweepResult, build_mesh, examples, run
-from simcase import quantities, reader
+from simcase import providers, quantities, reader
 from .bodies import (RequestRefused, UNEXPECTED, USER_FACING, diagnostics as _diagnostics, exact_json,
-                     read_envelope, reply_text)
+                     read_envelope, reply_text, unexpected)
 from . import thermal_api as thermal
 from . import thermal_regions_api as regions
 from . import transient_thermal_api as transient
@@ -181,6 +181,27 @@ def workspace_capabilities_v6():
     caps = json.loads(workspace_capabilities_v5().body)
     caps.update(schema_version=6)
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
+#: what ``/api/providers`` lists of each provider: data only, never code or a file path
+_PROVIDER_FIELDS = ("name", "version", "distribution", "protocol", "status", "error")
+
+
+@app.get("/api/providers")
+def list_providers():
+    """The installed physics providers, built-in first (``simcase.providers.providers()``).
+
+    Each entry has the provider's name, version, distribution, protocol, status
+    (``available`` or ``unavailable``), its error (the text ``providers()`` reports, which is
+    written for users) and the names of its kinds. No manifest content beyond the kind names,
+    no entry-point target and no code is sent: the workspace shows this list as text."""
+    try:
+        listing = [{**{key: getattr(p, key) for key in _PROVIDER_FIELDS}, "kinds": list(p.kinds)}
+                   for p in providers.providers()]
+    except Exception as exc:  # the built-in provider failed to load: the details stay in the log
+        return JSONResponse({"detail": unexpected(exc, "provider listing")}, status_code=500,
+                            headers={"Cache-Control": "no-store"})
+    return JSONResponse({"providers": listing}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/examples")
