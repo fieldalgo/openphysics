@@ -190,3 +190,38 @@ unchanged. A future field composition must independently verify its assembled
 operator, currents, material assumptions, and panel/outer-domain convergence.
 No general corner-field, small-mutual-loss or platform accuracy follows from
 the integral checks alone.
+
+### Separated power panels
+
+`power_panel_separated_log(first, second, offset, p, q)` evaluates the double
+weighted log distance for a panel from zero to `first` and a panel from
+`offset` to `offset + second`. These are finite planar displacement vectors
+in metres. Each power density starts at its specified panel origin; reversing
+a nonconstant panel moves its singularity and is not an invariant operation.
+
+Require a length ratio at most 64 and minimum segment distance at least half
+the longer panel length. Endpoint contact, intersection and overlap are
+rejected. Norms and quadrature distances must be representable. An explicit
+positive tensor Gauss–Jacobi rule compares coarse order 4–64 (default 32) with
+twice that order, retaining the same `1e-12*max(1,abs(fine))` gate and frozen
+result fields. Coordinate normalization extracts the logarithm of the length
+scale analytically; quadrature weights are not renormalized.
+
+```python
+from galerkin.laplace_corner import power_panel_separated_log
+
+pair = power_panel_separated_log(
+    [1e-3, 0.], [0., 1e-3], [2e-3, 2e-3], 2/3, .75,
+)
+print(pair.mean_log_distance, pair.refinement_error)
+```
+
+Four additional stored direct 2D mpmath 60/80-digit references cover parallel,
+perpendicular, skew and collinear separated panels, with unequal powers and
+lengths. Their record is
+`tests/galerkin/two_ground/evidence/corner-separated-integrals.json`.
+Tests retain the `1e-12` reference/transform and `1e-30` precision-agreement
+gates; they also check positive-weight distance bounds, the exact separation
+admission boundary, explicit refusal, density orientation and representable
+length scales. General near pairs, other endpoint contacts and an assembled
+weighted field solver remain outside this API.
