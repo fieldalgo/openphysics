@@ -577,3 +577,31 @@ integration rather than this finite Gauss-Jacobi implementation; they are not
 an independent full-field solver. Exchange, reflection, geometric scaling,
 constant-mode compatibility and immutable results are checked separately.
 No current-solver defaults, physical geometry or existing acceptance gates change.
+
+### Reproducible linear-block reference provenance
+
+The [far record](../../../tests/galerkin/reference_values/mpmath/linear_far_log.json)
+and [shared-vertex record](../../../tests/galerkin/reference_values/mpmath/linear_vertex_log.json)
+use the stored-reference v1 contract. Their explicit consumer builds inputs from
+those records and verifies that every binary64 value equals the original raw
+fixture before applying its unchanged dimensionless primitive criterion.
+The original fixtures, tests and requested-order refusals remain unchanged.
+
+The adjacent hash-pinned mpmath 1.3.0 requirements are for reference reproduction
+only, not a runtime dependency. Its unmodified BSD-3-Clause wheel runs in a
+separate environment without loading product modules. The compare-only script
+recomputes all entries at 60 and 80 decimal digits, prints per-array differences
+and removes temporary output; it cannot overwrite a fixture. From the repository
+root in that reference environment, run:
+
+```bash
+python tests/galerkin/reference_values/mpmath/compare_linear_logs.py far
+python tests/galerkin/reference_values/mpmath/compare_linear_logs.py vertex
+```
+
+The new records describe the measured reproduction, not the original generation
+time. Uncaptured CPU model, compilation time and resident memory remain null
+with reasons. A stored consumer reports no current reference execution time.
+These are mathematical primitive comparisons: the vertex reference shares the
+Duffy identity, and neither record establishes field convergence, physical
+accuracy or support on another platform.
