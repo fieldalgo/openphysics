@@ -689,3 +689,16 @@ compatibility, signed-coordinate transformations, scaling, reciprocity for
 unit powers, immutable outputs and unresolved-input refusal are tested.
 No full linear field assembly, fixed-ground accuracy or platform support follows
 from these primitive checks.
+
+### Self and squared-density reference provenance
+
+The [stored self/Gram record](../../../tests/galerkin/reference_values/mpmath/linear_self_gram.json)
+reproduces the original five power/length cases with direct density-removed
+Gram and Duffy self-log integrals at60/80 digits. All ten binary64 arrays equal
+the original raw fixture, including its tiny nonzero uniform cross moments.
+The consumer retains strict1e-12 nonzero-entry relative comparisons and the
+original exact uniform-mode zeros with the1e-30 reference cross-moment check.
+It introduces no denominator floor or numeric clipping. The adjacent compare-
+only generator uses the same hash-pinned mpmath1.3.0 reference environment.
+The new receipt measures only this reproduction; uncaptured CPU/RSS/compile
+metadata remain null. No runtime, raw fixture, old test or criterion changes.
