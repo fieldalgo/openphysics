@@ -265,3 +265,9 @@ analytic density moments, closed-form constant integrals, rotation/reflection,
 source reversal, length scaling, one-ULP gap/overlap distinction and actual
 near-pair refusal. These primitives do not establish weighted field or
 current-loss convergence and do not change existing boundary solvers.
+
+Repeated quadrature requests reuse at most 128 normalized power rules and
+128 cubic-coordinate rules per process. Inputs are validated before lookup,
+and cached nodes and weights have immutable byte storage. Rule arithmetic,
+orders, normalization and convergence gates are unchanged; this bounded
+reuse avoids repeated eigensolutions during field assembly.
