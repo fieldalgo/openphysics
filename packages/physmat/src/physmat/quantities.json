@@ -2283,7 +2283,7 @@
    "rank": ["scalar"],
    "domain": null,
    "band": {"range": ["1", null]},
-   "places": ["material"],
+   "places": ["material", "api"],
    "hint": false,
    "scope": {"quantity": "refractive_index", "model": "sellmeier"},
    "description": {"en": "Constant term A of the Sellmeier model n^2 = A + sum_i B_i lambda0^2 / (lambda0^2 - C_i); usually 1 or more.", "ko": "셀마이어 모형 n^2 = A + sum_i B_i lambda0^2 / (lambda0^2 - C_i)의 상수항 A. 보통 1 이상."}
@@ -2296,7 +2296,7 @@
    "rank": ["scalar"],
    "domain": {"min": "0"},
    "band": null,
-   "places": ["material"],
+   "places": ["material", "api"],
    "hint": false,
    "scope": {"quantity": "refractive_index", "model": "sellmeier"},
    "description": {"en": "Strength B_i of a Sellmeier term.", "ko": "셀마이어 항의 세기 B_i."}
@@ -2309,7 +2309,7 @@
    "rank": ["scalar"],
    "domain": null,
    "band": null,
-   "places": ["material"],
+   "places": ["material", "api"],
    "hint": false,
    "scope": {"quantity": "refractive_index", "model": "sellmeier"},
    "description": {"en": "Resonance vacuum wavelength lambda_i of a Sellmeier term, C_i = lambda_i^2.", "ko": "셀마이어 항의 공명 진공 파장 lambda_i, C_i = lambda_i^2."}
@@ -2322,7 +2322,7 @@
    "rank": ["scalar"],
    "domain": null,
    "band": null,
-   "places": ["material"],
+   "places": ["material", "api"],
    "hint": false,
    "scope": {"quantity": "refractive_index", "model": "sellmeier"},
    "description": {"en": "Coefficient C_i of a Sellmeier term, a squared vacuum wavelength.", "ko": "셀마이어 항의 계수 C_i, 진공 파장의 제곱."}

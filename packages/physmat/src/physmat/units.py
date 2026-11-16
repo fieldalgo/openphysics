@@ -17,9 +17,9 @@ unit as written), ``convert_array()`` does the same for every entry of an array,
 ``convert_complex()`` reads complex values under exp(-i omega t) and refuses gain,
 ``is_quantity_text()`` tells a quantity string from an expression, ``length_to_pm()`` puts a
 geometry length on the integer picometre grid, and ``format()`` writes a value back as a
-quantity string. The rules are in docs/packages/physmat/units.md. No other OpenPhysics
-package calls this module yet: documents, simcase and galerkin keep their current units
-until later steps of the units convention.
+quantity string. The rules are in docs/packages/physmat/units.md. simcase reads its
+documents with this module, and physmat's library functions take SI values under its names;
+galerkin and sipi keep their current units until later steps of the units convention.
 
 How a value is read: the character map and attached forms (``normalize``), then the number
 grammar, then a whole-string lookup of the unit in the frozen spelling table and the

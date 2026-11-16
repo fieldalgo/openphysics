@@ -208,8 +208,8 @@ def _note_transforms(obj, form: list) -> None:
 
 
 def _is_material(obj) -> bool:
-    """A physmat ``Material`` (``physmat.material`` today; any physmat module, so that a moved
-    class keeps its form)."""
+    """A physmat ``Material`` (``physmat._material`` since the galerkin step, ``physmat.material``
+    before it; any physmat module, so that a moved class keeps its form)."""
     t = type(obj)
     return t.__name__ == "Material" and t.__module__.split(".")[0] == "physmat"
 

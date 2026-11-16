@@ -9,12 +9,12 @@ registry entries and converter functions the document reader needs.**
 `physmat.units` holds the quantity registry and the one converter from
 human-written units to SI. **`simcase` calls it**: its format 0.3 reader
 ([document format 0.3](../simcase/document_format.md)), through which every
-`simcase` document kind and Studio read their documents. `galerkin` and `sipi` do not
-call it yet and keep their current key names and units, and the other physmat
-functions keep their current arguments (wavelengths in micrometres, temperatures in
-kelvin, and Celsius `temperature_c` for the Ciddor air model), until later steps of
-the convention change them. The module uses only
-the Python standard library.
+`simcase` document kind and Studio read their documents. The other physmat functions
+take SI values under its names ([physmat overview](overview.md#si-arguments): the
+vacuum wavelength in m, temperatures in K, the Ciddor air conditions in K, Pa and
+mole fractions). `galerkin` and `sipi` do not call it yet and keep their current key
+names and units until later steps of the convention change them. The module uses
+only the Python standard library.
 
 ```python
 from physmat.units import q, q_array, convert, convert_array, convert_complex

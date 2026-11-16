@@ -377,8 +377,8 @@ The formula is `n² = constant + sum(strength[i] * wavelength² / (wavelength² 
 `C[i]` the `resonance_wavelength_squared` (or the square of `resonance_wavelength`; a term
 takes exactly one of the two). `constant` (default 1, echoed in `defaults_applied`) and the
 strengths are dimensionless; every length carries its unit, so the same model in nm writes
-`"10000 nm^2"` and `["500 nm", "2000 nm"]`. The resolver converts each to physmat's
-micrometres once, from its exact value. `valid.vacuum_wavelength` is `[lo, hi]` with lo > 0, or
+`"10000 nm^2"` and `["500 nm", "2000 nm"]`. The resolver converts each to the micrometres of
+physmat's internal model kernels (`physmat.kernels`) once, from its exact value. `valid.vacuum_wavelength` is `[lo, hi]` with lo > 0, or
 `[null, hi]` for an open lower bound; omitting `valid` leaves the range unbounded.
 `reference_medium` is required and only `"vacuum"` is read in this release; the `rii_formula`
 model is refused by name. A model needs at least one term. The format 0.2 keys (`n`, `k`,

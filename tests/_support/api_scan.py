@@ -75,14 +75,17 @@ REASONS = {
 }
 
 CATEGORIES = ("object", "positional data", "index or count", "enum", "mapping of tags", "flag", "path or text",
-              "mesher, pending")
+              "mesher, pending", "deferred to the materials step")
 MESHER_SCOPE = ("galerkin.mesh", "galerkin.mesh3d")
+#: physmat record arguments the materials step after 0.0.2 replaces (spec 1.2, 13); each names its closing condition
+DEFERRED = "deferred to the materials step"
 
 # The phrase every internal module's docstring carries.
 INTERNAL_DOCSTRING = "Internal module, consistent units"
 
-# Allowlist counts on openphysics main f693ae3a, when the scan landed. They never grow.
-BASELINE_COUNTS = {"galerkin": 301, "physmat": 107, "refsol": 549}
+# Allowlist counts: galerkin and refsol on openphysics main f693ae3a, when the scan landed; physmat after
+# L1 commit 3, which emptied it (107 on f693ae3a). They never grow.
+BASELINE_COUNTS = {"galerkin": 301, "physmat": 0, "refsol": 549}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 
@@ -96,6 +99,8 @@ class Structural:
     source: str
     scope: tuple[str, ...] = ()        # module prefixes where the name is structural; empty means everywhere
     unit_token_note: str | None = None  # why a trailing unit token is not a unit here
+    reviewer_note: str | None = None    # why the name was added after L1 commit 1b
+    closing: str | None = None          # the condition that ends a 'deferred to the materials step' entry
 
 
 @dataclasses.dataclass(frozen=True)
@@ -159,7 +164,8 @@ def load_structural(path: Path = STRUCTURAL_FILE) -> dict[str, Structural]:
             raise ValueError(f"{path.name}: {name!r} is listed twice")
         if e["category"] not in CATEGORIES:
             raise ValueError(f"{path.name}: {name!r} has unknown category {e['category']!r}")
-        out[name] = Structural(name, e["category"], e["source"], tuple(e.get("scope", ())), e.get("unit_token_note"))
+        out[name] = Structural(name, e["category"], e["source"], tuple(e.get("scope", ())), e.get("unit_token_note"),
+                               e.get("reviewer_note"), e.get("closing"))
     return out
 
 
@@ -527,6 +533,10 @@ def structural_problems(rules: Rules) -> list[str]:
             problems.append(f"{e.name} has a unit-token note but ends in no unit token")
         if not e.source:
             problems.append(f"{e.name} has no source")
+        if e.category == DEFERRED and not (e.closing and e.reviewer_note):
+            problems.append(f"{e.name}: a '{DEFERRED}' entry names its closing condition and has a reviewer note")
+        if e.closing and e.category != DEFERRED:
+            problems.append(f"{e.name}: only a '{DEFERRED}' entry has a closing condition")
     return problems
 
 

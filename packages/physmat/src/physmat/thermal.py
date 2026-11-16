@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .dispersion import OutOfRange
-from .material import Property
+from ._material import Property
 
 CITATION = ('J. G. Hust and A. B. Lankford, "Thermal conductivity of aluminum, copper, iron, and tungsten for '
             'temperatures from 1 K to the melting point", NBSIR 84-3007, National Bureau of Standards (1984), '
@@ -97,7 +97,7 @@ _ALIASES = {"cu": "Cu", "copper": "Cu", "al": "Al", "aluminum": "Al", "aluminium
 # three metals and the typical grade of annealed, commercially pure metal (OFHC copper per the NIST
 # cryogenic material properties fits; Hust and Lankford put commercial copper wire at RRR 50-500).
 DEFAULT_RRR = 100.0
-MIN_TEMPERATURE_K = 1.0
+MINIMUM_TEMPERATURE = 1.0              # K: the lower end of the stated validity of every metal
 
 
 def _metal(metal: str) -> _MetalParameters:
@@ -165,7 +165,7 @@ class HustLankford:
     @property
     def range_k(self) -> tuple[float, float]:
         """Stated validity in kelvin: 1 K to the melting point."""
-        return (MIN_TEMPERATURE_K, self._m.melting_k)
+        return (MINIMUM_TEMPERATURE, self._m.melting_k)
 
     @property
     def rrr_fitted(self) -> tuple[float, float]:

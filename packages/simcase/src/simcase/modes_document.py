@@ -28,6 +28,7 @@ import math
 from fractions import Fraction
 
 import physmat
+from physmat import kernels
 from physmat.units import Diagnostic
 
 from . import views
@@ -523,16 +524,32 @@ def summary(doc) -> str:
 def optical_material(doc, ref) -> physmat.Material:
     """The physmat material of one reference: ``physmat:<Name>`` from the library, a local name
     from its ``refractive_index`` record (a constant index, n + i k, or the Sellmeier model with
-    its coefficients in square micrometres from their exact values, hazard H13)."""
+    its coefficients in square micrometres from their exact values, hazard H13).
+
+    A local record's model is built as a ``physmat.kernels`` model from those micrometre
+    doubles: no metre-to-micrometre float rule reproduces them for every Sellmeier fixture
+    (phase-3 decision D30). The run evaluates every material through its kernel model,
+    ``material.optical``, at the kernel's micrometre wavelength (``kernel_index``)."""
     if ref.startswith("physmat:"):
-        return physmat.get(ref[len("physmat:"):])
+        return physmat.material(ref[len("physmat:"):])
     record = doc.si["materials"][ref]
     index = record["refractive_index"]
     source = record.get("source", "document")
     if isinstance(index, dict):
         return physmat.Material(ref, _sellmeier(doc, ref, index), source)
     z = complex(index)
-    return physmat.Material(ref, physmat.Constant(float(z.real), float(z.imag), ref), source)
+    return physmat.Material(ref, kernels.Constant(float(z.real), float(z.imag), ref), source)
+
+
+def kernel_index(material: physmat.Material, wavelength_um):
+    """n + i k of ``material`` at a kernel wavelength in micrometres: its ``physmat.kernels`` model with
+    the strict validity check, the call physmat's own micrometre methods made before the galerkin step."""
+    return material.optical.index(wavelength_um, True)
+
+
+def kernel_permittivity(material: physmat.Material, wavelength_um):
+    """(n + i k)^2 of ``material`` at a kernel wavelength in micrometres (as ``kernel_index``)."""
+    return material.optical.eps(wavelength_um, True)
 
 
 def _sellmeier(doc, ref, model):
@@ -553,7 +570,7 @@ def _sellmeier(doc, ref, model):
     else:
         lo, hi = um(doc, f"{base}.valid.vacuum_wavelength")
         bounds = (0.0 if lo is None else lo, hi)
-    return physmat.Sellmeier(strengths, squares, constant, bounds, ref)
+    return kernels.Sellmeier(strengths, squares, constant, bounds, ref)
 
 
 # -- the kernel hand-off -----------------------------------------------------------------------------
@@ -704,7 +721,7 @@ def plausibility(doc, model, wavelength_um, say) -> None:
         refs.setdefault(key, where)
     for region, material in model.materials.items():
         try:
-            n = material.index(wavelength_um).real
+            n = kernel_index(material, wavelength_um).real
         except Exception:
             continue
         ref = model.region_materials[region]

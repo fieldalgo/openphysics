@@ -198,13 +198,9 @@ def get_example(name: str):
     return exact_json(doc.data)
 
 
-#: physmat's own wavelength unit (its ranges and index functions take micrometres)
-_PHYSMAT_UM = 1e-6
-
-
-def _metres(um: float) -> float | None:
-    """A physmat micrometre bound in metres (None for an open bound)."""
-    return None if um == float("inf") else um * _PHYSMAT_UM
+def _bound(metres: float) -> float | None:
+    """A validity bound of physmat in metres for JSON (None for an open bound)."""
+    return None if metres == float("inf") else metres
 
 
 @app.get("/api/materials")
@@ -212,10 +208,10 @@ def list_materials():
     """The library under the names a format 0.3 document writes ("physmat:Si"); no aliases."""
     out = []
     for n in physmat.names():
-        m = physmat.get(n)
-        lo, hi = m.range_um
+        m = physmat.material(n)
+        lo, hi = m.valid_vacuum_wavelength
         out.append({"name": "physmat:" + n,
-                    "valid": {"vacuum_wavelength": {"unit": "m", "values": [_metres(lo), _metres(hi)]}},
+                    "valid": {"vacuum_wavelength": {"unit": "m", "values": [_bound(lo), _bound(hi)]}},
                     "source": m.source.split(";")[0], "properties": sorted(m.properties)})
     return {"materials": out}
 
@@ -226,16 +222,16 @@ def material_preview(body: MaterialPreview):
     if not body.name.startswith("physmat:"):
         raise HTTPException(404, f'{body.name!r}: a library material is written "physmat:<Name>"')
     try:
-        m = physmat.get(body.name.removeprefix("physmat:"))
+        m = physmat.material(body.name.removeprefix("physmat:"))
     except KeyError as exc:
         raise HTTPException(404, str(exc))
-    lo, hi = (v * _PHYSMAT_UM for v in m.range_um)
+    lo, hi = m.valid_vacuum_wavelength
     a, b = max(body.vacuum_wavelength_minimum, lo), min(body.vacuum_wavelength_maximum, hi)
     if not a < b:
         raise HTTPException(400, f"material {body.name} has no data in [{body.vacuum_wavelength_minimum}, "
                                  f"{body.vacuum_wavelength_maximum}] m")
     wl = np.linspace(a, b, body.point_count)
-    idx = m.index(wl / _PHYSMAT_UM)
+    idx = m.refractive_index(vacuum_wavelength=wl)
     return {"name": body.name, "vacuum_wavelength": {"unit": "m", "values": wl.tolist()},
             "refractive_index": {"n": idx.real.tolist(), "k": idx.imag.tolist()}, "source": m.source}
 

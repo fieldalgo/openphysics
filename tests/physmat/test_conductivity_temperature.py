@@ -14,6 +14,11 @@ K4  The report's own tables (Tables 2.4.1, 3.4.1, 5.4.1) reproduced within 2 % (
 K5  Out-of-range refusal (temperature) and RRR validation.
 K6  Existing physmat tests unchanged (tests/physmat/test_physmat.py, test_air.py run alongside).
 
+The equation is the internal kernel module physmat.thermal (re-exported by physmat.kernels),
+tested as it is. The public API is physmat.metal_thermal_conductivity(metal, *, temperature,
+residual_resistivity_ratio) and the library's thermal_conductivity property, evaluated with
+Material.property(key, temperature=...) (temperature in K, required).
+
 References
 ----------
 * J. G. Hust and A. B. Lankford, NBSIR 84-3007 (1984), https://doi.org/10.6028/NBS.IR.84-3007:
@@ -37,7 +42,7 @@ import pytest
 
 import physmat
 from physmat import OutOfRange, thermal
-from physmat.thermal import HustLankford, thermal_conductivity
+from physmat.kernels import HustLankford, thermal_conductivity
 
 # ---- Hust and Lankford, Table 2.4.1 (copper), W/(m K) ----------------------------------------------
 T_CU = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 150,
@@ -178,7 +183,7 @@ def test_k4_excluded_entries_are_bounded_and_explained():
 
 def test_k1_copper_rrr100_against_nist_cryogenic_fit():
     T = np.array([4.0, 20.0, 77.0, 150.0, 300.0])
-    k = physmat.get("Cu").get("thermal_conductivity", T)          # the built-in property, RRR 100
+    k = physmat.material("Cu").property("thermal_conductivity", temperature=T)   # the built-in property, RRR 100
     worst = _rel(k, nist_ofhc(T, 100))
     RECORD["K1 Cu RRR 100 vs NIST OFHC fit, 4-300 K max |rel|"] = worst
     assert worst < 0.05
@@ -206,7 +211,7 @@ def test_k1_copper_against_ho_powell_liley():
 def test_k2_aluminium_against_ho_powell_liley():
     T = np.array([t for t in sorted(HPL_AL) if t >= 150], float)
     ref = np.array([HPL_AL[t] for t in sorted(HPL_AL) if t >= 150])
-    worst = _rel(physmat.get("Al").get("thermal_conductivity", T), ref)
+    worst = _rel(physmat.material("Al").property("thermal_conductivity", temperature=T), ref)
     RECORD["K2 Al RRR 100 vs Ho-Powell-Liley 150-900 K max |rel|"] = worst
     assert worst < 0.10
     rrr_hpl = 24.8e-9 / 5.94e-12 + 1.0                            # the HPL high-purity specimen
@@ -274,7 +279,7 @@ def test_k5_temperature_range_and_strict():
     with pytest.raises(OutOfRange):
         cu(np.array([300.0, 1400.0]))
     with pytest.raises(OutOfRange):
-        physmat.get("copper").get("thermal_conductivity", 2000.0)
+        physmat.material("Cu").property("thermal_conductivity", temperature=2000.0)
     assert np.isfinite(cu(0.5, strict=False)) and np.isfinite(cu(1400.0, strict=False))
     assert HustLankford("Cu", strict=False)(1400.0) == cu(1400.0, strict=False)
     with pytest.raises(ValueError):
@@ -303,15 +308,37 @@ def test_k5_rrr_validation():
 
 
 def test_property_plumbing_and_citation():
-    cu = physmat.get("Cu")
+    cu = physmat.material("Cu")
     p = cu.properties["thermal_conductivity"]
     assert p.unit == "W/(m K)" and "Hust" in p.source and "RRR = 100" in p.source and "NBS.IR.84-3007" in p.source
     assert isinstance(p.value, HustLankford)
-    assert cu.get("thermal_conductivity").shape == ()                 # default 293.15 K, scalar
-    assert cu.get("thermal_conductivity", [4.0, 300.0]).shape == (2,)
+    assert cu.property("thermal_conductivity", temperature=293.15).shape == ()   # scalar (the old default 293.15 K)
+    assert cu.property("thermal_conductivity", temperature=[4.0, 300.0]).shape == (2,)
+    with pytest.raises(TypeError):
+        cu.property("thermal_conductivity")                             # the temperature is required (D35)
     w = thermal.conductivity_property("W", rrr=50)
-    assert abs(w(300.0) - thermal_conductivity("W", 300.0, 50)) < 1e-12
-    assert physmat.get("Al").properties["thermal_conductivity"].value.rrr == thermal.DEFAULT_RRR == 100.0
+    assert abs(w(temperature=300.0) - thermal_conductivity("W", 300.0, 50)) < 1e-12
+    assert physmat.material("Al").properties["thermal_conductivity"].value.rrr == thermal.DEFAULT_RRR == 100.0
+
+
+def test_metal_thermal_conductivity_is_the_kernel_in_si():
+    T = np.array([1.0, 4.0, 77.0, 300.0, 900.0])                      # below the lowest melting point (Al)
+    for metal in ("Cu", "Al", "W"):
+        for rrr in (30.0, 100.0):
+            got = physmat.metal_thermal_conductivity(metal, temperature=T, residual_resistivity_ratio=rrr)
+            assert np.array_equal(got, thermal_conductivity(metal, T, rrr))
+    assert physmat.MINIMUM_TEMPERATURE == 1.0 == HustLankford("Cu").range_k[0]
+    with pytest.raises(OutOfRange):
+        physmat.metal_thermal_conductivity("Cu", temperature=0.5, residual_resistivity_ratio=100.0)
+    assert np.isfinite(physmat.metal_thermal_conductivity("Cu", temperature=0.5, residual_resistivity_ratio=100.0,
+                                                          strict=False))
+    for name in ("copper", "cu", "tungsten", "Fe"):                      # exact names only
+        with pytest.raises(KeyError):
+            physmat.metal_thermal_conductivity(name, temperature=300.0, residual_resistivity_ratio=100.0)
+    with pytest.raises(TypeError):
+        physmat.metal_thermal_conductivity("Cu", temperature=300.0)       # the purity is required
+    with pytest.raises(TypeError, match="SI numbers only"):
+        physmat.metal_thermal_conductivity("Cu", temperature=300.0, residual_resistivity_ratio="100")
 
 
 def test_zz_print_record(capsys):

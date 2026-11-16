@@ -8,9 +8,9 @@
 `physmat.units`는 물리량 등록부와,
 사람이 쓴 단위를 SI로 바꾸는 단 하나의 변환기를 담습니다. **`simcase`가 이 모듈을 부릅니다**: 형식 0.3
 읽기([문서 형식 0.3](../simcase/document_format.md))이며, 모든 `simcase` 문서 종류와 Studio가 이 읽기로 문서를
-읽습니다. `galerkin`과 `sipi`는 아직 부르지 않고 지금의 키 이름과 단위를 그대로 쓰며, physmat의 다른 함수도
-지금의 인수(파장은 마이크로미터, 온도는 켈빈, Ciddor 공기 모델만 섭씨 `temperature_c`)를 그대로 받습니다.
-이후 규칙 단계에서 바뀝니다. 이 모듈은 Python 표준
+읽습니다. physmat의 다른 함수는 이 등록부의 이름으로 SI 값을 받습니다([physmat 개요](overview.md#si-인수): 진공
+파장은 m, 온도는 K, Ciddor 공기 조건은 K, Pa, 몰분율). `galerkin`과 `sipi`는 아직 부르지 않고 이후 규칙 단계에서
+바뀔 때까지 지금의 키 이름과 단위를 그대로 씁니다. 이 모듈은 Python 표준
 라이브러리만 씁니다.
 
 ```python
