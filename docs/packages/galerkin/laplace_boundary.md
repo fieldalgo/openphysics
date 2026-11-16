@@ -310,3 +310,40 @@ reflection, scaling and immutable input/output checks verify this geometry.
 This function does not assemble a matrix or establish field/current-loss
 convergence. Existing constant-panel solvers keep their own panel limits
 and defaults; the geometry budget does not enlarge those solver contracts.
+
+### Corner-density half-space matrices
+
+`galerkin.laplace_corner_assembly.assemble_corner_half_space` accepts the
+same polygons, metre-valued rectangle dimensions and subdivisions as the
+corner geometry factory. It returns that immutable geometry and raw coarse
+and fine matrices for the Green kernel
+`0.5*log1p(4*y_target*y_source/distance_squared)` above the grounded line
+`y=0`. Each source and target uses its normalized power or constant density.
+The rectangle bounds admit and normalize the geometry; upper-plane and side
+corrections are not part of this primitive.
+
+```python
+from galerkin.laplace_corner_assembly import assemble_corner_half_space
+
+half = assemble_corner_half_space(
+    [[[.0038, .0008], [.0042, .0008], [.0042, .0012], [.0038, .0012]]],
+    width=.008, height=.002, panels_per_edge=16,
+)
+print(half.matrix.shape, half.quadrature_error, half.reciprocity_error)
+```
+
+Constant far interactions use four-term compensated float64 relative
+coordinates before adding quadrature motion. This preserves small distances
+without relying on a platform's extended floating-point type. Fixed 6/8-point
+Gauss rules and the power primitives' own refinement rules produce the two
+matrices. Both normalized matrix refinement and raw reciprocity must be at
+most `1e-10`; nonfinite or unresolved results raise `ValueError`. The arrays
+retain raw reciprocity evidence rather than averaging it away.
+
+Independent 60/80-digit direct two-dimensional integrals cover shared-corner,
+separated-power and constant entries, plus a short far-panel cancellation
+case. Horizontal translation/reflection, physical scaling, positive Green
+energy and immutability supply separate checks. These are integration checks,
+not panel/outer convergence or a field-accuracy guarantee. This primitive
+does not change existing solvers, their limits or defaults, and does not
+establish browser or Windows qualification.
