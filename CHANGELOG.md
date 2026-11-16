@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add reproducible provenance records for existing linear logarithmic references without changing their numerical values or acceptance criteria.
+
 - `galerkin`: an explicit two-ground corner-power field for one or two all-active convex conductors, with immutable edge/whole current factors, independent P3 references and separate panel, outer and reflection checks. Existing solvers are unchanged; fixed-ground trace reduction is outside this method.
 
 - `galerkin`: closed-form two-mode current Gram and self-log matrices on normalized power panels, with exact mode masses, independent direct-integral references and a uniform Legendre limit. These primitives do not replace a field solver.

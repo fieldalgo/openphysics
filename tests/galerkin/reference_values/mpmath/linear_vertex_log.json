@@ -1,0 +1,329 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "linear-power-vertex-log-primitives",
+  "physics": "2D Laplace logarithmic panel moments",
+  "comparison": "structure-oracle",
+  "role": "Primitive mathematical integral reproduction; not an independent field solver, mesh convergence or physical accuracy evidence.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "analytic Duffy radial integration and adaptive angular quadrature after flattening the power measure",
+        "decimal_precisions": [
+          60,
+          80
+        ],
+        "angular_breakpoints": [
+          0,
+          0.25,
+          0.75,
+          1
+        ]
+      },
+      "arrays": [
+        "case_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_linear_logs.py",
+    "sha256": "2b63e16679445350cdb83d3df29ed5a42c94c3ad6d8030c549533b04e75be2a9",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_linear_logs.py vertex",
+    "product_commit": "67a33dba5466695931948a331006c783c37dd18b",
+    "clean": false
+  },
+  "generated_utc": "2026-11-16T20:28:12.066450+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath 60/80 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 2.9667632229975425,
+    "wall_time_s": 2.985375998017844,
+    "peak_rss_mb": null,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import cost, compilation timing, CPU model and peak resident memory were not captured."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          -1.0,
+          0.0
+        ],
+        "p": 1.0,
+        "q": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          1.0
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.6666666666666666
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          0.5
+        ],
+        "p": 0.5001,
+        "q": 0.875
+      },
+      {
+        "first": [
+          0.3,
+          0.4
+        ],
+        "second": [
+          -0.4,
+          0.3
+        ],
+        "p": 0.6,
+        "q": 1.0
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          -0.015625,
+          0.0
+        ],
+        "p": 1.0,
+        "q": 0.5001
+      },
+      {
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.5,
+          0.5
+        ],
+        "p": 0.875,
+        "q": 0.6
+      }
+    ],
+    "mode_order": [
+      0,
+      1
+    ],
+    "quadrature_order": 64
+  },
+  "matched": [
+    "Exact binary64 segment coordinates and exponents; same two physical power modes and integral normalization.",
+    "All reproduced binary64 values equal the preserved original raw reference fixture."
+  ],
+  "not_matched": [
+    "No field discretization, PDE solve, material model or physical measurement.",
+    "Product uses finite Gauss-Jacobi comparisons; reference uses the separately described mathematical evaluation.",
+    "Vertex reference shares the analytic Duffy decomposition; it is not an independent derivation of that identity."
+  ],
+  "reference_self_check": [
+    "60/80-digit absolute agreement below 1e-40 in every entry.",
+    "Separate reference process did not load galerkin, sipi, meshine or simcase.",
+    "Temporary comparison output removed; source fixture not written.",
+    "Equal-opposite unit powers also have an independently checked closed form in the original consumer."
+  ],
+  "failed_or_discarded": [
+    "The length-ratio64 product example refuses order32/64; the preserved explicit comparison uses64/128."
+  ],
+  "not_run": [
+    "Full linear field assembly and physical/device validation.",
+    "Other operating systems and browser/portable execution."
+  ],
+  "values": [
+    {
+      "name": "case_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.11370563888010939,
+          0.3543231158106224
+        ],
+        [
+          0.3543231158106224,
+          -0.13629436111989063
+        ]
+      ]
+    },
+    {
+      "name": "case_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.6499531373229458,
+          0.4578301180748174
+        ],
+        [
+          0.4578301180748174,
+          -0.28433976385036536
+        ]
+      ]
+    },
+    {
+      "name": "case_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.0126124444584674,
+          0.3699938662717207
+        ],
+        [
+          0.5845582464744948,
+          -0.27029189656730573
+        ]
+      ]
+    },
+    {
+      "name": "case_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.2108028388342,
+          0.4309667561523684
+        ],
+        [
+          0.3507995550312611,
+          -0.23309148471113264
+        ]
+      ]
+    },
+    {
+      "name": "case_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -0.9696304536231858,
+          0.024374197692319216
+        ],
+        [
+          0.8310398703415417,
+          -0.026604183389643047
+        ]
+      ]
+    },
+    {
+      "name": "case_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        2,
+        2
+      ],
+      "data": [
+        [
+          -1.0011472628265028,
+          0.18363393308332498
+        ],
+        [
+          0.5332016642159312,
+          -0.3336990938917846
+        ]
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_linear_corner_logs.py"
+  ],
+  "provenance_status": "reconstructed",
+  "not_recorded": {
+    "environment.numpy": "Not imported or installed in the isolated reproduction; see the separate-process generator imports.",
+    "environment.cpu": "CPU model was not captured by the reproduction receipt; only platform.machine was recorded.",
+    "cost.compile_s": "No separate compile timer in the pure-Python reproduction.",
+    "cost.peak_rss_mb": "No resident-memory sampler in the reproduction."
+  },
+  "regeneration": [],
+  "preserved_raw_reference": {
+    "path": "tests/galerkin/two_ground/evidence/linear-vertex-log-integrals.json",
+    "sha256": "61f4ff5843f959e134247f0af059779d2d2843966c960ccc108f8669ef08558d"
+  },
+  "reproduction_note": "New measured reproduction of existing values. Original raw fixture and historical generation are unchanged; this timestamp/cost describes only the new comparison process.",
+  "reproduction": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "5.30354501994e-62",
+      "8.96701393975e-62",
+      "1.47033413605e-61",
+      "3.47688065659e-61",
+      "2.54188303806e-61",
+      "3.1592304968e-61"
+    ],
+    "temporary_numeric_sha256": "2aebd211f0e316e21e8f76dc8797ddc190d34e0ef431916ea1a5075afa298bc4"
+  },
+  "values_sha256": "b3520322d09a72aaf3b1195ae08c269518d59b593aa965235f847974d867d5c2",
+  "content_sha256": "3ac5cf65bcd554a02b96726f3f6a2ff1cb1a9d2c3b41918630cd468ce216d43d"
+}

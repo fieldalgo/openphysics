@@ -28,6 +28,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- 기존 선형 로그 참조의 수치값과 판정 기준을 유지하면서 재현 가능한 출처 기록을 추가했습니다.
+
 - `galerkin`: 모든 도체가 활성 기저인 볼록 도체 1~2개의 명시 two-ground corner-power 장 계산을 추가했습니다. 불변 edge/whole current factor·독립 P3 참조·별도 panel/outer/반사 검사를 제공하며 기존 솔버는 그대로입니다. 고정접지 trace 축약은 이 방법의 범위 밖입니다.
 
 - `galerkin`: 정규 power 패널의 두 모드 current Gram·self-log 폐형식을 추가했습니다. 정확한 모드 mass·독립 직접적분 참조·uniform Legendre 한계를 검사하며 장 솔버를 대체하지 않습니다.
