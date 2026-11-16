@@ -28,6 +28,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- Add explicit two-mode power/constant endpoint interactions, analytic source moments, retained fixed-rule refusal and stored adaptive references.
+
 - Add explicit separated linear-power logarithmic blocks with unchanged quadrature gates, independent parallel closed forms and stored high-precision direct-integral provenance.
 
 - Add reproducible provenance records for existing linear logarithmic references without changing their numerical values or acceptance criteria.
