@@ -24,6 +24,10 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: normalized corner power-panel quadrature, analytic self terms and checked shared-vertex, separated and power-to-constant logarithmic integrals. Immutable cached rules preserve the quadrature arithmetic and weights. Independent high-precision references and geometric invariants cover the declared length and separation ranges.
+- `galerkin`: immutable parametric corner-panel geometry for admitted convex conductors, and a checked bottom-ground half-space matrix with compensated relative coordinates. This is an integration primitive; it does not supply the upper/side boundary corrections or a complete field solution.
+- `galerkin`: `bounded_dense_residual` evaluates bounded binary64 dense residuals using compensated products and sums, with exact binary-rational reference checks. It does not change existing solver defaults. The corner primitives and residual evaluator passed 517 related source and installed checks on Linux; this does not qualify a complete field model or another platform. [Contracts and limits](docs/packages/galerkin/laplace_boundary.md).
+
 - Use scalar `math.hypot` in the planar small-angle lattice to avoid CPU-dependent BLAS reductions while preserving mesh controls and selection contracts.
 
 - `galerkin`: explicit two-ground homogeneous Laplace panels, with separate top/bottom current Gram factors, immutable results and bounded geometry/refinement gates. Existing bottom-ground defaults are unchanged. [Contract and finite-domain validation](docs/packages/galerkin/two-ground.md).
