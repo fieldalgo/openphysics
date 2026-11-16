@@ -761,3 +761,47 @@ and Duffy identities share mathematics. The compare-only generator retains
 all reference values. Matrix checks do not establish complete two-ground
 fields, current convergence or other-platform behavior; existing solvers and
 numerical criteria are unchanged.
+
+### Explicit two-mode corner field
+
+`galerkin.laplace_corner_linear_field.solve_two_ground_linear_corner_rectangle_edges`
+adds a separate homogeneous static solve with two physical density modes per
+corner panel. Inputs are metres; bottom/top planes are grounded and side walls
+have zero normal flux. One or two convex conductors are all active. There is no
+fixed-ground selection, heterogeneous corner or finite-metal diffusion here.
+The existing constant and single-mode solvers keep their behavior and defaults.
+
+Defaults are64 even subdivisions per edge,256 actual fine Fourier modes and
+fixed interpolation degree24. Geometry still admits even16..512 subdivisions,
+but at most512 physical panels (1024 density DOF) may be assembled. Fourier
+modes are even64..4096. There are n-6 physical panels per edge after endpoint
+merging; `whole.panel_count` counts those panels, not the twice-larger density
+space. The output uses the existing immutable `TwoGroundRectangleEdgesResult`:
+capacitance divided by permittivity is dimensionless, current Grams are in1/m,
+and integrated currents are dimensionless. Edges follow admitted CCW order.
+
+The half-space matrix explicitly selects the partitioned mixed method. Smooth
+projection compares20/24, ground integration16/32, and Fourier half/full counts.
+Both density modes retain analytic masses[1,0]. Exact physical squared-density
+Gram matrices are applied after unit-current normalization, with compensated
+small sums. Original1e-10 matrix/refinement, residual, energy, reciprocity,
+current, edge-partition and scaled-PSD checks and condition<1e10 remain; failure
+raises without retries, geometry snapping, weight normalization or diagonal
+floors. Internal consistency does not estimate panel or outer-domain errors.
+
+Independent Fraction polynomial moments through degree3 and closed horizontal
+Fourier moments check the projection and ground operators. Tests separately
+refine32->64 subdivisions and8->16->32mm outer width for a rectangle and an
+unequal tapered pair, retaining1% changes for each C/current quantity. Physical
+scale, conductor basis and reflected face correspondence retain1e-10 checks
+without a diagonal floor. An analytic limiting-circle comparison uses
+`C/eps=2*pi/acosh(h/a)`, signal Gram `h/(2*pi*a*sqrt(h*h-a*a))` and ground Gram
+`1/(2*pi*sqrt(h*h-a*a))`. Circumscribed16/24-gons at a=.1m,h=.5m and explicit
+W256m,H128m approach that limit with decreasing errors below.5%. This finite
+polygon/outer construction is not an exact circular or infinite-domain solve.
+Larger separate geometry/panel/outer studies are required before adopting the
+new method; a small residual or one passing comparison is insufficient.
+
+Every requested line quantity still needs its own material admission and finite
+panel/outer checks. This static API alone is not a frequency-dependent line,
+physical measurement, fixed-ground, three-active-conductor or platform claim.
