@@ -313,7 +313,10 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 이름은 출력이어서 쓰이는 곳이 `api`와 `result`뿐이므로, `evaluation_temperature`는 문서에서 읽지
 않습니다. 단위를 바꾸는 역할 낱말은 `reference_conductivity`처럼 따로 기반 항목을 만듭니다
 (`unnormalized_electric_field`는 단위가 없고, `mass_normalized_electric_field`는 1/m^(3/2)).
-등록부에는 항목 242개와 이름 367개가 있습니다(`physmat.units.names()`).
+등록부에는 항목 249개와 이름 376개가 있습니다(`physmat.units.names()`). galerkin 단계는
+`galerkin`과 `galerkin-refsol`의 열·전기·역학 API를 위해 `reference_electric_potential`과 `initial_time`(역할
+낱말), `design_velocity`(형상 운동의 설계 매개변수 한 단위당 m), `angular_frequency`(rad/s), `decay_rate`(1/s),
+`curvature`(1/m), `thickness`, `displacement_gradient`, 출력 `strain_energy_density`(J/m^3)를 더했습니다.
 
 메뉴 일부:
 
@@ -331,6 +334,8 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 | `vacuum_wavelength` | m | `nm um m` |
 | `vacuum_wavenumber`(1/λ₀) | 1/m | `1/cm 1/m` |
 | `vacuum_angular_wavenumber`(2π/λ₀) | rad/m | `rad/m rad/um` |
+| `angular_frequency` | rad/s | `rad/s` |
+| `decay_rate` | 1/s | `1/s` |
 | `propagation_loss` | dB/m | `dB/m dB/cm dB/mm` |
 | `relative_humidity` | 1 | 맨 숫자, `%` |
 

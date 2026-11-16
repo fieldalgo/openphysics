@@ -357,8 +357,13 @@ role word (`evaluation`, `unnormalized`, `mass_normalized`) is an output: its
 places are `api` and `result` only, so `evaluation_temperature` is never read from
 a document. A role word that changes the unit makes a base of its own
 (`unnormalized_electric_field` has no unit, `mass_normalized_electric_field` is in
-1/m^(3/2)), as `reference_conductivity` does. The registry has 242 entries and 367
-names (`physmat.units.names()`).
+1/m^(3/2)), as `reference_conductivity` does. The registry has 249 entries and 376
+names (`physmat.units.names()`). For the heat, electric and mechanics APIs of
+`galerkin` and `galerkin-refsol`, the galerkin step added `reference_electric_potential`
+and `initial_time` (role words), `design_velocity` (m per unit of a shape motion's
+design parameter), `angular_frequency` (rad/s), `decay_rate` (1/s), `curvature`
+(1/m), `thickness`, `displacement_gradient` and the output `strain_energy_density`
+(J/m^3).
 
 Selected menus:
 
@@ -376,6 +381,8 @@ Selected menus:
 | `vacuum_wavelength` | m | `nm um m` |
 | `vacuum_wavenumber` (1/λ₀) | 1/m | `1/cm 1/m` |
 | `vacuum_angular_wavenumber` (2π/λ₀) | rad/m | `rad/m rad/um` |
+| `angular_frequency` | rad/s | `rad/s` |
+| `decay_rate` | 1/s | `1/s` |
 | `propagation_loss` | dB/m | `dB/m dB/cm dB/mm` |
 | `relative_humidity` | 1 | a bare number, `%` |
 
