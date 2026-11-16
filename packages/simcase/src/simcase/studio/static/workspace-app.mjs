@@ -93,13 +93,13 @@ const heatDrafts=new Map();let heatSide='left',heatField='temperature',heatArrow
 async function studioRequest(method,url,body){const response=await fetch(url,method==='GET'?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let reply;try{reply=await response.json();}catch{throw new Error('Use the Studio server for heat and Joule calculations. Response is not JSON.');}if(!response.ok)throw new Error(reply.error?.message||reply.detail||('HTTP '+response.status));return reply;}
 const heatController=globalThis.ThermalStudio?.createController({
  request:studioRequest,
- onState:next=>{heatState=next;refreshHeatControls();},
+ onState:next=>{heatState=next;refreshHeatControls();jouleView.refreshControls();},
  onResult:payload=>{heatRun={input:JSON.parse(JSON.stringify(heatCapture)),signature:JSON.stringify(heatCapture),payload,completedAt:new Date().toISOString()};heatProbe=null;ui.page='Results';render();notice('Heat calculation complete. Result retains its input snapshot; it is kept in this tab only.');}
 })||null;
 let heatCapture=null;
 const heatLimits=()=>heatController?.state().cap?.limits||null;
 const heatSignature=()=>JSON.stringify(state.thermal);
-function heatBlock(){if(!heatController)return 'Heat calculation needs the Studio page script; reload the workspace.';if(!heatController.state().cap)return 'Heat calculation is unavailable from this server.';if(heatController.state().cap.run_enabled!==true)return 'This server does not enable heat runs.';if(heatDrafts.size)return 'Correct or restore the highlighted heat inputs before running.';return thermalBlock(state.thermal,heatLimits());}
+function heatBlock(){if(!heatController)return 'Heat calculation needs the Studio page script; reload the workspace.';if(jouleView.busy())return 'A Joule heating job holds the server job slot; wait for it to finish.';if(!heatController.state().cap)return 'Heat calculation is unavailable from this server.';if(heatController.state().cap.run_enabled!==true)return 'This server does not enable heat runs.';if(heatDrafts.size)return 'Correct or restore the highlighted heat inputs before running.';return thermalBlock(state.thermal,heatLimits());}
 function setThermal(next,message){
  let checked;try{checked=validateThermal(next);}catch(error){notice(error.message);return false;}
  state.thermal=checked;heatController?.invalidate();edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
@@ -151,7 +151,7 @@ function setJoule(next,message){
  state.joule=checked;edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
 }
 const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),notice:text=>notice(text),getJoule:()=>state.joule,commit:setJoule,render:()=>render(),
- request:studioRequest,active:()=>isJoule(),beforeRun:()=>edits.record(current())});
+ request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(current())});
 function refreshHeatControls(){
  const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat()||isJoule();if(!isHeat())return;
  const block=heatBlock();button.disabled=!!block||heatState.busy;button.textContent=heatState.busy?'Computing…':'Run heat study';
@@ -222,7 +222,8 @@ else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>';
 const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
-document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
+document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{const prior=state[b.dataset.toggle];state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;
+ if(isJoule()){state[b.dataset.toggle]=prior;notice('The multiphysics preview keeps mechanics or optics. For electric currents with heat alone, choose Applications → Joule heating.');}render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>select(b.dataset.select));document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
@@ -361,7 +362,7 @@ function rejectInvalidInput(){
   if(jouleView.hasDrafts())throw new Error('Correct or restore the highlighted Joule inputs before saving or opening files.');
 }
 function applyProject(doc,{saved=true,resetHistory=false}={}){
-  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.invalidate();
+  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.reset();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
@@ -424,7 +425,7 @@ $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)request
 function updateHistory(){ $('undo-edit').disabled=!edits.canUndo;$('redo-edit').disabled=!edits.canRedo; }
 function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before)checkpointRecovery();updateHistory();refreshPersistence();}
 function restoreEdit(doc,label){
- numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.invalidate();
+ numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.clearDrafts();
  Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
 }
@@ -832,7 +833,7 @@ $('run-optical').onclick=async()=>{
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
- try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v7'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v6';}
+ try{const caps=checkWorkspaceCapabilities(await solverApi('/api/workspace/capabilities/v7'));connection.ready=true;connection.version=caps.version;connection.instance=caps.instance;connection.message='Connected to simcase '+caps.version+' · optical workspace contract v7';}
  catch(error){
   // no answer at all: say so and keep checking; any other failure is shown and checking stops
   if(connectionFailure(error)==='unreachable'){connection.message=UNREACHABLE_MESSAGE;scheduleReconnect();}

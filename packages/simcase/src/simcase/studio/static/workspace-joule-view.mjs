@@ -13,7 +13,7 @@ const fmt=v=>String(Number(Number(v).toPrecision(6)));
 // commit(next, message) -> bool (validates, records the edit and renders), render(), request}.
 export function createJouleView(ctx){
  const {$,escapeHtml:esc,pair,notice,ui}=ctx;
- const drafts=new Map();let shapeIndex=0,field='temperature',arrows=true,probe=null,resize=null,result=null,error=null,cap=null,capError=null;
+ const drafts=new Map();let epoch=0,shapeIndex=0,field='temperature',arrows=true,probe=null,resize=null,result=null,error=null,cap=null,capError=null;
  const runner=new JouleRunner({request:ctx.request,onState:s=>{phase=s.message;refreshControls();}});let phase='';
  const j=()=>ctx.getJoule();
  const signature=()=>JSON.stringify(j());
@@ -22,6 +22,7 @@ export function createJouleView(ctx){
  function block(){
   if(capError)return capError;if(!cap)return 'Checking whether this server runs Joule heating…';if(!cap.run_enabled)return 'This server does not enable Joule heating runs.';
   if(drafts.size)return 'Correct or restore the highlighted Joule inputs before running.';
+  if(ctx.otherBusy?.())return 'A heat job holds the server job slot; wait for it to finish.';
   if(cap.limits?.max_iterations&&jouleKind(j())===TEMPERATURE&&j().iteration.iteration_limit>cap.limits.max_iterations)return `The iteration limit exceeds this server's ${cap.limits.max_iterations}.`;
   return jouleBlock(j(),cap.limits);
  }
@@ -43,7 +44,7 @@ export function createJouleView(ctx){
   html+=`<h3>Shapes (later shapes win where they overlap)</h3><div class="shape-list" role="group" aria-label="Joule shapes in draw order">${s.shapes.map((sh,i)=>`<button type="button" class="shape-item" data-joule-shape="${i}" aria-pressed="${i===shapeIndex}"><span class="swatch" style="background:${fill(sh.material)}"></span>${i+1}. ${esc(sh.name)} · ${sh.type} · ${esc(sh.material)}</button>`).join('')||'<p class="muted">No shapes: the background fills the domain.</p>'}</div>`;
   html+=`<div class="toolbar shape-actions">${['rect','circle','polygon'].map(t=>`<button type="button" data-joule-add="${t}" ${n>=MAX_JOULE_SHAPES?'disabled':''}>Add ${t==='rect'?'rectangle':t}</button>`).join('')}<button type="button" id="joule-delete-shape" ${n?'':'disabled'}>Delete shape</button></div>`;
   if(n){const sh=s.shapes[shapeIndex],base=`shapes.${shapeIndex}`;
-   html+=`<h3>${esc(sh.name)}</h3><label>Name<input data-joule-text="${base}.name" type="text" maxlength="32" value="${esc(sh.name)}"></label>`+select(`${base}.material`,materialOptions(),sh.material,'Material');
+   html+=`<h3>${esc(sh.name)}</h3><label>Name<input data-joule-text="${base}.name" type="text" maxlength="32" value="${esc(drafts.get(base+'.name')?.raw??sh.name)}" aria-invalid="${drafts.has(base+'.name')}"></label>${drafts.has(base+'.name')?`<p class="input-hint" role="alert">${esc(drafts.get(base+'.name').message)} Last valid value is retained.</p>`:''}`+select(`${base}.material`,materialOptions(),sh.material,'Material');
    if(sh.type==='rect')html+=input(`${base}.x`,'x [mm]')+input(`${base}.y`,'y [mm]')+input(`${base}.w`,'Width [mm]','min="0"')+input(`${base}.h`,'Height [mm]','min="0"');
    else if(sh.type==='circle')html+=input(`${base}.cx`,'Centre x [mm]')+input(`${base}.cy`,'Centre y [mm]')+input(`${base}.r`,'Radius [mm]','min="0"');
    else html+=`<label>Vertices [mm] · one "x, y" per line, 3–12 points<textarea id="joule-points" rows="${Math.min(12,sh.points.length+1)}" spellcheck="false">${sh.points.map(p=>p.join(', ')).join('\n')}</textarea></label><p class="input-hint" id="joule-points-hint">Applied when the field loses focus. Edges may not cross.</p>`;
@@ -82,7 +83,7 @@ export function createJouleView(ctx){
   document.querySelectorAll('[data-joule]').forEach(el=>el.onchange=()=>{const raw=el.value.trim();set(el.dataset.joule,raw===''?NaN:Number(raw),'Joule input updated.');});
   document.querySelectorAll('[data-joule-text]').forEach(el=>el.onchange=()=>set(el.dataset.jouleText,el.value.trim(),'Shape renamed.'));
   document.querySelectorAll('[data-joule-select]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleSelect;
-   if(path.endsWith('.sigma.model')){const next=el.value==='constant'?{model:'constant',value:1000}:{model:'linear_resistivity',reference_conductivity:1000,reference_temperature:300,coefficient:0.004,tmin:250,tmax:600};set(path.slice(0,-6),next,'Conductivity model changed.');}
+   if(path.endsWith('.sigma.model')){for(const key of [...drafts.keys()])if(key.startsWith(path.slice(0,-6)+'.'))drafts.delete(key);const next=el.value==='constant'?{model:'constant',value:1000}:{model:'linear_resistivity',reference_conductivity:1000,reference_temperature:300,coefficient:0.004,tmin:250,tmax:600};set(path.slice(0,-6),next,'Conductivity model changed.');}
    else set(path,el.value,'Material assignment updated.');});
   document.querySelectorAll('[data-joule-type]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleType,type=el.value,defaults={insulating:{type},potential:{type,potential:0},current:{type,current:0},insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:300}};
    for(const key of [...drafts.keys()])if(key.startsWith(path+'.'))drafts.delete(key);set(path,defaults[type],`${path.split('.')[1]} side: ${type}.`);});
@@ -156,11 +157,15 @@ export function createJouleView(ctx){
  }
  async function run(){
   if(runner.busy||block())return;
-  const input=clone(j()),doc=jouleDocument(input);error=null;ctx.beforeRun?.();refreshControls();
+  const input=clone(j()),doc=jouleDocument(input),started=epoch;error=null;ctx.beforeRun?.();refreshControls();
   try{const payload=await runner.calculate(doc);if(!payload)return;
-   result={input,signature:JSON.stringify(input),payload,completedAt:new Date().toISOString()};probe=null;ui.page='Results';ctx.render();notice('Joule heating calculation complete. The result keeps its input snapshot; it is kept in this tab only.');
-  }catch(e){error=e.message;notice('Joule heating run failed: '+e.message+(/[.!?]$/.test(e.message)?'':'.')+' Inputs unchanged.');}
-  finally{refreshControls();}
+   // a file opened meanwhile replaced the design: its run is not this design's result
+   if(started!==epoch){notice('A Joule heating run of the inputs before the file was opened finished; its result was discarded.');return;}
+   result={input,signature:JSON.stringify(input),payload,completedAt:new Date().toISOString()};probe=null;
+   if(ctx.active()){ui.page='Results';ctx.render();notice('Joule heating calculation complete. The result keeps its input snapshot; it is kept in this tab only.');}
+   else notice('A Joule heating result is ready; choose Applications → Joule heating to see it.');
+  }catch(e){if(started!==epoch)return;error=e.message;notice('Joule heating run failed: '+e.message+(/[.!?]$/.test(e.message)?'':'.')+' Inputs unchanged.');}
+  finally{refreshControls();ctx.onIdle?.();}
  }
  function page(){
   document.querySelector('main').classList.remove('comparing');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
@@ -173,5 +178,9 @@ export function createJouleView(ctx){
   if(ui.page==='Connections')$('canvas').innerHTML='<h2>Joule heating model</h2><p>One coupled model: the electric current heats the conductor (Joule heating), and for temperature-dependent materials the temperature changes the conductivity. No mechanical or optical coupling is configured.</p>';
   bindSvg();refreshControls();
  }
- return {svg,inspector,bindInspector,page,run,refreshControls,loadCapability,invalidate:()=>{drafts.clear();runner.stop();refreshControls();},hasDrafts:()=>drafts.size>0,disconnect:()=>resize?.disconnect()};
+ return {svg,inspector,bindInspector,page,run,refreshControls,loadCapability,// undo/redo: drafts go, the run and its result stay (labelled an earlier snapshot)
+  clearDrafts:()=>{drafts.clear();error=null;refreshControls();},
+  // a file or recovery replaces the design: drafts, result and error go; a running job is still
+  // followed to its end (it holds the server's job slot) and its result discarded
+  reset:()=>{drafts.clear();result=null;error=null;epoch++;refreshControls();},busy:()=>runner.busy,hasDrafts:()=>drafts.size>0,disconnect:()=>resize?.disconnect()};
 }
