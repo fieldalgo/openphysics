@@ -27,8 +27,37 @@ ALLOWLIST = Path(__file__).with_name("api_units_allowlist.json")
 
 # Valid calls for the TypeError clause, keyed "module:callable": each returns the callable
 # and keyword arguments that make a valid call. A module needs them once it has no
-# allowlist entries and takes a quantity.
-STRING_CASES = {}
+# allowlist entries and takes a quantity. physmat's allowlist is empty since L1 commit 3, so
+# every public quantity parameter must refuse a str.
+def _air():
+    return dict(temperature=293.15, absolute_pressure=101325.0, relative_humidity=0.5, co2_mole_fraction=450e-6)
+
+
+def _material(name):
+    import physmat
+    return physmat.material(name)
+
+
+STRING_CASES = {
+    "physmat._material:Material.refractive_index":
+        lambda: (_material("Si").refractive_index, {"vacuum_wavelength": 1.55e-6}),
+    "physmat._material:Material.relative_permittivity":
+        lambda: (_material("Si").relative_permittivity, {"vacuum_wavelength": [1.5e-6, 1.6e-6]}),
+    "physmat._material:Material.property":
+        lambda: (_material("Cu").property, {"key": "thermal_conductivity", "temperature": 300.0}),
+    "physmat._material:Property.__call__":
+        lambda: (_material("Cu").properties["thermal_conductivity"], {"temperature": 77.0}),
+    "physmat._api:ciddor_air": lambda: (__import__("physmat").ciddor_air, _air()),
+    "physmat._api:metal_thermal_conductivity":
+        lambda: (__import__("physmat").metal_thermal_conductivity,
+                 {"metal": "W", "temperature": 300.0, "residual_resistivity_ratio": 100.0}),
+    "physmat._api:constant_model": lambda: (__import__("physmat").constant_model, {"refractive_index": 1.5 + 0.01j}),
+    "physmat._api:sellmeier_model":
+        lambda: (__import__("physmat").sellmeier_model,
+                 {"strength": [0.6961663, 0.4079426, 0.8974794], "resonance_wavelength_squared":
+                  [4.67914825849e-15, 1.351206307396e-14, 9.7934002537921e-11], "constant": 1.0,
+                  "valid_vacuum_wavelength": (2.1e-7, 6.7e-6)}),
+}
 
 
 @pytest.fixture(scope="module")
@@ -61,8 +90,10 @@ def test_listed_result_classes_exist(rules):
     # Their constructors are outside the scan; their field names are check P3-11's job.
     problems = api_scan.result_class_problems(PACKAGE, rules)
     assert not problems, "\n".join(problems)
-    assert ("physmat.material", "Material") not in rules.result_classes      # handled in L1 commit 3
-    assert ("physmat.material", "Property") not in rules.result_classes
+    # Material and Property are records users build; their constructors are scanned (L1 commit 3 put their
+    # arguments on Appendix A, deferred to the materials step).
+    assert ("physmat._material", "Material") not in rules.result_classes
+    assert ("physmat._material", "Property") not in rules.result_classes
 
 
 def test_clean_modules_refuse_strings_and_removed_names(rules):
@@ -72,14 +103,34 @@ def test_clean_modules_refuse_strings_and_removed_names(rules):
 
 
 def test_public_names_are_not_kernel_names(rules):
+    # physmat.kernels exists since L1 commit 3: the public names and objects are disjoint from its own (D7).
     problems = api_scan.kernel_disjointness(PACKAGE, rules)
-    if problems is None:
-        # Nothing to compare yet: physmat.kernels does not exist until the physmat commit
-        # of the first landing creates it. This passes instead of skipping, because the
-        # installed-tests job fails on any skip; once the namespace exists it compares.
-        assert importlib.util.find_spec("physmat.kernels") is None
-        return
+    assert problems is not None and importlib.util.find_spec("physmat.kernels") is not None
     assert not problems, "\n".join(problems)
+
+
+def test_physmat_allowlist_is_empty_and_its_clauses_apply(rules):
+    # P3-3 at L1 commit 3: no physmat entry left, so both public modules are clean and the removed-name and
+    # string clauses apply to them (test_clean_modules_refuse_strings_and_removed_names).
+    assert api_scan.load_allowlist(ALLOWLIST) == [] and api_scan.BASELINE_COUNTS[PACKAGE] == 0
+    assert sorted(api_scan.clean_modules(PACKAGE, ALLOWLIST, rules)) == ["physmat", "physmat.rii"]
+    removed = {r.name for r in rules.removed if r.package == PACKAGE}
+    assert {"get", "standard_air", "Material.eps", "Material.index", "Material.n", "Material.k", "Material.range_um",
+            "Material.get", "wavelength_um", "temperature_c", "co2_ppm"} <= removed
+    assert set(STRING_CASES) == {f"{i.module}:{i.name}" for items in api_scan.package_items(PACKAGE, rules)[0].values()
+                                 for i in items if api_scan.quantity_parameters(i, rules)}
+
+
+def test_deferred_entries_name_their_closing_condition(rules):
+    deferred = {e.name for e in rules.structural.values() if e.category == api_scan.DEFERRED}
+    assert deferred == {"properties", "aliases", "datum_temperature", "datum_assumed", "value", "unit",
+                        "valid_vacuum_wavelength"}
+    for name in deferred | {"optical", "metal"}:
+        e = rules.structural[name]
+        assert e.reviewer_note and e.scope == ("physmat",), name
+    assert all(rules.structural[n].closing for n in deferred)
+    assert rules.structural["source"].scope == ("galerkin.interop", "physmat")
+    assert api_scan.structural_entry("unit", "refsol.thermal_convection", rules) is None   # scoped to physmat
 
 
 # ---- the shared rule data ---------------------------------------------------------------------------------------

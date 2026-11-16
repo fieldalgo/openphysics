@@ -114,7 +114,8 @@ def test_material_capability_v5_extends_v4_materials(client):
     import physmat
     for name in caps['materials'].values():
         assert name.startswith('physmat:')                           # the exact names a document writes
-        index = physmat.get(name.removeprefix('physmat:')).index([1.4, 1.55, 1.7])        # physmat's um
+        index = physmat.material(name.removeprefix('physmat:')).refractive_index(vacuum_wavelength=[1.4e-6, 1.55e-6,
+                                                                                                    1.7e-6])
         assert (abs(index.imag) == 0).all() and (index.real >= 1).all()
     unchanged = {k: v for k, v in caps.items() if k not in ('schema_version', 'adapter', 'materials')}
     assert unchanged == {k: v for k, v in v4.items() if k not in ('schema_version', 'adapter', 'materials')}

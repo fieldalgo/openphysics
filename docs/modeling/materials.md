@@ -13,29 +13,34 @@ to the [region model](../packages/galerkin/multimaterial.md).
 
 ```python
 import physmat
+from physmat.units import q
 
-si = physmat.get("Si")
-wavelength_um = 1.55
+si = physmat.material("Si")
+vacuum_wavelength = q("1550 nm", "vacuum_wavelength")    # 1.55e-06 m
 print(si.source)
-print(si.range_um)
-print(si.index(wavelength_um))
+print(si.valid_vacuum_wavelength)                         # (low, high) in m
+print(si.refractive_index(vacuum_wavelength=vacuum_wavelength))
 
 conductivity = si.properties["thermal_conductivity"]
 print(conductivity.unit, conductivity.source)
-k_w_mk = si.get("thermal_conductivity", T=300.0)
-print(k_w_mk)
+thermal_conductivity = si.property("thermal_conductivity", temperature=300.0)
+print(thermal_conductivity)
 ```
 
-`physmat` optical calls take wavelength in **micrometres**, regardless of a
-`simcase` document's geometry unit. The built-in Si record covers 1.357–11.04 µm;
-1.55 µm is inside it. The default strict check raises `physmat.OutOfRange` outside
-the model's range. Disabling a range check does not validate extrapolation.
-Inspect the citation and the range of the selected record; different records for
-the same substance can describe different samples or measurement conditions.
+`physmat` takes SI values: the vacuum wavelength in **metres**, whatever a
+`simcase` document's geometry unit, and temperatures in kelvin; a string raises
+`TypeError`, so convert text with `physmat.units.q`. The built-in Si record covers
+1.357–11.04 µm (`valid_vacuum_wavelength` gives it in m); 1.55 µm is inside it.
+Outside the model's range `refractive_index` raises `physmat.OutOfRange`; the
+public API has no switch to extrapolate, and extrapolation would not be validated
+anyway. Inspect the citation and the range of the selected record; different
+records for the same substance can describe different samples or measurement
+conditions.
 
 The Si conductivity above is 148 W/(m K), a handbook value at 300 K. Its source is
-attached to the property, separately from the optical model's source. Passing a
-new `T` to a constant `Property` returns the same constant. It does not create a
+attached to the property, separately from the optical model's source. The
+`temperature` is required, but a constant `Property` returns the same constant at
+every temperature. It does not create a
 temperature law or establish a valid temperature interval. Callable properties
 are possible, but each solver decides which coefficient forms it accepts.
 
@@ -60,8 +65,10 @@ replace them with an unrelated optical value.
 
 For optical JSON, use a built-in material name or the supported custom constant
 `n`/`k` or Sellmeier definition. Document wavelength and Sellmeier length inputs
-follow the [simcase unit contract](../packages/simcase/overview.md); direct
-`physmat` calls still use µm. Do not mix those interfaces' length conventions.
+follow the [simcase unit contract](../packages/simcase/overview.md), each value
+with its unit; direct `physmat` calls take metres, and
+`physmat.constant_model` and `physmat.sellmeier_model` build the same two model
+forms from SI values.
 
 For heat, use the explicit conductivity and heat-capacity fields in the
 [region heat contract](../packages/simcase/thermal_regions2d.md). Verify each

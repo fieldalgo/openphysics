@@ -101,8 +101,8 @@
       "physmat.air",
       "physmat.dispersion",
       "physmat.fit",
+      "physmat.kernels",
       "physmat.library",
-      "physmat.material",
       "physmat.thermal"
     ]
   }

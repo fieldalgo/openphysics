@@ -33,12 +33,26 @@ def check_local_name(name, path: str) -> Diagnostic | None:
     return None
 
 
+def _fold(text: str) -> str:
+    """A name folded for "did you mean": lower case, letters and digits only."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _folded_library_name(name: str) -> str | None:
+    """The library name ``name`` matches when case, spaces and punctuation are ignored, or through one of the
+    record's other names (``aliases``). physmat.material matches exactly; this is simcase's own suggestion."""
+    key, found = _fold(name), None
+    for library_name in physmat.names():
+        if key in {_fold(n) for n in (library_name, *physmat.material(library_name).aliases)}:
+            found = library_name                       # the last record wins, as physmat's folded look-up did
+    return found
+
+
 def _library_hints(name: str) -> list[str]:
     hints = []
-    try:
-        hints.append(physmat.get(name).name)          # case and the library's own aliases
-    except KeyError:
-        pass
+    folded = _folded_library_name(name)
+    if folded is not None:
+        hints.append(folded)                           # case and the library's own aliases
     if name.lower() == "air":
         hints += ["vacuum", "standard_air"]
     hints += difflib.get_close_matches(name, physmat.names(), n=2, cutoff=0.6)
@@ -86,7 +100,7 @@ def resolve_reference(ref, local: dict, path: str, policy: str) -> tuple[tuple |
 
 def datum_diagnostic(name: str, path: str) -> Diagnostic | None:
     """``I-DATUM-ASSUMED`` for a library record whose source states no reference temperature."""
-    material = physmat.get(name)
+    material = physmat.material(name)
     if getattr(material, "datum_assumed", False):
         return Diagnostic("I-DATUM-ASSUMED", path,
                           f'"{LIBRARY_PREFIX}{name}": its source states no temperature for its data, so the '

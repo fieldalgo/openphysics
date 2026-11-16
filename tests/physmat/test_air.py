@@ -17,13 +17,25 @@ References used below
 * P. E. Ciddor, Appl. Opt. 35, 1566 (1996), Appendix A: Z_a = 0.9995922115 for standard dry air and
   rho_ws = 0.00985938 kg/m^3 for water vapour at 20 C, 1333 Pa are published constants that the
   density equations must reproduce.
+
+The equations are the internal kernel module physmat.air (re-exported by physmat.kernels;
+micrometres, degrees Celsius, ppm), tested as they are. The public API, physmat.ciddor_air
+in kelvin, pascal and mole fraction, builds the same kernel (last section).
 """
 
 import numpy as np
 import pytest
 
 import physmat
-from physmat import OutOfRange, air
+from physmat import OutOfRange
+from physmat.kernels import air
+
+
+def ciddor_air(temperature=288.15, absolute_pressure=101325.0, relative_humidity=0.0, co2_mole_fraction=450e-6,
+               **kw):
+    """physmat.ciddor_air with Ciddor's standard conditions filled in for this test (the API has no defaults)."""
+    return physmat.ciddor_air(temperature=temperature, absolute_pressure=absolute_pressure,
+                              relative_humidity=relative_humidity, co2_mole_fraction=co2_mole_fraction, **kw)
 
 # (t [C], RH [%], p [kPa], wavelength [nm], n Ciddor, n modified Edlen): NIST Table 1, 450 umol/mol CO2
 NIST_TABLE_1 = [
@@ -122,40 +134,78 @@ def test_limits_in_pressure_temperature_humidity_and_co2():
 # ---- physmat API ----------------------------------------------------------------------
 
 def test_standard_air_material_and_registry():
-    std = physmat.get("standard air")
-    assert std is physmat.get("standard_air") is physmat.get("Ciddor air")
-    assert physmat.get("air").n(1.0) == 1.0                              # the vacuum alias is unchanged
-    assert "Ciddor" in std.source and std.range_um == (0.3, 1.69)
-    assert np.isclose(std.n(0.633), air.refractive_index(0.633), rtol=0, atol=1e-15)
-    assert std.k(0.633) == 0.0 and np.isclose(std.eps(0.633).real, std.n(0.633) ** 2)
+    std = physmat.material("standard_air")                               # exact name; the aliases are data only
+    for alias in ("standard air", "Ciddor air"):
+        assert alias in std.aliases
+        with pytest.raises(KeyError):
+            physmat.material(alias)
+    assert physmat.material("vacuum").refractive_index(vacuum_wavelength=1.0e-6).real == 1.0
+    assert "Ciddor" in std.source and std.valid_vacuum_wavelength == (3e-7, 1.69e-6)
+    n = std.refractive_index(vacuum_wavelength=6.33e-7)                  # 0.633 um by the decimal rule
+    assert np.isclose(n.real, air.refractive_index(0.633), rtol=0, atol=1e-15)
+    assert n.imag == 0.0 and np.isclose(std.relative_permittivity(vacuum_wavelength=6.33e-7).real, n.real ** 2)
     assert "standard_air" in physmat.names()
-    m = physmat.standard_air(20.0, 101325.0, humidity=0.5, co2_ppm=400.0)
-    assert np.isclose(m.n(0.633), air.refractive_index(0.633, 20.0, 101325.0, 0.5, 400.0), rtol=0, atol=1e-15)
+    m = ciddor_air(293.15, 101325.0, 0.5, 400e-6)                        # 20 C, 400 ppm
+    assert np.isclose(m.refractive_index(vacuum_wavelength=6.33e-7).real,
+                      air.refractive_index(0.633, 20.0, 101325.0, 0.5, 400.0), rtol=0, atol=1e-15)
     assert np.isclose(m.optical.at(humidity=0.0).n(0.633), air.refractive_index(0.633, 20.0, 101325.0), atol=1e-15)
     assert 0.011 < m.optical.water_mole_fraction < 0.012                # 0.5 * 2339 Pa * f / 101325 Pa
     # the density Property follows the package convention (kelvin) at the material's p, RH and CO2
-    assert np.isclose(m.get("density", 293.15), air.density(20.0, 101325.0, 0.5, 400.0))
+    assert np.isclose(m.property("density", temperature=293.15), air.density(20.0, 101325.0, 0.5, 400.0))
     assert m.properties["density"].unit == "kg/m^3"
-    assert 1.19 < m.get("density") < 1.21
-    assert m.optical.group_index(0.633) > m.n(0.633)                     # normal dispersion
+    assert 1.19 < m.property("density", temperature=293.15) < 1.21
+    assert m.optical.group_index(0.633) > m.optical.n(0.633)             # normal dispersion (kernel, micrometres)
+
+
+def test_ciddor_air_takes_kelvin_pascal_and_mole_fraction():
+    # The kernel's Celsius and ppm come from the decimal rule: 233.15 K is -40.0 C, where T - 273.15 is
+    # -39.99999999999997, and 300 K is 26.85 C (26.850000000000023); 450e-6 is 450.0 ppm (M3 proposal 5).
+    for kelvin, celsius in (("233.15", -40.0), ("300", 26.85), ("288.15", 15.0), ("373.15", 100.0)):
+        m = ciddor_air(float(kelvin), co2_mole_fraction=450e-6)
+        assert m.optical.temperature_c == celsius and m.optical.co2_ppm == 450.0
+        assert m.datum_temperature == float(kelvin)
+    assert 233.15 - 273.15 != -40.0 and 300.0 - 273.15 != 26.85         # the float subtraction misses
+    std = physmat.material("standard_air")
+    same = ciddor_air(288.15, 101325.0, 0.0, 450e-6)                      # Ciddor's standard air, in SI
+    wl = np.linspace(3e-7, 1.69e-6, 40)
+    assert np.array_equal(same.refractive_index(vacuum_wavelength=wl), std.refractive_index(vacuum_wavelength=wl))
+    assert same.property("density", temperature=288.15) == std.property("density", temperature=288.15)
+    assert ciddor_air(name="lab").name == "lab" and "293.15 K" in ciddor_air(293.15).name
+    pv = ciddor_air(293.15, relative_humidity=None, vapor_pressure=1000.0)
+    assert pv.optical.vapour_pressure_pa == 1000.0 and "pv = 1000 Pa" in pv.source
+    for key, value in (("temperature", "20 degC"), ("absolute_pressure", "1 atm"), ("relative_humidity", "50 %"),
+                       ("co2_mole_fraction", "450 ppm"), ("vapor_pressure", "1 kPa")):
+        with pytest.raises(TypeError, match="SI numbers only"):
+            ciddor_air(**{key: value})
+    with pytest.raises(TypeError):
+        physmat.ciddor_air(temperature=293.15, absolute_pressure=101325.0, relative_humidity=0.0)   # all required
 
 
 def test_validity_checks():
-    std = physmat.get("standard_air")
-    with pytest.raises(OutOfRange):
-        std.n(2.0)
-    assert np.isfinite(std.n(2.0, strict=False))
-    for bad in ({"temperature_c": 120.0}, {"pressure_pa": 50e3}, {"humidity": 1.2}, {"co2_ppm": 3000.0}):
-        with pytest.raises(OutOfRange):
-            physmat.standard_air(**bad)
-        physmat.standard_air(strict=False, **bad)                       # extrapolation on request
-    with pytest.raises(OutOfRange):
-        physmat.standard_air(20.0, vapour_pressure_pa=5000.0)           # above saturation at 20 C
+    std = physmat.material("standard_air")
+    with pytest.raises(OutOfRange, match="vacuum_wavelength outside its valid range"):
+        std.refractive_index(vacuum_wavelength=2.0e-6)
+    assert np.isfinite(std.optical.n(2.0, strict=False))                 # the kernel extrapolates on request
+    for bad, words in (({"temperature": 393.15}, "temperature outside [233.15, 373.15] K"),
+                       ({"absolute_pressure": 50e3}, "absolute_pressure outside"),
+                       ({"relative_humidity": 1.2}, "relative_humidity outside"),
+                       ({"co2_mole_fraction": 3000e-6}, "co2_mole_fraction outside [0, 0.002]")):
+        with pytest.raises(OutOfRange) as found:
+            ciddor_air(**bad)
+        assert words in str(found.value) and " C " not in str(found.value) and "ppm" not in str(found.value)
+        ciddor_air(strict=False, **bad)                                  # extrapolation on request
+    with pytest.raises(OutOfRange, match="vapor_pressure above saturation"):
+        ciddor_air(293.15, relative_humidity=None, vapor_pressure=5000.0)   # above saturation at 20 C
     with pytest.raises(ValueError):
-        physmat.standard_air(20.0, humidity=-0.1)
+        ciddor_air(293.15, relative_humidity=-0.1)
+    with pytest.raises(ValueError, match="not both"):
+        ciddor_air(293.15, relative_humidity=0.5, vapor_pressure=1000.0)
+    # the kernel model keeps its own check of the same conflict (physmat.air._check_conditions)
+    with pytest.raises(ValueError, match="not both"):
+        air.CiddorAir(20.0, humidity=0.5, vapour_pressure_pa=1000.0)
+    with pytest.raises(ValueError, match="give relative_humidity"):
+        ciddor_air(293.15, relative_humidity=None)
     with pytest.raises(ValueError):
-        physmat.standard_air(20.0, humidity=0.5, vapour_pressure_pa=1000.0)
-    with pytest.raises(ValueError):
-        physmat.standard_air(20.0, 1000.0, vapour_pressure_pa=2000.0, strict=False)   # p_v > p
+        ciddor_air(293.15, 1000.0, relative_humidity=None, vapor_pressure=2000.0, strict=False)   # p_v > p
     with pytest.raises(ValueError):
         air.refractive_index(0.633, pressure_pa=0.0, strict=False)

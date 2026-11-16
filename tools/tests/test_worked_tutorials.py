@@ -89,12 +89,15 @@ def test_material_selection_document_checks_source_and_range():
     import physmat
     namespace = _execute_document_python('modeling/materials.md')
     si = namespace['si']
-    assert namespace['k_w_mk'] == 148.0
+    assert namespace['thermal_conductivity'] == 148.0
     assert si.properties['thermal_conductivity'].source
     assert si.source
-    assert si.get('thermal_conductivity', T=400.0) == namespace['k_w_mk']
+    assert si.property('thermal_conductivity', temperature=400.0) == namespace['thermal_conductivity']
+    assert namespace['vacuum_wavelength'] == 1.55e-6 and si.valid_vacuum_wavelength == (1.357e-6, 1.104e-5)
     with pytest.raises(physmat.OutOfRange):
-        si.index(0.5)
+        si.refractive_index(vacuum_wavelength=5e-7)
+    with pytest.raises(TypeError):
+        si.refractive_index(vacuum_wavelength='1550 nm')
 
 
 def test_waveguide_interpretation_document_has_passive_loss():

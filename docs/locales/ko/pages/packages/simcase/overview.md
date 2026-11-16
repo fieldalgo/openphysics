@@ -184,7 +184,7 @@ score(a,b) = |<E_a,E_b>|^2 / (<E_a,E_a> <E_b,E_b>)
 }}}
 ```
 
-식은 `n² = constant + sum(strength[i] * wavelength² / (wavelength² - C[i]))`이며 `C[i]`는 `resonance_wavelength_squared`(또는 `resonance_wavelength`의 제곱; 항마다 둘 중 정확히 하나)입니다. `constant`(기본 1, `defaults_applied`에 기록)와 strength는 무차원이고 모든 길이는 단위를 함께 쓰므로 같은 모델을 nm로 쓰면 `"10000 nm^2"`, `["500 nm", "2000 nm"]`입니다. resolver는 각 값을 정확한 값에서 physmat의 마이크로미터로 한 번 환산합니다. `valid.vacuum_wavelength`는 lo > 0인 `[lo, hi]` 또는 아래가 열린 `[null, hi]`이며, `valid`를 생략하면 범위를 제한하지 않습니다. `reference_medium`은 필수이고 이번 릴리스는 `"vacuum"`만 읽습니다. `rii_formula` 모델은 이름을 밝혀 거절합니다. 모델에는 항이 적어도 하나 필요합니다. 형식 0.2 키(`n`, `k`, `sellmeier`, `A`, `B`, `C`, `range`)는 새 이름을 알려 주며 거절합니다. 잘못된 모델은 메시 생성·실행 전 문서 검증에서 실패합니다.
+식은 `n² = constant + sum(strength[i] * wavelength² / (wavelength² - C[i]))`이며 `C[i]`는 `resonance_wavelength_squared`(또는 `resonance_wavelength`의 제곱; 항마다 둘 중 정확히 하나)입니다. `constant`(기본 1, `defaults_applied`에 기록)와 strength는 무차원이고 모든 길이는 단위를 함께 쓰므로 같은 모델을 nm로 쓰면 `"10000 nm^2"`, `["500 nm", "2000 nm"]`입니다. resolver는 각 값을 정확한 값에서 physmat 내부 모델 커널(`physmat.kernels`)의 마이크로미터로 한 번 환산합니다. `valid.vacuum_wavelength`는 lo > 0인 `[lo, hi]` 또는 아래가 열린 `[null, hi]`이며, `valid`를 생략하면 범위를 제한하지 않습니다. `reference_medium`은 필수이고 이번 릴리스는 `"vacuum"`만 읽습니다. `rii_formula` 모델은 이름을 밝혀 거절합니다. 모델에는 항이 적어도 하나 필요합니다. 형식 0.2 키(`n`, `k`, `sellmeier`, `A`, `B`, `C`, `range`)는 새 이름을 알려 주며 거절합니다. 잘못된 모델은 메시 생성·실행 전 문서 검증에서 실패합니다.
 
 ## Python에서 사용
 

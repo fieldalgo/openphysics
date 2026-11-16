@@ -13,29 +13,32 @@ OpenPhysics 해석에 필요한 모든 계수가 정해지지는 않습니다. �
 
 ```python
 import physmat
+from physmat.units import q
 
-si = physmat.get("Si")
-wavelength_um = 1.55
+si = physmat.material("Si")
+vacuum_wavelength = q("1550 nm", "vacuum_wavelength")    # 1.55e-06 m
 print(si.source)
-print(si.range_um)
-print(si.index(wavelength_um))
+print(si.valid_vacuum_wavelength)                         # (low, high) in m
+print(si.refractive_index(vacuum_wavelength=vacuum_wavelength))
 
 conductivity = si.properties["thermal_conductivity"]
 print(conductivity.unit, conductivity.source)
-k_w_mk = si.get("thermal_conductivity", T=300.0)
-print(k_w_mk)
+thermal_conductivity = si.property("thermal_conductivity", temperature=300.0)
+print(thermal_conductivity)
 ```
 
-`physmat` 광학 호출의 파장 단위는 항상 **마이크로미터**이며, `simcase` 문서의
-형상 단위와 무관합니다. 내장 Si 레코드의 범위는 1.357–11.04 µm이고 1.55 µm는
-그 안에 있습니다. 기본 strict 검사에서는 범위를 벗어나면 `physmat.OutOfRange`가
-발생합니다. 범위 검사를 끄더라도 외삽의 타당성이 확보되지는 않습니다.
+`physmat`은 SI 값을 받습니다. 진공 파장은 `simcase` 문서의 형상 단위와 무관하게
+**미터**이고 온도는 켈빈입니다. 문자열은 `TypeError`가 나므로 텍스트는
+`physmat.units.q`로 바꾸세요. 내장 Si 레코드의 범위는 1.357–11.04 µm이고
+(`valid_vacuum_wavelength`가 m로 줍니다) 1.55 µm는 그 안에 있습니다. 모델 범위를
+벗어나면 `refractive_index`가 `physmat.OutOfRange`를 일으킵니다. 공개 API에는
+외삽 스위치가 없으며, 외삽했더라도 그 타당성이 확보되지는 않습니다.
 선택한 레코드의 출처와 범위를 확인하세요. 같은 물질이라도 시편이나 측정 조건이
 다른 레코드가 존재할 수 있습니다.
 
 위 Si 열전도율은 300 K의 핸드북 값인 148 W/(m K)입니다. 출처는 광학 모델의
-출처와 별도로 각 물성에 붙어 있습니다. 상수 `Property`에 다른 `T`를 전달해도
-동일한 상수를 반환합니다. 온도 의존 법칙이나 유효 온도 구간이 생기지 않습니다.
+출처와 별도로 각 물성에 붙어 있습니다. `temperature`는 필수이지만, 상수
+`Property`는 어느 온도에서나 같은 상수를 반환합니다. 온도 의존 법칙이나 유효 온도 구간이 생기지 않습니다.
 함수형 물성도 표현할 수 있지만, 허용하는 계수 형태는 각 solver가 결정합니다.
 
 ## 물리량 구분하기
@@ -57,9 +60,10 @@ print(k_w_mk)
 ## 모델에 배정하기
 
 광학 JSON에서는 내장 재료 이름 또는 지원되는 사용자 정의 상수 `n`/`k`, Sellmeier
-정의를 사용합니다. 문서의 파장·Sellmeier 길이 입력은
+정의를 사용합니다. 문서의 파장·Sellmeier 길이 입력은 값마다 단위를 붙여
 [simcase 단위 계약](../packages/simcase/overview.md)을 따르고, `physmat` 직접 호출은
-여전히 µm를 사용합니다. 두 인터페이스의 길이 규약을 섞지 마세요.
+미터를 받습니다. `physmat.constant_model`과 `physmat.sellmeier_model`은 같은 두 모델
+형식을 SI 값으로 만듭니다.
 
 열 모델에서는 [영역 열 계약](../packages/simcase/thermal_regions2d.md)의 명시적인
 열전도율·열용량 필드를 사용합니다. 각 도형과 배경의 재료, 도형이 덮지 않은 공간,
