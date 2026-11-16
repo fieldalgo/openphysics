@@ -489,3 +489,26 @@ again. The replacement dialog lists the source, old/new dimensions, core materia
 result counts and Undo behavior. It checks the workspace again when confirmed;
 a completed job arriving during review cannot be silently discarded by an old
 replacement prompt. Import runs continues to preserve current model inputs.
+
+## Installed physics
+
+**Installed physics**, below the connection and recovery help, lists the physics
+providers installed with Studio ([physics providers](providers.md)): each provider's
+name, version, distribution, status and physics kinds, built-in provider
+(`openphysics-fem`, distribution `simcase`) first. A provider that could not be loaded
+is listed as *Unavailable* with its error as `simcase.providers.providers()` reports
+it, for example `ImportError: No module named 'my_physics'`; the other providers and
+the built-in physics keep working. The list is read when the panel opens, from
+`GET /api/providers`.
+
+The list is data only. Every string a provider supplies is shown as text, and
+Studio never loads code (JavaScript or HTML) from a provider. The route sends the
+fields above and kind names, no manifest content beyond them, no entry-point target
+and no file path. If the list itself cannot be read, the panel says so and the
+server log holds the details. The workspace capability contract is unchanged
+(`/api/workspace/capabilities/v6`). Installed providers are not yet offered as
+workspace physics; the list only shows what is installed.
+
+Checks: `tests/simcase/test_studio_providers.py` (the built-in provider alone, an
+injected provider, unavailable providers and a failing listing) and
+`tests/simcase/studio_workspace_providers.cjs` (escaping and the reply contract).
