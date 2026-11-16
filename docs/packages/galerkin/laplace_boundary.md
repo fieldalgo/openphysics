@@ -271,3 +271,42 @@ Repeated quadrature requests reuse at most 128 normalized power rules and
 and cached nodes and weights have immutable byte storage. Rule arithmetic,
 orders, normalization and convergence gates are unchanged; this bounded
 reuse avoids repeated eigensolutions during field assembly.
+
+### Immutable parametric corner geometry
+
+`galerkin.laplace_corner_geometry.prepare_two_ground_corner_panels` prepares
+geometry for an explicit corner basis. Inputs are polygons and rectangle
+`width`/`height` in metres. It reuses the existing two-ground convex,
+disjoint, interior and side-distance admission and orients polygons CCW.
+The even `panels_per_edge` is 16–512. The first four cubic subdivisions at
+each end of an edge become one normalized power panel; the edge therefore
+has `panels_per_edge-6` actual panels. The total is bounded by 8192.
+
+```python
+from galerkin.laplace_corner_geometry import prepare_two_ground_corner_panels
+
+g = prepare_two_ground_corner_panels(
+    [[[.0038, .0008], [.0042, .0008], [.0042, .0012], [.0038, .0012]]],
+    width=.008, height=.002, panels_per_edge=32,
+)
+print(g.panel_count, g.lengths_m)
+```
+
+`CornerPanelGeometry` returns immutable normalized anchors, small local
+starts, directly computed displacement vectors, exponents, conductor owners,
+CCW face indices and shared endpoint IDs. Multiply normalized coordinates by
+`length_unit_m` for metres. Panel density starts at `anchor+local_start` and
+follows its displacement; the singular exponent is `pi/(2*pi-interior_angle)`
+at either end of each polygon edge, and 1 on the remaining panels. The
+opposite half of an edge uses the same small cubic coordinate from its other
+vertex, avoiding subtraction of a number close to one. Short displacement
+vectors are not formed by subtracting two large absolute endpoints.
+
+The normalized width/height, derived starts/ends and physical lengths are
+also available. Endpoint IDs have meaning within this snapshot. Unresolved
+edges, corner exponents or panel lengths fail explicitly. Analytic square,
+equilateral and right-triangle angles, polygon coverage/area, length sums,
+reflection, scaling and immutable input/output checks verify this geometry.
+This function does not assemble a matrix or establish field/current-loss
+convergence. Existing constant-panel solvers keep their own panel limits
+and defaults; the geometry budget does not enlarge those solver contracts.

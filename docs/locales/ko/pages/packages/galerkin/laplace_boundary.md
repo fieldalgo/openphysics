@@ -246,3 +246,38 @@ print(pair.mean_log_distance, pair.refinement_error)
 최대 128개 재사용한다. 조회 전에 입력을 검증하며 캐시된 노드·가중치는
 불변 바이트 저장소를 사용한다. 규칙의 계산식·차수·정규화·수렴 기준은
 그대로이며 field 행렬 구성 중 같은 고유문제를 반복해서 풀지 않는다.
+
+### 불변 parametric corner 기하
+
+`galerkin.laplace_corner_geometry.prepare_two_ground_corner_panels`는 명시적
+corner 기저의 기하를 준비한다. 입력 polygon과 rectangle `width`/`height`는
+미터 단위다. 기존 두-ground 볼록·분리·내부·측벽거리 조건을 재사용하고
+polygon을 CCW로 정렬한다. `panels_per_edge`는 16–512의 짝수다. 각 edge
+양끝의 첫 cubic 구간 4개를 각각 하나의 정규 power 패널로 합치므로 실제
+패널 수는 edge당 `panels_per_edge-6`이며 총 8192개 이하로 제한한다.
+
+```python
+from galerkin.laplace_corner_geometry import prepare_two_ground_corner_panels
+
+g = prepare_two_ground_corner_panels(
+    [[[.0038, .0008], [.0042, .0008], [.0042, .0012], [.0038, .0012]]],
+    width=.008, height=.002, panels_per_edge=32,
+)
+print(g.panel_count, g.lengths_m)
+```
+
+`CornerPanelGeometry`는 정규 anchor, 작은 local start, 직접 계산한 변위,
+지수, 도체 owner, CCW face 번호와 공통 끝점 ID를 불변 배열로 반환한다.
+정규 좌표에 `length_unit_m`를 곱하면 미터다. 밀도는
+`anchor+local_start`에서 시작해 변위 방향을 따르며, edge 양끝의 지수는
+`pi/(2*pi-interior_angle)`, 나머지는 1이다. Edge 반대쪽 절반도 해당
+꼭짓점으로부터 작은 cubic 좌표를 계산하므로 1에 가까운 수를 빼지 않는다.
+짧은 변위를 큰 절대 끝점 두 개의 차로 만들지 않는다.
+
+정규 width/height, 파생 start/end 및 물리 길이도 제공한다. 끝점 ID는
+해당 snapshot 안에서만 의미가 있다. 미해상 edge·corner 지수·패널 길이는
+명시적으로 거부한다. 정사각형·정삼각형·직각삼각형의 해석각, polygon
+coverage/면적·길이합, 반사·배율, 입력/출력 불변성을 검증한다. 이 함수는
+행렬을 구성하거나 field/전류손실 수렴을 입증하지 않는다. 기존 상수패널
+솔버의 개별 패널 제한과 기본값은 그대로이며 이 기하 예산으로 확대되지
+않는다.
