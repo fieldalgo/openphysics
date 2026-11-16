@@ -534,6 +534,7 @@ Used by the page, usable by anything else.
 |---|---|---|
 | GET | `/api/examples`, `/api/examples/{name}` | example documents |
 | GET | `/api/quantities` | every registry quantity a document writes, with its canonical unit and its unit menu (from `simcase.quantities`), and the length units |
+| GET | `/api/providers` | the installed physics providers (`simcase.providers.providers()`): name, version, distribution, protocol, status, error and kind names |
 | GET | `/api/materials` | physmat built-ins under their exact `physmat:` names: valid vacuum wavelengths (m), source |
 | POST | `/api/materials/preview` | n, k of a `physmat:` material over a vacuum wavelength interval in m |
 | POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` or `{ok: false, error, diagnostics}`; `doc` is the document as sent, every number with its written digits |

@@ -198,10 +198,13 @@ def list_providers():
     try:
         listing = [{**{key: getattr(p, key) for key in _PROVIDER_FIELDS}, "kinds": list(p.kinds)}
                    for p in providers.providers()]
-    except Exception as exc:  # the built-in provider failed to load: the details stay in the log
+        # ASCII escapes: a lone surrogate in an error text (a path read with surrogateescape)
+        # still makes valid JSON
+        body = json.dumps({"providers": listing}, ensure_ascii=True, allow_nan=False)
+    except Exception as exc:  # e.g. the built-in provider failed to load: the details stay in the log
         return JSONResponse({"detail": unexpected(exc, "provider listing")}, status_code=500,
                             headers={"Cache-Control": "no-store"})
-    return JSONResponse({"providers": listing}, headers={"Cache-Control": "no-store"})
+    return Response(body, media_type="application/json", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/examples")

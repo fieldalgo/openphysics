@@ -501,14 +501,18 @@ it, for example `ImportError: No module named 'my_physics'`; the other providers
 the built-in physics keep working. The list is read when the panel opens, from
 `GET /api/providers`.
 
-The list is data only. Every string a provider supplies is shown as text, and
-Studio never loads code (JavaScript or HTML) from a provider. The route sends the
-fields above and kind names, no manifest content beyond them, no entry-point target
-and no file path. If the list itself cannot be read, the panel says so and the
-server log holds the details. The workspace capability contract is unchanged
+The list is data only. Every string a provider supplies is shown as text (a
+string longer than 2000 characters is cut for display), and the page never loads
+code (JavaScript or HTML) from a provider. The route sends the fields above and
+kind names, no other manifest content and no entry-point target. The error text is
+sent as `providers()` reports it, so it can name a file, such as the module an
+import failed in; Studio serves only this computer by default (see the
+[package overview](overview.md)). If the list itself cannot be read, the panel
+says so and the server log holds the details. The workspace capability contract is unchanged
 (`/api/workspace/capabilities/v6`). Installed providers are not yet offered as
 workspace physics; the list only shows what is installed.
 
 Checks: `tests/simcase/test_studio_providers.py` (the built-in provider alone, an
-injected provider, unavailable providers and a failing listing) and
+injected provider, unavailable providers, a failing listing, and route output with
+empty, long and hostile strings read by the shipped page module) and
 `tests/simcase/studio_workspace_providers.cjs` (escaping and the reply contract).
