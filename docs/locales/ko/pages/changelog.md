@@ -10,6 +10,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## 0.x의 안정성
 
+- 계층 선형 power 패널의 유계 원거리 로그 상호작용에 해석적 영질량 중심화와 구적 비교 기록을 추가했습니다.
+
 0.x 릴리스는 알파입니다.
 
 - 모든 패키지의 Python API는 마이너 릴리스(0.1에서 0.2)마다 바뀔 수 있습니다. 패치
