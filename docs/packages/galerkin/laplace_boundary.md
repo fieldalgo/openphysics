@@ -347,3 +347,33 @@ energy and immutability supply separate checks. These are integration checks,
 not panel/outer convergence or a field-accuracy guarantee. This primitive
 does not change existing solvers, their limits or defaults, and does not
 establish browser or Windows qualification.
+
+### Bounded dense residuals
+
+`galerkin.dense_residual.bounded_dense_residual(A, x, b)` computes a fresh
+float64 array for `b - A @ x` using Dekker high/low product components and
+`math.fsum`. It retains product and summation bits that a rounded matrix
+product can lose; it does not solve or alter the equation. Inputs are not
+mutated, and no extended floating-point dtype is required.
+
+```python
+from galerkin.dense_residual import bounded_dense_residual
+
+r = bounded_dense_residual(
+    [[1.0, 1.0, 1.0]], [[2.0**53], [1.0], [-2.0**53]], [[0.0]],
+)
+assert r[0, 0] == -1.0
+```
+
+Inputs are real finite values converted to float64 and must be compatible
+2D arrays. Matrix rows and columns are 1–8192; right-hand columns are 1–16.
+Nonzero matrix and solution magnitudes are bounded by `2**-400` and `2**400`,
+inclusive, and right-side magnitudes by `2**900`. These ranges keep splitting
+and all nonzero product-expansion intermediates normal and finite; values
+outside the contract raise `ValueError`. Row blocks bound temporary storage.
+Exact binary rational product/sum references, cancellation cases, column
+permutations and inclusive boundary checks verify the arithmetic. An actual
+6072-row matrix comparison is recorded separately from small unit cases.
+A residual is neither a condition estimate nor a forward-error or field-
+convergence certificate. Existing solvers and their checks remain unchanged;
+this primitive alone does not qualify a corrected field or another platform.
