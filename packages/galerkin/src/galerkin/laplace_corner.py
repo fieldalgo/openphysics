@@ -17,7 +17,8 @@ from scipy.linalg import eigh_tridiagonal
 __all__ = ['PowerPanelLogResult', 'power_panel_quadrature',
            'power_panel_gram', 'power_panel_self_log',
            'power_panel_shared_vertex_log', 'power_panel_separated_log',
-           'power_panel_constant_log']
+           'power_panel_constant_log', 'power_panel_linear_gram',
+           'power_panel_linear_self_log']
 
 
 def _scalar(value, name):
@@ -301,3 +302,40 @@ def power_panel_constant_log(a, b, offset, exponent):
     if not math.isfinite(coarse) or not math.isfinite(fine) or abs(fine-coarse)>1e-12*max(1,abs(fine)):
         raise ValueError('power-constant quadrature did not converge')
     return PowerPanelLogResult(fine,coarse,n)
+
+
+def power_panel_linear_gram(length, exponent):
+    """Exact 2x2 squared-current Gram for a hierarchical linear power basis.
+
+    For u=s/h, phi0=p/h*u**(p-1) and
+    phi1=sqrt(p*(p+2)) * ((p+1)/h*u**p - phi0).
+    Their integrated masses are exactly [1,0]. Rows/columns follow phi0,
+    phi1; entries have units 1/metre. Require p in (0.5,1] for finite L2
+    current. No existing panel basis or field solver is changed.
+    """
+    h,p = _length(length),_power(exponent)
+    zero = power_panel_gram(h,p)
+    scale = math.sqrt(p*(p+2))
+    cross = (scale*(p-1)/(2*(2*p-1)))/h
+    linear = (p*p*(p+2)/((2*p-1)*(2*p+1)))/h
+    if (not all(map(math.isfinite,(zero,cross,linear))) or linear<=0
+            or (p!=1 and cross==0)):
+        raise ValueError('linear squared-current Gram is not representable')
+    return _frozen([[zero,cross],[cross,linear]]).reshape(2,2)
+
+
+def power_panel_linear_self_log(length, exponent):
+    """Exact 2x2 self log-distance integral for the linear power basis.
+
+    Use the same phi0/phi1 as power_panel_linear_gram. The logarithm is
+    log(|s-t| / 1 metre); only entry 00 changes under physical scaling,
+    since phi1 has zero mass. The closed expressions cancel the shared
+    digamma and length terms analytically, not by subtracting estimates.
+    This primitive does not supply interactions or a field approximation.
+    """
+    h,p = _length(length),_power(exponent)
+    zero = power_panel_self_log(h,p)
+    scale = math.sqrt(p*(p+2))
+    cross = scale*(1-p)/(2*p*(p+1))
+    linear = -(p+2)/(2*(p+1))
+    return _frozen([[zero,cross],[cross,linear]]).reshape(2,2)

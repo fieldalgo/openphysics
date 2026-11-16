@@ -384,3 +384,32 @@ mpmath 1.3.0(BSD-3-Clause)의 독립 직접2D 적분을 60/80자리로 확인한
 물리 배율·constant 밀도 상호성·접지에서의 이동·가중치 보존·입력 거부를 별도로
 검사합니다. 적분 원시요소의 검사이며 완전한 장 해·메시/외곽 수렴·다른 플랫폼·
 실측 검증을 뜻하지 않습니다.
+
+## Power 패널의 계층적 선형 모드
+
+`galerkin.laplace_corner`의 `power_panel_linear_gram(length, exponent)`와
+`power_panel_linear_self_log(length, exponent)`는 한 패널 위 두 모드의 불변
+2×2 행렬을 반환합니다. `h=length`, `u=s/h`, `p=exponent`일 때 정의는 다음과 같습니다.
+
+- `phi0 = p/h * u**(p-1)`: 적분 mass는 1입니다.
+- `phi1 = sqrt(p*(p+2)) * ((p+1)/h*u**p - phi0)`: 적분 mass는 0입니다.
+
+행·열 순서는 `[phi0, phi1]`입니다. `h`는 m 단위의 유한 양수이고 `p`는
+`(0.5,1]`이어야 하며 이 범위에서 두 모드의 제곱 전류가 적분 가능합니다.
+Gram 단위는 `1/metre`, self 적분의 kernel은 `log(abs(s-t) / 1 metre)`이며
+self 행렬은 무차원입니다. 다른 모드의 mass가 0이므로 self의 00 항만
+`log(h)`에 의존합니다. 공통 digamma·길이 항을 먼저 해석적으로 소거합니다.
+표현할 수 없는 Gram 항은 거부합니다. `p=0.5`에 가까우면 current Gram의
+조건수가 커집니다. 유한한 항만으로 상쇄하는 이차형식이나 장 해의 정확도를
+보장하지 않습니다.
+
+`p=1`은 정규 constant 모드와 첫 shifted Legendre 모드입니다. Gram은 `I/h`,
+self 행렬은 `[[log(h)-1.5, 0], [0, -0.75]]`입니다. 기존 스칼라 함수가
+00 항을 그대로 제공하며 기존 constant/power basis나 솔버는 바꾸지 않습니다.
+패널 간 상호작용과 완전한 선형 Galerkin 장 모델은 별도 구현·검증이 필요합니다.
+
+독립 직접1D 제곱밀도·2D Duffy 로그 적분을 mpmath 1.3.0(BSD-3-Clause)으로
+60/80자리에서 대조했습니다. `0.5001`과 uniform 한계를 포함한 지수 5개가
+대상입니다. Uniform 교차항의 정확한 0을 보존하고, 0이 아닌 참조항은
+분모 floor 없이 비교합니다. 물리 배율·양정 Gram 에너지·모드 moment·uniform
+정확 분할도 검사합니다.
