@@ -4,24 +4,27 @@
 """physmat — material properties for physics solvers, starting with optical dispersion.
 
     import physmat
-    si = physmat.get("Si")                 # built-in, with citation in si.source
-    si.n(1.55)                             # 3.4757  (wavelength in micrometres)
-    si.eps(1.55)                           # complex permittivity (n + i k)^2, exp(-i w t)
-    physmat.get("Au").index(0.8)           # 0.15 + 4.9j from Johnson & Christy
-    physmat.standard_air(20, 101325, humidity=0.5).n(0.633)   # moist air, Ciddor 1996
-    physmat.get("Cu").get("thermal_conductivity", 77.0)        # 544 W/(m K), Hust & Lankford 1984, RRR 100
-    physmat.thermal.thermal_conductivity("W", 300.0, rrr=100)  # tungsten, same equation
+    si = physmat.material("Si")                                  # built-in, exact name; citation in si.source
+    si.refractive_index(vacuum_wavelength=1.55e-6)               # (3.4777+0j): n + i k, metres in
+    si.relative_permittivity(vacuum_wavelength=1.55e-6)          # (n + i k)^2, exp(-i w t): Im >= 0 is loss
+    si.valid_vacuum_wavelength                                   # (1.357e-06, 1.104e-05) m
+    si.property("thermal_conductivity", temperature=300.0)       # 148.0 W/(m K); temperature required
+    physmat.material("Au").refractive_index(vacuum_wavelength=8e-7)   # 0.15 + 4.9j, Johnson & Christy
+    physmat.ciddor_air(temperature=293.15, absolute_pressure=101325.0, relative_humidity=0.5,
+                       co2_mole_fraction=450e-6)                 # moist air, Ciddor 1996
+    physmat.metal_thermal_conductivity("W", temperature=300.0, residual_resistivity_ratio=100.0)
+    glass = physmat.Material("my glass", physmat.constant_model(refractive_index=1.5))
 
-    db = physmat.rii.Database("path/to/refractiveindex.info-database")   # CC0 database
-    rec = db.load("main/SiO2/Malitson"); rec.dispersion.n(0.5876)
-
-    fit = physmat.fit_drude_lorentz(physmat.get("Au").optical, np.linspace(0.4, 1.0, 60), n_lorentz=2)
-    fit.model.eps(0.8), fit.rms_eps
-
-Conventions: wavelength in um; n~ = n + i k with k >= 0 for loss; eps = n~^2.
+Conventions: SI arguments (vacuum wavelength in m, temperature in K, pressure in Pa,
+mole fractions); n~ = n + i k with k >= 0 for loss; eps = n~^2, under exp(-i omega t).
+A quantity given as a str raises TypeError: convert text with physmat.units.q.
 
     from physmat.units import q              # quantity registry and exact unit converter
     q("200 GPa", "youngs_modulus")           # 200000000000.0 (Pa)
+
+The optical models and their micrometre and electronvolt helpers are physmat.kernels:
+internal, consistent units, not part of this API. ``physmat.rii`` reads the
+refractiveindex.info database (CC0) into such a model.
 
 Submodules and names load on first use, so ``import physmat.units`` needs only the
 standard library (numpy and scipy are imported by the material modules).
@@ -31,31 +34,23 @@ import importlib as _importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:                                   # the eager imports, for static tools only
-    from . import air, dispersion, fit, library, rii, thermal, units
-    from .air import CiddorAir
-    from .dispersion import (Composite, Constant, Dispersion, Drude, DrudeLorentz, OutOfRange, RIIFormula,
-                             Sellmeier, Tabulated, ev_to_um, um_to_ev)
-    from .fit import FitResult, fit_drude_lorentz
-    from .library import constant, get, names, standard_air
-    from .material import Material, Property
-    from .thermal import HustLankford
+    from . import rii, units
+    from ._api import ciddor_air, constant_model, material, metal_thermal_conductivity, names, sellmeier_model
+    from ._material import Material, Property
+    from .dispersion import OutOfRange
+    from .thermal import MINIMUM_TEMPERATURE
 
 __version__ = "0.0.2"
-__all__ = ["get", "names", "constant", "standard_air", "CiddorAir", "Material", "Property", "Dispersion", "Constant",
-           "Sellmeier", "Tabulated", "Composite", "Drude", "DrudeLorentz", "RIIFormula", "OutOfRange", "ev_to_um",
-           "um_to_ev", "fit_drude_lorentz", "FitResult", "HustLankford", "air", "dispersion", "fit", "library", "rii",
-           "thermal", "units", "__version__"]
+__all__ = ["material", "names", "Material", "Property", "OutOfRange", "ciddor_air", "metal_thermal_conductivity",
+           "MINIMUM_TEMPERATURE", "constant_model", "sellmeier_model", "rii", "units", "__version__"]
 
-_SUBMODULES = ("air", "dispersion", "fit", "library", "material", "rii", "thermal", "units")
+_SUBMODULES = ("rii", "units")
 _NAMES = {
-    "CiddorAir": "air",
-    "Composite": "dispersion", "Constant": "dispersion", "Dispersion": "dispersion", "Drude": "dispersion",
-    "DrudeLorentz": "dispersion", "OutOfRange": "dispersion", "RIIFormula": "dispersion", "Sellmeier": "dispersion",
-    "Tabulated": "dispersion", "ev_to_um": "dispersion", "um_to_ev": "dispersion",
-    "FitResult": "fit", "fit_drude_lorentz": "fit",
-    "constant": "library", "get": "library", "names": "library", "standard_air": "library",
-    "Material": "material", "Property": "material",
-    "HustLankford": "thermal",
+    "material": "_api", "names": "_api", "ciddor_air": "_api", "metal_thermal_conductivity": "_api",
+    "constant_model": "_api", "sellmeier_model": "_api",
+    "Material": "_material", "Property": "_material",
+    "OutOfRange": "dispersion",
+    "MINIMUM_TEMPERATURE": "thermal",
 }
 
 

@@ -368,6 +368,30 @@ recordings of `thermal_slab` and on its one-ulp twin, and the phase-3 identity o
 commit `f693ae3a` against the commit that added this mode, with no entry, is recorded in that
 commit's message.
 
+**physmat in SI (L1 commit 3).** physmat's model classes stay in `physmat.dispersion` and
+`physmat.air`, re-exported unchanged by the internal `physmat.kernels`, so the recorded target
+`physmat.dispersion.Dispersion.index`/`.eps` and every model's qualified name are the same on
+both sides. simcase builds its local models as kernels from its own micrometre doubles and
+evaluates every material through `material.optical` with `strict` passed as before, so the
+calls bind the same parameters, and that commit needs no rule entry.
+
+**P3-7, physmat's SI API against the baseline.** `physmat_si_check.py` is the landing check
+of the physmat commit. The baseline's micrometre API no longer exists on the head, so it runs
+in two processes and is not a test: `baseline` with the baseline's packages on `PYTHONPATH`
+(a worktree at the merge base) writes the baseline's values, and `check` with this tree's
+compares them. It covers the decimal-text wavelength grids (200–2000 nm by 1 nm,
+1500–1600 nm by 0.01 nm) for every library material bit for bit, the out-of-range refusals,
+the properties and `metal_thermal_conductivity`, every local model of the corpus through
+`physmat.kernels`, the public `constant_model` and `sellmeier_model` within 1e-14 relative of
+the model simcase builds, the signed zero of `constant_model`, and `ciddor_air` against
+`standard_air` at the shipped conditions and on a 1 K grid from 233.15 K to 333.15 K.
+
+```bash
+git worktree add --detach <tmp>/base <baseline>
+(cd <tmp>/base && PYTHONPATH=<its packages/*/src> python <this tree>/tools/units_batch/physmat_si_check.py baseline <tmp>/p37.npz)
+PYTHONPATH=<this tree's packages/*/src> python tools/units_batch/physmat_si_check.py check <tmp>/p37.npz
+```
+
 ## The converter
 
 `convert_v02.py` is a closed rule table: every key a 0.2 validator accepts is renamed, given

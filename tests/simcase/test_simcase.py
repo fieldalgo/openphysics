@@ -407,10 +407,10 @@ def test_sellmeier_roundtrips_and_preserves_physical_dispersion(symbol, factor_t
     wavelengths = np.array([0.5, 1.0, 1.55, 2.0])                         # the kernel's micrometres
     expected = np.sqrt(1.2 + 0.7 * wavelengths**2 / (wavelengths**2 - 0.01)
                        + 0.4 * wavelengths**2 / (wavelengths**2 - 0.04))
-    np.testing.assert_allclose(mat.index(wavelengths), expected, rtol=1e-13)
+    np.testing.assert_allclose(mat.optical.index(wavelengths), expected, rtol=1e-13)   # physmat.kernels model
     assert mat.source == "test reference"
     with pytest.raises(physmat.OutOfRange):
-        mat.index(2.1)
+        mat.optical.index(2.1)
 
 
 def test_minimal_sellmeier_uses_default_constant_and_unbounded_range():
@@ -420,7 +420,7 @@ def test_minimal_sellmeier_uses_default_constant_and_unbounded_range():
     d["geometry"]["background"] = {"material": "glass"}
     doc = Document.from_dict(d)
     mat = optical_material(doc, "glass")
-    assert mat.n(3.0) == pytest.approx(np.sqrt(1 + 9 / 8.99))
+    assert mat.optical.n(3.0) == pytest.approx(np.sqrt(1 + 9 / 8.99))       # physmat.kernels model, micrometres
     assert ("materials.glass.refractive_index.constant", 1) in [(a["path"], a["value"]) for a in doc.defaults_applied]
 
 
@@ -484,7 +484,7 @@ def test_sellmeier_slab_matches_refsol_across_units(symbol, factor_text):
     d["geometry"]["shapes"][0]["material"] = "film"
     res = run(Document.from_dict(d), verbose=False)
     n_film = np.sqrt(1 + 11 * 1.55**2 / (1.55**2 - 0.01))
-    n_clad = physmat.get("SiO2").n(1.55)
+    n_clad = physmat.material("SiO2").refractive_index(vacuum_wavelength=1.55e-6).real
     exact = slab.modes(n_film, n_clad, n_clad, 0.22, 1.55, "TE")[0]
     assert abs(res.effective_index[0, 0] - exact) < 1.5e-3
 
@@ -492,7 +492,7 @@ def test_sellmeier_slab_matches_refsol_across_units(symbol, factor_text):
 def test_slab_te_matches_refsol_through_the_whole_chain():
     doc = Document.from_dict(examples.SLAB_TE_CHECK)
     res = run(doc, verbose=False)
-    n_si, n_ox = physmat.get("Si").n(1.55), physmat.get("SiO2").n(1.55)
+    n_si, n_ox = (physmat.material(name).refractive_index(vacuum_wavelength=1.55e-6).real for name in ("Si", "SiO2"))
     exact = slab.modes(n_si, n_ox, n_ox, 0.22, 1.55, "TE")[0]
     assert abs(res.effective_index[0, 0] - exact) < 1.5e-3            # P1, h = 10 nm in the film
 

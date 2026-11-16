@@ -75,6 +75,24 @@ def _library():
     return physmat
 
 
+def _fold(text: str) -> str:
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _library_name(name: str) -> str:
+    """The library name a format 0.2 em document's bare material name meant. Format 0.2 matched library
+    names without case, spaces or punctuation and through each record's aliases; physmat.material is exact
+    since the galerkin step, so the converter folds them itself, as physmat's look-up did (the last match
+    wins). KeyError for a name that is no library material."""
+    lib, key, found = _library(), _fold(name), None
+    for library_name in lib.names():
+        if key in {_fold(n) for n in (library_name, *lib.material(library_name).aliases)}:
+            found = library_name
+    if found is None:
+        raise KeyError(name)
+    return found
+
+
 # -- numbers and quantity strings ---------------------------------------------------------------
 
 def _digits(x) -> str:
@@ -239,7 +257,7 @@ def _material_ref(name, local: dict, kind: str, path: str):
         return D24_RENAMES.get(name, name) if kind in EM else name
     if kind in EM:
         try:
-            return "physmat:" + _library().get(name).name
+            return "physmat:" + _library_name(name)
         except KeyError:
             raise ConversionError(f"{path}: {name!r} is neither local nor a library material") from None
     if kind in CAVITY and name == "vacuum":

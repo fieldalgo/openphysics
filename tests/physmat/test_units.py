@@ -779,27 +779,33 @@ def test_r11_menus_from_the_starter_registry():
 
 # ---- R12 existing physmat tests ------------------------------------------------------------------------------
 
-PUBLIC = ["get", "names", "constant", "standard_air", "CiddorAir", "Material", "Property", "Dispersion", "Constant",
-          "Sellmeier", "Tabulated", "Composite", "Drude", "DrudeLorentz", "RIIFormula", "OutOfRange", "ev_to_um",
-          "um_to_ev", "fit_drude_lorentz", "FitResult", "HustLankford", "air", "dispersion", "fit", "library", "rii",
-          "thermal", "__version__"]
+# The galerkin step (L1 commit 3) replaced the micrometre API by the SI surface of its spec section 4.2: the
+# model classes and the micrometre and electronvolt helpers are internal (physmat.kernels), with no aliases.
+PUBLIC = ["material", "names", "Material", "Property", "OutOfRange", "ciddor_air", "metal_thermal_conductivity",
+          "MINIMUM_TEMPERATURE", "constant_model", "sellmeier_model", "rii", "__version__"]
 
 
-def test_r12_public_physmat_api_is_unchanged():
+def test_r12_public_physmat_api_is_pinned():
     import importlib
 
     import physmat
     assert set(PUBLIC) <= set(physmat.__all__) and set(physmat.__all__) - set(PUBLIC) == {"units"}
-    modules = {"CiddorAir": "air", "Material": "material", "Property": "material", "HustLankford": "thermal",
-               "fit_drude_lorentz": "fit", "FitResult": "fit", "get": "library", "names": "library",
-               "constant": "library", "standard_air": "library"}
+    modules = {"Material": "_material", "Property": "_material", "material": "_api", "names": "_api",
+               "ciddor_air": "_api", "metal_thermal_conductivity": "_api", "constant_model": "_api",
+               "sellmeier_model": "_api", "OutOfRange": "dispersion", "MINIMUM_TEMPERATURE": "thermal"}
     for name in PUBLIC:
         value = getattr(physmat, name)
         assert name in dir(physmat)
         if name in modules:
             assert value is getattr(importlib.import_module(f"physmat.{modules[name]}"), name)
-    assert physmat.material.Material is physmat.Material
-    assert physmat.get("Si").n(1.55) == pytest.approx(3.4777, abs=2e-4)
+    assert physmat._material.Material is physmat.Material
+    assert physmat.material("Si").name == "Si"                     # the function: the module is physmat._material
+    assert physmat.material("Si").refractive_index(vacuum_wavelength=1.55e-6).real == pytest.approx(3.4777, abs=2e-4)
+    for gone in ("get", "constant", "standard_air", "CiddorAir", "Constant", "Sellmeier", "ev_to_um", "um_to_ev",
+                 "fit_drude_lorentz", "HustLankford", "kernels"):
+        assert gone not in physmat.__all__, gone
+    with pytest.raises(AttributeError):
+        physmat.get
     with pytest.raises(AttributeError):
         physmat.no_such_name
 
@@ -1428,8 +1434,9 @@ P2_NAMES = {  # name: (canonical unit, places) for every name R-2..R-22 makes le
                     ("residual_force", "N"), ("maximum_residual_force", "N"), ("stiffness_energy_functional", "J"))
        for d in ("", "_per_depth")},
     "relative_electrical_conductivity_change": ("1", ("result",)),
-    **{n: ("1", ("material",)) for n in _names("strength constant")},
-    "resonance_wavelength": ("m", ("material",)), "resonance_wavelength_squared": ("m^2", ("material",)),
+    # the four Sellmeier names gained an api place in L1 commit 3 (physmat.sellmeier_model)
+    **{n: ("1", ("material", "api")) for n in _names("strength constant")},
+    "resonance_wavelength": ("m", ("material", "api")), "resonance_wavelength_squared": ("m^2", ("material", "api")),
     "effective_index_threshold": ("1", ("document", "api", "result")),
     "bend_origin": ("m", ("document", "api")),
     "minimum_triangle_angle": ("rad", ("result",)),
@@ -1478,7 +1485,8 @@ def test_p2_r2_r5_temperatures_and_potentials():
 def test_p2_r11_sellmeier_parameters():
     for name in ("constant", "strength", "resonance_wavelength", "resonance_wavelength_squared"):
         qo = units.quantity(name)
-        assert dict(qo.scope) == {"quantity": "refractive_index", "model": "sellmeier"} and qo.places == ("material",)
+        assert dict(qo.scope) == {"quantity": "refractive_index", "model": "sellmeier"} \
+            and qo.places == ("material", "api")                     # api: physmat.sellmeier_model (L1 commit 3)
     assert units.menu("resonance_wavelength") == ("nm", "um", "m")
     assert units.menu("resonance_wavelength_squared") == ("nm^2", "um^2", "m^2")
     assert convert(-0.1, "strength").error.code == "E-DOMAIN" and q(0, "strength") == 0.0
@@ -1805,13 +1813,15 @@ def test_p2_r29_library_datum():
     import physmat
     assert set(physmat.names()) == set(LIBRARY_DATUM) | {"vacuum"}
     for name, datum in LIBRARY_DATUM.items():
-        m = physmat.get(name)
+        m = physmat.material(name)
         assert m.datum_temperature == datum and m.datum_assumed is (datum is None), name
-    vacuum = physmat.get("vacuum")                                   # exact at every temperature: nothing assumed
+    vacuum = physmat.material("vacuum")                              # exact at every temperature: nothing assumed
     assert vacuum.datum_temperature is None and vacuum.datum_assumed is False
-    assert physmat.standard_air(temperature_c=25).datum_temperature == 298.15
-    assert physmat.standard_air().datum_temperature == 288.15
-    assert physmat.constant(1.5).datum_temperature is None and not physmat.constant(1.5).datum_assumed
+    air = dict(absolute_pressure=101325.0, relative_humidity=0.0, co2_mole_fraction=450e-6)
+    assert physmat.ciddor_air(temperature=298.15, **air).datum_temperature == 298.15    # 25 C
+    assert physmat.ciddor_air(temperature=288.15, **air).datum_temperature == 288.15    # Ciddor's standard 15 C
+    own = physmat.Material("n=1.5", physmat.constant_model(refractive_index=1.5))
+    assert own.datum_temperature is None and not own.datum_assumed
 
 
 def test_p2_generator_refuses_broken_name_fields():

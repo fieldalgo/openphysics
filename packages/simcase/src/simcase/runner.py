@@ -116,9 +116,10 @@ class MeshedModel:
         return self._permittivity(_kernel_length(vacuum_wavelength))
 
     def _permittivity(self, wavelength_um: float) -> np.ndarray:
-        """``relative_permittivity`` at a kernel wavelength in micrometres (physmat's own unit)."""
+        """``relative_permittivity`` at a kernel wavelength in micrometres (the unit of physmat's kernels)."""
         tri = self.kernel_tri if self.kernel_tri is not None else self.tri
-        lut = np.array([self.materials[n].eps(wavelength_um) for n in tri.region_names])
+        lut = np.array([modes_document.kernel_permittivity(self.materials[n], wavelength_um)
+                        for n in tri.region_names])
         return lut[tri.regions]
 
 

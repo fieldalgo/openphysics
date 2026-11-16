@@ -10,8 +10,9 @@ Optical models are taken from the refractiveindex.info database (CC0 1.0), which
 cites the original measurements; the citation of each record is kept in
 ``Material.source``. The one exception is ``standard_air``, computed from the
 published Ciddor (1996) equations (``physmat.air``) rather than from stored
-data. Sellmeier-type coefficients are stored as refractiveindex.info
-formulas so they can be compared 1:1 with the database. A handful of thermal and
+data; ``physmat.ciddor_air`` builds the same model at other conditions.
+Sellmeier-type coefficients are stored as refractiveindex.info formulas so they
+can be compared 1:1 with the database. A handful of thermal and
 mechanical constants (room temperature, order-of-magnitude reference values from
 standard handbooks) are attached to the most common materials as a starting
 point for multiphysics — check them against your own data before relying on them.
@@ -19,8 +20,8 @@ The thermal conductivity of Cu and Al is the Hust and Lankford (1984) equation o
 temperature and residual resistivity ratio (``physmat.thermal``) at RRR 100; the
 same module evaluates tungsten.
 
-Look-up is case-insensitive and accepts aliases: ``get("sio2")``, ``get("silica")``,
-``get("fused silica")`` all return the same material.
+Look-up is exact, without case folding or aliases: ``physmat.material("SiO2")``
+(``physmat.names()`` lists the names). A record's ``aliases`` are kept as data only.
 
 Each record states the temperature of its optical data, ``datum_temperature`` in K,
 as its refractiveindex.info record gives it (comments or conditions, database
@@ -30,13 +31,11 @@ temperature" or nothing, ``datum_assumed`` is True instead.
 
 from __future__ import annotations
 
-from fractions import Fraction
-
 import numpy as np
 
 from . import _tables, air, thermal
 from .dispersion import Constant, RIIFormula, Tabulated
-from .material import Material, Property
+from ._material import Material, Property
 
 RII_CITE = 'via refractiveindex.info (CC0): M. N. Polyanskiy, Sci. Data 11, 94 (2024)'
 
@@ -62,32 +61,16 @@ def _add(m: Material):
 _add(Material("vacuum", Constant(1.0, 0.0, "vacuum"), "definition", aliases=("air",)))   # exact at every temperature
 
 
-def standard_air(temperature_c: float = air.STANDARD_TEMPERATURE_C, pressure_pa: float = air.STANDARD_PRESSURE_PA,
-                 humidity: float = 0.0, co2_ppm: float = air.STANDARD_CO2_PPM,
-                 vapour_pressure_pa: float | None = None, strict: bool = True, name: str | None = None) -> Material:
-    """Moist air after Ciddor (1996) at the given conditions: n(wavelength) for 0.3-1.69 um.
-
-    Defaults are Ciddor's standard dry air (15 C, 101325 Pa, 0 % RH, 450 ppm CO2).
-    ``humidity`` is the relative humidity as a fraction (0.5 = 50 %); alternatively
-    give the water-vapour partial pressure ``vapour_pressure_pa``. ``strict=False``
-    accepts conditions outside the stated validity ranges. The ``density`` property
-    (kg/m^3, temperature in kelvin like every ``Property``) is the BIPM 1981/91
-    moist-air density at the same pressure, humidity and CO2.
-    """
-    model = air.CiddorAir(temperature_c, pressure_pa, humidity, co2_ppm, vapour_pressure_pa, strict)
-    cond = f"{temperature_c:g} C, {pressure_pa:g} Pa, "
-    cond += (f"pv = {vapour_pressure_pa:g} Pa" if vapour_pressure_pa is not None else f"RH {100 * humidity:g} %")
-    cond += f", {co2_ppm:g} ppm CO2"
-    props = {"density": Property(lambda T: model.density(np.asarray(T, dtype=float) - 273.15), "kg/m^3",
-                                 "BIPM 1981/91 moist-air density equation (R. S. Davis, Metrologia 29, 67 (1992)) "
-                                 f"at {cond.split(', ', 1)[1]}")}
-    datum = float(Fraction(repr(float(temperature_c))) + Fraction(27315, 100))   # the given temperature in K
-    return Material(name or f"standard_air ({cond})", model, f"{air.CITATION} [{cond}]", properties=props,
-                    datum_temperature=datum)
+def _density_property(model: air.CiddorAir, conditions: str) -> Property:
+    """The BIPM 1981/91 moist-air density of ``model`` as a Property of temperature in kelvin, at the
+    model's pressure, humidity and CO2 (``conditions`` names them for the source)."""
+    return Property(lambda T: model.density(np.asarray(T, dtype=float) - 273.15), "kg/m^3",
+                    "BIPM 1981/91 moist-air density equation (R. S. Davis, Metrologia 29, 67 (1992)) "
+                    f"at {conditions}")
 
 
 _add(Material("standard_air", air.CiddorAir(), air.CITATION + " [15 C, 101325 Pa, RH 0 %, 450 ppm CO2]",
-              properties=standard_air().properties,
+              properties={"density": _density_property(air.CiddorAir(), "101325 Pa, RH 0 %, 450 ppm CO2")},
               aliases=("standard air", "Ciddor air", "air (Ciddor)", "moist air"), datum_temperature=288.15))
 
 # ---- dielectrics: Sellmeier-type formulas ----------------------------------
@@ -208,28 +191,9 @@ for _key, _name, _aliases in (("Au_Johnson", "Au", ("gold",)), ("Ag_Johnson", "A
 
 # ---------------------------------------------------------------------------
 
-def _key(s: str) -> str:
-    return "".join(ch for ch in s.lower() if ch.isalnum())
-
-
-_INDEX: dict[str, Material] = {}
-for _m in _MATERIALS:
-    for _n in (_m.name, *_m.aliases):
-        _INDEX[_key(_n)] = _m
-
-
-def get(name: str) -> Material:
-    """Built-in material by name or alias (case/space-insensitive)."""
-    try:
-        return _INDEX[_key(name)]
-    except KeyError:
-        raise KeyError(f"unknown material {name!r}; available: {names()}") from None
+BY_NAME: dict[str, Material] = {m.name: m for m in _MATERIALS}
 
 
 def names() -> list[str]:
+    """The names of the built-in materials, in library order."""
     return [m.name for m in _MATERIALS]
-
-
-def constant(n: float, k: float = 0.0, name: str | None = None) -> Material:
-    """A user-defined non-dispersive material."""
-    return Material(name or f"n={n}", Constant(n, k), "user-defined")

@@ -8,6 +8,11 @@ local copy (``git clone https://github.com/polyanskiy/refractiveindex.info-datab
 or ``Database.download()``) and look records up by shelf / book / page, e.g.
 ``("main", "SiO2", "Malitson")``.
 
+A record's ``dispersion`` is a kernel model of ``physmat.kernels`` (internal; vacuum
+wavelengths in micrometres, as the database stores them). Wrap it in a material for
+the SI methods: ``physmat.Material("SiO2 (Malitson)", rec.dispersion).refractive_index(
+vacuum_wavelength=1.55e-6)``.
+
 Please cite the database when you use its data:
 M. N. Polyanskiy, "Refractiveindex.info database of optical constants",
 Sci. Data 11, 94 (2024).
@@ -22,7 +27,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .dispersion import Composite, Dispersion, RIIFormula, Tabulated
+from . import dispersion as _dispersion      # the kernel models (physmat.kernels), not re-exported here
 
 __all__ = ["CITATION", "GITHUB_ZIP", "Record", "load_record", "Entry", "Database", "strip_html"]
 
@@ -33,7 +38,7 @@ GITHUB_ZIP = "https://github.com/polyanskiy/refractiveindex.info-database/archiv
 
 @dataclass
 class Record:
-    dispersion: Dispersion
+    dispersion: _dispersion.Dispersion
     references: str = ""
     comments: str = ""
     conditions: dict = field(default_factory=dict)
@@ -61,32 +66,32 @@ def load_record(path: str | Path, label: str | None = None) -> Record:
     yaml = _yaml()
     doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     label = label or Path(path).stem
-    n_parts: list[Dispersion] = []
-    k_parts: list[Dispersion] = []
-    nk_parts: list[Dispersion] = []
+    n_parts: list[_dispersion.Dispersion] = []
+    k_parts: list[_dispersion.Dispersion] = []
+    nk_parts: list[_dispersion.Dispersion] = []
     for block in doc.get("DATA", []):
         typ = block["type"].strip()
         if typ.startswith("formula"):
             kind = int(typ.split()[1])
             coeffs = [float(v) for v in str(block["coefficients"]).split()]
             lo, hi = (float(v) for v in str(block["wavelength_range"]).split())
-            n_parts.append(RIIFormula(kind, coeffs, (lo, hi), label))
+            n_parts.append(_dispersion.RIIFormula(kind, coeffs, (lo, hi), label))
         elif typ == "tabulated nk":
             t = _parse_table(block["data"], 3)
-            nk_parts.append(Tabulated(t[:, 0], t[:, 1], t[:, 2], label))
+            nk_parts.append(_dispersion.Tabulated(t[:, 0], t[:, 1], t[:, 2], label))
         elif typ == "tabulated n":
             t = _parse_table(block["data"], 2)
-            n_parts.append(Tabulated(t[:, 0], t[:, 1], None, label))
+            n_parts.append(_dispersion.Tabulated(t[:, 0], t[:, 1], None, label))
         elif typ == "tabulated k":
             t = _parse_table(block["data"], 2)
-            k_parts.append(Tabulated(t[:, 0], np.zeros(len(t)), t[:, 1], label))
+            k_parts.append(_dispersion.Tabulated(t[:, 0], np.zeros(len(t)), t[:, 1], label))
         else:
             # "formula A" etc. belong to the nonlinear-index (n2) files; ignore
             continue
     if nk_parts and not n_parts and not k_parts:
         disp = nk_parts[0]
     elif n_parts and k_parts:
-        disp = Composite(n_parts[0], k_parts[0], label)
+        disp = _dispersion.Composite(n_parts[0], k_parts[0], label)
     elif n_parts:
         disp = n_parts[0]
     elif k_parts:
