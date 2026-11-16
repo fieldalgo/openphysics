@@ -422,3 +422,36 @@ source reversal, physical scaling, constant-density reciprocity, ground
 translation, unchanged weights and input refusal are checked separately.
 These are primitive integration checks, not a complete field solution,
 mesh/outer convergence, another platform or a physical measurement.
+
+## Hierarchical linear modes on a power panel
+
+`power_panel_linear_gram(length, exponent)` and
+`power_panel_linear_self_log(length, exponent)` in `galerkin.laplace_corner`
+return immutable 2-by-2 matrices for two modes on one panel. With `h=length`,
+`u=s/h` and `p=exponent`, define
+
+- `phi0 = p/h * u**(p-1)`, of integrated mass one;
+- `phi1 = sqrt(p*(p+2)) * ((p+1)/h*u**p - phi0)`, of integrated mass zero.
+
+Rows and columns follow `[phi0, phi1]`. Require finite positive `h` in metres
+and `p` in `(0.5,1]`; both modes then have finite squared current. The Gram
+entries have units `1/metre`; the self integral uses
+`log(abs(s-t) / 1 metre)` and is dimensionless. Only self entry 00 depends on
+`log(h)`, since the other mode has zero mass. Shared digamma and length terms
+are canceled analytically before evaluation. Unrepresentable Gram entries
+are refused. Close to `p=0.5`, the current Gram becomes poorly conditioned;
+finite entries alone do not certify the accuracy of a cancelling quadratic
+form or a field solution.
+
+For `p=1`, the modes are the normalized constant and first shifted Legendre
+mode: the Gram is `I/h`, and the self matrix is
+`[[log(h)-1.5, 0], [0, -0.75]]`. The old scalar functions supply entry 00
+unchanged. The other entries do not alter the existing constant/power basis
+or any solver. Inter-panel interactions and a complete linear Galerkin
+field model require separate implementation and validation.
+
+Independent direct 1D squared-density and 2D Duffy log integrals at 60/80
+digits (mpmath 1.3.0, BSD-3-Clause) cover five exponents including `0.5001`
+and the uniform limit. Tests retain exact uniform zero cross terms, compare
+nonzero reference entries without a denominator floor, check physical
+scaling, positive Gram energy, mode moments and exact uniform subdivision.

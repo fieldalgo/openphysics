@@ -24,6 +24,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 정규 power 패널의 두 모드 current Gram·self-log 폐형식을 추가했습니다. 정확한 모드 mass·독립 직접적분 참조·uniform Legendre 한계를 검사하며 장 솔버를 대체하지 않습니다.
+
 - `galerkin`: 정규 power/constant 바닥접지 Green 평균에 해석 상수 moment·고정 구적·위상/해상도/양수성 거부를 추가했습니다. 독립 직접2D 참조와 물리 불변식으로 원시요소를 검증하며 기존 장 솔버는 바꾸지 않습니다.
 
 - `galerkin`: 정규화된 모서리 power-panel 구적, 해석적 self 항, 공통 꼭짓점·분리 패널·power-to-constant 로그 적분을 추가했습니다. 불변 캐시 규칙은 구적 산술과 가중치를 그대로 보존합니다. 독립 고정밀 참조와 기하 불변식으로 명시한 길이·분리 범위를 검사했습니다.
