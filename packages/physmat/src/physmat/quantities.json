@@ -3053,9 +3053,9 @@
    "complex": true,
    "domain": null,
    "band": null,
-   "places": ["result"],
+   "places": ["api", "result"],
    "sign": {"resonant_frequency": {"en": "Under exp(-i omega t); Im < 0 decays in time, quality_factor = Re f / (-2 Im f).", "ko": "exp(-i omega t) 기준. Im < 0이면 시간에 따라 감쇠, quality_factor = Re f / (-2 Im f)."}},
-   "description": {"en": "Complex resonant frequency; the imaginary part is negative for decay (output).", "ko": "복소 공진 주파수. 감쇠하면 허수부가 음수(출력)."}
+   "description": {"en": "Complex resonant frequency; the imaginary part is negative for decay (output; also an argument of the material cavity closed forms of galerkin-refsol).", "ko": "복소 공진 주파수. 감쇠하면 허수부가 음수(출력. galerkin-refsol 재료 공진기 닫힌 형식 해의 인수이기도 함)."}
   },
   "quality_factor": {
    "dimension": {},
@@ -3078,8 +3078,8 @@
    "complex": true,
    "domain": null,
    "band": null,
-   "places": ["result"],
-   "description": {"en": "Cavity eigenvalue k^2 (output).", "ko": "공진기 고유값 k^2(출력)."}
+   "places": ["api", "result"],
+   "description": {"en": "Cavity eigenvalue k^2 (output; also an argument of the material cavity closed forms of galerkin-refsol).", "ko": "공진기 고유값 k^2(출력. galerkin-refsol 재료 공진기 닫힌 형식 해의 인수이기도 함)."}
   },
   "absolute_pressure": {
    "dimension": {"M": 1, "L": -1, "T": -2},

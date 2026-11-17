@@ -372,7 +372,9 @@ and `applied_charge_per_depth`, `reaction_charge_per_depth`,
 `unnormalized_electric_field` (with `unnormalized_electric_field_z`) and
 `unnormalized_electric_field_line_integral` gained an `api` place for the public mode
 functions. It also added `radius` (m) for the core radius of the step-index fiber
-reference and the radius of the scattering cylinder in `galerkin-refsol`.
+reference and the radius of the scattering cylinder in `galerkin-refsol`, and gave
+`resonant_frequency` and `wavenumber_squared` an `api` place for the closed forms of
+the material cavity reference in `galerkin-refsol`.
 
 Selected menus:
 

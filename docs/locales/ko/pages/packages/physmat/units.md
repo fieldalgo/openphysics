@@ -324,7 +324,8 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 `unnormalized_electric_field`(`unnormalized_electric_field_z` 포함), `unnormalized_electric_field_line_integral`에
 공개 모드 함수를 위한 `api` 자리를 더했습니다.
 또 `galerkin-refsol`의 계단형 굴절률 광섬유 참조해의 코어 반지름과 산란 원기둥의 반지름을 위해 `radius`(m)를
-더했습니다.
+더했고, `galerkin-refsol` 재료 공진기 참조해의 닫힌 형식 해를 위해 `resonant_frequency`와 `wavenumber_squared`에
+`api` 자리를 더했습니다.
 
 메뉴 일부:
 
