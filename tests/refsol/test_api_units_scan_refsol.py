@@ -119,9 +119,60 @@ _JOULE = [
     ("joule_slab", "current_driven", dict(_JOULE_LAW, length=1.0, current_density=1.0,
                                           prescribed_electric_potential=0.0)),
 ]
-# L2 commit 6 emptied refsol's eight heat modules and L2 commit 7 joule_slab: each callable that takes a
-# quantity has a case.
-STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs) for module, name, kwargs in _HEAT + _JOULE}
+_ELASTIC = dict(youngs_modulus=70e9, poisson_ratio=0.3, plane="stress")
+_THERMOELASTIC = dict(_ELASTIC, stress_free_temperature=300.0, linear_expansion_coefficient=2e-5)
+_STRIP = dict(thickness=[1e-3, 2e-3], youngs_modulus=[70e9, 200e9], poisson_ratio=[0.3, 0.3],
+              linear_expansion_coefficient=[23e-6, 12e-6], temperature_change=80.0, length=0.02)
+_PAIRS = dict(thickness=(1e-3, 2e-3), youngs_modulus=(70e9, 200e9), linear_expansion_coefficient=(23e-6, 12e-6),
+              temperature_change=80.0)
+_NORMALS = [[1.0, 0.0], [0.0, 1.0]]
+_MECHANICS = [
+    ("bimetal", "curvature", dict(thickness=[1e-3, 2e-3], youngs_modulus=[70e9, 200e9],
+                                  linear_expansion_coefficient=[23e-6, 12e-6], temperature_change=80.0)),
+    ("bimetal", "timoshenko_curvature", _PAIRS),
+    ("bimetal", "villarceau_curvature", _PAIRS),
+    ("bimetal", "stoney_uniaxial_curvature", dict(thickness=(1e-6, 5e-4), youngs_modulus=170e9, stress=1e8)),
+    ("bimetal", "strip_fields", dict(_STRIP, points=[[5e-4, 0.01]])),
+    ("bimetal", "end_traction", dict(_STRIP, points=[[5e-4, 0.0]], normals=[[0.0, -1.0]])),
+    ("elasticity", "stress_from_strain", dict(_ELASTIC, strain=[[1e-4, 2e-4, 3e-4]])),
+    ("elasticity", "affine", dict(_ELASTIC, points=P2, displacement_gradient=[[1e-4, 2e-5], [0.0, -3e-5]],
+                                  displacement=(1e-6, 0.0))),
+    ("elasticity", "sine_manufactured", dict(_ELASTIC, points=P2)),
+    ("elasticity_multilayer", "laminate_axial", dict(points=[[0.1, 0.004]], position=[0.0, 0.003, 0.008],
+                                                     youngs_modulus=[70e9, 200e9], poisson_ratio=[0.3, 0.25],
+                                                     strain_xx=1e-3, plane="strain")),
+    ("elasticity_multilayer", "series_bar", dict(points=[[0.004, 0.1]], position=[0.0, 0.003, 0.008],
+                                                 youngs_modulus=[70e9, 200e9], poisson_ratio=[0.0, 0.0],
+                                                 stress_xx=1e6, plane="stress")),
+    ("elasticity_multilayer", "composite_cylinder", dict(points=[[0.012, 0.0]], position=[0.01, 0.015, 0.03],
+                                                         youngs_modulus=[70e9, 200e9], poisson_ratio=[0.3, 0.25],
+                                                         plane="strain", gauge_pressure=(1e6, 0.0),
+                                                         linear_expansion_coefficient=[2e-5, 1e-5],
+                                                         temperature_change=[[10.0, 0.0], [10.0, 0.0]])),
+    ("elasticity_traction", "traction_from_stress", dict(normals=_NORMALS, stress=[[1e6, 2e6, 3e6], [1e6, 2e6, 3e6]])),
+    ("elasticity_traction", "uniaxial", dict(_ELASTIC, points=P2, stress_xx=1e6)),
+    ("elasticity_traction", "shear", dict(_ELASTIC, points=P2, stress_xy=1e6)),
+    ("elasticity_traction", "polynomial_manufactured", dict(_ELASTIC, points=P2)),
+    ("elasticity_traction", "polynomial_traction", dict(_ELASTIC, points=P2, normals=_NORMALS)),
+    ("elasticity_traction", "polynomial_resultants", _ELASTIC),
+    ("thermoelastic_traction", "parent_state", dict(_THERMOELASTIC, strain=[[1e-4, 2e-4, 3e-4]], temperature=[320.0])),
+    ("thermoelastic_traction", "traction_from_stress", dict(normals=_NORMALS, stress=[[[1e6, 0.0, 0.0], [0.0, 2e6, 0.0],
+                                                                                      [0.0, 0.0, 0.0]]] * 2)),
+    ("thermoelastic_traction", "uniform_combined", dict(_THERMOELASTIC, points=P2, temperature_change=20.0,
+                                                        stress=(8e6, -2e6, 3e6), displacement=(2e-5, -1e-5))),
+    ("thermoelastic_traction", "polynomial_manufactured", dict(_THERMOELASTIC, points=P2)),
+    ("thermoelasticity", "state_from_3d", dict(_THERMOELASTIC, strain=[[1e-4, 2e-4, 3e-4]], temperature=[320.0])),
+    ("thermoelasticity", "uniform_free", dict(_THERMOELASTIC, points=P2, temperature_change=20.0)),
+    ("thermoelasticity", "uniform_constrained", dict(_THERMOELASTIC, points=P2, temperature_change=20.0)),
+    ("thermoelasticity", "linear_temperature", dict(_THERMOELASTIC, points=P2, temperature_change=10.0,
+                                                    temperature_gradient=20.0)),
+    ("thermoelasticity", "sine_manufactured", dict(_THERMOELASTIC, points=P2, temperature_difference=20.0,
+                                                   displacement=(1e-4, 6e-5), length=(1.0, 1.0))),
+]
+# L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab and L2 commit 8 the six mechanics and
+# thermoelastic modules: each callable that takes a quantity has a case.
+STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
+                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS}
 
 
 @pytest.fixture(scope="module")

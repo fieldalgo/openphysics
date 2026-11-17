@@ -71,8 +71,9 @@ For example, uniaxial extension with free lateral traction in plane stress:
 ```python
 from refsol.elasticity import affine
 
-field = affine([[0., 0.], [1., 1.]], [[1e-3, 0.], [0., -0.3e-3]],
-               young_modulus=70e9, poisson_ratio=0.3, plane="stress")
+field = affine([[0., 0.], [1., 1.]],
+               displacement_gradient=[[1e-3, 0.], [0., -0.3e-3]], displacement=(0., 0.),
+               youngs_modulus=70e9, poisson_ratio=0.3, plane="stress")
 print(field.displacement)  # metres
 print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 ```
@@ -142,6 +143,19 @@ layer boundaries, first face included), `time`, `initial_temperature` and
 `temperature_difference`; their fields carry the same names. A text value
 raises `TypeError`. The NAFEMS T4 data, published in °C, are kept as published
 in a private module and converted to kelvin when read.
+
+Since L2 commit 8 the mechanics references (`refsol.elasticity`,
+`elasticity_traction`, `elasticity_multilayer`, `thermoelasticity`,
+`thermoelastic_traction`, `bimetal`) do the same after their leading `points`
+(and `normals` for a traction): `youngs_modulus`, `poisson_ratio`, `plane`,
+`linear_expansion_coefficient`, `stress_free_temperature`, `temperature`,
+`temperature_change`, `temperature_gradient`, `displacement`,
+`displacement_gradient`, `strain`, `stress`, `stress_xx`, `stress_xy`,
+`strain_xx`, `gauge_pressure` (the inner/outer pair), `position` (the layer
+boundaries, first face or inner radius included), `thickness` (one per layer),
+`length`. Former defaults are written out by the caller, and the fields carry
+the registry names (`stress_zz`, `strain_zz`, `strain_energy_density`,
+`body_force_density`, `displacement_gradient`, `strain_yy`, ...).
 
 `refsol.transient_heat` provides `uniform_insulated`, `moving_affine`,
 `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and

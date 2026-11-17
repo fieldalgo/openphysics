@@ -182,9 +182,8 @@ def test_transient_mechanics_refuses_a_live_heat_history(name):
     heat = _run(*_live(name, VALUES), name=name)
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(
-            MESH, heat, units={"length": "m", "time": "s", "temperature": "K"},
-            young_modulus=70e9, poisson_ratio=0.3, plane="strain", thermal_expansion_per_k=12e-6,
-            reference_temperature_k=293.15, mechanical_dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
+            MESH, heat, youngs_modulus=70e9, poisson_ratio=0.3, plane="strain", linear_expansion_coefficient=12e-6,
+            stress_free_temperature=293.15, prescribed_displacement={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
     assert isinstance(caught.value.__cause__, TypeError)
     assert "cut the derivative" in str(caught.value.__cause__)
 

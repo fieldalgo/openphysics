@@ -15,11 +15,12 @@ runners build the mesh once in metres and call ``galerkin`` with no new discreti
 
 Both kinds read ``"openphysics": "0.3"`` (units batch C7; phase-2 spec sections 4.6 and 4.7):
 values carry their units, keys are registry names, and a format 0.2 document is refused by
-name. galerkin still receives today's keywords and values (``young_modulus``,
-``reference_temperature_k``, ``thermal_expansion_per_k``; the thermal stage the outward flux
-``0.0 - inward_heat_flux``, hazard H1; an absent body force or heat source as today's zeros,
-H8). Results save their arrays under registry names with the summary of section 5.3.3: numeric
-balances under ``balance``, every coded diagnostic under ``diagnostics``.
+name. galerkin receives the document's SI doubles under its registry keywords
+(``youngs_modulus``, ``prescribed_displacement``, ``body_force_density``,
+``stress_free_temperature``, ``linear_expansion_coefficient``; the thermal stage the inward heat
+flux through ``views.galerkin_heat_arguments``, hazard H1; an absent body force or heat source as
+today's zeros, H8). Results save their arrays under registry names with the summary of section
+5.3.3: numeric balances under ``balance``, every coded diagnostic under ``diagnostics``.
 """
 import copy
 import time
@@ -89,18 +90,15 @@ HEAT_ARRAYS = tuple((name, name) for name in (
     'temperature', 'heat_flux', 'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
     'residual_heat_rate_per_depth', 'outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
     'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth'))
-#: galerkin's result attribute of each mechanical array, per kind, in the saved order
-ELASTIC_ARRAYS = (('displacement', 'displacement'), ('strain', 'strain'), ('stress', 'stress'),
-                  ('applied_force_per_depth', 'load'), ('reaction_force_per_depth', 'reaction'),
-                  ('residual_force_per_depth', 'residual'))
-THERMOELASTIC_ARRAYS = (('displacement', 'displacement'), ('strain', 'total_strain'),
-                        ('thermal_strain', 'thermal_strain'), ('elastic_strain', 'elastic_strain'),
-                        ('stress', 'stress'), ('stress_zz', 'sigma_zz'), ('strain_zz', 'epsilon_zz'),
-                        ('applied_force_per_depth', 'load_external'),
-                        ('thermal_equivalent_force_per_depth', 'load_thermal'),
-                        ('applied_body_force_per_depth', 'load_body'),
-                        ('applied_traction_force_per_depth', 'load_traction'),
-                        ('reaction_force_per_depth', 'reaction'), ('residual_force_per_depth', 'residual'))
+#: galerkin's result attribute of each mechanical array, per kind, in the saved order (the same
+#: registry names since the galerkin step)
+ELASTIC_ARRAYS = tuple((name, name) for name in (
+    'displacement', 'strain', 'stress', 'applied_force_per_depth', 'reaction_force_per_depth',
+    'residual_force_per_depth'))
+THERMOELASTIC_ARRAYS = tuple((name, name) for name in (
+    'displacement', 'strain', 'thermal_strain', 'elastic_strain', 'stress', 'stress_zz', 'strain_zz',
+    'applied_force_per_depth', 'thermal_equivalent_force_per_depth', 'applied_body_force_per_depth',
+    'applied_traction_force_per_depth', 'reaction_force_per_depth', 'residual_force_per_depth'))
 #: the thermal stage's physics keys; an elasticity document refuses each by name (K4)
 HEAT_KEYS = ('stress_free_temperature', 'linear_expansion_coefficient', 'thermal_conductivity',
              'prescribed_temperature', 'inward_heat_flux', 'convection', 'heat_source_density')
@@ -453,10 +451,8 @@ def solver_inputs(doc, mesh):
     """The mechanical keyword arguments of a validated document on ``mesh``.
 
     For ``mechanics.elasticity2d`` these are the ``solve_elasticity`` arguments; a
-    thermoelastic document adds ``reference_temperature_k`` and ``thermal_expansion_per_k``
-    for ``solve_thermoelasticity`` (galerkin's keywords; the document's
-    ``stress_free_temperature`` and ``linear_expansion_coefficient``), whose temperature
-    snapshot comes from the heat solve. Prescribed DOFs are sorted by (node, component); the
+    thermoelastic document adds ``stress_free_temperature`` and ``linear_expansion_coefficient``
+    for ``solve_thermoelasticity``, whose temperature snapshot comes from the heat solve. Prescribed DOFs are sorted by (node, component); the
     body force is a (2,) tuple, (0.0, 0.0) when the document gives none (H8); each traction
     a global Cartesian [tx, ty] list in Pa in document order (H6). ``mesh`` must be the
     document's rectangle in metres (``build_rectangle``); the shared rectangle mesh checks run
@@ -467,13 +463,13 @@ def solver_inputs(doc, mesh):
     boundary_kwargs(views.rectangle_mesh(doc, 'difference'), _MESH_CHECK, mesh)
     m = views.rectangle_mechanics(doc)
     traction = {side: [float(v) for v in vector] for side, vector in m.traction.items()}
-    inputs = dict(young_modulus=float(m.young_modulus), poisson_ratio=float(m.poisson_ratio),
-                  plane=m.plane, dirichlet=_fixed_dofs(mesh, m.displacement),
-                  body_force=tuple(float(v) for v in m.body_force),
+    inputs = dict(youngs_modulus=float(m.young_modulus), poisson_ratio=float(m.poisson_ratio),
+                  plane=m.plane, prescribed_displacement=_fixed_dofs(mesh, m.displacement),
+                  body_force_density=tuple(float(v) for v in m.body_force),
                   traction=traction or None)
     if m.thermoelastic:
-        inputs.update(reference_temperature_k=float(m.reference_temperature),
-                      thermal_expansion_per_k=float(m.thermal_expansion))
+        inputs.update(stress_free_temperature=float(m.reference_temperature),
+                      linear_expansion_coefficient=float(m.thermal_expansion))
     return inputs
 
 
@@ -525,7 +521,7 @@ def balance_03(arrays, solved, mesh, *, thermal, heat=None, heat_fixed=None):
     energy = float(.5*np.sum(u*(load+residual)))
     if thermal:
         out['stiffness_energy_functional_per_depth'] = energy
-        out['strain_energy_per_depth'] = float(solved.physical_elastic_energy)
+        out['strain_energy_per_depth'] = float(solved.strain_energy_per_depth)
     else:
         out['strain_energy_per_depth'] = energy
     out['maximum_displacement'] = float(np.max(np.hypot(u[:, 0], u[:, 1]), initial=0.))
@@ -563,10 +559,11 @@ def summary_03(doc, *, result_format, field_layout, arrays, balance, timings, me
                                      timing_=results_common.timing(timings['mesh'], timings['solve'])),
            **maps, 'plane': p['plane']}
     if inputs is not None:
-        out['youngs_modulus'] = vo(inputs['young_modulus'], 'youngs_modulus')
+        out['youngs_modulus'] = vo(inputs['youngs_modulus'], 'youngs_modulus')
         out['poisson_ratio'] = inputs['poisson_ratio']
         if kind == THERMOELASTIC:
-            out['linear_expansion_coefficient'] = vo(inputs['thermal_expansion_per_k'], 'linear_expansion_coefficient')
+            out['linear_expansion_coefficient'] = vo(inputs['linear_expansion_coefficient'],
+                                                     'linear_expansion_coefficient')
             out['thermal_conductivity'] = vo(p['thermal_conductivity'], 'thermal_conductivity')
     out.update(extra or {})
     if kind == THERMOELASTIC:
@@ -654,7 +651,7 @@ def solve_03(mesh, inputs, heat_args, thermal, label=None):
     try:
         if thermal:
             heat = solve_steady_heat(mesh, **views.galerkin_heat_arguments(heat_args))
-            snapshot = freeze_temperature(mesh, heat.temperature)
+            snapshot = freeze_temperature(mesh, temperature=heat.temperature)
             solved = solve_thermoelasticity(mesh, snapshot, **inputs)
         else:
             solved = solve_elasticity(mesh, **inputs)
@@ -682,7 +679,7 @@ def run_mechanics(doc, verbose=True, *, mesh_limits=None):
     start = time.perf_counter()
     solved, heat, snapshot = solve_03(mesh, inputs, heat_args, thermal)
     solve_time = time.perf_counter()-start
-    fixed = inputs['dirichlet']
+    fixed = inputs['prescribed_displacement']
     arrays = result_arrays(mesh, solved, fixed, thermal=thermal, heat=heat,
                            heat_fixed=None if heat_args is None else heat_args['dirichlet'])
     balance = balance_03(arrays, solved, mesh, thermal=thermal, heat=heat,

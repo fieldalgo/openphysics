@@ -51,8 +51,9 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 ```python
 from refsol.elasticity import affine
 
-field = affine([[0., 0.], [1., 1.]], [[1e-3, 0.], [0., -0.3e-3]],
-               young_modulus=70e9, poisson_ratio=0.3, plane="stress")
+field = affine([[0., 0.], [1., 1.]],
+               displacement_gradient=[[1e-3, 0.], [0., -0.3e-3]], displacement=(0., 0.),
+               youngs_modulus=70e9, poisson_ratio=0.3, plane="stress")
 print(field.displacement)  # metres
 print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 ```
@@ -86,6 +87,8 @@ benchmarks.rib_neff(0.3)   # 3.412492
 `refsol.thermal_boundary`는 처방 내향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 내향 열유속은 W/m^2(양수가 몸체로 들어감), 대류 h는 W/(m^2 K)입니다.
 
 galerkin 단계(L2 커밋 6)부터 열 정답(`refsol.thermal`, `thermal3d`, `thermal_boundary`, `thermal_convection`, `thermal_multilayer`, `transient_heat`, `transient_heat_multilayer`, `transient_heat_robin`)은 앞의 `points` 다음에 registry 이름의 키워드 전용 SI 인자를 받고 차원 있는 기본값이 없습니다: `thermal_conductivity`, `prescribed_temperature`(두 끝의 쌍), `heat_source_density`, `inward_heat_flux`, `position`(첫 면을 포함한 층 경계), `time`, `initial_temperature`, `temperature_difference`. 필드도 같은 이름입니다. 문자열 값은 `TypeError`입니다. °C로 출판된 NAFEMS T4 데이터는 비공개 모듈에 출판된 그대로 두고 읽을 때 켈빈으로 바꿉니다.
+
+L2 커밋 8부터 역학 정답(`refsol.elasticity`, `elasticity_traction`, `elasticity_multilayer`, `thermoelasticity`, `thermoelastic_traction`, `bimetal`)도 앞의 `points`(표면하중이면 `normals`까지) 다음에 같은 방식으로 받습니다: `youngs_modulus`, `poisson_ratio`, `plane`, `linear_expansion_coefficient`, `stress_free_temperature`, `temperature`, `temperature_change`, `temperature_gradient`, `displacement`, `displacement_gradient`, `strain`, `stress`, `stress_xx`, `stress_xy`, `strain_xx`, `gauge_pressure`(안/밖 쌍), `position`(첫 면 또는 안쪽 반지름을 포함한 층 경계), `thickness`(층마다 하나), `length`. 이전 기본값은 호출하는 쪽이 적고, 필드는 registry 이름(`stress_zz`, `strain_zz`, `strain_energy_density`, `body_force_density`, `displacement_gradient`, `strain_yy` 등)을 씁니다.
 
 `refsol.transient_heat`는 `uniform_insulated`, `moving_affine`, `sine_manufactured`, 소형 dense `p1_matrices`, `smallest_dirichlet_mode`, `backward_euler_amplitude`를 제공합니다. 좌표·시간·온도는 m/s/K, 열전도율은 W/(m K), 체적열용량은 J/(m³ K), source는 W/m³, flux는 W/m²입니다. Dense 행렬과 mode는 작은 참조 메시용이며 semidiscrete 후진 Euler product는 연속체 PDE 해와 구분합니다. 이 참조는 물리 온도 유효성이나 최대 원리를 인증하지 않습니다. 과도 엔진은 galerkin [과도 열전도 계약](../galerkin/transient_heat.md)에 설명돼 있습니다.
 

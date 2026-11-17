@@ -64,7 +64,7 @@ outward integrated heat = -sum(heat reaction)
 
 Support work와 PE z/잔여 기여가 필수입니다. P1 온도는 요소 내부에서 변하므로 중심
 온도를 제곱하지 않고 T²를 적분합니다. 전체 strain은 요소별 상수이며 반환 stress/
-thermal·elastic strain/epsilon_zz/sigma_zz는 중심 표본으로 검사합니다. Full stress
+thermal·elastic strain/`strain_zz`/`stress_zz`는 중심 표본으로 검사합니다. Full stress
 오차는 실제 P1 T와 원 3D 법칙을 내부 구적점에서 복원하여 구합니다. 열 load/reaction/
 residual은 W/m, flux는 W/m², 기계 힘은 N/m, physical U는 J/m입니다. 열의 quadratic
 work는 W K/m이며 탄성 에너지나 저장 열이라고 부르지 않습니다.

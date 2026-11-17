@@ -531,7 +531,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
     scalar t (docs/packages/galerkin/shape_derivative.md).
     """
     if motion is not None:
-        from .shape import solve_transient_heat_moving
+        from ._moving import solve_transient_heat_moving
         return solve_transient_heat_moving(
             mesh, motion, thermal_conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity,
             time=time_s, initial_temperature=initial_temperature_k, prescribed_temperature=dirichlet,

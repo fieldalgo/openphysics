@@ -62,11 +62,11 @@ shape-function gradient와 교차 배치한 국소 DOF를 사용합니다.
 | E, stress | 스칼라 E 또는 `{영역 이름: E}`; stress `(T,3)` | Pa = N/m^2 |
 | nu, strain | 스칼라 nu 또는 `{영역 이름: nu}`; strain `(T,3)`, 공학 전단 | 무차원 |
 | 처방·결과 변위 | `(node,component)`마다 스칼라; 결과 `(N,2)` | m |
-| body_force | 상수 `(2,)` 또는 콜백 `(Q,2)->(Q,2)` | N/m^3 |
+| body_force_density | `None`(없음), 상수 `(2,)` 또는 콜백 `(Q,2)->(Q,2)` | N/m^3 |
 | 내부 강성행렬 | `(2N,2N)` | N/m^2 |
-| result.load | consistent 체적·경계 절점 하중의 합 `(N,2)` | 두께당 N/m |
-| result.reaction | 물체에 작용하는 지지력 `(N,2)` | 두께당 N/m |
-| result.residual | 모든 DOF의 `K*u-load`, `(N,2)` | 두께당 N/m |
+| result.applied_force_per_depth | consistent 체적·경계 절점 하중의 합 `(N,2)` | 두께당 N/m |
+| result.reaction_force_per_depth | 물체에 작용하는 지지력 `(N,2)` | 두께당 N/m |
+| result.residual_force_per_depth | 모든 DOF의 `K*u-load`, `(N,2)` | 두께당 N/m |
 | 복원한 `0.5*u.T*K*u` | 두께당 에너지 | J/m = N |
 
 실제 두께 t(m)를 하중·반력·에너지에 곱하면 N·N·J를 얻습니다. **두께 1 m**에서만
@@ -81,14 +81,17 @@ from galerkin.elasticity import solve_elasticity
 
 mesh = rectangle_mesh(.1, .02, 20, 4)  # coordinates in metres
 bc = {(int(i), c): 0. for i in mesh.boundary["left"] for c in (0, 1)}
-r = solve_elasticity(mesh, young_modulus=70e9, poisson_ratio=.3,
-                     plane="stress", dirichlet=bc,
-                     body_force=(0., -2700*9.81))
+r = solve_elasticity(mesh, youngs_modulus=70e9, poisson_ratio=.3,
+                     plane="stress", prescribed_displacement=bc,
+                     body_force_density=(0., -2700*9.81))
 print(r.displacement[:, 1].min())
-print(r.load.sum(axis=0), r.reaction.sum(axis=0))
+print(r.applied_force_per_depth.sum(axis=0), r.reaction_force_per_depth.sum(axis=0))
 ```
 
-`dirichlet`는 `{(node_index, component): value_in_metres}` 매핑입니다. 성분 0은 x,
+`solve_elasticity(mesh, *, youngs_modulus, poisson_ratio, plane,
+prescribed_displacement, body_force_density=None, traction=None, motion=None)`는
+registry 이름의 SI 숫자를 받으며 `str` 값은 `TypeError`를 냅니다.
+`prescribed_displacement`는 `{(node_index, component): value_in_metres}` 매핑입니다. 성분 0은 x,
 1은 y이며 0이 아닌 처방도 지원합니다. 인덱스는 bool이 아닌 정수여야 하고 절점은 구멍
 경계를 포함한 실제 기하 경계에 있어야 합니다. `mesh.boundary` 이름에 의존하지 않으며
 절점 tag는 매핑 생성의 편의 수단일 뿐입니다. traction 매핑이 없으면 구속되지 않은
@@ -102,8 +105,11 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))
 실수 배열을 반환해야 합니다. 콜백은 한 번 평가하며 상태를 가진 콜백은 권장하지 않습니다.
 상수 힘은 정확히 `(2,)`여야 합니다. 절점별·요소별 하중 배열을 암묵적으로 해석하지 않습니다.
 
-`ElasticityResult`는 `displacement`, `strain`, `stress`, `load`, `reaction`,
-`residual`과 명시적 `plane` 문자열을 포함합니다. 반력은 처방 DOF에서 `K*u-load`,
+`ElasticityResult`(frozen)는 `displacement`, `strain`, `stress`,
+`applied_force_per_depth`, `reaction_force_per_depth`, `residual_force_per_depth`와
+명시적 `plane` 문자열을 포함합니다. `result.units`는 각 물리량 필드를 SI 단위로
+매핑하며 `_per_depth`가 없는 이름(예: `reaction_force`)을 요청하면 깊이당 필드를
+알려 주는 `AttributeError`가 납니다. 반력은 처방 DOF에서 `K*u-load`,
 자유 DOF에서 0입니다. 자유 DOF 잔차는 작아야 하며 처방 위치의 잔차는 물리 반력이지
 수렴 실패가 아닙니다. 적용 traction이 0이면 반올림 범위에서
 `sum(reaction)+sum(load)=0`입니다. 반력은 구속 소거 전 원래 계를 사용합니다.

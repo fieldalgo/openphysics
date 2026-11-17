@@ -5,6 +5,7 @@
 Continuum truth comes from the original 3D law, never production/refsol helpers.
 Gates were registered in lab commit 34241af before reading the candidate API.
 """
+from types import MappingProxyType
 import numpy as np
 import pytest
 from galerkin.mesh import rectangle_mesh, Mesh
@@ -14,10 +15,10 @@ from thermoelasticity_independent_oracle import (
 
 
 def solve(m, theta, plane, bc, **kw):
-    args = dict(reference_temperature_k=TREF0, thermal_expansion_per_k=ALPHA0,
-                young_modulus=E0, poisson_ratio=NU0, plane=plane, dirichlet=bc)
+    args = dict(stress_free_temperature=TREF0, linear_expansion_coefficient=ALPHA0,
+                youngs_modulus=E0, poisson_ratio=NU0, plane=plane, prescribed_displacement=bc)
     args.update(kw)
-    return solve_thermoelasticity(m, freeze_temperature(m, TREF0+theta), **args)
+    return solve_thermoelasticity(m, freeze_temperature(m, temperature=TREF0+theta), **args)
 
 
 def exterior(m, u):
@@ -37,46 +38,46 @@ def reconstruction(m, r, plane, order=8):
     b,w,p,g = geometry(m,order)
     gu = np.einsum('tai,taj->tji',g,r.displacement[m.triangles])
     e = np.stack((gu[:,0,0],gu[:,1,1],gu[:,0,1]+gu[:,1,0]),axis=-1)
-    theta = b @ (r.temperature_snapshot.temperature_k[m.triangles]-r.reference_temperature_k).T
-    state = original_3d(e[:,None,:],theta.T,plane,alpha=r.thermal_expansion_per_k)
+    theta = b @ (r.temperature_snapshot.temperature[m.triangles]-r.stress_free_temperature).T
+    state = original_3d(e[:,None,:],theta.T,plane,alpha=r.linear_expansion_coefficient)
     return b,w,p,g,gu,e,theta.T,state
 
 
 def audit(m,r,plane,body=(0.,0.)):
     b,w,p,g,gu,e,theta,state = reconstruction(m,r,plane)
-    scale = E0*max(np.max(np.abs(e)), np.max(np.abs(theta*r.thermal_expansion_per_k)),1e-12)
-    np.testing.assert_allclose(e,r.total_strain,atol=1e-10*scale/E0,rtol=1e-10)
-    center=original_3d(e,(r.temperature_snapshot.temperature_k[m.triangles].mean(1)-r.reference_temperature_k),plane,alpha=r.thermal_expansion_per_k)
-    for actual,expected in [(r.stress,np.stack((center['sigma'][:,0,0],center['sigma'][:,1,1],center['sigma'][:,0,1]),axis=-1)),(r.sigma_zz,center['sigma'][:,2,2])]:
+    scale = E0*max(np.max(np.abs(e)), np.max(np.abs(theta*r.linear_expansion_coefficient)),1e-12)
+    np.testing.assert_allclose(e,r.strain,atol=1e-10*scale/E0,rtol=1e-10)
+    center=original_3d(e,(r.temperature_snapshot.temperature[m.triangles].mean(1)-r.stress_free_temperature),plane,alpha=r.linear_expansion_coefficient)
+    for actual,expected in [(r.stress,np.stack((center['sigma'][:,0,0],center['sigma'][:,1,1],center['sigma'][:,0,1]),axis=-1)),(r.stress_zz,center['sigma'][:,2,2])]:
         np.testing.assert_allclose(actual,expected,atol=scale*1e-10,rtol=1e-10)
-    np.testing.assert_allclose(r.epsilon_zz,center['total'][:,2,2],atol=scale/E0*1e-10)
+    np.testing.assert_allclose(r.strain_zz,center['total'][:,2,2],atol=scale/E0*1e-10)
     np.testing.assert_allclose(r.thermal_strain, np.stack((center['thermal'][:,0,0],center['thermal'][:,1,1],2*center['thermal'][:,0,1]),axis=-1),atol=1e-10*scale/E0)
-    np.testing.assert_allclose(r.elastic_strain,r.total_strain-r.thermal_strain,atol=1e-10*scale/E0)
+    np.testing.assert_allclose(r.elastic_strain,r.strain-r.thermal_strain,atol=1e-10*scale/E0)
     energy=np.sum(w*state['energy']); escale=max(E0*(scale/E0)**2,abs(energy),1e-20)
-    assert abs(energy-r.physical_elastic_energy)<=1e-10*escale
+    assert abs(energy-r.strain_energy_per_depth)<=1e-10*escale
     # Integrate initial stress from the parent 3D law, without a reduced D/RHS.
-    zero=original_3d(np.zeros_like(e[:,None,:]),theta,plane,alpha=r.thermal_expansion_per_k)
+    zero=original_3d(np.zeros_like(e[:,None,:]),theta,plane,alpha=r.linear_expansion_coefficient)
     local=-np.einsum('tq,tqij,taj->tai',w,zero['sigma'][...,:2,:2],g)
-    thermal=np.zeros_like(r.load_thermal)
+    thermal=np.zeros_like(r.thermal_equivalent_force_per_depth)
     np.add.at(thermal,m.triangles.ravel(),local.reshape(-1,2))
-    np.testing.assert_allclose(r.load_thermal,thermal,atol=scale*1e-10,rtol=1e-10)
+    np.testing.assert_allclose(r.thermal_equivalent_force_per_depth,thermal,atol=scale*1e-10,rtol=1e-10)
     local_internal=np.einsum('tq,tqij,taj->tai',w,state['sigma'][...,:2,:2],g)
-    internal=np.zeros_like(r.reaction)
+    internal=np.zeros_like(r.reaction_force_per_depth)
     np.add.at(internal,m.triangles.ravel(),local_internal.reshape(-1,2))
-    np.testing.assert_allclose(r.residual,internal-r.load_external,atol=1e-10*scale,rtol=1e-10)
-    np.testing.assert_allclose(r.residual,r.reaction,atol=1e-9*scale,rtol=1e-9)
+    np.testing.assert_allclose(r.residual_force_per_depth,internal-r.applied_force_per_depth,atol=1e-10*scale,rtol=1e-10)
+    np.testing.assert_allclose(r.residual_force_per_depth,r.reaction_force_per_depth,atol=1e-9*scale,rtol=1e-9)
     force=body(p.reshape(-1,2)).reshape(p.shape) if callable(body) else np.broadcast_to(body,p.shape)
     local_external=np.einsum('tq,qa,tqi->tai',w,b,force)
-    external=np.zeros_like(r.load_external)
+    external=np.zeros_like(r.applied_force_per_depth)
     np.add.at(external,m.triangles.ravel(),local_external.reshape(-1,2))
-    np.testing.assert_allclose(r.load_external,external,atol=1e-10*scale,rtol=1e-10)
+    np.testing.assert_allclose(r.applied_force_per_depth,external,atol=1e-10*scale,rtol=1e-10)
     tangent=original_3d(e,np.zeros(len(e)),plane)['sigma']
     uku=np.sum(w.sum(1)*np.einsum('tij,tji->t',tangent[:,:2,:2],gu))
-    u=r.displacement.ravel();f=r.load_external.ravel();th=r.load_thermal.ravel();reaction=r.reaction.ravel()
+    u=r.displacement.ravel();f=r.applied_force_per_depth.ravel();th=r.thermal_equivalent_force_per_depth.ravel();reaction=r.reaction_force_per_depth.ravel()
     ct=np.sum(w*zero['energy'])
     for error in [uku-u@(f+th+reaction),energy-(.5*uku-u@th+ct),2*energy-(u@f+u@reaction-u@th+2*ct),np.sum(w*np.einsum('tqij,tji->tq',state['sigma'][...,:2,:2],gu))-u@(f+reaction)]:
         assert abs(error)<=1e-10*max(escale,abs(uku),ct)
-    for forces in [r.load_external+r.reaction,r.load_thermal]:
+    for forces in [r.applied_force_per_depth+r.reaction_force_per_depth,r.thermal_equivalent_force_per_depth]:
         assert np.linalg.norm(forces.sum(0),np.inf)<1e-9*scale
         assert abs(np.sum(m.nodes[:,0]*forces[:,1]-m.nodes[:,1]*forces[:,0]))<1e-9*scale
     return energy
@@ -87,13 +88,13 @@ def audit(m,r,plane,body=(0.,0.)):
 def test_thermoelasticity_independent_uniform(plane,theta,alpha):
     m=rectangle_mesh(1,1,4,4);a=theta*alpha
     factor=1 if plane=='stress' else 1+NU0
-    r=solve(m,np.full(m.num_nodes,theta),plane,{(0,0):0.,(0,1):0.,(4,1):0.},thermal_expansion_per_k=alpha)
+    r=solve(m,np.full(m.num_nodes,theta),plane,{(0,0):0.,(0,1):0.,(4,1):0.},linear_expansion_coefficient=alpha)
     np.testing.assert_allclose(r.displacement,factor*a*m.nodes,atol=1e-10*max(abs(a),ALPHA0))
     np.testing.assert_allclose(r.stress,0,atol=1e-10*E0*max(abs(a),ALPHA0))
-    np.testing.assert_allclose(r.sigma_zz,0 if plane=='stress' else -E0*a,atol=1e-10*E0*max(abs(a),ALPHA0))
+    np.testing.assert_allclose(r.stress_zz,0 if plane=='stress' else -E0*a,atol=1e-10*E0*max(abs(a),ALPHA0))
     audit(m,r,plane)
     expected=0 if plane=='stress' else .5*E0*a*a
-    assert abs(r.physical_elastic_energy-expected)<1e-10*E0*max(a*a,ALPHA0**2)
+    assert abs(r.strain_energy_per_depth-expected)<1e-10*E0*max(a*a,ALPHA0**2)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -109,7 +110,7 @@ def test_thermoelasticity_independent_constrained(plane,theta):
         for edge in m.boundary_edges[tag]:
             value=stress[:2,:2]@normal*np.linalg.norm(np.diff(m.nodes[edge],axis=0))/2
             expected[edge]+=value
-    np.testing.assert_allclose(r.reaction,expected,atol=1e-10*E0*ALPHA0*abs(theta))
+    np.testing.assert_allclose(r.reaction_force_per_depth,expected,atol=1e-10*E0*ALPHA0*abs(theta))
 
 
 def error_metrics(m,r,plane,kind,order):
@@ -118,12 +119,12 @@ def error_metrics(m,r,plane,kind,order):
         exact_u,exact_e,exact_t=compatible(p,plane)
         exact=original_3d(exact_e,exact_t,plane)
         dt=theta-exact_t
-        dgt=(np.einsum('tai,ta->ti',g,r.temperature_snapshot.temperature_k[m.triangles])-np.array([20,0]))[:,None,:]
+        dgt=(np.einsum('tai,ta->ti',g,r.temperature_snapshot.temperature[m.triangles])-np.array([20,0]))[:,None,:]
     else:
         field=nonlinear_fields(p,plane,polynomial=kind=='polynomial')
         exact_u,exact_e,exact_t,exact=field['displacement'],field['strain'],field['theta'],field['state']
         dt=theta-exact_t
-        dgt=np.einsum('tai,ta->ti',g,r.temperature_snapshot.temperature_k[m.triangles])[:,None,:]-field['grad_theta']
+        dgt=np.einsum('tai,ta->ti',g,r.temperature_snapshot.temperature[m.triangles])[:,None,:]-field['grad_theta']
     uh=np.einsum('qa,tad->tqd',b,r.displacement[m.triangles]);du=uh-exact_u
     if kind=='linear':
         rigid=np.zeros((*p.shape[:-1],2,3));rigid[...,0,0]=1;rigid[...,1,1]=1;rigid[...,0,2]=-p[...,1];rigid[...,1,2]=p[...,0]
@@ -159,7 +160,7 @@ def test_thermoelasticity_independent_convergence(plane,kind):
         else:
             f=nonlinear_fields(m.nodes,plane,polynomial=kind=='polynomial');u,t=f['displacement'],f['theta'];bc=exterior(m,u)
             body=lambda p:nonlinear_fields(p,plane,polynomial=kind=='polynomial')['body']
-        r=solve(m,t,plane,bc,body_force=body);audit(m,r,plane,body)
+        r=solve(m,t,plane,bc,body_force_density=body);audit(m,r,plane,body)
         errors,energy=error_metrics(m,r,plane,kind,8)
         errors10,_=error_metrics(m,r,plane,kind,10)
         indices=[0,1,2,3,6] if kind=='linear' else list(range(7))
@@ -167,7 +168,7 @@ def test_thermoelasticity_independent_convergence(plane,kind):
         _,e12=error_metrics(m,r,plane,kind,12);_,e16=error_metrics(m,r,plane,kind,16)
         assert abs(e12-e16)<1e-8*max(e16,E0*(20*ALPHA0)**2)
         if kind=='linear':assert max(errors[4:6])<1e-10
-        history.append(errors);energy_errors.append(abs(r.physical_elastic_energy-energy)/max(energy,E0*(20*ALPHA0)**2))
+        history.append(errors);energy_errors.append(abs(r.strain_energy_per_depth-energy)/max(energy,E0*(20*ALPHA0)**2))
     indices=[0,1,2,3,6] if kind=='linear' else list(range(7))
     gates=np.array([1.8,.9,.9,.9,1.8,.9,.9])[indices]
     rates=np.log2(np.array(history[:-1])[:,indices]/np.array(history[1:])[:,indices])
@@ -181,36 +182,36 @@ def test_thermoelasticity_independent_convergence(plane,kind):
 def test_thermoelasticity_independent_support_work_shift(plane):
     m=rectangle_mesh(1,1,5,5);u=1e-4*np.column_stack((m.nodes[:,0]+m.nodes[:,1],2*m.nodes[:,1]))
     t=10+20*m.nodes[:,0];bc=exterior(m,u)
-    r=solve(m,t,plane,bc,body_force=(100.,-40.));audit(m,r,plane,(100.,-40.))
-    assert abs(np.sum(r.displacement*r.reaction))>1
-    shifted=solve(m,t+100,plane,bc,body_force=(100.,-40.),reference_temperature_k=TREF0+100)
+    r=solve(m,t,plane,bc,body_force_density=(100.,-40.));audit(m,r,plane,(100.,-40.))
+    assert abs(np.sum(r.displacement*r.reaction_force_per_depth))>1
+    shifted=solve(m,t+100,plane,bc,body_force_density=(100.,-40.),stress_free_temperature=TREF0+100)
     np.testing.assert_allclose(shifted.displacement,r.displacement,atol=1e-14)
-    assert shifted.physical_elastic_energy==pytest.approx(r.physical_elastic_energy,rel=1e-10)
+    assert shifted.strain_energy_per_depth==pytest.approx(r.strain_energy_per_depth,rel=1e-10)
 
 
 @pytest.mark.parametrize('change',['coordinate','node_order','cell_order','units','metadata','temperature','shape'])
 def test_thermoelasticity_independent_snapshot_reject(change):
-    m=rectangle_mesh(1,1,3,3);s=freeze_temperature(m,np.full(m.num_nodes,300.))
+    m=rectangle_mesh(1,1,3,3);s=freeze_temperature(m,temperature=np.full(m.num_nodes,300.))
     if change=='coordinate':m.nodes[5,0]+=.01
     elif change=='node_order':m.nodes[[5,6]]=m.nodes[[6,5]]
     elif change=='cell_order':m.triangles[[0,1]]=m.triangles[[1,0]]
-    elif change=='units':object.__setattr__(s,'temperature_unit','C')
+    elif change=='units':object.__setattr__(s,'units',MappingProxyType({'nodes':'m','temperature':'C'}))
     elif change=='metadata':object.__setattr__(s,'mesh_hash','fnv1a64:0000000000000000')
-    elif change=='temperature':object.__setattr__(s,'temperature_k',np.full(m.num_nodes,301.))
-    else:object.__setattr__(s,'temperature_k',np.full((m.num_nodes,1),300.))
-    with pytest.raises(ValueError):solve_thermoelasticity(m,s,reference_temperature_k=TREF0,thermal_expansion_per_k=ALPHA0,young_modulus=E0,poisson_ratio=NU0,plane='strain',dirichlet={(0,0):0.,(0,1):0.,(3,1):0.})
+    elif change=='temperature':object.__setattr__(s,'temperature',np.full(m.num_nodes,301.))
+    else:object.__setattr__(s,'temperature',np.full((m.num_nodes,1),300.))
+    with pytest.raises(ValueError):solve_thermoelasticity(m,s,stress_free_temperature=TREF0,linear_expansion_coefficient=ALPHA0,youngs_modulus=E0,poisson_ratio=NU0,plane='strain',prescribed_displacement={(0,0):0.,(0,1):0.,(3,1):0.})
 
 
 def test_thermoelasticity_independent_snapshot_copy():
-    m=rectangle_mesh(1,1,2,2);t=np.full(m.num_nodes,300.);s=freeze_temperature(m,t);ident=s.snapshot_hash
+    m=rectangle_mesh(1,1,2,2);t=np.full(m.num_nodes,300.);s=freeze_temperature(m,temperature=t);ident=s.snapshot_hash
     t[:]=301.;m.nodes[4,0]+=.01
-    assert np.all(s.temperature_k==300.) and s.nodes[4,0]==.5
-    for a in (s.nodes,s.triangles,s.temperature_k):
+    assert np.all(s.temperature==300.) and s.nodes[4,0]==.5
+    for a in (s.nodes,s.triangles,s.temperature):
         with pytest.raises(ValueError):a.flags.writeable=True
-    fresh=freeze_temperature(rectangle_mesh(1,1,2,2),np.full(9,300.))
+    fresh=freeze_temperature(rectangle_mesh(1,1,2,2),temperature=np.full(9,300.))
     assert fresh.snapshot_hash==ident
     for bad in (np.full(9,np.nan),np.full(9,-1.),np.full((9,1),300.),np.full(9,np.inf)):
-        with pytest.raises(ValueError):freeze_temperature(rectangle_mesh(1,1,2,2),bad)
+        with pytest.raises(ValueError):freeze_temperature(rectangle_mesh(1,1,2,2),temperature=bad)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -230,8 +231,8 @@ def test_thermoelasticity_independent_mesh_invariance(plane,transform):
         expected=u[perm]
     actual=solve(new,t[perm],plane,exterior(new,expected));audit(new,actual,plane)
     np.testing.assert_allclose(actual.displacement,r.displacement[perm]@q.T,atol=1e-14)
-    np.testing.assert_allclose(actual.reaction,r.reaction[perm]@q.T,atol=E0*ALPHA0*20*1e-10)
-    assert actual.physical_elastic_energy==pytest.approx(r.physical_elastic_energy,rel=1e-10)
+    np.testing.assert_allclose(actual.reaction_force_per_depth,r.reaction_force_per_depth[perm]@q.T,atol=E0*ALPHA0*20*1e-10)
+    assert actual.strain_energy_per_depth==pytest.approx(r.strain_energy_per_depth,rel=1e-10)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -254,15 +255,16 @@ def test_thermoelasticity_independent_disconnected_components(plane):
 def test_thermoelasticity_independent_zero_alpha_mechanical(plane):
     m=rectangle_mesh(1,1,4,4);matrix=np.array([[1e-4,2e-5],[-3e-5,2e-4]])
     u=m.nodes@matrix.T
-    r=solve(m,10+5*m.nodes[:,0]**2,plane,exterior(m,u),thermal_expansion_per_k=0.)
+    r=solve(m,10+5*m.nodes[:,0]**2,plane,exterior(m,u),linear_expansion_coefficient=0.)
     audit(m,r,plane)
     np.testing.assert_allclose(r.displacement,u,atol=1e-14)
-    np.testing.assert_array_equal(r.load_thermal,0.)
+    np.testing.assert_array_equal(r.thermal_equivalent_force_per_depth,0.)
 
 
 def test_thermoelasticity_independent_collision_does_not_bind(monkeypatch):
-    import galerkin.thermoelasticity as production
-    monkeypatch.setattr(production,'_fingerprint',lambda *args:'fnv1a64:0000000000000000')
-    m=rectangle_mesh(1,1,2,2);s=freeze_temperature(m,np.full(m.num_nodes,300.));m.nodes[4,0]+=.01
+    # the snapshot checksums live in galerkin._mechanics_kernels since the galerkin step (L2 commit 8)
+    import galerkin._mechanics_kernels as checks
+    monkeypatch.setattr(checks,'fingerprint',lambda *args:'fnv1a64:0000000000000000')
+    m=rectangle_mesh(1,1,2,2);s=freeze_temperature(m,temperature=np.full(m.num_nodes,300.));m.nodes[4,0]+=.01
     with pytest.raises(ValueError,match='stale or mismatched'):
-        solve_thermoelasticity(m,s,reference_temperature_k=TREF0,thermal_expansion_per_k=ALPHA0,young_modulus=E0,poisson_ratio=NU0,plane='stress',dirichlet={(0,0):0.,(0,1):0.,(2,1):0.})
+        solve_thermoelasticity(m,s,stress_free_temperature=TREF0,linear_expansion_coefficient=ALPHA0,youngs_modulus=E0,poisson_ratio=NU0,plane='stress',prescribed_displacement={(0,0):0.,(0,1):0.,(2,1):0.})

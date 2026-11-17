@@ -2,274 +2,148 @@
 # SPDX-License-Identifier: Apache-2.0
 """Small-strain isotropic P1 triangle elasticity in SI units.
 
-E and nu are one homogeneous material or piecewise constant on named mesh
-regions (galerkin.materials, docs/packages/galerkin/multimaterial.md).
+youngs_modulus and poisson_ratio are one homogeneous material or piecewise constant
+on named mesh regions (galerkin.materials, docs/packages/galerkin/multimaterial.md).
 Import this submodule explicitly; see docs/packages/galerkin/elasticity2d.md for the contract.
-No scalar or edge finite-element space is used here.
+No scalar or edge finite-element space is used here. Quantities are keyword-only
+registry names in SI units (the units convention of the galerkin step).
 
-E, nu, Dirichlet displacements, body force and traction may be JAX or PyTorch
-values (callbacks may return them); the result arrays are then in that library
-and carry reverse-mode derivatives. One body serves both: the formulas run in
-the inputs' library, the checks read their numbers, and the linear system is
-solved once with ``core.solve`` in that library (``displacement``), whose
-adjoint gives the exact derivatives.
+youngs_modulus, poisson_ratio, the prescribed displacements, body_force_density and
+traction may be JAX or PyTorch values (callbacks may return them); the result arrays
+are then in that library and carry reverse-mode derivatives. One body serves both:
+the formulas run in the inputs' library, the checks read their numbers, and the
+linear system is solved once with ``core.solve`` in that library, whose adjoint
+gives the exact derivatives.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 
-from .materials import is_per_region, region_property
-from .core import forms, kernels
 from .core import live as live_inputs
-from .core import solve as core_solve
-from .core.backend import Backend, backend_of, is_live, lift, live_namespace, namespace, scatter_add, to_numpy
+from .core.backend import live_namespace, lift, to_numpy
 from .core.boundary import traction_load
-from .core.checks import one_of, real_array, real_value, require_finite
-from .core.sparse import CooMatrix
-from .core.constraints import vector_dirichlet
-from .core.quadrature import triangle_product_rule
+from .core.checks import one_of, real_array, require_finite
 from .core.triangles import triangle_geometry, vector_strain
+from ._mechanics_kernels import (PLANES, at_fixed as _at_fixed, body_load as _body_load,
+                                 constitutive as _constitutive, displacement as _displacement,
+                                 element_materials as _element_materials, stress_of as _stress_of,
+                                 vector_stiffness as _vector_stiffness)
+from ._public import ResultSurface, refuse_tagged_text, refuse_text
 
 # Public names. The helpers lame, constitutive, element_materials, element_constitutive,
 # stiffness_and_stress, stress_of, body_load, check_solution, displacement, at_fixed and
-# vector_stiffness are internal: galerkin.kernels re-exports them.
+# vector_stiffness are internal: they live in the package-private galerkin._mechanics_kernels
+# (L2 commit 8), and galerkin.kernels re-exports them.
 __all__ = ["PLANES", "constitutive_matrix", "ElasticityResult", "solve_elasticity"]
 
 
-PLANES = ("stress", "strain")
-
-
-def lame(e, nu, plane):
-    """Lame parameters (lam, mu) in Pa of the plane-stress or plane-strain reduction.
-
-    Elementwise arithmetic only, so e and nu may be floats, NumPy arrays or
-    JAX/PyTorch arrays.
-    """
-    mu = e / (2 * (1 + nu))
-    lam = (e * nu / ((1 + nu) * (1 - 2 * nu)) if plane == "strain"
-           else e * nu / (1 - nu * nu))
-    return lam, mu
-
-
-def constitutive(xp, e, nu, plane):
-    """Pa matrix for [exx, eyy, gamma_xy] in ``xp``: (3,3) for 0-d e and nu, (T,3,3) for (T,)."""
-    lam, mu = lame(e, nu, plane)
-    zero = xp.zeros_like(mu)
-    rows = [[lam + 2*mu, lam, zero], [lam, lam + 2*mu, zero], [zero, zero, mu]]
-    return xp.stack([xp.stack(row, axis=-1) for row in rows], axis=-2)
-
-
-def constitutive_matrix(young_modulus, poisson_ratio, *, plane):
+def constitutive_matrix(*, youngs_modulus, poisson_ratio, plane):
     """Return Pa matrix for [exx, eyy, gamma_xy], gamma_xy=2*exy.
 
-    E > 0 and -1 < nu < 0.5 (stable 3D isotropic parent material).
-    ``plane`` is required and must be 'stress' or 'strain'.
+    youngs_modulus > 0 and -1 < poisson_ratio < 0.5 (stable 3D isotropic parent
+    material), both scalars. ``plane`` is required and must be 'stress' or 'strain'.
     """
-    e, nu = real_array(young_modulus, "young_modulus"), real_array(poisson_ratio, "poisson_ratio")
+    refuse_text("youngs_modulus", youngs_modulus)
+    refuse_text("poisson_ratio", poisson_ratio)
+    e, nu = real_array(youngs_modulus, "youngs_modulus"), real_array(poisson_ratio, "poisson_ratio")
     if e.shape != () or nu.shape != () or e <= 0 or not -1 < nu < .5:
-        raise ValueError("require scalar E > 0 and -1 < nu < 0.5")
+        raise ValueError("require scalar youngs_modulus > 0 and -1 < poisson_ratio < 0.5")
     one_of(plane, PLANES, "plane")
-    d = constitutive(np, np.float64(e), np.float64(nu), plane)
+    d = _constitutive(np, np.float64(e), np.float64(nu), plane)
     require_finite(d, "constitutive parameters exceed floating-point range")
     return d
 
 
-def element_materials(mesh, young_modulus, poisson_ratio):
-    """Checked E and nu: as given for scalars, (T,) if either is a region table.
+@dataclass(frozen=True)
+class ElasticityResult(ResultSurface):
+    """Nodal displacement (m), element engineering strain and stress (Pa); planar.
 
-    E > 0 and -1 < nu < 0.5 in every region. JAX or PyTorch values stay live.
+    applied_force_per_depth (body plus boundary traction) and reaction_force_per_depth
+    have shape (N,2), in N/m: per metre of out-of-plane depth.
+    reaction_force_per_depth is zero at free DOFs, and K*u-load at prescribed DOFs.
+    residual_force_per_depth is K*u-load at ALL DOFs, with the same units.
+    ``.units`` maps each quantity field to its canonical unit.
     """
-    e = region_property(mesh, young_modulus, "young_modulus", positive=True, live=True)
-    nu = region_property(mesh, poisson_ratio, "poisson_ratio", lower=-1., upper=.5, live=True)
-    if is_per_region(young_modulus) or is_per_region(poisson_ratio):
-        cells = len(mesh.triangles)
-        e, nu = (v if is_live(v) else np.broadcast_to(v, (cells,)) for v in (e, nu))
-        xp = live_namespace(e, nu)
-        e, nu = (xp.broadcast_to(lift(xp, v, xp.float64), (cells,)) for v in (e, nu))
-    return e, nu
+    UNITS = MappingProxyType({"displacement": "m", "strain": "1", "stress": "Pa",
+                              "applied_force_per_depth": "N/m", "reaction_force_per_depth": "N/m",
+                              "residual_force_per_depth": "N/m"})
+    BASIS = "planar"
 
-
-def element_constitutive(mesh, young_modulus, poisson_ratio, *, plane):
-    """Pa constitutive matrix: (3,3) for scalars, (T,3,3) for region mappings.
-
-    Scalars return exactly constitutive_matrix(...). A mapping for either
-    argument gives one matrix per triangle; each region must satisfy E > 0 and
-    -1 < nu < 0.5.
-    """
-    if not (is_per_region(young_modulus) or is_per_region(poisson_ratio)):
-        return constitutive_matrix(young_modulus, poisson_ratio, plane=plane)
-    one_of(plane, PLANES, "plane")
-    e, nu = element_materials(mesh, young_modulus, poisson_ratio)
-    xp = live_namespace(e, nu)
-    d = constitutive(xp, e, nu, plane)
-    require_finite(d, "constitutive parameters exceed floating-point range")
-    return d
-
-
-def stiffness_and_stress(b, d, area):
-    """Element stiffness (T,6,6) and a strain->stress map for (3,3) or (T,3,3) d."""
-    xp = namespace(d)
-    return kernels.vector_p1_stiffness(b, d, area), lambda strain: stress_of(xp, d, strain)
-
-
-def stress_of(xp, d, strain):
-    """Element stress (T,3) from strain (T,3) and d (3,3) or (T,3,3)."""
-    if d.ndim == 2:
-        return strain @ d.T
-    return xp.einsum("tij,tj->ti", d, strain)
-
-
-def body_load(p, t, area, dofs, body_force):
-    """Consistent load (2N,) of a constant (2,) or callable body force in N/m^3.
-
-    The callable takes (Q,2) coordinates and returns exactly (Q,2). The load is
-    in the library of the force (NumPy for NumPy input).
-    """
-    bary, weights = triangle_product_rule()
-    points = np.einsum("qa,tad->tqd", bary, p[t])
-    if callable(body_force):
-        force = real_value(body_force(points.reshape(-1, 2)), "body_force")
-        if tuple(force.shape) != (points.shape[0]*points.shape[1], 2):
-            raise ValueError("body_force callable must return shape (Q, 2)")
-        xp = namespace(force)
-        force = xp.reshape(force, points.shape)
-    else:
-        force = real_value(body_force, "body_force")
-        if tuple(force.shape) != (2,):
-            raise ValueError("constant body_force must have shape (2,)")
-        xp = namespace(force)
-        force = xp.broadcast_to(force, points.shape)
-    fe = xp.einsum("qa,q,tqd,t->tad", *(lift(xp, a) for a in (bary, weights)), force, lift(xp, area))
-    return scatter_add(xp, 2*len(p), dofs.ravel(), xp.reshape(fe, (-1,)))
-
-
-def check_solution(stiffness, u, load, fixed, what):
-    """Raise ValueError for a nonfinite displacement or a free-DOF residual above 1e-9 of the load scale.
-
-    NumPy arguments: ``stiffness`` as SciPy CSR, ``u`` and ``load`` (2N,).
-    """
-    residual = stiffness @ u - load
-    if not np.all(np.isfinite(u)) or not np.all(np.isfinite(residual)):
-        raise ValueError(f"nonfinite {what} solution; check geometry and material scaling")
-    free = np.setdiff1d(np.arange(len(load)), fixed)
-    scale = max(np.linalg.norm(abs(stiffness) @ abs(u)+abs(load), np.inf), np.finfo(float).tiny)
-    if len(free) and np.linalg.norm(residual[free], np.inf) > 1e-9*scale:
-        raise ValueError(f"constrained {what} solve failed its residual tolerance")
-
-
-def displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, what):
-    """Displacement (2N,) in ``xp`` and the fixed DOFs.
-
-    One ``core.solve`` solve in the inputs' library: with JAX or PyTorch values
-    the displacement carries exact derivatives to K, the load and the Dirichlet
-    values. The checks read its numbers: a singular or ill-conditioned system,
-    a nonfinite solution or a free-DOF residual above 1e-9 of the load scale
-    raises ValueError.
-    """
-    fixed, values = vector_dirichlet(live_inputs.numbers(dirichlet), p, boundary, count, labels)
-    if backend_of(xp) is not Backend.NUMPY and len(fixed):
-        values = xp.stack([lift(xp, v, xp.float64) for v in dirichlet.values()])
-    try:
-        u = core_solve.solve_dirichlet(stiffness, load, {tuple(fixed): values} if len(fixed) else {})
-    except (RuntimeError, ValueError) as exc:
-        raise ValueError(f"singular or ill-conditioned constrained {what} system") from exc
-    check_solution(_numbers(stiffness).to_scipy(), to_numpy(u), to_numpy(load), fixed, what)
-    return u, fixed
-
-
-def _numbers(matrix):
-    return CooMatrix(matrix.rows, matrix.cols, to_numpy(matrix.values), matrix.shape)
-
-
-def at_fixed(xp, residual, fixed):
-    """The reaction: ``residual`` at the fixed DOFs, zero elsewhere."""
-    mask = np.zeros(residual.shape[0], dtype=bool)
-    mask[fixed] = True
-    return xp.where(lift(xp, mask), residual, xp.zeros_like(residual))
-
-
-def vector_stiffness(xp, b, dofs, d, area, size):
-    """Element stiffness checked finite, assembled: a CooMatrix in ``xp`` (coalesced when live)."""
-    ke = kernels.vector_p1_stiffness(b, d, area)
-    if not np.all(np.isfinite(to_numpy(ke))):
-        raise ValueError("element stiffness exceeds floating-point range")
-    k = forms.matrix(dofs, dofs, ke, (size, size))
-    return k if backend_of(xp) is Backend.NUMPY else k.coalesce()
-
-
-@dataclass
-class ElasticityResult:
-    """Nodal displacement (m), element engineering strain and stress (Pa).
-
-    load (body plus boundary traction) and reaction have shape (N,2),
-    units N/m of out-of-plane thickness.
-    reaction is zero at free DOFs, and K*u-load at prescribed DOFs.
-    residual is K*u-load at ALL DOFs, with the same units.
-    """
     displacement: np.ndarray
     strain: np.ndarray
     stress: np.ndarray
-    load: np.ndarray
-    reaction: np.ndarray
-    residual: np.ndarray
+    applied_force_per_depth: np.ndarray
+    reaction_force_per_depth: np.ndarray
+    residual_force_per_depth: np.ndarray
     plane: str
 
 
-def solve_elasticity(mesh, *, young_modulus, poisson_ratio, plane, dirichlet,
-                     body_force=(0., 0.), traction=None, motion=None):
-    """Solve -div(sigma)=body_force with optional prescribed boundary traction.
-
-    E, nu, Dirichlet displacements, body_force and traction may be JAX or
-    PyTorch values, or callbacks returning them; the result is then in that
-    library with reverse-mode derivatives (docs/packages/galerkin/differentiation.md).
-    Callbacks are called once.
+#: the quantity parameters of solve_elasticity, refused as text (SI numbers only)
+_QUANTITIES = ("youngs_modulus", "poisson_ratio", "prescribed_displacement", "body_force_density", "traction")
 
 
-    body_force: constant (2,) or callable accepting (Q,2) coordinates in m
-    and returning exactly (Q,2), in N/m^3. Dirichlet: mapping from
-    (node, component=0|1) to scalar displacement in m. E (Pa) and nu are
-    scalars or {region name: value} mappings over mesh.region_names.
+def solve_elasticity(mesh, *, youngs_modulus, poisson_ratio, plane, prescribed_displacement,
+                     body_force_density=None, traction=None, motion=None):
+    """Solve -div(sigma)=body_force_density with optional prescribed boundary traction.
+
+    youngs_modulus, poisson_ratio, the prescribed displacements, body_force_density and
+    traction may be JAX or PyTorch values, or callbacks returning them; the result is then
+    in that library with reverse-mode derivatives (docs/packages/galerkin/differentiation.md).
+    Callbacks are called once. A str for a quantity raises TypeError (SI numbers only).
+
+    body_force_density: None (no body force), a constant (2,) or a callable accepting
+    (Q,2) coordinates in m and returning exactly (Q,2), in N/m^3.
+    prescribed_displacement: mapping from (node, component=0|1) to scalar displacement
+    in m. youngs_modulus (Pa) and poisson_ratio are scalars or {region name: value}
+    mappings over mesh.region_names.
     traction: {boundary_edges tag: global (2,) vector in Pa, or
     callable(points, outward_normals)->(Q,2)}. None/{} keeps zero traction.
     All line loads, including those on prescribed displacement components,
-    enter load; their support reactions are computed from the original K*u-load.
+    enter the applied force; their support reactions are computed from the original K*u-load.
     Duplicate selected edges and interior edges are rejected. See
     docs/packages/galerkin/elasticity_traction.md for overlap, quadrature and units.
     Nodes/triangles must form a conforming, nonoverlapping manifold mesh.
-    Plane strain P1 displacement elements lock as nu approaches 0.5.
-    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
-    t*velocity and every result carries the derivative with respect to the JAX
+    Plane strain P1 displacement elements lock as poisson_ratio approaches 0.5.
+    motion=galerkin.shape.MeshMotion(design_velocity=W, t=t) solves on the nodes X0 +
+    t*W and every result carries the derivative with respect to the JAX
     or PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
+    for name, value in zip(_QUANTITIES, (youngs_modulus, poisson_ratio, prescribed_displacement,
+                                         body_force_density, traction)):
+        (refuse_tagged_text if name == "traction" else refuse_text)(name, value)
+    young_modulus, dirichlet = youngs_modulus, prescribed_displacement
+    body_force = (0., 0.) if body_force_density is None else body_force_density
     if motion is not None:
-        from .shape import solve_elasticity_moving
-        return solve_elasticity_moving(mesh, motion, young_modulus=young_modulus, poisson_ratio=poisson_ratio,
-                                       plane=plane, dirichlet=dirichlet, body_force=body_force, traction=traction)
+        from ._moving import solve_elasticity_moving
+        return solve_elasticity_moving(mesh, motion, youngs_modulus=youngs_modulus, poisson_ratio=poisson_ratio,
+                                       plane=plane, prescribed_displacement=prescribed_displacement,
+                                       body_force_density=body_force, traction=traction)
     one_of(plane, PLANES, "plane")
     p, t, area, boundary, count, labels = triangle_geometry(mesh, counterclockwise=False)
     b, dofs = vector_strain(p, t)
-    e, nu = element_materials(mesh, young_modulus, poisson_ratio)
-    body = body_load(p, t, area, dofs, body_force)
+    e, nu = _element_materials(mesh, young_modulus, poisson_ratio)
+    body = _body_load(p, t, area, dofs, body_force)
     line = traction_load(mesh, p, t, traction, live=True)
     xp = live_namespace(e, nu, body, line, *live_inputs.leaves(dirichlet))
-    d = constitutive(xp, *(lift(xp, v, xp.float64) for v in (e, nu)), plane)
+    d = _constitutive(xp, *(lift(xp, v, xp.float64) for v in (e, nu)), plane)
     require_finite(d, "constitutive parameters exceed floating-point range")
     n = 2*len(p)
-    stiffness = vector_stiffness(xp, b, dofs, d, area, n)
+    stiffness = _vector_stiffness(xp, b, dofs, d, area, n)
     body = lift(xp, body)
     if not np.all(np.isfinite(to_numpy(body))):
         raise ValueError("assembled body force exceeds floating-point range")
     load = body + lift(xp, line)
     if not np.all(np.isfinite(to_numpy(load))):
         raise ValueError("total body and traction load exceeds floating-point range")
-    u, fixed = displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, "elasticity")
+    u, fixed = _displacement(xp, stiffness, load, dirichlet, p, boundary, count, labels, "elasticity")
     residual = stiffness.matvec(u) - load
     strain = xp.einsum("tij,tj->ti", lift(xp, b), u[dofs])
-    stress = stress_of(xp, d, strain)
+    stress = _stress_of(xp, d, strain)
     if not np.all(np.isfinite(to_numpy(strain))) or not np.all(np.isfinite(to_numpy(stress))):
         raise ValueError("computed strain/stress exceeds floating-point range")
     return ElasticityResult(xp.reshape(u, (-1, 2)), strain, stress,
-                            *(xp.reshape(a, (-1, 2)) for a in (load, at_fixed(xp, residual, fixed), residual)),
+                            *(xp.reshape(a, (-1, 2)) for a in (load, _at_fixed(xp, residual, fixed), residual)),
                             plane)

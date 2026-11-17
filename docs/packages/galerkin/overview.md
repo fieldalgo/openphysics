@@ -107,12 +107,14 @@ src/galerkin/
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
   transient_heat.py               # Transient heat, backward Euler
   _heat_kernels.py                # Boundary system, 3D source load and face map the heat solvers share (package-private)
-  _public.py                      # Text refusal, inward-to-outward data and result surfaces of the public heat, electric and Joule API (package-private)
+  _public.py                      # Text refusal, inward-to-outward data and result surfaces of the public galerkin APIs (package-private)
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   _thermal_mechanical_common.py   # Input isolation the two heat-to-mechanics workflows share (package-private)
+  _mechanics_kernels.py           # Elasticity/thermoelasticity helpers and the temperature-snapshot hashes (package-private)
+  _moving.py                      # The moving-mesh solves behind motion= (package-private)
   core/           # Shared layer: checks, edge numbering and signs, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked

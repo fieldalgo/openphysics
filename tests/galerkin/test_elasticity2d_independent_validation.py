@@ -14,8 +14,8 @@ from elasticity2d_independent_oracle import (
 
 
 def solve(mesh, plane, bc, force=(0., 0.)):
-    return solve_elasticity(mesh, young_modulus=E, poisson_ratio=NU,
-                            plane=plane, dirichlet=bc, body_force=force)
+    return solve_elasticity(mesh, youngs_modulus=E, poisson_ratio=NU,
+                            plane=plane, prescribed_displacement=bc, body_force_density=force)
 
 
 def prescribed(mesh, u):
@@ -29,22 +29,22 @@ def check_balance_and_work(mesh, result, oracle, plane, bc):
     total = np.sum(weights[..., None]*force, axis=(0, 1))
     moment = np.sum(weights*(points[..., 0]*force[..., 1]-points[..., 1]*force[..., 0]))
     force_scale = np.sum(weights*np.linalg.norm(force, axis=-1))
-    assert_allclose(result.load.sum(axis=0), total, rtol=1e-10, atol=1e-10)
-    nodal_moment = np.sum(mesh.nodes[:, 0]*result.load[:, 1]-mesh.nodes[:, 1]*result.load[:, 0])
+    assert_allclose(result.applied_force_per_depth.sum(axis=0), total, rtol=1e-10, atol=1e-10)
+    nodal_moment = np.sum(mesh.nodes[:, 0]*result.applied_force_per_depth[:, 1]-mesh.nodes[:, 1]*result.applied_force_per_depth[:, 0])
     assert abs(nodal_moment-moment) < 1e-10*force_scale
-    all_force = result.load+result.reaction
+    all_force = result.applied_force_per_depth+result.reaction_force_per_depth
     assert np.linalg.norm(all_force.sum(axis=0)) < 1e-9*force_scale
     assert abs(np.sum(mesh.nodes[:, 0]*all_force[:, 1]-mesh.nodes[:, 1]*all_force[:, 0])) < 1e-9*force_scale
     fixed = {2*i+c for i, c in bc}
     free = np.array(sorted(set(range(2*mesh.num_nodes))-fixed))
-    assert np.max(abs(result.reaction.ravel()[free])) == 0
+    assert np.max(abs(result.reaction_force_per_depth.ravel()[free])) == 0
     strain = fe_strain(mesh, result.displacement)
     assert_allclose(result.strain, strain, rtol=1e-9, atol=1e-12)
     sigma = stress(strain, plane)
     assert_allclose(result.stress, sigma, rtol=1e-9, atol=1e-6)
     area = weights.sum(axis=1)
     twice_energy = np.sum(area*np.sum(sigma*strain, axis=-1))
-    work = np.sum(result.load*result.displacement)+sum(result.reaction[i, c]*v for (i, c), v in bc.items())
+    work = np.sum(result.applied_force_per_depth*result.displacement)+sum(result.reaction_force_per_depth[i, c]*v for (i, c), v in bc.items())
     assert abs(work-twice_energy) < 1e-9*max(abs(twice_energy), abs(work))
     # A different virtual affine displacement checks both shear factors and
     # weak-form work, including the prescribed-boundary reactions.
@@ -123,8 +123,8 @@ def test_elasticity2d_independent_closed_form_affine_component_supports(plane):
     result = solve(mesh, plane, bc)
     assert_allclose(result.displacement, mesh.nodes*[-k*a, a], rtol=1e-9, atol=1e-12)
     assert_allclose(result.stress, np.tile([0., a*modulus, 0.], (mesh.num_triangles, 1)), rtol=1e-9, atol=1e-6)
-    assert_allclose(result.reaction[mesh.boundary['top'], 1].sum(), 1.3*a*modulus, rtol=1e-9)
-    assert_allclose(.5*np.sum(result.displacement*result.reaction), .5*modulus*a*a*1.3*.7, rtol=1e-9)
+    assert_allclose(result.reaction_force_per_depth[mesh.boundary['top'], 1].sum(), 1.3*a*modulus, rtol=1e-9)
+    assert_allclose(.5*np.sum(result.displacement*result.reaction_force_per_depth), .5*modulus*a*a*1.3*.7, rtol=1e-9)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -179,8 +179,8 @@ def test_elasticity2d_independent_rigid_superposition_mesh_covariance(plane):
                        np.stack((sigma[:, 2], sigma[:, 1]), axis=-1)), axis=1)
     rotated = q@tensor@q.T
     assert_allclose(r.stress, np.c_[rotated[:, 0, 0], rotated[:, 1, 1], rotated[:, 0, 1]], rtol=1e-9, atol=1e-6)
-    assert_allclose(r.load, (scale*result.load@q.T)[permutation], rtol=1e-9, atol=1e-9)
-    assert_allclose(r.reaction, (scale*result.reaction@q.T)[permutation], rtol=1e-9, atol=1e-9)
+    assert_allclose(r.applied_force_per_depth, (scale*result.applied_force_per_depth@q.T)[permutation], rtol=1e-9, atol=1e-9)
+    assert_allclose(r.reaction_force_per_depth, (scale*result.reaction_force_per_depth@q.T)[permutation], rtol=1e-9, atol=1e-9)
     # Infinitesimal rigid rotation/translation can be superposed on a strained
     # solution without changing stress, strain, load or reaction.
     rigid = .001*np.c_[-base.nodes[:, 1], base.nodes[:, 0]]+[.004, -.003]
@@ -188,4 +188,4 @@ def test_elasticity2d_independent_rigid_superposition_mesh_covariance(plane):
     assert_allclose(s.displacement, result.displacement+rigid, rtol=1e-9, atol=1e-12)
     assert_allclose(s.strain, result.strain, rtol=1e-9, atol=1e-12)
     assert_allclose(s.stress, result.stress, rtol=1e-9, atol=1e-6)
-    assert_allclose(s.reaction, result.reaction, rtol=1e-9, atol=1e-9)
+    assert_allclose(s.reaction_force_per_depth, result.reaction_force_per_depth, rtol=1e-9, atol=1e-9)

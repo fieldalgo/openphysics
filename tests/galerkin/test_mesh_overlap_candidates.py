@@ -175,8 +175,8 @@ def _thermal(mesh):
 
 def _elasticity(mesh):
     fixed = {(node, component): 0. for node in (0, 1) for component in (0, 1)}
-    return solve_elasticity(mesh, young_modulus=1e9, poisson_ratio=.3, plane="stress",
-                            dirichlet=fixed, body_force=(0., -1e3))
+    return solve_elasticity(mesh, youngs_modulus=1e9, poisson_ratio=.3, plane="stress",
+                            prescribed_displacement=fixed, body_force_density=(0., -1e3))
 
 
 CHECKS = {"thermal": _thermal, "elasticity": _elasticity}

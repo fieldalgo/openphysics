@@ -9,7 +9,7 @@ from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
 def main():
     n = 8
     mesh = rectangle_mesh(1., 1., n, n)
-    snapshot = freeze_temperature(mesh, np.full(mesh.num_nodes, 313.15))
+    snapshot = freeze_temperature(mesh, temperature=np.full(mesh.num_nodes, 313.15))
     minimal = {(0, 0): 0., (0, 1): 0., (n, 1): 0.}
     boundary = np.unique(np.concatenate(list(mesh.boundary.values())))
     blocked = {(int(node), component): 0. for node in boundary for component in (0, 1)}
@@ -20,18 +20,18 @@ def main():
         ('blocked_plane_strain', 'strain', blocked),
     ):
         r = solve_thermoelasticity(
-            mesh, snapshot, reference_temperature_k=293.15,
-            thermal_expansion_per_k=12e-6, young_modulus=70e9,
-            poisson_ratio=.3, plane=plane, dirichlet=supports)
+            mesh, snapshot, stress_free_temperature=293.15,
+            linear_expansion_coefficient=12e-6, youngs_modulus=70e9,
+            poisson_ratio=.3, plane=plane, prescribed_displacement=supports)
         results[name] = r
-        force = r.reaction.sum(axis=0)
-        moment = np.sum(mesh.nodes[:, 0] * r.reaction[:, 1]
-                        - mesh.nodes[:, 1] * r.reaction[:, 0])
+        force = r.reaction_force_per_depth.sum(axis=0)
+        moment = np.sum(mesh.nodes[:, 0] * r.reaction_force_per_depth[:, 1]
+                        - mesh.nodes[:, 1] * r.reaction_force_per_depth[:, 0])
         print(name)
         print('  max displacement (m):', np.linalg.norm(r.displacement, axis=1).max())
         print('  mean stress xx, yy, xy (Pa):', r.stress.mean(axis=0))
-        print('  mean sigma_zz (Pa):', r.sigma_zz.mean())
-        print('  elastic energy (J/m):', r.physical_elastic_energy)
+        print('  mean sigma_zz (Pa):', r.stress_zz.mean())
+        print('  elastic energy (J/m):', r.strain_energy_per_depth)
         print('  net support force (N/m):', force)
         print('  net support moment per depth (N):', moment)
     return mesh, results

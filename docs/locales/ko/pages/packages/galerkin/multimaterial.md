@@ -51,8 +51,8 @@ result = solve_steady_heat(
 
 ## 정상 열전도
 
-`galerkin.thermal.solve_steady_heat`는 영역별 `conductivity` k > 0(W/(m K))와
-영역별 상수 `heat_source` Q(W/m^3)를 받습니다. 스칼라와 기존 좌표 콜백 Q는 그대로
+`galerkin.thermal.solve_steady_heat`는 영역별 `thermal_conductivity` k > 0(W/(m K))와
+영역별 상수 `heat_source_density` Q(W/m^3)를 받습니다. 스칼라와 기존 좌표 콜백 Q는 그대로
 입니다. 약형식은 k와 Q가 삼각형마다 상수인 것 말고는 같습니다.
 
 ```text
@@ -123,11 +123,11 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ## 정적 탄성
 
-`galerkin.elasticity.solve_elasticity`는 `young_modulus`(Pa)와 `poisson_ratio`를
+`galerkin.elasticity.solve_elasticity`는 `youngs_modulus`(Pa)와 `poisson_ratio`를
 각각 스칼라 또는 영역 매핑으로 받습니다. 하나는 스칼라, 다른 하나는 매핑이어도 됩니다.
 영역마다 E > 0, -1 < nu < 0.5여야 하며 `plane`('stress' 또는 'strain')은 모든 영역에
 적용됩니다. 요소 행렬은 영역 자신의 `D_e`로 `K_e = A_e B_e^T D_e B_e`이고, 보고하는
-응력은 `D_e` 곱하기 요소 변형률입니다. 체적력, 견인력, Dirichlet 자료, 반력, 잔차 검사는
+응력은 `D_e` 곱하기 요소 변형률입니다. 체적력, 견인력, 처방 변위, 반력, 잔차 검사는
 그대로입니다([elasticity2d](elasticity2d.md), [elasticity_traction](elasticity_traction.md)).
 완전 접합을 가정합니다: 변위는 연속이고, 경계면을 가로지르는 견인력 `sigma.n`은 극한에서만
 연속입니다(요소 상수 P1 응력의 O(h) 점프). 이종 재료 자유단의 경계면 응력 특이성은
@@ -135,12 +135,18 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 `refsol.elasticity_multilayer`(NumPy만 사용)는 정확한 상태 세 가지를 줍니다.
 
-- `laminate_axial`: 하중 방향에 수직으로 쌓은 층, 균일 축 변형률, 자유면. 변위는 연속
+- `laminate_axial(points, *, position, youngs_modulus, poisson_ratio, strain_xx,
+  plane)`: 하중 방향에 수직으로 쌓은 층(`position`은 첫 면을 포함한 y_0 < ... < y_n),
+  균일 축 변형률, 자유면. 변위는 연속
   구간 선형이고 층마다 sigma_xx = E' eps(평면 응력 E' = E, 평면 변형률 E/(1-nu^2)).
-- `series_bar`: 균일 sigma_xx 아래 직렬 층. 모든 층의 측면 변형률이 같을 때만
+- `series_bar(points, *, position, youngs_modulus, poisson_ratio, stress_xx, plane)`:
+  균일 sigma_xx 아래 직렬 층. 모든 층의 측면 변형률이 같을 때만
   정확합니다(평면 응력 nu/E 같음, 평면 변형률 nu(1+nu)/E 같음). 그 밖의 자료는 실제 해가
   경계면 특이성을 가지므로 거부합니다.
-- `composite_cylinder`: 내·외압을 받는 동심 껍질, 껍질마다 u_r = A_i r + B_i/r,
+- `composite_cylinder(points, *, position, youngs_modulus, poisson_ratio, plane,
+  gauge_pressure, linear_expansion_coefficient=None, temperature_change=None)`:
+  반지름 `position` r_0 < ... < r_n의 동심 껍질에 (안, 밖) 계기압 쌍을 가함,
+  껍질마다 u_r = A_i r + B_i/r,
   변위와 반경 응력 연속. 2n개 계수는 작은 밀집 선형계로 구합니다.
 
 정답 시험은 변위의 중심차분으로 등방 법칙, 응력의 중심차분으로 직교좌표 평형, 경계면의
@@ -175,22 +181,22 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ## 열탄성과 열→역학 연성
 
-`galerkin.thermoelasticity.solve_thermoelasticity`는 `thermal_expansion_per_k`(1/K),
-`young_modulus`, `poisson_ratio`를 각각 스칼라 또는 영역 매핑으로 받습니다. 매핑이
+`galerkin.thermoelasticity.solve_thermoelasticity`는 `linear_expansion_coefficient`(1/K),
+`youngs_modulus`, `poisson_ratio`를 각각 스칼라 또는 영역 매핑으로 받습니다. 매핑이
 하나라도 있으면 삼각형 e는 자신의 `D_e`와 열응력 계수(평면 응력 E/(1-nu), 평면 변형률
 E/(1-2nu))를 쓰고, 요소 절점의 열 변형률은 `alpha_e (T - T_ref)`입니다. 열 하중, 중심
-값, `sigma_zz`/`epsilon_zz`, 축약 물리 에너지도 같은 삼각형별 값을 씁니다. 결과는 각
+값, `stress_zz`/`strain_zz`, 축약 물리 에너지도 같은 삼각형별 값을 씁니다. 결과는 각
 재료를 float 또는 `{영역 이름: float}` 사본으로 돌려줍니다. 모두 스칼라인 호출은 원래
 코드 경로를 그대로 씁니다.
 
-`galerkin.thermal_mechanical.solve_steady_thermoelasticity`는 `conductivity`,
-`young_modulus`, `poisson_ratio`, `thermal_expansion_per_k`, 상수 `heat_source`에
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`는 `thermal_conductivity`,
+`youngs_modulus`, `poisson_ratio`, `linear_expansion_coefficient`, 상수 `heat_source_density`에
 매핑을 받습니다. `input` 단계에서 검증하고 열·기계 단계로 넘깁니다. manifest는 재료를
 정렬된 사전으로, 영역별 열원을 `{'kind': 'per_region', 'value': ...}`로 기록하며 스칼라
-manifest는 그대로입니다. `galerkin.transient_thermal_mechanical`도 같은 기계 매핑을
+재료는 float로 남습니다. `galerkin.transient_thermal_mechanical`도 같은 기계 매핑을
 받습니다(영역별 과도 열전도는 별도 단계).
 
-**정답.** `thermal_expansions`와 `temperature_change` 행 (a_i, b_i), dT = a_i +
+**정답.** 껍질별 `linear_expansion_coefficient`와 `temperature_change` 행 (a_i, b_i), dT = a_i +
 b_i ln(r/r_0)를 준 `refsol.elasticity_multilayer.composite_cylinder`: 각 껍질에서
 u_r = kappa_i I(r)/r + A_i r + B_i/r, I = s dT ds의 적분,
 kappa_i = beta_i/(lambda_i+2 mu_i)(평면 변형률 beta = (3 lambda + 2 mu) alpha,
@@ -230,12 +236,12 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ## 과도 열전도
 
-`galerkin.transient_heat.solve_transient_heat`는 `conductivity`(W/(m K)),
-`volumetric_heat_capacity`(J/(m^3 K)), 상수 `heat_source`(W/m^3)를 스칼라 또는 영역
+`galerkin.transient_heat.solve_transient_heat`는 `thermal_conductivity`(W/(m K)),
+`volumetric_heat_capacity`(J/(m^3 K)), 상수 `heat_source_density`(W/m^3)를 스칼라 또는 영역
 매핑으로 받습니다. Q 콜백은 그대로입니다. 일관 질량 `M_e = c_e A_e/12 [[2,1,1],[1,2,1],[1,1,2]]`와
 강성은 삼각형마다 자기 값을 쓰며, backward Euler, offset, 보정, 모든 잔차·수지 검사는
-그대로입니다([transient_heat](transient_heat.md)). 결과는 `conductivity_w_mk`와
-`volumetric_heat_capacity_j_m3k`를 float 또는 `{영역 이름: float}` 사본으로 기록합니다.
+그대로입니다([transient_heat](transient_heat.md)). 결과는 `thermal_conductivity`와
+`volumetric_heat_capacity`를 float 또는 `{영역 이름: float}` 사본으로 기록합니다.
 
 **정답.** `refsol.transient_heat_multilayer.LayeredWall`: 양끝 온도가 고정된 층상 벽,
 T = T_s(x) + sum A_m X_m(x) exp(-lambda_m t). X_m은 X와 k X'가 연속인

@@ -141,12 +141,12 @@ def test_thermoelastic_controls_match_uniform_3d_reductions():
         np.testing.assert_allclose(r.displacement, factor * mesh.nodes, atol=1e-14, rtol=0)
         np.testing.assert_allclose(r.stress[:, :2], inplane, atol=1e-5, rtol=0)
         np.testing.assert_allclose(r.stress[:, 2], 0., atol=1e-5, rtol=0)
-        np.testing.assert_allclose(r.sigma_zz, zz, atol=1e-5, rtol=0)
-        assert r.physical_elastic_energy == pytest.approx(energy, abs=1e-8, rel=1e-12)
-        np.testing.assert_allclose(r.reaction.sum(axis=0), 0., atol=1e-5, rtol=0)
-        moment = np.sum(mesh.nodes[:, 0]*r.reaction[:, 1] - mesh.nodes[:, 1]*r.reaction[:, 0])
+        np.testing.assert_allclose(r.stress_zz, zz, atol=1e-5, rtol=0)
+        assert r.strain_energy_per_depth == pytest.approx(energy, abs=1e-8, rel=1e-12)
+        np.testing.assert_allclose(r.reaction_force_per_depth.sum(axis=0), 0., atol=1e-5, rtol=0)
+        moment = np.sum(mesh.nodes[:, 0]*r.reaction_force_per_depth[:, 1] - mesh.nodes[:, 1]*r.reaction_force_per_depth[:, 0])
         assert abs(moment) < 1e-5
-    assert np.linalg.norm(results['blocked_plane_strain'].reaction) > 1e6
+    assert np.linalg.norm(results['blocked_plane_strain'].reaction_force_per_depth) > 1e6
 
 
 def test_run_record_preserves_inputs_and_detects_changed_output(tmp_path, monkeypatch):

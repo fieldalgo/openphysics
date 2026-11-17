@@ -154,8 +154,8 @@ def test_elasticity_p1_three_region_bar_same_mesh(skfem, plane):
     dirichlet = {(int(i), c): 0. for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=dict(zip(NAMES, e)), poisson_ratio=dict(zip(NAMES, nu)),
-                                plane=plane, dirichlet=dirichlet, body_force=body)
+        ours = solve_elasticity(mesh, youngs_modulus=dict(zip(NAMES, e)), poisson_ratio=dict(zip(NAMES, nu)),
+                                plane=plane, prescribed_displacement=dirichlet, body_force_density=body)
     with clock("reference"):
         displacement, stress = _skfem_mechanics(skfem, mesh, plane, _per_triangle(mesh, e),
                                                 _per_triangle(mesh, nu), body=body)
@@ -185,10 +185,10 @@ def test_thermoelasticity_p1_three_region_bar_same_mesh(skfem, plane):
     dirichlet = {(int(i), c): 0. for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_thermoelasticity(mesh, freeze_temperature(mesh, temperature), reference_temperature_k=tref,
-                                      thermal_expansion_per_k=dict(zip(NAMES, alpha)),
-                                      young_modulus=dict(zip(NAMES, e)), poisson_ratio=dict(zip(NAMES, nu)),
-                                      plane=plane, dirichlet=dirichlet)
+        ours = solve_thermoelasticity(mesh, freeze_temperature(mesh, temperature=temperature), stress_free_temperature=tref,
+                                      linear_expansion_coefficient=dict(zip(NAMES, alpha)),
+                                      youngs_modulus=dict(zip(NAMES, e)), poisson_ratio=dict(zip(NAMES, nu)),
+                                      plane=plane, prescribed_displacement=dirichlet)
     with clock("reference"):
         et, nut, at = (_per_triangle(mesh, v) for v in (e, nu, alpha))
         beta = et * at / ((1 - nut) if plane == "stress" else (1 - 2 * nut))

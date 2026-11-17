@@ -11,23 +11,23 @@
 ## API와 SI 계약
 
 ```python
-snapshot = freeze_temperature(mesh, temperature_k)
+snapshot = freeze_temperature(mesh, temperature=nodal_temperature)
 result = solve_thermoelasticity(
-    mesh, snapshot, reference_temperature_k=293.15,
-    thermal_expansion_per_k=12e-6, young_modulus=70e9,
+    mesh, snapshot, stress_free_temperature=293.15,
+    linear_expansion_coefficient=12e-6, youngs_modulus=70e9,
     poisson_ratio=0.3, plane="strain",
-    dirichlet={(0, 0): 0., (0, 1): 0., (nx, 1): 0.})
+    prescribed_displacement={(0, 0): 0., (0, 1): 0., (nx, 1): 0.})
 ```
 
-이 예제의 지지는 원래 절점 순서를 유지한 `rectangle_mesh(1., 1., nx, ny)`를 가정합니다. 완전한 실행 예제는 `examples/galerkin/prescribed_temperature_thermoelasticity.py`입니다. 좌표·변위는 m, Young 계수·응력은 Pa, 변형률은 무차원이고 alpha는 부호를 가질 수 있는 1/K입니다. T는 K 단위의 유한 비음수 실수 `(N,)` 배열, Tref는 유한 비음수 실수 스칼라 K입니다. 냉각, alpha=0과 음수 alpha를 허용합니다. 유한한 E>0, -1<nu<0.5와 명시적 plane=`"stress"` 또는 `"strain"`이 필요합니다. 섭씨 변환, 스칼라 온도 broadcast 또는 단위 추론은 없습니다.
+이 예제의 지지는 원래 절점 순서를 유지한 `rectangle_mesh(1., 1., nx, ny)`를 가정합니다. 완전한 실행 예제는 `examples/galerkin/prescribed_temperature_thermoelasticity.py`입니다. 좌표·변위는 m, Young 계수·응력은 Pa, 변형률은 무차원이고 alpha는 부호를 가질 수 있는 1/K입니다. T는 K 단위의 유한 비음수 실수 `(N,)` 배열, Tref는 유한 비음수 실수 스칼라 K입니다. 냉각, alpha=0과 음수 alpha를 허용합니다. 유한한 E>0, -1<nu<0.5와 명시적 plane=`"stress"` 또는 `"strain"`이 필요합니다. 섭씨 변환, 스칼라 온도 broadcast 또는 단위 추론은 없습니다. 모든 물리량은 registry 이름(`temperature`, `stress_free_temperature`, `linear_expansion_coefficient`, `youngs_modulus`, `poisson_ratio`, `prescribed_displacement`, `body_force_density`)의 keyword 전용 SI 숫자이며 `str` 값은 `TypeError`를 냅니다.
 
-체적력은 유한한 2성분 벡터 또는 `(Q,2)` 좌표를 받아 `(Q,2)` 힘 밀도 N/m^3를 반환하는 callable입니다. 탄성 체적 하중과 같은 축당 6점 Duffy 구적법으로 적분합니다. 메시는 벡터 절점 변위를 갖는 삼각형이며 DOF 순서는 `[ux0, uy0, ux1, uy1, ...]`입니다. Dirichlet는 외곽 `(node, component)`를 변위 m에 대응시킵니다. 성분은 0=x, 1=y입니다. 적용한 traction 매핑이 없으면 나머지 성분에는 **총 열탄성 natural traction이 0**입니다. 선택적인 전역 Cartesian total-traction 매핑은 [traction 계약](thermoelastic_traction.md)을 참고하세요. 스칼라 pressure 전용·로컬 프레임·follower API는 없지만 고정 경계에서 전역 Pa callback `lambda points_m, normals: -p * normals`는 유효합니다.
+`body_force_density`(기본값 `None`, 체적력 없음)는 유한한 2성분 벡터 또는 `(Q,2)` 좌표를 받아 `(Q,2)` 힘 밀도 N/m^3를 반환하는 callable입니다. 탄성 체적 하중과 같은 축당 6점 Duffy 구적법으로 적분합니다. 메시는 벡터 절점 변위를 갖는 삼각형이며 DOF 순서는 `[ux0, uy0, ux1, uy1, ...]`입니다. `prescribed_displacement`는 외곽 `(node, component)`를 변위 m에 대응시킵니다. 성분은 0=x, 1=y입니다. 적용한 traction 매핑이 없으면 나머지 성분에는 **총 열탄성 natural traction이 0**입니다. 선택적인 전역 Cartesian total-traction 매핑은 [traction 계약](thermoelastic_traction.md)을 참고하세요. 스칼라 pressure 전용·로컬 프레임·follower API는 없지만 고정 경계에서 전역 Pa callback `lambda points_m, normals: -p * normals`는 유효합니다.
 
 하중·반력은 면외 두께당 선하중 N/m입니다. 실제 두께(m)를 곱하면 N입니다. 물리적 탄성에너지는 J/m이며 두께를 곱하면 J입니다. 이 힘의 모멘트는 N, 즉 두께당 모멘트입니다. 열 등가 하중은 약형의 기여 항이며 추가적인 물리적 외력이 아닙니다. 체적 하중과 지지 반력을 구분해 보고합니다.
 
 ## 동결 장의 식별
 
-`TemperatureSnapshot`은 좌표, connectivity, 절점·요소 순서와 T를 canonical little-endian float64/int64의 immutable bytes-backed 배열로 복사합니다. schema1, `length_unit="m"`, `temperature_unit="K"`와 mesh·temperature·combined 재현 fingerprint를 저장합니다. fingerprint는 version tag와 length framing을 갖는 FNV-1a64 checksum이며 암호학적 서명이나 출처 인증이 아닙니다. 실제 메시 배열도 정확히 비교하므로 checksum 충돌로 다른 기하를 허용할 수 없습니다. 동일 배열을 복사한 메시는 허용하지만 좌표, scale, 순서, connectivity, schema, 단위나 동결 데이터를 바꾸면 거절합니다. 원래 온도 입력 배열을 변이해도 snapshot은 유지되며 온도를 바꾸려면 다시 freeze해야 합니다. 이 API는 잘못 표시한 단위를 탐지하거나 직접 입력의 취득 경위를 인증하지 못합니다. Python의 의도적인 저수준 객체 변이는 불변성 계약 밖이며 검출한 metadata·배열·checksum 손상은 거절합니다.
+`TemperatureSnapshot`은 좌표, connectivity, 절점·요소 순서와 T를 canonical little-endian float64/int64의 immutable bytes-backed 배열로 복사합니다. schema1, 읽기 전용 `units` 매핑 `{"nodes": "m", "temperature": "K"}`와 mesh·temperature·combined 재현 fingerprint를 저장하며 절점 값은 `snapshot.temperature`입니다. fingerprint는 version tag와 length framing을 갖는 FNV-1a64 checksum이며 암호학적 서명이나 출처 인증이 아닙니다. 실제 메시 배열도 정확히 비교하므로 checksum 충돌로 다른 기하를 허용할 수 없습니다. 동일 배열을 복사한 메시는 허용하지만 좌표, scale, 순서, connectivity, schema, 단위나 동결 데이터를 바꾸면 거절합니다. 원래 온도 입력 배열을 변이해도 snapshot은 유지되며 온도를 바꾸려면 다시 freeze해야 합니다. 이 API는 잘못 표시한 단위를 탐지하거나 직접 입력의 취득 경위를 인증하지 못합니다. Python의 의도적인 저수준 객체 변이는 불변성 계약 밖이며 검출한 metadata·배열·checksum 손상은 거절합니다.
 
 ## 구성식 축약과 약형
 
@@ -50,11 +50,11 @@ lambda=E nu/[(1+nu)(1-2nu)]는 원래 3D Lamé 상수입니다. 물리적 열변
 
 ## 결과 위치, 재구성과 에너지
 
-`displacement`의 shape은 `(N,2)`입니다. `total_strain`은 요소별 상수 `(M,3)`입니다. `thermal_strain`, `elastic_strain`, `stress`는 centroid의 `(M,3)`, `sigma_zz`와 `epsilon_zz`는 centroid의 `(M,)`입니다. `load_external`, `load_thermal`, `reaction`, `residual`은 별개의 `(N,2)` 배열입니다. `load_total`은 앞의 두 하중을 더한 값입니다. 반력은 처방 DOF에서만 `Ku-f_body-g`이며 나머지에서 0입니다. residual은 모든 DOF의 값을 유지합니다.
+`displacement`의 shape은 `(N,2)`입니다. `strain`은 요소별 상수 `(M,3)`입니다. `thermal_strain`, `elastic_strain`, `stress`는 centroid의 `(M,3)`, `stress_zz`와 `strain_zz`는 centroid의 `(M,)`입니다. `applied_force_per_depth`, `thermal_equivalent_force_per_depth`, `reaction_force_per_depth`, `residual_force_per_depth`는 별개의 `(N,2)` 배열(깊이당 N/m)입니다. 전체 하중은 앞의 두 하중을 더한 값이며 별도 필드는 없습니다. `result.units`는 각 물리량 필드를 SI 단위로 매핑합니다. 반력은 처방 DOF에서만 `Ku-f_body-g`이며 나머지에서 0입니다. residual은 모든 DOF의 값을 유지합니다.
 
 요소의 barycentric 좌표 l에서 T(l)=sum l_i T_i, a(l)=alpha(T(l)-Tref)로 재구성합니다. 열변형률=a(l)m, 탄성 변형률=e-a(l)m, sigma(l)=D e-q(l)m이며 sigma_zz/epsilon_zz는 표의 식을 사용합니다. 따라서 응력은 일반적으로 요소 내부에서 선형입니다. centroid 응력을 완전한 조각별 상수 응력장으로 해석해서는 안 됩니다. 응력 smoothing이나 절점 recovery는 사용하지 않습니다.
 
-`physical_elastic_energy`는 선택한 축약을 적용한 원래 3D 탄성에너지를 적분합니다. 요소 에너지 밀도는 다음과 같습니다.
+`strain_energy_per_depth`는 선택한 축약을 적용한 원래 3D 탄성에너지를 적분합니다. 요소 에너지 밀도는 다음과 같습니다.
 
 - PS: `.5 (e-a m)^T D (e-a m)`;
 - PE: `.5 (e-(1+nu)a m)^T D (e-(1+nu)a m) + .5 E a^2`.

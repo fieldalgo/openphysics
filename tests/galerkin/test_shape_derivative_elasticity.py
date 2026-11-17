@@ -75,8 +75,8 @@ def _plate():
 
 
 def _plate_solve(m, W, t, plane="stress"):
-    return solve_elasticity(m, young_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28},
-                            plane=plane, dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
+    return solve_elasticity(m, youngs_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28},
+                            plane=plane, prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4),
                             traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
 
@@ -84,8 +84,8 @@ def _functionals(m, r, xp):
     tip = int(np.argmin(np.hypot(m.nodes[:, 0] - 1.0, m.nodes[:, 1] - 0.2)))
     left = np.asarray([int(i) for i in m.boundary["left"]])
     return {"tip_uy": lambda: r.displacement[tip, 1],
-            "reaction_x": lambda: xp.sum(r.reaction[left, 0]),
-            "energy": lambda: 0.5 * xp.sum(r.load * r.displacement)}
+            "reaction_x": lambda: xp.sum(r.reaction_force_per_depth[left, 0]),
+            "energy": lambda: 0.5 * xp.sum(r.applied_force_per_depth * r.displacement)}
 
 
 # ---------------------------------------------------------------- M1 discrete consistency
@@ -125,7 +125,7 @@ def test_m2_uniaxial_bar_length(name):
     tip = np.asarray([int(i) for i in m.boundary["right"]])
 
     def delta(t):
-        r = solve_elasticity(m, young_modulus=E, poisson_ratio=0.3, plane="stress", dirichlet=dirichlet,
+        r = solve_elasticity(m, youngs_modulus=E, poisson_ratio=0.3, plane="stress", prescribed_displacement=dirichlet,
                              traction={"right": (sigma, 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
@@ -148,8 +148,8 @@ def test_m3_series_bar_interface(name):
     tip = np.asarray([int(i) for i in m.boundary["right"]])
 
     def delta(t):
-        r = solve_elasticity(m, young_modulus={"a": E1, "b": E2}, poisson_ratio=0.0, plane="stress",
-                             dirichlet=dirichlet, traction={"right": (sigma, 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
+        r = solve_elasticity(m, youngs_modulus={"a": E1, "b": E2}, poisson_ratio=0.0, plane="stress",
+                             prescribed_displacement=dirichlet, traction={"right": (sigma, 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
     value, grad = _gradient(name, delta)
@@ -205,9 +205,9 @@ def test_m4_thick_cylinder_inner_radius(name):
         dirichlet = {(int(i), c): float(U0 * radial[k, c]) for k, i in enumerate(nodes) for c in (0, 1)}
 
         def force(t):
-            r = solve_elasticity(mesh, young_modulus=E, poisson_ratio=nu, plane="strain", dirichlet=dirichlet,
+            r = solve_elasticity(mesh, youngs_modulus=E, poisson_ratio=nu, plane="strain", prescribed_displacement=dirichlet,
                                  motion=MeshMotion(design_velocity=W, t=t))
-            return xp.sum(r.reaction[nodes] * xp.asarray(radial))
+            return xp.sum(r.reaction_force_per_depth[nodes] * xp.asarray(radial))
 
         value, grad = _gradient(name, force)
         errors.append(rel(grad, exact))
@@ -227,7 +227,7 @@ def test_m5_rigid_translation(name, functional):
 
     def objective(t):
         r = _plate_solve(m, W, t)
-        return 0.5 * xp.sum(r.load * r.displacement) if functional == "energy" else xp.sum(r.displacement)
+        return 0.5 * xp.sum(r.applied_force_per_depth * r.displacement) if functional == "energy" else xp.sum(r.displacement)
 
     value, grad = _gradient(name, objective)
     assert abs(grad) <= 1e-12 * abs(value)
@@ -247,7 +247,7 @@ def test_m6_energy_identity_along_the_motion(name):
 
     def work(t):
         r = _plate_solve(m, W, t)
-        return 0.5 * xp.sum(r.load * r.displacement)
+        return 0.5 * xp.sum(r.applied_force_per_depth * r.displacement)
 
     _u, d_u = _gradient(name, strain_energy)
     _w, d_w = _gradient(name, work)
@@ -269,10 +269,10 @@ def test_m7_unchanged_without_motion():
 
     def digest(r):
         return hashlib.sha256(b"".join(np.ascontiguousarray(getattr(r, f), dtype=float).tobytes() for f in
-                                       ("displacement", "strain", "stress", "load", "reaction", "residual"))).hexdigest()
+                                       ("displacement", "strain", "stress", "applied_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth"))).hexdigest()
 
-    kw = dict(young_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28}, plane="stress",
-              dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)})
+    kw = dict(youngs_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28}, plane="stress",
+              prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)})
     assert digest(solve_elasticity(m, **kw)) == digest(solve_elasticity(m, **kw, motion=None))
 
 
@@ -282,32 +282,32 @@ def test_m8_refusals():
     xp = _xp("jax")
     m, W = _plate()
     t = xp.asarray(0.0)
-    common = dict(young_modulus=70e9, poisson_ratio=0.33, plane="stress", dirichlet=_clamped_left(m))
+    common = dict(youngs_modulus=70e9, poisson_ratio=0.33, plane="stress", prescribed_displacement=_clamped_left(m))
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         solve_elasticity(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match="body_force is a callback"):
-        solve_elasticity(m, **common, body_force=lambda p: np.zeros((len(p), 2)), motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(TypeError, match="body_force_density is a callback"):
+        solve_elasticity(m, **common, body_force_density=lambda p: np.zeros((len(p), 2)), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"traction\['right'\] is a callback"):
         solve_elasticity(m, **common, traction={"right": lambda p, n: np.zeros((len(p), 2))}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"traction\['right'\] is live"):
         solve_elasticity(m, **common, traction={"right": (xp.asarray(1.0), 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="body_force is live"):
-        solve_elasticity(m, **common, body_force=(0.0, xp.asarray(-1.0)), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="young_modulus is live"):
-        solve_elasticity(m, young_modulus=xp.asarray(70e9), poisson_ratio=0.33, plane="stress",
-                         dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="Dirichlet displacement is live"):
-        solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress",
-                         dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)},
+    with pytest.raises(TypeError, match="body_force_density is live"):
+        solve_elasticity(m, **common, body_force_density=(0.0, xp.asarray(-1.0)), motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(TypeError, match="youngs_modulus is live"):
+        solve_elasticity(m, youngs_modulus=xp.asarray(70e9), poisson_ratio=0.33, plane="stress",
+                         prescribed_displacement=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(TypeError, match="prescribed_displacement is live"):
+        solve_elasticity(m, youngs_modulus=70e9, poisson_ratio=0.33, plane="stress",
+                         prescribed_displacement={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)},
                          motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="poisson_ratio is live"):
-        solve_elasticity(m, young_modulus=70e9, poisson_ratio={"host": xp.asarray(0.33), "core": 0.28},
-                         plane="stress", dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
+        solve_elasticity(m, youngs_modulus=70e9, poisson_ratio={"host": xp.asarray(0.33), "core": 0.28},
+                         plane="stress", prescribed_displacement=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="poisson_ratio is a callback; with a motion it must be a finite real scalar"):
-        solve_elasticity(m, young_modulus=70e9, poisson_ratio=lambda p: 0.3, plane="stress",
-                         dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(ValueError, match="dirichlet must map"):
-        solve_elasticity(m, **{**common, "dirichlet": [((0, 0), 0.0)]}, motion=MeshMotion(design_velocity=W, t=t))
+        solve_elasticity(m, youngs_modulus=70e9, poisson_ratio=lambda p: 0.3, plane="stress",
+                         prescribed_displacement=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(ValueError, match="prescribed_displacement must map"):
+        solve_elasticity(m, **{**common, "prescribed_displacement": [((0, 0), 0.0)]}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="traction must map boundary edge tags"):
         solve_elasticity(m, **common, traction=[("right", (1.0, 0.0))], motion=MeshMotion(design_velocity=W, t=t))
 
@@ -318,7 +318,7 @@ def test_review_jax_without_x64_is_named():
     jax.config.update("jax_enable_x64", False)
     try:
         with pytest.raises(ValueError, match="galerkin needs float64"):
-            solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress", dirichlet=_clamped_left(m),
+            solve_elasticity(m, youngs_modulus=70e9, poisson_ratio=0.33, plane="stress", prescribed_displacement=_clamped_left(m),
                              motion=MeshMotion(design_velocity=W, t=jax.numpy.asarray(0.0)))
     finally:
         jax.config.update("jax_enable_x64", True)

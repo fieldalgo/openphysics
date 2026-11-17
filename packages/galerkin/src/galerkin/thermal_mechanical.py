@@ -4,9 +4,12 @@
 
 No persistence, unit conversion, source authentication, or thermodynamic coupling.
 Import this submodule explicitly; existing component APIs remain unchanged.
+Quantities are keyword-only registry names in SI units (the units convention of the
+galerkin step); a str for a quantity raises TypeError. The manifest's keys are
+registry names (schema ``galerkin-steady-thermoelasticity-v2``).
 """
-from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 import json
 import numpy as np
 
@@ -17,8 +20,19 @@ from ._thermal_mechanical_common import check_mesh_unchanged, dirichlet_supports
 from .materials import is_per_region, region_property
 from .thermal import solve_steady_heat_outward
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
+from ._public import ResultSurface, refuse_text
 
 __all__ = ["WorkflowStageError", "SteadyThermoelasticResult", "solve_steady_thermoelasticity"]
+
+#: the manifest schema; v2 (the galerkin step, L2 commit 8) writes registry names where v1 wrote
+#: unit-suffixed keys (conductivity_w_mk, young_modulus_pa, ...) and drops the units= argument
+SCHEMA = 'galerkin-steady-thermoelasticity-v2'
+#: the canonical unit of each quantity the manifest's inputs name (node_coordinates: the mesh
+#: its 'mesh' section hashes)
+INPUT_UNITS = MappingProxyType({
+    'node_coordinates': 'm', 'thermal_conductivity': 'W/(m K)', 'youngs_modulus': 'Pa', 'poisson_ratio': '1',
+    'linear_expansion_coefficient': '1/K', 'stress_free_temperature': 'K', 'prescribed_temperature': 'K',
+    'prescribed_displacement': 'm', 'heat_source_density': 'W/m^3', 'body_force_density': 'N/m^3'})
 
 
 class WorkflowStageError(ValueError):
@@ -49,12 +63,17 @@ def _input_record(value):
 
 
 @dataclass(frozen=True)
-class SteadyThermoelasticResult:
+class SteadyThermoelasticResult(ResultSurface):
     """Aggregate at return time; component arrays/owned mesh remain mutable.
 
     temperature_snapshot and canonical manifest JSON are immutable copies.
     There is no post-return certification of mutable component results.
+    Its fields are objects (``.units`` is empty); ``heat.units`` and ``mechanics.units``
+    give the units of the stage results.
     """
+    UNITS = MappingProxyType({})
+    BASIS = "planar"
+
     reference_mesh: Mesh
     heat: object
     temperature_snapshot: object
@@ -67,59 +86,75 @@ class SteadyThermoelasticResult:
         return json.loads(self.manifest_json)
 
 
-def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichlet,
-                                 heat_source=0.0, young_modulus, poisson_ratio,
-                                 plane, thermal_expansion_per_k, reference_temperature_k,
-                                 mechanical_dirichlet, body_force=(0., 0.), motion=None):
+#: the quantity parameters of solve_steady_thermoelasticity, refused as text (SI numbers only)
+_QUANTITIES = ('thermal_conductivity', 'prescribed_temperature', 'heat_source_density', 'youngs_modulus',
+               'poisson_ratio', 'linear_expansion_coefficient', 'stress_free_temperature', 'prescribed_displacement',
+               'body_force_density')
+
+
+def solve_steady_thermoelasticity(mesh, *, thermal_conductivity, prescribed_temperature,
+                                 heat_source_density=None, youngs_modulus, poisson_ratio,
+                                 plane, linear_expansion_coefficient, stress_free_temperature,
+                                 prescribed_displacement, body_force_density=None, motion=None):
     """Run existing heat/freeze/mechanics APIs on one isolated SI reference mesh.
 
-    units must equal {'length':'m','temperature':'K'}; no conversion/inference.
-    Constant k W/(m K), E Pa, nu, signed alpha 1/K, nonnegative Tref K.
-    k, E, nu, alpha and a constant heat_source may each be {region name: value}
-    over mesh.region_names (piecewise constant; docs/packages/galerkin/multimaterial.md).
-    Heat uses Dirichlet + insulation. Mechanics uses component Dirichlet and
-    zero total natural traction; body force N/m^3. See the complete EN/KO guide.
-    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 +
-    t*velocity, solving the heat stage again on the moving mesh, and every heat
-    and mechanics result carries the derivative with respect to the JAX or
-    PyTorch scalar t (docs/packages/galerkin/shape_derivative.md).
+    SI only, no conversion or inference. Constant thermal_conductivity W/(m K),
+    youngs_modulus Pa, poisson_ratio, signed linear_expansion_coefficient 1/K,
+    nonnegative stress_free_temperature K. thermal_conductivity, youngs_modulus,
+    poisson_ratio, linear_expansion_coefficient and a constant heat_source_density
+    (W/m^3) may each be {region name: value} over mesh.region_names (piecewise
+    constant; docs/packages/galerkin/multimaterial.md). heat_source_density=None is
+    no source. Heat uses prescribed_temperature + insulation. Mechanics uses the
+    component prescribed_displacement and zero total natural traction;
+    body_force_density None (no body force), a constant (2,) or a callable, N/m^3.
+    See the complete EN/KO guide.
+    motion=galerkin.shape.MeshMotion(design_velocity=W, t=t) solves on the nodes X0 +
+    t*W, solving the heat stage again on the moving mesh, and every heat and
+    mechanics result carries the derivative with respect to the JAX or PyTorch
+    scalar t (docs/packages/galerkin/shape_derivative.md).
     """
+    for name, value in zip(_QUANTITIES, (thermal_conductivity, prescribed_temperature, heat_source_density,
+                                         youngs_modulus, poisson_ratio, linear_expansion_coefficient,
+                                         stress_free_temperature, prescribed_displacement, body_force_density)):
+        refuse_text(name, value)
+    heat_source = 0.0 if heat_source_density is None else heat_source_density
+    body_force = (0., 0.) if body_force_density is None else body_force_density
     if motion is not None:
-        from .shape import solve_steady_thermoelasticity_moving
+        from ._moving import solve_steady_thermoelasticity_moving
         return solve_steady_thermoelasticity_moving(
-            mesh, motion, units=units, conductivity=conductivity, thermal_dirichlet=thermal_dirichlet,
-            heat_source=heat_source, young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
-            thermal_expansion_per_k=thermal_expansion_per_k, reference_temperature_k=reference_temperature_k,
-            mechanical_dirichlet=mechanical_dirichlet, body_force=body_force)
+            mesh, motion, thermal_conductivity=thermal_conductivity, prescribed_temperature=prescribed_temperature,
+            heat_source_density=heat_source, youngs_modulus=youngs_modulus, poisson_ratio=poisson_ratio,
+            plane=plane, linear_expansion_coefficient=linear_expansion_coefficient,
+            stress_free_temperature=stress_free_temperature, prescribed_displacement=prescribed_displacement,
+            body_force_density=body_force)
     chain = OneWayChain(_stage_error)
     with chain.stage('input'):
-        if not isinstance(units, Mapping) or dict(units) != {'length': 'm', 'temperature': 'K'}:
-            raise ValueError("units must be exactly {'length':'m','temperature':'K'}; convert inputs explicitly")
         owned = isolated_mesh(mesh)
         state = mesh_state(owned)
-        k = _material(owned, conductivity, 'conductivity', positive=True)
-        e = _material(owned, young_modulus, 'young_modulus', positive=True)
+        k = _material(owned, thermal_conductivity, 'thermal_conductivity', positive=True)
+        e = _material(owned, youngs_modulus, 'youngs_modulus', positive=True)
         nu = _material(owned, poisson_ratio, 'poisson_ratio', lower=-1., upper=.5)
-        alpha = _material(owned, thermal_expansion_per_k, 'thermal_expansion_per_k')
-        tref = real_scalar(reference_temperature_k, 'reference_temperature_k')
+        alpha = _material(owned, linear_expansion_coefficient, 'linear_expansion_coefficient')
+        tref = real_scalar(stress_free_temperature, 'stress_free_temperature')
         scalars = [v for v in (k, e) if not isinstance(v, dict)]
         if (any(v <= 0 for v in scalars) or (not isinstance(nu, dict) and not -1 < nu < .5)
                 or tref < 0 or plane not in ('stress', 'strain')):
-            raise ValueError('require k>0, E>0, -1<nu<.5, Tref>=0K and plane stress/strain')
-        heat_bc = dirichlet_supports(thermal_dirichlet)
-        mechanical_bc = dirichlet_supports(mechanical_dirichlet, vector=True)
+            raise ValueError('require thermal_conductivity > 0, youngs_modulus > 0, -1 < poisson_ratio < 0.5, '
+                             "stress_free_temperature >= 0 K and plane 'stress' or 'strain'")
+        heat_bc = dirichlet_supports(prescribed_temperature)
+        mechanical_bc = dirichlet_supports(prescribed_displacement, vector=True)
         source = (heat_source if callable(heat_source)
-                  else _material(owned, heat_source, 'heat_source'))
-        body = body_force if callable(body_force) else real_array(body_force, 'body_force')
+                  else _material(owned, heat_source, 'heat_source_density'))
+        body = body_force if callable(body_force) else real_array(body_force, 'body_force_density')
         if not callable(body) and body.shape != (2,):
-            raise ValueError('constant body_force must have shape (2,)')
+            raise ValueError('constant body_force_density must have shape (2,)')
         # Capture configuration before external callbacks can mutate caller inputs.
-        inputs = {'materials': {'conductivity_w_mk': k, 'young_modulus_pa': e,
-                               'poisson_ratio': nu, 'thermal_expansion_per_k': alpha,
-                               'reference_temperature_k': tref, 'plane': plane},
-                  'thermal_dirichlet': [[i, v] for i, v in sorted(heat_bc.items())],
-                  'mechanical_dirichlet': [[i, c, v] for (i, c), v in sorted(mechanical_bc.items())],
-                  'heat_source_w_m3': _input_record(source), 'body_force_n_m3': _input_record(body)}
+        inputs = {'materials': {'thermal_conductivity': k, 'youngs_modulus': e,
+                               'poisson_ratio': nu, 'linear_expansion_coefficient': alpha,
+                               'stress_free_temperature': tref, 'plane': plane},
+                  'prescribed_temperature': [[i, v] for i, v in sorted(heat_bc.items())],
+                  'prescribed_displacement': [[i, c, v] for (i, c), v in sorted(mechanical_bc.items())],
+                  'heat_source_density': _input_record(source), 'body_force_density': _input_record(body)}
     with chain.stage('heat'):
         heat = solve_steady_heat_outward(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
         # The mechanical stage computes with NumPy; a live heat input would lose its derivative.
@@ -128,9 +163,9 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
     with chain.stage('transfer'):
         raw = np.asarray(heat.temperature)
         if raw.shape != (len(owned.nodes),):
-            raise ValueError(f'heat temperature_k must have shape ({len(owned.nodes)},), got {raw.shape}')
+            raise ValueError(f'heat temperature must have shape ({len(owned.nodes)},), got {raw.shape}')
         if raw.dtype.kind not in 'iuf':
-            raise ValueError('heat temperature_k must be a real numeric nodal array')
+            raise ValueError('heat temperature must be a real numeric nodal array')
         invalid = np.flatnonzero(~np.isfinite(raw))
         if len(invalid):
             node = int(invalid[0])
@@ -147,18 +182,18 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
         # Same-mesh identity transfer of the nodal Kelvin field; the snapshot
         # below adds its immutable fingerprinted form for mechanics.
         nodal = transfer(Field(owned, temperature, location='node', unit='K',
-                               name='heat temperature_k'), owned)
-        snapshot = freeze_temperature(owned, nodal.values)
-        if not np.array_equal(snapshot.temperature_k, temperature):
+                               name='heat temperature'), owned)
+        snapshot = freeze_temperature(owned, temperature=nodal.values)
+        if not np.array_equal(snapshot.temperature, temperature):
             raise ValueError('temperature transfer did not preserve exact nodal values')
     with chain.stage('mechanics'):
-        mechanics = solve_thermoelasticity(owned, snapshot, reference_temperature_k=tref,
-            thermal_expansion_per_k=alpha, young_modulus=e, poisson_ratio=nu, plane=plane,
-            dirichlet=mechanical_bc, body_force=body)
+        mechanics = solve_thermoelasticity(owned, snapshot, stress_free_temperature=tref,
+            linear_expansion_coefficient=alpha, youngs_modulus=e, poisson_ratio=nu, plane=plane,
+            prescribed_displacement=mechanical_bc, body_force_density=body)
         check_mesh_unchanged(owned, state)
     with chain.stage('manifest'):
-        manifest = {'schema': 'galerkin-steady-thermoelasticity-v1',
-            'units': {'length': 'm', 'temperature': 'K'}, 'inputs': inputs,
+        manifest = {'schema': SCHEMA,
+            'units': {**INPUT_UNITS, **heat.units, **mechanics.units}, 'inputs': inputs,
             'mesh': {'nodes': len(owned.nodes), 'triangles': len(owned.triangles),
                      'mesh_hash': snapshot.mesh_hash,
                      'boundary': {k: v.tolist() for k, v in state[2].items()},
@@ -169,8 +204,6 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
             'stages': {stage: 'completed' for stage in chain.completed if stage != 'input'},
             'origin': 'workflow_owned_heat_call', 'authentication': 'not_certified',
             'callback_policy': 'caller_provided_unfingerprinted',
-            'post_return_integrity': 'not_certified_mutable_component_results',
-            'quantity_units': {'heat_load_reaction_residual': 'W/m', 'heat_flux': 'W/m^2',
-                               'mechanical_load_reaction_residual': 'N/m', 'physical_elastic_energy': 'J/m'}}
+            'post_return_integrity': 'not_certified_mutable_component_results'}
         encoded = json.dumps(manifest, sort_keys=True, separators=(',', ':'), allow_nan=False)
     return SteadyThermoelasticResult(owned, heat, snapshot, mechanics, encoded)

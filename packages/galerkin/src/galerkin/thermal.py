@@ -207,7 +207,7 @@ def solve_steady_heat_outward(mesh, *, conductivity, dirichlet, heat_source=0.0,
     PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
     if motion is not None:
-        from .shape import solve_steady_heat_moving
+        from ._moving import solve_steady_heat_moving
         return solve_steady_heat_moving(mesh, motion, thermal_conductivity=conductivity,
                                         prescribed_temperature=dirichlet, heat_source_density=heat_source,
                                         outward_heat_flux=outward_flux, convection=convection,

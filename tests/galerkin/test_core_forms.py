@@ -207,7 +207,7 @@ def test_vector_p1_stiffness_is_elasticity(plane):
     mesh = MESH2D["annulus"]
     p, t, area, *_ = triangle_geometry(mesh, counterclockwise=False)
     bmat, dofs = vector_strain(p, t)
-    d = constitutive_matrix(2.0e9, 0.3, plane=plane)
+    d = constitutive_matrix(youngs_modulus=2.0e9, poisson_ratio=0.3, plane=plane)
     expected, _ = stiffness_and_stress(bmat, d, area)
     assert np.array_equal(kernels.vector_p1_stiffness(bmat, d, area), expected)
     per_cell = np.broadcast_to(d, (len(t), 3, 3)) * RNG.uniform(0.5, 2, len(t))[:, None, None]

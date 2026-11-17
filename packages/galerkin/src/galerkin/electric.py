@@ -184,7 +184,7 @@ def solve_steady_electric_outward(mesh, *, conductivity, dirichlet, outward_curr
         docs/packages/galerkin/shape_derivative.md.
     """
     if motion is not None:
-        from .shape import solve_steady_electric_moving
+        from ._moving import solve_steady_electric_moving
         return solve_steady_electric_moving(mesh, motion, electrical_conductivity=conductivity,
                                             prescribed_electric_potential=dirichlet,
                                             outward_current_density=outward_current,

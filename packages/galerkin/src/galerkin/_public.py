@@ -50,6 +50,17 @@ def refuse_text(name: str, value) -> None:
                         f"physmat.units.q('...', {name!r})")
 
 
+def refuse_tagged_text(name: str, value) -> None:
+    """``refuse_text`` for a mapping of boundary edge tags (such as ``traction``).
+
+    Its tags are text by design and are not looked at; a value that is neither a mapping nor
+    text is left for the solver to refuse ("must map boundary edge tags"), as the inward
+    boundary mappings are by ``outward_from_inward``.
+    """
+    if value is None or isinstance(value, (Mapping, str, bytes)):
+        refuse_text(name, value)
+
+
 def _is_constant_number(value) -> bool:
     if isinstance(value, (bool, np.bool_)):
         return False

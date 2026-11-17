@@ -106,8 +106,10 @@ uses another module's private (underscore) names, imported or read as
 attributes, and only a class's own methods read its underscore members. What a family of modules
 shares lives in core, in the package-private `_thermal_mechanical_common` (the
 heat-to-mechanics workflows), `_cavity_common` (the two box cavities), `_heat_kernels`
-(the heat solvers' boundary system, 3D source load and face map) and `_public` (the
-public heat, electric and Joule API's text refusal, inward data and result surfaces),
+(the heat solvers' boundary system, 3D source load and face map), `_mechanics_kernels`
+(the elasticity and thermoelasticity helpers and the temperature-snapshot hashes),
+`_moving` (the moving-mesh solves behind `motion=`) and `_public` (the public APIs'
+text refusal, inward data and result surfaces),
 or in public names of the module that owns it (thermoelasticity builds on elasticity's;
 joule heating and the workflows call `galerkin.thermal.solve_steady_heat_outward`, and
 the temperature-dependent Joule iteration `galerkin.electric.solve_steady_electric_outward`

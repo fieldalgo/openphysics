@@ -23,9 +23,10 @@ T1 = T2 = .5e-3
 LENGTH = 20e-3
 E, NU, ALPHA = [200e9, 70e9], [.3, .33], [12e-6, 23e-6]
 DT, TREF = 100., 293.15
-STRIP = dict(thicknesses=[T1, T2], young_moduli=E, poisson_ratios=NU, expansions=ALPHA,
+STRIP = dict(thickness=[T1, T2], youngs_modulus=E, poisson_ratio=NU, linear_expansion_coefficient=ALPHA,
              temperature_change=DT, length=LENGTH)
-KAPPA = bimetal.curvature([T1, T2], E, ALPHA, DT).curvature
+KAPPA = bimetal.curvature(thickness=[T1, T2], youngs_modulus=E, linear_expansion_coefficient=ALPHA,
+                          temperature_change=DT).curvature
 FORCE_SCALE = E[0]*ALPHA[1]*DT*(T1+T2)     # N/m of thickness
 KELVIN = 273.15
 
@@ -52,16 +53,16 @@ def solve_strip(n, free_ends):
     """2n elements across the thickness, 40n along the strip (square cells)."""
     mesh = layered_rectangle_mesh([T1, T1+T2], LENGTH, [n, n], 40*n, ['layer1', 'layer2'])
     top_left = 40*n*(2*n+1)                       # node (0, LENGTH)
-    snapshot = freeze_temperature(mesh, np.full(len(mesh.nodes), TREF+DT))
+    snapshot = freeze_temperature(mesh, temperature=np.full(len(mesh.nodes), TREF+DT))
     supports = {(0, 0): 0., (0, 1): 0., (top_left, 0): 0.}   # statically determinate
     traction = None
     if not free_ends:
         end = lambda p, normals: bimetal.end_traction(p, normals, **STRIP)
         traction = {'top': end, 'bottom': end}
     result = solve_thermoelasticity(
-        mesh, snapshot, reference_temperature_k=TREF, plane='stress', dirichlet=supports,
-        thermal_expansion_per_k={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
-        young_modulus={'layer1': E[0], 'layer2': E[1]},
+        mesh, snapshot, stress_free_temperature=TREF, plane='stress', prescribed_displacement=supports,
+        linear_expansion_coefficient={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
+        youngs_modulus={'layer1': E[0], 'layer2': E[1]},
         poisson_ratio={'layer1': NU[0], 'layer2': NU[1]}, traction=traction)
     return mesh, result
 
@@ -86,10 +87,12 @@ def _orders(errors):
 
 def test_bimetal_closed_form_and_quick_mesh():
     """n = 4: 2560 triangles; preregistered from the convergence table (6.1e-2)."""
-    assert abs(KAPPA-bimetal.timoshenko_curvature(T1, T2, E[0], E[1], ALPHA[0], ALPHA[1], DT)) <= 1e-10*KAPPA
+    assert abs(KAPPA-bimetal.timoshenko_curvature(thickness=(T1, T2), youngs_modulus=(E[0], E[1]),
+                                                  linear_expansion_coefficient=(ALPHA[0], ALPHA[1]),
+                                                  temperature_change=DT)) <= 1e-10*KAPPA
     for free in (False, True):
         mesh, r = solve_strip(4, free)
-        assert np.max(abs(r.reaction)) <= 1e-9*FORCE_SCALE
+        assert np.max(abs(r.reaction_force_per_depth)) <= 1e-9*FORCE_SCALE
         assert abs(fit_curvature(mesh, r.displacement, LENGTH/4, 3*LENGTH/4)/KAPPA-1) <= 8e-2
 
 
@@ -99,7 +102,7 @@ def test_bimetal_strip_converges_to_the_timoshenko_field():
     errors, curvatures = [], []
     for n in (1, 2, 4, 8):
         mesh, r = solve_strip(n, free_ends=False)
-        assert np.max(abs(r.reaction)) <= 1e-9*FORCE_SCALE
+        assert np.max(abs(r.reaction_force_per_depth)) <= 1e-9*FORCE_SCALE
         errors.append(strip_errors(mesh, r))
         curvatures.append(fit_curvature(mesh, r.displacement, 0., LENGTH))
     errors = np.array(errors)

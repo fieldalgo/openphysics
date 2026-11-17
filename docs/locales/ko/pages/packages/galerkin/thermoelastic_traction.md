@@ -11,16 +11,16 @@
 
 ```python
 from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
-snapshot = freeze_temperature(mesh, temperature_k)
+snapshot = freeze_temperature(mesh, temperature=nodal_temperature)
 result = solve_thermoelasticity(
-    mesh, snapshot, reference_temperature_k=293.15,
-    thermal_expansion_per_k=12e-6, young_modulus=70e9,
-    poisson_ratio=.3, plane="strain", dirichlet=constraints,
-    body_force=(0., 0.), traction={"right": (8e6, 3e6)})
+    mesh, snapshot, stress_free_temperature=293.15,
+    linear_expansion_coefficient=12e-6, youngs_modulus=70e9,
+    poisson_ratio=.3, plane="strain", prescribed_displacement=constraints,
+    body_force_density=(0., 0.), traction={"right": (8e6, 3e6)})
 ```
 
-`dirichlet`는 `(node_id, component)`를 m 단위 변위로 매핑합니다. component 0/1은
-Cartesian x/y입니다. `body_force`는 유한 실수 상수 `(2,)` N/m³ 또는 순수
+`prescribed_displacement`는 `(node_id, component)`를 m 단위 변위로 매핑합니다. component 0/1은
+Cartesian x/y입니다. `body_force_density`는 유한 실수 상수 `(2,)` N/m³ 또는 순수
 `callback(points_m)->(Q,2)` N/m³입니다. `traction`은 `None`, `{}`, 또는
 `mesh.boundary_edges` 태그를 전역 Cartesian 유한 실수 `(2,)` Pa 벡터나 순수
 `callback(points_m, outward_normals)->(Q,2)` Pa로 매핑합니다. 좌표와 단위 법선의
@@ -56,12 +56,12 @@ zz를 출력합니다. 처방 온도 기계 예제이며 열 workflow가 아닙�
 mu = E/[2(1+nu)]
 lambda = E*nu/[(1+nu)(1-2nu)]
 sigma = 2*mu*(epsilon-a*I) + lambda*tr(epsilon-a*I)*I
--div(sigma) = body_force
+-div(sigma) = body_force_density
 sigma*n = traction
-K*u = load_body + load_traction + load_thermal
-load_external = load_body + load_traction
-load_total = load_external + load_thermal
-residual = K*u - load_external - load_thermal
+K*u = applied_body_force_per_depth + applied_traction_force_per_depth
+      + thermal_equivalent_force_per_depth
+applied_force_per_depth = applied_body_force_per_depth + applied_traction_force_per_depth
+residual_force_per_depth = K*u - applied_force_per_depth - thermal_equivalent_force_per_depth
 ```
 
 Traction은 **전체 물리 sigma*n**입니다. 이미 전체인 traction에 열 q*n을 더하거나
@@ -113,18 +113,22 @@ f1 = L*(t0+2*t1)/6
 
 ## 결과, 기존 생성 방식과 snapshot
 
-기존 `ThermoelasticResult`의 위치 인자 18개는 순서와 의미를 유지합니다.
-displacement, total_strain, thermal_strain, elastic_strain, stress,
-sigma_zz, epsilon_zz, load_external, load_thermal, reaction, residual,
-physical_elastic_energy, temperature_snapshot, reference_temperature_k,
-thermal_expansion_per_k, young_modulus, poisson_ratio, plane입니다.
-끝에 `load_body=None`, `load_traction=None` 두 필드가 추가됩니다. 정상 솔버 결과는
-둘 다 `(N,2)` 배열로 채웁니다. 기존 18인자로 직접 생성한 결과는 새 필드가 `None`일 수
-있으므로 소비자는 이를 허용해야 합니다. `load_total`은 계산된 합으로 유지됩니다.
-`traction=None/{}`는 이전 수치 결과를 유지합니다.
+`ThermoelasticResult`의 앞 위치 인자 18개는 순서대로 displacement, strain,
+thermal_strain, elastic_strain, stress, stress_zz, strain_zz,
+applied_force_per_depth, thermal_equivalent_force_per_depth,
+reaction_force_per_depth, residual_force_per_depth, strain_energy_per_depth,
+temperature_snapshot, stress_free_temperature, linear_expansion_coefficient,
+youngs_modulus, poisson_ratio, plane입니다. 그 뒤에
+`applied_body_force_per_depth=None`, `applied_traction_force_per_depth=None` 두 필드가
+옵니다. 정상 솔버 결과는 둘 다 `(N,2)` 배열로 채웁니다. 18인자로 직접 생성한 결과는
+이 필드가 `None`일 수 있으므로 소비자는 이를 허용해야 합니다. 전체 하중 필드는 없으며
+전체 하중은 `applied_force_per_depth + thermal_equivalent_force_per_depth`입니다.
+`result.units`는 각 물리량 필드를 SI 단위로 매핑합니다. 힘과 에너지는 깊이 1 m당
+값(N/m, J/m)이며 `_per_depth`가 없는 이름을 요청하면 깊이당 필드를 알려 주는
+`AttributeError`가 납니다. `traction=None/{}`는 이전 수치 결과를 유지합니다.
 
-변위는 절점 값이며 total_strain은 요소별 상수입니다. thermal_strain,
-elastic_strain, stress, sigma_zz, epsilon_zz는 중심점 표본입니다. 응력 벡터 순서는
+변위는 절점 값이며 strain은 요소별 상수입니다. thermal_strain,
+elastic_strain, stress, stress_zz, strain_zz는 중심점 표본입니다. 응력 벡터 순서는
 `(sxx,syy,sxy)`, 변형률 벡터 순서는 `(exx,eyy,gamma_xy)`입니다. P1 T에서는 셀 내부
 물리 응력이 선형입니다. 적분할 때 상수 변형률과 보간 T로 복원해야 합니다. 중심 응력을
 셀 전체 상수 응력으로 취급하면 안 됩니다. 물리 에너지는 온도의 이차 항을 적분합니다.
@@ -144,7 +148,8 @@ snapshot은 변하지 않습니다. 내용이 동일한 다른 메시 객체를 
 ## 물리 끝점 에너지와 지지 일
 
 고정 온도에서 C_T를 면내 변형률 0인 물리 에너지라 합니다.
-F=load_external, g=load_thermal, r=reaction이면 다음과 같습니다.
+F=applied_force_per_depth, g=thermal_equivalent_force_per_depth,
+r=reaction_force_per_depth이면 다음과 같습니다.
 
 ```text
 uKu = u·(F+g+r)

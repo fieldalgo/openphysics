@@ -157,18 +157,18 @@ def test_traction_uniaxial_closed_form(plane):
     mesh = rectangle_mesh(1.2, .7, 4, 3)
     e, nu, p = 70000., .3, 123.
     ex, ey = (p/e, -nu*p/e) if plane == 'stress' else ((1-nu**2)*p/e, -nu*(1+nu)*p/e)
-    result = elastic.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu,
-                                      plane=plane, dirichlet=rollers(mesh), traction={'right': (p, 0.)})
-    exact = traction_reference.uniaxial(mesh.nodes, p, young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elastic.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu,
+                                      plane=plane, prescribed_displacement=rollers(mesh), traction={'right': (p, 0.)})
+    exact = traction_reference.uniaxial(mesh.nodes, stress_xx=p, youngs_modulus=e, poisson_ratio=nu, plane=plane)
     expected_u = mesh.nodes * [ex, ey]
     scaled_close(result.displacement, expected_u, p/e*1.2)
     scaled_close(exact.displacement, expected_u, p/e*1.2)
     scaled_close(result.strain, np.tile([ex, ey, 0.], (mesh.num_triangles, 1)), p/e)
     scaled_close(result.stress, np.tile([p, 0., 0.], (mesh.num_triangles, 1)), p)
-    scaled_close(result.load.sum(axis=0), [p*.7, 0.], p*.7)
-    scaled_close(result.reaction.sum(axis=0), [-p*.7, 0.], p*.7)
-    scale = np.linalg.norm(result.load.sum(axis=0))
-    assert np.linalg.norm((result.load + result.reaction).sum(axis=0)) / scale <= 1e-9
+    scaled_close(result.applied_force_per_depth.sum(axis=0), [p*.7, 0.], p*.7)
+    scaled_close(result.reaction_force_per_depth.sum(axis=0), [-p*.7, 0.], p*.7)
+    scale = np.linalg.norm(result.applied_force_per_depth.sum(axis=0))
+    assert np.linalg.norm((result.applied_force_per_depth + result.reaction_force_per_depth).sum(axis=0)) / scale <= 1e-9
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -181,9 +181,9 @@ def test_traction_shear_closed_form(plane):
     def field(points, normals):
         return tau * normals[:, ::-1]  # sigma=[[0,tau],[tau,0]]
 
-    result = elastic.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu, plane=plane,
-                                      dirichlet=bc, traction={s: field for s in ('left', 'right', 'top')})
-    exact = traction_reference.shear(mesh.nodes, tau, young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elastic.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu, plane=plane,
+                                      prescribed_displacement=bc, traction={s: field for s in ('left', 'right', 'top')})
+    exact = traction_reference.shear(mesh.nodes, stress_xy=tau, youngs_modulus=e, poisson_ratio=nu, plane=plane)
     expected = np.column_stack([tau/mu * mesh.nodes[:, 1], np.zeros(mesh.num_nodes)])
     scaled_close(result.displacement, expected, tau/mu*.7)
     scaled_close(exact.displacement, expected, tau/mu*.7)
@@ -207,11 +207,11 @@ def test_traction_consistent_linear_load_and_outward_normal():
     for reverse in (False, True):
         if reverse:
             mesh.boundary_edges['right'] = mesh.boundary_edges['right'][:, ::-1].copy()
-        r = elastic.solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3, plane='stress',
-                                     dirichlet=bc, traction={'right': linear})
-        scaled_close(r.load, expected, np.linalg.norm([4., -3.5]))
-        scaled_close(r.reaction, -expected, np.linalg.norm([4., -3.5]))
-        outputs.append(r.load)
+        r = elastic.solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3, plane='stress',
+                                     prescribed_displacement=bc, traction={'right': linear})
+        scaled_close(r.applied_force_per_depth, expected, np.linalg.norm([4., -3.5]))
+        scaled_close(r.reaction_force_per_depth, -expected, np.linalg.norm([4., -3.5]))
+        outputs.append(r.applied_force_per_depth)
     scaled_close(outputs[0], outputs[1], np.linalg.norm([4., -3.5]))
 
 
@@ -219,12 +219,12 @@ def test_traction_preserves_load_on_prescribed_dofs():
     mesh = rectangle_mesh(1., 1., 1, 1)
     u = mesh.nodes @ np.array([[.002, .0003], [.0001, -.0006]]).T + [.01, -.02]
     bc = {(i, c): u[i, c] for i in range(mesh.num_nodes) for c in (0, 1)}
-    args = dict(young_modulus=70000., poisson_ratio=.3, plane='stress', dirichlet=bc)
+    args = dict(youngs_modulus=70000., poisson_ratio=.3, plane='stress', prescribed_displacement=bc)
     base = elastic.solve_elasticity(mesh, **args)
     loaded = elastic.solve_elasticity(mesh, **args, traction={'right': (123., -17.)})
     np.testing.assert_array_equal(loaded.displacement, base.displacement)
-    scaled_close(loaded.reaction - base.reaction, -loaded.load, np.linalg.norm([123., -17.]))
-    scaled_close(loaded.load.sum(axis=0), [123., -17.], np.linalg.norm([123., -17.]))
+    scaled_close(loaded.reaction_force_per_depth - base.reaction_force_per_depth, -loaded.applied_force_per_depth, np.linalg.norm([123., -17.]))
+    scaled_close(loaded.applied_force_per_depth.sum(axis=0), [123., -17.], np.linalg.norm([123., -17.]))
 
 
 @pytest.mark.parametrize('kind', ['duplicate', 'interior'])
@@ -243,18 +243,18 @@ def test_traction_rejects_invalid_selected_edges(kind):
         mesh.boundary_edges['interior'] = np.array([edge], dtype=int)
         traction = {'interior': (1., 0.)}
     with pytest.raises(ValueError):
-        elastic.solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3, plane='stress',
-                                 dirichlet=rollers(mesh), traction=traction)
+        elastic.solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3, plane='stress',
+                                 prescribed_displacement=rollers(mesh), traction=traction)
 
 
 def test_traction_none_and_empty_mapping_keep_existing_results():
     mesh = rectangle_mesh(1., 1., 2, 2)
     bc = {(int(i), c): 0. for i in mesh.boundary['left'] for c in (0, 1)}
-    args = dict(young_modulus=70000., poisson_ratio=.3, plane='strain', dirichlet=bc, body_force=(0., -1.))
+    args = dict(youngs_modulus=70000., poisson_ratio=.3, plane='strain', prescribed_displacement=bc, body_force_density=(0., -1.))
     default = elastic.solve_elasticity(mesh, **args)
     for traction in (None, {}):
         result = elastic.solve_elasticity(mesh, **args, traction=traction)
-        for name in ('displacement', 'strain', 'stress', 'load', 'reaction', 'residual'):
+        for name in ('displacement', 'strain', 'stress', 'applied_force_per_depth', 'reaction_force_per_depth', 'residual_force_per_depth'):
             np.testing.assert_array_equal(getattr(result, name), getattr(default, name))
 
 

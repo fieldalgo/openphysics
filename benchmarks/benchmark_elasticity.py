@@ -56,15 +56,15 @@ def elasticity(n):
     mesh, mesh_seconds = harness.timed(mesh_of, n)
     dirichlet = clamp(mesh)
     result, seconds = harness.timed(
-        solve_elasticity, mesh, young_modulus=YOUNG, poisson_ratio=POISSON, plane=PLANE,
-        dirichlet=dirichlet, traction={"right": TRACTION})
+        solve_elasticity, mesh, youngs_modulus=YOUNG, poisson_ratio=POISSON, plane=PLANE,
+        prescribed_displacement=dirichlet, traction={"right": TRACTION})
     sample = harness.peak_rss()
     right = [int(i) for i in mesh.boundary["right"]]
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, dofs=2 * mesh.num_nodes,
                   mesh_seconds=mesh_seconds, solver_call_seconds=seconds,
                   mean_end_displacement_m=float(np.mean(result.displacement[right, 0])),
                   bar_end_displacement_m=TRACTION[0] * LENGTH / YOUNG,  # uniaxial bar, for orientation only
-                  max_abs_free_residual_n_per_m=residual_free(result.residual, dirichlet))
+                  max_abs_free_residual_n_per_m=residual_free(result.residual_force_per_depth, dirichlet))
     return sample
 
 
@@ -77,20 +77,20 @@ def thermoelastic_traction(n):
     mesh, mesh_seconds = harness.timed(mesh_of, n)
     heat, heat_seconds = harness.timed(
         solve_steady_heat, mesh, thermal_conductivity=CONDUCTIVITY, prescribed_temperature=thermal_ends(mesh))
-    snapshot, freeze_seconds = harness.timed(freeze_temperature, mesh, heat.temperature)
+    snapshot, freeze_seconds = harness.timed(freeze_temperature, mesh, temperature=heat.temperature)
     dirichlet = clamp(mesh)
     result, mechanics_seconds = harness.timed(
-        solve_thermoelasticity, mesh, snapshot, reference_temperature_k=REFERENCE,
-        thermal_expansion_per_k=EXPANSION, young_modulus=YOUNG, poisson_ratio=POISSON,
-        plane=PLANE, dirichlet=dirichlet, traction={"right": THERMAL_TRACTION})
+        solve_thermoelasticity, mesh, snapshot, stress_free_temperature=REFERENCE,
+        linear_expansion_coefficient=EXPANSION, youngs_modulus=YOUNG, poisson_ratio=POISSON,
+        plane=PLANE, prescribed_displacement=dirichlet, traction={"right": THERMAL_TRACTION})
     sample = harness.peak_rss()
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, dofs=2 * mesh.num_nodes,
                   mesh_seconds=mesh_seconds, heat_seconds=heat_seconds, freeze_seconds=freeze_seconds,
                   mechanics_seconds=mechanics_seconds,
                   temperature_max_k=float(heat.temperature.max()),
                   max_abs_displacement_m=float(np.max(np.abs(result.displacement))),
-                  physical_elastic_energy_j_per_m=float(result.physical_elastic_energy),
-                  max_abs_free_residual_n_per_m=residual_free(result.residual, dirichlet))
+                  physical_elastic_energy_j_per_m=float(result.strain_energy_per_depth),
+                  max_abs_free_residual_n_per_m=residual_free(result.residual_force_per_depth, dirichlet))
     return sample
 
 
@@ -102,17 +102,17 @@ def workflow(n):
     mesh, mesh_seconds = harness.timed(mesh_of, n)
     dirichlet = clamp(mesh)
     result, seconds = harness.timed(
-        solve_steady_thermoelasticity, mesh, units={"length": "m", "temperature": "K"},
-        conductivity=CONDUCTIVITY, thermal_dirichlet=thermal_ends(mesh), heat_source=0.0,
-        young_modulus=YOUNG, poisson_ratio=POISSON, plane=PLANE,
-        thermal_expansion_per_k=EXPANSION, reference_temperature_k=REFERENCE,
-        mechanical_dirichlet=dirichlet)
+        solve_steady_thermoelasticity, mesh, thermal_conductivity=CONDUCTIVITY,
+        prescribed_temperature=thermal_ends(mesh), heat_source_density=0.0,
+        youngs_modulus=YOUNG, poisson_ratio=POISSON, plane=PLANE,
+        linear_expansion_coefficient=EXPANSION, stress_free_temperature=REFERENCE,
+        prescribed_displacement=dirichlet)
     sample = harness.peak_rss()
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, dofs=2 * mesh.num_nodes,
                   mesh_seconds=mesh_seconds, workflow_seconds=seconds,
                   temperature_max_k=float(result.heat.temperature.max()),
                   max_abs_displacement_m=float(np.max(np.abs(result.mechanics.displacement))),
-                  max_abs_free_residual_n_per_m=residual_free(result.mechanics.residual, dirichlet))
+                  max_abs_free_residual_n_per_m=residual_free(result.mechanics.residual_force_per_depth, dirichlet))
     return sample
 
 

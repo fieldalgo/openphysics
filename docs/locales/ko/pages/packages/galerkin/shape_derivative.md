@@ -65,8 +65,8 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 ## 선형 탄성
 
 `solve_elasticity(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))`는 plane stress·plane strain, 스칼라 또는 영역별 영률·푸아송비,
-일정 체적력, 경계 태그의 일정 traction(변과 함께 움직임), Dirichlet 변위 `{(node, component): value}`를 받습니다. 변위·변형률·
-응력·부하·반력·잔차가 d/dt를 나릅니다.
+일정 체적력, 경계 태그의 일정 traction(변과 함께 움직임), 처방 변위 `{(node, component): value}`를 받습니다. 변위·변형률·
+응력과 깊이당 부하·반력·잔차가 d/dt를 나릅니다.
 - Dirichlet 값은 노드에 붙어 노드와 함께 움직입니다.
 - 큰 강체 변위 오프셋(탄성 변형보다 훨씬 큰 Dirichlet 값)은 솔버 자체에서처럼 결과와 그 미분의 정밀도를 떨어뜨립니다.
 
@@ -84,7 +84,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
     미분에 온도장의 변화가 들어갑니다.
   - `result.heat`와 `result.mechanics` 모두 d/dt를 나릅니다.
   - `result.reference_mesh`, `result.temperature_snapshot`, manifest는 옮겨진 메시를 기술하며 미분을 나르지 않습니다.
-- 두 경로 모두 변위, 세 변형률, 응력, σzz, εzz, 외부·열 하중, 반력, 잔차, 물리 탄성 에너지가 d/dt를 나릅니다.
+- 두 경로 모두 변위, 세 변형률, 응력, `stress_zz`, `strain_zz`, 깊이당 외부·열 하중, 반력, 잔차, 변형 에너지가 d/dt를 나릅니다.
   `result.temperature_snapshot`은 옮겨진 메시의 스냅샷입니다.
 - 공간에 고정된 온도장을 움직이는 노드에서 다시 샘플링하는 방식은 제공하지 않습니다. 좌표 콜백이 필요하기 때문입니다(아래
   거부).

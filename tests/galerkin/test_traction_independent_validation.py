@@ -14,7 +14,7 @@ from traction_independent_oracle import (
 
 
 def solve(mesh, plane='stress', **kw):
-    return solve_elasticity(mesh, young_modulus=E, poisson_ratio=NU, plane=plane, **kw)
+    return solve_elasticity(mesh, youngs_modulus=E, poisson_ratio=NU, plane=plane, **kw)
 
 
 def fixed(mesh, u=None):
@@ -48,11 +48,11 @@ def check_work(mesh, result, plane, bc):
     _, _, w = integration(mesh, 7)
     area = w.sum(axis=1)
     twice_u = np.sum(area*np.sum(e*s, axis=-1))
-    applied_work = np.sum(result.displacement*result.load)
-    support_work = sum(result.reaction[i, c]*value for (i, c), value in bc.items())
+    applied_work = np.sum(result.displacement*result.applied_force_per_depth)
+    support_work = sum(result.reaction_force_per_depth[i, c]*value for (i, c), value in bc.items())
     assert abs(twice_u-applied_work-support_work) <= 1e-9*max(abs(twice_u), abs(applied_work), abs(support_work), 1e-20)
-    force = result.load+result.reaction
-    scale = max(np.linalg.norm(result.load, axis=1).sum(), 1.)
+    force = result.applied_force_per_depth+result.reaction_force_per_depth
+    scale = max(np.linalg.norm(result.applied_force_per_depth, axis=1).sum(), 1.)
     assert np.linalg.norm(force.sum(axis=0)) <= 1e-9*scale
     assert abs(np.sum(mesh.nodes[:, 0]*force[:, 1]-mesh.nodes[:, 1]*force[:, 0])) <= 1e-9*scale
     v = mesh.nodes@np.array([[.003, .001], [-.002, -.004]]).T+[.001, -.002]
@@ -83,9 +83,9 @@ def test_traction_independent_mixed_mms_convergence(plane):
     for n in (6, 12, 24):
         mesh = rectangle_mesh(1., 1., n, n)
         bc = mixed_bc(mesh, plane)
-        r = solve(mesh, plane, dirichlet=bc, body_force=lambda p: manufactured(p, plane)[3], traction=mms_traction(plane))
+        r = solve(mesh, plane, prescribed_displacement=bc, body_force_density=lambda p: manufactured(p, plane)[3], traction=mms_traction(plane))
         expected_load = consistent_load(mesh, plane)
-        assert_allclose(r.load, expected_load, rtol=1e-11, atol=1e-8)
+        assert_allclose(r.applied_force_per_depth, expected_load, rtol=1e-11, atol=1e-8)
         # Direct continuum body+full-surface resultants cancel. Nodal moment is
         # exact because the consistent shape functions reproduce coordinates.
         assert_allclose(expected_load.sum(axis=0), 0., atol=1e-8)
@@ -118,7 +118,7 @@ def test_traction_independent_affine_compliance(plane, kind):
         u = np.c_[np.zeros(mesh.num_nodes), tau/mu*mesh.nodes[:, 0]]
         bc = {(int(i), c): 0. for i in mesh.boundary['left'] for c in (0, 1)}
         traction, target = {'top': (tau, 0.), 'bottom': (-tau, 0.), 'right': (0., tau)}, [0., 0., tau]
-    r = solve(mesh, plane, dirichlet=bc, traction=traction)
+    r = solve(mesh, plane, prescribed_displacement=bc, traction=traction)
     assert_allclose(r.displacement, u, rtol=1e-9, atol=1e-12)
     assert_allclose(r.stress, np.tile(target, (mesh.num_triangles, 1)), rtol=1e-9, atol=1e-6)
     check_work(mesh, r, plane, bc)
@@ -128,13 +128,13 @@ def test_traction_independent_affine_compliance(plane, kind):
 def test_traction_independent_degree_six_consistent_weights(segments):
     mesh = rectangle_mesh(1., 1., 1, segments)
     field = lambda p, n: np.c_[3+2*p[:, 1]**6, -4+p[:, 1]**5]
-    r = solve(mesh, dirichlet=fixed(mesh), traction={'right': field})
+    r = solve(mesh, prescribed_displacement=fixed(mesh), traction={'right': field})
     expected = right_edge_load(mesh)
-    assert_allclose(r.load, expected, rtol=1e-11, atol=1e-12)
-    assert_allclose(r.load.sum(axis=0), [3+2/7, -4+1/6], rtol=1e-11)
-    moment = np.sum(mesh.nodes[:, 0]*r.load[:, 1]-mesh.nodes[:, 1]*r.load[:, 0])
+    assert_allclose(r.applied_force_per_depth, expected, rtol=1e-11, atol=1e-12)
+    assert_allclose(r.applied_force_per_depth.sum(axis=0), [3+2/7, -4+1/6], rtol=1e-11)
+    moment = np.sum(mesh.nodes[:, 0]*r.applied_force_per_depth[:, 1]-mesh.nodes[:, 1]*r.applied_force_per_depth[:, 0])
     assert_allclose(moment, -4+1/6-1.5-2/8, rtol=1e-11)
-    assert_allclose(r.reaction, -r.load, atol=1e-12)
+    assert_allclose(r.reaction_force_per_depth, -r.applied_force_per_depth, atol=1e-12)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -142,14 +142,14 @@ def test_traction_independent_dirichlet_overlap_and_default(plane):
     mesh = rectangle_mesh(1., 1., 4, 3)
     u = mesh.nodes@np.array([[.001, -.002], [.003, .004]]).T+[.002, -.001]
     bc = fixed(mesh, u)
-    baseline = solve(mesh, plane, dirichlet=bc)
+    baseline = solve(mesh, plane, prescribed_displacement=bc)
     for traction in (None, {}):
-        r = solve(mesh, plane, dirichlet=bc, traction=traction)
-        for name in ('displacement', 'strain', 'stress', 'load', 'reaction', 'residual'):
+        r = solve(mesh, plane, prescribed_displacement=bc, traction=traction)
+        for name in ('displacement', 'strain', 'stress', 'applied_force_per_depth', 'reaction_force_per_depth', 'residual_force_per_depth'):
             assert np.array_equal(getattr(r, name), getattr(baseline, name))
-    r = solve(mesh, plane, dirichlet=bc, traction={'right': lambda p, n: np.c_[3+2*p[:, 1]**6, -4+p[:, 1]**5]})
+    r = solve(mesh, plane, prescribed_displacement=bc, traction={'right': lambda p, n: np.c_[3+2*p[:, 1]**6, -4+p[:, 1]**5]})
     assert_allclose(r.displacement, baseline.displacement, rtol=0, atol=0)
-    assert_allclose(r.reaction-baseline.reaction, -r.load, rtol=1e-10, atol=1e-8)
+    assert_allclose(r.reaction_force_per_depth-baseline.reaction_force_per_depth, -r.applied_force_per_depth, rtol=1e-10, atol=1e-8)
     energy, external, support = check_work(mesh, r, plane, bc)
     assert abs(2*energy-external) > 1e-3  # support work cannot be dropped
 
@@ -184,9 +184,9 @@ def test_traction_independent_pressure_normals_order_rotation(hole, pressure_sig
             else:
                 normal = np.asarray(NORMALS[tag])
             expected[[i, j]] += .5*pressure*np.linalg.norm(mesh.nodes[j]-mesh.nodes[i])*normal
-    base = solve(mesh, dirichlet=fixed(mesh), traction=fields_for(mesh))
-    assert_allclose(base.load, expected, rtol=1e-10, atol=1e-8)
-    assert_allclose(base.reaction, -expected, rtol=1e-10, atol=1e-8)
+    base = solve(mesh, prescribed_displacement=fixed(mesh), traction=fields_for(mesh))
+    assert_allclose(base.applied_force_per_depth, expected, rtol=1e-10, atol=1e-8)
+    assert_allclose(base.reaction_force_per_depth, -expected, rtol=1e-10, atol=1e-8)
     theta = .41; q = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
     shift, scale = np.array([1.7, -2.1]), 2.
     rng = np.random.default_rng(31); permutation = rng.permutation(mesh.num_nodes); inverse = np.argsort(permutation)
@@ -194,9 +194,9 @@ def test_traction_independent_pressure_normals_order_rotation(hole, pressure_sig
     changed = Mesh((scale*mesh.nodes@q.T+shift)[permutation], inverse[mesh.triangles[cells]][:, ::-1],
                    {tag: inverse[v] for tag, v in mesh.boundary.items()},
                    {tag: inverse[e][::-1, ::-1] for tag, e in reversed(list(mesh.boundary_edges.items()))})
-    r = solve(changed, dirichlet=fixed(changed), traction=fields_for(changed, q, shift))
-    assert_allclose(r.load, (scale*base.load@q.T)[permutation], rtol=1e-10, atol=1e-8)
-    assert_allclose(r.reaction, -r.load, atol=1e-8)
+    r = solve(changed, prescribed_displacement=fixed(changed), traction=fields_for(changed, q, shift))
+    assert_allclose(r.applied_force_per_depth, (scale*base.applied_force_per_depth@q.T)[permutation], rtol=1e-10, atol=1e-8)
+    assert_allclose(r.reaction_force_per_depth, -r.applied_force_per_depth, atol=1e-8)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -204,7 +204,7 @@ def test_traction_independent_displacement_stress_covariance(plane):
     mesh = rectangle_mesh(1., 1., 6, 6)
     u = manufactured(mesh.nodes, plane)[0]
     bc = {(int(i), c): float(u[i, c]) for i in mesh.boundary['left'] for c in (0, 1)}
-    base = solve(mesh, plane, dirichlet=bc, body_force=lambda p: manufactured(p, plane)[3], traction=mms_traction(plane))
+    base = solve(mesh, plane, prescribed_displacement=bc, body_force_density=lambda p: manufactured(p, plane)[3], traction=mms_traction(plane))
     angle, scale = .41, 2.
     q = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     shift = np.array([1.7, -2.1])
@@ -217,12 +217,12 @@ def test_traction_independent_displacement_stress_covariance(plane):
     rb = {(int(i), c): float(target[i, c]) for i in rotated.boundary['left'] for c in (0, 1)}
     def traction(p, normal):
         return surface((p-shift)@q/scale, normal@q, plane)@q.T
-    r = solve(rotated, plane, dirichlet=rb,
-              body_force=lambda p: manufactured((p-shift)@q/scale, plane)[3]@q.T/scale,
+    r = solve(rotated, plane, prescribed_displacement=rb,
+              body_force_density=lambda p: manufactured((p-shift)@q/scale, plane)[3]@q.T/scale,
               traction={tag: traction for tag in rotated.boundary_edges})
     assert_allclose(r.displacement, (scale*base.displacement@q.T)[permutation], rtol=1e-10, atol=1e-12)
-    assert_allclose(r.load, (scale*base.load@q.T)[permutation], rtol=1e-10, atol=1e-8)
-    assert_allclose(r.reaction, (scale*base.reaction@q.T)[permutation], rtol=1e-10, atol=1e-8)
+    assert_allclose(r.applied_force_per_depth, (scale*base.applied_force_per_depth@q.T)[permutation], rtol=1e-10, atol=1e-8)
+    assert_allclose(r.reaction_force_per_depth, (scale*base.reaction_force_per_depth@q.T)[permutation], rtol=1e-10, atol=1e-8)
     s = base.stress[cells]
     tensor = np.stack((np.stack((s[:, 0], s[:, 2]), axis=-1), np.stack((s[:, 2], s[:, 1]), axis=-1)), axis=1)
     expected = q@tensor@q.T
@@ -252,4 +252,4 @@ def test_traction_independent_rejection_contract(bad):
     elif bad == 'normal_nan': traction['right'] = lambda p, n: n*np.nan
     elif bad == 'rigid': bc = {}
     with pytest.raises(ValueError):
-        solve(mesh, dirichlet=bc, traction=traction)
+        solve(mesh, prescribed_displacement=bc, traction=traction)

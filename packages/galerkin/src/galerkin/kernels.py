@@ -31,18 +31,23 @@ matrices these assembly functions place, for galerkin's own modules.
   look-up ``region_property`` (``galerkin.materials``);
 - mechanics: ``lame``, ``constitutive``, ``element_materials``,
   ``element_constitutive``, ``stiffness_and_stress``, ``stress_of``, ``body_load``,
-  ``check_solution``, ``displacement``, ``at_fixed`` and ``vector_stiffness``
-  (``galerkin.elasticity``); ``thermal_coefficient``, ``physical_energy`` and
-  ``verify_snapshot`` (``galerkin.thermoelasticity``);
+  ``check_solution``, ``displacement``, ``at_fixed`` and ``vector_stiffness`` (the
+  helpers of ``galerkin.elasticity``); ``thermal_coefficient``, ``physical_energy`` and
+  ``verify_snapshot`` (those of ``galerkin.thermoelasticity``); all from the
+  package-private ``galerkin._mechanics_kernels`` since L2 commit 8, so that the clean
+  public mechanics modules hold no removed name;
 - the moving-mesh solves ``solve_steady_heat_moving``, ``solve_transient_heat_moving``,
   ``solve_steady_electric_moving``, ``solve_elasticity_moving``,
-  ``solve_thermoelasticity_moving`` and ``solve_steady_thermoelasticity_moving``
-  (``galerkin.shape``). The public route to them is ``motion=`` on the public solver,
+  ``solve_thermoelasticity_moving`` and ``solve_steady_thermoelasticity_moving`` (the
+  package-private ``galerkin._moving`` since L2 commit 8; they were names of
+  ``galerkin.shape``). The public route to them is ``motion=`` on the public solver,
   which negates inward data first: the heat mirrors take today's outward heat flux, as
   ``outward_heat_flux``, and the electric mirror the outward current density, as
   ``outward_current_density`` (A/m^2, positive leaves the body; the registry has no
   outward density name, and this internal keyword is not scanned), with registry names
-  for the other quantities.
+  for the other quantities (the mechanics mirrors take ``youngs_modulus``,
+  ``prescribed_displacement``, ``body_force_density``, ``stress_free_temperature``,
+  ``linear_expansion_coefficient``, ...; mechanics has no inward or outward sign).
 
 The electromagnetic kernels (edge spaces, curl-curl, PML, mode systems and overlaps)
 are not in this namespace yet; they are still names of galerkin's top level.
@@ -50,14 +55,16 @@ are not in this namespace yet; they are still names of galerkin's top level.
 
 from .assembly import assemble_boundary_mass, assemble_load, assemble_mass, assemble_stiffness
 from .assembly3d import assemble_mass_3d, assemble_stiffness_3d, tet_gradients
-from .elasticity import (at_fixed, body_load, check_solution, constitutive, displacement, element_constitutive,
-                         element_materials, lame, stiffness_and_stress, stress_of, vector_stiffness)
 from .materials import region_property
-from .shape import (solve_elasticity_moving, solve_steady_electric_moving, solve_steady_heat_moving,
-                    solve_steady_thermoelasticity_moving, solve_thermoelasticity_moving, solve_transient_heat_moving)
 from .solver import solve_dirichlet
 from ._heat_kernels import dirichlet_from_faces, scalar_boundary_system, source_load_3d
-from .thermoelasticity import physical_energy, thermal_coefficient, verify_snapshot
+from ._mechanics_kernels import (at_fixed, body_load, check_solution, constitutive, displacement,
+                                 element_constitutive, element_materials, lame, physical_energy,
+                                 stiffness_and_stress, stress_of, thermal_coefficient, vector_stiffness,
+                                 verify_snapshot)
+from ._moving import (solve_elasticity_moving, solve_steady_electric_moving, solve_steady_heat_moving,
+                      solve_steady_thermoelasticity_moving, solve_thermoelasticity_moving,
+                      solve_transient_heat_moving)
 
 __all__ = [
     # P1 assembly and the Dirichlet solve

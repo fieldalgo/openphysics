@@ -8,8 +8,8 @@ import refsol.thermoelastic_traction as reference
 
 
 def mat(plane):
-    return dict(young_modulus=70e9,poisson_ratio=.3,plane=plane,
-                thermal_expansion_per_k=12e-6,reference_temperature_k=293.15)
+    return dict(youngs_modulus=70e9,poisson_ratio=.3,plane=plane,
+                linear_expansion_coefficient=12e-6,stress_free_temperature=293.15)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -21,24 +21,25 @@ def test_polynomial_direct_derivatives(plane,linear):
     for j in (0,1):
         dp=np.zeros_like(p);dp[:,j]=1e-5
         plus,minus=field(p+dp),field(p-dp)
-        np.testing.assert_allclose((plus.displacement-minus.displacement)/2e-5,f.gradient[:,:,j],rtol=0,atol=2e-14)
+        np.testing.assert_allclose((plus.displacement-minus.displacement)/2e-5,f.displacement_gradient[:,:,j],rtol=0,atol=2e-14)
         div+=(plus.stress[:,:2,j]-minus.stress[:,:2,j])/2e-5
-    np.testing.assert_allclose(div,-f.body_force,rtol=1e-9,atol=.002)
+    np.testing.assert_allclose(div,-f.body_force_density,rtol=1e-9,atol=.002)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
 @pytest.mark.parametrize('theta,alpha',[ (20.,12e-6),(-20.,12e-6),(20.,-12e-6),(20.,0.)])
 def test_uniform_original_law(plane,theta,alpha):
-    m=mat(plane)|{'thermal_expansion_per_k':alpha}
-    f=reference.uniform_combined(np.array([[0.,0.],[.2,.3]]),theta_k=theta,**m)
+    m=mat(plane)|{'linear_expansion_coefficient':alpha}
+    f=reference.uniform_combined(np.array([[0.,0.],[.2,.3]]),temperature_change=theta,stress=(8e6,-2e6,3e6),
+                                 displacement=(2e-5,-1e-5),**m)
     s=np.array([[8e6,3e6],[3e6,-2e6]])
     np.testing.assert_allclose(f.stress[:,:2,:2],np.broadcast_to(s,(2,2,2)),atol=.001,rtol=0)
     zz=0 if plane=='stress' else .3*6e6-70e9*alpha*theta
     np.testing.assert_allclose(f.stress[:,2,2],zz,atol=.001,rtol=0)
     eta=alpha*theta*(1 if plane=='stress' else 1.3)
-    em=f.total_strain[0,:2,:2]-eta*np.eye(2)
+    em=f.strain[0,:2,:2]-eta*np.eye(2)
     expected=.5*np.sum(s*em)+(0 if plane=='stress' else .5*70e9*(alpha*theta)**2)
-    np.testing.assert_allclose(f.energy_density,expected,atol=1e-7,rtol=0)
+    np.testing.assert_allclose(f.strain_energy_density,expected,atol=1e-7,rtol=0)
 
 
 def test_reference_no_engine_or_other_reference_imports():
@@ -47,14 +48,14 @@ def test_reference_no_engine_or_other_reference_imports():
     for n in ast.walk(tree):
         if isinstance(n,ast.Import):roots.update(a.name.split('.')[0] for a in n.names)
         elif isinstance(n,ast.ImportFrom):roots.add(n.module.split('.')[0])
-    assert roots=={'numpy','dataclasses'}
+    assert roots=={'numpy','dataclasses','_checks'}   # _checks: refsol's own text refusal (L2 commit 8)
 
 
 def test_traction_contract():
     s=np.array([[[8.,3.,0.],[3.,-2.,0.],[0.,0.,5.]]])
-    np.testing.assert_array_equal(reference.traction_from_stress(s,np.array([[0.,-1.]])),[[-3.,2.]])
+    np.testing.assert_array_equal(reference.traction_from_stress(np.array([[0.,-1.]]),stress=s),[[-3.,2.]])
     for n in ([[0.,2.]],[[True,False]],[[float('nan'),0.]]):
-        with pytest.raises(ValueError):reference.traction_from_stress(s,n)
+        with pytest.raises(ValueError):reference.traction_from_stress(n,stress=s)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])

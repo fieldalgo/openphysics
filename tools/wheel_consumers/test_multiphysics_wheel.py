@@ -46,10 +46,10 @@ def test_installed_elasticity_uniaxial_closed_form(plane):
     bc = {(int(i), 0): 0. for i in mesh.boundary["left"]}
     bc.update({(int(i), 0): 2 * extension for i in mesh.boundary["right"]})
     bc.update({(int(i), 1): 0. for i in mesh.boundary["bottom"]})
-    result = elasticity.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu,
-                                        plane=plane, dirichlet=bc)
-    exact = reference.affine(mesh.nodes, np.diag([extension, lateral]),
-                             young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elasticity.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu,
+                                        plane=plane, prescribed_displacement=bc)
+    exact = reference.affine(mesh.nodes, displacement_gradient=np.diag([extension, lateral]), displacement=(0., 0.),
+                             youngs_modulus=e, poisson_ratio=nu, plane=plane)
     for u in (result.displacement, exact.displacement):
         np.testing.assert_allclose(u, expected_u, rtol=1e-10, atol=1e-14)
     for strain in (result.strain, exact.strain):
@@ -59,10 +59,10 @@ def test_installed_elasticity_uniaxial_closed_form(plane):
         np.testing.assert_allclose(stress, np.broadcast_to(expected_stress, stress.shape),
                                    rtol=1e-10, atol=1e-6)
     assert result.plane == plane
-    np.testing.assert_array_equal(result.load, 0.)
+    np.testing.assert_array_equal(result.applied_force_per_depth, 0.)
     # Reactions on opposite ends match the analytic stress times unit height.
     for side, sign in (("left", -1), ("right", 1)):
-        np.testing.assert_allclose(result.reaction[mesh.boundary[side], 0].sum(),
+        np.testing.assert_allclose(result.reaction_force_per_depth[mesh.boundary[side], 0].sum(),
                                    sign * axial_stress, rtol=1e-10)
 
 
@@ -73,8 +73,8 @@ def test_installed_elasticity_rejects_unremoved_rigid_modes(plane, constraints):
     node = int(mesh.boundary["left"][0])
     bc = {} if constraints == "none" else {(node, 0): 0., (node, 1): 0.}
     with pytest.raises(ValueError, match="rigid|singular"):
-        elasticity.solve_elasticity(mesh, young_modulus=70e9, poisson_ratio=.3,
-                                    plane=plane, dirichlet=bc)
+        elasticity.solve_elasticity(mesh, youngs_modulus=70e9, poisson_ratio=.3,
+                                    plane=plane, prescribed_displacement=bc)
 
 
 def test_english_elasticity_example_runs_with_installed_packages():
