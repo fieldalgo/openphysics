@@ -60,7 +60,7 @@ the convergence rate is the lie detector.
   the obvious direction alone stalls at 3.6e-4.
 
 - **M3a against a published benchmark** — Hadley's dielectric-corner problems
-  (`refsol.benchmarks.DIELECTRIC_CORNERS`, quoted to ±1e-8), a unit square with a
+  (`refsol.benchmarks.dielectric_corners()`, quoted to ±1e-8), a unit square with a
   square core in one corner, PEC on two sides and PMC on the other two. At a
   48×48 mesh the four cases land 4.0e-5, 6.3e-5, 9.5e-6 and 7.1e-6 from the
   published values, converging at orders 2.09, 2.01 and 2.44.
@@ -148,7 +148,7 @@ the convergence rate is the lie detector.
   (pure numpy/scipy, planar) and [gmshio](https://github.com/fieldalgo/openphysics/blob/main/packages/gmshio/README.md)
   (runs the Gmsh executable as a separate process).
 
-  All eight of Hadley's **rib waveguides** (`refsol.benchmarks.RIB_WAVEGUIDES`,
+  All eight of Hadley's **rib waveguides** (`refsol.benchmarks.rib_waveguides()`,
   quoted to ±3e-6, slab thickness 0 to 0.7 µm) come out within **1.2e-4** of the
   published quasi-TE indices on a meshine mesh. Re-entrant dielectric corners
   where the rib meets the slab, not the reference, set that floor.

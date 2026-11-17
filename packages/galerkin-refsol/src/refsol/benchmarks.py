@@ -18,86 +18,120 @@ values are reproduced here, no femwell code or text. See NOTICE.
 
 Two data sets:
 
-1. RIB_WAVEGUIDES — quasi-TE fundamental mode of a rib waveguide family
+1. rib_waveguides() — quasi-TE fundamental mode of a rib waveguide family
    (stated error < 3e-6 in n_eff). Wavelength 1.15 um. Core (rib + slab)
    index 3.44 on a substrate ("box") of index 3.40, air cover (index 1.0).
    Rib width 3 um, total core thickness 1 um; the slab thickness t is varied
    from 0 (strip waveguide) to 0.7 um. Simulation window used by femwell:
    18 um wide, 10 um substrate below, 3 um cover above.
 
-2. DIELECTRIC_CORNERS — "analytically solvable" corner problems (stated error
+2. dielectric_corners() — "analytically solvable" corner problems (stated error
    < 1e-8). Unit square domain, wavelength 1.5, a square core [0,0.5]^2 in the
    lower-left corner, remaining region is cladding. Perfect-conductor (PEC,
    tangential E = 0) boundaries on the listed sides; the other sides are the
-   symmetry counterpart (perfect magnetic conductor). Given as (eps_core,
-   eps_clad, pec_sides, n_eff).
+   symmetry counterpart (perfect magnetic conductor).
+
+Units and names (galerkin step, L3 commit 11e; spec D44). The published numbers are
+stored as published, with their unit, in the private ``refsol._published``: the rib
+lengths in micrometres, the corner problems dimensionless. The accessors return SI
+records under registry names, computed at run time by a stated rule:
+
+- ``rib_waveguides()``: each micrometre value becomes metres by the decimal rule
+  m = float(Fraction(repr(value)) / 10**6), the double nearest the exact decimal
+  (0.3 um -> 3e-07 m, 1.15 um -> 1.15e-06 m; the reverse rule of spec D31 gives the
+  published micrometre doubles back exactly).
+- ``dielectric_corners()``: the dimensionless problem read in metres (a unit square of
+  side 1 m, wavelength 1.5 m): the doubles are the published ones, and the problem
+  depends only on the ratios.
+- ``rib_neff(*, thickness)``: the slab thickness in m, matched to a tabulated case to
+  a relative 1e-12 (the former absolute 1e-12 um match on the micrometre value).
+
+The stated errors (3e-6 and 1e-8 in n_eff) stay with the published records.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from fractions import Fraction
 
-__all__ = ["CITATION", "RibWaveguide", "RIB_WAVEGUIDES", "DielectricCorner", "DIELECTRIC_CORNERS",
-           "rib_neff"]
+import numpy as np
+
+from . import _published
+from ._checks import refuse_text
+
+__all__ = ["CITATION", "RibWaveguide", "rib_waveguides", "rib_neff", "DielectricCorner", "dielectric_corners"]
 
 
-CITATION = ("G. R. Hadley, J. Lightwave Technol. 20(7), 1210-1218 (2002), "
-            "doi:10.1109/JLT.2002.800370")
+CITATION = _published.HADLEY_2002
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RibWaveguide:
-    slab_thickness_um: float
-    neff_quasi_te: float
-    # shared geometry
-    wavelength_um: float = 1.15
-    rib_width_um: float = 3.0
-    core_thickness_um: float = 1.0
-    n_core: float = 3.44
-    n_substrate: float = 3.40
-    n_cover: float = 1.0
-    uncertainty: float = 3e-6
-    citation: str = CITATION
+    """One of Hadley's rib waveguides in SI.
+
+    thickness: (slab, core), the slab thickness t and the total core (rib) thickness, m;
+    length: the rib width, m; vacuum_wavelength: m; refractive_index: (substrate, core,
+    cover) by increasing height; effective_index: Hadley's quasi-TE n_eff; source: the citation.
+    """
+    thickness: tuple[float, float]
+    length: float
+    vacuum_wavelength: float
+    refractive_index: tuple[float, float, float]
+    effective_index: float
+    source: str
 
 
-RIB_WAVEGUIDES: tuple[RibWaveguide, ...] = tuple(
-    RibWaveguide(t, n) for t, n in [
-        (0.0, 3.412022),
-        (0.1, 3.412126),
-        (0.2, 3.412279),
-        (0.3, 3.412492),
-        (0.4, 3.412774),
-        (0.5, 3.413132),
-        (0.6, 3.413571),
-        (0.7, 3.414100),
-    ]
-)
+def _metres(micrometres):
+    """The decimal rule: the double nearest the exact decimal value times 1e-6."""
+    return float(Fraction(repr(float(micrometres))) / 10 ** 6)
 
 
-@dataclass(frozen=True)
+def rib_waveguides() -> tuple[RibWaveguide, ...]:
+    """Hadley's eight rib waveguides in SI, computed from the published micrometre literals at run time."""
+    record = _published.RIB_WAVEGUIDES
+    assert record.unit == "um"
+    core, width, wavelength = (_metres(v) for v in (record.core_thickness, record.rib_width, record.wavelength))
+    return tuple(RibWaveguide(thickness=(_metres(t), core), length=width, vacuum_wavelength=wavelength,
+                              refractive_index=(record.n_substrate, record.n_core, record.n_cover),
+                              effective_index=neff, source=record.source)
+                 for t, neff in record.table)
+
+
+@dataclass(frozen=True, kw_only=True)
 class DielectricCorner:
-    eps_core: float
-    eps_clad: float
+    """One of Hadley's dielectric-corner problems, read in metres (dimensionless as published).
+
+    relative_permittivity: (core, cladding); pec_sides: the sides of the square carrying PEC;
+    effective_index: Hadley's n_eff; vacuum_wavelength: m; box_size: the domain [0, W] x [0, H], m;
+    upper_corner_position: the core's corner (its box is [0, cw] x [0, ch]), m; source: the citation.
+    """
+    relative_permittivity: tuple[float, float]
     pec_sides: tuple[str, ...]
-    neff: float
-    wavelength: float = 1.5
-    domain: tuple[float, float] = (1.0, 1.0)
-    core_box: tuple[float, float] = (0.5, 0.5)   # lower-left corner core
-    uncertainty: float = 1e-8
-    citation: str = CITATION
+    effective_index: float
+    vacuum_wavelength: float
+    box_size: tuple[float, float]
+    upper_corner_position: tuple[float, float]
+    source: str
 
 
-DIELECTRIC_CORNERS: tuple[DielectricCorner, ...] = (
-    DielectricCorner(2.25, 1.0, ("left", "right"), 1.27627404),
-    DielectricCorner(8.0, 1.0, ("left", "right"), 2.65679692),
-    DielectricCorner(1.0, 2.25, ("left", "top"), 1.387926425),
-    DielectricCorner(1.0, 8.0, ("left", "top"), 2.761465320),
-)
+def dielectric_corners() -> tuple[DielectricCorner, ...]:
+    """Hadley's four corner problems; the dimensionless published numbers read in metres."""
+    out = []
+    for case in _published.DIELECTRIC_CORNERS:
+        assert case.unit == "1"
+        out.append(DielectricCorner(relative_permittivity=(case.eps_core, case.eps_clad), pec_sides=case.pec_sides,
+                                    effective_index=case.neff, vacuum_wavelength=case.wavelength,
+                                    box_size=case.domain, upper_corner_position=case.core_box, source=case.source))
+    return tuple(out)
 
 
-def rib_neff(slab_thickness_um: float) -> float:
-    """Reference quasi-TE n_eff for one of the tabulated slab thicknesses."""
-    for rw in RIB_WAVEGUIDES:
-        if abs(rw.slab_thickness_um - slab_thickness_um) < 1e-12:
-            return rw.neff_quasi_te
-    raise KeyError(f"no tabulated rib waveguide with slab thickness {slab_thickness_um}")
+def rib_neff(*, thickness) -> float:
+    """Reference quasi-TE effective index for one of the tabulated slab thicknesses (``thickness``, m)."""
+    refuse_text(thickness=thickness)
+    if np.ndim(thickness) != 0 or np.iscomplexobj(thickness) or not np.isfinite(float(thickness)):
+        raise ValueError("thickness must be the slab thickness, one finite number in m")
+    slab = float(thickness)
+    for rw in rib_waveguides():
+        if abs(rw.thickness[0] - slab) <= 1e-12 * abs(rw.thickness[0]):
+            return rw.effective_index
+    raise KeyError(f"no tabulated rib waveguide with slab thickness {thickness} m")

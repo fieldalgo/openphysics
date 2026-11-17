@@ -15,6 +15,7 @@ the four cases is limited by something more interesting than that — see below.
 """
 
 import functools
+from fractions import Fraction
 
 import numpy as np
 import pytest
@@ -31,15 +32,17 @@ SECOND_ORDER_CASES = (0, 1, 2)
 
 
 def _solve_corner(case, n):
-    w, h = case.domain
-    cw, ch = case.core_box
-    k0 = 2.0 * np.pi / case.wavelength
+    # the dimensionless published problem, read in metres by refsol: the same doubles
+    w, h = case.box_size
+    cw, ch = case.upper_corner_position
+    eps_core, eps_clad = case.relative_permittivity
+    k0 = 2.0 * np.pi / case.vacuum_wavelength
     mesh = rectangle_mesh(w, h, n, n)
     c = mesh.nodes[mesh.triangles].mean(axis=1)
-    eps = np.where((c[:, 0] < cw) & (c[:, 1] < ch), case.eps_core, case.eps_clad)
+    eps = np.where((c[:, 0] < cw) & (c[:, 1] < ch), eps_core, eps_clad)
     pec = np.unique(np.concatenate([mesh.boundary[s] for s in case.pec_sides]))
-    n_hi = np.sqrt(max(case.eps_core, case.eps_clad))
-    n_lo = np.sqrt(min(case.eps_core, case.eps_clad))
+    n_hi = np.sqrt(max(eps_core, eps_clad))
+    n_lo = np.sqrt(min(eps_core, eps_clad))
     n_eff, _, _, _ = solve_modes(mesh, eps, k0, n_target=n_hi, num_modes=8,
                                  pec_nodes=pec)
     guided = np.sort(n_eff[(n_eff > n_lo) & (n_eff < n_hi)])[::-1]
@@ -49,18 +52,18 @@ def _solve_corner(case, n):
 
 @pytest.mark.parametrize("index", range(4))
 def test_dielectric_corner_effective_index(refsol, index):
-    case = refsol.benchmarks.DIELECTRIC_CORNERS[index]
-    err = abs(_solve_corner(case, 48) - case.neff) / case.neff
+    case = refsol.benchmarks.dielectric_corners()[index]
+    err = abs(_solve_corner(case, 48) - case.effective_index) / case.effective_index
     assert err < 1e-4, (
-        f"case {index} (eps {case.eps_core}/{case.eps_clad}, PEC "
+        f"case {index} (eps {case.relative_permittivity}, PEC "
         f"{case.pec_sides}): {err:.2e} from the published value")
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("index", SECOND_ORDER_CASES)
 def test_dielectric_corner_converges_at_second_order(refsol, index):
-    case = refsol.benchmarks.DIELECTRIC_CORNERS[index]
-    errors = [abs(_solve_corner(case, n) - case.neff) / case.neff for n in (24, 48, 96)]
+    case = refsol.benchmarks.dielectric_corners()[index]
+    errors = [abs(_solve_corner(case, n) - case.effective_index) / case.effective_index for n in (24, 48, 96)]
     assert rate(errors)[-1] > 1.8, f"case {index}: rates {rate(errors)}"
 
 
@@ -68,8 +71,8 @@ def test_dielectric_corner_converges_at_second_order(refsol, index):
 def test_reentrant_corner_converges_but_only_at_first_order(refsol):
     """The one case that does not reach second order, pinned down rather than
     excused: it still converges monotonically, just at about order one."""
-    case = refsol.benchmarks.DIELECTRIC_CORNERS[3]
-    errors = [abs(_solve_corner(case, n) - case.neff) / case.neff for n in (48, 96, 144)]
+    case = refsol.benchmarks.dielectric_corners()[3]
+    errors = [abs(_solve_corner(case, n) - case.effective_index) / case.effective_index for n in (48, 96, 144)]
     assert errors[0] > errors[1] > errors[2], f"not converging: {errors}"
     observed = rate(errors, refinement=2.0)[0]
     assert 0.5 < observed < 1.8, (
@@ -103,16 +106,23 @@ def _solve_rib_cached(slab, core_width, core_thickness, n_core, n_sub, n_cov,
     return float(guided[0])
 
 
+def _um(metres):
+    """refsol's SI length as the micrometre double the mesher and the kernel take: the decimal rule of spec D31,
+    which gives Hadley's published micrometre values back exactly."""
+    return float(Fraction(repr(float(metres))) * 10 ** 6)
+
+
 def _solve_rib(case, size_core, size_far):
-    return _solve_rib_cached(case.slab_thickness_um, case.rib_width_um,
-                             case.core_thickness_um, case.n_core,
-                             case.n_substrate, case.n_cover,
-                             case.wavelength_um, size_core, size_far)
+    slab, core = case.thickness
+    n_substrate, n_core, n_cover = case.refractive_index
+    return _solve_rib_cached(_um(slab), _um(case.length), _um(core), n_core,
+                             n_substrate, n_cover,
+                             _um(case.vacuum_wavelength), size_core, size_far)
 
 
 def _rib_case(refsol, slab):
-    matches = [c for c in refsol.benchmarks.RIB_WAVEGUIDES
-               if c.slab_thickness_um == slab]
+    matches = [c for c in refsol.benchmarks.rib_waveguides()
+               if _um(c.thickness[0]) == slab]
     assert matches, f"refsol has no rib case with slab {slab}"
     return matches[0]
 
@@ -123,9 +133,9 @@ def test_rib_waveguide_matches_the_published_value(refsol, slab):
     (slab 0) to the nearly-planar 0.7 um case."""
     case = _rib_case(refsol, slab)
     value = _solve_rib(case, SIZE_CORE, SIZE_FAR)
-    rel = abs(value - case.neff_quasi_te) / case.neff_quasi_te
+    rel = abs(value - case.effective_index) / case.effective_index
     assert rel < 2e-4, (
-        f"slab {slab}: {value:.7f} vs Hadley's {case.neff_quasi_te} ({rel:.2e})")
+        f"slab {slab}: {value:.7f} vs Hadley's {case.effective_index} ({rel:.2e})")
 
 
 def test_rib_family_reproduces_the_published_trend(refsol):
@@ -134,7 +144,7 @@ def test_rib_family_reproduces_the_published_trend(refsol):
     total, so reproducing the ORDER is a sharper test than any single value."""
     cases = [_rib_case(refsol, s) for s in SLABS]
     computed = [_solve_rib(c, SIZE_CORE, SIZE_FAR) for c in cases]
-    published = [c.neff_quasi_te for c in cases]
+    published = [c.effective_index for c in cases]
     assert all(b > a for a, b in zip(computed, computed[1:])), (
         f"not monotonic in slab thickness: {computed}")
     # the published spread across the family is 2.08e-3; the computed one is
@@ -152,8 +162,8 @@ def test_rib_waveguide_error_falls_under_refinement(refsol):
     asserted is that refining helps — the clean second-order ladder lives on the
     structured meshes galerkin builds itself."""
     case = _rib_case(refsol, 0.3)
-    errors = [abs(_solve_rib(case, sc, sf) - case.neff_quasi_te)
-              / case.neff_quasi_te
+    errors = [abs(_solve_rib(case, sc, sf) - case.effective_index)
+              / case.effective_index
               for sc, sf in ((0.20, 1.6), (0.12, 1.0), (0.08, 0.7))]
     assert errors[-1] < errors[0] / 2, f"refinement did not help: {errors}"
     assert errors[-1] < 1e-4, f"finest mesh still {errors[-1]:.2e} off"

@@ -24,6 +24,8 @@ adopts (spec D3): sipi keeps its own convention until its own step, and tests/ i
   converts its outputs. refsol's fiber is lossless (real indices only), so its converted output, the
   exact vector mode field (L3 commit 11d), has a convention clause instead: the forward mode of
   exp(-i omega t) varies as exp(+i beta z), so div E = 0 reads dEx/dx + dEy/dy + i beta Ez = 0.
+  refsol's cylinder scattering is written in exp(-i omega t) and converts nothing (L3 commit 11e): its
+  scattered field carries power outward, and an absorbing cylinder (Im n > 0) absorbs.
 - **Live arrays.** A JAX and a PyTorch gradient pass through ``to_public`` and ``to_kernel``, on a
   synthetic product (L3 commit 10) and through a mode solve (L3 commit 11b).
 """
@@ -343,6 +345,40 @@ def test_refsol_fiber_mode_field_follows_exp_minus_i_omega_t(label):
     assert np.linalg.norm(transverse - 1j * beta * e[:, 2]) > scale
     with pytest.raises(ValueError, match="real indices only"):
         fiber.vector_modes(**dict(fibre, refractive_index=(1.45 + 1e-4j, 1.44)))
+
+
+def _scattering_flux(field, wavenumber, radius=2e-6, step=1e-12, count=256):
+    """(R / k) times the closed integral of Im(conj(u) du/dr) d theta on the circle r = R: the outward power of
+    the field u divided by the incident plane wave's intensity, a width in m (u = E_z or H_z, exp(-i omega t))."""
+    theta = np.linspace(0.0, 2 * np.pi, count, endpoint=False)
+
+    def ring(r):
+        return np.stack([r * np.cos(theta), r * np.sin(theta)], axis=-1)
+    derivative = (field(ring(radius + step)) - field(ring(radius - step))) / (2 * step)
+    return radius / wavenumber * 2 * np.pi * np.mean(np.imag(np.conj(field(ring(radius))) * derivative))
+
+
+@pytest.mark.parametrize("kind,index", [("pec_tm", None), ("pec_te", None), ("dielectric", 1.5),
+                                        ("dielectric", 1.5 + 0.05j)])
+def test_refsol_scattering_is_outgoing_and_passive(kind, index):
+    """refsol.scattering follows exp(-i omega t) as written (L3 commit 11e, nothing converted): the scattered
+    field is outgoing, H^(1)(k r) ~ exp(+i k r), so its outward power equals the scattering width (it would be
+    the negative under exp(+i omega t)); the total field of a passive cylinder absorbs a width >= 0, zero for a
+    lossless one and positive for an absorbing index n' + i n''."""
+    from refsol import scattering
+    k = 2 * np.pi / 1.55e-6
+    cylinder = dict(vacuum_angular_wavenumber=k, radius=0.8e-6, kind=kind, refractive_index=index)
+    width = scattering.scattering_width(**cylinder)
+    assert width > 0
+    outward = _scattering_flux(lambda p: scattering.scattered(p, **cylinder), k)
+    assert abs(outward - width) < 1e-6 * width
+    absorbed = -_scattering_flux(lambda p: scattering.total(p, **cylinder), k)
+    if index is None or np.imag(index) == 0:
+        assert abs(absorbed) < 1e-6 * width
+    else:
+        assert absorbed > 0.1 * width
+        gain = dict(cylinder, refractive_index=np.conj(index))       # n' - i n'': a gain under exp(-i omega t)
+        assert _scattering_flux(lambda p: scattering.total(p, **gain), k) > 0.1 * width
 
 
 # ---- passivity: modes (L3 commit 11b) -------------------------------------------------------------------------

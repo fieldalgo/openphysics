@@ -27,18 +27,18 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.slab` | 대칭/비대칭 평면 유전체 도파로 TE/TM 모드, TE 장 분포 | 차단식 대비 모드 수, 짝수 모드 방정식, 경계면 연속성 |
 | `refsol.lossy_slab` | 복소 유전율 다층 슬랩, 공개 값은 `exp(-i omega t)`(전달행렬은 `exp(+i omega t - i beta z)`로 계산하고 한 번 변환): 전달행렬 특성함수, 무손실 `slab` 근에서 연속 추적한 흡수 결합 모드, 외향 sheet의 기판 누설 모드, 장 분포 | 무손실 극한 = `slab`, 정규화 잔차 ≤ 1e-12, 1차 섭동론(TE 구속률, TM 벡터식)과 O(n''^2) 일치, 유한차분 경계면·층 방정식, exp(-2 k0 gamma gap) 터널링률, 경로 무관 연속 추적 |
 | `refsol.fiber` | 계단형 굴절률 광섬유: 스칼라 LP 모드(Gloge), 정확한 벡터 TE/TM/HE/EH 모드, 음함수 미분으로 구한 정확한 벡터 군굴절률(`vector_group_index`, 파장에서 고정한 굴절률), 정확한 벡터 모드 장(`vector_mode_field`, 공개 값은 `exp(-i omega t)`: galerkin 커널 틀에서 계산하고 한 번 변환); 키워드 전용 SI 등록부 이름(코어 반경 `radius`, 쌍 (core, cladding)인 `refractive_index`, `vacuum_wavelength`, `points` (Q,2)), 무손실 | Bessel 차단값 대비 LP 개수, 2.4048의 LP11 차단, 약한 도파에서 HE11 ≈ LP01, LP11 군 축퇴, Rudolph–Neumann 근사; Richardson 외삽한 정밀 근 대비 군굴절률(재료 분산은 테스트의 내부 형식으로), 중심차분 대비 잔차 편미분; 근에서 특이한 장 연속 조건, 경계 조건(E_phi, E_z, n^2 E_r), `+i beta E_z`를 쓴 `div E = 0` |
-| `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장(`coax_potential(points, *, position, prescribed_electric_potential)`, L3 커밋 10부터 SI 등록부 이름) | 폐형식 |
+| `refsol.metallic` | 직사각형 도파로 차단(`rect_waveguide_cutoffs(*, box_size, n_max=5, include_tm=False)`, 단면 (a, b)는 m, L3 커밋 11e부터), 직육면체 공진기 공진, 동축 전위·장(`coax_potential(points, *, position, prescribed_electric_potential)`, L3 커밋 10부터 SI 등록부 이름) | 폐형식 |
 | `refsol.electrostatics` | 동축선 깊이 1 m당 정전용량 `2 pi eps0 eps_r / ln(b/a)`와 두 층 평행판 직렬 정전용량(`capacitance_per_depth`), 실수·복소 `relative_permittivity`(`exp(-i omega t)`, 손실 `Im >= 0`); 키워드 전용 SI 등록부 이름(반경은 `position`, 층마다 `thickness`와 `relative_permittivity`, `length`); 동축 전위를 재노출 | 폐형식; 평행판은 P1에서 정확 |
 | `refsol.cavity` | 주파수 상한까지의 모든 진공 PEC 상자 모드, 편광·기하 축퇴 포함, SI | 독립 Cartesian 열거, 솔버·메시 없음 |
 | `refsol.material_cavity` | 균일 충전 또는 손실 유전·자성 판을 넣은 PEC 상자의 복소 공진과 Q(TE/TM-to-z 초월방정식 근), `exp(+j*omega*t)` | 진공 극한 = 직교 좌표 스펙트럼, 같은 두 층 = 균일 축척, 소손실 Q = 에너지 충전율 |
 | `refsol.wall_loss` | 직육면체 공동 모드의 벽별 1차 도체 손실 Q, 축퇴 편광 분리, 균일 충전 | Pozar TE101, 유한차분 curl의 수치 적분, 벽별 가법성, sqrt(sigma) 축척 |
-| `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭 | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한 |
+| `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭(m); 적힌 그대로 `exp(-i omega t)`(변환 없음); `points` 다음 키워드 전용 SI 등록부 이름(`vacuum_angular_wavenumber`, 원통 반경 `radius`, `refractive_index`, `kind`, `terms`) | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한; 외향 `exp(+i k r)`, `Im n >= 0`이면 흡수 `>= 0` |
 | `refsol.bimetal` | Timoshenko (1925) 바이메탈 온도계: 힘·모멘트 평형에서 얻은 곡률, 출판된 폐형식(Timoshenko, Villarceau, 단축 Stoney 극한), 끝면 표면하중을 포함한 정확한 평면응력 띠 장 | 무작위 데이터에서 세 폐형식 일치, Stoney 극한, 단면 힘·모멘트 0, 계면 연속, 유한차분 변형률 |
 | `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C(`nafems_t4()`·`nafems_t4_target()`가 SI K로 읽음) | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
 | `refsol.joule_slab` | 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정상 1D Joule 가열: erf/erfi 폐형식(`voltage_driven`), 상수 전도도 극한, 금속형 fold 양쪽의 전류 구동 상태(`current_driven`, `fold_current`), 유계 전도도 모델용 온도 범위 | 적분한 보존 법칙(`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), 모듈 자체 도함수의 수치 적분, 유한차분, 상수 sigma 폐형식으로의 O(alpha) 접근, 대칭·반사, 전력 평형, 1매개변수 대칭 방정식 |
 | `refsol.bent_slab` | 복소 차수 Bessel/Hankel 정합(안쪽 `J`, 필름 `J`/`Y`, 외향 `H^(2)`)으로 구한 일정 반경 굽은 슬랩 극점, 안쪽 반경 기준 `n_eff`, 공개 값은 `exp(-i omega t)`(`exp(+i omega t)`로 정합하고 한 번 변환); 호출 시 선택적 `mpmath` 필요 | 잔차 ≤ 1e-12, 1/R 1차의 직선 슬랩 극한(Richardson), 큰 반경에서 초지수적으로 사라지는 손실, 반경이 줄수록 커지는 손실, TM보다 잘 구속되는 TE, mpmath 없이는 ImportError |
 | `refsol.thermal3d` | 정상 3D 열전도: 상자의 사인 곱 제조해(온도·열유속·열원)와 z 방향 층상 슬랩의 직렬 전도 | 유한차분 대비 열유속·열원, 직렬 저항 공식 대비 슬랩, NumPy만 |
-| `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세 | — |
+| `refsol.benchmarks` | Hadley (2002) 리브 도파로 n_eff 표(±3e-6), 유전체 모서리 사례(±1e-8), 완전한 형상 명세; 비공개 모듈에 출판된 그대로 두고 `rib_waveguides()`, `rib_neff(*, thickness)`, `dielectric_corners()`로 SI로 읽음 | — |
 
 ## 사용법
 
@@ -78,11 +78,11 @@ lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 + 0.01j, 1.444), thic
 lossy_slab.substrate_leaky_mode(refractive_index=(1.444, 3.48, 1.444, 3.48), thickness=(0.22e-6, 0.25e-6),
                                 vacuum_wavelength=1.55e-6)
 
-# scattered field of a PEC cylinder, radius a, wavenumber k, at points (x, y)
-u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
+# scattered field of a PEC cylinder of radius 1 um at k0 = 3.14 rad/um, at points (Q, 2) in m
+u_s = scattering.scattered(points, vacuum_angular_wavenumber=3.14e6, radius=1e-6, kind="pec_tm")
 
-# published reference: quasi-TE n_eff of the Hadley rib waveguide, slab 0.3 um
-benchmarks.rib_neff(0.3)   # 3.412492
+# published reference: quasi-TE n_eff of the Hadley rib waveguide, slab thickness 0.3 um
+benchmarks.rib_neff(thickness=0.3e-6)   # 3.412492
 ```
 
 `refsol.lossy_slab`은 복소 유전율 평면 다층 구조를 풉니다. 공개 값은 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 11c). 수동 재료는 `Im eps >= 0`(굴절률 `n' + i n''`), 감쇠하는 모드는 `Im n_eff > 0`입니다. 전달행렬은 galerkin 모드 커널의 `exp(+i omega t - i beta z)` 규약으로 그대로 계산하고, 각 함수가 복소 입력을 `refsol._conventions.to_kernel`로 한 번 변환하고 결과의 켤레(`to_public`)를 돌려줍니다. 그래서 아래 sheet 규칙은 그 내부 규약으로 적혀 있고, 공개 쪽에서는 `Im`의 부호가 반대입니다. 함수는 키워드 전용 SI 등록부 이름을 받습니다. `relative_permittivity`(층마다), `thickness`(내부 층마다, m), `vacuum_wavelength`(m), `effective_index`, `target_effective_index`, `refractive_index`(`three_layer_modes`와 `substrate_leaky_mode`의 층), `mode_count`, `mode_index`, `subdivision_count`, `relative_tolerance`, `iteration_limit`입니다. 길이는 `k0 d`로만 들어가므로 어떤 일관된 척도든 같은 지수를 줍니다. `characteristic`은 영점이 모드인 해석적 전달행렬 함수이고, `solve`는 초기값을 다듬은 뒤(실수부·허수부에 대한 scipy root, 이어서 복소 Newton) 정규화 잔차가 `1e-12`를 넘는 결과를 거부하며, `continued_root`는 구조 경로를 따라 근을 추적합니다. `three_layer_modes`는 흡수 슬랩의 모든 모드를 무손실 `slab` 근에서 감쇠 sheet(`Im Q <= 0`, 외부 장 감쇠)로 출발시키고, `substrate_leaky_mode`는 고립 슬랩의 결합 모드에서 출발해 고굴절률 기판까지 간격을 줄이며 외향 sheet(`Re Q >= 0`; 누설 모드는 `Im Q_sub > 0`로 횡방향으로 커지는 부적절(improper) 기판 장을 가지며, 복소 좌표 PML 솔버가 수렴하는 극점)에서 풉니다. `field`는 `E_y`(TE) 또는 `H_y`(TM)를 반환합니다. 자체 검증은 무손실 극한을 `slab`과, 소손실 극한을 1차 섭동론과(`n'' = 1e-3`에서 `Im n_eff` 상대오차 2.6e-8, `1e-4`에서 100배 감소), 장을 경계면·층 방정식과, 누설률을 터널링 법칙 `exp(-2 k0 gamma gap)`과 비교합니다. `tests/galerkin/test_lossy_slab_modes.py`는 닫힌 띠(흡수 필름)와 복소 좌표 PML(누설 슬랩)에서 galerkin 스칼라·벡터 솔버를 이 근과 대조합니다. 복소 오차는 2차로(가장 미세한 쌍에서 차수 1.97–2.00) 0.01 um 간격에서 3.9e-4–6.8e-4까지 줄고, `Im n_eff`는 상대적으로 3e-4(TE), 4e-3(TM) 이내로 일치합니다.
@@ -125,7 +125,7 @@ python -m pip install -e packages/galerkin-refsol
 ## 규약
 
 - 시간 의존성은 `exp(-i omega t)`이며 입사 평면파는 +x로 진행합니다.
-- 길이는 일관된 어떤 단위든 사용할 수 있습니다(파장이 척도를 정함).
+- 길이는 SI 등록부 이름 아래 미터입니다(galerkin 단계). 도파로와 산란 참조해는 k0와 길이의 곱에만 의존하므로, 다른 일관된 척도로 쓴 문제도 같은 굴절률과 장을 줍니다.
 - 유효 굴절률은 `n_eff = beta / k0`입니다.
 - `refsol.lossy_slab`과 `refsol.bent_slab`은 galerkin의 공개 모드 함수처럼 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 11c): 수동 `Im eps >= 0`, 감쇠 또는 복사하는 모드 `Im n_eff > 0`. 식은 `exp(+i omega t)`로 적혀 있고 `refsol._conventions`에서 한 번 변환합니다. 이를 모드 커널(exp(+i omega t))과 비교하는 galerkin 테스트는 비교할 때 켤레를 한 번 취합니다.
 - `refsol.fiber.vector_mode_field`는 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 11d): 전방 모드는 `exp(i (beta z - omega t))`로 변하므로 `dEx/dx + dEy/dy + i beta E_z = 0`입니다. 장은 galerkin 커널 틀 `exp(+i omega t - i beta z)`에서 계산하고 `refsol._conventions`에서 한 번 변환합니다. 이를 모드 커널과 비교하는 테스트는 비교할 때 켤레를 한 번 취합니다. 광섬유의 다른 값은 실수입니다.
@@ -156,4 +156,4 @@ Apache License 2.0 — [LICENSE](../../../../../../packages/galerkin-refsol/LICE
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-`refsol.benchmarks`의 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과이고, `refsol.thermal_convection`의 NAFEMS T4 목표값은 출판된 벤치마크 수치입니다. 출처는 [NOTICE](../../../../../../packages/galerkin-refsol/NOTICE)를 참조하세요.
+`refsol.benchmarks`가 읽는 벤치마크 수치는 Hadley (2002)가 출판한 수치 결과이고, `refsol.thermal_convection`의 NAFEMS T4 목표값은 출판된 벤치마크 수치입니다. 출처는 [NOTICE](../../../../../../packages/galerkin-refsol/NOTICE)를 참조하세요.

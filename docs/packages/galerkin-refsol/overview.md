@@ -32,18 +32,18 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.lossy_slab` | multilayer slab with complex permittivity, public values in `exp(-i omega t)` (the transfer matrix computes in `exp(+i omega t - i beta z)` and converts once): transfer-matrix characteristic function, bound absorbing modes continued from the lossless `slab` roots, substrate-leaky modes on the outgoing sheet, field profiles | lossless limit equals `slab`, normalized residual ≤ 1e-12, first-order perturbation theory (TE confinement factor, TM vector formula) to O(n''^2), interface and layer equations by finite differences, exp(-2 k0 gamma gap) tunnelling rate, path-independent continuation |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, indices frozen at the wavelength) and exact vector mode fields (`vector_mode_field`, public values in `exp(-i omega t)`: computed in galerkin's kernel frame and converted once); keyword-only SI registry names (`radius` the core radius, `refractive_index` the pair (core, cladding), `vacuum_wavelength`, `points` (Q,2)), lossless | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots (with material dispersion through the tests' internal form), residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r), `div E = 0` with `+i beta E_z` |
-| `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field (`coax_potential(points, *, position, prescribed_electric_potential)`, SI registry names since L3 commit 10) | closed forms |
+| `refsol.metallic` | rectangular waveguide cutoffs (`rect_waveguide_cutoffs(*, box_size, n_max=5, include_tm=False)`, the cross-section (a, b) in m, since L3 commit 11e), rectangular cavity resonances, coaxial potential and field (`coax_potential(points, *, position, prescribed_electric_potential)`, SI registry names since L3 commit 10) | closed forms |
 | `refsol.electrostatics` | coaxial-line capacitance `2 pi eps0 eps_r / ln(b/a)` and two-layer parallel-plate series capacitance per metre of depth (`capacitance_per_depth`), real or complex `relative_permittivity` (`exp(-i omega t)`, loss `Im >= 0`); keyword-only SI registry names (`position` for the radii, `thickness` and `relative_permittivity` per layer, `length`); re-exports the coaxial potential | closed forms; the plate case is exact in P1 |
 | `refsol.cavity` | every vacuum PEC box mode up to a frequency ceiling, with polarization and geometric degeneracy, SI | independent Cartesian enumeration, no solver or mesh |
 | `refsol.material_cavity` | complex resonances and Q of a PEC box uniformly filled or loaded by a lossy dielectric/magnetic slab (TE/TM-to-z transcendental roots), `exp(+j*omega*t)` | vacuum limit equals the Cartesian spectrum, identical layers equal uniform rescaling, small-loss Q equals the energy filling factor |
 | `refsol.wall_loss` | first-order conductor-loss Q of rectangular cavity modes per wall, split degenerate polarizations, uniform filling | Pozar TE101, numerical quadrature of a finite-difference curl, per-wall additivity, sqrt(sigma) scaling |
-| `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
+| `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width (m); `exp(-i omega t)` as written (nothing converted); keyword-only SI registry names after `points` (`vacuum_angular_wavenumber`, `radius` the cylinder radius, `refractive_index`, `kind`, `terms`) | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit; outgoing `exp(+i k r)` and absorption `>= 0` for `Im n >= 0` |
 | `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
 | `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance, read in SI (K) through `nafems_t4()` and `nafems_t4_target()` | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
 | `refsol.joule_slab` | steady 1D Joule heating with `sigma = sigma0 (1 + alpha (T - T0))` between fixed potentials and temperatures: closed form in erf/erfi (`voltage_driven`), the constant-conductivity limit, current-driven states on both sides of the metal-like fold (`current_driven`, `fold_current`), temperature range for bounded conductivity models | integrated conservation laws (`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), quadrature of the module's own derivatives, finite differences, O(alpha) approach to the constant-sigma closed form, symmetry and reflection, power balance, one-parameter symmetric equation |
 | `refsol.bent_slab` | constant-radius bent slab poles by complex-order Bessel/Hankel matching (inner `J`, film `J`/`Y`, outgoing `H^(2)`), `n_eff` referred to the inner radius, public values in `exp(-i omega t)` (matched in `exp(+i omega t)`, converted once); needs the optional `mpmath` at call time | residual ≤ 1e-12, straight-slab limit at first order in 1/R (Richardson), super-exponentially vanishing loss at large radius, loss growing as the radius shrinks, TE better confined than TM, ImportError without mpmath |
 | `refsol.thermal3d` | Steady 3D heat: sine-product manufactured field on a box (temperature, flux, source) and series conduction through a layered slab along z | Flux and source against finite differences, slab against the series-resistance formula, NumPy only |
-| `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
+| `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry; stored as published in a private module, read in SI through `rib_waveguides()`, `rib_neff(*, thickness)` and `dielectric_corners()` | — |
 
 ## Usage
 
@@ -100,11 +100,11 @@ lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 + 0.01j, 1.444), thic
 lossy_slab.substrate_leaky_mode(refractive_index=(1.444, 3.48, 1.444, 3.48), thickness=(0.22e-6, 0.25e-6),
                                 vacuum_wavelength=1.55e-6)
 
-# scattered field of a PEC cylinder, radius a, wavenumber k, at points (x, y)
-u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
+# scattered field of a PEC cylinder of radius 1 um at k0 = 3.14 rad/um, at points (Q, 2) in m
+u_s = scattering.scattered(points, vacuum_angular_wavenumber=3.14e6, radius=1e-6, kind="pec_tm")
 
-# published reference: quasi-TE n_eff of the Hadley rib waveguide, slab 0.3 um
-benchmarks.rib_neff(0.3)   # 3.412492
+# published reference: quasi-TE n_eff of the Hadley rib waveguide, slab thickness 0.3 um
+benchmarks.rib_neff(thickness=0.3e-6)   # 3.412492
 ```
 
 `refsol.lossy_slab` solves the planar multilayer stack with complex permittivity.
@@ -270,7 +270,7 @@ graders for another solver.
 ## Conventions
 
 - Time dependence `exp(-i omega t)`; incident plane waves travel toward +x.
-- Lengths in any consistent unit (the wavelength sets the scale).
+- Lengths in metres under SI registry names (galerkin step); the waveguide and scattering references depend only on k0 times a length, so a problem written in another consistent scale gives the same indices and fields.
 - Effective index `n_eff = beta / k0`.
 - `refsol.lossy_slab` and `refsol.bent_slab` follow `exp(-i omega t)` like galerkin's public mode functions (galerkin step, L3 commit 11c): passive `Im eps >= 0`, attenuated or radiating `Im n_eff > 0`. Their formulas are written in `exp(+i omega t)` and convert once in `refsol._conventions`; a galerkin test that compares them with a mode kernel (exp(+i omega t)) conjugates once at the comparison.
 - `refsol.fiber.vector_mode_field` follows `exp(-i omega t)` (galerkin step, L3 commit 11d): a forward mode varies as `exp(i (beta z - omega t))`, so `dEx/dx + dEy/dy + i beta E_z = 0`. The field is computed in galerkin's kernel frame `exp(+i omega t - i beta z)` and converted once in `refsol._conventions`; a test that compares it with a mode kernel conjugates once at the comparison. The fiber's other values are real.
@@ -304,6 +304,6 @@ Apache License 2.0 - see [LICENSE](../../../packages/galerkin-refsol/LICENSE) an
 
 Copyright 2026 Yongha Kim (FieldAlgo)
 
-The benchmark values in `refsol.benchmarks` are numerical results published by
+The benchmark values that `refsol.benchmarks` reads are numerical results published by
 Hadley (2002), and the NAFEMS T4 target in `refsol.thermal_convection` is a published
 benchmark number; see [NOTICE](../../../packages/galerkin-refsol/NOTICE) for their provenance.
