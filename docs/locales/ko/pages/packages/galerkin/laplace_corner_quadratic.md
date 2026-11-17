@@ -37,3 +37,5 @@ zeta 급수를 불러오지 않습니다. 기저 정의와 분할 영역 항등�
 고정 접지 도체 정확도, 메시 수렴, 다른 운영체제의 검증을 뜻하지 않습니다.
 
 [English](../../../../../packages/galerkin/laplace_corner_quadratic.md)
+
+별도 [세 기저 원거리 상호 작용](laplace_corner_quadratic_far.md)은 이 밀도의 명시적 원거리 로그 블록입니다. 근접·접촉 적분과 전체 장 연결은 별개입니다.
