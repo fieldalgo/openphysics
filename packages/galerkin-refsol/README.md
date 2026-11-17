@@ -30,7 +30,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.elasticity_traction` | Plane stress/strain uniaxial and shear fields, Cartesian sigma*n and polynomial traction resultants | Closed forms and direct differentiation, no FEM imports |
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
-| `refsol.lossy_slab` | multilayer slab with complex permittivity, `exp(+i omega t - i beta z)`: transfer-matrix characteristic function, bound absorbing modes continued from the lossless `slab` roots, substrate-leaky modes on the outgoing sheet, field profiles | lossless limit equals `slab`, normalized residual ≤ 1e-12, first-order perturbation theory (TE confinement factor, TM vector formula) to O(n''^2), interface and layer equations by finite differences, exp(-2 k0 gamma gap) tunnelling rate, path-independent continuation |
+| `refsol.lossy_slab` | multilayer slab with complex permittivity, public values in `exp(-i omega t)` (the transfer matrix computes in `exp(+i omega t - i beta z)` and converts once): transfer-matrix characteristic function, bound absorbing modes continued from the lossless `slab` roots, substrate-leaky modes on the outgoing sheet, field profiles | lossless limit equals `slab`, normalized residual ≤ 1e-12, first-order perturbation theory (TE confinement factor, TM vector formula) to O(n''^2), interface and layer equations by finite differences, exp(-2 k0 gamma gap) tunnelling rate, path-independent continuation |
 | `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, optional material dispersion) and exact vector mode fields (`vector_mode_field`) | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots, residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r) |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field (`coax_potential(points, *, position, prescribed_electric_potential)`, SI registry names since L3 commit 10) | closed forms |
 | `refsol.electrostatics` | coaxial-line capacitance `2 pi eps0 eps_r / ln(b/a)` and two-layer parallel-plate series capacitance per metre of depth (`capacitance_per_depth`), real or complex `relative_permittivity` (`exp(-i omega t)`, loss `Im >= 0`); keyword-only SI registry names (`position` for the radii, `thickness` and `relative_permittivity` per layer, `length`); re-exports the coaxial potential | closed forms; the plate case is exact in P1 |
@@ -41,7 +41,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
 | `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance, read in SI (K) through `nafems_t4()` and `nafems_t4_target()` | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
 | `refsol.joule_slab` | steady 1D Joule heating with `sigma = sigma0 (1 + alpha (T - T0))` between fixed potentials and temperatures: closed form in erf/erfi (`voltage_driven`), the constant-conductivity limit, current-driven states on both sides of the metal-like fold (`current_driven`, `fold_current`), temperature range for bounded conductivity models | integrated conservation laws (`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), quadrature of the module's own derivatives, finite differences, O(alpha) approach to the constant-sigma closed form, symmetry and reflection, power balance, one-parameter symmetric equation |
-| `refsol.bent_slab` | constant-radius bent slab poles by complex-order Bessel/Hankel matching (inner `J`, film `J`/`Y`, outgoing `H^(2)`), `n_eff` referred to the inner radius, `exp(+i omega t)`; needs the optional `mpmath` at call time | residual ≤ 1e-12, straight-slab limit at first order in 1/R (Richardson), super-exponentially vanishing loss at large radius, loss growing as the radius shrinks, TE better confined than TM, ImportError without mpmath |
+| `refsol.bent_slab` | constant-radius bent slab poles by complex-order Bessel/Hankel matching (inner `J`, film `J`/`Y`, outgoing `H^(2)`), `n_eff` referred to the inner radius, public values in `exp(-i omega t)` (matched in `exp(+i omega t)`, converted once); needs the optional `mpmath` at call time | residual ≤ 1e-12, straight-slab limit at first order in 1/R (Richardson), super-exponentially vanishing loss at large radius, loss growing as the radius shrinks, TE better confined than TM, ImportError without mpmath |
 | `refsol.thermal3d` | Steady 3D heat: sine-product manufactured field on a box (temperature, flux, source) and series conduction through a layered slab along z | Flux and source against finite differences, slab against the series-resistance formula, NumPy only |
 | `refsol.benchmarks` | Hadley (2002) rib-waveguide n_eff table (±3e-6) and dielectric-corner cases (±1e-8), fully specified geometry | — |
 
@@ -88,14 +88,17 @@ from refsol import fiber, slab, lossy_slab, scattering, benchmarks
 # exact HE11 effective index of a step-index fiber
 n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
 
-# all guided TE modes of a 220 nm SOI slab
-slab.modes(n_f=3.48, n_s=1.444, n_c=1.444, d=0.22, wavelength=1.55, pol="TE")
+# all guided TE modes of a 220 nm SOI slab: layers (substrate, film, cover), lengths in m
+slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22e-6, vacuum_wavelength=1.55e-6, pol="TE")
 
-# complex TE0 of the same slab with an absorbing film n = 3.48 - 0.01i (Im n_eff < 0)
-lossy_slab.three_layer_modes(3.48 - 0.01j, 1.444, 1.444, d=0.22, wavelength=1.55, pol="TE")[0]
+# complex TE0 of the same slab with an absorbing film n = 3.48 + 0.01i (exp(-i omega t): Im n_eff > 0)
+lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 + 0.01j, 1.444), thickness=0.22e-6,
+                             vacuum_wavelength=1.55e-6, pol="TE")[0]
 
-# substrate-leaky TE0: 0.22 um film over a 0.25 um low-index gap on silicon, outgoing sheet
-lossy_slab.substrate_leaky_mode(3.48, 1.444, 3.48, d=0.22, gap=0.25, wavelength=1.55)
+# substrate-leaky TE0: 0.22 um film over a 0.25 um low-index gap on silicon, outgoing sheet;
+# layers (cover, film, gap material, substrate), thickness the pair (film, gap)
+lossy_slab.substrate_leaky_mode(refractive_index=(1.444, 3.48, 1.444, 3.48), thickness=(0.22e-6, 0.25e-6),
+                                vacuum_wavelength=1.55e-6)
 
 # scattered field of a PEC cylinder, radius a, wavenumber k, at points (x, y)
 u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
@@ -104,10 +107,20 @@ u_s = scattering.scattered(x, y, k=3.14, a=1.0, kind="pec_tm")
 benchmarks.rib_neff(0.3)   # 3.412492
 ```
 
-`refsol.lossy_slab` solves the planar multilayer stack with complex permittivity
-in the `exp(+i omega t - i beta z)` convention of the galerkin mode solvers: a
-passive material has `Im eps <= 0` (index `n' - i n''`) and an attenuated mode
-`Im n_eff < 0`. `characteristic` is the analytic transfer-matrix function whose
+`refsol.lossy_slab` solves the planar multilayer stack with complex permittivity.
+Its public values follow `exp(-i omega t)` (galerkin step, L3 commit 11c): a
+passive material has `Im eps >= 0` (index `n' + i n''`) and an attenuated mode
+`Im n_eff > 0`. The transfer matrix computes in the `exp(+i omega t - i beta z)`
+convention of the galerkin mode kernels, unchanged; each function converts its
+complex inputs once with `refsol._conventions.to_kernel` and returns the
+conjugate of the result (`to_public`), so the sheet rules below are stated in that
+internal convention and read with the opposite sign of `Im` on the public side.
+The functions take keyword-only SI registry names: `relative_permittivity` (one
+per layer), `thickness` (one per interior layer, m), `vacuum_wavelength` (m),
+`effective_index`, `target_effective_index`, `refractive_index` (the layers of
+`three_layer_modes` and `substrate_leaky_mode`), `mode_count`, `mode_index`,
+`subdivision_count`, `relative_tolerance` and `iteration_limit`; the lengths only
+enter through `k0 d`, so any consistent scale gives the same index. `characteristic` is the analytic transfer-matrix function whose
 zeros are the modes; `solve` refines a guess (scipy root on real and imaginary
 parts, then complex Newton) and rejects a result whose normalized residual
 exceeds `1e-12`; `continued_root` follows a root along a path of structures.
@@ -183,8 +196,12 @@ galerkin bend solver. `mode` starts a secant iteration from the straight
 `slab` root and accepts a pole only when its normalized `residual` is at most
 `1e-12`; `mpmath` is imported when a function is called and a missing package
 raises `ImportError` naming it, so `import refsol` and the rest of the package
-work without it. The self-checks skip without `mpmath` and verify the residual,
-`Im n_eff < 0`, the straight-slab limit at first order in `1/R` (the
+work without it. It takes `refractive_index` (the regions `(cladding, film,
+cladding)` by increasing radius), `thickness`, `bend_radius`, `vacuum_wavelength`,
+`effective_index`, `target_effective_index`, `mode_index` and `relative_tolerance`,
+and its public values follow `exp(-i omega t)` (L3 commit 11c): the matching above
+runs in `exp(+i omega t)` and the result is conjugated once. The self-checks skip without `mpmath` and verify the residual,
+`Im n_eff > 0`, the straight-slab limit at first order in `1/R` (the
 Richardson-extrapolated R = 40/80 um values recover the straight root to
 5.8e-6 against a 3.9e-3 shift), the super-exponential vanishing of the loss at
 large radius and its growth as the radius shrinks. The poles coincide with the
@@ -255,7 +272,8 @@ graders for another solver.
 - Time dependence `exp(-i omega t)`; incident plane waves travel toward +x.
 - Lengths in any consistent unit (the wavelength sets the scale).
 - Effective index `n_eff = beta / k0`.
-- `refsol.lossy_slab` and `refsol.material_cavity` use `exp(+i omega t)` like the galerkin solvers: passive `Im eps <= 0`, attenuated `Im n_eff < 0`, decaying resonance `Im omega > 0`. Conjugate to convert.
+- `refsol.lossy_slab` and `refsol.bent_slab` follow `exp(-i omega t)` like galerkin's public mode functions (galerkin step, L3 commit 11c): passive `Im eps >= 0`, attenuated or radiating `Im n_eff > 0`. Their formulas are written in `exp(+i omega t)` and convert once in `refsol._conventions`.
+- `refsol.material_cavity` uses `exp(+i omega t)` like the galerkin cavity kernels: passive `Im eps <= 0`, decaying resonance `Im omega > 0`. Conjugate to convert.
 
 ## References
 

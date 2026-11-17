@@ -410,6 +410,26 @@
     {"package": "galerkin", "kind": "parameter", "name": "et_mode", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode"},
     {"package": "galerkin", "kind": "parameter", "name": "ez_mode", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode"},
     {"package": "galerkin", "kind": "parameter", "name": "et_in", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: incident and incident_mode"},
-    {"package": "galerkin", "kind": "parameter", "name": "ez_in", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: incident and incident_mode"}
+    {"package": "galerkin", "kind": "parameter", "name": "ez_in", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: incident and incident_mode"},
+    {"package": "refsol", "kind": "parameter", "name": "n_f", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index, the layers in order of increasing x or r (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_s", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_c", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_clad", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_gap", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_sub", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n_cover", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): refractive_index, written out (the former default was the gap's)"},
+    {"package": "refsol", "kind": "parameter", "name": "d", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): thickness"},
+    {"package": "refsol", "kind": "parameter", "name": "gap", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): thickness, the pair (film, gap) (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "wavelength", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): vacuum_wavelength"},
+    {"package": "refsol", "kind": "parameter", "name": "neff", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): effective_index"},
+    {"package": "refsol", "kind": "parameter", "name": "eps", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): relative_permittivity, one per layer (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "guess", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): target_effective_index"},
+    {"package": "refsol", "kind": "parameter", "name": "neff_start", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): effective_index"},
+    {"package": "refsol", "kind": "parameter", "name": "max_modes", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): mode_count"},
+    {"package": "refsol", "kind": "parameter", "name": "steps", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): subdivision_count"},
+    {"package": "refsol", "kind": "parameter", "name": "tol", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): relative_tolerance"},
+    {"package": "refsol", "kind": "parameter", "name": "max_newton", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): iteration_limit"},
+    {"package": "refsol", "kind": "parameter", "name": "radius", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): bend_radius"},
+    {"package": "refsol", "kind": "parameter", "name": "order", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): mode_index"}
   ]
 }

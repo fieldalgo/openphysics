@@ -56,8 +56,8 @@ def solve(pol, scale):
 
 @pytest.mark.parametrize("pol", ["TE", "TM"])
 def test_fundamental_slab_mode(refsol, pol):
-    reference = refsol.slab.modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                                  d=THICKNESS, wavelength=WAVELENGTH, pol=pol)[0]
+    reference = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                                  vacuum_wavelength=WAVELENGTH, pol=pol)[0]
     _, _, _, value = solve(pol, 2)
     rel = abs(value - reference) / reference
     assert rel < 1e-3, f"{pol}0: {value:.9f} vs {reference:.9f} ({rel:.2e})"
@@ -82,7 +82,7 @@ def test_the_side_walls_really_do_select_the_polarization(refsol, pol):
 
 @pytest.mark.parametrize("pol", ["TE", "TM"])
 def test_slab_mode_converges_at_second_order(refsol, pol):
-    reference = refsol.slab.modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                                  d=THICKNESS, wavelength=WAVELENGTH, pol=pol)[0]
+    reference = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                                  vacuum_wavelength=WAVELENGTH, pol=pol)[0]
     errors = [abs(solve(pol, s)[3] - reference) / reference for s in (1, 2, 4)]
     assert_second_order(errors, name=f"{pol}0 slab mode")

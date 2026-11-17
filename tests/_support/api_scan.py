@@ -86,15 +86,16 @@ INTERNAL_DOCSTRING = "Internal module, consistent units"
 # Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin after L3 commit 11a,
 # whose em kernels left the top level and galerkin.waveguide for galerkin.kernels and whose EdgeSpace method
 # argument node_set became structural (98 before), so only the cavity modules keep entries; refsol after L3
-# commit 10, which emptied galerkin's electrostatics and refsol's electrostatics with the coax potential and
-# field of refsol.metallic it re-exports (galerkin 102 and refsol 240 before). L2 commit 8 had emptied
+# commit 11c, which emptied slab, lossy_slab and bent_slab (222 before; 240 before L3 commit 10, which emptied
+# galerkin's electrostatics and refsol's electrostatics with the coax potential and field of refsol.metallic it
+# re-exports, galerkin 102 before). L2 commit 8 had emptied
 # galerkin's elasticity, thermoelasticity, the two thermal-mechanical workflows, shape and coupling and refsol's
 # bimetal, elasticity, elasticity_multilayer, elasticity_traction, thermoelastic_traction and thermoelasticity,
 # so only the electromagnetic modules keep entries (galerkin 301 on f693ae3a, 191 after L2 commit 4, 170 after
 # L2 commit 6, which emptied the heat modules, 154 after L2 commit 7, which emptied electric, joule_heating and
 # temperature_joule_heating; refsol 549 on f693ae3a, 394 after L2 commit 6, 354 after L2 commit 7, which
 # emptied joule_slab). They never grow.
-BASELINE_COUNTS = {"galerkin": 25, "physmat": 0, "refsol": 222}
+BASELINE_COUNTS = {"galerkin": 25, "physmat": 0, "refsol": 120}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 

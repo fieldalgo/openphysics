@@ -26,8 +26,8 @@ def solve(scale, pad):
 
 
 def main():
-    reference = modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                      d=THICKNESS, wavelength=WAVELENGTH, pol='TE')[0]
+    reference = modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS, vacuum_wavelength=WAVELENGTH,
+                      pol='TE')[0]
     print(f'Infinite-cladding TE0 reference: {reference:.9f}')
     rows = []
     for study, settings in (

@@ -39,7 +39,7 @@ def slab_document(pol="TE", size=0.012, pad=1.5):
 
 @pytest.mark.parametrize("pol", ["TE", "TM"])
 def test_vector_slab_reference_polarization_and_mesh_convergence(pol):
-    exact = slab.modes(3.48, 1.444, 1.444, 0.22, 1.55, pol)[0]
+    exact = slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22, vacuum_wavelength=1.55, pol=pol)[0]
     errors = []
     for h in (0.024, 0.012, 0.006):
         result = run(slab_document(pol, h), verbose=False)
@@ -121,7 +121,7 @@ def rescale(doc, symbol, ratio):
 def test_vector_units_and_saved_raw_fields_reconstruct_the_physical_field(symbol, ratio, tmp_path):
     doc = rescale(slab_document("TM"), symbol, ratio)
     result = run(doc, verbose=False)
-    exact = slab.modes(3.48, 1.444, 1.444, 0.22, 1.55, "TM")[0]
+    exact = slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22, vacuum_wavelength=1.55, pol="TM")[0]
     assert abs(result.effective_index[0, 0] - exact) < 1e-3
     assert result.mode_fields == [] and result.group_index() is None
     out = result.save(tmp_path / symbol)
