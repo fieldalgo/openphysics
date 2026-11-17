@@ -11,7 +11,8 @@ The coaxial closed forms take SI keyword-only registry names after the leading
 positional ``points`` ((Q,2) metre coordinates around the axis at the origin); a str
 for a quantity raises TypeError. ``refsol.electrostatics`` re-exports them.
 ``rect_waveguide_cutoffs`` takes the cross-section as ``box_size`` (a, b) in m (L3 commit
-11e); ``rect_cavity_resonances`` is converted with the cavity references (L3 commit 12).
+11e) and ``rect_cavity_resonances`` the box as ``box_size`` (a, b, d) in m (L3 commit 12);
+both return real k**2 in 1/m**2.
 """
 
 from __future__ import annotations
@@ -53,14 +54,30 @@ def _rect_waveguide_cutoffs(a, b, n_max=5, include_tm=False):
     return sorted(out)
 
 
-def rect_cavity_resonances(a: float, b: float, d: float, n_max: int = 3
-                           ) -> list[tuple[float, str]]:
-    """Sorted list of (k^2, label) for a PEC box a x b x d.
+def rect_cavity_resonances(*, box_size, n_max: int = 3) -> list[tuple[float, str]]:
+    """Sorted list of (k^2, label) for a PEC box a x b x d (``box_size`` (a, b, d), m).
 
-    k^2 = (m pi/a)^2 + (n pi/b)^2 + (p pi/d)^2 with the usual existence rules:
-    TE_mnp needs p >= 1 and (m, n) != (0, 0); TM_mnp needs m, n >= 1 and p >= 0.
+    k^2 = (m pi/a)^2 + (n pi/b)^2 + (p pi/d)^2 in 1/m^2, for m, n, p <= ``n_max``, with the usual
+    existence rules: TE_mnp needs p >= 1 and (m, n) != (0, 0); TM_mnp needs m, n >= 1 and p >= 0.
     A 3D Nedelec eigen-solver (M3b) must reproduce this spectrum exactly.
     """
+    refuse_text(box_size=box_size)
+    message = "box_size must be the box (a, b, d), three finite positive lengths in m"
+    if isinstance(box_size, (bytes, dict)) or np.ndim(box_size) != 1 or len(box_size) != 3 \
+            or np.iscomplexobj(box_size):
+        raise ValueError(message)
+    try:
+        a, b, d = (float(v) for v in box_size)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(message) from exc
+    if not all(np.isfinite(v) and v > 0 for v in (a, b, d)):
+        raise ValueError(message)
+    if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or n_max < 0:
+        raise ValueError("n_max must be a non-negative integer")
+    return _rect_cavity_resonances(a, b, d, n_max)
+
+
+def _rect_cavity_resonances(a, b, d, n_max=3):
     out = []
     for m in range(n_max + 1):
         for n in range(n_max + 1):

@@ -90,7 +90,7 @@ def _check_result(result):
 @pytest.mark.parametrize("lengths", [(1, 1, 1), (1, .8, .6)])
 def test_independent_transverse_amplitude_count_matches_refsol(lengths, refsol):
     exact = _amplitude_spectrum(lengths)
-    reference = [pair[0] for pair in refsol.metallic.rect_cavity_resonances(*lengths, n_max=4)]
+    reference = [pair[0] for pair in refsol.metallic.rect_cavity_resonances(box_size=lengths, n_max=4)]
     np.testing.assert_allclose(exact, reference, rtol=1e-13)
     if lengths == (1, 1, 1):
         np.testing.assert_allclose(exact[:11] / np.pi**2, [2]*3 + [3]*2 + [5]*6)
@@ -326,7 +326,7 @@ def test_fixed_three_mesh_cluster_convergence(lengths, multiplicities, refsol):
     count = sum(multiplicities)
     reference = _amplitude_spectrum(lengths)[:count]
     np.testing.assert_allclose(reference, [p[0] for p in
-        refsol.metallic.rect_cavity_resonances(*lengths, n_max=4)][:count], rtol=1e-13)
+        refsol.metallic.rect_cavity_resonances(box_size=lengths, n_max=4)][:count], rtol=1e-13)
     boundaries = np.cumsum(multiplicities)[:-1]
     exact_groups = np.split(reference, boundaries)
     errors, widths = [], []

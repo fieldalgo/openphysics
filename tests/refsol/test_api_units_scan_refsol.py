@@ -174,7 +174,7 @@ _ELECTROSTATICS = [
     ("electrostatics", "coax_capacitance", dict(position=(1.0, 3.0), relative_permittivity=2.2 + 0.044j)),
     ("electrostatics", "two_layer_plate_capacitance", dict(thickness=(3e-4, 7e-4), relative_permittivity=(2.0, 5.0),
                                                            length=2e-3)),
-    # re-exported by refsol.electrostatics (their own module, metallic, keeps entries until L3 commit 11)
+    # re-exported by refsol.electrostatics (their own module, metallic, is clean since L3 commit 12)
     ("metallic", "coax_potential", dict(_COAX, points=P2)),
     ("metallic", "coax_field_magnitude", dict(_COAX, points=P2)),
 ]
@@ -223,12 +223,31 @@ _EM_SCATTERING = [
     ("scattering", "scattering_width", dict(_CYLINDER, kind="dielectric", refractive_index=1.5, terms=20)),
     ("benchmarks", "rib_neff", dict(thickness=0.3e-6)),
 ]
+_BOX = (1.0, 0.8, 0.6)
+_EM_CAVITY = [
+    ("cavity", "rectangular_cavity_modes", dict(box_size=_BOX, frequency_limit=4e8)),
+    ("material_cavity", "quality_factor", dict(resonant_frequency=1.5e8 - 6e5j)),
+    ("material_cavity", "complex_frequency_from_eigenvalue", dict(wavenumber_squared=10.6 - 0.08j)),
+    ("material_cavity", "uniformly_filled_eigenvalue", dict(wavenumber_squared=19.7, relative_permittivity=4 + 0.04j,
+                                                            relative_permeability=1.0)),
+    ("material_cavity", "dielectric_loss_quality_factor", dict(loss_tangent=0.01)),
+    ("material_cavity", "slab_loaded_cavity_modes", dict(box_size=_BOX, thickness=0.3, frequency_limit=2e8,
+                                                         relative_permittivity=(4 + 0.04j, 1.0),
+                                                         relative_permeability=(1.0, 1.0), scan_samples=400,
+                                                         subdivision_count=4)),
+    ("wall_loss", "wall_loss_modes", dict(box_size=_BOX, frequency_limit=3e8, electrical_conductivity=5.8e7,
+                                          relative_permittivity=1.0, relative_permeability=1.0)),
+    ("wall_loss", "pozar_te101_quality_factor", dict(box_size=(0.02286, 0.01016, 0.02), electrical_conductivity=5.8e7)),
+    ("metallic", "rect_waveguide_cutoffs", dict(box_size=(1.0, 0.5))),
+    ("metallic", "rect_cavity_resonances", dict(box_size=_BOX)),
+]
 # L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab, L2 commit 8 the six mechanics and
 # thermoelastic modules, L3 commit 10 electrostatics, L3 commit 11c slab, lossy_slab and bent_slab, L3 commit
-# 11d fiber and L3 commit 11e scattering and benchmarks: each callable that takes a quantity has a case.
+# 11d fiber, L3 commit 11e scattering and benchmarks and L3 commit 12 cavity, material_cavity, wall_loss and
+# metallic: each callable that takes a quantity has a case.
 STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
                 for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR + _EM_FIBER
-                + _EM_SCATTERING}
+                + _EM_SCATTERING + _EM_CAVITY}
 
 
 @pytest.fixture(scope="module")

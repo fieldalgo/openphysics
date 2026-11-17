@@ -4,9 +4,8 @@
 """Material-loaded PEC cavity: exact rescaling, slab references and fixed gates.
 
 The public solver takes and returns complex values under exp(-i omega t) (a passive loss is
-Im >= 0, a decaying mode Im f < 0). refsol's material cavity references still compute under
-exp(+j omega t) until their own conversion: each comparison hands them the conjugate inputs and
-conjugates their complex outputs once (D8).
+Im >= 0, a decaying mode Im f < 0), as refsol's material cavity references do since the galerkin
+step (L3 commit 12): the comparisons take both as they are.
 """
 
 import numpy as np
@@ -103,12 +102,13 @@ def test_uniform_filling_is_an_exact_discrete_rescaling(n, eps, mu, refsol):
     filled = solve_material_cavity_box(
         box_size=LENGTHS, subdivision_count=(n,) * 3, regions=[Region(((0, 1), (0, .8), (0, .6)), eps, mu)],
         mode_count=5, target_frequency=float(150e6 / np.sqrt(abs(eps * mu))))
-    reference = [refsol.material_cavity.uniformly_filled_eigenvalue(v, np.conj(eps), np.conj(mu))
+    reference = [refsol.material_cavity.uniformly_filled_eigenvalue(wavenumber_squared=v, relative_permittivity=eps,
+                                                                    relative_permeability=mu)
                  for v in vacuum.wavenumber_squared]
     np.testing.assert_allclose(np.sort_complex(filled.wavenumber_squared),
-                               np.sort_complex(np.conj(reference)), rtol=1e-11)
+                               np.sort_complex(reference), rtol=1e-11)
     exact_q = refsol.material_cavity.quality_factor(
-        refsol.material_cavity.complex_frequency_from_eigenvalue(reference[0]))
+        resonant_frequency=refsol.material_cavity.complex_frequency_from_eigenvalue(wavenumber_squared=reference[0]))
     np.testing.assert_allclose(filled.quality_factor, exact_q, rtol=1e-9)
     assert filled.lossless == (np.imag(eps) == 0 and np.imag(mu) == 0)
     _check_result(filled)
@@ -119,7 +119,7 @@ def test_low_loss_uniform_dielectric_quality_factor_is_inverse_loss_tangent(refs
     result = solve_material_cavity_box(box_size=LENGTHS, subdivision_count=(4, 4, 4), regions=[
         Region(((0, 1), (0, .8), (0, .6)), 2.2 * (1 + 1j * tan_delta))],
         mode_count=3, target_frequency=120e6)
-    exact = refsol.material_cavity.dielectric_loss_quality_factor(tan_delta)
+    exact = refsol.material_cavity.dielectric_loss_quality_factor(loss_tangent=tan_delta)
     np.testing.assert_allclose(result.quality_factor, exact, rtol=1e-9)
     assert abs(exact * tan_delta - 1) < 1e-6
 
@@ -152,11 +152,11 @@ def test_near_target_matches_complete_dense_complex_spectrum(n, target, count):
 
 def test_lossless_slab_is_real_and_near_reference(refsol):
     reference = refsol.material_cavity.slab_loaded_cavity_modes(
-        LENGTHS, 0.3, 300e6, slab_permittivity=4.0)[:4]
+        box_size=LENGTHS, thickness=0.3, frequency_limit=300e6, relative_permittivity=(4.0, 1.0))[:4]
     result = solve_material_cavity_box(box_size=LENGTHS, subdivision_count=(8, 8, 8), regions=_slab(4.0),
                                        mode_count=4, target_frequency=50e6)
     assert result.lossless
-    error = abs(result.wavenumber_squared - [m.eigenvalue_m2 for m in reference])
+    error = abs(result.wavenumber_squared - [m.wavenumber_squared for m in reference])
     assert np.max(error / abs(result.wavenumber_squared)) < 0.015
     _check_result(result)
 
@@ -165,11 +165,11 @@ def test_slab_normal_along_x_matches_rotated_reference(refsol):
     """The reference stacks along z; permuting the box exercises other diagonals."""
     eps = 4 + 0.04j
     reference = refsol.material_cavity.slab_loaded_cavity_modes(
-        LENGTHS, 0.3, 300e6, slab_permittivity=np.conj(eps))[:3]
+        box_size=LENGTHS, thickness=0.3, frequency_limit=300e6, relative_permittivity=(eps, 1.0))[:3]
     result = solve_material_cavity_box(
         box_size=(0.6, 0.8, 1.0), subdivision_count=(8, 8, 8), regions=[Region(((0, .3), (0, .8), (0, 1)), eps)],
         mode_count=3, target_frequency=50e6)
-    expected = np.conj([m.eigenvalue_m2 for m in reference])
+    expected = np.array([m.wavenumber_squared for m in reference])
     assert np.max(abs(result.wavenumber_squared - expected) / abs(expected)) < 0.015
     np.testing.assert_allclose(result.quality_factor, [m.quality_factor for m in reference],
                                rtol=3e-3)
@@ -238,10 +238,11 @@ def test_slab_loaded_mesh_convergence(case, refsol):
     """
     eps, mu = CONVERGENCE_CASES[case]
     reference = refsol.material_cavity.slab_loaded_cavity_modes(
-        LENGTHS, 0.3, 400e6, slab_permittivity=np.conj(eps), slab_permeability=np.conj(mu))[:6]
+        box_size=LENGTHS, thickness=0.3, frequency_limit=400e6, relative_permittivity=(eps, 1.0),
+        relative_permeability=(mu, 1.0))[:6]
     assert [(m.family, m.indices) for m in reference[:3]] == [
         ("TM_z", (1, 1)), ("TE_z", (1, 0)), ("TE_z", (0, 1))]
-    exact = np.conj([m.eigenvalue_m2 for m in reference])
+    exact = np.array([m.wavenumber_squared for m in reference])
     exact_q = np.array([m.quality_factor for m in reference])
     errors, q_errors = [], []
     for n in (4, 8, 16):

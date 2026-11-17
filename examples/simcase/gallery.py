@@ -153,10 +153,10 @@ def box_cavity(out, quick):
     computed = np.asarray(result.resonant_frequency)
 
     # Analytical modes nearest the same target, one entry per independent mode.
-    analytic = rectangular_cavity_modes(lengths, 2.0 * computed.max())
-    analytic = sorted(analytic, key=lambda m: abs(m.frequency_hz - target))[:len(computed)]
-    analytic = sorted(analytic, key=lambda m: m.frequency_hz)
-    exact = np.array([m.frequency_hz for m in analytic])
+    analytic = rectangular_cavity_modes(box_size=lengths, frequency_limit=2.0 * computed.max())
+    analytic = sorted(analytic, key=lambda m: abs(m.frequency - target))[:len(computed)]
+    analytic = sorted(analytic, key=lambda m: m.frequency)
+    exact = np.array([m.frequency for m in analytic])
     if len(np.unique(np.round(exact, 3))) != len(exact):
         raise RuntimeError("the gallery box must have non-degenerate modes near the target")
     relative = (computed - exact) / exact

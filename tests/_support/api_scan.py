@@ -88,9 +88,10 @@ INTERNAL_DOCSTRING = "Internal module, consistent units"
 # Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin after L3 commit 12,
 # which emptied the cavity modules (25 before; 98 before L3 commit 11a, whose em kernels left the top level and
 # galerkin.waveguide for galerkin.kernels and whose EdgeSpace method argument node_set became structural);
-# refsol after L3 commit 11e, which emptied scattering and benchmarks and converted metallic's
-# rect_waveguide_cutoffs, whose n_max became structural for rect_cavity_resonances too (91 before; 120 before
-# L3 commit 11d, which emptied
+# refsol after L3 commit 12, which emptied cavity, material_cavity, wall_loss and metallic (42 before; 91
+# before L3 commit 11e, which emptied scattering and benchmarks and converted metallic's
+# rect_waveguide_cutoffs, whose n_max became structural for rect_cavity_resonances too; 120 before L3 commit
+# 11d, which emptied
 # fiber; 222 before L3 commit 11c, which emptied slab, lossy_slab and bent_slab; 240 before L3 commit 10, which
 # emptied
 # galerkin's electrostatics and refsol's electrostatics with the coax potential and field of refsol.metallic it
@@ -101,7 +102,7 @@ INTERNAL_DOCSTRING = "Internal module, consistent units"
 # L2 commit 6, which emptied the heat modules, 154 after L2 commit 7, which emptied electric, joule_heating and
 # temperature_joule_heating; refsol 549 on f693ae3a, 394 after L2 commit 6, 354 after L2 commit 7, which
 # emptied joule_slab). They never grow.
-BASELINE_COUNTS = {"galerkin": 0, "physmat": 0, "refsol": 42}
+BASELINE_COUNTS = {"galerkin": 0, "physmat": 0, "refsol": 0}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 

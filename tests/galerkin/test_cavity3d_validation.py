@@ -31,7 +31,7 @@ def oracle(sides, cap=4):
         values.extend([value] * multiplicity)
     values = np.sort(values)
     reference = np.sort([value for value, _ in
-                         rect_cavity_resonances(*sides, n_max=cap)])
+                         rect_cavity_resonances(box_size=sides, n_max=cap)])
     np.testing.assert_allclose(values, reference, rtol=1e-13, atol=0)
     return values
 

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
+import pytest
 
 from refsol import metallic, scattering
 
@@ -14,10 +15,21 @@ def test_rect_waveguide_cutoffs_1_by_half():
 
 
 def test_cavity_lowest_mode_cube():
-    res = metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=2)
+    res = metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=2)      # a 1 m cube: k^2 in 1/m^2
     k2, lbl = res[0]
     assert np.isclose(k2, 2 * np.pi ** 2)      # TE101 / TE011 / TM110 degenerate
     assert sum(np.isclose(v, 2 * np.pi ** 2) for v, _ in res) == 3
+
+
+@pytest.mark.parametrize("box_size", [(1.0, 1.0), (1.0, 0.0, 1.0), (1.0, np.nan, 1.0), (1.0, 1.0, 1.0j), 1.0, None])
+def test_cavity_resonances_refuse_a_box_that_is_not_three_positive_lengths(box_size):
+    # L3 commit 12: box_size (a, b, d) in m; a str is a TypeError (the units scan's string rule)
+    with pytest.raises(ValueError, match="box_size"):
+        metallic.rect_cavity_resonances(box_size=box_size)
+    with pytest.raises(TypeError, match="box_size"):
+        metallic.rect_cavity_resonances(box_size=(1.0, "1", 1.0))
+    with pytest.raises(ValueError, match="n_max"):
+        metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=-1)
 
 
 #: radii (1, 3) and the potentials (1 V, 0 V) the coax functions took by default before the galerkin step

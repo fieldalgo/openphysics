@@ -160,6 +160,8 @@ python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
 ```
 
 The references are in `refsol.material_cavity` and `refsol.wall_loss` and use no mesh or FEM code.
+Their public values follow `exp(-i omega t)` as the solver's do (galerkin step, L3 commit 12), so the
+tests compare the two as they are.
 
 **Uniform filling.** A homogeneous cavity has the vacuum fields and
 `k0^2 = k_vac^2 / (eps_r mu_r)` exactly, and the discrete problem rescales the same way.
@@ -287,7 +289,8 @@ all three indices are positive, the two polarizations are degenerate. Wall loss
 is then a quadratic form on the amplitude plane, and its eigenvectors give two Q
 values. The Leontovich reactance lowers the real frequency by as much as the loss
 raises the imaginary part: `omega = omega0 (1 + (j - 1)/(2 Q_c))`. The neglected
-terms are of relative order `1/Q_c`.
+terms are of relative order `1/Q_c`. The public `resonant_frequency` of `refsol.wall_loss` is its
+conjugate under `exp(-i omega t)`, `f0 (1 - (1 + i)/(2 Q_c))`.
 
 Reference self-checks: TE101 equals Pozar's closed form (*Microwave Engineering*,
 4th ed., eq. 6.46) at `1e-12`. Every mode of `(1, 0.8, 0.6) m` up to 400 MHz,
