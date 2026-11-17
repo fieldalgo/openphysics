@@ -121,6 +121,12 @@ JAX 0.12.0.1, PyTorch 2.14.1 CPU). 결과 이력 자체는 O(Nt (N + M))이며 �
 
 ## 도파관 모드: 고유값, 필드, 축퇴 모드
 
+공개 함수 `galerkin.solve_waveguide_modes`(SI, exp(−iωt))는 `relative_permittivity`,
+`relative_permeability`, 파장 또는 k0에 JAX·PyTorch 값을 받습니다. 복소 값은 그 라이브러리의 `conj`로
+켤레를 취하고(`to_kernel`) 커널의 live 출력에 `to_public`을 적용해 돌려주므로, 미분은 두 변환을 모두
+지나갑니다(`tests/galerkin/test_conventions.py`가 Im(`effective_index`)의 JAX·PyTorch 기울기를 점검).
+그 커널 `galerkin.kernels.solve_modes`는 다음과 같이 동작합니다.
+
 `solve_modes`는 입력의 숫자로 NumPy 고유값 풀이를 돌립니다. 돌려받은 각 쌍 (λ0, x0)
 (λ0 = −(k0 n_eff)², x0 = 자유 자유도 위의 [et β, ez])은 정규화 xᵀ B x = 1을 덧붙인
 고유값 문제 A x = λ B x에서 Newton 한 걸음을 밟습니다. 이 연립방정식은 살아 있는 A와

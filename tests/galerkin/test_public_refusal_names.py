@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""The outward-form bodies refuse under the public registry names (galerkin step, L2 commit 8b).
+"""The outward-form bodies and the public mode functions refuse under the public registry names.
 
 The public heat, electric and Joule solvers negate their inward boundary data once and call
 internal outward-form bodies. A bad value is refused by the body, so its message must name the
@@ -114,3 +114,45 @@ def test_joule_refusals_name_the_public_quantities(mesh):
              r"^relaxation_factor must be in \(0,1\]; temperature_tolerance and relative_tolerance must be positive$")
     _refused(lambda: solve_temperature_joule_heat(mesh, **common, iteration_limit=0),
              r"^iteration_limit must be a positive integer$")
+
+
+#: the mode kernel's keywords (galerkin.kernels.solve_modes, mode_coordinates); none may reach a public message
+OLD_MODES = re.compile(r"\b(eps_r|mu_r|k0|n_target|num_modes|coordinate_factors|thickness|strength|order|"
+                       r"et|ez|n_eff)\b")
+
+
+def _mode_refused(call, pattern, error=ValueError):
+    with pytest.raises(error, match=pattern) as info:
+        call()
+    message = re.sub(r"\bpml_(thickness|strength|order)\b", "", str(info.value))
+    assert not OLD_MODES.search(message), str(info.value)
+
+
+def test_mode_refusals_name_the_public_quantities():
+    """The public mode functions (galerkin step, L3 commit 11b) refuse under their own registry names."""
+    from galerkin.waveguide import Bend, ModalPML, mode_power, solve_waveguide_modes
+    mesh = rectangle_mesh(2e-6, 1e-6, 8, 4)
+    good = dict(relative_permittivity=2.25, vacuum_wavelength=1.55e-6, target_effective_index=1.4, search_mode_count=2)
+
+    def solve(**changes):
+        return lambda: solve_waveguide_modes(mesh, **{**good, **changes})
+    _mode_refused(solve(vacuum_angular_wavenumber=4e6), "exactly one of vacuum_wavelength")
+    _mode_refused(solve(vacuum_wavelength=None), "exactly one of vacuum_wavelength")
+    _mode_refused(solve(vacuum_wavelength=-1.55e-6), "vacuum_wavelength must be a finite real number > 0")
+    _mode_refused(solve(relative_permittivity=np.ones(3)), "relative_permittivity must be a finite number or an array")
+    _mode_refused(solve(relative_permittivity=complex(np.nan, 0)), "relative_permittivity must be finite")
+    _mode_refused(solve(relative_permeability=np.inf), "relative_permeability must be finite")
+    _mode_refused(solve(target_effective_index=-1.0), "target_effective_index must be a finite number")
+    _mode_refused(solve(search_mode_count=0), "search_mode_count must be a positive integer")
+    _mode_refused(solve(pml={"left": 1e-7}), "pml must be a galerkin.ModalPML", TypeError)
+    _mode_refused(solve(bend=Bend(bend_radius=1e-5, bend_origin=0.0)), "a bend needs a ModalPML")
+    _mode_refused(solve(pml=ModalPML(pml_thickness={"left": 2e-7}), bend=Bend(bend_radius=1e-7, bend_origin=5e-7)),
+                  "bend_radius and bend_origin must put every node")
+    _mode_refused(lambda: ModalPML(pml_thickness={"left": 0.0}), r"pml_thickness\['left'\] must be a finite real")
+    _mode_refused(lambda: ModalPML(pml_thickness={"front": 1e-7}), "pml_thickness must map one or more of")
+    _mode_refused(lambda: ModalPML(pml_thickness={"left": 1e-7}, pml_order=5), "pml_order must be 2, 3 or 4")
+    _mode_refused(lambda: Bend(bend_radius=0.0, bend_origin=0.0), "bend_radius must be a finite real number > 0")
+    _mode_refused(lambda: Bend(bend_radius=1e-5, bend_origin=0.0, bend_axis="z"), "bend_axis must be 'x' or 'y'")
+    modes = solve_waveguide_modes(mesh, **good)
+    _mode_refused(lambda: mode_power(modes, len(modes.effective_index)), "mode must be a mode index")
+    _mode_refused(lambda: mode_power(object(), 0), "modes must be the WaveguideModes", TypeError)

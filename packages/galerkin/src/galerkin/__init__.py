@@ -26,6 +26,8 @@ from .edge import EdgeSpace
 from .edge3d import EdgeSpace3D
 from .gmsh import read_msh, write_msh
 from .interop import from_mesher
+from .waveguide import (ModalPML, Bend, WaveguideModes, solve_waveguide_modes, mode_power, cross_power,
+                        field_overlap, mode_coupling_efficiency, mode_confinement_factor, mode_effective_area)
 from .cavity import CavityResult, solve_cavity, solve_cavity_box
 from .material_cavity import (CavityMaterialRegion, MaterialCavityResult,
                               solve_material_cavity, solve_material_cavity_box)
@@ -36,14 +38,17 @@ from .electrostatics import (ElementPermittivity, ElectrostaticsResult,
 # The public names: those imported above, then the submodules those imports bind. The kernels
 # re-exported by galerkin.kernels are not among them (``from galerkin import *`` gave them
 # before the galerkin step of the units convention: the non-em kernels left in L2 commit 4, the
-# em kernels in L3 commit 11).
+# em kernels in L3 commit 11), and neither is the submodule mode_coordinates, which
+# galerkin.waveguide binds: its name is a kernel's (D7).
 __all__ = ["Mesh", "rectangle_mesh", "annulus_mesh", "disk_mesh", "Mesh3D", "box_mesh",
-           "EdgeSpace", "EdgeSpace3D", "read_msh", "write_msh", "from_mesher", "CavityResult",
+           "EdgeSpace", "EdgeSpace3D", "read_msh", "write_msh", "from_mesher", "ModalPML", "Bend",
+           "WaveguideModes", "solve_waveguide_modes", "mode_power", "cross_power", "field_overlap",
+           "mode_coupling_efficiency", "mode_confinement_factor", "mode_effective_area", "CavityResult",
            "solve_cavity", "solve_cavity_box", "CavityMaterialRegion", "MaterialCavityResult",
            "solve_material_cavity", "solve_material_cavity_box", "element_gradient", "l2_error",
            "ElementPermittivity", "ElectrostaticsResult", "solve_electrostatics",
            "capacitance_matrix",
-           "cavity", "core", "coupling", "edge", "edge3d", "electrostatics", "gmsh", "interop",
-           "material_cavity", "materials", "mesh", "mesh3d", "postprocess"]
+           "assembly", "cavity", "core", "coupling", "edge", "edge3d", "electrostatics", "gmsh", "interop",
+           "material_cavity", "materials", "mesh", "mesh3d", "mode_overlap", "postprocess", "waveguide"]
 
 __version__ = "0.0.2"

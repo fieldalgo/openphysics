@@ -444,6 +444,10 @@ its micrometre doubles). `solve_modes` and `assemble_mode_system` move unchanged
 map the baseline's calls to them; every other recorded em kernel (`galerkin.mode_coordinates`,
 `galerkin.mode_overlap`, `galerkin.assembly`) keeps its module and name.
 
+**The public mode functions (L3 commit 11b).** `galerkin.solve_waveguide_modes` and the
+`mode_*` functions wrap the kernels above; simcase does not call them (route K), so they are not
+recorded targets and that commit needs no rule entry.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

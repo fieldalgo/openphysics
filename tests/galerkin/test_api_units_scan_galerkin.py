@@ -204,6 +204,24 @@ def _capacitance():
     return capacitance_matrix, dict(mesh=mesh, relative_permittivity=2.2, conductors={"inner": inner}, ground=outer)
 
 
+def _waveguide_modes():
+    from galerkin.mesh import rectangle_mesh
+    from galerkin.waveguide import solve_waveguide_modes
+    mesh = rectangle_mesh(2e-6, 1e-6, 8, 4)
+    return solve_waveguide_modes, dict(mesh=mesh, relative_permittivity=2.25 + 0.01j, vacuum_wavelength=1.55e-6,
+                                       target_effective_index=1.4, search_mode_count=2, relative_permeability=1.0)
+
+
+def _modal_pml():
+    from galerkin.waveguide import ModalPML
+    return ModalPML, dict(pml_thickness={"left": 2e-7, "right": 2e-7}, pml_strength=3.0, pml_order=2)
+
+
+def _bend():
+    from galerkin.waveguide import Bend
+    return Bend, dict(bend_radius=1e-5, bend_origin=0.0)
+
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
@@ -228,7 +246,11 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.shape:MotionStep": _motion_step_record,
                 # L3 commit 10 emptied electrostatics
                 "galerkin.electrostatics:solve_electrostatics": _electrostatics,
-                "galerkin.electrostatics:capacitance_matrix": _capacitance}
+                "galerkin.electrostatics:capacitance_matrix": _capacitance,
+                # L3 commit 11b: the public mode functions (the others take no quantity)
+                "galerkin.waveguide:solve_waveguide_modes": _waveguide_modes,
+                "galerkin.waveguide:ModalPML": _modal_pml,
+                "galerkin.waveguide:Bend": _bend}
 
 
 @pytest.fixture(scope="module")
@@ -337,13 +359,34 @@ def test_kernels_reexport_the_moved_names_unchanged(rules):
     assert "galerkin.kernels" in rules.internal[PACKAGE]
 
 
+#: spec 4.3: the public mode functions and spec objects, defined in galerkin.waveguide and re-exported at the top level
+PUBLIC_MODE_NAMES = {"solve_waveguide_modes", "WaveguideModes", "ModalPML", "Bend", "mode_power", "cross_power",
+                     "field_overlap", "mode_coupling_efficiency", "mode_confinement_factor", "mode_effective_area"}
+
+
+def test_public_mode_names_are_hosted_by_waveguide_and_re_exported(rules):
+    import galerkin
+    import galerkin.kernels as kernels
+    import galerkin.waveguide as waveguide
+    assert PUBLIC_MODE_NAMES <= set(waveguide.__all__) and PUBLIC_MODE_NAMES <= set(galerkin.__all__)
+    for name in PUBLIC_MODE_NAMES:
+        assert getattr(galerkin, name) is getattr(waveguide, name), name
+        assert getattr(waveguide, name).__module__ == "galerkin.waveguide", name
+        assert not hasattr(kernels, name), name                     # D7: distinct names ...
+    for name in kernels.__all__:
+        assert all(getattr(kernels, name) is not getattr(waveguide, n) for n in waveguide.__all__), name  # ... objects
+
+
 def test_star_import_gives_the_public_names():
     namespace = {}
     exec("from galerkin import *", namespace)
     names = set(namespace) - {"__builtins__"}
     # 78 before L2 commit 4: its 8 kernels left, and so did the submodules assembly3d and solver, which the
     # top-level imports no longer bind. 68 before L3 commit 11a: its 27 em kernels left, and so did the
-    # submodules assembly, mode_overlap, pml and waveguide, which the top-level imports no longer bind.
-    assert len(names) == 37 and {"Mesh", "EdgeSpace", "EdgeSpace3D", "core", "edge"} <= names
+    # submodules assembly, mode_overlap, pml and waveguide, which the top-level imports no longer bind (37).
+    # L3 commit 11b adds the 10 public mode names and binds assembly, mode_overlap and waveguide again
+    # (mode_coordinates too, which is not listed: its name is a kernel's).
+    assert len(names) == 50 and {"Mesh", "EdgeSpace", "EdgeSpace3D", "core", "edge", "waveguide"} <= names
+    assert PUBLIC_MODE_NAMES <= names and "mode_coordinates" not in names
     assert not names & {"assemble_stiffness", "solve_dirichlet", "tet_gradients", "assembly3d", "solver", "kernels"}
     assert not names & {n for k in ("edge", "edge3d", "waveguide", "pml", "mode_overlap") for n in MOVED_TOP_LEVEL[k]}

@@ -41,6 +41,8 @@
     {"name": "mode", "category": "index or count", "source": "seed"},
     {"name": "mode_a", "category": "index or count", "source": "seed", "unit_token_note": "a pair label (mode_a, mode_b), not the ampere"},
     {"name": "mode_b", "category": "index or count", "source": "seed"},
+    {"name": "modes_a", "category": "object", "source": "spec 4.3 (cross_power, field_overlap)", "scope": ["galerkin"], "unit_token_note": "a pair label (modes_a, modes_b), not the ampere", "note": "the WaveguideModes of the solve that carries mode_a", "reviewer_note": "L3 commit 11b: spec 4.3 gives cross_power(modes_a, mode_a, modes_b, mode_b) and field_overlap with these names; the result objects of two solves, as modes is, not quantities."},
+    {"name": "modes_b", "category": "object", "source": "spec 4.3 (cross_power, field_overlap)", "scope": ["galerkin"], "note": "the WaveguideModes of the solve that carries mode_b", "reviewer_note": "L3 commit 11b: as modes_a."},
     {"name": "incident_mode", "category": "index or count", "source": "seed"},
     {"name": "subdivision_count", "category": "index or count", "source": "seed"},
     {"name": "checkpoint_every", "category": "index or count", "source": "seed"},

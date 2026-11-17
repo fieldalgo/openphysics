@@ -148,6 +148,10 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
 
 ## Waveguide modes
 
+The public `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`
+passes the motion to its kernel with the converted inputs; it refuses a motion together with a
+`ModalPML` or `Bend`, and live materials or a live wavelength with a motion. The kernel:
+
 `solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))` takes eps_r
 and mu_r as scalars or per-element arrays (real or complex), PEC nodes and edges as
 without a motion, and numbers for k0 and n_target.

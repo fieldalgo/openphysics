@@ -2,7 +2,14 @@
 
 [English](../../../../../packages/galerkin/modal_coordinates.md)
 
-저수준 API는 `exp(+i omega t-i beta z)`를 사용합니다.
+공개 경로는 `galerkin.ModalPML(*, pml_thickness={side: m}, pml_strength=3.0, pml_order=2)`와
+`galerkin.Bend(*, bend_radius, bend_origin, bend_axis="x")`이며 `solve_waveguide_modes`(SI, exp(−iωt))에
+`pml=`, `bend=`로 넘깁니다. 주어진 면의 두께는 미터 단위로 0보다 크고(흡수층이 없는 면은 빼고 줍니다),
+굽힘은 원점의 기본값이 없고 흡수층이 있어야 합니다. 아래 좌표 인자는 솔버가 미터 메시 위에서 직접
+만듭니다. exp(−iωt)로 쓰면 늘림은 `s = 1 + i pml_strength (depth/pml_thickness)**pml_order`이고, 인자는
+커널의 관례를 유지하며 호출자에게 나가지 않습니다.
+
+저수준 API(`galerkin.kernels.mode_coordinates`)는 `exp(+i omega t-i beta z)`를 사용합니다.
 `galerkin.mode_coordinates.mode_coordinates(mesh, thickness={"left": 1.0,
 "right": 1.0}, strength=3.0, order=2)`는 요소 중심 Jacobian `(sx, sy, h)`,
 물리 영역 마스크와 경계를 반환합니다. 두께 단위는 메시 길이 단위이며
