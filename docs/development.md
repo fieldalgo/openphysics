@@ -128,12 +128,10 @@ default, or a structural name, and no name ends in a unit token. Public methods 
 The shared logic and its data are in `tests/_support/`: `api_scan.py`, the public and
 internal module lists, the closed lists of structural names and result classes, and the
 removed names. Every other module is internal and says "Internal module, consistent
-units" in its docstring. Each package's `api_units_allowlist.json` lists the violations
-that exist today. Entries may only be removed: a new violation fails, and so does an
-entry that no longer matches one. physmat's allowlist is empty, so every name of its
-removed-name list is asserted absent and a `str` given to any of its public quantity
-parameters must raise `TypeError`; for galerkin and refsol these two clauses apply to each
-public module once it has no allowlist entry. A removed name with a scope (and a note that
+units" in its docstring. Each package's `api_units_allowlist.json` is empty and may
+not grow: a new violation fails. So every public module is clean: every name
+of the removed-name list is asserted absent, and a `str` given to any public quantity
+parameter must raise `TypeError`. A removed name with a scope (and a note that
 says why) is asserted absent only in those modules: `refsol.bent_slab` no longer takes
 `radius` (now `bend_radius`), while `refsol.fiber` takes the registry name `radius`.
 `galerkin.kernels` and `physmat.kernels` are

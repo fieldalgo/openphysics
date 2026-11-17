@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The Python API of every package may change in any minor release (0.1 to 0.2).
   Patch releases (0.1.x) fix bugs and are not meant to change the API.
+- What does not change in 0.x is how the Python API states units and names. The
+  public functions, classes and results of physmat, galerkin and refsol take and
+  return SI values under physmat registry names (`physmat.units`). A quantity
+  is a keyword argument with no dimensional default, and text in place of a
+  number raises `TypeError`. Their complex values follow exp(-i omega t): a passive loss has a
+  non-negative imaginary part. `galerkin.kernels`, `physmat.kernels` and every
+  module or name that starts with an underscore are internal: they keep units of
+  their own, and simcase and sipi may call them, but they carry no promise and may
+  change in any release. The names that the units and naming batch removed get
+  no alias: no release carried them.
 - The JSON model document format `"openphysics": "0.3"` is a contract: a document
   that is valid in this format keeps validating and keeps its meaning. A change
   that would break that gets a new format version. Format 0.2 documents are not

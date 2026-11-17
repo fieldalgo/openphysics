@@ -4,8 +4,8 @@
 
 The rule, the module lists and the structural names are shared with galerkin and refsol
 in tests/_support/ (api_scan.py and its JSON files). The first part holds physmat's part:
-api_units_allowlist.json next to it lists today's violations, and entries may only be
-removed. ``physmat.units`` is public but not scanned. The second part checks the shared
+api_units_allowlist.json next to it is empty (since L3 commit 13; physmat's since L1
+commit 3) and may not grow, so no public callable may violate the rule. ``physmat.units`` is public but not scanned. The second part checks the shared
 rule data, and shows on small synthetic packages that the scan catches each kind of
 violation and passes compliant code. docs/development.md describes the scan.
 """
