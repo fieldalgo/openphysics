@@ -12,6 +12,8 @@ from galerkin.transient_heat import solve_transient_heat
 from refsol.transient_heat import (p1_matrices, smallest_dirichlet_mode,
                                    backward_euler_amplitude, sine_manufactured)
 
+MATERIAL=dict(thermal_conductivity=2.5,volumetric_heat_capacity=4.)
+
 
 def exterior(mesh):
     return np.unique(np.concatenate(list(mesh.boundary.values())))
@@ -19,18 +21,17 @@ def exterior(mesh):
 
 def temporal_gate():
     mesh=rectangle_mesh(1.,1.,8,8)
-    m,k=p1_matrices(mesh.nodes,mesh.triangles,
-        conductivity=2.5,volumetric_heat_capacity=4.)
+    m,k=p1_matrices(mesh.nodes,mesh.triangles,**MATERIAL)
     fixed=exterior(mesh)
     lam,phi=smallest_dirichlet_mode(m,k,fixed)
     tau=1/lam;errors=[]
     for steps in (8,16,32,64):
         times=np.linspace(0.,tau,steps+1)
-        result=solve_transient_heat(mesh,conductivity=2.5,volumetric_heat_capacity=4.,
-            time_s=times,initial_temperature_k=300.+phi,
-            dirichlet={int(i):300. for i in fixed})
-        product=backward_euler_amplitude(lam,times)
-        increment=result.temperature_k-300.
+        result=solve_transient_heat(mesh,thermal_conductivity=2.5,volumetric_heat_capacity=4.,
+            time=times,initial_temperature=300.+phi,
+            prescribed_temperature={int(i):300. for i in fixed})
+        product=backward_euler_amplitude(decay_rate=lam,time=times)
+        increment=result.temperature-300.
         np.testing.assert_allclose(increment,product[:,None]*phi,rtol=0,atol=1e-10)
         difference=increment[-1]-np.exp(-1)*phi
         errors.append(float(np.sqrt(difference@m@difference/(phi@m@phi))))
@@ -52,10 +53,10 @@ def pde_errors(mesh,result,index,order):
         area=(a[:,0]*b[:,1]-a[:,1]*b[:,0])/2
         points=np.einsum('qa,tad->tqd',bary,p)
         shape=points.shape[:2]
-        exact=sine_manufactured(points.reshape(-1,2),float(result.time_s[index]))
-        recovered=np.einsum('qa,ta->tq',bary,result.temperature_k[index,tri])
-        dt=recovered-exact.temperature_k.reshape(shape)
-        dq=result.heat_flux_w_m2[index,start:start+len(tri),None,:]-exact.heat_flux_w_m2.reshape((*shape,2))
+        exact=sine_manufactured(points.reshape(-1,2),time=float(result.time[index]),**MATERIAL)
+        recovered=np.einsum('qa,ta->tq',bary,result.temperature[index,tri])
+        dt=recovered-exact.temperature.reshape(shape)
+        dq=result.heat_flux[index,start:start+len(tri),None,:]-exact.heat_flux.reshape((*shape,2))
         sums[0]+=np.sum(area[:,None]*weights*dt**2)
         sums[1]+=np.sum(area[:,None]*weights*np.sum(dq**2,axis=-1))
     return np.sqrt(sums)
@@ -64,13 +65,13 @@ def pde_errors(mesh,result,index,order):
 def pde_run(n,steps):
     mesh=rectangle_mesh(1.,1.,n,n)
     times=np.linspace(0.,1.,steps+1)
-    result=solve_transient_heat(mesh,conductivity=2.5,volumetric_heat_capacity=4.,
-        time_s=times,initial_temperature_k=sine_manufactured(mesh.nodes,0.).temperature_k,
-        dirichlet={int(i):300. for i in exterior(mesh)},
-        heat_source=lambda p,t:sine_manufactured(p,t).heat_source_w_m3)
+    result=solve_transient_heat(mesh,thermal_conductivity=2.5,volumetric_heat_capacity=4.,
+        time=times,initial_temperature=sine_manufactured(mesh.nodes,time=0.,**MATERIAL).temperature,
+        prescribed_temperature={int(i):300. for i in exterior(mesh)},
+        heat_source_density=lambda p,t:sine_manufactured(p,time=t,**MATERIAL).heat_source_density)
     errors=[]
     for observed in (.25,.5,1.):
-        index=int(round(observed*steps));assert result.time_s[index]==observed
+        index=int(round(observed*steps));assert result.time[index]==observed
         e8=pde_errors(mesh,result,index,8);e10=pde_errors(mesh,result,index,10)
         np.testing.assert_allclose(e8,e10,rtol=.01,atol=0)
         errors.append(e8)

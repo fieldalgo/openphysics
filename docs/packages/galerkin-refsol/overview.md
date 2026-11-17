@@ -21,7 +21,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 |---|---|---|
 | `refsol.thermoelasticity` | Prescribed-Kelvin uniform free/constrained, compatible and sine fields; out-of-plane stress and physical elastic energy | Original three-dimensional law, no FEM imports |
 | `refsol.thermal` | Kelvin slab and steady sine manufactured fields; heat flux W/m^2 and source W/m^3 | Direct analytic derivatives, no engine imports |
-| `refsol.thermal_boundary` | Steady slabs and a sine field with prescribed outward flux and Robin convection | Closed forms, no engine imports |
+| `refsol.thermal_boundary` | Steady slabs and a sine field with a prescribed inward heat flux and Robin convection | Closed forms, no engine imports |
 | `refsol.transient_heat` | Uniform insulated heating, moving affine field, manufactured sine solution; small dense P1 matrices and backward-Euler modal references | Analytic forms and dense eigenproblems, no engine imports |
 | `refsol.thermal_multilayer` | Steady conduction through layered walls with piecewise-constant conductivity and a uniform source per layer: series slab and concentric composite cylinder, temperature and normal flux continuous at the interfaces | Boundary values and series resistance without source, interface continuity, Fourier's law and energy balance by finite differences, textbook single layer; no engine imports |
 | `refsol.transient_heat_multilayer` | Transient conduction through a layered wall by an eigenfunction series (`LayeredWall`): eigenvalues by bisection on the exact Pruefer zero count, so none is skipped; fixed end temperatures, given initial amplitudes or source-driven starts | Single-layer sine series, two-layer characteristic equation, independent fine finite-element eigenvalues, c-weighted orthogonality and interface conditions, PDE/boundary/initial residuals, steady long-time limit; no engine imports |
@@ -39,7 +39,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.wall_loss` | first-order conductor-loss Q of rectangular cavity modes per wall, split degenerate polarizations, uniform filling | Pozar TE101, numerical quadrature of a finite-difference curl, per-wall additivity, sqrt(sigma) scaling |
 | `refsol.scattering` | plane wave on a circular cylinder: PEC (TM/TE) and dielectric, partial-wave series; scattering width | boundary conditions satisfied to 1e-9, interface continuity, geometric-optics limit |
 | `refsol.bimetal` | Timoshenko (1925) bimetal thermostat: curvature from force/moment balance, the published closed forms (Timoshenko, Villarceau, uniaxial Stoney limit) and the exact plane-stress strip field with its end traction | Three closed forms agree on random data, Stoney limit, section force/moment zero, interface continuity, finite-difference strains |
-| `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
+| `refsol.thermal_convection` | NAFEMS T4 rectangle (hot edge, insulated edge, two convecting edges): separation-of-variables series and the published target 18.3 °C with its provenance, read in SI (K) through `nafems_t4()` and `nafems_t4_target()` | Eigenvalue equation, Laplace and Fourier by finite differences, Robin/insulated/hot-edge conditions, geometric convergence, linearity |
 | `refsol.joule_slab` | steady 1D Joule heating with `sigma = sigma0 (1 + alpha (T - T0))` between fixed potentials and temperatures: closed form in erf/erfi (`voltage_driven`), the constant-conductivity limit, current-driven states on both sides of the metal-like fold (`current_driven`, `fold_current`), temperature range for bounded conductivity models | integrated conservation laws (`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), quadrature of the module's own derivatives, finite differences, O(alpha) approach to the constant-sigma closed form, symmetry and reflection, power balance, one-parameter symmetric equation |
 | `refsol.bent_slab` | constant-radius bent slab poles by complex-order Bessel/Hankel matching (inner `J`, film `J`/`Y`, outgoing `H^(2)`), `n_eff` referred to the inner radius, `exp(+i omega t)`; needs the optional `mpmath` at call time | residual ≤ 1e-12, straight-slab limit at first order in 1/R (Richardson), super-exponentially vanishing loss at large radius, loss growing as the radius shrinks, TE better confined than TM, ImportError without mpmath |
 | `refsol.thermal3d` | Steady 3D heat: sine-product manufactured field on a box (temperature, flux, source) and series conduction through a layered slab along z | Flux and source against finite differences, slab against the series-resistance formula, NumPy only |
@@ -127,9 +127,21 @@ error falls at second order (orders 1.97-2.00 on the finest pair) to
 3.9e-4 to 6.8e-4 at a 0.01 um step, where `Im n_eff` agrees to 3e-4 (TE) and
 4e-3 (TM) relative.
 
-`refsol.thermal_boundary` provides independent closed forms for prescribed
-outward flux and Robin boundaries. Coordinates are m, temperature K,
-conductivity W/(m K), outward flux W/m^2 and convection h W/(m^2 K).
+`refsol.thermal_boundary` provides independent closed forms for a prescribed
+inward heat flux and Robin boundaries. Coordinates are m, temperature K,
+conductivity W/(m K), inward heat flux W/m^2 (positive enters the body) and
+convection h W/(m^2 K).
+
+Since the galerkin step (L2 commit 6) the heat references (`refsol.thermal`,
+`thermal3d`, `thermal_boundary`, `thermal_convection`, `thermal_multilayer`,
+`transient_heat`, `transient_heat_multilayer`, `transient_heat_robin`) take
+keyword-only SI arguments under registry names (after a leading `points`), with
+no dimensional defaults: `thermal_conductivity`, `prescribed_temperature` (a pair
+for the two ends), `heat_source_density`, `inward_heat_flux`, `position` (the
+layer boundaries, first face included), `time`, `initial_temperature` and
+`temperature_difference`; their fields carry the same names. A text value
+raises `TypeError`. The NAFEMS T4 data, published in °C, are kept as published
+in a private module and converted to kelvin when read.
 
 `refsol.transient_heat` provides `uniform_insulated`, `moving_affine`,
 `sine_manufactured`, small dense `p1_matrices`, `smallest_dirichlet_mode` and

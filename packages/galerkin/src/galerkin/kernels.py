@@ -24,10 +24,11 @@ matrices these assembly functions place, for galerkin's own modules.
   ``assemble_stiffness_3d``, ``assemble_mass_3d`` and ``tet_gradients``
   (``galerkin.assembly3d``); the Dirichlet solve ``solve_dirichlet(K, f, dirichlet)``
   (``galerkin.solver``);
-- heat: the boundary system of the 2D heat solve, ``scalar_boundary_system``
-  (``galerkin.thermal``); the 3D source load and face-tag Dirichlet map,
-  ``source_load_3d`` and ``dirichlet_from_faces`` (``galerkin.thermal3d``); and the
-  region table look-up ``region_property`` (``galerkin.materials``);
+- heat: the boundary system of the 2D heat solve, ``scalar_boundary_system``; the 3D
+  source load and face-tag Dirichlet map, ``source_load_3d`` and ``dirichlet_from_faces``
+  (all three from the package-private ``galerkin._heat_kernels`` since L2 commit 6, so
+  that the clean public heat modules hold no removed name); and the region table
+  look-up ``region_property`` (``galerkin.materials``);
 - mechanics: ``lame``, ``constitutive``, ``element_materials``,
   ``element_constitutive``, ``stiffness_and_stress``, ``stress_of``, ``body_load``,
   ``check_solution``, ``displacement``, ``at_fixed`` and ``vector_stiffness``
@@ -36,7 +37,9 @@ matrices these assembly functions place, for galerkin's own modules.
 - the moving-mesh solves ``solve_steady_heat_moving``, ``solve_transient_heat_moving``,
   ``solve_steady_electric_moving``, ``solve_elasticity_moving``,
   ``solve_thermoelasticity_moving`` and ``solve_steady_thermoelasticity_moving``
-  (``galerkin.shape``). The public route to them is ``motion=`` on the public solver.
+  (``galerkin.shape``). The public route to them is ``motion=`` on the public solver,
+  which negates inward data first: the heat mirrors take today's outward heat flux, as
+  ``outward_heat_flux``, and registry names for the other heat quantities.
 
 The electromagnetic kernels (edge spaces, curl-curl, PML, mode systems and overlaps)
 are not in this namespace yet; they are still names of galerkin's top level.
@@ -50,8 +53,7 @@ from .materials import region_property
 from .shape import (solve_elasticity_moving, solve_steady_electric_moving, solve_steady_heat_moving,
                     solve_steady_thermoelasticity_moving, solve_thermoelasticity_moving, solve_transient_heat_moving)
 from .solver import solve_dirichlet
-from .thermal import scalar_boundary_system
-from .thermal3d import dirichlet_from_faces, source_load_3d
+from ._heat_kernels import dirichlet_from_faces, scalar_boundary_system, source_load_3d
 from .thermoelasticity import physical_energy, thermal_coefficient, verify_snapshot
 
 __all__ = [

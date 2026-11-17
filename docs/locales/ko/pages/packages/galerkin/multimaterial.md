@@ -25,9 +25,9 @@ dirichlet = {int(i): 400.0 for i in mesh.boundary["left"]}
 dirichlet.update({int(i): 300.0 for i in mesh.boundary["right"]})
 result = solve_steady_heat(
     mesh,
-    conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
-    heat_source={"steel": 2e5, "foam": 0.0},      # W/m^3
-    dirichlet=dirichlet,
+    thermal_conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
+    heat_source_density={"steel": 2e5, "foam": 0.0},      # W/m^3
+    prescribed_temperature=dirichlet,
 )
 ```
 
@@ -70,11 +70,13 @@ heat_flux_e = -k_e grad(T_h) on triangle e
 
 `refsol.thermal_multilayer`는 닫힌 형태 두 개를 계산하며 NumPy만 import합니다.
 
-- `layered_slab`: 직렬 벽 0 < x_1 < ... < x_n = L, 층마다 k_i와 균일 Q_i,
-  T(0)=T_L, T(L)=T_R. 열유속 q(x) = q_0 + Q의 적분, T' = -q/k이며 q_0는 T(L)에서
+- `layered_slab(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: `position` x_0 < x_1 < ... < x_n의 직렬 벽, 층마다 k_i와
+  균일 Q_i, x_0와 x_n의 `prescribed_temperature` (T_L, T_R). 열유속 q(x) = q_0 + Q의 적분, T' = -q/k이며 q_0는 T(L)에서
   정해집니다. 열원이 없으면 직렬 열저항 q_0 = (T_L-T_R)/sum(L_i/k_i)입니다.
-- `composite_cylinder`: 동심 껍질 r_0 < ... < r_n, k_i와 Q_i, T(r_0)=T_i,
-  T(r_n)=T_o. r q_r = C + Q r dr의 적분이고 각 껍질에서
+- `composite_cylinder(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: `position` r_0 < ... < r_n의 동심 껍질, k_i와 Q_i,
+  r_0와 r_n의 `prescribed_temperature` (T_i, T_o). r q_r = C + Q r dr의 적분이고 각 껍질에서
   T = A_i - (C + offset_i) ln(r)/k_i - Q_i r^2/(4 k_i)입니다.
 
 정답 시험은 유한차분만으로 각 층의 푸리에 법칙과 에너지 수지, 모든 경계면의 온도·

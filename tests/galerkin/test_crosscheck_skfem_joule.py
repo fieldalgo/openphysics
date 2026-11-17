@@ -77,7 +77,7 @@ def test_actual_joule_pipeline_against_independent_skfem(case):
                      observables=[observable(name, unit, 'max relative difference', relative_difference(a, b), 1e-9)
                                   for name, unit, a, b in [
                                       ('Joule source', 'W/m^3', electric.joule_heating, Q),
-                                      ('nodal heat load', 'W/m', ours.thermal.load, load),
+                                      ('nodal heat load', 'W/m', ours.thermal.generated_heat_rate_per_depth, load),
                                       ('temperature rise', 'K', ours.thermal.temperature-300., rise),
                                       ('heat flux', 'W/m^2', ours.thermal.heat_flux, flux),
                                       ('power', 'W/m', ours.source_power_per_length, reference_power)]]))

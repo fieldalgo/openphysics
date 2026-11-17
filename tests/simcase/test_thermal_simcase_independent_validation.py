@@ -203,7 +203,8 @@ def test_independent_actual_two_writers(tmp_path):
         assert json.loads(data['metadata_json'].item())==meta
 
 
-@pytest.mark.parametrize('field',['heat_flux','load','reaction','residual'])
+@pytest.mark.parametrize('field',['heat_flux','generated_heat_rate_per_depth','reaction_heat_rate_per_depth',
+                                  'residual_heat_rate_per_depth'])
 def test_independent_save_refuses_nonfinite_result_arrays(tmp_path,field):
     result=actual();getattr(result.solution,field).flat[0]=np.nan
     with pytest.raises(ValueError):result.save(tmp_path/'invalid')
@@ -365,9 +366,7 @@ def test_independent_all_raw_nonfinite_refused(key,fields,tmp_path):
     owners={'node_coordinates':(result.mesh,'nodes'),'triangles':(result.mesh,'triangles'),
             'prescribed_node_ids':(result,'dirichlet_node_ids'),
             'prescribed_temperature':(result,'dirichlet_temperature_k')}
-    properties={'temperature':'temperature','heat_flux':'heat_flux','generated_heat_rate_per_depth':'load',
-                'reaction_heat_rate_per_depth':'reaction','residual_heat_rate_per_depth':'residual'}
-    owner,name=owners[key] if key in owners else (result.solution,properties[key])
+    owner,name=owners[key] if key in owners else (result.solution,key)    # galerkin's field: the saved name
     changed=np.asarray(getattr(owner,name),dtype=float).copy();changed.flat[-1]=np.inf;setattr(owner,name,changed)
     with pytest.raises(ValueError):result.save(tmp_path/'nonfinite')
     assert not (tmp_path/'nonfinite'/'summary.json').exists()

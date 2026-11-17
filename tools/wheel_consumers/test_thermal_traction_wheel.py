@@ -36,24 +36,24 @@ def test_heat_kelvin_slab_flux_and_outward_sign(offset):
     mesh = rectangle_mesh(2., .7, 8, 5)
     bc = {int(i): 350. + offset for i in mesh.boundary['left']}
     bc.update({int(i): 300. + offset for i in mesh.boundary['right']})
-    result = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc)
+    result = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc)
     expected = 350. + offset - 25. * mesh.nodes[:, 0]
-    reference = heat_reference.slab(mesh.nodes, length=2., conductivity=12.,
-                                    left_temperature=350. + offset, right_temperature=300. + offset)
+    reference = heat_reference.slab(mesh.nodes, length=2., thermal_conductivity=12.,
+                                    prescribed_temperature=(350. + offset, 300. + offset))
     scaled_close(result.temperature - (300. + offset), expected - (300. + offset), 50.)
     scaled_close(reference.temperature - (300. + offset), expected - (300. + offset), 50.)
     scaled_close(result.heat_flux, np.tile([300., 0.], (mesh.num_triangles, 1)), 300.)
     scaled_close(reference.heat_flux, np.tile([300., 0.], (mesh.num_nodes, 1)), 300.)
-    np.testing.assert_array_equal(result.load, 0.)
-    left = result.reaction[mesh.boundary['left']].sum()
-    right = result.reaction[mesh.boundary['right']].sum()
+    np.testing.assert_array_equal(result.generated_heat_rate_per_depth, 0.)
+    left = result.reaction_heat_rate_per_depth[mesh.boundary['left']].sum()
+    right = result.reaction_heat_rate_per_depth[mesh.boundary['right']].sum()
     scaled_close([left, right], [210., -210.], 210.)
     assert -left < 0 < -right  # outward heat is minus the fixed-node reaction
     fixed = np.array(sorted(bc))
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
-    np.testing.assert_array_equal(result.reaction[free], 0.)
-    scale = np.abs(result.load).sum() + np.abs(result.reaction).sum()
-    assert abs(np.sum(result.load + result.reaction)) / scale <= 1e-10
+    np.testing.assert_array_equal(result.reaction_heat_rate_per_depth[free], 0.)
+    scale = np.abs(result.generated_heat_rate_per_depth).sum() + np.abs(result.reaction_heat_rate_per_depth).sum()
+    assert abs(np.sum(result.generated_heat_rate_per_depth + result.reaction_heat_rate_per_depth)) / scale <= 1e-10
 
 
 def heat_closed_form_errors(mesh, result):
@@ -83,18 +83,18 @@ def test_heat_constant_source_mixed_insulation_closed_form():
     for nx in (8, 16):
         mesh = rectangle_mesh(2., .7, nx, nx // 2)
         bc = {int(i): 300. for i in mesh.boundary['left']}
-        constant = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc, heat_source=48.)
-        callback = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc,
-                                          heat_source=lambda points: np.full(len(points), 48.))
+        constant = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc, heat_source_density=48.)
+        callback = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc,
+                                          heat_source_density=lambda points: np.full(len(points), 48.))
         scaled_close(callback.temperature - 300., constant.temperature - 300., 8.)
         scaled_close(callback.heat_flux, constant.heat_flux, 96.)
-        scaled_close(callback.load, constant.load, 67.2)
-        scaled_close(callback.reaction, constant.reaction, 67.2)
-        scaled_close(constant.load.sum(), 48.*2.*.7, 67.2)
-        scaled_close(constant.reaction.sum(), -48.*2.*.7, 67.2)
-        assert -constant.reaction.sum() > 0  # positive generation leaves through x=0
-        scale = np.abs(constant.load).sum() + np.abs(constant.reaction).sum()
-        assert abs(np.sum(constant.load + constant.reaction)) / scale <= 1e-10
+        scaled_close(callback.generated_heat_rate_per_depth, constant.generated_heat_rate_per_depth, 67.2)
+        scaled_close(callback.reaction_heat_rate_per_depth, constant.reaction_heat_rate_per_depth, 67.2)
+        scaled_close(constant.generated_heat_rate_per_depth.sum(), 48.*2.*.7, 67.2)
+        scaled_close(constant.reaction_heat_rate_per_depth.sum(), -48.*2.*.7, 67.2)
+        assert -constant.reaction_heat_rate_per_depth.sum() > 0  # positive generation leaves through x=0
+        scale = np.abs(constant.generated_heat_rate_per_depth).sum() + np.abs(constant.reaction_heat_rate_per_depth).sum()
+        assert abs(np.sum(constant.generated_heat_rate_per_depth + constant.reaction_heat_rate_per_depth)) / scale <= 1e-10
         assert constant.temperature.max() > 300.
         errors.append(heat_closed_form_errors(mesh, constant))
     coarse, fine = np.asarray(errors)
@@ -106,21 +106,21 @@ def test_heat_constant_source_mixed_insulation_closed_form():
 def test_heat_rejects_unconstrained_constant_mode():
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=12., dirichlet={})
+        heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature={})
 
 
 @pytest.mark.parametrize('conductivity', [0., -1., np.nan])
 def test_heat_rejects_invalid_conductivity(conductivity):
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=conductivity, dirichlet={0: 300.})
+        heat.solve_steady_heat(mesh, thermal_conductivity=conductivity, prescribed_temperature={0: 300.})
 
 
 @pytest.mark.parametrize('source', [lambda p: 1., lambda p: np.full(len(p), np.nan)])
 def test_heat_rejects_invalid_source_callback(source):
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=12., dirichlet={0: 300.}, heat_source=source)
+        heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature={0: 300.}, heat_source_density=source)
 
 
 def checkout_example(name):

@@ -84,11 +84,11 @@ def _dense_be(mesh, initial, boundary, mass, stiffness, area, omit_old_fixed=Fal
 def _audit(mesh, initial, boundary):
     mass, stiffness, gradients, area, local_k = _operators(mesh)
     expected = _dense_be(mesh, initial, boundary, mass, stiffness, area)
-    result = solve_transient_heat(mesh, conductivity=K, volumetric_heat_capacity=C,
-        time_s=TIMES, initial_temperature_k=initial, dirichlet=boundary, heat_source=_q)
-    np.testing.assert_array_equal(result.temperature_k[0], initial)
-    np.testing.assert_array_equal(result.time_s, TIMES)
-    np.testing.assert_allclose(result.temperature_k, expected, rtol=0, atol=1e-10)
+    result = solve_transient_heat(mesh, thermal_conductivity=K, volumetric_heat_capacity=C,
+        time=TIMES, initial_temperature=initial, prescribed_temperature=boundary, heat_source_density=_q)
+    np.testing.assert_array_equal(result.temperature[0], initial)
+    np.testing.assert_array_equal(result.time, TIMES)
+    np.testing.assert_allclose(result.temperature, expected, rtol=0, atol=1e-10)
     cells = mesh.triangles
     # Independent local differences remove only a constant in the gradient/K action.
     local_t = expected[:, cells]-expected[:, cells[:, :1]]
@@ -103,18 +103,18 @@ def _audit(mesh, initial, boundary):
     fixed = np.array(sorted(boundary), dtype=int)
     reaction = np.zeros_like(residual); reaction[:, fixed] = residual[:, fixed]
     scale = max(1., float(np.max(np.sum(abs(storage)+abs(loads[1:])+abs(reaction), axis=1))))
-    for actual, truth in ((result.source_load_w_per_m, loads),
-                          (result.storage_rate_w_per_m, storage),
-                          (result.residual_w_per_m, residual),
-                          (result.reaction_w_per_m, reaction)):
+    for actual, truth in ((result.generated_heat_rate_per_depth, loads),
+                          (result.heat_storage_rate_per_depth, storage),
+                          (result.residual_heat_rate_per_depth, residual),
+                          (result.reaction_heat_rate_per_depth, reaction)):
         np.testing.assert_allclose(actual, truth, rtol=0, atol=1e-10*scale)
-    np.testing.assert_allclose(result.heat_flux_w_m2, flux, rtol=0, atol=1e-10*max(1., float(np.max(abs(flux)))))
+    np.testing.assert_allclose(result.heat_flux, flux, rtol=0, atol=1e-10*max(1., float(np.max(abs(flux)))))
     heat = expected@mass.sum(axis=1)
     quadratic = .5*np.einsum('ti,ij,tj->t', expected, mass, expected)
-    np.testing.assert_allclose(result.heat_content_j_per_m, heat, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(result.quadratic_functional_jk_per_m, quadratic, rtol=0, atol=1e-10)
-    np.testing.assert_array_equal(result.dirichlet_node_ids, fixed)
-    np.testing.assert_allclose(result.dirichlet_temperatures_k, expected[:, fixed], rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.stored_heat_per_depth, heat, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.thermal_energy_functional_per_depth, quadratic, rtol=0, atol=1e-10)
+    np.testing.assert_array_equal(result.prescribed_node_ids, fixed)
+    np.testing.assert_allclose(result.prescribed_temperature, expected[:, fixed], rtol=0, atol=1e-10)
     return result, expected, (mass, stiffness, area)
 
 

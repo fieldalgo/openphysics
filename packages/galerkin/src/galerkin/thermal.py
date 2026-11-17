@@ -11,19 +11,26 @@ validation limits. No other physics module is required.
 Conductivity, heat source, Dirichlet temperatures and boundary data may be JAX
 or PyTorch values (callbacks may return them); the result arrays are then in
 that library and carry derivatives. NumPy inputs compute exactly as before.
+
+The public function takes keyword-only SI quantities under registry names, with the
+inward heat flux (positive enters the body). It negates the inward values once and
+calls the internal ``solve_steady_heat_outward`` (outside ``__all__``), which keeps the
+outward form galerkin's own callers use (``joule_heating``, the workflows and the
+moving-mesh solve).
 """
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping
 
 import numpy as np
-from scipy.sparse import coo_matrix, issparse
+from scipy.sparse import issparse
 
 from .mesh import Mesh
 from .heat_source import ElementHeatSource
 from .materials import is_per_region, region_property
 from .postprocess import element_gradient
 from .core import forms, kernels
-from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
+from .core.backend import is_live, lift, live_namespace, scatter_add, to_numpy
 from .core.boundary import scalar_boundary_samples
 from .core.checks import real_value
 from .core.loads import ElementSource, source_load
@@ -31,21 +38,18 @@ from .core.measure import ScalarMeasure
 from .core import solve as core_solve
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
+from ._heat_kernels import component_offsets as _offsets, scalar_boundary_system as _scalar_boundary_system
+from ._public import ResultSurface, outward_from_inward, refuse_text
 
-# Public names. scalar_boundary_system is internal: galerkin.kernels re-exports it.
-__all__ = ["SteadyHeatResult", "solve_steady_heat", "ElementHeatSource"]
+# Public names. Internal: the boundary system (galerkin._heat_kernels, re-exported by galerkin.kernels) and
+# solve_steady_heat_outward, the outward-form body that galerkin's own callers use (outside __all__).
+__all__ = ["SteadyHeatResult", "PlanarSteadyHeatResult", "AxisymmetricSteadyHeatResult", "solve_steady_heat",
+           "ElementHeatSource"]
 
 
 def _numbers(matrix):
     """A NumPy snapshot of a CooMatrix as SciPy CSR, for checks."""
     return CooMatrix(matrix.rows, matrix.cols, to_numpy(matrix.values), matrix.shape).to_scipy()
-
-
-def _offsets(xp, anchors):
-    """Per-component absolute temperature offsets as one array."""
-    if any(is_live(a) for a in anchors):
-        return xp.stack([lift(xp, a, xp.float64) for a in anchors])
-    return lift(xp, np.array(anchors, dtype=float))
 
 
 def _coo(xp, matrix):
@@ -59,80 +63,72 @@ def _coo(xp, matrix):
     return CooMatrix(matrix.rows, matrix.cols, lift(xp, matrix.values), matrix.shape)
 
 
-def scalar_boundary_system(samples, n, labels, anchors, constrained):
-    """Robin matrix H, outward-flux load G, ambient load B and shifted ambient load from ``samples``.
+class SteadyHeatResult(ResultSurface):
+    """Base of the steady heat results: ``PlanarSteadyHeatResult`` (``coordinate_system``
+    "cartesian", nodal rates per metre of depth) and ``AxisymmetricSteadyHeatResult``
+    ("axisymmetric", nodal rates over the full revolution). Not constructed itself.
 
-    ``samples`` come from ``core.boundary.scalar_boundary_samples``. ``anchors`` and
-    ``constrained`` (one entry per connected component, from ``labels``) are updated
-    in place: a component without Dirichlet support is anchored at the ambient
-    temperature of its first positive h sample. The shifted load integrates
-    h*(ambient - offset of the component). H is SciPy CSR on NumPy and a CooMatrix
-    of the live library otherwise; the loads are arrays of that library. Shared so
-    that the Newton step of galerkin.temperature_joule_heating linearizes the
-    operator this heat solve uses; internal (galerkin.kernels re-exports it).
+    Fields: temperature (N,) K and heat_flux (M,2) W/m^2, then the nodal heat rates
+    (N,): generated (the source load), reaction (residual=(K+H)*T-applied on fixed
+    nodes, zero on free nodes; positive injects heat, so the Dirichlet thermostat's
+    outward contribution is -reaction), residual, outward_prescribed (G),
+    ambient_convective (B), outward_convective (C=H*T-B) and applied (load+B-G, the
+    system right-hand side). Total outward heat is -reaction+G+C. ``.units`` maps
+    every field to its SI unit.
     """
-    # Pick a useful absolute offset for Robin-only components. Any positive
-    # sampled h anchors discretely; no unit-dependent artificial cutoff.
-    for kind, edges, shape, weights, values in samples:
-        if kind != "convection":
-            continue
-        h, ambient = values
-        for e, q in np.argwhere(to_numpy(h) > 0):
-            c = labels[edges[e, 0]]
-            if not constrained[c]:
-                anchors[c] = ambient[e, q]
-                constrained[c] = True
-    xp = live_namespace(*(v for sample in samples for v in sample[4]), *anchors)
-    offsets = _offsets(xp, anchors)
-    G, B, shifted_B = (xp.asarray(row) for row in np.zeros((3, n)))
-    rows, cols, entries = [], [], []
-    for kind, edges, shape, weights, values in samples:
-        weights, shape = xp.asarray(weights), xp.asarray(shape)
-        values = tuple(lift(xp, v) for v in values)
-        if kind == "outward_flux":
-            local = xp.einsum("eq,qa,eq->ea", weights, shape, values[0])
-            G = scatter_add(xp, n, edges.ravel(), xp.reshape(local, (-1,)), base=G)
-        else:
-            h, ambient = values
-            local_h = xp.einsum("eq,qa,qb,eq->eab", weights, shape, shape, h)
-            local_b = xp.einsum("eq,qa,eq->ea", weights, shape, h*ambient)
-            local_shift = xp.einsum("eq,qa,eq->ea", weights, shape,
-                                    h*(ambient-offsets[labels[edges[:, 0]]][:, None]))
-            B = scatter_add(xp, n, edges.ravel(), xp.reshape(local_b, (-1,)), base=B)
-            shifted_B = scatter_add(xp, n, edges.ravel(), xp.reshape(local_shift, (-1,)), base=shifted_B)
-            rows.append(np.repeat(edges, 2, axis=1).ravel())
-            cols.append(np.tile(edges, (1, 2)).ravel())
-            entries.append(xp.reshape(local_h, (-1,)))
-    rows = np.concatenate(rows) if rows else np.zeros(0, dtype=int)
-    cols = np.concatenate(cols) if cols else np.zeros(0, dtype=int)
-    if backend_of(xp) is Backend.NUMPY:
-        entries = np.concatenate(entries) if entries else np.zeros(0)
-        return coo_matrix((entries, (rows, cols)), shape=(n, n)).tocsr(), G, B, shifted_B
-    return CooMatrix(rows, cols, xp.concat(entries) if entries else xp.zeros(0, dtype=xp.float64),
-                     (n, n)), G, B, shifted_B
+
+
+_RATES = ("generated_heat_rate", "reaction_heat_rate", "residual_heat_rate", "outward_prescribed_heat_rate",
+          "ambient_convective_heat_rate", "outward_convective_heat_rate", "applied_heat_rate")
 
 
 @dataclass
-class SteadyHeatResult:
-    """temperature (N,) K, heat_flux (M,2) W/m^2, nodal forces (N,) W/m.
+class PlanarSteadyHeatResult(SteadyHeatResult):
+    """A Cartesian (planar) steady heat result: nodal heat rates in W per metre of depth.
 
-    reaction is residual=(K+H)*T-system_rhs on fixed nodes, zero on free nodes.
-    Positive reaction injects heat; the Dirichlet thermostat outward contribution
-    is -reaction. Total outward heat also includes prescribed and convective terms.
-    Cartesian nodal heat rates are per unit out-of-plane thickness (W/m).
-    Axisymmetric rates integrate a full revolution (W); see nodal_heat_rate_unit.
+    See ``SteadyHeatResult``. The optional rates are None when built without them.
     """
     temperature: np.ndarray
     heat_flux: np.ndarray
-    load: np.ndarray
-    reaction: np.ndarray
-    residual: np.ndarray
-    prescribed_outward_load: np.ndarray | None = None
-    ambient_load: np.ndarray | None = None
-    convective_outward: np.ndarray | None = None
-    system_rhs: np.ndarray | None = None
-    coordinate_system: str = "cartesian"
-    nodal_heat_rate_unit: str = "W/m"
+    generated_heat_rate_per_depth: np.ndarray
+    reaction_heat_rate_per_depth: np.ndarray
+    residual_heat_rate_per_depth: np.ndarray
+    outward_prescribed_heat_rate_per_depth: np.ndarray | None = None
+    ambient_convective_heat_rate_per_depth: np.ndarray | None = None
+    outward_convective_heat_rate_per_depth: np.ndarray | None = None
+    applied_heat_rate_per_depth: np.ndarray | None = None
+
+    coordinate_system = "cartesian"
+    BASIS = "planar"
+    UNITS = MappingProxyType({"temperature": "K", "heat_flux": "W/m^2",
+                              **{f"{name}_per_depth": "W/m" for name in _RATES}})
+
+
+@dataclass
+class AxisymmetricSteadyHeatResult(SteadyHeatResult):
+    """An axisymmetric steady heat result: nodal heat rates in W over the full revolution.
+
+    See ``SteadyHeatResult``. Its fields have no ``_per_depth``; asking for one raises
+    AttributeError, which says why.
+    """
+    temperature: np.ndarray
+    heat_flux: np.ndarray
+    generated_heat_rate: np.ndarray
+    reaction_heat_rate: np.ndarray
+    residual_heat_rate: np.ndarray
+    outward_prescribed_heat_rate: np.ndarray | None = None
+    ambient_convective_heat_rate: np.ndarray | None = None
+    outward_convective_heat_rate: np.ndarray | None = None
+    applied_heat_rate: np.ndarray | None = None
+
+    coordinate_system = "axisymmetric"
+    BASIS = "axisymmetric"
+    UNITS = MappingProxyType({"temperature": "K", "heat_flux": "W/m^2", **{name: "W" for name in _RATES}})
+
+
+def _steady_result(coordinate_system):
+    """The result class of a solve in ``coordinate_system`` (validated by ScalarMeasure)."""
+    return AxisymmetricSteadyHeatResult if coordinate_system == "axisymmetric" else PlanarSteadyHeatResult
 
 
 def _element_source(heat_source, mesh):
@@ -142,9 +138,54 @@ def _element_source(heat_source, mesh):
     return heat_source
 
 
-def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
-                      outward_flux=None, convection=None, coordinate_system="cartesian", motion=None):
-    """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data.
+def solve_steady_heat(mesh, *, thermal_conductivity, prescribed_temperature, heat_source_density=None,
+                      inward_heat_flux=None, convection=None, coordinate_system="cartesian", motion=None):
+    """Solve -div(k grad T)=Q with prescribed temperatures, inward heat flux and Robin data, in SI.
+
+    thermal_conductivity is a finite scalar k>0 in W/(m K), or {region name: k}
+    with every mesh.region_names entry. heat_source_density is Q in W/m^3: a
+    scalar, {region name: Q}, a callback receiving (Q,2) metre coordinates
+    (positions) and returning (Q,) W/m^3, or ElementHeatSource(mesh, values) with
+    (M,) W/m^3 in exact cell order; None (the default) is no source.
+    prescribed_temperature maps integer node indices (exterior or interior: a
+    prescribed temperature on an internal surface is an ordinary constraint, and
+    its reaction is the heat that surface injects) to scalar temperatures in K;
+    every disconnected component requires a prescribed temperature or positive
+    Robin support. inward_heat_flux maps edge tags to the normal heat flux
+    entering the body (W/m^2, positive in); convection maps tags to
+    (heat_transfer_coefficient h, ambient_temperature) in W/(m^2 K) and K,
+    h>=0, so that the heat leaving the body is h*(T-ambient) less the inward
+    flux. Boundary values are scalars or callbacks(position, outward_normal)->(Q,).
+    Untagged natural edges are insulated. See docs/packages/galerkin/thermal_flux_robin.md.
+    coordinate_system="axisymmetric" interprets coordinates as (r,z), r>=0,
+    and uses the full 2*pi*r volume and surface measure: the result is then an
+    AxisymmetricSteadyHeatResult with nodal heat rates in W over the revolution,
+    otherwise a PlanarSteadyHeatResult with rates in W per metre of depth.
+    motion=galerkin.shape.MeshMotion(design_velocity, t) solves on the nodes
+    X0 + t*design_velocity and carries the derivative with respect to the JAX or
+    PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
+
+    A str for a quantity raises TypeError (SI numbers only). The inward flux is
+    negated once, as 0.0 - x (a callback's checked float result likewise), and the
+    outward-form solve runs exactly as before; see galerkin._public.
+    """
+    outward_flux = outward_from_inward(inward_heat_flux, "inward_heat_flux")     # a non-mapping: ValueError
+    for name, value in (("thermal_conductivity", thermal_conductivity),
+                        ("prescribed_temperature", prescribed_temperature),
+                        ("heat_source_density", heat_source_density), ("inward_heat_flux", inward_heat_flux),
+                        ("convection", convection)):
+        refuse_text(name, value)
+    return solve_steady_heat_outward(mesh, conductivity=thermal_conductivity, dirichlet=prescribed_temperature,
+                              heat_source=0.0 if heat_source_density is None else heat_source_density,
+                              outward_flux=outward_flux, convection=convection,
+                              coordinate_system=coordinate_system, motion=motion)
+
+
+def solve_steady_heat_outward(mesh, *, conductivity, dirichlet, heat_source=0.0,
+                       outward_flux=None, convection=None, coordinate_system="cartesian", motion=None):
+    """Solve -div(k grad T)=Q with Dirichlet, outward flux and Robin data (the outward form).
+
+    The body of solve_steady_heat before the galerkin step, for galerkin's own callers.
 
     conductivity is finite scalar k>0 in W/(m K), or {region name: k} with
     every mesh.region_names entry. heat_source is scalar Q, {region name: Q},
@@ -161,15 +202,16 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     coordinate_system="axisymmetric" interprets coordinates as (r,z), r>=0,
     and uses the full 2*pi*r volume and surface measure. Nodal heat rates then
     have units W, recorded on the result, instead of the Cartesian W/m.
-    motion=galerkin.shape.MeshMotion(velocity, t) solves on the nodes
-    X0 + t*velocity and carries the derivative with respect to the JAX or
+    motion=galerkin.shape.MeshMotion(design_velocity, t) solves on the nodes
+    X0 + t*design_velocity and carries the derivative with respect to the JAX or
     PyTorch scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
     """
     if motion is not None:
         from .shape import solve_steady_heat_moving
-        return solve_steady_heat_moving(mesh, motion, conductivity=conductivity, dirichlet=dirichlet,
-                                        heat_source=heat_source, outward_flux=outward_flux,
-                                        convection=convection, coordinate_system=coordinate_system)
+        return solve_steady_heat_moving(mesh, motion, thermal_conductivity=conductivity,
+                                        prescribed_temperature=dirichlet, heat_source_density=heat_source,
+                                        outward_heat_flux=outward_flux, convection=convection,
+                                        coordinate_system=coordinate_system)
     if not is_per_region(conductivity):
         k = real_value(conductivity, "conductivity")
         if tuple(k.shape) != () or to_numpy(k) <= 0:
@@ -200,7 +242,7 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
     measure.check_axis_dirichlet(prescribed)
     samples = measure.boundary_samples(
         scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, live=True))
-    H, G, B, shifted_B = scalar_boundary_system(samples, len(p), labels, anchors, constrained)
+    H, G, B, shifted_B = _scalar_boundary_system(samples, len(p), labels, anchors, constrained)
     missing = np.flatnonzero(~constrained)
     if len(missing):
         raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
@@ -258,5 +300,4 @@ def solve_steady_heat(mesh, *, conductivity, dirichlet, heat_source=0.0,
             raise ValueError("heat solve failed the normalized component heat balance tolerance")
     if is_live(residual):
         reaction = scatter_add(xp, len(p), fixed, residual[fixed])
-    return SteadyHeatResult(temperature, flux, load, reaction, residual,
-                            G, B, convective, rhs, coordinate_system, measure.nodal_rate_unit)
+    return _steady_result(coordinate_system)(temperature, flux, load, reaction, residual, G, B, convective, rhs)

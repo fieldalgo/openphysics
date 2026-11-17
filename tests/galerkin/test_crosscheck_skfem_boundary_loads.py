@@ -71,9 +71,12 @@ def _ambient_bottom(x, y):
 
 
 def _heat_data(mesh, case):
-    """galerkin's boundary arguments: edge-tag keyed scalars and (points, normals) callbacks."""
-    flux = {"right": HEAT["g_right"],
-            "top": lambda p, n: _g_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1])}
+    """galerkin's boundary arguments: edge-tag keyed scalars and (points, normals) callbacks.
+
+    The flux is galerkin's inward heat flux, the negated outward flux g of the reference
+    (whose load G keeps the outward sign)."""
+    flux = {"right": -HEAT["g_right"],
+            "top": lambda p, n: -_g_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1])}
     convection = {"right": (HEAT["h_right"], HEAT["ambient_right"]),
                   "bottom": (lambda p, n: _h_bottom(p[:, 0], p[:, 1]),
                              lambda p, n: _ambient_bottom(p[:, 0], p[:, 1]))}
@@ -169,8 +172,8 @@ def test_heat_p1_flux_robin_same_mesh(skfem, case):
     dirichlet, flux, convection = _heat_data(mesh, case)
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=HEAT["k"], dirichlet=dirichlet,
-                                 heat_source=HEAT["q"], outward_flux=flux, convection=convection)
+        ours = solve_steady_heat(mesh, thermal_conductivity=HEAT["k"], prescribed_temperature=dirichlet,
+                                 heat_source_density=HEAT["q"], inward_heat_flux=flux, convection=convection)
         K = assemble_stiffness(mesh, HEAT["k"])
         H_right = assemble_boundary_mass(mesh, mesh.boundary_edges["right"], HEAT["h_right"])
     with clock("reference"):
@@ -186,18 +189,18 @@ def test_heat_p1_flux_robin_same_mesh(skfem, case):
                    "max relative difference", relative_difference(_dense(H_right), _dense(theirs["H_right"])),
                    SAME),
         observable("volumetric load fQ", "W/m", "max relative difference",
-                   relative_difference(ours.load, theirs["f"]), SAME),
+                   relative_difference(ours.generated_heat_rate_per_depth, theirs["f"]), SAME),
         observable("prescribed outward load G", "W/m", "max relative difference",
-                   relative_difference(ours.prescribed_outward_load, theirs["G"]), SAME),
+                   relative_difference(ours.outward_prescribed_heat_rate_per_depth, theirs["G"]), SAME),
         observable("ambient load B", "W/m", "max relative difference",
-                   relative_difference(ours.ambient_load, theirs["B"]), SAME),
+                   relative_difference(ours.ambient_convective_heat_rate_per_depth, theirs["B"]), SAME),
         observable("system right-hand side fQ + B - G", "W/m", "max relative difference",
-                   relative_difference(ours.system_rhs, theirs["rhs"]), SAME),
+                   relative_difference(ours.applied_heat_rate_per_depth, theirs["rhs"]), SAME),
         observable("convective outward rate C = H T - B", "W/m", "max relative difference",
-                   relative_difference(ours.convective_outward, theirs["C"]), SAME)]
+                   relative_difference(ours.outward_convective_heat_rate_per_depth, theirs["C"]), SAME)]
     if case == "mixed":
         observables.append(observable("reaction at the Dirichlet nodes", "W/m", "max relative difference",
-                                      relative_difference(ours.reaction, theirs["reaction"]), SAME))
+                                      relative_difference(ours.reaction_heat_rate_per_depth, theirs["reaction"]), SAME))
     anchor = ("Dirichlet 320 K on the left edge" if case == "mixed"
               else "no Dirichlet node; convection h = 8 W/(m^2 K), ambient 320 K on the left edge")
     emit(make_record(

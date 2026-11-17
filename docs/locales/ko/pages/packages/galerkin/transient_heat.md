@@ -4,7 +4,7 @@
 
 **한눈에 보기**
 
-- **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점, 그리고 태그가 붙은 외곽 변의 처방 외향 열유속 g[W/m²] 또는 대류 h·(T − T_amb)(정상 솔버와 같은 입력 형식; 각각 상수, 공간 변화 또는 시간 의존)이며 나머지 경계는 단열입니다.
+- **하는 일:** `galerkin.transient_heat.solve_transient_heat`는 고정된 적합 P1 삼각형 메시에서 일관 질량과 후진 Euler로 2D 열전도 c·dT/dt − div(k·grad T) = Q를 시간 진행합니다. 입력은 상수 등방 k[W/(m K)]와 c[J/(m³ K)], 열원 Q[W/m³], 명시 시간[s], 초기 온도장[K], 시간에 따라 온도가 바뀌는 고정 Dirichlet 절점, 그리고 태그가 붙은 외곽 변의 처방 내향 열유속 q_in[W/m²](양수가 들어옴, 아래 식의 g = −q_in) 또는 대류 h·(T − T_amb)(정상 솔버와 같은 입력 형식; 각각 상수, 공간 변화 또는 시간 의존)이며 나머지 경계는 단열입니다.
 - **축대칭:** `coordinate_system="axisymmetric"`은 메시를 (r, z)로 읽고 [축대칭 정상 열전도](thermal_axisymmetric.md)의 측도로 전체 회전을 적분합니다. [축대칭 과도 열](#축대칭-과도-열) 참조.
 - **한계:** 복사나 온도 의존 h는 없습니다. 시간 의존 경계 데이터는 엔진 기능이며(simcase 문서 adapter는 상수만 받음), JAX·PyTorch 입력에서는 시간 의존 h를 거절합니다. restart, 자동 열전도→기계 연성이 없습니다. 유한한 음의 Kelvin을 clamp하지 않으며 이산 최대 원리를 약속하지 않습니다.
 - **검증:** [검증 계약](transient_heat_validation.md)과 [독립 수용 검증](transient_heat_independent_validation.md)은 정확한 이산 고유모드 곱 대비 후진 Euler 차수 0.9–1.1, 사인 제조해에서 온도 L2 차수 ≥ 1.8과 열유속 L2 차수 ≥ 0.9를 고정합니다. [열유속·대류 기준](transient_heat_validation.md#외향-열유속과-대류-기준)은 대류 slab과 상수 열유속 slab을 독립 급수·정상 솔버·단계별 열수지와 비교하고, [시간 의존 기준](transient_heat_validation.md#시간-의존-열유속과-대류-기준)은 정현파 주변 온도와 ramp 열유속을 닫힌 형식과 비교합니다. 특정 커밋의 결과는 그 커밋의 CI 실행에서 확인하세요.
@@ -24,11 +24,11 @@ from galerkin.transient_heat import solve_transient_heat
 
 mesh = rectangle_mesh(1., 1., 4, 4)  # metres
 result = solve_transient_heat(
-    mesh, conductivity=2.5, volumetric_heat_capacity=4.0,
-    time_s=np.array([0., .1, .3]),
-    initial_temperature_k=np.full(mesh.num_nodes, 300.),
-    dirichlet={}, heat_source=8.0)
-outward_dirichlet_w_per_m = -result.reaction_w_per_m.sum(axis=1)
+    mesh, thermal_conductivity=2.5, volumetric_heat_capacity=4.0,
+    time=np.array([0., .1, .3]),
+    initial_temperature=np.full(mesh.num_nodes, 300.),
+    prescribed_temperature={}, heat_source_density=8.0)
+outward_dirichlet_per_depth = -result.reaction_heat_rate_per_depth.sum(axis=1)   # W/m
 ```
 
 이 단열·상수 source 예제의 수학적 목표는 T=300+(8/4)*t K이며 flux와 thermostat
@@ -38,10 +38,10 @@ reaction은 0입니다. 이는 정확한 기준 기대값이며 **관측한 실�
 
 ```text
 solve_transient_heat(
-    mesh, *, conductivity, volumetric_heat_capacity,
-    time_s, initial_temperature_k, dirichlet, heat_source=0.0,
-    outward_flux=None, convection=None, checkpoint_every=None,
-    coordinate_system="cartesian")
+    mesh, *, thermal_conductivity, volumetric_heat_capacity,
+    time, initial_temperature, prescribed_temperature, heat_source_density=None,
+    inward_heat_flux=None, convection=None, checkpoint_every=None,
+    coordinate_system="cartesian", motion=None)
 ```
 
 하위 모듈을 명시적으로 import합니다. 자동 최상위 export는 추가하지 않습니다.
@@ -57,13 +57,13 @@ anchor 규칙을 가져오면 안 됩니다.
 | 입력 | 계약 |
 |---|---|
 | mesh | galerkin Mesh, 유한한 m 좌표; 사용 절점·적합·비중첩 manifold CCW 삼각형 |
-| conductivity | 유한한 양의 scalar k, W/(m K), 또는 `{영역 이름: k}` |
+| thermal_conductivity | 유한한 양의 scalar k, W/(m K), 또는 `{영역 이름: k}` |
 | volumetric_heat_capacity | 유한한 양의 scalar c, J/(m³ K), 또는 `{영역 이름: c}` |
-| time_s | 유한 실수 1D 초, 최소 두 개, 음이 아니며 유한 양의 차이로 엄격히 증가 |
-| initial_temperature_k | time_s[0]의 유한 실수 정확히 (N,) K |
-| dirichlet | 고정 정수 절점(외부나 내부, [정상 열](thermal_steady2d.md)과 같음) -> scalar K 또는 callback(time_s)->scalar K |
-| heat_source | 유한 scalar W/m³, `{영역 이름: Q}`, 또는 callback(points_m,time_s)->정확히 (Q,) W/m³ |
-| outward_flux | `None` 또는 `{boundary_edges 태그: g}`, g는 W/m²(양수면 열 제거); scalar, callback(points_m, outward_normals)->정확히 (Q,), callback(time_s)->scalar 또는 callback(points_m, outward_normals, time_s)->정확히 (Q,) |
+| time | 유한 실수 1D 초, 최소 두 개, 음이 아니며 유한 양의 차이로 엄격히 증가 |
+| initial_temperature | time[0]의 유한 실수 정확히 (N,) K |
+| prescribed_temperature | 고정 정수 절점(외부나 내부, [정상 열](thermal_steady2d.md)과 같음) -> scalar K 또는 callback(time)->scalar K |
+| heat_source_density | `None`(열원 없음, 기본값), 유한 scalar W/m³, `{영역 이름: Q}`, 또는 callback(position,time)->정확히 (Q,) W/m³ |
+| inward_heat_flux | `None` 또는 `{boundary_edges 태그: q_in}`, q_in은 W/m²(양수면 열 주입; solver는 g = 0.0 − q_in을 정확히 씀); scalar, callback(position, outward_normal)->정확히 (Q,), callback(time)->scalar 또는 callback(position, outward_normal, time)->정확히 (Q,) |
 | convection | `None` 또는 `{boundary_edges 태그: (h, T_amb)}`, h ≥ 0은 W/(m² K), T_amb는 K; 각각 scalar 또는 같은 callback 형식 중 하나 |
 
 Source callback은 (Q,2) m 좌표와 한 scalar 초 값을 받습니다.
@@ -73,12 +73,12 @@ Source callback은 (Q,2) m 좌표와 한 scalar 초 값을 받습니다.
 같은 단위 길이 외향 법선을 사용합니다. g, h, T_amb는 각각 네 형식 중 하나이며 callback의
 필수 위치 인자 수로 구분합니다. scalar 또는 `callback(points_m, outward_normals)`는
 **정적** 데이터로 이전과 똑같이 시간 진행 전에 한 번 표본화합니다. scalar를 돌려주는
-`callback(time_s)`와 정확히 (Q,)를 돌려주는 `callback(points_m, outward_normals, time_s)`는
-**시간 의존** 데이터입니다. 시간 의존 값은 검증을 위해 `time_s[0]`에서 표본화한 뒤
+`callback(time)`과 정확히 (Q,)를 돌려주는 `callback(position, outward_normal, time)`은
+**시간 의존** 데이터입니다. 시간 의존 값은 검증을 위해 `time[0]`에서 표본화한 뒤
 **각 단계의 끝 t_{n+1}**에서 표본화합니다. Dirichlet·source callback을 평가하는 것과 같은
 시점이며 후진 Euler는 오른쪽 끝 데이터를 사용합니다. 그 밖의 서명(인자 없음, 넷 이상,
 가변 위치 인자, 인자 이름이 `time_s`/`time`인 두 인자 callback)은 표본화 전에
-ValueError로 거절합니다. 변 형상과 검증은 한 번 수행하며 `time_s[0]`의 표본화·조립 실패는
+ValueError로 거절합니다. 변 형상과 검증은 한 번 수행하며 `time[0]`의 표본화·조립 실패는
 time index 0으로, 이후 실패는 해당 단계로 chaining합니다. Robin 행렬 H는 h 자체가 시간
 의존일 때만 단계마다 다시 조립하고 그 외에는 한 번 조립합니다. G와 B는 어떤 값이든 시간
 의존이면 단계마다 다시 평가합니다(변 국소 비용으로 단계별 factorization에 비해 작음).
@@ -122,7 +122,7 @@ callback도 그렇습니다(정적 데이터는 시간 진행 전에 한 번). �
 복사본입니다. 이후 caller의 변경은 반환 history나 캡처 형상을 바꾸지 않습니다.
 
 해석은 eager all-or-error입니다. 구조적 입력 오류는 ValueError입니다. 준비·표본화·
-해석·파생 history·최종 복사 실패는 time_index와 time_s를 갖는 ValueError 하위 클래스
+해석·파생 history·최종 복사 실패는 time_index와 time을 갖는 ValueError 하위 클래스
 TransientHeatStepError로 chaining합니다. __cause__는 원래 예외를 보존합니다.
 준비 실패는 index0, 최종 복사 실패는 마지막 index/time입니다. 부분 성공 결과를
 반환하지 않으며 실패한 trial로 이전 수용 내부 상태를 바꾸지 않습니다. 외부 callback의
@@ -134,7 +134,7 @@ TransientHeatStepError로 chaining합니다. __cause__는 원래 예외를 보�
 M_e = c*A/12 * [[2,1,1],[1,2,1],[1,1,2]]
 K_ij = integral k*grad(N_i).grad(N_j)
 H_n,ij = integral_Gamma h(t_n)*N_i*N_j ds        (대류 변)
-G_n,i  = integral_Gamma g(t_n)*N_i ds            (outward_flux 변)
+G_n,i  = integral_Gamma g(t_n)*N_i ds            (inward_heat_flux 변, g = -q_in)
 B_n,i  = integral_Gamma h(t_n)*T_amb(t_n)*N_i ds
 f_i(t) = integral N_i*Q(x,t)
 A_n = M/h_n + K + H_n
@@ -161,31 +161,32 @@ residual/balance 검사 실패는 잘못된 성공 history 대신 예외를 발�
 
 ## 결과 배열, 수명과 메모리
 
-TransientHeatResult는 다음 배열을 소유하며 read-only 복사본으로 보존합니다.
-N은 절점, M은 삼각형, Nt는 요청 시간, D는 정렬된 고유 지정 절점 수입니다.
+Cartesian 풀이는 `PlanarTransientHeatResult`(frozen, `TransientHeatResult`의 한 종류)를
+돌려줍니다. registry 이름의 다음 배열을 소유하며 read-only 복사본으로 보존하고, `.units`가
+각 배열의 SI 단위를 줍니다. N은 절점, M은 삼각형, Nt는 요청 시간, D는 정렬된 고유 지정 절점 수입니다.
 
 | 필드 | Shape | 의미 / 단위 |
 |---|---|---|
-| time_s | (Nt,) | 요청 초 |
-| temperature_k | (Nt,N) | 절점 K, 정확한 초기 복사 장 포함 |
-| heat_flux_w_m2 | (Nt,M,2) | 요소 q=-k*grad(P1 T), W/m², t0 포함 |
-| source_load_w_per_m | (Nt,N) | 절점 f, W/m; f0는 진단용만 |
-| reaction_w_per_m | (Nt-1,N) | 고정 절점의 원래 residual, 자유 절점은 0, W/m |
-| residual_w_per_m | (Nt-1,N) | 모든 절점의 원래 전체 BE residual, W/m |
-| storage_rate_w_per_m | (Nt-1,N) | M*(T_n-T_n-1)/h_n, W/m |
-| heat_content_j_per_m | (Nt,) | H=1ᵀ M T, J/m |
-| quadratic_functional_jk_per_m | (Nt,) | V=.5 Tᵀ M T, J K/m |
-| dirichlet_node_ids | (D,) | 정렬된 고유 고정 절점 인덱스 |
-| dirichlet_temperatures_k | (Nt,D) | 표본화한 지정 K |
-| nodes_m / triangles | (N,2) / (M,3) | 복사한 SI 형상/연결/순서 |
-| prescribed_outward_load_w_per_m | (Nt-1,N) 또는 None | 단계별 G_n, W/m; outward_flux/convection이 없으면 None |
-| convective_outward_w_per_m | (Nt-1,N) 또는 None | C_n = H_n*T_n-B_n, W/m; outward_flux/convection이 없으면 None |
+| time | (Nt,) | 요청 초 |
+| temperature | (Nt,N) | 절점 K, 정확한 초기 복사 장 포함 |
+| heat_flux | (Nt,M,2) | 요소 q=-k*grad(P1 T), W/m², t0 포함 |
+| generated_heat_rate_per_depth | (Nt,N) | 절점 f, W/m; f0는 진단용만 |
+| reaction_heat_rate_per_depth | (Nt-1,N) | 고정 절점의 원래 residual, 자유 절점은 0, W/m |
+| residual_heat_rate_per_depth | (Nt-1,N) | 모든 절점의 원래 전체 BE residual, W/m |
+| heat_storage_rate_per_depth | (Nt-1,N) | M*(T_n-T_n-1)/h_n, W/m |
+| stored_heat_per_depth | (Nt,) | H=1ᵀ M T, J/m |
+| thermal_energy_functional_per_depth | (Nt,) | V=.5 Tᵀ M T, J K/m |
+| prescribed_node_ids | (D,) | 정렬된 고유 고정 절점 인덱스 |
+| prescribed_temperature | (Nt,D) | 표본화한 지정 K |
+| node_coordinates / triangles | (N,2) / (M,3) | 복사한 SI 형상/연결/순서 |
+| outward_prescribed_heat_rate_per_depth | (Nt-1,N) 또는 None | 단계별 G_n, W/m; inward_heat_flux/convection이 없으면 None |
+| outward_convective_heat_rate_per_depth | (Nt-1,N) 또는 None | C_n = H_n*T_n-B_n, W/m; inward_heat_flux/convection이 없으면 None |
 
-두 경계 열률은 외향이 양수입니다. `outward_flux`와 `convection`을 모두 주지 않으면 0 배열이
+두 경계 열률은 외향이 양수입니다. `inward_heat_flux`와 `convection`을 모두 주지 않으면 0 배열이
 아니라 `None`이므로 Dirichlet만 있는 결과의 필드와 메모리는 그대로입니다.
-`residual_w_per_m`과 `reaction_w_per_m`은 H, G, B 항이 있으면 이를 포함합니다.
+`residual_heat_rate_per_depth`와 `reaction_heat_rate_per_depth`는 H, G, B 항이 있으면 이를 포함합니다.
 
-두 metadata 필드 conductivity_w_mk와 volumetric_heat_capacity_j_m3k는
+두 metadata 필드 thermal_conductivity와 volumetric_heat_capacity는
 제공한 상수를 기록합니다(float, 또는 영역별 입력이면 `{영역 이름: float}` 사본). 단위·provenance·hash·source 출처 인증을 주장하지 않습니다.
 Read-only 배열과 frozen container는 적대적 코드에 대한 암호학적 보호가 아닙니다.
 
@@ -238,11 +239,13 @@ m 단위 (r, z)이고 r ≥ 0이며, 모든 적분은 [축대칭 정상 열전�
 `∫ c N_i N_j 2πr = 2π|T| c Σ_m r_m ∫ N_i N_j N_m`(`core.kernels.p1_mass_axisymmetric`,
 구적 없음; 꼭짓점 중복도에 대해 `∫ N_i N_j N_m = |T| a!b!c!/60`)를 쓰고, 열원과
 열유속·대류 표본은 기존 Gauss 점에서 가중하며, 요소 열유속은 W/m²의 `(q_r, q_z)`
-그대로입니다. 절점 열량(`source_load`·`reaction`·`residual`·`storage_rate`·경계 하중)은
-**전체 회전의 W**, `heat_content`는 J, 이차 functional은 J K이고, 결과는
-`coordinate_system`과 `nodal_rate_unit`(`"W"`)을 기록합니다(필드 이름은 Cartesian
-`_w_per_m` 철자를 유지하고 [simcase 영역 adapter](../simcase/thermal_regions2d.md#축대칭-문서)가
-바꿔 적습니다). 정상 페이지의 축 규칙이 그대로 적용됩니다. 축에만 놓인 절점의 Dirichlet
+그대로입니다. 절점 열량(생성·reaction·residual·저장 열률, 경계 열률)은 **전체 회전의 W**,
+저장 열은 J, 에너지 functional은 J K입니다. 풀이는 `AxisymmetricTransientHeatResult`를 돌려주며
+그 열률·열 필드는 registry의 기본 이름(`generated_heat_rate`, `reaction_heat_rate`,
+`residual_heat_rate`, `heat_storage_rate`, `stored_heat`, `thermal_energy_functional`,
+`outward_prescribed_heat_rate`, `outward_convective_heat_rate`)이고 `.units`는 W, J, J K를
+줍니다. `_per_depth` 이름을 물으면 이유를 말하는 `AttributeError`입니다
+([simcase 영역 adapter](../simcase/thermal_regions2d.md#축대칭-문서)가 이 이름으로 읽습니다). 정상 페이지의 축 규칙이 그대로 적용됩니다. 축에만 놓인 절점의 Dirichlet
 데이터와 축 변의 비영 열유속·h는 거부하며(경계 거부는 그 값을 처음 표본화한 시각 index에
 연결됨: 정적 데이터는 index 0, 축에서 뒤늦게 비영이 되는 콜백은 그 시각), 축 자체에는 조건이
 필요 없습니다. 기본값은 Cartesian 풀이와 bit 단위로

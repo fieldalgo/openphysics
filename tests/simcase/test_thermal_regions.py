@@ -40,8 +40,8 @@ def handoff(data):
     return handoff_03(Document.from_dict(data))
 
 
-EXACT = dict(interfaces=[.01, .03], conductivities=[45., .5], left_temperature=400.,
-             right_temperature=300., sources=[2e5, 0.])
+EXACT = dict(position=[0., .01, .03], thermal_conductivity=[45., .5], prescribed_temperature=(400., 300.),
+             heat_source_density=[2e5, 0.])
 
 
 def _errors(result):
@@ -100,10 +100,10 @@ def test_region_document_equals_a_direct_engine_call_and_balances_heat():
     k = {'plate': 45., 'heater': 400., 'background': .04}
     q = {'plate': 0., 'heater': 5e6, 'background': 0.}
     bc = {int(i): 300. for i in mesh.boundary['bottom']}
-    direct = solve_steady_heat(mesh, conductivity=k, heat_source=q, dirichlet=dict(sorted(bc.items())),
+    direct = solve_steady_heat(mesh, thermal_conductivity=k, heat_source_density=q, prescribed_temperature=dict(sorted(bc.items())),
                                convection={'top': (10., 295.)})
     np.testing.assert_array_equal(r.temperature, direct.temperature)
-    np.testing.assert_array_equal(r.reaction_heat_rate_per_depth, direct.reaction)
+    np.testing.assert_array_equal(r.reaction_heat_rate_per_depth, direct.reaction_heat_rate_per_depth)
     heater = mesh.regions == mesh.region_names.index('heater')
     np.testing.assert_allclose(r.diagnostics['generated_heat_rate_per_depth'], 5e6*mesh.areas()[heater].sum(), rtol=1e-12)
     # Inscribed polygon of the 2 mm circle: area within the O(h^2) chord error.

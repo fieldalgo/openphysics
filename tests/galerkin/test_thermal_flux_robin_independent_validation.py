@@ -1,10 +1,15 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Fixed-gate independent acceptance of outward flux and Robin heat boundaries."""
+"""Fixed-gate independent acceptance of outward flux and Robin heat boundaries.
+
+The cases and the independent oracle state the prescribed boundary flux outward (positive
+leaving the body); ``solve`` hands galerkin the inward heat flux 0.0 - g it takes since the
+galerkin step (a callback likewise), so the solver computes with the same doubles.
+"""
 import numpy as np
 import pytest
 from galerkin.mesh import Mesh,rectangle_mesh
-from galerkin.thermal import solve_steady_heat,SteadyHeatResult
+from galerkin.thermal import solve_steady_heat,PlanarSteadyHeatResult
 from thermal_flux_robin_independent_oracle import (
     dirichlet_flux,dirichlet_robin,robin_only,slab_state,smooth_mms,
     independent_system,triangle_geometry,exact_line_moments)
@@ -20,25 +25,33 @@ def audit(mesh,result,bc,source=0.,flux=None,convection=None,k=K0,normals=normal
     delta=result.temperature-reference
     expected_conv=H@delta-shift
     expected_residual=K@delta+expected_conv-f+G
-    rate=max(np.sum(abs(f))+np.sum(abs(G))+np.sum(abs(expected_conv))+np.sum(abs(result.reaction)),k,1e-30)
-    for actual,expected in [(result.load,f),(result.prescribed_outward_load,G),(result.ambient_load,B),(result.system_rhs,f+B-G),(result.convective_outward,expected_conv),(result.residual,expected_residual)]:
+    rate=max(np.sum(abs(f))+np.sum(abs(G))+np.sum(abs(expected_conv))+np.sum(abs(result.reaction_heat_rate_per_depth)),k,1e-30)
+    for actual,expected in [(result.generated_heat_rate_per_depth,f),(result.outward_prescribed_heat_rate_per_depth,G),(result.ambient_convective_heat_rate_per_depth,B),(result.applied_heat_rate_per_depth,f+B-G),(result.outward_convective_heat_rate_per_depth,expected_conv),(result.residual_heat_rate_per_depth,expected_residual)]:
         np.testing.assert_allclose(actual,expected,rtol=1e-10,atol=1e-10*rate)
     free=np.setdiff1d(np.arange(mesh.num_nodes),list(bc));fixed=np.array(list(bc),dtype=int)
-    np.testing.assert_allclose(result.reaction[free],0,atol=1e-10*rate)
-    np.testing.assert_allclose(result.residual[free],0,atol=1e-10*rate)
-    np.testing.assert_allclose(result.reaction[fixed],expected_residual[fixed],atol=1e-10*rate,rtol=1e-10)
-    assert abs(np.sum(f+result.reaction-G-expected_conv))<=1e-10*rate
+    np.testing.assert_allclose(result.reaction_heat_rate_per_depth[free],0,atol=1e-10*rate)
+    np.testing.assert_allclose(result.residual_heat_rate_per_depth[free],0,atol=1e-10*rate)
+    np.testing.assert_allclose(result.reaction_heat_rate_per_depth[fixed],expected_residual[fixed],atol=1e-10*rate,rtol=1e-10)
+    assert abs(np.sum(f+result.reaction_heat_rate_per_depth-G-expected_conv))<=1e-10*rate
     b,w,p,grad=triangle_geometry(mesh.nodes,mesh.triangles,order)
     gradient=np.einsum('tai,ta->ti',grad,delta[mesh.triangles])
     np.testing.assert_allclose(result.heat_flux,-k*gradient,atol=1e-10*max(k,np.max(abs(result.heat_flux))),rtol=1e-10)
     rhs=f+shift-G
-    support=delta@result.reaction
+    support=delta@result.reaction_heat_rate_per_depth
     assert abs(delta@((K+H)@delta)-delta@rhs-support)<1e-10*max(rate*np.max(abs(delta)),k)
     return K,H,f,B,G
 
 
+def inward(flux):
+    """The inward heat flux of the cases' outward data: 0.0 - g (a callback's float result likewise)."""
+    if flux is None:return None
+    return {tag:((lambda p,n,g=g:0.0-np.asarray(g(p,n),dtype=float)) if callable(g) else 0.0-g)
+            for tag,g in flux.items()}
+
+
 def solve(m,bc,source=0.,flux=None,convection=None,k=K0):
-    return solve_steady_heat(m,conductivity=k,dirichlet=bc,heat_source=source,outward_flux=flux,convection=convection)
+    return solve_steady_heat(m,thermal_conductivity=k,prescribed_temperature=bc,heat_source_density=source,
+                             inward_heat_flux=inward(flux),convection=convection)
 
 
 @pytest.mark.parametrize('kind',['flux','robin','robin_only','one_robin'])
@@ -59,7 +72,7 @@ def test_thermal_flux_robin_independent_strip(kind,source):
         np.testing.assert_allclose(r.heat_flux,np.column_stack((np.full(m.num_triangles,qq[0]),np.zeros(m.num_triangles))),atol=1e-10*K0*40)
     # Weak endpoint rates, distinct from integrating raw P1 gradients.
     gtotal=sum(v*.8 for v in flux.values())
-    assert abs(np.sum(r.load+r.reaction-r.convective_outward)-gtotal)<1e-10*max(K0,abs(gtotal),np.sum(abs(r.load)))
+    assert abs(np.sum(r.generated_heat_rate_per_depth+r.reaction_heat_rate_per_depth-r.outward_convective_heat_rate_per_depth)-gtotal)<1e-10*max(K0,abs(gtotal),np.sum(abs(r.generated_heat_rate_per_depth)))
 
 
 def norms(m,r,exact,k=K0,order=8):
@@ -105,7 +118,7 @@ def test_thermal_flux_robin_independent_convergence(kind):
             owner={tuple(sorted((int(a),int(b)))):i for i,tri in enumerate(m.triangles) for a,b in ((tri[0],tri[1]),(tri[1],tri[2]),(tri[2],tri[0]))}
             raw=sum(np.linalg.norm(m.nodes[e[1]]-m.nodes[e[0]])*r.heat_flux[owner[tuple(sorted(map(int,e)))]][0] for e in edges)
             raw_errors.append(abs(raw-target)/abs(target))
-            nodes=m.boundary['right'];weak=np.sum(r.prescribed_outward_load[nodes]+r.convective_outward[nodes])
+            nodes=m.boundary['right'];weak=np.sum(r.outward_prescribed_heat_rate_per_depth[nodes]+r.outward_convective_heat_rate_per_depth[nodes])
             weak_errors.append(abs(weak-target)/abs(target))
     rates=np.log2(np.array(history[:-1])/np.array(history[1:]))
     print(kind,'errors',history,'rates',rates,'rawboundary',raw_errors,'weakboundary',weak_errors)
@@ -136,9 +149,9 @@ def test_thermal_flux_robin_independent_line_offset(mode):
             hp=poly.polyadd(poly.polyadd([2.],3*y),poly.polymul(y,y));ap=poly.polyadd(poly.polyadd([300.],-7*y),5*poly.polymul(y,y));gp=poly.polyadd(poly.polyadd([3.],-8*y),2*poly.polymul(y,y))
             H,B,G=exact_line_moments(abs(end-start),hp,ap,gp)
             expectedH[np.ix_(edge,edge)]+=H;np.add.at(expectedB,edge,B);np.add.at(expectedG,edge,G)
-        np.testing.assert_allclose(r.ambient_load,expectedB,rtol=1e-10,atol=1e-10)
-        np.testing.assert_allclose(r.prescribed_outward_load,expectedG,rtol=1e-10,atol=1e-10)
-        np.testing.assert_allclose(r.convective_outward,expectedH@r.temperature-expectedB,rtol=1e-10,atol=1e-10)
+        np.testing.assert_allclose(r.ambient_convective_heat_rate_per_depth,expectedB,rtol=1e-10,atol=1e-10)
+        np.testing.assert_allclose(r.outward_prescribed_heat_rate_per_depth,expectedG,rtol=1e-10,atol=1e-10)
+        np.testing.assert_allclose(r.outward_convective_heat_rate_per_depth,expectedH@r.temperature-expectedB,rtol=1e-10,atol=1e-10)
     if mode=='h0':
         bare=solve(m,bc,flux=flux);np.testing.assert_array_equal(r.temperature,bare.temperature)
     if mode=='offset':
@@ -148,7 +161,7 @@ def test_thermal_flux_robin_independent_line_offset(mode):
         np.testing.assert_allclose(shifted.temperature-shift,r.temperature,rtol=0,atol=2e-6)
         # Stable differences retain flux/rates, independently of large absolute T.
         np.testing.assert_allclose(shifted.heat_flux,r.heat_flux,rtol=1e-9,atol=1e-9)
-        np.testing.assert_allclose(shifted.convective_outward,r.convective_outward,rtol=1e-9,atol=1e-9)
+        np.testing.assert_allclose(shifted.outward_convective_heat_rate_per_depth,r.outward_convective_heat_rate_per_depth,rtol=1e-9,atol=1e-9)
 
 
 @pytest.mark.parametrize('scale',[1e-3,1.,1e3])
@@ -164,7 +177,7 @@ def test_thermal_flux_robin_independent_similarity(scale,factor):
     audit(changed,rr,bc,factor/scale**2*6.3,{'right':factor/scale*2.1},{'right':(factor/scale*7.,300.)},k=factor*K0,normals=expected_norm)
     np.testing.assert_allclose(rr.temperature,r.temperature,rtol=0,atol=1e-9*40)
     np.testing.assert_allclose(rr.heat_flux,factor/scale*r.heat_flux[::-1]@R.T,rtol=1e-9,atol=1e-9*factor/scale*K0*40)
-    np.testing.assert_allclose(rr.reaction,factor*r.reaction,rtol=1e-9,atol=1e-9*factor*K0*40)
+    np.testing.assert_allclose(rr.reaction_heat_rate_per_depth,factor*r.reaction_heat_rate_per_depth,rtol=1e-9,atol=1e-9*factor*K0*40)
 
 
 @pytest.mark.parametrize('change',['none','reverse','rotate','order'])
@@ -237,8 +250,8 @@ def test_thermal_flux_robin_independent_components_corner_defaults():
     np.testing.assert_allclose(r.temperature,affine,atol=1e-10)
     baseline=solve(m,corner);empty=solve(m,corner,flux={},convection={})
     for field in baseline.__dataclass_fields__:np.testing.assert_array_equal(getattr(baseline,field),getattr(empty,field))
-    five=SteadyHeatResult(*(np.zeros(1) for _ in range(5)))
-    assert five.system_rhs is None and five.ambient_load is None
+    five=PlanarSteadyHeatResult(*(np.zeros(1) for _ in range(5)))
+    assert five.applied_heat_rate_per_depth is None and five.ambient_convective_heat_rate_per_depth is None
 
 
 def test_thermal_flux_robin_independent_assembled_operator(monkeypatch):

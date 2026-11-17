@@ -113,7 +113,7 @@ change or recertify the completed run.
 | Member | Contract |
 | --- | --- |
 | reference_mesh | isolated owned Mesh; SI reference nodes, mutable after return |
-| heat | existing SteadyHeatResult; temperature/flux/load/reaction/residual |
+| heat | the steady heat result, a `PlanarSteadyHeatResult`: temperature, heat_flux and the generated, reaction and residual heat rates per depth (`*_heat_rate_per_depth`) |
 | temperature_snapshot | immutable TemperatureSnapshot actually passed to mechanics |
 | mechanics | existing ThermoelasticResult; fields, separate loads, reactions, physical energy |
 | manifest_json | immutable canonical JSON string |

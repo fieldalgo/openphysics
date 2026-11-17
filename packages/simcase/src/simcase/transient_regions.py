@@ -222,8 +222,8 @@ class TransientRegionRunResult(TransientThermalRunResult):
         materials = doc.si['materials']
         expected_k = {r: float(materials[m]['thermal_conductivity']) for r, m in self.region_materials.items()}
         expected_c = {r: float(materials[m]['volumetric_heat_capacity']) for r, m in self.region_materials.items()}
-        if (self.solution.conductivity_w_mk != expected_k
-                or self.solution.volumetric_heat_capacity_j_m3k != expected_c):
+        if (self.solution.thermal_conductivity != expected_k
+                or self.solution.volumetric_heat_capacity != expected_c):
             raise ValueError('transient result materials do not match the document')
         source = arrays[n('generated_heat_rate_per_depth')].sum(axis=1)
         storage = arrays[n('heat_storage_rate_per_depth')].sum(axis=1)
@@ -345,7 +345,7 @@ def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
     started = time.perf_counter()
     axisymmetric = is_axisymmetric(h)
     try:
-        solution = solve_transient_heat(mesh, **inputs,
+        solution = solve_transient_heat(mesh, **views.galerkin_heat_arguments(inputs),
                                         coordinate_system='axisymmetric' if axisymmetric else 'cartesian')
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
@@ -354,7 +354,7 @@ def run_transient_region_thermal(doc, verbose=True, *, mesh_limits=None):
     printed = (doc.summary(), f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, '
                f'regions {mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-               f'transient heat: {len(solution.time_s)} requested times; full histories retained')
+               f'transient heat: {len(solution.time)} requested times; full histories retained')
     log = tuple(log_lines_03(doc, printed))
     cls = AxisymmetricTransientRegionRunResult if axisymmetric else TransientRegionRunResult
     result = cls(doc, solution, {'mesh': mesh_seconds, 'solve': solve_seconds}, log,

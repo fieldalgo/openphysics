@@ -15,7 +15,7 @@ is a concrete fixed-temperature plus convection example.
 |---|---|---|
 | Ideal temperature-controlled surface | Dirichlet temperature in K | The solver determines its heat input as `reaction` |
 | No heat exchange | Unspecified natural edge | Insulation; not a fixed temperature |
-| Known outward heat flux | `outward_flux`, W/m² | Positive removes heat; negative injects it |
+| Known heat flux into the body | `inward_heat_flux`, W/m² | Positive injects heat; negative removes it (documents and galerkin's heat solvers alike) |
 | Exchange with an ambient medium | `convection`, h and ambient K | Outward q·n=h(T−Tamb); a warmer ambient injects heat |
 
 Flux plus convection on the same supported edge is additive. Do not impose either
@@ -27,7 +27,8 @@ initial field without a Dirichlet anchor because its storage term matters.
 Transient heat currently has no flux/Robin input. The steady heat-to-mechanics
 wrapper does not inherit every boundary extension of the standalone heat solver.
 
-For steady heat, `sum(load + reaction)` equals prescribed plus convective outward
+For steady heat, `sum(generated + reaction)` (the `generated_heat_rate_per_depth` and
+`reaction_heat_rate_per_depth` fields) equals prescribed plus convective outward
 heat. Thermostat outward heat is **minus reaction**. A positive reaction is heat
 entering the body, not positive outward flow. Exact equations and callback rules:
 [flux/Robin contract](../packages/galerkin/thermal_flux_robin.md).

@@ -116,10 +116,10 @@ def audit_heat(m,heat,kind,bc):
         local_internal=K*w.sum(1)[:,None]*np.einsum('tni,ti->tn',g,gradient)
         np.add.at(load,tri.ravel(),local_load.ravel());np.add.at(internal,tri.ravel(),local_internal.ravel())
     scale=max(K*30,abs(load.sum()))
-    np.testing.assert_allclose(heat.load,load,atol=scale*1e-10,rtol=1e-10)
-    np.testing.assert_allclose(heat.residual,internal-load,atol=scale*1e-10,rtol=1e-10)
+    np.testing.assert_allclose(heat.generated_heat_rate_per_depth,load,atol=scale*1e-10,rtol=1e-10)
+    np.testing.assert_allclose(heat.residual_heat_rate_per_depth,internal-load,atol=scale*1e-10,rtol=1e-10)
     reaction=np.zeros_like(load);ids=list(bc);reaction[ids]=(internal-load)[ids]
-    np.testing.assert_allclose(heat.reaction,reaction,atol=scale*1e-10,rtol=1e-10)
+    np.testing.assert_allclose(heat.reaction_heat_rate_per_depth,reaction,atol=scale*1e-10,rtol=1e-10)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -138,10 +138,10 @@ def test_fixed_four_mesh_chain_gates(plane,kind):
         assert abs(e12-e16)<=1e-8*scale
         energy_errors.append(abs(r.physical_elastic_energy-exact)/max(exact,scale))
         history.append(errors);audit_loads(m,r,kind)
-        heat=aggregate.heat;audit_heat(m,heat,kind,kw['thermal_dirichlet']);hscale=max(K*30,abs(heat.load.sum()))
-        assert abs(heat.reaction.sum()+heat.load.sum())<=1e-10*hscale
+        heat=aggregate.heat;audit_heat(m,heat,kind,kw['thermal_dirichlet']);hscale=max(K*30,abs(heat.generated_heat_rate_per_depth.sum()))
+        assert abs(heat.reaction_heat_rate_per_depth.sum()+heat.generated_heat_rate_per_depth.sum())<=1e-10*hscale
         # Independent integrated volumetric heat: sine integral is1600W/m.
-        assert abs(heat.load.sum()-(1600 if kind=='sine' else 0))<=1e-10*hscale
+        assert abs(heat.generated_heat_rate_per_depth.sum()-(1600 if kind=='sine' else 0))<=1e-10*hscale
         if kind=='linear':assert max(errors[4:6])<=1e-10
         ti=field(m.nodes,kind,plane)[0]
         prescribed=solve_thermoelasticity(m,freeze_temperature(m,ti),reference_temperature_k=TREF,

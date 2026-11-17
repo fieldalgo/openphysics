@@ -382,6 +382,20 @@ level. The recorded targets `galerkin.assembly.assemble_stiffness` and `.assembl
 same objects under the same names on both sides (the recorder replaces every binding of one,
 `galerkin.kernels`' included), so that commit needs no rule entry either.
 
+**The heat API in SI (L2 commit 6).** `galerkin.thermal.solve_steady_heat` and
+`galerkin.transient_heat.solve_transient_heat` take registry names and the inward heat flux;
+each negates the inward values once and calls the internal outward-form body
+(`solve_steady_heat_outward`, `solve_transient_heat_outward`, outside `__all__`) with today's
+keywords. simcase converts its outward flux g back to the inward `0.0 - g` before the call
+(`simcase.views.galerkin_heat_arguments`), so the body computes with today's doubles. The
+steady public call is a wrapper over the body, which `galerkin.joule_heating` and
+`galerkin.thermal_mechanical` now call directly; the recorded target
+`galerkin.thermal:solve_steady_heat_outward` is new, and one kind 7 entry compares every
+baseline `solve_steady_heat` call (simcase's and the one nested under
+`solve_steady_joule_heat`) with the body call beneath, with four kind 8 entries for the
+defaults the public function forwards. The transient call is compared at the public frame:
+six kind 2 entries rename its keywords and one kind 3 entry negates the flux.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

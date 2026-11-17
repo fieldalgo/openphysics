@@ -47,7 +47,7 @@ def test_uniform_bar_actual_api_analytical_temperature_and_power(voltage):
     q = 3*(voltage/.02)**2
     exact = 300+q*mesh.nodes[:, 0]*(.02-mesh.nodes[:, 0])/10
     np.testing.assert_allclose(result.thermal.temperature, exact, atol=1e-10, rtol=0)
-    np.testing.assert_allclose(result.thermal.load, electric.joule_load, atol=1e-12, rtol=1e-12)
+    np.testing.assert_allclose(result.thermal.generated_heat_rate_per_depth, electric.joule_load, atol=1e-12, rtol=1e-12)
     assert result.source_power_per_length == pytest.approx(q*.02*.01, abs=1e-13)
     assert result.outward_heat_per_length == pytest.approx(q*.02*.01, abs=1e-11)
     assert result.electrical is not electric
@@ -173,5 +173,5 @@ def test_disconnected_thermal_components_need_separate_support_and_balance():
     temperatures = ends(part, 300., 300.) | {i+n: 310. for i in ends(part, 0., 0.)}
     result = couple(mesh, electric, dirichlet=temperatures)
     for ids, power in [(slice(0, n), 6.), (slice(n, None), 1.5)]:
-        assert np.sum(result.thermal.load[ids]) == pytest.approx(power, rel=1e-10)
-        assert -np.sum(result.thermal.reaction[ids]) == pytest.approx(power, rel=1e-10)
+        assert np.sum(result.thermal.generated_heat_rate_per_depth[ids]) == pytest.approx(power, rel=1e-10)
+        assert -np.sum(result.thermal.reaction_heat_rate_per_depth[ids]) == pytest.approx(power, rel=1e-10)

@@ -76,7 +76,7 @@ def thermoelastic_traction(n):
 
     mesh, mesh_seconds = harness.timed(mesh_of, n)
     heat, heat_seconds = harness.timed(
-        solve_steady_heat, mesh, conductivity=CONDUCTIVITY, dirichlet=thermal_ends(mesh))
+        solve_steady_heat, mesh, thermal_conductivity=CONDUCTIVITY, prescribed_temperature=thermal_ends(mesh))
     snapshot, freeze_seconds = harness.timed(freeze_temperature, mesh, heat.temperature)
     dirichlet = clamp(mesh)
     result, mechanics_seconds = harness.timed(

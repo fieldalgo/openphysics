@@ -27,9 +27,9 @@ dirichlet = {int(i): 400.0 for i in mesh.boundary["left"]}
 dirichlet.update({int(i): 300.0 for i in mesh.boundary["right"]})
 result = solve_steady_heat(
     mesh,
-    conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
-    heat_source={"steel": 2e5, "foam": 0.0},      # W/m^3
-    dirichlet=dirichlet,
+    thermal_conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
+    heat_source_density={"steel": 2e5, "foam": 0.0},      # W/m^3
+    prescribed_temperature=dirichlet,
 )
 ```
 
@@ -79,12 +79,14 @@ those of [thermal_steady2d](thermal_steady2d.md) and
 
 `refsol.thermal_multilayer` evaluates two closed forms and imports only NumPy:
 
-- `layered_slab`: series wall 0 < x_1 < ... < x_n = L with k_i and uniform
-  Q_i per layer, T(0)=T_L, T(L)=T_R. The flux is q(x) = q_0 + integral of Q,
+- `layered_slab(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: series wall at `position` x_0 < x_1 < ... < x_n with k_i
+  and uniform Q_i per layer, `prescribed_temperature` (T_L, T_R) at x_0 and x_n. The flux is q(x) = q_0 + integral of Q,
   T' = -q/k, and q_0 follows from T(L); without sources this is the series
   thermal resistance q_0 = (T_L-T_R)/sum(L_i/k_i).
-- `composite_cylinder`: concentric shells r_0 < ... < r_n with k_i and Q_i,
-  T(r_0)=T_i, T(r_n)=T_o. r q_r = C + integral of Q r dr and
+- `composite_cylinder(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: concentric shells at `position` r_0 < ... < r_n with
+  k_i and Q_i, `prescribed_temperature` (T_i, T_o) at r_0 and r_n. r q_r = C + integral of Q r dr and
   T = A_i - (C + offset_i) ln(r)/k_i - Q_i r^2/(4 k_i) in each shell.
 
 The reference tests check, by finite differences only, Fourier's law and

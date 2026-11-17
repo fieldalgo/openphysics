@@ -145,7 +145,7 @@ class TransientThermalRunResult:
             raise AttributeError(name)
         old = _SOLUTION_03.get(name)
         if old is not None and (old in _FIELD_SPEC or (old in _BOUNDARY_FIELD_SPEC and self.boundary_enabled)):
-            return getattr(self.solution, old)
+            return views.heat_field(self.solution, name)
         if name in _FIELD_SPEC or name in _BOUNDARY_FIELD_SPEC:
             raise AttributeError(f'{name} is the format 0.2 name; read {ARRAY_NAMES_03[name]}')
         raise AttributeError(name)
@@ -164,7 +164,8 @@ class TransientThermalRunResult:
     def _checked_arrays(self):
         # Freeze the values used by this save before writing any artifact.
         spec = self._field_spec()
-        arrays = {key: np.array(getattr(self.solution, key), copy=True) for key in spec}
+        # simcase's own array keys; galerkin's planar field of each is its format 0.3 name
+        arrays = {key: np.array(views.heat_field(self.solution, ARRAY_NAMES_03[key]), copy=True) for key in spec}
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'transient raw array {key}: expected finite real numeric values')
@@ -215,8 +216,8 @@ class TransientThermalRunResult:
         if not np.array_equal(times, np.asarray(doc.si['study']['time'])):
             raise ValueError('transient result time does not match the document')
         for value, expected, label in (
-                (self.solution.conductivity_w_mk, p['thermal_conductivity'], 'thermal_conductivity'),
-                (self.solution.volumetric_heat_capacity_j_m3k, p['volumetric_heat_capacity'],
+                (self.solution.thermal_conductivity, p['thermal_conductivity'], 'thermal_conductivity'),
+                (self.solution.volumetric_heat_capacity, p['volumetric_heat_capacity'],
                  'volumetric_heat_capacity')):
             if not np.isfinite(value) or value <= 0 or value != expected:
                 raise ValueError(f'transient result {label} does not match the document')
@@ -344,11 +345,11 @@ def run_transient_thermal(doc, verbose=True, *, mesh_limits=None):
     mesh_seconds = time.perf_counter()-started
     started = time.perf_counter()
     try:
-        solution = solve_transient_heat(mesh, **inputs)
+        solution = solve_transient_heat(mesh, **views.galerkin_heat_arguments(inputs))
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     solve_seconds = time.perf_counter()-started
-    printed = (doc.summary(), f'transient heat: {len(solution.time_s)} requested times; full histories retained')
+    printed = (doc.summary(), f'transient heat: {len(solution.time)} requested times; full histories retained')
     if has_natural_conditions_03(p):
         printed += (f'boundary layout {V2_03[1]}: per-step outward_prescribed_heat_rate_per_depth and '
                     'outward_convective_heat_rate_per_depth; inward_heat_flux and convection are constant',)

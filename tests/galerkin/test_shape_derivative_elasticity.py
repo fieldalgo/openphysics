@@ -77,7 +77,7 @@ def _plate():
 def _plate_solve(m, W, t, plane="stress"):
     return solve_elasticity(m, young_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28},
                             plane=plane, dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
-                            traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(W, t))
+                            traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
 
 def _functionals(m, r, xp):
@@ -126,7 +126,7 @@ def test_m2_uniaxial_bar_length(name):
 
     def delta(t):
         r = solve_elasticity(m, young_modulus=E, poisson_ratio=0.3, plane="stress", dirichlet=dirichlet,
-                             traction={"right": (sigma, 0.0)}, motion=MeshMotion(W, t))
+                             traction={"right": (sigma, 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
     value, grad = _gradient(name, delta)
@@ -149,7 +149,7 @@ def test_m3_series_bar_interface(name):
 
     def delta(t):
         r = solve_elasticity(m, young_modulus={"a": E1, "b": E2}, poisson_ratio=0.0, plane="stress",
-                             dirichlet=dirichlet, traction={"right": (sigma, 0.0)}, motion=MeshMotion(W, t))
+                             dirichlet=dirichlet, traction={"right": (sigma, 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
     value, grad = _gradient(name, delta)
@@ -206,7 +206,7 @@ def test_m4_thick_cylinder_inner_radius(name):
 
         def force(t):
             r = solve_elasticity(mesh, young_modulus=E, poisson_ratio=nu, plane="strain", dirichlet=dirichlet,
-                                 motion=MeshMotion(W, t))
+                                 motion=MeshMotion(design_velocity=W, t=t))
             return xp.sum(r.reaction[nodes] * xp.asarray(radial))
 
         value, grad = _gradient(name, force)
@@ -284,32 +284,32 @@ def test_m8_refusals():
     t = xp.asarray(0.0)
     common = dict(young_modulus=70e9, poisson_ratio=0.33, plane="stress", dirichlet=_clamped_left(m))
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
-        solve_elasticity(m, **common, motion=MeshMotion(W, 0.0))
+        solve_elasticity(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
     with pytest.raises(TypeError, match="body_force is a callback"):
-        solve_elasticity(m, **common, body_force=lambda p: np.zeros((len(p), 2)), motion=MeshMotion(W, t))
+        solve_elasticity(m, **common, body_force=lambda p: np.zeros((len(p), 2)), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"traction\['right'\] is a callback"):
-        solve_elasticity(m, **common, traction={"right": lambda p, n: np.zeros((len(p), 2))}, motion=MeshMotion(W, t))
+        solve_elasticity(m, **common, traction={"right": lambda p, n: np.zeros((len(p), 2))}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"traction\['right'\] is live"):
-        solve_elasticity(m, **common, traction={"right": (xp.asarray(1.0), 0.0)}, motion=MeshMotion(W, t))
+        solve_elasticity(m, **common, traction={"right": (xp.asarray(1.0), 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="body_force is live"):
-        solve_elasticity(m, **common, body_force=(0.0, xp.asarray(-1.0)), motion=MeshMotion(W, t))
+        solve_elasticity(m, **common, body_force=(0.0, xp.asarray(-1.0)), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="young_modulus is live"):
         solve_elasticity(m, young_modulus=xp.asarray(70e9), poisson_ratio=0.33, plane="stress",
-                         dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
+                         dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="Dirichlet displacement is live"):
         solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress",
                          dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)},
-                         motion=MeshMotion(W, t))
+                         motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="poisson_ratio is live"):
         solve_elasticity(m, young_modulus=70e9, poisson_ratio={"host": xp.asarray(0.33), "core": 0.28},
-                         plane="stress", dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
+                         plane="stress", dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="poisson_ratio is a callback; with a motion it must be a finite real scalar"):
         solve_elasticity(m, young_modulus=70e9, poisson_ratio=lambda p: 0.3, plane="stress",
-                         dirichlet=_clamped_left(m), motion=MeshMotion(W, t))
+                         dirichlet=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="dirichlet must map"):
-        solve_elasticity(m, **{**common, "dirichlet": [((0, 0), 0.0)]}, motion=MeshMotion(W, t))
+        solve_elasticity(m, **{**common, "dirichlet": [((0, 0), 0.0)]}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="traction must map boundary edge tags"):
-        solve_elasticity(m, **common, traction=[("right", (1.0, 0.0))], motion=MeshMotion(W, t))
+        solve_elasticity(m, **common, traction=[("right", (1.0, 0.0))], motion=MeshMotion(design_velocity=W, t=t))
 
 
 def test_review_jax_without_x64_is_named():
@@ -319,6 +319,6 @@ def test_review_jax_without_x64_is_named():
     try:
         with pytest.raises(ValueError, match="galerkin needs float64"):
             solve_elasticity(m, young_modulus=70e9, poisson_ratio=0.33, plane="stress", dirichlet=_clamped_left(m),
-                             motion=MeshMotion(W, jax.numpy.asarray(0.0)))
+                             motion=MeshMotion(design_velocity=W, t=jax.numpy.asarray(0.0)))
     finally:
         jax.config.update("jax_enable_x64", True)

@@ -470,25 +470,28 @@ class ThermalRunResult:
     def heat_flux(self): return self.solution.heat_flux
 
     @property
-    def generated_heat_rate_per_depth(self): return self.solution.load
+    def generated_heat_rate_per_depth(self): return views.heat_field(self.solution, 'generated_heat_rate_per_depth')
 
     @property
-    def reaction_heat_rate_per_depth(self): return self.solution.reaction
+    def reaction_heat_rate_per_depth(self): return views.heat_field(self.solution, 'reaction_heat_rate_per_depth')
 
     @property
-    def residual_heat_rate_per_depth(self): return self.solution.residual
+    def residual_heat_rate_per_depth(self): return views.heat_field(self.solution, 'residual_heat_rate_per_depth')
 
     @property
-    def outward_prescribed_heat_rate_per_depth(self): return self.solution.prescribed_outward_load
+    def outward_prescribed_heat_rate_per_depth(self):
+        return views.heat_field(self.solution, 'outward_prescribed_heat_rate_per_depth')
 
     @property
-    def ambient_convective_heat_rate_per_depth(self): return self.solution.ambient_load
+    def ambient_convective_heat_rate_per_depth(self):
+        return views.heat_field(self.solution, 'ambient_convective_heat_rate_per_depth')
 
     @property
-    def outward_convective_heat_rate_per_depth(self): return self.solution.convective_outward
+    def outward_convective_heat_rate_per_depth(self):
+        return views.heat_field(self.solution, 'outward_convective_heat_rate_per_depth')
 
     @property
-    def applied_heat_rate_per_depth(self): return self.solution.system_rhs
+    def applied_heat_rate_per_depth(self): return views.heat_field(self.solution, 'applied_heat_rate_per_depth')
 
     @property
     def prescribed_node_ids(self): return self.dirichlet_node_ids
@@ -508,14 +511,17 @@ class ThermalRunResult:
         sol = self.solution
         arrays = dict(nodes_m=np.asarray(self.mesh.nodes), triangles=np.asarray(self.mesh.triangles),
                       temperature_k=np.asarray(sol.temperature), heat_flux_w_m2=np.asarray(sol.heat_flux),
-                      load_w_per_m=np.asarray(sol.load), reaction_w_per_m=np.asarray(sol.reaction),
-                      residual_w_per_m=np.asarray(sol.residual), dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
+                      load_w_per_m=np.asarray(views.heat_field(sol, 'generated_heat_rate_per_depth')),
+                      reaction_w_per_m=np.asarray(views.heat_field(sol, 'reaction_heat_rate_per_depth')),
+                      residual_w_per_m=np.asarray(views.heat_field(sol, 'residual_heat_rate_per_depth')),
+                      dirichlet_node_ids=np.asarray(self.dirichlet_node_ids),
                       dirichlet_temperature_k=np.asarray(self.dirichlet_temperature_k))
         if self.boundary_enabled:
-            arrays.update(prescribed_outward_load_w_per_m=np.asarray(sol.prescribed_outward_load),
-                          ambient_load_w_per_m=np.asarray(sol.ambient_load),
-                          convective_outward_w_per_m=np.asarray(sol.convective_outward),
-                          system_rhs_w_per_m=np.asarray(sol.system_rhs))
+            arrays.update(
+                prescribed_outward_load_w_per_m=np.asarray(views.heat_field(sol, 'outward_prescribed_heat_rate_per_depth')),
+                ambient_load_w_per_m=np.asarray(views.heat_field(sol, 'ambient_convective_heat_rate_per_depth')),
+                convective_outward_w_per_m=np.asarray(views.heat_field(sol, 'outward_convective_heat_rate_per_depth')),
+                system_rhs_w_per_m=np.asarray(views.heat_field(sol, 'applied_heat_rate_per_depth')))
         for key, a in arrays.items():
             if a.dtype.kind not in 'iuf' or not np.isfinite(a).all():
                 raise ValueError(f'thermal raw array {key}: expected finite real numeric values')
@@ -683,7 +689,7 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
     calculation_prescribed = dict(prescribed)
     t0 = time.perf_counter()
     try:
-        solution = solve_steady_heat(mesh, **kwargs)
+        solution = solve_steady_heat(mesh, **views.galerkin_heat_arguments(kwargs))
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
@@ -693,22 +699,23 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
             or prescribed != calculation_prescribed):
         raise ValueError('thermal calculation inputs changed during the solve')
     if boundary_enabled:
-        for attr in ('prescribed_outward_load', 'ambient_load',
-                     'convective_outward', 'system_rhs'):
+        for attr in ('outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
+                     'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth'):
             array = np.asarray(getattr(solution, attr, None))
             if (array.shape != (mesh.num_nodes,) or array.dtype.kind not in 'iuf'
                     or not np.isfinite(array).all()):
                 raise ValueError(f'thermal boundary result {attr}: expected finite real (N,) data')
         # These are returned physical terms, not an absolute-temperature reassembly.
-        G = solution.prescribed_outward_load
-        C = solution.convective_outward
-        source_heat = float(solution.load.sum())
+        G = solution.outward_prescribed_heat_rate_per_depth
+        C = solution.outward_convective_heat_rate_per_depth
+        load, reaction = solution.generated_heat_rate_per_depth, solution.reaction_heat_rate_per_depth
+        source_heat = float(load.sum())
         prescribed_outward = float(G.sum())
         convective_outward = float(C.sum())
-        thermostat_outward = -float(solution.reaction.sum())
+        thermostat_outward = -float(reaction.sum())
         outward = prescribed_outward+convective_outward+thermostat_outward
         balance_scale = max(float(sum(np.sum(abs(a)) for a in
-                            (solution.load, solution.reaction, G, C))), np.finfo(float).tiny)
+                            (load, reaction, G, C))), np.finfo(float).tiny)
         free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
         diagnostics = {
             'source_heat_w_per_m': source_heat,
@@ -719,19 +726,22 @@ def run_thermal(doc, verbose=True, *, mesh_limits=None):
             'heat_balance_defect_w_per_m': outward-source_heat,
             'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
             # No K-only scale is presented as the Robin engine's normalized guard.
-            'free_residual_max_w_per_m': float(np.max(abs(solution.residual[free]))) if len(free) else 0.}
+            'free_residual_max_w_per_m': (float(np.max(abs(solution.residual_heat_rate_per_depth[free])))
+                                          if len(free) else 0.)}
     else:
         stiffness = assemble_stiffness(mesh, heat.conductivity)
         increment = solution.temperature-prescribed[int(fixed[0])]
-        scale = max(float(np.max(abs(stiffness)@abs(increment)+abs(solution.load))), np.finfo(float).tiny)
+        load, reaction = solution.generated_heat_rate_per_depth, solution.reaction_heat_rate_per_depth
+        scale = max(float(np.max(abs(stiffness)@abs(increment)+abs(load))), np.finfo(float).tiny)
         free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
-        source_heat = float(solution.load.sum())
-        outward = -float(solution.reaction[fixed].sum())
-        balance_scale = max(float(np.sum(abs(solution.load))+np.sum(abs(solution.reaction))), np.finfo(float).tiny)
+        source_heat = float(load.sum())
+        outward = -float(reaction[fixed].sum())
+        balance_scale = max(float(np.sum(abs(load))+np.sum(abs(reaction))), np.finfo(float).tiny)
         diagnostics = {'source_heat_w_per_m': source_heat, 'outward_heat_w_per_m': outward,
                        'heat_balance_defect_w_per_m': outward-source_heat,
                        'normalized_heat_balance_defect': abs(outward-source_heat)/balance_scale,
-                       'normalized_free_residual': float(np.max(abs(solution.residual[free]))/scale) if len(free) else 0.}
+                       'normalized_free_residual': (float(np.max(abs(solution.residual_heat_rate_per_depth[free]))/scale)
+                                                    if len(free) else 0.)}
     diagnostics = {BALANCE_03[key]: value for key, value in diagnostics.items()}
     printed = [doc.summary(), f'temperature: {solution.temperature.min():.12g} K to '
                               f'{solution.temperature.max():.12g} K',

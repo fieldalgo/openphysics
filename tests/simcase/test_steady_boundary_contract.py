@@ -68,14 +68,14 @@ def test_five_kwargs_and_independent_additive_linear_patch():
     assert set(kw) == {"conductivity", "dirichlet", "heat_source", "outward_flux", "convection"}
     assert kw["outward_flux"] == {"right": 2.}                 # outward = 0.0 - inward (hazard H1)
     assert kw["convection"] == {"right": (4., 290.)}
-    result = solve_steady_heat(mesh, **kw)
+    result = solve_steady_heat(mesh, **views.galerkin_heat_arguments(kw))
     # Direct q=-k gradT and right 2+4*(293-290)=14, independent of production summary.
     np.testing.assert_allclose(result.temperature, 300-7*mesh.nodes[:, 0], rtol=0, atol=1e-10)
     np.testing.assert_allclose(result.heat_flux, np.tile([14., 0.], (mesh.num_triangles, 1)),
                                rtol=0, atol=1e-10)
-    np.testing.assert_allclose(result.prescribed_outward_load.sum(), 2., rtol=0, atol=1e-10)
-    np.testing.assert_allclose(result.convective_outward.sum(), 12., rtol=0, atol=1e-10)
-    np.testing.assert_allclose(result.reaction.sum(), 14., rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.outward_prescribed_heat_rate_per_depth.sum(), 2., rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.outward_convective_heat_rate_per_depth.sum(), 12., rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.reaction_heat_rate_per_depth.sum(), 14., rtol=0, atol=1e-10)
 
 
 @pytest.mark.parametrize("presence", ["neither", "flux", "robin", "both"])
@@ -127,7 +127,7 @@ def test_reordered_nodes_and_reversed_edges_are_valid_single_identities():
     mesh.boundary_edges = {k: inverse[v][:, ::-1] for k, v in mesh.boundary_edges.items()}
     kw = steady_boundary_inputs(d, mesh)
     assert list(kw["dirichlet"]) == sorted(kw["dirichlet"])
-    result = solve_steady_heat(mesh, **kw)
+    result = solve_steady_heat(mesh, **views.galerkin_heat_arguments(kw))
     np.testing.assert_allclose(result.temperature, 300-7*mesh.nodes[:, 0], rtol=0, atol=1e-10)
 
 
@@ -137,9 +137,9 @@ def test_robin_only_anchor_and_empty_fixed_set():
     physics(raw)["inward_heat_flux"] = {}
     d = document(raw)
     result = solve_steady_heat(rectangle_mesh(1, 1, 2, 2),
-                               **steady_boundary_inputs(d, rectangle_mesh(1, 1, 2, 2)))
+                               **views.galerkin_heat_arguments(steady_boundary_inputs(d, rectangle_mesh(1, 1, 2, 2))))
     np.testing.assert_allclose(result.temperature, 290., rtol=0, atol=1e-10)
-    assert not result.reaction.any()
+    assert not result.reaction_heat_rate_per_depth.any()
 
 
 @pytest.mark.parametrize("balanced", [False, True])
@@ -169,11 +169,11 @@ def test_partial_corner_load_is_not_deleted():
     p["convection"] = {}
     mesh = rectangle_mesh(1, 1, 2, 2)
     kw = steady_boundary_inputs(document(raw), mesh)
-    result = solve_steady_heat(mesh, **kw)
+    result = solve_steady_heat(mesh, **views.galerkin_heat_arguments(kw))
     corner = np.intersect1d(mesh.boundary["left"], mesh.boundary["top"])[0]
     # First top edge length .5, endpoint moment g*ell/2=1.5 W/m, even at fixed corner.
-    np.testing.assert_allclose(result.prescribed_outward_load[corner], 1.5, rtol=0, atol=1e-12)
-    np.testing.assert_allclose(result.prescribed_outward_load.sum(), 6., rtol=0, atol=1e-12)
+    np.testing.assert_allclose(result.outward_prescribed_heat_rate_per_depth[corner], 1.5, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(result.outward_prescribed_heat_rate_per_depth.sum(), 6., rtol=0, atol=1e-12)
 
 
 @pytest.mark.parametrize("kind", ["flux", "robin"])
@@ -316,7 +316,7 @@ def test_signed_flux_and_unclamped_negative_solution_format_03():
         "results": {"save_fields": True, "plots": False}})
     kw = steady_boundary_inputs(d, rectangle_mesh(1, 1, 2, 2))
     assert kw["outward_flux"] == {"right": 10.}            # outward = 0.0 - inward (hazard H1)
-    result = solve_steady_heat(rectangle_mesh(1, 1, 2, 2), **kw)
+    result = solve_steady_heat(rectangle_mesh(1, 1, 2, 2), **views.galerkin_heat_arguments(kw))
     assert result.temperature.min() < 0
     np.testing.assert_allclose(result.temperature.min(), -4., rtol=0, atol=1e-12)
     d.data["physics"]["heat1"]["prescribed_temperature"] = {"left": "0 K"}

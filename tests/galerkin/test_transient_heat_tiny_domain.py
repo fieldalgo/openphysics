@@ -103,20 +103,20 @@ def test_tiny_domain_original_heat_balance_and_zero_flux(scenario):
     bc = {int(i): (lambda now: 290.+3.*(now-TIMES[0])) for i in fixed}
     # Original guard failures remain failures, with the complete chained cause.
     result = solve_transient_heat(
-        mesh, conductivity=2.5, volumetric_heat_capacity=4., time_s=TIMES,
-        initial_temperature_k=np.full(mesh.num_nodes, initial),
-        dirichlet=bc, heat_source=q)
+        mesh, thermal_conductivity=2.5, volumetric_heat_capacity=4., time=TIMES,
+        initial_temperature=np.full(mesh.num_nodes, initial),
+        prescribed_temperature=bc, heat_source_density=q)
     rate = 3. if ramp else q/4.
     expected = initial+rate*(TIMES-TIMES[0])
-    np.testing.assert_allclose(result.temperature_k,
-        np.broadcast_to(expected[:, None], result.temperature_k.shape),
+    np.testing.assert_allclose(result.temperature,
+        np.broadcast_to(expected[:, None], result.temperature.shape),
         rtol=0, atol=1e-10*max(1., float(np.max(abs(expected)))))
-    np.testing.assert_allclose(result.heat_flux_w_m2, 0., rtol=0, atol=1e-10)
+    np.testing.assert_allclose(result.heat_flux, 0., rtol=0, atol=1e-10)
     area = .002*.001
     source = np.full(len(TIMES), q*area)
     storage = np.full(len(TIMES)-1, 4.*rate*area)
     reaction = storage-source[1:]
     scale = max(abs(q)*area, abs(4.*rate)*area, float(np.max(abs(reaction))), 1e-30)
-    np.testing.assert_allclose(result.source_load_w_per_m.sum(1), source, rtol=0, atol=1e-10*scale)
-    np.testing.assert_allclose(result.storage_rate_w_per_m.sum(1), storage, rtol=0, atol=1e-10*scale)
-    np.testing.assert_allclose(result.reaction_w_per_m.sum(1), reaction, rtol=0, atol=1e-10*scale)
+    np.testing.assert_allclose(result.generated_heat_rate_per_depth.sum(1), source, rtol=0, atol=1e-10*scale)
+    np.testing.assert_allclose(result.heat_storage_rate_per_depth.sum(1), storage, rtol=0, atol=1e-10*scale)
+    np.testing.assert_allclose(result.reaction_heat_rate_per_depth.sum(1), reaction, rtol=0, atol=1e-10*scale)

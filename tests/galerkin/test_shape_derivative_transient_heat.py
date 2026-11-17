@@ -77,16 +77,16 @@ def _plate_inputs(m):
     left = [int(i) for i in m.boundary["left"]]
     T0 = 300.0 + 20.0 * np.sin(3 * x) * np.cos(2 * y)
     T0[left] = 300.0
-    return dict(conductivity={"host": 1.5, "core": 0.3}, volumetric_heat_capacity={"host": 2e3, "core": 4e3},
-                time_s=np.linspace(0.0, 200.0, 11), initial_temperature_k=T0,
-                dirichlet={i: (lambda time: 300.0 + 0.05 * time) for i in left},
-                heat_source={"host": 0.0, "core": 800.0},
-                outward_flux={"top": (lambda time: -30.0 - 0.1 * time)}, convection={"right": (12.0, 290.0)})
+    return dict(thermal_conductivity={"host": 1.5, "core": 0.3}, volumetric_heat_capacity={"host": 2e3, "core": 4e3},
+                time=np.linspace(0.0, 200.0, 11), initial_temperature=T0,
+                prescribed_temperature={i: (lambda time: 300.0 + 0.05 * time) for i in left},
+                heat_source_density={"host": 0.0, "core": 800.0},
+                inward_heat_flux={"top": (lambda time: 30.0 + 0.1 * time)}, convection={"right": (12.0, 290.0)})
 
 
 def _plate_solve(m, W, t, inputs_mesh=None):
     """``inputs_mesh``: the mesh whose nodes define the initial field (nodal values move with the nodes)."""
-    return solve_transient_heat(m, motion=None if t is None else MeshMotion(W, t),
+    return solve_transient_heat(m, motion=None if t is None else MeshMotion(design_velocity=W, t=t),
                                 **_plate_inputs(m if inputs_mesh is None else inputs_mesh))
 
 
@@ -94,10 +94,10 @@ def _functionals(m, r, xp):
     x, y = m.nodes[:, 0], m.nodes[:, 1]
     probe = int(np.argmin((x - 0.7) ** 2 + (y - 0.25) ** 2))
     weights = xp.asarray(np.linspace(0.1, 1.0, 11))[:, None]
-    return {"probe": lambda: r.temperature_k[-1, probe],
-            "reaction": lambda: xp.sum(r.reaction_w_per_m[-1]),
-            "content": lambda: r.heat_content_j_per_m[-1],
-            "history": lambda: xp.sum(r.temperature_k * weights)}
+    return {"probe": lambda: r.temperature[-1, probe],
+            "reaction": lambda: xp.sum(r.reaction_heat_rate_per_depth[-1]),
+            "content": lambda: r.stored_heat_per_depth[-1],
+            "history": lambda: xp.sum(r.temperature * weights)}
 
 
 # ---------------------------------------------------------------- H1 discrete consistency
@@ -125,10 +125,10 @@ def test_h2_uniform_heat_content(name):
     times = np.linspace(0.0, 50.0, 6)
 
     def content(t, index):
-        r = solve_transient_heat(m, conductivity=1.2, volumetric_heat_capacity=c, time_s=times,
-                                 initial_temperature_k=np.full(m.num_nodes, T0), dirichlet={}, heat_source=Q,
-                                 motion=MeshMotion(W, t))
-        return r.heat_content_j_per_m[index]
+        r = solve_transient_heat(m, thermal_conductivity=1.2, volumetric_heat_capacity=c, time=times,
+                                 initial_temperature=np.full(m.num_nodes, T0), prescribed_temperature={}, heat_source_density=Q,
+                                 motion=MeshMotion(design_velocity=W, t=t))
+        return r.stored_heat_per_depth[index]
 
     p, w = m.nodes[m.triangles], W[m.triangles]
     e1, e2, d1, d2 = p[:, 1] - p[:, 0], p[:, 2] - p[:, 0], w[:, 1] - w[:, 0], w[:, 2] - w[:, 0]
@@ -156,10 +156,10 @@ def test_h3_decaying_sine_bar_length(name):
         T0[ends] = 0.0
 
         def content(t):
-            r = solve_transient_heat(m, conductivity=kappa, volumetric_heat_capacity=1.0,
-                                     time_s=np.linspace(0.0, tf, steps + 1), initial_temperature_k=T0,
-                                     dirichlet={i: 0.0 for i in ends}, motion=MeshMotion(W, t))
-            return r.heat_content_j_per_m[-1]
+            r = solve_transient_heat(m, thermal_conductivity=kappa, volumetric_heat_capacity=1.0,
+                                     time=np.linspace(0.0, tf, steps + 1), initial_temperature=T0,
+                                     prescribed_temperature={i: 0.0 for i in ends}, motion=MeshMotion(design_velocity=W, t=t))
+            return r.stored_heat_per_depth[-1]
 
         _v, grad = _gradient(name, content)
         errors.append(rel(grad, exact))
@@ -177,19 +177,19 @@ def test_h4_steady_limit(name):
     left = [int(i) for i in m.boundary["left"]]
     x, y = m.nodes[:, 0], m.nodes[:, 1]
     probe = int(np.argmin((x - 0.7) ** 2 + (y - 0.25) ** 2))
-    common = dict(conductivity={"host": 1.5, "core": 0.3}, dirichlet={i: 300.0 for i in left},
-                  heat_source={"host": 0.0, "core": 800.0}, outward_flux={"top": -30.0},
+    common = dict(thermal_conductivity={"host": 1.5, "core": 0.3}, prescribed_temperature={i: 300.0 for i in left},
+                  heat_source_density={"host": 0.0, "core": 800.0}, inward_heat_flux={"top": 30.0},
                   convection={"right": (12.0, 290.0)})
 
     def transient(t):
         r = solve_transient_heat(m, volumetric_heat_capacity={"host": 2e3, "core": 4e3},
-                                 time_s=np.array([0.0, 1e9, 2e9, 3e9]),
-                                 initial_temperature_k=np.full(m.num_nodes, 300.0), motion=MeshMotion(W, t),
+                                 time=np.array([0.0, 1e9, 2e9, 3e9]),
+                                 initial_temperature=np.full(m.num_nodes, 300.0), motion=MeshMotion(design_velocity=W, t=t),
                                  **common)
-        return r.temperature_k[-1, probe]
+        return r.temperature[-1, probe]
 
     def steady(t):
-        return solve_steady_heat(m, motion=MeshMotion(W, t), **common).temperature[probe]
+        return solve_steady_heat(m, motion=MeshMotion(design_velocity=W, t=t), **common).temperature[probe]
 
     _v, d_transient = _gradient(name, transient)
     _v, d_steady = _gradient(name, steady)
@@ -207,7 +207,7 @@ def test_h5_rigid_translation(name, functional):
 
     def objective(t):
         r = _plate_solve(m, W, t)
-        return r.heat_content_j_per_m[-1] if functional == "content" else xp.sum(r.temperature_k)
+        return r.stored_heat_per_depth[-1] if functional == "content" else xp.sum(r.temperature)
 
     value, grad = _gradient(name, objective)
     assert abs(grad) <= 1e-12 * abs(value)
@@ -221,12 +221,12 @@ def test_h6_heat_balance_along_the_motion(name):
     m, W = _plate()
 
     def reaction(t):
-        return xp.sum(_plate_solve(m, W, t).reaction_w_per_m[-1])
+        return xp.sum(_plate_solve(m, W, t).reaction_heat_rate_per_depth[-1])
 
     def balance(t):
         r = _plate_solve(m, W, t)
-        return xp.sum(r.storage_rate_w_per_m[-1] - r.source_load_w_per_m[-1] + r.prescribed_outward_load_w_per_m[-1]
-                      + r.convective_outward_w_per_m[-1])
+        return xp.sum(r.heat_storage_rate_per_depth[-1] - r.generated_heat_rate_per_depth[-1] + r.outward_prescribed_heat_rate_per_depth[-1]
+                      + r.outward_convective_heat_rate_per_depth[-1])
 
     _v, d_reaction = _gradient(name, reaction)
     _v, d_balance = _gradient(name, balance)
@@ -236,9 +236,9 @@ def test_h6_heat_balance_along_the_motion(name):
 # ---------------------------------------------------------------- H7 unchanged without motion
 
 def _digest(r):
-    fields = ("temperature_k", "heat_flux_w_m2", "source_load_w_per_m", "reaction_w_per_m", "residual_w_per_m",
-              "storage_rate_w_per_m", "heat_content_j_per_m", "quadratic_functional_jk_per_m",
-              "prescribed_outward_load_w_per_m", "convective_outward_w_per_m")
+    fields = ("temperature", "heat_flux", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth", "residual_heat_rate_per_depth",
+              "heat_storage_rate_per_depth", "stored_heat_per_depth", "thermal_energy_functional_per_depth",
+              "outward_prescribed_heat_rate_per_depth", "outward_convective_heat_rate_per_depth")
     return hashlib.sha256(b"".join(np.ascontiguousarray(getattr(r, f), dtype=float).tobytes()
                                    for f in fields)).hexdigest()
 
@@ -259,43 +259,43 @@ def test_h8_refusals():
 
     def call(**over):
         kw = {**base, **over}
-        return solve_transient_heat(m, motion=MeshMotion(W, kw.pop("t", t)), **kw)
+        return solve_transient_heat(m, motion=MeshMotion(design_velocity=W, t=kw.pop("t", t)), **kw)
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)
-    with pytest.raises(TypeError, match="heat_source is a callback; with a moving mesh its sample points move"):
-        call(heat_source=lambda points, time: np.zeros(len(points)))
-    with pytest.raises(TypeError, match=r"outward_flux\['top'\] is a callback of coordinates"):
-        call(outward_flux={"top": lambda points, normals: np.zeros(len(points))})
+    with pytest.raises(TypeError, match="heat_source_density is a callback; with a moving mesh its sample points move"):
+        call(heat_source_density=lambda points, time: np.zeros(len(points)))
+    with pytest.raises(TypeError, match="the heat flux on 'top' is a callback of coordinates"):
+        call(inward_heat_flux={"top": lambda points, normals: np.zeros(len(points))})
     with pytest.raises(TypeError, match=r"convection\['right'\] is a callback of coordinates"):
         call(convection={"right": (lambda points, normals, time: np.ones(len(points)), 290.0)})
     with pytest.raises(TypeError, match="Dirichlet temperature is a callback of coordinates"):
-        call(dirichlet={0: lambda a, b: 300.0})
-    with pytest.raises(TypeError, match="must be a constant or a callback\\(time_s\\) with one positional"):
-        call(dirichlet={0: lambda: 300.0})
-    with pytest.raises(TypeError, match=r"outward_flux\['top'\] must be a constant or a callback\(time_s\)"):
-        call(outward_flux={"top": lambda *, time: 1.0})
-    with pytest.raises(TypeError, match="initial_temperature_k is live"):
-        call(initial_temperature_k=[xp.asarray(300.0)] * m.num_nodes)
-    with pytest.raises(TypeError, match="conductivity is live"):
-        call(conductivity=xp.asarray(1.5))
+        call(prescribed_temperature={0: lambda a, b: 300.0})
+    with pytest.raises(TypeError, match="must be a constant or a callback\\(time\\) with one positional"):
+        call(prescribed_temperature={0: lambda: 300.0})
+    with pytest.raises(TypeError, match=r"the heat flux on 'top' must be a constant or a callback\(time\)"):
+        call(inward_heat_flux={"top": lambda *, time: 1.0})
+    with pytest.raises(TypeError, match="initial_temperature is live"):
+        call(initial_temperature=[xp.asarray(300.0)] * m.num_nodes)
+    with pytest.raises(TypeError, match="thermal_conductivity is live"):
+        call(thermal_conductivity=xp.asarray(1.5))
     with pytest.raises(TypeError, match="volumetric_heat_capacity is live"):
         call(volumetric_heat_capacity={"host": xp.asarray(2e3), "core": 4e3})
-    with pytest.raises(TypeError, match="initial_temperature_k is live"):
-        call(initial_temperature_k=xp.asarray(base["initial_temperature_k"]))
+    with pytest.raises(TypeError, match="initial_temperature is live"):
+        call(initial_temperature=xp.asarray(base["initial_temperature"]))
     with pytest.raises(TypeError, match="Dirichlet temperature is live"):
-        call(dirichlet={0: xp.asarray(300.0)})
+        call(prescribed_temperature={0: xp.asarray(300.0)})
     with pytest.raises(TypeError, match=r"convection\['right'\] is live"):
         call(convection={"right": (xp.asarray(12.0), 290.0)})
     with pytest.raises(TypeError, match="callbacks of time must return NumPy numbers"):
-        call(dirichlet={int(m.boundary["left"][0]): (lambda time: xp.asarray(300.0))})
+        call(prescribed_temperature={int(m.boundary["left"][0]): (lambda time: xp.asarray(300.0))})
     with pytest.raises(ValueError, match="axisymmetric is refused"):
         call(coordinate_system="axisymmetric")
     with pytest.raises(ValueError, match="checkpoint_every is not supported with a motion"):
         call(checkpoint_every=2)
     with pytest.raises(ValueError, match="conductivity is a callback; with a motion it must be"):
-        call(conductivity=lambda: 1.5)
-    _lo, hi = admissible_interval(m, W)
+        call(thermal_conductivity=lambda: 1.5)
+    _lo, hi = admissible_interval(m, design_velocity=W)
     with pytest.raises(ElementInversion):
         call(t=xp.asarray(hi * 1.01))
 

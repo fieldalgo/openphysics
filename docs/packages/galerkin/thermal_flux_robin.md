@@ -1,4 +1,4 @@
-# Steady 2D outward heat flux and convection
+# Steady 2D boundary heat flux and convection
 
 [한국어](../../locales/ko/pages/packages/galerkin/thermal_flux_robin.md)
 
@@ -11,22 +11,24 @@ The independent references are in `refsol.thermal_boundary`.
 
 ```python
 result = solve_steady_heat(
-    mesh, conductivity=2.5, dirichlet=prescribed_node_temperatures,
-    heat_source=5.0,
-    outward_flux={"right": 0.7},
+    mesh, thermal_conductivity=2.5, prescribed_temperature=prescribed_node_temperatures,
+    heat_source_density=5.0,
+    inward_heat_flux={"right": -0.7},
     convection={"right": (10.0, 300.0)},
 )
 ```
 
-The two new optional keywords default to `None`. Existing arguments and the
-five original result fields retain their meaning. Every unselected natural
+The two optional keywords default to `None`. The prescribed flux is given
+**inward** (positive enters the body, the sign convention of the galerkin step);
+the solver negates it once, exactly, into the outward g_out = 0.0 - q_in of the
+equations below (a callback's result likewise). Every unselected natural
 edge remains insulated. The above right boundary is intentionally additive:
 
-`q.n = g_out + h*(T-T_amb)`, with `q=-k grad T`.
+`q.n = g_out + h*(T-T_amb)`, with `q=-k grad T` and `g_out = -q_in`.
 
 | Input | Contract |
 | --- | --- |
-| outward_flux | Mapping exterior edge tag to g_out in W/m²; positive removes heat |
+| inward_heat_flux | Mapping exterior edge tag to q_in in W/m²; positive injects heat |
 | convection | Mapping tag to pair (h, T_amb), h in W/(m² K), ambient K |
 | Boundary scalar | Finite real scalar, not bool/complex; h>=0 |
 | Boundary callback | `(points_m, outward_normals)->values`, both arguments `(Q,2)`, result exactly `(Q,)`; finite real values, no scalar/column/vector broadcasting |
@@ -35,7 +37,7 @@ All three boundary quantities may be callbacks. The outward normals have unit
 length and are computed from the actual incident triangle, independently of tag
 orientation; on a hole they point into the hole. Callback batches are quadrature
 points, not nodes; callbacks must not mutate the mesh and should be deterministic.
-Negative g models prescribed injection. Negative convection when T<T_amb is
+Negative q_in (positive g_out) removes heat. Negative convection when T<T_amb is
 ambient heating. h=0 is allowed but does not anchor absolute temperature;
 provided ambient values are still validated. h<0 or any nonfinite data rejects.
 
@@ -86,24 +88,25 @@ C = H*T-B
 sum(fQ+reaction) = sum(G+C)   (also separately on every component)
 ```
 
-| Result field | Shape | Meaning/unit |
+| Result field (`PlanarSteadyHeatResult`) | Shape | Meaning/unit |
 | --- | --- | --- |
 | temperature | `(N,)` | Nodal T, K |
 | heat_flux | `(M,2)` | Elementwise -k grad T, W/m² |
-| load | `(N,)` | Original volumetric fQ, W/m |
-| reaction | `(N,)` | Fixed-node heat injection, W/m |
-| residual | `(N,)` | All rows of r, W/m |
-| prescribed_outward_load | `(N,)` | G, W/m |
-| ambient_load | `(N,)` | B, W/m |
-| convective_outward | `(N,)` | C, W/m |
-| system_rhs | `(N,)` | fQ+B-G, W/m |
+| generated_heat_rate_per_depth | `(N,)` | Original volumetric fQ, W/m |
+| reaction_heat_rate_per_depth | `(N,)` | Fixed-node heat injection, W/m |
+| residual_heat_rate_per_depth | `(N,)` | All rows of r, W/m |
+| outward_prescribed_heat_rate_per_depth | `(N,)` | G, W/m |
+| ambient_convective_heat_rate_per_depth | `(N,)` | B, W/m |
+| outward_convective_heat_rate_per_depth | `(N,)` | C, W/m |
+| applied_heat_rate_per_depth | `(N,)` | fQ+B-G, W/m |
 
 The thermostat's outward rate is **minus reaction**. Total outward rate is
 G+C-reaction. Nodal integrated quantities are W/m of depth, not W; explicitly
-multiply by a physical depth in metres outside this API to obtain W. `load`
-never silently becomes a combined boundary/system load. Direct five-positional-
-argument `SteadyHeatResult` construction remains possible: the four appended
-fields default to `None`; actual solve results populate all nine arrays.
+multiply by a physical depth in metres outside this API to obtain W (the
+`_per_depth` names say so; `.units` gives W/m). The generated heat rate never
+silently becomes a combined boundary/system load. Direct five-positional-argument
+`PlanarSteadyHeatResult` construction remains possible: the four appended fields
+default to `None`; actual solve results populate all nine arrays.
 
 Four-point line Gauss integrates the consistent boundary matrix and the product
 h*T_amb. For constant h on length ell, `H=h*ell/6*[[2,1],[1,2]]`.
@@ -172,7 +175,7 @@ Frozen gates retain all original Dirichlet tests and add:
 - Invalid values/shapes/topology/overlaps, holes, disconnected components and
   pure Neumann compatibility versus uniqueness. No gate reduction is intended.
 
-The same `outward_flux`/`convection` inputs, signs and edge validation are
+The same `inward_heat_flux`/`convection` inputs, signs and edge validation are
 available, time-independent and sampled once, in
 [`solve_transient_heat`](transient_heat.md); its H, G and B enter M/dt+K+H and
 the per-step heat balance. No radiation, variable/anisotropic k,

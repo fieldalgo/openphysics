@@ -105,8 +105,12 @@ the mesh types (`mesh`, `mesh3d`), which import nothing else from galerkin. No m
 uses another module's private (underscore) names, imported or read as
 attributes, and only a class's own methods read its underscore members. What a family of modules
 shares lives in core, in the package-private `_thermal_mechanical_common` (the
-heat-to-mechanics workflows) and `_cavity_common` (the two box cavities), or in
-public names of the module that owns it (thermoelasticity builds on elasticity's). Material lookup lives in
+heat-to-mechanics workflows), `_cavity_common` (the two box cavities), `_heat_kernels`
+(the heat solvers' boundary system, 3D source load and face map) and `_public` (the
+public heat API's text refusal, inward flux and result surfaces), or in public names
+of the module that owns it (thermoelasticity builds on elasticity's; joule heating and
+the workflows call `galerkin.thermal.solve_steady_heat_outward`, the internal
+outward-form body outside `__all__`). Material lookup lives in
 core (`galerkin.materials` keeps its public names), and a physics module hands
 core its mesh-bound containers as plain checked values (`core.loads.ElementSource`).
 `tests/galerkin/test_layers.py` fails if the mesh types, core, the public

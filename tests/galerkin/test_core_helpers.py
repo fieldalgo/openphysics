@@ -69,8 +69,8 @@ def test_elasticity_now_uses_the_strict_check():
 def test_thermal_now_rejects_bools_inside_callback_values():
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError, match="must not contain booleans"):
-        solve_steady_heat(mesh, conductivity=1., dirichlet={0: 300.},
-                          heat_source=lambda x: [True]*len(x))
+        solve_steady_heat(mesh, thermal_conductivity=1., prescribed_temperature={0: 300.},
+                          heat_source_density=lambda x: [True]*len(x))
 
 
 def test_orientation_is_the_only_difference_between_the_two_mesh_checks():

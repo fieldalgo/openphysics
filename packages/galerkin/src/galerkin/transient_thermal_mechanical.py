@@ -111,22 +111,22 @@ def solve_transient_thermoelasticity(
             raise ValueError("heat must be a TransientHeatResult")
         owned = isolated_mesh(mesh)
         state = mesh_state(owned)
-        nodes = real_array(heat.nodes_m, "heat.nodes_m")
+        nodes = real_array(heat.node_coordinates, "heat.node_coordinates")
         triangles = np.asarray(heat.triangles)
         if (triangles.dtype.kind not in "iu"
                 or not np.array_equal(nodes, owned.nodes)
                 or not np.array_equal(triangles, owned.triangles)):
             raise ValueError("heat and mechanics require identical ordered nodes and triangles")
-        times = real_array(heat.time_s, "heat.time_s")
+        times = real_array(heat.time, "heat.time")
         with np.errstate(over="ignore", invalid="ignore"):
             differences = np.diff(times) if times.ndim == 1 else np.array([])
         if (times.ndim != 1 or len(times) < 2 or np.any(times < 0)
                 or not np.all(np.isfinite(differences)) or np.any(differences <= 0)):
-            raise ValueError("heat.time_s must have at least two strictly increasing nonnegative seconds")
+            raise ValueError("heat.time must have at least two strictly increasing nonnegative seconds")
         # Validate consumed fields only; heat diagnostics/provenance are not certified.
-        temperatures = real_array(heat.temperature_k, "heat.temperature_k")
+        temperatures = real_array(heat.temperature, "heat.temperature")
         if temperatures.shape != (len(times), len(owned.nodes)):
-            raise ValueError("heat.temperature_k must have shape (stored times, nodes)")
+            raise ValueError("heat.temperature must have shape (stored times, nodes)")
         selected = _indices(time_indices, len(times))
         def material(value, name, **bounds):
             if is_per_region(value):
@@ -153,7 +153,7 @@ def solve_transient_thermoelasticity(
         with chain.stage("transfer", time_index=index, time_s=float(times[index])):
             # Same-mesh identity transfer of the stored nodal Kelvin field.
             nodal = transfer(Field(owned, temperatures[index], location="node", unit="K",
-                                   name="heat.temperature_k"), owned)
+                                   name="heat.temperature"), owned)
             snapshots.append(freeze_temperature(owned, nodal.values))
     # The entire input history copy is temporary; only selected snapshots survive.
     del temperatures

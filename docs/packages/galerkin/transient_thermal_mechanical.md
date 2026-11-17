@@ -31,7 +31,7 @@ prove that the heat calculation completed or that its data are authentic.
 index 0. Otherwise supply a nonempty 1D list, tuple or array of strictly increasing
 integer indices. Booleans, floats, repeats, reversed order and out-of-range values
 are rejected. There is no nearest-time lookup. Nonuniform time grids and nonzero
-initial time are supported; `time_s[0]` is preserved without resetting the clock.
+initial time are supported; the heat result's `time[0]` is preserved without resetting the clock.
 The initial temperature is not advanced before its mechanical solve.
 
 Every selected temperature must be nonnegative absolute Kelvin. A selected

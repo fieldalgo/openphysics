@@ -13,7 +13,7 @@
 ## 무엇을 미분하나
 
 설계 변수 t가 모든 노드를 움직입니다: **X(t) = X₀ + t·W**.
-- **W**는 (N, 2) 모양의 고정된 NumPy 메시 속도입니다. t 한 단위당 노드가 메시 길이 단위로 움직이는 양입니다.
+- **W**는 (N, 2) 모양의 고정된 NumPy 메시 속도 `MeshMotion.design_velocity`입니다(`t`처럼 키워드 전용). t 한 단위당 노드가 메시 길이 단위로 움직이는 양입니다.
 - **t**만 live 값입니다(JAX·PyTorch 스칼라). 그 수치는 풀이가 이루어지는 스텝이며, 보통 0(주어진 메시)입니다.
 - 연결·태그·영역은 고정입니다.
 
@@ -22,8 +22,8 @@
 
 풀이는 옮겨진 메시에서 일반 솔버로 한 번 돌기 때문에, 모든 입력 검사·잔차 허용치·열수지가 그대로 적용됩니다. 그다음
 live 풀이 한 번이 미분을 붙입니다: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). A(t)와 b(t)는 X₀ + t·W로 live 라이브러리에서 조립하며
-(P1 강성, 영역 열원, 움직이는 변의 flux·Robin 항), T는 반올림 안에서 T₀와 같습니다. `temperature`·`heat_flux`·`load`·
-`reaction`·`residual`이 미분을 나릅니다.
+(P1 강성, 영역 열원, 움직이는 변의 flux·Robin 항), T는 반올림 안에서 T₀와 같습니다. `temperature`·`heat_flux`·
+`generated_heat_rate_per_depth`·`reaction_heat_rate_per_depth`·`residual_heat_rate_per_depth`가 미분을 나릅니다.
 
 ```python
 import jax
@@ -33,12 +33,13 @@ from galerkin.thermal import solve_steady_heat
 
 jax.config.update("jax_enable_x64", True)
 W = extend_velocity(mesh, boundary_velocity, on_curve)   # (N, 2)
-lo, hi = admissible_interval(mesh, W)                    # lo < t < hi에서 뒤집히는 요소 없음
+lo, hi = admissible_interval(mesh, design_velocity=W)                    # lo < t < hi에서 뒤집히는 요소 없음
 
 
 def heat_in(t):
-    r = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, motion=MeshMotion(W, t))
-    return jnp.sum(r.reaction[hot])
+    r = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet,
+                          motion=MeshMotion(design_velocity=W, t=t))
+    return jnp.sum(r.reaction_heat_rate_per_depth[hot])
 
 
 dQ = jax.grad(heat_in)(jnp.asarray(0.0))
@@ -48,7 +49,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 
 ## 정상 전기 전도
 
-`solve_steady_electric(mesh, ..., motion=MeshMotion(W, t))`도 같은 방식입니다.
+`solve_steady_electric(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))`도 같은 방식입니다.
 - 옮겨진 메시에서 일반 풀이가 돌고, 잔차·전류 수지·전력 수지 검사를 그대로 거칩니다.
 - live 풀이 한 번이 X₀ + t·W로 시스템을 다시 조립합니다: 영역 전도도를 쓴 P1 강성, 움직이는 변의 outward current.
 - 모든 필드가 d/dt를 나릅니다: `potential`·`electric_field`·`current_density`·`joule_heating`·`joule_load`·
@@ -61,7 +62,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 
 ## 선형 탄성
 
-`solve_elasticity(mesh, ..., motion=MeshMotion(W, t))`는 plane stress·plane strain, 스칼라 또는 영역별 영률·푸아송비,
+`solve_elasticity(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))`는 plane stress·plane strain, 스칼라 또는 영역별 영률·푸아송비,
 일정 체적력, 경계 태그의 일정 traction(변과 함께 움직임), Dirichlet 변위 `{(node, component): value}`를 받습니다. 변위·변형률·
 응력·부하·반력·잔차가 d/dt를 나릅니다.
 - Dirichlet 값은 노드에 붙어 노드와 함께 움직입니다.
@@ -70,12 +71,12 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 ## 열탄성
 
 `motion=`을 받는 경로는 둘이고, 온도장이 메시와 함께 움직이는 방식이 다릅니다.
-- **정해진 온도**, `solve_thermoelasticity(mesh, snapshot, ..., motion=MeshMotion(W, t))`:
+- **정해진 온도**, `solve_thermoelasticity(mesh, snapshot, ..., motion=MeshMotion(design_velocity=W, t=t))`:
   - 스냅샷은 주어진 메시(X₀)의 것이며, motion이 없을 때처럼 그 메시에 대해 검사합니다.
   - 노드 온도는 Dirichlet 변위처럼 노드에 붙어 함께 움직입니다. 그래서 미분은 기하(변형률 행렬·요소 넓이·하중 변
     길이)에서만 옵니다.
   - 선형 탄성이 받는 것에 더해 스칼라 또는 영역별 열팽창 계수와 기준 온도를 받습니다.
-- **열 뒤 기계 워크플로**, `solve_steady_thermoelasticity(..., motion=MeshMotion(W, t))`:
+- **열 뒤 기계 워크플로**, `solve_steady_thermoelasticity(..., motion=MeshMotion(design_velocity=W, t=t))`:
   - 일반 워크플로를 옮겨진 메시에서 한 번 돌려 모든 단계 검사와 manifest를 얻습니다.
   - 그 뒤 열 단계를 움직이는 메시에서 다시 풀고(위 정상 열과 같음), 그 live 온도로 live 기계 단계를 풉니다. 그래서
     미분에 온도장의 변화가 들어갑니다.
@@ -88,13 +89,13 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 
 ## 과도 열
 
-`solve_transient_heat(mesh, ..., motion=MeshMotion(W, t))`는 영역별 전도도와 열용량, 일정 또는 영역별 열원, 경계 태그의
-outward flux와 convection(변과 함께 움직임), Dirichlet 값을 받습니다.
+`solve_transient_heat(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))`는 영역별 전도도와 열용량, 일정 또는 영역별 열원, 경계 태그의
+내향 열유속(inward heat flux)과 convection(변과 함께 움직임), Dirichlet 값을 받습니다.
 - 일반 backward-Euler 풀이를 옮겨진 메시에서 한 번 돌려 모든 스텝 검사를 거칩니다.
 - 그 뒤 각 스텝에 X₀ + t·W에서 조립한 질량·강성·Robin 행렬과 하중으로 live 보정을 한 번 붙입니다. 모든 이력이 d/dt를
   나릅니다: 온도, 열유속, 열원 하중, 반력, 잔차, 저장률, 열량, 이차 범함수, prescribed·convective outward.
 - 초기 온도와 Dirichlet 값은 열탄성처럼 노드에 붙어 함께 움직입니다.
-- 시간만의 콜백 `callback(time_s)`은 Dirichlet 값, outward flux, convection의 h와 ambient에 쓸 수 있습니다. 노드 위치와
+- 시간만의 콜백 `callback(time)`은 Dirichlet 값, 내향 열유속, convection의 h와 ambient에 쓸 수 있습니다. 노드 위치와
   무관하기 때문입니다. 시간 콜백은 NumPy 숫자를 돌려줘야 하고 순수해야 합니다. 일반 풀이에 한 번, 미분에 한 번 더
   불리기 때문입니다. (live 값을 돌려주는 시간 의존 h는 솔버 자체의 live 시간 의존 h 거부를 받습니다.) 좌표 콜백은
   어디서나처럼 거부합니다.
@@ -102,7 +103,7 @@ outward flux와 convection(변과 함께 움직임), Dirichlet 값을 받습니�
 
 ## 도파관 모드
 
-`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(W, t))`는 스칼라 또는 요소별 배열(실수·복소)인 eps_r·mu_r,
+`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))`는 스칼라 또는 요소별 배열(실수·복소)인 eps_r·mu_r,
 motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습니다.
 - NumPy 고유값 풀이를 옮겨진 메시에서 합니다.
 - 그 뒤 모드마다 live 입력 경로의 경계 Newton 한 번을 합니다
@@ -136,7 +137,7 @@ p).node_velocity(meshine_mesh)`가 그 값을 줍니다([설계 속도](../simca
 
 ## 요소 뒤집힘과 재메시
 
-X₀ + t·W에서 각 요소의 부호 넓이는 t의 이차식입니다. `admissible_interval(mesh, W)`는 모든 요소에서 양쪽으로 가장 가까운
+X₀ + t·W에서 각 요소의 부호 넓이는 t의 이차식입니다. `admissible_interval(mesh, design_velocity=W)`는 모든 요소에서 양쪽으로 가장 가까운
 근을 돌려줍니다. 그 열린 구간 안에서는 어떤 요소도 뒤집히지 않습니다. 구간 밖 스텝에서 풀면 구간을 밝히는
 `galerkin.shape.ElementInversion`이 납니다. t = 0의 미분은 언제나 정의됩니다.
 
@@ -150,7 +151,7 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - NumPy `t`(`TypeError`): NumPy는 미분하지 않습니다. 옮겨진 메시에서 풀려면 노드를 옮겨 그 메시를 푸십시오.
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
-- 열원·outward flux·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
+- 열원·경계 열유속·convection·outward current·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
   `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받습니다.
 - 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
@@ -237,7 +238,7 @@ h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값 d(ΣR_y)/
 
 | 검사 | 기준 | 결과 |
 |---|---|---|
-| H1 이산 일관성 | 두 재료·열원·불균일 초기 온도·시간에 따라 변하는 Dirichlet 변과 outward flux·움직이는 변의 convection이 있는 문제에서, 최종 탐침 온도·최종 Dirichlet 반력 합·최종 열량·온도 이력 전체의 가중합의 미분 vs 옮긴 메시 중심차분(h = 1e-4); 상대 1e-6, JAX·PyTorch | 1.2e-11 ~ 3.5e-9 |
+| H1 이산 일관성 | 두 재료·열원·불균일 초기 온도·시간에 따라 변하는 Dirichlet 변과 경계 열유속·움직이는 변의 convection이 있는 문제에서, 최종 탐침 온도·최종 Dirichlet 반력 합·최종 열량·온도 이력 전체의 가중합의 미분 vs 옮긴 메시 중심차분(h = 1e-4); 상대 1e-6, JAX·PyTorch | 1.2e-11 ~ 3.5e-9 |
 | H2 균일 해 | 단열, 균일 초기 온도와 열원: 이산 해는 어떤 메시에서도 T₀ + Q t_n/c이므로 dC_n/dt = (c T₀ + Q t_n) dA/dt; 상대 1e-10 | 통과 |
 | H3 사인 감쇠, 막대 길이 | 양끝 Dirichlet, 노드에 붙인 초기 sin(πx/L), 막대 늘림; 최종 열량의 d/dL을 닫힌 식과 비교; (nx, 스텝) = (10, 10), (20, 40), (40, 160); 관측 차수 ≥ 1.0, 최세 1e-2 이내 | 2.0e-2, 5.1e-3, 1.3e-3(차수 2.0, 2.0) |
 | H4 정상 극한 | 해가 정상에 이른 뒤 탐침 미분이 정상 열의 미분과 같음, 상대 1e-8 | 통과 |

@@ -47,7 +47,7 @@ def test_uniform_exact_and_manifest(plane):
                                     {'length':'m','temperature':'K','time':'s'}])
 def test_units_reject_before_heat(monkeypatch,units):
     mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);kw['units']=units
-    monkeypatch.setattr(workflow,'solve_steady_heat',lambda *a,**k:pytest.fail('heat called after invalid input'))
+    monkeypatch.setattr(workflow,'solve_steady_heat_outward',lambda *a,**k:pytest.fail('heat called after invalid input'))
     with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert e.value.stage=='input' and isinstance(e.value.__cause__,ValueError)
 
@@ -80,7 +80,7 @@ def test_bad_temperature_transfer(damage,monkeypatch):
     elif damage=='inf':t[4]=np.inf
     elif damage=='shape':t=t[:,None]
     else:t=t+1j
-    monkeypatch.setattr(workflow,'solve_steady_heat',lambda *a,**k:SimpleNamespace(temperature=t))
+    monkeypatch.setattr(workflow,'solve_steady_heat_outward',lambda *a,**k:SimpleNamespace(temperature=t))
     monkeypatch.setattr(workflow,'solve_thermoelasticity',lambda *a,**k:pytest.fail('invalid transfer reached mechanics'))
     with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert e.value.stage=='transfer'
@@ -91,7 +91,7 @@ def test_bad_temperature_transfer(damage,monkeypatch):
 def test_chained_component_failure(stage,monkeypatch):
     mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);cause=RuntimeError('original callback failure')
     def fail(*a,**k):raise cause
-    monkeypatch.setattr(workflow,'solve_steady_heat' if stage=='heat' else 'solve_thermoelasticity',fail)
+    monkeypatch.setattr(workflow,'solve_steady_heat_outward' if stage=='heat' else 'solve_thermoelasticity',fail)
     with pytest.raises(workflow.WorkflowStageError) as e:workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert e.value.stage==stage and e.value.__cause__ is cause
 
@@ -108,10 +108,10 @@ def test_original_mutation_from_callback_is_isolated():
 
 
 def test_detected_private_mesh_mutation_stops_transfer(monkeypatch):
-    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);real=workflow.solve_steady_heat
+    mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);real=workflow.solve_steady_heat_outward
     def changed(private,**kwargs):
         result=real(private,**kwargs);private.nodes[5,0]+=.001;return result
-    monkeypatch.setattr(workflow,'solve_steady_heat',changed)
+    monkeypatch.setattr(workflow,'solve_steady_heat_outward',changed)
     with pytest.raises(workflow.WorkflowStageError,match='reference mesh changed') as e:
         workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert e.value.stage=='heat'
@@ -142,11 +142,11 @@ def test_canonical_input_order_and_callback_copies():
 
 def test_private_reference_is_identical_across_stages(monkeypatch):
     mesh=rectangle_mesh(1,1,3,3);kw=arguments(mesh);seen=[]
-    heat=workflow.solve_steady_heat;freeze=workflow.freeze_temperature;mechanical=workflow.solve_thermoelasticity
+    heat=workflow.solve_steady_heat_outward;freeze=workflow.freeze_temperature;mechanical=workflow.solve_thermoelasticity
     def h(private,**args):seen.append(private);return heat(private,**args)
     def t(private,temperature):seen.append(private);return freeze(private,temperature)
     def m(private,snapshot,**args):seen.append(private);return mechanical(private,snapshot,**args)
-    monkeypatch.setattr(workflow,'solve_steady_heat',h);monkeypatch.setattr(workflow,'freeze_temperature',t)
+    monkeypatch.setattr(workflow,'solve_steady_heat_outward',h);monkeypatch.setattr(workflow,'freeze_temperature',t)
     monkeypatch.setattr(workflow,'solve_thermoelasticity',m)
     r=workflow.solve_steady_thermoelasticity(mesh,**kw)
     assert len(seen)==3 and all(x is r.reference_mesh for x in seen) and r.reference_mesh is not mesh

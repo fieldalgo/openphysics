@@ -126,25 +126,27 @@ def test_free_ended_strip_has_the_timoshenko_curvature_away_from_the_ends():
 
 
 # NAFEMS T4
-P = tc.NAFEMS_T4
-TARGET = tc.NAFEMS_T4_TARGET
+P = tc.nafems_t4()                  # SI: 373.15 K and 273.15 K, the doubles of 100 + 273.15 and 0 + 273.15
+TARGET = tc.nafems_t4_target()      # 291.45 K, quoted to 0.1 K
 
 
 def solve_t4(n):
-    mesh = rectangle_mesh(P.width, P.height, 6*n, 10*n)
-    hot = {int(i): P.bottom_temperature+KELVIN for i in mesh.boundary['bottom']}
-    ambient = P.ambient+KELVIN
-    r = solve_steady_heat(mesh, conductivity=P.conductivity, dirichlet=hot,
-                          convection={'right': (P.convection, ambient), 'top': (P.convection, ambient)})
+    mesh = rectangle_mesh(*P.length, 6*n, 10*n)
+    hot = {int(i): P.prescribed_temperature for i in mesh.boundary['bottom']}
+    ambient = P.ambient_temperature
+    h = P.heat_transfer_coefficient
+    r = solve_steady_heat(mesh, thermal_conductivity=P.thermal_conductivity, prescribed_temperature=hot,
+                          convection={'right': (h, ambient), 'top': (h, ambient)})
     celsius = r.temperature-KELVIN
-    node = np.flatnonzero(np.isclose(mesh.nodes[:, 0], TARGET.point[0]) & np.isclose(mesh.nodes[:, 1], TARGET.point[1]))
+    node = np.flatnonzero(np.isclose(mesh.nodes[:, 0], TARGET.position[0])
+                          & np.isclose(mesh.nodes[:, 1], TARGET.position[1]))
     assert len(node) == 1
     return mesh, celsius, float(celsius[node[0]])
 
 
 def t4_errors(mesh, celsius, terms=300):
     bary, points, weight = _duffy(mesh, 4)
-    exact = tc.series(points.reshape(-1, 2), P, terms=terms).temperature.reshape(points.shape[:2])
+    exact = tc.series(points.reshape(-1, 2), P, terms=terms).temperature.reshape(points.shape[:2])-KELVIN
     th = np.einsum('qi,ti->tq', bary, celsius[mesh.triangles])
     sq = weight*(th-exact)**2
     norm = np.sqrt(np.sum(weight*exact**2))
@@ -154,15 +156,15 @@ def t4_errors(mesh, celsius, terms=300):
 
 def test_nafems_t4_quick_mesh_matches_the_series_and_the_published_target():
     """n = 8: 7680 triangles; preregistered point error 1.5e-2 C."""
-    exact = tc.series(np.array([TARGET.point]), P, terms=160).temperature[0]
+    exact = tc.series(np.array([TARGET.position]), P, terms=160).temperature[0]-KELVIN
     _, _, value = solve_t4(8)
     assert abs(value-exact) <= 2.5e-2
-    assert abs(value-TARGET.value) <= TARGET.quoted_precision
+    assert abs((value+KELVIN)-TARGET.temperature) <= TARGET.temperature_tolerance
 
 
 @pytest.mark.slow
 def test_nafems_t4_converges_at_second_order_away_from_the_hot_corner():
-    exact = tc.series(np.array([TARGET.point]), P, terms=300).temperature[0]
+    exact = tc.series(np.array([TARGET.position]), P, terms=300).temperature[0]-KELVIN
     l2, far, point = [], [], []
     for n in (2, 4, 8, 16):
         mesh, celsius, value = solve_t4(n)
@@ -188,5 +190,5 @@ def test_figure_script_quick_run_writes_consistent_numbers(tmp_path):
     assert json.loads((tmp_path/'public_benchmarks.json').read_text(encoding='utf-8')) == values
     assert (tmp_path/'public_benchmarks.png').stat().st_size > 0
     assert abs(values['bimetal']['closed_form_curvature_per_m']-KAPPA) <= 1e-12*KAPPA
-    assert values['nafems_t4']['published_c'] == TARGET.value
+    assert values['nafems_t4']['published_k'] == TARGET.temperature
     assert abs(values['nafems_t4']['rows'][-1]['temperature_c']-18.1936) < 1e-3     # n = 4 row of the table

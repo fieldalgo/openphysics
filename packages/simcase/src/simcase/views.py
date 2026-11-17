@@ -299,6 +299,38 @@ class HeatInputs:
     initial_temperature: object = None
 
 
+#: galerkin's heat keywords (galerkin step, L2 commit 6) of the heat-solver arguments simcase builds,
+#: which keep today's names because the Joule heat stage (``solve_steady_joule_heat``,
+#: ``solve_temperature_joule_heat``) still takes them
+GALERKIN_HEAT_NAMES = {"conductivity": "thermal_conductivity", "dirichlet": "prescribed_temperature",
+                       "heat_source": "heat_source_density", "time_s": "time",
+                       "initial_temperature_k": "initial_temperature", "outward_flux": "inward_heat_flux"}
+
+
+def galerkin_heat_arguments(kwargs: dict) -> dict:
+    """simcase's heat-solver arguments (today's names, the outward flux g = 0.0 - inward) as
+    ``galerkin.thermal.solve_steady_heat`` and ``galerkin.transient_heat.solve_transient_heat``
+    take them: registry names and the inward heat flux ``0.0 - g``.
+
+    Bit for bit (hazard H1): g = 0.0 - x is never -0.0, so 0.0 - g is x with a zero as +0.0, and
+    galerkin's own negation 0.0 - (0.0 - g) is g again: the solver computes with today's doubles.
+    Every other value is handed on as it is, in the same order (H6)."""
+    out = {}
+    for key, value in kwargs.items():
+        if key == "outward_flux":
+            value = None if value is None else {tag: 0.0 - g for tag, g in value.items()}
+        out[GALERKIN_HEAT_NAMES.get(key, key)] = value
+    return out
+
+
+def heat_field(solution, name: str):
+    """A field of a galerkin heat result by its planar name (``generated_heat_rate_per_depth``): an
+    axisymmetric result holds the full-revolution array under the plain name (``generated_heat_rate``)."""
+    if getattr(solution, "coordinate_system", "cartesian") == "axisymmetric" and name.endswith("_per_depth"):
+        return getattr(solution, name[:-len("_per_depth")])
+    return getattr(solution, name)
+
+
 def rectangle_heat(doc) -> HeatInputs:
     """thermal.steady2d on a format 0.3 rectangle without boundary data (layout v1): SI values."""
     from .steady_boundary_contract import heat_inputs_03

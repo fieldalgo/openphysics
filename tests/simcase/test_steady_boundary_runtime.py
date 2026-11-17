@@ -104,10 +104,7 @@ def test_presence_empty_preserves_physics_but_not_layout(tmp_path):
 @pytest.mark.parametrize('fields', [False, True])
 def test_added_raw_invalid_never_completes(tmp_path, key, fault, fields):
     r = run(Document.from_dict(model(fields=fields)), False)
-    attr = {'outward_prescribed_heat_rate_per_depth': 'prescribed_outward_load',
-            'ambient_convective_heat_rate_per_depth': 'ambient_load',
-            'outward_convective_heat_rate_per_depth': 'convective_outward',
-            'applied_heat_rate_per_depth': 'system_rhs'}[key]
+    attr = key                  # galerkin's steady result field has the saved array's registry name
     if fault == 'nan':
         getattr(r.solution, attr)[0] = np.nan
     else:

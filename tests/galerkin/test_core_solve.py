@@ -356,8 +356,8 @@ def test_overlapping_numpy_solves_leave_the_warning_filters_alone(monkeypatch, p
     left = [int(i) for i in mesh.boundary["left"]]
     right = [int(i) for i in mesh.boundary["right"]]
     solves = {
-        "heat": lambda: solve_steady_heat(mesh, conductivity=2.0, dirichlet={i: 300.0 for i in left},
-                                          heat_source=1.0),
+        "heat": lambda: solve_steady_heat(mesh, thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in left},
+                                          heat_source_density=1.0),
         "electric": lambda: solve_steady_electric(
             mesh, conductivity=2.0, dirichlet={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
         "elasticity": lambda: solve_elasticity(

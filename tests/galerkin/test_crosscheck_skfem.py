@@ -65,7 +65,7 @@ def test_heat_p1_same_mesh(skfem):
     k, q = 3.0, 50.0
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, heat_source=q)
+        ours = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet, heat_source_density=q)
     with clock("reference"):
         basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP1(), k, lambda x: q + 0 * x[0],
                                     dirichlet)
@@ -99,8 +99,8 @@ def test_heat_p2_reference_is_reported(skfem):
 
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet,
-                                 heat_source=lambda p: source(p.T))
+        ours = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet,
+                                 heat_source_density=lambda p: source(p.T))
     with clock("reference"):
         basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP2(), k, source, dirichlet)
     vertices = basis.nodal_dofs[0]

@@ -85,13 +85,10 @@ FIELDS = {
     'prescribed_displacement': ('prescribed_displacement', 'prescribed_dofs', None),
 }
 #: galerkin's heat result attribute of each heat-stage array
-HEAT_ARRAYS = (('temperature', 'temperature'), ('heat_flux', 'heat_flux'),
-               ('generated_heat_rate_per_depth', 'load'), ('reaction_heat_rate_per_depth', 'reaction'),
-               ('residual_heat_rate_per_depth', 'residual'),
-               ('outward_prescribed_heat_rate_per_depth', 'prescribed_outward_load'),
-               ('ambient_convective_heat_rate_per_depth', 'ambient_load'),
-               ('outward_convective_heat_rate_per_depth', 'convective_outward'),
-               ('applied_heat_rate_per_depth', 'system_rhs'))
+HEAT_ARRAYS = tuple((name, name) for name in (
+    'temperature', 'heat_flux', 'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
+    'residual_heat_rate_per_depth', 'outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
+    'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth'))
 #: galerkin's result attribute of each mechanical array, per kind, in the saved order
 ELASTIC_ARRAYS = (('displacement', 'displacement'), ('strain', 'strain'), ('stress', 'stress'),
                   ('applied_force_per_depth', 'load'), ('reaction_force_per_depth', 'reaction'),
@@ -535,11 +532,12 @@ def balance_03(arrays, solved, mesh, *, thermal, heat=None, heat_fixed=None):
     out['maximum_stress'] = _norm(arrays['stress'])
     if heat is not None:
         free_t = np.setdiff1d(np.arange(mesh.num_nodes), list(heat_fixed))
-        source = float(heat.load.sum())
-        outward = float(np.sum(-heat.reaction+heat.prescribed_outward_load+heat.convective_outward))
+        source = float(heat.generated_heat_rate_per_depth.sum())
+        outward = float(np.sum(-heat.reaction_heat_rate_per_depth+heat.outward_prescribed_heat_rate_per_depth
+                               + heat.outward_convective_heat_rate_per_depth))
         out.update(generated_heat_rate_per_depth=source, outward_heat_rate_per_depth=outward,
                    heat_rate_imbalance_per_depth=outward-source,
-                   maximum_residual_heat_rate_per_depth=_norm(heat.residual[free_t]),
+                   maximum_residual_heat_rate_per_depth=_norm(heat.residual_heat_rate_per_depth[free_t]),
                    minimum_temperature=float(heat.temperature.min()),
                    maximum_temperature=float(heat.temperature.max()))
     return out
@@ -655,7 +653,7 @@ def solve_03(mesh, inputs, heat_args, thermal, label=None):
     heat = snapshot = None
     try:
         if thermal:
-            heat = solve_steady_heat(mesh, **heat_args)
+            heat = solve_steady_heat(mesh, **views.galerkin_heat_arguments(heat_args))
             snapshot = freeze_temperature(mesh, heat.temperature)
             solved = solve_thermoelasticity(mesh, snapshot, **inputs)
         else:

@@ -20,7 +20,44 @@ ALLOWLIST = Path(__file__).with_name("api_units_allowlist.json")
 # Valid calls for the TypeError clause, keyed "module:callable": each returns the callable
 # and keyword arguments that make a valid call. A module needs them once it has no
 # allowlist entries and takes a quantity.
-STRING_CASES = {}
+
+
+def _steady_heat():
+    from galerkin.mesh import rectangle_mesh
+    from galerkin.thermal import solve_steady_heat
+    mesh = rectangle_mesh(1.0, 1.0, 2, 2)
+    return solve_steady_heat, dict(mesh=mesh, thermal_conductivity=2.0, prescribed_temperature={0: 300.0},
+                                   heat_source_density=5.0, inward_heat_flux={"right": 3.0})
+
+
+def _transient_heat():
+    import numpy as np
+    from galerkin.mesh import rectangle_mesh
+    from galerkin.transient_heat import solve_transient_heat
+    mesh = rectangle_mesh(1.0, 1.0, 2, 2)
+    return solve_transient_heat, dict(mesh=mesh, thermal_conductivity=2.0, volumetric_heat_capacity=3.0,
+                                      time=np.array([0.0, 1.0]), initial_temperature=np.full(9, 300.0),
+                                      prescribed_temperature={0: 300.0}, heat_source_density=5.0,
+                                      inward_heat_flux={"right": 3.0})
+
+
+def _steady_heat_3d():
+    from galerkin.mesh3d import box_mesh
+    from galerkin.thermal3d import solve_steady_heat_3d
+    mesh = box_mesh(1.0, 1.0, 1.0, 1, 1, 1)
+    return solve_steady_heat_3d, dict(mesh=mesh, thermal_conductivity=2.0, prescribed_temperature={0: 300.0},
+                                      heat_source_density=5.0)
+
+
+def _step_error():
+    from galerkin.transient_heat import TransientHeatStepError
+    return TransientHeatStepError, dict(time_index=1, time=0.5)
+
+
+STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
+                "galerkin.transient_heat:solve_transient_heat": _transient_heat,
+                "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
+                "galerkin.transient_heat:TransientHeatStepError": _step_error}
 
 
 @pytest.fixture(scope="module")
@@ -83,20 +120,25 @@ MOVED_HELPERS = {"elasticity": ["lame", "constitutive", "element_materials", "el
                            "solve_steady_thermoelasticity_moving"]}
 
 
+HEAT_KERNELS = {"scalar_boundary_system", "source_load_3d", "dirichlet_from_faces"}
+
+
 def test_kernels_reexport_the_moved_names_unchanged(rules):
     import galerkin
     import galerkin.kernels as kernels
     moved = {**MOVED_TOP_LEVEL, **MOVED_HELPERS}
     assert sorted(kernels.__all__) == sorted(n for names in moved.values() for n in names)
     for module, names in moved.items():
-        defining = importlib.import_module(f"galerkin.{module}")
         for name in names:
+            # L2 commit 6: the heat helpers moved to the package-private galerkin._heat_kernels (the clean heat
+            # modules hold no removed name); galerkin.kernels re-exports them from there
+            defining = importlib.import_module("galerkin._heat_kernels" if name in HEAT_KERNELS else f"galerkin.{module}")
             assert getattr(kernels, name) is getattr(defining, name), name
     for name in (n for names in MOVED_TOP_LEVEL.values() for n in names):
         assert name not in galerkin.__all__ and not hasattr(galerkin, name), name
     public = {n for m in rules.public[PACKAGE] for n in api_scan.public_names(importlib.import_module(m))}
     assert not public & set(kernels.__all__)
-    removed = {r.name for r in rules.removed if r.package == PACKAGE}
+    removed = {r.name for r in rules.removed if r.package == PACKAGE and r.kind == "name"}
     assert removed == set(kernels.__all__) - {"region_property"}      # galerkin.materials was never public
     assert "galerkin.kernels" in rules.internal[PACKAGE]
 

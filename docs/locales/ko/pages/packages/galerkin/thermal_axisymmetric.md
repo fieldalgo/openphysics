@@ -13,13 +13,13 @@ from galerkin.thermal import solve_steady_heat
 R, L, k, Q, Tb = .003, .001, 1.114, 1e5, 293.15
 mesh = rectangle_mesh(R, L, 64, 32)
 result = solve_steady_heat(
-    mesh, conductivity=k, heat_source=Q,
-    dirichlet={int(i): Tb for i in mesh.boundary["right"]},
+    mesh, thermal_conductivity=k, heat_source_density=Q,
+    prescribed_temperature={int(i): Tb for i in mesh.boundary["right"]},
     coordinate_system="axisymmetric",
 )
-assert result.nodal_heat_rate_unit == "W"
-absorbed_W = result.load.sum()
-outward_W = -result.reaction.sum()
+assert result.units["generated_heat_rate"] == "W"     # an AxisymmetricSteadyHeatResult
+absorbed_W = result.generated_heat_rate.sum()
+outward_W = -result.reaction_heat_rate.sum()
 ```
 
 ## 적분과 경계조건
@@ -42,10 +42,14 @@ Dirichlet 온도를 가질 수 있습니다. r>0인 환형 영역도 허용합�
 
 ## 단위와 결합
 
-온도는 K, 열유속 `(q_r,q_z)`는 W/m²입니다. 적분한 절점량(load·reaction·residual·경계
-하중·system_rhs)은 W입니다. 결과의 `coordinate_system`과 `nodal_heat_rate_unit`이
-이를 기록합니다. Cartesian은 `"cartesian"`·`"W/m"`입니다. 수지는
-`sum(load + reaction - prescribed_outward_load - convective_outward) = 0`입니다.
+온도는 K, 열유속 `(q_r,q_z)`는 W/m²입니다. 결과는 `AxisymmetricSteadyHeatResult`입니다.
+적분한 절점 열률은 전체 회전의 합계 W이고 registry의 기본 이름(`generated_heat_rate`,
+`reaction_heat_rate`, `residual_heat_rate`, `outward_prescribed_heat_rate`,
+`ambient_convective_heat_rate`, `outward_convective_heat_rate`, `applied_heat_rate`)을
+가지며 `.units`는 W를 줍니다. Cartesian 풀이는 깊이당 W/m인 `..._per_depth` 열률의
+`PlanarSteadyHeatResult`를 돌려줍니다. 한쪽에 다른 쪽 이름을 물으면 이유를 말하는
+`AttributeError`입니다. 둘 다 `coordinate_system`을 기록합니다. 수지는
+`sum(generated + reaction - outward_prescribed - outward_convective) = 0`입니다.
 
 [Field](coupling.md)의 Q W/m³는 여전히 체적 밀도입니다. 요소 체적은
 `2*pi*mean(r_vertices)*area`입니다. Field는 메시·단위만 저장하므로 **축대칭 좌표·측도는

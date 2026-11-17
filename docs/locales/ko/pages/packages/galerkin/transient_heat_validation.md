@@ -26,8 +26,8 @@ dataclasses만 import하며 engine이나 다른 reference helper는 import하지
 
 Reference 계열은 uniform_insulated, moving_affine, sine_manufactured,
 부모 구현과 무관한 소형 P1 matrix, smallest_dirichlet_mode,
-backward_euler_amplitude입니다. Reference field 객체는 temperature_k,
-heat_flux_w_m2, heat_source_w_m3, temperature_gradient_k_m를 가집니다.
+backward_euler_amplitude입니다. Reference field 객체는 temperature,
+heat_flux, heat_source_density, temperature_gradient(registry 이름, SI)를 가집니다.
 Semidiscrete mode는 연속 PDE 고유함수와 의도적으로 구분합니다. 별도 독립 수용은
 producer/refsol 값을 자기 정답으로 채택하면 안 됩니다.
 
@@ -156,8 +156,8 @@ companion에 상당한 메모리가 필요합니다. 실행 시간은 전용 호
 ## 외향 열유속과 대류 기준
 
 `tests/galerkin/test_transient_heat_robin.py`와
-`tests/refsol/test_transient_heat_robin_reference.py`는 `outward_flux`/`convection`
-keyword의 기준을 고정합니다. 정답은 `refsol.transient_heat_robin`의 독립 급수(NumPy와
+`tests/refsol/test_transient_heat_robin_reference.py`는 `inward_heat_flux`/`convection`
+keyword의 기준을 고정합니다(solver는 내향 q_in을 이곳 식의 외향 g = −q_in으로 바꿉니다). 정답은 `refsol.transient_heat_robin`의 독립 급수(NumPy와
 SciPy `brentq`만 사용, 엔진 import 없음)입니다. slab 0<x<L, x=0 단열, 균일 초기 T0에
 x=L의 대류 h·(T−T_a)(고유값 β_n tan β_n = hL/k, 구간 (nπ, nπ+π/2)마다 bracketing한
 근 하나) 또는 x=L의 상수 외향 열유속 g를 둡니다. 두 급수는 명시한 꼬리 한계가 온도
@@ -173,7 +173,7 @@ scale(|T0−T_a| 또는 |g|L/k)의 1e-13 아래로 떨어질 때까지 더합니
 | T2 상수 열유속 slab, 시간 | n=128, 4/8/16 스텝 | 두 차수 ≥ 0.9 |
 | T3 장시간 극한 | 8×4 직사각형, 왼쪽 320 K Dirichlet, 위 g=−20, 오른쪽 (h=5, 300 K), Q=30; 320 K에서 100 s 스텝 8회 vs 같은 메시·같은 데이터의 `solve_steady_heat` | T, C, reaction, G가 각 scale의 1e-8 이내; 최종 storage ≤ 1e-8 |
 | T4 열수지 | T3 문제와 offset 350 K·−20 K인 분리된 Robin-only 띠 둘(callback h와 g); 단계마다·성분마다 storage = f + reaction − G − C; C를 독립 조립한 h·ℓ/6·[[2,1],[1,2]]와 h·T_a·ℓ/2와 비교 | 가장 큰 항의 1e-10 이내 |
-| T5 JAX/PyTorch | 이력이 NumPy와 일치; 최종 온도 functional의 d/d(h, T_a, g, k)를 중심 차분과 비교 | 1e-12; 상대 1e-6(라이브러리가 없으면 skip) |
+| T5 JAX/PyTorch | 이력이 NumPy와 일치; 최종 온도 functional의 d/d(h, T_a, q_in, k)를 중심 차분과 비교 | 1e-12; 상대 1e-6(라이브러리가 없으면 skip) |
 | T6 Dirichlet 전용 | 동결 텍스트 fixture `tests/galerkin/data/transient_heat_dirichlet_48720c9.json`(origin/main 솔버, 두 사례)과 경계 표본화 호출 없음 | 기록된 플랫폼에서 비트 동일, 그 외 1e-13 |
 
 2026-11-02 개발 환경(Linux x86_64, NumPy 2.5.4, SciPy 1.18.1; CI 결과 아님) 측정값:
@@ -187,13 +187,13 @@ T1 공간 오차 1.34e-3, 3.29e-4, 7.24e-5(차수 2.03, 2.19), 시간 1.08e-2, 5
 
 `tests/galerkin/test_transient_heat_time_boundary.py`와
 `tests/refsol/test_transient_heat_robin_reference.py`의 주기·ramp 사례는 시간 의존 경계
-값(`callback(time_s)`, `callback(points_m, outward_normals, time_s)`)의 기준을 고정합니다.
+값(`callback(time)`, `callback(position, outward_normal, time)`)의 기준을 고정합니다.
 정답은 `refsol.transient_heat_robin`의 닫힌 형식 둘(NumPy와 SciPy `brentq`만 사용, 엔진
 import 없음)이며 유도는 모듈 docstring에 있습니다. `PeriodicAmbientSlab`: slab 0<x<L, x=0
 단열, x=L에서 대류 h·(T−T_a(t)), T_a(t) = T_m + A sin(ωt). 주기 정상 상태는
 T_m + Im[Θ(x) e^{iωt}], Θ(x) = A h cosh(qx)/(h cosh(qL) + k q sinh(qL)), q² = iω/α이며,
 각 단계 끝에서 주변 온도를 표본화하는 후진 Euler 시간 이산 문제는 q_d² = (1 − e^{−iωΔt})/(αΔt)로
-같은 형식을 가져 공간 오차를 분리합니다. `RampedFluxSlab`: x=L의 외향 열유속
+같은 형식을 가져 공간 오차를 분리합니다. `_RampedFluxSlab`(비공개: 그 열유속 변화율 W/(m² s)에 registry 이름이 없음): x=L의 외향 열유속
 g(t) = g0·t/τ, x=0 단열, 균일 T0. 상수 열유속 계단 응답의 Duhamel 적분이며 n⁻⁴ 합은 닫힌
 형식입니다. 정답 시험은 열방정식과 양쪽 면 조건을 유한차분으로, 주기성, 이산 진폭의 후진
 Euler 점화식과 해석 진폭으로의 1차 수렴, 정확한 ramp 평균 T0 − (g0/τ)t²/(2cL), `FluxSlab`의
@@ -212,7 +212,7 @@ exp(−β₁²αt/L²)로 감쇠) 이력의 한 주기 DFT로 x=0과 x=L의 복�
 | U2 ramp 열유속, 시간 | n=128, 4/8/16 스텝 | 두 차수 ≥ 0.9 |
 | U3 상수 callback | 왼쪽 Dirichlet ramp·열원·위 g·오른쪽 (h, T_a)의 8×4 직사각형; g, h, T_a의 `lambda t: const`와 `lambda p, n, t: full(const)` vs 상수 값; 경계 시스템은 정적 데이터에서 한 번, 시간 의존 데이터에서 시간마다 한 번 조립 | 모든 결과 배열 비트 동일 |
 | U4 열수지와 표본화 시점 | U3 직사각형과 g(t), h(t), T_a(t)가 모두 변하는(scalar·field 형식) 분리된 Robin-only 띠 둘; 단계마다·성분마다 storage = f + reaction − G_n − C_n; C_n·G_n을 독립 조립한 h(t_{n+1})·ℓ/6·[[2,1],[1,2]], h·T_a(t_{n+1})·ℓ/2, g(t_{n+1})·ℓ/2와 비교; `lambda t: t`의 G_n 합은 t_{n+1} | 가장 큰 항의 1e-10 이내; 상대 1e-10과 1e-12 |
-| U5 JAX/PyTorch | 시간 의존 g·T_a(정적 h)의 이력이 NumPy와 일치; 최종 온도 functional의 d/d(h, A, g 변화율)을 중심 차분과 비교; 시간 의존 h 거절 | 1e-12; 상대 1e-6; ValueError(라이브러리가 없으면 skip) |
+| U5 JAX/PyTorch | 시간 의존 g·T_a(정적 h)의 이력이 NumPy와 일치; 최종 온도 functional의 d/d(h, A, q_in 변화율)을 중심 차분과 비교; 시간 의존 h 거절 | 1e-12; 상대 1e-6; ValueError(라이브러리가 없으면 skip) |
 | U6 거절 | 다른 서명(위치 인자 0·4개 또는 가변, `(points, time)`), index 0의 잘못된 shape·bool, 이후 단계의 NaN·무한대·음의 h(메시지에 단계 index와 시간), 결과 shape 불변 | ValueError / TransientHeatStepError |
 
 2026-11-02 개발 환경(Linux x86_64, NumPy 2.5.4, SciPy 1.18.1; CI 결과 아님) 측정값:

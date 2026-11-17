@@ -3,8 +3,10 @@
 """Exact transient conduction through a layered wall by eigenfunction series.
 
 NumPy only; no engine, solver or assembly imports. SI: m, s, K, W/(m K),
-J/(m^3 K). Layers 0 < x_1 < ... < x_n = L with k_i, c_i; perfect contact;
-fixed end temperatures T(0)=T_L, T(L)=T_R; insulated in y.
+J/(m^3 K), keyword-only registry names after the leading positional ``points``; a
+str for a quantity raises TypeError. Layers x_0 < x_1 < ... < x_n (``position``)
+with k_i, c_i; perfect contact; fixed end temperatures T(x_0)=T_L, T(x_n)=T_R;
+insulated in y.
 
     c dT/dt = d/dx(k dT/dx),   T = T_s(x) + sum_m A_m X_m(x) exp(-lambda_m t)
 
@@ -26,6 +28,8 @@ T_s + sum A_m X_m, so the series is exact with the given finite amplitudes.
 from dataclasses import dataclass
 
 import numpy as np
+
+from ._checks import pair, refuse_text
 
 __all__ = ["LayeredTransientFields", "LayeredWall"]
 
@@ -53,16 +57,21 @@ def _scalar(value, name):
 
 
 class LayeredWall:
-    """Eigenvalues and modes of one layered wall; reuse for many evaluations."""
+    """Eigenvalues and modes of one layered wall; reuse for many evaluations.
 
-    def __init__(self, interfaces, conductivities, capacities):
-        x = _vector(interfaces, "interfaces")
-        self.edges = np.concatenate([[0.], x])
-        if np.any(np.diff(self.edges) <= 0):
-            raise ValueError("interfaces must increase strictly from 0")
-        n = len(x)
-        self.k = _vector(conductivities, "conductivities", n, True)
-        self.c = _vector(capacities, "capacities", n, True)
+    position: x_0 < x_1 < ... < x_n, the faces of the wall and its interfaces (m);
+    thermal_conductivity and volumetric_heat_capacity: one value per layer.
+    """
+
+    def __init__(self, *, position, thermal_conductivity, volumetric_heat_capacity):
+        refuse_text(position=position, thermal_conductivity=thermal_conductivity,
+                    volumetric_heat_capacity=volumetric_heat_capacity)
+        self.edges = _vector(position, "position")
+        if len(self.edges) < 2 or np.any(np.diff(self.edges) <= 0):
+            raise ValueError("position must increase strictly, with at least two layer boundaries")
+        n = len(self.edges)-1
+        self.k = _vector(thermal_conductivity, "thermal_conductivity", n, True)
+        self.c = _vector(volumetric_heat_capacity, "volumetric_heat_capacity", n, True)
         self.width = np.diff(self.edges)
         self._eigen = np.array([])
 
@@ -78,7 +87,7 @@ class LayeredWall:
         r = np.hypot(X, F/(k*w))
         return X/r, F/r, np.log(r)
 
-    def zero_count(self, s):
+    def _zero_count(self, s):
         """Zeros of X(x; s^2) on (0, L], counted exactly layer by layer.
 
         In a layer X(d) = R cos(w d + phi) with R cos(phi) = X0 and
@@ -94,10 +103,11 @@ class LayeredWall:
             X, F, _ = self._advance(X, F, k, w, d)
         return total
 
-    def eigenvalues(self, count):
-        """The first `count` eigenvalues lambda_m (1/s), increasing."""
+    def eigenvalues(self, terms):
+        """The first `terms` eigenvalues lambda_m (decay rates, 1/s), increasing."""
+        count = terms
         if not isinstance(count, (int, np.integer)) or count < 1:
-            raise ValueError("count must be a positive integer")
+            raise ValueError("terms must be a positive integer")
         if len(self._eigen) >= count:
             return self._eigen[:count].copy()
         phase = np.sum(self.width*np.sqrt(self.c/self.k))     # s * phase = total optical length
@@ -106,13 +116,13 @@ class LayeredWall:
         while len(roots) < count:
             target = len(roots)+1
             hi = lo+np.pi/phase
-            while self.zero_count(hi) < target:
+            while self._zero_count(hi) < target:
                 hi = lo+2*(hi-lo)
             for _ in range(400):
                 mid = .5*(lo+hi)
                 if mid <= lo or mid >= hi:
                     break
-                if self.zero_count(mid) >= target:
+                if self._zero_count(mid) >= target:
                     hi = mid
                 else:
                     lo = mid
@@ -141,7 +151,7 @@ class LayeredWall:
         d = x-self.edges[layer]
         return X0*np.cos(w*d)-F0*np.sin(w*d)/(k*w), F0*np.cos(w*d)+k*w*X0*np.sin(w*d)
 
-    def mode(self, m, x, layer):
+    def _mode(self, m, x, layer):
         """Mode m (0-based) X_m and its flux -k X_m' at x, scaled to max |X| = 1."""
         s = np.sqrt(self.eigenvalues(m+1)[m])
         counts = [max(400, int(20*np.ceil(s*np.sqrt(c/k)*d/np.pi))+1)
@@ -154,37 +164,44 @@ class LayeredWall:
         X, F = self._state(s, x, layer)
         return X/scale, F/scale
 
-    def locate(self, x, layer=None):
+    def _locate(self, x, layer=None):
         if layer is not None:
             i = np.asarray(layer)
             if i.shape != x.shape or i.dtype.kind not in "iu" or np.any(i < 0) or np.any(i >= len(self.k)):
                 raise ValueError("layer must give one valid layer index per point")
             return i.astype(int)
-        span = self.edges[-1]
-        if np.any(x < -1e-9*span) or np.any(x > span*(1+1e-9)):
+        # x_0 = 0 gives the bounds -1e-9 L and L (1 + 1e-9) of the wall [0, L], as before
+        start, span = self.edges[0], self.edges[-1]-self.edges[0]
+        if np.any(x < start-1e-9*span) or np.any(x > start+span*(1+1e-9)):
             raise ValueError("points lie outside the layered wall")
         return np.clip(np.searchsorted(self.edges, x, side="right")-1, 0, len(self.k)-1)
 
-    def fields(self, points, time_s, *, left_temperature, right_temperature, amplitudes,
-               layer=None):
-        """Exact T and q at points (Q,2) and time t >= 0 (s)."""
+    def fields(self, points, *, time, prescribed_temperature, temperature_difference, layer=None):
+        """Exact T and q at points (Q,2) and time t >= 0 (s).
+
+        prescribed_temperature is the pair (T_L, T_R) of the end temperatures and
+        temperature_difference the amplitude A_m (K) of each mode, in order.
+        """
+        refuse_text(time=time, prescribed_temperature=prescribed_temperature,
+                    temperature_difference=temperature_difference)
         p = np.asarray(points)
         if p.ndim != 2 or p.shape[1] != 2 or p.dtype.kind not in "iuf" or not np.all(np.isfinite(p)):
             raise ValueError("points must be finite real (Q,2) metre coordinates")
-        t = _scalar(time_s, "time_s")
+        t = _scalar(time, "time")
         if t < 0:
-            raise ValueError("time_s must be >= 0")
-        tl, tr = _scalar(left_temperature, "left_temperature"), _scalar(right_temperature, "right_temperature")
-        amp = _vector(amplitudes, "amplitudes")
+            raise ValueError("time must be >= 0")
+        tl, tr = pair(prescribed_temperature, "prescribed_temperature")
+        tl, tr = _scalar(tl, "prescribed_temperature[0]"), _scalar(tr, "prescribed_temperature[1]")
+        amp = _vector(temperature_difference, "temperature_difference")
         x = p[:, 0].astype(float)
-        i = self.locate(x, layer)
+        i = self._locate(x, layer)
         q0 = (tl-tr)/np.sum(self.width/self.k)
         drop = np.concatenate([[0.], np.cumsum(q0*self.width/self.k)])[:-1]
         T = tl-drop[i]-q0*(x-self.edges[i])/self.k[i]
         q = np.full(len(x), q0)
         lam = self.eigenvalues(len(amp))
         for m, (a, l) in enumerate(zip(amp, lam)):
-            X, F = self.mode(m, x, i)
+            X, F = self._mode(m, x, i)
             T = T+a*np.exp(-l*t)*X
             q = q+a*np.exp(-l*t)*F
         return LayeredTransientFields(T, np.column_stack([q, np.zeros(len(x))]), i)
@@ -211,10 +228,12 @@ class LayeredWall:
                 layer.append(np.full(order, i))
         return np.concatenate(xs), np.concatenate(ws), np.concatenate(layer)
 
-    def source_amplitudes(self, *, temperature, sources, count):
-        """A_m for T(x,0) = temperature: c-weighted projections of T0 - T_s."""
-        T0 = _scalar(temperature, "temperature")
-        Q = _vector(sources, "sources", len(self.k))
+    def source_amplitudes(self, *, initial_temperature, heat_source_density, terms):
+        """A_m for T(x,0) = initial_temperature: c-weighted projections of T0 - T_s (terms of them)."""
+        refuse_text(initial_temperature=initial_temperature, heat_source_density=heat_source_density)
+        temperature, sources, count = initial_temperature, heat_source_density, terms
+        T0 = _scalar(temperature, "initial_temperature")
+        Q = _vector(sources, "heat_source_density", len(self.k))
         key = (T0, tuple(Q), int(count))
         cache = getattr(self, "_amplitude_cache", {})
         if key in cache:
@@ -228,30 +247,33 @@ class LayeredWall:
         weight = w*self.c[layer]
         amp = np.empty(count)
         for m in range(count):
-            X, _ = self.mode(m, x, layer)
+            X, _ = self._mode(m, x, layer)
             amp[m] = np.sum(weight*(T0-Ts)*X)/np.sum(weight*X*X)
         cache[key] = amp
         self._amplitude_cache = cache
         return amp
 
-    def source_driven(self, points, time_s, *, temperature, sources, count, layer=None):
-        """Wall at uniform `temperature` with fixed ends; sources switched on at t = 0.
+    def source_driven(self, points, *, time, initial_temperature, heat_source_density, terms, layer=None):
+        """Wall at a uniform initial_temperature with the ends held there; the per-layer
+        heat_source_density is switched on at t = 0.
 
-        T = T_s + sum_{m<count} A_m X_m exp(-lambda_m t). The truncated tail is
-        not bounded here; compare two counts to measure it.
+        T = T_s + sum_{m<terms} A_m X_m exp(-lambda_m t). The truncated tail is
+        not bounded here; compare two term counts to measure it.
         """
+        refuse_text(time=time, initial_temperature=initial_temperature, heat_source_density=heat_source_density)
+        temperature, sources, count = initial_temperature, heat_source_density, terms
         p = np.asarray(points)
         if p.ndim != 2 or p.shape[1] != 2 or p.dtype.kind not in "iuf" or not np.all(np.isfinite(p)):
             raise ValueError("points must be finite real (Q,2) metre coordinates")
-        t = _scalar(time_s, "time_s")
+        t = _scalar(time, "time")
         if t < 0:
-            raise ValueError("time_s must be >= 0")
-        amp = self.source_amplitudes(temperature=temperature, sources=sources, count=count)
+            raise ValueError("time must be >= 0")
+        amp = self.source_amplitudes(initial_temperature=temperature, heat_source_density=sources, terms=count)
         x = p[:, 0].astype(float)
-        i = self.locate(x, layer)
+        i = self._locate(x, layer)
         T, q = self._steady(x, i, float(temperature), np.asarray(sources, dtype=float))
         for m, (a, l) in enumerate(zip(amp, self.eigenvalues(count))):
-            X, F = self.mode(m, x, i)
+            X, F = self._mode(m, x, i)
             T = T+a*np.exp(-l*t)*X
             q = q+a*np.exp(-l*t)*F
         return LayeredTransientFields(T, np.column_stack([q, np.zeros(len(x))]), i)

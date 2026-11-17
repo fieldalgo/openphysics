@@ -417,10 +417,10 @@ def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
     result = run(Document.from_dict(d), verbose=False)
     mesh = rectangle_mesh(1., .4, 10, 4)
     mesh.nodes += [-.5, .1]
-    heat = solve_steady_heat(mesh, conductivity=237., heat_source=2e4,
-                             dirichlet=dict(sorted({int(n): t for side, t in (('left', 293.15), ('right', 353.15))
+    heat = solve_steady_heat(mesh, thermal_conductivity=237., heat_source_density=2e4,
+                             prescribed_temperature=dict(sorted({int(n): t for side, t in (('left', 293.15), ('right', 353.15))
                                                     for n in mesh.boundary[side]}.items())),
-                             outward_flux={'bottom': 150.}, convection={'top': (25., 300.)})
+                             inward_heat_flux={'bottom': -150.}, convection={'top': (25., 300.)})
     fixed = {}
     for side, component in (('left', 0), ('bottom', 1)):
         for node in mesh.boundary[side]:
@@ -432,7 +432,7 @@ def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
     f = result.fields
     assert f['temperature'].tobytes() == np.asarray(heat.temperature).tobytes()
     assert f['heat_flux'].tobytes() == np.asarray(heat.heat_flux).tobytes()
-    assert f['outward_convective_heat_rate_per_depth'].tobytes() == np.asarray(heat.convective_outward).tobytes()
+    assert f['outward_convective_heat_rate_per_depth'].tobytes() == np.asarray(heat.outward_convective_heat_rate_per_depth).tobytes()
     for key, attr in (('displacement', 'displacement'), ('strain', 'total_strain'), ('thermal_strain', 'thermal_strain'),
                       ('elastic_strain', 'elastic_strain'), ('stress', 'stress'), ('stress_zz', 'sigma_zz'),
                       ('strain_zz', 'epsilon_zz'), ('applied_force_per_depth', 'load_external'),

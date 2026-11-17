@@ -15,7 +15,7 @@ from .core.checks import real_array, real_scalar, refuse_live
 from .coupling import Field, OneWayChain, transfer
 from ._thermal_mechanical_common import check_mesh_unchanged, dirichlet_supports, isolated_mesh, mesh_state
 from .materials import is_per_region, region_property
-from .thermal import solve_steady_heat
+from .thermal import solve_steady_heat_outward
 from .thermoelasticity import freeze_temperature, solve_thermoelasticity
 
 __all__ = ["WorkflowStageError", "SteadyThermoelasticResult", "solve_steady_thermoelasticity"]
@@ -121,7 +121,7 @@ def solve_steady_thermoelasticity(mesh, *, units, conductivity, thermal_dirichle
                   'mechanical_dirichlet': [[i, c, v] for (i, c), v in sorted(mechanical_bc.items())],
                   'heat_source_w_m3': _input_record(source), 'body_force_n_m3': _input_record(body)}
     with chain.stage('heat'):
-        heat = solve_steady_heat(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
+        heat = solve_steady_heat_outward(owned, conductivity=k, dirichlet=heat_bc, heat_source=source)
         # The mechanical stage computes with NumPy; a live heat input would lose its derivative.
         refuse_live(heat.temperature, "solve_steady_thermoelasticity heat inputs")
         check_mesh_unchanged(owned, state)

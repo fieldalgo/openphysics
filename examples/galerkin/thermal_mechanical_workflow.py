@@ -17,7 +17,7 @@ def main():
         reference_temperature_k=293.15,
         mechanical_dirichlet={(0,0):0.,(0,1):0.,(n,1):0.})
     print(json.dumps({'temperature_range_k':[float(result.heat.temperature.min()),float(result.heat.temperature.max())],
-        'net_outward_heat_w_per_m':float(-result.heat.reaction.sum()),
+        'net_outward_heat_w_per_m':float(-result.heat.reaction_heat_rate_per_depth.sum()),
         'max_displacement_m':float(np.linalg.norm(result.mechanics.displacement,axis=1).max()),
         'sigma_zz_range_pa':[float(result.mechanics.sigma_zz.min()),float(result.mechanics.sigma_zz.max())],
         'physical_elastic_energy_j_per_m':result.mechanics.physical_elastic_energy,

@@ -1,4 +1,4 @@
-# 정상 2D 외향 열유속과 대류
+# 정상 2D 경계 열유속과 대류
 
 [English original](../../../../../packages/galerkin/thermal_flux_robin.md)
 
@@ -10,22 +10,23 @@
 
 ```python
 result = solve_steady_heat(
-    mesh, conductivity=2.5, dirichlet=prescribed_node_temperatures,
-    heat_source=5.0,
-    outward_flux={"right": 0.7},
+    mesh, thermal_conductivity=2.5, prescribed_temperature=prescribed_node_temperatures,
+    heat_source_density=5.0,
+    inward_heat_flux={"right": -0.7},
     convection={"right": (10.0, 300.0)},
 )
 ```
 
-새 선택 키워드 두 개의 기본값은 `None`입니다. 기존 인자와 원래 다섯 결과 필드는
-의미를 유지합니다. 선택하지 않은 자연 경계는 단열입니다. 위 오른쪽 경계에는
-두 조건이 의도적으로 더해집니다.
+선택 키워드 두 개의 기본값은 `None`입니다. 처방 열유속은 **내향**으로 줍니다(양수가 몸체로
+들어감, galerkin 단계의 부호 규약). solver가 이를 한 번 정확히 부호를 바꿔 아래 식의 외향
+g_out = 0.0 - q_in으로 씁니다(콜백 결과도 같음). 선택하지 않은 자연 경계는 단열입니다.
+위 오른쪽 경계에는 두 조건이 의도적으로 더해집니다.
 
-`q.n = g_out + h*(T-T_amb)`, `q=-k grad T`.
+`q.n = g_out + h*(T-T_amb)`, `q=-k grad T`, `g_out = -q_in`.
 
 | 입력 | 계약 |
 | --- | --- |
-| outward_flux | 외부 경계 edge tag→g_out 매핑, W/m². 양수는 열을 제거 |
+| inward_heat_flux | 외부 경계 edge tag→q_in 매핑, W/m². 양수는 열을 주입 |
 | convection | tag→(h, T_amb) 쌍 매핑, h는 W/(m² K), 주변 온도는 K |
 | 경계 상수 | 유한한 실수 스칼라. bool/complex 제외, h>=0 |
 | 경계 콜백 | `(points_m, outward_normals)->values`. 두 인자는 `(Q,2)`, 반환은 정확히 `(Q,)`인 유한 실수. 스칼라·열·벡터 broadcasting 없음 |
@@ -33,7 +34,7 @@ result = solve_steady_heat(
 세 경계량 모두 콜백일 수 있습니다. 외향 법선은 단위 길이이며 실제 인접 삼각형으로
 계산하므로 tag 방향과 무관합니다. 구멍에서는 구멍 안을 향합니다. 콜백 배치는 절점이
 아닌 구적점입니다. 콜백은 mesh를 변경하지 않아야 하며 결정적 동작을 권장합니다.
-음수 g는 처방 열 주입입니다. T<T_amb에서 음수 대류는 주변으로부터의 가열입니다.
+음수 q_in(양수 g_out)은 열을 제거합니다. T<T_amb에서 음수 대류는 주변으로부터의 가열입니다.
 h=0은 허용하지만 절대온도를 고정하지 않으며, 이때도 주변 온도를 검증합니다.
 h<0 또는 유한하지 않은 데이터는 거부합니다.
 
@@ -81,22 +82,23 @@ C = H*T-B
 sum(fQ+reaction) = sum(G+C)   (also separately on every component)
 ```
 
-| 결과 필드 | shape | 의미/단위 |
+| 결과 필드(`PlanarSteadyHeatResult`) | shape | 의미/단위 |
 | --- | --- | --- |
 | temperature | `(N,)` | 절점 T, K |
 | heat_flux | `(M,2)` | 요소별 -k grad T, W/m² |
-| load | `(N,)` | 기존 체적원 fQ, W/m |
-| reaction | `(N,)` | 고정 절점의 열 주입, W/m |
-| residual | `(N,)` | r의 모든 행, W/m |
-| prescribed_outward_load | `(N,)` | G, W/m |
-| ambient_load | `(N,)` | B, W/m |
-| convective_outward | `(N,)` | C, W/m |
-| system_rhs | `(N,)` | fQ+B-G, W/m |
+| generated_heat_rate_per_depth | `(N,)` | 기존 체적원 fQ, W/m |
+| reaction_heat_rate_per_depth | `(N,)` | 고정 절점의 열 주입, W/m |
+| residual_heat_rate_per_depth | `(N,)` | r의 모든 행, W/m |
+| outward_prescribed_heat_rate_per_depth | `(N,)` | G, W/m |
+| ambient_convective_heat_rate_per_depth | `(N,)` | B, W/m |
+| outward_convective_heat_rate_per_depth | `(N,)` | C, W/m |
+| applied_heat_rate_per_depth | `(N,)` | fQ+B-G, W/m |
 
 thermostat의 외향 열률은 **-reaction**이며, 전체 외향 열률은 G+C-reaction입니다.
 절점 적분량은 W가 아닌 깊이당 W/m입니다. W를 얻으려면 API 밖에서 실제 깊이(m)를
-명시적으로 곱합니다. `load`를 경계·system 하중의 합으로 바꾸지 않습니다.
-`SteadyHeatResult`를 기존처럼 다섯 위치 인자로 만들 수 있습니다. 추가 네 필드는
+명시적으로 곱합니다(`_per_depth` 이름이 이를 말하고 `.units`는 W/m를 줍니다). 생성 열률을
+경계·system 하중의 합으로 바꾸지 않습니다. `PlanarSteadyHeatResult`를 기존처럼 다섯 위치
+인자로 만들 수 있습니다. 추가 네 필드는
 기본값 `None`이며 실제 solver 결과에는 아홉 배열이 모두 채워집니다.
 
 4점 선 Gauss가 consistent 경계 행렬과 h*T_amb의 곱을 적분합니다. 길이 ell에서
@@ -161,7 +163,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q -
 - 잘못된 값·shape·위상·겹침, 구멍, 분리 성분, 순수 Neumann 호환성과 유일성 구분을
   검사합니다. gate를 낮추려는 의도는 없습니다.
 
-같은 `outward_flux`/`convection` 입력·부호·변 검증을 시간에 무관하게 한 번 표본화하는
+같은 `inward_heat_flux`/`convection` 입력·부호·변 검증을 시간에 무관하게 한 번 표본화하는
 형태로 [`solve_transient_heat`](transient_heat.md)에서도 쓸 수 있습니다. 그 H, G, B는
 M/dt+K+H와 단계별 열수지에 들어갑니다. 복사, 가변·이방성 k, 온도 의존 h, 3D, 새 연성
 workflow, simcase/Studio 또는 export 연결은 추가하지 않습니다. 기존 NumPy/SciPy만 사용하며 새 runtime 의존성이나

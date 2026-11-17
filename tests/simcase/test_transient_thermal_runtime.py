@@ -13,7 +13,7 @@ import pytest
 from simcase.schema import Document, DocumentError
 from simcase.transient_thermal import TransientThermalRunResult, run_transient_thermal as run
 from simcase.examples import TRANSIENT_THERMAL_UNIFORM
-from simcase.transient_thermal import _FIELD_SPEC, FIELDS_03
+from simcase.transient_thermal import _FIELD_SPEC, ARRAY_NAMES_03, FIELDS_03
 import simcase.transient_thermal as adapter
 import simcase.thermal as storage
 
@@ -147,9 +147,10 @@ def test_nonfinite_public_result_is_refused_without_complete_output(tmp_path, ke
     d = document()
     heat(d)['prescribed_temperature'] = {'left': '300 K'}
     r = run(d, verbose=False)
-    bad = getattr(r.solution, key).astype(float).copy()
+    field = ARRAY_NAMES_03[key]                  # the galerkin result field of the format 0.2 array
+    bad = getattr(r.solution, field).astype(float).copy()
     bad.flat[0] = np.nan
-    object.__setattr__(r.solution, key, bad)
+    object.__setattr__(r.solution, field, bad)
     with pytest.raises(ValueError, match='finite'):
         r.save(tmp_path/'bad')
     assert not (tmp_path/'bad').exists()
@@ -160,7 +161,7 @@ def test_wrong_shape_is_refused_even_without_fields(tmp_path, key):
     d = document()
     d.data['results']['save_fields'] = False
     r = run(d, verbose=False)
-    object.__setattr__(r.solution, key, np.zeros((1, 1, 1)))
+    object.__setattr__(r.solution, ARRAY_NAMES_03[key], np.zeros((1, 1, 1)))
     with pytest.raises(ValueError):
         r.save(tmp_path/'bad')
     assert not (tmp_path/'bad').exists()
@@ -310,8 +311,8 @@ def test_derived_json_overflow_leaves_no_completed_output(tmp_path, save_fields)
     d.data['results']['save_fields'] = save_fields
     r = run(d, verbose=False)
     # Each raw entry is finite but its nodal sum overflows.
-    huge = np.full_like(r.solution.source_load_w_per_m, np.finfo(float).max)
-    object.__setattr__(r.solution, 'source_load_w_per_m', huge)
+    huge = np.full_like(r.solution.generated_heat_rate_per_depth, np.finfo(float).max)
+    object.__setattr__(r.solution, 'generated_heat_rate_per_depth', huge)
     with np.errstate(over='ignore', invalid='ignore'):
         with pytest.raises(ValueError):
             r.save(tmp_path/'overflow')

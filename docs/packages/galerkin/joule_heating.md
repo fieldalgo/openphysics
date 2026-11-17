@@ -50,7 +50,7 @@ prescribed outward and convective loads; a positive reaction injects heat.
 
 `galerkin.thermal.ElementHeatSource(mesh, values)` explicitly binds a finite real
 `(M,)` array in W/m³ to a snapshot of mesh geometry, connectivity and region
-ordering. Pass it to `solve_steady_heat(..., heat_source=source)`. It supports
+ordering. Pass it to `solve_steady_heat(..., heat_source_density=source)`. It supports
 signed heat/cooling for general thermal use; the Joule workflow rejects negative
 Q. Scalar, region-mapping and coordinate-function heat inputs retain their
 existing meaning. A bare array remains invalid. Boundary tags may change for a

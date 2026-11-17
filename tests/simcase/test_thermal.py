@@ -122,8 +122,8 @@ def test_thermal_si_invariance_and_direct_api(unit):
     r=run(Document.from_dict(model(1e5,unit=unit)),False)
     base=run(Document.from_dict(model(1e5,unit='m')),False)
     np.testing.assert_allclose(r.node_coordinates,base.node_coordinates,atol=1e-16,rtol=1e-12)
-    direct=solve_steady_heat(r.mesh,conductivity=12.5,heat_source=1e5,
-        dirichlet=dict(zip(r.prescribed_node_ids,r.prescribed_temperature)))
+    direct=solve_steady_heat(r.mesh,thermal_conductivity=12.5,heat_source_density=1e5,
+        prescribed_temperature=dict(zip(r.prescribed_node_ids,r.prescribed_temperature)))
     for actual,expected,scale in [(r.temperature,base.temperature,35.),
         (r.heat_flux,base.heat_flux,12.5*35/.03),
         (r.generated_heat_rate_per_depth,base.generated_heat_rate_per_depth,12.5*35*.02/.03),
@@ -131,7 +131,9 @@ def test_thermal_si_invariance_and_direct_api(unit):
         (r.residual_heat_rate_per_depth,base.residual_heat_rate_per_depth,12.5*35*.02/.03)]:
         assert np.max(abs(actual-expected))/scale<=1e-9
     for a,b in [(r.temperature,direct.temperature),(r.heat_flux,direct.heat_flux),
-        (r.generated_heat_rate_per_depth,direct.load),(r.reaction_heat_rate_per_depth,direct.reaction),(r.residual_heat_rate_per_depth,direct.residual)]:
+        (r.generated_heat_rate_per_depth,direct.generated_heat_rate_per_depth),
+        (r.reaction_heat_rate_per_depth,direct.reaction_heat_rate_per_depth),
+        (r.residual_heat_rate_per_depth,direct.residual_heat_rate_per_depth)]:
         np.testing.assert_array_equal(a,b)
 
 
@@ -157,7 +159,7 @@ def test_thermal_mixed_convergence_and_refsol_slab():
     assert np.all(np.diff(e,axis=0)<0)
     assert np.all(rates[-2:,0]>=1.8) and np.all(rates[-2:,1]>=.9)
     r=run(Document.from_dict(model()),False)
-    exact=slab(r.node_coordinates,length=.03,conductivity=12.5,left_temperature=280,right_temperature=315)
+    exact=slab(r.node_coordinates,length=.03,thermal_conductivity=12.5,prescribed_temperature=(280,315))
     assert max(abs(r.temperature-exact.temperature))/35<=1e-10
 
 
@@ -336,7 +338,7 @@ def test_thermal_all_raw_nonfinite_rejected_even_without_fields(tmp_path,key):
     r=run(Document.from_dict(data),False)
     owners={'node_coordinates':(r.mesh,'nodes'),'triangles':(r.mesh,'triangles'),
             'prescribed_node_ids':(r,'dirichlet_node_ids'),'prescribed_temperature':(r,'dirichlet_temperature_k')}
-    owner,attr=owners.get(key,(r.solution,{'temperature':'temperature','heat_flux':'heat_flux','generated_heat_rate_per_depth':'load','reaction_heat_rate_per_depth':'reaction','residual_heat_rate_per_depth':'residual'}.get(key)))
+    owner,attr=owners.get(key,(r.solution,key))        # galerkin's field has the saved array's name
     a=np.asarray(getattr(owner,attr),dtype=float).copy();a.flat[0]=np.nan;setattr(owner,attr,a)
     with pytest.raises(ValueError,match='finite'):r.save(tmp_path/'bad')
     assert not (tmp_path/'bad').exists()
@@ -353,7 +355,8 @@ def test_thermal_raw_structure_rejected(tmp_path,damage):
     elif damage=='duplicate':r.dirichlet_node_ids[1]=r.dirichlet_node_ids[0]
     elif damage=='clockwise':r.mesh.triangles[0]=r.mesh.triangles[0,::-1]
     else:
-        attr={'temperature_shape':'temperature','flux_shape':'heat_flux','load_shape':'load','reaction_shape':'reaction','residual_shape':'residual'}[damage]
+        attr={'temperature_shape':'temperature','flux_shape':'heat_flux','load_shape':'generated_heat_rate_per_depth',
+              'reaction_shape':'reaction_heat_rate_per_depth','residual_shape':'residual_heat_rate_per_depth'}[damage]
         setattr(r.solution,attr,getattr(r.solution,attr)[:-1])
     with pytest.raises(ValueError):r.save(tmp_path/'bad')
     assert not (tmp_path/'bad').exists()

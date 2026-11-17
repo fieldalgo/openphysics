@@ -324,9 +324,9 @@ def test_newton_heat_operator_is_the_heat_solve():
                                    convection=args['convection']).thermal
     newton = _JointNewton(mesh, args['thermal_conductivity'], args['thermal_dirichlet'],
                           set(args['reference_potential']), args['outward_flux'], args['convection'])
-    residual = newton.heat_operator@heat.temperature-heat.load-newton.heat_rhs
+    residual = newton.heat_operator@heat.temperature-heat.generated_heat_rate_per_depth-newton.heat_rhs
     free = np.setdiff1d(np.arange(mesh.num_nodes), list(args['thermal_dirichlet']))
-    scale = max(np.max(np.abs(heat.load)), np.max(np.abs(newton.heat_rhs)))
+    scale = max(np.max(np.abs(heat.generated_heat_rate_per_depth)), np.max(np.abs(newton.heat_rhs)))
     assert np.max(np.abs(residual[free])) <= 1e-12*scale
 
 
