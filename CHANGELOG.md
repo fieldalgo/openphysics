@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an explicit three-active static corner-harmonic field with compact physical partitions, bounded numerical gates, independent finite comparisons and immutable edge currents.
+
 - Add a private compact corner partition with rational geometry checks while retaining all public geometry and field controls.
 
 - Add private physical static wedge projections and plane Fourier moments with stable small exponential differences and closed analytical checks.
