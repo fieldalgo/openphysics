@@ -2944,6 +2944,17 @@
    "places": ["api"],
    "description": {"en": "Thickness of a layer; a stack of layers gives one value per layer.", "ko": "층의 두께. 여러 층이면 층마다 값 하나."}
   },
+  "radius": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "A radius: a step-index fiber's core, a cylinder's.", "ko": "반지름: 계단형 굴절률 광섬유의 코어나 원기둥의 반지름."}
+  },
   "curvature": {
    "dimension": {"L": -1},
    "unit": "1/m",

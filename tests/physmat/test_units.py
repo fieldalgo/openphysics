@@ -1234,13 +1234,17 @@ PHASE3_L3_OUTPUT_ONLY = {"electric_flux_density": "C/m^2", "applied_charge_per_d
                          "free_charge_per_depth": "C/m"}
 #: output entries that also have an api place (P3_L3_NAMES pins their places); their menu is still checked
 OUTPUT_AND_API = ("unnormalized_electric_field", "unnormalized_electric_field_line_integral")
+# The registry addition of L3 commit 11d0 (spec rule R(3), map M3 Q18's first name): the fiber core and
+# scattering cylinder radii.
+PHASE3_L3_RADIUS_MENUS = {"radius": L_MENU}
 
 
 def test_r11_every_menu_equals_the_design_table():
     tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY,
-              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY)
+              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY, PHASE3_L3_RADIUS_MENUS)
     assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
-    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS, **PHASE3_L3_MENUS}.items():
+    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS, **PHASE3_L3_MENUS,
+                       **PHASE3_L3_RADIUS_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
@@ -1492,8 +1496,8 @@ def test_p2_names_are_legal_with_their_unit_and_places():
         assert name not in names, name                      # spec section 6, "not added"
     # registry pin follows the addition: 242 entries and 367 names until L2 commit 5 of the galerkin step
     # added the 7 bases and 2 role names of P3_L2_NAMES, 249 and 376 until L3 commit 9 added the 9 bases of
-    # P3_L3_NAMES
-    assert len(units._ENTRIES) == 258 and len(names) == 385
+    # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS)
+    assert len(units._ENTRIES) == 259 and len(names) == 386
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
@@ -1519,9 +1523,10 @@ def test_p3_l2_names_are_legal_with_their_unit_and_places():
     assert units.quantity("initial_time").base == "time" and units.quantity("initial_time").kind == "ordinary"
     assert units.quantity("design_velocity").rank == ("vector",) and units.quantity("thickness").rank == ("scalar",)
     assert units.quantity("displacement_gradient").rank == ("tensor",)
-    for name in ("reference_time", "initial_electric_potential", "radius", "inner_radius", "energy_density",
+    # not added in L2 commit 5 (radius, also listed here then, is added by L3 commit 11d0: P3_L3_RADIUS)
+    for name in ("reference_time", "initial_electric_potential", "inner_radius", "energy_density",
                  "heat_flux_rate", "inward_heat_flux_rate", "electric_potential_difference"):
-        assert name not in names, name                      # not added in L2 commit 5
+        assert name not in names, name
     assert q("2 ms", "initial_time") == 0.002 and q("1 mV", "reference_electric_potential") == 1e-3
     assert q("3 um", "thickness") == 3e-6 and convert("0 m", "thickness").error.code == "E-DOMAIN"
     assert q("4 rad/s", "angular_frequency") == 4.0 and q("0.5 1/s", "decay_rate") == 0.5
@@ -1556,13 +1561,36 @@ def test_p3_l3_names_are_legal_with_their_unit_and_places():
     assert units.quantity("unnormalized_electric_field_z").base == "unnormalized_electric_field"
     assert "Im >= 0 is loss" in units.quantity("effective_index").sign["en"]
     # design 4.2: maximum_ is only a result statistic, so the enumeration ceiling is frequency_limit
-    for name in ("maximum_frequency", "electric_displacement_field", "total_free_charge", "radius",
+    # not added in L3 commit 9 (radius, also listed here then, is added by L3 commit 11d0: P3_L3_RADIUS)
+    for name in ("maximum_frequency", "electric_displacement_field", "total_free_charge",
                  "box_length", "maximum_box_size", "inward_charge_per_depth"):
-        assert name not in names, name                      # not added in L3 commit 9
+        assert name not in names, name
     assert q("3 mm", "box_size") == 0.003 and convert("0 m", "box_size").error.code == "E-DOMAIN"
     assert q("2 GHz", "frequency_limit") == 2e9 and convert("0 Hz", "frequency_limit").error.code == "E-DOMAIN"
     assert q("-2 um", "lower_corner_position") == -2e-6
     assert q("1 C/m^2", "electric_flux_density") == 1.0 and convert("1 C/m2", "electric_flux_density").error.fix
+
+
+P3_L3_RADIUS = {"radius": ("m", ("api",))}  # name: (canonical unit, places), the name L3 commit 11d0 makes legal
+
+
+def test_p3_l3_radius_is_legal_with_its_unit_and_places():
+    names = set(units.names())
+    for name, (unit, places) in P3_L3_RADIUS.items():
+        assert name in names, name
+        qo = units.quantity(name)
+        assert (qo.unit, qo.places) == (unit, places), (name, qo.unit, qo.places)
+    qo = units.quantity("radius")
+    assert qo.base == "radius" and qo.rank == ("scalar",) and qo.kind == "ordinary" and not qo.complex
+    assert dict(qo.dimension) == {"L": 1} and units.menu("radius") == L_MENU
+    assert "radius" in units.display_groups()["length"]["quantities"]
+    assert qo.description["en"] == "A radius: a step-index fiber's core, a cylinder's." and qo.description["ko"]
+    # map M3 Q18 offered radius or length: the registry keeps one name for the quantity, no role or statistic
+    for name in ("core_radius", "cylinder_radius", "minimum_radius", "maximum_radius", "radius_limit"):
+        assert name not in names, name                      # not added in L3 commit 11d0
+    assert q("4 um", "radius") == 4e-6 and q("0.5 mm", "radius") == 0.0005
+    assert convert("0 m", "radius").error.code == "E-DOMAIN" and convert("-1 um", "radius").error.code == "E-DOMAIN"
+    assert convert("4 s", "radius").error.code == "E-UNIT-DIMENSION"
 
 
 def test_p2_r2_r5_temperatures_and_potentials():
