@@ -121,6 +121,8 @@ def test_module_imports_no_engine():
     for n in ast.walk(ast.parse(source)):
         if isinstance(n, ast.Import):
             names |= {a.name.split('.')[0] for a in n.names}
+        elif isinstance(n, ast.ImportFrom) and n.level:             # refsol's own modules, by name
+            names |= {'.' + n.module} if n.module else {'.' + a.name for a in n.names}
         elif isinstance(n, ast.ImportFrom):
-            names.add('.' if n.level else n.module.split('.')[0])     # '.': refsol's private modules
-    assert names <= {'dataclasses', 'fractions', 'numpy', 'scipy', '.'}
+            names.add(n.module.split('.')[0])
+    assert names <= {'dataclasses', 'fractions', 'numpy', 'scipy', '._checks', '._published'}
