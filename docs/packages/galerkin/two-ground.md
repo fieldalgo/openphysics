@@ -76,3 +76,5 @@ one platform does not establish another platform.
 
 The separate [straight-edge API](two-ground-edges.md) exposes conductor-edge
 current factors while retaining this whole-surface result.
+
+The [private compact geometry](laplace_corner_compact_geometry.md) has independent partition checks and does not change any existing field solver.

@@ -53,3 +53,5 @@ BSD-3-Clause scikit-fem을 사용한다. 정확한 설치 버전·wheel 해시·
 
 별도 [직선 모서리 API](two-ground-edges.md)는 이 전체 표면 결과를 유지하며
 도체 모서리별 전류 계수를 제공한다.
+
+[비공개 간결한 기하 분할](laplace_corner_compact_geometry.md)은 독립 분할 검사를 갖추며 기존 장 솔버를 바꾸지 않습니다.
