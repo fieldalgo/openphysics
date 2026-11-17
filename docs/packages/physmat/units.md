@@ -357,7 +357,7 @@ role word (`evaluation`, `unnormalized`, `mass_normalized`) is an output: its
 places are `api` and `result` only, so `evaluation_temperature` is never read from
 a document. A role word that changes the unit makes a base of its own
 (`unnormalized_electric_field` has no unit, `mass_normalized_electric_field` is in
-1/m^(3/2)), as `reference_conductivity` does. The registry has 258 entries and 385
+1/m^(3/2)), as `reference_conductivity` does. The registry has 259 entries and 386
 names (`physmat.units.names()`). For the heat, electric and mechanics APIs of
 `galerkin` and `galerkin-refsol`, the galerkin step added `reference_electric_potential`
 and `initial_time` (role words), `design_velocity` (m per unit of a shape motion's
@@ -371,7 +371,8 @@ and `applied_charge_per_depth`, `reaction_charge_per_depth`,
 `residual_charge_per_depth` and `free_charge_per_depth` (C/m); `effective_index`,
 `unnormalized_electric_field` (with `unnormalized_electric_field_z`) and
 `unnormalized_electric_field_line_integral` gained an `api` place for the public mode
-functions.
+functions. It also added `radius` (m) for the core radius of the step-index fiber
+reference and the radius of the scattering cylinder in `galerkin-refsol`.
 
 Selected menus:
 
