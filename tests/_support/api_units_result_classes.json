@@ -24,6 +24,8 @@
     {"module": "galerkin.material_cavity", "class": "MaterialCavityResult", "reason": "returned by solve_material_cavity and solve_material_cavity_box"},
     {"module": "refsol.bimetal", "class": "BimetalCurvature", "reason": "returned by curvature"},
     {"module": "refsol.bimetal", "class": "StripFields", "reason": "returned by strip_fields"},
+    {"module": "refsol.benchmarks", "class": "RibWaveguide", "reason": "one published case returned by rib_waveguides (in SI from refsol._published, spec D44)"},
+    {"module": "refsol.benchmarks", "class": "DielectricCorner", "reason": "one published case returned by dielectric_corners (spec D44)"},
     {"module": "refsol.cavity", "class": "AnalyticCavityMode", "reason": "one mode returned by rectangular_cavity_modes"},
     {"module": "refsol.elasticity", "class": "ElasticityFields", "reason": "returned by affine and sine_manufactured"},
     {"module": "refsol.elasticity_multilayer", "class": "LayeredElasticFields", "reason": "returned by laminate_axial and series_bar"},

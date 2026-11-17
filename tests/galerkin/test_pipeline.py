@@ -17,6 +17,7 @@ reference for reasons that have nothing to do with the model being right.
 """
 
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +43,7 @@ def vector():
 
 
 def test_scalar_pipeline_runs_end_to_end(refsol, scalar):
-    ref = refsol.benchmarks.rib_neff(0.3)
+    ref = refsol.benchmarks.rib_neff(thickness=0.3e-6)
     tm, mesh, neff, fields, _, _ = scalar.run(0.3, H_COARSE)
     assert tm.num_triangles > 1000
     assert mesh.region_names == ["core", "box", "clad"]
@@ -51,7 +52,7 @@ def test_scalar_pipeline_runs_end_to_end(refsol, scalar):
 
 
 def test_vector_pipeline_runs_end_to_end(refsol, vector):
-    ref = refsol.benchmarks.rib_neff(0.3)
+    ref = refsol.benchmarks.rib_neff(thickness=0.3e-6)
     tm, mesh, neff, (space, et, ez), _, _ = vector.run(0.3, H_COARSE)
     assert mesh.region_names == ["core", "box", "clad"]
     assert abs(neff[0] - ref) < 5e-4, f"{neff[0]:.6f} vs {ref}"
@@ -81,10 +82,11 @@ def test_vector_error_is_uniform_across_the_slab_family(refsol, vector):
     scalar spread of 1.6e-4 over the same family.
     """
     errors = []
-    for case in refsol.benchmarks.RIB_WAVEGUIDES:
-        neff = vector.run(case.slab_thickness_um, H_COARSE)[2]
-        assert len(neff), f"slab {case.slab_thickness_um}: no guided mode"
-        errors.append(neff[0] - case.neff_quasi_te)
+    for case in refsol.benchmarks.rib_waveguides():
+        slab = float(Fraction(repr(case.thickness[0])) * 10 ** 6)     # m -> um, spec D31: the published value
+        neff = vector.run(slab, H_COARSE)[2]
+        assert len(neff), f"slab {slab}: no guided mode"
+        errors.append(neff[0] - case.effective_index)
     errors = np.array(errors)
     assert (errors < 0).all(), (
         f"the vector solver should sit below the reference at this resolution: "

@@ -72,7 +72,7 @@ def _nedelec(nx, ny, k=10, sigma=60.0):
 
 
 def test_cutoffs_match_the_analytic_spectrum(refsol):
-    exact = refsol.metallic.rect_waveguide_cutoffs(A_WG, B_WG, n_max=4)
+    exact = refsol.metallic.rect_waveguide_cutoffs(box_size=(A_WG, B_WG), n_max=4)
     _, _, _, vals = _nedelec(60, 30, k=14, sigma=60.0)
     got = vals[vals > 1.0]
     for (kc2, label), v in zip(exact[:6], got[:6]):
@@ -81,7 +81,7 @@ def test_cutoffs_match_the_analytic_spectrum(refsol):
 
 
 def test_te10_converges_at_second_order(refsol):
-    te10 = refsol.metallic.rect_waveguide_cutoffs(A_WG, B_WG, n_max=2)[0][0]
+    te10 = refsol.metallic.rect_waveguide_cutoffs(box_size=(A_WG, B_WG), n_max=2)[0][0]
     errors = []
     for nx in (10, 20, 40):
         _, _, _, vals = _nedelec(nx, nx // 2, k=6, sigma=12.0)
@@ -104,7 +104,7 @@ def test_boundary_edges_are_exactly_the_topological_boundary():
 def test_nodal_vector_elements_produce_spurious_modes(refsol):
     """The deliberately wrong discretization, kept as a permanent counter-example."""
     exact = [k for k, _ in refsol.metallic.rect_waveguide_cutoffs(
-        A_WG, B_WG, n_max=6, include_tm=True)]
+        box_size=(A_WG, B_WG), n_max=6, include_tm=True)]
     nx, ny = 40, 20
     mesh = rectangle_mesh(A_WG, B_WG, nx, ny)
     p = mesh.nodes[mesh.triangles]

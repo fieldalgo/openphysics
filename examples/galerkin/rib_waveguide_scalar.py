@@ -104,7 +104,7 @@ def run(slab_thickness: float, size_core: float, wavelength: float = 1.15):
 
 if __name__ == "__main__":
     t = 0.3
-    ref = benchmarks.rib_neff(t)
+    ref = benchmarks.rib_neff(thickness=t * 1e-6)     # the slab thickness in m
     print(f"Hadley 2002 rib waveguide, slab {t} um, lambda 1.15 um: reference quasi-TE n_eff = {ref:.6f}\n")
     print(f"{'h_core':>7} {'triangles':>9} {'n_eff (scalar P1)':>18} {'vs Hadley':>10} {'mesh s':>7} {'solve s':>8}")
     results = []

@@ -214,11 +214,21 @@ _EM_FIBER = [
     ("fiber", "vector_group_index", dict(_FIBER, label="HE11")),
     ("fiber", "vector_mode_field", dict(_FIBER, points=[[1e-6, 0.5e-6]], label="HE11", polarization=1)),
 ]
+_CYLINDER = dict(vacuum_angular_wavenumber=3.14e6, radius=1e-6)
+_EM_SCATTERING = [
+    ("scattering", "incident", dict(points=[[2e-6, 0.5e-6]], vacuum_angular_wavenumber=3.14e6)),
+    ("scattering", "scattered", dict(_CYLINDER, points=[[2e-6, 0.5e-6]], terms=20)),
+    ("scattering", "total", dict(_CYLINDER, points=[[0.5e-6, 0.0], [2e-6, 0.5e-6]], kind="dielectric",
+                                 refractive_index=1.5 + 0.01j, terms=20)),
+    ("scattering", "scattering_width", dict(_CYLINDER, kind="dielectric", refractive_index=1.5, terms=20)),
+    ("benchmarks", "rib_neff", dict(thickness=0.3e-6)),
+]
 # L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab, L2 commit 8 the six mechanics and
-# thermoelastic modules, L3 commit 10 electrostatics, L3 commit 11c slab, lossy_slab and bent_slab and L3 commit
-# 11d fiber: each callable that takes a quantity has a case.
+# thermoelastic modules, L3 commit 10 electrostatics, L3 commit 11c slab, lossy_slab and bent_slab, L3 commit
+# 11d fiber and L3 commit 11e scattering and benchmarks: each callable that takes a quantity has a case.
 STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
-                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR + _EM_FIBER}
+                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR + _EM_FIBER
+                + _EM_SCATTERING}
 
 
 @pytest.fixture(scope="module")

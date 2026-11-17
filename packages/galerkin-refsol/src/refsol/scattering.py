@@ -17,6 +17,15 @@ with scattering coefficients c_m depending on the cylinder:
              / [n J'_m(nka) H_m(ka) - J_m(nka) H'_m(ka)]
         interior field: u_in = sum eps_m i^m d_m J_m(n k r) cos(m theta),
         d_m = [J_m(ka) + c_m H_m(ka)] / J_m(nka)
+
+Units and names (galerkin step, L3 commit 11e). The public functions take SI keyword-only
+registry names after the leading ``points`` ((..., 2) metre coordinates, the cylinder's axis
+at the origin): ``vacuum_angular_wavenumber`` k = 2 pi / lambda_0 in rad/m (the exterior is
+vacuum), ``radius`` the cylinder radius a in m, ``refractive_index`` the interior index n
+of a dielectric cylinder, ``kind`` and the series length ``terms``. Only k a, k r and n enter, so any consistent
+scale gives the same field. The formulas above are written in exp(-i omega t), the public
+convention, so nothing is converted: a passive (absorbing) cylinder has Im n >= 0, and the
+scattered field is outgoing, H^(1)_m(k r) ~ exp(+i k r). ``scattering_width`` is in m.
 """
 
 from __future__ import annotations
@@ -24,7 +33,40 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import jv, jvp, hankel1, h1vp
 
+from ._checks import refuse_text
+
 __all__ = ["incident", "scattered", "total", "scattering_width"]
+
+
+def _points(points):
+    """x and y of real (..., 2) metre coordinates."""
+    refuse_text(points=points)
+    p = np.asarray(points, dtype=float)
+    if p.ndim < 1 or p.shape[-1] != 2:
+        raise ValueError("points must be an array (..., 2) of x, y coordinates in m")
+    return p[..., 0], p[..., 1]
+
+
+def _number(value, name):
+    if np.ndim(value) != 0 or np.iscomplexobj(value):
+        raise ValueError(f"{name} must be one real number in SI units")
+    value = float(value)
+    if not (np.isfinite(value) and value > 0):
+        raise ValueError(f"{name} must be a finite positive number in SI units")
+    return value
+
+
+def _cylinder(vacuum_angular_wavenumber, radius, kind, refractive_index, terms):
+    """k, a, kind, n and the series length as checked values."""
+    refuse_text(vacuum_angular_wavenumber=vacuum_angular_wavenumber, radius=radius,
+                refractive_index=refractive_index)
+    k = _number(vacuum_angular_wavenumber, "vacuum_angular_wavenumber")
+    a = _number(radius, "radius (the cylinder radius)")
+    if refractive_index is not None and np.ndim(refractive_index) != 0:
+        raise ValueError("refractive_index must be one (real or complex) index")
+    if isinstance(terms, bool) or not isinstance(terms, (int, np.integer)) or terms < 1:
+        raise ValueError("terms must be a positive integer")
+    return k, a, kind, refractive_index, terms
 
 
 def _polar(x, y):
@@ -32,7 +74,14 @@ def _polar(x, y):
     return np.sqrt(x ** 2 + y ** 2), np.arctan2(y, x)
 
 
-def incident(x, y, k: float):
+def incident(points, *, vacuum_angular_wavenumber):
+    """The incident plane wave exp(i k x) at ``points`` (..., 2) in m."""
+    x, _ = _points(points)
+    refuse_text(vacuum_angular_wavenumber=vacuum_angular_wavenumber)
+    return _incident(x, _number(vacuum_angular_wavenumber, "vacuum_angular_wavenumber"))
+
+
+def _incident(x, k):
     return np.exp(1j * k * np.asarray(x, dtype=float))
 
 
@@ -47,7 +96,7 @@ def _coeffs(k, a, kind, n=None, n_terms=60):
         d = None
     elif kind == "dielectric":
         if n is None:
-            raise ValueError("dielectric cylinder needs a refractive index n")
+            raise ValueError("a dielectric cylinder needs its refractive_index")
         nka = n * ka
         num = n * jvp(m, nka) * jv(m, ka) - jv(m, nka) * jvp(m, ka)
         den = n * jvp(m, nka) * hankel1(m, ka) - jv(m, nka) * h1vp(m, ka)
@@ -59,9 +108,14 @@ def _coeffs(k, a, kind, n=None, n_terms=60):
     return m, eps * (1j ** m) * c, (eps * (1j ** m) * d) if d is not None else None
 
 
-def scattered(x, y, k: float, a: float, kind: str = "pec_tm", n: float | None = None,
-              n_terms: int = 60):
-    """Scattered field u_s at points (x, y) with r >= a."""
+def scattered(points, *, vacuum_angular_wavenumber, radius, kind: str = "pec_tm", refractive_index=None,
+              terms: int = 60):
+    """Scattered field u_s at ``points`` (..., 2) in m with r >= a (``radius``)."""
+    x, y = _points(points)
+    return _scattered(x, y, *_cylinder(vacuum_angular_wavenumber, radius, kind, refractive_index, terms))
+
+
+def _scattered(x, y, k, a, kind="pec_tm", n=None, n_terms=60):
     r, th = _polar(x, y)
     m, cm, _ = _coeffs(k, a, kind, n, n_terms)
     u = np.zeros_like(r, dtype=complex)
@@ -70,15 +124,20 @@ def scattered(x, y, k: float, a: float, kind: str = "pec_tm", n: float | None = 
     return u
 
 
-def total(x, y, k: float, a: float, kind: str = "pec_tm", n: float | None = None,
-          n_terms: int = 60):
-    """Total field: incident + scattered outside, interior series inside (dielectric)."""
+def total(points, *, vacuum_angular_wavenumber, radius, kind: str = "pec_tm", refractive_index=None,
+          terms: int = 60):
+    """Total field at ``points`` (..., 2) in m: incident + scattered outside, interior series inside (dielectric)."""
+    x, y = _points(points)
+    return _total(x, y, *_cylinder(vacuum_angular_wavenumber, radius, kind, refractive_index, terms))
+
+
+def _total(x, y, k, a, kind="pec_tm", n=None, n_terms=60):
     r, th = _polar(x, y)
     m, cm, dm = _coeffs(k, a, kind, n, n_terms)
     u = np.zeros_like(r, dtype=complex)
     outside = r >= a
-    u[outside] = incident(np.asarray(x)[outside], np.asarray(y)[outside], k) \
-        + scattered(np.asarray(x)[outside], np.asarray(y)[outside], k, a, kind, n, n_terms)
+    u[outside] = _incident(np.asarray(x)[outside], k) \
+        + _scattered(np.asarray(x)[outside], np.asarray(y)[outside], k, a, kind, n, n_terms)
     inside = ~outside
     if np.any(inside):
         if dm is None:
@@ -89,9 +148,13 @@ def total(x, y, k: float, a: float, kind: str = "pec_tm", n: float | None = None
     return u
 
 
-def scattering_width(k: float, a: float, kind: str = "pec_tm", n: float | None = None,
-                     n_terms: int = 60) -> float:
-    """Total scattering width (2D cross-section) sigma = (4/k) sum eps_m |c_m|^2."""
+def scattering_width(*, vacuum_angular_wavenumber, radius, kind: str = "pec_tm", refractive_index=None,
+                     terms: int = 60) -> float:
+    """Total scattering width (2D cross-section, m) sigma = (4/k) sum eps_m |c_m|^2."""
+    return _scattering_width(*_cylinder(vacuum_angular_wavenumber, radius, kind, refractive_index, terms))
+
+
+def _scattering_width(k, a, kind="pec_tm", n=None, n_terms=60):
     m, cm_full, _ = _coeffs(k, a, kind, n, n_terms)
     eps = np.where(m == 0, 1.0, 2.0)
     cm = cm_full / (eps * (1j ** m))

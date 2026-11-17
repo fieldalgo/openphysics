@@ -117,7 +117,7 @@ def run(slab_thickness: float, size_core: float, wavelength: float = 1.15):
 
 def main(levels=(0.20, 0.10, 0.05, 0.035)):
     t = 0.3
-    ref = benchmarks.rib_neff(t)
+    ref = benchmarks.rib_neff(thickness=t * 1e-6)     # the slab thickness in m
     print(f"Hadley 2002 rib waveguide, slab {t} um, lambda 1.15 um: "
           f"reference quasi-TE n_eff = {ref:.6f} (+-3e-6)\n")
     print(f"{'h_core':>7} {'triangles':>9} {'n_eff (vector)':>16} {'vs Hadley':>10} "
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     t = 0.3
-    ref = benchmarks.rib_neff(t)
+    ref = benchmarks.rib_neff(thickness=t * 1e-6)     # the slab thickness in m
     tm, mesh, neff, (space, et, ez), _, _ = run(t, 0.05)
     E = eval_edge_field(space, et[0])
     E = E / np.abs(E).max()

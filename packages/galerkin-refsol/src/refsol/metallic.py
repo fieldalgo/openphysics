@@ -10,6 +10,8 @@
 The coaxial closed forms take SI keyword-only registry names after the leading
 positional ``points`` ((Q,2) metre coordinates around the axis at the origin); a str
 for a quantity raises TypeError. ``refsol.electrostatics`` re-exports them.
+``rect_waveguide_cutoffs`` takes the cross-section as ``box_size`` (a, b) in m (L3 commit
+11e); ``rect_cavity_resonances`` is converted with the cavity references (L3 commit 12).
 """
 
 from __future__ import annotations
@@ -22,15 +24,24 @@ __all__ = ["rect_waveguide_cutoffs", "rect_cavity_resonances", "coax_potential",
            "coax_field_magnitude"]
 
 
-def rect_waveguide_cutoffs(a: float, b: float, n_max: int = 5,
-                           include_tm: bool = False) -> list[tuple[float, str]]:
-    """Sorted list of (k_c^2, label) for a PEC rectangular waveguide a x b.
+def rect_waveguide_cutoffs(*, box_size, n_max: int = 5, include_tm: bool = False) -> list[tuple[float, str]]:
+    """Sorted list of (k_c^2, label) for a PEC rectangular waveguide a x b (``box_size`` (a, b), m).
 
-    k_c^2 = (m pi / a)^2 + (n pi / b)^2.
+    k_c^2 = (m pi / a)^2 + (n pi / b)^2 in 1/m^2, for m, n <= ``n_max``.
     TE requires (m, n) != (0, 0); TM requires m >= 1 and n >= 1.
     The 2D curl-curl eigenproblem  curl curl E_t = k_c^2 E_t  with n x E = 0
     returns exactly the TE set, which is why include_tm defaults to False.
     """
+    refuse_text(box_size=box_size)
+    a, b = (float(v) for v in pair(box_size, "box_size"))
+    if not (np.isfinite(a) and np.isfinite(b) and a > 0 and b > 0):
+        raise ValueError("box_size must be the cross-section (a, b), two finite positive lengths in m")
+    if isinstance(n_max, bool) or not isinstance(n_max, (int, np.integer)) or n_max < 0:
+        raise ValueError("n_max must be a non-negative integer")
+    return _rect_waveguide_cutoffs(a, b, n_max, include_tm)
+
+
+def _rect_waveguide_cutoffs(a, b, n_max=5, include_tm=False):
     out = []
     for m in range(n_max + 1):
         for n in range(n_max + 1):
