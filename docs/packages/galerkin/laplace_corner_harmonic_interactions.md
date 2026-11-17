@@ -61,3 +61,5 @@ Self integrals and interactions alone do not qualify an assembled matrix,
 fixed internal guard, field convergence, physical measurement or another
 execution platform. Existing solver APIs, defaults and reference records remain
 separate.
+
+A separate [half-space assembler](laplace_corner_harmonic_assembly.md) retains raw matrix refinement and reciprocity before any charge solve.
