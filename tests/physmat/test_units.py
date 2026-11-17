@@ -1223,19 +1223,31 @@ PHASE3_MENUS = {
     "decay_rate": ("1/s",), "displacement_gradient": BARE,
 }
 PHASE3_OUTPUT_ONLY = {"strain_energy_density": "J/m^3"}
+# Phase-3 registry additions of landing L3 (galerkin step spec 4.1; L3 commit 9), written from the commit's
+# table: the cavity inputs and the electrostatics outputs. effective_index (in DESIGN_MENUS),
+# unnormalized_electric_field and unnormalized_electric_field_line_integral (in PHASE2_OUTPUT_ONLY) gain an api
+# place there.
+PHASE3_L3_MENUS = {"box_size": L_MENU, "lower_corner_position": L_MENU, "upper_corner_position": L_MENU,
+                   "frequency_limit": HZ}
+PHASE3_L3_OUTPUT_ONLY = {"electric_flux_density": "C/m^2", "applied_charge_per_depth": "C/m",
+                         "reaction_charge_per_depth": "C/m", "residual_charge_per_depth": "C/m",
+                         "free_charge_per_depth": "C/m"}
+#: output entries that also have an api place (P3_L3_NAMES pins their places); their menu is still checked
+OUTPUT_AND_API = ("unnormalized_electric_field", "unnormalized_electric_field_line_integral")
 
 
 def test_r11_every_menu_equals_the_design_table():
-    tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY)
+    tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY,
+              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY)
     assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
-    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS}.items():
+    for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS, **PHASE3_L3_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
         assert units.quantity(base).unit == unit and unit not in DESIGN_MENUS[base], base
-    for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY, **PHASE3_OUTPUT_ONLY}.items():
-        assert units.menu(base) == (unit,) and units.quantity(base).places == ("result",) or base in (
-            "conductance_per_depth",), base
+    for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY, **PHASE3_OUTPUT_ONLY, **PHASE3_L3_OUTPUT_ONLY}.items():
+        assert units.menu(base) == (unit,), (base, units.menu(base), unit)
+        assert units.quantity(base).places == ("result",) or base in OUTPUT_AND_API, base
 
 
 def test_r11_statistic_names_of_results():
@@ -1452,13 +1464,16 @@ P2_NAMES = {  # name: (canonical unit, places) for every name R-2..R-22 makes le
     **{n: ("1", ("document", "api", "result"))
        for n in _names("mode_tracking_margin_threshold cluster_span_tolerance cluster_gap_threshold")},
     **{n: ("1", ("result",)) for n in _names("relative_residual_threshold physical_l2_fraction pml_l2_fraction "
-                                             "mean_effective_index mean_group_index "
+                                             "mean_group_index "
                                              "engineering_shear_elastic_strain_xy "
                                              "engineering_shear_thermal_strain_xy")},
     "maximum_displacement": ("m", ("document", "api", "result")),
-    "unnormalized_mode_field": ("1", ("result",)), "unnormalized_electric_field": ("1", ("result",)),
-    "unnormalized_electric_field_z": ("1", ("result",)),
-    "unnormalized_electric_field_line_integral": ("m", ("result",)), "unnormalized_mode_power": ("W", ("result",)),
+    # these four gained an api place in L3 commit 9 of the galerkin step (the public mode functions)
+    "mean_effective_index": ("1", ("api", "result")),
+    "unnormalized_mode_field": ("1", ("result",)), "unnormalized_electric_field": ("1", ("api", "result")),
+    "unnormalized_electric_field_z": ("1", ("api", "result")),
+    "unnormalized_electric_field_line_integral": ("m", ("api", "result")),
+    "unnormalized_mode_power": ("W", ("result",)),
     "unnormalized_mode_field_square_integral": ("m^2", ("result",)), "unnormalized_field_overlap": ("m^2", ("result",)),
     "mass_normalized_electric_field": ("1/m^(3/2)", ("result",)),
     "mass_normalized_electric_field_line_integral": ("1/m^(1/2)", ("result",)),
@@ -1476,8 +1491,9 @@ def test_p2_names_are_legal_with_their_unit_and_places():
                  "joule_heat_rate_per_depth", "minimum_principal_squared", "near_element_size"):
         assert name not in names, name                      # spec section 6, "not added"
     # registry pin follows the addition: 242 entries and 367 names until L2 commit 5 of the galerkin step
-    # added the 7 bases and 2 role names of P3_L2_NAMES
-    assert len(units._ENTRIES) == 249 and len(names) == 376
+    # added the 7 bases and 2 role names of P3_L2_NAMES, 249 and 376 until L3 commit 9 added the 9 bases of
+    # P3_L3_NAMES
+    assert len(units._ENTRIES) == 258 and len(names) == 385
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
@@ -1509,6 +1525,44 @@ def test_p3_l2_names_are_legal_with_their_unit_and_places():
     assert q("2 ms", "initial_time") == 0.002 and q("1 mV", "reference_electric_potential") == 1e-3
     assert q("3 um", "thickness") == 3e-6 and convert("0 m", "thickness").error.code == "E-DOMAIN"
     assert q("4 rad/s", "angular_frequency") == 4.0 and q("0.5 1/s", "decay_rate") == 0.5
+
+
+P3_L3_NAMES = {  # name: (canonical unit, places) for every name L3 commit 9 of the galerkin step makes legal or places
+    "box_size": ("m", ("api",)),
+    "lower_corner_position": ("m", ("api",)),
+    "upper_corner_position": ("m", ("api",)),
+    "frequency_limit": ("Hz", ("api",)),
+    "electric_flux_density": ("C/m^2", ("result",)),
+    "applied_charge_per_depth": ("C/m", ("result",)),
+    "reaction_charge_per_depth": ("C/m", ("result",)),
+    "residual_charge_per_depth": ("C/m", ("result",)),
+    "free_charge_per_depth": ("C/m", ("result",)),
+    "effective_index": ("1", ("api", "result")),
+    "unnormalized_electric_field_line_integral": ("m", ("api", "result")),
+    "unnormalized_electric_field_z": ("1", ("api", "result")),
+}
+
+
+def test_p3_l3_names_are_legal_with_their_unit_and_places():
+    names = set(units.names())
+    for name, (unit, places) in P3_L3_NAMES.items():
+        assert name in names, name
+        qo = units.quantity(name)
+        assert (qo.unit, qo.places) == (unit, places), (name, qo.unit, qo.places)
+    for name in ("box_size", "lower_corner_position", "upper_corner_position", "electric_flux_density"):
+        assert units.quantity(name).rank == ("vector",), name
+    assert units.quantity("electric_flux_density").complex and units.quantity("electric_flux_density").base == \
+        "electric_flux_density"
+    assert units.quantity("unnormalized_electric_field_z").base == "unnormalized_electric_field"
+    assert "Im >= 0 is loss" in units.quantity("effective_index").sign["en"]
+    # design 4.2: maximum_ is only a result statistic, so the enumeration ceiling is frequency_limit
+    for name in ("maximum_frequency", "electric_displacement_field", "total_free_charge", "radius",
+                 "box_length", "maximum_box_size", "inward_charge_per_depth"):
+        assert name not in names, name                      # not added in L3 commit 9
+    assert q("3 mm", "box_size") == 0.003 and convert("0 m", "box_size").error.code == "E-DOMAIN"
+    assert q("2 GHz", "frequency_limit") == 2e9 and convert("0 Hz", "frequency_limit").error.code == "E-DOMAIN"
+    assert q("-2 um", "lower_corner_position") == -2e-6
+    assert q("1 C/m^2", "electric_flux_density") == 1.0 and convert("1 C/m2", "electric_flux_density").error.fix
 
 
 def test_p2_r2_r5_temperatures_and_potentials():

@@ -313,10 +313,16 @@ python -m physmat._unit_tables --write             # regenerate without reading 
 이름은 출력이어서 쓰이는 곳이 `api`와 `result`뿐이므로, `evaluation_temperature`는 문서에서 읽지
 않습니다. 단위를 바꾸는 역할 낱말은 `reference_conductivity`처럼 따로 기반 항목을 만듭니다
 (`unnormalized_electric_field`는 단위가 없고, `mass_normalized_electric_field`는 1/m^(3/2)).
-등록부에는 항목 249개와 이름 376개가 있습니다(`physmat.units.names()`). galerkin 단계는
+등록부에는 항목 258개와 이름 385개가 있습니다(`physmat.units.names()`). galerkin 단계는
 `galerkin`과 `galerkin-refsol`의 열·전기·역학 API를 위해 `reference_electric_potential`과 `initial_time`(역할
 낱말), `design_velocity`(형상 운동의 설계 매개변수 한 단위당 m), `angular_frequency`(rad/s), `decay_rate`(1/s),
 `curvature`(1/m), `thickness`, `displacement_gradient`, 출력 `strain_energy_density`(J/m^3)를 더했습니다.
+전자기 API를 위해서는 공동 입력 `box_size`, `lower_corner_position`, `upper_corner_position`(m, 벡터)과
+`frequency_limit`(Hz, 공진 열거의 상한. `maximum_`은 결과 통계에만 씁니다), 정전 출력
+`electric_flux_density`(C/m^2)와 `applied_charge_per_depth`, `reaction_charge_per_depth`,
+`residual_charge_per_depth`, `free_charge_per_depth`(C/m)를 더했고, `effective_index`,
+`unnormalized_electric_field`(`unnormalized_electric_field_z` 포함), `unnormalized_electric_field_line_integral`에
+공개 모드 함수를 위한 `api` 자리를 더했습니다.
 
 메뉴 일부:
 
