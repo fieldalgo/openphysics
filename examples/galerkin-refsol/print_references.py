@@ -6,11 +6,14 @@
 from refsol import fiber, slab, benchmarks, metallic
 
 a, n1, n2, lam = 4.0, 1.45, 1.44, 1.55
+# SI registry names; only k0 a enters, so these numbers give the um fibre's modes read in metres
+fibre = dict(radius=a, refractive_index=(n1, n2), vacuum_wavelength=lam)
 print(f"Step-index fiber  a={a} um  n1={n1}  n2={n2}  lambda={lam} um   "
-      f"V={fiber.v_number(a, n1, n2, lam):.4f}")
-for md in fiber.vector_modes(a, n1, n2, lam, l_max=3):
-    print(f"  {md.label:5s}  n_eff = {md.neff:.8f}   b = {md.b:.5f}")
-print("  scalar LP:", ", ".join(f"{m.label}={m.neff:.8f}" for m in fiber.lp_modes(a, n1, n2, lam)))
+      f"V={fiber.v_number(**fibre):.4f}")
+for md in fiber.vector_modes(**fibre, l_max=3):
+    b = (md.effective_index ** 2 - n2 ** 2) / (n1 ** 2 - n2 ** 2)    # normalized propagation constant
+    print(f"  {md.label:5s}  n_eff = {md.effective_index:.8f}   b = {b:.5f}")
+print("  scalar LP:", ", ".join(f"{m.label}={m.effective_index:.8f}" for m in fiber.lp_modes(**fibre)))
 
 print("\nSOI slab  n_f=3.48  n_s=n_c=1.444  d=0.22 um  lambda=1.55 um")
 print("  TE:", [f"{n:.6f}" for n in slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22,

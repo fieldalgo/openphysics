@@ -26,7 +26,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.elasticity` | 균질 등방성 평면응력/평면변형률: 아핀 장, 폐형식 응력, 매끄러운 제조해 | 재료 계수, 공학 전단, 독립적인 힘 미분 |
 | `refsol.slab` | 대칭/비대칭 평면 유전체 도파로 TE/TM 모드, TE 장 분포 | 차단식 대비 모드 수, 짝수 모드 방정식, 경계면 연속성 |
 | `refsol.lossy_slab` | 복소 유전율 다층 슬랩, 공개 값은 `exp(-i omega t)`(전달행렬은 `exp(+i omega t - i beta z)`로 계산하고 한 번 변환): 전달행렬 특성함수, 무손실 `slab` 근에서 연속 추적한 흡수 결합 모드, 외향 sheet의 기판 누설 모드, 장 분포 | 무손실 극한 = `slab`, 정규화 잔차 ≤ 1e-12, 1차 섭동론(TE 구속률, TM 벡터식)과 O(n''^2) 일치, 유한차분 경계면·층 방정식, exp(-2 k0 gamma gap) 터널링률, 경로 무관 연속 추적 |
-| `refsol.fiber` | 계단형 굴절률 광섬유: 스칼라 LP 모드(Gloge), 정확한 벡터 TE/TM/HE/EH 모드, 음함수 미분으로 구한 정확한 벡터 군굴절률(`vector_group_index`, 재료 분산 선택), 정확한 벡터 모드 장(`vector_mode_field`) | Bessel 차단값 대비 LP 개수, 2.4048의 LP11 차단, 약한 도파에서 HE11 ≈ LP01, LP11 군 축퇴, Rudolph–Neumann 근사; Richardson 외삽한 정밀 근 대비 군굴절률, 중심차분 대비 잔차 편미분; 근에서 특이한 장 연속 조건, 경계 조건(E_phi, E_z, n^2 E_r) |
+| `refsol.fiber` | 계단형 굴절률 광섬유: 스칼라 LP 모드(Gloge), 정확한 벡터 TE/TM/HE/EH 모드, 음함수 미분으로 구한 정확한 벡터 군굴절률(`vector_group_index`, 파장에서 고정한 굴절률), 정확한 벡터 모드 장(`vector_mode_field`, 공개 값은 `exp(-i omega t)`: galerkin 커널 틀에서 계산하고 한 번 변환); 키워드 전용 SI 등록부 이름(코어 반경 `radius`, 쌍 (core, cladding)인 `refractive_index`, `vacuum_wavelength`, `points` (Q,2)), 무손실 | Bessel 차단값 대비 LP 개수, 2.4048의 LP11 차단, 약한 도파에서 HE11 ≈ LP01, LP11 군 축퇴, Rudolph–Neumann 근사; Richardson 외삽한 정밀 근 대비 군굴절률(재료 분산은 테스트의 내부 형식으로), 중심차분 대비 잔차 편미분; 근에서 특이한 장 연속 조건, 경계 조건(E_phi, E_z, n^2 E_r), `+i beta E_z`를 쓴 `div E = 0` |
 | `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장(`coax_potential(points, *, position, prescribed_electric_potential)`, L3 커밋 10부터 SI 등록부 이름) | 폐형식 |
 | `refsol.electrostatics` | 동축선 깊이 1 m당 정전용량 `2 pi eps0 eps_r / ln(b/a)`와 두 층 평행판 직렬 정전용량(`capacitance_per_depth`), 실수·복소 `relative_permittivity`(`exp(-i omega t)`, 손실 `Im >= 0`); 키워드 전용 SI 등록부 이름(반경은 `position`, 층마다 `thickness`와 `relative_permittivity`, `length`); 동축 전위를 재노출 | 폐형식; 평행판은 P1에서 정확 |
 | `refsol.cavity` | 주파수 상한까지의 모든 진공 PEC 상자 모드, 편광·기하 축퇴 포함, SI | 독립 Cartesian 열거, 솔버·메시 없음 |
@@ -63,8 +63,8 @@ print(field.stress)        # [70e6, 0, 0] Pa at each point (up to roundoff)
 ```python
 from refsol import fiber, slab, lossy_slab, scattering, benchmarks
 
-# exact HE11 effective index of a step-index fiber
-n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
+# exact HE11 effective index of a step-index fiber: core radius 4 um, indices (core, cladding), lengths in m
+n_eff = fiber.fundamental_neff(radius=4e-6, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55e-6)
 
 # all guided TE modes of a 220 nm SOI slab: layers (substrate, film, cover), lengths in m
 slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22e-6, vacuum_wavelength=1.55e-6, pol="TE")
@@ -128,6 +128,7 @@ python -m pip install -e packages/galerkin-refsol
 - 길이는 일관된 어떤 단위든 사용할 수 있습니다(파장이 척도를 정함).
 - 유효 굴절률은 `n_eff = beta / k0`입니다.
 - `refsol.lossy_slab`과 `refsol.bent_slab`은 galerkin의 공개 모드 함수처럼 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 11c): 수동 `Im eps >= 0`, 감쇠 또는 복사하는 모드 `Im n_eff > 0`. 식은 `exp(+i omega t)`로 적혀 있고 `refsol._conventions`에서 한 번 변환합니다. 이를 모드 커널(exp(+i omega t))과 비교하는 galerkin 테스트는 비교할 때 켤레를 한 번 취합니다.
+- `refsol.fiber.vector_mode_field`는 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 11d): 전방 모드는 `exp(i (beta z - omega t))`로 변하므로 `dEx/dx + dEy/dy + i beta E_z = 0`입니다. 장은 galerkin 커널 틀 `exp(+i omega t - i beta z)`에서 계산하고 `refsol._conventions`에서 한 번 변환합니다. 이를 모드 커널과 비교하는 테스트는 비교할 때 켤레를 한 번 취합니다. 광섬유의 다른 값은 실수입니다.
 - `refsol.material_cavity`는 galerkin 공진기 커널처럼 `exp(+i omega t)`를 씁니다: 수동 `Im eps <= 0`, 감쇠 공진 `Im omega > 0`. 변환은 복소 공액입니다.
 - `refsol.electrostatics`는 galerkin의 공개 정전기처럼 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 10): 수동 `Im eps_r >= 0`이면 `Im C >= 0`입니다. 폐형식은 두 규약에서 같은 식이므로 아무것도 변환하지 않습니다.
 

@@ -16,8 +16,14 @@ from refsol import fiber
 A, N1, N2 = 4.0, 1.45, 1.44
 
 
+def _fiber(n1, n2, wavelength, a=A):
+    """The keyword arguments of the public functions (lengths read in m: only k0 a enters)."""
+    return dict(radius=a, refractive_index=(n1, n2), vacuum_wavelength=wavelength)
+
+
 def _root(label, wavelength, n1, n2):
-    return next(md.neff for md in fiber.vector_modes(A, n1, n2, wavelength, l_max=3) if md.label == label)
+    return next(md.effective_index for md in fiber.vector_modes(**_fiber(n1, n2, wavelength), l_max=3)
+                if md.label == label)
 
 
 def _refined_derivative(label, wavelength, materials):
@@ -58,35 +64,36 @@ def test_analytic_partials_match_central_differences_of_the_residual(family, l):
 def test_group_index_matches_independent_root_refinement(label, materials):
     wl = 1.55
     n1, n2, dn1, dn2 = materials(wl)
-    neff, ng = fiber.vector_group_index(A, n1, n2, wl, label, dn1, dn2)
+    # the dispersive form is private (rule R(2): the index derivative has no registry name, only tests use it)
+    neff, ng = fiber._vector_group_index(A, n1, n2, wl, label, dn1, dn2)
     assert neff == pytest.approx(_root(label, wl, n1, n2), abs=1e-14)
     assert ng == pytest.approx(neff - wl * _refined_derivative(label, wl, materials), abs=1e-9)
 
 
 def test_te01_tm01_he21_group_indices_are_distinct():
     """Physically split families keep distinct group indices (not one LP11 value)."""
-    values = [fiber.vector_group_index(A, N1, N2, 1.55, label)[1] for label in ("TE01", "TM01", "HE21")]
+    values = [fiber.vector_group_index(**_fiber(N1, N2, 1.55), label=label)[1] for label in ("TE01", "TM01", "HE21")]
     assert min(abs(x - y) for i, x in enumerate(values) for y in values[i + 1:]) > 1e-6
 
 
 def test_material_dispersion_raises_the_group_index():
     n1, n2, dn1, dn2 = _sellmeier(1.55)
-    plain = fiber.vector_group_index(A, n1, n2, 1.55, "HE11")[1]
-    dispersive = fiber.vector_group_index(A, n1, n2, 1.55, "HE11", dn1, dn2)[1]
+    plain = fiber.vector_group_index(**_fiber(n1, n2, 1.55), label="HE11")[1]
+    dispersive = fiber._vector_group_index(A, n1, n2, 1.55, "HE11", dn1, dn2)[1]
     assert dispersive > plain
 
 
 def test_scale_invariance_of_the_nondispersive_group_index():
     """n_eff depends only on a/lambda, so scaling both leaves n_g unchanged."""
-    one = fiber.vector_group_index(A, N1, N2, 1.55, "HE11")
-    other = fiber.vector_group_index(A * 1e3, N1, N2, 1.55e3, "HE11")
+    one = fiber.vector_group_index(**_fiber(N1, N2, 1.55), label="HE11")
+    other = fiber.vector_group_index(**_fiber(N1, N2, 1.55e3, a=A * 1e3), label="HE11")
     np.testing.assert_allclose(other, one, rtol=1e-12)
 
 
 def test_refuses_unguided_and_near_cutoff_modes():
     with pytest.raises(ValueError, match="not guided"):
-        fiber.vector_group_index(A, N1, N2, 1.55, "EH11")
+        fiber.vector_group_index(**_fiber(N1, N2, 1.55), label="EH11")
     # TE01 cuts off at the first zero of J0, V = 2.40483; place V just above it.
     wl = 2 * np.pi * A * np.sqrt(N1 ** 2 - N2 ** 2) / 2.40484
     with pytest.raises(ValueError, match="cutoff|not guided"):
-        fiber.vector_group_index(A, N1, N2, wl, "TE01")
+        fiber.vector_group_index(**_fiber(N1, N2, wl), label="TE01")

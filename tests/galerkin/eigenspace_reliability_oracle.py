@@ -6,7 +6,8 @@
 Time convention exp(+i omega t), axial convention exp(-i beta z).
 Ez=f(r) exp(i l phi), Hz=h f(r) exp(i l phi); mu=c=1.
 Et=(-i beta grad Ez + i k0 zhat cross grad Hz)/(k0^2 n^2-beta^2).
-Continuity of Ephi determines h; refsol supplies only the scalar root.
+Continuity of Ephi determines h; refsol supplies only the scalar root (its effective index and the
+internal normalized parameters u, w of the mode, spec 4.1).
 """
 
 import numpy as np
@@ -15,20 +16,20 @@ from scipy.special import jv, jvp, kv, kvp
 
 def fiber_electric(points, mode, wavelength=1.5, radius=4., n1=1.45, n2=1.44):
     k0 = 2*np.pi/wavelength
-    beta = k0*mode.neff
-    uc, ws = mode.u/radius, mode.w/radius
+    beta = k0*mode.effective_index
+    uc, ws = mode._u/radius, mode._w/radius
     qc, qs = uc**2, -ws**2
-    dc = uc*jvp(mode.l, mode.u)/jv(mode.l, mode.u)
-    ds = ws*kvp(mode.l, mode.w)/kv(mode.l, mode.w)
+    dc = uc*jvp(mode.l, mode._u)/jv(mode.l, mode._u)
+    ds = ws*kvp(mode.l, mode._w)/kv(mode.l, mode._w)
     x, y = points[..., 0], points[..., 1]
     r = np.hypot(x, y)
     phi = np.arctan2(y, x)
     inside = r <= radius
     # No quadrature point is at r=0; interface tests also avoid the axis.
-    f = np.where(inside, jv(mode.l, uc*r)/jv(mode.l, mode.u),
-                 kv(mode.l, ws*r)/kv(mode.l, mode.w))
-    df = np.where(inside, uc*jvp(mode.l, uc*r)/jv(mode.l, mode.u),
-                  ws*kvp(mode.l, ws*r)/kv(mode.l, mode.w))
+    f = np.where(inside, jv(mode.l, uc*r)/jv(mode.l, mode._u),
+                 kv(mode.l, ws*r)/kv(mode.l, mode._w))
+    df = np.where(inside, uc*jvp(mode.l, uc*r)/jv(mode.l, mode._u),
+                  ws*kvp(mode.l, ws*r)/kv(mode.l, mode._w))
     q2 = np.where(inside, qc, qs)
     columns = []
     for l in (mode.l, -mode.l):

@@ -73,8 +73,8 @@ def _refined(d, factor):
 
 
 def test_vector_fiber_family_matches_refsol_and_improves_on_refinement():
-    modes = fiber.vector_modes(4.0, 1.45, 1.44, 1.55)
-    exact = np.array([m.neff for m in modes for _ in range(2 if m.l else 1)])
+    modes = fiber.vector_modes(radius=4.0, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55)
+    exact = np.array([m.effective_index for m in modes for _ in range(2 if m.l else 1)])
     errors = []
     for factor in (1.0, 0.65):
         res = run(_refined(examples.VECTOR_FIBER, factor), verbose=False)

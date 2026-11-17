@@ -51,7 +51,7 @@ from subspace_fiber_fixture import (A, N1, N2, centred, cluster_sweep, field_spa
 
 @pytest.fixture(scope="module")
 def exact():
-    return fiber.vector_group_index(A, N1, N2, 1.55, "HE11")[1]
+    return fiber.vector_group_index(radius=A, refractive_index=(N1, N2), vacuum_wavelength=1.55, label="HE11")[1]
 
 
 @pytest.fixture(scope="module")
@@ -113,8 +113,9 @@ def test_field_space_negative_control():
 @pytest.fixture(scope="module")
 def sellmeier_case():
     n1, n2, dn1, dn2 = sellmeier(1.55)
-    exact = fiber.vector_group_index(A, n1, n2, 1.55, "HE11", dn1, dn2)[1]
-    frozen = fiber.vector_group_index(A, n1, n2, 1.55, "HE11")[1]
+    # the dispersive form is private (rule R(2): the index derivative has no registry name, only tests use it)
+    exact = fiber._vector_group_index(A, n1, n2, 1.55, "HE11", dn1, dn2)[1]
+    frozen = fiber.vector_group_index(radius=A, refractive_index=(n1, n2), vacuum_wavelength=1.55, label="HE11")[1]
     dispersive = he11_sweep(centred(0.01), materials=lambda wl: sellmeier(wl)[:2])["g"][2]
     fem_frozen = he11_sweep(centred(0.01), materials=lambda wl: (n1, n2))["g"][2]
     return dict(exact=exact, frozen=frozen, dispersive=dispersive, fem_frozen=fem_frozen)
@@ -135,7 +136,8 @@ def test_dispersive_he11_error_decreases_with_refinement(sellmeier_case):
 @pytest.mark.slow
 def test_rank_three_accidental_cluster_mean_group_index():
     a, n1, n2 = 4.0, 1.47, 1.44
-    ng = {label: fiber.vector_group_index(a, n1, n2, 1.55, label)[1] for label in ("HE11", "TE01", "HE21", "TM01")}
+    ng = {label: fiber.vector_group_index(radius=a, refractive_index=(n1, n2), vacuum_wavelength=1.55, label=label)[1]
+          for label in ("HE11", "TE01", "HE21", "TM01")}
     reference = np.array([ng["HE11"], ng["TE01"], (2 * ng["HE21"] + ng["TM01"]) / 3])
     settings = dict(method="electric-l2-subspace-v1", cluster_span_max=4e-5, external_gap_min=6e-5)
     errors = []

@@ -302,7 +302,11 @@ def fiber(refsol):
     assert abs(n_eff[0] - n_eff[1]) < 1e-9, "HE11 pair must be degenerate"
 
     def exact(x, y, polarization=0):
-        return refsol.fiber.vector_mode_field(A_CORE, N1, N2, WL, "HE11", x, y, polarization)
+        # refsol's public field follows exp(-i omega t); the kernel's modes exp(+i omega t): conjugated once
+        # here, at the comparison (D8), which gives the former kernel-frame field bit for bit
+        points = np.stack([np.asarray(x, dtype=float), np.asarray(y, dtype=float)], axis=-1)
+        return refsol.fiber.vector_mode_field(points, radius=A_CORE, refractive_index=(N1, N2), vacuum_wavelength=WL,
+                                              label="HE11", polarization=polarization).conj()
     return {"mesh": mesh, "space": space, "eps": eps, "n_eff": n_eff, "et": et, "ez": ez, "exact": exact}
 
 

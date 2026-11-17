@@ -205,11 +205,20 @@ _EM_PLANAR = [
     ("bent_slab", "residual", dict(_BENT, effective_index=3.0 + 1e-9j)),
     ("bent_slab", "mode", dict(_BENT, mode_index=0, target_effective_index=3.013, relative_tolerance=1e-10)),
 ]
+_FIBER = dict(radius=4e-6, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55e-6)
+_EM_FIBER = [
+    ("fiber", "v_number", dict(_FIBER)),
+    ("fiber", "lp_modes", dict(_FIBER, l_max=1)),
+    ("fiber", "vector_modes", dict(_FIBER, l_max=1)),
+    ("fiber", "fundamental_neff", dict(_FIBER)),
+    ("fiber", "vector_group_index", dict(_FIBER, label="HE11")),
+    ("fiber", "vector_mode_field", dict(_FIBER, points=[[1e-6, 0.5e-6]], label="HE11", polarization=1)),
+]
 # L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab, L2 commit 8 the six mechanics and
-# thermoelastic modules, L3 commit 10 electrostatics and L3 commit 11c slab, lossy_slab and bent_slab: each callable
-# that takes a quantity has a case.
+# thermoelastic modules, L3 commit 10 electrostatics, L3 commit 11c slab, lossy_slab and bent_slab and L3 commit
+# 11d fiber: each callable that takes a quantity has a case.
 STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
-                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR}
+                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR + _EM_FIBER}
 
 
 @pytest.fixture(scope="module")
@@ -248,3 +257,12 @@ def test_clean_modules_refuse_strings_and_removed_names(rules):
     problems = api_scan.string_refusal_problems(PACKAGE, ALLOWLIST, rules, STRING_CASES)
     problems += api_scan.removed_name_problems(PACKAGE, ALLOWLIST, rules)
     assert not problems, "\n".join(problems)
+
+
+def test_the_one_scoped_removed_name(rules):
+    # L3 commit 11d: radius is a registry name since L3 commit 11d0, and refsol.fiber takes it (the core radius);
+    # bent_slab's former radius (bend_radius since 11c) stays asserted absent from refsol.bent_slab, where it was
+    assert [(r.package, r.kind, r.name, r.scope) for r in rules.removed if r.scope] == [
+        ("refsol", "parameter", "radius", ("refsol.bent_slab",))]
+    assert "api" in rules.registry["radius"][0]
+    assert "refsol.bent_slab" in api_scan.clean_modules(PACKAGE, ALLOWLIST, rules)

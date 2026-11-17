@@ -21,7 +21,9 @@ adopts (spec D3): sipi keeps its own convention until its own step, and tests/ i
 - **Passivity** of each public complex output on a passive lossy input, from the commit that
   converts it: electrostatics (L3 commit 10), the modes (L3 commit 11b: Im(effective_index) >= 0) and
   refsol's planar mode references (L3 commit 11c); the cavity clause comes with L3 commit 12, which
-  converts its outputs.
+  converts its outputs. refsol's fiber is lossless (real indices only), so its converted output, the
+  exact vector mode field (L3 commit 11d), has a convention clause instead: the forward mode of
+  exp(-i omega t) varies as exp(+i beta z), so div E = 0 reads dEx/dx + dEy/dy + i beta Ez = 0.
 - **Live arrays.** A JAX and a PyTorch gradient pass through ``to_public`` and ``to_kernel``, on a
   synthetic product (L3 commit 10) and through a mode solve (L3 commit 11b).
 """
@@ -317,6 +319,30 @@ def test_refsol_electrostatics_has_the_passive_sign():
     assert coax_capacitance(position=(1.0, 3.0), relative_permittivity=2.2 * (1 + 0.02j)).imag > 0
     assert two_layer_plate_capacitance(thickness=(3e-4, 7e-4), relative_permittivity=(2.0 * (1 + 0.01j), 5.0),
                                        length=2e-3).imag > 0
+
+
+@pytest.mark.parametrize("label", ["HE11", "TM01"])
+def test_refsol_fiber_mode_field_follows_exp_minus_i_omega_t(label):
+    """refsol.fiber.vector_mode_field follows exp(-i omega t) since L3 commit 11d: a forward mode varies as
+    exp(i (beta z - omega t)), so Gauss's law div E = 0 in each region reads dEx/dx + dEy/dy + i beta Ez = 0
+    (central differences of the public field, away from the core boundary); the kernel frame's -i beta Ez
+    leaves a residual of the field's own size. The fiber references are lossless: a complex index is refused."""
+    from refsol import fiber
+    fibre = dict(radius=4e-6, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55e-6)
+    beta = 2 * np.pi / 1.55e-6 * next(m.effective_index for m in fiber.vector_modes(**fibre) if m.label == label)
+    points, h = np.array([[1.3e-6, 0.7e-6], [-2.1e-6, 1.6e-6], [6e-6, 1.1e-6], [-3.5e-6, -5.2e-6]]), 1e-10
+    e = fiber.vector_mode_field(points, **fibre, label=label)
+    d_dx = (fiber.vector_mode_field(points + [h, 0.0], **fibre, label=label)
+            - fiber.vector_mode_field(points - [h, 0.0], **fibre, label=label)) / (2 * h)
+    d_dy = (fiber.vector_mode_field(points + [0.0, h], **fibre, label=label)
+            - fiber.vector_mode_field(points - [0.0, h], **fibre, label=label)) / (2 * h)
+    transverse = d_dx[:, 0] + d_dy[:, 1]
+    scale = beta * np.linalg.norm(e[:, 2])
+    assert scale > 0
+    assert np.linalg.norm(transverse + 1j * beta * e[:, 2]) < 1e-6 * scale
+    assert np.linalg.norm(transverse - 1j * beta * e[:, 2]) > scale
+    with pytest.raises(ValueError, match="real indices only"):
+        fiber.vector_modes(**dict(fibre, refractive_index=(1.45 + 1e-4j, 1.44)))
 
 
 # ---- passivity: modes (L3 commit 11b) -------------------------------------------------------------------------
