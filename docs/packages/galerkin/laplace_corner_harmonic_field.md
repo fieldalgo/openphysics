@@ -59,3 +59,6 @@ other-platform, product-integration or deployment qualification is implied.
 [Two-ground fields](two-ground.md) ·
 [Compact geometry](laplace_corner_compact_geometry.md) ·
 [한국어](../../locales/ko/pages/packages/galerkin/laplace_corner_harmonic_field.md)
+
+
+A separate [two-active fixed-potential guard API](laplace_corner_harmonic_guard_field.md) selects two active current coordinates and retains induced guard currents. This does not change the three-active contract above.

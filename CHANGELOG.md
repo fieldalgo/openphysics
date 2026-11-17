@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an explicit two-active, fixed-potential finite guard field with signed induced currents and independent circle and finite-element validation.
+
 - Add explicit three-radial-mode far logarithmic interactions with exact existing subspace, independent analytic-moment references and no field-method changes.
 
 - Add explicit three-radial-mode physical Gram and self-log primitives with exact existing subspace, independent multiprecision references and no field-method changes.
