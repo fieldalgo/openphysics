@@ -1,5 +1,7 @@
 # Changelog
 
+- Add private physical static wedge projections and plane Fourier moments with stable small exponential differences and closed analytical checks.
+
 - Add bounded static wedge-harmonic half-space Green assembly with immutable raw evidence and analytical circular-line checks.
 
 - Add explicit bounded harmonic interaction blocks with physical mass checks, immutable refinement evidence and separately documented integral references.
