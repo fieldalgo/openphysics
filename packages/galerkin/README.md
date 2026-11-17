@@ -106,7 +106,7 @@ src/galerkin/
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
   thermal3d.py    # Steady heat on tetrahedral meshes: P1, Dirichlet faces, insulation
   _heat_kernels.py # Boundary system, 3D source load and face map the heat solvers share (package-private)
-  _public.py      # Text refusal, inward-to-outward flux and result surfaces of the public heat API (package-private)
+  _public.py      # Text refusal, inward-to-outward data and result surfaces of the public heat, electric and Joule API (package-private)
   transient_heat.py               # Transient heat, backward Euler
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field

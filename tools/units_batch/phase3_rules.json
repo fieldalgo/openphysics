@@ -85,6 +85,160 @@
    "keyword": "inward_heat_flux",
    "transform": "neg",
    "note": "L2 commit 6: the inward heat flux; the baseline's outward value is 0.0 - the head's"
+  },
+  {
+   "kind": 7,
+   "old": "galerkin.electric.solve_steady_electric",
+   "wrapper": "galerkin.electric.solve_steady_electric",
+   "kernel": "galerkin.electric.solve_steady_electric_outward",
+   "note": "L2 commit 7, rule 6: solve_steady_electric is a thin public function over the internal outward-form solve_steady_electric_outward (outside __all__), which solve_temperature_joule_heat's iterations and the shape mirror now call directly; every baseline call (simcase's and the ones nested under solve_temperature_joule_heat) is compared with the private call beneath, which receives today's keywords and the outward current density 0.0 - inward"
+  },
+  {
+   "kind": 7,
+   "old": "galerkin.joule_heating.solve_steady_joule_heat",
+   "wrapper": "galerkin.joule_heating.solve_steady_joule_heat",
+   "kernel": "galerkin.joule_heating.solve_steady_joule_heat_outward",
+   "note": "L2 commit 7, rule 6: solve_steady_joule_heat is a thin public function over the internal outward-form solve_steady_joule_heat_outward (outside __all__), which solve_temperature_joule_heat's iterations now call directly; every baseline call (simcase's and the ones nested under solve_temperature_joule_heat) is compared with the private call beneath, which receives today's keywords and the outward heat flux 0.0 - inward"
+  },
+  {
+   "kind": 8,
+   "function": "galerkin.electric.solve_steady_electric_outward",
+   "keyword": "reference_potential",
+   "value": null,
+   "note": "L2 commit 7: the public function forwards its default; the baseline call left it out"
+  },
+  {
+   "kind": 8,
+   "function": "galerkin.electric.solve_steady_electric_outward",
+   "keyword": "motion",
+   "value": null,
+   "note": "L2 commit 7: the public function forwards its default; the baseline call left it out"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "potential",
+   "new": "electric_potential",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "conductivity",
+   "new": "electrical_conductivity",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "joule_heating",
+   "new": "joule_power_density",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "joule_load",
+   "new": "generated_heat_rate_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "joule_power_per_length",
+   "new": "joule_power_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "reaction",
+   "new": "reaction_current_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "prescribed_outward_load",
+   "new": "outward_prescribed_current_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "residual",
+   "new": "residual_current_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.electric.SteadyElectricResult",
+   "old": "supplied_power_per_length",
+   "new": "inward_electric_power_per_depth",
+   "note": "L2 commit 7: the electric result's registry field name (the electrical_result argument of the Joule calls)"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "electric_dirichlet",
+   "new": "prescribed_electric_potential",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "thermal_dirichlet",
+   "new": "prescribed_temperature",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "outward_current",
+   "new": "inward_current_density",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "outward_flux",
+   "new": "inward_heat_flux",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "relaxation",
+   "new": "relaxation_factor",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "temperature_atol",
+   "new": "temperature_tolerance",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "old": "max_iterations",
+   "new": "iteration_limit",
+   "note": "L2 commit 7: registry name"
+  },
+  {
+   "kind": 3,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "keyword": "inward_current_density",
+   "transform": "neg",
+   "note": "L2 commit 7: the inward current density; the baseline's outward value is 0.0 - the head's"
+  },
+  {
+   "kind": 3,
+   "function": "galerkin.temperature_joule_heating.solve_temperature_joule_heat",
+   "keyword": "inward_heat_flux",
+   "transform": "neg",
+   "note": "L2 commit 7: the inward heat flux; the baseline's outward value is 0.0 - the head's"
   }
  ]
 }

@@ -172,12 +172,13 @@ def _series(sigma0, sigma1, v0, v1):
     mesh = layered_rectangle_mesh([0.3, 1.0], 0.5, [2, 5], 3)
     left = {int(i): v0 for i in mesh.boundary["left"]}
     right = {int(i): v1 for i in mesh.boundary["right"]}
-    return solve_steady_electric(mesh, conductivity={"layer0": sigma0, "layer1": sigma1},
-                                 dirichlet=left | right)
+    return solve_steady_electric(mesh, electrical_conductivity={"layer0": sigma0, "layer1": sigma1},
+                                 prescribed_electric_potential=left | right)
 
 
-ELECTRIC_FIELDS = ("potential", "electric_field", "current_density", "conductivity", "joule_heating",
-                   "joule_load", "reaction", "prescribed_outward_load", "residual")
+ELECTRIC_FIELDS = ("electric_potential", "electric_field", "current_density", "electrical_conductivity",
+                   "joule_power_density", "generated_heat_rate_per_depth", "reaction_current_per_depth",
+                   "outward_prescribed_current_per_depth", "residual_current_per_depth")
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -188,7 +189,7 @@ def test_electric_values_match_numpy(name):
         expected = getattr(reference, field)
         np.testing.assert_allclose(_numbers(getattr(live, field)), expected, rtol=1e-12,
                                    atol=1e-12 * max(1.0, np.max(abs(expected))))
-    for field in ("joule_power_per_length", "supplied_power_per_length"):
+    for field in ("joule_power_per_depth", "inward_electric_power_per_depth"):
         assert abs(float(_numbers(getattr(live, field))) - getattr(reference, field)) <= 1e-12 * getattr(reference, field)
 
 
@@ -200,29 +201,29 @@ def test_series_joule_power_matches_closed_form(name):
 
     def closed(s0, s1, v0, v1):
         return (v0 - v1)**2 * H / (L0 / s0 + L1 / s1)
-    assert abs(_series(*values).joule_power_per_length - closed(*values)) < 1e-12 * closed(*values)
+    assert abs(_series(*values).joule_power_per_depth - closed(*values)) < 1e-12 * closed(*values)
     s0, s1, v0, v1 = values
     R = L0 / s0 + L1 / s1
     dv = v0 - v1
     exact = [dv**2 * H * L0 / (s0**2 * R**2), dv**2 * H * L1 / (s1**2 * R**2),
              2 * dv * H / R, -2 * dv * H / R]
-    got = _gradient(name, lambda *v: _series(*v).joule_power_per_length, values)
+    got = _gradient(name, lambda *v: _series(*v).joule_power_per_depth, values)
     np.testing.assert_allclose(got, exact, rtol=1e-10)
 
 
 @pytest.mark.parametrize("name", BACKENDS)
 def test_electric_neumann_current_and_reference_potential(name):
-    """A current-driven component: outward current callback and gauge potential are live."""
+    """A current-driven component: inward current density callback and gauge potential are live."""
     left = int(MESH.boundary["left"][0])
 
     def solve(j, gauge, sigma):
         def current(points, normals):
             y = points[:, 1] if not hasattr(j, "shape") else _wrap(name, points[:, 1])
-            return j * (y - 0.25)                    # zero net current on the edge
-        r = solve_steady_electric(MESH, conductivity=sigma, dirichlet={},
-                                  outward_current={"right": current, "left": lambda p, n: -0.0 * p[:, 0]},
-                                  reference_potential={left: gauge})
-        return (r.potential**2).mean() + r.joule_power_per_length
+            return -(j * (y - 0.25))                 # zero net current on the edge
+        r = solve_steady_electric(MESH, electrical_conductivity=sigma, prescribed_electric_potential={},
+                                  inward_current_density={"right": current, "left": lambda p, n: 0.0 * p[:, 0]},
+                                  reference_electric_potential={left: gauge})
+        return (r.electric_potential**2).mean() + r.joule_power_per_depth
     values = (3.0, 0.2, 2.5)
     np.testing.assert_allclose(_gradient(name, solve, values), _central(solve, values), rtol=2e-6)
 
@@ -263,12 +264,14 @@ def test_numpy_containers_and_couplings_refuse_live_values(name):
     (sigma,) = _live(name, [3.0])
     bc = {**{i: 1.0 for i in LEFT}, **{i: 0.0 for i in right}}
     with pytest.raises(TypeError, match="cut the derivative"):       # live Joule source
-        solve_steady_joule_heat(MESH, electrical_result=solve_steady_electric(MESH, conductivity=sigma, dirichlet=bc),
-                                conductivity=2.0, dirichlet={i: 300.0 for i in LEFT})
+        solve_steady_joule_heat(MESH, electrical_result=solve_steady_electric(
+                                    MESH, electrical_conductivity=sigma, prescribed_electric_potential=bc),
+                                thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in LEFT})
     (k,) = _live(name, [2.0])
     with pytest.raises(TypeError, match="cut the derivative"):       # live thermal input
-        solve_steady_joule_heat(MESH, electrical_result=solve_steady_electric(MESH, conductivity=3.0, dirichlet=bc),
-                                conductivity=k, dirichlet={i: 300.0 for i in LEFT})
+        solve_steady_joule_heat(MESH, electrical_result=solve_steady_electric(
+                                    MESH, electrical_conductivity=3.0, prescribed_electric_potential=bc),
+                                thermal_conductivity=k, prescribed_temperature={i: 300.0 for i in LEFT})
     (q,) = _live(name, [5.0])
     with pytest.raises(workflow.WorkflowStageError, match="cut the derivative"):
         workflow.solve_steady_thermoelasticity(
@@ -287,6 +290,6 @@ def test_a_singular_heat_or_electric_system_is_one_value_error(name):
         solve_steady_heat(MESH, thermal_conductivity=k, prescribed_temperature={i: 300.0 for i in LEFT}, heat_source_density=1.0)
     right = [int(i) for i in MESH.boundary["right"]]
     with pytest.raises(ValueError, match="^singular or ill-conditioned electric system$"):
-        solve_steady_electric(MESH, conductivity=k,
-                              dirichlet={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in right}})
+        solve_steady_electric(MESH, electrical_conductivity=k,
+                              prescribed_electric_potential={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in right}})
 

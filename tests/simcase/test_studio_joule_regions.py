@@ -242,7 +242,7 @@ def test_js2_a_wrapped_unexpected_failure_inside_the_iteration_is_not_shown(clie
         try:
             raise HiddenFailure(MARKER)
         except HiddenFailure as exc:
-            raise tj.JouleConvergenceError(str(exc), (), np.zeros(1)) from exc
+            raise tj.JouleConvergenceError(str(exc), (), temperature=np.zeros(1)) from exc
     monkeypatch.setattr(tj, "solve_temperature_joule_heat", fail)
     with caplog.at_level(logging.WARNING, logger="simcase.studio"):
         _, status = finished(client, strip())
@@ -265,7 +265,7 @@ def test_js2_another_plain_value_error_inside_the_iteration_is_not_shown(client,
         try:
             raise ValueError(MARKER)
         except ValueError as exc:
-            raise tj.JouleConvergenceError(str(exc), (), np.zeros(1)) from exc
+            raise tj.JouleConvergenceError(str(exc), (), temperature=np.zeros(1)) from exc
     monkeypatch.setattr(tj, "solve_temperature_joule_heat", fail)
     with caplog.at_level(logging.WARNING, logger="simcase.studio"):
         _, status = finished(client, strip())

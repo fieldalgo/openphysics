@@ -2,7 +2,10 @@
 
 [English](../../../../../packages/galerkin/joule_heating.md)
 
-명시적 단방향 workflow `galerkin.joule_heating.solve_steady_joule_heat`는
+명시적 단방향 workflow `galerkin.joule_heating.solve_steady_joule_heat(mesh, *,
+electrical_result, thermal_conductivity, prescribed_temperature,
+inward_heat_flux=None, convection=None)`는 모든 물리량을 레지스트리 이름의
+keyword-only SI 값으로 받으며(`str`은 `TypeError`)
 `galerkin.electric.solve_steady_electric`의 `SteadyElectricResult`를 받아
 요소별 발열을 기존 정상 열 솔버에 전달합니다. 전기 결과의 기준 계약은
 [정상 전기전도](electric_steady2d.md)에 정의되어 있습니다.
@@ -15,12 +18,12 @@ from galerkin.mesh import rectangle_mesh
 mesh = rectangle_mesh(.02, .01, 16, 8)  # metres
 voltage = {int(i): 0. for i in mesh.boundary['left']}
 voltage.update({int(i): 2. for i in mesh.boundary['right']})
-electric = solve_steady_electric(mesh, conductivity=3., dirichlet=voltage)
+electric = solve_steady_electric(mesh, electrical_conductivity=3., prescribed_electric_potential=voltage)
 temperature = {i: 300. for i in voltage}
 result = solve_steady_joule_heat(
-    mesh, electrical_result=electric, conductivity=5., dirichlet=temperature)
+    mesh, electrical_result=electric, thermal_conductivity=5., prescribed_temperature=temperature)
 print(result.thermal.temperature.max())
-print(result.source_power_per_length)  # W/m, not W
+print(result.generated_heat_rate_per_depth)  # W/m, not W
 ```
 
 전기 해석은 사용자가 명시적으로 한 번 실행합니다. 전기전도도(S/m)와
@@ -31,13 +34,15 @@ print(result.source_power_per_length)  # W/m, not W
 
 요소별 `Q=J·E`는 W/m³입니다. 보간·영역 평균·AC의 1/2 계수 없이 각 절점에
 `Q*area/3`을 조립합니다. 전기 결과의 절점 부하·적분 전력을 열 조립 결과와
-독립 비교합니다. `source_power_per_length`, `outward_heat_per_length`는
-W/m이며 실제 두께(m)를 명시적으로 곱해야 W입니다. 반환 전기·열 결과는
-입력과 독립적인 배열을 소유합니다. 추가 열원을 암묵적으로 더하지 않습니다.
+독립 비교합니다. 반환되는 `SteadyJouleHeatResult`(frozen, 평면, `.units` 포함)는
+`electrical`, `thermal`(`PlanarSteadyHeatResult`), `generated_heat_rate_per_depth`,
+`outward_heat_rate_per_depth`를 담으며 두 율은 W/m이고 실제 두께(m)를 명시적으로
+곱해야 W입니다. 반환 전기·열 결과는 입력과 독립적인 배열을 소유합니다. 추가 열원을 암묵적으로 더하지 않습니다.
 
-`dirichlet`은 외부 절점→K입니다. `outward_flux`, `convection`은
-[정상 열 경계 규약](thermal_flux_robin.md)의 외향 `q·n=g+h(T-Tambient)`를
-따릅니다. 유속은 W/m², h는 W/(m² K)입니다. 미지정 변은 절연이며 독립 성분마다
+`prescribed_temperature`는 외부 절점→K입니다. `inward_heat_flux`, `convection`은
+[정상 열 경계 규약](thermal_flux_robin.md)을 따릅니다. 물체에서 나가는 열은
+`q·n=h(T-Tambient)-inward_heat_flux`이고 유속은 W/m², h는 W/(m² K)입니다. 내향
+유속은 `0.0 - x`로 한 번 부호 반전합니다. 미지정 변은 절연이며 독립 성분마다
 고정 온도 또는 양의 Robin 지지가 필요합니다. 총 유출은 Dirichlet reaction의
 음수에 지정 외향·대류 부하를 더한 값입니다. 양의 reaction은 열을 주입합니다.
 

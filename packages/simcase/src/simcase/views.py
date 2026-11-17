@@ -299,9 +299,9 @@ class HeatInputs:
     initial_temperature: object = None
 
 
-#: galerkin's heat keywords (galerkin step, L2 commit 6) of the heat-solver arguments simcase builds,
-#: which keep today's names because the Joule heat stage (``solve_steady_joule_heat``,
-#: ``solve_temperature_joule_heat``) still takes them
+#: galerkin's heat keywords (galerkin step, L2 commit 6) of the heat-solver arguments simcase builds;
+#: simcase's own argument dicts keep these keys and the outward flux, and every galerkin heat or
+#: Joule call converts them (``galerkin_heat_arguments``)
 GALERKIN_HEAT_NAMES = {"conductivity": "thermal_conductivity", "dirichlet": "prescribed_temperature",
                        "heat_source": "heat_source_density", "time_s": "time",
                        "initial_temperature_k": "initial_temperature", "outward_flux": "inward_heat_flux"}
@@ -309,8 +309,10 @@ GALERKIN_HEAT_NAMES = {"conductivity": "thermal_conductivity", "dirichlet": "pre
 
 def galerkin_heat_arguments(kwargs: dict) -> dict:
     """simcase's heat-solver arguments (today's names, the outward flux g = 0.0 - inward) as
-    ``galerkin.thermal.solve_steady_heat`` and ``galerkin.transient_heat.solve_transient_heat``
-    take them: registry names and the inward heat flux ``0.0 - g``.
+    ``galerkin.thermal.solve_steady_heat``, ``galerkin.transient_heat.solve_transient_heat`` and the
+    heat stage of ``galerkin.joule_heating.solve_steady_joule_heat`` and
+    ``galerkin.temperature_joule_heating.solve_temperature_joule_heat`` take them: registry names and
+    the inward heat flux ``0.0 - g``.
 
     Bit for bit (hazard H1): g = 0.0 - x is never -0.0, so 0.0 - g is x with a zero as +0.0, and
     galerkin's own negation 0.0 - (0.0 - g) is g again: the solver computes with today's doubles.
@@ -320,6 +322,30 @@ def galerkin_heat_arguments(kwargs: dict) -> dict:
         if key == "outward_flux":
             value = None if value is None else {tag: 0.0 - g for tag, g in value.items()}
         out[GALERKIN_HEAT_NAMES.get(key, key)] = value
+    return out
+
+
+#: galerkin's electric keywords (galerkin step, L2 commit 7) of the electric-solver arguments simcase
+#: builds; simcase's own argument dicts keep these keys and the outward current density
+GALERKIN_ELECTRIC_NAMES = {"conductivity": "electrical_conductivity", "dirichlet": "prescribed_electric_potential",
+                           "outward_current": "inward_current_density",
+                           "reference_potential": "reference_electric_potential"}
+
+
+def galerkin_electric_arguments(kwargs: dict) -> dict:
+    """simcase's electric-solver arguments (today's names, the outward current density g = 0.0 -
+    inward) as ``galerkin.electric.solve_steady_electric`` and the electric stage of
+    ``galerkin.temperature_joule_heating.solve_temperature_joule_heat`` take them: registry names and
+    the inward current density ``0.0 - g``.
+
+    Bit for bit (hazard H1), as ``galerkin_heat_arguments``: g = 0.0 - x is never -0.0, so galerkin's
+    own negation 0.0 - (0.0 - g) is g again. Every other value is handed on as it is, in the same
+    order (H6)."""
+    out = {}
+    for key, value in kwargs.items():
+        if key == "outward_current":
+            value = None if value is None else {tag: 0.0 - g for tag, g in value.items()}
+        out[GALERKIN_ELECTRIC_NAMES.get(key, key)] = value
     return out
 
 
@@ -406,7 +432,8 @@ class ElectricInputs:
 
     ``conductivity`` (S/m) is a number on a rectangle and {material name: number} on regions
     (None for ``joule.temperature2d``). ``dirichlet`` maps boundary names to V,
-    ``outward_current`` to A/m^2. ``joule.temperature2d`` adds its conductivity model
+    ``outward_current`` to A/m^2 (galerkin takes the inward value, ``galerkin_electric_arguments``).
+    ``joule.temperature2d`` adds its conductivity model
     (``galerkin.temperature_joule_heating.ConductivityModel``; on regions {material name:
     model}), its initial temperature (K) and its iteration options, keyed as galerkin takes them.
     """
@@ -436,12 +463,12 @@ def rectangle_electric(doc) -> ElectricInputs:
 
 
 def _iteration_options(iteration) -> dict:
-    """The ``iteration`` options of ``joule.temperature2d`` keyed as galerkin takes them, in the
-    order galerkin received before the units batch: the tolerance last."""
-    names = {"relaxation_factor": "relaxation", "relative_tolerance": "relative_tolerance",
-             "iteration_limit": "max_iterations"}
-    options = {names[k]: v for k, v in iteration.items() if k != "temperature_tolerance"}
-    options["temperature_atol"] = iteration["temperature_tolerance"]
+    """The ``iteration`` options of ``joule.temperature2d`` keyed as galerkin takes them (since the
+    galerkin step, L2 commit 7, the document's own names: ``relaxation_factor``,
+    ``relative_tolerance``, ``iteration_limit``, ``temperature_tolerance``), in the order galerkin
+    received before the units batch: the tolerance last."""
+    options = {k: v for k, v in iteration.items() if k != "temperature_tolerance"}
+    options["temperature_tolerance"] = iteration["temperature_tolerance"]
     return options
 
 

@@ -16,8 +16,9 @@ python examples/galerkin/temperature_joule_heating.py
 ```
 
 [예제](../../../../../../examples/galerkin/temperature_joule_heating.py)는
-1 m × 0.25 m 직사각형을 16 × 4개 셀로 나눕니다. 왼쪽 전위는 0 V, 오른쪽 외향 전류밀도는
-1 A/m²이며 나머지 전기 자연 경계는 절연입니다. 열 경계는 양 끝 300 K, 위·아래 단열이고
+1 m × 0.25 m 직사각형을 16 × 4개 셀로 나눕니다. 왼쪽 전위는 0 V이고 오른쪽 변으로 전류밀도
+1 A/m²가 나갑니다(예제는 `inward_current_density={'right': -1.}`를 넘깁니다). 나머지 전기 자연
+경계는 절연입니다. 열 경계는 양 끝 300 K, 위·아래 단열이고
 k=1 W/(m K)입니다. 전류밀도와 총전류는 다릅니다. 오른쪽 변의 전류는 돌출 깊이당 0.25 A/m입니다.
 
 설명용 비저항 법칙은 `rho(T)=1+0.5*(T-300)` ohm m이므로 `sigma(T)=1/rho(T)` S/m입니다.
@@ -28,7 +29,7 @@ k=1 W/(m K)입니다. 전류밀도와 총전류는 다릅니다. 오른쪽 변�
 
 ## 2. 수렴한 계산 읽기
 
-예제의 `relaxation=1.`로 실행한 결과는 대략 다음과 같습니다.
+예제의 `relaxation_factor=1.`로 실행한 결과는 대략 다음과 같습니다.
 
 ```text
 Maximum temperature: 300.131806613 K
@@ -51,7 +52,7 @@ Nonlinear heat residual: 6.216e-12
 ## 3. 종료 검사 이해하기
 
 각 Picard 단계는 T에서 평가한 전도도로 시험 온도 H(T)를 구한 다음
-`T_next=T+relaxation*(H(T)-T)`로 갱신합니다.
+`T_next=T+relaxation_factor*(H(T)-T)`로 갱신합니다.
 
 - 온도 defect는 **완화 전 H(T)−T**를 K 단위로 측정합니다.
 - 별도의 상대 전도도 defect 검사도 통과해야 합니다.
@@ -69,10 +70,10 @@ Nonlinear heat residual: 6.216e-12
 
 | 변경 | 확인할 내용 |
 |---|---|
-| `relaxation=.5` | 허용치 안에서 같은 해; 로컬 실행에서는 8회 대신 33회 반복 |
+| `relaxation_factor=.5` | 허용치 안에서 같은 해; 로컬 실행에서는 8회 대신 33회 반복 |
 | 솔버 호출의 `method='picard'`를 `method='newton'`으로 변경 | 허용치 안에서 같은 해를 8회 대신 3개 상태로([Newton 방법](temperature_joule_heating.md#newton-방법)) |
 | `.5*(t-300)`를 `0.*(t-300)`로 교체 | 상수 sigma=1 S/m: 최고 300.125 K, 전력 0.25 W/m |
-| 솔버 호출에 `max_iterations=1` 추가 | 예산 부족으로 `JouleConvergenceError`; 완료한 이력 1개 보존 |
+| 솔버 호출에 `iteration_limit=1` 추가 | 예산 부족으로 `JouleConvergenceError`; 완료한 이력 1개 보존 |
 | 모델 범위를 `(300., 300.05)`로 변경 | 시험 온도가 재료 범위를 초과하며 성공한 부분 결과를 반환하지 않음 |
 
 진단하려면 `galerkin.temperature_joule_heating`에서 `JouleConvergenceError`를 import하고

@@ -54,10 +54,54 @@ def _step_error():
     return TransientHeatStepError, dict(time_index=1, time=0.5)
 
 
+def _electric_inputs():
+    from galerkin.mesh import rectangle_mesh
+    mesh = rectangle_mesh(1.0, 1.0, 2, 2)
+    left = {int(i): 1.0 for i in mesh.boundary["left"]}
+    return mesh, dict(mesh=mesh, electrical_conductivity=2.0, prescribed_electric_potential=left,
+                      inward_current_density={"right": -3.0})
+
+
+def _steady_electric():
+    from galerkin.electric import solve_steady_electric
+    return solve_steady_electric, _electric_inputs()[1]
+
+
+def _steady_joule_heat():
+    from galerkin.electric import solve_steady_electric
+    from galerkin.joule_heating import solve_steady_joule_heat
+    mesh, kwargs = _electric_inputs()
+    electric = solve_steady_electric(**kwargs)
+    return solve_steady_joule_heat, dict(mesh=mesh, electrical_result=electric, thermal_conductivity=5.0,
+                                         prescribed_temperature={0: 300.0}, inward_heat_flux={"top": 2.0})
+
+
+def _temperature_joule_heat():
+    from galerkin.temperature_joule_heating import ConductivityModel, solve_temperature_joule_heat
+    mesh, kwargs = _electric_inputs()
+    right = {int(i): 300.0 for i in mesh.boundary["right"]}
+    return solve_temperature_joule_heat, dict(
+        mesh=mesh, electrical_conductivity=ConductivityModel(lambda t: 2.0 / (1 + 0.01 * (t - 300)), (250.0, 900.0)),
+        thermal_conductivity=5.0, prescribed_electric_potential=kwargs["prescribed_electric_potential"],
+        prescribed_temperature=right, initial_temperature=300.0, temperature_tolerance=1e-8,
+        inward_current_density={"right": -3.0}, inward_heat_flux={"top": 2.0}, relaxation_factor=1.0,
+        relative_tolerance=1e-10, iteration_limit=100)
+
+
+def _convergence_error():
+    from galerkin.temperature_joule_heating import JouleConvergenceError
+    return JouleConvergenceError, dict(reason="maximum iterations exceeded", history=(), temperature=[300.0, 301.0])
+
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
-                "galerkin.transient_heat:TransientHeatStepError": _step_error}
+                "galerkin.transient_heat:TransientHeatStepError": _step_error,
+                # L2 commit 7 emptied electric, joule_heating and temperature_joule_heating
+                "galerkin.electric:solve_steady_electric": _steady_electric,
+                "galerkin.joule_heating:solve_steady_joule_heat": _steady_joule_heat,
+                "galerkin.temperature_joule_heating:solve_temperature_joule_heat": _temperature_joule_heat,
+                "galerkin.temperature_joule_heating:JouleConvergenceError": _convergence_error}
 
 
 @pytest.fixture(scope="module")

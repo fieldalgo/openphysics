@@ -37,7 +37,7 @@ def test_first_heat_examples_match_independent_uniform_references():
     np.testing.assert_allclose(heat['result'].heat_flux[:, 0], 300., rtol=0, atol=1e-8)
     joule = runpy.run_path(str(ROOT / 'examples/galerkin/joule_heating.py'))['result']
     assert joule.thermal.temperature.max() == pytest.approx(300.3, abs=1e-8, rel=0)
-    assert joule.source_power_per_length == pytest.approx(6., abs=1e-8, rel=0)
+    assert joule.generated_heat_rate_per_depth == pytest.approx(6., abs=1e-8, rel=0)
     transient = runpy.run_path(str(ROOT / 'examples/galerkin/transient_heat_uniform.py'))['result']
     expected = np.broadcast_to(300. + 2. * transient.time[:, None], transient.temperature.shape)
     np.testing.assert_allclose(transient.temperature, expected, rtol=0, atol=1e-10)

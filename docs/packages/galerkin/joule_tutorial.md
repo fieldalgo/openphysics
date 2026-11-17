@@ -26,8 +26,8 @@ conductivity is 3 S/m. Both ends are held at 300 K, with thermal conductivity
 
 The [example](../../../examples/galerkin/joule_heating.py) first calls
 `solve_steady_electric`, then passes that result to `solve_steady_joule_heat`
-on the same mesh. Electric `conductivity` is in S/m; thermal `conductivity` is
-in W/(m K). They are different properties even though the keyword is the same.
+on the same mesh. `electrical_conductivity` is in S/m; `thermal_conductivity` is
+in W/(m K). They are different properties, each under its own registry name.
 The thermal call uses a new boundary map in kelvin; voltages are not temperatures.
 
 ## 2. Run and interpret

@@ -16,8 +16,9 @@ heat load equals the Joule load node by node and that the outward heat equals th
 Temperature-dependent conductivity (``joule.temperature2d``) and an axisymmetric component are
 refused. A rectangle document keeps the rectangle path (:mod:`simcase.electric_joule`).
 
-Format 0.3 (units batch C6): the mesh is the region heat hand-off's (``handoff_03``); galerkin
-receives ``0.0 - inward_current_density`` and ``0.0 - inward_heat_flux`` (H1).
+Format 0.3 (units batch C6): the mesh is the region heat hand-off's (``handoff_03``); galerkin's
+solves compute with ``0.0 - inward_current_density`` and ``0.0 - inward_heat_flux`` (H1; galerkin
+takes the inward values and negates them, ``views.galerkin_electric_arguments``).
 """
 
 import math
@@ -94,8 +95,9 @@ def run_region_joule(doc, verbose=True, *, mesh_limits=None):
     calculation_json = doc.canonical_json(separators=(',', ':'))
     t0 = time.perf_counter()
     try:
-        electric = solve_steady_electric(mesh, **electric_kwargs)
-        coupled = solve_steady_joule_heat(mesh, electrical_result=electric, **heat_kwargs)
+        electric = solve_steady_electric(mesh, **views.galerkin_electric_arguments(electric_kwargs))
+        coupled = solve_steady_joule_heat(mesh, electrical_result=electric,
+                                          **views.galerkin_heat_arguments(heat_kwargs))
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
@@ -117,7 +119,7 @@ def run_region_joule(doc, verbose=True, *, mesh_limits=None):
     printed = [doc.summary(),
                f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-               f'joule_power_per_depth {electric.joule_power_per_length:.12g} W/m; temperature: '
+               f'joule_power_per_depth {electric.joule_power_per_depth:.12g} W/m; temperature: '
                f'{float(np.min(heat.temperature)):.12g} K to {float(np.max(heat.temperature)):.12g} K']
     if verbose:
         print('\n'.join(printed))

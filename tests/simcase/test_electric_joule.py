@@ -33,18 +33,18 @@ def test_public_roundtrip_and_direct_api(tmp_path, kind):
         from galerkin.temperature_joule_heating import ConductivityModel, solve_temperature_joule_heat
         direct = solve_temperature_joule_heat(mesh,
             electrical_conductivity=ConductivityModel(lambda t: 2/(1+.01*(t-300)), (290,400)),
-            thermal_conductivity=1., electric_dirichlet=bc,
-            thermal_dirichlet={int(n):300. for side in ('left','right') for n in mesh.boundary[side]},
-            initial_temperature=300., method='picard')
+            thermal_conductivity=1., prescribed_electric_potential=bc,
+            prescribed_temperature={int(n):300. for side in ('left','right') for n in mesh.boundary[side]},
+            initial_temperature=300., temperature_tolerance=1e-8, method='picard')
         electric, heat = direct.coupled.electrical, direct.coupled.thermal
         assert len(result.summary()['iterations']) == len(direct.history)
-        np.testing.assert_allclose(arrays['evaluation_temperature'], direct.evaluated_temperature, rtol=1e-12)
+        np.testing.assert_allclose(arrays['evaluation_temperature'], direct.evaluation_temperature, rtol=1e-12)
     else:
-        electric = solve_steady_electric(mesh, conductivity=2., dirichlet=bc)
-        heat = solve_steady_joule_heat(mesh, electrical_result=electric, conductivity=1.,
-            dirichlet={int(n):300. for side in ('left','right') for n in mesh.boundary[side]}).thermal
-    np.testing.assert_allclose(arrays['electric_potential'], electric.potential, atol=1e-12)
-    np.testing.assert_allclose(arrays['joule_power_density'], electric.joule_heating, rtol=1e-12)
+        electric = solve_steady_electric(mesh, electrical_conductivity=2., prescribed_electric_potential=bc)
+        heat = solve_steady_joule_heat(mesh, electrical_result=electric, thermal_conductivity=1.,
+            prescribed_temperature={int(n):300. for side in ('left','right') for n in mesh.boundary[side]}).thermal
+    np.testing.assert_allclose(arrays['electric_potential'], electric.electric_potential, atol=1e-12)
+    np.testing.assert_allclose(arrays['joule_power_density'], electric.joule_power_density, rtol=1e-12)
     if kind != 'electric_rectangle':
         np.testing.assert_allclose(arrays['temperature'], heat.temperature, rtol=1e-12)
     out = result.save(tmp_path/kind)

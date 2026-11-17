@@ -36,9 +36,9 @@ entering the body, not positive outward flow. Exact equations and callback rules
 ## Electric and mechanical constraints
 
 - Electrical voltage fixes potential (`prescribed_electric_potential` in documents). A
-  document's `inward_current_density` is positive entering the body; the Python electric
-  API takes the prescribed outward current density J·n, positive leaving the body (simcase
-  hands it the negated document value). Reported boundary currents
+  document's `inward_current_density` is positive entering the body, and so is the Python
+  electric API's `inward_current_density` (galerkin negates it once into the outward J·n
+  it assembles). Reported boundary currents
   (`outward_current_per_depth`) are positive leaving. The Python electric API has an
   explicit pure-Neumann gauge path; do not infer that the more restricted JSON input
   supports it.

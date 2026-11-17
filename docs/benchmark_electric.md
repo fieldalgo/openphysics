@@ -26,7 +26,7 @@ reports RSS as null.
 |---|---|
 | `conduction` | `galerkin.electric.solve_steady_electric` on the 20 mm × 10 mm strip of the [Joule tutorial](packages/galerkin/joule_tutorial.md) with `2n × n` cells, σ = 3 S/m, 0 V left and 2 V right |
 | `joule` | the same DC solve, then `galerkin.joule_heating.solve_steady_joule_heat` with k = 5 W/(m K) and both ends at 300 K, the two stages timed apart |
-| `thermistor_picard` | `galerkin.temperature_joule_heating.solve_temperature_joule_heat(method="picard")` on the current-driven thermistor of the [temperature-dependent tutorial](packages/galerkin/temperature_joule_tutorial.md): 1 m × 0.25 m with `4n × n` cells, ρ(T) = 1 + 0.5 (T − 300 K) Ω m on [300, 400] K, 1 A/m² into the right end, both ends at 300 K, `--relaxation` 1.0 by default (the tutorial's value) |
+| `thermistor_picard` | `galerkin.temperature_joule_heating.solve_temperature_joule_heat(method="picard")` on the current-driven thermistor of the [temperature-dependent tutorial](packages/galerkin/temperature_joule_tutorial.md): 1 m × 0.25 m with `4n × n` cells, ρ(T) = 1 + 0.5 (T − 300 K) Ω m on [300, 400] K, 1 A/m² leaving through the right end (`inward_current_density` −1 A/m²), both ends at 300 K, `--relaxation` 1.0 by default (the tutorial's value) |
 | `thermistor_newton` | the same problem with `method="newton"`; the `ConductivityModel` carries the analytic dσ/dT, so the Newton step uses no difference quotient |
 
 Current density is per unit depth; the exact Joule power of the strip,

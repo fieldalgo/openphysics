@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Steady isotropic electric conduction; see electric_steady2d.md for SI contracts.
 
-Conductivity (scalar or region table), Dirichlet and reference potentials and
-outward current may be JAX or PyTorch values (callbacks may return them); the
-result arrays are then in that library and carry derivatives. NumPy inputs
-compute exactly as before.
+Electrical conductivity (scalar or region table), prescribed and reference
+potentials and the inward current density may be JAX or PyTorch values
+(callbacks may return them); the result arrays are then in that library and
+carry derivatives. NumPy inputs compute exactly as before.
 """
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 
@@ -23,7 +24,10 @@ from .core.boundary import scalar_boundary_samples
 from .core.checks import readonly_copy, real_value
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
+from ._public import ResultSurface, outward_from_inward, refuse_text
 
+# Public names. Internal: solve_steady_electric_outward, the outward-form body that galerkin's own callers
+# use (outside __all__).
 __all__ = ["ElementConductivity", "SteadyElectricResult", "solve_steady_electric"]
 
 
@@ -65,24 +69,41 @@ def _snapshot(mesh):
 
 
 @dataclass(frozen=True)
-class SteadyElectricResult:
-    """Nodal volts, element V/m, A/m² and W/m³; integrated rates are per metre.
+class SteadyElectricResult(ResultSurface):
+    """A planar steady electric result: nodal volts, element V/m, A/m^2 and W/m^3;
+    nodal and integrated rates are per metre of depth.
 
-    Arrays are independent read-only snapshots in the returned mesh's order.
-    reaction is injected current at physical voltage nodes only, never gauges.
+    Fields: electric_potential (N,) V; electric_field (M,2) V/m, current_density
+    (M,2) A/m^2, electrical_conductivity (M,) S/m and joule_power_density (M,)
+    W/m^3 per element; generated_heat_rate_per_depth (N,) W/m, the nodal Joule
+    load; joule_power_per_depth, the dissipated power in W/m; the nodal currents
+    in A/m: reaction_current_per_depth (injected at physical voltage nodes only,
+    never gauges), outward_prescribed_current_per_depth (the prescribed current
+    leaving the body) and residual_current_per_depth; and
+    inward_electric_power_per_depth, the supplied power in W/m. Arrays are
+    independent read-only snapshots in the returned mesh's order. ``.units`` maps
+    every quantity field to its SI unit.
     """
     mesh: Mesh
-    potential: np.ndarray
+    electric_potential: np.ndarray
     electric_field: np.ndarray
     current_density: np.ndarray
-    conductivity: np.ndarray
-    joule_heating: np.ndarray
-    joule_load: np.ndarray
-    joule_power_per_length: float
-    reaction: np.ndarray
-    prescribed_outward_load: np.ndarray
-    residual: np.ndarray
-    supplied_power_per_length: float
+    electrical_conductivity: np.ndarray
+    joule_power_density: np.ndarray
+    generated_heat_rate_per_depth: np.ndarray
+    joule_power_per_depth: float
+    reaction_current_per_depth: np.ndarray
+    outward_prescribed_current_per_depth: np.ndarray
+    residual_current_per_depth: np.ndarray
+    inward_electric_power_per_depth: float
+
+    BASIS = "planar"
+    UNITS = MappingProxyType({
+        "electric_potential": "V", "electric_field": "V/m", "current_density": "A/m^2",
+        "electrical_conductivity": "S/m", "joule_power_density": "W/m^3", "generated_heat_rate_per_depth": "W/m",
+        "joule_power_per_depth": "W/m", "reaction_current_per_depth": "A/m",
+        "outward_prescribed_current_per_depth": "A/m", "residual_current_per_depth": "A/m",
+        "inward_electric_power_per_depth": "W/m"})
 
 
 def _potentials(data, n, name, boundary=None):
@@ -107,9 +128,47 @@ def _frozen(value):
     return value if is_live(value) else readonly_copy(value)
 
 
-def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None,
-                          reference_potential=None, motion=None):
-    """Solve div(-sigma grad V)=0 on a conforming 2D P1 mesh in metres.
+def solve_steady_electric(mesh, *, electrical_conductivity, prescribed_electric_potential,
+                          inward_current_density=None, reference_electric_potential=None, motion=None):
+    """Solve div(-sigma grad V)=0 on a conforming 2D P1 mesh in metres, in SI.
+
+    electrical_conductivity: positive scalar, exact region-name table or
+        mesh-bound ElementConductivity, S/m. Bare element arrays remain invalid.
+    prescribed_electric_potential: exterior node -> scalar potential in V.
+    inward_current_density: edge tag -> the normal current density entering the
+        body in A/m^2 (positive in), a scalar or a callback(position,
+        outward_normal) -> (Q,). Unspecified edges are insulated.
+    reference_electric_potential: node -> volts, exactly one gauge per component
+        without a prescribed potential. Each such component must have zero net
+        imposed current to 1e-12 relative to integral(abs(J.n)); incompatible data
+        is never repaired.
+    motion: galerkin.shape.MeshMotion(design_velocity, t) solves on the nodes
+        X0 + t*design_velocity and every result carries the derivative with respect
+        to the JAX or PyTorch scalar t (a shape derivative); see
+        docs/packages/galerkin/shape_derivative.md.
+
+    Returns a SteadyElectricResult (planar: nodal currents and powers per metre of
+    depth). A str for a quantity raises TypeError (SI numbers only). The inward
+    current density is negated once, as 0.0 - x (a callback's checked float result
+    likewise), and the outward-form solve runs exactly as before; see
+    galerkin._public.
+    """
+    outward_current = outward_from_inward(inward_current_density, "inward_current_density")  # non-mapping: ValueError
+    for name, value in (("electrical_conductivity", electrical_conductivity),
+                        ("prescribed_electric_potential", prescribed_electric_potential),
+                        ("inward_current_density", inward_current_density),
+                        ("reference_electric_potential", reference_electric_potential)):
+        refuse_text(name, value)
+    return solve_steady_electric_outward(mesh, conductivity=electrical_conductivity,
+                                         dirichlet=prescribed_electric_potential, outward_current=outward_current,
+                                         reference_potential=reference_electric_potential, motion=motion)
+
+
+def solve_steady_electric_outward(mesh, *, conductivity, dirichlet, outward_current=None,
+                                  reference_potential=None, motion=None):
+    """Solve div(-sigma grad V)=0 on a conforming 2D P1 mesh in metres (the outward form).
+
+    The body of solve_steady_electric before the galerkin step, for galerkin's own callers.
 
     conductivity: positive scalar, exact region-name table or mesh-bound
         ElementConductivity, S/m. Bare element arrays remain invalid.
@@ -119,15 +178,17 @@ def solve_steady_electric(mesh, *, conductivity, dirichlet, outward_current=None
     reference_potential: node -> volts, exactly one gauge per component without
         Dirichlet support. Each such component must have zero net imposed current
         to 1e-12 relative to integral(abs(J.n)); incompatible data is never repaired.
-    motion: galerkin.shape.MeshMotion(velocity, t) solves on the nodes X0 + t*velocity
-        and every result carries the derivative with respect to the JAX or PyTorch
-        scalar t (a shape derivative); see docs/packages/galerkin/shape_derivative.md.
+    motion: galerkin.shape.MeshMotion(design_velocity, t) solves on the nodes
+        X0 + t*design_velocity and every result carries the derivative with respect
+        to the JAX or PyTorch scalar t (a shape derivative); see
+        docs/packages/galerkin/shape_derivative.md.
     """
     if motion is not None:
         from .shape import solve_steady_electric_moving
-        return solve_steady_electric_moving(mesh, motion, conductivity=conductivity, dirichlet=dirichlet,
-                                            outward_current=outward_current,
-                                            reference_potential=reference_potential)
+        return solve_steady_electric_moving(mesh, motion, electrical_conductivity=conductivity,
+                                            prescribed_electric_potential=dirichlet,
+                                            outward_current_density=outward_current,
+                                            reference_electric_potential=reference_potential)
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
     sigma = (conductivity.on_mesh(mesh) if isinstance(conductivity, ElementConductivity)
              else region_property(mesh, conductivity, "conductivity", positive=True, live=True))

@@ -13,24 +13,33 @@
 같은 모양의 유한한 실수 배열로 반환하며, [Newton 방법](#newton-방법)이 걸음을 만들 때만 쓴다.
 σ는 실수·유한·양수여야 한다. 클리핑·외삽·섭씨 변환은 없다. 콜백은 순수하고 결정적이어야 한다.
 
-`solve_temperature_joule_heat`는 명시적 초기 K 스칼라 또는 `(N,)` 배열을 받으며
-열 Dirichlet 값을 먼저 적용한다. `relaxation=0.5`, `temperature_atol=1e-8 K`,
-`relative_tolerance=1e-10`, `max_iterations=100`, `method="picard"`가 기본값이다. `method="newton"`은
+`solve_temperature_joule_heat(mesh, *, electrical_conductivity, thermal_conductivity,
+prescribed_electric_potential, prescribed_temperature, initial_temperature,
+temperature_tolerance, inward_current_density=None, reference_electric_potential=None,
+inward_heat_flux=None, convection=None, relaxation_factor=0.5, relative_tolerance=1e-10,
+iteration_limit=100, method="picard")`는 모든 물리량을 레지스트리 이름의 keyword-only SI
+값으로 받는다(`str`은 `TypeError`). `prescribed_electric_potential`(V)과
+`prescribed_temperature`(K)는 외곽 절점 표이고, `inward_current_density`(A/m²)와
+`inward_heat_flux`(W/m²)는 [정상 전기전도](electric_steady2d.md)·[정상 열](thermal_flux_robin.md)처럼
+물체로 들어오는 방향이 양수이며 반복 전에 `0.0 - x`로 한 번 부호 반전한다. 명시적 초기 K 스칼라
+또는 `(N,)` 배열을 받으며 열 Dirichlet 값을 먼저 적용한다. `temperature_tolerance`(K)는 기본값이
+없는 필수 인수이다. `relaxation_factor=0.5`, `relative_tolerance=1e-10`, `iteration_limit=100`,
+`method="picard"`가 기본값이다. `method="newton"`은
 [아래](#newton-방법)에 설명하며, 언제 쓰는지는 아래 *방법 고르기*에 적는다.
-기본 Picard는 T→σ→전기→열 H(T)를 계산하고 `T += relaxation*(H(T)-T)`로 갱신한다.
+기본 Picard는 T→σ→전기→열 H(T)를 계산하고 `T += relaxation_factor*(H(T)-T)`로 갱신한다.
 완화 전 무한노름 결함이 절대+상대 온도 기준을 만족하고,
 σ(H(T))와 σ(T)의 각 요소별 상대 차의 최댓값도 상대 기준을 만족해야 성공한다.
 작은 완화값으로 거짓 수렴할 수 없다. 열 후보·완화 상태 모두 유효 범위를 검사한다.
 H(T)에서 전기를 한 번 더 풀고 `r_heat + load(T) - load(H(T))`의 열 자유 절점
 무한노름을 두 Joule 하중 및 열 반력·처방 유출·대류 하중의 가장 큰 무한노름(machine tiny 하한)으로 나눈다.
-이 무차원 `nonlinear_heat_residual`도 1e-8 이하여야 성공한다. 선형 해석 잔차와 구별한다.
-Picard는 결합 해석을 최대 `max_iterations`번 하며 자동 재시도·완화 조절은 없다.
+이 무차원 `relative_residual`도 1e-8 이하여야 성공한다. 선형 해석 잔차와 구별한다.
+Picard는 결합 해석을 최대 `iteration_limit`번 하며 자동 재시도·완화 조절은 없다.
 Newton의 한계는 [아래](#newton-방법)에 적는다. 유일해는 보장하지 않는다.
 
 **방법 고르기.** 처음에는 기본값인 `"picard"`를 쓴다.
 오래 써 온 경로이고, JSON 문서가 쓰며, macOS·Windows 설치 검사가 simcase `joule_temperature` 예제로
 돌리는 방법이다. 피드백이 약하면 몇 번 안에 수렴하고, 반복 한 번이 Newton 상태 하나보다 싸다.
-Picard가 느리거나 강한 피드백에서 `max_iterations`에 걸리면 `"newton"`을 쓴다. 계약 서미스터의
+Picard가 느리거나 강한 피드백에서 `iteration_limit`에 걸리면 `"newton"`을 쓴다. 계약 서미스터의
 alpha = 7, 9 /K에서 Newton은 4개 상태면 된다([검증](#검증)). dσ/dT를 알면 `derivative`를 준다.
 두 방법 모두 같은 수렴 검사를 통과해야 결과를 낸다. Newton은 Linux에서만 실행해 보았다.
 
@@ -62,9 +71,9 @@ complex step으로 계산한다. σ는 dσ/dT로 1차까지 확장한다. dσ/dT
 `Newton step does not reduce the temperature defect`와 T_i의 무한노름 결함(K, 이력 기록과 같은 값)을
 알리고, 마지막으로 평가한 후보가 실패했다면 그 실패를 덧붙여 원인 예외로 잇는다. 결함이 온도의 몇 ulp
 (계약 문서의 메시에서 300 K 기준 약 1e-13 K, 더 촘촘한 메시에서는 더 큼)이면 허용오차가 부동소수점이
-구별할 수 있는 것보다 작을 수 있다. `relaxation`은 쓰지
-않는다. `max_iterations`는 받아들인 상태(이력 기록 하나씩)의 수를 제한하며, 한 걸음은 후보를 최대
-31개 평가하므로 평가하는 상태는 최대 `1 + 31*(max_iterations-1)`개다.
+구별할 수 있는 것보다 작을 수 있다. `relaxation_factor`는 쓰지
+않는다. `iteration_limit`은 받아들인 상태(이력 기록 하나씩)의 수를 제한하며, 한 걸음은 후보를 최대
+31개 평가하므로 평가하는 상태는 최대 `1 + 31*(iteration_limit-1)`개다.
 
 수렴은 위 검사로만 판정하므로 Newton 결과는 Picard 결과와 같은 한계를 만족한다. 정확한
 `derivative`가 있으면 해 근처에서 결함이 2차로 줄어들고, 차분을 쓰면 마지막 걸음들은 결함을 차분의
@@ -74,10 +83,17 @@ complex step으로 계산한다. σ는 dσ/dT로 1차까지 확장한다. dσ/dT
 
 ## 결과·잔차·실패
 
-결과의 `coupled`는 기존 전기/열 결과이며 `evaluated_temperature`는 물성을 평가한 T다.
+frozen 결과 `TemperatureJouleHeatResult`의 `coupled`는 기존 전기/열 결과이며
+`evaluation_temperature`는 물성을 평가한 T다. 각 결과는 `.units`를 가진다.
 반환 열 온도 H(T)와 T는 위 두 허용오차로 제한되며 정확한 비선형 근으로 주장하지 않는다.
-`history`에는 반복 번호, 온도 결함 K, 물성 상대 결함, 온도 최소/최대 K,
-전기/열 자유 절점 잔차 A/m·W/m, 전류 수지 A/m, 공급/발열/유출 및 수지 오차 W/m가 담긴다.
+`history`의 frozen `JouleIteration` 기록에는 반복 번호 `iteration_count`, 온도 결함
+`temperature_change` K, 물성 상대 결함 `relative_electrical_conductivity_change`, 온도
+`minimum_temperature`/`maximum_temperature` K, 전기/열 자유 절점 잔차
+`maximum_residual_current_per_depth` A/m·`maximum_residual_heat_rate_per_depth` W/m,
+`relative_residual`, 전류 수지 `current_imbalance_per_depth` A/m, 공급/발열/유출
+`inward_electric_power_per_depth`·`joule_power_per_depth`·`outward_heat_rate_per_depth` W/m와
+수지 오차 `electric_power_imbalance_per_depth`·`heat_rate_imbalance_per_depth` W/m가
+담긴다(simcase의 반복 열 이름과 같다).
 기존 해석기의 1e-10 정규화 잔차·성분별 보존·전력/열 수지 기준은 그대로 유지한다.
 온도 사본은 읽기 전용이다. 단위 깊이 W/m에 깊이 m를 곱하면 W다.
 
@@ -85,16 +101,16 @@ complex step으로 계산한다. σ는 dσ/dT로 1차까지 확장한다. dσ/dT
 
 어떤 상태도 평가하기 전에 메시와 다음 옵션을 검사해 ValueError를 낸다. 메시는 올바른 삼각형
 메시여야 하고(예: 겹치는 절점이 없어야 한다), `method`는 `"picard"` 또는 `"newton"`,
-`relaxation`은 (0,1], 두 허용오차는 유한한 양수, `max_iterations`는 양의 정수,
+`relaxation_factor`는 (0,1], 두 허용오차는 유한한 양수, `iteration_limit`은 양의 정수,
 `electrical_conductivity`는 `ConductivityModel` 하나이거나 키가 메시 영역 이름과 정확히 같은 그 표,
-`initial_temperature`는 유한한 실수 스칼라 또는 `(N,)` 벡터(K), `thermal_dirichlet`은 외곽 정수 절점
+`initial_temperature`는 유한한 실수 스칼라 또는 `(N,)` 벡터(K), `prescribed_temperature`는 외곽 정수 절점
 번호를 유한한 K에 대응시키는 표여야 한다. 그 밖의 입력에 JAX·PyTorch 값을 직접(또는 그 표 안에)
 넘기면 그보다 먼저 TypeError가 난다([근사하지 않고 거부하는 것](differentiation.md#근사하지-않고-거부하는-것)).
 `method`와 `electrical_conductivity`는 문자열과 `ConductivityModel`만 받으므로, 거기에 넘긴 살아 있는
 값은 위의 ValueError가 된다.
 
 나머지는 상태 T_i를 평가할 때 해석기의 σ 검사나 하위 해석이 검사한다. 열전도도, 전기 Dirichlet·
-기준 전위, 유출 전류·유속·대류 자료, 그리고 전도도 콜백과 경계 콜백이 돌려주는 모든 값이다. 평가 중에
+기준 전위, 내향 전류밀도·열유속·대류 자료, 그리고 전도도 콜백과 경계 콜백이 돌려주는 모든 값이다. 평가 중에
 난 `Exception`의 모든 하위 예외는 `JouleConvergenceError`로 감싸고 원래 예외를 `__cause__`로 잇는다.
 KeyboardInterrupt와 SystemExit은 그대로 지나간다. 음수이거나 유한하지 않은 열전도도, 메시 밖의
 전기 Dirichlet 절점, 모르는 경계 태그, 양수가 아닌 σ 콜백 값의 ValueError, 재료 범위 위반, 콜백이
@@ -102,17 +118,18 @@ KeyboardInterrupt와 SystemExit은 그대로 지나간다. 음수이거나 유�
 RuntimeError이므로 `except ValueError`나 `except TypeError`로는 잡히지 않는다. 원인 예외를 읽으면
 된다. 잘못된 입력은 대개 기록이 하나도 없는 첫 평가에서 실패하므로 `history`가 비어 있을 수 있다.
 Newton은 걸음을 만들 수 없을 때(Jacobian, dσ/dT, 선형 풀이)에도 그 원인을 이어
-`JouleConvergenceError`를 내고, 선 탐색이 어떤 걸음도 받아들이지 못할 때도 낸다(위). `max_iterations`에
+`JouleConvergenceError`를 내고, 선 탐색이 어떤 걸음도 받아들이지 못할 때도 낸다(위). `iteration_limit`에
 닿으면 원인 없이 낸다. 부분 결과를 성공 반환하지 않는다.
 
-오류는 `reason`(메시지), `history`(완료된 기록, Picard 반복 또는 받아들인 Newton 상태마다 하나),
-`last_temperature`를 담는다. `last_temperature`는 읽기 전용 `(N,)` K 배열이며, 어떻게 끝났는지에 따라
+오류 `JouleConvergenceError(reason, history, *, temperature)`는 `reason`(메시지),
+`history`(완료된 기록, Picard 반복 또는 받아들인 Newton 상태마다 하나), `last_temperature`(키워드
+`temperature`)를 담는다. `last_temperature`는 읽기 전용 `(N,)` K 배열이며, 어떻게 끝났는지에 따라
 가리키는 상태가 다르다.
 
 | 끝난 방식 | `last_temperature` |
 |---|---|
-| Picard가 `max_iterations`에 닿음 | 완화한 다음 상태 `T_i + relaxation*(H(T_i)-T_i)`. 평가하지 않았고 `history`에 없다 |
-| Newton이 `max_iterations`에 닿음 | 마지막으로 받아들인 상태 T_i. 그 H(T_i)가 `history`의 마지막 기록이다 |
+| Picard가 `iteration_limit`에 닿음 | 완화한 다음 상태 `T_i + relaxation_factor*(H(T_i)-T_i)`. 평가하지 않았고 `history`에 없다 |
+| Newton이 `iteration_limit`에 닿음 | 마지막으로 받아들인 상태 T_i. 그 H(T_i)가 `history`의 마지막 기록이다 |
 | Newton이 걸음을 만들지 못하거나 선 탐색이 어떤 걸음도 받아들이지 못함 | 마지막으로 받아들인 상태 T_i |
 | 열 해가 생기기 전에 평가가 실패함(σ(T_i), 전기 풀이, 열 풀이) | 평가하던 상태 T_i |
 | 열 해가 생긴 뒤에 평가가 실패함(예: H(T_i)가 재료 범위 밖) | 그 시도 열 해 H(T_i) |
@@ -138,7 +155,7 @@ python examples/galerkin/temperature_joule_heating.py
 ```
 
 [실행 예제](../../../../../../examples/galerkin/temperature_joule_heating.py)는 오른쪽
-유출 전류 1 A/m², 왼쪽 V=0, 양끝 T=300 K, k=1 W/(m K),
+유출 전류 1 A/m²(`inward_current_density` -1 A/m²), 왼쪽 V=0, 양끝 T=300 K, k=1 W/(m K),
 σ=1/(1+0.5*(T-300)) S/m, 유효 범위 [300,400] K를 사용한다.
 온도·단위 깊이 전력·반복 횟수·결함을 출력한다.
 `galerkin.electric.ElementConductivity(mesh, values)`는 명시적인 양수·유한

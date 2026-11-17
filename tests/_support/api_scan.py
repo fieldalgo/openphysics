@@ -84,9 +84,11 @@ DEFERRED = "deferred to the materials step"
 INTERNAL_DOCSTRING = "Internal module, consistent units"
 
 # Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin and refsol after
-# L2 commit 6, which emptied galerkin's heat modules (thermal, thermal3d, transient_heat) and refsol's eight
-# heat modules (galerkin 301 on f693ae3a, 191 after L2 commit 4; refsol 549 on f693ae3a). They never grow.
-BASELINE_COUNTS = {"galerkin": 170, "physmat": 0, "refsol": 394}
+# L2 commit 7, which emptied galerkin's electric, joule_heating and temperature_joule_heating and refsol's
+# joule_slab, and made branch structural (an enum; lossy_slab's entry for it went too) (galerkin 301 on
+# f693ae3a, 191 after L2 commit 4, 170 after L2 commit 6, which emptied the heat modules; refsol 549 on
+# f693ae3a, 394 after L2 commit 6). They never grow.
+BASELINE_COUNTS = {"galerkin": 154, "physmat": 0, "refsol": 354}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 

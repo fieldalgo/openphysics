@@ -15,7 +15,8 @@ document keeps the rectangle path (:mod:`simcase.electric_joule`).
 
 Format 0.3 (units batch C6): the mesh is made from the geometry hand-off of region heat
 (``thermal_regions.handoff_03``), so the mesher receives the micrometre model it received for
-format 0.2, and galerkin receives the outward current ``0.0 - inward_current_density`` (H1).
+format 0.2, and galerkin's solve computes with the outward current ``0.0 - inward_current_density``
+(H1; galerkin takes the inward value and negates it, ``views.galerkin_electric_arguments``).
 """
 
 import math
@@ -225,7 +226,7 @@ def outward_terminal_currents(electric, fixed_by, potentials):
     """The current leaving the conductor through each fixed boundary, A per metre of depth:
     ``0.0 - (current the fixed potential injects)``; a node two boundaries fix counts for the
     first of them in name order."""
-    reaction = np.asarray(electric.reaction)
+    reaction = np.asarray(electric.reaction_current_per_depth)
     injected = {tag: float(sum(reaction[n] for n, by in fixed_by.items() if by == tag)) for tag in potentials}
     return {tag: 0.0 - value for tag, value in injected.items()}
 
@@ -258,7 +259,7 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     calculation_json = doc.canonical_json(separators=(',', ':'))
     t0 = time.perf_counter()
     try:
-        electric = solve_steady_electric(mesh, **kwargs)
+        electric = solve_steady_electric(mesh, **views.galerkin_electric_arguments(kwargs))
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
@@ -277,9 +278,9 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     printed = [doc.summary(),
                f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-               f'electric_potential: {float(np.min(electric.potential)):.12g} V to '
-               f'{float(np.max(electric.potential)):.12g} V',
-               f'joule_power_per_depth {electric.joule_power_per_length:.12g} W/m']
+               f'electric_potential: {float(np.min(electric.electric_potential)):.12g} V to '
+               f'{float(np.max(electric.electric_potential)):.12g} V',
+               f'joule_power_per_depth {electric.joule_power_per_depth:.12g} W/m']
     if verbose:
         print('\n'.join(printed))
     result = RegionElectricRunResult(doc, arrays, metadata, log_lines_03(doc, printed))

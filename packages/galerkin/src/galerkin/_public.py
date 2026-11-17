@@ -16,7 +16,7 @@ and today's outward keywords. This module holds what the thin public layer adds.
   ``inspect.signature`` follows the wrapper's ``__wrapped__``, so the callback forms
   of transient heat are told apart as before.
 - ``ResultSurface``: ``.units`` (field -> canonical unit) and the planar,
-  axisymmetric and 3D naming of the heat results.
+  axisymmetric and 3D naming of the heat, electric and Joule results.
 """
 from collections.abc import Mapping
 from dataclasses import fields
@@ -87,7 +87,7 @@ def outward_from_inward(data, name):
 
 
 class ResultSurface:
-    """``.units`` and the planar, axisymmetric or 3D naming of a heat result dataclass.
+    """``.units`` and the planar, axisymmetric or 3D naming of a result dataclass.
 
     ``UNITS`` maps each quantity field to its canonical unit (registry names; structural
     fields such as node indices have none). ``BASIS`` is "planar" (nodal rates per metre
@@ -118,5 +118,6 @@ class ResultSurface:
         if cls.BASIS == "planar" and name + PER_DEPTH in names:
             raise AttributeError(
                 f"{cls.__name__} has no field {name!r}: a planar solve gives rates per metre of depth "
-                f"({name + PER_DEPTH!r}, in W/m); multiply by the depth for a total")
+                f"({name + PER_DEPTH!r}, in {cls.UNITS.get(name + PER_DEPTH, 'per metre of depth')}); "
+                f"multiply by the depth for a total")
         raise AttributeError(f"{cls.__name__!r} object has no attribute {name!r}")

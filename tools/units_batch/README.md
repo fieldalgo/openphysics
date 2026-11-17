@@ -396,6 +396,24 @@ baseline `solve_steady_heat` call (simcase's and the one nested under
 defaults the public function forwards. The transient call is compared at the public frame:
 six kind 2 entries rename its keywords and one kind 3 entry negates the flux.
 
+**The electric and Joule APIs in SI (L2 commit 7).** `galerkin.electric.solve_steady_electric`,
+`galerkin.joule_heating.solve_steady_joule_heat` and
+`galerkin.temperature_joule_heating.solve_temperature_joule_heat` take registry names and
+inward values (`inward_current_density`, `inward_heat_flux`); each negates them once and calls
+its internal outward-form body (`solve_steady_electric_outward`,
+`solve_steady_joule_heat_outward`, `solve_temperature_joule_heat_outward`) with today's
+keywords. simcase converts its outward values back to the inward `0.0 - g`
+(`simcase.views.galerkin_electric_arguments` and `galerkin_heat_arguments`). The temperature
+Joule iteration now calls the electric and Joule bodies directly, so the recorded targets
+`galerkin.electric:solve_steady_electric_outward` and
+`galerkin.joule_heating:solve_steady_joule_heat_outward` are new: two kind 7 entries compare
+every baseline electric and Joule call (simcase's and the ones nested under
+`solve_temperature_joule_heat`) with the body call beneath, two kind 8 entries cover the
+electric defaults the public function forwards (`reference_potential`, `motion`), and nine kind
+5 entries rename the fields of the `SteadyElectricResult` the Joule calls receive as
+`electrical_result`. The temperature-dependent call is compared at the public frame: seven kind
+2 entries rename its keywords and two kind 3 entries negate the current density and the flux.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

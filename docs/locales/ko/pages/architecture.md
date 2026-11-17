@@ -96,7 +96,7 @@ galerkin은 배포판 하나이고, 안이 여러 층으로 나뉩니다. import
 물리 모듈은 coupling, core, 공개 조립 모듈을 쓰고, coupling은 core를 씁니다. 공개 조립 모듈(`assembly`,
 `assembly3d`, `edge`, `edge3d`, `solver`)은 호출자를 위해 이름을 유지하며 core 위에 있습니다. core는 메시
 형식(`mesh`, `mesh3d`)만 쓰고, 메시 형식은 galerkin의 다른 모듈을 import하지 않습니다. 어떤 모듈도 다른 모듈의 비공개(밑줄) 이름을 import하거나 속성으로 읽지 않으며, 클래스의 밑줄 멤버는 그 클래스의 메서드만 읽습니다.
-여러 모듈이 함께 쓰는 것은 core, 패키지 비공개 모듈 `_thermal_mechanical_common`(열→역학 workflow), `_cavity_common`(두 상자 공진기), `_heat_kernels`(열 솔버의 경계 계, 3D 열원 하중과 면 맵), `_public`(공개 열 API의 문자열 거부, 내향 열유속, 결과 표면), 또는 그것을 가진 모듈의 공개 이름(thermoelasticity는 elasticity의 것을 쓰고, Joule 가열과 workflow는 `__all__` 밖 내부의 바깥 방향 형식 본체 `galerkin.thermal.solve_steady_heat_outward`를 부릅니다)에 둡니다.
+여러 모듈이 함께 쓰는 것은 core, 패키지 비공개 모듈 `_thermal_mechanical_common`(열→역학 workflow), `_cavity_common`(두 상자 공진기), `_heat_kernels`(열 솔버의 경계 계, 3D 열원 하중과 면 맵), `_public`(공개 열·전기·Joule API의 문자열 거부, 내향 자료, 결과 표면), 또는 그것을 가진 모듈의 공개 이름(thermoelasticity는 elasticity의 것을 쓰고, Joule 가열과 workflow는 `galerkin.thermal.solve_steady_heat_outward`를, 온도 의존 Joule 반복은 `galerkin.electric.solve_steady_electric_outward`와 `galerkin.joule_heating.solve_steady_joule_heat_outward`를 부릅니다. 모두 `__all__` 밖 내부의 바깥 방향 형식 본체입니다)에 둡니다.
 재료 조회는 core에 있고(`galerkin.materials`는 공개 이름을 그대로 둡니다), 물리 모듈은 메시에 묶인
 자기 컨테이너를 검사를 마친 값으로 바꿔 core에 넘깁니다(`core.loads.ElementSource`).
 메시 형식, core, 공개 조립 모듈, coupling 중 하나가 위쪽 모듈을 import하거나, 어떤 모듈이 다른 모듈의 비공개 이름을 쓰면 `tests/galerkin/test_layers.py`가 실패합니다.

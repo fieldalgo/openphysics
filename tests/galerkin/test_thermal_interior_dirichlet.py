@@ -68,4 +68,5 @@ def test_g6_4_a_node_outside_the_mesh_is_refused_and_the_other_solvers_keep_thei
     interior = next(int(i) for i in _plate()[1] if int(i) not in
                     set(np.concatenate(list(mesh.boundary.values())).tolist()))
     with pytest.raises(ValueError, match="exterior mesh boundary"):
-        solve_steady_electric(mesh, conductivity=1.0, dirichlet={interior: 1.0, int(mesh.boundary["left"][0]): 0.0})
+        solve_steady_electric(mesh, electrical_conductivity=1.0,
+                              prescribed_electric_potential={interior: 1.0, int(mesh.boundary["left"][0]): 0.0})

@@ -2,8 +2,10 @@
 
 [한국어](../../locales/ko/pages/packages/galerkin/joule_heating.md)
 
-The explicit one-way workflow is `galerkin.joule_heating.solve_steady_joule_heat`.
-It consumes a `SteadyElectricResult` produced by
+The explicit one-way workflow is `galerkin.joule_heating.solve_steady_joule_heat(mesh, *,
+electrical_result, thermal_conductivity, prescribed_temperature,
+inward_heat_flux=None, convection=None)`, with every quantity a keyword-only SI value
+under its registry name (a `str` raises `TypeError`). It consumes a `SteadyElectricResult` produced by
 `galerkin.electric.solve_steady_electric` and passes elementwise Joule heat to the
 existing steady heat solver. The electrical result contract is defined in
 [steady electric conduction](electric_steady2d.md).
@@ -16,12 +18,12 @@ from galerkin.mesh import rectangle_mesh
 mesh = rectangle_mesh(.02, .01, 16, 8)  # metres
 voltage = {int(i): 0. for i in mesh.boundary['left']}
 voltage.update({int(i): 2. for i in mesh.boundary['right']})
-electric = solve_steady_electric(mesh, conductivity=3., dirichlet=voltage)
+electric = solve_steady_electric(mesh, electrical_conductivity=3., prescribed_electric_potential=voltage)
 temperature = {i: 300. for i in voltage}
 result = solve_steady_joule_heat(
-    mesh, electrical_result=electric, conductivity=5., dirichlet=temperature)
+    mesh, electrical_result=electric, thermal_conductivity=5., prescribed_temperature=temperature)
 print(result.thermal.temperature.max())
-print(result.source_power_per_length)  # W/m, not W
+print(result.generated_heat_rate_per_depth)  # W/m, not W
 ```
 
 The electrical solve is explicit and runs once. Electrical conductivity (S/m)
@@ -34,14 +36,17 @@ accepted; changed geometry or ordering raises `ValueError`.
 `Q = J·E` is W/m³ on each triangle. It is transferred without interpolation,
 region averaging or an AC factor of 1/2. Each vertex receives `Q * area / 3`.
 The workflow independently checks the electric nodal load and integrated power
-against heat assembly. `source_power_per_length` and `outward_heat_per_length`
-are W/m; multiply by an explicit extrusion depth in metres to obtain watts.
-The returned electrical and thermal results own their arrays independently of
-input data. No additional heat source is implicitly added.
+against heat assembly. The returned `SteadyJouleHeatResult` (frozen, planar, with
+`.units`) holds `electrical`, `thermal` (a `PlanarSteadyHeatResult`),
+`generated_heat_rate_per_depth` and `outward_heat_rate_per_depth`, both W/m; multiply
+by an explicit extrusion depth in metres to obtain watts. The returned electrical and
+thermal results own their arrays independently of input data. No additional heat
+source is implicitly added.
 
-`dirichlet` maps exterior nodes to kelvin. `outward_flux` and `convection`
-follow [steady heat boundary conventions](thermal_flux_robin.md): outward
-`q·n = g + h(T-Tambient)`, in W/m², with h in W/(m² K). Unspecified edges are
+`prescribed_temperature` maps exterior nodes to kelvin. `inward_heat_flux` and
+`convection` follow [steady heat boundary conventions](thermal_flux_robin.md): the
+heat leaving the body is `q·n = h(T-Tambient) - inward_heat_flux`, in W/m², with h
+in W/(m² K); the inward flux is negated once, as `0.0 - x`. Unspecified edges are
 insulated. Each disconnected component requires fixed temperature or positive
 Robin support. Total outward heat is minus the Dirichlet reaction plus the
 prescribed outward and convective loads; a positive reaction injects heat.

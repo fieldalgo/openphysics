@@ -181,7 +181,12 @@ galerkin bend solver against the same equation.
 `k T'' + sigma(T) V'^2 = 0` on a slab `0 <= x <= L` with fixed face potentials and
 temperatures and the linear isotropic model `sigma = sigma0 (1 + alpha (T - T0))`,
 the form a galerkin `ConductivityModel` callback evaluates. Units are SI (m, K,
-V, S/m, W/(m K), A/m^2); `alpha > 0` is a conductivity rising with temperature,
+V, S/m, W/(m K), A/m^2). The functions take keyword-only registry names: `length`,
+the face pairs `prescribed_electric_potential` and `prescribed_temperature`,
+`reference_conductivity` (sigma0), `conductivity_temperature_coefficient` (alpha),
+`reference_temperature` (T0), `thermal_conductivity`, and for `current_driven`
+`current_density` and `prescribed_electric_potential` (V(0), required); a `str`
+raises `TypeError`. `alpha > 0` is a conductivity rising with temperature,
 `alpha < 0` metal-like, `alpha = 0` the parabolic constant-conductivity closed
 form. With `u = sigma/sigma0` the heat equation is `u'' = -c/u`,
 `c = alpha J^2/(k sigma0)`, whose first integral gives `u` and `x` in closed
@@ -190,11 +195,12 @@ voltage drop fixes both face slopes independently of `J`, so `voltage_driven`
 is explicit, evaluated with `erfcx`/`dawsn` so that nearly linear solutions do
 not overflow. `current_driven` finds the drop carrying a prescribed `J`; for
 `alpha < 0` the current-voltage curve folds at `fold_current` and both branches
-are available. Each `JouleSlab` returns `temperature`, `temperature_gradient`,
-`heat_flux`, `potential`, `electric_field`, `electrical_conductivity`,
-`heat_source`, `current_density`, `joule_power` (per face area,
-`J (V_a - V_b) = k (T'(0) - T'(L))`) and `temperature_range`, the interval a
-bounded model must cover. `tests/galerkin/test_joule_slab_reference.py` grades
+are available. Each `JouleSlab` carries its inputs under the same names, evaluates
+`temperature`, `temperature_gradient`, `heat_flux`, `electric_potential`,
+`electric_field`, `electrical_conductivity` and `joule_power_density` at the x
+coordinates `points`, and holds `current_density`, the private `_joule_power` (per
+face area, `J (V_a - V_b) = k (T'(0) - T'(L))`; no registry name, rule R(2)) and
+`temperature_range`, the interval a bounded model must cover. `tests/galerkin/test_joule_slab_reference.py` grades
 `solve_temperature_joule_heat` on a 1 m x 0.25 m rectangle (Picard, relaxation
 1): the RMS temperature error over the three-point triangle rule falls at second
 order (orders 2.00-2.02) to 3.5e-4 and 4.1e-4 K (`alpha = 0.5` /K, 2 V,
