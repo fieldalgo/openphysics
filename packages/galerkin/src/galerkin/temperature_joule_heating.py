@@ -176,7 +176,7 @@ def _models(mesh, value):
         raise ValueError("electrical_conductivity must be a ConductivityModel or region table")
     regions, names = region_index(mesh)
     if set(value) != set(names) or not all(isinstance(v, ConductivityModel) for v in value.values()):
-        raise ValueError("conductivity models must match mesh region names exactly")
+        raise ValueError("electrical_conductivity models must match mesh region names exactly")
     return [(name, np.flatnonzero(regions == i), value[name]) for i, name in enumerate(names)]
 
 
@@ -274,7 +274,7 @@ class _JointNewton:
         n = mesh.num_nodes
         samples = scalar_boundary_samples(mesh, p, t, thermal_dirichlet, outward_flux, convection)
         H, G, B, _ = _scalar_boundary_system(samples, n, labels, [0.]*count, np.zeros(count, dtype=bool))
-        k = region_property(mesh, thermal_conductivity, "conductivity", positive=True)
+        k = region_property(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
         cells = np.asarray(mesh.triangles)
         heat = forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (n, n)).to_scipy()+H
         self.mesh, self.n, self.cells = mesh, n, cells
@@ -416,21 +416,23 @@ def solve_temperature_joule_heat_outward(
     anything is copied or solved; one returned by a callback surfaces as a
     JouleConvergenceError caused by that TypeError.
     """
+    # the public names; the flux and current density are the public layer's negated (outward) values
     _refuse_live_inputs(
-        thermal_conductivity=thermal_conductivity, electric_dirichlet=electric_dirichlet,
-        thermal_dirichlet=thermal_dirichlet, initial_temperature=initial_temperature,
-        outward_current=outward_current, reference_potential=reference_potential,
-        outward_flux=outward_flux, convection=convection, relaxation=relaxation,
-        temperature_atol=temperature_atol, relative_tolerance=relative_tolerance,
-        max_iterations=max_iterations)
+        thermal_conductivity=thermal_conductivity, prescribed_electric_potential=electric_dirichlet,
+        prescribed_temperature=thermal_dirichlet, initial_temperature=initial_temperature,
+        inward_current_density=outward_current, reference_electric_potential=reference_potential,
+        inward_heat_flux=outward_flux, convection=convection, relaxation_factor=relaxation,
+        temperature_tolerance=temperature_atol, relative_tolerance=relative_tolerance,
+        iteration_limit=max_iterations)
     one_of(method, METHODS, "method")
-    relaxation = finite_scalar(relaxation, "relaxation")
-    atol = finite_scalar(temperature_atol, "temperature_atol")
+    relaxation = finite_scalar(relaxation, "relaxation_factor")
+    atol = finite_scalar(temperature_atol, "temperature_tolerance")
     rtol = finite_scalar(relative_tolerance, "relative_tolerance")
     if not 0 < relaxation <= 1 or atol <= 0 or rtol <= 0:
-        raise ValueError("relaxation must be in (0,1]; tolerances must be positive")
+        raise ValueError("relaxation_factor must be in (0,1]; temperature_tolerance and relative_tolerance "
+                         "must be positive")
     if isinstance(max_iterations, (bool, np.bool_)) or not isinstance(max_iterations, (int, np.integer)) or max_iterations < 1:
-        raise ValueError("max_iterations must be a positive integer")
+        raise ValueError("iteration_limit must be a positive integer")
     mesh = copy.deepcopy(mesh)
     _, _, _, boundary, _, _ = triangle_geometry(mesh)
     models = _models(mesh, electrical_conductivity)
@@ -442,7 +444,7 @@ def solve_temperature_joule_heat_outward(
     else:
         raise ValueError("initial_temperature must be scalar or shape (N,) in K")
     if not isinstance(thermal_dirichlet, Mapping):
-        raise ValueError("thermal_dirichlet must map exterior node indices to K")
+        raise ValueError("prescribed_temperature must map exterior node indices to K")
     thermal_dirichlet = dict(thermal_dirichlet)
     electric_dirichlet = copy.deepcopy(electric_dirichlet)
     thermal_conductivity = copy.deepcopy(thermal_conductivity)
@@ -450,8 +452,8 @@ def solve_temperature_joule_heat_outward(
         (outward_current, reference_potential, outward_flux, convection))
     for node, value in thermal_dirichlet.items():
         if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)) or node not in boundary:
-            raise ValueError("thermal Dirichlet nodes must be exterior integer indices")
-        temperature[node] = finite_scalar(value, "thermal Dirichlet temperature")
+            raise ValueError("prescribed_temperature nodes must be exterior integer indices")
+        temperature[node] = finite_scalar(value, "prescribed_temperature value")
     free_t = np.setdiff1d(np.arange(mesh.num_nodes), list(thermal_dirichlet))
     history = []
     # Each iteration calls the outward-form bodies (rule 6): the public function negated the inward data once.

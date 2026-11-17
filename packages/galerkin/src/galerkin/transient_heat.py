@@ -542,7 +542,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
             or not isinstance(checkpoint_every, (int, np.integer)) or checkpoint_every < 1):
         raise ValueError("checkpoint_every must be None or an integer >= 1")
     regional = [is_per_region(v) for v in (conductivity, volumetric_heat_capacity, heat_source)]
-    k = conductivity if regional[0] else _value(conductivity, "conductivity", True)
+    k = conductivity if regional[0] else _value(conductivity, "thermal_conductivity", True)
     capacity = (volumetric_heat_capacity if regional[1]
                 else _value(volumetric_heat_capacity, "volumetric_heat_capacity", True))
     times = real_array(time_s, "time").copy()
@@ -564,7 +564,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
                             region_names=list(names))
         # Validate before recording, so a bad value gets the labelled message.
         if regional[0]:
-            k = region_property(private_mesh, conductivity, "conductivity", positive=True,
+            k = region_property(private_mesh, conductivity, "thermal_conductivity", positive=True,
                                 live=True)
             record_k = {str(n): _recorded(conductivity[n]) for n in names}
         if regional[1]:
@@ -572,7 +572,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
                                        "volumetric_heat_capacity", positive=True, live=True)
             record_c = {str(n): _recorded(volumetric_heat_capacity[n]) for n in names}
         if regional[2]:
-            region_property(private_mesh, heat_source, "heat_source", live=True)
+            region_property(private_mesh, heat_source, "heat_source_density", live=True)
     else:
         private_mesh = Mesh(p.copy(), t.copy(), boundary={})
     # Boundary edge selections are copied as given, so natural-condition
@@ -583,20 +583,21 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
     if tuple(initial.shape) != (len(p),):
         raise ValueError("initial_temperature must have exactly shape (N,)")
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map integer nodes to Kelvin values")
+        raise ValueError("prescribed_temperature must map integer nodes to Kelvin values")
     conditions = {}
     for node, value in dirichlet.items():
         if (isinstance(node, (bool, np.bool_))
                 or not isinstance(node, (int, np.integer))
                 or not 0 <= node < len(p)):
-            raise ValueError(f"Dirichlet nodes must be integer node indices inside the mesh's {len(p)} nodes")
-        conditions[int(node)] = value if callable(value) else _value(value, "Dirichlet temperature")
+            raise ValueError("prescribed_temperature nodes must be integer node indices inside the mesh's "
+                             f"{len(p)} nodes")
+        conditions[int(node)] = value if callable(value) else _value(value, "prescribed_temperature value")
     measure.check_axis_dirichlet(conditions)
     fixed = np.array(sorted(conditions), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)
     source = (heat_source if callable(heat_source) or regional[2]
-              else _value(heat_source, "heat_source"))
-    flux_forms = _boundary_forms(outward_flux, "outward_flux")
+              else _value(heat_source, "heat_source_density"))
+    flux_forms = _boundary_forms(outward_flux, "inward_heat_flux")
     convection_forms = _boundary_forms(convection, "convection")
     natural = outward_flux is not None or convection is not None
     # Static data are sampled once, exactly as before; H is reassembled per step
@@ -620,7 +621,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
         shifted by them as in steady heat: shifted_B integrates h*(ambient-offset
         of the component). The offsets are the initial temperatures throughout.
         """
-        flux_now = None if outward_flux is None else _bound(outward_flux, flux_forms, "outward_flux", now)
+        flux_now = None if outward_flux is None else _bound(outward_flux, flux_forms, "inward_heat_flux", now)
         convection_now = (None if convection is None
                           else _bound(convection, convection_forms, "convection", now))
         samples = measure.boundary_samples(
@@ -690,7 +691,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
     def sample(index):
         """Dirichlet values, load and boundary data at ``times[index]``, live if an input is."""
         now = float(times[index])
-        values = [_value(conditions[int(node)](now), "Dirichlet callback")
+        values = [_value(conditions[int(node)](now), "prescribed_temperature callback")
                   if callable(conditions[int(node)]) else conditions[int(node)]
                   for node in fixed]
         if any(is_live(v) for v in values):
@@ -700,7 +701,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
             bc = np.array(values, dtype=float)
         load = source_load(
             private_mesh, p, t, area,
-            (lambda points: real_value(source(points.copy(), now), "heat_source callback"))
+            (lambda points: real_value(source(points.copy(), now), "heat_source_density callback"))
             if callable(source) else source, live=True, measure=measure)
         _finite(to_numpy(bc), to_numpy(load))
         return bc, load, boundary_at(index)
@@ -842,7 +843,8 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
         bound = 32*np.finfo(float).eps*np.maximum(
             1., np.maximum(np.abs(initial[fixed]), np.abs(to_numpy(bc))))
         if np.any(np.abs(initial[fixed]-to_numpy(bc)) > bound):
-            raise ValueError("initial Dirichlet data mismatch (32 eps bound); no projection")
+            raise ValueError("initial_temperature and prescribed_temperature differ at a prescribed node at the "
+                             "first time (32 eps bound); no projection")
         previous = initial_increment.copy()
         record(0, previous, to_numpy(load), to_numpy(bc))
     except Exception as exc:
@@ -853,7 +855,7 @@ def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity
                 "time-dependent convection h (callback(time) or callback(position, "
                 "outward_normal, time)) is not supported with JAX or PyTorch inputs: H would "
                 "have to be reassembled inside the differentiated steps; use NumPy inputs, or "
-                "keep h static and vary the ambient temperature and outward flux in time")
+                "keep h static and vary the ambient temperature and inward_heat_flux in time")
         history = _live_history(
             live_namespace(k_live, capacity_live, initial_live, bc, load,
                            *(natural_live[1:] if natural else ())), private_mesh,

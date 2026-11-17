@@ -115,7 +115,7 @@ def disconnected():
 
 def test_disconnected_components_need_independent_compatibility_and_gauges():
     m = disconnected()
-    with pytest.raises(ValueError, match='incompatible Neumann'):
+    with pytest.raises(ValueError, match='incompatible inward_current_density'):
         solve_steady_electric(m, electrical_conductivity=1, prescribed_electric_potential={},
                              inward_current_density={'left': 1., 'right2': -1.},
                              reference_electric_potential={0: 0., 9: 0.})

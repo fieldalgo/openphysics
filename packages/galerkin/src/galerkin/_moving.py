@@ -74,7 +74,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     if not isinstance(dirichlet, Mapping):
         raise ValueError("prescribed_temperature must map node indices to temperatures in K")
     for node, value in dirichlet.items():
-        _numpy_data(value, "Dirichlet temperature", sampled=False)
+        _numpy_data(value, "prescribed_temperature", sampled=False)
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
@@ -288,7 +288,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     if not isinstance(dirichlet, Mapping):
         raise ValueError("prescribed_temperature must map integer nodes to Kelvin values")
     for node, value in dirichlet.items():
-        _time_only(value, "Dirichlet temperature")
+        _time_only(value, "prescribed_temperature")
     tables = {}
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
         for tag, condition in _tags(table, name).items():
@@ -710,10 +710,10 @@ def _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, o
         if any(labels[n] == k for n in dirichlet):
             continue
         if abs(rate[k]) > 1e-12 * max(scale[k], np.finfo(float).tiny) and scale[k] > 0:
-            raise ValueError(f"motion: component {k} has current data only, and the motion changes its net "
-                             f"imposed current (rate {rate[k]:g} A/m per unit t); next to t the problem has no "
-                             "solution, so it has no derivative. Keep the current-carrying sides' lengths, or "
-                             "fix a Dirichlet volt on that component")
+            raise ValueError(f"motion: component {k} has inward_current_density data only, and the motion changes "
+                             f"its net outward current (rate {rate[k]:g} A/m per unit t); next to t the problem has "
+                             "no solution, so it has no derivative. Keep the current-carrying sides' lengths, or "
+                             "give that component a prescribed_electric_potential")
 
 
 def _live_t(t):

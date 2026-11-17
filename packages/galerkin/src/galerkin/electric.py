@@ -115,7 +115,7 @@ def _potentials(data, n, name, boundary=None):
                 or not isinstance(node, (int, np.integer)) or not 0 <= node < n):
             raise ValueError(f"{name} node indices must be integers within the mesh")
         if boundary is not None and node not in boundary:
-            raise ValueError("Dirichlet node must lie on the exterior mesh boundary")
+            raise ValueError(f"{name} node must lie on the exterior mesh boundary")
         v = real_value(value, name)
         if tuple(v.shape) != ():
             raise ValueError(f"{name} values must be scalar volts")
@@ -191,11 +191,11 @@ def solve_steady_electric_outward(mesh, *, conductivity, dirichlet, outward_curr
                                             reference_electric_potential=reference_potential)
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
     sigma = (conductivity.on_mesh(mesh) if isinstance(conductivity, ElementConductivity)
-             else region_property(mesh, conductivity, "conductivity", positive=True, live=True))
+             else region_property(mesh, conductivity, "electrical_conductivity", positive=True, live=True))
     sigma = element_values(mesh, sigma)
-    prescribed = _potentials(dirichlet, len(p), "dirichlet", boundary)
+    prescribed = _potentials(dirichlet, len(p), "prescribed_electric_potential", boundary)
     gauges = _potentials({} if reference_potential is None else reference_potential,
-                         len(p), "reference_potential")
+                         len(p), "reference_electric_potential")
     anchored = np.zeros(count, dtype=bool)
     offsets = [0.0]*count
     for node, value in prescribed.items():
@@ -203,7 +203,9 @@ def solve_steady_electric_outward(mesh, *, conductivity, dirichlet, outward_curr
             offsets[labels[node]] = value
             anchored[labels[node]] = True
     # Only physical voltage constraints exclude natural edges; gauges do not.
-    samples = scalar_boundary_samples(mesh, p, t, prescribed, outward_current, None, live=True)
+    samples = scalar_boundary_samples(mesh, p, t, prescribed, outward_current, None, live=True,
+                                      flux_name="inward_current_density",
+                                      prescribed_name="prescribed_electric_potential")
     xp = live_namespace(sigma, *prescribed.values(), *gauges.values(), *(s[4][0] for s in samples))
     outward = lift(xp, np.zeros(len(p)))
     absolute_current = np.zeros(count)
@@ -219,13 +221,16 @@ def solve_steady_electric_outward(mesh, *, conductivity, dirichlet, outward_curr
         selected = [node for node in gauges if labels[node] == component]
         if anchored[component]:
             if selected:
-                raise ValueError("reference_potential is unnecessary on a Dirichlet component")
+                raise ValueError("reference_electric_potential is unnecessary on a component with a "
+                                 "prescribed_electric_potential")
         else:
             net = np.sum(outward_numbers[labels == component])
             if abs(net) > 1e-12*absolute_current[component]:
-                raise ValueError(f"incompatible Neumann current on component {component}")
+                raise ValueError(f"incompatible inward_current_density on component {component}: a component "
+                                 "without a prescribed_electric_potential needs zero net current")
             if len(selected) != 1:
-                raise ValueError("exactly one reference_potential node is required per Neumann component")
+                raise ValueError("exactly one reference_electric_potential node is required per component "
+                                 "without a prescribed_electric_potential")
             offsets[component] = gauges[selected[0]]
     if any(is_live(o) for o in offsets):
         offsets = xp.stack([lift(xp, o, xp.float64) for o in offsets])
