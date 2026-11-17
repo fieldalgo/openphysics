@@ -56,3 +56,6 @@ T=C[:,S] inv(C_SS)입니다.
 
 [세 활성 도체](laplace_corner_harmonic_field.md) ·
 [English](../../../../../packages/galerkin/laplace_corner_harmonic_guard_field.md)
+
+
+별도 [한 활성 도체와 두 고정 전위 가드 API](laplace_corner_harmonic_single_active_field.md)는 한 활성 전류 좌표를 선택하고 유도 가드 전류를 유지합니다. 위의 두 활성 가드 계약은 바꾸지 않습니다.
