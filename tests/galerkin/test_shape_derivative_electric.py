@@ -299,7 +299,7 @@ def test_review_motion_that_changes_a_current_only_balance_is_refused():
     x, y = m.nodes[:, 0], m.nodes[:, 1]
     W = np.stack([np.zeros_like(x), x * y], axis=1)                 # the right side grows, the left does not
     gauge = int(m.boundary["left"][0])
-    with pytest.raises(ValueError, match="changes its net imposed current"):
+    with pytest.raises(ValueError, match="changes its net outward current"):
         solve_steady_electric(m, electrical_conductivity=1.0e3, prescribed_electric_potential={},
                               inward_current_density={"left": -100.0, "right": 100.0},
                               reference_electric_potential={gauge: 0.0},

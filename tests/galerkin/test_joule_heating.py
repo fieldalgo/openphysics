@@ -150,7 +150,7 @@ def test_corrupted_actual_result_rejected(field, value):
 
 def test_snapshots_survive_input_mutation_and_missing_support_rejected():
     mesh = rectangle_mesh(.02, .01, 4, 2); electric = uniform(mesh)
-    with pytest.raises(ValueError, match='requires Dirichlet or positive Robin'):
+    with pytest.raises(ValueError, match='requires prescribed_temperature or a positive convection'):
         couple(mesh, electric, prescribed_temperature={})
     result = couple(copy.deepcopy(mesh), electric, prescribed_temperature=ends(mesh, 300., 300.))
     expected = result.electrical.mesh.nodes.copy()
@@ -170,7 +170,7 @@ def test_disconnected_thermal_components_need_separate_support_and_balance():
                 part.boundary_edges | {tag+'2': edges+n for tag, edges in part.boundary_edges.items()})
     volts = ends(part, 0., 2.) | {i+n: value/2 for i, value in ends(part, 0., 2.).items()}
     electric = solve_steady_electric(mesh, electrical_conductivity=3., prescribed_electric_potential=volts)
-    with pytest.raises(ValueError, match='requires Dirichlet or positive Robin'):
+    with pytest.raises(ValueError, match='requires prescribed_temperature or a positive convection'):
         couple(mesh, electric, prescribed_temperature=ends(part, 300., 300.))
     temperatures = ends(part, 300., 300.) | {i+n: 310. for i in ends(part, 0., 0.)}
     result = couple(mesh, electric, prescribed_temperature=temperatures)

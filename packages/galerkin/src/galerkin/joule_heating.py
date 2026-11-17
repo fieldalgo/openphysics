@@ -45,10 +45,10 @@ def _agree(actual, expected, name, *, balance_scale=0.):
     if (actual.shape != expected.shape or actual.dtype.kind not in "iuf"
             or not np.all(np.isfinite(actual)) or not np.all(np.isfinite(expected))
             or not np.isfinite(balance_scale)):
-        raise ValueError(f"electrical {name} must be finite real with the expected shape")
+        raise ValueError(f"{name} must be finite real with the expected shape")
     scale = max(float(np.max(abs(expected))), balance_scale, np.finfo(float).tiny)
     if np.max(abs(actual-expected)) > 1e-10*scale:
-        raise ValueError(f"electrical {name} disagrees with integrated Joule source")
+        raise ValueError(f"{name} disagrees with integrated Joule source")
 
 
 def solve_steady_joule_heat(mesh, *, electrical_result, thermal_conductivity, prescribed_temperature,
@@ -125,13 +125,14 @@ def solve_steady_joule_heat_outward(mesh, *, electrical_result, conductivity, di
     # Check both the nodal distribution and total power; totals alone can hide
     # incorrect element-to-node correspondence.
     power = float(np.sum(heat.generated_heat_rate_per_depth))
-    _agree(electric.generated_heat_rate_per_depth, heat.generated_heat_rate_per_depth, "joule_load")
-    _agree(electric.joule_power_per_depth, power, "joule_power_per_length")
-    _agree(electric.inward_electric_power_per_depth, power, "supplied_power_per_length")
+    _agree(electric.generated_heat_rate_per_depth, heat.generated_heat_rate_per_depth,
+           "electrical_result.generated_heat_rate_per_depth")
+    _agree(electric.joule_power_per_depth, power, "electrical_result.joule_power_per_depth")
+    _agree(electric.inward_electric_power_per_depth, power, "electrical_result.inward_electric_power_per_depth")
     outward = float(np.sum(-heat.reaction_heat_rate_per_depth + heat.outward_prescribed_heat_rate_per_depth
                            + heat.outward_convective_heat_rate_per_depth))
     boundary_scale = float(np.sum(abs(heat.reaction_heat_rate_per_depth)
                                   + abs(heat.outward_prescribed_heat_rate_per_depth)
                                   + abs(heat.outward_convective_heat_rate_per_depth)))
-    _agree(outward, power, "thermal outward power", balance_scale=boundary_scale)
+    _agree(outward, power, "outward_heat_rate_per_depth", balance_scale=boundary_scale)
     return SteadyJouleHeatResult(electric, heat, power, outward)

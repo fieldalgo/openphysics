@@ -96,7 +96,7 @@ def source_load_3d(mesh: Mesh3D, heat_source) -> np.ndarray:
     """(N,) W nodal load of a per-tetrahedron (T,) W/m^3 source: Q V / 4 per node."""
     values = np.asarray(heat_source, dtype=float)
     if values.shape != (mesh.num_tets,):
-        raise ValueError("heat_source must hold one value per tetrahedron")
+        raise ValueError("heat_source_density must hold one value per tetrahedron")
     local = (values * mesh.volumes() / 4.0)[:, None] * np.ones((1, 4))
     load = np.zeros(mesh.num_nodes)
     np.add.at(load, mesh.tets, local)

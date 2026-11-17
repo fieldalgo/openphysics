@@ -213,27 +213,27 @@ def solve_steady_heat_outward(mesh, *, conductivity, dirichlet, heat_source=0.0,
                                         outward_heat_flux=outward_flux, convection=convection,
                                         coordinate_system=coordinate_system)
     if not is_per_region(conductivity):
-        k = real_value(conductivity, "conductivity")
+        k = real_value(conductivity, "thermal_conductivity")
         if tuple(k.shape) != () or to_numpy(k) <= 0:
-            raise ValueError("conductivity must be a finite scalar > 0")
+            raise ValueError("thermal_conductivity must be a finite scalar > 0")
         k = k if is_live(k) else float(k)
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
     measure = ScalarMeasure(mesh, coordinate_system)
     if is_per_region(conductivity):
-        k = region_property(mesh, conductivity, "conductivity", positive=True, live=True)
+        k = region_property(mesh, conductivity, "thermal_conductivity", positive=True, live=True)
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map node indices to temperatures in K")
+        raise ValueError("prescribed_temperature must map node indices to temperatures in K")
     prescribed = {}
     anchors = [0.0]*count
     constrained = np.zeros(count, dtype=bool)
     for node, value in dirichlet.items():
         if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)):
-            raise ValueError("Dirichlet node indices must be integers")
+            raise ValueError("prescribed_temperature node indices must be integers")
         if not 0 <= node < len(p):
-            raise ValueError(f"Dirichlet node {node} is outside the mesh's {len(p)} nodes")
-        value = real_value(value, "Dirichlet temperature")
+            raise ValueError(f"prescribed_temperature node {node} is outside the mesh's {len(p)} nodes")
+        value = real_value(value, "prescribed_temperature value")
         if tuple(value.shape) != ():
-            raise ValueError("Dirichlet temperature must be scalar")
+            raise ValueError("prescribed_temperature values must be scalar")
         prescribed[int(node)] = value if is_live(value) else float(value)
         component = labels[node]
         if not constrained[component]:
@@ -245,7 +245,8 @@ def solve_steady_heat_outward(mesh, *, conductivity, dirichlet, heat_source=0.0,
     H, G, B, shifted_B = _scalar_boundary_system(samples, len(p), labels, anchors, constrained)
     missing = np.flatnonzero(~constrained)
     if len(missing):
-        raise ValueError(f"each connected component requires Dirichlet or positive Robin data; missing {missing.tolist()}")
+        raise ValueError("each connected component requires prescribed_temperature or a positive convection "
+                         f"heat_transfer_coefficient; missing {missing.tolist()}")
     cells = np.asarray(mesh.triangles)
     element = kernels.p1_stiffness(mesh, k)
     if measure.axisymmetric:
