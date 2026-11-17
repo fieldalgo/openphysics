@@ -91,8 +91,8 @@ def heat_problem(n, library):
     right = np.asarray(mesh.boundary["right"], dtype=int)  # an int array: JAX refuses list indexing
 
     def objective(*k):
-        result = solve_steady_heat(mesh, conductivity={f"layer{i}": v for i, v in enumerate(k)},
-                                   dirichlet={i: HOT for i in left}, convection={"right": (FILM, AMBIENT)})
+        result = solve_steady_heat(mesh, thermal_conductivity={f"layer{i}": v for i, v in enumerate(k)},
+                                   prescribed_temperature={i: HOT for i in left}, convection={"right": (FILM, AMBIENT)})
         return library.module.mean(result.temperature[right])
     return mesh, objective, dict(objective="mean temperature of the right edge, K",
                                  parameters="conductivity of the four layers, W/(m K)")
@@ -112,10 +112,10 @@ def transient_problem(n, library, steps):
     def objective(k, c, q, t0):
         # The uniform initial field equals the left Dirichlet value, so no projection is needed.
         result = solve_transient_heat(
-            mesh, conductivity=k, volumetric_heat_capacity=c, time_s=times,
-            initial_temperature_k=t0 * ones, dirichlet={i: t0 for i in left},
-            heat_source=lambda points, time_s: q * library.constant(1.0 + points[:, 0]))  # grows with x
-        return library.module.mean(result.temperature_k[-1][right_half])
+            mesh, thermal_conductivity=k, volumetric_heat_capacity=c, time=times,
+            initial_temperature=t0 * ones, prescribed_temperature={i: t0 for i in left},
+            heat_source_density=lambda points, time_s: q * library.constant(1.0 + points[:, 0]))  # grows with x
+        return library.module.mean(result.temperature[-1][right_half])
     return mesh, objective, dict(objective="mean final temperature of the right half, K",
                                  parameters="k, c, the source amplitude and the initial/left temperature",
                                  steps=steps)

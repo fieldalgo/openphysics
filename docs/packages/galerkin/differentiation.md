@@ -23,17 +23,17 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 
 | Solver | Inputs that may be JAX or PyTorch values |
 |---|---|
-| `solve_steady_heat` | `conductivity` (scalar or `{region name: value}`); `heat_source` (scalar, region table or a callback returning live values); `dirichlet` temperatures; `outward_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
+| `solve_steady_heat` | `thermal_conductivity` (scalar or `{region name: value}`); `heat_source_density` (scalar, region table or a callback returning live values); `prescribed_temperature` values; `inward_heat_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
 | `solve_steady_electric` | `conductivity` (scalar or region table); `dirichlet` and `reference_potential` volts; `outward_current` (scalar or callback returning live values) |
 | `solve_electrostatics`, `capacitance_matrix` | `permittivity` (real scalar or region table; complex permittivity is NumPy only); conductor and `reference_potential` volts; `charge_density` (scalar, region table or a callback returning live values). The capacitance matrix is returned in that library ([contract](electrostatics.md)) |
-| `solve_transient_heat` | `conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source` (scalar, region table or a callback `(points, time)` returning live values); `dirichlet` temperatures (scalars or callbacks `(time)` returning live values); `initial_temperature_k` |
+| `solve_transient_heat` | `thermal_conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source_density` (scalar, region table or a callback `(position, time)` returning live values); `prescribed_temperature` values (scalars or callbacks `(time)` returning live values); `initial_temperature` |
 | `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
 | `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
 | `solve_modes` | `eps_r` and `mu_r` (scalars or per-element arrays, real or complex) and `k0`; `n_eff`, `et` and `ez` are returned in that library. `n_target` only selects the modes and has no derivative; `coordinate_factors` must be NumPy |
 | `solve_cavity_box` | `lengths_m` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency_hz` only selects the modes |
 | `eval_edge_field` | `dofs` (real or complex), such as `et[i]` of `solve_modes`; the centroid field is returned in that library as float64 or complex128. The `EdgeSpace` is NumPy structure: its geometry and edge signs carry no derivative |
 
-The time grid `time_s` is structure, like the mesh. A transient callback must
+The time grid `time` is structure, like the mesh. A transient callback must
 return values of one library for the whole run: a callback that returns NumPy
 numbers at the first time and live values later is refused.
 
@@ -62,7 +62,7 @@ right = jnp.asarray(mesh.boundary["right"])
 
 
 def right_temperature(k, h):
-    result = solve_steady_heat(mesh, conductivity=k, dirichlet={i: 350.0 for i in left},
+    result = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature={i: 350.0 for i in left},
                                convection={"right": (h, 300.0)})
     return result.temperature[right].mean()
 

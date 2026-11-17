@@ -26,8 +26,8 @@ helpers target small reference meshes, not large production solves.
 
 Reference families are uniform_insulated, moving_affine, sine_manufactured,
 parent-independent small P1 matrices, smallest_dirichlet_mode and
-backward_euler_amplitude. The reference field object contains temperature_k,
-heat_flux_w_m2, heat_source_w_m3 and temperature_gradient_k_m. The semidiscrete
+backward_euler_amplitude. The reference field object contains temperature,
+heat_flux, heat_source_density and temperature_gradient (registry names, SI). The semidiscrete
 mode is deliberately distinct from a continuous PDE eigenfunction. Separate
 independent acceptance must not adopt producer/refsol values as its truth.
 
@@ -163,7 +163,8 @@ The distribution helper builds real sdist→wheel artifacts and checks that thei
 
 `tests/galerkin/test_transient_heat_robin.py` and
 `tests/refsol/test_transient_heat_robin_reference.py` fix these gates for the
-`outward_flux`/`convection` keywords. The references are the independent series
+`inward_heat_flux`/`convection` keywords (the solver negates the inward q_in into the outward g = −q_in of the
+equations here). The references are the independent series
 of `refsol.transient_heat_robin` (NumPy and SciPy `brentq` only, no engine
 import): a slab 0<x<L, insulated at x=0, uniform initial T0, with either
 convection h·(T−T_a) at x=L (eigenvalues β_n tan β_n = hL/k, one bracketed root
@@ -181,7 +182,7 @@ long-time limits and the truncation bound; they do not import the solver.
 | T2 constant-flux slab, temporal | n=128, 4/8/16 steps | both orders ≥ 0.9 |
 | T3 long-time limit | 8×4 rectangle, left 320 K Dirichlet, top g=−20, right (h=5, 300 K), Q=30; 8 steps of 100 s from 320 K vs `solve_steady_heat` with the same data on the same mesh | T, C, reaction and G within 1e-8 of their scales; final storage ≤ 1e-8 |
 | T4 heat balance | the T3 problem and two disconnected Robin-only strips with offsets 350 K and −20 K, callback h and g; storage = f + reaction − G − C per step and per component; C against independently assembled h·ℓ/6·[[2,1],[1,2]] and h·T_a·ℓ/2 | ≤ 1e-10 of the largest term |
-| T5 JAX/PyTorch | histories equal NumPy; d/d(h, T_a, g, k) of a final-temperature functional vs central differences | 1e-12; relative 1e-6 (skips without the libraries) |
+| T5 JAX/PyTorch | histories equal NumPy; d/d(h, T_a, q_in, k) of a final-temperature functional vs central differences | 1e-12; relative 1e-6 (skips without the libraries) |
 | T6 Dirichlet-only | the frozen text fixture `tests/galerkin/data/transient_heat_dirichlet_48720c9.json` (origin/main solver, two cases) and no boundary sampling call | bit-identical on the recorded platform, 1e-13 elsewhere |
 
 Measured on 2026-11-02 in the development environment (Linux x86_64, NumPy
@@ -198,8 +199,8 @@ not retuned from them.
 
 `tests/galerkin/test_transient_heat_time_boundary.py` and the periodic and
 ramped cases of `tests/refsol/test_transient_heat_robin_reference.py` fix these
-gates for time-dependent boundary values (`callback(time_s)` and
-`callback(points_m, outward_normals, time_s)`). The references are two further
+gates for time-dependent boundary values (`callback(time)` and
+`callback(position, outward_normal, time)`). The references are two further
 closed forms in `refsol.transient_heat_robin` (NumPy and SciPy `brentq` only,
 no engine import), derived in its module docstring. `PeriodicAmbientSlab`: slab
 0<x<L, insulated at x=0, convection h·(T−T_a(t)) at x=L with
@@ -207,7 +208,7 @@ T_a(t) = T_m + A sin(ωt); the periodic steady state is T_m + Im[Θ(x) e^{iωt}]
 with Θ(x) = A h cosh(qx)/(h cosh(qL) + k q sinh(qL)), q² = iω/α, and the
 backward-Euler time-discrete problem with the ambient sampled at the end of
 each step has the same form with q_d² = (1 − e^{−iωΔt})/(αΔt), which isolates
-the spatial error. `RampedFluxSlab`: outward flux g(t) = g0·t/τ at x=L,
+the spatial error. `_RampedFluxSlab` (private: its flux rate in W/(m² s) has no registry name): outward flux g(t) = g0·t/τ at x=L,
 insulated at x=0, uniform T0; Duhamel's integral of the constant-flux step
 response with the n⁻⁴ sum in closed form. The reference tests check the heat
 equation and both face conditions by finite differences, periodicity, the
@@ -229,7 +230,7 @@ is |Θ_fem − Θ_ref|/A, which bounds the amplitude and phase errors together.
 | U2 ramped flux, temporal | n=128, 4/8/16 steps | both orders ≥ 0.9 |
 | U3 constant callbacks | 8×4 rectangle with left Dirichlet ramp, source, top g, right (h, T_a): `lambda t: const` and `lambda p, n, t: full(const)` for g, h and T_a vs the constant values; boundary systems assembled once for static data, once per time for time-dependent data | every result array bit-identical |
 | U4 heat balance and sampling instant | the U3 rectangle and two disconnected Robin-only strips with g(t), h(t), T_a(t) all varying, scalar and field forms; storage = f + reaction − G_n − C_n per step and per component; C_n and G_n vs independently assembled h(t_{n+1})·ℓ/6·[[2,1],[1,2]], h·T_a(t_{n+1})·ℓ/2 and g(t_{n+1})·ℓ/2; G_n of `lambda t: t` sums to t_{n+1} | ≤ 1e-10 of the largest term; 1e-10 and 1e-12 relative |
-| U5 JAX/PyTorch | histories with time-dependent g and T_a (static h) equal NumPy; d/d(h, A, g-rate) of a final-temperature functional vs central differences; time-dependent h refused | 1e-12; relative 1e-6; ValueError (skips without the libraries) |
+| U5 JAX/PyTorch | histories with time-dependent g and T_a (static h) equal NumPy; d/d(h, A, q_in-rate) of a final-temperature functional vs central differences; time-dependent h refused | 1e-12; relative 1e-6; ValueError (skips without the libraries) |
 | U6 refusals | other signatures (0, 4 or variadic positionals, `(points, time)`), wrong shapes and booleans at index 0, NaN/infinity/negative h at a later step with the step index and time in the message, unchanged result shapes | ValueError / TransientHeatStepError |
 
 Measured on 2026-11-02 in the development environment (Linux x86_64, NumPy

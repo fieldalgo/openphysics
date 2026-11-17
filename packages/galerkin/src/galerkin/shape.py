@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Shape derivatives: derivatives with respect to a design parameter that moves the mesh.
 
-A design parameter t moves every node: X(t) = X0 + t W, with a fixed NumPy mesh
-velocity W of shape (N, 2) (metres of node motion per unit of t). Only t is live:
+A design parameter t moves every node: X(t) = X0 + t W, with a fixed NumPy design
+velocity W of shape (N, 2) (``design_velocity``: metres of node motion per unit of the
+dimensionless t). Only t is live:
 a JAX or PyTorch scalar whose number is the step at which the solve runs (usually
 0, the mesh as given). The connectivity, tags and regions stay fixed, so the
 derivative is the exact derivative of the discrete solution on the moving mesh.
@@ -12,8 +13,8 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
   curves (``simcase.geometry_velocity.DesignVelocity.node_velocity``): every other
   node moves by a harmonic extension of them.
 - ``admissible_interval`` is the exact range of t over which no element inverts.
-- ``MeshMotion(velocity, t)`` passed as ``motion=`` to a supported solver returns its
-  result fields with their derivative with respect to t.
+- ``MeshMotion(design_velocity=W, t=t)`` passed as ``motion=`` to a supported solver
+  returns its result fields with their derivative with respect to t.
 
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
 ``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
@@ -46,11 +47,15 @@ __all__ = ["MeshMotion", "ElementInversion", "admissible_interval", "extend_velo
 _EDGE_MASS = np.array([[2.0, 1.0], [1.0, 2.0]]) / 6.0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MeshMotion:
-    """Nodes at X0 + t * velocity; ``t`` is a JAX or PyTorch scalar (the design parameter step)."""
+    """Nodes at X0 + t * design_velocity; ``t`` is a JAX or PyTorch scalar (the design parameter step).
 
-    velocity: object
+    ``design_velocity`` is the (N, 2) NumPy node velocity in metres per unit of the
+    dimensionless t. Both are keyword-only.
+    """
+
+    design_velocity: object
     t: object
 
 
@@ -58,11 +63,12 @@ class ElementInversion(ValueError):
     """The motion inverts an element at the requested step."""
 
 
-def admissible_interval(mesh: Mesh, velocity) -> tuple[float, float]:
+def admissible_interval(mesh: Mesh, *, design_velocity) -> tuple[float, float]:
     """(t_lo, t_hi), t_lo < 0 < t_hi: the open interval of t in which every element of
-    X0 + t W keeps its orientation. Each signed area is a quadratic in t; its nearest
-    root on each side bounds the interval (inf when an element never inverts)."""
-    W = _velocity(mesh, velocity)
+    X0 + t W keeps its orientation (W = design_velocity, (N, 2) m per unit of t). Each
+    signed area is a quadratic in t; its nearest root on each side bounds the interval
+    (inf when an element never inverts)."""
+    W = _velocity(mesh, design_velocity)
     e1, e2, f1, f2 = _edges(mesh.nodes, W, mesh.triangles)
     a0 = _cross(e1, e2)
     a1 = _cross(e1, f2) + _cross(f1, e2)
@@ -127,45 +133,51 @@ def extend_velocity(mesh: Mesh, values, known, *, method: str = "harmonic"):
 
 # ----------------------------------------------------------------------------- steady heat
 
-def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, dirichlet, heat_source=0.0,
-                             outward_flux=None, convection=None, coordinate_system="cartesian"):
+def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conductivity, prescribed_temperature,
+                             heat_source_density=0.0, outward_heat_flux=None, convection=None,
+                             coordinate_system="cartesian"):
     """``thermal.solve_steady_heat`` on X0 + t W with the derivative with respect to ``motion.t``.
 
+    Internal (galerkin.kernels): reached through ``motion=``, after the public solver has
+    negated the inward flux, so this takes the outward heat flux (positive leaves the body).
     The numbers come from the ordinary solve on the moved mesh, with all its checks;
     the derivative is attached by one more live solve of the system assembled from
     the live node coordinates: T = T0 + A(t)^-1 (b(t) - A(t) T0), equal to T0 up to
     rounding."""
     from . import thermal
 
+    conductivity, dirichlet, heat_source, outward_flux = (thermal_conductivity, prescribed_temperature,
+                                                          heat_source_density, outward_heat_flux)
+
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     if coordinate_system != "cartesian":
         raise ValueError("motion: shape derivatives cover Cartesian heat in this slice; axisymmetric is refused")
-    _coefficient(conductivity, "conductivity")
-    _numpy_data(heat_source, "heat_source")
+    _coefficient(conductivity, "thermal_conductivity")
+    _numpy_data(heat_source, "heat_source_density")
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
         for tag, value in _tags(table, name).items():
-            _numpy_data(value, f"{name}[{tag!r}]")
+            _numpy_data(value, _boundary_label(name, tag))
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map node indices to temperatures in K")
+        raise ValueError("prescribed_temperature must map node indices to temperatures in K")
     for node, value in dirichlet.items():
         _numpy_data(value, "Dirichlet temperature", sampled=False)
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
-    lo, hi = admissible_interval(mesh, W)
+    lo, hi = admissible_interval(mesh, design_velocity=W)
     if not lo < t0 < hi:
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
                                f"({lo:g}, {hi:g}))")
     moved = _moved_mesh(mesh, W, t0)
-    base = thermal.solve_steady_heat(moved, conductivity=conductivity, dirichlet=dirichlet, heat_source=heat_source,
-                                     outward_flux=outward_flux, convection=convection)
+    base = thermal.solve_steady_heat_outward(moved, conductivity=conductivity, dirichlet=dirichlet,
+                                      heat_source=heat_source, outward_flux=outward_flux, convection=convection)
     n = mesh.num_nodes
     X = lift(xp, mesh.nodes) + t * lift(xp, W)
     tris = mesh.triangles
     b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
-    k = _per_triangle(mesh, conductivity, "conductivity", positive=True)
-    Q = _per_triangle(mesh, heat_source, "heat_source")
+    k = _per_triangle(mesh, conductivity, "thermal_conductivity", positive=True)
+    Q = _per_triangle(mesh, heat_source, "heat_source_density")
     kk = lift(xp, k)[:, None, None]
     element = kk * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) / (4.0 * area)[:, None, None]
     K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
@@ -202,8 +214,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, di
     grad_x = xp.sum(b * temperature[tris], axis=1) / (2.0 * area)
     grad_y = xp.sum(c * temperature[tris], axis=1) / (2.0 * area)
     flux = -lift(xp, k)[:, None] * xp.stack([grad_x, grad_y], axis=1)
-    return thermal.SteadyHeatResult(temperature, flux, load, reaction, residual, G, B, convective, rhs,
-                                    "cartesian", base.nodal_heat_rate_unit)
+    return thermal.PlanarSteadyHeatResult(temperature, flux, load, reaction, residual, G, B, convective, rhs)
 
 
 # ----------------------------------------------------------------------------- steady electric
@@ -218,7 +229,7 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
     from . import electric
 
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     if type(conductivity).__name__ == "ElementConductivity":
         raise TypeError("motion: conductivity is an ElementConductivity; give a scalar or a region table")
     _coefficient(conductivity, "conductivity")
@@ -232,7 +243,7 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
-    lo, hi = admissible_interval(mesh, W)
+    lo, hi = admissible_interval(mesh, design_velocity=W)
     if not lo < t0 < hi:
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
                                f"({lo:g}, {hi:g}))")
@@ -299,7 +310,7 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, young_modulus, po
     from . import elasticity
 
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
     moved = _checked_step(mesh, W, t)
     base = elasticity.solve_elasticity(moved, young_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
@@ -330,7 +341,7 @@ def motion_step(mesh: Mesh, motion: MeshMotion) -> MotionStep:
 
     For solver modules that assemble their own live system on X0 + t W."""
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     return MotionStep(xp, t, W, _checked_step(mesh, W, t))
 
 
@@ -345,10 +356,14 @@ def live_triangle_geometry(xp, mesh: Mesh, triangles, step: MotionStep):
 
 # ----------------------------------------------------------------------------- transient heat
 
-def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, volumetric_heat_capacity, time_s,
-                                initial_temperature_k, dirichlet, heat_source=0.0, outward_flux=None, convection=None,
-                                checkpoint_every=None, coordinate_system="cartesian"):
+def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conductivity, volumetric_heat_capacity,
+                                time, initial_temperature, prescribed_temperature, heat_source_density=0.0,
+                                outward_heat_flux=None, convection=None, checkpoint_every=None,
+                                coordinate_system="cartesian"):
     """``transient_heat.solve_transient_heat`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    Internal (galerkin.kernels): reached through ``motion=``, after the public solver has
+    negated the inward flux, so this takes the outward heat flux (positive leaves the body).
 
     The ordinary solve on the moved mesh gives the numbers and every step check. The
     initial temperatures and Dirichlet values stay attached to their nodes. Each
@@ -358,23 +373,26 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity,
     from . import transient_heat
     from .core.triangles import triangle_geometry
 
+    conductivity, time_s, initial_temperature_k, dirichlet, heat_source, outward_flux = (
+        thermal_conductivity, time, initial_temperature, prescribed_temperature, heat_source_density,
+        outward_heat_flux)
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     if coordinate_system != "cartesian":
         raise ValueError("motion: shape derivatives cover Cartesian transient heat in this slice; axisymmetric "
                          "is refused")
     if checkpoint_every is not None:
         raise ValueError("motion: checkpoint_every is not supported with a motion in this slice; every step is "
                          "kept")
-    _coefficient(conductivity, "conductivity")
+    _coefficient(conductivity, "thermal_conductivity")
     _coefficient(volumetric_heat_capacity, "volumetric_heat_capacity")
-    _numpy_data(heat_source, "heat_source")
+    _numpy_data(heat_source, "heat_source_density")
     if is_live(initial_temperature_k) or (isinstance(initial_temperature_k, (list, tuple))
                                           and any(is_live(v) for v in initial_temperature_k)):
-        raise TypeError("motion: initial_temperature_k is live; in this slice only the motion's t carries a "
+        raise TypeError("motion: initial_temperature is live; in this slice only the motion's t carries a "
                         "derivative")
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map integer nodes to Kelvin values")
+        raise ValueError("prescribed_temperature must map integer nodes to Kelvin values")
     for node, value in dirichlet.items():
         _time_only(value, "Dirichlet temperature")
     tables = {}
@@ -382,32 +400,32 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity,
         for tag, condition in _tags(table, name).items():
             values = condition if isinstance(condition, (tuple, list)) else (condition,)
             for value in values:
-                _time_only(value, f"{name}[{tag!r}]")
+                _time_only(value, _boundary_label(name, tag))
         tables[name] = _tags(table, name)
     moved = _checked_step(mesh, W, t)
-    base = transient_heat.solve_transient_heat(
+    base = transient_heat.solve_transient_heat_outward(
         moved, conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity, time_s=time_s,
         initial_temperature_k=initial_temperature_k, dirichlet=dirichlet, heat_source=heat_source,
         outward_flux=outward_flux, convection=convection)
-    if is_live(base.temperature_k):
+    if is_live(base.temperature):
         raise TypeError("motion: a callback returned a JAX or PyTorch value; with a motion, callbacks of time "
                         "must return NumPy numbers (t is the one live input)")
 
     n = mesh.num_nodes
     tris = mesh.triangles
-    times = np.asarray(base.time_s, dtype=float)
-    fixed = np.asarray(base.dirichlet_node_ids, dtype=int)
-    bc_history = np.asarray(base.dirichlet_temperatures_k, dtype=float)
-    initial = np.asarray(base.temperature_k[0], dtype=float)
+    times = np.asarray(base.time, dtype=float)
+    fixed = np.asarray(base.prescribed_node_ids, dtype=int)
+    bc_history = np.asarray(base.prescribed_temperature, dtype=float)
+    initial = np.asarray(base.temperature[0], dtype=float)
     _p, _t, _area, _exterior, count, labels = triangle_geometry(mesh)
     representatives = np.array([np.flatnonzero(labels == c)[0] for c in range(count)])
     offsets = initial[representatives][labels]
 
     X = lift(xp, mesh.nodes) + t * lift(xp, W)
     b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
-    k = _per_triangle(mesh, conductivity, "conductivity", positive=True)
+    k = _per_triangle(mesh, conductivity, "thermal_conductivity", positive=True)
     capacity = _per_triangle(mesh, volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
-    Q = _per_triangle(mesh, heat_source, "heat_source")
+    Q = _per_triangle(mesh, heat_source, "heat_source_density")
     rows, cols = np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel()
     stiff_e = lift(xp, k)[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
         / (4.0 * area)[:, None, None]
@@ -480,7 +498,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity,
             H_terms, G, shifted = natural(float(times[index]))
             terms += H_terms
             rhs = rhs + shifted - G
-        x0 = lift(xp, np.asarray(base.temperature_k[index], dtype=float) - offsets)
+        x0 = lift(xp, np.asarray(base.temperature[index], dtype=float) - offsets)
         A_x0 = sum((term.matvec(x0) for term in terms[1:]), terms[0].matvec(x0))
         target = bc_history[index] - offsets[fixed] - to_numpy(x0)[fixed]
         delta = core_solve.solve_dirichlet(terms, rhs - A_x0, {tuple(fixed): target} if len(fixed) else {})
@@ -502,12 +520,17 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, conductivity,
     stack = xp.stack
     loads = stack([load] * len(times))
     extra = (stack(history["G"]), stack(history["C"])) if has_natural else ()
-    return transient_heat.TransientHeatResult(
+    return transient_heat.PlanarTransientHeatResult(
         times, stack(history["T"]), stack(history["flux"]), loads, stack(history["reaction"]),
         stack(history["residual"]), stack(history["storage"]), stack(history["content"]),
-        stack(history["quadratic"]), fixed, bc_history, np.asarray(base.nodes_m), np.asarray(base.triangles),
-        base.conductivity_w_mk, base.volumetric_heat_capacity_j_m3k, *extra,
-        coordinate_system="cartesian", nodal_rate_unit=base.nodal_rate_unit)
+        stack(history["quadratic"]), fixed, bc_history, np.asarray(base.node_coordinates),
+        np.asarray(base.triangles), base.thermal_conductivity, base.volumetric_heat_capacity, *extra)
+
+
+def _boundary_label(name, tag):
+    """The message label of boundary data: the heat flux by its edge tag, as the public solvers take it
+    inward and hand it here outward (so neither keyword names it), convection by its keyword."""
+    return f"the heat flux on {tag!r}" if name == "outward_flux" else f"{name}[{tag!r}]"
 
 
 def _time_only(value, name):
@@ -525,9 +548,9 @@ def _time_only(value, name):
         p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) and p.default is p.empty]
     if required is not None and len(required) in (2, 3) and not any(p.kind is p.VAR_POSITIONAL for p in parameters):
         raise TypeError(f"motion: {name} is a callback of coordinates; with a moving mesh its sample points move "
-                        "too, which this slice does not differentiate. Give a constant or a callback(time_s)")
+                        "too, which this slice does not differentiate. Give a constant or a callback(time)")
     if required is None or len(required) != 1 or any(p.kind is p.VAR_POSITIONAL for p in parameters):
-        raise TypeError(f"motion: {name} must be a constant or a callback(time_s) with one positional parameter")
+        raise TypeError(f"motion: {name} must be a constant or a callback(time) with one positional parameter")
 
 
 # ----------------------------------------------------------------------------- thermoelasticity
@@ -544,7 +567,7 @@ def solve_thermoelasticity_moving(mesh: Mesh, temperature_snapshot, motion: Mesh
     from .core.triangles import triangle_geometry
 
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k)
     _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
     p, tris, *_ = triangle_geometry(mesh, counterclockwise=False)
@@ -573,7 +596,7 @@ def solve_steady_thermoelasticity_moving(mesh: Mesh, motion: MeshMotion, *, unit
     from ._thermal_mechanical_common import dirichlet_supports
 
     xp, t = _live_t(motion.t)
-    W = _velocity(mesh, motion.velocity)
+    W = _velocity(mesh, motion.design_velocity)
     _coefficient(conductivity, "conductivity")
     _numpy_data(heat_source, "heat_source")
     _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k)
@@ -590,8 +613,9 @@ def solve_steady_thermoelasticity_moving(mesh: Mesh, motion: MeshMotion, *, unit
         mechanical_dirichlet=mechanical_dirichlet, body_force=body_force)
     # The heat stage is solved once more here (the workflow's own heat result is NumPy); both solves take the
     # same inputs and agree to rounding. The snapshot and manifest stay those of the workflow above.
-    heat = solve_steady_heat_moving(mesh, motion, conductivity=conductivity,
-                                    dirichlet=dirichlet_supports(thermal_dirichlet), heat_source=heat_source)
+    heat = solve_steady_heat_moving(mesh, motion, thermal_conductivity=conductivity,
+                                    prescribed_temperature=dirichlet_supports(thermal_dirichlet),
+                                    heat_source_density=heat_source)
     mechanics = _thermoelastic_live(xp, mesh, moved, t, W, base.mechanics, heat.temperature,
                                     dirichlet_supports(mechanical_dirichlet, vector=True), body_force, None)
     return thermal_mechanical.SteadyThermoelasticResult(base.reference_mesh, heat, base.temperature_snapshot,
@@ -743,7 +767,7 @@ def _checked_step(mesh, W, t):
     t0 = float(to_numpy(t))
     if not math.isfinite(t0):
         raise ValueError(f"motion: t must be finite, got {t0!r}")
-    lo, hi = admissible_interval(mesh, W)
+    lo, hi = admissible_interval(mesh, design_velocity=W)
     if not lo < t0 < hi:
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
                                f"({lo:g}, {hi:g}))")

@@ -1156,15 +1156,20 @@ if (HARNESS / "compare.py").is_file():
             assert found, f"kind {kind}, {description}: passes"
 
     def test_phase3_compares_a_repeat_and_detects_a_one_ulp_change(slab_recording):
-        """compare.py --phase3 with the committed rules: two recordings of this checkout are equal
-        and declare the same targets; a one-ulp conductivity fails at the bound solver call."""
+        """compare.py --phase3 on two recordings of this checkout: they are equal and declare the same
+        targets; a one-ulp conductivity fails at the bound solver call. The committed rules map the
+        baseline's calls to this checkout's, so a repeat of this checkout is compared with no rule entry
+        (the committed entries would map head calls as baseline ones, and unused entries are problems)."""
         manifest = json.loads((slab_recording / "rec_a" / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["install"]["targets_source"] == "tools/units_batch/targets.json"
         assert not manifest["install"]["targets_missing"] and not manifest["install"]["targets_shadowed"]
-        same = _compare(slab_recording / "rec_a", slab_recording / "rec_b", "--phase3")
+        committed = json.loads((HARNESS / "phase3_rules.json").read_text(encoding="utf-8"))
+        none = slab_recording / "no_rule_entries.json"
+        none.write_text(json.dumps({"format": committed["format"], "entries": []}), encoding="utf-8")
+        same = _compare(slab_recording / "rec_a", slab_recording / "rec_b", "--phase3", "--rules", str(none))
         assert same.returncode == 0, same.stdout + same.stderr
         assert "1 documents compared: 1 equal, 0 different; 0 other problems" in same.stdout
-        nudged = _compare(slab_recording / "rec_a", slab_recording / "rec_ulp", "--phase3")
+        nudged = _compare(slab_recording / "rec_a", slab_recording / "rec_ulp", "--phase3", "--rules", str(none))
         assert nudged.returncode == 1, nudged.stdout
         assert "galerkin.thermal.solve_steady_heat.bound" in nudged.stdout
         assert "fields.npz temperature" in nudged.stdout

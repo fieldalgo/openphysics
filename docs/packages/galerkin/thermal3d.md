@@ -32,35 +32,37 @@ mesh = from_mesher(extrude(generate(d, box_sides(0, 1.0, 0, 0.8)), [0.0, 0.2, 0.
                            {"chip": ["substrate", "die", "mold"]}, size=0.1))
 result = solve_steady_heat_3d(
     mesh,
-    conductivity={"substrate": 1.0, "die": 0.01, "mold": 0.5},
-    dirichlet=dirichlet_from_faces(mesh, {"z0": 320.0, "z1": 300.0}),
-    heat_source={"substrate": 0.0, "die": 2e5, "mold": 0.0},
+    thermal_conductivity={"substrate": 1.0, "die": 0.01, "mold": 0.5},
+    prescribed_temperature=dirichlet_from_faces(mesh, {"z0": 320.0, "z1": 300.0}),
+    heat_source_density={"substrate": 0.0, "die": 2e5, "mold": 0.0},
 )
 ```
 
 | Input | Contract / units |
 | --- | --- |
 | mesh | `galerkin.Mesh3D` in metres: `from_mesher` of a meshine or gmshio mesh, or `box_mesh`. Face tags are needed only by `dirichlet_from_faces`. |
-| conductivity | finite k > 0 in W/(m K), or `{region name: k}` with exactly the entries of `mesh.region_names` |
-| dirichlet | `{node index: temperature K}`; every node on the exterior boundary and every connected component of the mesh anchored by at least one |
-| heat_source | Q in W/m^3, `{region name: Q}`, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default zero |
+| thermal_conductivity | finite k > 0 in W/(m K), or `{region name: k}` with exactly the entries of `mesh.region_names` |
+| prescribed_temperature | `{node index: temperature K}`; every node on the exterior boundary and every connected component of the mesh anchored by at least one |
+| heat_source_density | Q in W/m^3, `{region name: Q}`, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default `None`, no source |
 
 `dirichlet_from_faces(mesh, {face tag: T})` turns tags into the node map and
 refuses a node that two tags would set to different temperatures. It is a helper of
 the internal `galerkin.kernels` (consistent units: kelvin here), not of the public API.
 
-| Result field | Meaning and units |
+| Result field (`SteadyHeat3DResult`, frozen) | Meaning and units |
 | --- | --- |
 | `temperature` | `(N,)` K |
 | `heat_flux` | `(T, 3)` W/m^2, `-k grad T` per tetrahedron |
-| `load` | `(N,)` W, the source load `Q V / 4` per node of each tetrahedron |
-| `reaction` | `(N,)` W, `K T - load` on the Dirichlet nodes, zero elsewhere; positive injects heat |
-| `residual` | `(N,)` W, `K T - load` everywhere |
-| `conductivity`, `heat_source` | `(T,)` values used |
-| `balance_error` | `abs(sum(load) + sum(reaction))` over the total absolute nodal heat |
-| `dirichlet_nodes` | sorted node indices that were fixed |
+| `generated_heat_rate` | `(N,)` W, the source load `Q V / 4` per node of each tetrahedron |
+| `reaction_heat_rate` | `(N,)` W, `K T - load` on the Dirichlet nodes, zero elsewhere; positive injects heat |
+| `residual_heat_rate` | `(N,)` W, `K T - load` everywhere |
+| `thermal_conductivity`, `heat_source_density` | `(T,)` values used |
+| `relative_conservation_residual` | `abs(sum(load) + sum(reaction))` over the total absolute nodal heat |
+| `prescribed_node_ids` | sorted node indices that were fixed |
 
-Nodal heat rates are watts, not per depth. The solver raises `ValueError` when
+Nodal heat rates are watts, not per depth, so the fields have no `_per_depth`
+(asking for one raises an `AttributeError` that says why); `.units` maps each
+quantity field to its SI unit. The solver raises `ValueError` when
 the free residual exceeds `1e-10` of the system scale or the heat balance exceeds
 `1e-10`, so a returned result has passed both. NumPy only: JAX or PyTorch values
 raise `TypeError`; no derivative path exists here.
@@ -69,11 +71,12 @@ raise `TypeError`; no derivative path exists here.
 
 `refsol.thermal3d` provides two independent closed forms:
 
-- `sine_product(points, lengths, conductivity, reference_temperature, amplitude)`:
+- `sine_product(points, *, length, thermal_conductivity, reference_temperature, temperature_difference)`:
   `T = T0 + A sin(pi x/Lx) sin(pi y/Ly) sin(pi z/Lz)` with its flux and source
   `Q = k pi^2 (1/Lx^2 + 1/Ly^2 + 1/Lz^2) (T - T0)`, `T = T0` on the six faces.
-- `layered_slab(points, interfaces, conductivities, bottom_temperature, top_temperature)`:
-  series conduction along z without a source; piecewise-linear temperature and a
+- `layered_slab(points, *, position, thermal_conductivity, prescribed_temperature)`:
+  series conduction along z without a source (`position` the layer boundaries from the
+  bottom face, `prescribed_temperature` the pair (bottom, top)); piecewise-linear temperature and a
   uniform flux `(T_bottom - T_top) / sum(d_i / k_i)`, exact in P1 when the layer
   boundaries are node planes.
 
@@ -85,7 +88,7 @@ box (no Gmsh), with the pre-registered gates of the 3D opening:
 | --- | --- | --- |
 | Sine product, k = 2.5, sizes 0.2, 0.1, 0.05 m, source at centroids | L2 order >= 1.8, H1 order >= 0.9 (least-squares slope over the three meshes) | L2 errors 6.12e-2, 1.70e-2, 4.46e-3 (order 1.889); H1 errors 8.17e-1, 4.30e-1, 2.20e-1 (order 0.946) |
 | Three-layer slab 0.2 / 0.1 / 0.3 m with k = 1, 0.01, 0.5, 320 K to 300 K, size 0.15 m | temperature error <= 1e-10 of the 20 K drop; flux <= 1e-9; hot-face reaction = flux x area | passes (roundoff) |
-| Every solve | `balance_error <= 1e-10` | enforced by the solver |
+| Every solve | `relative_conservation_residual <= 1e-10` | enforced by the solver |
 
 `tests/refsol/test_thermal3d_reference.py` checks the references themselves:
 flux and source against finite differences, the slab against the series formula,

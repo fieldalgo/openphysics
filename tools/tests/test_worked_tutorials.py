@@ -39,10 +39,10 @@ def test_first_heat_examples_match_independent_uniform_references():
     assert joule.thermal.temperature.max() == pytest.approx(300.3, abs=1e-8, rel=0)
     assert joule.source_power_per_length == pytest.approx(6., abs=1e-8, rel=0)
     transient = runpy.run_path(str(ROOT / 'examples/galerkin/transient_heat_uniform.py'))['result']
-    expected = np.broadcast_to(300. + 2. * transient.time_s[:, None], transient.temperature_k.shape)
-    np.testing.assert_allclose(transient.temperature_k, expected, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(transient.heat_content_j_per_m - transient.heat_content_j_per_m[0],
-                               8. * transient.time_s, rtol=0, atol=1e-10)
+    expected = np.broadcast_to(300. + 2. * transient.time[:, None], transient.temperature.shape)
+    np.testing.assert_allclose(transient.temperature, expected, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(transient.stored_heat_per_depth - transient.stored_heat_per_depth[0],
+                               8. * transient.time, rtol=0, atol=1e-10)
 
 
 @pytest.mark.parametrize('size', [4., 2.])

@@ -14,7 +14,7 @@
 |---|---|---|
 | 이상적인 온도 제어 표면 | K 단위 Dirichlet 온도 | 필요한 열 유입을 솔버가 `reaction`으로 계산 |
 | 열 교환 없음 | 지정하지 않은 자연 경계 | 단열이며 온도 고정은 아님 |
-| 알려진 외향 열유속 | `outward_flux`, W/m² | 양수는 열 제거, 음수는 열 주입 |
+| 알려진 몸체로 들어오는 열유속 | `inward_heat_flux`, W/m² | 양수는 열 주입, 음수는 열 제거(문서와 galerkin 열 솔버 모두) |
 | 주위 매질과 열 교환 | `convection`, h와 주위 온도 K | 외향 q·n=h(T−Tamb); 주위가 더 뜨거우면 열 유입 |
 
 지원되는 같은 모서리의 열유속과 대류는 합산됩니다. 양 끝 노드가 온도 고정된 모서리에는
@@ -24,7 +24,8 @@ h=0은 온도 기준이 아닙니다. 완전 단열 과도 문제는 저장 항�
 초기장에서 진화할 수 있습니다. 과도 열전도는 현재 flux/Robin을 지원하지 않으며,
 정상 열→역학 wrapper도 독립 열 솔버의 모든 경계 확장을 받지는 않습니다.
 
-정상 열에서 `sum(load + reaction)`은 처방 외향 열과 대류 유출의 합입니다.
+정상 열에서 `sum(generated + reaction)`(`generated_heat_rate_per_depth`와
+`reaction_heat_rate_per_depth` 필드)은 처방 외향 열과 대류 유출의 합입니다.
 온도 고정 경계의 외향 열은 **reaction의 음수**입니다. 양의 reaction은 물체로 들어오는
 열입니다. 정확한 방정식과 callback 규칙은 [flux/Robin 계약](../packages/galerkin/thermal_flux_robin.md)을 따릅니다.
 

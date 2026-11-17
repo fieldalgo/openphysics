@@ -102,7 +102,7 @@ Boundary/configuration은 snapshot 메시 checksum으로 인증하지 않고 man
 | 멤버 | 계약 |
 | --- | --- |
 | reference_mesh | 격리된 소유 Mesh; SI 기준 절점, 반환 후 가변 |
-| heat | 기존 SteadyHeatResult; temperature/flux/load/reaction/residual |
+| heat | 정상 열 결과 `PlanarSteadyHeatResult`: temperature, heat_flux와 깊이당 생성·reaction·residual 열률(`*_heat_rate_per_depth`) |
 | temperature_snapshot | 실제 기계단계에 전달한 불변 TemperatureSnapshot |
 | mechanics | 기존 ThermoelasticResult; 장·분리된 하중·반력·물리 에너지 |
 | manifest_json | 불변 canonical JSON 문자열 |

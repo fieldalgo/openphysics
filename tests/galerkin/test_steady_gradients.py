@@ -84,13 +84,15 @@ def _heat(k, q, t0, g, h, ambient, *, name=None):
     def source(points):
         y = points[:, 1] if name is None else _wrap(name, points[:, 1])
         return q * (2.0 - y)
-    return solve_steady_heat(MESH, conductivity=k, dirichlet={i: t0 for i in LEFT}, heat_source=source,
-                             outward_flux={"top": flux}, convection={"right": (h, ambient)})
+    return solve_steady_heat(MESH, thermal_conductivity=k, prescribed_temperature={i: t0 for i in LEFT}, heat_source_density=source,
+                             inward_heat_flux={"top": lambda p, n: -flux(p, n)}, convection={"right": (h, ambient)})
 
 
 HEAT = (2.0, 50.0, 300.0, 3.0, 10.0, 290.0)
-HEAT_FIELDS = ("temperature", "heat_flux", "load", "reaction", "residual", "prescribed_outward_load",
-               "ambient_load", "convective_outward", "system_rhs")
+HEAT_FIELDS = ("temperature", "heat_flux", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+               "residual_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth",
+               "ambient_convective_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+               "applied_heat_rate_per_depth")
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -120,7 +122,7 @@ def test_heat_slab_right_temperature_matches_closed_form(name):
     right = np.asarray(MESH.boundary["right"], dtype=int)
 
     def fem(k, h, t0, ta):
-        r = solve_steady_heat(MESH, conductivity=k, dirichlet={i: t0 for i in LEFT}, convection={"right": (h, ta)})
+        r = solve_steady_heat(MESH, thermal_conductivity=k, prescribed_temperature={i: t0 for i in LEFT}, convection={"right": (h, ta)})
         return r.temperature[right].mean()
 
     def closed(k, h, t0, ta):
@@ -142,9 +144,9 @@ def test_heat_region_conductivity_and_source_tables(name):
     right = [int(i) for i in mesh.boundary["right"]]
 
     def solve(k0, k1, q0, q1, t_left):
-        r = solve_steady_heat(mesh, conductivity={"layer0": k0, "layer1": k1},
-                              heat_source={"layer0": q0, "layer1": q1},
-                              dirichlet={**{i: t_left for i in left}, **{i: 300.0 for i in right}})
+        r = solve_steady_heat(mesh, thermal_conductivity={"layer0": k0, "layer1": k1},
+                              heat_source_density={"layer0": q0, "layer1": q1},
+                              prescribed_temperature={**{i: t_left for i in left}, **{i: 300.0 for i in right}})
         return (r.temperature**2).mean()
     values = (1.5, 4.0, 20.0, -7.0, 320.0)
     np.testing.assert_allclose(_gradient(name, solve, values), _central(solve, values), rtol=2e-6)
@@ -157,8 +159,8 @@ def test_heat_live_dirichlet_with_element_heat_source(name):
     right = [int(i) for i in MESH.boundary["right"]]
 
     def solve(t0, t1):
-        r = solve_steady_heat(MESH, conductivity=3.0, heat_source=source,
-                              dirichlet={**{i: t0 for i in LEFT}, **{i: t1 for i in right}})
+        r = solve_steady_heat(MESH, thermal_conductivity=3.0, heat_source_density=source,
+                              prescribed_temperature={**{i: t0 for i in LEFT}, **{i: t1 for i in right}})
         return r.heat_flux[:, 0].sum()
     values = (310.0, 290.0)
     np.testing.assert_allclose(_gradient(name, solve, values), _central(solve, values), rtol=1e-6)
@@ -247,8 +249,8 @@ def test_single_precision_jax_is_refused():
 def test_mixing_jax_and_torch_is_refused():
     jax, torch = _jax(), _torch()
     with pytest.raises(TypeError, match="namespaces"):
-        solve_steady_heat(MESH, conductivity=jax.numpy.asarray(2.0),
-                          dirichlet={i: torch.tensor(300.0, dtype=torch.float64) for i in LEFT})
+        solve_steady_heat(MESH, thermal_conductivity=jax.numpy.asarray(2.0),
+                          prescribed_temperature={i: torch.tensor(300.0, dtype=torch.float64) for i in LEFT})
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -282,7 +284,7 @@ def test_a_singular_heat_or_electric_system_is_one_value_error(name):
     small for SuperLU to factor, so every library reports the same singular system."""
     k = 5e-324 if name is None else _wrap(name, 5e-324)
     with pytest.raises(ValueError, match="^singular or ill-conditioned constrained heat system$"):
-        solve_steady_heat(MESH, conductivity=k, dirichlet={i: 300.0 for i in LEFT}, heat_source=1.0)
+        solve_steady_heat(MESH, thermal_conductivity=k, prescribed_temperature={i: 300.0 for i in LEFT}, heat_source_density=1.0)
     right = [int(i) for i in MESH.boundary["right"]]
     with pytest.raises(ValueError, match="^singular or ill-conditioned electric system$"):
         solve_steady_electric(MESH, conductivity=k,

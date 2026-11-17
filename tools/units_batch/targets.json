@@ -5,6 +5,7 @@
   "meshine.refine:generate",
   "galerkin.mesh:rectangle_mesh",
   "galerkin.thermal:solve_steady_heat",
+  "galerkin.thermal:solve_steady_heat_outward",
   "galerkin.transient_heat:solve_transient_heat",
   "galerkin.electric:solve_steady_electric",
   "galerkin.joule_heating:solve_steady_joule_heat",

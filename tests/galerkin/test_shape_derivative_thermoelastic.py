@@ -93,7 +93,7 @@ def _snapshot_solve(m, W, t, plane="stress", temperature=None, tref=290.0):
     T = _plate_temperature(m) if temperature is None else temperature
     return solve_thermoelasticity(m, freeze_temperature(m, T), reference_temperature_k=tref, plane=plane,
                                   dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
-                                  traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(W, t),
+                                  traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(design_velocity=W, t=t),
                                   **MATERIALS)
 
 
@@ -104,7 +104,7 @@ def _workflow_solve(m, W, t, plane="stress"):
         m, units=UNITS, conductivity={"host": 160.0, "core": 20.0}, thermal_dirichlet={**hot, **cold},
         heat_source={"host": 0.0, "core": 5e6}, plane=plane, reference_temperature_k=300.0,
         mechanical_dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
-        motion=None if t is None else MeshMotion(W, t), **MATERIALS)
+        motion=None if t is None else MeshMotion(design_velocity=W, t=t), **MATERIALS)
 
 
 def _functionals(m, mech, xp):
@@ -229,7 +229,7 @@ def test_t2_free_expansion_length(name, plane):
     def delta(t):
         r = solve_thermoelasticity(m, snapshot, reference_temperature_k=293.0, thermal_expansion_per_k=alpha,
                                    young_modulus=80e9, poisson_ratio=nu, plane=plane, dirichlet=dirichlet,
-                                   motion=MeshMotion(W, t))
+                                   motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
     value, grad = _gradient(name, delta)
@@ -291,7 +291,7 @@ def test_t3_thick_cylinder_heat_chained(name):
             r = solve_steady_thermoelasticity(
                 mesh, units=UNITS, conductivity=1.0, thermal_dirichlet=heat, young_modulus=E, poisson_ratio=nu,
                 plane="strain", thermal_expansion_per_k=alpha, reference_temperature_k=Tref,
-                mechanical_dirichlet=clamp, motion=MeshMotion(W, t))
+                mechanical_dirichlet=clamp, motion=MeshMotion(design_velocity=W, t=t))
             return xp.sum(r.mechanics.reaction[nodes] * xp.asarray(radial))
 
         value, grad = _gradient(name, force)
@@ -320,7 +320,7 @@ def test_t4_clamped_series_bar_interface(name):
     def sigma(t):
         r = solve_thermoelasticity(m, snapshot, reference_temperature_k=300.0,
                                    thermal_expansion_per_k={"a": a1, "b": a2}, young_modulus={"a": E1, "b": E2},
-                                   poisson_ratio=0.0, plane="stress", dirichlet=dirichlet, motion=MeshMotion(W, t))
+                                   poisson_ratio=0.0, plane="stress", dirichlet=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
         return r.stress[0, 0]
 
     def exact(L1):
@@ -363,7 +363,7 @@ def test_t6_reduces_to_elasticity_without_temperature_change(name, plane):
                    dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)})
     for pick in (lambda r: r.displacement[tip, 1], lambda r: xp.sum(r.reaction[left, 0])):
         _v, d_thermo = _gradient(name, lambda t: pick(_snapshot_solve(m, W, t, plane, uniform, tref=290.0)))
-        _v, d_elastic = _gradient(name, lambda t: pick(solve_elasticity(m, motion=MeshMotion(W, t), **elastic)))
+        _v, d_elastic = _gradient(name, lambda t: pick(solve_elasticity(m, motion=MeshMotion(design_velocity=W, t=t), **elastic)))
         assert rel(d_thermo, d_elastic) <= 1e-12, (d_thermo, d_elastic)
 
 
@@ -406,7 +406,7 @@ def test_t8_snapshot_refusals():
     def call(**over):
         kw = {**common, **over}
         snapshot = kw.pop("snapshot", snap)
-        return solve_thermoelasticity(m, snapshot, motion=MeshMotion(W, kw.pop("t", t)), **kw)
+        return solve_thermoelasticity(m, snapshot, motion=MeshMotion(design_velocity=W, t=kw.pop("t", t)), **kw)
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)
@@ -440,7 +440,7 @@ def test_t8_snapshot_refusals():
         call(young_modulus=lambda: 70e9)
     with pytest.raises(ValueError, match="stale or mismatched mesh"):
         call(snapshot=freeze_temperature(_moved(m, W, 0.01), _plate_temperature(m)))
-    lo, hi = __import__("galerkin.shape", fromlist=["admissible_interval"]).admissible_interval(m, W)
+    lo, hi = __import__("galerkin.shape", fromlist=["admissible_interval"]).admissible_interval(m, design_velocity=W)
     with pytest.raises(ElementInversion):
         call(t=xp.asarray(hi * 1.01))
 
@@ -456,7 +456,7 @@ def test_t8_workflow_refusals():
 
     def call(**over):
         kw = {**common, **over}
-        return solve_steady_thermoelasticity(m, motion=MeshMotion(W, kw.pop("t", t)), **kw)
+        return solve_steady_thermoelasticity(m, motion=MeshMotion(design_velocity=W, t=kw.pop("t", t)), **kw)
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)

@@ -80,7 +80,7 @@ def joule(n, relaxation):
                   source_power_w_per_m=float(result.source_power_per_length),
                   outward_heat_w_per_m=float(result.outward_heat_per_length),
                   temperature_max_k=float(result.thermal.temperature.max()),
-                  max_abs_free_heat_residual_w_per_m=free_residual(result.thermal.residual, voltage))
+                  max_abs_free_heat_residual_w_per_m=free_residual(result.thermal.residual_heat_rate_per_depth, voltage))
     return sample
 
 

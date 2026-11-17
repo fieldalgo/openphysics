@@ -19,8 +19,8 @@ solvers follow the same frame later.
 ## What is differentiated
 
 A design parameter t moves every node: **X(t) = X₀ + t·W**.
-- **W** is a fixed NumPy mesh velocity of shape (N, 2): node motion in the
-  mesh's length unit per unit of t.
+- **W** is a fixed NumPy mesh velocity of shape (N, 2), `MeshMotion.design_velocity`
+  (keyword-only, like `t`): node motion in the mesh's length unit per unit of t.
 - **t** is the only live value, a JAX or PyTorch scalar. Its number is the step
   at which the solve runs, usually 0, i.e. the mesh as given.
 - Connectivity, tags and regions stay fixed.
@@ -34,8 +34,8 @@ check, residual tolerance and heat balance applies unchanged. One more live
 solve then attaches the derivative: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). Here A(t)
 and b(t) are assembled from X₀ + t·W in the live library (P1 stiffness, region
 sources, and the flux and Robin terms on the moving edges), and T equals T₀ up to
-rounding. `temperature`, `heat_flux`, `load`, `reaction` and `residual` carry the
-derivative.
+rounding. `temperature`, `heat_flux`, `generated_heat_rate_per_depth`,
+`reaction_heat_rate_per_depth` and `residual_heat_rate_per_depth` carry the derivative.
 
 ```python
 import jax
@@ -45,12 +45,13 @@ from galerkin.thermal import solve_steady_heat
 
 jax.config.update("jax_enable_x64", True)
 W = extend_velocity(mesh, boundary_velocity, on_curve)   # (N, 2)
-lo, hi = admissible_interval(mesh, W)                    # no element inverts for lo < t < hi
+lo, hi = admissible_interval(mesh, design_velocity=W)                    # no element inverts for lo < t < hi
 
 
 def heat_in(t):
-    r = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, motion=MeshMotion(W, t))
-    return jnp.sum(r.reaction[hot])
+    r = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet,
+                          motion=MeshMotion(design_velocity=W, t=t))
+    return jnp.sum(r.reaction_heat_rate_per_depth[hot])
 
 
 dQ = jax.grad(heat_in)(jnp.asarray(0.0))
@@ -61,7 +62,7 @@ and call `.backward()`.
 
 ## Steady electric conduction
 
-`solve_steady_electric(mesh, ..., motion=MeshMotion(W, t))` works the same way:
+`solve_steady_electric(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))` works the same way:
 - The ordinary solve runs on the moved mesh, with its residual, current-balance
   and power-balance checks.
 - One live solve re-assembles the system from X₀ + t·W: P1 stiffness with region
@@ -82,7 +83,7 @@ and call `.backward()`.
 
 ## Linear elasticity
 
-`solve_elasticity(mesh, ..., motion=MeshMotion(W, t))` takes plane stress and
+`solve_elasticity(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))` takes plane stress and
 plane strain, scalar or region Young's modulus and Poisson ratio, a constant body
 force, constant tractions on boundary tags (they move with their edges) and
 Dirichlet displacements `{(node, component): value}`. The displacement, strain,
@@ -97,7 +98,7 @@ stress, load, reaction and residual carry d/dt.
 Two paths take `motion=`. They differ in how the temperature field moves with the
 mesh.
 - **A prescribed temperature**, `solve_thermoelasticity(mesh, snapshot, ...,
-  motion=MeshMotion(W, t))`:
+  motion=MeshMotion(design_velocity=W, t=t))`:
   - The snapshot belongs to the mesh as given (X₀) and is checked against it, as
     without a motion.
   - Its nodal temperatures stay attached to their nodes as they move, like
@@ -106,7 +107,7 @@ mesh.
   - It takes what linear elasticity takes, plus scalar or region thermal expansion
     and the reference temperature.
 - **The heat-then-mechanics workflow**, `solve_steady_thermoelasticity(...,
-  motion=MeshMotion(W, t))`:
+  motion=MeshMotion(design_velocity=W, t=t))`:
   - The ordinary workflow runs once on the moved mesh, with every stage check and
     its manifest.
   - The heat stage is then solved again on the moving mesh (as in steady heat
@@ -123,8 +124,8 @@ mesh.
 
 ## Transient heat
 
-`solve_transient_heat(mesh, ..., motion=MeshMotion(W, t))` takes region
-conductivity and heat capacity, a constant or region heat source, outward flux and
+`solve_transient_heat(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))` takes region
+conductivity and heat capacity, a constant or region heat source, the inward heat flux and
 convection on boundary tags (they move with their edges), and Dirichlet values.
 - The ordinary backward-Euler solve runs once on the moved mesh, with every step
   check.
@@ -134,8 +135,8 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
   content, quadratic functional, and the prescribed and convective outward rates.
 - The initial temperatures and the Dirichlet values stay attached to their nodes
   as they move, as in thermoelasticity.
-- Callbacks of time alone, `callback(time_s)`, are taken for the Dirichlet values,
-  the outward flux and the convection h and ambient. They do not depend on node
+- Callbacks of time alone, `callback(time)`, are taken for the Dirichlet values,
+  the inward heat flux and the convection h and ambient. They do not depend on node
   positions. A callback of time must return NumPy numbers and must be pure: it is
   called once for the ordinary solve and once more for the derivative. (A
   time-dependent h that returns a live value gets the solver's own refusal of a
@@ -144,7 +145,7 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
 
 ## Waveguide modes
 
-`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(W, t))` takes eps_r
+`solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))` takes eps_r
 and mu_r as scalars or per-element arrays (real or complex), PEC nodes and edges as
 without a motion, and numbers for k0 and n_target.
 - The NumPy eigensolve runs on the moved mesh.
@@ -194,7 +195,7 @@ decides how far a step can go before an element inverts.
 ## Element inversion and remeshing
 
 Each element's signed area under X₀ + t·W is a quadratic in t.
-`admissible_interval(mesh, W)` returns the nearest roots on each side over all
+`admissible_interval(mesh, design_velocity=W)` returns the nearest roots on each side over all
 elements: the open interval in which no element inverts. A solve at a step
 outside it raises `galerkin.shape.ElementInversion`, which names the interval.
 The derivative at t = 0 is always defined.
@@ -213,7 +214,7 @@ Each refusal names the reason:
   mesh, move the nodes and solve that mesh;
 - a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
 - a step outside the admissible interval (`ElementInversion`);
-- coordinate callbacks for the heat source, outward flux, convection, outward
+- coordinate callbacks for the heat source, boundary heat flux, convection, outward
   current, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat;
@@ -322,7 +323,7 @@ measured that day with the same versions.
 
 | Check | Criterion | Result |
 |---|---|---|
-| H1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a final probe temperature, the final Dirichlet reaction sum, the final heat content and a weighted sum of the whole temperature history, with two materials, a source, a nonuniform initial temperature, a Dirichlet side and an outward flux that depend on time, and convection on a moving side; relative 1e-6, JAX and PyTorch | 1.2e-11 to 3.5e-9 |
+| H1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a final probe temperature, the final Dirichlet reaction sum, the final heat content and a weighted sum of the whole temperature history, with two materials, a source, a nonuniform initial temperature, a Dirichlet side and a boundary heat flux that depend on time, and convection on a moving side; relative 1e-6, JAX and PyTorch | 1.2e-11 to 3.5e-9 |
 | H2 uniform solution | insulated, uniform initial temperature and source: the discrete solution is T₀ + Q t_n/c on any mesh, so dC_n/dt = (c T₀ + Q t_n) dA/dt; relative 1e-10 | pass |
 | H3 decaying sine, bar length | Dirichlet ends, initial sin(πx/L) on the nodes, the bar stretched; d/dL of the final heat content against the closed form; (nx, steps) = (10, 10), (20, 40), (40, 160); observed order ≥ 1.0, finest within 1e-2 | 2.0e-2, 5.1e-3, 1.3e-3 (order 2.0 and 2.0) |
 | H4 steady limit | after the solution reaches steady state, the probe derivative equals steady heat's, relative 1e-8 | pass |

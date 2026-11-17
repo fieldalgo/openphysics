@@ -3,10 +3,14 @@
 """NumPy-only transient heat reference fields and small dense P1 algebra.
 
 Independent of engine, existing references and production assembly. SI metres,
-seconds, Kelvin. Dense matrix/mode helpers are for small reference meshes.
+seconds, Kelvin, keyword-only registry names after the leading positional ``points``
+(or ``nodes``); a str for a quantity raises TypeError. Dense matrix/mode helpers are
+for small reference meshes.
 """
 from dataclasses import dataclass
 import numpy as np
+
+from ._checks import refuse_text
 
 __all__ = ["TransientHeatFields", "uniform_insulated", "moving_affine", "sine_manufactured",
            "p1_matrices", "smallest_dirichlet_mode", "backward_euler_amplitude"]
@@ -30,53 +34,58 @@ def _scalar(value, name, positive=False):
 
 
 def _points(points):
-    p = _real(points, "points_m")
+    p = _real(points, "points")
     if p.ndim != 2 or p.shape[1] != 2:
-        raise ValueError("points_m must have shape (Q,2)")
+        raise ValueError("points must have shape (Q,2)")
     return p
 
 
 @dataclass
 class TransientHeatFields:
-    temperature_k: np.ndarray
-    heat_flux_w_m2: np.ndarray
-    heat_source_w_m3: np.ndarray
-    temperature_gradient_k_m: np.ndarray
+    temperature: np.ndarray
+    heat_flux: np.ndarray
+    heat_source_density: np.ndarray
+    temperature_gradient: np.ndarray
 
 
-def uniform_insulated(points_m, time_s, *, volumetric_heat_capacity,
-                      heat_source=0., initial_temperature_k=300., initial_time_s=0.):
-    """Continuous and BE-exact constant-source insulated uniform field."""
-    p = _points(points_m)
+def uniform_insulated(points, *, time, volumetric_heat_capacity, heat_source_density, initial_temperature,
+                      initial_time):
+    """Continuous and BE-exact constant-source insulated uniform field (T0 at initial_time)."""
+    refuse_text(time=time, volumetric_heat_capacity=volumetric_heat_capacity,
+                heat_source_density=heat_source_density, initial_temperature=initial_temperature,
+                initial_time=initial_time)
+    p = _points(points)
     c = _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True)
-    q = _scalar(heat_source, "heat_source")
-    initial = _scalar(initial_temperature_k, "initial_temperature_k")
-    dt = _scalar(time_s, "time_s")-_scalar(initial_time_s, "initial_time_s")
+    q = _scalar(heat_source_density, "heat_source_density")
+    initial = _scalar(initial_temperature, "initial_temperature")
+    dt = _scalar(time, "time")-_scalar(initial_time, "initial_time")
     temp = np.full(len(p), initial+q*dt/c)
     return TransientHeatFields(temp, np.zeros_like(p), np.full(len(p),q), np.zeros_like(p))
 
 
-def moving_affine(points_m, time_s, *, conductivity=2.5,
-                  volumetric_heat_capacity=4., initial_time_s=0.):
-    """T=290+5*x+3*(t-t0), Q=3*c, flux=(-5*k,0), all SI."""
-    p = _points(points_m)
-    k = _scalar(conductivity, "conductivity", True)
+def moving_affine(points, *, time, thermal_conductivity, volumetric_heat_capacity, initial_time):
+    """T=290+5*x+3*(t-t0), Q=3*c, flux=(-5*k,0), all SI; t0 is initial_time."""
+    refuse_text(time=time, thermal_conductivity=thermal_conductivity,
+                volumetric_heat_capacity=volumetric_heat_capacity, initial_time=initial_time)
+    p = _points(points)
+    k = _scalar(thermal_conductivity, "thermal_conductivity", True)
     c = _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True)
-    dt = _scalar(time_s, "time_s")-_scalar(initial_time_s, "initial_time_s")
+    dt = _scalar(time, "time")-_scalar(initial_time, "initial_time")
     grad = np.tile([5.,0.], (len(p),1))
     return TransientHeatFields(290+5*p[:,0]+3*dt, -k*grad, np.full(len(p),3*c), grad)
 
 
-def sine_manufactured(points_m, time_s, *, conductivity=2.5,
-                      volumetric_heat_capacity=4.):
+def sine_manufactured(points, *, time, thermal_conductivity, volumetric_heat_capacity):
     """Unit-square PDE MMS, 300K baseline, 1K amplitude, gamma=.7/s.
 
     T=300+(1+.7*t)*sin(pi*x)*sin(pi*y). This is a PDE field, not the
     generalized discrete eigenmode, and does not imply zero FE time error.
     """
-    p = _points(points_m)
-    now = _scalar(time_s, "time_s")
-    k = _scalar(conductivity, "conductivity", True)
+    refuse_text(time=time, thermal_conductivity=thermal_conductivity,
+                volumetric_heat_capacity=volumetric_heat_capacity)
+    p = _points(points)
+    now = _scalar(time, "time")
+    k = _scalar(thermal_conductivity, "thermal_conductivity", True)
     c = _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True)
     x,y = p.T
     phi = np.sin(np.pi*x)*np.sin(np.pi*y)
@@ -87,18 +96,19 @@ def sine_manufactured(points_m, time_s, *, conductivity=2.5,
         (c*.7+2*k*np.pi**2*(1+.7*now))*phi, gradient)
 
 
-def p1_matrices(nodes_m, triangles, *, conductivity, volumetric_heat_capacity):
+def p1_matrices(nodes, triangles, *, thermal_conductivity, volumetric_heat_capacity):
     """Small dense independent triangle integrals, no geometry repair.
 
-    The caller supplies a conforming used-node CCW mesh; this reference performs
-    local shape/index/positive-area checks, not full mesh intersection validation.
+    The caller supplies a conforming used-node CCW mesh (nodes in m); this reference
+    performs local shape/index/positive-area checks, not full mesh intersection validation.
     """
-    p = _points(nodes_m)
+    refuse_text(thermal_conductivity=thermal_conductivity, volumetric_heat_capacity=volumetric_heat_capacity)
+    p = _points(nodes)
     t = np.asarray(triangles)
     if (t.ndim != 2 or t.shape[1] != 3 or not len(t) or t.dtype.kind not in "iu"
             or np.any(t < 0) or np.any(t >= len(p))):
         raise ValueError("triangles must be nonempty valid integer (M,3)")
-    k = _scalar(conductivity, "conductivity", True)
+    k = _scalar(thermal_conductivity, "thermal_conductivity", True)
     c = _scalar(volumetric_heat_capacity, "volumetric_heat_capacity", True)
     mass = np.zeros((len(p),len(p)))
     stiffness = np.zeros_like(mass)
@@ -147,13 +157,18 @@ def smallest_dirichlet_mode(mass, stiffness, fixed_node_ids):
     return float(values[0]),phi
 
 
-def backward_euler_amplitude(eigenvalue_per_s, time_s):
-    """Exact scalar semidiscrete BE product, not a continuous PDE solution."""
-    value = _scalar(eigenvalue_per_s,"eigenvalue_per_s",True)
-    times = _real(time_s,"time_s")
+def backward_euler_amplitude(*, decay_rate, time):
+    """Exact scalar semidiscrete BE product prod 1/(1 + lambda dt), not a continuous PDE solution.
+
+    decay_rate is lambda in 1/s (for example from smallest_dirichlet_mode), time the
+    nonnegative increasing step ends in s.
+    """
+    refuse_text(decay_rate=decay_rate, time=time)
+    value = _scalar(decay_rate,"decay_rate",True)
+    times = _real(time,"time")
     if times.ndim != 1 or len(times) < 2 or np.any(times < 0):
-        raise ValueError("time_s must be a nonnegative 1D sequence")
+        raise ValueError("time must be a nonnegative 1D sequence")
     step = np.diff(times)
     if not np.all(np.isfinite(step)) or np.any(step <= 0):
-        raise ValueError("time_s must be strictly increasing with finite dt")
+        raise ValueError("time must be strictly increasing with finite dt")
     return np.r_[1.,np.cumprod(1/(1+value*step))]

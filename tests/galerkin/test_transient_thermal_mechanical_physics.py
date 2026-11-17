@@ -35,17 +35,17 @@ def options(mesh, plane, constrained=False, alpha=ALPHA, tref=TREF):
 def test_uniform_history_against_3d_analytic_fields(plane, constrained, source, alpha, shift):
     mesh = rectangle_mesh(1., 1., 4, 4)
     times = np.array([2., 2.03, 2.4, 3.])
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-        time_s=times, initial_temperature_k=np.full(mesh.num_nodes, TREF+shift),
-        dirichlet={}, heat_source=source)
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+        time=times, initial_temperature=np.full(mesh.num_nodes, TREF+shift),
+        prescribed_temperature={}, heat_source_density=source)
     result = solve_transient_thermoelasticity(mesh, heat,
         **options(mesh, plane, constrained, alpha, TREF+shift))
     oracle = reference.uniform_constrained if constrained else reference.uniform_free
     centroids = mesh.nodes[mesh.triangles].mean(axis=1)
     for step in result.steps:
-        thermal = uniform_insulated(mesh.nodes, step.time_s, volumetric_heat_capacity=4.,
-            heat_source=source, initial_temperature_k=TREF+shift, initial_time_s=times[0])
-        np.testing.assert_allclose(step.temperature_snapshot.temperature_k, thermal.temperature_k, rtol=0, atol=1e-9)
+        thermal = uniform_insulated(mesh.nodes, time=step.time_s, volumetric_heat_capacity=4.,
+            heat_source_density=source, initial_temperature=TREF+shift, initial_time=times[0])
+        np.testing.assert_allclose(step.temperature_snapshot.temperature_k, thermal.temperature, rtol=0, atol=1e-9)
         material = dict(**MATERIAL, plane=plane)
         material.update(thermal_expansion_per_k=alpha, reference_temperature_k=TREF+shift)
         exact = oracle(mesh.nodes, source*(step.time_s-times[0])/4., **material)
@@ -74,9 +74,9 @@ def test_backward_euler_time_error_is_separate_from_space(plane, constrained):
     errors = []
     for count in (8, 16, 32):
         times = np.linspace(0., 1., count+1)
-        heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-            time_s=times, initial_temperature_k=np.full(mesh.num_nodes, 300.), dirichlet={},
-            heat_source=lambda points, now: np.full(len(points), 8*now))
+        heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+            time=times, initial_temperature=np.full(mesh.num_nodes, 300.), prescribed_temperature={},
+            heat_source_density=lambda points, now: np.full(len(points), 8*now))
         result = solve_transient_thermoelasticity(mesh, heat, time_indices=[count],
             **options(mesh, plane, constrained))
         step = result.steps[0]
@@ -100,9 +100,9 @@ def test_backward_euler_time_error_is_separate_from_space(plane, constrained):
 def test_nonuniform_quadratic_time_error_at_every_index():
     mesh = rectangle_mesh(1., 1., 2, 2)
     times = np.array([2., 2.1, 2.3, 2.8, 3.])
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-        time_s=times, initial_temperature_k=np.full(mesh.num_nodes, 300.), dirichlet={},
-        heat_source=lambda points, now: np.full(len(points), 8*(now-2)))
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+        time=times, initial_temperature=np.full(mesh.num_nodes, 300.), prescribed_temperature={},
+        heat_source_density=lambda points, now: np.full(len(points), 8*(now-2)))
     result = solve_transient_thermoelasticity(mesh, heat, **options(mesh, 'stress'))
     accumulated = np.r_[0., np.cumsum(np.diff(times)**2)]
     for step in result.steps:
@@ -144,9 +144,9 @@ def test_stationary_affine_heat_and_mechanical_space_convergence(plane):
         mesh = rectangle_mesh(1., 1., count, count)
         thermal = 310.+20.*mesh.nodes[:, 0]
         fixed = np.r_[mesh.boundary['left'], mesh.boundary['right']]
-        heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-            time_s=[0., .07, .4], initial_temperature_k=thermal,
-            dirichlet={int(i): thermal[i] for i in fixed})
+        heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+            time=[0., .07, .4], initial_temperature=thermal,
+            prescribed_temperature={int(i): thermal[i] for i in fixed})
         exact = reference.linear_temperature(mesh.nodes, offset_k=10., gradient_k_per_m=20., plane=plane, **MATERIAL)
         kwargs = options(mesh, plane)
         kwargs['mechanical_dirichlet'] = {(int(i), c): exact.displacement[i, c]
@@ -169,8 +169,8 @@ def test_constant_body_and_nonzero_fixed_supports(plane):
     # constant body loads are independent triangle integrals, and reactions
     # retain applied body force on fixed components.
     mesh = rectangle_mesh(1., 1., 1, 1)
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-        time_s=[0., .1], initial_temperature_k=np.full(mesh.num_nodes, 320.), dirichlet={})
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+        time=[0., .1], initial_temperature=np.full(mesh.num_nodes, 320.), prescribed_temperature={})
     displacement = 1e-4*mesh.nodes
     kwargs = options(mesh, plane)
     kwargs['mechanical_dirichlet'] = {(int(i), c): displacement[i, c]

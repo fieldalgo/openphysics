@@ -79,8 +79,8 @@ def test_heat_p1_three_region_wall_same_mesh(skfem):
     dirichlet = {int(i): 420. for i in left} | {int(i): 300. for i in right}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=dict(zip(NAMES, k)), dirichlet=dirichlet,
-                                 heat_source=dict(zip(NAMES, q)))
+        ours = solve_steady_heat(mesh, thermal_conductivity=dict(zip(NAMES, k)), prescribed_temperature=dirichlet,
+                                 heat_source_density=dict(zip(NAMES, q)))
     conduction, _, source = _skfem_heat_forms(skfem)
     with clock("reference"):
         basis = _basis(skfem, mesh, skfem.ElementTriP1())
@@ -222,10 +222,10 @@ def test_transient_heat_p1_three_region_wall_same_mesh(skfem):
     dirichlet = {int(i): 420. for i in left} | {int(i): 300. for i in right}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_transient_heat(mesh, conductivity=dict(zip(NAMES, k)),
+        ours = solve_transient_heat(mesh, thermal_conductivity=dict(zip(NAMES, k)),
                                     volumetric_heat_capacity=dict(zip(NAMES, c)),
-                                    heat_source=dict(zip(NAMES, q)), time_s=times,
-                                    initial_temperature_k=initial, dirichlet=dirichlet)
+                                    heat_source_density=dict(zip(NAMES, q)), time=times,
+                                    initial_temperature=initial, prescribed_temperature=dirichlet)
     conduction, capacity, source = _skfem_heat_forms(skfem)
     with clock("reference"):
         basis = _basis(skfem, mesh, skfem.ElementTriP1())
@@ -254,4 +254,4 @@ def test_transient_heat_p1_three_region_wall_same_mesh(skfem):
         not_matched=["linear solver (galerkin factorization with its offsets and refinement, reference "
                      "scikit-fem condense and solve)"],
         observables=[observable("nodal temperature at every stored time", "K", "max relative difference",
-                                relative_difference(ours.temperature_k, theirs), SAME)]))
+                                relative_difference(ours.temperature, theirs), SAME)]))

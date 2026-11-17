@@ -10,7 +10,7 @@ from .core.checks import refuse_live
 from .coupling import Field, transfer
 from .electric import SteadyElectricResult
 from .heat_source import MESH_MISMATCH, ElementHeatSource
-from .thermal import SteadyHeatResult, solve_steady_heat
+from .thermal import SteadyHeatResult, solve_steady_heat_outward
 
 __all__ = ["SteadyJouleHeatResult", "solve_steady_joule_heat"]
 
@@ -70,21 +70,24 @@ def solve_steady_joule_heat(mesh, *, electrical_result, conductivity, dirichlet,
     if np.any(source.values < 0):
         raise ValueError("Joule heating must be nonnegative")
     owned_mesh = copy.deepcopy(mesh)
-    heat = solve_steady_heat(owned_mesh, conductivity=conductivity, dirichlet=dirichlet,
-                             heat_source=source, outward_flux=outward_flux,
-                             convection=convection)
+    # galerkin's own caller: the private outward-form heat solve (rule 6; this module's
+    # outward_flux is still outward until its own commit).
+    heat = solve_steady_heat_outward(owned_mesh, conductivity=conductivity, dirichlet=dirichlet,
+                              heat_source=source, outward_flux=outward_flux,
+                              convection=convection)
     # This transfer computes with NumPy; a live thermal input would lose its derivative here.
     refuse_live(heat.temperature, "solve_steady_joule_heat thermal inputs")
     # The heat assembly independently integrates the electric element field.
     # Check both the nodal distribution and total power; totals alone can hide
     # incorrect element-to-node correspondence.
-    power = float(np.sum(heat.load))
-    _agree(electric.joule_load, heat.load, "joule_load")
+    power = float(np.sum(heat.generated_heat_rate_per_depth))
+    _agree(electric.joule_load, heat.generated_heat_rate_per_depth, "joule_load")
     _agree(electric.joule_power_per_length, power, "joule_power_per_length")
     _agree(electric.supplied_power_per_length, power, "supplied_power_per_length")
-    outward = float(np.sum(-heat.reaction + heat.prescribed_outward_load
-                           + heat.convective_outward))
-    boundary_scale = float(np.sum(abs(heat.reaction) + abs(heat.prescribed_outward_load)
-                                  + abs(heat.convective_outward)))
+    outward = float(np.sum(-heat.reaction_heat_rate_per_depth + heat.outward_prescribed_heat_rate_per_depth
+                           + heat.outward_convective_heat_rate_per_depth))
+    boundary_scale = float(np.sum(abs(heat.reaction_heat_rate_per_depth)
+                                  + abs(heat.outward_prescribed_heat_rate_per_depth)
+                                  + abs(heat.outward_convective_heat_rate_per_depth)))
     _agree(outward, power, "thermal outward power", balance_scale=boundary_scale)
     return SteadyJouleHeatResult(electric, heat, power, outward)

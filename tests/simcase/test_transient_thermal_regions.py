@@ -16,8 +16,8 @@ from simcase import Document, DocumentError, examples, run
 from simcase.cli import main
 from refsol.transient_heat_multilayer import LayeredWall
 
-WALL = LayeredWall([.01, .03], [45., .5], [3.6e6, 1.2e6])
-SOURCE = dict(temperature=300., sources=[2e5, 5e4])
+WALL = LayeredWall(position=[0., .01, .03], thermal_conductivity=[45., .5], volumetric_heat_capacity=[3.6e6, 1.2e6])
+SOURCE = dict(initial_temperature=300., heat_source_density=[2e5, 5e4])
 OBSERVE = (20.,)
 
 
@@ -60,7 +60,7 @@ def _errors(result):
     for t in OBSERVE:
         k = int(np.argmin(abs(result.time-t)))
         assert abs(result.time[k]-t) < 1e-9
-        exact = WALL.source_driven(points.reshape(-1, 2), t, **SOURCE, count=60, layer=layer)
+        exact = WALL.source_driven(points.reshape(-1, 2), time=t, **SOURCE, terms=60, layer=layer)
         th = np.einsum('qi,ti->tq', bary, result.temperature[k][tri])
         dt_ = th-exact.temperature.reshape(th.shape)
         dq = result.heat_flux[k][:, None, :]-exact.heat_flux.reshape(*th.shape, 2)
@@ -139,14 +139,12 @@ def test_region_document_equals_a_direct_engine_call():
     k = {'steel_plate': 45., 'background': .5}
     c = {'steel_plate': 3.6e6, 'background': 1.2e6}
     q = {'steel_plate': 2e5, 'background': 5e4}
-    direct = solve_transient_heat(mesh, conductivity=k, volumetric_heat_capacity=c, heat_source=q,
-                                  time_s=np.asarray(r.time), initial_temperature_k=np.full(len(nodes), 300.),
-                                  dirichlet={int(i): 300. for i in fixed})
+    direct = solve_transient_heat(mesh, thermal_conductivity=k, volumetric_heat_capacity=c, heat_source_density=q,
+                                  time=np.asarray(r.time), initial_temperature=np.full(len(nodes), 300.),
+                                  prescribed_temperature={int(i): 300. for i in fixed})
     np.testing.assert_array_equal(np.asarray(r.prescribed_node_ids), fixed)
-    for key, engine in (('temperature', 'temperature_k'), ('heat_flux', 'heat_flux_w_m2'),
-                        ('reaction_heat_rate_per_depth', 'reaction_w_per_m'),
-                        ('stored_heat_per_depth', 'heat_content_j_per_m')):
-        np.testing.assert_array_equal(getattr(r, key), getattr(direct, engine))
+    for key in ('temperature', 'heat_flux', 'reaction_heat_rate_per_depth', 'stored_heat_per_depth'):
+        np.testing.assert_array_equal(getattr(r, key), getattr(direct, key))     # the engine's field: same name
 
 
 def test_uniform_region_document_matches_the_rectangle_document():

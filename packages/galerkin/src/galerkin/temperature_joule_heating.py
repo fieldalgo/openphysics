@@ -23,7 +23,7 @@ from .core.boundary import scalar_boundary_samples
 from .core.checks import finite_scalar, one_of, readonly_copy, real_array, refuse_live
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
-from .thermal import scalar_boundary_system
+from ._heat_kernels import scalar_boundary_system as _scalar_boundary_system
 
 __all__ = ["METHODS", "ConductivityModel", "JouleIteration", "TemperatureJouleHeatResult",
            "JouleConvergenceError", "solve_temperature_joule_heat"]
@@ -230,7 +230,7 @@ class _JointNewton:
         p, t, _, _, count, labels = triangle_geometry(mesh)
         n = mesh.num_nodes
         samples = scalar_boundary_samples(mesh, p, t, thermal_dirichlet, outward_flux, convection)
-        H, G, B, _ = scalar_boundary_system(samples, n, labels, [0.]*count, np.zeros(count, dtype=bool))
+        H, G, B, _ = _scalar_boundary_system(samples, n, labels, [0.]*count, np.zeros(count, dtype=bool))
         k = region_property(mesh, thermal_conductivity, "conductivity", positive=True)
         cells = np.asarray(mesh.triangles)
         heat = forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (n, n)).to_scipy()+H
@@ -383,15 +383,16 @@ def solve_temperature_joule_heat(
             # Independent electrical refresh measures the nonlinear heat equation
             # at H(T_i), rather than only reporting linear subsolve residuals.
             refreshed = electric(trial_sigma)
-            nonlinear = heat.residual + heat.load - refreshed.joule_load
-            nonlinear_scale = max(_norm(heat.load), _norm(refreshed.joule_load),
-                _norm(heat.reaction), _norm(heat.prescribed_outward_load),
-                _norm(heat.convective_outward), np.finfo(float).tiny)
+            nonlinear = (heat.residual_heat_rate_per_depth + heat.generated_heat_rate_per_depth
+                         - refreshed.joule_load)
+            nonlinear_scale = max(_norm(heat.generated_heat_rate_per_depth), _norm(refreshed.joule_load),
+                _norm(heat.reaction_heat_rate_per_depth), _norm(heat.outward_prescribed_heat_rate_per_depth),
+                _norm(heat.outward_convective_heat_rate_per_depth), np.finfo(float).tiny)
             nonlinear_residual = _norm(nonlinear[free_t])/nonlinear_scale
             free_e = np.setdiff1d(np.arange(mesh.num_nodes), list(electric_dirichlet))
             row = JouleIteration(iteration, defect, sigma_defect,
                 float(trial.min()), float(trial.max()),
-                _norm(electrical.residual[free_e]), _norm(heat.residual[free_t]),
+                _norm(electrical.residual[free_e]), _norm(heat.residual_heat_rate_per_depth[free_t]),
                 nonlinear_residual,
                 float(np.sum(electrical.reaction-electrical.prescribed_outward_load)),
                 electrical.supplied_power_per_length, coupled.source_power_per_length,
@@ -425,7 +426,8 @@ def solve_temperature_joule_heat(
                                       set(electric_dirichlet) | set(reference_potential or {}),
                                       outward_flux, convection)
             dsigma = _conductivity_derivative(mesh, models, temperature)
-            increment = newton.step(temperature, sigma, dsigma, electrical, coupled.thermal.load)
+            increment = newton.step(temperature, sigma, dsigma, electrical,
+                                    coupled.thermal.generated_heat_rate_per_depth)
         except Exception as exc:
             raise JouleConvergenceError(str(exc), history, temperature) from exc
         merit = _euclidean(trial-temperature)

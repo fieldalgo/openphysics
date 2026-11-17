@@ -12,10 +12,10 @@ from refsol.thermal_boundary import (dirichlet_robin_slab,robin_only_slab,
 @pytest.mark.parametrize('h0,h1',[(8.,12.),(0.,12.),(8.,0.)])
 def test_constant_Q_equations_and_flux_balance(h0,h1):
     L,k,Q=1.3,2.5,5.;g0,g1=.7,-.2;ta0,ta1=300.,310.
-    ref=robin_only_slab(length=L,conductivity=k,heat_source=Q,left_h=h0,right_h=h1,
-        left_ambient=ta0,right_ambient=ta1,left_outward=g0,right_outward=g1)
+    ref=robin_only_slab(length=L,thermal_conductivity=k,heat_source_density=Q,heat_transfer_coefficient=(h0,h1),
+        ambient_temperature=(ta0,ta1),inward_heat_flux=(-g0,-g1))
     points=np.array([[0.,0.],[L,0.]])
-    t=ref.temperature(points);F0,F1=ref.outward_fluxes
+    t=ref.temperature(points);F0,F1=ref.outward_heat_flux
     np.testing.assert_allclose([F0,F1],[g0+h0*(t[0]-ta0),g1+h1*(t[1]-ta1)],rtol=1e-12,atol=1e-12)
     assert abs(F0+F1-Q*L)<1e-12
     x=.4;eps=1e-3
@@ -25,10 +25,11 @@ def test_constant_Q_equations_and_flux_balance(h0,h1):
 
 @pytest.mark.parametrize('h',[0.,10.])
 def test_dirichlet_flux_or_robin_equations(h):
-    ref=dirichlet_robin_slab(length=1.,conductivity=2.5,left_temperature=320.,heat_source=5.,outward_flux=.7,h=h,ambient=300.)
+    ref=dirichlet_robin_slab(length=1.,thermal_conductivity=2.5,prescribed_temperature=320.,heat_source_density=5.,
+                             inward_heat_flux=-.7,heat_transfer_coefficient=h,ambient_temperature=300.)
     t=ref.temperature(np.array([[0.,0.],[1.,0.]]))
     assert t[0]==320.
-    np.testing.assert_allclose(ref.outward_fluxes[1],.7+h*(t[1]-300.),atol=1e-12)
+    np.testing.assert_allclose(ref.outward_heat_flux[1],.7+h*(t[1]-300.),atol=1e-12)
 
 
 def test_mms_differentiation_and_source_sign():
@@ -38,15 +39,17 @@ def test_mms_differentiation_and_source_sign():
         d=np.zeros(2);d[axis]=eps
         gradient.append((sine_temperature(p+d)-sine_temperature(p-d))/(2*eps))
         laplace+=(sine_temperature(p+d)-2*sine_temperature(p)+sine_temperature(p-d))/eps**2
-    np.testing.assert_allclose(sine_flux(p),-k*np.array(gradient).T,rtol=1e-6)
-    np.testing.assert_allclose(sine_source(p),-k*laplace,rtol=1e-6)
-    assert np.all(sine_source(p)>0)
+    np.testing.assert_allclose(sine_flux(p,thermal_conductivity=k),-k*np.array(gradient).T,rtol=1e-6)
+    np.testing.assert_allclose(sine_source(p,thermal_conductivity=k),-k*laplace,rtol=1e-6)
+    assert np.all(sine_source(p,thermal_conductivity=k)>0)
 
 
-@pytest.mark.parametrize('kwargs',[{'left_h':0.,'right_h':0.},{'left_h':-1.,'right_h':1.},
-                                  {'left_h':True,'right_h':1.},{'left_h':np.nan,'right_h':1.}])
-def test_reference_rejects_invalid_or_unanchored(kwargs):
-    with pytest.raises(ValueError):robin_only_slab(length=1.,conductivity=1.,**kwargs)
+@pytest.mark.parametrize('h',[(0.,0.),(-1.,1.),(True,1.),(np.nan,1.)])
+def test_reference_rejects_invalid_or_unanchored(h):
+    # the other values are the ones the signature defaulted to before the galerkin step (D45)
+    with pytest.raises(ValueError):robin_only_slab(length=1.,thermal_conductivity=1.,heat_transfer_coefficient=h,
+                                                  ambient_temperature=(300.,300.),heat_source_density=0.,
+                                                  inward_heat_flux=(0.,0.))
 
 
 def test_reference_has_no_solver_or_assembly_imports():

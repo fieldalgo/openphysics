@@ -20,7 +20,7 @@ The [script](../../../examples/galerkin/transient_heat_uniform.py) uses a 1 m ×
 square with 4 × 4 cells, initial temperature 300 K, conductivity 2.5 W/(m K),
 volumetric heat capacity **c=4 J/(m³ K)** and uniform source **Q=8 W/m³**.
 Volumetric heat capacity is density times specific heat; it is not specific heat
-in J/(kg K). `dirichlet={}` means no fixed-temperature nodes, hence insulation
+in J/(kg K). `prescribed_temperature={}` means no fixed-temperature nodes, hence insulation
 on every natural edge. Unlike steady heat, transient heat needs no thermostat
 anchor on this fully insulated component.
 
@@ -40,20 +40,20 @@ The temperature stays spatially uniform, so the diffusion term vanishes:
 `c*dT/dt=Q`, or `T(t)=300+2*t` K. On this 1 m² domain, source power per
 extrusion depth is 8 W/m. At 0.3 s the stored heat increase is 2.4 J/m.
 For a physical depth of 0.01 m, that is 0.024 J; do not multiply temperature by depth.
-The script subtracts the initial `heat_content_j_per_m` so the printed value is
+The script subtracts the initial `stored_heat_per_depth` so the printed value is
 an energy **change**, not the absolute heat-content diagnostic.
 
 ## 3. Distinguish time samples from time steps
 
 | Array | Shape here | Meaning |
 |---|---|---|
-| `time_s` | (3,) | Requested times, including the initial time |
-| `temperature_k` | (3, 25) | Three nodal states, including the initial field |
-| `heat_flux_w_m2` | (3, 32, 2) | Flux per triangle and component at each time |
-| `storage_rate_w_per_m` | (2, 25) | Rates for the two completed time intervals |
-| `reaction_w_per_m` | (2, 25) | Thermostat reactions after each step, none at t0 |
+| `time` | (3,) | Requested times, including the initial time |
+| `temperature` | (3, 25) | Three nodal states, including the initial field |
+| `heat_flux` | (3, 32, 2) | Flux per triangle and component at each time |
+| `heat_storage_rate_per_depth` | (2, 25) | Rates for the two completed time intervals |
+| `reaction_heat_rate_per_depth` | (2, 25) | Thermostat reactions after each step, none at t0 |
 
-`temperature_k[0]` is the initial state, not the result of a hidden first step.
+`temperature[0]` is the initial state, not the result of a hidden first step.
 Rate row 0 describes the interval from time sample 0 to 1. The solver uses backward
 Euler with the supplied, possibly nonuniform time intervals; it does not choose
 adaptive steps. All histories are retained, so memory grows with both mesh size
@@ -63,7 +63,7 @@ and the number of times. There is no streaming or restart in this API.
 
 Copy the script to a local working file outside `packages/` and change one input.
 
-- Double `heat_source` to 16. The final temperature is 301.2 K and heat increase
+- Double `heat_source_density` to 16. The final temperature is 301.2 K and heat increase
   is 4.8 J/m; stored power is 16 W/m.
 - Double `volumetric_heat_capacity` to 8. The final temperature is 300.3 K, but
   heat increase remains 2.4 J/m: the same input energy produces a smaller rise.

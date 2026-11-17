@@ -952,25 +952,25 @@ class AxisymmetricRegionThermalRunResult(RegionThermalRunResult):
 
     # the full-revolution rates under their plain names (the planar names are refused below)
     @property
-    def generated_heat_rate(self): return self.solution.load
+    def generated_heat_rate(self): return self.solution.generated_heat_rate
 
     @property
-    def reaction_heat_rate(self): return self.solution.reaction
+    def reaction_heat_rate(self): return self.solution.reaction_heat_rate
 
     @property
-    def residual_heat_rate(self): return self.solution.residual
+    def residual_heat_rate(self): return self.solution.residual_heat_rate
 
     @property
-    def outward_prescribed_heat_rate(self): return self.solution.prescribed_outward_load
+    def outward_prescribed_heat_rate(self): return self.solution.outward_prescribed_heat_rate
 
     @property
-    def ambient_convective_heat_rate(self): return self.solution.ambient_load
+    def ambient_convective_heat_rate(self): return self.solution.ambient_convective_heat_rate
 
     @property
-    def outward_convective_heat_rate(self): return self.solution.convective_outward
+    def outward_convective_heat_rate(self): return self.solution.outward_convective_heat_rate
 
     @property
-    def applied_heat_rate(self): return self.solution.system_rhs
+    def applied_heat_rate(self): return self.solution.applied_heat_rate
 
     @staticmethod
     def _text(text):
@@ -1012,28 +1012,34 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     axisymmetric = is_axisymmetric(h)
     t0 = time.perf_counter()
     try:
-        solution = solve_steady_heat(mesh, **kwargs, coordinate_system='axisymmetric' if axisymmetric else 'cartesian')
+        solution = solve_steady_heat(mesh, **views.galerkin_heat_arguments(kwargs),
+                                     coordinate_system='axisymmetric' if axisymmetric else 'cartesian')
     except (ValueError, RuntimeError) as exc:
         raise ValueError(f'physics.{name} ({PHYSICS}): {exc}') from exc
     t_solve = time.perf_counter()-t0
     if doc.canonical_json(separators=(',', ':')) != calculation_json:
         raise ValueError('thermal calculation inputs changed during the solve')
     fixed = np.array(list(kwargs['dirichlet']), dtype=int)
-    G, C = solution.prescribed_outward_load, solution.convective_outward
-    source_heat = float(solution.load.sum())
-    outward = float(G.sum())+float(C.sum())-float(solution.reaction.sum())
-    scale = max(float(sum(np.sum(abs(a)) for a in (solution.load, solution.reaction, G, C))),
+    G = views.heat_field(solution, 'outward_prescribed_heat_rate_per_depth')
+    C = views.heat_field(solution, 'outward_convective_heat_rate_per_depth')
+    load = views.heat_field(solution, 'generated_heat_rate_per_depth')
+    reaction = views.heat_field(solution, 'reaction_heat_rate_per_depth')
+    source_heat = float(load.sum())
+    outward = float(G.sum())+float(C.sum())-float(reaction.sum())
+    scale = max(float(sum(np.sum(abs(a)) for a in (load, reaction, G, C))),
                 np.finfo(float).tiny)
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
     rate = '' if axisymmetric else '_per_depth'
     diagnostics = {f'generated_heat_rate{rate}': source_heat,
                    f'outward_prescribed_heat_rate{rate}': float(G.sum()),
                    f'outward_convective_heat_rate{rate}': float(C.sum()),
-                   f'outward_reaction_heat_rate{rate}': -float(solution.reaction.sum()),
+                   f'outward_reaction_heat_rate{rate}': -float(reaction.sum()),
                    f'outward_heat_rate{rate}': outward,
                    f'heat_rate_imbalance{rate}': outward-source_heat,
                    'relative_conservation_residual': abs(outward-source_heat)/scale,
-                   f'maximum_residual_heat_rate{rate}': float(np.max(abs(solution.residual[free]))) if len(free) else 0.,
+                   f'maximum_residual_heat_rate{rate}': (
+                       float(np.max(abs(views.heat_field(solution, 'residual_heat_rate_per_depth')[free])))
+                       if len(free) else 0.),
                    'minimum_triangle_angle': math.radians(float(tri.min_angle()))}
     covered = covered_shapes(h, mesh)
     unit = 'W' if axisymmetric else 'W/m'

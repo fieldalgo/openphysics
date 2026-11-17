@@ -70,13 +70,10 @@ ELECTRIC_ARRAYS = (('electric_potential', 'potential'), ('electric_field', 'elec
                    ('outward_prescribed_current_per_depth', 'prescribed_outward_load'),
                    ('residual_current_per_depth', 'residual'))
 #: galerkin's heat result attribute of each heat-stage array
-HEAT_ARRAYS = (('temperature', 'temperature'), ('heat_flux', 'heat_flux'),
-               ('generated_heat_rate_per_depth', 'load'), ('reaction_heat_rate_per_depth', 'reaction'),
-               ('residual_heat_rate_per_depth', 'residual'),
-               ('outward_prescribed_heat_rate_per_depth', 'prescribed_outward_load'),
-               ('ambient_convective_heat_rate_per_depth', 'ambient_load'),
-               ('outward_convective_heat_rate_per_depth', 'convective_outward'),
-               ('applied_heat_rate_per_depth', 'system_rhs'))
+HEAT_ARRAYS = tuple((name, name) for name in (
+    'temperature', 'heat_flux', 'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
+    'residual_heat_rate_per_depth', 'outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
+    'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth'))
 #: ``JouleIteration`` field -> (column name, registry quantity, or None for a bare count)
 ITERATION_COLUMNS = (
     ('iteration', 'iteration_count', None), ('temperature_defect', 'temperature_change', 'temperature_change'),
@@ -463,7 +460,7 @@ def heat_balance(coupled, fixed, mesh):
     free = np.setdiff1d(np.arange(mesh.num_nodes), list(fixed))
     return {'outward_heat_rate_per_depth': coupled.outward_heat_per_length,
             'heat_rate_imbalance_per_depth': coupled.outward_heat_per_length-coupled.source_power_per_length,
-            'maximum_residual_heat_rate_per_depth': _norm(np.asarray(heat.residual)[free]),
+            'maximum_residual_heat_rate_per_depth': _norm(np.asarray(heat.residual_heat_rate_per_depth)[free]),
             'minimum_temperature': float(np.min(heat.temperature)), 'maximum_temperature': float(np.max(heat.temperature))}
 
 

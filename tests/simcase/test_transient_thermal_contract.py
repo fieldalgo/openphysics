@@ -297,6 +297,7 @@ def test_runtime_mesh_boundary_rejections(damage):
 
 def test_kwargs_execute_existing_engine_with_linear_time_exact_field():
     from galerkin.transient_heat import solve_transient_heat
+    from simcase import views
     raw = model()
     raw['physics']['heat1'].update(
         heat_source_density="2000000 W/m^3",
@@ -304,12 +305,12 @@ def test_kwargs_execute_existing_engine_with_linear_time_exact_field():
                                 for side in ['left', 'right', 'bottom', 'top']})
     doc = Document.from_dict(raw)
     mesh = mesh_for(doc)
-    result = solve_transient_heat(mesh, **transient_solver_inputs(doc, mesh))
-    np.testing.assert_allclose(result.temperature_k,
-        np.broadcast_to((300.+2*result.time_s)[:, None], result.temperature_k.shape),
+    result = solve_transient_heat(mesh, **views.galerkin_heat_arguments(transient_solver_inputs(doc, mesh)))
+    np.testing.assert_allclose(result.temperature,
+        np.broadcast_to((300.+2*result.time)[:, None], result.temperature.shape),
         rtol=0, atol=1e-12)
-    assert result.reaction_w_per_m.shape == (2, mesh.num_nodes)
-    np.testing.assert_array_equal(result.temperature_k[0], 300.)
+    assert result.reaction_heat_rate_per_depth.shape == (2, mesh.num_nodes)
+    np.testing.assert_array_equal(result.temperature[0], 300.)
 
 
 def test_steady_and_optical_schema_dispatch_unchanged():

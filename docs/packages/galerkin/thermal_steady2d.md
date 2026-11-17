@@ -26,18 +26,18 @@ from galerkin.thermal import solve_steady_heat
 
 result = solve_steady_heat(
     mesh,
-    conductivity=12.0,
-    dirichlet={0: 350.0, 1: 300.0},  # Example node IDs; select actual boundary nodes.
-    heat_source=0.0,
+    thermal_conductivity=12.0,
+    prescribed_temperature={0: 350.0, 1: 300.0},  # Example node IDs; select actual boundary nodes.
+    heat_source_density=0.0,
 )
 ```
 
 | Input | Contract / units |
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, reference coordinates `(N,2)` in m, integer triangles `(M,3)` |
-| conductivity | Required finite real scalar k>0, W/(m K), or `{region name: k}` piecewise constant on `mesh.region_names` ([multimaterial](multimaterial.md)); no tensors or k varying inside a region |
-| dirichlet | Mapping integer node ID (exterior or interior) -> finite scalar temperature in K |
-| heat_source | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; or mesh-bound `ElementHeatSource(mesh, values)` for elementwise `(M,)` W/m^3; default zero |
+| thermal_conductivity | Required finite real scalar k>0, W/(m K), or `{region name: k}` piecewise constant on `mesh.region_names` ([multimaterial](multimaterial.md)); no tensors or k varying inside a region |
+| prescribed_temperature | Mapping integer node ID (exterior or interior) -> finite scalar temperature in K |
+| heat_source_density | Finite real scalar Q, `{region name: Q}`, or callable `(Qpoints,2)` metre coordinates -> exactly `(Qpoints,)` W/m^3; or mesh-bound `ElementHeatSource(mesh, values)` for elementwise `(M,)` W/m^3; default `None`, no source |
 
 With the default insulated boundary, each connected component requires at least
 one prescribed temperature; the optional Robin extension can also anchor it. No node is silently pinned,
@@ -48,7 +48,7 @@ prescribed temperature on an internal surface), and its reaction is the heat
 that surface injects, which the balance identity counts like any thermostat
 (2026-11-08; the electric, Joule and 3D solvers keep their exterior rule).
 Unselected natural edges have insulation. Boundary node tags can construct the
-Dirichlet mapping. Optional prescribed outward flux and Robin edge-tag inputs,
+Dirichlet mapping. Optional prescribed inward heat flux and convection edge-tag inputs,
 including additional result fields and modified balance equations, are documented
 in the source-tree guide `docs/packages/galerkin/thermal_flux_robin.md`. That guide and its
 example are not shipped in the distributions. The equations below describe
@@ -60,18 +60,22 @@ values model heat sinks. This constant-coefficient linear PDE does not enforce
 material-valid temperature ranges, thermodynamic nonlinearities or positivity
 of its computed temperature. Supply physically meaningful SI data.
 
-`SteadyHeatResult` contains:
+The Cartesian solve returns a `PlanarSteadyHeatResult` (the
+[axisymmetric](thermal_axisymmetric.md) one an `AxisymmetricSteadyHeatResult`;
+both are `SteadyHeatResult`s). Its fields carry registry names and `.units`
+maps each one to its SI unit:
 
 | Field | Shape | Unit / location |
 | --- | --- | --- |
 | temperature | `(N,)` | K at mesh nodes |
 | heat_flux | `(M,2)` | W/m^2, constant vector on each P1 triangle |
-| load | `(N,)` | W/m of out-of-plane thickness, integrated volumetric heat source |
-| reaction | `(N,)` | W/m of thickness, boundary heat input on fixed nodes; exactly zero at free nodes |
-| residual | `(N,)` | W/m of thickness, K*T-load on all nodes |
+| generated_heat_rate_per_depth | `(N,)` | W/m of out-of-plane thickness, integrated volumetric heat source (the load) |
+| reaction_heat_rate_per_depth | `(N,)` | W/m of thickness, boundary heat input on fixed nodes; exactly zero at free nodes |
+| residual_heat_rate_per_depth | `(N,)` | W/m of thickness, K*T-load on all nodes |
 
-The 2D weak form is **per unit out-of-plane thickness**. `load` and `reaction`
-are not total watts. Multiply them by a physical thickness in metres only in an
+The 2D weak form is **per unit out-of-plane thickness**, which the `_per_depth`
+names say: the generated and reaction heat rates are not total watts (asking a
+planar result for `generated_heat_rate` raises an `AttributeError` that says so). Multiply them by a physical thickness in metres only in an
 explicit external calculation. No implicit thickness argument or scaling is used.
 
 ## Assembly, boundary signs and quality

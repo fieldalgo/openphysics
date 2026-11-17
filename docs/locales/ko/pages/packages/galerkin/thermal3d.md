@@ -30,34 +30,35 @@ mesh = from_mesher(extrude(generate(d, box_sides(0, 1.0, 0, 0.8)), [0.0, 0.2, 0.
                            {"chip": ["substrate", "die", "mold"]}, size=0.1))
 result = solve_steady_heat_3d(
     mesh,
-    conductivity={"substrate": 1.0, "die": 0.01, "mold": 0.5},
-    dirichlet=dirichlet_from_faces(mesh, {"z0": 320.0, "z1": 300.0}),
-    heat_source={"substrate": 0.0, "die": 2e5, "mold": 0.0},
+    thermal_conductivity={"substrate": 1.0, "die": 0.01, "mold": 0.5},
+    prescribed_temperature=dirichlet_from_faces(mesh, {"z0": 320.0, "z1": 300.0}),
+    heat_source_density={"substrate": 0.0, "die": 2e5, "mold": 0.0},
 )
 ```
 
 | 입력 | 계약 / 단위 |
 | --- | --- |
 | mesh | m 단위 `galerkin.Mesh3D`: meshine·gmshio 메시의 `from_mesher` 또는 `box_mesh`. 면 태그는 `dirichlet_from_faces`에만 필요합니다. |
-| conductivity | 유한한 k > 0, W/(m K), 또는 `mesh.region_names`와 정확히 같은 항목의 `{영역 이름: k}` |
-| dirichlet | `{절점 인덱스: 온도 K}`; 모든 절점은 외부 경계 위에 있고 메시의 모든 연결 성분에 하나 이상 |
-| heat_source | Q W/m^3, `{영역 이름: Q}`, 또는 읽기 전용 `(T, 3)` 사면체 중심 좌표를 받아 `(T,)` 값을 돌려주는 callable; 기본 0 |
+| thermal_conductivity | 유한한 k > 0, W/(m K), 또는 `mesh.region_names`와 정확히 같은 항목의 `{영역 이름: k}` |
+| prescribed_temperature | `{절점 인덱스: 온도 K}`; 모든 절점은 외부 경계 위에 있고 메시의 모든 연결 성분에 하나 이상 |
+| heat_source_density | Q W/m^3, `{영역 이름: Q}`, 또는 읽기 전용 `(T, 3)` 사면체 중심 좌표를 받아 `(T,)` 값을 돌려주는 callable; 기본 `None`(열원 없음) |
 
 `dirichlet_from_faces(mesh, {면 태그: T})`는 태그를 절점 맵으로 바꾸고, 두 태그가 다른
 온도로 두려는 절점을 거부합니다. 공개 API가 아니라 내부 `galerkin.kernels`의 도우미입니다(일관 단위: 여기서는 켈빈).
 
-| 결과 필드 | 의미와 단위 |
+| 결과 필드(`SteadyHeat3DResult`, frozen) | 의미와 단위 |
 | --- | --- |
 | `temperature` | `(N,)` K |
 | `heat_flux` | `(T, 3)` W/m^2, 사면체별 `-k grad T` |
-| `load` | `(N,)` W, 열원 하중: 사면체마다 절점당 `Q V / 4` |
-| `reaction` | `(N,)` W, Dirichlet 절점의 `K T - load`, 그 외 0; 양수가 열을 넣음 |
-| `residual` | `(N,)` W, 모든 절점의 `K T - load` |
-| `conductivity`, `heat_source` | 사용한 `(T,)` 값 |
-| `balance_error` | 절점 열량 절대합에 대한 `abs(sum(load) + sum(reaction))` |
-| `dirichlet_nodes` | 고정한 절점 인덱스(정렬) |
+| `generated_heat_rate` | `(N,)` W, 열원 하중: 사면체마다 절점당 `Q V / 4` |
+| `reaction_heat_rate` | `(N,)` W, Dirichlet 절점의 `K T - load`, 그 외 0; 양수가 열을 넣음 |
+| `residual_heat_rate` | `(N,)` W, 모든 절점의 `K T - load` |
+| `thermal_conductivity`, `heat_source_density` | 사용한 `(T,)` 값 |
+| `relative_conservation_residual` | 절점 열량 절대합에 대한 `abs(sum(load) + sum(reaction))` |
+| `prescribed_node_ids` | 고정한 절점 인덱스(정렬) |
 
-절점 열량은 깊이당이 아닌 W입니다. 자유 잔차가 계 규모의 `1e-10`을 넘거나 열수지가
+절점 열량은 깊이당이 아닌 W이므로 필드에 `_per_depth`가 없습니다(물으면 이유를 말하는
+`AttributeError`). `.units`가 각 물리량 필드의 SI 단위를 줍니다. 자유 잔차가 계 규모의 `1e-10`을 넘거나 열수지가
 `1e-10`을 넘으면 `ValueError`를 던지므로, 반환된 결과는 둘을 통과한 것입니다. NumPy
 전용: JAX·PyTorch 값은 `TypeError`이며 미분 경로는 없습니다.
 
@@ -65,11 +66,12 @@ result = solve_steady_heat_3d(
 
 `refsol.thermal3d`는 독립 폐형식 둘을 제공합니다.
 
-- `sine_product(points, lengths, conductivity, reference_temperature, amplitude)`:
+- `sine_product(points, *, length, thermal_conductivity, reference_temperature, temperature_difference)`:
   `T = T0 + A sin(pi x/Lx) sin(pi y/Ly) sin(pi z/Lz)`와 그 열유속·열원
   `Q = k pi^2 (1/Lx^2 + 1/Ly^2 + 1/Lz^2) (T - T0)`, 여섯 면에서 `T = T0`.
-- `layered_slab(points, interfaces, conductivities, bottom_temperature, top_temperature)`:
-  열원 없는 z 방향 직렬 전도. 구간 선형 온도와 균일 열유속
+- `layered_slab(points, *, position, thermal_conductivity, prescribed_temperature)`:
+  열원 없는 z 방향 직렬 전도(`position`은 아랫면부터의 층 경계, `prescribed_temperature`는
+  (아래, 위) 쌍). 구간 선형 온도와 균일 열유속
   `(T_bottom - T_top) / sum(d_i / k_i)`. 층 경계가 절점 평면이면 P1에서 정확.
 
 `tests/galerkin/test_thermal3d.py`는 1.0 x 0.8 x 0.6 m 상자의 비정형 발자국을
@@ -80,7 +82,7 @@ result = solve_steady_heat_3d(
 | --- | --- | --- |
 | 사인 곱, k = 2.5, 크기 0.2, 0.1, 0.05 m, 중심점 열원 | L2 차수 >= 1.8, H1 차수 >= 0.9(세 메시의 최소제곱 기울기) | L2 오차 6.12e-2, 1.70e-2, 4.46e-3(차수 1.889); H1 오차 8.17e-1, 4.30e-1, 2.20e-1(차수 0.946) |
 | 3층 슬랩 0.2 / 0.1 / 0.3 m, k = 1, 0.01, 0.5, 320 K → 300 K, 크기 0.15 m | 20 K 낙차 대비 온도 오차 <= 1e-10; 열유속 <= 1e-9; 뜨거운 면 반력 = 열유속 x 면적 | 통과(roundoff) |
-| 모든 풀이 | `balance_error <= 1e-10` | 솔버가 강제 |
+| 모든 풀이 | `relative_conservation_residual <= 1e-10` | 솔버가 강제 |
 
 `tests/refsol/test_thermal3d_reference.py`는 기준해 자체를 검사합니다. 유한차분 대비
 열유속·열원, 직렬 공식 대비 슬랩, 모듈이 NumPy만 import하는지.

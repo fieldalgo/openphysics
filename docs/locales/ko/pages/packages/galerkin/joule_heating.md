@@ -45,7 +45,7 @@ W/m이며 실제 두께(m)를 명시적으로 곱해야 W입니다. 반환 전�
 
 `galerkin.thermal.ElementHeatSource(mesh, values)`는 유한 실수 `(M,)` 배열
 (W/m³)을 메시 좌표·연결·영역 순서 사본에 결합합니다.
-`solve_steady_heat(..., heat_source=source)`로 사용합니다. 일반 열 해석의
+`solve_steady_heat(..., heat_source_density=source)`로 사용합니다. 일반 열 해석의
 음수 냉각은 허용하지만 Joule workflow는 음수 Q를 거절합니다. 기존 스칼라·
 영역 사전·좌표 함수 입력의 의미는 그대로이며 일반 배열은 거절합니다.
 열 문제의 경계 태그는 달라도 되지만 메시 좌표·순서·영역 대응은 같아야 합니다.

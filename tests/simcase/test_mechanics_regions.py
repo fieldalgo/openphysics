@@ -163,10 +163,10 @@ def test_r1_thermoelastic_region_run_equals_direct_solves(plane):
     mesh, region_materials, _ = build_region_mesh_03(Document.from_dict(raw))
     m = doc.si['materials']
     heat = solve_steady_heat(
-        mesh, conductivity={r: m[n]['thermal_conductivity'] for r, n in region_materials.items()},
-        dirichlet={int(i): 300.0 for i in sorted(map(int, mesh.boundary['left']))},
-        heat_source={r: (2e6 if r == 'alu' else 0.0) for r in mesh.region_names},
-        outward_flux={'bottom': -500.0}, convection={'top': (25.0, 290.0)})
+        mesh, thermal_conductivity={r: m[n]['thermal_conductivity'] for r, n in region_materials.items()},
+        prescribed_temperature={int(i): 300.0 for i in sorted(map(int, mesh.boundary['left']))},
+        heat_source_density={r: (2e6 if r == 'alu' else 0.0) for r in mesh.region_names},
+        inward_heat_flux={'bottom': 500.0}, convection={'top': (25.0, 290.0)})
     snapshot = freeze_temperature(mesh, heat.temperature)
     args = _direct_inputs(doc, mesh, region_materials, 'bar')
     direct = solve_thermoelasticity(

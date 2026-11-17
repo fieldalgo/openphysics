@@ -14,9 +14,9 @@ from galerkin.transient_heat import solve_transient_heat
 def test_installed_transient_thermomechanical_closed_form(plane):
     assert Path(workflow.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
     mesh = rectangle_mesh(1., 1., 3, 3)
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-        time_s=[2., 2.1, 2.4, 3.], initial_temperature_k=np.full(mesh.num_nodes, 300.),
-        dirichlet={}, heat_source=8.)
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+        time=[2., 2.1, 2.4, 3.], initial_temperature=np.full(mesh.num_nodes, 300.),
+        prescribed_temperature={}, heat_source_density=8.)
     right = int(np.argmin(np.sum((mesh.nodes-[1., 0.])**2, axis=1)))
     result = workflow.solve_transient_thermoelasticity(mesh, heat,
         units={'length': 'm', 'time': 's', 'temperature': 'K'}, time_indices=[0, 2, 3],

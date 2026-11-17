@@ -170,7 +170,7 @@ def _big_around_small(small_first):
 
 
 def _thermal(mesh):
-    return solve_steady_heat(mesh, conductivity=1., dirichlet={0: 300.})
+    return solve_steady_heat(mesh, thermal_conductivity=1., prescribed_temperature={0: 300.})
 
 
 def _elasticity(mesh):

@@ -43,11 +43,6 @@ V1_ARRAYS = ("node_coordinates", "triangles", "time", "temperature", "heat_flux"
              "prescribed_node_ids", "prescribed_temperature")
 STRUCTURAL = ("triangles", "prescribed_node_ids")          # no unit
 BOUNDARY_ARRAYS = ("outward_prescribed_heat_rate_per_depth", "outward_convective_heat_rate_per_depth")
-# the engine's names of the same arrays
-ENGINE = {"temperature": "temperature_k", "heat_flux": "heat_flux_w_m2",
-          "heat_storage_rate_per_depth": "storage_rate_w_per_m", "reaction_heat_rate_per_depth": "reaction_w_per_m",
-          "outward_prescribed_heat_rate_per_depth": "prescribed_outward_load_w_per_m",
-          "outward_convective_heat_rate_per_depth": "convective_outward_w_per_m"}
 NPZ_STRINGS = ("result_format", "field_layout", "metadata_json")
 V1_SUMMARY_KEYS = (
     "name", "physics_name", "physics_type", "result_format", "field_layout", "diagnostics", "defaults_applied",
@@ -88,11 +83,12 @@ def mixed():
 
 
 def natural_of(doc):
-    """The engine keywords of the document's boundary keys: outward flux = 0.0 - inward (hazard H1)."""
+    """The engine keywords of the document's boundary keys; the engine takes the inward heat flux as
+    the document states it (and computes the outward 0.0 - inward itself, as the runner does)."""
     p = doc.si["physics"]["heat1"]
     natural = {}
     if "inward_heat_flux" in p:
-        natural["outward_flux"] = {tag: 0.0 - v for tag, v in p["inward_heat_flux"].items()}
+        natural["inward_heat_flux"] = dict(p["inward_heat_flux"])
     if "convection" in p:
         natural["convection"] = {tag: (v["heat_transfer_coefficient"], v["ambient_temperature"])
                                  for tag, v in p["convection"].items()}
@@ -107,10 +103,10 @@ def direct(data, **natural):
     dirichlet = {int(i): float(v) for tag, v in p["prescribed_temperature"].items()
                  for i in mesh.boundary[tag]}
     return mesh, solve_transient_heat(
-        mesh, conductivity=p["thermal_conductivity"], volumetric_heat_capacity=p["volumetric_heat_capacity"],
-        time_s=np.array(doc.si["study"]["time"], dtype=float),
-        initial_temperature_k=np.full(mesh.num_nodes, float(p["initial_temperature"])),
-        dirichlet=dirichlet, heat_source=p.get("heat_source_density", 0.0), **natural)
+        mesh, thermal_conductivity=p["thermal_conductivity"], volumetric_heat_capacity=p["volumetric_heat_capacity"],
+        time=np.array(doc.si["study"]["time"], dtype=float),
+        initial_temperature=np.full(mesh.num_nodes, float(p["initial_temperature"])),
+        prescribed_temperature=dirichlet, heat_source_density=p.get("heat_source_density", 0.0), **natural)
 
 
 def _runner_mesh(doc):
@@ -154,7 +150,7 @@ def test_s1_document_run_equals_the_direct_engine_call_bit_for_bit(case):
     assert result.node_coordinates.tobytes() == mesh.nodes.tobytes()
     for name in ("temperature", "heat_flux", "heat_storage_rate_per_depth", "reaction_heat_rate_per_depth") \
             + BOUNDARY_ARRAYS:
-        ours, theirs = getattr(result, name), getattr(engine, ENGINE[name])
+        ours, theirs = getattr(result, name), getattr(engine, name)     # the engine's field has the same name
         assert ours.shape == theirs.shape and ours.dtype == theirs.dtype, name
         assert ours.tobytes() == theirs.tobytes(), name
     nt, n = len(data["study"]["time"]["values"]), mesh.num_nodes
@@ -237,9 +233,9 @@ def test_s2_dirichlet_only_documents_keep_plain_identifiers_arrays_keys_and_valu
         result.outward_convective_heat_rate_per_depth
     if case == "uniform":
         _, engine = direct(data)
-        assert result.temperature.tobytes() == engine.temperature_k.tobytes()
-        assert result.heat_storage_rate_per_depth.tobytes() == engine.storage_rate_w_per_m.tobytes()
-        assert engine.prescribed_outward_load_w_per_m is None
+        assert result.temperature.tobytes() == engine.temperature.tobytes()
+        assert result.heat_storage_rate_per_depth.tobytes() == engine.heat_storage_rate_per_depth.tobytes()
+        assert engine.outward_prescribed_heat_rate_per_depth is None
     out = result.save(tmp_path/case)
     with np.load(out/"fields.npz", allow_pickle=False) as saved:
         assert tuple(saved.files) == V1_ARRAYS + NPZ_STRINGS
@@ -259,9 +255,10 @@ def test_s2_dirichlet_only_documents_keep_plain_identifiers_arrays_keys_and_valu
 def test_s3_convective_slab_document_matches_the_independent_series():
     times = np.linspace(0., 80., 81)              # dt = 1 s, Fo = alpha*t/L^2 = 0.44, Bi = 0.5
     result = run(Document.from_dict(slab(40, 2, times)), verbose=False)
-    series = ConvectiveSlab(L, K, C, H, AMBIENT, INITIAL)
+    series = ConvectiveSlab(length=L, thermal_conductivity=K, volumetric_heat_capacity=C, heat_transfer_coefficient=H,
+                            ambient_temperature=AMBIENT, initial_temperature=INITIAL)
     assert series.biot == pytest.approx(0.5)
-    exact = lambda x: series.temperature(x, float(times[-1])).temperature_k
+    exact = lambda x: series.temperature(x, time=float(times[-1])).temperature
     error = l2_error(result.node_coordinates, result.triangles, result.temperature[-1], exact, INITIAL-AMBIENT)
     example = run(Document.from_dict(EXAMPLE), verbose=False)
     example_error = l2_error(example.node_coordinates, example.triangles, example.temperature[-1], exact,
@@ -272,7 +269,7 @@ def test_s3_convective_slab_document_matches_the_independent_series():
     # Consistency, not a gate: the convective outward history is h*(T_surface-T_ambient)
     # integrated over the 0.01 m side; the first backward-Euler step is the least accurate.
     outward = result.summary()["outward_convective_heat_rate_per_depth"]["values"]
-    expected = [H*(series.temperature(L, float(t)).temperature_k-AMBIENT)*0.01 for t in times[1:]]
+    expected = [H*(series.temperature(L, time=float(t)).temperature-AMBIENT)*0.01 for t in times[1:]]
     np.testing.assert_allclose(outward, expected, rtol=1e-2, atol=0)
     assert all(a > b > 0 for a, b in zip(outward, outward[1:]))
 

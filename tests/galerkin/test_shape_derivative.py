@@ -84,16 +84,16 @@ def _plate():
 
 def _plate_solve(m, W, t, xp):
     left = [int(i) for i in m.boundary["left"]]
-    return solve_steady_heat(m, conductivity={"host": 1.5, "core": 4.0}, heat_source={"host": 0.0, "core": 50.0},
-                             dirichlet={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)},
-                             outward_flux={"right": -3.0}, motion=None if t is None else MeshMotion(W, t))
+    return solve_steady_heat(m, thermal_conductivity={"host": 1.5, "core": 4.0}, heat_source_density={"host": 0.0, "core": 50.0},
+                             prescribed_temperature={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)},
+                             inward_heat_flux={"right": 3.0}, motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
 
 def _plate_functionals(m, r, xp):
     probe = int(np.argmin(np.hypot(m.nodes[:, 0] - 0.5, m.nodes[:, 1] - 0.3)))
     left = [int(i) for i in m.boundary["left"]]
     return {"probe": lambda: r.temperature[probe],
-            "dirichlet_heat": lambda: xp.sum(r.reaction[np.asarray(left)]),
+            "dirichlet_heat": lambda: xp.sum(r.reaction_heat_rate_per_depth[np.asarray(left)]),
             "mean": lambda: xp.mean(r.temperature)}
 
 
@@ -129,9 +129,9 @@ def test_s2_two_layer_slab(name):
     left, right = ([int(i) for i in m.boundary[s]] for s in ("left", "right"))
 
     def resistance(t):
-        r = solve_steady_heat(m, conductivity={"a": k1, "b": k2}, dirichlet={**{i: 1.0 for i in left},
-                              **{i: 0.0 for i in right}}, motion=MeshMotion(W, t))
-        return H / xp.sum(r.reaction[np.asarray(left)])
+        r = solve_steady_heat(m, thermal_conductivity={"a": k1, "b": k2}, prescribed_temperature={**{i: 1.0 for i in left},
+                              **{i: 0.0 for i in right}}, motion=MeshMotion(design_velocity=W, t=t))
+        return H / xp.sum(r.reaction_heat_rate_per_depth[np.asarray(left)])
 
     value, grad = _gradient(name, resistance)
     assert rel(value, L1 / k1 + (L - L1) / k2) <= 1e-10
@@ -178,8 +178,8 @@ def test_s3_annulus_inner_radius(name):
         dirichlet = {**{int(i): 1.0 for i in inner_nodes}, **{int(i): 0.0 for i in np.flatnonzero(outer)}}
 
         def heat(t):
-            r = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, motion=MeshMotion(W, t))
-            return xp.sum(r.reaction[inner_nodes])
+            r = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
+            return xp.sum(r.reaction_heat_rate_per_depth[inner_nodes])
 
         _value, grad = _gradient(name, heat)
         errors.append(rel(grad, exact))
@@ -205,8 +205,8 @@ def test_s4_extension_does_not_matter_in_the_limit(name):
             W = extend_velocity(mesh, nv.values, nv.on_curve, method=method)
 
             def heat(t):
-                r = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, motion=MeshMotion(W, t))
-                return xp.sum(r.reaction[inner_nodes])
+                r = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
+                return xp.sum(r.reaction_heat_rate_per_depth[inner_nodes])
 
             grads.append(_gradient(name, heat)[1])
         gaps.append(abs(grads[0] - grads[1]) / exact)
@@ -225,9 +225,9 @@ def test_s5_rigid_translation(name):
     left = [int(i) for i in m.boundary["left"]]
 
     def total(t):
-        r = solve_steady_heat(m, conductivity={"host": 1.5, "core": 4.0}, heat_source={"host": 0.0, "core": 50.0},
-                              dirichlet={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)},
-                              motion=MeshMotion(W, t))
+        r = solve_steady_heat(m, thermal_conductivity={"host": 1.5, "core": 4.0}, heat_source_density={"host": 0.0, "core": 50.0},
+                              prescribed_temperature={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)},
+                              motion=MeshMotion(design_velocity=W, t=t))
         return xp.sum(r.temperature)
 
     value, grad = _gradient(name, total)
@@ -240,15 +240,15 @@ def test_s6_admissible_interval_exact():
     # one triangle (0,0), (1,0), (0,1); the apex moves down by t: area (1 - t)/2 -> t_hi = 1
     m = Mesh(np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), np.array([[0, 1, 2]]), {})
     W = np.array([[0.0, 0.0], [0.0, 0.0], [0.0, -1.0]])
-    assert admissible_interval(m, W) == (-math.inf, 1.0)
+    assert admissible_interval(m, design_velocity=W) == (-math.inf, 1.0)
     # the right corner moves left and up: 2A = (1 - t)(1) - (t)(0) ... with a quadratic term
     W2 = np.array([[0.0, 0.0], [-1.0, 1.0], [1.0, 0.0]])
     # 2A(t) = (1 - t)(1) - (t)(t) = 1 - t - t^2 -> roots (-1 +- sqrt 5)/2
-    lo, hi = admissible_interval(m, W2)
+    lo, hi = admissible_interval(m, design_velocity=W2)
     assert hi == pytest.approx((-1 + math.sqrt(5)) / 2, rel=1e-15)
     assert lo == pytest.approx((-1 - math.sqrt(5)) / 2, rel=1e-15)
     slab, Ws = _slab()
-    assert admissible_interval(slab, Ws) == pytest.approx((-0.4, 0.6), rel=1e-12)
+    assert admissible_interval(slab, design_velocity=Ws) == pytest.approx((-0.4, 0.6), rel=1e-12)
 
 
 @pytest.mark.parametrize("name", BACKENDS[:1])
@@ -257,12 +257,12 @@ def test_s6_step_beyond_the_bound_is_refused(name):
     m, W = _slab()
     left, right = ([int(i) for i in m.boundary[s]] for s in ("left", "right"))
     with pytest.raises(ElementInversion, match=r"admissible interval \(-0.4, 0.6\)"):
-        solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet={**{i: 1.0 for i in left},
-                          **{i: 0.0 for i in right}}, motion=MeshMotion(W, xp.asarray(0.61)))
+        solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={**{i: 1.0 for i in left},
+                          **{i: 0.0 for i in right}}, motion=MeshMotion(design_velocity=W, t=xp.asarray(0.61)))
     # inside the interval the step solves the moved mesh
-    r = solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet={**{i: 1.0 for i in left},
-                          **{i: 0.0 for i in right}}, motion=MeshMotion(W, xp.asarray(0.3)))
-    Q = float(np.sum(np.asarray(r.reaction)[left]))
+    r = solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={**{i: 1.0 for i in left},
+                          **{i: 0.0 for i in right}}, motion=MeshMotion(design_velocity=W, t=xp.asarray(0.3)))
+    Q = float(np.sum(np.asarray(r.reaction_heat_rate_per_depth)[left]))
     assert rel(0.2 / Q, 0.7 / 2.0 + 0.3 / 5.0) <= 1e-10
 
 
@@ -273,14 +273,16 @@ def test_s7_unchanged_without_motion():
     # (main and this branch give the same sha256 for this problem, measured 2026-11-09; the HQ record)
     m, _W = _plate()
     left = [int(i) for i in m.boundary["left"]]
-    kw = dict(conductivity={"host": 1.5, "core": 4.0}, heat_source={"host": 0.0, "core": 50.0},
-              dirichlet={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)}, outward_flux={"right": -3.0})
+    kw = dict(thermal_conductivity={"host": 1.5, "core": 4.0}, heat_source_density={"host": 0.0, "core": 50.0},
+              prescribed_temperature={i: 300.0 for i in left}, convection={"top": (8.0, 290.0)},
+              inward_heat_flux={"right": 3.0})
     r1 = solve_steady_heat(m, **kw)
     r2 = solve_steady_heat(m, **kw, motion=None)
 
     def digest(r):
         return hashlib.sha256(b"".join(np.ascontiguousarray(getattr(r, f), dtype=float).tobytes()
-                                       for f in ("temperature", "heat_flux", "load", "reaction", "residual")))
+                                       for f in ("temperature", "heat_flux", "generated_heat_rate_per_depth",
+                                                 "reaction_heat_rate_per_depth", "residual_heat_rate_per_depth")))
 
     assert digest(r1).hexdigest() == digest(r2).hexdigest()
     assert isinstance(r1.temperature, np.ndarray)
@@ -295,24 +297,24 @@ def test_s8_refusals():
     common = dict(conductivity={"a": 2.0, "b": 5.0}, dirichlet={i: 1.0 for i in left})
     t = xp.asarray(0.0)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
-        solve_steady_heat(m, **common, motion=MeshMotion(W, 0.0))
+        solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
     with pytest.raises(TypeError, match="heat_source is a callback"):
-        solve_steady_heat(m, **common, heat_source=lambda p: np.ones(len(p)), motion=MeshMotion(W, t))
+        solve_steady_heat(m, **common, heat_source_density=lambda p: np.ones(len(p)), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"outward_flux\['right'\] is a callback"):
-        solve_steady_heat(m, **common, outward_flux={"right": lambda p, n: np.ones(len(p))}, motion=MeshMotion(W, t))
+        solve_steady_heat(m, **common, inward_heat_flux={"right": lambda p, n: -(np.ones(len(p)))}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="conductivity is live"):
-        solve_steady_heat(m, conductivity={"a": xp.asarray(2.0), "b": 5.0}, dirichlet={i: 1.0 for i in left},
-                          motion=MeshMotion(W, t))
+        solve_steady_heat(m, thermal_conductivity={"a": xp.asarray(2.0), "b": 5.0}, prescribed_temperature={i: 1.0 for i in left},
+                          motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match=r"velocity must have shape"):
-        solve_steady_heat(m, **common, motion=MeshMotion(W[:-1], t))
+        solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=W[:-1], t=t))
     bad = W.copy()
     bad[0, 0] = np.nan
     with pytest.raises(ValueError, match="velocity must be finite"):
-        solve_steady_heat(m, **common, motion=MeshMotion(bad, t))
+        solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=bad, t=t))
     with pytest.raises(ValueError, match="axisymmetric is refused"):
-        solve_steady_heat(m, **common, coordinate_system="axisymmetric", motion=MeshMotion(W, t))
+        solve_steady_heat(m, **common, coordinate_system="axisymmetric", motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="only t is live"):
-        solve_steady_heat(m, **common, motion=MeshMotion(xp.asarray(W), t))
+        solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=xp.asarray(W), t=t))
 
 
 # ---------------------------------------------------------------- independent review regressions (2026-11-09)
@@ -326,20 +328,20 @@ def test_review_live_or_callable_values_inside_a_convection_pair_are_refused():
     h = torch.tensor(8.0, dtype=torch.float64, requires_grad=True)
     # a list pair with a live h once ran and returned dJ/dh = 0 (the correction removed it)
     with pytest.raises(TypeError, match=r"convection\['right'\] is live"):
-        solve_steady_heat(m, **common, convection={"right": [h, 280.0]}, motion=MeshMotion(W, t))
+        solve_steady_heat(m, **common, convection={"right": [h, 280.0]}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
         solve_steady_heat(m, **common, convection={"right": (lambda p, n: np.ones(len(p)), 280.0)},
-                          motion=MeshMotion(W, t))
+                          motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
         solve_steady_heat(m, **common, convection={"right": [8.0, lambda p, n: np.ones(len(p))]},
-                          motion=MeshMotion(W, t))
+                          motion=MeshMotion(design_velocity=W, t=t))
 
 
 def test_review_small_motion_keeps_its_inversion_bound():
     m = Mesh(np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), np.array([[0, 1, 2]]), {})
     for s in (1e-6, 1e-7, 1e-9):
         W = s * np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]])          # 2A = 1 - s^2 t^2
-        lo, hi = admissible_interval(m, W)
+        lo, hi = admissible_interval(m, design_velocity=W)
         assert hi == pytest.approx(1 / s, rel=1e-12) and lo == pytest.approx(-1 / s, rel=1e-12)
 
 
@@ -358,9 +360,9 @@ def test_review_messages_name_the_input():
     xp = _xp("jax")
     m, W = _slab()
     with pytest.raises(ValueError, match="t must be finite"):
-        solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet={0: 1.0}, motion=MeshMotion(W, xp.asarray(np.nan)))
+        solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={0: 1.0}, motion=MeshMotion(design_velocity=W, t=xp.asarray(np.nan)))
     with pytest.raises(ValueError, match="dirichlet must map node indices"):
-        solve_steady_heat(m, conductivity={"a": 2.0, "b": 5.0}, dirichlet=[(0, 1.0)], motion=MeshMotion(W, xp.asarray(0.0)))
+        solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature=[(0, 1.0)], motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
 
 
 def test_review_torch_second_derivative_is_refused():
@@ -370,7 +372,7 @@ def test_review_torch_second_derivative_is_refused():
     W = np.stack([0.1 * x * y, 0.05 * x], axis=1)
     left = [int(i) for i in m.boundary["left"]]
     t = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
-    J = torch.sum(solve_steady_heat(m, conductivity=2.0, dirichlet={i: 300.0 for i in left}, heat_source=3.0,
-                                    motion=MeshMotion(W, t)).temperature)
+    J = torch.sum(solve_steady_heat(m, thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in left}, heat_source_density=3.0,
+                                    motion=MeshMotion(design_velocity=W, t=t)).temperature)
     with pytest.raises(RuntimeError, match="second derivatives"):
         torch.autograd.grad(J, t, create_graph=True)

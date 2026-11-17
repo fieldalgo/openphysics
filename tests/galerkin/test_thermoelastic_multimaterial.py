@@ -146,9 +146,8 @@ def _temperature_rows(t_in, t_out):
     rows = []
     for i, (lo, hi) in enumerate(zip([R0]+EDGES[:-1], EDGES)):
         r = np.array([lo+.25*(hi-lo), lo+.75*(hi-lo)])
-        t = thermal_multilayer.composite_cylinder(np.column_stack([r, 0*r]), inner_radius=R0,
-            interfaces=EDGES, conductivities=K, inner_temperature=t_in, outer_temperature=t_out,
-            layer=np.array([i, i])).temperature
+        t = thermal_multilayer.composite_cylinder(np.column_stack([r, 0*r]), position=[R0, *EDGES],
+            thermal_conductivity=K, prescribed_temperature=(t_in, t_out), layer=np.array([i, i])).temperature
         b = (t[1]-t[0])/np.log(r[1]/r[0])
         rows.append([t[0]-b*np.log(r[0]/R0)-TREF, b])
     return np.array(rows)
@@ -172,9 +171,8 @@ def test_coupled_heat_to_mechanics_composite_cylinder_converges(plane):
             thermal_dirichlet=heat_bc, reference_temperature_k=TREF,
             mechanical_dirichlet=_supports(n), **_material_kw(plane))
         bary, points, weight, layer = _quadrature(result.reference_mesh)
-        exact_t = thermal_multilayer.composite_cylinder(points.reshape(-1, 2), inner_radius=R0,
-            interfaces=EDGES, conductivities=K, inner_temperature=420., outer_temperature=300.,
-            layer=layer).temperature
+        exact_t = thermal_multilayer.composite_cylinder(points.reshape(-1, 2), position=[R0, *EDGES],
+            thermal_conductivity=K, prescribed_temperature=(420., 300.), layer=layer).temperature
         th = np.einsum('qi,ti->tq', bary, result.heat.temperature[mesh.triangles])
         t_err.append(np.sqrt(np.sum(weight*(th-exact_t.reshape(th.shape))**2)))
         errors.append(_errors(result.reference_mesh, result.mechanics, reference))
@@ -193,9 +191,9 @@ def test_coupled_heat_to_mechanics_composite_cylinder_converges(plane):
 def test_transient_mechanics_steps_equal_the_static_per_region_solve():
     mesh = layered_rectangle_mesh([.02, .05], .02, [2, 3], 3, ['a', 'b'])
     initial = np.full(len(mesh.nodes), 300.)
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4e6,
-                                time_s=[0., 5., 10.], initial_temperature_k=initial,
-                                dirichlet={int(i): (lambda t: 300.+50*t/10.) for i in mesh.boundary['left']})
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4e6,
+                                time=[0., 5., 10.], initial_temperature=initial,
+                                prescribed_temperature={int(i): (lambda t: 300.+50*t/10.) for i in mesh.boundary['left']})
     bc = {(int(i), c): 0. for i in mesh.boundary['left'] for c in (0, 1)}
     materials = dict(young_modulus={'a': 200e9, 'b': 70e9}, poisson_ratio={'a': .3, 'b': .33},
                      thermal_expansion_per_k={'a': 1.2e-5, 'b': 2.3e-5}, plane='stress')

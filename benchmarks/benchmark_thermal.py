@@ -60,14 +60,14 @@ def steady(n, steps):
     sample = dict(nodes=mesh.num_nodes, triangles=mesh.num_triangles, mesh_seconds=mesh_seconds)
     sample.update(assembly_breakdown(mesh, CONDUCTIVITY))
     result, seconds = harness.timed(
-        solve_steady_heat, mesh, conductivity=CONDUCTIVITY,
-        dirichlet={i: HOT for i in left_nodes(mesh)}, heat_source=SOURCE,
+        solve_steady_heat, mesh, thermal_conductivity=CONDUCTIVITY,
+        prescribed_temperature={i: HOT for i in left_nodes(mesh)}, heat_source_density=SOURCE,
         convection={"right": (FILM, AMBIENT)})
     sample.update(harness.peak_rss())
     sample.update(solver_call_seconds=seconds,
                   temperature_min_k=float(result.temperature.min()),
                   temperature_max_k=float(result.temperature.max()),
-                  max_abs_free_residual_w_per_m=free_residual(result.residual, left_nodes(mesh)))
+                  max_abs_free_residual_w_per_m=free_residual(result.residual_heat_rate_per_depth, left_nodes(mesh)))
     return sample
 
 
@@ -88,14 +88,14 @@ def steady_regions(n, steps):
     per_cell = np.array([conductivity[names[r]] for r in mesh.regions])
     sample.update(assembly_breakdown(mesh, per_cell))
     result, seconds = harness.timed(
-        solve_steady_heat, mesh, conductivity=conductivity,
-        dirichlet={i: HOT for i in left_nodes(mesh)}, heat_source=SOURCE,
+        solve_steady_heat, mesh, thermal_conductivity=conductivity,
+        prescribed_temperature={i: HOT for i in left_nodes(mesh)}, heat_source_density=SOURCE,
         convection={"right": (FILM, AMBIENT)})
     sample.update(harness.peak_rss())
     sample.update(solver_call_seconds=seconds,
                   temperature_min_k=float(result.temperature.min()),
                   temperature_max_k=float(result.temperature.max()),
-                  max_abs_free_residual_w_per_m=free_residual(result.residual, left_nodes(mesh)))
+                  max_abs_free_residual_w_per_m=free_residual(result.residual_heat_rate_per_depth, left_nodes(mesh)))
     return sample
 
 
@@ -111,14 +111,14 @@ def transient(n, steps):
     initial = np.full(mesh.num_nodes, AMBIENT)
     initial[left_nodes(mesh)] = HOT  # the initial field must satisfy the Dirichlet data
     result, seconds = harness.timed(
-        solve_transient_heat, mesh, conductivity=CONDUCTIVITY, volumetric_heat_capacity=CAPACITY,
-        time_s=times, initial_temperature_k=initial,
-        dirichlet={i: HOT for i in left_nodes(mesh)}, heat_source=SOURCE)
+        solve_transient_heat, mesh, thermal_conductivity=CONDUCTIVITY, volumetric_heat_capacity=CAPACITY,
+        time=times, initial_temperature=initial,
+        prescribed_temperature={i: HOT for i in left_nodes(mesh)}, heat_source_density=SOURCE)
     sample.update(harness.peak_rss())
     sample.update(solver_call_seconds=seconds, seconds_per_step=seconds / steps,
-                  history_bytes=int(result.temperature_k.nbytes + result.heat_flux_w_m2.nbytes),
-                  final_temperature_max_k=float(result.temperature_k[-1].max()),
-                  max_abs_free_residual_w_per_m=free_residual(result.residual_w_per_m, left_nodes(mesh)))
+                  history_bytes=int(result.temperature.nbytes + result.heat_flux.nbytes),
+                  final_temperature_max_k=float(result.temperature[-1].max()),
+                  max_abs_free_residual_w_per_m=free_residual(result.residual_heat_rate_per_depth, left_nodes(mesh)))
     return sample
 
 

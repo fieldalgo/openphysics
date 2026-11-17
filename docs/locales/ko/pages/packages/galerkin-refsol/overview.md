@@ -16,7 +16,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 |---|---|---|
 | `refsol.thermoelasticity` | 주어진 Kelvin 온도장의 균일 자유/구속·적합·사인 장, 면외 응력과 물리적 탄성에너지 | 원래 3차원 법칙, FEM import 없음 |
 | `refsol.thermal` | Kelvin 슬랩 및 정상 사인 제조해, 열유속 W/m^2와 열원 W/m^3 | 직접 해석 미분, 엔진 import 없음 |
-| `refsol.thermal_boundary` | 처방 외향 열유속·Robin 대류를 갖는 정상 슬랩과 사인 장 | 폐형식, 엔진 import 없음 |
+| `refsol.thermal_boundary` | 처방 내향 열유속·Robin 대류를 갖는 정상 슬랩과 사인 장 | 폐형식, 엔진 import 없음 |
 | `refsol.transient_heat` | 균일 단열 가열, 이동 affine 장, 사인 제조해, 소형 dense P1 행렬과 후진 Euler 모드 참조 | 해석식과 dense 고유값 문제, 엔진 import 없음 |
 | `refsol.thermal_multilayer` | 층별 상수 전도도와 균일 열원을 갖는 적층 벽의 정상 전도: 직렬 슬랩과 동심 복합 원통, 경계면에서 온도와 수직 열유속 연속 | 열원 없는 경계값과 직렬 열저항, 경계면 연속성, 유한차분으로 확인한 Fourier 법칙과 에너지 균형, 교과서 단일 층; 엔진 import 없음 |
 | `refsol.transient_heat_multilayer` | 고유함수 급수로 푼 적층 벽의 과도 전도(`LayeredWall`): 정확한 Pruefer 영점 개수에 대한 이분법으로 고유값을 빠뜨리지 않고 구함; 고정 양끝 온도, 주어진 초기 진폭 또는 열원 구동 시작 | 단일 층 사인 급수, 2층 특성 방정식, 독립적인 조밀 유한요소 고유값, c 가중 직교성과 경계면 조건, PDE·경계·초기 잔차, 정상 장시간 극한; 엔진 import 없음 |
@@ -34,7 +34,7 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.wall_loss` | 직육면체 공동 모드의 벽별 1차 도체 손실 Q, 축퇴 편광 분리, 균일 충전 | Pozar TE101, 유한차분 curl의 수치 적분, 벽별 가법성, sqrt(sigma) 축척 |
 | `refsol.scattering` | 원형 원통의 평면파 산란: PEC(TM/TE)와 유전체, 부분파 급수, 산란 폭 | 1e-9까지 경계조건 만족, 경계면 연속성, 기하광학 극한 |
 | `refsol.bimetal` | Timoshenko (1925) 바이메탈 온도계: 힘·모멘트 평형에서 얻은 곡률, 출판된 폐형식(Timoshenko, Villarceau, 단축 Stoney 극한), 끝면 표면하중을 포함한 정확한 평면응력 띠 장 | 무작위 데이터에서 세 폐형식 일치, Stoney 극한, 단면 힘·모멘트 0, 계면 연속, 유한차분 변형률 |
-| `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
+| `refsol.thermal_convection` | NAFEMS T4 직사각형(뜨거운 변, 단열 변, 대류 변 둘): 변수분리 급수와 출처를 적은 출판 목표값 18.3 °C(`nafems_t4()`·`nafems_t4_target()`가 SI K로 읽음) | 고유값 방정식, 유한차분 Laplace·Fourier, Robin·단열·뜨거운 변 조건, 기하급수 수렴, 선형성 |
 | `refsol.joule_slab` | 고정 전위·온도 사이의 `sigma = sigma0 (1 + alpha (T - T0))` 정상 1D Joule 가열: erf/erfi 폐형식(`voltage_driven`), 상수 전도도 극한, 금속형 fold 양쪽의 전류 구동 상태(`current_driven`, `fold_current`), 유계 전도도 모델용 온도 범위 | 적분한 보존 법칙(`J = -sigma V'`, `k (T'(0) - T'(x)) = J (V_a - V(x))`), 모듈 자체 도함수의 수치 적분, 유한차분, 상수 sigma 폐형식으로의 O(alpha) 접근, 대칭·반사, 전력 평형, 1매개변수 대칭 방정식 |
 | `refsol.bent_slab` | 복소 차수 Bessel/Hankel 정합(안쪽 `J`, 필름 `J`/`Y`, 외향 `H^(2)`)으로 구한 일정 반경 굽은 슬랩 극점, 안쪽 반경 기준 `n_eff`, `exp(+i omega t)`; 호출 시 선택적 `mpmath` 필요 | 잔차 ≤ 1e-12, 1/R 1차의 직선 슬랩 극한(Richardson), 큰 반경에서 초지수적으로 사라지는 손실, 반경이 줄수록 커지는 손실, TM보다 잘 구속되는 TE, mpmath 없이는 ImportError |
 | `refsol.thermal3d` | 정상 3D 열전도: 상자의 사인 곱 제조해(온도·열유속·열원)와 z 방향 층상 슬랩의 직렬 전도 | 유한차분 대비 열유속·열원, 직렬 저항 공식 대비 슬랩, NumPy만 |
@@ -83,7 +83,9 @@ benchmarks.rib_neff(0.3)   # 3.412492
 
 `refsol.lossy_slab`은 galerkin 모드 솔버의 `exp(+i omega t - i beta z)` 규약으로 복소 유전율 평면 다층 구조를 풉니다. 수동 재료는 `Im eps <= 0`(굴절률 `n' - i n''`), 감쇠하는 모드는 `Im n_eff < 0`입니다. `characteristic`은 영점이 모드인 해석적 전달행렬 함수이고, `solve`는 초기값을 다듬은 뒤(실수부·허수부에 대한 scipy root, 이어서 복소 Newton) 정규화 잔차가 `1e-12`를 넘는 결과를 거부하며, `continued_root`는 구조 경로를 따라 근을 추적합니다. `three_layer_modes`는 흡수 슬랩의 모든 모드를 무손실 `slab` 근에서 감쇠 sheet(`Im Q <= 0`, 외부 장 감쇠)로 출발시키고, `substrate_leaky_mode`는 고립 슬랩의 결합 모드에서 출발해 고굴절률 기판까지 간격을 줄이며 외향 sheet(`Re Q >= 0`; 누설 모드는 `Im Q_sub > 0`로 횡방향으로 커지는 부적절(improper) 기판 장을 가지며, 복소 좌표 PML 솔버가 수렴하는 극점)에서 풉니다. `field`는 `E_y`(TE) 또는 `H_y`(TM)를 반환합니다. 자체 검증은 무손실 극한을 `slab`과, 소손실 극한을 1차 섭동론과(`n'' = 1e-3`에서 `Im n_eff` 상대오차 2.6e-8, `1e-4`에서 100배 감소), 장을 경계면·층 방정식과, 누설률을 터널링 법칙 `exp(-2 k0 gamma gap)`과 비교합니다. `tests/galerkin/test_lossy_slab_modes.py`는 닫힌 띠(흡수 필름)와 복소 좌표 PML(누설 슬랩)에서 galerkin 스칼라·벡터 솔버를 이 근과 대조합니다. 복소 오차는 2차로(가장 미세한 쌍에서 차수 1.97–2.00) 0.01 um 간격에서 3.9e-4–6.8e-4까지 줄고, `Im n_eff`는 상대적으로 3e-4(TE), 4e-3(TM) 이내로 일치합니다.
 
-`refsol.thermal_boundary`는 처방 외향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 외향 열유속은 W/m^2, 대류 h는 W/(m^2 K)입니다.
+`refsol.thermal_boundary`는 처방 내향 열유속과 Robin 경계의 독립 폐형식을 제공합니다. 좌표는 m, 온도는 K, 열전도율은 W/(m K), 내향 열유속은 W/m^2(양수가 몸체로 들어감), 대류 h는 W/(m^2 K)입니다.
+
+galerkin 단계(L2 커밋 6)부터 열 정답(`refsol.thermal`, `thermal3d`, `thermal_boundary`, `thermal_convection`, `thermal_multilayer`, `transient_heat`, `transient_heat_multilayer`, `transient_heat_robin`)은 앞의 `points` 다음에 registry 이름의 키워드 전용 SI 인자를 받고 차원 있는 기본값이 없습니다: `thermal_conductivity`, `prescribed_temperature`(두 끝의 쌍), `heat_source_density`, `inward_heat_flux`, `position`(첫 면을 포함한 층 경계), `time`, `initial_temperature`, `temperature_difference`. 필드도 같은 이름입니다. 문자열 값은 `TypeError`입니다. °C로 출판된 NAFEMS T4 데이터는 비공개 모듈에 출판된 그대로 두고 읽을 때 켈빈으로 바꿉니다.
 
 `refsol.transient_heat`는 `uniform_insulated`, `moving_affine`, `sine_manufactured`, 소형 dense `p1_matrices`, `smallest_dirichlet_mode`, `backward_euler_amplitude`를 제공합니다. 좌표·시간·온도는 m/s/K, 열전도율은 W/(m K), 체적열용량은 J/(m³ K), source는 W/m³, flux는 W/m²입니다. Dense 행렬과 mode는 작은 참조 메시용이며 semidiscrete 후진 Euler product는 연속체 PDE 해와 구분합니다. 이 참조는 물리 온도 유효성이나 최대 원리를 인증하지 않습니다. 과도 엔진은 galerkin [과도 열전도 계약](../galerkin/transient_heat.md)에 설명돼 있습니다.
 

@@ -55,6 +55,8 @@
     {"name": "m_max", "category": "index or count", "source": "M3 1.2 fiber"},
     {"name": "terms", "category": "index or count", "source": "M3 1.2 thermal_convection; M3 1.1 table G", "note": "a series term count; the search text of physmat.rii.Database.search"},
     {"name": "chunk", "category": "index or count", "source": "M3 1.2 thermal_convection"},
+    {"name": "maximum_terms", "category": "index or count", "source": "M3 1.2 transient_heat_robin", "scope": ["refsol"], "note": "the most series terms a slab temperature may sum before it refuses", "reviewer_note": "L2 commit 6: ConvectiveSlab and FluxSlab.temperature(points, *, time, relative_tolerance, maximum_terms) keep their term cap; a count, not a quantity (iteration_limit means iterations)."},
+    {"name": "time_index", "category": "index or count", "source": "M1 1.4 TransientHeatStepError", "note": "the index of a requested time, as time_indices", "reviewer_note": "L2 commit 6: TransientHeatStepError(time_index, *, time) keeps the failing step index beside its time in s; an index into the requested times."},
     {"name": "coordinate_system", "category": "enum", "source": "seed"},
     {"name": "plane", "category": "enum", "source": "seed"},
     {"name": "bend_axis", "category": "enum", "source": "seed"},

@@ -22,17 +22,17 @@ NumPy는 미분하지 않습니다.
 
 | Solver | JAX·PyTorch 값으로 줄 수 있는 입력 |
 |---|---|
-| `solve_steady_heat` | `conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `dirichlet` 온도; `outward_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_steady_heat` | `thermal_conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `prescribed_temperature` 값; `inward_heat_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_electrostatics`, `capacitance_matrix` | `permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_potential` 전위(V); `charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
-| `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
+| `solve_transient_heat` | `thermal_conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(position, time)`); `prescribed_temperature` 값(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature` |
 | `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
 | `solve_modes` | `eps_r`와 `mu_r`(스칼라 또는 요소별 배열, 실수·복소수)와 `k0`; `n_eff`, `et`, `ez`를 그 라이브러리로 돌려줌. `n_target`은 모드를 고르기만 하므로 미분이 없음; `coordinate_factors`는 NumPy여야 함 |
 | `solve_cavity_box` | `lengths_m`(세 값의 배열, 또는 숫자와 살아 있는 값을 섞은 시퀀스); 주파수, 고유값, 모서리 계수, 중심 필드는 미분과 함께, 잔차(NumPy 풀이의 진단값)는 미분 없이 그 라이브러리로 돌려줌. `target_frequency_hz`는 모드를 고르기만 함 |
 | `eval_edge_field` | `dofs`(실수 또는 복소수, 예: `solve_modes`의 `et[i]`); 중심 필드를 그 라이브러리의 float64 또는 complex128로 돌려줌. `EdgeSpace`는 NumPy 구조이므로 그 기하와 모서리 부호에는 미분이 없음 |
 
-시간 격자 `time_s`는 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
+시간 격자 `time`은 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
 라이브러리의 값을 돌려줘야 합니다. 첫 시각에 NumPy 숫자를 돌려주고 나중에 살아 있는
 값을 돌려주는 콜백은 거부합니다.
 
@@ -59,7 +59,7 @@ right = jnp.asarray(mesh.boundary["right"])
 
 
 def right_temperature(k, h):
-    result = solve_steady_heat(mesh, conductivity=k, dirichlet={i: 350.0 for i in left},
+    result = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature={i: 350.0 for i in left},
                                convection={"right": (h, 300.0)})
     return result.temperature[right].mean()
 

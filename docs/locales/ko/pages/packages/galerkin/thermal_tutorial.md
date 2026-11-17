@@ -25,7 +25,7 @@ python -m pip install -e packages/galerkin -e packages/galerkin-refsol
 
 [기존 예제](../../../../../../examples/galerkin/thermal_steady2d.py)는
 `rectangle_mesh(2., .7, 8, 5)`로 8 × 5개 격자 셀을 만들고 각 셀을 P1 삼각형 두 개로 나눕니다.
-실제 왼쪽·오른쪽 경계 노드 ID를 `dirichlet`에 넣으며, 지정하지 않은 자연 경계는 단열입니다.
+실제 왼쪽·오른쪽 경계 노드 ID를 `prescribed_temperature`에 넣으며, 지정하지 않은 자연 경계는 단열입니다.
 `solve_steady_heat`는 노드 온도와 삼각형마다 일정한 열유속 벡터를 반환합니다.
 
 ## 2. 실행과 결과 해석

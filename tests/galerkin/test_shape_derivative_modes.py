@@ -126,7 +126,7 @@ def test_w1_matches_moved_mesh_central_difference(strip, name, material, mode, f
         return lib.real(n_eff[mode]) if functional == "n_eff_real" else lib.imag(n_eff[mode])
 
     def solve(m, t=None):
-        return solve_modes(m, eps, K0, N_CORE, num_modes=2, motion=None if t is None else MeshMotion(W, t))
+        return solve_modes(m, eps, K0, N_CORE, num_modes=2, motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
     value, grad = _gradient(name, lambda t: pick(solve(mesh, t), xp))
     # Deviation from the pre-registered plain central difference (HQ record 2026-11-11): the reference
@@ -158,7 +158,7 @@ def test_w2_hollow_rectangular_guide_width(name):
         W = np.stack([mesh.nodes[:, 0] / a, np.zeros(mesh.num_nodes)], axis=1)  # stretch: da = 1
 
         def n_eff(t):
-            return xp.real(solve_modes(mesh, 1.0, k0, n_exact, num_modes=1, motion=MeshMotion(W, t))[0][0])
+            return xp.real(solve_modes(mesh, 1.0, k0, n_exact, num_modes=1, motion=MeshMotion(design_velocity=W, t=t))[0][0])
 
         _v, grad = _gradient(name, n_eff)
         errors.append(rel(grad, exact))
@@ -180,7 +180,7 @@ def test_w3_strip_width_against_modesolverpy(name):
     xp = _xp(name)
     mesh, W, core = _strip(0.02)
     _v, grad = _gradient(name, lambda t: xp.real(
-        solve_modes(mesh, _eps(core), K0, N_CORE, num_modes=1, motion=MeshMotion(W, t))[0][0]))
+        solve_modes(mesh, _eps(core), K0, N_CORE, num_modes=1, motion=MeshMotion(design_velocity=W, t=t))[0][0]))
     assert rel(grad, MODESOLVERPY_DNDW) <= 3e-2, grad
 
 
@@ -192,7 +192,7 @@ def test_w4_rigid_translation(strip, name):
     mesh, _W, core = strip
     W = np.tile([0.7, -0.4], (mesh.num_nodes, 1))
     value, grad = _gradient(name, lambda t: xp.real(
-        solve_modes(mesh, _eps(core), K0, N_CORE, num_modes=1, motion=MeshMotion(W, t))[0][0]))
+        solve_modes(mesh, _eps(core), K0, N_CORE, num_modes=1, motion=MeshMotion(design_velocity=W, t=t))[0][0]))
     assert abs(grad) <= 1e-10 * abs(value)
 
 
@@ -205,7 +205,7 @@ def test_w5_uniform_scaling_equals_wavenumber_derivative(strip, name):
     eps = _eps(core)
     W = mesh.nodes.copy()                                                         # X(t) = (1 + t) X0
     _v, d_scale = _gradient(name, lambda t: xp.real(
-        solve_modes(mesh, eps, K0, N_CORE, num_modes=1, motion=MeshMotion(W, t))[0][0]))
+        solve_modes(mesh, eps, K0, N_CORE, num_modes=1, motion=MeshMotion(design_velocity=W, t=t))[0][0]))
     _v, d_k0 = _gradient(name, lambda k: xp.real(solve_modes(mesh, eps, k, N_CORE, num_modes=1)[0][0]), K0)
     assert rel(d_scale, K0 * d_k0) <= 1e-8, (d_scale, K0 * d_k0)
 
@@ -246,7 +246,7 @@ def test_w6_degenerate_modes_get_nan_derivatives(name):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             _v, grad = _gradient(name, lambda t: xp.real(
-                solve_modes(mesh, eps, K0, N_CORE, num_modes=3, motion=MeshMotion(W, t))[0][mode]))
+                solve_modes(mesh, eps, K0, N_CORE, num_modes=3, motion=MeshMotion(design_velocity=W, t=t))[0][mode]))
         assert any(issubclass(w.category, DegenerateModeWarning) for w in caught)
         grads.append(grad)
     assert math.isnan(grads[0]) and math.isnan(grads[1])
@@ -276,21 +276,21 @@ def test_w8_refusals(strip):
     t = xp.asarray(0.0)
     eps = _eps(core)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
-        solve_modes(mesh, eps, K0, N_CORE, motion=MeshMotion(W, 0.0))
+        solve_modes(mesh, eps, K0, N_CORE, motion=MeshMotion(design_velocity=W, t=0.0))
     with pytest.raises(TypeError, match="eps_r is live"):
-        solve_modes(mesh, xp.asarray(eps), K0, N_CORE, motion=MeshMotion(W, t))
+        solve_modes(mesh, xp.asarray(eps), K0, N_CORE, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="mu_r is live"):
-        solve_modes(mesh, eps, K0, N_CORE, mu_r=xp.asarray(1.0), motion=MeshMotion(W, t))
+        solve_modes(mesh, eps, K0, N_CORE, mu_r=xp.asarray(1.0), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="k0 is live"):
-        solve_modes(mesh, eps, xp.asarray(K0), N_CORE, motion=MeshMotion(W, t))
+        solve_modes(mesh, eps, xp.asarray(K0), N_CORE, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="eps_r must be a number or a per-element array"):
-        solve_modes(mesh, lambda p: 1.0, K0, N_CORE, motion=MeshMotion(W, t))
+        solve_modes(mesh, lambda p: 1.0, K0, N_CORE, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match="coordinate_factors .* refused with a motion"):
         solve_modes(mesh, eps, K0, N_CORE, coordinate_factors=np.ones((mesh.num_triangles, 3)),
-                    motion=MeshMotion(W, t))
-    _lo, hi = admissible_interval(mesh, W)
+                    motion=MeshMotion(design_velocity=W, t=t))
+    _lo, hi = admissible_interval(mesh, design_velocity=W)
     with pytest.raises(ElementInversion):
-        solve_modes(mesh, eps, K0, N_CORE, motion=MeshMotion(W, xp.asarray(hi * 1.01)))
+        solve_modes(mesh, eps, K0, N_CORE, motion=MeshMotion(design_velocity=W, t=xp.asarray(hi * 1.01)))
 
 
 def test_w8_jax_without_x64_is_named(strip):
@@ -299,6 +299,6 @@ def test_w8_jax_without_x64_is_named(strip):
     jax.config.update("jax_enable_x64", False)
     try:
         with pytest.raises(ValueError, match="galerkin needs float64"):
-            solve_modes(mesh, _eps(core), K0, N_CORE, motion=MeshMotion(W, jax.numpy.asarray(0.0)))
+            solve_modes(mesh, _eps(core), K0, N_CORE, motion=MeshMotion(design_velocity=W, t=jax.numpy.asarray(0.0)))
     finally:
         jax.config.update("jax_enable_x64", True)

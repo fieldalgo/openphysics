@@ -40,7 +40,7 @@ unittest subtest와 후속 pytest/subtest 개수는 실제 관측값으로 따�
 ## 독립 유도와 scale
 
 scalar SI 문제는 c*Tdot-div(k*gradT)=Q이며, 외부 고정 노드의 온도를 처방하고
-나머지 변은 단열이다. 뒤에 추가된 `outward_flux`/`convection` keyword는 이 동결
+나머지 변은 단열이다. 뒤에 추가된 `inward_heat_flux`/`convection` keyword는 이 동결
 oracle의 범위 밖이며, 그 생산 측 기준은
 [검증 계약](transient_heat_validation.md#외향-열유속과-대류-기준)에 있다. 좌표는 m, k는 W/(m K), c는 J/(m^3 K), Q는 W/m^3,
 T는 Kelvin이다. 원 barycentric geometry에서 다음을 얻는다.
@@ -140,10 +140,10 @@ R6는 전체 이산 열원 lookup을 먼저 정의한다. 잘못된 좌단점/�
 actor는 같은 함수/history에 적용한다. 이차식의 연속 미분을 평균하여 우연히
 같아지는 경우를 음성 검출로 사용하지 않는다.
 
-R1의 실제 캡처 접근자는 nodes_m/triangles이다.
+R1의 실제 캡처 접근자는 node_coordinates/triangles이다.
 R3은 요청 시간별 샘플과 같은 sampled-point 합계를 확인하며,
 임의의 Python 호출1회나 배치 순서를 강요하지 않는다.
-R4는 time_index/time_s와 비어 있지 않은 chained cause를 갖는
+R4는 time_index/time와 비어 있지 않은 chained cause를 갖는
 TransientHeatStepError를 요구한다. R7 정규화 및5% 오차비 해석은 원 사전계획과
 같다. 이것으로 생산 수치 계약 준수를 추정하지 않는다.
 

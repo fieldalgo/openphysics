@@ -19,8 +19,9 @@ interval (n pi, n pi + pi/2)), xi = x / L and Fo = alpha t / L^2,
     theta(x, t) = theta_0 sum_n  2 sin(beta_n) / (beta_n + sin(beta_n) cos(beta_n))
                                  cos(beta_n xi) exp(-beta_n^2 Fo).
 
-Prescribed face: outward flux density g [W/m^2] at x = L (q.n = -k dT/dx = g,
-positive g removes heat), insulated at x = 0:
+Prescribed face: inward heat flux density q_in [W/m^2] at x = L (positive q_in
+adds heat), insulated at x = 0. With the outward flux g = 0.0 - q_in (q.n = -k dT/dx
+= g, positive g removes heat):
 
     T(x, t) = T0 - (g L / k) [ Fo + (3 xi^2 - 1) / 6
                                - (2 / pi^2) sum_{n>=1} (-1)^n / n^2 exp(-n^2 pi^2 Fo) cos(n pi xi) ].
@@ -49,7 +50,8 @@ exp(-beta_1^2 alpha t / L^2), has died out) is
     z = exp(i omega dt)); it isolates the spatial error of a backward-Euler
     discretization, as q_d -> q when dt -> 0.
 
-Ramped outward flux g(t) = g0 t / tau at x = L, insulated at x = 0, uniform
+Ramped outward flux g(t) = g0 t / tau at x = L (the private ``_RampedFluxSlab``:
+its rate of heat flux has no registry name, and only tests use it), insulated at x = 0, uniform
 initial T0: Duhamel's integral of the constant-flux step response above,
 T - T0 = (g0 / tau) integral_0^t S(x, u) du with S the unit-step response,
 gives with Fo = alpha t / L^2 and xi = x / L
@@ -71,14 +73,17 @@ tolerance of the temperature scale (|T0 - T_a|, |g| L / k or the ramp's
 |g0| L / k (L^2 / (alpha tau)) Fo^2 / 2); the truncation bound is returned with
 the temperature. At t = 0 the exact initial value is returned (the series
 converge slowly there). NumPy and SciPy's ``brentq`` only; no FEM, assembly or
-solver import. SI units throughout.
+solver import. SI units throughout, keyword-only registry names after a leading
+positional ``points`` (x coordinates in m); a str for a quantity raises TypeError.
 """
 from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import brentq
 
-__all__ = ["SlabTemperature", "ConvectiveSlab", "FluxSlab", "PeriodicAmbientSlab", "RampedFluxSlab"]
+from ._checks import refuse_text
+
+__all__ = ["SlabTemperature", "ConvectiveSlab", "FluxSlab", "PeriodicAmbientSlab"]
 
 
 def _finite_scalar(value, name, positive=False, nonnegative=False):
@@ -115,37 +120,40 @@ def _terms(bound, tolerance, maximum):
 
 @dataclass(frozen=True)
 class SlabTemperature:
-    """Temperature (same shape as x), the series length and its truncation bound [K]."""
-    temperature_k: np.ndarray
+    """Temperature [K] (same shape as the points), the series length and its truncation bound [K]."""
+    temperature: np.ndarray
     terms: int
-    truncation_bound_k: float
+    truncation_bound: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvectiveSlab:
     """Slab 0<x<L, insulated at x=0, convective at x=L, uniform initial temperature."""
     length: float
-    conductivity: float
+    thermal_conductivity: float
     volumetric_heat_capacity: float
-    convection: float
-    ambient: float
+    heat_transfer_coefficient: float
+    ambient_temperature: float
     initial_temperature: float
 
     def __post_init__(self):
+        refuse_text(**{f: getattr(self, f) for f in ("length", "thermal_conductivity", "volumetric_heat_capacity",
+                                                     "heat_transfer_coefficient", "ambient_temperature",
+                                                     "initial_temperature")})
         _finite_scalar(self.length, "length", positive=True)
-        _finite_scalar(self.conductivity, "conductivity", positive=True)
+        _finite_scalar(self.thermal_conductivity, "thermal_conductivity", positive=True)
         _finite_scalar(self.volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
-        _finite_scalar(self.convection, "convection", positive=True)
-        _finite_scalar(self.ambient, "ambient")
+        _finite_scalar(self.heat_transfer_coefficient, "heat_transfer_coefficient", positive=True)
+        _finite_scalar(self.ambient_temperature, "ambient_temperature")
         _finite_scalar(self.initial_temperature, "initial_temperature")
 
     @property
     def biot(self):
-        return self.convection*self.length/self.conductivity
+        return self.heat_transfer_coefficient*self.length/self.thermal_conductivity
 
     @property
     def diffusivity(self):
-        return self.conductivity/self.volumetric_heat_capacity
+        return self.thermal_conductivity/self.volumetric_heat_capacity
 
     def eigenvalues(self, terms):
         """The first ``terms`` positive roots beta_n of beta tan(beta) = Bi, increasing.
@@ -168,124 +176,146 @@ class ConvectiveSlab:
             raise ValueError("eigenvalue bracketing failed")
         return roots
 
-    def tail_bound(self, terms, fourier):
+    def _tail_bound(self, terms, fourier):
         """Bound of the omitted terms n >= terms, in K, for Fourier number fourier > 0.
 
         |A_n| <= 2 |theta_0| / (beta_n - 1/2) <= 2 |theta_0| / (N pi - 1/2) and
         exp(-beta_n^2 Fo) <= exp(-n^2 pi^2 Fo); the geometric bound uses
         n^2 - N^2 >= (n - N)(2N + 1).
         """
-        rise = abs(self.initial_temperature-self.ambient)
+        rise = abs(self.initial_temperature-self.ambient_temperature)
         n = terms
         lead = np.exp(-(n*np.pi)**2*fourier)
         ratio = np.exp(-(2*n+1)*np.pi**2*fourier)
         return 2*rise/(n*np.pi-.5)*lead/(1-ratio)
 
-    def temperature(self, x, t, *, tolerance=1e-13, maximum_terms=20000):
-        """T(x, t) with the series tail bounded by tolerance*|T0 - T_a|."""
+    def temperature(self, points, *, time, relative_tolerance=1e-13, maximum_terms=20000):
+        """T(x, t) at the x coordinates ``points``, the series tail bounded by relative_tolerance*|T0 - T_a|."""
+        refuse_text(time=time, relative_tolerance=relative_tolerance)
+        x, t, tolerance = points, time, relative_tolerance
         x = _coordinates(x, self.length)
-        t = _finite_scalar(t, "t", nonnegative=True)
-        rise = self.initial_temperature-self.ambient
+        t = _finite_scalar(t, "time", nonnegative=True)
+        rise = self.initial_temperature-self.ambient_temperature
         if t == 0 or rise == 0:
             return SlabTemperature(np.full(x.shape, self.initial_temperature), 0, 0.)
         fourier = self.diffusivity*t/self.length**2
-        terms = _terms(lambda n: self.tail_bound(n, fourier), tolerance*abs(rise), maximum_terms)
+        terms = _terms(lambda n: self._tail_bound(n, fourier), tolerance*abs(rise), maximum_terms)
         beta = self.eigenvalues(terms)
         amplitude = 2*np.sin(beta)/(beta+np.sin(beta)*np.cos(beta))
         xi = x/self.length
         series = np.sum(amplitude*np.cos(np.multiply.outer(xi, beta))*np.exp(-beta**2*fourier),
                         axis=-1)
-        return SlabTemperature(self.ambient+rise*series, terms, float(self.tail_bound(terms, fourier)))
+        return SlabTemperature(self.ambient_temperature+rise*series, terms,
+                               float(self._tail_bound(terms, fourier)))
 
-    def surface_outward_w_m2(self, t, **options):
-        """Convective outward flux density h (T(L, t) - T_a) at x = L."""
-        return self.convection*(self.temperature(self.length, t, **options).temperature_k-self.ambient)
+    def outward_heat_flux(self, *, time, relative_tolerance=1e-13, maximum_terms=20000):
+        """Convective outward heat flux density h (T(L, t) - T_a) at x = L, W/m^2 (positive leaves)."""
+        temperature = self.temperature(self.length, time=time, relative_tolerance=relative_tolerance,
+                                       maximum_terms=maximum_terms).temperature
+        return self.heat_transfer_coefficient*(temperature-self.ambient_temperature)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FluxSlab:
-    """Slab 0<x<L, insulated at x=0, constant outward flux g at x=L, uniform initial temperature."""
+    """Slab 0<x<L, insulated at x=0, constant inward heat flux at x=L, uniform initial temperature.
+
+    The series uses the outward flux g = 0.0 - inward_heat_flux (exact).
+    """
     length: float
-    conductivity: float
+    thermal_conductivity: float
     volumetric_heat_capacity: float
-    outward_flux: float
+    inward_heat_flux: float
     initial_temperature: float
 
     def __post_init__(self):
+        refuse_text(**{f: getattr(self, f) for f in ("length", "thermal_conductivity", "volumetric_heat_capacity",
+                                                     "inward_heat_flux", "initial_temperature")})
         _finite_scalar(self.length, "length", positive=True)
-        _finite_scalar(self.conductivity, "conductivity", positive=True)
+        _finite_scalar(self.thermal_conductivity, "thermal_conductivity", positive=True)
         _finite_scalar(self.volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
-        _finite_scalar(self.outward_flux, "outward_flux")
+        _finite_scalar(self.inward_heat_flux, "inward_heat_flux")
         _finite_scalar(self.initial_temperature, "initial_temperature")
 
     @property
+    def _outward(self):
+        return 0.0 - self.inward_heat_flux
+
+    @property
     def diffusivity(self):
-        return self.conductivity/self.volumetric_heat_capacity
+        return self.thermal_conductivity/self.volumetric_heat_capacity
 
     @property
     def temperature_scale(self):
         """|g| L / k, the magnitude of the steady temperature difference across the slab."""
-        return abs(self.outward_flux)*self.length/self.conductivity
+        return abs(self._outward)*self.length/self.thermal_conductivity
 
-    def tail_bound(self, terms, fourier):
+    def _tail_bound(self, terms, fourier):
         """Bound of the omitted terms n >= terms, in K: (2 scale / pi^2) sum exp(-n^2 pi^2 Fo) / n^2."""
         n = terms
         lead = np.exp(-(n*np.pi)**2*fourier)
         ratio = np.exp(-(2*n+1)*np.pi**2*fourier)
         return 2*self.temperature_scale/(np.pi**2*n**2)*lead/(1-ratio)
 
-    def temperature(self, x, t, *, tolerance=1e-13, maximum_terms=20000):
-        """T(x, t) with the series tail bounded by tolerance*|g| L / k."""
+    def temperature(self, points, *, time, relative_tolerance=1e-13, maximum_terms=20000):
+        """T(x, t) at the x coordinates ``points``, the series tail bounded by relative_tolerance*|g| L / k."""
+        refuse_text(time=time, relative_tolerance=relative_tolerance)
+        x, t, tolerance = points, time, relative_tolerance
         x = _coordinates(x, self.length)
-        t = _finite_scalar(t, "t", nonnegative=True)
-        if t == 0 or self.outward_flux == 0:
+        t = _finite_scalar(t, "time", nonnegative=True)
+        if t == 0 or self._outward == 0:
             return SlabTemperature(np.full(x.shape, self.initial_temperature), 0, 0.)
         fourier = self.diffusivity*t/self.length**2
-        terms = _terms(lambda n: self.tail_bound(n, fourier), tolerance*self.temperature_scale,
+        terms = _terms(lambda n: self._tail_bound(n, fourier), tolerance*self.temperature_scale,
                        maximum_terms)
         n = np.arange(1, terms+1)
         xi = x/self.length
         series = np.sum((-1.)**n/n**2*np.exp(-(n*np.pi)**2*fourier)*np.cos(np.pi*np.multiply.outer(xi, n)),
                         axis=-1)
         bracket = fourier+(3*xi**2-1)/6-2/np.pi**2*series
-        scale = self.outward_flux*self.length/self.conductivity
+        scale = self._outward*self.length/self.thermal_conductivity
         return SlabTemperature(self.initial_temperature-scale*bracket, terms,
-                               float(self.tail_bound(terms, fourier)))
+                               float(self._tail_bound(terms, fourier)))
 
-    def mean_temperature(self, t):
+    def mean_temperature(self, *, time):
         """Exact slab mean T0 - g t / (c L): the stored heat changes only through x = L."""
-        t = _finite_scalar(t, "t", nonnegative=True)
-        return self.initial_temperature-self.outward_flux*t/(self.volumetric_heat_capacity*self.length)
+        refuse_text(time=time)
+        t = _finite_scalar(time, "time", nonnegative=True)
+        return self.initial_temperature-self._outward*t/(self.volumetric_heat_capacity*self.length)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PeriodicAmbientSlab:
     """Slab 0<x<L, insulated at x=0, convective at x=L with T_a(t) = T_m + A sin(omega t).
 
-    ``temperature`` is the periodic steady state (module docstring), not the
-    solution from a given initial field: the difference decays as
-    exp(-beta_1^2 alpha t / L^2) with beta_1 the first root of ConvectiveSlab.
+    ambient_temperature is the mean T_m, temperature_difference the amplitude A and
+    angular_frequency omega (rad/s). ``temperature`` is the periodic steady state
+    (module docstring), not the solution from a given initial field: the difference
+    decays as exp(-beta_1^2 alpha t / L^2) with beta_1 the first root of ConvectiveSlab.
+    The complex amplitude follows exp(+i omega t) (module docstring).
     """
     length: float
-    conductivity: float
+    thermal_conductivity: float
     volumetric_heat_capacity: float
-    convection: float
-    mean_ambient: float
-    amplitude: float
+    heat_transfer_coefficient: float
+    ambient_temperature: float
+    temperature_difference: float
     angular_frequency: float
 
     def __post_init__(self):
+        refuse_text(**{f: getattr(self, f) for f in ("length", "thermal_conductivity", "volumetric_heat_capacity",
+                                                     "heat_transfer_coefficient", "ambient_temperature",
+                                                     "temperature_difference", "angular_frequency")})
         _finite_scalar(self.length, "length", positive=True)
-        _finite_scalar(self.conductivity, "conductivity", positive=True)
+        _finite_scalar(self.thermal_conductivity, "thermal_conductivity", positive=True)
         _finite_scalar(self.volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
-        _finite_scalar(self.convection, "convection", positive=True)
-        _finite_scalar(self.mean_ambient, "mean_ambient")
-        _finite_scalar(self.amplitude, "amplitude")
+        _finite_scalar(self.heat_transfer_coefficient, "heat_transfer_coefficient", positive=True)
+        _finite_scalar(self.ambient_temperature, "ambient_temperature")
+        _finite_scalar(self.temperature_difference, "temperature_difference")
         _finite_scalar(self.angular_frequency, "angular_frequency", positive=True)
 
     @property
     def diffusivity(self):
-        return self.conductivity/self.volumetric_heat_capacity
+        return self.thermal_conductivity/self.volumetric_heat_capacity
 
     @property
     def period(self):
@@ -298,47 +328,60 @@ class PeriodicAmbientSlab:
 
     def transient_decay_time(self):
         """L^2 / (alpha beta_1^2): the e-folding time of the slowest transient mode."""
-        slab = ConvectiveSlab(self.length, self.conductivity, self.volumetric_heat_capacity,
-                              self.convection, self.mean_ambient, self.mean_ambient+1.0)
+        slab = ConvectiveSlab(length=self.length, thermal_conductivity=self.thermal_conductivity,
+                              volumetric_heat_capacity=self.volumetric_heat_capacity,
+                              heat_transfer_coefficient=self.heat_transfer_coefficient,
+                              ambient_temperature=self.ambient_temperature,
+                              initial_temperature=self.ambient_temperature+1.0)
         return self.length**2/(self.diffusivity*slab.eigenvalues(1)[0]**2)
 
-    def discrete_wavenumber(self, time_step):
+    def discrete_wavenumber(self, *, time_step):
         """q_d = sqrt((1 - exp(-i omega dt)) / (alpha dt)) of backward Euler with step dt, 1/m."""
+        refuse_text(time_step=time_step)
         dt = _finite_scalar(time_step, "time_step", positive=True)
         return np.sqrt((1-np.exp(-1j*self.angular_frequency*dt))/(self.diffusivity*dt))
 
-    def complex_amplitude(self, x, time_step=None):
-        """Theta(x) = A h cosh(q x) / (h cosh(q L) + k q sinh(q L)), K (complex).
+    def complex_amplitude(self, points, *, time_step=None):
+        """Theta(x) = A h cosh(q x) / (h cosh(q L) + k q sinh(q L)), K (complex), at the x coordinates ``points``.
 
         With ``time_step`` the backward-Euler wavenumber q_d replaces q: the
         periodic steady state of the time-discrete problem (module docstring).
         """
-        x = _coordinates(x, self.length)
-        q = self.wavenumber if time_step is None else self.discrete_wavenumber(time_step)
-        h, k = self.convection, self.conductivity
-        return self.amplitude*h*np.cosh(q*x)/(h*np.cosh(q*self.length)+k*q*np.sinh(q*self.length))
+        refuse_text(time_step=time_step)
+        x = _coordinates(points, self.length)
+        q = self.wavenumber if time_step is None else self.discrete_wavenumber(time_step=time_step)
+        h, k = self.heat_transfer_coefficient, self.thermal_conductivity
+        return self.temperature_difference*h*np.cosh(q*x)/(h*np.cosh(q*self.length)+k*q*np.sinh(q*self.length))
 
-    def ambient(self, t):
+    def ambient(self, *, time):
         """T_a(t) = T_m + A sin(omega t)."""
-        t = _finite_scalar(t, "t")
-        return self.mean_ambient+self.amplitude*np.sin(self.angular_frequency*t)
+        refuse_text(time=time)
+        t = _finite_scalar(time, "time")
+        return self.ambient_temperature+self.temperature_difference*np.sin(self.angular_frequency*t)
 
-    def temperature(self, x, t):
-        """Periodic steady state T_m + Im[Theta(x) exp(i omega t)] (same shape as x)."""
-        t = _finite_scalar(t, "t")
-        theta = self.complex_amplitude(x)
-        return self.mean_ambient+np.imag(theta*np.exp(1j*self.angular_frequency*t))
+    def temperature(self, points, *, time):
+        """Periodic steady state T_m + Im[Theta(x) exp(i omega t)] (same shape as the x coordinates ``points``)."""
+        refuse_text(time=time)
+        t = _finite_scalar(time, "time")
+        theta = self.complex_amplitude(points)
+        return self.ambient_temperature+np.imag(theta*np.exp(1j*self.angular_frequency*t))
 
-    def surface_outward_w_m2(self, t):
-        """Convective outward flux density h (T(L, t) - T_a(t)) in the periodic steady state."""
-        t = _finite_scalar(t, "t")
+    def outward_heat_flux(self, *, time):
+        """Convective outward heat flux density h (T(L, t) - T_a(t)) in the periodic steady state, W/m^2."""
+        refuse_text(time=time)
+        t = _finite_scalar(time, "time")
         theta = self.complex_amplitude(np.asarray(self.length))
-        return self.convection*np.imag((theta-self.amplitude)*np.exp(1j*self.angular_frequency*t))
+        return self.heat_transfer_coefficient*np.imag((theta-self.temperature_difference)
+                                                      *np.exp(1j*self.angular_frequency*t))
 
 
 @dataclass(frozen=True)
-class RampedFluxSlab:
-    """Slab 0<x<L, insulated at x=0, outward flux g0 t / tau at x=L, uniform initial temperature."""
+class _RampedFluxSlab:
+    """Slab 0<x<L, insulated at x=0, outward flux g0 t / tau at x=L, uniform initial temperature.
+
+    Private (spec rule R(2)): its rate of heat flux (W/(m^2 s)) has no registry name and no
+    shipped code uses it; tests do. It keeps its consistent-units fields and returns a
+    ``SlabTemperature``."""
     length: float
     conductivity: float
     volumetric_heat_capacity: float
