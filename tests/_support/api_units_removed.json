@@ -392,6 +392,24 @@
     {"package": "galerkin", "kind": "name", "name": "normalize_scalar", "source": "Appendix D, L3 commit 11: galerkin top level -> internal, galerkin.kernels (galerkin.mode_overlap)"},
     {"package": "galerkin", "kind": "name", "name": "scalar_coupling_efficiency", "source": "Appendix D, L3 commit 11: galerkin top level -> internal, galerkin.kernels (galerkin.mode_overlap)"},
     {"package": "galerkin", "kind": "name", "name": "scalar_confinement_factor", "source": "Appendix D, L3 commit 11: galerkin top level -> internal, galerkin.kernels (galerkin.mode_overlap)"},
-    {"package": "galerkin", "kind": "name", "name": "scalar_effective_area", "source": "Appendix D, L3 commit 11: galerkin top level -> internal, galerkin.kernels (galerkin.mode_overlap)"}
+    {"package": "galerkin", "kind": "name", "name": "scalar_effective_area", "source": "Appendix D, L3 commit 11: galerkin top level -> internal, galerkin.kernels (galerkin.mode_overlap)"},
+    {"package": "galerkin", "kind": "parameter", "name": "eps_r", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: relative_permittivity"},
+    {"package": "galerkin", "kind": "parameter", "name": "k0", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: vacuum_wavelength or vacuum_angular_wavenumber (exactly one; k0 = 2 pi / vacuum_wavelength)"},
+    {"package": "galerkin", "kind": "parameter", "name": "n_target", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: target_effective_index"},
+    {"package": "galerkin", "kind": "parameter", "name": "num_modes", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: search_mode_count (D6: the eigensolver's search count; the cavity's is mode_count)"},
+    {"package": "galerkin", "kind": "parameter", "name": "mu_r", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: relative_permeability"},
+    {"package": "galerkin", "kind": "parameter", "name": "coordinate_factors", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: pml=ModalPML(...) and bend=Bend(...) (D5: the factors carry the kernel convention)"},
+    {"package": "galerkin", "kind": "parameter", "name": "et", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode: WaveguideModes.unnormalized_electric_field_line_integral"},
+    {"package": "galerkin", "kind": "parameter", "name": "ez", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode: WaveguideModes.unnormalized_electric_field_z, E_z itself (D4)"},
+    {"package": "galerkin", "kind": "parameter", "name": "n_eff", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode: WaveguideModes.effective_index"},
+    {"package": "galerkin", "kind": "parameter", "name": "et_a", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes_a and mode_a"},
+    {"package": "galerkin", "kind": "parameter", "name": "ez_a", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes_a and mode_a"},
+    {"package": "galerkin", "kind": "parameter", "name": "et_b", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes_b and mode_b"},
+    {"package": "galerkin", "kind": "parameter", "name": "ez_b", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes_b and mode_b"},
+    {"package": "galerkin", "kind": "parameter", "name": "n_eff_b", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes_b and mode_b"},
+    {"package": "galerkin", "kind": "parameter", "name": "et_mode", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode"},
+    {"package": "galerkin", "kind": "parameter", "name": "ez_mode", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: modes and mode"},
+    {"package": "galerkin", "kind": "parameter", "name": "et_in", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: incident and incident_mode"},
+    {"package": "galerkin", "kind": "parameter", "name": "ez_in", "source": "L3 commit 11b, spec 4.3, M2 1.1, 1.6: incident and incident_mode"}
   ]
 }

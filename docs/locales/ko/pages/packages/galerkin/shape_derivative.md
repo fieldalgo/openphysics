@@ -105,6 +105,10 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 
 ## 도파관 모드
 
+공개 함수 `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`는
+변환한 입력과 함께 motion을 커널에 넘깁니다. `ModalPML`·`Bend`와 motion을 함께 주거나, motion과 함께
+live 재료나 live 파장을 주면 거부합니다. 커널은 다음과 같습니다.
+
 `solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))`는 스칼라 또는 요소별 배열(실수·복소)인 eps_r·mu_r,
 motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습니다.
 - NumPy 고유값 풀이를 옮겨진 메시에서 합니다.

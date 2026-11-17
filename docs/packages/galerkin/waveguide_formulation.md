@@ -14,6 +14,11 @@ not a textbook's. The normative contracts, limits and measured validation stay
 in the pages this one links to: this page adds no accuracy claim and no new
 validation result.
 
+The functions named here are the kernels: consistent units and the phasor exp(+iωt) below, reached
+through the internal `galerkin.kernels`. The public surface is `galerkin.solve_waveguide_modes` and its
+post-processing functions, in SI units and exp(−iωt): each wraps these kernels, conjugates its complex
+inputs and outputs once and takes k0 = 2π/λ ([public SI functions](mode_overlap.md#public-si-functions)).
+
 ## 1. Problem statement and notation
 
 A guide that does not change along z carries fields of the form

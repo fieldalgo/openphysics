@@ -129,6 +129,12 @@ linearly with the number of steps in both modes; checkpointing lowers the slope.
 
 ## Waveguide modes: eigenvalues, fields and degenerate modes
 
+The public `galerkin.solve_waveguide_modes` (SI, exp(−iωt)) takes JAX or PyTorch values for
+`relative_permittivity`, `relative_permeability` and the wavelength or k0; it conjugates the complex
+ones with the library's `conj` (`to_kernel`) and returns `to_public` of the kernel's live outputs, so
+the derivatives pass through both conversions (`tests/galerkin/test_conventions.py` checks a JAX and a
+PyTorch gradient of Im(`effective_index`)). Its kernel, `galerkin.kernels.solve_modes`, works as follows.
+
 `solve_modes` runs the NumPy eigensolve on the numbers of the inputs. Each
 returned pair (λ0, x0), with λ0 = −(k0 n_eff)² and x0 = [et β, ez] on the free
 degrees of freedom, then takes one Newton step on the eigenproblem A x = λ B x
