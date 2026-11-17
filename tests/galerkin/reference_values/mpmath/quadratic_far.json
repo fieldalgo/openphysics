@@ -1,0 +1,432 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-three-radial-mode-far-logarithmic-interactions",
+  "physics": "2D Laplace far logarithmic physical radial-density interactions",
+  "comparison": "structure-oracle",
+  "role": "Independent complex Taylor series and analytic physical moments; shares the density definition and logarithmic kernel but not the product Jacobi quadrature, centering or implementation. No full field or measurement qualification.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          70,
+          100
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "100term complex logarithm series with analytic radial-density moments",
+        "decimal_precisions": [
+          70,
+          100
+        ],
+        "series_terms": 100,
+        "maximum_distance_ratio": 0.25,
+        "remainder": "5*rho^101/(101*(1-rho))",
+        "input_conversion": "exact binary64"
+      },
+      "arrays": [
+        "far_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false,
+        "shared_math": "Physical radial densities and log-distance kernel; independent moment expansion, no product quadrature or code."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_quadratic_far.py",
+    "sha256": "f5097b88378cfa9f7214b64842f8beeac99e4d60311a88dcbdba8963d43c0d71",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_quadratic_far.py",
+    "product_commit": "c8926a0c3dea914339858bc5d663faa788c9b8ae",
+    "clean": false
+  },
+  "generated_utc": "2026-11-17T04:27:09.521127+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath70/100 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 13.328072656004224,
+    "wall_time_s": null,
+    "peak_rss_mb": 15.23828125,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured by the generation wrapper."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "id": "uniform-parallel",
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          2.0,
+          0.0
+        ],
+        "offset": [
+          16.0,
+          0.5
+        ],
+        "p": 1.0,
+        "q": 1.0
+      },
+      {
+        "id": "equal-opposite-admission",
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          -1.0,
+          0.0
+        ],
+        "offset": [
+          8.0,
+          0.0
+        ],
+        "p": 0.6666666666666666,
+        "q": 0.6666666666666666
+      },
+      {
+        "id": "unequal-exponents-oblique",
+        "first": [
+          0.6,
+          0.8
+        ],
+        "second": [
+          -0.8,
+          0.6
+        ],
+        "offset": [
+          8.0,
+          -6.0
+        ],
+        "p": 0.55,
+        "q": 0.95
+      },
+      {
+        "id": "ratio64",
+        "first": [
+          0.015625,
+          0.0
+        ],
+        "second": [
+          0.6,
+          0.8
+        ],
+        "offset": [
+          0.0,
+          8.0
+        ],
+        "p": 0.6,
+        "q": 0.8
+      },
+      {
+        "id": "near-half",
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          1.0
+        ],
+        "offset": [
+          8.0,
+          1.0
+        ],
+        "p": 0.5000000000000001,
+        "q": 0.500001
+      },
+      {
+        "id": "distant-mixed",
+        "first": [
+          1.0,
+          0.0
+        ],
+        "second": [
+          0.0,
+          1.0
+        ],
+        "offset": [
+          1000000.0,
+          -1000000.0
+        ],
+        "p": 1.0,
+        "q": 0.7
+      },
+      {
+        "id": "oblique-scale--20",
+        "first": [
+          5.7220458984375e-07,
+          7.62939453125e-07
+        ],
+        "second": [
+          -7.62939453125e-07,
+          5.7220458984375e-07
+        ],
+        "offset": [
+          7.62939453125e-06,
+          -5.7220458984375e-06
+        ],
+        "p": 0.55,
+        "q": 0.95
+      },
+      {
+        "id": "oblique-scale-20",
+        "first": [
+          629145.6,
+          838860.8
+        ],
+        "second": [
+          -838860.8,
+          629145.6
+        ],
+        "offset": [
+          8388608.0,
+          -6291456.0
+        ],
+        "p": 0.55,
+        "q": 0.95
+      }
+    ],
+    "mode_order": [
+      "rho_p",
+      "sqrt3*(rho_2p-rho_p)",
+      "sqrt5*(2rho_3p-3rho_2p+rho_p)"
+    ],
+    "length_unit": "m",
+    "log_reference_length_m": 1.0
+  },
+  "matched": [
+    "Exact binary64 geometry and exponents, physical three-mode densities, dimensionless logarithmic kernel with1metre reference."
+  ],
+  "not_matched": [
+    "Reference uses analytic multipole moments and100term expansion; product uses physical Jacobi measures with zero-mass centering.",
+    "No near, touching or mixed-panel integral, matrix assembly, field convergence or measurement validation."
+  ],
+  "reference_self_check": [
+    "70/100digit absolute entry differences below1e-60 on every registered array.",
+    "Analytic series remainder bound5*rho^101/(101*(1-rho)); rho<=.25.",
+    "Pure-mpmath process loads no product packages, NumPy or SciPy; compare-only replay preserves fixture bytes."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Complete field/guard qualification, near/touching/mixed interactions and other platforms."
+  ],
+  "values": [
+    {
+      "name": "far_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        2.803054912949263,
+        0.03499513149406123,
+        -0.0005474035532721419,
+        -0.01750398172100938,
+        0.0006121757171704677,
+        -1.913473321757559e-05,
+        -0.0001370657039949507,
+        9.576358518375455e-06,
+        -4.4851433828768786e-07
+      ]
+    },
+    {
+      "name": "far_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        1.9723197139402142,
+        -0.041573265443417357,
+        -0.006697523148107522,
+        -0.041573265443417357,
+        -0.001747820542764657,
+        -0.0003128378930371085,
+        -0.006697523148107522,
+        -0.0003128378930371085,
+        -5.7106339296341706e-05
+      ]
+    },
+    {
+      "name": "far_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        2.2533630386221764,
+        -0.03054571640071981,
+        -0.000925393657127418,
+        0.0013304128447242515,
+        8.123761423943524e-05,
+        4.659296111499467e-06,
+        0.0006809341223726095,
+        4.149490862771277e-05,
+        2.3753345017266883e-06
+      ]
+    },
+    {
+      "name": "far_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        2.123199395109512,
+        0.028947820043174394,
+        0.002013796313600419,
+        -1.652292051305409e-05,
+        -1.0687872872179348e-05,
+        -2.583125323232487e-07,
+        -2.9202679543272802e-06,
+        -1.978779984259864e-06,
+        -4.8056323964422036e-08
+      ]
+    },
+    {
+      "name": "far_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        2.0517649925476764,
+        0.006665402853252451,
+        0.002245631194154649,
+        -0.03683164283745727,
+        0.0004972231623314367,
+        0.00016465910112397556,
+        -0.010049108487710848,
+        0.0001506653270311999,
+        4.972243375523213e-05
+      ]
+    },
+    {
+      "name": "far_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        14.16208369236179,
+        -1.4858286415641131e-07,
+        -1.8563192206761524e-08,
+        -1.4433762673054916e-07,
+        -4.289219737203295e-14,
+        -5.3587398121230874e-15,
+        1.6441683699541525e-21,
+        -5.5373610235559186e-21,
+        -6.91812003873627e-22
+      ]
+    },
+    {
+      "name": "far_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        -11.60958057257673,
+        -0.03054571640071981,
+        -0.000925393657127418,
+        0.0013304128447242515,
+        8.123761423943524e-05,
+        4.659296111499467e-06,
+        0.0006809341223726095,
+        4.149490862771277e-05,
+        2.3753345017266883e-06
+      ]
+    },
+    {
+      "name": "far_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        9
+      ],
+      "data": [
+        16.116306649821084,
+        -0.03054571640071981,
+        -0.000925393657127418,
+        0.0013304128447242515,
+        8.123761423943524e-05,
+        4.659296111499467e-06,
+        0.0006809341223726095,
+        4.149490862771277e-05,
+        2.3753345017266883e-06
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_quadratic_far.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath reference process did not import NumPy; generator imports and process receipt were checked.",
+    "environment.cpu": "platform.machine was captured but CPU model was not; generation receipt consulted.",
+    "cost.compile_s": "No separate compilation timer in the pure-Python generation wrapper.",
+    "cost.wall_time_s": "Generation wrapper starts timer after imports; no end-to-end process timing captured."
+  },
+  "regeneration": [],
+  "values_sha256": "1369393c272a5d712a4499f9657ae3e8de5c91bd87a444f0e944d844eb5a0e48",
+  "content_sha256": "7e34edd23f9f4e59fb04aca8893c880da9ef6cfc6de19177e91cd50da817708b",
+  "generation_details": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "5.98875850764726722238200431734e-70",
+      "5.65191244840546819030964686717e-70",
+      "1.60457203064354926951864640718e-70",
+      "3.5064475577541429475521211739e-71",
+      "2.75274900240246200810848529877e-70",
+      "2.56918811367706736590053731489e-69",
+      "8.27893669124776233958806373303e-69",
+      "3.40014890262352780650820698554e-69"
+    ],
+    "tail_bounds": [
+      "2.170188458592443759881969486164210627776995239792147231674140083540346311217598365086915957451232086e-75",
+      "1.026900210868175199198690437917512250922483856224615038465530794519752282844122680063357231538896636e-62",
+      "1.568874505232960707216389109865468604965965349763945610591495903516693464364185410057914067364473143e-72",
+      "1.665689433564159777755503862702540155266862107782607915361969074687594713877228137774341510275271444e-92",
+      "4.681402289556233229037725830834261238926451691685216466610350284658743017123727691090220882018493853e-63",
+      "7.88250084125961067694961619972238017546106264497686640486485636453397186082974271369811569566171488e-593",
+      "1.568874505232960707216389109865468604965965349763945610591495903516693464364185410057914067364473143e-72",
+      "1.568874505232960707216389109865468604965965349763945610591495903516693464364185410057914067364473143e-72"
+    ]
+  }
+}
