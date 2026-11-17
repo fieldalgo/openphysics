@@ -95,8 +95,8 @@ src/galerkin/
   mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
-  cavity.py       # Vacuum PEC cavity, box or external mesh: SI output and projected gradient kernel
-  material_cavity.py # Cavity with lossy materials and impedance walls, box or external mesh: complex resonances and Q
+  cavity.py       # Public vacuum PEC cavity in SI, box or external mesh: CavityResult, projected gradient kernel
+  material_cavity.py # Public cavity with lossy materials and impedance walls in SI and exp(-i omega t): complex resonances and Q
   _cavity_common.py  # Box mesh, mesh normalization, gradient kernel count and limits the cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin

@@ -30,7 +30,7 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 | `solve_elasticity` | `youngs_modulus` and `poisson_ratio` (scalars or region tables); `prescribed_displacement` values; `body_force_density` and `traction` (constant vectors or callbacks returning live values) |
 | `solve_thermoelasticity` | as `solve_elasticity`, plus `stress_free_temperature` and `linear_expansion_coefficient` (scalar or region table); the temperature snapshot stays a NumPy record |
 | `solve_modes` | `eps_r` and `mu_r` (scalars or per-element arrays, real or complex) and `k0`; `n_eff`, `et` and `ez` are returned in that library. `n_target` only selects the modes and has no derivative; `coordinate_factors` must be NumPy |
-| `solve_cavity_box` | `lengths_m` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency_hz` only selects the modes |
+| `solve_cavity_box` | `box_size` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency` only selects the modes |
 | `eval_edge_field` | `dofs` (real or complex), such as `et[i]` of `solve_modes`; the centroid field is returned in that library as float64 or complex128. The `EdgeSpace` is NumPy structure: its geometry and edge signs carry no derivative |
 
 The time grid `time` is structure, like the mesh. A transient callback must
@@ -161,7 +161,7 @@ geometry carries no derivative.
 A degenerate eigenvalue has no derivative: its eigenvectors are any combination
 of the pair. When a returned eigenvalue lies within 1e-8 relative
 (`galerkin.waveguide.DEGENERATE_GAP`) of another eigenvalue of the discrete
-problem, whether or not that one was returned (`num_modes` may cut a pair), the
+problem, whether or not that one was returned (the requested count may cut a pair), the
 mode keeps its exact values and gets a `DegenerateModeWarning` and NaN
 derivatives, so a backward pass that uses it gives NaN instead of a wrong
 number. The nearest other eigenvalue is found densely for small problems and by
@@ -194,7 +194,7 @@ evaluated on the solved mesh and divided by d_a, component by component.
 
 Boxes have many degenerate modes (any two equal side lengths give pairs); they
 follow the same rule as the waveguide: NaN derivatives and a
-`DegenerateModeWarning`, also when `num_modes` cuts the pair. `result.mesh` and
+`DegenerateModeWarning`, also when `mode_count` cuts the pair. `result.mesh` and
 `result.space` hold the numbers of the solved geometry; node coordinates carry
 no derivative.
 
@@ -290,7 +290,7 @@ structure; only coefficients may be live.
   live box lengths the cavity field also depends on the lengths through the
   geometry, which `result.space` holds as numbers, so evaluating it from live
   coefficients alone would miss that part of the derivative. `solve_cavity_box`
-  returns the field with its full derivative in `result.electric_field`.
+  returns the field with its full derivative in `result.mass_normalized_electric_field`.
 - Forward-mode differentiation (`jax.jvp`, `jax.jacfwd`) and second derivatives.
 - JAX without `jax_enable_x64`, and JAX and PyTorch values in one call.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
@@ -399,7 +399,7 @@ PyTorch 2.14.1 CPU):
   paths, and for one live length beside two numbers.
 - A box with a square cross-section: the degenerate pair warns and gives NaN, the
   simple fundamental matches central differences, and a pair cut by
-  `num_modes=1` still warns and gives NaN.
+  `mode_count=1` still warns and gives NaN.
 
 `tests/galerkin/test_edge_field_gradients.py` (2026-10-29, Linux, NumPy 2.5, JAX
 0.12.0.1, PyTorch 2.14.1 CPU):

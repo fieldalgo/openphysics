@@ -54,15 +54,15 @@ def test_documented_public_api_is_installed():
     for module in (galerkin, simcase):
         assert Path(module.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
     # Reproduce the public galerkin documentation example without source imports.
-    result = solve_cavity_box(lengths_m=(1.0, 1.0, 1.0), subdivisions=(8, 8, 8),
-                              num_modes=6, target_frequency_hz=210e6)
+    result = solve_cavity_box(box_size=(1.0, 1.0, 1.0), subdivision_count=(8, 8, 8),
+                              mode_count=6, target_frequency=210e6)
     assert isinstance(result, CavityResult)
-    assert result.frequencies_hz.shape == (6,)
-    assert np.all(np.isfinite(result.frequencies_hz))
-    assert np.all(result.frequencies_hz > 0) and np.all(np.diff(result.frequencies_hz) >= 0)
-    np.testing.assert_allclose(result.frequencies_hz,
-                               299792458 * np.sqrt(result.eigenvalues_m2) / (2 * np.pi))
-    assert max(result.relative_residuals) <= 1e-8
+    assert result.resonant_frequency.shape == (6,)
+    assert np.all(np.isfinite(result.resonant_frequency))
+    assert np.all(result.resonant_frequency > 0) and np.all(np.diff(result.resonant_frequency) >= 0)
+    np.testing.assert_allclose(result.resonant_frequency,
+                               299792458 * np.sqrt(result.wavenumber_squared) / (2 * np.pi))
+    assert max(result.relative_residual) <= 1e-8
     assert result.cluster_completeness == "not_certified"
     assert result.mode_count_policy == "exact_count_may_split_cluster"
 

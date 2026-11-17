@@ -112,13 +112,14 @@ def _result(save_fields=True):
         space=SimpleNamespace(edges=np.array([[0, 1], [0, 2]]),
                               tet_edges=np.array([[0, 1, 0, 1, 0, 1]]),
                               signs=np.ones((1, 6))),
-        pec_edge_ids=np.array([1]), frequencies_hz=np.array([2e8]), eigenvalues_m2=np.array([17.57]),
-        relative_residuals=np.array([1e-12]), edge_coefficients=np.array([[1.], [0.]]),
-        electric_field=np.array([[[1., 0., 0.]]]), search="near_target", target_frequency_hz=2.5e8,
-        requested_modes=1, cluster_completeness="not_certified",
+        pec_edges=np.array([1]), resonant_frequency=np.array([2e8]), wavenumber_squared=np.array([17.57]),
+        relative_residual=np.array([1e-12]), mass_normalized_electric_field_line_integral=np.array([[1.], [0.]]),
+        mass_normalized_electric_field=np.array([[[1., 0., 0.]]]), search="near_target", target_frequency=2.5e8,
+        mode_count=1, cluster_completeness="not_certified",
         mode_count_policy="exact_count_may_split_cluster",
     )
-    return CavityRunResult(Document.from_dict(data), cavity, {"mesh_and_solve": 0.1}, ["fixture"])
+    return CavityRunResult(Document.from_dict(data), cavity, {"mesh_and_solve": 0.1}, ["fixture"],
+                           cavity.mesh.nodes)
 
 
 @pytest.mark.parametrize("save_fields", [True, False])
@@ -157,7 +158,7 @@ def test_cavity_serialization_has_explicit_si_units_and_no_2d_arrays(tmp_path, s
             assert arrays["mass_normalized_electric_field_line_integral"].shape == (2, 1)
             np.testing.assert_array_equal(arrays["pec_edge_ids"], [1])
             np.testing.assert_array_equal(arrays["mass_normalized_electric_field_line_integral"],
-                                          result.cavity.edge_coefficients)
+                                          result.cavity.mass_normalized_electric_field_line_integral)
             assert not any(key.endswith("_unit") or key in ("returned_modes", "requested_modes")
                            for key in arrays.files)
 
@@ -167,7 +168,7 @@ def test_cavity_reused_output_rejected_without_mixing_results(tmp_path):
     (out / "notes.txt").write_text("user notes")
     before = {p.name: p.read_bytes() for p in out.iterdir()}
     second = _result(False)
-    second.cavity.frequencies_hz *= 2
+    second.cavity.resonant_frequency *= 2
     with pytest.raises(FileExistsError, match="fresh output directory"):
         second.save(out)
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
@@ -271,17 +272,19 @@ def test_cavity_adapter_converts_lengths_and_translation_to_si(unit, ratio, monk
     captured = {}
     expected = _result().cavity
     original_nodes = expected.mesh.nodes.copy()
-    def solve(lengths_m, subdivisions, **kwargs):
-        captured.update(lengths_m=lengths_m, subdivisions=subdivisions, **kwargs)
+    def solve(**kwargs):
+        captured.update(**kwargs)
         return expected
     monkeypatch.setattr(galerkin, "solve_cavity_box", solve, raising=False)
     result = run(Document.from_dict(data), verbose=False)
     # the lengths are differences of exact picometre corners: [1, 2, 3] m in every unit
-    assert captured["lengths_m"] == [1.0, 2.0, 3.0]
-    assert captured["subdivisions"] == [6, 6, 6]
-    assert captured["target_frequency_hz"] == 250000000.0
-    assert captured["num_modes"] == 5 and type(captured["num_modes"]) is int
-    np.testing.assert_array_equal(result.cavity.mesh.nodes, original_nodes + [2, -3, 4])
+    assert captured["box_size"] == [1.0, 2.0, 3.0]
+    assert captured["subdivision_count"] == [6, 6, 6]
+    assert captured["target_frequency"] == 250000000.0
+    assert captured["mode_count"] == 5 and type(captured["mode_count"]) is int
+    # simcase translates the solver's nodes to the domain origin itself and leaves the result alone (D14)
+    np.testing.assert_array_equal(result.node_coordinates, original_nodes + [2, -3, 4])
+    np.testing.assert_array_equal(result.cavity.mesh.nodes, original_nodes)
     summary = result.summary()
     assert summary["resolved_inputs"]["geometry.domain.xmin"]["length_unit"] == unit
     assert summary["resolved_inputs"]["geometry.domain.xmin"]["value"] == 2.0

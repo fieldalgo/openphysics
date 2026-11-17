@@ -61,7 +61,9 @@ matrices these assembly functions place, for galerkin's own modules.
   (``galerkin.mode_coordinates``); the 16 power, overlap, normalisation, coupling,
   confinement and effective-area functions of ``galerkin.mode_overlap``; and the radial
   PML ``radial_pml_coeffs`` (``galerkin.pml``). The mesh and the edge spaces they work on
-  (``Mesh``, ``Mesh3D``, ``EdgeSpace``, ``EdgeSpace3D``) stay public.
+  (``Mesh``, ``Mesh3D``, ``EdgeSpace``, ``EdgeSpace3D``) stay public. The cavity solvers have
+  no kernel export (L3 commit 12): their bodies are private functions of the public
+  ``galerkin.cavity`` and ``galerkin.material_cavity``, behind the public SI functions there.
 
   Complex values: these kernels compute in exp(+i omega t) (a passive loss is
   Im eps_r < 0 and a forward lossy mode has Im n_eff < 0; the field ``ez`` has

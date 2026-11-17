@@ -250,7 +250,7 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
     lengths, cells = (1.0, 0.7, 0.5), (4, 3, 2)
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_cavity_box(lengths, cells, num_modes=8, target_frequency_hz=1e8)
+        ours = solve_cavity_box(box_size=lengths, subdivision_count=cells, mode_count=8, target_frequency=1e8)
     mesh = skfem.MeshTet(ours.mesh.nodes.T.copy(), ours.mesh.tets.T.copy())
     basis = skfem.Basis(mesh, skfem.ElementTetN0())
 
@@ -277,7 +277,7 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
         not_matched=["eigensolver (galerkin dense or shift-invert with gradient projection, "
                      "reference dense with a kernel cut-off)"],
         observables=[observable("eigenvalue k^2, lowest eight", "m^-2", "max relative difference",
-                                relative_difference(np.sort(ours.eigenvalues_m2), reference), SAME)]))
+                                relative_difference(np.sort(ours.wavenumber_squared), reference), SAME)]))
 
 
 def test_scalar_absorbing_waveguide_same_mesh(skfem):

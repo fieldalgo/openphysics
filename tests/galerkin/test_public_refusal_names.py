@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""The outward-form bodies and the public mode functions refuse under the public registry names.
+"""The outward-form bodies and the public mode and cavity functions refuse under the public registry names.
 
 The public heat, electric and Joule solvers negate their inward boundary data once and call
 internal outward-form bodies. A bad value is refused by the body, so its message must name the
@@ -156,3 +156,61 @@ def test_mode_refusals_name_the_public_quantities():
     modes = solve_waveguide_modes(mesh, **good)
     _mode_refused(lambda: mode_power(modes, len(modes.effective_index)), "mode must be a mode index")
     _mode_refused(lambda: mode_power(object(), 0), "modes must be the WaveguideModes", TypeError)
+
+
+#: the cavity solvers' former keywords and labels; none may reach a public message
+OLD_CAVITY = re.compile(r"\b(lengths_m|subdivisions|num_modes|target_frequency_hz|wall_conductivity_s_per_m|walls|"
+                        r"bounds_m|regions\[[^]]*\] relative permittivity)\b|exp\(\+j")
+
+
+def _cavity_refused(call, pattern, error=ValueError):
+    with pytest.raises(error, match=pattern) as info:
+        call()
+    assert not OLD_CAVITY.search(str(info.value)), str(info.value)
+
+
+def test_cavity_refusals_name_the_public_quantities():
+    """The public cavity functions (galerkin step, L3 commit 12) refuse under their registry names."""
+    from galerkin.cavity import solve_cavity, solve_cavity_box
+    from galerkin.material_cavity import CavityMaterialRegion, solve_material_cavity, solve_material_cavity_box
+    from galerkin.mesh3d import box_mesh
+    good = dict(box_size=(1.0, 0.8, 0.6), subdivision_count=(2, 2, 2), mode_count=1, target_frequency=2.2e8)
+    corners = dict(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=(1.0, 0.8, 0.3))
+
+    def box(solve, **changes):
+        return lambda: solve(**{**good, **changes})
+    for solve in (solve_cavity_box, solve_material_cavity_box):
+        _cavity_refused(box(solve, box_size=(1.0, -0.8, 0.6)), r"^box_size\[1\] must be a finite positive number$")
+        _cavity_refused(box(solve, subdivision_count=(2, 0, 2)), r"^subdivision_count\[1\] must be a positive integer$")
+        _cavity_refused(box(solve, mode_count=0), r"^mode_count must be a positive integer$")
+        _cavity_refused(box(solve, target_frequency=-1.0), r"^target_frequency must be a finite positive number$")
+    _cavity_refused(box(solve_material_cavity_box, electrical_conductivity=-1.0),
+                    r"^electrical_conductivity must be a finite positive number$")
+    _cavity_refused(box(solve_material_cavity_box, electrical_conductivity={"z1": 0.0}),
+                    r"^electrical_conductivity\[z1\] must be a finite positive number$")
+    _cavity_refused(lambda: CavityMaterialRegion(**corners, relative_permittivity=4 - 0.1j),
+                    r"^relative_permittivity must be finite with positive real part and non-negative imaginary part "
+                    r"\(passive under exp\(-i omega t\): a loss is Im >= 0\)$")
+    _cavity_refused(lambda: CavityMaterialRegion(**corners, relative_permeability=-1.0),
+                    r"^relative_permeability must be finite with positive real part")
+    _cavity_refused(lambda: CavityMaterialRegion(lower_corner_position=(0.0, 0.0), upper_corner_position=(1, 1, 1)),
+                    r"^lower_corner_position must be three coordinates \(x, y, z\) in m$")
+    region = CavityMaterialRegion(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=(1.0, 0.8, 0.25))
+    _cavity_refused(box(solve_material_cavity_box, regions=[region]),
+                    r"^regions\[0\] bound 0.25 on axis 2 is not a mesh grid plane .*; adjust subdivision_count$")
+    mesh = box_mesh(1.0, 0.8, 0.6, 2, 2, 2)
+    mesh_good = dict(mode_count=1, target_frequency=0.8e8)
+    _cavity_refused(lambda: solve_cavity(mesh, **mesh_good, pec_faces=("lid",)), r"^pec_faces: unknown face tag")
+    _cavity_refused(lambda: solve_material_cavity(mesh, relative_permittivity={"other": 2.0}, **mesh_good),
+                    r"^relative_permittivity must name the regions of mesh.region_names exactly")
+    _cavity_refused(lambda: solve_material_cavity(mesh, relative_permittivity={"domain": 2.0},
+                                                  relative_permeability={"other": 2.0}, **mesh_good),
+                    r"^relative_permeability: unknown region")
+    _cavity_refused(lambda: solve_material_cavity(mesh, relative_permittivity={"domain": 2.0 - 0.1j}, **mesh_good),
+                    r"^relative_permittivity\['domain'\] must be finite with positive real part and non-negative")
+    _cavity_refused(lambda: solve_material_cavity(mesh, relative_permittivity={"domain": 2.0},
+                                                  electrical_conductivity={"lid": 1e6}, **mesh_good),
+                    r"^electrical_conductivity: unknown face tag")
+    _cavity_refused(lambda: solve_material_cavity(mesh, relative_permittivity={"domain": 2.0},
+                                                  electrical_conductivity={"z1": -1e6}, **mesh_good),
+                    r"^electrical_conductivity\['z1'\] must be a finite positive number$")

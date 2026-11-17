@@ -589,10 +589,10 @@ KERNEL_FRAME = {
 #: they call), the one place a complex value changes convention. runner.py (em.modes2d): _to_kernel
 #: (eps in), _to_public (results out), _public_open_boundary and _public_candidate (PML diagnostics,
 #: from _to_public), and _shown (the log text of a kernel index under exp(-i omega t)). cavity.py
-#: (em.cavity3d, units batch C9): _to_kernel (eps and mu in, as 0.0 - Im) and _to_public (the saved
-#: arrays out; the result properties read them through it).
-BOUNDARY = {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"},
-            "cavity.py": {"_to_kernel", "_to_public"}}
+#: (em.cavity3d) has none since the galerkin step's route S (D2): it calls galerkin's public SI
+#: cavity functions, which take and return exp(-i omega t), so it converts nothing (units batch C9's
+#: _to_kernel and _to_public are gone).
+BOUNDARY = {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"}}
 CONJUGATION = re.compile(r"np\.conj(?:ugate)?\(|\.conj\(\)|0\.0 - [\w\[\]\"'.]*imag|-\s*\w+\.imag\b")
 
 
@@ -623,15 +623,9 @@ def test_p2_15_only_the_boundary_functions_conjugate_on_the_simcase_surface():
             if not owners or not set(owners) & BOUNDARY.get(path.name, set()):
                 found.append(f"{path.relative_to(SIMCASE)}:{number}: {line.strip()}")
     assert not found, "conjugation outside the boundary functions:\n" + "\n".join(found)
+    # em.cavity3d converts nothing (route S, D2): no conversion function, and no conjugation (the scan above)
     cavity = ast.parse((SIMCASE / "cavity.py").read_text(encoding="utf-8"))
-    used = {}
-    for f in _functions(cavity):
-        for node in ast.walk(f):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                used.setdefault(node.func.id, set()).add(f.name)
-    assert used["_to_kernel"] == {"kernel_inputs"}
-    assert used["_to_public"] <= {"arrays", "resonant_frequency", "wavenumber_squared", "mass_normalized_electric_field",
-                                  "mass_normalized_electric_field_line_integral"}
+    assert not {f.name for f in _functions(cavity)} & {"_to_kernel", "_to_public"}
     runner = ast.parse((SIMCASE / "runner.py").read_text(encoding="utf-8"))
     callers = {}
     for f in _functions(runner):

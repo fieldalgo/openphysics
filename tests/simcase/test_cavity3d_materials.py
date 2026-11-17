@@ -4,8 +4,8 @@
 """Cavity documents with box materials and finite-conductivity walls (format 0.3).
 
 Public complex values read under exp(-i omega t): loss is a positive imaginary part of a material
-and a negative imaginary part of a resonant frequency. ``result.cavity`` is the galerkin result
-in the kernel's exp(+j omega t) and keeps the kernel's signs."""
+and a negative imaginary part of a resonant frequency. ``result.cavity`` is galerkin's public result
+(route S of the galerkin step, D2), under exp(-i omega t) too: simcase saves its fields as they are."""
 
 import copy
 import json
@@ -149,13 +149,14 @@ def _small(data, n=4):
 def test_document_run_equals_direct_engine_call():
     result = run(Document.from_dict(_small(slab_document())), verbose=False)
     direct = galerkin.solve_material_cavity_box(
-        (1, 0.8, 0.6), (4, 4, 4),
-        regions=[galerkin.CavityMaterialRegion(((0, 1), (0, 0.8), (0, 0.3)), 4 - 0.04j)],
-        num_modes=2, target_frequency_hz=150e6, wall_conductivity_s_per_m=5.8e7)
-    np.testing.assert_allclose(result.cavity.frequencies_hz, direct.frequencies_hz, rtol=1e-12)
-    np.testing.assert_allclose(result.cavity.edge_coefficients, direct.edge_coefficients,
-                               rtol=1e-9, atol=1e-12)
-    np.testing.assert_array_equal(result.resonant_frequency, np.conj(result.cavity.frequencies_hz))
+        box_size=(1, 0.8, 0.6), subdivision_count=(4, 4, 4),
+        regions=[galerkin.CavityMaterialRegion(lower_corner_position=(0, 0, 0), upper_corner_position=(1, 0.8, 0.3),
+                                               relative_permittivity=4 + 0.04j)],
+        mode_count=2, target_frequency=150e6, electrical_conductivity=5.8e7)
+    np.testing.assert_allclose(result.cavity.resonant_frequency, direct.resonant_frequency, rtol=1e-12)
+    np.testing.assert_allclose(result.cavity.mass_normalized_electric_field_line_integral,
+                               direct.mass_normalized_electric_field_line_integral, rtol=1e-9, atol=1e-12)
+    np.testing.assert_array_equal(result.resonant_frequency, result.cavity.resonant_frequency)
     assert np.all(result.resonant_frequency.imag < 0) and np.all(result.quality_factor > 0)
 
 
@@ -168,9 +169,9 @@ def test_millimetres_and_translation_give_the_same_si_result():
         data["geometry"]["domain"][key] = data["geometry"]["domain"][key] * 1000 + shift[key[0]]
         data["geometry"]["shapes"][0][key] = data["geometry"]["shapes"][0][key] * 1000 + shift[key[0]]
     moved = run(Document.from_dict(data), verbose=False)
-    np.testing.assert_allclose(moved.cavity.frequencies_hz, base.cavity.frequencies_hz, rtol=1e-10)
-    np.testing.assert_allclose(moved.cavity.mesh.nodes,
-                               base.cavity.mesh.nodes + [-0.5, 0.2, 1.0], atol=1e-12)
+    np.testing.assert_allclose(moved.cavity.resonant_frequency, base.cavity.resonant_frequency, rtol=1e-10)
+    # galerkin solves the box at the origin; simcase translates its nodes to the domain (D14)
+    np.testing.assert_allclose(moved.cavity.mesh.nodes, base.cavity.mesh.nodes, atol=1e-12)
     np.testing.assert_allclose(moved.node_coordinates, base.node_coordinates + [-0.5, 0.2, 1.0], atol=1e-12)
 
 
@@ -178,14 +179,14 @@ def test_single_wall_conductivity_maps_to_the_engine_wall():
     data = _small(slab_document())
     data["physics"]["em1"]["boundary"] = {"electrical_conductivity": {"zmax": "1 MS/m"}}
     result = run(Document.from_dict(data), verbose=False)
-    walls = result.cavity.wall_conductivity_s_per_m
+    walls = result.cavity.electrical_conductivity
     assert walls["z1"] == 1e6 and all(walls[w] is None for w in walls if w != "z1")
     summary = result.summary()
     assert summary["electrical_conductivity"]["zmax"] == {"value": 1e6, "unit": "S/m"}
     assert summary["electrical_conductivity"]["zmin"] is None
     z1 = np.all(np.isclose(result.cavity.mesh.nodes[result.cavity.space.edges][:, :, 2], 0.6), axis=1)
     pec = np.zeros(len(z1), dtype=bool)
-    pec[result.cavity.pec_edge_ids] = True
+    pec[result.cavity.pec_edges] = True
     x = result.cavity.mesh.nodes[result.cavity.space.edges]
     on_other_walls = np.zeros(len(z1), dtype=bool)
     for axis, top in enumerate((1.0, 0.8, 0.6)):
@@ -203,13 +204,13 @@ def test_background_material_fills_the_box():
     data["physics"]["em1"]["boundary"] = "pec"
     data["physics"]["em1"]["target_frequency"] = "80 MHz"
     result = run(Document.from_dict(data), verbose=False)
-    assert np.all(result.cavity.tet_relative_permittivity == 4 - 0.04j)
+    assert np.all(result.cavity.relative_permittivity == 4 + 0.04j)
     assert np.all(result.arrays()["relative_permittivity"] == 4 + 0.04j)
-    vacuum = galerkin.solve_cavity_box((1, 0.8, 0.6), (4, 4, 4), num_modes=2,
-                                       target_frequency_hz=160e6)
-    np.testing.assert_allclose(result.cavity.eigenvalues_m2, vacuum.eigenvalues_m2 / (4 - 0.04j),
+    vacuum = galerkin.solve_cavity_box(box_size=(1, 0.8, 0.6), subdivision_count=(4, 4, 4), mode_count=2,
+                                       target_frequency=160e6)
+    np.testing.assert_allclose(result.cavity.wavenumber_squared, vacuum.wavenumber_squared / (4 + 0.04j),
                                rtol=1e-10)
-    np.testing.assert_allclose(result.wavenumber_squared, np.conj(vacuum.eigenvalues_m2 / (4 - 0.04j)),
+    np.testing.assert_allclose(result.wavenumber_squared, np.conj(vacuum.wavenumber_squared / (4 - 0.04j)),
                                rtol=1e-10)
 
 
@@ -222,22 +223,21 @@ def test_complex_output_files_load_without_pickle(tmp_path):
     assert summary["normalization"] == "vacuum_mass_hermitian_unit_si"
     frequency = summary["resonant_frequency"]
     assert frequency["unit"] == "Hz" and frequency["time_convention"] == TC
-    np.testing.assert_allclose(frequency["re"], result.cavity.resonant_frequencies_hz, rtol=1e-15)
-    np.testing.assert_allclose(frequency["im"], -result.cavity.frequencies_hz.imag, rtol=1e-15)
+    np.testing.assert_allclose(frequency["re"], result.cavity.resonant_frequency.real, rtol=1e-15)
+    np.testing.assert_allclose(frequency["im"], result.cavity.resonant_frequency.imag, rtol=1e-15)
     assert summary["quality_factor"]["unit"] == "1"
-    np.testing.assert_allclose(summary["quality_factor"]["values"], result.cavity.quality_factors,
+    np.testing.assert_allclose(summary["quality_factor"]["values"], result.cavity.quality_factor,
                                rtol=1e-15)
     assert not any(key.endswith("_unit") or key.endswith("_hz") for key in summary)
     with np.load(out / "fields.npz", allow_pickle=False) as arrays:
         assert arrays["mass_normalized_electric_field_line_integral"].dtype == np.complex128
         assert arrays["resonant_frequency"].dtype == np.complex128
-        np.testing.assert_array_equal(arrays["resonant_frequency"], np.conj(result.cavity.frequencies_hz))
+        np.testing.assert_array_equal(arrays["resonant_frequency"], result.cavity.resonant_frequency)
         assert list(arrays["wall_names"]) == ["xmin", "xmax", "ymin", "ymax", "zmin", "zmax"]
         np.testing.assert_array_equal(arrays["electrical_conductivity"], np.full(6, 5.8e7))
         assert str(arrays["field_layout"]) == "cavity3d-edge-complex-v2"
         assert arrays["relative_permittivity"].shape == (result.cavity.mesh.num_tets,)
-        np.testing.assert_array_equal(arrays["relative_permittivity"],
-                                      np.conj(result.cavity.tet_relative_permittivity))
+        np.testing.assert_array_equal(arrays["relative_permittivity"], result.cavity.relative_permittivity)
         metadata = json.loads(str(arrays["metadata_json"]))
         assert metadata["time_convention"] == TC
         assert metadata["field_units"]["mass_normalized_electric_field"] == "1/m^(3/2)"

@@ -582,19 +582,19 @@ def modes_inputs(physics: dict) -> ModesInputs:
 
 @dataclass(frozen=True)
 class CavityInputs:
-    """A rectangular cavity in SI.
+    """A rectangular cavity in SI, as galerkin's public cavity solvers take it.
 
-    ``box`` is the domain (lengths by ``difference``). ``wall_conductivity`` is None (PEC
+    ``box`` is the domain (lengths by ``difference``). ``electrical_conductivity`` is None (PEC
     walls), a number or {galerkin wall name: number} in S/m. ``materials`` maps names to
-    (relative permittivity, relative permeability) as complex numbers under the kernel's
-    exp(+j omega t); ``background`` is a local material name or ``"physmat:vacuum"``; ``boxes`` are the
+    (relative permittivity, relative permeability) as complex numbers under exp(-i omega t);
+    ``background`` is a local material name or ``"physmat:vacuum"``; ``boxes`` are the
     shape boxes as ((min, max) per axis in metres from the domain origin, material name).
     ``material_solver`` is True when the complex material cavity solver runs.
     """
     box: RectangleMesh
-    num_modes: int
+    mode_count: int
     target_frequency: object
-    wall_conductivity: object
+    electrical_conductivity: object
     materials: dict
     background: str
     boxes: list
@@ -602,6 +602,6 @@ class CavityInputs:
 
 
 def cavity_inputs(doc) -> CavityInputs:
-    """em.cavity3d, validated: a format 0.3 document through ``cavity.kernel_inputs``."""
-    from .cavity import kernel_inputs
-    return kernel_inputs(doc)
+    """em.cavity3d, validated: a format 0.3 document through ``cavity.solver_inputs``."""
+    from .cavity import solver_inputs
+    return solver_inputs(doc)

@@ -393,12 +393,12 @@ def test_a_document_with_version_1_geometry_runs_the_same_input(name):
     """The version 1 form of a flat cavity block (a 3d component of boxes, compiled to the flat block
     by the reader) hands the solver the same input; repr tells every double apart (and -0.0)."""
     from simcase import Document
-    from simcase.cavity import kernel_inputs
+    from simcase.cavity import solver_inputs
     v1_doc = _as_v1(name)
     doc = Document.from_dict(copy.deepcopy(v1_doc))
     flat = Document.from_dict(copy.deepcopy(DOCS[name]))
     assert doc.geometry_flat is not None and not doc.is_version_1      # compiled, not kept as regions
-    assert repr(kernel_inputs(doc)) == repr(kernel_inputs(flat))
+    assert repr(solver_inputs(doc)) == repr(solver_inputs(flat))
     assert json.loads(doc.canonical_json())["geometry"] == v1_doc["geometry"]        # kept as written
     assert doc.geometry_roundings == [] and not doc.diagnostics
     assert doc.copy().to_dict() == doc.to_dict()

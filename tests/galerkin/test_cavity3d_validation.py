@@ -87,14 +87,14 @@ def vertex_fields(mesh, coefficients, tet_edges, signs):
 
 def check_result(result, expected_count):
     mesh, space = result.mesh, result.space
-    q = np.asarray(result.edge_coefficients)
-    values = np.asarray(result.eigenvalues_m2)
-    frequencies = np.asarray(result.frequencies_hz)
+    q = np.asarray(result.mass_normalized_electric_field_line_integral)
+    values = np.asarray(result.wavenumber_squared)
+    frequencies = np.asarray(result.resonant_frequency)
     assert q.shape == (space.num_edges, expected_count)
     assert values.shape == frequencies.shape == (expected_count,)
     assert np.isfinite(q).all() and np.isfinite(values).all()
     assert (values > 0).all() and (np.diff(values) >= 0).all()
-    assert result.requested_modes == expected_count
+    assert result.mode_count == expected_count
     assert result.search == "near_target"
     np.testing.assert_allclose(frequencies, C0 * np.sqrt(values) / (2 * np.pi),
                                rtol=1e-12, atol=0)
@@ -103,7 +103,7 @@ def check_result(result, expected_count):
     np.testing.assert_array_equal(space.edges, edges)
     np.testing.assert_array_equal(space.tet_edges, tet_edges)
     np.testing.assert_array_equal(space.signs, signs)
-    np.testing.assert_array_equal(np.sort(result.pec_edge_ids), pec)
+    np.testing.assert_array_equal(np.sort(result.pec_edges), pec)
     assert np.max(np.abs(q)) > 0
     assert np.max(np.abs(q[pec])) / np.max(np.abs(q)) <= 1e-12
     free = np.setdiff1d(np.arange(len(edges)), pec)
@@ -118,7 +118,7 @@ def check_result(result, expected_count):
     assert np.max(residuals) <= 1e-9, residuals
     # The returned diagnostics must match the independently recomputed ones to
     # numerical roundoff, rather than merely containing a plausible small value.
-    np.testing.assert_allclose(result.relative_residuals, residuals,
+    np.testing.assert_allclose(result.relative_residual, residuals,
                                rtol=1e-3, atol=1e-12)
     assert np.max(abs(q.conj().T @ (mass @ q) - np.eye(expected_count))) <= 1e-8
 
@@ -136,7 +136,7 @@ def check_result(result, expected_count):
         assert np.max(coupling) <= 1e-9, np.max(coupling)
 
     field = vertex_fields(mesh, q, tet_edges, signs)
-    np.testing.assert_allclose(np.asarray(result.electric_field),
+    np.testing.assert_allclose(np.asarray(result.mass_normalized_electric_field),
                                field.mean(axis=1).transpose(2, 0, 1),
                                rtol=1e-12, atol=1e-12 * np.max(abs(field)))
     scale = np.max(np.linalg.norm(field, axis=2))
@@ -198,17 +198,17 @@ class PublishedCavityAPIValidation(unittest.TestCase):
         cls.solve = staticmethod(api)
 
     def test_explicit_search_and_cluster_metadata(self):
-        result = self.solve((1., 1., 1.), (3, 3, 3), num_modes=2,
-                            target_frequency_hz=C0 / np.sqrt(2))
+        result = self.solve(box_size=(1., 1., 1.), subdivision_count=(3, 3, 3), mode_count=2,
+                            target_frequency=C0 / np.sqrt(2))
         self.assertEqual(result.cluster_completeness, "not_certified")
         self.assertEqual(result.mode_count_policy, "exact_count_may_split_cluster")
-        self.assertEqual(len(result.frequencies_hz), 2)
+        self.assertEqual(len(result.resonant_frequency), 2)
 
     def test_raw_fields_free_residual_gradient_and_pec(self):
         for sides in ((1., 1., 1.), (1., .8, .6)):
             target = C0 * np.sqrt(1.3 * oracle(sides)[0]) / (2 * np.pi)
-            result = self.solve(sides, (4, 4, 4), num_modes=5,
-                                target_frequency_hz=target)
+            result = self.solve(box_size=sides, subdivision_count=(4, 4, 4), mode_count=5,
+                                target_frequency=target)
             check_result(result, 5)
 
     def test_complete_clusters_and_fixed_convergence(self):
@@ -218,10 +218,10 @@ class PublishedCavityAPIValidation(unittest.TestCase):
             target = C0 * np.sqrt(1.3 * groups[0][0]) / (2 * np.pi)
             errors, widths = [], []
             for n in (4, 8, 16):
-                result = self.solve(sides, (n, n, n), num_modes=count,
-                                    target_frequency_hz=target)
+                result = self.solve(box_size=sides, subdivision_count=(n, n, n), mode_count=count,
+                                    target_frequency=target)
                 check_result(result, count)
-                values = result.eigenvalues_m2
+                values = result.wavenumber_squared
                 row, split, offset = [], [], 0
                 for exact, mult in groups:
                     numerical = values[offset:offset + mult]
@@ -244,18 +244,18 @@ class PublishedCavityAPIValidation(unittest.TestCase):
     def test_geometric_scaling_and_degenerate_subspace(self):
         sides = np.ones(3)
         target = C0 / np.sqrt(2)
-        base = self.solve(sides, (4, 4, 4), num_modes=3,
-                          target_frequency_hz=target)
+        base = self.solve(box_size=sides, subdivision_count=(4, 4, 4), mode_count=3,
+                          target_frequency=target)
         mass = check_result(base, 3)
         stiff = galerkin.kernels.assemble_curlcurl_3d(base.space)
         for scale in (1e-6, 1e3):
-            result = self.solve(sides * scale, (4, 4, 4), num_modes=3,
-                                target_frequency_hz=target / scale)
+            result = self.solve(box_size=sides * scale, subdivision_count=(4, 4, 4), mode_count=3,
+                                target_frequency=target / scale)
             check_result(result, 3)
-            np.testing.assert_allclose(result.frequencies_hz * scale,
-                                       base.frequencies_hz, rtol=1e-9, atol=0)
-            mapped = result.edge_coefficients * np.sqrt(scale)
-            overlap = base.edge_coefficients.conj().T @ (mass @ mapped)
+            np.testing.assert_allclose(result.resonant_frequency * scale,
+                                       base.resonant_frequency, rtol=1e-9, atol=0)
+            mapped = result.mass_normalized_electric_field_line_integral * np.sqrt(scale)
+            overlap = base.mass_normalized_electric_field_line_integral.conj().T @ (mass @ mapped)
             self.assertGreaterEqual(np.linalg.svd(overlap, compute_uv=False).min(),
                                     1 - 1e-7)
             scaled_m = galerkin.kernels.assemble_edge_mass_3d(result.space) / scale

@@ -222,6 +222,40 @@ def _bend():
     return Bend, dict(bend_radius=1e-5, bend_origin=0.0)
 
 
+def _cavity_box():
+    from galerkin.cavity import solve_cavity_box
+    return solve_cavity_box, dict(box_size=(1.0, 0.8, 0.6), subdivision_count=(2, 2, 2), mode_count=1,
+                                  target_frequency=2.2e8)
+
+
+def _cavity():
+    from galerkin.cavity import solve_cavity
+    from galerkin.mesh3d import box_mesh
+    return solve_cavity, dict(mesh=box_mesh(1.0, 0.8, 0.6, 2, 2, 2), mode_count=1, target_frequency=2.2e8)
+
+
+def _material_region():
+    from galerkin.material_cavity import CavityMaterialRegion
+    return CavityMaterialRegion, dict(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=(1.0, 0.8, 0.3),
+                                      relative_permittivity=4.0 + 0.04j, relative_permeability=1.0)
+
+
+def _material_cavity_box():
+    from galerkin.material_cavity import solve_material_cavity_box
+    region, kwargs = _material_region()
+    return solve_material_cavity_box, dict(box_size=(1.0, 0.8, 0.6), subdivision_count=(2, 2, 2),
+                                           regions=[region(**kwargs)], mode_count=1, target_frequency=1.5e8,
+                                           electrical_conductivity={"z1": 1e6})
+
+
+def _material_cavity():
+    from galerkin.material_cavity import solve_material_cavity
+    from galerkin.mesh3d import box_mesh
+    return solve_material_cavity, dict(mesh=box_mesh(1.0, 0.8, 0.6, 2, 2, 2), relative_permittivity={"domain": 4.0},
+                                       relative_permeability={"domain": 1.0 + 0.01j},
+                                       electrical_conductivity={"z1": 1e6}, mode_count=1, target_frequency=0.8e8)
+
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
@@ -250,7 +284,13 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 # L3 commit 11b: the public mode functions (the others take no quantity)
                 "galerkin.waveguide:solve_waveguide_modes": _waveguide_modes,
                 "galerkin.waveguide:ModalPML": _modal_pml,
-                "galerkin.waveguide:Bend": _bend}
+                "galerkin.waveguide:Bend": _bend,
+                # L3 commit 12: the public cavity functions in SI
+                "galerkin.cavity:solve_cavity_box": _cavity_box,
+                "galerkin.cavity:solve_cavity": _cavity,
+                "galerkin.material_cavity:CavityMaterialRegion": _material_region,
+                "galerkin.material_cavity:solve_material_cavity_box": _material_cavity_box,
+                "galerkin.material_cavity:solve_material_cavity": _material_cavity}
 
 
 @pytest.fixture(scope="module")

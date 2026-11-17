@@ -8,6 +8,11 @@ boundary data as galerkin, so the discrete eigenvalues must agree to the 1e-9
 same-discretization gate of docs/reference-comparisons.md. The analytical and
 convergence acceptance stays in test_material_cavity.py and
 test_cavity_wall_loss.py; agreement here is not convergence evidence.
+
+The scikit-fem forms are written under exp(+j omega t), as the records describe them (eps 2.5-0.1j,
+Zs = sqrt(j omega mu0 / sigma)). galerkin's public results follow exp(-i omega t), so each case
+conjugates the returned materials and eigenvalues once into that frame (D8); the records are the
+same as before the public convention.
 """
 
 import numpy as np
@@ -74,15 +79,17 @@ def _wall_facets(mesh, wall):
 
 def test_lossy_slab_cavity_same_mesh(skfem):
     lengths, cells = (1.0, 0.8, 0.6), (3, 2, 4)
-    slab = CavityMaterialRegion(((0, 1), (0, 0.8), (0, 0.3)), 2.5 - 0.1j, 1.2 - 0.02j)
+    slab = CavityMaterialRegion(lower_corner_position=(0, 0, 0), upper_corner_position=(1, 0.8, 0.3),
+                                relative_permittivity=2.5 + 0.1j, relative_permeability=1.2 + 0.02j)
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_material_cavity_box(lengths, cells, regions=[slab], num_modes=6,
-                                         target_frequency_hz=150e6)
+        ours = solve_material_cavity_box(box_size=lengths, subdivision_count=cells, regions=[slab], mode_count=6,
+                                         target_frequency=150e6)
+    eigenvalues = np.conj(ours.wavenumber_squared)                      # exp(+j omega t), as the forms
     mesh = skfem.MeshTet(ours.mesh.nodes.T.copy(), ours.mesh.tets.T.copy())
     with clock("reference"):
         basis, stiffness, mass = _material_matrices(
-            skfem, mesh, ours.tet_relative_permittivity, ours.tet_relative_permeability)
+            skfem, mesh, np.conj(ours.relative_permittivity), np.conj(ours.relative_permeability))
         free = basis.complement_dofs(basis.get_dofs().all())
         values = la.eigvals(stiffness[free][:, free].toarray(), mass[free][:, free].toarray())
     physical = values[np.abs(values) > 1e-6]
@@ -105,10 +112,10 @@ def test_lossy_slab_cavity_same_mesh(skfem):
                      "reference dense QZ with a kernel cut-off)"],
         observables=[
             observable("complex eigenvalue k0^2, six near 150 MHz", "m^-2",
-                       "max relative difference", relative_difference(ours.eigenvalues_m2, reference),
+                       "max relative difference", relative_difference(eigenvalues, reference),
                        SAME),
             observable("quality factor Re f / (2 Im f)", "1", "max relative difference",
-                       relative_difference(ours.quality_factors,
+                       relative_difference(ours.quality_factor,
                                            (lambda f: f.real / (2 * f.imag))(
                                                C0 * np.sqrt(reference) / (2 * np.pi))), SAME)]))
 
@@ -119,20 +126,21 @@ def test_impedance_wall_cavity_same_mesh(skfem):
     walls = {"z1": 5.8e7, "x0": 1.0e6}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_material_cavity_box(lengths, cells, num_modes=3, target_frequency_hz=200e6,
-                                         wall_conductivity_s_per_m=walls)
+        ours = solve_material_cavity_box(box_size=lengths, subdivision_count=cells, mode_count=3,
+                                         target_frequency=200e6, electrical_conductivity=walls)
+    eigenvalues = np.conj(ours.wavenumber_squared)                      # exp(+j omega t), as the forms
     mesh = skfem.MeshTet(ours.mesh.nodes.T.copy(), ours.mesh.tets.T.copy())
     _, _, tangential_mass = _forms(skfem)
     reference = []
     with clock("reference"):
         basis, stiffness, mass = _material_matrices(
-            skfem, mesh, ours.tet_relative_permittivity, ours.tet_relative_permeability)
+            skfem, mesh, np.conj(ours.relative_permittivity), np.conj(ours.relative_permeability))
         pec = np.concatenate([_wall_facets(mesh, w) for w in WALL_AXES if w not in walls])
         free = basis.complement_dofs(basis.get_dofs(facets=pec))
         boundary = {w: tangential_mass.assemble(
             skfem.FacetBasis(mesh, skfem.ElementTetN0(), facets=_wall_facets(mesh, w))).tocsr()
             for w in walls}
-        for value in ours.eigenvalues_m2:
+        for value in eigenvalues:
             k = np.sqrt(value)
             operator = stiffness.copy()
             for wall, sigma in walls.items():
@@ -159,4 +167,4 @@ def test_impedance_wall_cavity_same_mesh(skfem):
                      "exact for these quadratic integrands)"],
         observables=[observable("complex eigenvalue k0^2 at the fixed point, three modes", "m^-2",
                                 "max relative difference",
-                                relative_difference(ours.eigenvalues_m2, reference), SAME)]))
+                                relative_difference(eigenvalues, reference), SAME)]))
