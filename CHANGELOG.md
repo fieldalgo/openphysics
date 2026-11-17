@@ -1,5 +1,7 @@
 # Changelog
 
+- Add explicit three-radial-mode physical Gram and self-log primitives with exact existing subspace, independent multiprecision references and no field-method changes.
+
 - Add an explicit three-active static corner-harmonic field with compact physical partitions, bounded numerical gates, independent finite comparisons and immutable edge currents.
 
 - Add a private compact corner partition with rational geometry checks while retaining all public geometry and field controls.

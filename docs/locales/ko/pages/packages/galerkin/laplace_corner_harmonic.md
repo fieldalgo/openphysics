@@ -52,3 +52,5 @@ zeta 함수는 평가하지 않는다. 비영 성분은 바닥값 없는 상대 
 Far, 공통 원점, separated, mixed-source 블록은 별도 [상호작용 계약](laplace_corner_harmonic_interactions.md)을 참고한다.
 
 [비공개 물리 모멘트](laplace_corner_harmonic_moments.md)는 다항식·접지 Fourier 투영에서 같은 질량을 보존하며 장 솔버를 공개하지 않습니다.
+
+별도 [세 기저 자기 적분](laplace_corner_quadratic.md)은 기존 두 기저 블록을 정확히 보존하고 이차 방사형 분기를 추가합니다. 패널 상호 작용과 장 연결은 별개입니다.
