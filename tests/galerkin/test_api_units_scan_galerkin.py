@@ -4,8 +4,8 @@
 
 The rule, the module lists and the structural names are shared with refsol and physmat
 in tests/_support/ (api_scan.py and its JSON files). This file holds galerkin's part:
-api_units_allowlist.json next to it lists today's violations, and entries may only be
-removed. docs/development.md describes the scan.
+api_units_allowlist.json next to it is empty (since L3 commit 13; physmat's since L1
+commit 3) and may not grow, so no public callable may violate the rule. docs/development.md describes the scan.
 """
 import importlib.util
 from pathlib import Path
@@ -306,6 +306,17 @@ def test_public_parameters_match_the_allowlist(rules):
 def test_allowlist_is_canonical_and_never_grows():
     problems = api_scan.allowlist_format_problems(PACKAGE, ALLOWLIST)
     assert not problems, "\n".join(problems)
+
+
+def test_galerkin_allowlist_is_empty_and_its_clauses_apply(rules):
+    # P3-3 at L3 commit 13: no galerkin entry is left and none may be added, so every scanned public module is
+    # clean and the removed-name and string clauses apply to all of them
+    # (test_clean_modules_refuse_strings_and_removed_names).
+    assert api_scan.load_allowlist(ALLOWLIST) == []
+    assert api_scan.BASELINE_COUNTS[PACKAGE] == 0
+    scanned = sorted(m.__name__ for m in api_scan.scanned_modules(PACKAGE, rules))
+    assert scanned
+    assert sorted(api_scan.clean_modules(PACKAGE, ALLOWLIST, rules)) == scanned
 
 
 def test_every_module_is_public_or_internal(rules):

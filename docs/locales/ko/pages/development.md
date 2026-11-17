@@ -118,11 +118,9 @@ node --test tests/simcase/*.cjs                    # Studio JavaScript 검사
 검사하지 않습니다. 공통 논리와 데이터는 `tests/_support/`에 있습니다. `api_scan.py`, 공개·내부
 모듈 목록, 닫힌 구조 이름 목록과 결과 클래스 목록, 제거된 이름 목록입니다. 그 밖의 모듈은 모두 내부 모듈이며
 docstring에 "Internal module, consistent units"라고 적습니다. 패키지마다의
-`api_units_allowlist.json`은 지금 있는 위반을 적어 둡니다. 항목은 지우기만 할 수 있습니다.
-새 위반도, 더는 어떤 위반과도 맞지 않는 항목도 실패합니다. physmat의 허용 목록은 비어 있으므로
-제거된 이름 목록의 모든 이름이 없는지 확인하고, 공개 물리량 매개변수에 `str`을 주면 반드시
-`TypeError`가 나야 합니다. galerkin과 refsol에서는 공개 모듈마다 허용 목록 항목이 없어지는 때부터
-이 두 조항이 적용됩니다. 범위(scope)와 그 까닭을 적은 메모가 붙은 제거된 이름은 그 모듈에서만 없는지
+`api_units_allowlist.json`은 비어 있고 늘어날 수 없습니다. 새 위반은 실패합니다. 그래서 모든 공개 모듈이
+깨끗합니다. 제거된 이름 목록의 모든 이름이 없는지 확인하고, 공개 물리량 매개변수에 `str`을 주면
+반드시 `TypeError`가 나야 합니다. 범위(scope)와 그 까닭을 적은 메모가 붙은 제거된 이름은 그 모듈에서만 없는지
 확인합니다. `refsol.bent_slab`은 더는 `radius`를 받지 않고(이제 `bend_radius`), `refsol.fiber`는 등록부 이름
 `radius`를 받습니다. `galerkin.kernels`와 `physmat.kernels`는 simcase와 sipi를 위해 일관 단위의
 커널을 다시 내보내는 내부 이름공간입니다. 어떤 공개 이름도 그 이름과 같지 않고, 그 객체도 아닙니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the

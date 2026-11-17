@@ -35,7 +35,8 @@ its constructor, ``Class.method`` for a method) and ``reason`` one of ``REASONS`
 parameter with several problems gives one violation per reason. Each package keeps
 today's violations in ``tests/<package>/api_units_allowlist.json``. The allowlist must
 equal the violations found: a new violation fails, and so does an entry that no longer
-matches one. Entries may only be removed, never added.
+matches one. Entries may only be removed, never added. Since L3 commit 13 every
+package's allowlist is empty (``BASELINE_COUNTS`` 0), so the rule holds with no exception.
 
 Once no allowlist entry belongs to a public module, two more clauses apply to it: every
 removed name (``api_units_removed.json``) is absent from it, and a ``str`` passed to each
@@ -85,23 +86,19 @@ DEFERRED = "deferred to the materials step"
 # The phrase every internal module's docstring carries.
 INTERNAL_DOCSTRING = "Internal module, consistent units"
 
-# Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin after L3 commit 12,
-# which emptied the cavity modules (25 before; 98 before L3 commit 11a, whose em kernels left the top level and
-# galerkin.waveguide for galerkin.kernels and whose EdgeSpace method argument node_set became structural);
-# refsol after L3 commit 12, which emptied cavity, material_cavity, wall_loss and metallic (42 before; 91
-# before L3 commit 11e, which emptied scattering and benchmarks and converted metallic's
-# rect_waveguide_cutoffs, whose n_max became structural for rect_cavity_resonances too; 120 before L3 commit
-# 11d, which emptied
-# fiber; 222 before L3 commit 11c, which emptied slab, lossy_slab and bent_slab; 240 before L3 commit 10, which
-# emptied
-# galerkin's electrostatics and refsol's electrostatics with the coax potential and field of refsol.metallic it
-# re-exports, galerkin 102 before). L2 commit 8 had emptied
-# galerkin's elasticity, thermoelasticity, the two thermal-mechanical workflows, shape and coupling and refsol's
-# bimetal, elasticity, elasticity_multilayer, elasticity_traction, thermoelastic_traction and thermoelasticity,
-# so only the electromagnetic modules keep entries (galerkin 301 on f693ae3a, 191 after L2 commit 4, 170 after
-# L2 commit 6, which emptied the heat modules, 154 after L2 commit 7, which emptied electric, joule_heating and
-# temperature_joule_heating; refsol 549 on f693ae3a, 394 after L2 commit 6, 354 after L2 commit 7, which
-# emptied joule_slab). They never grow.
+# Allowlist counts. Every package is at 0 and stays there (L3 commit 13). How they fell:
+# - physmat: 107 on f693ae3a, 0 after L1 commit 3.
+# - galerkin: 301 on f693ae3a; 191 after L2 commit 4; 170 after L2 commit 6 (the heat modules); 154 after L2
+#   commit 7 (electric, joule_heating, temperature_joule_heating); 102 after L2 commit 8 (elasticity,
+#   thermoelasticity, the two thermal-mechanical workflows, shape, coupling); 98 after L3 commit 10
+#   (electrostatics); 25 after L3 commit 11a (the em kernels left the top level and galerkin.waveguide for
+#   galerkin.kernels; EdgeSpace's node_set became structural); 0 after L3 commit 12a (cavity, material_cavity).
+# - refsol: 549 on f693ae3a; 394 after L2 commit 6; 354 after L2 commit 7 (joule_slab); 240 after L2 commit 8
+#   (bimetal, the elasticity modules, thermoelastic_traction, thermoelasticity); 222 after L3 commit 10
+#   (electrostatics with the coax closed forms of refsol.metallic it re-exports); 120 after L3 commit 11c (slab,
+#   lossy_slab, bent_slab); 91 after 11d (fiber); 42 after 11e (scattering, benchmarks, rect_waveguide_cutoffs,
+#   whose n_max became structural for rect_cavity_resonances too); 0 after L3 commit 12b (cavity,
+#   material_cavity, wall_loss, metallic).
 BASELINE_COUNTS = {"galerkin": 0, "physmat": 0, "refsol": 0}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
