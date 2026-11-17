@@ -1,0 +1,1133 @@
+{
+  "schema": "openphysics.reference-values/1",
+  "case": "static-three-radial-mode-self-integrals",
+  "physics": "2D Laplace static wedge radial-density physical self integrals",
+  "comparison": "structure-oracle",
+  "role": "Partial mathematical structure oracle for the declared physical modes. Direct Duffy angular log integration and beta power-density Gram; shares definitions and split-domain identities but no product rational formulas, zeta series or implementation. No field or measurement qualification.",
+  "references": [
+    {
+      "tool": "mpmath",
+      "version": "1.3.0",
+      "build": "unmodified pure-Python wheel sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "modified": {
+        "value": false,
+        "description": "Unmodified published mpmath wheel; no third-party source copied into the product."
+      },
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/mpmath/mpmath/tree/1.3.0",
+      "install": {
+        "kind": "hash-verified local wheel in a separate isolated environment",
+        "command": "python -m pip install --no-deps --require-hashes -r tests/galerkin/reference_values/mpmath/requirements.txt",
+        "lock": "tests/galerkin/reference_values/mpmath/requirements.txt"
+      },
+      "settings": {
+        "decimal_precisions": [
+          70,
+          100
+        ],
+        "input_conversion": "binary64 inputs converted exactly to multiprecision",
+        "backend": "python"
+      },
+      "discretization": {
+        "kind": "analytic Duffy radial reduction, independently flattened numerical angular log integration and beta physical Gram",
+        "decimal_precisions": [
+          70,
+          100
+        ],
+        "angular_coordinate": "t=u^a for each a=p,2p,3p",
+        "angular_breakpoints": [
+          0,
+          0.5,
+          0.9,
+          1
+        ],
+        "evaluated_kernel": "log1p(-t^(1/a)); no product digamma/zeta series"
+      },
+      "arrays": [
+        "gram_*",
+        "self_log_*"
+      ],
+      "execution": "separate-process",
+      "independence": {
+        "product_loaded": false,
+        "inputs_from_product": false,
+        "shared_math": "Physical radial density definitions, exact power integrals and Duffy radial decomposition; product code and series not loaded."
+      }
+    }
+  ],
+  "generator": {
+    "path": "tests/galerkin/reference_values/mpmath/compare_quadratic_self.py",
+    "sha256": "7e4bbc128bb57d4dd68c0b82a83e8d56cbbbe077837845605707557c0d0f3176",
+    "command": "python tests/galerkin/reference_values/mpmath/compare_quadratic_self.py",
+    "product_commit": "596ba5fae956c3be85b83811144dea7cb33165f5",
+    "clean": false
+  },
+  "generated_utc": "2026-11-17T03:23:24.166856+00:00",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": null,
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu": null,
+    "dtype": "mpmath70/100 decimal digits; stored little-endian binary64",
+    "backend/device": "Python multiprecision on CPU"
+  },
+  "cost": {
+    "compile_s": null,
+    "compute_s": 6.415109378984198,
+    "wall_time_s": null,
+    "peak_rss_mb": 16.4609375,
+    "threads": 1,
+    "not_measured": [
+      "Process-start/import and end-to-end wall timing, compilation and CPU model not captured by the generation wrapper."
+    ]
+  },
+  "inputs": {
+    "cases": [
+      {
+        "exponent": 0.500001,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.500001,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.500001,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.55,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.55,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.55,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.6,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.6,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.6,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.6666666666666666,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.8,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.8,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.8,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.95,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.95,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.95,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.9999990463256836,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.9999990463256836,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.9999990463256836,
+        "length": 1048576
+      },
+      {
+        "exponent": 0.9999999999990905,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 0.9999999999990905,
+        "length": 1.0
+      },
+      {
+        "exponent": 0.9999999999990905,
+        "length": 1048576
+      },
+      {
+        "exponent": 1.0,
+        "length": 9.5367431640625e-07
+      },
+      {
+        "exponent": 1.0,
+        "length": 1.0
+      },
+      {
+        "exponent": 1.0,
+        "length": 1048576
+      }
+    ],
+    "entry_order": [
+      "00",
+      "01",
+      "02",
+      "11",
+      "12",
+      "22"
+    ],
+    "basis": "rho_a=a/h*(s/h)^(a-1); phi0=rho_p; phi1=sqrt(3)*(rho_2p-rho_p); phi2=sqrt(5)*(2*rho_3p-3*rho_2p+rho_p)"
+  },
+  "matched": [
+    "Exact binary64 p and h, physical density basis with masses1/0/0, current-squared integrals in1/m and dimensionless self-log with1metre reference."
+  ],
+  "not_matched": [
+    "Reference shares mathematical density definitions and Duffy reduction, but evaluates beta power integrals and normalized angular quadrature; product uses rational formulas and a finite zeta series.",
+    "No conductor interaction, field convergence, fixed-guard or measurement validation."
+  ],
+  "reference_self_check": [
+    "70/100digit scaled entry differences below1e-50 for all54 arrays.",
+    "Independent pure-mpmath process loaded no product packages, NumPy or SciPy.",
+    "Compare-only reproduction leaves fixture bytes intact and removes temporary output."
+  ],
+  "failed_or_discarded": [],
+  "not_run": [
+    "Interactions, matrices, field solving and fixed-guard qualification.",
+    "Other operating systems, browsers and portable executables."
+  ],
+  "values": [
+    {
+      "name": "gram_00",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        131072524284.75522,
+        -227022455354.22632,
+        293083557266.44934,
+        393214427138.8485,
+        -507635612051.2203,
+        655354757148.3402
+      ]
+    },
+    {
+      "name": "self_log_00",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.476648184884802,
+        0.35432175611520866,
+        0.11842465267112384,
+        -0.8862937161874299,
+        0.052687962183712064,
+        -0.44703882008565593
+      ]
+    },
+    {
+      "name": "gram_01",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        125000.49999690554,
+        -216505.4849188102,
+        279506.2611259931,
+        374998.50000271655,
+        -484119.0453064158,
+        624995.0000270273
+      ]
+    },
+    {
+      "name": "self_log_01",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.6137045736858955,
+        0.35432175611520866,
+        0.11842465267112384,
+        -0.8862937161874299,
+        0.052687962183712064,
+        -0.44703882008565593
+      ]
+    },
+    {
+      "name": "gram_02",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        0.11920976638498834,
+        -0.20647572032814998,
+        0.2665579425105983,
+        0.35762643814345985,
+        -0.4616918995918425,
+        0.5960416794080995
+      ]
+    },
+    {
+      "name": "self_log_02",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.24923903751301,
+        0.35432175611520866,
+        0.11842465267112384,
+        -0.8862937161874299,
+        0.052687962183712064,
+        -0.44703882008565593
+      ]
+    },
+    {
+      "name": "gram_03",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        3171942.3999999976,
+        -3803514.504564432,
+        4091930.0925656655,
+        6831875.938461532,
+        -7168430.030730538,
+        9591602.22150023
+      ]
+    },
+    {
+      "name": "self_log_03",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.431472752730992,
+        0.2921262504192448,
+        0.1277652192654518,
+        -0.8576588556856425,
+        0.04197377719482227,
+        -0.4403518664802531
+      ]
+    },
+    {
+      "name": "gram_04",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        3.0249999999999977,
+        -3.6273140950817413,
+        3.9023686338097243,
+        6.515384615384609,
+        -6.83634760926298,
+        9.1472646918299
+      ]
+    },
+    {
+      "name": "self_log_04",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.5685291415320863,
+        0.2921262504192448,
+        0.1277652192654518,
+        -0.8576588556856425,
+        0.04197377719482227,
+        -0.4403518664802531
+      ]
+    },
+    {
+      "name": "gram_05",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        2.884864807128904e-06,
+        -3.459276290017835e-06,
+        3.7215887392136806e-06,
+        6.213554969200715e-06,
+        -6.5196491329793735e-06,
+        8.723511401967907e-06
+      ]
+    },
+    {
+      "name": "self_log_05",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.29441446966682,
+        0.2921262504192448,
+        0.1277652192654518,
+        -0.8576588556856425,
+        0.04197377719482227,
+        -0.4403518664802531
+      ]
+    },
+    {
+      "name": "gram_06",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1887436.8000000003,
+        -1634568.2168376092,
+        1507298.9242980988,
+        3235605.9428571435,
+        -2715147.0518413507,
+        4023766.364835166
+      ]
+    },
+    {
+      "name": "self_log_06",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.39954006220725,
+        0.23965079289347468,
+        0.13639168518906108,
+        -0.8349126506343355,
+        0.03334397041109773,
+        -0.43514244099716093
+      ]
+    },
+    {
+      "name": "gram_07",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.8000000000000003,
+        -1.55884572681199,
+        1.4374722712498653,
+        3.0857142857142863,
+        -2.589366008607245,
+        3.8373626373626384
+      ]
+    },
+    {
+      "name": "self_log_07",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.5365964510083425,
+        0.23965079289347468,
+        0.13639168518906108,
+        -0.8349126506343355,
+        0.03334397041109773,
+        -0.43514244099716093
+      ]
+    },
+    {
+      "name": "gram_08",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.7166137695312503e-06,
+        -1.4866311329002285e-06,
+        1.3708803856371549e-06,
+        2.942766462053572e-06,
+        -2.4694118581840946e-06,
+        3.6595941899896988e-06
+      ]
+    },
+    {
+      "name": "self_log_08",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.326347160190563,
+        0.23965079289347468,
+        0.13639168518906108,
+        -0.8349126506343355,
+        0.03334397041109773,
+        -0.43514244099716093
+      ]
+    },
+    {
+      "name": "gram_09",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1398101.3333333335,
+        -807194.181154375,
+        625249.9241532855,
+        1957341.8666666672,
+        -1186104.1252108465,
+        2197016.3809523815
+      ]
+    },
+    {
+      "name": "self_log_09",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.37192486031385,
+        0.18117214741215912,
+        0.14689012361043152,
+        -0.8112006357657822,
+        0.024224238265727956,
+        -0.4298181151192735
+      ]
+    },
+    {
+      "name": "gram_10",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.3333333333333335,
+        -0.7698003589195013,
+        0.5962847939999442,
+        1.8666666666666671,
+        -1.1311570407970872,
+        2.095238095238096
+      ]
+    },
+    {
+      "name": "self_log_10",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.5089812491149444,
+        0.18117214741215912,
+        0.14689012361043152,
+        -0.8112006357657822,
+        0.024224238265727956,
+        -0.4298181151192735
+      ]
+    },
+    {
+      "name": "gram_11",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.2715657552083335e-06,
+        -7.341388310618413e-07,
+        5.686614933013384e-07,
+        1.7801920572916671e-06,
+        -1.0787554176302788e-06,
+        1.9981747581845243e-06
+      ]
+    },
+    {
+      "name": "self_log_11",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.353962362083962,
+        0.18117214741215912,
+        0.14689012361043152,
+        -0.8112006357657822,
+        0.024224238265727956,
+        -0.4298181151192735
+      ]
+    },
+    {
+      "name": "gram_12",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1118481.0666666667,
+        -276752.2906814998,
+        162402.57770215193,
+        1263738.348051948,
+        -348798.9996667467,
+        1298905.9003873318
+      ]
+    },
+    {
+      "name": "self_log_12",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.3501507093943,
+        0.09176634993951506,
+        0.16494985547218236,
+        -0.7785560194796147,
+        0.011437777694130027,
+        -0.4226870502604552
+      ]
+    },
+    {
+      "name": "gram_13",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0666666666666667,
+        -0.2639315516295431,
+        0.15487916727271264,
+        1.2051948051948052,
+        -0.3326406475703685,
+        1.2387331966279334
+      ]
+    },
+    {
+      "name": "self_log_13",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.4872070981953944,
+        0.09176634993951506,
+        0.16494985547218236,
+        -0.7785560194796147,
+        0.011437777694130027,
+        -0.4226870502604552
+      ]
+    },
+    {
+      "name": "gram_14",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0172526041666667e-06,
+        -2.517047420783454e-07,
+        1.4770428397437348e-07,
+        1.1493633319805194e-06,
+        -3.172308421806035e-07,
+        1.1813480345038732e-06
+      ]
+    },
+    {
+      "name": "self_log_14",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.375736513003512,
+        0.09176634993951506,
+        0.16494985547218236,
+        -0.7785560194796147,
+        0.011437777694130027,
+        -0.4226870502604552
+      ]
+    },
+    {
+      "name": "gram_15",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1051488.711111111,
+        -49222.48300620432,
+        22694.98296928654,
+        1071787.720978121,
+        -56290.2926461514,
+        1074361.8081867886
+      ]
+    },
+    {
+      "name": "self_log_15",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.356497028316166,
+        0.019536263849833858,
+        0.18152423931059097,
+        -0.755635882632543,
+        0.0022780600248224385,
+        -0.4178370706763465
+      ]
+    },
+    {
+      "name": "gram_16",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0027777777777778,
+        -0.04694221783276016,
+        0.021643622369085826,
+        1.0221364221364222,
+        -0.0536826063596262,
+        1.0245912629955183
+      ]
+    },
+    {
+      "name": "self_log_16",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.4935534171172602,
+        0.019536263849833858,
+        0.18152423931059097,
+        -0.755635882632543,
+        0.0022780600248224385,
+        -0.4178370706763465
+      ]
+    },
+    {
+      "name": "gram_17",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        9.563234117296007e-07,
+        -4.4767587502250825e-08,
+        2.0640966767392946e-08,
+        9.747852536548826e-07,
+        -5.119572292292232e-08,
+        9.771263723330672e-07
+      ]
+    },
+    {
+      "name": "self_log_17",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.369390194081646,
+        0.019536263849833858,
+        0.18152423931059097,
+        -0.755635882632543,
+        0.0022780600248224385,
+        -0.4178370706763465
+      ]
+    },
+    {
+      "name": "gram_18",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1048576.0000009537,
+        -0.8660266426462759,
+        0.37267900325707476,
+        1048576.3333351878,
+        -0.968247606389028,
+        1048576.3666687685
+      ]
+    },
+    {
+      "name": "self_log_18",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.36294347297928,
+        3.551036747596534e-07,
+        0.18633890927156901,
+        -0.7500001001988128,
+        4.059679302409617e-08,
+        -0.4166666873925175
+      ]
+    },
+    {
+      "name": "gram_19",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0000000000009095,
+        -8.25907366415287e-07,
+        3.554143936701534e-07,
+        1.0000003178932073,
+        -9.233928741350441e-07,
+        1.000000349682587
+      ]
+    },
+    {
+      "name": "self_log_19",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.4999998617803738,
+        3.551036747596534e-07,
+        0.18633890927156901,
+        -0.7500001001988128,
+        4.059679302409617e-08,
+        -0.4166666873925175
+      ]
+    },
+    {
+      "name": "gram_20",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        9.536743164071174e-07,
+        -7.87646643080985e-13,
+        3.3894957892432536e-13,
+        9.536746195728372e-07,
+        -8.806160680151406e-13,
+        9.536746498895522e-07
+      ]
+    },
+    {
+      "name": "self_log_20",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.362943749418532,
+        3.551036747596534e-07,
+        0.18633890927156901,
+        -0.7500001001988128,
+        4.059679302409617e-08,
+        -0.4166666873925175
+      ]
+    },
+    {
+      "name": "gram_21",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1048576.0,
+        -8.259061849456979e-07,
+        3.554134333142522e-07,
+        1048576.0000003178,
+        -9.233911862883969e-07,
+        1048576.0000003497
+      ]
+    },
+    {
+      "name": "self_log_21",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.362943611198775,
+        3.3865295072673866e-13,
+        0.18633899812489774,
+        -0.7500000000000956,
+        3.871606993485505e-14,
+        -0.41666666666668645
+      ]
+    },
+    {
+      "name": "gram_22",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0,
+        -7.876455163437823e-13,
+        3.3894866305756777e-13,
+        1.000000000000303,
+        -8.806144583591431e-13,
+        1.0000000000003335
+      ]
+    },
+    {
+      "name": "self_log_22",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.499999999999868,
+        3.3865295072673866e-13,
+        0.18633899812489774,
+        -0.7500000000000956,
+        3.871606993485505e-14,
+        -0.41666666666668645
+      ]
+    },
+    {
+      "name": "gram_23",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        9.5367431640625e-07,
+        -7.511572993696044e-19,
+        3.232466345382383e-19,
+        9.53674316406539e-07,
+        -8.398193915931159e-19,
+        9.53674316406568e-07
+      ]
+    },
+    {
+      "name": "self_log_23",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.362943611199038,
+        3.3865295072673866e-13,
+        0.18633899812489774,
+        -0.7500000000000956,
+        3.871606993485505e-14,
+        -0.41666666666668645
+      ]
+    },
+    {
+      "name": "gram_24",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1048576.0,
+        0.0,
+        0.0,
+        1048576.0,
+        -6.69986980975691e-95,
+        1048576.0
+      ]
+    },
+    {
+      "name": "self_log_24",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -15.362943611198906,
+        0.0,
+        0.18633899812498247,
+        -0.75,
+        -1.1181614081453889e-100,
+        -0.4166666666666667
+      ]
+    },
+    {
+      "name": "gram_25",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        -6.389493760830794e-101,
+        1.0
+      ]
+    },
+    {
+      "name": "self_log_25",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        -1.5,
+        0.0,
+        0.18633899812498247,
+        -0.75,
+        -1.1181614081453889e-100,
+        -0.4166666666666667
+      ]
+    },
+    {
+      "name": "gram_26",
+      "unit": "1/m",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        9.5367431640625e-07,
+        0.0,
+        0.0,
+        9.5367431640625e-07,
+        -6.093496094542307e-107,
+        9.5367431640625e-07
+      ]
+    },
+    {
+      "name": "self_log_26",
+      "unit": "1",
+      "dtype": "<f8",
+      "shape": [
+        6
+      ],
+      "data": [
+        12.362943611198906,
+        0.0,
+        0.18633899812498247,
+        -0.75,
+        -1.1181614081453889e-100,
+        -0.4166666666666667
+      ]
+    }
+  ],
+  "consumers": [
+    "tests/galerkin/test_reference_quadratic_self.py"
+  ],
+  "provenance_status": "complete",
+  "not_recorded": {
+    "environment.numpy": "Pure-mpmath reference process did not import NumPy; generator imports and process receipt were checked.",
+    "environment.cpu": "platform.machine was captured but CPU model was not; generation receipt consulted.",
+    "cost.compile_s": "No separate compilation timer in the pure-Python generation wrapper.",
+    "cost.wall_time_s": "Generation wrapper starts timer after imports; no end-to-end process timing captured."
+  },
+  "regeneration": [],
+  "values_sha256": "9fc9337831f97091ebbc1a5801f5ee3a7f513c91083c56cb44743fd367483127",
+  "content_sha256": "b4c93a90694c7dcc17f2dbacba4d93e79db3ea13fcb9a884d22595e4452252d9",
+  "generation_details": {
+    "machine": "x86_64",
+    "precision_differences": [
+      "1.16073517740388187071262312778e-69",
+      "1.16073517740388187071262312778e-69",
+      "1.16073517740388187071262312778e-69",
+      "1.99137339133572892416033262927e-70",
+      "1.99137339133572892416033262927e-70",
+      "1.99137339133572892416033262927e-70",
+      "4.73238805381637196315355236427e-70",
+      "4.73238805381637196315355236427e-70",
+      "4.73238805381637196315355236427e-70",
+      "5.21428922217852560561952028212e-70",
+      "5.21428922217852560561952028212e-70",
+      "5.21428922217852560561952028212e-70",
+      "3.92546705189213897296278971335e-70",
+      "3.92546705189213897296278971335e-70",
+      "3.92546705189213897296278971335e-70",
+      "1.11774219282447571658326492131e-69",
+      "6.06825079402450063870230489016e-70",
+      "6.06825079402450063870230489016e-70",
+      "1.30620584858383198484426816163e-64",
+      "5.62322257916747151415186880076e-70",
+      "7.77802861122607800793963469186e-71",
+      "5.61338392132823331028402498513e-65",
+      "4.25600080253123744498042043165e-70",
+      "4.25600080253123744498042043165e-70",
+      "8.49309398578934017363026323982e-65",
+      "1.33269410443399783675175872231e-69",
+      "1.33269410443399783675175872231e-69"
+    ]
+  }
+}
