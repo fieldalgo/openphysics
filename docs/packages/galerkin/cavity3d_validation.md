@@ -153,7 +153,7 @@ root = Path.cwd()
 for package in (root / "packages").iterdir():
     if (package / "pyproject.toml").exists():
         sys.path.insert(0, str(package))
-sys.path.insert(0, str(root / "packages/galerkin/examples"))
+sys.path.insert(0, str(root / "examples/galerkin"))
 import cavity_modes as example
 from refsol.metallic import rect_cavity_resonances
 
