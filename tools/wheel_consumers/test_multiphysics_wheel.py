@@ -19,7 +19,8 @@ import pytest
 import galerkin.elasticity as elasticity
 import galerkin.waveguide as waveguide
 import refsol.elasticity as reference
-from galerkin import EdgeSpace, disk_mesh, eval_edge_field
+from galerkin import EdgeSpace, disk_mesh
+from galerkin.kernels import eval_edge_field
 from galerkin.mesh import rectangle_mesh
 from simcase import Document, examples
 from simcase.fields import VectorField

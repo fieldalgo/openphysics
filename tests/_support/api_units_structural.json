@@ -49,6 +49,7 @@
     {"name": "prescribed_node_ids", "category": "index or count", "source": "M1 2.2, 2.3"},
     {"name": "fixed_node_ids", "category": "index or count", "source": "M3 1.2 transient_heat"},
     {"name": "fixed_nodes", "category": "index or count", "source": "M2 1.4"},
+    {"name": "node_set", "category": "index or count", "source": "M2 3.4 (EdgeSpace, EdgeSpace3D stay public)", "scope": ["galerkin"], "note": "the node ids of EdgeSpace.boundary_edge_ids(node_set) and EdgeSpace3D.boundary_edge_ids(node_set): the boundary edges with both ends in it", "reviewer_note": "L3 commit 11: the edge spaces stay public structural types (map M2 3.4) while the em kernels leave the top level; their one method takes node indices, as pec_nodes and fixed_nodes do; ids, not a quantity."},
     {"name": "l", "category": "index or count", "source": "M3 1.2 fiber"},
     {"name": "m", "category": "index or count", "source": "M3 1.2 fiber"},
     {"name": "l_max", "category": "index or count", "source": "M3 1.2 fiber"},

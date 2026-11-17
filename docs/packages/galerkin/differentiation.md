@@ -9,7 +9,7 @@ conduction (`galerkin.electric.solve_steady_electric`), transient heat conductio
 (`galerkin.transient_heat.solve_transient_heat`), elasticity
 (`galerkin.elasticity.solve_elasticity`), thermoelasticity
 (`galerkin.thermoelasticity.solve_thermoelasticity`), waveguide modes
-(`galerkin.waveguide.solve_modes`) and the PEC box cavity
+(`galerkin.kernels.solve_modes`) and the PEC box cavity
 (`galerkin.cavity.solve_cavity_box`) accept JAX or PyTorch values
 in place of NumPy numbers. The result arrays are then arrays of that library, and
 derivatives with respect to those inputs flow through the solve. NumPy remains the

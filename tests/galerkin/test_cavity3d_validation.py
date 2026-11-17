@@ -14,6 +14,7 @@ import scipy.linalg as la
 import scipy.sparse as sp
 
 import galerkin
+import galerkin.kernels
 from refsol.metallic import rect_cavity_resonances
 
 C0 = 299792458.0
@@ -106,8 +107,8 @@ def check_result(result, expected_count):
     assert np.max(np.abs(q)) > 0
     assert np.max(np.abs(q[pec])) / np.max(np.abs(q)) <= 1e-12
     free = np.setdiff1d(np.arange(len(edges)), pec)
-    mass = galerkin.assemble_edge_mass_3d(space)
-    stiff = galerkin.assemble_curlcurl_3d(space)
+    mass = galerkin.kernels.assemble_edge_mass_3d(space)
+    stiff = galerkin.kernels.assemble_curlcurl_3d(space)
     u = q[free]
     mf = mass[free][:, free]
     kf = stiff[free][:, free]
@@ -168,8 +169,8 @@ class IndependentOracleValidation(unittest.TestCase):
             space = galerkin.EdgeSpace3D(mesh)
             edges, _, _, faces, pec = independent_topology(mesh)
             free = np.setdiff1d(np.arange(len(edges)), pec)
-            k = galerkin.assemble_curlcurl_3d(space)[free][:, free]
-            m = galerkin.assemble_edge_mass_3d(space)[free][:, free]
+            k = galerkin.kernels.assemble_curlcurl_3d(space)[free][:, free]
+            m = galerkin.kernels.assemble_edge_mass_3d(space)[free][:, free]
             values = la.eigvalsh(k.toarray(), m.toarray())
             self.assertFalse(np.any(values < -1e-9 * max(abs(values))))
             self.assertEqual(int(np.count_nonzero(abs(values) <=
@@ -246,7 +247,7 @@ class PublishedCavityAPIValidation(unittest.TestCase):
         base = self.solve(sides, (4, 4, 4), num_modes=3,
                           target_frequency_hz=target)
         mass = check_result(base, 3)
-        stiff = galerkin.assemble_curlcurl_3d(base.space)
+        stiff = galerkin.kernels.assemble_curlcurl_3d(base.space)
         for scale in (1e-6, 1e3):
             result = self.solve(sides * scale, (4, 4, 4), num_modes=3,
                                 target_frequency_hz=target / scale)
@@ -257,8 +258,8 @@ class PublishedCavityAPIValidation(unittest.TestCase):
             overlap = base.edge_coefficients.conj().T @ (mass @ mapped)
             self.assertGreaterEqual(np.linalg.svd(overlap, compute_uv=False).min(),
                                     1 - 1e-7)
-            scaled_m = galerkin.assemble_edge_mass_3d(result.space) / scale
-            scaled_k = galerkin.assemble_curlcurl_3d(result.space) * scale
+            scaled_m = galerkin.kernels.assemble_edge_mass_3d(result.space) / scale
+            scaled_k = galerkin.kernels.assemble_curlcurl_3d(result.space) * scale
             self.assertLessEqual(abs(scaled_m - mass).max() / abs(mass).max(), 1e-11)
             self.assertLessEqual(abs(scaled_k - stiff).max() / abs(stiff).max(), 1e-11)
 

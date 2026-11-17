@@ -18,7 +18,7 @@ z 방향으로 변하지 않는 도파관은 다음 형태의 장을 전파합�
 
     E(x, y, z, t) = [E_t(x, y) + zhat E_z(x, y)] exp(+i omega t - i beta z)
 
-(`packages/galerkin/src/galerkin/waveguide.py` 모듈 docstring; 같은 phasor를
+(`packages/galerkin/src/galerkin/_waveguide_kernels.py` 모듈 docstring; 같은 phasor를
 [흡수 모드](../simcase/lossy_modes.md)와 [모드 복소 좌표](modal_coordinates.md)가
 명시합니다). 단면 Omega는 P1 삼각형으로 메시된 2D 영역(`galerkin.mesh.Mesh`)이고,
 길이는 메시 길이 단위, `k0`는 그 역단위입니다. 원천 없는 Maxwell 방정식은
@@ -29,15 +29,15 @@ z 방향으로 변하지 않는 도파관은 다음 형태의 장을 전파합�
 
 | 기호 | 의미 | 코드에서 |
 |---|---|---|
-| `E_t`, `E_z` | 한 모드의 횡·종방향 전기장 | `et`(`E_t`의 edge 선적분), `ez`와 `E_z = 1j * ez` (`waveguide.py::solve_modes`) |
+| `E_t`, `E_z` | 한 모드의 횡·종방향 전기장 | `et`(`E_t`의 edge 선적분), `ez`와 `E_z = 1j * ez` (`_waveguide_kernels.py::solve_modes`) |
 | `eps_r` | 상대 유전율, 스칼라 또는 삼각형당 하나, 실수 또는 복소수 | `solve_modes`, `assemble_mode_system`의 `eps_r`; simcase의 `eps_tri` |
-| `mu_r` | 상대 투자율, 스칼라 또는 삼각형당, 실수 또는 복소수; `1/mu_r`로만 들어감 | `mu_r`(기본 1.0); `waveguide.py::_mode_blocks`의 `inv_mu` |
+| `mu_r` | 상대 투자율, 스칼라 또는 삼각형당, 실수 또는 복소수; `1/mu_r`로만 들어감 | `mu_r`(기본 1.0); `_waveguide_kernels.py::_mode_blocks`의 `inv_mu` |
 | `k0 = 2 pi / lambda0` | 진공 파수, 메시 길이의 역단위 | `k0`; simcase는 메시를 파장으로 나누고 `k0 = 2 pi`를 넘김 (`simcase/physics_em_modes2d.py::_solve_vector`) |
 | `beta` | z 방향 전파상수 | `beta = k0 * n_eff` |
 | `n_eff = beta / k0` | 유효굴절률, 실수 또는 복소수 | `solve_modes`의 첫 반환값 `n_eff` |
 | `e_t = beta E_t`, `e_z = -i E_z` | 혼합 정식화의 스케일된 미지수 | pencil 벡터 `x = [beta * et; ez]` |
-| `lambda = -beta^2` | pencil `A x = lambda B x`의 고유값 | `waveguide.py::_live_modes`의 `lam0 = -(k0 n_eff)^2` |
-| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert 목표와 ARPACK이 실제로 반환하는 고유값 | `waveguide.py::_solve_modes_numpy`의 `sigma`, `nu` |
+| `lambda = -beta^2` | pencil `A x = lambda B x`의 고유값 | `_waveguide_kernels.py::_live_modes`의 `lam0 = -(k0 n_eff)^2` |
+| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert 목표와 ARPACK이 실제로 반환하는 고유값 | `_waveguide_kernels.py::_solve_modes_numpy`의 `sigma`, `nu` |
 | `(s_x, s_y, h)` | 두 횡축의 복소 좌표 늘림과 굽힘 metric, 삼각형당 한 쌍 | `coordinate_factors` (T, 3), `mode_coordinates.py::mode_coordinates`가 생성 |
 | `phi` | scalar 근사의 절점(nodal) 모드 함수 | `physics_em_modes2d.solve(formulation="scalar")`의 `fields` |
 
@@ -141,7 +141,7 @@ Jin 2014 도파관 장).
     A = [ S - k0^2 Mt_eps   0 ]        B = [ Mt_mu   G            ]
         [ 0                 0 ]            [ G^T     K - k0^2 M   ]
 
-입니다. `waveguide.py::assemble_mode_system`이 `waveguide.py::_mode_blocks`로부터
+입니다. `_waveguide_kernels.py::assemble_mode_system`이 `_waveguide_kernels.py::_mode_blocks`로부터
 정확히 이 블록을 (`sp.bmat`) 만듭니다.
 
 | 블록 | 적분 | 커널 (`galerkin/core/kernels.py`) | 공개 조립 함수 |
@@ -176,10 +176,10 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 
 `A`와 `B`는 전치대칭입니다. 실수 `eps_r`, `mu_r`에서는 실대칭이고 `B`는
 부정부호(indefinite)이며, 복소 재료나 좌표 인자에서는 복소대칭이고 Hermitian이
-아닙니다(`waveguide.py` docstring).
+아닙니다(`_waveguide_kernels.py` docstring).
 
 **경계조건.** PEC 벽 `n x E = 0`은 두 종류의 자유도를 0으로 고정합니다
-(`waveguide.py::_free_dofs`). `pec_nodes`(기본: 모든 이름 있는 경계의 모든 절점)의
+(`_waveguide_kernels.py::_free_dofs`). `pec_nodes`(기본: 모든 이름 있는 경계의 모든 절점)의
 `e_z` 값과 `pec_edges`의 `e_t` 선적분입니다. 기본 `pec_edges`는 삼각형 하나만이
 소유하고 두 끝점이 모두 `pec_nodes`에 있는 edge입니다
 (`core/spaces.py::EdgeSpace.boundary_edge_ids`; 소속은 위상으로 결정하므로 두 경계
@@ -192,7 +192,7 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 
 **고유값 풀이.** `B`가 부정부호이므로 양의 준정부호 질량행렬을 요구하는 SciPy
 일반화 ARPACK 드라이버는 쓰지 않습니다. 대신 shift-invert 연산자를 만들어 표준
-고유값 문제로 넘깁니다(`waveguide.py::_solve_modes_numpy`).
+고유값 문제로 넘깁니다(`_waveguide_kernels.py::_solve_modes_numpy`).
 
     sigma = -(k0 n_target)^2,    (A - sigma B)의 LU   (scipy.sparse.linalg.splu),
     op(v) = (A - sigma B)^-1 B v,     eigs(op, k=num_modes, which="LM", v0=ones),
@@ -315,7 +315,7 @@ PML 밖의 물리 종방향 장은 `1j * ez / h`이고, simcase 후보 솔버는
 `solve_modes`는 `eps_r`, `mu_r`, `k0`에 JAX 또는 PyTorch 값을 받습니다
 ([미분](differentiation.md)). 3절의 NumPy 고유값 풀이가 먼저 숫자로 실행됩니다.
 그 뒤 자유 자유도에서 반환된 각 단순 고유쌍 `(lambda0, x0)`,
-`lambda0 = -(k0 n_eff)^2`, `x0 = [beta et; ez]`에 대해 `waveguide.py::_live_modes`가
+`lambda0 = -(k0 n_eff)^2`, `x0 = [beta et; ez]`에 대해 `_waveguide_kernels.py::_live_modes`가
 같은 커널로 live 라이브러리에서 `A`, `B`를 다시 만들고(`_live_blocks`,
 `_restricted`) `galerkin.core.eigen.refine`을 호출합니다. 정규화 `x^T B x = 1`
 (전치, 공액 없음)로 테두리를 친 고유값 문제의 Newton 한 단계입니다.
@@ -348,7 +348,7 @@ PML 밖의 물리 종방향 장은 `1j * ez / h`이고, simcase 후보 솔버는
 `-n_eff/k0`를 더합니다.
 
 단계 후 반환 gauge를 다시 적용합니다. NumPy 풀이가 실수 양수로 남긴 성분을 pivot
-`p`로 택해(`waveguide.py::_pivot`, 여러 성분이 같은 크기면 위상이 0인 것)
+`p`로 택해(`_waveguide_kernels.py::_pivot`, 여러 성분이 같은 크기면 위상이 0인 것)
 
     x <- x conj(x_p) / ( |x_p| ||x||_2 ),    beta = sqrt(-lambda),    et = x_t / beta,    ez = x_z,
 

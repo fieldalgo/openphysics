@@ -11,8 +11,8 @@ absorbing boundary.
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, annulus_mesh, l2_error, radial_pml_coeffs
-from galerkin.kernels import (assemble_stiffness, assemble_mass, assemble_boundary_mass,
+from galerkin import rectangle_mesh, annulus_mesh, l2_error
+from galerkin.kernels import (radial_pml_coeffs, assemble_stiffness, assemble_mass, assemble_boundary_mass,
                               solve_dirichlet)
 from conftest import assert_second_order, rate
 

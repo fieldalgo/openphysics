@@ -5,7 +5,8 @@
 
 import numpy as np
 
-from galerkin import disk_mesh, eval_edge_field, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 from simcase.fields import VectorField
 from simcase.subspace_tracking import SubspaceTracker, columns
 from simcase.tracking import tracking_settings

@@ -279,7 +279,18 @@ def test_public_names_are_not_kernel_names(rules):
 # the public API for the internal galerkin.kernels, which re-exports them unchanged from their modules.
 MOVED_TOP_LEVEL = {"assembly": ["assemble_stiffness", "assemble_mass", "assemble_boundary_mass", "assemble_load"],
                    "assembly3d": ["tet_gradients", "assemble_stiffness_3d", "assemble_mass_3d"],
-                   "solver": ["solve_dirichlet"]}
+                   "solver": ["solve_dirichlet"],
+                   # L3 commit 11 (Appendix D): the em kernels; simcase's em.modes2d calls them (route K, D1)
+                   "edge": ["assemble_curlcurl", "assemble_edge_mass", "assemble_edge_grad", "eval_edge_field"],
+                   "edge3d": ["assemble_curlcurl_3d", "assemble_edge_mass_3d", "assemble_edge_grad_3d",
+                              "eval_edge_field_3d"],
+                   "waveguide": ["solve_modes", "assemble_mode_system"],
+                   "pml": ["radial_pml_coeffs"],
+                   "mode_overlap": ["vector_power", "vector_cross_power", "vector_field_overlap", "normalize_vector",
+                                    "coupling_efficiency", "confinement_factor", "overlap_matrix", "centroid_field",
+                                    "interpolate_vector_field", "effective_area", "scalar_power", "scalar_overlap",
+                                    "normalize_scalar", "scalar_coupling_efficiency", "scalar_confinement_factor",
+                                    "scalar_effective_area"]}
 MOVED_HELPERS = {"elasticity": ["lame", "constitutive", "element_materials", "element_constitutive",
                                 "stiffness_and_stress", "stress_of", "body_load", "check_solution", "displacement",
                                 "at_fixed", "vector_stiffness"],
@@ -288,7 +299,11 @@ MOVED_HELPERS = {"elasticity": ["lame", "constitutive", "element_materials", "el
                  "materials": ["region_property"],
                  "shape": ["solve_steady_heat_moving", "solve_transient_heat_moving", "solve_steady_electric_moving",
                            "solve_elasticity_moving", "solve_thermoelasticity_moving",
-                           "solve_steady_thermoelasticity_moving"]}
+                           "solve_steady_thermoelasticity_moving"],
+                 # L3 commit 11: the internal galerkin.mode_coordinates was never public (no removed name; its
+                 # module name is also bound on galerkin once imported)
+                 "mode_coordinates": ["mode_coordinates", "scalar_coordinate_system", "solve_scalar_coordinates"]}
+NEVER_PUBLIC = {"region_property", *MOVED_HELPERS["mode_coordinates"]}
 
 
 HEAT_KERNELS = {"scalar_boundary_system", "source_load_3d", "dirichlet_from_faces"}
@@ -296,7 +311,9 @@ HEAT_KERNELS = {"scalar_boundary_system", "source_load_3d", "dirichlet_from_face
 # galerkin._mechanics_kernels and galerkin._moving
 DEFINING = {**{n: "galerkin._heat_kernels" for n in HEAT_KERNELS},
             **{n: "galerkin._mechanics_kernels" for n in MOVED_HELPERS["elasticity"] + MOVED_HELPERS["thermoelasticity"]},
-            **{n: "galerkin._moving" for n in MOVED_HELPERS["shape"]}}
+            **{n: "galerkin._moving" for n in MOVED_HELPERS["shape"]},
+            # L3 commit 11: galerkin.waveguide is the public mode module; its kernels moved to a package-private one
+            **{n: "galerkin._waveguide_kernels" for n in MOVED_TOP_LEVEL["waveguide"]}}
 
 
 def test_kernels_reexport_the_moved_names_unchanged(rules):
@@ -315,7 +332,8 @@ def test_kernels_reexport_the_moved_names_unchanged(rules):
     public = {n for m in rules.public[PACKAGE] for n in api_scan.public_names(importlib.import_module(m))}
     assert not public & set(kernels.__all__)
     removed = {r.name for r in rules.removed if r.package == PACKAGE and r.kind == "name"}
-    assert removed == set(kernels.__all__) - {"region_property"}      # galerkin.materials was never public
+    # galerkin.materials and galerkin.mode_coordinates were never public
+    assert removed == set(kernels.__all__) - NEVER_PUBLIC
     assert "galerkin.kernels" in rules.internal[PACKAGE]
 
 
@@ -324,6 +342,8 @@ def test_star_import_gives_the_public_names():
     exec("from galerkin import *", namespace)
     names = set(namespace) - {"__builtins__"}
     # 78 before L2 commit 4: its 8 kernels left, and so did the submodules assembly3d and solver, which the
-    # top-level imports no longer bind.
-    assert len(names) == 68 and {"Mesh", "solve_modes", "scalar_effective_area", "core", "waveguide"} <= names
+    # top-level imports no longer bind. 68 before L3 commit 11a: its 27 em kernels left, and so did the
+    # submodules assembly, mode_overlap, pml and waveguide, which the top-level imports no longer bind.
+    assert len(names) == 37 and {"Mesh", "EdgeSpace", "EdgeSpace3D", "core", "edge"} <= names
     assert not names & {"assemble_stiffness", "solve_dirichlet", "tet_gradients", "assembly3d", "solver", "kernels"}
+    assert not names & {n for k in ("edge", "edge3d", "waveguide", "pml", "mode_overlap") for n in MOVED_TOP_LEVEL[k]}

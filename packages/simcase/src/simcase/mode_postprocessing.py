@@ -4,7 +4,8 @@
 """Mode power, confinement, overlaps and Gaussian coupling saved with ``em.modes2d`` results.
 
 This module runs in the kernel frame (micrometres, exp(+i omega t)): every number is a direct
-call of ``galerkin.mode_overlap`` on the kernel's mesh and fields, and ``runner._to_public``
+call of a ``galerkin.mode_overlap`` kernel (re-exported by ``galerkin.kernels``) on the kernel's
+mesh and fields, and ``runner._to_public``
 converts the results to SI under exp(-i omega t) once (areas times 1e-12, complex values
 conjugated). A reader can recompute them from ``fields.npz`` alone, after taking the saved
 arrays back to the kernel frame (tests/simcase/test_modes_postprocessing.py checks that the
@@ -65,9 +66,9 @@ import math
 import numpy as np
 
 from galerkin import EdgeSpace, Mesh
-from galerkin.mode_overlap import (confinement_factor, coupling_efficiency, interpolate_vector_field,
-                                   overlap_matrix, scalar_coupling_efficiency, scalar_confinement_factor,
-                                   scalar_overlap, scalar_power, vector_power)
+from galerkin.kernels import (confinement_factor, coupling_efficiency, interpolate_vector_field, overlap_matrix,
+                              scalar_coupling_efficiency, scalar_confinement_factor, scalar_overlap, scalar_power,
+                              vector_power)
 
 __all__ = ["validate_mode_overlap", "gaussian_settings", "vector_postprocessing", "scalar_postprocessing",
            "stack_points", "summary_block"]

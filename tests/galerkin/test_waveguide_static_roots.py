@@ -12,9 +12,10 @@ Lengths in micrometres; the slab of test_pml_modes.
 import numpy as np
 import pytest
 
-import galerkin.waveguide as waveguide
+import galerkin._waveguide_kernels as waveguide
 from galerkin.mode_coordinates import mode_coordinates
-from galerkin.waveguide import STATIC_ROOT_TOL, solve_modes
+from galerkin.waveguide import STATIC_ROOT_TOL
+from galerkin.kernels import solve_modes
 from test_pml_modes import K0, slab_mesh
 
 N_TARGET = 2.85

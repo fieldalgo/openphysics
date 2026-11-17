@@ -15,10 +15,10 @@
 
 | 문제 | 진입점 | 계약·검증 | 예제 |
 |---|---|---|---|
-| 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | `radial_pml_coeffs`; 내부 `galerkin.kernels`(`assemble_stiffness`, `solve_dirichlet`) | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 흡수 경계 또는 원통형 PML을 쓰는 2D 정전기·주파수 영역 파동 | 내부 `galerkin.kernels`(`radial_pml_coeffs`, `assemble_stiffness`, `solve_dirichlet`) | [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
 | 절점 집합 도체·자유 전하·절연 외부 경계의 2D 정전기; 에너지·전하 경로로 검사한 Maxwell 정전용량 행렬, 실수 또는 손실 복소 유전율 | `solve_electrostatics`, `capacitance_matrix` | [계약과 기준](electrostatics.md) | — |
-| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | `solve_modes` | [도파관 정식화](waveguide_formulation.md), [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
-| 벡터·스칼라 모드의 전력(Faraday 경로 Poynting 적분), 장 중첩, 정규화, 결합 효율, 구속 계수, 유효 면적 | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, 스칼라 쌍 | [계약과 검증](mode_overlap.md) | — |
+| 도파로 차단 모드와 유전체 도파 모드: 스칼라 P1, 혼합 Nédélec/절점 전체 벡터 | 내부 `galerkin.kernels`(`solve_modes`) | [도파관 정식화](waveguide_formulation.md), [고유공간 신뢰성](eigenspace_reliability.md), [단계별 검증 결과](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| 벡터·스칼라 모드의 전력(Faraday 경로 Poynting 적분), 장 중첩, 정규화, 결합 효율, 구속 계수, 유효 면적 | 내부 `galerkin.kernels`(`galerkin.mode_overlap`에서): `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, 스칼라 쌍 | [계약과 검증](mode_overlap.md) | — |
 | 3D 진공 직육면체 PEC 공진기 고유모드, SI 주파수와 원시 변 장 | `solve_cavity_box` | [공진기 API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 외부 사면체 메시(meshine, gmshio)의 3D 진공 PEC 공진기, 고른 면 태그에 PEC | `solve_cavity` | [공진기 API, 외부 메시](cavity_solver.md#외부-메시), [메시 형식](mesh3d_format.md) | — |
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
@@ -29,8 +29,8 @@
 | 같은 메시의 정상 전기→열 단방향 연성 | `galerkin.joule_heating.solve_steady_joule_heat` | [API·단위·검증](joule_heating.md) | [joule_heating.py](../../../../../../examples/galerkin/joule_heating.py) |
 | 온도 의존 정상 Joule heating: 유효 범위가 있는 등방 σ(T)를 완화 Picard 또는 Newton으로 | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [계약과 검증](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../../../../examples/galerkin/temperature_joule_heating.py) |
 | 정상 열전도의 처방 경계 열유속(내향)과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../../../examples/galerkin/thermal_flux_robin.py) |
-| JAX·PyTorch에서 재료·열원·경계값에 대한 미분: 정상·과도 열, 정상 전기 전도, 탄성, 열탄성, 도파관 고유값과 필드, 길이에 대한 PEC 상자 공진 | JAX·PyTorch 입력을 준 `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes`(필드는 `eval_edge_field`로), `solve_cavity_box` | [계약과 검증](differentiation.md) | — |
-| 정상 열·정상 전기 전도·선형 탄성·열탄성·과도 열·도파관 모드의 형상 미분: 설계 변수가 메시를 움직임(X₀ + t·W), 경계 속도의 조화 확장, 정확한 요소 뒤집힘 구간 | `galerkin.shape.MeshMotion`과 `solve_steady_heat(..., motion=)`·`solve_steady_electric(..., motion=)`·`solve_elasticity(..., motion=)`·`solve_thermoelasticity(..., motion=)`·`solve_steady_thermoelasticity(..., motion=)`·`solve_transient_heat(..., motion=)`·`solve_modes(..., motion=)`, `extend_velocity`, `admissible_interval` | [계약과 검증](shape_derivative.md) | — |
+| JAX·PyTorch에서 재료·열원·경계값에 대한 미분: 정상·과도 열, 정상 전기 전도, 탄성, 열탄성, 도파관 고유값과 필드, 길이에 대한 PEC 상자 공진 | JAX·PyTorch 입력을 준 `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `galerkin.kernels.solve_modes`(필드는 `eval_edge_field`로), `solve_cavity_box` | [계약과 검증](differentiation.md) | — |
+| 정상 열·정상 전기 전도·선형 탄성·열탄성·과도 열·도파관 모드의 형상 미분: 설계 변수가 메시를 움직임(X₀ + t·W), 경계 속도의 조화 확장, 정확한 요소 뒤집힘 구간 | `galerkin.shape.MeshMotion`과 `solve_steady_heat(..., motion=)`·`solve_steady_electric(..., motion=)`·`solve_elasticity(..., motion=)`·`solve_thermoelasticity(..., motion=)`·`solve_steady_thermoelasticity(..., motion=)`·`solve_transient_heat(..., motion=)`·`galerkin.kernels.solve_modes(..., motion=)`, `extend_velocity`, `admissible_interval` | [계약과 검증](shape_derivative.md) | — |
 | 과도 2D 열전도: 고정 P1·일관 질량·후진 Euler, 시간변 Dirichlet, 단열과 시간에 무관한 경계 열유속/대류 | `galerkin.transient_heat.solve_transient_heat` | [계약](transient_heat.md), [검증](transient_heat_validation.md), [독립 검증](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../../../../examples/galerkin/transient_heat_convergence.py) |
 | 정적 2D 선형탄성, 평면응력 또는 평면변형률 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity2d.md), [검증](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../../../../examples/galerkin/elasticity2d.py) |
 | 탄성의 전역 Cartesian 경계 표면하중 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity_traction.md), [검증](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../../../../examples/galerkin/elasticity_traction.py) |
@@ -76,11 +76,12 @@ src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
-  kernels.py      # Internal: re-exports the non-em assembly kernels, the Dirichlet solve and the physics helpers (consistent units)
+  kernels.py      # Internal: re-exports the assembly kernels, the Dirichlet solve, the physics helpers and the em kernels (consistent units)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
-  waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
+  waveguide.py    # The public mode module: the static-root tolerance and the degenerate-mode warning
+  _waveguide_kernels.py # Mixed edge/nodal vector mode solver, A x = -beta^2 B x (package-private; galerkin.kernels re-exports it)
   mode_overlap.py # Mode power, overlaps, normalisation, coupling efficiency, confinement (vector and scalar)
   mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form

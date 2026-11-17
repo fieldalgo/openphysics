@@ -13,9 +13,8 @@ import pytest
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (Mesh, rectangle_mesh, EdgeSpace, assemble_curlcurl, assemble_edge_mass,
-                      eval_edge_field)
-from galerkin.kernels import assemble_mass
+from galerkin import Mesh, rectangle_mesh, EdgeSpace
+from galerkin.kernels import assemble_curlcurl, assemble_edge_mass, eval_edge_field, assemble_mass
 from conftest import assert_second_order
 
 A_WG, B_WG = 1.0, 0.5

@@ -37,8 +37,8 @@ import pytest
 import scipy.sparse.linalg as spla
 from scipy.integrate import quad
 
-from galerkin import assemble_edge_mass, disk_mesh, rectangle_mesh, solve_modes
-from galerkin.kernels import assemble_mass, assemble_stiffness
+from galerkin import disk_mesh, rectangle_mesh
+from galerkin.kernels import assemble_edge_mass, solve_modes, assemble_mass, assemble_stiffness
 from galerkin.core.quadrature import triangle_product_rule, triangle_symmetric_rule
 from galerkin.edge import EdgeSpace
 from galerkin.mode_overlap import (_quartic_integral, _scalar_density, _vector_density, centroid_field,

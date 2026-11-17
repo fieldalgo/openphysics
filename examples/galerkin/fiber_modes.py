@@ -46,9 +46,9 @@ from scipy.special import jv, jvp, kv, kvp
 
 import scipy.sparse as sp
 
-from galerkin import (disk_mesh, solve_modes, assemble_edge_grad, assemble_edge_mass,
-                      assemble_curlcurl, eval_edge_field, EdgeSpace, rectangle_mesh)
-from galerkin.kernels import assemble_stiffness, assemble_mass
+from galerkin import disk_mesh, EdgeSpace, rectangle_mesh
+from galerkin.kernels import (solve_modes, assemble_edge_grad, assemble_edge_mass, assemble_curlcurl,
+                              eval_edge_field, assemble_stiffness, assemble_mass)
 
 A_CORE, N_CO, N_CL = 1.0, 1.5, 1.0
 V_NUM = 3.5

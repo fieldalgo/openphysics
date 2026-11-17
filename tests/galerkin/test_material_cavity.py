@@ -7,9 +7,8 @@ import numpy as np
 import pytest
 import scipy.linalg as la
 
-from galerkin import (CavityMaterialRegion as Region, MaterialCavityResult,
-                      assemble_curlcurl_3d, assemble_edge_mass_3d, eval_edge_field_3d,
-                      solve_cavity_box, solve_material_cavity_box)
+from galerkin import CavityMaterialRegion as Region, MaterialCavityResult, solve_cavity_box, solve_material_cavity_box
+from galerkin.kernels import assemble_curlcurl_3d, assemble_edge_mass_3d, eval_edge_field_3d
 from conftest import rate
 
 C0 = 299792458.0

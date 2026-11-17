@@ -19,7 +19,8 @@ import functools
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes, from_mesher
+from galerkin import rectangle_mesh, from_mesher
+from galerkin.kernels import solve_modes
 from conftest import rate
 
 # Case 3 has the high-index region wrapping a re-entrant dielectric corner, and

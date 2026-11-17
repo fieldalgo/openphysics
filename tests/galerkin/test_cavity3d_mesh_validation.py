@@ -14,6 +14,7 @@ import scipy.linalg as la
 import scipy.sparse as sp
 
 import galerkin
+import galerkin.kernels
 
 SIDES = np.array((1., .8, .6))
 FACES = ((1, 2, 3), (0, 3, 2), (0, 1, 3), (0, 2, 1))
@@ -131,8 +132,8 @@ class IndependentReturnedCavityMeshValidation(unittest.TestCase):
             with self.subTest(cells=cells.tolist()):
                 space, mesh = result.space, result.mesh
                 free = np.setdiff1d(np.arange(space.num_edges), result.pec_edge_ids)
-                stiff = galerkin.assemble_curlcurl_3d(space)[free][:, free]
-                mass = galerkin.assemble_edge_mass_3d(space)[free][:, free]
+                stiff = galerkin.kernels.assemble_curlcurl_3d(space)[free][:, free]
+                mass = galerkin.kernels.assemble_edge_mass_3d(space)[free][:, free]
                 values = la.eigvalsh(stiff.toarray(), mass.toarray())
                 tolerance = 1e-9 * max(abs(values))
                 self.assertFalse(np.any(values < -tolerance))

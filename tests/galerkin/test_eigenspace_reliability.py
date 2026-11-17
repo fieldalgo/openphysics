@@ -7,10 +7,11 @@ import numpy as np
 import pytest
 from scipy.optimize import linear_sum_assignment
 
-from galerkin import disk_mesh, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import solve_modes
 from galerkin.assembly import assemble_mass
 from galerkin.edge import assemble_edge_mass
-import galerkin.waveguide as waveguide
+import galerkin._waveguide_kernels as waveguide
 from eigenspace_reliability_oracle import fiber_electric, sampled_spans, span_error
 
 

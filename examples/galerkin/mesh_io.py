@@ -156,7 +156,8 @@ def check_round_trip(n=(5, 4, 3)):
     _, _, _, vals_direct, _ = solve_cavity(*n)
     _, _, _, S, M, _ = cavity_matrices(*n)
     import scipy.sparse.linalg as spla
-    from galerkin import EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d
+    from galerkin import EdgeSpace3D
+    from galerkin.kernels import assemble_curlcurl_3d, assemble_edge_mass_3d
     space = EdgeSpace3D(back)
     Sb = assemble_curlcurl_3d(space)
     Mb = assemble_edge_mass_3d(space)

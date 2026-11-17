@@ -80,7 +80,7 @@ scikit-fem 12.0.2). The CI records of each commit are authoritative.
 | `heat-p1-slab` | `thermal.solve_steady_heat`, P1 | `ElementTriP1` | nodal temperature; element heat flux | 2.1e-15; 4.0e-14 | 1e-9 |
 | `elasticity-p1-plane-strain-cantilever` | `elasticity.solve_elasticity`, P1 | `ElementVector(ElementTriP1)` | nodal displacement | 4.5e-13 | 1e-9 |
 | `elasticity-p1-plane-stress-cantilever` | same, plane stress | same | nodal displacement | 8.2e-14 | 1e-9 |
-| `waveguide-vector-rect-core` | `waveguide.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | effective index, 4 guided modes | 1.5e-15 | 1e-9 |
+| `waveguide-vector-rect-core` | `kernels.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | effective index, 4 guided modes | 1.5e-15 | 1e-9 |
 | `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec tetrahedra | `ElementTetN0` | lowest 8 eigenvalues k^2 | 1.4e-14 | 1e-9 |
 | `cavity-lossy-slab` | `material_cavity.solve_material_cavity_box`, complex eps/mu per tetrahedron | `ElementTetN0`, per-material assembly | six complex k^2; Q | 4.1e-15; 9.2e-14 | 1e-9 |
 | `cavity-impedance-walls` | same, Leontovich walls z1 and x0 | `ElementTetN0` + `FacetBasis` tangential mass, `T(k)` frozen at galerkin's `k0` | three complex k^2 at the fixed point | 6.8e-13 | 1e-9 |

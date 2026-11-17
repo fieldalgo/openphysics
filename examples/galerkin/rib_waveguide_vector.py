@@ -64,7 +64,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from galerkin import Mesh, eval_edge_field, solve_modes
+from galerkin import Mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 from meshine import generate, shapes
 from refsol import benchmarks
 from rib_waveguide_scalar import material_array, to_galerkin   # unchanged adapters

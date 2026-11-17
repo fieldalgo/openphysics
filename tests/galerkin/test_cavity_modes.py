@@ -14,9 +14,9 @@ import pytest
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (box_mesh, EdgeSpace3D, assemble_curlcurl_3d, assemble_edge_mass_3d,
-                      assemble_edge_grad_3d)
-from galerkin.kernels import assemble_stiffness_3d
+from galerkin import box_mesh, EdgeSpace3D
+from galerkin.kernels import (assemble_curlcurl_3d, assemble_edge_mass_3d, assemble_edge_grad_3d,
+                              assemble_stiffness_3d)
 from conftest import rate
 
 

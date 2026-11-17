@@ -18,8 +18,8 @@ import sys
 import numpy as np
 import pytest
 
-from galerkin import (EdgeSpace3D, Mesh3D, assemble_curlcurl_3d,
-                      assemble_edge_mass_3d, eval_edge_field_3d)
+from galerkin import EdgeSpace3D, Mesh3D
+from galerkin.kernels import assemble_curlcurl_3d, assemble_edge_mass_3d, eval_edge_field_3d
 from refsol.metallic import rect_cavity_resonances
 from simcase import CavityRunResult, Document, examples, run
 

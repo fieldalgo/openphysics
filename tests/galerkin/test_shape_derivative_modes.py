@@ -20,7 +20,8 @@ import pytest
 
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.shape import ElementInversion, MeshMotion, admissible_interval, extend_velocity
-from galerkin.waveguide import DegenerateModeWarning, solve_modes
+from galerkin.waveguide import DegenerateModeWarning
+from galerkin.kernels import solve_modes
 
 BACKENDS = ["jax", "torch"]
 LAMBDA, N_CORE, N_CLAD = 1.55, 3.48, 1.444

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Compare a vector TE slab with an independent infinite-cladding reference."""
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from refsol.slab import modes
 
 N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55

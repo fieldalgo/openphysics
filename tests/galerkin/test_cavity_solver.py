@@ -11,9 +11,8 @@ import scipy.linalg as la
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (CavityResult, solve_cavity_box,
-                      assemble_curlcurl_3d, assemble_edge_mass_3d,
-                      eval_edge_field_3d)
+from galerkin import CavityResult, solve_cavity_box
+from galerkin.kernels import assemble_curlcurl_3d, assemble_edge_mass_3d, eval_edge_field_3d
 import galerkin.cavity as cavity
 
 C0 = 299792458.0

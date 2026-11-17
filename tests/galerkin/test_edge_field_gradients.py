@@ -13,7 +13,8 @@ them first checks that both import.
 import numpy as np
 import pytest
 
-from galerkin import EdgeSpace, eval_edge_field, rectangle_mesh, solve_modes
+from galerkin import EdgeSpace, rectangle_mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 
 BACKENDS = ["jax", "torch"]
 MESH = rectangle_mesh(2.0, 1.5, 6, 5)

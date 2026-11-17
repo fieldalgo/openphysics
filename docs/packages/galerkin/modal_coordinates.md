@@ -19,7 +19,7 @@ The entire domain must have positive radius. The metric is
 coordinate inside PML. This is a constant-curvature model.
 
 Pass `coordinates.factors` as `coordinate_factors` to
-`galerkin.solve_modes` or `assemble_mode_system`. The vector formulation uses
+`galerkin.kernels.solve_modes` or `assemble_mode_system`. The vector formulation uses
 the transformed permittivity **and permeability**, not an absorbing epsilon
 alone. Returned edge/nodal coefficients are computational covariant fields;
 outside PML the physical longitudinal field is `1j*ez/h`.

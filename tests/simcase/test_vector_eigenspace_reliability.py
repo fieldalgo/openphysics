@@ -8,7 +8,8 @@ import json
 
 import numpy as np
 
-from galerkin import disk_mesh, EdgeSpace, Mesh, eval_edge_field
+from galerkin import disk_mesh, EdgeSpace, Mesh
+from galerkin.kernels import eval_edge_field
 from galerkin.edge import assemble_edge_mass
 from galerkin.assembly import assemble_mass
 from simcase import Document, examples

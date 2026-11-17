@@ -8,7 +8,8 @@ import json
 import numpy as np
 import pytest
 
-from galerkin import EdgeSpace, eval_edge_field, rectangle_mesh
+from galerkin import EdgeSpace, rectangle_mesh
+from galerkin.kernels import eval_edge_field
 from simcase.fields import VectorField
 from simcase.tracking import ModeTracker, ModeTrackingError, tracking_settings
 

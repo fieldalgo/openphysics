@@ -8,7 +8,7 @@
 (`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 Cartesian 열(`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10), 도파관 모드(`galerkin.waveguide.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+2026-11-10), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 

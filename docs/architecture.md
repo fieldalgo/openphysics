@@ -109,9 +109,10 @@ heat-to-mechanics workflows), `_cavity_common` (the two box cavities), `_heat_ke
 (the heat solvers' boundary system, 3D source load and face map), `_mechanics_kernels`
 (the elasticity and thermoelasticity helpers and the temperature-snapshot hashes),
 `_moving` (the moving-mesh solves behind `motion=`), `_public` (the public APIs'
-text refusal, inward data and result surfaces) and `_conventions` (`to_kernel` and
+text refusal, inward data and result surfaces), `_conventions` (`to_kernel` and
 `to_public`, the one place a complex value changes between the public exp(−iωt) and
-a kernel's exp(+iωt)),
+a kernel's exp(+iωt)) and `_waveguide_kernels` (the mode solve `solve_modes` and its pencil
+`assemble_mode_system`, which `galerkin.kernels` re-exports),
 or in public names of the module that owns it (thermoelasticity builds on elasticity's;
 joule heating and the workflows call `galerkin.thermal.solve_steady_heat_outward`, and
 the temperature-dependent Joule iteration `galerkin.electric.solve_steady_electric_outward`
@@ -151,10 +152,11 @@ flowchart TB
 Each element formula lives once, as a closed-form kernel in `core.kernels`. The
 assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
 assemble those kernels with `core.forms` and return SciPy matrices; they take
-NumPy values and refuse JAX or PyTorch ones. The non-electromagnetic ones, the
-Dirichlet solve and the physics modules' helpers are reached through `galerkin.kernels`,
-an internal namespace (consistent units, not part of the public API) above every layer
-that only re-exports them for simcase and sipi. Physics modules that differentiate
+NumPy values and refuse JAX or PyTorch ones. They, the Dirichlet solve, the physics
+modules' helpers and the electromagnetic kernels (the mode solve and coordinates, the
+mode overlaps and the radial PML) are reached through `galerkin.kernels`, an internal
+namespace (consistent units, not part of the public API) above every layer that only
+re-exports them for galerkin's modules, simcase and sipi. Physics modules that differentiate
 assemble the same kernels in the input's array library, and through that route
 seven solvers differentiate on JAX and PyTorch
 ([derivatives](packages/galerkin/differentiation.md)). The kernels are checked
