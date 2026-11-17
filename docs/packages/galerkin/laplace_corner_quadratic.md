@@ -43,3 +43,5 @@ This does not establish universal relative accuracy, a complete current solver,
 fixed-guard accuracy, mesh convergence or another platform.
 
 [한국어](../../locales/ko/pages/packages/galerkin/laplace_corner_quadratic.md)
+
+The separate [three-mode far interactions](laplace_corner_quadratic_far.md) add explicit far logarithmic blocks for these densities. Near/touching interactions and complete field integration remain separate.
