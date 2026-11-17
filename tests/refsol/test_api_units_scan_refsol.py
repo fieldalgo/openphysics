@@ -169,10 +169,19 @@ _MECHANICS = [
     ("thermoelasticity", "sine_manufactured", dict(_THERMOELASTIC, points=P2, temperature_difference=20.0,
                                                    displacement=(1e-4, 6e-5), length=(1.0, 1.0))),
 ]
-# L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab and L2 commit 8 the six mechanics and
-# thermoelastic modules: each callable that takes a quantity has a case.
+_COAX = dict(position=(1.0, 3.0), prescribed_electric_potential=(1.0, 0.0))
+_ELECTROSTATICS = [
+    ("electrostatics", "coax_capacitance", dict(position=(1.0, 3.0), relative_permittivity=2.2 + 0.044j)),
+    ("electrostatics", "two_layer_plate_capacitance", dict(thickness=(3e-4, 7e-4), relative_permittivity=(2.0, 5.0),
+                                                           length=2e-3)),
+    # re-exported by refsol.electrostatics (their own module, metallic, keeps entries until L3 commit 11)
+    ("metallic", "coax_potential", dict(_COAX, points=P2)),
+    ("metallic", "coax_field_magnitude", dict(_COAX, points=P2)),
+]
+# L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab, L2 commit 8 the six mechanics and
+# thermoelastic modules and L3 commit 10 electrostatics: each callable that takes a quantity has a case.
 STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
-                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS}
+                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS}
 
 
 @pytest.fixture(scope="module")

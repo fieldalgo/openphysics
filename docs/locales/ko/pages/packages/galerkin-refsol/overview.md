@@ -27,8 +27,8 @@ Python 패키지 이름은 `refsol`입니다(`from refsol import fiber`).
 | `refsol.slab` | 대칭/비대칭 평면 유전체 도파로 TE/TM 모드, TE 장 분포 | 차단식 대비 모드 수, 짝수 모드 방정식, 경계면 연속성 |
 | `refsol.lossy_slab` | 복소 유전율 다층 슬랩, `exp(+i omega t - i beta z)`: 전달행렬 특성함수, 무손실 `slab` 근에서 연속 추적한 흡수 결합 모드, 외향 sheet의 기판 누설 모드, 장 분포 | 무손실 극한 = `slab`, 정규화 잔차 ≤ 1e-12, 1차 섭동론(TE 구속률, TM 벡터식)과 O(n''^2) 일치, 유한차분 경계면·층 방정식, exp(-2 k0 gamma gap) 터널링률, 경로 무관 연속 추적 |
 | `refsol.fiber` | 계단형 굴절률 광섬유: 스칼라 LP 모드(Gloge), 정확한 벡터 TE/TM/HE/EH 모드, 음함수 미분으로 구한 정확한 벡터 군굴절률(`vector_group_index`, 재료 분산 선택), 정확한 벡터 모드 장(`vector_mode_field`) | Bessel 차단값 대비 LP 개수, 2.4048의 LP11 차단, 약한 도파에서 HE11 ≈ LP01, LP11 군 축퇴, Rudolph–Neumann 근사; Richardson 외삽한 정밀 근 대비 군굴절률, 중심차분 대비 잔차 편미분; 근에서 특이한 장 연속 조건, 경계 조건(E_phi, E_z, n^2 E_r) |
-| `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장 | 폐형식 |
-| `refsol.electrostatics` | 동축선 단위길이 정전용량 `2 pi eps0 eps_r / ln(b/a)`와 두 층 평행판 직렬 정전용량, 실수·복소 `eps_r`; 동축 전위를 재노출 | 폐형식; 평행판은 P1에서 정확 |
+| `refsol.metallic` | 직사각형 도파로 차단, 직육면체 공진기 공진, 동축 전위·장(`coax_potential(points, *, position, prescribed_electric_potential)`, L3 커밋 10부터 SI 등록부 이름) | 폐형식 |
+| `refsol.electrostatics` | 동축선 깊이 1 m당 정전용량 `2 pi eps0 eps_r / ln(b/a)`와 두 층 평행판 직렬 정전용량(`capacitance_per_depth`), 실수·복소 `relative_permittivity`(`exp(-i omega t)`, 손실 `Im >= 0`); 키워드 전용 SI 등록부 이름(반경은 `position`, 층마다 `thickness`와 `relative_permittivity`, `length`); 동축 전위를 재노출 | 폐형식; 평행판은 P1에서 정확 |
 | `refsol.cavity` | 주파수 상한까지의 모든 진공 PEC 상자 모드, 편광·기하 축퇴 포함, SI | 독립 Cartesian 열거, 솔버·메시 없음 |
 | `refsol.material_cavity` | 균일 충전 또는 손실 유전·자성 판을 넣은 PEC 상자의 복소 공진과 Q(TE/TM-to-z 초월방정식 근), `exp(+j*omega*t)` | 진공 극한 = 직교 좌표 스펙트럼, 같은 두 층 = 균일 축척, 소손실 Q = 에너지 충전율 |
 | `refsol.wall_loss` | 직육면체 공동 모드의 벽별 1차 도체 손실 Q, 축퇴 편광 분리, 균일 충전 | Pozar TE101, 유한차분 curl의 수치 적분, 벽별 가법성, sqrt(sigma) 축척 |
@@ -124,7 +124,8 @@ python -m pip install -e packages/galerkin-refsol
 - 시간 의존성은 `exp(-i omega t)`이며 입사 평면파는 +x로 진행합니다.
 - 길이는 일관된 어떤 단위든 사용할 수 있습니다(파장이 척도를 정함).
 - 유효 굴절률은 `n_eff = beta / k0`입니다.
-- `refsol.lossy_slab`과 `refsol.material_cavity`는 galerkin 솔버처럼 `exp(+i omega t)`를 씁니다: 수동 `Im eps <= 0`, 감쇠 `Im n_eff < 0`, 감쇠 공진 `Im omega > 0`. 변환은 복소 공액입니다.
+- `refsol.lossy_slab`과 `refsol.material_cavity`는 galerkin 모드·공진기 커널처럼 `exp(+i omega t)`를 씁니다: 수동 `Im eps <= 0`, 감쇠 `Im n_eff < 0`, 감쇠 공진 `Im omega > 0`. 변환은 복소 공액입니다.
+- `refsol.electrostatics`는 galerkin의 공개 정전기처럼 `exp(-i omega t)`를 따릅니다(galerkin 단계, L3 커밋 10): 수동 `Im eps_r >= 0`이면 `Im C >= 0`입니다. 폐형식은 두 규약에서 같은 식이므로 아무것도 변환하지 않습니다.
 
 ## 참고문헌
 

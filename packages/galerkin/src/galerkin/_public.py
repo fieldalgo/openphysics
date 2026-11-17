@@ -16,7 +16,7 @@ and today's outward keywords. This module holds what the thin public layer adds.
   ``inspect.signature`` follows the wrapper's ``__wrapped__``, so the callback forms
   of transient heat are told apart as before.
 - ``ResultSurface``: ``.units`` (field -> canonical unit) and the planar,
-  axisymmetric and 3D naming of the heat, electric and Joule results.
+  axisymmetric and 3D naming of the heat, electric, Joule and electrostatic results.
 """
 from collections.abc import Mapping
 from dataclasses import fields
@@ -108,6 +108,8 @@ class ResultSurface:
 
     UNITS: Mapping = MappingProxyType({})
     BASIS: str = "planar"
+    #: what a planar result's ``_per_depth`` fields hold, for the wrong-name message
+    PER_DEPTH_KIND: str = "rates"
 
     @property
     def units(self):
@@ -128,7 +130,7 @@ class ResultSurface:
                 f"({name[:-len(PER_DEPTH)]!r}), not per metre of depth")
         if cls.BASIS == "planar" and name + PER_DEPTH in names:
             raise AttributeError(
-                f"{cls.__name__} has no field {name!r}: a planar solve gives rates per metre of depth "
+                f"{cls.__name__} has no field {name!r}: a planar solve gives {cls.PER_DEPTH_KIND} per metre of depth "
                 f"({name + PER_DEPTH!r}, in {cls.UNITS.get(name + PER_DEPTH, 'per metre of depth')}); "
                 f"multiply by the depth for a total")
         raise AttributeError(f"{cls.__name__!r} object has no attribute {name!r}")

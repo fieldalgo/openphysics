@@ -99,6 +99,7 @@ src/galerkin/
   transient_heat.py               # Transient heat, backward Euler
   _heat_kernels.py                # Boundary system, 3D source load and face map the heat solvers share (package-private)
   _public.py                      # Text refusal, inward-to-outward data and result surfaces of the public galerkin APIs (package-private)
+  _conventions.py                 # to_kernel/to_public: the one place a complex value changes time convention (package-private)
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow

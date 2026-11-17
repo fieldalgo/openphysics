@@ -20,13 +20,23 @@ def test_cavity_lowest_mode_cube():
     assert sum(np.isclose(v, 2 * np.pi ** 2) for v, _ in res) == 3
 
 
+#: radii (1, 3) and the potentials (1 V, 0 V) the coax functions took by default before the galerkin step
+COAX = dict(position=(1.0, 3.0), prescribed_electric_potential=(1.0, 0.0))
+
+
+def _on_axis(r):
+    """Points (r, 0): their hypot is r exactly, the radius these checks passed before."""
+    r = np.atleast_1d(np.asarray(r, dtype=float))
+    return np.column_stack([r, np.zeros_like(r)])
+
+
 def test_coax_boundary_values_and_field():
-    assert np.isclose(metallic.coax_potential(1.0, 1.0, 3.0), 1.0)
-    assert np.isclose(metallic.coax_potential(3.0, 1.0, 3.0), 0.0)
+    assert np.isclose(metallic.coax_potential(_on_axis(1.0), **COAX), 1.0)
+    assert np.isclose(metallic.coax_potential(_on_axis(3.0), **COAX), 0.0)
     r = np.array([1.5, 2.0])
     h = 1e-6
-    dV = (metallic.coax_potential(r + h, 1, 3) - metallic.coax_potential(r - h, 1, 3)) / (2 * h)
-    assert np.allclose(-dV, metallic.coax_field_magnitude(r, 1, 3), rtol=1e-6)
+    dV = (metallic.coax_potential(_on_axis(r + h), **COAX) - metallic.coax_potential(_on_axis(r - h), **COAX)) / (2 * h)
+    assert np.allclose(-dV, metallic.coax_field_magnitude(_on_axis(r), **COAX), rtol=1e-6)
 
 
 def test_pec_tm_total_field_vanishes_on_cylinder():
