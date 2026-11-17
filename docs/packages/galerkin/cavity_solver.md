@@ -6,12 +6,12 @@
 from galerkin import solve_cavity_box
 
 result = solve_cavity_box(
-    lengths_m=(1.0, 1.0, 1.0),
-    subdivisions=(8, 8, 8),
-    num_modes=6,
-    target_frequency_hz=210e6,
+    box_size=(1.0, 1.0, 1.0),       # m
+    subdivision_count=(8, 8, 8),
+    mode_count=6,
+    target_frequency=210e6,         # Hz
 )
-print(result.frequencies_hz)
+print(result.resonant_frequency)    # Hz
 ```
 
 This API solves a vacuum rectangular box starting at `(0, 0, 0)`, with a perfect
@@ -26,16 +26,22 @@ checked separately; a small residual alone does not certify mesh accuracy.
 
 ## Arguments and search
 
-`solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`
-returns a `CavityResult`.
+`solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`
+returns a `CavityResult`. Quantities are keyword-only SI registry names; text for
+a quantity raises `TypeError`, other invalid values `ValueError` naming the quantity.
 
-- `lengths_m`: three finite, strictly positive real lengths in metres
+- `box_size`: three finite, strictly positive real side lengths in metres
   (Python or NumPy numeric scalars). JAX or PyTorch values give derivatives
   with respect to the lengths ([Derivatives](differentiation.md#box-cavity-derivatives-with-respect-to-the-lengths)).
-- `subdivisions`: three strictly positive integers.
-- `num_modes`: strictly positive integer, counting individual eigenvectors and
+- `subdivision_count`: three strictly positive integers.
+- `mode_count`: strictly positive integer, counting individual eigenvectors and
   retaining repeated eigenvalues. Booleans are not accepted as numeric inputs.
-- `target_frequency_hz`: required finite, strictly positive frequency in Hz.
+- `target_frequency`: required finite, strictly positive frequency in Hz.
+
+The vacuum PEC cavity is lossless: every result is real and carries no time
+convention. The function is a thin public layer over the private body
+`galerkin.cavity._solve_cavity_box`, which keeps the solver's code; there is no
+kernel export of the cavity solvers.
 
 Search is `near_target`. Among a finite set of computed physical candidates,
 select the requested number nearest the target in **squared** wave number
@@ -53,25 +59,28 @@ search limitations, not a diagnosis of whether that result has missing partners.
 ## Arrays, orientation and units
 
 Let K be the requested mode count, E the total edge count, and T the tetrahedron
-count. All modes are real standing waves.
+count. All modes are real standing waves. `CavityResult` is frozen; its fields are
+registry names, and `result.units` maps each quantity field to its SI unit.
 
 | Attribute | Shape / meaning | Units |
 | --- | --- | --- |
 | `mesh` | `Mesh3D`, nodes and tetrahedral connectivity | nodes in m |
 | `space` | `EdgeSpace3D` on that same mesh | oriented topology |
-| `frequencies_hz` | `(K,)`, positive and ascending | Hz |
-| `eigenvalues_m2` | `(K,)`, squared wave numbers | m^-2 |
-| `edge_coefficients` | `(E,K)`, full vectors including exact PEC zeros | m^-1/2 |
-| `electric_field` | `(K,T,3)`, vectors at tetrahedron centroids | m^-3/2 |
-| `relative_residuals` | `(K,)`, free-edge equations | dimensionless |
-| `pec_edge_ids` | indices into the full edge ordering | indices |
-| `requested_modes` | K | count |
-| `target_frequency_hz` | supplied target | Hz |
+| `resonant_frequency` | `(K,)`, positive and ascending | Hz |
+| `wavenumber_squared` | `(K,)`, squared wave numbers | m^-2 |
+| `mass_normalized_electric_field_line_integral` | `(E,K)`, full vectors including exact PEC zeros | m^-1/2 |
+| `mass_normalized_electric_field` | `(K,T,3)`, vectors at tetrahedron centroids | m^-3/2 |
+| `relative_residual` | `(K,)`, free-edge equations | dimensionless |
+| `pec_edges` | indices into the full edge ordering | indices |
+| `pec_faces` | the face tags that carry PEC | tags |
+| `gradient_kernel_dimension` | the dimension of the discrete gradient kernel | count |
+| `mode_count` | K | count |
+| `target_frequency` | supplied target | Hz |
 | `search` | `"near_target"` | metadata |
 
-The two cluster-policy attributes above are also carried by `CavityResult`.
-The exact vacuum speed of light is `c0 = 299792458 m/s`, and
-`f = c0 * sqrt(eigenvalues_m2) / (2*pi)`.
+The two cluster-policy attributes above, like `search`, are constants of
+`CavityResult`. The exact vacuum speed of light is `c0 = 299792458 m/s`, and
+`f = c0 * sqrt(wavenumber_squared) / (2*pi)`.
 
 Each global edge points from its lower node ID to its higher node ID.
 `space.edges`, `space.tet_edges` and `space.signs` describe the ordering and the
@@ -86,13 +95,13 @@ The largest absolute edge coefficient of each mode is positive. Degenerate
 subspaces can rotate their basis between solves; individual polarization labels,
 vector signs and eigenvectors are not unique physical identifiers.
 
-Internally, coordinates are divided by `L=max(lengths_m)`. Returned coefficients
+Internally, coordinates are divided by `L=max(box_size)`. Returned coefficients
 are `q_normalized/sqrt(L)`, eigenvalues `k2_normalized/L**2`, and centroid fields
 `E_normalized/L**1.5`. A uniform physical enlargement by s divides frequency by s.
 Reconstruct each centroid field of a NumPy result with
-`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`; it takes
-NumPy coefficients only. A result from JAX or PyTorch lengths already carries
-its centroid fields, with derivatives, in `result.electric_field`.
+`galerkin.kernels.eval_edge_field_3d(result.space, result.mass_normalized_electric_field_line_integral[:, j])`;
+it takes NumPy coefficients only. A result from JAX or PyTorch lengths already carries
+its centroid fields, with derivatives, in `result.mass_normalized_electric_field`.
 
 Serialization belongs to the caller. To preserve the technical field contract,
 store SI coordinates, tetrahedra, edge ordering/orientation, PEC indices and full
@@ -159,7 +168,7 @@ No silent count reduction, zero padding or tolerance relaxation is performed.
 
 ## External meshes
 
-`solve_cavity(mesh, *, pec_faces=None, num_modes=6, target_frequency_hz)` runs
+`solve_cavity(mesh, *, pec_faces=None, mode_count=6, target_frequency)` runs
 the same assembly, projected search and checks on any tetrahedral mesh of the
 [tetrahedral mesh format](mesh3d_format.md): a `galerkin.Mesh3D` with tagged
 outward faces, from `from_mesher` of a meshine or gmshio mesh or from `box_mesh`,
@@ -168,12 +177,12 @@ coordinates in metres. The mesh is checked on entry (`Mesh3D.check`).
 - `pec_faces`: the face tags that carry the perfect conductor; `None` means every
   tagged face. Faces left out keep the natural condition `n x curl E = 0`
   (perfect magnetic conductor). Unknown tags raise `ValueError`.
-- `num_modes`, `target_frequency_hz`: as above. JAX or PyTorch values raise
-  `TypeError`: the derivative path exists only for `solve_cavity_box`'s lengths.
+- `mode_count`, `target_frequency`: as above. JAX or PyTorch values raise
+  `TypeError`: the derivative path exists only for `solve_cavity_box`'s `box_size`.
 - The mesh is scaled by its longest bounding-box edge; the kernel cutoff
   `1e-8 * fundamental` uses the lowest TE resonance of that bounding box, so a
   domain much smaller than its bounding box has a lower (more conservative) cutoff.
-- The result's `mesh` is the one given; `pec_face_tags` records the tags and
+- The result's `mesh` is the one given; `pec_faces` records the tags and
   `gradient_kernel_dimension` the counted kernel.
 
 The gradient kernel is counted from the PEC surface instead of the box formula:

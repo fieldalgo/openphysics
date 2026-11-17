@@ -117,7 +117,10 @@ or in public names of the module that owns it (thermoelasticity builds on elasti
 joule heating and the workflows call `galerkin.thermal.solve_steady_heat_outward`, and
 the temperature-dependent Joule iteration `galerkin.electric.solve_steady_electric_outward`
 and `galerkin.joule_heating.solve_steady_joule_heat_outward`: the internal outward-form
-bodies outside `__all__`). Material lookup lives in
+bodies outside `__all__`). The cavity functions are thin public layers over private bodies
+in their own modules (`galerkin.cavity._solve_cavity_box`, `_solve_cavity`,
+`galerkin.material_cavity._solve_material_cavity_box`, `_solve_material_cavity`), which
+`galerkin.kernels` does not export. Material lookup lives in
 core (`galerkin.materials` keeps its public names), and a physics module hands
 core its mesh-bound containers as plain checked values (`core.loads.ElementSource`).
 `tests/galerkin/test_layers.py` fails if the mesh types, core, the public

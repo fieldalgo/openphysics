@@ -88,8 +88,8 @@ def profiling_state():
 
 
 def worker(case, subdivision, modes, target):
-    inputs = dict(lengths_m=CASES[case], subdivisions=[subdivision] * 3,
-                  num_modes=modes, target_frequency_hz=target)
+    inputs = dict(box_size=CASES[case], subdivision_count=[subdivision] * 3,
+                  mode_count=modes, target_frequency=target)
     sample = dict(case=case, subdivision=subdivision, inputs=inputs,
                   input_sha256=hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest(),
                   pid=os.getpid(), parent_pid=os.getppid(),
@@ -116,21 +116,21 @@ def worker(case, subdivision, modes, target):
         result = galerkin.solve_cavity_box(**inputs)
         seconds = time.perf_counter() - start
         sample.update(peak_rss())  # Before reporting/profiling postprocessing allocates memory.
-        if (len(result.frequencies_hz) != modes
-                or not np.isfinite(result.relative_residuals).all()
-                or np.max(result.relative_residuals) > 1e-8):
+        if (len(result.resonant_frequency) != modes
+                or not np.isfinite(result.relative_residual).all()
+                or np.max(result.relative_residual) > 1e-8):
             raise RuntimeError("returned count/residual does not satisfy the solver contract")
         sample.update(status="ok", solve_wall_seconds=seconds,
                       nodes=result.mesh.num_nodes, tets=len(result.mesh.tets),
-                      edge_dofs=result.space.num_edges, pec_dofs=len(result.pec_edge_ids),
-                      free_dofs=result.space.num_edges - len(result.pec_edge_ids),
-                      returned_modes=len(result.frequencies_hz),
-                      frequencies_hz=result.frequencies_hz.tolist(),
-                      eigenvalues_m2=result.eigenvalues_m2.tolist(),
-                      relative_residuals=result.relative_residuals.tolist(),
-                      max_relative_residual=float(np.max(result.relative_residuals)),
-                      edge_coefficients_bytes=result.edge_coefficients.nbytes,
-                      centroid_electric_field_bytes=result.electric_field.nbytes,
+                      edge_dofs=result.space.num_edges, pec_dofs=len(result.pec_edges),
+                      free_dofs=result.space.num_edges - len(result.pec_edges),
+                      returned_modes=len(result.resonant_frequency),
+                      frequencies_hz=result.resonant_frequency.tolist(),
+                      eigenvalues_m2=result.wavenumber_squared.tolist(),
+                      relative_residuals=result.relative_residual.tolist(),
+                      max_relative_residual=float(np.max(result.relative_residual)),
+                      edge_coefficients_bytes=result.mass_normalized_electric_field_line_integral.nbytes,
+                      centroid_electric_field_bytes=result.mass_normalized_electric_field.nbytes,
                       search=result.search, cluster_completeness=result.cluster_completeness,
                       mode_count_policy=result.mode_count_policy)
     except Exception as exc:

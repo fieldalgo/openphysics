@@ -126,7 +126,7 @@ PY
 
 ## 승인된 기술 계약과 실행 가능한 시험
 
-호출 형식은 `galerkin.solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`입니다. 길이와 mesh 좌표는 SI m, 주파수는 Hz입니다. 선택은 제곱 주파수 기준 `near_target`이며 성공하면 요청한 개수를 정확히 반환합니다. 축퇴 cluster를 가를 수 있습니다. 결과와 저장 metadata는 `cluster_completeness="not_certified"`, `mode_count_policy="exact_count_may_split_cluster"`를 선언합니다. 저장 데이터는 `field_layout="cavity3d-edge-v1"`을 선언하고 pickle 없이 load되어야 합니다. `save_fields=false`이면 raw 에지/centroid 배열은 생략하고 spectrum과 검색/정규화 metadata는 유지합니다.
+호출 형식은 `galerkin.solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`입니다(galerkin 단계부터 SI registry 이름. 그 전에는 `lengths_m`, `subdivisions`, `num_modes`, `target_frequency_hz`). 길이와 mesh 좌표는 SI m, 주파수는 Hz입니다. 선택은 제곱 주파수 기준 `near_target`이며 성공하면 요청한 개수를 정확히 반환합니다. 축퇴 cluster를 가를 수 있습니다. 결과와 저장 metadata는 `cluster_completeness="not_certified"`, `mode_count_policy="exact_count_may_split_cluster"`를 선언합니다. 저장 데이터는 `field_layout="cavity3d-edge-v1"`을 선언하고 pickle 없이 load되어야 합니다. `save_fields=false`이면 raw 에지/centroid 배열은 생략하고 spectrum과 검색/정규화 metadata는 유지합니다.
 
 공개 솔버의 거절 한계는 잔차 1e-8, 질량 직교성 1e-7입니다. 표의 더 엄격한 독립 benchmark 한계 1e-9와 1e-8은 그대로입니다. 정규화 계수는 Q* M_SI Q = I를 만족합니다. 에지 계수는 임의 정규화 단위 m^-1/2, centroid 장은 m^-3/2이며 보정된 V/m가 아닙니다.
 
@@ -138,7 +138,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q \
   packages/simcase/tests/test_cavity3d_persistence_validation.py
 ```
 
-수렴 fixture는 원래 고정 shift sigma = 해석 기본 k²의 1.3배를 target_frequency_hz로 표현해 사용합니다. gradient kernel에서 떨어져 있으면서 시험 대상인 완전한 기준 cluster를 유지합니다. 수치 gate를 바꾸거나 다른 목표에서의 완전성을 보장하지 않습니다. raw 복원 시험은 저장한 primitive 배열에서 Mesh3D/EdgeSpace3D를 재구성하며 제품 load API를 요구하거나 만들어 내지 않습니다.
+수렴 fixture는 원래 고정 shift sigma = 해석 기본 k²의 1.3배를 target_frequency로 표현해 사용합니다. gradient kernel에서 떨어져 있으면서 시험 대상인 완전한 기준 cluster를 유지합니다. 수치 gate를 바꾸거나 다른 목표에서의 완전성을 보장하지 않습니다. raw 복원 시험은 저장한 primitive 배열에서 Mesh3D/EdgeSpace3D를 재구성하며 제품 load API를 요구하거나 만들어 내지 않습니다.
 
 ## 측정한 후보 결과(2026-10-15)
 

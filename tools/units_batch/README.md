@@ -448,6 +448,18 @@ map the baseline's calls to them; every other recorded em kernel (`galerkin.mode
 `mode_*` functions wrap the kernels above; simcase does not call them (route K), so they are not
 recorded targets and that commit needs no rule entry.
 
+**The cavity on the public SI functions (L3 commit 12a, route S).** simcase's `em.cavity3d`
+calls galerkin's public `solve_cavity_box` and `solve_material_cavity_box`, which take registry
+names and complex values under exp(-iωt) and call the private bodies `_solve_cavity_box` and
+`_solve_material_cavity_box` with the solver's former arguments (the material constants through
+`galerkin._conventions.to_kernel`, the operation simcase applied before). `targets.json` declares
+the two bodies beside the public functions, and two kind 7 entries compare every baseline call of
+the former public functions with the body call beneath the public frame, whose arguments are the
+baseline's under the former names. One kind 4 entry renames the class of the regions the body
+receives: `galerkin.material_cavity.CavityMaterialRegion` (the baseline's argument) is
+`galerkin.material_cavity._KernelRegion` with the same fields (`bounds_m` and the constants under
+exp(+jωt)); the public `CavityMaterialRegion` with its two corners never reaches the body.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

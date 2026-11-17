@@ -35,7 +35,7 @@ EDGES = tuple(combinations(range(4), 2))
 
 def independent_vertices(result):
     """Evaluate Whitney fields at vertices using raw oriented edge integrals."""
-    mesh, coefficients = result.mesh, result.edge_coefficients[:, -2:]
+    mesh, coefficients = result.mesh, result.mass_normalized_electric_field_line_integral[:, -2:]
     lookup = {tuple(edge): i for i, edge in enumerate(result.space.edges)}
     tet = mesh.tets
     points = mesh.nodes[tet]
@@ -91,7 +91,7 @@ def overlaps(result, vertex_field, order):
         fe_gram += np.einsum("tq,tqdl,tqdk->lk", physical_weight, discrete, discrete)
     singular_values = np.linalg.svd(overlap, compute_uv=False)
     projection_mass = np.sum(overlap**2, axis=0)
-    relative_eigenvalues = result.eigenvalues_m2[-2:] / np.sum(wavevector**2)
+    relative_eigenvalues = result.wavenumber_squared[-2:] / np.sum(wavevector**2)
     return {
         "order": order, "overlap": overlap.tolist(),
         "exact_gram_error": float(np.max(abs(exact_gram - np.eye(2)))),
@@ -128,19 +128,19 @@ def main():
     rows = []
     for n in sorted(set(args.meshes)):
         started = time.monotonic()
-        result = solve_cavity_box(SIDES, (n, n, n), num_modes=5,
-                                 target_frequency_hz=C0*np.sqrt(1.3*fundamental)/(2*np.pi))
+        result = solve_cavity_box(box_size=SIDES, subdivision_count=(n, n, n), mode_count=5,
+                                 target_frequency=C0*np.sqrt(1.3*fundamental)/(2*np.pi))
         vertices = independent_vertices(result)
-        signed = result.eigenvalues_m2[-2:] / exact - 1
+        signed = result.wavenumber_squared[-2:] / exact - 1
         integrals = [overlaps(result, vertices, q) for q in args.quadrature_orders]
-        row = {"n": n, "eigenvalues_m2": result.eigenvalues_m2.tolist(),
+        row = {"n": n, "eigenvalues_m2": result.wavenumber_squared.tolist(),
                "signed_relative_errors": signed.tolist(),
                "signed_mean_error": float(signed.mean()),
                "rms_eigenvalue_error": float(np.sqrt(np.mean(signed**2))),
                "max_eigenvalue_error": float(max(abs(signed))),
                "relative_split": float(np.ptp(signed)),
                "cancellation_ratio": float(abs(signed.mean()) / np.mean(abs(signed))),
-               "relative_residuals": result.relative_residuals.tolist(),
+               "relative_residuals": result.relative_residual.tolist(),
                "quadrature": integrals,
                "subspace_gap": integrals[-1]["max_principal_sine"],
                "seconds": time.monotonic()-started}

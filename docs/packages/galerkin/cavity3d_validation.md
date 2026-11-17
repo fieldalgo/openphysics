@@ -203,7 +203,9 @@ a full suite pass is not claimed.
 ## Approved technical contract and executable tests
 
 The callable is
-`galerkin.solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`.
+`galerkin.solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`
+(its SI registry names since the galerkin step; `lengths_m`, `subdivisions`, `num_modes` and
+`target_frequency_hz` before).
 Lengths and mesh coordinates are SI metres; frequencies are Hz. Selection is
 `near_target` in squared frequency and returns exactly the requested count on
 success. It can split a degenerate cluster. Results and saved metadata declare
@@ -230,7 +232,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q \
 ```
 
 The convergence fixture uses the original fixed shift sigma = 1.3 times the
-analytic fundamental k², expressed as target_frequency_hz. This stays away from
+analytic fundamental k², expressed as target_frequency. This stays away from
 the gradient kernel while retaining the complete reference clusters under test.
 It does not change the numerical gates or guarantee completeness for other targets.
 The raw restoration test reconstructs Mesh3D/EdgeSpace3D from saved primitive

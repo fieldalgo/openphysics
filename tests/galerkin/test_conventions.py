@@ -19,9 +19,11 @@ adopts (spec D3): sipi keeps its own convention until its own step, and tests/ i
   source line (comment and spacing removed) with the count of sites on it, never by line number,
   so unrelated edits keep it; an entry that no longer matches fails, and so does any other site.
 - **Passivity** of each public complex output on a passive lossy input, from the commit that
-  converts it: electrostatics (L3 commit 10), the modes (L3 commit 11b: Im(effective_index) >= 0) and
-  refsol's planar mode references (L3 commit 11c); the cavity clause comes with L3 commit 12, which
-  converts its outputs. refsol's fiber is lossless (real indices only), so its converted output, the
+  converts it: electrostatics (L3 commit 10), the modes (L3 commit 11b: Im(effective_index) >= 0),
+  refsol's planar mode references (L3 commit 11c) and the material cavity (L3 commit 12: a passive
+  lossy material or a conducting wall gives Im(resonant_frequency) < 0, so Im(omega) < 0, and a
+  quality factor Q = Re f / (-2 Im f) > 0; the vacuum PEC cavity is real). refsol's fiber is lossless
+  (real indices only), so its converted output, the
   exact vector mode field (L3 commit 11d), has a convention clause instead: the forward mode of
   exp(-i omega t) varies as exp(+i beta z), so div E = 0 reads dEx/dx + dEy/dy + i beta Ez = 0.
   refsol's cylinder scattering is written in exp(-i omega t) and converts nothing (L3 commit 11e): its
@@ -209,8 +211,9 @@ def test_the_allowlist_is_closed_and_complete():
     assert {s.package for s in conventions} == {"galerkin", "refsol"}
     for package in ("galerkin", "refsol"):
         assert {s.function for s in conventions if s.package == package} == {"to_kernel", "to_public"}, package
+    # simcase's P2-15 set; cavity.py's _to_kernel and _to_public left it in L3 commit 12 (route S, D2)
     assert boundary == {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate",
-                                      "_shown"}, "cavity.py": {"_to_kernel", "_to_public"}}
+                                      "_shown"}}
 
 
 PLANTED = '''
@@ -379,6 +382,55 @@ def test_refsol_scattering_is_outgoing_and_passive(kind, index):
         assert absorbed > 0.1 * width
         gain = dict(cylinder, refractive_index=np.conj(index))       # n' - i n'': a gain under exp(-i omega t)
         assert _scattering_flux(lambda p: scattering.total(p, **gain), k) > 0.1 * width
+
+
+# ---- passivity: cavity (L3 commit 12) -------------------------------------------------------------------------
+
+_CAVITY = dict(box_size=(1.0, 0.8, 0.6), subdivision_count=(2, 2, 2), mode_count=3, target_frequency=1.5e8)
+
+
+@pytest.mark.parametrize("permittivity,permeability,walls", [
+    (4 + 0.04j, 1.0, None), (1.0, 1.2 + 0.02j, None), (1.0, 1.0, 5.8e7), (2.5 + 0.1j, 1.2 + 0.02j, {"z1": 1e6})])
+def test_cavity_resonances_of_passive_lossy_inputs_decay(permittivity, permeability, walls):
+    """A passive lossy slab (Im eps_r, Im mu_r >= 0 under exp(-i omega t)) or a conducting wall gives
+    resonances that decay in time: a mode varies as exp(-i omega t), so Im(omega) = 2 pi Im(f) < 0, the
+    quality factor Q = Re f / (-2 Im f) > 0 (bitwise) and Im(wavenumber_squared) < 0. The public values
+    are the conjugates of the private body's (exp(+j omega t): Im f > 0), bit for bit."""
+    from galerkin.material_cavity import (CavityMaterialRegion, _KernelRegion, _solve_material_cavity_box,
+                                          solve_material_cavity_box)
+    slab = dict(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=(1.0, 0.8, 0.3))
+    result = solve_material_cavity_box(**_CAVITY, electrical_conductivity=walls, regions=[CavityMaterialRegion(
+        **slab, relative_permittivity=permittivity, relative_permeability=permeability)])
+    f = result.resonant_frequency
+    assert f.dtype == complex and not result.lossless
+    assert np.all(f.real > 0) and np.all(2 * np.pi * f.imag < 0)
+    assert np.all(result.quality_factor > 0)
+    assert np.array_equal(result.quality_factor, f.real / (-2 * f.imag))
+    assert np.all(result.wavenumber_squared.imag < 0)
+    kernel = _solve_material_cavity_box(
+        _CAVITY["box_size"], _CAVITY["subdivision_count"], num_modes=3, target_frequency_hz=1.5e8,
+        wall_conductivity_s_per_m=walls, regions=[_KernelRegion(((0.0, 1.0), (0.0, 0.8), (0.0, 0.3)),
+                                                                to_kernel(complex(permittivity)),
+                                                                to_kernel(complex(permeability)))])
+    assert np.all(kernel.frequencies_hz.imag > 0)
+    assert f.tobytes() == np.conj(kernel.frequencies_hz).tobytes()
+
+
+def test_cavity_lossless_is_real_and_a_gain_is_refused():
+    from galerkin import solve_material_cavity, box_mesh
+    from galerkin.material_cavity import CavityMaterialRegion, solve_material_cavity_box
+    slab = dict(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=(1.0, 0.8, 0.3))
+    result = solve_material_cavity_box(**_CAVITY, regions=[CavityMaterialRegion(**slab, relative_permittivity=4.0)])
+    assert result.lossless and np.all(result.resonant_frequency.imag == 0) and np.all(np.isinf(result.quality_factor))
+    with pytest.raises(ValueError, match="Im >= 0"):
+        CavityMaterialRegion(**slab, relative_permittivity=4 - 0.04j)          # a gain under exp(-i omega t)
+    mesh = box_mesh(1.0, 0.8, 0.6, 2, 2, 2)
+    lossy = solve_material_cavity(mesh, relative_permittivity={"domain": 4 + 0.04j}, mode_count=3,
+                                  target_frequency=0.8e8)
+    assert np.all(lossy.resonant_frequency.imag < 0) and np.all(lossy.quality_factor > 0)
+    with pytest.raises(ValueError, match="Im >= 0"):
+        solve_material_cavity(mesh, relative_permittivity={"domain": 4.0}, relative_permeability={"domain": 1 - 0.1j},
+                              mode_count=3, target_frequency=0.8e8)
 
 
 # ---- passivity: modes (L3 commit 11b) -------------------------------------------------------------------------

@@ -24,7 +24,7 @@ import physmat
 import simcase
 from physmat import units
 from simcase import Document, DocumentError, examples, run
-from simcase.cavity import FIELDS, kernel_inputs
+from simcase.cavity import FIELDS, solver_inputs
 
 galerkin = pytest.importorskip("galerkin")
 
@@ -138,7 +138,7 @@ ALIASES = [(P + "target_frequency", "150 MHz"), (P + "boundary.electrical_condu
 def test_p2_4_unit_spellings_give_the_same_si_tree_kernel_doubles_arrays_and_summary(tmp_path):
     base = example("cavity_lossy_slab")
     base_doc = Document.from_dict(copy.deepcopy(base))
-    base_si, base_inputs = hexed(base_doc.si), hexed(kernel_inputs(base_doc))
+    base_si, base_inputs = hexed(base_doc.si), hexed(solver_inputs(base_doc))
     _, _, base_summary, base_arrays, _ = saved(base, tmp_path / "base")
     for i, (path, value, quantity) in enumerate(SPELLINGS):
         if quantity is not None:
@@ -149,7 +149,7 @@ def test_p2_4_unit_spellings_give_the_same_si_tree_kernel_doubles_arrays_and_sum
         doc = Document.from_dict(data)
         assert not doc.diagnostics.errors and not doc.spelling_fixes(), (path, value)
         assert hexed(doc.si) == base_si, (path, value)
-        assert hexed(kernel_inputs(doc)) == base_inputs, (path, value)
+        assert hexed(solver_inputs(doc)) == base_inputs, (path, value)
         _, _, summary, arrays, _ = saved(data, tmp_path / f"v{i}")
         same_arrays(arrays, base_arrays)
         assert results_of(summary) == results_of(base_summary), (path, value)
@@ -197,14 +197,14 @@ def test_p2_5_shape_numbers_in_any_length_unit_give_the_same_pm_solver_call_arra
     base = in_unit(name, "m", "1")
     assert base == example(name)                                  # the shipped examples are in m
     base_doc = Document.from_dict(copy.deepcopy(base))
-    counts, call = pm_counts(base_doc), hexed(kernel_inputs(base_doc))
+    counts, call = pm_counts(base_doc), hexed(solver_inputs(base_doc))
     _, _, summary, arrays, _ = saved(base, tmp_path / "m")
     for unit, factor_text in UNITS[1:]:
         data = in_unit(name, unit, factor_text)
         doc = Document.from_dict(copy.deepcopy(data))
         assert not doc.diagnostics, unit                         # no W-CAVITY-SCALE: the box is the same
         assert pm_counts(doc) == counts, unit
-        assert hexed(kernel_inputs(doc)) == call, unit
+        assert hexed(solver_inputs(doc)) == call, unit
         _, _, other, raw, _ = saved(data, tmp_path / unit)
         same_arrays(raw, arrays)
         assert results_of(other) == results_of(summary), unit
@@ -214,12 +214,12 @@ def test_p2_5_the_gallery_box_gives_the_same_pm_and_solver_call_in_any_length_un
     """The gallery mesh (30 x 18 x 12) takes about 30 s a solve: its pm counts and solver call are
     compared at that mesh, its saved results at the gallery's own quick mesh (10 x 6 x 4)."""
     base = Document.from_dict(in_unit("gallery_box_cavity", "m", "1"))
-    counts, call = pm_counts(base), hexed(kernel_inputs(base))
+    counts, call = pm_counts(base), hexed(solver_inputs(base))
     quick = []
     for unit, factor_text in UNITS:
         data = in_unit("gallery_box_cavity", unit, factor_text)
         doc = Document.from_dict(copy.deepcopy(data))
-        assert pm_counts(doc) == counts and hexed(kernel_inputs(doc)) == call, unit
+        assert pm_counts(doc) == counts and hexed(solver_inputs(doc)) == call, unit
         data["mesh"]["subdivision_count"] = [10, 6, 4]
         quick.append(saved(data, tmp_path / unit))
     for _, _, summary, arrays, _ in quick[1:]:
@@ -241,7 +241,7 @@ def test_p2_5_an_exact_mil_box_equals_its_millimetre_twin(tmp_path):
     a, b = Document.from_dict(copy.deepcopy(mil)), Document.from_dict(copy.deepcopy(mm))
     assert not a.diagnostics and not b.diagnostics
     assert pm_counts(a) == pm_counts(b) and pm_counts(a)["geometry.domain.xmax"] == 25_400_000_000
-    assert hexed(kernel_inputs(a)) == hexed(kernel_inputs(b))
+    assert hexed(solver_inputs(a)) == hexed(solver_inputs(b))
     _, _, sa, aa, _ = saved(mil, tmp_path / "mil")
     _, _, sb, ab, _ = saved(mm, tmp_path / "mm")
     same_arrays(aa, ab)
@@ -359,7 +359,8 @@ def test_p2_8_a_version_1_box_component_reads_as_its_flat_block():
     data["geometry"] = {"version": 1, "components": {"cav": {
         "dimension": "3d", "length_unit": "m", "domain": geometry["domain"], "background": geometry["background"],
         "features": copy.deepcopy(geometry["shapes"])}}}
-    assert hexed(kernel_inputs(Document.from_dict(copy.deepcopy(data)))) == hexed(kernel_inputs(Document.from_dict(flat)))
+    assert (hexed(solver_inputs(Document.from_dict(copy.deepcopy(data))))
+            == hexed(solver_inputs(Document.from_dict(flat))))
     data["geometry"]["components"]["cav"]["features"][0]["zmax"] = 0.35
     errors, text = refusal(data)
     assert [(d.code, d.path) for d in errors] == [("E-CONTRACT", "geometry.components.cav.features[0].zmax")]
@@ -390,7 +391,7 @@ def test_p2_9_cavity_diagnostics_reach_validate_the_log_the_summary_and_the_meta
     doc = Document.from_dict(copy.deepcopy(data))
     assert [(d.code, d.path) for d in doc.diagnostics] == expected
     doc.validate()
-    kernel_inputs(doc)
+    solver_inputs(doc)
     assert len(doc.diagnostics) == 1                               # the count never drops, nor doubles
     model = tmp_path / "model.json"
     model.write_text(json.dumps(data), encoding="utf-8")
@@ -526,7 +527,7 @@ def test_p2_15_a_lossy_cavity_decays_with_positive_q_and_names_its_convention(tm
     q = arrays["quality_factor"]
     assert np.all(q > 0)
     np.testing.assert_array_equal(q, f.real / (-2 * f.imag))      # Q = Re f / (-2 Im f), bitwise
-    np.testing.assert_array_equal(f, np.conj(result.cavity.frequencies_hz))
+    np.testing.assert_array_equal(f, result.cavity.resonant_frequency)       # galerkin's public value, saved as is
     assert np.all(arrays["relative_permittivity"].imag >= 0) and arrays["relative_permittivity"].imag.max() == 0.04
     assert summary["time_convention"] == metadata["time_convention"] == TC
     assert summary["resonant_frequency"]["time_convention"] == TC
@@ -537,11 +538,26 @@ def test_p2_15_a_lossy_cavity_decays_with_positive_q_and_names_its_convention(tm
         encoding="utf-8")
 
 
-def test_p2_15_the_kernel_receives_the_format_0_2_doubles():
-    """H16: the kernel takes exp(+j omega t); the boundary writes 0.0 - Im, so a real value keeps +0.0
-    and a lossy one is the 0.2 input's double."""
+def test_p2_15_the_kernel_receives_the_format_0_2_doubles(monkeypatch):
+    """H16 under route S (galerkin step, D2): simcase hands galerkin's public cavity solver the SI values
+    under exp(-i omega t), and galerkin's to_kernel writes 0.0 - Im, so the solver body receives the 0.2
+    input's doubles: a lossy value conjugated once, a real one with +0.0."""
+    import galerkin.material_cavity as material_cavity
     doc = Document.from_dict(example("cavity_lossy_slab"))
-    eps, mu = kernel_inputs(doc).materials["lossy_dielectric"]
+    eps, mu = solver_inputs(doc).materials["lossy_dielectric"]
+    assert hexed(eps) == hexed(4 + 0.04j) and hexed(mu) == hexed(complex(1.0, 0.0))
+    body, received = material_cavity._solve_material_cavity_box, []
+
+    def recording(*args, **kwargs):
+        received.append(kwargs["regions"])
+        return body(*args, **kwargs)
+    monkeypatch.setattr(material_cavity, "_solve_material_cavity_box", recording)
+    data = example("cavity_lossy_slab")
+    data["mesh"]["subdivision_count"] = [4, 4, 4]                     # the materials only; a small solve
+    data["physics"]["em1"]["mode_count"] = 1
+    run(Document.from_dict(data), verbose=False)
+    (slab,) = received[0]
+    eps, mu = slab.relative_permittivity, slab.relative_permeability
     assert hexed(eps) == hexed(4 - 0.04j) and hexed(mu) == hexed(complex(1.0, 0.0))
     assert str(mu.imag) == "0.0"                                      # +0.0, not -0.0
 

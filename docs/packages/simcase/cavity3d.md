@@ -107,8 +107,9 @@ A successful `run(doc)` returns `CavityRunResult`, distinct from the 2D
 `RunResult`. `result.resonant_frequency` is the frequency vector in Hz,
 `result.mass_normalized_electric_field` and
 `result.mass_normalized_electric_field_line_integral` the saved fields,
-`result.cavity` the galerkin result (in the solver's own convention), and
-`result.save(directory)` writes:
+`result.node_coordinates` the nodes in m from the document origin, `result.cavity` the
+galerkin result (`galerkin.CavityResult` or `galerkin.MaterialCavityResult`, on the solver's
+box at the origin), and `result.save(directory)` writes:
 
 - `model.json`: the authored document (its bytes, when it was read from a file).
 - `summary.json`: the results as `{"value", "unit"}` objects and tagged arrays
@@ -240,11 +241,12 @@ by name: the cavity solvers are passive.
   fixed-point iteration.
 
 The numerical method, gates and validation are in the engine's
-[material cavity contract](../galerkin/material_cavity.md). The engine works in
-exp(+j omega t); simcase conjugates each complex value once at its boundary (the
-material values going in, the results coming out), so the solver receives the same
-doubles as before the units batch and every saved complex array is the conjugate of
-the engine's.
+[material cavity contract](../galerkin/material_cavity.md). simcase calls galerkin's public SI
+cavity functions, which take and return exp(-i omega t) like the document, so simcase converts
+nothing: galerkin converts once in `galerkin._conventions` (its solver computes in
+exp(+j omega t)), the solver receives the same doubles as before the units batch, and every
+saved complex array is galerkin's public value as returned. simcase translates the returned
+nodes to the document origin itself.
 
 ### Complex results
 
@@ -288,7 +290,7 @@ array's unit and the time convention; see
 Tests in `tests/simcase/test_cavity3d_materials.py` check:
 
 - validation of every field, each refusal with its code and path;
-- that a document run equals the direct engine call, and the public values are its conjugate;
+- that a document run equals the direct call of galerkin's public function, and saves its values as they are;
 - that millimetres with a translated origin give the same SI result;
 - the mapping of a single wall onto the engine wall and onto PEC edges;
 - that a filled background equals the vacuum spectrum divided by the relative permittivity;

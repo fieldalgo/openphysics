@@ -98,7 +98,8 @@ python -m simcase run cavity.json -o cavity_results
 `result.resonant_frequency`는 Hz 단위 주파수 벡터이고,
 `result.mass_normalized_electric_field`와
 `result.mass_normalized_electric_field_line_integral`은 저장되는 장이며,
-`result.cavity`에는 galerkin 결과(솔버 자체 규약)가 들어 있습니다.
+`result.node_coordinates`는 문서 원점 기준 m 단위 절점, `result.cavity`에는 원점에 놓인 솔버
+상자의 galerkin 결과(`galerkin.CavityResult` 또는 `galerkin.MaterialCavityResult`)가 들어 있습니다.
 `result.save(directory)`는 다음 파일을 씁니다.
 
 - `model.json`: 작성한 문서(파일에서 읽었다면 그 바이트 그대로).
@@ -220,10 +221,11 @@ Cavity 출력에는 유효 굴절률이나 삼각형·절점 스칼라 배열이
   반복으로 수렴시킵니다.
 
 수치 방법, 기준, 검증은 엔진의
-[재료 공진기 계약](../galerkin/material_cavity.md)에 있습니다. 엔진은 exp(+j omega t)로
-계산합니다. simcase는 경계에서 각 복소값을 한 번 켤레로 바꾸므로(들어가는 재료 값과 나오는
-결과) 솔버는 단위 일괄 변경 이전과 같은 double을 받고, 저장되는 복소 배열은 모두 엔진 값의
-켤레입니다.
+[재료 공진기 계약](../galerkin/material_cavity.md)에 있습니다. simcase는 문서처럼
+exp(-i omega t)로 받고 돌려주는 galerkin의 공개 SI 공진기 함수를 부르므로 아무것도 변환하지
+않습니다. galerkin이 `galerkin._conventions`에서 한 번 변환하고(솔버는 exp(+j omega t)로 계산),
+솔버는 단위 일괄 변경 이전과 같은 double을 받으며, 저장되는 복소 배열은 모두 galerkin이 돌려준
+공개 값 그대로입니다. 돌려받은 절점을 문서 원점으로 옮기는 일은 simcase가 직접 합니다.
 
 ### 복소 결과
 
@@ -264,7 +266,7 @@ VTU로 쓸 때 복소 모드마다 셀 데이터 `mass_normalized_electric_field
 `tests/simcase/test_cavity3d_materials.py`의 시험이 확인하는 것:
 
 - 각 필드의 검증과 각 거부의 코드·경로;
-- 문서 실행이 엔진 직접 호출과 같고 공개 값이 그 켤레임;
+- 문서 실행이 galerkin 공개 함수의 직접 호출과 같고 그 값을 그대로 저장함;
 - 원점을 옮긴 mm 문서가 같은 SI 결과를 냄;
 - 단일 벽이 엔진 벽과 PEC 에지에 대응됨;
 - 채운 배경이 진공 스펙트럼을 비유전율로 나눈 값과 같음;

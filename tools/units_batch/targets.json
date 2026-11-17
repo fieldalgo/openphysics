@@ -24,7 +24,9 @@
   "galerkin.assembly:assemble_stiffness",
   "galerkin.assembly:assemble_mass",
   "galerkin.cavity:solve_cavity_box",
+  "galerkin.cavity:_solve_cavity_box",
   "galerkin.material_cavity:solve_material_cavity_box",
+  "galerkin.material_cavity:_solve_material_cavity_box",
   "simcase.tracking:tracking_settings",
   "simcase.subspace_tracking:subspace_settings"
  ],

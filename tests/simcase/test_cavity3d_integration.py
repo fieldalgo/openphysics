@@ -98,9 +98,9 @@ def test_real_cavity_document_unit_invariance(solved_cube, unit, ratio):
     result = run(Document.from_dict(data), verbose=False)
     # the box is the same picometre grid in every unit: the solve is bitwise the same
     np.testing.assert_array_equal(result.resonant_frequency, solved_cube.resonant_frequency)
-    np.testing.assert_array_equal(result.cavity.mesh.nodes, solved_cube.cavity.mesh.nodes)
+    np.testing.assert_array_equal(result.node_coordinates, solved_cube.node_coordinates)
     np.testing.assert_array_equal(result.cavity.mesh.tets, solved_cube.cavity.mesh.tets)
-    assert max(result.cavity.relative_residuals) < 1e-8
+    assert max(result.cavity.relative_residual) < 1e-8
 
 
 @pytest.mark.parametrize("save_fields", [True, False])

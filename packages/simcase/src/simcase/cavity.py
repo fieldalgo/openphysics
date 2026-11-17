@@ -11,11 +11,13 @@ wall, or ``{"electrical_conductivity": {"zmax": "1 MS/m"}}`` per wall, the other
 or ``{"re": .., "im": ..}``, with Re > 0 and Im >= 0 (loss). The background is ``"physmat:vacuum"`` or a
 local material; the shapes are boxes on the subdivision planes (phase-2 spec section 4.9).
 
-The galerkin cavity solvers keep their own convention, exp(+j omega t). ``_to_kernel`` hands
-them every material value conjugated once, as ``0.0 - Im`` so that a real value keeps its
-+0.0, and ``_to_public`` conjugates every complex result once (section 5.3.5): these two are
-the cavity's only conversions between the conventions (check P2-15). Lengths reach the solver
-in metres from the exact picometre values of the geometry numbers.
+simcase calls galerkin's public SI cavity functions (route S of the galerkin step, D2):
+``solve_cavity_box`` and ``solve_material_cavity_box`` take the material values under
+exp(-i omega t) as the document writes them and return their results under exp(-i omega t), so
+simcase converts nothing between conventions (galerkin's ``to_kernel`` writes ``0.0 - Im``, so
+a real value reaches its solver with +0.0, and ``to_public`` conjugates each complex result once;
+map M2 4.3). Lengths reach the solver in metres from the exact picometre values of the geometry
+numbers; simcase translates the returned nodes to the domain origin itself (D14).
 
 A vacuum PEC box gives the real layout ``cavity3d-edge-v2``; box materials, a non-vacuum
 background or conducting walls run the complex material cavity solver and give
@@ -41,7 +43,7 @@ from .registry import PhysicsKind, register
 from .schema import Document, DocumentError
 
 if TYPE_CHECKING:
-    from galerkin import CavityResult
+    from galerkin import CavityResult, MaterialCavityResult
 
 TYPE = "em.cavity3d"
 FIELD_LAYOUT = "cavity3d-edge-v2"
@@ -325,60 +327,52 @@ def cavity_summary(doc) -> str:
             "  study: single; output coordinates m, frequencies Hz")
 
 
-# -- format 0.3: the kernel hand-off and back ------------------------------------------------------
+# -- format 0.3: the solver inputs and the saved arrays ----------------------------------------------
 
-def _to_kernel(doc) -> dict:
-    """{name: (relative permittivity, relative permeability)} of the local materials as the galerkin
-    cavity solvers take them, under exp(+j omega t): each SI value under exp(-i omega t)
-    conjugated once, as ``0.0 - Im`` (a real value keeps +0.0, so the solver receives the doubles
-    of the format 0.2 input; hazard H16)."""
-    out = {}
-    for name, record in doc.si["materials"].items():
-        eps, mu = complex(record["relative_permittivity"]), complex(record.get("relative_permeability", 1))
-        out[name] = (complex(eps.real, 0.0 - eps.imag), complex(mu.real, 0.0 - mu.imag))
-    return out
+def _materials(doc) -> dict:
+    """{name: (relative permittivity, relative permeability)} of the local materials as complex numbers,
+    SI under exp(-i omega t), as the document writes them (galerkin's public cavity solver converts them)."""
+    return {name: (complex(record["relative_permittivity"]), complex(record.get("relative_permeability", 1)))
+            for name, record in doc.si["materials"].items()}
 
 
-def kernel_inputs(doc) -> views.CavityInputs:
+def solver_inputs(doc) -> views.CavityInputs:
     """The SI solver inputs of a validated format 0.3 cavity document: the box from the exact
     picometre corners (``views.rectangle_mesh``), the counts as Python ints, the target frequency
-    in Hz, the wall conductivities in S/m and the materials under the kernel's convention."""
+    in Hz, the wall conductivities in S/m and the materials under exp(-i omega t)."""
     name, p, path = entry(doc)
     material_solver = uses_material_solver_03(doc)
-    materials = _to_kernel(doc) if material_solver else {}
+    materials = _materials(doc) if material_solver else {}
     base, flat, _ = geometry_block(doc)
     background = _background_material(doc, base, flat)
     return views.CavityInputs(box=views.rectangle_mesh(doc, "difference", axes="xyz"),
-                              num_modes=int(p["mode_count"]), target_frequency=float(p["target_frequency"]),
-                              wall_conductivity=_conductivity(p, path), materials=materials,
+                              mode_count=int(p["mode_count"]), target_frequency=float(p["target_frequency"]),
+                              electrical_conductivity=_conductivity(p, path), materials=materials,
                               background=background,
                               boxes=_boxes(doc, materials) if material_solver else [],
                               material_solver=material_solver)
 
 
-def _to_public(cavity) -> dict:
-    """The saved arrays of a galerkin cavity result under the format 0.3 names, SI under
-    exp(-i omega t): every complex kernel value conjugated once (section 5.3.5). The real layout
-    holds real values only and is saved as computed."""
-    complex_layout = hasattr(cavity, "quality_factors")
-    conj = np.conj if complex_layout else (lambda a: a)
-    out = {"node_coordinates": cavity.mesh.nodes, "tetrahedra": cavity.mesh.tets, "edges": cavity.space.edges,
+def _saved_arrays(cavity, node_coordinates, complex_layout) -> dict:
+    """The saved arrays of a galerkin cavity result under the format 0.3 names: SI under exp(-i omega t),
+    as galerkin's public solvers return them, and the nodes translated to the domain origin."""
+    out = {"node_coordinates": node_coordinates, "tetrahedra": cavity.mesh.tets, "edges": cavity.space.edges,
            "tet_edges": cavity.space.tet_edges, "edge_signs": cavity.space.signs,
-           "pec_edge_ids": cavity.pec_edge_ids,
-           "resonant_frequency": conj(cavity.frequencies_hz), "wavenumber_squared": conj(cavity.eigenvalues_m2)}
+           "pec_edge_ids": cavity.pec_edges,
+           "resonant_frequency": cavity.resonant_frequency, "wavenumber_squared": cavity.wavenumber_squared}
     if complex_layout:
-        out["quality_factor"] = cavity.quality_factors
-    out.update(mass_normalized_electric_field_line_integral=conj(cavity.edge_coefficients),
-               mass_normalized_electric_field=conj(cavity.electric_field),
-               relative_residual=cavity.relative_residuals)
+        out["quality_factor"] = cavity.quality_factor
+    out.update(mass_normalized_electric_field_line_integral=cavity.mass_normalized_electric_field_line_integral,
+               mass_normalized_electric_field=cavity.mass_normalized_electric_field,
+               relative_residual=cavity.relative_residual)
     if complex_layout:
-        sigma = cavity.wall_conductivity_s_per_m
-        out.update(relative_permittivity=np.conj(cavity.tet_relative_permittivity),
-                   relative_permeability=np.conj(cavity.tet_relative_permeability),
+        sigma = cavity.electrical_conductivity
+        out.update(relative_permittivity=cavity.relative_permittivity,
+                   relative_permeability=cavity.relative_permeability,
                    wall_names=np.array(list(WALL_NAMES)),
                    electrical_conductivity=np.array([np.nan if sigma[w] is None else sigma[w]
                                                      for w in WALL_NAMES.values()]),
-                   iteration_count=cavity.fixed_point_iterations)
+                   iteration_count=cavity.iteration_count)
     return out
 
 
@@ -398,23 +392,27 @@ def run_cavity(doc: Document, *, verbose: bool = True) -> "CavityRunResult":
         regions = []
         if inputs.background != "physmat:vacuum":
             eps, mu = inputs.materials[inputs.background]
-            regions.append(region_type(tuple((0.0, length) for length in box.lengths), eps, mu))
+            regions.append(region_type(lower_corner_position=(0.0, 0.0, 0.0), upper_corner_position=tuple(box.lengths),
+                                       relative_permittivity=eps, relative_permeability=mu))
         for bounds, name in inputs.boxes:
             eps, mu = inputs.materials[name]
-            regions.append(region_type(bounds, eps, mu))
-        cavity = solve(list(box.lengths), list(box.subdivisions), regions=regions, num_modes=inputs.num_modes,
-                       target_frequency_hz=inputs.target_frequency,
-                       wall_conductivity_s_per_m=inputs.wall_conductivity)
+            regions.append(region_type(lower_corner_position=tuple(low for low, _ in bounds),
+                                       upper_corner_position=tuple(high for _, high in bounds),
+                                       relative_permittivity=eps, relative_permeability=mu))
+        cavity = solve(box_size=list(box.lengths), subdivision_count=list(box.subdivisions), regions=regions,
+                       mode_count=inputs.mode_count, target_frequency=inputs.target_frequency,
+                       electrical_conductivity=inputs.electrical_conductivity)
     else:
         solve = getattr(galerkin, "solve_cavity_box", None)
         if solve is None:
             raise RuntimeError("em.cavity3d requires a matching cavity-enabled galerkin build "
                                "providing solve_cavity_box")
-        cavity = solve(list(box.lengths), list(box.subdivisions), num_modes=inputs.num_modes,
-                       target_frequency_hz=inputs.target_frequency)
-    cavity.mesh.nodes += np.array(box.origin)
+        cavity = solve(box_size=list(box.lengths), subdivision_count=list(box.subdivisions),
+                       mode_count=inputs.mode_count, target_frequency=inputs.target_frequency)
+    # the solver's box starts at the origin; the domain's nodes are its nodes plus the domain origin (D14)
+    node_coordinates = cavity.mesh.nodes + np.array(box.origin)
     timings = {"mesh_and_solve": time.perf_counter() - start}
-    result = CavityRunResult(doc, cavity, timings, [])
+    result = CavityRunResult(doc, cavity, timings, [], node_coordinates)
     result.log = [results_common.log_header(doc).rstrip("\n"), *result.result_lines()]
     if verbose:
         print("\n".join(result.log))
@@ -467,21 +465,24 @@ def _material_echo(doc, name, record):
 class CavityRunResult:
     """A cavity result in SI under exp(-i omega t) (spec section 5.3.5).
 
-    ``cavity`` is galerkin's result, in the solver's convention exp(+j omega t), with its mesh
-    translated to the domain origin; the public names (``resonant_frequency``,
-    ``mass_normalized_electric_field``, ...) are its values conjugated once
-    (``_to_public``). See ``docs/packages/simcase/cavity3d.md`` for the units of the raw
-    coefficients and the limits of the search.
+    ``cavity`` is galerkin's public result (``galerkin.CavityResult`` or
+    ``galerkin.MaterialCavityResult``), SI under exp(-i omega t), on the solver's box at the
+    origin; ``node_coordinates`` are its nodes translated to the domain origin. The saved names
+    (``resonant_frequency``, ``mass_normalized_electric_field``, ...) are its fields. See
+    ``docs/packages/simcase/cavity3d.md`` for the units of the raw coefficients and the limits of
+    the search.
     """
     doc: Document
-    cavity: CavityResult
+    cavity: CavityResult | MaterialCavityResult
     timings: dict[str, float]
     log: list[str]
+    node_coordinates: np.ndarray
 
     @property
     def complex_layout(self) -> bool:
         """True for the material/impedance solver's complex result."""
-        return hasattr(self.cavity, "quality_factors")
+        from galerkin import MaterialCavityResult
+        return isinstance(self.cavity, MaterialCavityResult)
 
     @property
     def field_layout(self) -> str:
@@ -490,39 +491,36 @@ class CavityRunResult:
     def arrays(self) -> dict:
         """The ``fields.npz`` arrays and text scalars (without ``metadata_json``)."""
         c = self.cavity
-        return {**_to_public(c), "field_layout": self.field_layout, "normalization": self._normalization(),
+        return {**_saved_arrays(c, self.node_coordinates, self.complex_layout), "field_layout": self.field_layout,
+                "normalization": self._normalization(),
                 "search": c.search, **_TEXT, "cluster_completeness": c.cluster_completeness,
                 "mode_count_policy": c.mode_count_policy}
 
     @property
-    def node_coordinates(self):
-        return self.cavity.mesh.nodes
-
-    @property
     def resonant_frequency(self):
         """Hz, one per mode; complex in the complex layout, Im < 0 a decaying mode."""
-        return _to_public(self.cavity)["resonant_frequency"]
+        return self.cavity.resonant_frequency
 
     @property
     def quality_factor(self):
         """Re f / (-2 Im f) per mode (inf when lossless); None in the real layout."""
-        return self.cavity.quality_factors if self.complex_layout else None
+        return self.cavity.quality_factor if self.complex_layout else None
 
     @property
     def wavenumber_squared(self):
-        return _to_public(self.cavity)["wavenumber_squared"]
+        return self.cavity.wavenumber_squared
 
     @property
     def mass_normalized_electric_field(self):
-        return _to_public(self.cavity)["mass_normalized_electric_field"]
+        return self.cavity.mass_normalized_electric_field
 
     @property
     def mass_normalized_electric_field_line_integral(self):
-        return _to_public(self.cavity)["mass_normalized_electric_field_line_integral"]
+        return self.cavity.mass_normalized_electric_field_line_integral
 
     @property
     def relative_residual(self):
-        return self.cavity.relative_residuals
+        return self.cavity.relative_residual
 
     @property
     def cluster_completeness(self):
@@ -582,8 +580,8 @@ class CavityRunResult:
                 if isinstance(sigma, dict) else results_common.value_object(sigma, "electrical_conductivity"))}
         if self.complex_layout:
             out["electrical_conductivity"] = {
-                wall: None if c.wall_conductivity_s_per_m[engine] is None
-                else results_common.value_object(c.wall_conductivity_s_per_m[engine], "electrical_conductivity")
+                wall: None if c.electrical_conductivity[engine] is None
+                else results_common.value_object(c.electrical_conductivity[engine], "electrical_conductivity")
                 for wall, engine in WALL_NAMES.items()}
         out["background"] = {"material": _background_material(doc, base, flat)}
         if self.complex_layout:
@@ -591,7 +589,7 @@ class CavityRunResult:
             out["lossless"] = bool(c.lossless)
         out.update({"search": c.search,
                     "target_frequency": results_common.value_object(p["target_frequency"], "target_frequency"),
-                    "mode_count": int(p["mode_count"]), "returned_mode_count": len(c.frequencies_hz)})
+                    "mode_count": int(p["mode_count"]), "returned_mode_count": len(c.resonant_frequency)})
         f = arrays["resonant_frequency"]
         k2 = arrays["wavenumber_squared"]
         if self.complex_layout:

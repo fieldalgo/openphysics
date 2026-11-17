@@ -33,33 +33,33 @@ MESH = rectangle_mesh(2.0, 1.5, 8, 6)
 PML = {"k": 2 * np.pi, "r0": 1.0, "d": 0.5, "sigma_max": 30.0}
 FACTORS = np.ones((MESH.num_triangles, 3))
 SIZE = [1.0, 0.7, 0.45]
-BOX = {"subdivisions": (2, 2, 2), "num_modes": 2, "target_frequency_hz": 2.2e8}
-SLAB = ((0.0, 0.5), (0.0, 0.35), (0.0, 0.45))
+BOX = {"subdivision_count": (2, 2, 2), "mode_count": 2, "target_frequency": 2.2e8}
+SLAB = {"lower_corner_position": (0.0, 0.0, 0.0), "upper_corner_position": (0.5, 0.35, 0.45)}
 SPACE3D = EdgeSpace3D(box_mesh(1.0, 0.7, 0.45, 2, 2, 2))
 
 
 def _cavity(**kw):
-    return solve_material_cavity_box(**{"lengths_m": SIZE, **BOX, **kw})
+    return solve_material_cavity_box(**{"box_size": SIZE, **BOX, **kw})
 
 
 def _region(**kw):
-    return [CavityMaterialRegion(kw.pop("bounds_m", SLAB), **kw)]
+    return [CavityMaterialRegion(**{**SLAB, **kw})]
 
 
 CASES = {
-    "solve_material_cavity_box lengths_m": lambda v: _cavity(lengths_m=[v(1.0), 0.7, 0.45]),
-    "solve_material_cavity_box target_frequency_hz": lambda v: _cavity(target_frequency_hz=v(2.2e8)),
-    "solve_material_cavity_box subdivisions": lambda v: _cavity(subdivisions=(v(2), 2, 2)),
-    "solve_material_cavity_box num_modes": lambda v: _cavity(num_modes=v(2)),
-    "solve_material_cavity_box region bounds": lambda v: _cavity(
-        regions=_region(bounds_m=((0.0, v(0.5)), (0.0, 0.35), (0.0, 0.45)))),
+    "solve_material_cavity_box box_size": lambda v: _cavity(box_size=[v(1.0), 0.7, 0.45]),
+    "solve_material_cavity_box target_frequency": lambda v: _cavity(target_frequency=v(2.2e8)),
+    "solve_material_cavity_box subdivision_count": lambda v: _cavity(subdivision_count=(v(2), 2, 2)),
+    "solve_material_cavity_box mode_count": lambda v: _cavity(mode_count=v(2)),
+    "solve_material_cavity_box region corner": lambda v: _cavity(
+        regions=_region(upper_corner_position=(v(0.5), 0.35, 0.45))),
     "solve_material_cavity_box region permittivity": lambda v: _cavity(
         regions=_region(relative_permittivity=v(2.0))),
     "solve_material_cavity_box region permeability": lambda v: _cavity(
         regions=_region(relative_permeability=v(2.0))),
-    "solve_material_cavity_box wall conductivity": lambda v: _cavity(wall_conductivity_s_per_m=v(5.8e7)),
+    "solve_material_cavity_box wall conductivity": lambda v: _cavity(electrical_conductivity=v(5.8e7)),
     "solve_material_cavity_box one wall's conductivity": lambda v: _cavity(
-        wall_conductivity_s_per_m={"x0": v(5.8e7)}),
+        electrical_conductivity={"x0": v(5.8e7)}),
     "mode_coordinates thickness": lambda v: mode_coordinates(MESH, thickness={"left": v(0.4)}),
     "mode_coordinates strength": lambda v: mode_coordinates(MESH, thickness={"left": 0.4}, strength=v(3.0)),
     "mode_coordinates order": lambda v: mode_coordinates(MESH, thickness={"left": 0.4}, order=v(2)),
