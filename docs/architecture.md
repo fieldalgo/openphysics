@@ -108,8 +108,10 @@ shares lives in core, in the package-private `_thermal_mechanical_common` (the
 heat-to-mechanics workflows), `_cavity_common` (the two box cavities), `_heat_kernels`
 (the heat solvers' boundary system, 3D source load and face map), `_mechanics_kernels`
 (the elasticity and thermoelasticity helpers and the temperature-snapshot hashes),
-`_moving` (the moving-mesh solves behind `motion=`) and `_public` (the public APIs'
-text refusal, inward data and result surfaces),
+`_moving` (the moving-mesh solves behind `motion=`), `_public` (the public APIs'
+text refusal, inward data and result surfaces) and `_conventions` (`to_kernel` and
+`to_public`, the one place a complex value changes between the public exp(−iωt) and
+a kernel's exp(+iωt)),
 or in public names of the module that owns it (thermoelasticity builds on elasticity's;
 joule heating and the workflows call `galerkin.thermal.solve_steady_heat_outward`, and
 the temperature-dependent Joule iteration `galerkin.electric.solve_steady_electric_outward`

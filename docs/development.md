@@ -139,6 +139,17 @@ public name equals one of their names, and no public name is one of their object
 carries a reviewer note; the category "deferred to the materials step" (physmat's record
 arguments, such as `datum_temperature`) also names the condition that ends it.
 
+**Complex conventions.** Public complex values of galerkin and refsol follow
+exp(−iωt); a kernel that computes in exp(+iωt) is converted only by `to_kernel` and
+`to_public` of the package's private `_conventions` module.
+`tests/galerkin/test_conventions.py` reads the package code of galerkin, refsol and
+simcase (not sipi, not the tests) and allows a conjugation (`conj`, `conjugate`, or
+`0.0 - x.imag` and `-x.imag`) only there, in simcase's boundary functions, and on the
+closed list `tests/galerkin/conventions_allowlist.json` of mathematical conjugations,
+each with its function, source line and reason; an entry that no longer matches fails.
+It also checks the passive signs of each converted output (electrostatics so far) and
+that a JAX and a PyTorch gradient pass through the conversions.
+
 ## Running the checks
 
 ```bash

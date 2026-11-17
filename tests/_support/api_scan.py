@@ -84,13 +84,15 @@ DEFERRED = "deferred to the materials step"
 INTERNAL_DOCSTRING = "Internal module, consistent units"
 
 # Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin and refsol after
-# L2 commit 8, which emptied galerkin's elasticity, thermoelasticity, the two thermal-mechanical workflows,
-# shape and coupling and refsol's bimetal, elasticity, elasticity_multilayer, elasticity_traction,
-# thermoelastic_traction and thermoelasticity, so only the electromagnetic modules keep entries (galerkin 301
-# on f693ae3a, 191 after L2 commit 4, 170 after L2 commit 6, which emptied the heat modules, 154 after L2
-# commit 7, which emptied electric, joule_heating and temperature_joule_heating; refsol 549 on f693ae3a, 394
-# after L2 commit 6, 354 after L2 commit 7, which emptied joule_slab). They never grow.
-BASELINE_COUNTS = {"galerkin": 102, "physmat": 0, "refsol": 240}
+# L3 commit 10, which emptied galerkin's electrostatics and refsol's electrostatics with the coax potential and
+# field of refsol.metallic it re-exports (galerkin 102 and refsol 240 before). L2 commit 8 had emptied
+# galerkin's elasticity, thermoelasticity, the two thermal-mechanical workflows, shape and coupling and refsol's
+# bimetal, elasticity, elasticity_multilayer, elasticity_traction, thermoelastic_traction and thermoelasticity,
+# so only the electromagnetic modules keep entries (galerkin 301 on f693ae3a, 191 after L2 commit 4, 170 after
+# L2 commit 6, which emptied the heat modules, 154 after L2 commit 7, which emptied electric, joule_heating and
+# temperature_joule_heating; refsol 549 on f693ae3a, 394 after L2 commit 6, 354 after L2 commit 7, which
+# emptied joule_slab). They never grow.
+BASELINE_COUNTS = {"galerkin": 98, "physmat": 0, "refsol": 222}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 

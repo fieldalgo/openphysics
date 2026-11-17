@@ -11,6 +11,8 @@ from galerkin.kernels import assemble_stiffness, assemble_load, solve_dirichlet
 from conftest import assert_second_order
 
 A, B = 1.0, 3.0
+#: the coax potentials refsol.metallic took by default before the galerkin step, written out
+COAX = dict(position=(A, B), prescribed_electric_potential=(1.0, 0.0))
 
 
 def solve(n_r, n_theta):
@@ -23,8 +25,7 @@ def solve(n_r, n_theta):
 
 
 def test_potential_converges_at_second_order(refsol):
-    exact = lambda x, y: refsol.metallic.coax_potential(
-        np.sqrt(x ** 2 + y ** 2), A, B)
+    exact = lambda x, y: refsol.metallic.coax_potential(np.column_stack([x, y]), **COAX)   # r = hypot(x, y)
     errors = []
     for n_r in (4, 8, 16, 32):
         mesh, V = solve(n_r, 6 * n_r)
@@ -42,6 +43,6 @@ def test_field_is_radial_with_the_right_magnitude(refsol):
     radial = np.einsum("td,td->t", E, rhat) / np.linalg.norm(E, axis=1)
     assert radial.min() > 0.999, "field is not radial"
 
-    exact = refsol.metallic.coax_field_magnitude(r, A, B)
+    exact = refsol.metallic.coax_field_magnitude(centroid, **COAX)          # r = hypot(x, y)
     rel = np.abs(np.linalg.norm(E, axis=1) - exact) / exact
     assert rel.mean() < 0.01, f"mean |E| error {rel.mean():.3%}"

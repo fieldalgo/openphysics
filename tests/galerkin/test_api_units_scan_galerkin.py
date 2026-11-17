@@ -185,6 +185,25 @@ def _motion_step_record():
     return MotionStep, dict(xp=np, t=0.0, design_velocity=np.zeros((9, 2)), moved=mesh)
 
 
+def _coax_conductors():
+    from galerkin.mesh import annulus_mesh
+    mesh = annulus_mesh(1.0, 3.0, 2, 12)
+    return mesh, mesh.boundary["inner"], mesh.boundary["outer"]
+
+
+def _electrostatics():
+    from galerkin.electrostatics import solve_electrostatics
+    mesh, inner, outer = _coax_conductors()
+    return solve_electrostatics, dict(mesh=mesh, relative_permittivity=2.2 + 0.044j,
+                                      conductors={"inner": (inner, 1.0)}, ground=outer, free_charge_density=1e-6)
+
+
+def _capacitance():
+    from galerkin.electrostatics import capacitance_matrix
+    mesh, inner, outer = _coax_conductors()
+    return capacitance_matrix, dict(mesh=mesh, relative_permittivity=2.2, conductors={"inner": inner}, ground=outer)
+
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
@@ -206,7 +225,10 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_thermal_mechanical:TransientThermoelasticError": _transient_thermoelastic_error,
                 "galerkin.shape:MeshMotion": _mesh_motion,
                 "galerkin.shape:admissible_interval": _admissible_interval,
-                "galerkin.shape:MotionStep": _motion_step_record}
+                "galerkin.shape:MotionStep": _motion_step_record,
+                # L3 commit 10 emptied electrostatics
+                "galerkin.electrostatics:solve_electrostatics": _electrostatics,
+                "galerkin.electrostatics:capacitance_matrix": _capacitance}
 
 
 @pytest.fixture(scope="module")

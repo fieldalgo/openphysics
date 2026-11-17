@@ -126,6 +126,14 @@ docstring에 "Internal module, consistent units"라고 적습니다. 패키지�
 커널을 다시 내보내는 내부 이름공간입니다. 어떤 공개 이름도 그 이름과 같지 않고, 그 객체도 아닙니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the
 materials step" 범주(`datum_temperature` 같은 physmat 레코드 인수)는 그 항목을 끝낼 조건도 적습니다.
 
+**복소 규약.** galerkin과 refsol의 공개 복소 값은 exp(−iωt)를 따릅니다. exp(+iωt)로 계산하는 커널은
+패키지의 비공개 모듈 `_conventions`의 `to_kernel`과 `to_public`으로만 변환합니다.
+`tests/galerkin/test_conventions.py`는 galerkin, refsol, simcase의 패키지 코드를 읽고(sipi와 시험은
+읽지 않음) 켤레(`conj`, `conjugate`, 또는 `0.0 - x.imag`와 `-x.imag`)를 거기와 simcase의 경계 함수,
+수학적 켤레의 닫힌 목록 `tests/galerkin/conventions_allowlist.json`에서만 허용합니다. 목록 항목마다
+함수, 원본 줄, 이유를 적으며, 더는 맞지 않는 항목도 실패합니다. 이 시험은 변환된 출력마다(지금은
+정전기) 수동 매질의 부호를 확인하고, JAX와 PyTorch 기울기가 변환을 지나는지도 확인합니다.
+
 ## 검사 실행
 
 ```bash
