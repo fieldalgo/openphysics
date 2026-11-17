@@ -55,3 +55,5 @@ See [corner panel primitives](laplace_boundary.md) for the existing
 constant and linear density families and their separate contracts.
 
 See the separate [harmonic interaction contracts](laplace_corner_harmonic_interactions.md) for explicit far, shared-origin, separated and mixed-source blocks.
+
+[Private physical moments](laplace_corner_harmonic_moments.md) retain the same masses through polynomial and plane Fourier projection; they do not expose a field solver.
