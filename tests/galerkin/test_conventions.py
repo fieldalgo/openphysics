@@ -27,7 +27,9 @@ adopts (spec D3): sipi keeps its own convention until its own step, and tests/ i
   exact vector mode field (L3 commit 11d), has a convention clause instead: the forward mode of
   exp(-i omega t) varies as exp(+i beta z), so div E = 0 reads dEx/dx + dEy/dy + i beta Ez = 0.
   refsol's cylinder scattering is written in exp(-i omega t) and converts nothing (L3 commit 11e): its
-  scattered field carries power outward, and an absorbing cylinder (Im n > 0) absorbs.
+  scattered field carries power outward, and an absorbing cylinder (Im n > 0) absorbs. refsol's cavity
+  references (L3 commit 12) give the material cavity's signs: Im(resonant_frequency) < 0 and Q > 0 on a
+  passive lossy slab, filling or conducting wall.
 - **Live arrays.** A JAX and a PyTorch gradient pass through ``to_public`` and ``to_kernel``, on a
   synthetic product (L3 commit 10) and through a mode solve (L3 commit 11b).
 """
@@ -382,6 +384,41 @@ def test_refsol_scattering_is_outgoing_and_passive(kind, index):
         assert absorbed > 0.1 * width
         gain = dict(cylinder, refractive_index=np.conj(index))       # n' - i n'': a gain under exp(-i omega t)
         assert _scattering_flux(lambda p: scattering.total(p, **gain), k) > 0.1 * width
+
+
+_REFSOL_BOX = dict(box_size=(1.0, 0.8, 0.6), frequency_limit=3e8)
+
+
+@pytest.mark.parametrize("slab,background", [((4 + 0.04j, 1.0), (1.0, 1.0)), ((2.2, 1.0), (1.0, 1.1 + 0.01j)),
+                                             ((2.0 + 0.1j, 2.0 + 0.1j), (1.3 + 0.02j, 1.3 + 0.02j))])
+def test_refsol_cavity_resonances_of_passive_lossy_inputs_decay(slab, background):
+    """refsol's cavity references follow exp(-i omega t) since L3 commit 12 (their formulas, written in
+    exp(+j omega t), convert through refsol._conventions): a passive lossy slab or background (Im >= 0)
+    gives Im(resonant_frequency) < 0, Im(wavenumber_squared) < 0 and Q = Re f / (-2 Im f) > 0, as the
+    galerkin cavity below; the uniform filling and the conducting walls too; a gain is refused."""
+    from refsol import material_cavity, wall_loss
+    permittivity, permeability = (slab[0], background[0]), (slab[1], background[1])
+    modes = material_cavity.slab_loaded_cavity_modes(**_REFSOL_BOX, thickness=0.3, relative_permittivity=permittivity,
+                                                     relative_permeability=permeability)
+    assert len(modes) >= 3
+    for mode in modes:
+        f = mode.resonant_frequency
+        assert f.real > 0 and f.imag < 0 and mode.wavenumber_squared.imag < 0
+        assert mode.quality_factor > 0
+        assert mode.quality_factor == material_cavity.quality_factor(resonant_frequency=f)
+        assert material_cavity.complex_frequency_from_eigenvalue(wavenumber_squared=mode.wavenumber_squared) == f
+    uniform = material_cavity.uniformly_filled_eigenvalue(wavenumber_squared=2 * np.pi ** 2,
+                                                          relative_permittivity=permittivity[0],
+                                                          relative_permeability=permeability[0])
+    if np.imag(permittivity[0]) or np.imag(permeability[0]):
+        assert uniform.imag < 0
+        assert material_cavity.complex_frequency_from_eigenvalue(wavenumber_squared=uniform).imag < 0
+    walls = wall_loss.wall_loss_modes(**_REFSOL_BOX, electrical_conductivity={"z1": 1e6})
+    assert walls and all(m.resonant_frequency.imag < 0 and m.quality_factor > 0 for m in walls)
+    gain = (np.conj(permittivity[0]), permittivity[1])           # eps' - i eps'': a gain under exp(-i omega t)
+    if np.imag(permittivity[0]):
+        with pytest.raises(ValueError, match="Im >= 0"):
+            material_cavity.slab_loaded_cavity_modes(**_REFSOL_BOX, thickness=0.3, relative_permittivity=gain)
 
 
 # ---- passivity: cavity (L3 commit 12) -------------------------------------------------------------------------

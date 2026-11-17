@@ -23,7 +23,8 @@ For side lengths a, b, d in metres,
     k² = π²[(m/a)² + (n/b)² + (p/d)²]
     f_Hz = 299792458 sqrt(k²) / (2π).
 
-`refsol.metallic.rect_cavity_resonances` returns k², not Hz.
+`refsol.metallic.rect_cavity_resonances(*, box_size, n_max=3)` (the box (a, b, d) in m) returns
+k² in 1/m², not Hz.
 Its TE index rules are p >= 1 and (m,n) != (0,0); TM requires m,n >= 1,
 p >= 0. Independently, the standing-wave amplitudes give one polarization
 when exactly two indices are positive and two when all three are positive.
@@ -166,7 +167,7 @@ for sides in ((1, 1, 1), (1, .8, .6)):
         multiplicity = {0: 0, 1: 0, 2: 1, 3: 2}[positive]
         k2 = sum((np.pi * i / a)**2 for i, a in zip(indices, sides))
         independent.extend([k2] * multiplicity)
-    expected = [k2 for k2, _ in rect_cavity_resonances(*sides, n_max=4)]
+    expected = [k2 for k2, _ in rect_cavity_resonances(box_size=sides, n_max=4)]
     assert len(independent) == len(expected) == 176
     assert np.allclose(sorted(independent), sorted(expected), rtol=1e-13, atol=0)
     if sides == (1, 1, 1):

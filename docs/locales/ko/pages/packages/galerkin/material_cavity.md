@@ -150,6 +150,8 @@ python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
 ```
 
 정답은 `refsol.material_cavity`와 `refsol.wall_loss`에 있으며 mesh나 FEM 코드를 쓰지 않습니다.
+정답의 공개 값도 솔버처럼 `exp(-i omega t)`를 따르므로(galerkin 단계, L3 커밋 12) 테스트는 둘을
+그대로 비교합니다.
 
 **균일 충전.** 균질 공동은 진공 장을 그대로 가지고 `k0^2 = k_vac^2 / (eps_r mu_r)`가
 정확하며, 이산 문제도 똑같이 축척됩니다. 시험은 재료 솔버를 진공 솔버에 이 인자를 곱한
@@ -260,6 +262,8 @@ z 적층 정답과 일치(n = 8에서 고유값 1.5%, Q 0.3% 이내); 영역 우
 이때 벽 손실은 진폭 평면의 이차형식이고, 그 고유벡터가 두 Q 값을 줍니다. Leontovich
 리액턴스는 손실이 허수부를 올리는 만큼 실수 주파수를 낮춥니다:
 `omega = omega0 (1 + (j - 1)/(2 Q_c))`. 무시한 항의 상대 크기는 `1/Q_c`입니다.
+`refsol.wall_loss`의 공개 `resonant_frequency`는 `exp(-i omega t)`에서 그 켤레인
+`f0 (1 - (1 + i)/(2 Q_c))`입니다.
 
 정답 자체 검사: TE101이 Pozar 닫힌 식(*Microwave Engineering*, 4판, 식 6.46)과 `1e-12`로
 같습니다. `(1, 0.8, 0.6) m`의 400 MHz 이하 모든 모드(분리된 111 이중 모드 포함)가 유한차분

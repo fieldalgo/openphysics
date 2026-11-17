@@ -17,7 +17,7 @@
     k² = π²[(m/a)² + (n/b)² + (p/d)²]
     f_Hz = 299792458 sqrt(k²) / (2π).
 
-`refsol.metallic.rect_cavity_resonances`는 Hz가 아니라 k²를 반환합니다. TE index 규칙은 p >= 1, (m,n) != (0,0)이고 TM은 m,n >= 1, p >= 0입니다. 이와 독립적으로 정재파 진폭을 보면 양의 index가 정확히 두 개일 때 편광 하나, 세 개 모두 양수일 때 편광 두 개가 있습니다. 양의 index가 0개 또는 1개이면 물리 모드가 없습니다. 기준 구현·솔버와 독립된 두 번째 열거로 유용합니다.
+`refsol.metallic.rect_cavity_resonances(*, box_size, n_max=3)`(상자 (a, b, d)는 m)는 Hz가 아니라 1/m² 단위 k²를 반환합니다. TE index 규칙은 p >= 1, (m,n) != (0,0)이고 TM은 m,n >= 1, p >= 0입니다. 이와 독립적으로 정재파 진폭을 보면 양의 index가 정확히 두 개일 때 편광 하나, 세 개 모두 양수일 때 편광 두 개가 있습니다. 양의 index가 0개 또는 1개이면 물리 모드가 없습니다. 기준 구현·솔버와 독립된 두 번째 열거로 유용합니다.
 
 단위 정육면체에는 k²/π² = 2, 3, 5의 완전한 낮은 cluster가 있고 중복도는 3, 2, 6입니다. 직육면체 (1, 0.8, 0.6) 사례는 처음 세 단순 모드와 TE111/TM111 쌍을 시험합니다. 유한한 index 상한은 생략된 가장 작은 index의 k²가 비교 대역보다 클 때만 충분합니다. index 상한 N에 대해 π²(N+1)² / max(a,b,d)²가 보수적인 하한입니다.
 
@@ -105,7 +105,7 @@ for sides in ((1, 1, 1), (1, .8, .6)):
         multiplicity = {0: 0, 1: 0, 2: 1, 3: 2}[positive]
         k2 = sum((np.pi * i / a)**2 for i, a in zip(indices, sides))
         independent.extend([k2] * multiplicity)
-    expected = [k2 for k2, _ in rect_cavity_resonances(*sides, n_max=4)]
+    expected = [k2 for k2, _ in rect_cavity_resonances(box_size=sides, n_max=4)]
     assert len(independent) == len(expected) == 176
     assert np.allclose(sorted(independent), sorted(expected), rtol=1e-13, atol=0)
     if sides == (1, 1, 1):

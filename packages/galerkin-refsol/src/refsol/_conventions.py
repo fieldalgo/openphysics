@@ -4,9 +4,11 @@
 
 Private (rule 5 and D8 of the galerkin step). refsol's public complex values follow exp(-i omega t):
 a passive loss is Im(relative_permittivity) >= 0 (a refractive index n' + i n''), and a forward mode
-that decays along +z has Im(effective_index) >= 0. Modules whose closed forms are written in
-exp(+i omega t) (``refsol.lossy_slab``, ``refsol.bent_slab``) keep that internal arithmetic and
-convert here only: a public complex output is ``to_public(internal(to_kernel(x)))``, never re-derived.
+that decays along +z has Im(effective_index) >= 0; a decaying cavity resonance has
+Im(resonant_frequency) < 0. Modules whose closed forms are written in exp(+i omega t)
+(``refsol.lossy_slab``, ``refsol.bent_slab``, ``refsol.material_cavity`` and ``refsol.wall_loss``
+since L3 commit 12) keep that internal arithmetic and convert here only: a public complex output is
+``to_public(internal(to_kernel(x)))``, never re-derived.
 refsol computes with NumPy and Python numbers only.
 
 - ``to_kernel(x)``: a Python or NumPy complex scalar becomes ``complex(x.real, 0.0 - x.imag)``; a NumPy

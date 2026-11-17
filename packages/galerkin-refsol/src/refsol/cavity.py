@@ -6,6 +6,12 @@
 Unlike a FEM target search, this reference enumerates every analytic mode up to
 an explicit frequency ceiling, retaining polarization and geometric degeneracy.
 It does not use a solver, mesh, or the TE/TM enumeration in ``metallic``.
+
+Public API (galerkin step, L3 commit 12): ``rectangular_cavity_modes(*, box_size,
+frequency_limit)`` takes the box's side lengths (a, b, c) in m and the frequency ceiling
+in Hz under registry names, keyword-only; a str for either raises TypeError. Each mode's
+``frequency`` (Hz) and ``wavenumber_squared`` (k**2, 1/m**2) are real, so no time
+convention enters.
 """
 
 from __future__ import annotations
@@ -14,6 +20,8 @@ from dataclasses import dataclass
 from itertools import product
 import math
 from numbers import Real
+
+from ._checks import refuse_text
 
 __all__ = ["C0", "AnalyticCavityMode", "rectangular_cavity_modes"]
 
@@ -26,13 +34,13 @@ class AnalyticCavityMode:
     """One independent polarization, including repeated frequencies.
 
     ``polarization`` is an ordinal in the transverse Cartesian subspace, not a
-    TE/TM label. ``eigenvalue_m2`` denotes inverse square metres (k squared).
+    TE/TM label. ``frequency`` is in Hz and ``wavenumber_squared`` is k**2 in 1/m**2.
     """
 
     indices: tuple[int, int, int]
     polarization: int
-    frequency_hz: float
-    eigenvalue_m2: float
+    frequency: float
+    wavenumber_squared: float
 
 
 def _positive(value, name):
@@ -42,8 +50,8 @@ def _positive(value, name):
     return float(value)
 
 
-def rectangular_cavity_modes(lengths_m, max_frequency_hz) -> list[AnalyticCavityMode]:
-    """All vacuum PEC modes at or below ``max_frequency_hz`` in an SI box.
+def rectangular_cavity_modes(*, box_size, frequency_limit) -> list[AnalyticCavityMode]:
+    """All vacuum PEC modes at or below ``frequency_limit`` (Hz) in a box of ``box_size`` (a, b, c) in m.
 
     Electric components have the standing-wave form
     ``Ex = Ax cos(kx*x) sin(ky*y) sin(kz*z)`` and cyclic permutations.
@@ -57,17 +65,18 @@ def rectangular_cavity_modes(lengths_m, max_frequency_hz) -> list[AnalyticCavity
     analytic list; it makes no assertion about completeness of a FEM search.
     Frequencies at the ceiling are included within floating-point rounding.
     """
+    refuse_text(box_size=box_size, frequency_limit=frequency_limit)
     try:
-        lengths = tuple(lengths_m)
+        lengths = tuple(box_size)
     except TypeError as exc:
-        raise ValueError("lengths_m must contain three positive lengths") from exc
+        raise ValueError("box_size must contain three positive lengths in m") from exc
     if len(lengths) != 3:
-        raise ValueError("lengths_m must contain three positive lengths")
-    lengths = tuple(_positive(v, "lengths_m") for v in lengths)
-    ceiling = _positive(max_frequency_hz, "max_frequency_hz")
+        raise ValueError("box_size must contain three positive lengths in m")
+    lengths = tuple(_positive(v, "box_size") for v in lengths)
+    ceiling = _positive(frequency_limit, "frequency_limit")
     bounds = [2 * (ceiling / C0) * length for length in lengths]
     if not all(math.isfinite(bound) for bound in bounds):
-        raise ValueError("frequency and lengths exceed representable index bounds")
+        raise ValueError("frequency_limit and box_size exceed representable index bounds")
     # One extra index protects an exactly integral floating-point boundary.
     ranges = [range(math.floor(bound) + 2) for bound in bounds]
     modes = []
@@ -82,4 +91,4 @@ def rectangular_cavity_modes(lengths_m, max_frequency_hz) -> list[AnalyticCavity
         eigenvalue = (math.pi * inverse_wavelength) ** 2
         for polarization in range(positive - 1):
             modes.append(AnalyticCavityMode(indices, polarization, frequency, eigenvalue))
-    return sorted(modes, key=lambda mode: (mode.frequency_hz, mode.indices, mode.polarization))
+    return sorted(modes, key=lambda mode: (mode.frequency, mode.indices, mode.polarization))

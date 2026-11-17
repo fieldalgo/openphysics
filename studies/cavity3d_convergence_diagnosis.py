@@ -124,7 +124,7 @@ def main():
     if any(n < 2 for n in args.meshes) or any(q < 2 for q in args.quadrature_orders):
         parser.error("meshes and quadrature orders must be >=2")
     exact = float(np.sum((np.pi/SIDES)**2))
-    fundamental = rect_cavity_resonances(*SIDES, n_max=4)[0][0]
+    fundamental = rect_cavity_resonances(box_size=SIDES, n_max=4)[0][0]
     rows = []
     for n in sorted(set(args.meshes)):
         started = time.monotonic()

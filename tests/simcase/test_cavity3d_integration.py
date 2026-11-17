@@ -41,7 +41,7 @@ def test_real_cavity_document_selects_expected_reference_modes(solved_cube):
     result = solved_cube
     assert isinstance(result, CavityRunResult)
     assert result.resonant_frequency.shape == (5,)
-    exact_k2 = np.array([k2 for k2, _ in rect_cavity_resonances(1, 1, 1, n_max=2)][:5])
+    exact_k2 = np.array([k2 for k2, _ in rect_cavity_resonances(box_size=(1, 1, 1), n_max=2)][:5])
     exact_hz = 299792458 / (2 * np.pi) * np.sqrt(exact_k2)
     # This coarse product example is a smoke/reference check, not the independent
     # acceptance convergence gate. Five modes span the first two full clusters.

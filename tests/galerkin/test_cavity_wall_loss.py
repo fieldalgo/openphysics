@@ -3,10 +3,10 @@
 
 """Finite-conductivity (Leontovich) cavity walls: references, consistency and gates.
 
-The public solver's complex values follow exp(-i omega t) (a decaying mode has Im f < 0). The
-independent rebuild of the impedance operator and refsol's wall-loss references are written in
-exp(+j omega t): each comparison conjugates the public values, or the reference's complex frequency,
-once (D8).
+The public solver's complex values follow exp(-i omega t) (a decaying mode has Im f < 0), as
+refsol's wall-loss references do since the galerkin step (L3 commit 12), so their complex frequency is
+compared as it is. The independent rebuild of the impedance operator is written in exp(+j omega t): it
+conjugates the public values once (D8).
 """
 
 import numpy as np
@@ -89,7 +89,7 @@ def test_te101_matches_pozar_and_satisfies_the_si_impedance_equation(refsol):
     result = solve_material_cavity_box(box_size=BOX, subdivision_count=(8, 8, 8), mode_count=2,
                                        target_frequency=200e6, electrical_conductivity=COPPER)
     _check(result)
-    pozar = refsol.wall_loss.pozar_te101_quality_factor(a, b, d, COPPER)
+    pozar = refsol.wall_loss.pozar_te101_quality_factor(box_size=(a, b, d), electrical_conductivity=COPPER)
     assert abs(result.quality_factor[0] / pozar - 1) < 0.015
     # Independent rebuild uses the SI form j k eta0 / Zs, not the solver's sqrt(j k eta0 sigma).
     assert _independent_nonlinear_residual(result).max() < 1e-7
@@ -121,7 +121,8 @@ def test_wall_losses_add_and_single_walls_match_reference(refsol):
                                            electrical_conductivity={wall: COPPER})
         _check(single)
         inverse += 1 / single.quality_factor
-        reference = refsol.wall_loss.wall_loss_modes(BOX, 400e6, {wall: COPPER})[:3]
+        reference = refsol.wall_loss.wall_loss_modes(box_size=BOX, frequency_limit=400e6,
+                                                     electrical_conductivity={wall: COPPER})[:3]
         np.testing.assert_allclose(single.quality_factor,
                                    [m.quality_factor for m in reference], rtol=0.1)
     # First-order additivity: second-order terms are O(1/Q) relative.
@@ -145,10 +146,10 @@ def test_dielectric_and_wall_losses_combine(refsol):
                                      electrical_conductivity=COPPER, **args)
     walls = solve_material_cavity_box(box_size=BOX, subdivision_count=(8, 8, 8), regions=[Region(fill, eps)],
                                       electrical_conductivity=COPPER, **args)
-    dielectric = refsol.material_cavity.dielectric_loss_quality_factor(tan_delta)
+    dielectric = refsol.material_cavity.dielectric_loss_quality_factor(loss_tangent=tan_delta)
     np.testing.assert_allclose(1 / both.quality_factor,
                                1 / walls.quality_factor + 1 / dielectric, rtol=1e-4)
-    reference = refsol.wall_loss.wall_loss_modes(BOX, 300e6, COPPER,
+    reference = refsol.wall_loss.wall_loss_modes(box_size=BOX, frequency_limit=300e6, electrical_conductivity=COPPER,
                                                  relative_permittivity=eps)[:2]
     np.testing.assert_allclose(walls.quality_factor, [m.quality_factor for m in reference],
                                rtol=0.04)
@@ -160,7 +161,8 @@ def test_cube_degenerate_triplet_keeps_three_independent_modes(refsol):
                                        electrical_conductivity=COPPER)
     _check(result)
     np.testing.assert_allclose(result.wavenumber_squared, result.wavenumber_squared[0], rtol=1e-8)
-    reference = refsol.wall_loss.wall_loss_modes((1, 1, 1), 250e6, COPPER)[0].quality_factor
+    reference = refsol.wall_loss.wall_loss_modes(box_size=(1, 1, 1), frequency_limit=250e6,
+                                                 electrical_conductivity=COPPER)[0].quality_factor
     np.testing.assert_allclose(result.quality_factor, reference, rtol=0.06)
 
 
@@ -185,10 +187,11 @@ def test_invalid_wall_conductivity(value, match):
 @pytest.mark.slow
 def test_wall_loss_mesh_convergence(refsol):
     """Fixed n=4,8,16, copper walls; four lowest non-degenerate modes against Q_c."""
-    reference = refsol.wall_loss.wall_loss_modes(BOX, 400e6, COPPER)[:4]
+    reference = refsol.wall_loss.wall_loss_modes(box_size=BOX, frequency_limit=400e6,
+                                                 electrical_conductivity=COPPER)[:4]
     assert [m.indices for m in reference] == [(1, 0, 1), (2, 0, 1), (1, 1, 0), (0, 1, 1)]
     exact_q = np.array([m.quality_factor for m in reference])
-    exact_f = np.conj([m.complex_frequency_hz for m in reference])
+    exact_f = np.array([m.resonant_frequency for m in reference])
     q_errors, f_errors = [], []
     for n in (4, 8, 16):
         result = solve_material_cavity_box(box_size=BOX, subdivision_count=(n,) * 3, mode_count=4,

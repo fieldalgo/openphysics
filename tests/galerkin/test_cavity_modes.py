@@ -55,7 +55,7 @@ def _clusters(pairs, take=3):
 def test_unit_cube_lowest_resonance_is_a_triple(refsol):
     """The claim worth checking before any solver runs: on a unit cube the lowest
     k^2 is 2 pi^2 with THREE modes, and the next is 3 pi^2."""
-    cl = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    cl = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     assert abs(cl[0][0] - 2 * np.pi ** 2) < 1e-9 and cl[0][1] == 3
     assert sorted(cl[0][2]) == ["TE011", "TE101", "TM110"]
     assert abs(cl[1][0] - 3 * np.pi ** 2) < 1e-9 and cl[1][1] == 2
@@ -92,7 +92,7 @@ def test_whitney_identities_hold_in_3d():
 
 
 def test_no_spurious_mode_between_the_physical_ones(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     flat = [k for k, mult, _ in exact for _ in range(mult)]
     got = _resonances(8, 8, 8, sigma=1.3 * exact[0][0])[:len(flat)]
     for value in got:
@@ -111,7 +111,7 @@ def test_unit_cube_resonances_converge_at_second_order(refsol):
     them. Each cluster is therefore compared through its mean, which is the
     mesh-independent quantity.
     """
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     errors = []
     for n in (6, 12):
         got = _resonances(n, n, n, sigma=1.3 * exact[0][0])
@@ -136,7 +136,7 @@ def test_the_example_agrees_with_the_answer_key(refsol):
 
     mine = cavity_modes.exact_spectrum()
     theirs = _clusters(refsol.metallic.rect_cavity_resonances(
-        cavity_modes.A_BOX, cavity_modes.B_BOX, cavity_modes.C_BOX, n_max=3),
+        box_size=(cavity_modes.A_BOX, cavity_modes.B_BOX, cavity_modes.C_BOX), n_max=3),
         take=8)
     for (k_mine, mult_mine, labels_mine), (k_ref, mult_ref, labels_ref) in zip(
             mine[:8], theirs):
@@ -185,7 +185,7 @@ def _unstructured_cavity(lc, nev=16, sigma=None):
 
 @needs_gmsh
 def test_unstructured_cavity_matches_the_analytic_spectrum(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     mesh, vals = _unstructured_cavity(0.11, sigma=1.3 * exact[0][0])
     assert abs(mesh.volumes().sum() - 1.0) < 1e-9
@@ -209,7 +209,7 @@ def test_unstructured_cavity_improves_under_refinement(refsol):
     sequence are not nested and a fitted order would be measuring the mesher as
     much as the solver. The strict second-order ladder is the structured test
     above; what is asserted here is that refinement monotonically helps."""
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     first = []
     for lc in (0.25, 0.16, 0.11):
@@ -247,7 +247,7 @@ def _extruded_cavity(size, nev=16, sigma=None):
 
 
 def test_extruded_cavity_matches_the_analytic_spectrum(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     mesh, vals = _extruded_cavity(0.11, sigma=1.3 * exact[0][0])
     assert abs(mesh.volumes().sum() - 1.0) < 1e-9
@@ -266,7 +266,7 @@ def test_extruded_cavity_matches_the_analytic_spectrum(refsol):
 
 @pytest.mark.slow
 def test_extruded_cavity_improves_under_refinement(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     first = []
     for size in (0.25, 0.16, 0.11):
