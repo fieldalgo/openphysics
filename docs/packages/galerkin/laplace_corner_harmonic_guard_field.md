@@ -60,3 +60,6 @@ Other platforms, product consumer integration and UI require separate checks.
 
 [Three-active fields](laplace_corner_harmonic_field.md) ·
 [한국어](../../locales/ko/pages/packages/galerkin/laplace_corner_harmonic_guard_field.md)
+
+
+A separate [one-active/two-fixed-guard API](laplace_corner_harmonic_single_active_field.md) selects one active current coordinate and retains induced guard currents. This does not change the two-active guard contract above.
