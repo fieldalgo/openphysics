@@ -371,6 +371,39 @@
    "places": ["document", "api"],
    "description": {"en": "Number of subdivisions along each axis (a list of 2 or 3 counts).", "ko": "축마다의 분할 개수(개수 2개 또는 3개의 목록)."}
   },
+  "box_size": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Side lengths of an axis-aligned box with one corner at the origin, one per axis.", "ko": "한 꼭짓점이 원점에 있는 축 정렬 상자의 변 길이. 축마다 하나."}
+  },
+  "lower_corner_position": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Corner of an axis-aligned box with the smallest coordinates (x, y, z).", "ko": "축 정렬 상자에서 좌표 (x, y, z)가 가장 작은 꼭짓점."}
+  },
+  "upper_corner_position": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "km", "in", "mil"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Corner of an axis-aligned box with the largest coordinates (x, y, z).", "ko": "축 정렬 상자에서 좌표 (x, y, z)가 가장 큰 꼭짓점."}
+  },
   "layer_division_count": {
    "dimension": {},
    "unit": "1",
@@ -1383,6 +1416,18 @@
    "places": ["result"],
    "description": {"en": "Absolute permittivity epsilon_0 epsilon_r (output).", "ko": "절대 유전율 epsilon_0 epsilon_r(출력)."}
   },
+  "electric_flux_density": {
+   "dimension": {"I": 1, "T": 1, "L": -2},
+   "unit": "C/m^2",
+   "menu": ["C/m^2"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "complex": true,
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Electric flux density D = epsilon_0 epsilon_r E (the electric displacement; output).", "ko": "전기 선속 밀도 D = epsilon_0 epsilon_r E(전기 변위. 출력)."}
+  },
   "free_charge_density": {
    "dimension": {"I": 1, "T": 1, "L": -3},
    "unit": "C/m^3",
@@ -1415,6 +1460,51 @@
    "band": null,
    "places": ["result"],
    "description": {"en": "Charge on a conductor per metre of depth (output).", "ko": "깊이 1 m당 도체 전하(출력)."}
+  },
+  "applied_charge_per_depth": {
+   "dimension": {"I": 1, "T": 1, "L": -1},
+   "unit": "C/m",
+   "menu": ["C/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal charge per metre of depth from the free charge density (output).", "ko": "자유 전하 밀도에서 온 깊이 1 m당 절점 전하(출력)."}
+  },
+  "reaction_charge_per_depth": {
+   "dimension": {"I": 1, "T": 1, "L": -1},
+   "unit": "C/m",
+   "menu": ["C/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"reaction_charge_per_depth": {"en": "Charge the fixed conductor potential holds on a conductor node; positive is positive charge.", "ko": "고정된 도체 전위가 도체 절점에 붙드는 전하. 양수는 양전하."}},
+   "description": {"en": "Nodal conductor charge per metre of depth, the reaction of the fixed potentials (output).", "ko": "고정 전위의 반력인 깊이 1 m당 절점 도체 전하(출력)."}
+  },
+  "residual_charge_per_depth": {
+   "dimension": {"I": 1, "T": 1, "L": -1},
+   "unit": "C/m",
+   "menu": ["C/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal charge residual per metre of depth of the discrete electrostatic balance (output).", "ko": "이산 정전 균형의 깊이 1 m당 절점 전하 잔차(출력)."}
+  },
+  "free_charge_per_depth": {
+   "dimension": {"I": 1, "T": 1, "L": -1},
+   "unit": "C/m",
+   "menu": ["C/m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Free charge per metre of depth: the free charge density integrated over the cross-section (output).", "ko": "깊이 1 m당 자유 전하. 자유 전하 밀도를 단면에서 적분한 값(출력)."}
   },
   "capacitance": {
    "dimension": {"M": -1, "L": -2, "T": 4, "I": 2},
@@ -1586,6 +1676,17 @@
    "band": null,
    "places": ["document", "api", "result"],
    "description": {"en": "Frequency around which an eigenfrequency search looks.", "ko": "고유주파수 탐색의 목표 주파수."}
+  },
+  "frequency_limit": {
+   "dimension": {"T": -1},
+   "unit": "Hz",
+   "menu": ["Hz", "kHz", "MHz", "GHz", "THz"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Upper bound of the frequencies an enumeration of resonances returns (an input bound, not a result statistic).", "ko": "공진 열거가 돌려주는 주파수의 상한(결과 통계가 아니라 입력 상한)."}
   },
   "reference_frequency": {
    "dimension": {"T": -1},
@@ -2381,11 +2482,11 @@
    "complex": true,
    "domain": null,
    "band": null,
-   "places": ["result"],
+   "places": ["api", "result"],
    "qualifiers": {"statistic": ["mean"]},
    "symbols": ["n_eff", "neff"],
    "sign": {"effective_index": {"en": "beta / k0 with fields exp(i (beta z - omega t)); Im >= 0 is loss along +z.", "ko": "필드 exp(i (beta z - omega t))에서 beta / k0. Im >= 0이 +z 방향 손실."}},
-   "description": {"en": "Effective index of a mode (output).", "ko": "모드의 유효 굴절률(출력)."}
+   "description": {"en": "Effective index of a mode (output; also an argument of the public mode functions).", "ko": "모드의 유효 굴절률(출력. 공개 모드 함수의 인수이기도 함)."}
   },
   "group_index": {
    "dimension": {},
@@ -2615,9 +2716,9 @@
    "complex": true,
    "domain": null,
    "band": null,
-   "places": ["result"],
+   "places": ["api", "result"],
    "qualifiers": {"component": ["z"]},
-   "description": {"en": "Electric field of a mode as solved, a relative field without a unit (output).", "ko": "풀이한 그대로의 모드 전기장. 단위 없는 상대 필드(출력)."}
+   "description": {"en": "Electric field of a mode as solved, a relative field without a unit (output; also an argument of the public mode functions).", "ko": "풀이한 그대로의 모드 전기장. 단위 없는 상대 필드(출력. 공개 모드 함수의 인수이기도 함)."}
   },
   "unnormalized_electric_field_line_integral": {
    "dimension": {"L": 1},
@@ -2628,8 +2729,8 @@
    "complex": true,
    "domain": null,
    "band": null,
-   "places": ["result"],
-   "description": {"en": "Line integral of the tangential unnormalized_electric_field along a mesh edge (output).", "ko": "메시 모서리를 따른 접선 unnormalized_electric_field의 선적분(출력)."}
+   "places": ["api", "result"],
+   "description": {"en": "Line integral of the tangential unnormalized_electric_field along a mesh edge (output; also an argument of the public mode functions).", "ko": "메시 모서리를 따른 접선 unnormalized_electric_field의 선적분(출력. 공개 모드 함수의 인수이기도 함)."}
   },
   "mass_normalized_electric_field": {
    "dimension": {"L": -1.5},

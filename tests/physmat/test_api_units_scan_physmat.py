@@ -227,8 +227,8 @@ def positional(length):
     return length
 
 
-def unplaced(*, effective_index):
-    return effective_index
+def unplaced(*, stored_energy_per_depth):
+    return stored_energy_per_depth
 
 
 class Thing:
@@ -308,7 +308,7 @@ EXPECTED = {
     ("apiscan_planted", "planted", "length_um", "unit-suffix"),
     ("apiscan_planted", "defaulted", "length", "dimensional-default"),
     ("apiscan_planted", "positional", "length", "positional"),
-    ("apiscan_planted", "unplaced", "effective_index", "no-api-place"),
+    ("apiscan_planted", "unplaced", "stored_energy_per_depth", "no-api-place"),
     ("apiscan_planted", "Thing", "temperature_k", "unregistered"),
     ("apiscan_planted", "Thing", "temperature_k", "unit-suffix"),
     ("apiscan_planted", "Thing.at", "wavelength", "unregistered"),
@@ -316,7 +316,8 @@ EXPECTED = {
 
 
 def test_scan_catches_each_planted_violation_and_passes_compliant_code(rules, tmp_path, make_package):
-    assert "api" not in rules.registry["effective_index"][0]       # the no-api-place probe stays valid
+    # the no-api-place probe stays valid (effective_index, the probe until L3 commit 9, gained an api place there)
+    assert "api" not in rules.registry["stored_energy_per_depth"][0]
     make_package("apiscan_planted", {"__init__.py": PLANTED, "helpers.py": HELPERS})
     synthetic = _rules(rules, "apiscan_planted", ["apiscan_planted"], ["apiscan_planted.helpers"])
     assert api_scan.package_violations("apiscan_planted", synthetic) == EXPECTED

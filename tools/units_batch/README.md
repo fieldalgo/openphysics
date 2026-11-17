@@ -427,6 +427,14 @@ same doubles under the new keywords. Eight kind 2 entries rename the keywords si
 `temperature_unit` give way to the one read-only `units` map; its arrays and three hashes are
 unchanged. The workflows are not recorded targets (simcase does not call them).
 
+**Landing L3 starts again from an empty list (L3 commit 9).** L3's baseline is L2's head, where
+the 47 entries of L2 commits 6 to 8 no longer describe a difference: with them, the phase-3
+identity of L3 commit 9 against `c184343f` reports 57 equal and 30 different documents and 34
+other problems. The 34 problems are the 22 kind 2 and 12 kind 5 entries that apply to nothing;
+the other 13 (kinds 7, 8, 3 and 5) still match a recorded call and misalign the calls of the 30
+documents. Commit 9 therefore empties `phase3_rules.json`; it changes only the registry, so no
+call changes and all 87 documents compare equal with no entry.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter
