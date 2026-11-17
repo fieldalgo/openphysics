@@ -18,11 +18,12 @@ def ends(mesh, left, right):
 
 
 def uniform(mesh, voltage=2.):
-    return solve_steady_electric(mesh, conductivity=3., dirichlet=ends(mesh, 0., voltage))
+    return solve_steady_electric(mesh, electrical_conductivity=3.,
+                                 prescribed_electric_potential=ends(mesh, 0., voltage))
 
 
 def couple(mesh, electric, **kwargs):
-    return solve_steady_joule_heat(mesh, electrical_result=electric, conductivity=5., **kwargs)
+    return solve_steady_joule_heat(mesh, electrical_result=electric, thermal_conductivity=5., **kwargs)
 
 
 def errors(mesh, result, exact):
@@ -43,26 +44,27 @@ def errors(mesh, result, exact):
 def test_uniform_bar_actual_api_analytical_temperature_and_power(voltage):
     mesh = rectangle_mesh(.02, .01, 16, 8)
     electric = uniform(mesh, voltage)
-    result = couple(mesh, electric, dirichlet=ends(mesh, 300., 300.))
+    result = couple(mesh, electric, prescribed_temperature=ends(mesh, 300., 300.))
     q = 3*(voltage/.02)**2
     exact = 300+q*mesh.nodes[:, 0]*(.02-mesh.nodes[:, 0])/10
     np.testing.assert_allclose(result.thermal.temperature, exact, atol=1e-10, rtol=0)
-    np.testing.assert_allclose(result.thermal.generated_heat_rate_per_depth, electric.joule_load, atol=1e-12, rtol=1e-12)
-    assert result.source_power_per_length == pytest.approx(q*.02*.01, abs=1e-13)
-    assert result.outward_heat_per_length == pytest.approx(q*.02*.01, abs=1e-11)
+    np.testing.assert_allclose(result.thermal.generated_heat_rate_per_depth, electric.generated_heat_rate_per_depth,
+                               atol=1e-12, rtol=1e-12)
+    assert result.generated_heat_rate_per_depth == pytest.approx(q*.02*.01, abs=1e-13)
+    assert result.outward_heat_rate_per_depth == pytest.approx(q*.02*.01, abs=1e-11)
     assert result.electrical is not electric
-    assert not np.shares_memory(result.electrical.joule_heating, electric.joule_heating)
-    assert not result.electrical.joule_heating.flags.writeable
+    assert not np.shares_memory(result.electrical.joule_power_density, electric.joule_power_density)
+    assert not result.electrical.joule_power_density.flags.writeable
     assert not result.electrical.mesh.nodes.flags.writeable
 
 
 def test_two_series_materials_and_element_order():
     mesh = layered_rectangle_mesh([.01, .03], .01, [8, 16], 8, ['a', 'b'])
-    electric = solve_steady_electric(mesh, conductivity={'a': 2., 'b': 8.},
-                                     dirichlet=ends(mesh, 0., 2.))
+    electric = solve_steady_electric(mesh, electrical_conductivity={'a': 2., 'b': 8.},
+                                     prescribed_electric_potential=ends(mesh, 0., 2.))
     result = solve_steady_joule_heat(mesh, electrical_result=electric,
-                                    conductivity={'a': 3., 'b': 7.},
-                                    dirichlet=ends(mesh, 300., 300.))
+                                    thermal_conductivity={'a': 3., 'b': 7.},
+                                    prescribed_temperature=ends(mesh, 300., 300.))
     d, sigma, k = np.array([.01, .02]), np.array([2., 8.]), np.array([3., 7.])
     current = -2/np.sum(d/sigma); q = current**2/sigma
     f0 = -np.sum((np.array([0., q[0]*d[0]])*d+q*d*d/2)/k)/np.sum(d/k)
@@ -72,8 +74,8 @@ def test_two_series_materials_and_element_order():
     u = x[right]-d[0]
     exact[right] = interface-((f0+q[0]*d[0])*u+q[1]*u*u/2)/k[1]
     assert np.max(abs(result.thermal.temperature-exact)) < .01
-    np.testing.assert_allclose(electric.joule_heating, q[mesh.regions], rtol=1e-10)
-    assert result.source_power_per_length == pytest.approx(.01*np.sum(q*d), rel=1e-10)
+    np.testing.assert_allclose(electric.joule_power_density, q[mesh.regions], rtol=1e-10)
+    assert result.generated_heat_rate_per_depth == pytest.approx(.01*np.sum(q*d), rel=1e-10)
 
 
 def test_actual_harmonic_voltage_coupled_mesh_convergence():
@@ -86,13 +88,13 @@ def test_actual_harmonic_voltage_coupled_mesh_convergence():
         mesh = rectangle_mesh(L, H, n, n)
         fixed = np.unique(np.concatenate(list(mesh.boundary.values())))
         voltage = alpha*(mesh.nodes[:, 0]**2-mesh.nodes[:, 1]**2)
-        electric = solve_steady_electric(mesh, conductivity=sigma,
-                                         dirichlet={int(i): voltage[i] for i in fixed})
+        electric = solve_steady_electric(mesh, electrical_conductivity=sigma,
+                                         prescribed_electric_potential={int(i): voltage[i] for i in fixed})
         temp, _ = exact(mesh.nodes)
-        result = couple(mesh, electric, dirichlet={int(i): temp[i] for i in fixed})
+        result = couple(mesh, electric, prescribed_temperature={int(i): temp[i] for i in fixed})
         all_errors.append(errors(mesh, result.thermal, exact))
-        powers.append(result.source_power_per_length)
-        assert abs(result.outward_heat_per_length/result.source_power_per_length-1) < 1e-10
+        powers.append(result.generated_heat_rate_per_depth)
+        assert abs(result.outward_heat_rate_per_depth/result.generated_heat_rate_per_depth-1) < 1e-10
     orders = np.log2(np.array(all_errors[:-1])/all_errors[1:])
     print('actual coupled L2 errors, orders, powers:', all_errors, orders.tolist(), powers)
     assert orders[-1, 0] > 1.8
@@ -107,18 +109,18 @@ def test_actual_api_mixed_thermal_boundaries_and_zero_budget(kind):
     mesh = rectangle_mesh(.02, .01, 8, 4)
     electric = uniform(mesh, 0. if kind == 'zero_with_heat_flow' else 2.)
     if kind == 'neumann_electric':
-        electric = solve_steady_electric(mesh, conductivity=3., dirichlet={},
-                                         outward_current={'left': 300., 'right': -300.},
-                                         reference_potential={0: 0.})
+        electric = solve_steady_electric(mesh, electrical_conductivity=3., prescribed_electric_potential={},
+                                         inward_current_density={'left': -300., 'right': 300.},
+                                         reference_electric_potential={0: 0.})
     if kind == 'zero_with_heat_flow':
-        result = couple(mesh, electric, dirichlet=ends(mesh, 300., 310.))
+        result = couple(mesh, electric, prescribed_temperature=ends(mesh, 300., 310.))
     elif kind == 'mixed':
-        result = couple(mesh, electric, dirichlet={}, outward_flux={'right': 20.},
+        result = couple(mesh, electric, prescribed_temperature={}, inward_heat_flux={'right': -20.},
                          convection={'left': (100., 300.)})
     else:
-        result = couple(mesh, electric, dirichlet={},
+        result = couple(mesh, electric, prescribed_temperature={},
                          convection={tag: (100., 300.) for tag in mesh.boundary_edges})
-    assert result.outward_heat_per_length == pytest.approx(result.source_power_per_length,
+    assert result.outward_heat_rate_per_depth == pytest.approx(result.generated_heat_rate_per_depth,
                                                            rel=1e-10, abs=1e-10)
 
 
@@ -132,31 +134,31 @@ def test_mismatched_mesh_rejected_before_heat_solve(kind):
     else:
         mesh.regions = np.zeros(mesh.num_triangles, dtype=int); mesh.region_names = ['new']
     with pytest.raises(ValueError, match='do not match'):
-        couple(mesh, electric, dirichlet=ends(mesh, 300., 300.))
+        couple(mesh, electric, prescribed_temperature=ends(mesh, 300., 300.))
 
 
-@pytest.mark.parametrize('field,value', [('joule_heating', -1.), ('joule_heating', np.nan),
-                                       ('joule_load', 99.), ('joule_power_per_length', 99.),
-                                       ('supplied_power_per_length', 99.)])
+@pytest.mark.parametrize('field,value', [('joule_power_density', -1.), ('joule_power_density', np.nan),
+                                       ('generated_heat_rate_per_depth', 99.), ('joule_power_per_depth', 99.),
+                                       ('inward_electric_power_per_depth', 99.)])
 def test_corrupted_actual_result_rejected(field, value):
     mesh = rectangle_mesh(.02, .01, 4, 2); electric = uniform(mesh)
     old = getattr(electric, field)
     bad = replace(electric, **{field: np.full_like(old, value) if np.ndim(old) else value})
     with pytest.raises(ValueError):
-        couple(mesh, bad, dirichlet=ends(mesh, 300., 300.))
+        couple(mesh, bad, prescribed_temperature=ends(mesh, 300., 300.))
 
 
 def test_snapshots_survive_input_mutation_and_missing_support_rejected():
     mesh = rectangle_mesh(.02, .01, 4, 2); electric = uniform(mesh)
     with pytest.raises(ValueError, match='requires Dirichlet or positive Robin'):
-        couple(mesh, electric, dirichlet={})
-    result = couple(copy.deepcopy(mesh), electric, dirichlet=ends(mesh, 300., 300.))
+        couple(mesh, electric, prescribed_temperature={})
+    result = couple(copy.deepcopy(mesh), electric, prescribed_temperature=ends(mesh, 300., 300.))
     expected = result.electrical.mesh.nodes.copy()
     mesh.nodes[:] += 100
     electric.mesh.nodes = np.zeros_like(electric.mesh.nodes)
     np.testing.assert_array_equal(result.electrical.mesh.nodes, expected)
     with pytest.raises(ValueError, match='SteadyElectricResult'):
-        couple(mesh, object(), dirichlet={})
+        couple(mesh, object(), prescribed_temperature={})
 
 
 def test_disconnected_thermal_components_need_separate_support_and_balance():
@@ -167,11 +169,11 @@ def test_disconnected_thermal_components_need_separate_support_and_balance():
                 part.boundary | {tag+'2': ids+n for tag, ids in part.boundary.items()},
                 part.boundary_edges | {tag+'2': edges+n for tag, edges in part.boundary_edges.items()})
     volts = ends(part, 0., 2.) | {i+n: value/2 for i, value in ends(part, 0., 2.).items()}
-    electric = solve_steady_electric(mesh, conductivity=3., dirichlet=volts)
+    electric = solve_steady_electric(mesh, electrical_conductivity=3., prescribed_electric_potential=volts)
     with pytest.raises(ValueError, match='requires Dirichlet or positive Robin'):
-        couple(mesh, electric, dirichlet=ends(part, 300., 300.))
+        couple(mesh, electric, prescribed_temperature=ends(part, 300., 300.))
     temperatures = ends(part, 300., 300.) | {i+n: 310. for i in ends(part, 0., 0.)}
-    result = couple(mesh, electric, dirichlet=temperatures)
+    result = couple(mesh, electric, prescribed_temperature=temperatures)
     for ids, power in [(slice(0, n), 6.), (slice(n, None), 1.5)]:
         assert np.sum(result.thermal.generated_heat_rate_per_depth[ids]) == pytest.approx(power, rel=1e-10)
         assert -np.sum(result.thermal.reaction_heat_rate_per_depth[ids]) == pytest.approx(power, rel=1e-10)

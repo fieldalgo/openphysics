@@ -49,14 +49,16 @@ def conduction(n, relaxation):
         {tuple(int(i) for i in mesh.boundary["left"]): 0.0,
          tuple(int(i) for i in mesh.boundary["right"]): VOLTAGE})
     result, seconds = harness.timed(
-        solve_steady_electric, mesh, conductivity=SIGMA, dirichlet=ends(mesh, 0.0, VOLTAGE))
+        solve_steady_electric, mesh, electrical_conductivity=SIGMA,
+        prescribed_electric_potential=ends(mesh, 0.0, VOLTAGE))
     sample = harness.peak_rss()
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, mesh_seconds=mesh_seconds,
                   stiffness_assembly_seconds=k_seconds, stiffness_nonzeros=int(stiffness.nnz),
                   dirichlet_solve_seconds=solve_seconds, solver_call_seconds=seconds,
-                  joule_power_w_per_m=float(result.joule_power_per_length),
+                  joule_power_w_per_m=float(result.joule_power_per_depth),
                   exact_joule_power_w_per_m=SIGMA * VOLTAGE**2 / WIDTH * HEIGHT,
-                  max_abs_free_residual_a_per_m=free_residual(result.residual, ends(mesh, 0.0, VOLTAGE)))
+                  max_abs_free_residual_a_per_m=free_residual(result.residual_current_per_depth,
+                                                              ends(mesh, 0.0, VOLTAGE)))
     return sample
 
 
@@ -70,15 +72,15 @@ def joule(n, relaxation):
     mesh, mesh_seconds = harness.timed(rectangle_mesh, WIDTH, HEIGHT, 2 * n, n)
     voltage = ends(mesh, 0.0, VOLTAGE)
     electrical, electric_seconds = harness.timed(
-        solve_steady_electric, mesh, conductivity=SIGMA, dirichlet=voltage)
+        solve_steady_electric, mesh, electrical_conductivity=SIGMA, prescribed_electric_potential=voltage)
     result, heat_seconds = harness.timed(
         solve_steady_joule_heat, mesh, electrical_result=electrical,
-        conductivity=THERMAL_CONDUCTIVITY, dirichlet={i: WALL for i in voltage})
+        thermal_conductivity=THERMAL_CONDUCTIVITY, prescribed_temperature={i: WALL for i in voltage})
     sample = harness.peak_rss()
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, mesh_seconds=mesh_seconds,
                   electric_seconds=electric_seconds, heat_seconds=heat_seconds,
-                  source_power_w_per_m=float(result.source_power_per_length),
-                  outward_heat_w_per_m=float(result.outward_heat_per_length),
+                  source_power_w_per_m=float(result.generated_heat_rate_per_depth),
+                  outward_heat_w_per_m=float(result.outward_heat_rate_per_depth),
                   temperature_max_k=float(result.thermal.temperature.max()),
                   max_abs_free_heat_residual_w_per_m=free_residual(result.thermal.residual_heat_rate_per_depth, voltage))
     return sample
@@ -96,19 +98,19 @@ def thermistor(n, relaxation, method):
     left = {int(i): 0.0 for i in mesh.boundary["left"]}
     result, seconds = harness.timed(
         solve_temperature_joule_heat, mesh, method=method, electrical_conductivity=model,
-        thermal_conductivity=THERMISTOR_K, electric_dirichlet=left,
-        outward_current={"right": CURRENT_DENSITY},
-        thermal_dirichlet=ends(mesh, THERMISTOR_T, THERMISTOR_T),
-        initial_temperature=THERMISTOR_T, relaxation=relaxation)
+        thermal_conductivity=THERMISTOR_K, prescribed_electric_potential=left,
+        inward_current_density={"right": 0.0 - CURRENT_DENSITY},        # CURRENT_DENSITY leaves on the right
+        prescribed_temperature=ends(mesh, THERMISTOR_T, THERMISTOR_T),
+        initial_temperature=THERMISTOR_T, temperature_tolerance=1e-8, relaxation_factor=relaxation)
     sample = harness.peak_rss()
     last = result.history[-1]
     sample.update(nodes=mesh.num_nodes, triangles=mesh.num_triangles, mesh_seconds=mesh_seconds,
                   method=method, relaxation=relaxation, solver_call_seconds=seconds,
                   iterations=len(result.history), seconds_per_iteration=seconds / len(result.history),
                   temperature_max_k=float(result.coupled.thermal.temperature.max()),
-                  joule_power_w_per_m=float(result.coupled.source_power_per_length),
-                  final_temperature_defect_k=float(last.temperature_defect),
-                  final_nonlinear_heat_residual=float(last.nonlinear_heat_residual))
+                  joule_power_w_per_m=float(result.coupled.generated_heat_rate_per_depth),
+                  final_temperature_defect_k=float(last.temperature_change),
+                  final_nonlinear_heat_residual=float(last.relative_residual))
     return sample
 
 
@@ -150,7 +152,7 @@ def main():
              ["--worker", case, "--size", str(size), "--relaxation", str(args.relaxation)])
             for size in args.sizes for case in cases]
     # names without unit suffixes, values in SI units (m, S/m, V, W/(m K), K, A/m^2, 1/K); the thermistor's
-    # current density leaves through its right side (galerkin's outward_current)
+    # current density leaves through its right side (galerkin takes it as inward_current_density, negated)
     settings = dict(cases=cases, sizes=args.sizes, strip_size=(WIDTH, HEIGHT), electrical_conductivity=SIGMA,
                     electric_potential_difference=VOLTAGE, thermal_conductivity=THERMAL_CONDUCTIVITY,
                     wall_temperature=WALL, thermistor_size=(THERMISTOR_WIDTH, THERMISTOR_HEIGHT),

@@ -22,8 +22,9 @@ the physics entry, ``heat_source_density``, an axisymmetric component and a void
 are refused by name. Picard iteration only, as on a rectangle; a failed iteration raises
 ``JouleConvergenceError`` with its history, unchanged.
 
-Format 0.3: the mesh is the region heat hand-off's (``handoff_03``); galerkin receives
-``0.0 - inward_current_density`` and ``0.0 - inward_heat_flux`` (H1).
+Format 0.3: the mesh is the region heat hand-off's (``handoff_03``); galerkin's solves compute
+with ``0.0 - inward_current_density`` and ``0.0 - inward_heat_flux`` (H1; galerkin takes the inward
+values and negates them, ``views.galerkin_electric_arguments``).
 """
 
 import math
@@ -167,11 +168,17 @@ def solver_inputs(doc, mesh, region_materials):
     electric = views.region_joule_temperature(doc)
     electric_kwargs, fixed_by = electric_inputs(doc, mesh, region_materials, electric)
     heat_kwargs = heat_inputs(doc, mesh, region_materials, views.region_heat_03(doc), NAMES_03)
+    # galerkin's keywords and inward values (views.galerkin_*_arguments): the same doubles (H1)
+    electric_kw = views.galerkin_electric_arguments(electric_kwargs)
+    heat_kw = views.galerkin_heat_arguments(heat_kwargs)
     kwargs = dict(electrical_conductivity={r: electric.conductivity_model[m] for r, m in region_materials.items()},
-                  thermal_conductivity=heat_kwargs['conductivity'], electric_dirichlet=electric_kwargs['dirichlet'],
-                  thermal_dirichlet=heat_kwargs['dirichlet'], initial_temperature=electric.initial_temperature,
-                  outward_current=electric_kwargs['outward_current'], outward_flux=heat_kwargs['outward_flux'],
-                  convection=heat_kwargs['convection'], method='picard', **electric.iteration)
+                  thermal_conductivity=heat_kw['thermal_conductivity'],
+                  prescribed_electric_potential=electric_kw['prescribed_electric_potential'],
+                  prescribed_temperature=heat_kw['prescribed_temperature'],
+                  initial_temperature=electric.initial_temperature,
+                  inward_current_density=electric_kw['inward_current_density'],
+                  inward_heat_flux=heat_kw['inward_heat_flux'],
+                  convection=heat_kw['convection'], method='picard', **electric.iteration)
     return kwargs, fixed_by
 
 
@@ -204,9 +211,9 @@ def run_region_joule_temperature(doc, verbose=True, *, mesh_limits=None):
         raise ValueError('Joule calculation inputs changed during the solve')
     coupled = nonlinear.coupled
     electric, heat = coupled.electrical, coupled.thermal
-    fixed, held = kwargs['electric_dirichlet'], kwargs['thermal_dirichlet']
+    fixed, held = kwargs['prescribed_electric_potential'], kwargs['prescribed_temperature']
     arrays = result_arrays(mesh, electric, fixed, regions=mesh.regions, heat=heat, heat_fixed=held,
-                           evaluated=nonlinear.evaluated_temperature)
+                           evaluated=nonlinear.evaluation_temperature)
     balance = electric_balance(electric, fixed, mesh)
     balance['outward_current_per_depth'] = outward_terminal_currents(electric, fixed_by,
                                                                      doc.si['physics'][name]['prescribed_electric_potential'])
@@ -220,7 +227,7 @@ def run_region_joule_temperature(doc, verbose=True, *, mesh_limits=None):
                f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
                f'converged in {len(nonlinear.history)} Picard iterations; joule_power_per_depth '
-               f'{electric.joule_power_per_length:.12g} W/m; temperature: {float(np.min(heat.temperature)):.12g} K to '
+               f'{electric.joule_power_per_depth:.12g} W/m; temperature: {float(np.min(heat.temperature)):.12g} K to '
                f'{float(np.max(heat.temperature)):.12g} K']
     if verbose:
         print('\n'.join(printed))

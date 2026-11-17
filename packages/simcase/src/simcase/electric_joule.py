@@ -5,8 +5,11 @@ region documents in :mod:`simcase.electric_regions` and :mod:`simcase.joule_regi
 
 The three kinds read ``"openphysics": "0.3"`` (units batch C6; phase-2 spec sections 4.3 to 4.5):
 values carry their units, keys are registry names, and a format 0.2 document is refused by
-name. ``inward_current_density`` and ``inward_heat_flux`` are positive into the body; galerkin
-still receives the outward values ``0.0 - value`` (hazard H1). Results save their arrays under
+name. ``inward_current_density`` and ``inward_heat_flux`` are positive into the body; simcase's
+solver arguments hold the outward values ``0.0 - value`` (hazard H1), and galerkin, which takes
+inward values since the galerkin step, receives ``0.0 - (0.0 - value)`` and negates it once more
+(``views.galerkin_electric_arguments``, ``views.galerkin_heat_arguments``): the same doubles as
+before. Results save their arrays under
 registry names with the summary of section 5.3.2: numeric balances under ``balance``, every
 coded diagnostic under ``diagnostics``.
 """
@@ -62,33 +65,38 @@ FIELDS = {
     'prescribed_temperature': ('prescribed_temperature', 'thermal_prescribed_nodes', None),
     'evaluation_temperature': ('evaluation_temperature', 'nodes', None),
 }
-#: galerkin's electric result attribute of each electric array
-ELECTRIC_ARRAYS = (('electric_potential', 'potential'), ('electric_field', 'electric_field'),
-                   ('current_density', 'current_density'), ('electrical_conductivity', 'conductivity'),
-                   ('joule_power_density', 'joule_heating'), ('joule_power_per_depth', 'joule_load'),
-                   ('reaction_current_per_depth', 'reaction'),
-                   ('outward_prescribed_current_per_depth', 'prescribed_outward_load'),
-                   ('residual_current_per_depth', 'residual'))
+#: galerkin's electric result attribute of each electric array (the result's registry names since the
+#: galerkin step, L2 commit 7; the saved nodal Joule load keeps its name joule_power_per_depth, D20)
+ELECTRIC_ARRAYS = (('electric_potential', 'electric_potential'), ('electric_field', 'electric_field'),
+                   ('current_density', 'current_density'), ('electrical_conductivity', 'electrical_conductivity'),
+                   ('joule_power_density', 'joule_power_density'),
+                   ('joule_power_per_depth', 'generated_heat_rate_per_depth'),
+                   ('reaction_current_per_depth', 'reaction_current_per_depth'),
+                   ('outward_prescribed_current_per_depth', 'outward_prescribed_current_per_depth'),
+                   ('residual_current_per_depth', 'residual_current_per_depth'))
 #: galerkin's heat result attribute of each heat-stage array
 HEAT_ARRAYS = tuple((name, name) for name in (
     'temperature', 'heat_flux', 'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
     'residual_heat_rate_per_depth', 'outward_prescribed_heat_rate_per_depth', 'ambient_convective_heat_rate_per_depth',
     'outward_convective_heat_rate_per_depth', 'applied_heat_rate_per_depth'))
-#: ``JouleIteration`` field -> (column name, registry quantity, or None for a bare count)
+#: ``JouleIteration`` field -> (column name, registry quantity, or None for a bare count). Since the
+#: galerkin step (L2 commit 7, D27) each field is its column's name.
 ITERATION_COLUMNS = (
-    ('iteration', 'iteration_count', None), ('temperature_defect', 'temperature_change', 'temperature_change'),
-    ('conductivity_defect', 'relative_electrical_conductivity_change', 'relative_electrical_conductivity_change'),
+    ('iteration_count', 'iteration_count', None), ('temperature_change', 'temperature_change', 'temperature_change'),
+    ('relative_electrical_conductivity_change', 'relative_electrical_conductivity_change',
+     'relative_electrical_conductivity_change'),
     ('minimum_temperature', 'minimum_temperature', 'minimum_temperature'),
     ('maximum_temperature', 'maximum_temperature', 'maximum_temperature'),
-    ('electric_free_residual', 'maximum_residual_current_per_depth', 'maximum_residual_current_per_depth'),
-    ('thermal_free_residual', 'maximum_residual_heat_rate_per_depth', 'maximum_residual_heat_rate_per_depth'),
-    ('nonlinear_heat_residual', 'relative_residual', 'relative_residual'),
-    ('current_balance', 'current_imbalance_per_depth', 'current_imbalance_per_depth'),
-    ('supplied_power_per_length', 'inward_electric_power_per_depth', 'inward_electric_power_per_depth'),
-    ('joule_power_per_length', 'joule_power_per_depth', 'joule_power_per_depth'),
-    ('outward_heat_per_length', 'outward_heat_rate_per_depth', 'outward_heat_rate_per_depth'),
-    ('electric_power_defect', 'electric_power_imbalance_per_depth', 'electric_power_imbalance_per_depth'),
-    ('heat_power_defect', 'heat_rate_imbalance_per_depth', 'heat_rate_imbalance_per_depth'))
+    ('maximum_residual_current_per_depth', 'maximum_residual_current_per_depth', 'maximum_residual_current_per_depth'),
+    ('maximum_residual_heat_rate_per_depth', 'maximum_residual_heat_rate_per_depth',
+     'maximum_residual_heat_rate_per_depth'),
+    ('relative_residual', 'relative_residual', 'relative_residual'),
+    ('current_imbalance_per_depth', 'current_imbalance_per_depth', 'current_imbalance_per_depth'),
+    ('inward_electric_power_per_depth', 'inward_electric_power_per_depth', 'inward_electric_power_per_depth'),
+    ('joule_power_per_depth', 'joule_power_per_depth', 'joule_power_per_depth'),
+    ('outward_heat_rate_per_depth', 'outward_heat_rate_per_depth', 'outward_heat_rate_per_depth'),
+    ('electric_power_imbalance_per_depth', 'electric_power_imbalance_per_depth', 'electric_power_imbalance_per_depth'),
+    ('heat_rate_imbalance_per_depth', 'heat_rate_imbalance_per_depth', 'heat_rate_imbalance_per_depth'))
 
 
 def is_electric_joule(data):
@@ -446,20 +454,21 @@ def failure_evidence(exc):
 def electric_balance(electric, fixed, mesh):
     """The electric values of ``balance`` (SI, per metre of depth)."""
     free = np.setdiff1d(np.arange(mesh.num_nodes), list(fixed))
-    return {'current_imbalance_per_depth': float(np.sum(np.asarray(electric.reaction)
-                                                        - np.asarray(electric.prescribed_outward_load))),
-            'maximum_residual_current_per_depth': _norm(np.asarray(electric.residual)[free]),
-            'inward_electric_power_per_depth': electric.supplied_power_per_length,
-            'joule_power_per_depth': electric.joule_power_per_length,
-            'electric_power_imbalance_per_depth': electric.supplied_power_per_length-electric.joule_power_per_length}
+    return {'current_imbalance_per_depth': float(np.sum(np.asarray(electric.reaction_current_per_depth)
+                                                        - np.asarray(electric.outward_prescribed_current_per_depth))),
+            'maximum_residual_current_per_depth': _norm(np.asarray(electric.residual_current_per_depth)[free]),
+            'inward_electric_power_per_depth': electric.inward_electric_power_per_depth,
+            'joule_power_per_depth': electric.joule_power_per_depth,
+            'electric_power_imbalance_per_depth':
+                electric.inward_electric_power_per_depth-electric.joule_power_per_depth}
 
 
 def heat_balance(coupled, fixed, mesh):
     """The heat-stage values of ``balance``."""
     heat = coupled.thermal
     free = np.setdiff1d(np.arange(mesh.num_nodes), list(fixed))
-    return {'outward_heat_rate_per_depth': coupled.outward_heat_per_length,
-            'heat_rate_imbalance_per_depth': coupled.outward_heat_per_length-coupled.source_power_per_length,
+    return {'outward_heat_rate_per_depth': coupled.outward_heat_rate_per_depth,
+            'heat_rate_imbalance_per_depth': coupled.outward_heat_rate_per_depth-coupled.generated_heat_rate_per_depth,
             'maximum_residual_heat_rate_per_depth': _norm(np.asarray(heat.residual_heat_rate_per_depth)[free]),
             'minimum_temperature': float(np.min(heat.temperature)), 'maximum_temperature': float(np.max(heat.temperature))}
 
@@ -637,22 +646,28 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     start = time.perf_counter()
     coupled = nonlinear = None
     if kind == 'joule.temperature2d':
+        # galerkin's keywords and inward values (views.galerkin_*_arguments): the same doubles (H1)
+        electric_kw = views.galerkin_electric_arguments(electric_args)
+        heat_kw = views.galerkin_heat_arguments(heat_args)
         nonlinear = solve_temperature_joule_heat(mesh,
             electrical_conductivity=inputs.conductivity_model,
-            thermal_conductivity=heat_args['conductivity'], electric_dirichlet=electric_fixed,
-            thermal_dirichlet=heat_args['dirichlet'], initial_temperature=inputs.initial_temperature,
-            outward_current=electric_args['outward_current'], outward_flux=heat_args['outward_flux'],
-            convection=heat_args['convection'], method='picard', **inputs.iteration)
+            thermal_conductivity=heat_kw['thermal_conductivity'],
+            prescribed_electric_potential=electric_kw['prescribed_electric_potential'],
+            prescribed_temperature=heat_kw['prescribed_temperature'], initial_temperature=inputs.initial_temperature,
+            inward_current_density=electric_kw['inward_current_density'], inward_heat_flux=heat_kw['inward_heat_flux'],
+            convection=heat_kw['convection'], method='picard', **inputs.iteration)
         coupled = nonlinear.coupled
         electric = coupled.electrical
     else:
-        electric = solve_steady_electric(mesh, conductivity=inputs.conductivity, **electric_args)
+        electric = solve_steady_electric(mesh, **views.galerkin_electric_arguments(
+            dict(conductivity=inputs.conductivity, **electric_args)))
         if kind == 'joule.steady2d':
-            coupled = solve_steady_joule_heat(mesh, electrical_result=electric, **heat_args)
+            coupled = solve_steady_joule_heat(mesh, electrical_result=electric,
+                                              **views.galerkin_heat_arguments(heat_args))
     solve_time = time.perf_counter()-start
     arrays = result_arrays(mesh, electric, electric_fixed, heat=None if coupled is None else coupled.thermal,
                            heat_fixed=None if coupled is None else heat_args['dirichlet'],
-                           evaluated=None if nonlinear is None else nonlinear.evaluated_temperature)
+                           evaluated=None if nonlinear is None else nonlinear.evaluation_temperature)
     balance = electric_balance(electric, electric_fixed, mesh)
     if coupled is not None:
         balance.update(heat_balance(coupled, heat_args['dirichlet'], mesh))
@@ -660,7 +675,7 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
                           balance=balance, timings={'mesh': mesh_time, 'solve': solve_time}, mesh=mesh,
                           depth=rect_geometry_03(doc)[2], history=() if nonlinear is None else nonlinear.history)
     printed = [doc.summary(), f'Solved {mesh.num_nodes} nodes, {mesh.num_triangles} triangles; '
-               f'joule_power_per_depth {electric.joule_power_per_length:.12g} W/m']
+               f'joule_power_per_depth {electric.joule_power_per_depth:.12g} W/m']
     if verbose:
         print('\n'.join(printed))
     return ElectricJouleRunResult(doc, arrays, metadata, log_lines_03(doc, printed))

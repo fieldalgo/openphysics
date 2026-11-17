@@ -219,23 +219,30 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
 
 # ----------------------------------------------------------------------------- steady electric
 
-def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity, dirichlet, outward_current=None,
-                                 reference_potential=None):
+def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, electrical_conductivity,
+                                 prescribed_electric_potential, outward_current_density=None,
+                                 reference_electric_potential=None):
     """``electric.solve_steady_electric`` on X0 + t W with the derivative with respect to ``motion.t``.
 
-    As for heat: the ordinary solve on the moved mesh gives the numbers and all checks,
-    and one live solve of the system assembled from the live coordinates attaches the
-    derivative to every result field."""
+    Internal (galerkin.kernels): reached through ``motion=``, after the public solver has
+    negated the inward current density, so this takes the outward current density
+    (A/m^2, positive leaves the body). As for heat: the ordinary solve on the moved mesh
+    gives the numbers and all checks, and one live solve of the system assembled from
+    the live coordinates attaches the derivative to every result field."""
     from . import electric
+
+    conductivity, dirichlet, outward_current, reference_potential = (
+        electrical_conductivity, prescribed_electric_potential, outward_current_density, reference_electric_potential)
 
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
     if type(conductivity).__name__ == "ElementConductivity":
-        raise TypeError("motion: conductivity is an ElementConductivity; give a scalar or a region table")
-    _coefficient(conductivity, "conductivity")
-    for tag, value in _tags(outward_current, "outward_current").items():
-        _numpy_data(value, f"outward_current[{tag!r}]")
-    for name, table in (("dirichlet", dirichlet), ("reference_potential", reference_potential or {})):
+        raise TypeError("motion: electrical_conductivity is an ElementConductivity; give a scalar or a region table")
+    _coefficient(conductivity, "electrical_conductivity")
+    for tag, value in _tags(outward_current, "outward_current_density").items():
+        _numpy_data(value, f"the current density on {tag!r}")
+    for name, table in (("prescribed_electric_potential", dirichlet),
+                        ("reference_electric_potential", reference_potential or {})):
         if not isinstance(table, Mapping):
             raise ValueError(f"{name} must map node indices to scalar volts")
         for value in table.values():
@@ -248,13 +255,14 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
                                f"({lo:g}, {hi:g}))")
     moved = _moved_mesh(mesh, W, t0)
-    base = electric.solve_steady_electric(moved, conductivity=conductivity, dirichlet=dirichlet,
-                                          outward_current=outward_current, reference_potential=reference_potential)
+    base = electric.solve_steady_electric_outward(moved, conductivity=conductivity, dirichlet=dirichlet,
+                                                  outward_current=outward_current,
+                                                  reference_potential=reference_potential)
     n = mesh.num_nodes
     X = lift(xp, mesh.nodes) + t * lift(xp, W)
     tris = mesh.triangles
     b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
-    sigma = lift(xp, _per_triangle(mesh, conductivity, "conductivity", positive=True))
+    sigma = lift(xp, _per_triangle(mesh, conductivity, "electrical_conductivity", positive=True))
     element = sigma[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
         / (4.0 * area)[:, None, None]
     K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
@@ -276,7 +284,7 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, conductivity
         if not anchored[labels[node]]:
             offsets[labels[node]], anchored[labels[node]] = float(value), True
     _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, outward_current)
-    I0 = lift(xp, np.asarray(base.potential) - offsets[labels])
+    I0 = lift(xp, np.asarray(base.electric_potential) - offsets[labels])
     fixed = {(int(node),): 0.0 for node in (*dirichlet, *gauges)}
     delta = core_solve.solve_dirichlet(K, -outward - K.matvec(I0), fixed)
     increment = I0 + delta

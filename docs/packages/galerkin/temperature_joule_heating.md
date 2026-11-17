@@ -29,21 +29,27 @@ inputs or depend on call count. General positivity between evaluations is the
 material author's responsibility.
 
 `solve_temperature_joule_heat(mesh, *, electrical_conductivity,
-thermal_conductivity, electric_dirichlet, thermal_dirichlet,
-initial_temperature, outward_current=None, reference_potential=None,
-outward_flux=None, convection=None, relaxation=0.5, temperature_atol=1e-8,
-relative_tolerance=1e-10, max_iterations=100, method="picard")` uses relaxed
-Picard iteration by default; `method="newton"` is described [below](#newton-method),
+thermal_conductivity, prescribed_electric_potential, prescribed_temperature,
+initial_temperature, temperature_tolerance, inward_current_density=None,
+reference_electric_potential=None, inward_heat_flux=None, convection=None,
+relaxation_factor=0.5, relative_tolerance=1e-10, iteration_limit=100,
+method="picard")` takes every quantity as a keyword-only SI value under its registry
+name (a `str` raises `TypeError`); `temperature_tolerance` (K) is required, with no
+default. `prescribed_electric_potential` (V) and `prescribed_temperature` (K) map
+exterior nodes; `inward_current_density` (A/m²) and `inward_heat_flux` (W/m²) are
+positive into the body, as in [steady electric conduction](electric_steady2d.md)
+and [steady heat](thermal_flux_robin.md), and are negated once, as `0.0 - x`,
+before the iteration. It uses relaxed Picard iteration by default; `method="newton"` is described [below](#newton-method),
 and *Choosing a method* below says when to use it.
 The initial value is a finite scalar K or `(N,)` nodal K vector; impose thermal
 Dirichlet values before the first evaluation. Initial values are required:
 there is no implicit choice of a thermal branch. Relaxation is fixed in `(0,1]`.
 Each iteration evaluates sigma(T_i), calls the existing electrical solver and
 one-way heat solver to obtain H(T_i), then forms
-`T_(i+1) = T_i + relaxation * (H(T_i)-T_i)`.
+`T_(i+1) = T_i + relaxation_factor * (H(T_i)-T_i)`.
 
 Convergence requires the **unrelaxed** infinity defect to be at most
-`temperature_atol + relative_tolerance * max(abs(T_i), abs(H(T_i)))` and the
+`temperature_tolerance + relative_tolerance * max(abs(T_i), abs(H(T_i)))` and the
 maximum elementwise relative change `abs(sigma(H(T_i))-sigma(T_i))/max(sigma(H(T_i)),sigma(T_i))` to be at most
 `relative_tolerance`. Both the trial heat solution and relaxed state are checked
 against material ranges. Tiny relaxation cannot manufacture convergence.
@@ -51,16 +57,16 @@ A further electric solve at H(T_i) verifies the nonlinear heat residual
 `r_heat + load(T_i) - load(H(T_i))` on free thermal nodes. Its infinity norm
 divided by the largest infinity norm of the two Joule loads and thermal
 reaction/prescribed-outward/convective loads (machine tiny floor)
-must be <= 1e-8. This dimensionless diagnostic is `nonlinear_heat_residual`.
-Picard performs at most `max_iterations` coupled solves, with no hidden retry or
+must be <= 1e-8. This dimensionless diagnostic is `relative_residual`.
+Picard performs at most `iteration_limit` coupled solves, with no hidden retry or
 adaptive relaxation; the [Newton method](#newton-method) states its own bound.
-Tolerances are finite positive, max_iterations is a positive integer. Multiple solutions, uniqueness and convergence are not guaranteed.
+Tolerances are finite positive, iteration_limit is a positive integer. Multiple solutions, uniqueness and convergence are not guaranteed.
 
 **Choosing a method.** Start with the default, `"picard"`: it is the established
 path, the one JSON documents use, and the one the macOS and Windows installation
 checks run (through the simcase `joule_temperature` example). With weak feedback
 it converges in a few iterations, and an iteration costs less than a Newton state. Use `"newton"` when
-Picard is slow or stops at `max_iterations` under strong feedback; for the
+Picard is slow or stops at `iteration_limit` under strong feedback; for the
 contract thermistor at alpha = 7 or 9 per K Newton needs 4 states (see
 [Validation](#validation)). Pass `derivative` when dsigma/dT is known. Both
 methods return a result only through the same convergence tests. Newton has been
@@ -105,9 +111,9 @@ defect` with T_i's maximum-norm defect in K, as in its history record, followed,
 when the last evaluated candidate failed, by that failure, chained as the cause.
 A defect of a few ulp of the temperatures (about 1e-13 K at 300 K on the
 contract's meshes, more on finer ones) may mean the tolerances ask for more than
-floating point resolves. `relaxation` does not apply. `max_iterations` bounds the
+floating point resolves. `relaxation_factor` does not apply. `iteration_limit` bounds the
 accepted states, one history record each; each step evaluates at most 31
-candidates, so at most `1 + 31*(max_iterations-1)` states are evaluated.
+candidates, so at most `1 + 31*(iteration_limit-1)` states are evaluated.
 
 Convergence is decided only by the tests above, so a Newton result satisfies
 the same bounds as a Picard result. With an exact `derivative` the defect falls
@@ -119,14 +125,21 @@ from a nearby solved load may succeed).
 
 ## Results, residuals and failure
 
-Return a `TemperatureJouleHeatResult` containing `coupled` (the existing
-`SteadyJouleHeatResult`), `evaluated_temperature` (T_i), and immutable scalar
-`history` records. The returned thermal temperature is H(T_i); sigma belongs to
-T_i. Their discrepancy is explicitly bounded by both convergence tests above,
-not claimed to be an exact nonlinear root. Each record reports iteration,
-unrelaxed temperature defect K, relative conductivity defect, temperature extrema
-K, electric and thermal free residual infinity norms A/m and W/m, current balance
-A/m, supplied/Joule/outward heat W/m, and electric/heat power defects W/m.
+Return a frozen `TemperatureJouleHeatResult` containing `coupled` (the existing
+`SteadyJouleHeatResult`), `evaluation_temperature` (T_i), and immutable scalar
+`history` records (`JouleIteration`, frozen; each result has `.units`). The returned
+thermal temperature is H(T_i); sigma belongs to T_i. Their discrepancy is explicitly
+bounded by both convergence tests above, not claimed to be an exact nonlinear root.
+Each record reports `iteration_count`, the unrelaxed temperature defect
+`temperature_change` K, the relative conductivity defect
+`relative_electrical_conductivity_change`, `minimum_temperature` and
+`maximum_temperature` K, the electric and thermal free residual infinity norms
+`maximum_residual_current_per_depth` A/m and `maximum_residual_heat_rate_per_depth`
+W/m, `relative_residual`, the current balance `current_imbalance_per_depth` A/m, the
+supplied/Joule/outward heat `inward_electric_power_per_depth`,
+`joule_power_per_depth` and `outward_heat_rate_per_depth` W/m, and the electric/heat
+power defects `electric_power_imbalance_per_depth` and
+`heat_rate_imbalance_per_depth` W/m (simcase's iteration columns).
 Existing subsolves retain their normalized 1e-10 residual and per-component
 current/heat and electric-power gates; the one-way transfer retains its 1e-10
 power gates. These checks do not replace the nonlinear fixed-point tests.
@@ -137,11 +150,11 @@ Rates are per unit out-of-plane depth; multiply W/m by depth in m for W.
 
 Before anything is evaluated, the solver checks the mesh and these options and
 raises ValueError: the mesh is a valid triangle mesh (no coincident nodes, for
-example); `method` is `"picard"` or `"newton"`; `relaxation` is in (0,1] and
-both tolerances are finite and positive; `max_iterations` is a positive integer;
+example); `method` is `"picard"` or `"newton"`; `relaxation_factor` is in (0,1] and
+both tolerances are finite and positive; `iteration_limit` is a positive integer;
 `electrical_conductivity` is one `ConductivityModel` or a table of them whose
 keys are exactly the mesh region names; `initial_temperature` is a finite real
-scalar or `(N,)` vector in K; and `thermal_dirichlet` maps exterior integer node
+scalar or `(N,)` vector in K; and `prescribed_temperature` maps exterior integer node
 indices to finite K. A JAX or PyTorch value passed directly in any other input
 (or inside its tables) raises TypeError before that
 ([refused, not approximated](differentiation.md#refused-not-approximated));
@@ -150,7 +163,7 @@ indices to finite K. A JAX or PyTorch value passed directly in any other input
 
 Everything else is checked when a state T_i is evaluated, by the solver's sigma
 checks or by the subsolves: the thermal conductivity, the electric Dirichlet and
-reference potentials, the outward current, flux and convection data, and every
+reference potentials, the inward current density, heat flux and convection data, and every
 value a conductivity or boundary callback returns. Any `Exception` raised during
 an evaluation is wrapped in `JouleConvergenceError` with the original exception
 chained as `__cause__`; KeyboardInterrupt and SystemExit pass through. That
@@ -164,17 +177,18 @@ failures; read the cause instead. An invalid input usually fails in the first
 evaluation, before any record exists, so `history` may be empty. Newton also
 raises `JouleConvergenceError` when its step cannot be formed (the Jacobian,
 dsigma/dT or the linear solve), chaining that cause, and when its line search
-accepts no step (above). Reaching `max_iterations` raises it without a cause.
+accepts no step (above). Reaching `iteration_limit` raises it without a cause.
 No partial successful result is returned.
 
-The error carries `reason` (its message), `history` (the completed records, one
-per Picard iteration or accepted Newton state) and `last_temperature`, a
+The error, `JouleConvergenceError(reason, history, *, temperature)`, carries `reason`
+(its message), `history` (the completed records, one per Picard iteration or
+accepted Newton state) and `last_temperature` (the keyword `temperature`), a
 read-only `(N,)` array in K whose state depends on how the solve ended:
 
 | How the solve ended | `last_temperature` |
 |---|---|
-| Picard reaches `max_iterations` | the relaxed next state `T_i + relaxation*(H(T_i)-T_i)`; it is not evaluated and not in `history` |
-| Newton reaches `max_iterations` | the last accepted state T_i, whose H(T_i) is the last record of `history` |
+| Picard reaches `iteration_limit` | the relaxed next state `T_i + relaxation_factor*(H(T_i)-T_i)`; it is not evaluated and not in `history` |
+| Newton reaches `iteration_limit` | the last accepted state T_i, whose H(T_i) is the last record of `history` |
 | Newton cannot form a step, or its line search accepts none | the last accepted state T_i |
 | An evaluation fails before its heat solution exists (sigma(T_i), the electric solve or the heat solve) | the state being evaluated, T_i |
 | An evaluation fails after its heat solution exists (for example H(T_i) outside a material range) | that trial heat solution H(T_i) |
@@ -210,7 +224,7 @@ repository root with galerkin installed:
 python examples/galerkin/temperature_joule_heating.py
 ```
 
-The example prescribes 1 A/m² outward on the right, V=0 on the left, T=300 K
+The example prescribes 1 A/m² leaving on the right (`inward_current_density` -1 A/m²), V=0 on the left, T=300 K
 at both ends, k=1 W/(m K), sigma=1/(1+0.5*(T-300)) S/m and a [300,400] K
 valid interval. It prints temperature, W/m power, iteration count and defects.
 `ElementConductivity(mesh, values)` in `galerkin.electric` also accepts explicit

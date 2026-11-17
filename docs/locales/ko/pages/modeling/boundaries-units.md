@@ -32,8 +32,8 @@ h=0은 온도 기준이 아닙니다. 완전 단열 과도 문제는 저장 항�
 ## 전기·역학 구속
 
 - 전압은 전위를 고정합니다(문서의 `prescribed_electric_potential`). 문서의
-  `inward_current_density`는 물체로 들어올 때 양수이고, Python 전기 API는 물체 밖으로 나갈 때
-  양수인 처방 외향 전류밀도 J·n을 받습니다(simcase가 문서 값의 부호를 뒤집어 넘깁니다).
+  `inward_current_density`는 물체로 들어올 때 양수이고, Python 전기 API의
+  `inward_current_density`도 같습니다(galerkin이 한 번 부호를 뒤집어 조립하는 외향 J·n으로 바꿉니다).
   보고하는 경계 전류(`outward_current_per_depth`)는 밖으로 나갈 때 양수입니다.
   Python 전기 API에는 명시적 순수 Neumann gauge 경로가 있지만 제한된 JSON 입력도
   이를 지원한다고 가정하면 안 됩니다.

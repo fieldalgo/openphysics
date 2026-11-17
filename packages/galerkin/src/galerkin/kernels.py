@@ -39,7 +39,10 @@ matrices these assembly functions place, for galerkin's own modules.
   ``solve_thermoelasticity_moving`` and ``solve_steady_thermoelasticity_moving``
   (``galerkin.shape``). The public route to them is ``motion=`` on the public solver,
   which negates inward data first: the heat mirrors take today's outward heat flux, as
-  ``outward_heat_flux``, and registry names for the other heat quantities.
+  ``outward_heat_flux``, and the electric mirror the outward current density, as
+  ``outward_current_density`` (A/m^2, positive leaves the body; the registry has no
+  outward density name, and this internal keyword is not scanned), with registry names
+  for the other quantities.
 
 The electromagnetic kernels (edge spaces, curl-curl, PML, mode systems and overlaps)
 are not in this namespace yet; they are still names of galerkin's top level.

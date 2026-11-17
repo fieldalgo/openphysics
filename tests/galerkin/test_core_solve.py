@@ -359,7 +359,8 @@ def test_overlapping_numpy_solves_leave_the_warning_filters_alone(monkeypatch, p
         "heat": lambda: solve_steady_heat(mesh, thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in left},
                                           heat_source_density=1.0),
         "electric": lambda: solve_steady_electric(
-            mesh, conductivity=2.0, dirichlet={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
+            mesh, electrical_conductivity=2.0,
+            prescribed_electric_potential={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
         "elasticity": lambda: solve_elasticity(
             mesh, young_modulus=2e3, poisson_ratio=0.3, plane="stress",
             dirichlet={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),

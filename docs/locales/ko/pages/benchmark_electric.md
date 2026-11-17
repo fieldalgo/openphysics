@@ -24,7 +24,7 @@ status는 0이 아닙니다. 기본값은 네 사례를 `n = 8, 16, 32, 64`에�
 |---|---|
 | `conduction` | [Joule 튜토리얼](packages/galerkin/joule_tutorial.md)의 20 mm × 10 mm 띠를 `2n × n` 셀로 나눈 `galerkin.electric.solve_steady_electric`, σ = 3 S/m, 왼쪽 0 V, 오른쪽 2 V |
 | `joule` | 같은 DC 풀이 뒤 k = 5 W/(m K), 양 끝 300 K의 `galerkin.joule_heating.solve_steady_joule_heat`. 두 단계를 따로 측정 |
-| `thermistor_picard` | [온도 의존 튜토리얼](packages/galerkin/temperature_joule_tutorial.md)의 전류 구동 thermistor에 `galerkin.temperature_joule_heating.solve_temperature_joule_heat(method="picard")`: 1 m × 0.25 m를 `4n × n` 셀로, [300, 400] K에서 ρ(T) = 1 + 0.5 (T − 300 K) Ω m, 오른쪽 끝으로 1 A/m², 양 끝 300 K, `--relaxation` 기본 1.0(튜토리얼 값) |
+| `thermistor_picard` | [온도 의존 튜토리얼](packages/galerkin/temperature_joule_tutorial.md)의 전류 구동 thermistor에 `galerkin.temperature_joule_heating.solve_temperature_joule_heat(method="picard")`: 1 m × 0.25 m를 `4n × n` 셀로, [300, 400] K에서 ρ(T) = 1 + 0.5 (T − 300 K) Ω m, 오른쪽 끝으로 나가는 1 A/m²(`inward_current_density` −1 A/m²), 양 끝 300 K, `--relaxation` 기본 1.0(튜토리얼 값) |
 | `thermistor_newton` | 같은 문제를 `method="newton"`으로. `ConductivityModel`이 해석적 dσ/dT를 지니므로 Newton 단계는 차분을 쓰지 않음 |
 
 전류 밀도는 단위 깊이당 값입니다. 띠의 정확한 Joule 전력 σV²H/L = 6 W/m을 계산값

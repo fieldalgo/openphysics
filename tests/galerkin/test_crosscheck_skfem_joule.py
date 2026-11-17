@@ -22,11 +22,11 @@ def test_actual_joule_pipeline_against_independent_skfem(case):
         bc.update({int(i): 0. for i in right})
     clock = Stopwatch()
     with clock('openphysics'):
-        electric = solve_steady_electric(mesh, conductivity=sigma, dirichlet=bc,
-                                         outward_current={'right': 100.} if case == 'current' else None)
-        ours = solve_steady_joule_heat(mesh, electrical_result=electric, conductivity=k,
-                                       dirichlet={int(i): 300. for i in left},
-                                       outward_flux={'top': 20.}, convection={'right': (100., 300.)})
+        electric = solve_steady_electric(mesh, electrical_conductivity=sigma, prescribed_electric_potential=bc,
+                                         inward_current_density={'right': -100.} if case == 'current' else None)
+        ours = solve_steady_joule_heat(mesh, electrical_result=electric, thermal_conductivity=k,
+                                       prescribed_temperature={int(i): 300. for i in left},
+                                       inward_heat_flux={'top': -20.}, convection={'right': (100., 300.)})
     with clock('reference'):
         m = sk.MeshTri(mesh.nodes.T.copy(), mesh.triangles.T.copy())
         basis = sk.Basis(m, sk.ElementTriP1())
@@ -76,8 +76,8 @@ def test_actual_joule_pipeline_against_independent_skfem(case):
                      analytical_acceptance='tests/galerkin/test_joule_heating.py',
                      observables=[observable(name, unit, 'max relative difference', relative_difference(a, b), 1e-9)
                                   for name, unit, a, b in [
-                                      ('Joule source', 'W/m^3', electric.joule_heating, Q),
+                                      ('Joule source', 'W/m^3', electric.joule_power_density, Q),
                                       ('nodal heat load', 'W/m', ours.thermal.generated_heat_rate_per_depth, load),
                                       ('temperature rise', 'K', ours.thermal.temperature-300., rise),
                                       ('heat flux', 'W/m^2', ours.thermal.heat_flux, flux),
-                                      ('power', 'W/m', ours.source_power_per_length, reference_power)]]))
+                                      ('power', 'W/m', ours.generated_heat_rate_per_depth, reference_power)]]))

@@ -72,16 +72,18 @@ def _plate():
 
 def _plate_solve(m, W, t):
     left = [int(i) for i in m.boundary["left"]]
-    return solve_steady_electric(m, conductivity={"host": 2.0e3, "core": 5.0e4}, dirichlet={i: 0.0 for i in left},
-                                 outward_current={"right": -1.5e3}, motion=None if t is None else MeshMotion(design_velocity=W, t=t))
+    return solve_steady_electric(m, electrical_conductivity={"host": 2.0e3, "core": 5.0e4},
+                                 prescribed_electric_potential={i: 0.0 for i in left},
+                                 inward_current_density={"right": 1.5e3},
+                                 motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
 
 def _functionals(m, r, xp):
     probe = int(np.argmin(np.hypot(m.nodes[:, 0] - 0.7, m.nodes[:, 1] - 0.3)))
     left = np.asarray([int(i) for i in m.boundary["left"]])
-    return {"probe": lambda: r.potential[probe],
-            "terminal_current": lambda: xp.sum(r.reaction[left]),
-            "joule_power": lambda: r.joule_power_per_length}
+    return {"probe": lambda: r.electric_potential[probe],
+            "terminal_current": lambda: xp.sum(r.reaction_current_per_depth[left]),
+            "joule_power": lambda: r.joule_power_per_depth}
 
 
 # ---------------------------------------------------------------- E1 discrete consistency
@@ -115,10 +117,10 @@ def test_e2_two_layer_resistor(name):
     left, right = ([int(i) for i in m.boundary[s]] for s in ("left", "right"))
 
     def resistance(t):
-        r = solve_steady_electric(m, conductivity={"a": s1, "b": s2},
-                                  dirichlet={**{i: 1.0 for i in left}, **{i: 0.0 for i in right}},
+        r = solve_steady_electric(m, electrical_conductivity={"a": s1, "b": s2},
+                                  prescribed_electric_potential={**{i: 1.0 for i in left}, **{i: 0.0 for i in right}},
                                   motion=MeshMotion(design_velocity=W, t=t))
-        return 1.0 / xp.sum(r.reaction[np.asarray(left)])
+        return 1.0 / xp.sum(r.reaction_current_per_depth[np.asarray(left)])
 
     value, grad = _gradient(name, resistance)
     assert rel(value, (L1 / s1 + (L - L1) / s2) / H) <= 1e-10
@@ -162,8 +164,9 @@ def test_e3_coaxial_inner_radius(name):
         dirichlet = {**{int(i): 1.0 for i in inner_nodes}, **{int(i): 0.0 for i in np.flatnonzero(outer)}}
 
         def current(t):
-            r = solve_steady_electric(mesh, conductivity=sigma, dirichlet=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
-            return xp.sum(r.reaction[inner_nodes])
+            r = solve_steady_electric(mesh, electrical_conductivity=sigma, prescribed_electric_potential=dirichlet,
+                                      motion=MeshMotion(design_velocity=W, t=t))
+            return xp.sum(r.reaction_current_per_depth[inner_nodes])
 
         errors.append(rel(_gradient(name, current)[1], exact))
     orders = [math.log(errors[i] / errors[i + 1]) / math.log(sizes[i] / sizes[i + 1]) for i in range(2)]
@@ -182,7 +185,7 @@ def test_e4_rigid_translation(name, functional):
 
     def objective(t):
         r = _plate_solve(m, W, t)
-        return r.joule_power_per_length if functional == "joule_power" else xp.sum(r.potential)
+        return r.joule_power_per_depth if functional == "joule_power" else xp.sum(r.electric_potential)
 
     value, grad = _gradient(name, objective)
     assert abs(grad) <= 1e-12 * abs(value)
@@ -193,8 +196,8 @@ def test_e4_rigid_translation(name, functional):
 @pytest.mark.parametrize("name", BACKENDS)
 def test_e5_power_identity_holds_along_the_motion(name):
     m, W = _plate()
-    _p, d_power = _gradient(name, lambda t: _plate_solve(m, W, t).joule_power_per_length)
-    _s, d_supplied = _gradient(name, lambda t: _plate_solve(m, W, t).supplied_power_per_length)
+    _p, d_power = _gradient(name, lambda t: _plate_solve(m, W, t).joule_power_per_depth)
+    _s, d_supplied = _gradient(name, lambda t: _plate_solve(m, W, t).inward_electric_power_per_depth)
     assert rel(d_power, d_supplied) <= 1e-10
 
 
@@ -204,13 +207,14 @@ def test_e6_unchanged_without_motion():
     # main and this branch give the same sha256 for this problem (measured 2026-11-10; HQ record)
     m, _W = _plate()
     left = [int(i) for i in m.boundary["left"]]
-    kw = dict(conductivity={"host": 2.0e3, "core": 5.0e4}, dirichlet={i: 0.0 for i in left},
-              outward_current={"right": -1.5e3})
+    kw = dict(electrical_conductivity={"host": 2.0e3, "core": 5.0e4}, prescribed_electric_potential={i: 0.0 for i in left},
+              inward_current_density={"right": 1.5e3})
 
     def digest(r):
         return hashlib.sha256(b"".join(np.ascontiguousarray(getattr(r, f), dtype=float).tobytes() for f in
-                                       ("potential", "electric_field", "current_density", "joule_heating",
-                                        "joule_load", "reaction", "residual"))).hexdigest()
+                                       ("electric_potential", "electric_field", "current_density",
+                                        "joule_power_density", "generated_heat_rate_per_depth",
+                                        "reaction_current_per_depth", "residual_current_per_depth"))).hexdigest()
 
     assert digest(solve_steady_electric(m, **kw)) == digest(solve_steady_electric(m, **kw, motion=None))
 
@@ -223,9 +227,10 @@ def test_e7_neumann_component_with_a_gauge(name):
     gauge = int(m.boundary["left"][0])
 
     def solve(mesh, t):
-        return solve_steady_electric(mesh, conductivity={"host": 2.0e3, "core": 5.0e4}, dirichlet={},
-                                     outward_current={"right": -1.5e3, "left": 1.5e3},
-                                     reference_potential={gauge: 0.0},
+        return solve_steady_electric(mesh, electrical_conductivity={"host": 2.0e3, "core": 5.0e4},
+                                     prescribed_electric_potential={},
+                                     inward_current_density={"right": 1.5e3, "left": -1.5e3},
+                                     reference_electric_potential={gauge: 0.0},
                                      motion=None if t is None else MeshMotion(design_velocity=W, t=t))
 
     # left (height 0.6) and right (moves) carry currents that must balance; keep the right side
@@ -233,10 +238,10 @@ def test_e7_neumann_component_with_a_gauge(name):
     x = m.nodes[:, 0]
     W = W * (x[:, None] * (1 - x[:, None])) * 4.0
     probe = int(np.argmin(np.hypot(m.nodes[:, 0] - 0.7, m.nodes[:, 1] - 0.3)))
-    _value, grad = _gradient(name, lambda t: solve(m, t).potential[probe])
+    _value, grad = _gradient(name, lambda t: solve(m, t).electric_potential[probe])
     h = 1e-4
-    fd = (float(solve(_moved(m, W, h), None).potential[probe])
-          - float(solve(_moved(m, W, -h), None).potential[probe])) / (2 * h)
+    fd = (float(solve(_moved(m, W, h), None).electric_potential[probe])
+          - float(solve(_moved(m, W, -h), None).electric_potential[probe])) / (2 * h)
     assert rel(grad, fd) <= 1e-6, (grad, fd)
 
 
@@ -246,20 +251,22 @@ def test_e8_refusals():
     xp = _xp("jax")
     m, W = _plate()
     left = [int(i) for i in m.boundary["left"]]
-    common = dict(dirichlet={i: 0.0 for i in left})
+    common = dict(prescribed_electric_potential={i: 0.0 for i in left})
     t = xp.asarray(0.0)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
-        solve_steady_electric(m, conductivity=2.0e3, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match=r"outward_current\['right'\] is a callback"):
-        solve_steady_electric(m, conductivity=2.0e3, **common, outward_current={"right": lambda p, n: np.ones(len(p))},
+        solve_steady_electric(m, electrical_conductivity=2.0e3, **common, motion=MeshMotion(design_velocity=W, t=0.0))
+    with pytest.raises(TypeError, match=r"the current density on 'right' is a callback"):
+        solve_steady_electric(m, electrical_conductivity=2.0e3, **common,
+                              inward_current_density={"right": lambda p, n: -np.ones(len(p))},
                               motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="conductivity is live"):
-        solve_steady_electric(m, conductivity={"host": xp.asarray(2.0e3), "core": 5.0e4}, **common,
+    with pytest.raises(TypeError, match="electrical_conductivity is live"):
+        solve_steady_electric(m, electrical_conductivity={"host": xp.asarray(2.0e3), "core": 5.0e4}, **common,
                               motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="dirichlet is live"):
-        solve_steady_electric(m, conductivity=2.0e3, dirichlet={left[0]: xp.asarray(1.0)}, motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(TypeError, match="prescribed_electric_potential is live"):
+        solve_steady_electric(m, electrical_conductivity=2.0e3, prescribed_electric_potential={left[0]: xp.asarray(1.0)},
+                              motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="ElementConductivity"):
-        solve_steady_electric(m, conductivity=ElementConductivity(m, np.full(m.num_triangles, 2.0e3)), **common,
+        solve_steady_electric(m, electrical_conductivity=ElementConductivity(m, np.full(m.num_triangles, 2.0e3)), **common,
                               motion=MeshMotion(design_velocity=W, t=t))
 
 
@@ -274,14 +281,15 @@ def test_review_large_common_mode_voltage(name, common):
     x, y = m.nodes[:, 0], m.nodes[:, 1]
     W = np.stack([0.1 * x * y, 0.05 * np.sin(3 * x)], axis=1)
     left, right = ([int(i) for i in m.boundary[s]] for s in ("left", "right"))
-    kw = dict(conductivity=1.0e3, dirichlet={**{i: common + 1.0 for i in left}, **{i: common for i in right}})
+    kw = dict(electrical_conductivity=1.0e3,
+              prescribed_electric_potential={**{i: common + 1.0 for i in left}, **{i: common for i in right}})
     base = solve_steady_electric(m, **kw)
     supplied, d_supplied = _gradient(name, lambda t: solve_steady_electric(m, **kw, motion=MeshMotion(design_velocity=W, t=t))
-                                     .supplied_power_per_length)
+                                     .inward_electric_power_per_depth)
     power, d_power = _gradient(name, lambda t: solve_steady_electric(m, **kw, motion=MeshMotion(design_velocity=W, t=t))
-                               .joule_power_per_length)
-    assert rel(supplied, base.supplied_power_per_length) <= 1e-9
-    assert rel(power, base.joule_power_per_length) <= 1e-12
+                               .joule_power_per_depth)
+    assert rel(supplied, base.inward_electric_power_per_depth) <= 1e-9
+    assert rel(power, base.joule_power_per_depth) <= 1e-12
     assert rel(d_supplied, d_power) <= 1e-10                         # E5's criterion
 
 
@@ -292,17 +300,22 @@ def test_review_motion_that_changes_a_current_only_balance_is_refused():
     W = np.stack([np.zeros_like(x), x * y], axis=1)                 # the right side grows, the left does not
     gauge = int(m.boundary["left"][0])
     with pytest.raises(ValueError, match="changes its net imposed current"):
-        solve_steady_electric(m, conductivity=1.0e3, dirichlet={}, outward_current={"left": 100.0, "right": -100.0},
-                              reference_potential={gauge: 0.0}, motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
+        solve_steady_electric(m, electrical_conductivity=1.0e3, prescribed_electric_potential={},
+                              inward_current_density={"left": -100.0, "right": 100.0},
+                              reference_electric_potential={gauge: 0.0},
+                              motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
 
 
 def test_review_messages():
     xp = _xp("jax")
     m, W = _plate()
     left = [int(i) for i in m.boundary["left"]]
-    with pytest.raises(ValueError, match="outward_current must map boundary edge tags"):
-        solve_steady_electric(m, conductivity=2.0e3, dirichlet={i: 0.0 for i in left},
-                              outward_current=[("right", 1.0)], motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
-    with pytest.raises(ValueError, match="conductivity is a callback; with a motion it must be a finite real scalar"):
-        solve_steady_electric(m, conductivity=lambda p: np.ones(len(p)), dirichlet={i: 0.0 for i in left},
+    with pytest.raises(ValueError, match="inward_current_density must map boundary edge tags"):
+        solve_steady_electric(m, electrical_conductivity=2.0e3, prescribed_electric_potential={i: 0.0 for i in left},
+                              inward_current_density=[("right", -1.0)],
+                              motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
+    with pytest.raises(ValueError,
+                       match="electrical_conductivity is a callback; with a motion it must be a finite real scalar"):
+        solve_steady_electric(m, electrical_conductivity=lambda p: np.ones(len(p)),
+                              prescribed_electric_potential={i: 0.0 for i in left},
                               motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))

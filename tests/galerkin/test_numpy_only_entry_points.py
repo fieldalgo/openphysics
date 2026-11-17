@@ -131,8 +131,9 @@ def _joule(v, **kw):
     """The arguments of a small voltage-driven strip, with ``kw`` replacing some of them."""
     args = dict(electrical_conductivity=ConductivityModel(lambda t: 1 / (1 + 0.5 * (t - 300)), (0.0, 5000.0)),
                 thermal_conductivity=1.0,
-                electric_dirichlet={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in RIGHT}},
-                thermal_dirichlet={i: 300.0 for i in LEFT + RIGHT}, initial_temperature=300.0)
+                prescribed_electric_potential={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in RIGHT}},
+                prescribed_temperature={i: 300.0 for i in LEFT + RIGHT}, initial_temperature=300.0,
+                temperature_tolerance=1e-8)
     args.update(kw)
     return args
 
@@ -140,26 +141,27 @@ def _joule(v, **kw):
 # Every input that can hold a number, in each container it may come in. ``v``
 # turns a number into a live value of the library under test.
 JOULE_CASES = {
-    "electric_dirichlet": lambda v: _joule(v, electric_dirichlet={**{i: 0.0 for i in LEFT},
-                                                                  **{i: v(1.0) for i in RIGHT}}),
+    "prescribed_electric_potential": lambda v: _joule(v, prescribed_electric_potential={
+        **{i: 0.0 for i in LEFT}, **{i: v(1.0) for i in RIGHT}}),
     "thermal_conductivity scalar": lambda v: _joule(v, thermal_conductivity=v(1.0)),
     "thermal_conductivity region table": lambda v: _joule(v, thermal_conductivity={"a": 1.0, "b": v(2.0)}),
-    "outward_current": lambda v: _joule(v, electric_dirichlet={i: 0.0 for i in LEFT},
-                                        outward_current={"right": v(-1.0)}),
-    "reference_potential": lambda v: _joule(v, electric_dirichlet={}, reference_potential={LEFT[0]: v(0.0)},
-                                            outward_current={"left": -1.0, "right": 1.0}),
-    "outward_flux": lambda v: _joule(v, outward_flux={"top": v(1.0)}),
+    "inward_current_density": lambda v: _joule(v, prescribed_electric_potential={i: 0.0 for i in LEFT},
+                                               inward_current_density={"right": v(1.0)}),
+    "reference_electric_potential": lambda v: _joule(v, prescribed_electric_potential={},
+                                                     reference_electric_potential={LEFT[0]: v(0.0)},
+                                                     inward_current_density={"left": 1.0, "right": -1.0}),
+    "inward_heat_flux": lambda v: _joule(v, inward_heat_flux={"top": v(-1.0)}),
     "convection coefficient": lambda v: _joule(v, convection={"top": (v(2.0), 300.0)}),
     "convection ambient": lambda v: _joule(v, convection={"top": [2.0, v(300.0)]}),
-    "thermal_dirichlet": lambda v: _joule(v, thermal_dirichlet={**{i: 300.0 for i in LEFT},
-                                                                **{i: v(300.0) for i in RIGHT}}),
+    "prescribed_temperature": lambda v: _joule(v, prescribed_temperature={**{i: 300.0 for i in LEFT},
+                                                                          **{i: v(300.0) for i in RIGHT}}),
     "initial_temperature scalar": lambda v: _joule(v, initial_temperature=v(300.0)),
     "initial_temperature array": lambda v: _joule(v, initial_temperature=v(np.full(JOULE_MESH.num_nodes, 300.0))),
     "initial_temperature list": lambda v: _joule(v, initial_temperature=[v(300.0)] * JOULE_MESH.num_nodes),
-    "relaxation": lambda v: _joule(v, relaxation=v(0.5)),
-    "temperature_atol": lambda v: _joule(v, temperature_atol=v(1e-8)),
+    "relaxation_factor": lambda v: _joule(v, relaxation_factor=v(0.5)),
+    "temperature_tolerance": lambda v: _joule(v, temperature_tolerance=v(1e-8)),
     "relative_tolerance": lambda v: _joule(v, relative_tolerance=v(1e-10)),
-    "max_iterations": lambda v: _joule(v, max_iterations=v(100.0)),
+    "iteration_limit": lambda v: _joule(v, iteration_limit=v(100.0)),
 }
 
 
@@ -210,11 +212,11 @@ JOULE_CALLBACKS = {
     "derivative": (lambda v: _joule(v, electrical_conductivity=ConductivityModel(
         lambda t: 1 / (1 + 0.5 * (t - 300)), (0.0, 5000.0),
         derivative=lambda t: v(-0.5 / (1 + 0.5 * (t - 300)) ** 2))), 1),
-    "outward_flux": (lambda v: _joule(v, outward_flux={"top": _ones(v)}), 0),
+    "inward_heat_flux": (lambda v: _joule(v, inward_heat_flux={"top": _ones(v)}), 0),
     "convection coefficient": (lambda v: _joule(v, convection={"top": (_ones(v), 300.0)}), 0),
     "convection ambient": (lambda v: _joule(v, convection={"top": (2.0, _ones(v))}), 0),
-    "outward_current": (lambda v: _joule(v, electric_dirichlet={i: 0.0 for i in LEFT},
-                                         outward_current={"right": _ones(v)}), 0),
+    "inward_current_density": (lambda v: _joule(v, prescribed_electric_potential={i: 0.0 for i in LEFT},
+                                                inward_current_density={"right": _ones(v)}), 0),
 }
 
 

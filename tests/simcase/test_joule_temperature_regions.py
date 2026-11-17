@@ -172,9 +172,10 @@ def _direct(raw):
     thermal = {int(n): v for side, v in (("left", T_LEFT), ("right", T_RIGHT)) for n in mesh.boundary[side]}
     return mesh, solve_temperature_joule_heat(
         mesh, electrical_conductivity=models, thermal_conductivity={r: KAPPA[m] for r, m in region_materials.items()},
-        electric_dirichlet=dict(sorted(electric.items())), thermal_dirichlet=dict(sorted(thermal.items())),
-        initial_temperature=300.0, outward_current={}, outward_flux={}, convection={}, method="picard",
-        relaxation=0.5, relative_tolerance=1e-10, max_iterations=100, temperature_atol=1e-9)
+        prescribed_electric_potential=dict(sorted(electric.items())),
+        prescribed_temperature=dict(sorted(thermal.items())),
+        initial_temperature=300.0, inward_current_density={}, inward_heat_flux={}, convection={}, method="picard",
+        relaxation_factor=0.5, relative_tolerance=1e-10, iteration_limit=100, temperature_tolerance=1e-9)
 
 
 def test_t2_the_adapter_equals_a_direct_galerkin_call_bit_for_bit():
@@ -184,14 +185,14 @@ def test_t2_the_adapter_equals_a_direct_galerkin_call_bit_for_bit():
     fields = result.fields
     np.testing.assert_array_equal(fields["node_coordinates"], mesh.nodes)
     for key, value in (("temperature", direct.coupled.thermal.temperature),
-                       ("electric_potential", direct.coupled.electrical.potential),
-                       ("evaluation_temperature", direct.evaluated_temperature),
-                       ("joule_power_density", direct.coupled.electrical.joule_heating),
+                       ("electric_potential", direct.coupled.electrical.electric_potential),
+                       ("evaluation_temperature", direct.evaluation_temperature),
+                       ("joule_power_density", direct.coupled.electrical.joule_power_density),
                        ("heat_flux", direct.coupled.thermal.heat_flux)):
         assert fields[key].tobytes() == np.asarray(value).tobytes(), key
     history = result.summary()["iterations"]
     assert len(history) == len(direct.history)
-    assert [r["temperature_change"]["value"] for r in history] == [r.temperature_defect for r in direct.history]
+    assert [r["temperature_change"]["value"] for r in history] == [r.temperature_change for r in direct.history]
 
 
 def test_t3_supplied_joule_and_outward_power_agree():

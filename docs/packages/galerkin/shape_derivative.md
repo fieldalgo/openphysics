@@ -66,13 +66,16 @@ and call `.backward()`.
 - The ordinary solve runs on the moved mesh, with its residual, current-balance
   and power-balance checks.
 - One live solve re-assembles the system from X₀ + t·W: P1 stiffness with region
-  conductivity, and the outward current on moving edges.
-- Every field carries d/dt: `potential`, `electric_field`, `current_density`,
-  `joule_heating`, `joule_load`, `joule_power_per_length`, `reaction`,
-  `prescribed_outward_load`, `residual` and `supplied_power_per_length`.
+  conductivity, and the current density on moving edges (the inward value,
+  negated once before the motion is applied, as for heat).
+- Every field carries d/dt: `electric_potential`, `electric_field`, `current_density`,
+  `electrical_conductivity`, `joule_power_density`, `generated_heat_rate_per_depth`,
+  `joule_power_per_depth`, `reaction_current_per_depth`,
+  `outward_prescribed_current_per_depth`, `residual_current_per_depth` and
+  `inward_electric_power_per_depth`.
   `result.mesh` is the NumPy snapshot of the moved mesh; its coordinates carry no
   derivative.
-- Dirichlet volts and `reference_potential` gauges (components with only current
+- Prescribed volts and `reference_electric_potential` gauges (components with only current
   data) are both taken. On a gauge component the motion must keep the net imposed
   current at zero, for example by keeping the current-carrying sides' lengths.
   Otherwise the problem has no solution next to t, and the call is refused.
@@ -214,8 +217,8 @@ Each refusal names the reason:
   mesh, move the nodes and solve that mesh;
 - a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
 - a step outside the admissible interval (`ElementInversion`);
-- coordinate callbacks for the heat source, boundary heat flux, convection, outward
-  current, body force or traction, also inside a convection pair, and
+- coordinate callbacks for the heat source, boundary heat flux, convection, current
+  density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat;
 - callable coefficients or Dirichlet values (other than callbacks of time in
@@ -255,13 +258,13 @@ with the same versions.
 
 | Check | Criterion | Result |
 |---|---|---|
-| E1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a probe potential, the terminal current and the Joule power, with region conductivity and an outward current on a moving side; relative 1e-6, JAX and PyTorch | 7.2e-10, 1.9e-9, 1.2e-9 |
+| E1 discrete consistency | derivative vs central differences of moved meshes (h = 1e-4) for a probe potential, the terminal current and the Joule power, with region conductivity and a current density on a moving side; relative 1e-6, JAX and PyTorch | 7.2e-10, 1.9e-9, 1.2e-9 |
 | E2 two-layer resistor | dR/dL₁ = (1/σ₁ − 1/σ₂)/H, relative 1e-10 | pass |
 | E3 coaxial conductor | inner radius from the geometry engine's node velocities; dI/da = 2πσΔV/(a ln²(b/a)); observed order ≥ 1.5, finest within 1e-3 | 8.1e-3, 2.1e-3, 5.8e-4 at sizes 0.8, 0.4, 0.2 |
 | E4 rigid translation | dJ/dt = 0 within 1e-12 · \|J\| (power, sum of potentials) | pass |
 | E5 power identity | d(Joule power)/dt = d(supplied power)/dt, relative 1e-10 | 9e-14 (JAX), 5e-14 (PyTorch) |
 | E6 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `a0a432b` (measured); `motion=None` equals no keyword (test) |
-| E7 gauge component | a component with only current data and a `reference_potential`: E1 criterion | pass |
+| E7 gauge component | a component with only current data and a `reference_electric_potential`: E1 criterion | pass |
 | E8 refusals | as listed above | pass |
 
 An independent review then added regression tests: a common-mode voltage up to

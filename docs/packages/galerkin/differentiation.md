@@ -24,7 +24,7 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 | Solver | Inputs that may be JAX or PyTorch values |
 |---|---|
 | `solve_steady_heat` | `thermal_conductivity` (scalar or `{region name: value}`); `heat_source_density` (scalar, region table or a callback returning live values); `prescribed_temperature` values; `inward_heat_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
-| `solve_steady_electric` | `conductivity` (scalar or region table); `dirichlet` and `reference_potential` volts; `outward_current` (scalar or callback returning live values) |
+| `solve_steady_electric` | `electrical_conductivity` (scalar or region table); `prescribed_electric_potential` and `reference_electric_potential` volts; `inward_current_density` (scalar or callback returning live values) |
 | `solve_electrostatics`, `capacitance_matrix` | `permittivity` (real scalar or region table; complex permittivity is NumPy only); conductor and `reference_potential` volts; `charge_density` (scalar, region table or a callback returning live values). The capacitance matrix is returned in that library ([contract](electrostatics.md)) |
 | `solve_transient_heat` | `thermal_conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source_density` (scalar, region table or a callback `(position, time)` returning live values); `prescribed_temperature` values (scalars or callbacks `(time)` returning live values); `initial_temperature` |
 | `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
@@ -309,7 +309,7 @@ structure; only coefficients may be live.
   iteration, so a live value that one returns surfaces as a
   `JouleConvergenceError` whose cause is that `TypeError`: the conductivity
   callbacks `ConductivityModel.evaluate` and `derivative`, and boundary callbacks
-  given for `outward_flux`, `convection` or `outward_current`. See [iterative solvers](#iterative-solvers) for the derivative
+  given for `inward_heat_flux`, `convection` or `inward_current_density`. See [iterative solvers](#iterative-solvers) for the derivative
   such a solver would need.
 
 ## Limits
@@ -322,7 +322,7 @@ structure; only coefficients may be live.
 - On JAX, a singular sparse system fails inside the host callback of the solve:
   JAX logs the callback's traceback (`jax.pure_callback failed`) before the
   solver raises its `ValueError`. PyTorch prints nothing.
-- With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
+- With live inputs, `joule_power_per_depth` and `inward_electric_power_per_depth` are
   0-d arrays of that library instead of Python floats, and result arrays are not
   made read-only.
 - Tested on CPU only. Static data is lifted to CPU tensors; tensors on another

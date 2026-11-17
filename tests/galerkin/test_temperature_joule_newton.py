@@ -37,9 +37,9 @@ def thermistor(n=16, alpha=.5, **options):
     left, right = mesh.boundary['left'], mesh.boundary['right']
     model = ConductivityModel(bounded(lambda t: 1/(1+alpha*(t-300)), 300., 400.), (300., 400.))
     args = dict(electrical_conductivity=model, thermal_conductivity=1.,
-                electric_dirichlet={int(i): 0. for i in left},
-                thermal_dirichlet={int(i): 300. for i in np.r_[left, right]}, initial_temperature=300.,
-                outward_current={'right': 1.})
+                prescribed_electric_potential={int(i): 0. for i in left},
+                prescribed_temperature={int(i): 300. for i in np.r_[left, right]}, initial_temperature=300.,
+                temperature_tolerance=1e-8, inward_current_density={'right': -1.})
     args.update(options)
     return mesh, args
 
@@ -54,12 +54,18 @@ def every_boundary_kind(current=3., **options):
     models = {'a': ConductivityModel(bounded(lambda t: 2/(1+.01*(t-300)), 250., 900.), (250., 900.)),
               'b': ConductivityModel(bounded(lambda t: np.exp(.01*(t-300)), 250., 900.), (250., 900.))}
     args = dict(electrical_conductivity=models, thermal_conductivity={'a': 1., 'b': 2.},
-                electric_dirichlet={}, reference_potential={int(left[0]): 0.},
-                outward_current={'left': -current, 'right': current},
-                thermal_dirichlet={int(i): 300. for i in left}, initial_temperature=300.,
-                outward_flux={'bottom': 5.}, convection={'top': (3., 290.), 'right': (2., 300.)})
+                prescribed_electric_potential={}, reference_electric_potential={int(left[0]): 0.},
+                inward_current_density={'left': current, 'right': -current},
+                prescribed_temperature={int(i): 300. for i in left}, initial_temperature=300.,
+                temperature_tolerance=1e-8, inward_heat_flux={'bottom': -5.},
+                convection={'top': (3., 290.), 'right': (2., 300.)})
     args.update(options)
     return mesh, args
+
+
+def outward(inward):
+    """A test's inward heat flux in the outward form the internal _JointNewton takes (0.0 - g)."""
+    return {tag: 0.0 - g for tag, g in inward.items()}
 
 
 def test_invalid_method_and_derivative():
@@ -77,16 +83,17 @@ def test_invalid_method_and_derivative():
 @pytest.mark.parametrize('alpha', [.5, 7.])
 def test_newton_matches_picard_in_few_states(alpha):
     mesh, args = thermistor(alpha=alpha)
-    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
+    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation_factor=1., iteration_limit=300)
     newton = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(newton.history) <= 5 < len(picard.history)
     assert_allclose(newton.coupled.thermal.temperature, picard.coupled.thermal.temperature, rtol=0., atol=2e-8)
-    assert_allclose(newton.coupled.electrical.potential, picard.coupled.electrical.potential, rtol=0., atol=2e-8)
+    assert_allclose(newton.coupled.electrical.electric_potential, picard.coupled.electrical.electric_potential,
+                    rtol=0., atol=2e-8)
     last = newton.history[-1]
-    assert last.conductivity_defect <= 1e-10 and last.nonlinear_heat_residual <= 1e-8
-    assert abs(last.current_balance) < 1e-10 and abs(last.heat_power_defect) < 1e-10
-    assert [row.iteration for row in newton.history] == list(range(1, len(newton.history)+1))
-    assert not newton.evaluated_temperature.flags.writeable
+    assert last.relative_electrical_conductivity_change <= 1e-10 and last.relative_residual <= 1e-8
+    assert abs(last.current_imbalance_per_depth) < 1e-10 and abs(last.heat_rate_imbalance_per_depth) < 1e-10
+    assert [row.iteration_count for row in newton.history] == list(range(1, len(newton.history)+1))
+    assert not newton.evaluation_temperature.flags.writeable
 
 
 @pytest.mark.parametrize('alpha', [.5, 7.])
@@ -96,7 +103,7 @@ def test_newton_converges_quadratically_with_an_exact_derivative(alpha):
     model = ConductivityModel(bounded(lambda t: 1/(1+alpha*(t-300)), 300., 400.), (300., 400.),
                               derivative=lambda t: -alpha/(1+alpha*(t-300))**2)
     mesh, args = thermistor(alpha=alpha, electrical_conductivity=model)
-    defects = [row.temperature_defect
+    defects = [row.temperature_change
                for row in solve_temperature_joule_heat(mesh, **args, method='newton').history]
     pairs = [(before, after) for before, after in zip(defects, defects[1:]) if before < 1e-2]
     assert pairs and all(after <= max(before**2, 1e-12) for before, after in pairs)
@@ -109,18 +116,20 @@ def test_newton_converges_where_the_default_picard_does_not(alpha):
         solve_temperature_joule_heat(mesh, **args, method='picard')
     result = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(result.history) <= 6
-    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=500)
+    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation_factor=1., iteration_limit=500)
     assert_allclose(result.coupled.thermal.temperature, reference.coupled.thermal.temperature, rtol=0., atol=2e-8)
 
 
 def test_newton_with_every_boundary_kind_and_region_models():
     mesh, args = every_boundary_kind()
-    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
+    picard = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation_factor=1., iteration_limit=300)
     newton = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(newton.history) <= 5
     assert_allclose(newton.coupled.thermal.temperature, picard.coupled.thermal.temperature, rtol=0., atol=2e-8)
-    assert_allclose(newton.coupled.electrical.potential, picard.coupled.electrical.potential, rtol=0., atol=2e-8)
-    assert_allclose(newton.coupled.electrical.conductivity, picard.coupled.electrical.conductivity, rtol=1e-10)
+    assert_allclose(newton.coupled.electrical.electric_potential, picard.coupled.electrical.electric_potential,
+                    rtol=0., atol=2e-8)
+    assert_allclose(newton.coupled.electrical.electrical_conductivity,
+                    picard.coupled.electrical.electrical_conductivity, rtol=1e-10)
 
 
 def test_given_derivative_is_used_and_does_not_change_the_result():
@@ -167,7 +176,7 @@ def test_the_difference_derivative_stays_in_range_and_is_second_order():
 
 
 def test_newton_failures_keep_their_evidence():
-    mesh, args = thermistor(alpha=7., max_iterations=2)
+    mesh, args = thermistor(alpha=7., iteration_limit=2)
     with pytest.raises(JouleConvergenceError, match='maximum iterations') as exc:
         solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(exc.value.history) == 2
@@ -179,7 +188,7 @@ def test_newton_failures_keep_their_evidence():
                        r"\([0-9.e+-]+ K\); last candidate failed: material 'all': temperature") as exc:
         solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(exc.value.history) == 1 and isinstance(exc.value.__cause__, ValueError)
-    assert f"({exc.value.history[-1].temperature_defect:.3g} K)" in exc.value.reason
+    assert f"({exc.value.history[-1].temperature_change:.3g} K)" in exc.value.reason
     assert np.all(exc.value.last_temperature == 300.)
 
 
@@ -194,15 +203,15 @@ def test_a_step_that_no_longer_changes_t_ends_the_search(monkeypatch):
         increment = newton_step(self, *args)
         return increment if len(steps) == 1 else 0*increment
     monkeypatch.setattr(_JointNewton, 'step', step)
-    joule = module.solve_steady_joule_heat
-    monkeypatch.setattr(module, 'solve_steady_joule_heat',
+    joule = module.solve_steady_joule_heat_outward      # each iteration calls the outward-form body (rule 6)
+    monkeypatch.setattr(module, 'solve_steady_joule_heat_outward',
                         lambda *args, **kwargs: evaluations.append(1) or joule(*args, **kwargs))
     mesh, args = thermistor(alpha=7.)
     with pytest.raises(JouleConvergenceError,
                        match=r"^Newton step does not reduce the temperature defect \([0-9.e+-]+ K\)$") as exc:
         solve_temperature_joule_heat(mesh, **args, method='newton')
     history = exc.value.history
-    assert len(history) == 2 and f"({history[-1].temperature_defect:.3g} K)" in exc.value.reason
+    assert len(history) == 2 and f"({history[-1].temperature_change:.3g} K)" in exc.value.reason
     assert len(evaluations) == 3   # T_1, the accepted T_2 and the unchanged T_2 at the full step
 
 
@@ -244,8 +253,9 @@ def _state(seed=0):
     temperature = 300+rng.uniform(0, 60, mesh.num_nodes)
     potential = rng.uniform(-2, 2, mesh.num_nodes)
     models = _models(mesh, args['electrical_conductivity'])
-    newton = _JointNewton(mesh, args['thermal_conductivity'], args['thermal_dirichlet'],
-                          set(args['reference_potential']), args['outward_flux'], args['convection'])
+    newton = _JointNewton(mesh, args['thermal_conductivity'], args['prescribed_temperature'],
+                          set(args['reference_electric_potential']), outward(args['inward_heat_flux']),
+                          args['convection'])
     return mesh, models, newton, temperature, potential
 
 
@@ -308,7 +318,7 @@ def test_newton_holds_the_gauge_node(monkeypatch):
     monkeypatch.setattr(_JointNewton, '__init__', spy)
     mesh, args = every_boundary_kind()
     solve_temperature_joule_heat(mesh, **args, method='newton')
-    assert held and set(args['reference_potential']) <= held[0]
+    assert held and set(args['reference_electric_potential']) <= held[0]
 
 
 def test_newton_heat_operator_is_the_heat_solve():
@@ -316,16 +326,19 @@ def test_newton_heat_operator_is_the_heat_solve():
     mesh, args = every_boundary_kind()
     models = _models(mesh, args['electrical_conductivity'])
     sigma = _conductivity(mesh, models, np.full(mesh.num_nodes, 300.))
-    electrical = solve_steady_electric(mesh, conductivity=ElementConductivity(mesh, sigma), dirichlet={},
-                                       outward_current=args['outward_current'],
-                                       reference_potential=args['reference_potential'])
-    heat = solve_steady_joule_heat(mesh, electrical_result=electrical, conductivity=args['thermal_conductivity'],
-                                   dirichlet=args['thermal_dirichlet'], outward_flux=args['outward_flux'],
-                                   convection=args['convection']).thermal
-    newton = _JointNewton(mesh, args['thermal_conductivity'], args['thermal_dirichlet'],
-                          set(args['reference_potential']), args['outward_flux'], args['convection'])
+    electrical = solve_steady_electric(mesh, electrical_conductivity=ElementConductivity(mesh, sigma),
+                                       prescribed_electric_potential={},
+                                       inward_current_density=args['inward_current_density'],
+                                       reference_electric_potential=args['reference_electric_potential'])
+    heat = solve_steady_joule_heat(mesh, electrical_result=electrical,
+                                   thermal_conductivity=args['thermal_conductivity'],
+                                   prescribed_temperature=args['prescribed_temperature'],
+                                   inward_heat_flux=args['inward_heat_flux'], convection=args['convection']).thermal
+    newton = _JointNewton(mesh, args['thermal_conductivity'], args['prescribed_temperature'],
+                          set(args['reference_electric_potential']), outward(args['inward_heat_flux']),
+                          args['convection'])
     residual = newton.heat_operator@heat.temperature-heat.generated_heat_rate_per_depth-newton.heat_rhs
-    free = np.setdiff1d(np.arange(mesh.num_nodes), list(args['thermal_dirichlet']))
+    free = np.setdiff1d(np.arange(mesh.num_nodes), list(args['prescribed_temperature']))
     scale = max(np.max(np.abs(heat.generated_heat_rate_per_depth)), np.max(np.abs(newton.heat_rhs)))
     assert np.max(np.abs(residual[free])) <= 1e-12*scale
 
@@ -336,26 +349,28 @@ def test_newton_electric_residual_is_the_electric_solve():
     models = _models(mesh, args['electrical_conductivity'])
     temperature = np.full(mesh.num_nodes, 300.)
     sigma = _conductivity(mesh, models, temperature)
-    electrical = solve_steady_electric(mesh, conductivity=ElementConductivity(mesh, sigma), dirichlet={},
-                                       outward_current=args['outward_current'],
-                                       reference_potential=args['reference_potential'])
-    newton = _JointNewton(mesh, args['thermal_conductivity'], args['thermal_dirichlet'],
-                          set(args['reference_potential']), args['outward_flux'], args['convection'])
-    r_v, _ = newton.element_residuals(sigma, np.asarray(electrical.potential)[mesh.triangles])
+    electrical = solve_steady_electric(mesh, electrical_conductivity=ElementConductivity(mesh, sigma),
+                                       prescribed_electric_potential={},
+                                       inward_current_density=args['inward_current_density'],
+                                       reference_electric_potential=args['reference_electric_potential'])
+    newton = _JointNewton(mesh, args['thermal_conductivity'], args['prescribed_temperature'],
+                          set(args['reference_electric_potential']), outward(args['inward_heat_flux']),
+                          args['convection'])
+    r_v, _ = newton.element_residuals(sigma, np.asarray(electrical.electric_potential)[mesh.triangles])
     assembled = np.zeros(mesh.num_nodes)
     np.add.at(assembled, mesh.triangles, r_v)
-    assembled += electrical.prescribed_outward_load
-    scale = np.max(np.abs(electrical.prescribed_outward_load))
-    assert_allclose(assembled, electrical.residual, rtol=0., atol=1e-12*scale)
+    assembled += electrical.outward_prescribed_current_per_depth
+    scale = np.max(np.abs(electrical.outward_prescribed_current_per_depth))
+    assert_allclose(assembled, electrical.residual_current_per_depth, rtol=0., atol=1e-12*scale)
 
 
 def test_steps_that_raise_the_defect_are_halved(monkeypatch):
     """With every Newton step made 64 times too long, six halvings restore convergence."""
     mesh, args = thermistor(alpha=7.)
-    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation=1., max_iterations=300)
+    reference = solve_temperature_joule_heat(mesh, **args, method='picard', relaxation_factor=1., iteration_limit=300)
     newton_step = _JointNewton.step
     monkeypatch.setattr(_JointNewton, 'step', lambda self, *a: 64*newton_step(self, *a))
     result = solve_temperature_joule_heat(mesh, **args, method='newton')
     assert len(result.history) <= 6
-    assert [row.iteration for row in result.history] == list(range(1, len(result.history)+1))
+    assert [row.iteration_count for row in result.history] == list(range(1, len(result.history)+1))
     assert_allclose(result.coupled.thermal.temperature, reference.coupled.thermal.temperature, rtol=0., atol=2e-8)

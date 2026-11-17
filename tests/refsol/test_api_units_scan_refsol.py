@@ -106,8 +106,22 @@ _HEAT = [
     ("transient_heat_robin", "PeriodicAmbientSlab.temperature", dict(points=[0.5], time=0.3)),
     ("transient_heat_robin", "PeriodicAmbientSlab.outward_heat_flux", dict(time=0.3)),
 ]
-# L2 commit 6 emptied refsol's eight heat modules: each callable that takes a quantity has a case.
-STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs) for module, name, kwargs in _HEAT}
+_JOULE_LAW = dict(prescribed_temperature=(300.0, 300.0), reference_conductivity=1.0,
+                  conductivity_temperature_coefficient=-0.005, reference_temperature=300.0, thermal_conductivity=1.0)
+_JOULE = [
+    ("joule_slab", "constant_conductivity", dict(length=1.0, prescribed_electric_potential=(1.0, 0.0),
+                                                 prescribed_temperature=(300.0, 310.0), electrical_conductivity=1.0,
+                                                 thermal_conductivity=1.0, reference_temperature=300.0)),
+    ("joule_slab", "voltage_driven", dict(_JOULE_LAW, length=1.0, prescribed_electric_potential=(1.0, 0.0))),
+    ("joule_slab", "drop_scale", dict(reference_conductivity=1.0, conductivity_temperature_coefficient=0.5,
+                                      thermal_conductivity=1.0)),
+    ("joule_slab", "fold_current", dict(_JOULE_LAW, length=1.0)),
+    ("joule_slab", "current_driven", dict(_JOULE_LAW, length=1.0, current_density=1.0,
+                                          prescribed_electric_potential=0.0)),
+]
+# L2 commit 6 emptied refsol's eight heat modules and L2 commit 7 joule_slab: each callable that takes a
+# quantity has a case.
+STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs) for module, name, kwargs in _HEAT + _JOULE}
 
 
 @pytest.fixture(scope="module")

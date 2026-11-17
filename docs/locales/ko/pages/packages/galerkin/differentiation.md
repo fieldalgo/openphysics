@@ -23,7 +23,7 @@ NumPy는 미분하지 않습니다.
 | Solver | JAX·PyTorch 값으로 줄 수 있는 입력 |
 |---|---|
 | `solve_steady_heat` | `thermal_conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `prescribed_temperature` 값; `inward_heat_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
-| `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_steady_electric` | `electrical_conductivity`(스칼라 또는 영역표); `prescribed_electric_potential`과 `reference_electric_potential` 전위(V); `inward_current_density`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
 | `solve_electrostatics`, `capacitance_matrix` | `permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_potential` 전위(V); `charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
 | `solve_transient_heat` | `thermal_conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(position, time)`); `prescribed_temperature` 값(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature` |
 | `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
@@ -271,8 +271,8 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`
   같은 경계 표 안의 값도 마찬가지입니다. 콜백은 반복 안에서만 돌므로, 콜백이 돌려준 살아 있는
   값은 그 `TypeError`를 원인으로 가진 `JouleConvergenceError`로 나옵니다. 전도도 콜백
-  `ConductivityModel.evaluate`와 `derivative`, 그리고 `outward_flux`, `convection`,
-  `outward_current`에 준 경계 콜백이 그렇습니다. 이런 solver에 필요한 미분은
+  `ConductivityModel.evaluate`와 `derivative`, 그리고 `inward_heat_flux`, `convection`,
+  `inward_current_density`에 준 경계 콜백이 그렇습니다. 이런 solver에 필요한 미분은
   [반복 solver](#반복-solver)를 보십시오.
 
 ## 한계
@@ -284,7 +284,7 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
   `ValueError`를 내기 전에 JAX가 callback의 traceback(`jax.pure_callback failed`)을
   기록합니다. PyTorch는 아무것도 출력하지 않습니다.
-- 살아 있는 입력에서는 `joule_power_per_length`와 `supplied_power_per_length`가
+- 살아 있는 입력에서는 `joule_power_per_depth`와 `inward_electric_power_per_depth`가
   Python float 대신 그 라이브러리의 0차원 배열이며, 결과 배열을 읽기 전용으로
   만들지 않습니다.
 - CPU에서만 시험했습니다. 정적 데이터는 CPU 텐서로 올리며, 다른 PyTorch 장치의

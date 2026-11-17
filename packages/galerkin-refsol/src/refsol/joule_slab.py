@@ -22,6 +22,14 @@ temperature range must contain ``temperature_range`` of the returned solution.
 closed form. SI units: m, K, V, S/m, W/(m K), A/m^2, W/m^2 (any consistent set
 works).
 
+Inputs are keyword-only SI registry names: ``length``, the face pairs
+``prescribed_electric_potential`` ``(V_a, V_b)`` and ``prescribed_temperature``
+``(T_a, T_b)``, ``reference_conductivity`` (sigma0), ``conductivity_temperature_coefficient``
+(alpha), ``reference_temperature`` (T0), ``thermal_conductivity`` (k) and, for a
+prescribed current, ``current_density`` (J). The returned ``JouleSlab`` carries the
+same names and evaluates its fields at the x coordinates ``points``. A str for a
+quantity raises TypeError.
+
 Derivation. The current density ``J = -sigma V'`` is constant. With
 ``u = sigma / sigma0 = 1 + alpha (T - T0)`` the heat equation becomes
 
@@ -73,6 +81,8 @@ import numpy as np
 from scipy.optimize import brentq, minimize_scalar
 from scipy.special import dawsn, erf, erfcx
 
+from ._checks import refuse_text
+
 __all__ = ["JouleSlab", "constant_conductivity", "voltage_driven", "drop_scale", "fold_current",
            "current_driven"]
 
@@ -95,6 +105,7 @@ def _pair(values, name):
     except (TypeError, ValueError):
         raise ValueError(f"{name} must be a pair (face 0, face L)") from None
     return _scalar(a, name), _scalar(b, name)
+
 
 
 @dataclass(frozen=True)
@@ -173,22 +184,26 @@ class _Scaled:
 class JouleSlab:
     """Exact fields of one slab; see the module docstring.
 
-    ``current_density`` is ``J = -sigma V'`` (positive toward ``+x``) and
-    ``joule_power`` the dissipated power per unit face area,
-    ``J (V_a - V_b) = k (T'(0) - T'(L))``. ``temperature_range`` bounds ``T``
-    on ``[0, L]`` (faces and interior stationary point): the interval a bounded
-    conductivity model must cover.
+    ``prescribed_electric_potential`` and ``prescribed_temperature`` are the face
+    pairs (x = 0, x = L); ``reference_conductivity``,
+    ``conductivity_temperature_coefficient`` and ``reference_temperature`` the
+    conductivity law. ``current_density`` is ``J = -sigma V'`` (positive toward
+    ``+x``). ``_joule_power`` is the dissipated power per unit face area,
+    ``J (V_a - V_b) = k (T'(0) - T'(L))`` in W/m^2: private (rule R(2) of the
+    galerkin step: no registry name, and no shipped code reads it).
+    ``temperature_range`` bounds ``T`` on ``[0, L]`` (faces and interior stationary
+    point): the interval a bounded conductivity model must cover.
     """
 
     length: float
-    potentials: tuple[float, float]
-    temperatures: tuple[float, float]
-    sigma0: float
-    alpha: float
+    prescribed_electric_potential: tuple[float, float]
+    prescribed_temperature: tuple[float, float]
+    reference_conductivity: float
+    conductivity_temperature_coefficient: float
     reference_temperature: float
     thermal_conductivity: float
     current_density: float
-    joule_power: float
+    _joule_power: float
     temperature_range: tuple[float, float]
     _scaled: _Scaled | None
 
@@ -196,7 +211,7 @@ class JouleSlab:
         a = np.asarray(x, dtype=float)
         tolerance = 1e-12 * self.length
         if not np.all(np.isfinite(a)) or np.any(a < -tolerance) or np.any(a > self.length + tolerance):
-            raise ValueError("x must lie in [0, length]")
+            raise ValueError("points must lie in [0, length]")
         return np.clip(a, 0.0, self.length)
 
     def _deltas(self, x):
@@ -205,35 +220,38 @@ class JouleSlab:
             fraction = 1.0 - fraction
         return self._scaled.delta(fraction)
 
-    def temperature(self, x):
-        """``T(x)`` in K."""
-        x = self._points(x)
+    def temperature(self, points):
+        """``T(x)`` in K at the x coordinates ``points``."""
+        x = self._points(points)
         if self._scaled is None:
-            t_a, t_b = self.temperatures
+            t_a, t_b = self.prescribed_temperature
             return t_a + (t_b - t_a) * x / self.length + self._heating() * x * (self.length - x)
-        return self.reference_temperature + (self._scaled.u(self._deltas(x)) - 1.0) / self.alpha
+        return (self.reference_temperature
+                + (self._scaled.u(self._deltas(x)) - 1.0) / self.conductivity_temperature_coefficient)
 
-    def temperature_gradient(self, x):
-        """``dT/dx`` in K/m."""
-        x = self._points(x)
+    def temperature_gradient(self, points):
+        """``dT/dx`` in K/m at the x coordinates ``points``."""
+        x = self._points(points)
         if self._scaled is None:
-            t_a, t_b = self.temperatures
+            t_a, t_b = self.prescribed_temperature
             return (t_b - t_a) / self.length + self._heating() * (self.length - 2 * x)
-        gradient = self._scaled.root_2c * self._scaled.s(self._deltas(x)) / self.alpha
+        gradient = self._scaled.root_2c * self._scaled.s(self._deltas(x)) / self.conductivity_temperature_coefficient
         return -gradient if self._scaled.reflected else gradient
 
-    def heat_flux(self, x):
-        """``q = -k dT/dx`` in W/m^2, positive toward ``+x``."""
-        return -self.thermal_conductivity * self.temperature_gradient(x)
+    def heat_flux(self, points):
+        """``q = -k dT/dx`` in W/m^2, positive toward ``+x``, at the x coordinates ``points``."""
+        return -self.thermal_conductivity * self.temperature_gradient(points)
 
-    def electrical_conductivity(self, x):
-        """``sigma(T(x))`` in S/m."""
-        return self.sigma0 * (1.0 + self.alpha * (self.temperature(x) - self.reference_temperature))
+    def electrical_conductivity(self, points):
+        """``sigma(T(x))`` in S/m at the x coordinates ``points``."""
+        return self.reference_conductivity * (1.0 + self.conductivity_temperature_coefficient
+                                              * (self.temperature(points) - self.reference_temperature))
 
-    def potential(self, x):
-        """``V(x)`` in V: ``V_a + (V_b - V_a) R(x)/R(L)`` with ``R(x) = int_0^x dx'/sigma``."""
-        x = self._points(x)
-        v_a, v_b = self.potentials
+    def electric_potential(self, points):
+        """``V(x)`` in V: ``V_a + (V_b - V_a) R(x)/R(L)`` with ``R(x) = int_0^x dx'/sigma``, at the x
+        coordinates ``points``."""
+        x = self._points(points)
+        v_a, v_b = self.prescribed_electric_potential
         if self._scaled is None:
             return v_a + (v_b - v_a) * x / self.length
         # R(x) = (u'(0) - u'(x)) / c in the oriented frame: the fraction |s_a - s| / |s_a - s_b|
@@ -242,18 +260,18 @@ class JouleSlab:
             fraction = 1.0 - fraction
         return v_a + (v_b - v_a) * fraction
 
-    def electric_field(self, x):
-        """``E = -dV/dx = J / sigma`` in V/m."""
-        return self.current_density / self.electrical_conductivity(x)
+    def electric_field(self, points):
+        """``E = -dV/dx = J / sigma`` in V/m at the x coordinates ``points``."""
+        return self.current_density / self.electrical_conductivity(points)
 
-    def heat_source(self, x):
-        """``Q = sigma E^2 = J^2 / sigma`` in W/m^3."""
-        return self.current_density**2 / self.electrical_conductivity(x)
+    def joule_power_density(self, points):
+        """``Q = sigma E^2 = J^2 / sigma`` in W/m^3 at the x coordinates ``points``."""
+        return self.current_density**2 / self.electrical_conductivity(points)
 
     def _heating(self):
         """Constant-conductivity parabola coefficient ``sigma0 (V_a - V_b)^2 / (2 k L^2)``."""
-        v_a, v_b = self.potentials
-        return self.sigma0 * (v_a - v_b) ** 2 / (2 * self.thermal_conductivity * self.length**2)
+        v_a, v_b = self.prescribed_electric_potential
+        return self.reference_conductivity * (v_a - v_b) ** 2 / (2 * self.thermal_conductivity * self.length**2)
 
 
 def _finish(slab, extremum_fraction):
@@ -262,21 +280,27 @@ def _finish(slab, extremum_fraction):
     if extremum_fraction is not None and 0.0 < extremum_fraction < 1.0:
         candidates.append(extremum_fraction * slab.length)
     values = slab.temperature(np.array(candidates))
-    return JouleSlab(slab.length, slab.potentials, slab.temperatures, slab.sigma0, slab.alpha,
+    return JouleSlab(slab.length, slab.prescribed_electric_potential, slab.prescribed_temperature,
+                     slab.reference_conductivity, slab.conductivity_temperature_coefficient,
                      slab.reference_temperature, slab.thermal_conductivity, slab.current_density,
-                     slab.joule_power, (float(values.min()), float(values.max())), slab._scaled)
+                     slab._joule_power, (float(values.min()), float(values.max())), slab._scaled)
 
 
-def constant_conductivity(length, potentials, temperatures, sigma, thermal_conductivity,
-                          reference_temperature=None) -> JouleSlab:
-    """Closed form for a constant ``sigma``: linear ``V`` and a parabolic Joule term in ``T``.
+def constant_conductivity(*, length, prescribed_electric_potential, prescribed_temperature, electrical_conductivity,
+                          thermal_conductivity, reference_temperature=None) -> JouleSlab:
+    """Closed form for a constant ``electrical_conductivity`` sigma: linear ``V`` and a parabolic Joule term in ``T``.
 
-    ``T = T_a + (T_b - T_a) x/L + sigma (V_a - V_b)^2 x (L - x) / (2 k L^2)``.
+    ``T = T_a + (T_b - T_a) x/L + sigma (V_a - V_b)^2 x (L - x) / (2 k L^2)``. The
+    returned slab records sigma as its ``reference_conductivity`` with a zero
+    coefficient; ``reference_temperature`` (None: ``T_a``) is recorded only.
     """
+    refuse_text(length=length, prescribed_electric_potential=prescribed_electric_potential,
+                prescribed_temperature=prescribed_temperature, electrical_conductivity=electrical_conductivity,
+                thermal_conductivity=thermal_conductivity, reference_temperature=reference_temperature)
     L = _scalar(length, "length", positive=True)
-    v_a, v_b = _pair(potentials, "potentials")
-    t_a, t_b = _pair(temperatures, "temperatures")
-    sigma = _scalar(sigma, "sigma", positive=True)
+    v_a, v_b = _pair(prescribed_electric_potential, "prescribed_electric_potential")
+    t_a, t_b = _pair(prescribed_temperature, "prescribed_temperature")
+    sigma = _scalar(electrical_conductivity, "electrical_conductivity", positive=True)
     k = _scalar(thermal_conductivity, "thermal_conductivity", positive=True)
     t0 = t_a if reference_temperature is None else _scalar(reference_temperature, "reference_temperature")
     current = sigma * (v_a - v_b) / L
@@ -289,26 +313,34 @@ def constant_conductivity(length, potentials, temperatures, sigma, thermal_condu
     return _finish(slab, extremum)
 
 
-def voltage_driven(length, potentials, temperatures, sigma0, alpha, reference_temperature,
-                   thermal_conductivity) -> JouleSlab:
+def voltage_driven(*, length, prescribed_electric_potential, prescribed_temperature, reference_conductivity,
+                   conductivity_temperature_coefficient, reference_temperature, thermal_conductivity) -> JouleSlab:
     """Exact solution for fixed face potentials ``(V_a, V_b)`` and temperatures ``(T_a, T_b)``.
 
-    ``sigma(T) = sigma0 (1 + alpha (T - reference_temperature))`` must be positive
-    at both faces. Closed form in ``erf``/``erfi`` (module docstring); raises
-    ``ValueError`` when the drop is so large that the scaled slopes overflow.
+    ``sigma(T) = sigma0 (1 + alpha (T - T0))`` with sigma0 the
+    ``reference_conductivity``, alpha the ``conductivity_temperature_coefficient``
+    and T0 the ``reference_temperature`` must be positive at both faces. Closed form
+    in ``erf``/``erfi`` (module docstring); raises ``ValueError`` when the drop is so
+    large that the scaled slopes overflow.
     """
+    refuse_text(length=length, prescribed_electric_potential=prescribed_electric_potential,
+                prescribed_temperature=prescribed_temperature, reference_conductivity=reference_conductivity,
+                conductivity_temperature_coefficient=conductivity_temperature_coefficient,
+                reference_temperature=reference_temperature, thermal_conductivity=thermal_conductivity)
     L = _scalar(length, "length", positive=True)
-    v_a, v_b = _pair(potentials, "potentials")
-    t_a, t_b = _pair(temperatures, "temperatures")
-    sigma0 = _scalar(sigma0, "sigma0", positive=True)
-    alpha = _scalar(alpha, "alpha")
+    v_a, v_b = _pair(prescribed_electric_potential, "prescribed_electric_potential")
+    t_a, t_b = _pair(prescribed_temperature, "prescribed_temperature")
+    sigma0 = _scalar(reference_conductivity, "reference_conductivity", positive=True)
+    alpha = _scalar(conductivity_temperature_coefficient, "conductivity_temperature_coefficient")
     t0 = _scalar(reference_temperature, "reference_temperature")
     k = _scalar(thermal_conductivity, "thermal_conductivity", positive=True)
     u_a, u_b = 1 + alpha * (t_a - t0), 1 + alpha * (t_b - t0)
     if u_a <= 0 or u_b <= 0:
         raise ValueError("sigma(T) must be positive at both faces")
     if alpha == 0.0:
-        return constant_conductivity(L, (v_a, v_b), (t_a, t_b), sigma0, k, t0)
+        return constant_conductivity(length=L, prescribed_electric_potential=(v_a, v_b),
+                                     prescribed_temperature=(t_a, t_b), electrical_conductivity=sigma0,
+                                     thermal_conductivity=k, reference_temperature=t0)
     if v_a == v_b:
         # no current, no heating: T is linear and sigma(T) varies along it
         return _finish(JouleSlab(L, (v_a, v_b), (t_a, t_b), sigma0, alpha, t0, k, 0.0, 0.0, (0.0, 0.0), None), None)
@@ -340,56 +372,79 @@ def voltage_driven(length, potentials, temperatures, sigma0, alpha, reference_te
     return _finish(slab, scaled.extremum_fraction())
 
 
-def drop_scale(sigma0, alpha, thermal_conductivity) -> float:
+def drop_scale(*, reference_conductivity, conductivity_temperature_coefficient, thermal_conductivity) -> float:
     """Voltage drop ``sqrt(2k/(|alpha| sigma0))`` at which ``|s_a - s_b| = 1``."""
+    refuse_text(reference_conductivity=reference_conductivity,
+                conductivity_temperature_coefficient=conductivity_temperature_coefficient,
+                thermal_conductivity=thermal_conductivity)
     return math.sqrt(2 * _scalar(thermal_conductivity, "thermal_conductivity", True)
-                     / (abs(_scalar(alpha, "alpha")) * _scalar(sigma0, "sigma0", True)))
+                     / (abs(_scalar(conductivity_temperature_coefficient, "conductivity_temperature_coefficient"))
+                        * _scalar(reference_conductivity, "reference_conductivity", True)))
 
 
-def fold_current(length, temperatures, sigma0, alpha, reference_temperature, thermal_conductivity):
-    """``alpha < 0`` only: ``(J_fold, drop_fold)``, the largest current density a steady
-    voltage-driven state carries and the drop at which the current-voltage curve folds."""
-    alpha = _scalar(alpha, "alpha")
+def fold_current(*, length, prescribed_temperature, reference_conductivity, conductivity_temperature_coefficient,
+                 reference_temperature, thermal_conductivity):
+    """``conductivity_temperature_coefficient < 0`` only: ``(J_fold, drop_fold)``, the largest current
+    density a steady voltage-driven state carries and the drop at which the current-voltage curve folds."""
+    refuse_text(length=length, prescribed_temperature=prescribed_temperature,
+                reference_conductivity=reference_conductivity,
+                conductivity_temperature_coefficient=conductivity_temperature_coefficient,
+                reference_temperature=reference_temperature, thermal_conductivity=thermal_conductivity)
+    alpha = _scalar(conductivity_temperature_coefficient, "conductivity_temperature_coefficient")
     if not alpha < 0:
-        raise ValueError("the current folds only for alpha < 0")
-    scale = drop_scale(sigma0, alpha, thermal_conductivity)
+        raise ValueError("the current folds only for conductivity_temperature_coefficient < 0")
+    scale = drop_scale(reference_conductivity=reference_conductivity, conductivity_temperature_coefficient=alpha,
+                       thermal_conductivity=thermal_conductivity)
+    law = dict(prescribed_temperature=prescribed_temperature, reference_conductivity=reference_conductivity,
+               conductivity_temperature_coefficient=alpha, reference_temperature=reference_temperature,
+               thermal_conductivity=thermal_conductivity)
 
     def current(drop):
-        return abs(voltage_driven(length, (drop, 0.0), temperatures, sigma0, alpha,
-                                  reference_temperature, thermal_conductivity).current_density)
+        return abs(voltage_driven(length=length, prescribed_electric_potential=(drop, 0.0), **law).current_density)
 
     answer = minimize_scalar(lambda d: -current(d), bounds=(1e-6 * scale, 50 * scale),
                              method="bounded", options=dict(xatol=1e-12 * scale))
     return float(current(answer.x)), float(answer.x)
 
 
-def current_driven(length, current_density, temperatures, sigma0, alpha, reference_temperature,
-                   thermal_conductivity, potential_a=0.0, branch="lower") -> JouleSlab:
-    """Slab carrying ``J`` (A/m^2, positive toward ``+x``) between fixed temperatures.
+def current_driven(*, length, current_density, prescribed_temperature, reference_conductivity,
+                   conductivity_temperature_coefficient, reference_temperature, thermal_conductivity,
+                   prescribed_electric_potential, branch="lower") -> JouleSlab:
+    """Slab carrying ``current_density`` J (A/m^2, positive toward ``+x``) between fixed temperatures.
 
     Finds the voltage drop whose ``voltage_driven`` solution carries ``J`` and
-    returns that solution with ``V(0) = potential_a``. For ``alpha < 0`` the
-    current-voltage curve folds at ``fold_current``: ``branch="lower"`` returns
-    the state with the smaller drop (and smaller temperature rise), ``"upper"``
-    the other one; ``|J|`` above the fold raises ``ValueError``.
+    returns that solution with ``V(0) = prescribed_electric_potential`` (V, the
+    potential of the face x = 0; the other face's follows). For
+    ``conductivity_temperature_coefficient < 0`` the current-voltage curve folds at
+    ``fold_current``: ``branch="lower"`` returns the state with the smaller drop
+    (and smaller temperature rise), ``"upper"`` the other one; ``|J|`` above the
+    fold raises ``ValueError``.
     """
+    refuse_text(length=length, current_density=current_density, prescribed_temperature=prescribed_temperature,
+                reference_conductivity=reference_conductivity,
+                conductivity_temperature_coefficient=conductivity_temperature_coefficient,
+                reference_temperature=reference_temperature, thermal_conductivity=thermal_conductivity,
+                prescribed_electric_potential=prescribed_electric_potential)
     J = _scalar(current_density, "current_density")
     L = _scalar(length, "length", positive=True)
-    alpha = _scalar(alpha, "alpha")
-    v_a = _scalar(potential_a, "potential_a")
+    alpha = _scalar(conductivity_temperature_coefficient, "conductivity_temperature_coefficient")
+    v_a = _scalar(prescribed_electric_potential, "prescribed_electric_potential")
     if branch not in ("lower", "upper"):
         raise ValueError("branch must be 'lower' or 'upper'")
-    args = (temperatures, sigma0, alpha, reference_temperature, thermal_conductivity)
+    law = dict(prescribed_temperature=prescribed_temperature, reference_conductivity=reference_conductivity,
+               conductivity_temperature_coefficient=alpha, reference_temperature=reference_temperature,
+               thermal_conductivity=thermal_conductivity)
     if J == 0.0:
-        return voltage_driven(L, (v_a, v_a), *args)
+        return voltage_driven(length=L, prescribed_electric_potential=(v_a, v_a), **law)
 
     def magnitude(drop):
-        return abs(voltage_driven(L, (drop, 0.0), *args).current_density)
+        return abs(voltage_driven(length=L, prescribed_electric_potential=(drop, 0.0), **law).current_density)
 
     if alpha == 0.0:
-        drop = abs(J) * L / _scalar(sigma0, "sigma0", True)
+        drop = abs(J) * L / _scalar(reference_conductivity, "reference_conductivity", True)
     elif alpha > 0:
-        scale = drop_scale(sigma0, alpha, thermal_conductivity)
+        scale = drop_scale(reference_conductivity=reference_conductivity, conductivity_temperature_coefficient=alpha,
+                           thermal_conductivity=thermal_conductivity)
         lo, hi = 1e-9 * scale, scale
         while magnitude(hi) < abs(J):
             lo, hi = hi, 2 * hi
@@ -398,7 +453,7 @@ def current_driven(length, current_density, temperatures, sigma0, alpha, referen
         drop = brentq(lambda d: magnitude(d) - abs(J), lo, hi, xtol=1e-15 * scale,
                       rtol=4 * np.finfo(float).eps, maxiter=200)
     else:
-        j_fold, d_fold = fold_current(L, *args)
+        j_fold, d_fold = fold_current(length=L, **law)
         if abs(J) > j_fold:
             raise ValueError(f"no steady state: |J| = {abs(J):.6g} exceeds the fold current {j_fold:.6g}")
         if branch == "lower":
@@ -412,4 +467,4 @@ def current_driven(length, current_density, temperatures, sigma0, alpha, referen
         drop = brentq(lambda d: magnitude(d) - abs(J), lo, hi, xtol=1e-15 * d_fold,
                       rtol=4 * np.finfo(float).eps, maxiter=200)
     v_b = v_a - drop if J > 0 else v_a + drop
-    return voltage_driven(L, (v_a, v_b), *args)
+    return voltage_driven(length=L, prescribed_electric_potential=(v_a, v_b), **law)
