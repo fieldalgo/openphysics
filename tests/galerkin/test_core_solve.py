@@ -362,8 +362,8 @@ def test_overlapping_numpy_solves_leave_the_warning_filters_alone(monkeypatch, p
             mesh, electrical_conductivity=2.0,
             prescribed_electric_potential={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
         "elasticity": lambda: solve_elasticity(
-            mesh, young_modulus=2e3, poisson_ratio=0.3, plane="stress",
-            dirichlet={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),
+            mesh, youngs_modulus=2e3, poisson_ratio=0.3, plane="stress",
+            prescribed_displacement={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),
     }
     original = core_solve.scipy_solve_dirichlet
     first_inside, first_done = threading.Event(), threading.Event()

@@ -29,19 +29,19 @@ T1 = T2 = .5e-3
 LENGTH = 20e-3
 E, NU, ALPHA = [200e9, 70e9], [.3, .33], [12e-6, 23e-6]
 DT, TREF, KELVIN = 100., 293.15, 273.15
-STRIP = dict(thicknesses=[T1, T2], young_moduli=E, poisson_ratios=NU, expansions=ALPHA,
+STRIP = dict(thickness=[T1, T2], youngs_modulus=E, poisson_ratio=NU, linear_expansion_coefficient=ALPHA,
              temperature_change=DT, length=LENGTH)
 P, TARGET = tc.nafems_t4(), tc.nafems_t4_target()        # SI (K); this figure shows degC
 
 
 def solve_strip(n):
     mesh = layered_rectangle_mesh([T1, T1+T2], LENGTH, [n, n], 40*n, ['layer1', 'layer2'])
-    snapshot = freeze_temperature(mesh, np.full(len(mesh.nodes), TREF+DT))
+    snapshot = freeze_temperature(mesh, temperature=np.full(len(mesh.nodes), TREF+DT))
     supports = {(0, 0): 0., (0, 1): 0., (40*n*(2*n+1), 0): 0.}
     r = solve_thermoelasticity(
-        mesh, snapshot, reference_temperature_k=TREF, plane='stress', dirichlet=supports,
-        thermal_expansion_per_k={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
-        young_modulus={'layer1': E[0], 'layer2': E[1]},
+        mesh, snapshot, stress_free_temperature=TREF, plane='stress', prescribed_displacement=supports,
+        linear_expansion_coefficient={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
+        youngs_modulus={'layer1': E[0], 'layer2': E[1]},
         poisson_ratio={'layer1': NU[0], 'layer2': NU[1]})
     ids = mesh.boundary['left']
     y = mesh.nodes[ids, 1]
@@ -70,7 +70,8 @@ def main(argv):
     out = Path(args[0])
     out.mkdir(parents=True, exist_ok=True)
     levels = (1, 2, 4) if quick else (1, 2, 4, 8, 16)
-    kappa = bimetal.curvature([T1, T2], E, ALPHA, DT).curvature
+    kappa = bimetal.curvature(thickness=[T1, T2], youngs_modulus=E, linear_expansion_coefficient=ALPHA,
+                              temperature_change=DT).curvature
     exact_t4 = tc.series(np.array([TARGET.position]), P, terms=300).temperature[0]-KELVIN
     strip_rows, t4_rows = [], []
     for n in levels:

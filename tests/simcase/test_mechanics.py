@@ -93,15 +93,15 @@ def test_j1_document_run_matches_direct_solve_byte_for_byte(plane):
     for side, component in (('left', 0), ('bottom', 1)):
         for node in mesh.boundary[side]:
             fixed[int(node), component] = 0.
-    direct = solve_elasticity(mesh, young_modulus=2e11, poisson_ratio=.3, plane=plane,
-                              dirichlet=dict(sorted(fixed.items())), body_force=(0., -7.7e4),
+    direct = solve_elasticity(mesh, youngs_modulus=2e11, poisson_ratio=.3, plane=plane,
+                              prescribed_displacement=dict(sorted(fixed.items())), body_force_density=(0., -7.7e4),
                               traction={'right': [3e6, 0.], 'top': [0., -1e5]})
     f = result.fields
     assert f['node_coordinates'].tobytes() == mesh.nodes.tobytes()
     assert f['triangles'].tobytes() == mesh.triangles.tobytes()
     for key, attr in (('displacement', 'displacement'), ('strain', 'strain'), ('stress', 'stress'),
-                      ('applied_force_per_depth', 'load'), ('reaction_force_per_depth', 'reaction'),
-                      ('residual_force_per_depth', 'residual')):
+                      ('applied_force_per_depth', 'applied_force_per_depth'), ('reaction_force_per_depth', 'reaction_force_per_depth'),
+                      ('residual_force_per_depth', 'residual_force_per_depth')):
         value = np.asarray(getattr(direct, attr))
         assert f[key].shape == value.shape and f[key].dtype == value.dtype, key
         assert f[key].tobytes() == value.tobytes(), key
@@ -126,9 +126,9 @@ def test_j2_uniaxial_refsol_across_length_units(unit, factor, plane):
                  traction={'right': [applied, 0.]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    exact = refsol.uniaxial(f['node_coordinates'], applied, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    exact = refsol.uniaxial(f['node_coordinates'], stress_xx=applied, youngs_modulus=2e11, poisson_ratio=.3, plane=plane)
     centroids = f['node_coordinates'][f['triangles']].mean(axis=1)
-    exact_cells = refsol.uniaxial(centroids, applied, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    exact_cells = refsol.uniaxial(centroids, stress_xx=applied, youngs_modulus=2e11, poisson_ratio=.3, plane=plane)
     du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
     ds = relative(f['stress'], exact_cells.stress, applied)
     de = relative(f['strain'], exact_cells.strain, np.max(abs(exact_cells.strain)))
@@ -149,9 +149,9 @@ def test_j2_shear_refsol_across_length_units(unit, factor, plane):
                  traction={'top': [tau, 0.], 'left': [0., -tau], 'right': [0., tau]})
     r = run(Document.from_dict(d), verbose=False)
     f = r.fields
-    exact = refsol.shear(f['node_coordinates'], tau, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    exact = refsol.shear(f['node_coordinates'], stress_xy=tau, youngs_modulus=2e11, poisson_ratio=.3, plane=plane)
     centroids = f['node_coordinates'][f['triangles']].mean(axis=1)
-    exact_cells = refsol.shear(centroids, tau, young_modulus=2e11, poisson_ratio=.3, plane=plane)
+    exact_cells = refsol.shear(centroids, stress_xy=tau, youngs_modulus=2e11, poisson_ratio=.3, plane=plane)
     du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
     ds = relative(f['stress'], exact_cells.stress, tau)
     print(dict(unit=unit, plane=plane, displacement_relative=du, stress_relative=ds))
@@ -271,10 +271,10 @@ def test_j4_rigid_mode_rule_matches_the_solver_rank_test(fixed, held):
     mesh = rectangle_mesh(1., .4, 4, 2)
     dirichlet = {(int(node), 'xy'.index(c)): 0. for side, c in fixed for node in mesh.boundary[side]}
     if held:
-        solve_elasticity(mesh, young_modulus=1e9, poisson_ratio=.3, plane='stress', dirichlet=dirichlet)
+        solve_elasticity(mesh, youngs_modulus=1e9, poisson_ratio=.3, plane='stress', prescribed_displacement=dirichlet)
     else:
         with pytest.raises(ValueError, match='rigid modes'):
-            solve_elasticity(mesh, young_modulus=1e9, poisson_ratio=.3, plane='stress', dirichlet=dirichlet)
+            solve_elasticity(mesh, youngs_modulus=1e9, poisson_ratio=.3, plane='stress', prescribed_displacement=dirichlet)
 
 
 def test_j4_adjacent_sides_may_share_a_corner_value_and_zero_traction_on_fixed_components():
@@ -384,7 +384,7 @@ def test_j6_studio_rejects_mechanics_documents(kind):
 
 # K1-K4: mechanics.thermoelastic2d --------------------------------------------------------------
 
-MATERIAL = dict(young_modulus=70e9, poisson_ratio=.3, thermal_expansion_per_k=12e-6, reference_temperature_k=293.15)
+MATERIAL = dict(youngs_modulus=70e9, poisson_ratio=.3, linear_expansion_coefficient=12e-6, stress_free_temperature=293.15)
 
 
 def thermo_document(unit='m', factor=1., *, plane='stress', nu=.3, domain=(0., 1., 0., .4), subdivisions=(10, 4),
@@ -425,20 +425,20 @@ def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
     for side, component in (('left', 0), ('bottom', 1)):
         for node in mesh.boundary[side]:
             fixed[int(node), component] = 0.
-    direct = solve_thermoelasticity(mesh, freeze_temperature(mesh, heat.temperature), reference_temperature_k=293.15,
-                                    thermal_expansion_per_k=12e-6, young_modulus=70e9, poisson_ratio=.3, plane=plane,
-                                    dirichlet=dict(sorted(fixed.items())), body_force=(0., -2.7e4),
+    direct = solve_thermoelasticity(mesh, freeze_temperature(mesh, temperature=heat.temperature), stress_free_temperature=293.15,
+                                    linear_expansion_coefficient=12e-6, youngs_modulus=70e9, poisson_ratio=.3, plane=plane,
+                                    prescribed_displacement=dict(sorted(fixed.items())), body_force_density=(0., -2.7e4),
                                     traction={'right': [3e6, 0.], 'top': [0., -1e5]})
     f = result.fields
     assert f['temperature'].tobytes() == np.asarray(heat.temperature).tobytes()
     assert f['heat_flux'].tobytes() == np.asarray(heat.heat_flux).tobytes()
     assert f['outward_convective_heat_rate_per_depth'].tobytes() == np.asarray(heat.outward_convective_heat_rate_per_depth).tobytes()
-    for key, attr in (('displacement', 'displacement'), ('strain', 'total_strain'), ('thermal_strain', 'thermal_strain'),
-                      ('elastic_strain', 'elastic_strain'), ('stress', 'stress'), ('stress_zz', 'sigma_zz'),
-                      ('strain_zz', 'epsilon_zz'), ('applied_force_per_depth', 'load_external'),
-                      ('thermal_equivalent_force_per_depth', 'load_thermal'), ('applied_body_force_per_depth', 'load_body'),
-                      ('applied_traction_force_per_depth', 'load_traction'), ('reaction_force_per_depth', 'reaction'),
-                      ('residual_force_per_depth', 'residual')):
+    for key, attr in (('displacement', 'displacement'), ('strain', 'strain'), ('thermal_strain', 'thermal_strain'),
+                      ('elastic_strain', 'elastic_strain'), ('stress', 'stress'), ('stress_zz', 'stress_zz'),
+                      ('strain_zz', 'strain_zz'), ('applied_force_per_depth', 'applied_force_per_depth'),
+                      ('thermal_equivalent_force_per_depth', 'thermal_equivalent_force_per_depth'), ('applied_body_force_per_depth', 'applied_body_force_per_depth'),
+                      ('applied_traction_force_per_depth', 'applied_traction_force_per_depth'), ('reaction_force_per_depth', 'reaction_force_per_depth'),
+                      ('residual_force_per_depth', 'residual_force_per_depth')):
         value = np.asarray(getattr(direct, attr))
         assert f[key].shape == value.shape and f[key].dtype == value.dtype, key
         assert f[key].tobytes() == value.tobytes(), key
@@ -448,13 +448,14 @@ def test_k1_thermoelastic_run_matches_direct_calls_byte_for_byte(plane):
     assert summary['temperature_snapshot']['snapshot_hash'] == direct.temperature_snapshot.snapshot_hash
     # D-30: strain_energy_per_depth is the physical elastic energy; the solver's quadratic
     # functional is stiffness_energy_functional_per_depth
-    assert summary['balance']['strain_energy_per_depth']['value'] == float(direct.physical_elastic_energy)
+    assert summary['balance']['strain_energy_per_depth']['value'] == float(direct.strain_energy_per_depth)
     assert summary['balance']['stiffness_energy_functional_per_depth']['unit'] == 'J/m'
     assert 'length_unit mm' in summary['extent'][0]
 
 
 def _combined(points, plane, nu):
-    return thermo_refsol.uniform_combined(points, applied_stress=(8e6, -2e6, 0.), **dict(MATERIAL, plane=plane, poisson_ratio=nu))
+    return thermo_refsol.uniform_combined(points, temperature_change=20., stress=(8e6, -2e6, 0.),
+                                         displacement=(2e-5, -1e-5), **dict(MATERIAL, plane=plane, poisson_ratio=nu))
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -475,16 +476,16 @@ def test_k2_uniform_combined_refsol_across_length_units(unit, factor, plane):
     exact = _combined(f['node_coordinates'], plane, .3)
     cells = _combined(f['node_coordinates'][f['triangles']].mean(axis=1), plane, .3)
     stress = np.column_stack([cells.stress[:, 0, 0], cells.stress[:, 1, 1], cells.stress[:, 0, 1]])
-    dt = relative(f['temperature'], exact.temperature_k, 313.15)
+    dt = relative(f['temperature'], exact.temperature, 313.15)
     du = relative(f['displacement'], exact.displacement, np.max(abs(exact.displacement)))
     ds = relative(f['stress'], stress, 8e6)
     dz = relative(f['stress_zz'], cells.stress[:, 2, 2], 8e6)
-    de = relative(f['strain'], cells.total_strain[:, [0, 1, 0], [0, 1, 1]]*[1, 1, 2], np.max(abs(cells.total_strain)))
+    de = relative(f['strain'], cells.strain[:, [0, 1, 0], [0, 1, 1]]*[1, 1, 2], np.max(abs(cells.strain)))
     print(dict(unit=unit, plane=plane, temperature_relative=dt, displacement_relative=du, stress_relative=ds,
                sigma_zz_relative=dz, strain_relative=de))
     assert dt <= 1e-10 and du <= 1e-10 and ds <= 1e-10 and dz <= 1e-10 and de <= 1e-10
     area = .1*.04
-    energy = float(np.mean(cells.energy_density))*area
+    energy = float(np.mean(cells.strain_energy_density))*area
     assert r.summary()['balance']['strain_energy_per_depth']['value'] == pytest.approx(energy, rel=1e-10)
 
 
@@ -514,7 +515,7 @@ def test_k3_confined_bar_with_linear_temperature_mesh_convergence(plane):
         approx = f['displacement'][f['triangles']].mean(axis=1)
         errors.append(float(np.sqrt(np.mean(np.sum((approx-exact)**2, axis=1)))))
         theta = t1-tref+g*xc
-        stress, _, _ = thermo_refsol.parent_state(np.column_stack([k*alpha*theta, 0*theta, 0*theta]), tref+theta,
+        stress, _, _ = thermo_refsol.parent_state(strain=np.column_stack([k*alpha*theta, 0*theta, 0*theta]), temperature=tref+theta,
                                                    **dict(MATERIAL, plane=plane))
         exact_stress = np.column_stack([stress[:, 0, 0], stress[:, 1, 1], stress[:, 0, 1]])
         scale = np.max(abs(exact_stress))

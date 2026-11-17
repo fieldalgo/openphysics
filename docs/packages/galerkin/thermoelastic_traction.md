@@ -11,16 +11,16 @@ Both `plane="stress"` and `plane="strain"` are required explicit choices.
 
 ```python
 from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
-snapshot = freeze_temperature(mesh, temperature_k)
+snapshot = freeze_temperature(mesh, temperature=nodal_temperature)
 result = solve_thermoelasticity(
-    mesh, snapshot, reference_temperature_k=293.15,
-    thermal_expansion_per_k=12e-6, young_modulus=70e9,
-    poisson_ratio=.3, plane="strain", dirichlet=constraints,
-    body_force=(0., 0.), traction={"right": (8e6, 3e6)})
+    mesh, snapshot, stress_free_temperature=293.15,
+    linear_expansion_coefficient=12e-6, youngs_modulus=70e9,
+    poisson_ratio=.3, plane="strain", prescribed_displacement=constraints,
+    body_force_density=(0., 0.), traction={"right": (8e6, 3e6)})
 ```
 
-`dirichlet` maps `(node_id, component)` to displacement in m; component 0/1 is
-Cartesian x/y. `body_force` is a finite real constant `(2,)` N/m³ or pure
+`prescribed_displacement` maps `(node_id, component)` to displacement in m; component 0/1 is
+Cartesian x/y. `body_force_density` is a finite real constant `(2,)` N/m³ or pure
 `callback(points_m)->(Q,2)` N/m³. `traction` is `None`, `{}`, or a mapping from
 `mesh.boundary_edges` tags to global Cartesian finite real `(2,)` vectors in Pa,
 or pure `callback(points_m, outward_normals)->(Q,2)` in Pa. Points and unit
@@ -57,12 +57,12 @@ The original 3D law is
 mu = E/[2(1+nu)]
 lambda = E*nu/[(1+nu)(1-2nu)]
 sigma = 2*mu*(epsilon-a*I) + lambda*tr(epsilon-a*I)*I
--div(sigma) = body_force
+-div(sigma) = body_force_density
 sigma*n = traction
-K*u = load_body + load_traction + load_thermal
-load_external = load_body + load_traction
-load_total = load_external + load_thermal
-residual = K*u - load_external - load_thermal
+K*u = applied_body_force_per_depth + applied_traction_force_per_depth
+      + thermal_equivalent_force_per_depth
+applied_force_per_depth = applied_body_force_per_depth + applied_traction_force_per_depth
+residual_force_per_depth = K*u - applied_force_per_depth - thermal_equivalent_force_per_depth
 ```
 
 Traction is **TOTAL physical sigma*n**. Do not add or subtract the thermal
@@ -117,18 +117,24 @@ loads require sufficient rigid constraints on every connected component.
 
 ## Results, legacy construction and snapshots
 
-The original 18 `ThermoelasticResult` positional fields retain their order and
-meaning: displacement, total_strain, thermal_strain, elastic_strain, stress,
-sigma_zz, epsilon_zz, load_external, load_thermal, reaction, residual,
-physical_elastic_energy, temperature_snapshot, reference_temperature_k,
-thermal_expansion_per_k, young_modulus, poisson_ratio, plane. Two fields are
-appended: `load_body=None`, `load_traction=None`. Normal solver results populate
-both as `(N,2)` arrays. Legacy manually constructed 18-argument results have
-`None` for these fields; consumers must allow that. `load_total` remains a
-computed sum. `traction=None/{}` preserves earlier numerical results.
+The first 18 `ThermoelasticResult` positional fields, in order, are
+displacement, strain, thermal_strain, elastic_strain, stress, stress_zz,
+strain_zz, applied_force_per_depth, thermal_equivalent_force_per_depth,
+reaction_force_per_depth, residual_force_per_depth, strain_energy_per_depth,
+temperature_snapshot, stress_free_temperature, linear_expansion_coefficient,
+youngs_modulus, poisson_ratio and plane. Two fields follow:
+`applied_body_force_per_depth=None`, `applied_traction_force_per_depth=None`.
+Normal solver results populate both as `(N,2)` arrays. Manually constructed
+18-argument results have `None` for these fields; consumers must allow that.
+There is no total-load field: the total is
+`applied_force_per_depth + thermal_equivalent_force_per_depth`. `result.units`
+maps each quantity field to its SI unit; the forces and the energy are per metre
+of depth (N/m, J/m), and asking for a name without `_per_depth` raises an
+`AttributeError` that names the per-depth field. `traction=None/{}` preserves
+earlier numerical results.
 
-Displacement is nodal; total_strain is element constant. thermal_strain,
-elastic_strain, stress, sigma_zz and epsilon_zz are centroid samples. Stress
+Displacement is nodal; strain is element constant. thermal_strain,
+elastic_strain, stress, stress_zz and strain_zz are centroid samples. Stress
 vector order is `(sxx,syy,sxy)` and strain vector order `(exx,eyy,gamma_xy)`.
 P1 T makes physical stress linear inside each cell. Reconstruct from constant
 strain plus interpolated T for integrals; centroid stress is not a constant
@@ -151,7 +157,8 @@ are mutable; no post-return integrity guarantee is made.
 ## Physical endpoint energy and support work
 
 At fixed temperature, let C_T be physical energy with zero in-plane strain.
-With F=load_external, g=load_thermal, r=reaction:
+With F=applied_force_per_depth, g=thermal_equivalent_force_per_depth,
+r=reaction_force_per_depth:
 
 ```text
 uKu = u·(F+g+r)

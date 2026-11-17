@@ -122,10 +122,10 @@ def _direct_inputs(doc, mesh, region_materials, name):
     loads = {tag: [float(v) for v in t] for tag, t in p.get('traction', {}).items()}
     for tag, value in p.get('gauge_pressure', {}).items():
         loads[tag] = (lambda points, normals, value=float(value): -value * normals)
-    return dict(young_modulus={r: m[n]['youngs_modulus'] for r, n in region_materials.items()},
+    return dict(youngs_modulus={r: m[n]['youngs_modulus'] for r, n in region_materials.items()},
                 poisson_ratio={r: m[n]['poisson_ratio'] for r, n in region_materials.items()},
-                plane=p['plane'], dirichlet=dict(sorted(fixed.items())),
-                body_force=tuple(p.get('body_force_density', (0.0, 0.0))), traction=dict(sorted(loads.items())))
+                plane=p['plane'], prescribed_displacement=dict(sorted(fixed.items())),
+                body_force_density=tuple(p.get('body_force_density', (0.0, 0.0))), traction=dict(sorted(loads.items())))
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -142,8 +142,8 @@ def test_r1_elastic_region_run_equals_direct_solve(plane):
     assert f['node_coordinates'].tobytes() == mesh.nodes.tobytes()
     assert f['triangle_regions'].tobytes() == np.asarray(mesh.regions, dtype=np.int64).tobytes()
     for key, attr in (('displacement', 'displacement'), ('strain', 'strain'), ('stress', 'stress'),
-                      ('applied_force_per_depth', 'load'), ('reaction_force_per_depth', 'reaction'),
-                      ('residual_force_per_depth', 'residual')):
+                      ('applied_force_per_depth', 'applied_force_per_depth'), ('reaction_force_per_depth', 'reaction_force_per_depth'),
+                      ('residual_force_per_depth', 'residual_force_per_depth')):
         assert f[key].tobytes() == np.asarray(getattr(direct, attr)).tobytes(), key
 
 
@@ -167,17 +167,17 @@ def test_r1_thermoelastic_region_run_equals_direct_solves(plane):
         prescribed_temperature={int(i): 300.0 for i in sorted(map(int, mesh.boundary['left']))},
         heat_source_density={r: (2e6 if r == 'alu' else 0.0) for r in mesh.region_names},
         inward_heat_flux={'bottom': 500.0}, convection={'top': (25.0, 290.0)})
-    snapshot = freeze_temperature(mesh, heat.temperature)
+    snapshot = freeze_temperature(mesh, temperature=heat.temperature)
     args = _direct_inputs(doc, mesh, region_materials, 'bar')
     direct = solve_thermoelasticity(
-        mesh, snapshot, reference_temperature_k=300.0,
-        thermal_expansion_per_k={r: m[n]['linear_expansion_coefficient'] for r, n in region_materials.items()}, **args)
+        mesh, snapshot, stress_free_temperature=300.0,
+        linear_expansion_coefficient={r: m[n]['linear_expansion_coefficient'] for r, n in region_materials.items()}, **args)
     f = result.fields
     assert f['temperature'].tobytes() == heat.temperature.tobytes()
     assert result.summary()['temperature_snapshot']['snapshot_hash'] == snapshot.snapshot_hash
-    for key, attr in (('displacement', 'displacement'), ('strain', 'total_strain'),
-                      ('stress', 'stress'), ('stress_zz', 'sigma_zz'), ('reaction_force_per_depth', 'reaction'),
-                      ('thermal_equivalent_force_per_depth', 'load_thermal'), ('residual_force_per_depth', 'residual')):
+    for key, attr in (('displacement', 'displacement'), ('strain', 'strain'),
+                      ('stress', 'stress'), ('stress_zz', 'stress_zz'), ('reaction_force_per_depth', 'reaction_force_per_depth'),
+                      ('thermal_equivalent_force_per_depth', 'thermal_equivalent_force_per_depth'), ('residual_force_per_depth', 'residual_force_per_depth')):
         assert f[key].tobytes() == np.asarray(getattr(direct, attr)).tobytes(), key
 
 

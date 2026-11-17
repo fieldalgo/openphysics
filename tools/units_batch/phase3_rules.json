@@ -239,6 +239,97 @@
    "keyword": "inward_heat_flux",
    "transform": "neg",
    "note": "L2 commit 7: the inward heat flux; the baseline's outward value is 0.0 - the head's"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.elasticity.solve_elasticity",
+   "old": "young_modulus",
+   "new": "youngs_modulus",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.elasticity.solve_elasticity",
+   "old": "dirichlet",
+   "new": "prescribed_displacement",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.elasticity.solve_elasticity",
+   "old": "body_force",
+   "new": "body_force_density",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.freeze_temperature",
+   "old": "temperature_k",
+   "new": "temperature",
+   "note": "L2 commit 8: registry name; the parameter is keyword-only now (simcase passes it by keyword), and the call binds it by name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.solve_thermoelasticity",
+   "old": "young_modulus",
+   "new": "youngs_modulus",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.solve_thermoelasticity",
+   "old": "dirichlet",
+   "new": "prescribed_displacement",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.solve_thermoelasticity",
+   "old": "body_force",
+   "new": "body_force_density",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.solve_thermoelasticity",
+   "old": "reference_temperature_k",
+   "new": "stress_free_temperature",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 2,
+   "function": "galerkin.thermoelasticity.solve_thermoelasticity",
+   "old": "thermal_expansion_per_k",
+   "new": "linear_expansion_coefficient",
+   "note": "L2 commit 8: registry name"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.thermoelasticity.TemperatureSnapshot",
+   "old": "temperature_k",
+   "new": "temperature",
+   "note": "L2 commit 8 (M1 proposal 6): the snapshot's temperature field takes its registry name; the arrays and the three hashes are unchanged"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.thermoelasticity.TemperatureSnapshot",
+   "old": "length_unit",
+   "new": null,
+   "note": "L2 commit 8 (M1 proposal 6): length_unit and temperature_unit became the one read-only units map"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.thermoelasticity.TemperatureSnapshot",
+   "old": "temperature_unit",
+   "new": null,
+   "note": "L2 commit 8 (M1 proposal 6): length_unit and temperature_unit became the one read-only units map"
+  },
+  {
+   "kind": 5,
+   "class": "galerkin.thermoelasticity.TemperatureSnapshot",
+   "old": null,
+   "new": "units",
+   "note": "L2 commit 8 (M1 proposal 6): the read-only units map {nodes: m, temperature: K} that replaces length_unit and temperature_unit"
   }
  ]
 }

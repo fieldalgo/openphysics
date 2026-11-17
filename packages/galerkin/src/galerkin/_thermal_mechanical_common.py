@@ -4,8 +4,9 @@
 
 A workflow copies the caller's mesh once (``isolated_mesh``), records its state
 (``mesh_state``) and checks that the copy is unchanged between stages
-(``check_mesh_unchanged``). ``dirichlet_supports`` validates scalar or
-(node, component) Dirichlet mappings before any stage runs.
+(``check_mesh_unchanged``). ``dirichlet_supports`` validates the prescribed
+temperature {node: K} or prescribed displacement {(node, component): m} mappings
+before any stage runs.
 
 Package-private: galerkin.thermal_mechanical and
 galerkin.transient_thermal_mechanical import these names so that neither
@@ -27,19 +28,22 @@ def _integer(value, name):
 
 
 def dirichlet_supports(mapping, vector=False):
+    """The checked prescribed values: ``prescribed_temperature`` {node: K}, or with
+    ``vector`` ``prescribed_displacement`` {(node, component): m}; messages name them."""
+    name = 'prescribed_displacement' if vector else 'prescribed_temperature'
     if not isinstance(mapping, Mapping):
-        raise ValueError('Dirichlet data must be a mapping')
+        raise ValueError(f'{name} must be a mapping')
     result = {}
     for key, value in mapping.items():
         if vector:
             if not isinstance(key, tuple) or len(key) != 2:
-                raise ValueError('mechanical Dirichlet keys must be (node, component)')
-            key = tuple(_integer(k, 'mechanical Dirichlet index') for k in key)
+                raise ValueError('prescribed_displacement keys must be (node, component)')
+            key = tuple(_integer(k, 'prescribed_displacement index') for k in key)
             if key[1] not in (0, 1):
-                raise ValueError('mechanical component must be 0 or 1')
+                raise ValueError('prescribed_displacement component must be 0 or 1')
         else:
-            key = _integer(key, 'thermal Dirichlet node')
-        result[key] = real_scalar(value, 'Dirichlet value')
+            key = _integer(key, 'prescribed_temperature node')
+        result[key] = real_scalar(value, f'{name} value')
     return result
 
 

@@ -275,10 +275,10 @@ def test_numpy_containers_and_couplings_refuse_live_values(name):
     (q,) = _live(name, [5.0])
     with pytest.raises(workflow.WorkflowStageError, match="cut the derivative"):
         workflow.solve_steady_thermoelasticity(
-            MESH, units={"length": "m", "temperature": "K"}, conductivity=10.0,
-            thermal_dirichlet={i: 313.15 for i in LEFT}, heat_source=lambda p: q * _wrap(name, 1.0 + p[:, 0]),
-            young_modulus=70e9, poisson_ratio=0.3, plane="strain", thermal_expansion_per_k=12e-6,
-            reference_temperature_k=293.15, mechanical_dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
+            MESH, thermal_conductivity=10.0,
+            prescribed_temperature={i: 313.15 for i in LEFT}, heat_source_density=lambda p: q * _wrap(name, 1.0 + p[:, 0]),
+            youngs_modulus=70e9, poisson_ratio=0.3, plane="strain", linear_expansion_coefficient=12e-6,
+            stress_free_temperature=293.15, prescribed_displacement={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
 
 
 @pytest.mark.parametrize("name", [None, *BACKENDS])

@@ -127,7 +127,8 @@ def test_deferred_entries_name_their_closing_condition(rules):
                         "valid_vacuum_wavelength"}
     for name in deferred | {"optical", "metal"}:
         e = rules.structural[name]
-        assert e.reviewer_note and e.scope == ("physmat",), name
+        # unit also covers galerkin.coupling's Field(..., unit=...) (L2 commit 8; spec 1.2 F4 defers its quantity=)
+        assert e.reviewer_note and e.scope == (("physmat", "galerkin.coupling") if name == "unit" else ("physmat",)), name
     assert all(rules.structural[n].closing for n in deferred)
     assert rules.structural["source"].scope == ("galerkin.interop", "physmat")
     assert api_scan.structural_entry("unit", "refsol.thermal_convection", rules) is None   # scoped to physmat

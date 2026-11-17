@@ -161,9 +161,10 @@ def rigid_free_regions(mesh, fixed):
 
 def region_mechanics_inputs(doc, mesh, region_materials):
     """The solve_elasticity (or solve_thermoelasticity) keyword arguments of a meshed region document,
-    from its internal SI view (``simcase.views.region_mechanics``), under galerkin's keywords.
+    from its internal SI view (``simcase.views.region_mechanics``), under galerkin's registry keywords.
 
-    E, nu (and alpha) are {region name: value} from ``materials``; prescribed DOFs are sorted by
+    youngs_modulus, poisson_ratio (and linear_expansion_coefficient) are {region name: value} from
+    ``materials``; prescribed DOFs are sorted by
     (node, component); each traction is a global [tx, ty] in Pa and each gauge pressure p the
     callback ``-p * outward normal`` on its boundary edges; the loads are sorted by name (H6).
     """
@@ -216,14 +217,15 @@ def region_mechanics_inputs(doc, mesh, region_materials):
     loads = dict(traction)
     for tag, value in pressure.items():
         loads[tag] = (lambda points, normals, value=value: -value * normals)
-    inputs = dict(young_modulus={r: float(m.young_modulus[k]) for r, k in region_materials.items()},
+    inputs = dict(youngs_modulus={r: float(m.young_modulus[k]) for r, k in region_materials.items()},
                   poisson_ratio={r: float(m.poisson_ratio[k]) for r, k in region_materials.items()},
-                  plane=m.plane, dirichlet=fixed,
-                  body_force=tuple(float(v) for v in m.body_force),
+                  plane=m.plane, prescribed_displacement=fixed,
+                  body_force_density=tuple(float(v) for v in m.body_force),
                   traction=dict(sorted(loads.items())) or None)
     if m.thermoelastic:
-        inputs.update(reference_temperature_k=float(m.reference_temperature),
-                      thermal_expansion_per_k={r: float(m.thermal_expansion[k]) for r, k in region_materials.items()})
+        inputs.update(stress_free_temperature=float(m.reference_temperature),
+                      linear_expansion_coefficient={r: float(m.thermal_expansion[k])
+                                                    for r, k in region_materials.items()})
     return inputs
 
 
@@ -279,7 +281,7 @@ def run_region_mechanics(doc, verbose=True, *, mesh_limits=None):
     start = time.perf_counter()
     solved, heat, snapshot = solve_03(mesh, inputs, heat_args, thermal, label=f'{path} ({kind})')
     solve_time = time.perf_counter() - start
-    fixed = inputs['dirichlet']
+    fixed = inputs['prescribed_displacement']
     heat_fixed = None if heat_args is None else heat_args['dirichlet']
     arrays = result_arrays(mesh, solved, fixed, thermal=thermal, regions=np.asarray(mesh.regions).astype(np.int64),
                            heat=heat, heat_fixed=heat_fixed)

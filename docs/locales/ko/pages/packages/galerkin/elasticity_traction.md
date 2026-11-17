@@ -15,13 +15,14 @@ from galerkin.elasticity import solve_elasticity
 mesh = rectangle_mesh(1.2, .7, 12, 7)  # metres
 bc = {(int(i), 0): 0. for i in mesh.boundary["left"]}
 bc.update({(int(i), 1): 0. for i in mesh.boundary["bottom"]})
-r = solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3,
-                     plane="stress", dirichlet=bc,
+r = solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3,
+                     plane="stress", prescribed_displacement=bc,
                      traction={"right": (123., 0.)})
-print(r.load.sum(axis=0), r.reaction.sum(axis=0))  # N/m of thickness
+print(r.applied_force_per_depth.sum(axis=0),
+      r.reaction_force_per_depth.sum(axis=0))  # N/m of thickness
 ```
 
-기본값 `traction=None` 또는 `{}`는 기존 zero-traction 동작을 유지합니다. 기존 `body_force`와 성분별 Dirichlet 매핑은 바뀌지 않습니다. 선택하지 않은 경계의 구속되지 않은 성분에는 가해진 traction이 0입니다. E와 nu는 균일하며 plane은 `"stress"` 또는 `"strain"`으로 명시해야 합니다.
+기본값 `traction=None` 또는 `{}`는 기존 zero-traction 동작을 유지합니다. `body_force_density`와 성분별 `prescribed_displacement` 매핑은 바뀌지 않습니다. 선택하지 않은 경계의 구속되지 않은 성분에는 가해진 traction이 0입니다. E와 nu는 균일하며 plane은 `"stress"` 또는 `"strain"`으로 명시해야 합니다.
 
 | 물리량 | 정의 | SI 단위 |
 |---|---|---|
@@ -30,8 +31,8 @@ print(r.load.sum(axis=0), r.reaction.sum(axis=0))  # N/m of thickness
 | 변 적분 측도 | ds | m |
 | 일관 경계 절점 하중 | integral(N_i*t)ds | 두께당 N/m |
 | 체적력 | 기존 체적 밀도 b | N/m^3 |
-| result.load | **체적력과 경계 하중의 합**인 `(N,2)` 절점 하중 | 두께당 N/m |
-| result.reaction / residual | 원 K*u-load, 반력은 처방 DOF에만 존재 | 두께당 N/m |
+| result.applied_force_per_depth | **체적력과 경계 하중의 합**인 `(N,2)` 절점 하중 | 두께당 N/m |
+| result.reaction_force_per_depth / residual_force_per_depth | 원 K*u-load, 반력은 처방 DOF에만 존재 | 두께당 N/m |
 | 면내 한 점에 대한 모멘트 | sum(r_x*f_y-r_y*f_x) | N = 두께당 (N*m)/m |
 | 탄성 변형에너지 / 외력 일 | 두께당 값 | J/m = N |
 
@@ -73,7 +74,7 @@ a에서 b로 향하는 변에 대해 q(s)=(1-s)*p_a+s*p_b, 0<=s<=1이면 다음�
 
 **처방 변위 성분에 가해지는 하중을 허용하고 유지합니다.** 해당 DOF에 가해지는 외력으로 해석합니다. 그 성분의 변위는 여전히 처방값으로 결정하며 지지 반력은 원 시스템의 `reaction=(K*u-load)`로 계산합니다. 구속된 성분에 별도의 독립 응력 경계조건을 추가로 부과하지 않습니다. 하중을 조용히 버리거나 Dirichlet 값을 덮어쓰는 데 쓰지 않습니다. 공유 모서리 절점과 완전히 처방된 변에도 같은 정책을 적용합니다. 고정 DOF의 하중을 늘리면 반력이 바뀌며, 영향을 받는 모든 DOF가 고정되어 있으면 변위는 바뀌지 않을 수 있습니다.
 
-`result.load`는 구속 DOF의 하중까지 포함한 체적력·경계 하중의 합입니다. `result.reaction`은 자유 DOF에서 0입니다. `result.residual`은 모든 DOF의 K*u-load를 유지하며 처방 DOF 값은 물리적 반력입니다. 힘·모멘트 평형에는 어느 한 항만이 아니라 **load plus reaction**을 사용합니다.
+`result.applied_force_per_depth`는 구속 DOF의 하중까지 포함한 체적력·경계 하중의 합입니다. `result.reaction_force_per_depth`는 자유 DOF에서 0입니다. `result.residual_force_per_depth`는 모든 DOF의 K*u-load를 유지하며 처방 DOF 값은 물리적 반력입니다. 힘·모멘트 평형에는 어느 한 항만이 아니라 **load plus reaction**을 사용합니다.
 
 분리된 각 연결 성분에서 세 강체 모드를 모두 제거해야 합니다. 평형을 이루는 순수 traction만으로는 변위해가 유일하지 않으며, 처방 변위 구속이 부족하면 거절합니다. 자동 절점 고정, 약한 스프링, penalty 정칙화나 최소제곱 해를 추가하지 않습니다.
 

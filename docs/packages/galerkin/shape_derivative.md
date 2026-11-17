@@ -89,8 +89,8 @@ and call `.backward()`.
 `solve_elasticity(mesh, ..., motion=MeshMotion(design_velocity=W, t=t))` takes plane stress and
 plane strain, scalar or region Young's modulus and Poisson ratio, a constant body
 force, constant tractions on boundary tags (they move with their edges) and
-Dirichlet displacements `{(node, component): value}`. The displacement, strain,
-stress, load, reaction and residual carry d/dt.
+prescribed displacements `{(node, component): value}`. The displacement, strain,
+stress and the applied, reaction and residual forces per depth carry d/dt.
 - The Dirichlet values stay attached to their nodes as the nodes move.
 - A large rigid displacement offset (Dirichlet values far larger than the
   elastic deformation) costs precision in the result and its derivative, as it
@@ -119,9 +119,9 @@ mesh.
   - `result.heat` and `result.mechanics` both carry d/dt.
   - `result.reference_mesh`, `result.temperature_snapshot` and the manifest
     describe the moved mesh and carry no derivative.
-- Both paths: displacement, the three strains, stress, σzz, εzz, the external
-  and thermal loads, reaction, residual and the physical elastic energy carry
-  d/dt. `result.temperature_snapshot` is the moved mesh's snapshot.
+- Both paths: displacement, the three strains, stress, `stress_zz`, `strain_zz`,
+  the external and thermal loads, reaction, residual and the strain energy (each
+  per depth) carry d/dt. `result.temperature_snapshot` is the moved mesh's snapshot.
 - A temperature field fixed in space and sampled at the moving nodes is not
   offered: that needs a coordinate callback (refused below).
 

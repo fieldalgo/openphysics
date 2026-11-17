@@ -24,7 +24,6 @@ from galerkin.thermal_mechanical import solve_steady_thermoelasticity
 from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
 
 BACKENDS = ["jax", "torch"]
-UNITS = {"length": "m", "temperature": "K"}
 
 
 def _jax():
@@ -68,8 +67,8 @@ def _clamped_left(m):
 
 # ---------------------------------------------------------------- problems
 
-MATERIALS = dict(young_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28},
-                 thermal_expansion_per_k={"host": 2.3e-5, "core": 1.2e-5})
+MATERIALS = dict(youngs_modulus={"host": 70e9, "core": 200e9}, poisson_ratio={"host": 0.33, "core": 0.28},
+                 linear_expansion_coefficient={"host": 2.3e-5, "core": 1.2e-5})
 
 
 def _plate():
@@ -91,8 +90,8 @@ def _plate_temperature(m):
 
 def _snapshot_solve(m, W, t, plane="stress", temperature=None, tref=290.0):
     T = _plate_temperature(m) if temperature is None else temperature
-    return solve_thermoelasticity(m, freeze_temperature(m, T), reference_temperature_k=tref, plane=plane,
-                                  dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
+    return solve_thermoelasticity(m, freeze_temperature(m, temperature=T), stress_free_temperature=tref, plane=plane,
+                                  prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4),
                                   traction={"right": (1.0e6, -4.0e5)}, motion=None if t is None else MeshMotion(design_velocity=W, t=t),
                                   **MATERIALS)
 
@@ -101,9 +100,9 @@ def _workflow_solve(m, W, t, plane="stress"):
     hot = {int(i): 400.0 for i in m.boundary["right"]}
     cold = {int(i): 300.0 for i in m.boundary["left"]}
     return solve_steady_thermoelasticity(
-        m, units=UNITS, conductivity={"host": 160.0, "core": 20.0}, thermal_dirichlet={**hot, **cold},
-        heat_source={"host": 0.0, "core": 5e6}, plane=plane, reference_temperature_k=300.0,
-        mechanical_dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4),
+        m, thermal_conductivity={"host": 160.0, "core": 20.0}, prescribed_temperature={**hot, **cold},
+        heat_source_density={"host": 0.0, "core": 5e6}, plane=plane, stress_free_temperature=300.0,
+        prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4),
         motion=None if t is None else MeshMotion(design_velocity=W, t=t), **MATERIALS)
 
 
@@ -113,10 +112,10 @@ def _functionals(m, mech, xp):
     y = m.nodes[left, 1] - 0.2
     return {"tip_uy": lambda: mech.displacement[tip, 1],
             # the clamped side's reaction sum (T1); its x component vanishes by equilibrium in path 2
-            "reaction": lambda: xp.sum(mech.reaction[left, 1]),
-            "energy": lambda: mech.physical_elastic_energy,
+            "reaction": lambda: xp.sum(mech.reaction_force_per_depth[left, 1]),
+            "energy": lambda: mech.strain_energy_per_depth,
             # extra, not pre-registered: the clamped side's reaction moment, which the thermal load drives
-            "moment": lambda: xp.sum(mech.reaction[left, 0] * xp.asarray(y))}
+            "moment": lambda: xp.sum(mech.reaction_force_per_depth[left, 0] * xp.asarray(y))}
 
 
 def _same_value(m, plain, value, expected):
@@ -126,7 +125,7 @@ def _same_value(m, plain, value, expected):
     largely cancel, and the live correction's rounding (and in path 2 the live heat stage's)
     shows at 1e-12 to 3e-10 of the moment itself."""
     left = np.asarray([int(i) for i in m.boundary["left"]])
-    scale = max(abs(float(expected)), float(np.sum(np.abs(plain.reaction[left, 0] * (m.nodes[left, 1] - 0.2)))))
+    scale = max(abs(float(expected)), float(np.sum(np.abs(plain.reaction_force_per_depth[left, 0] * (m.nodes[left, 1] - 0.2)))))
     assert abs(value - float(expected)) <= 1e-12 * scale, (value, float(expected), scale)
 
 
@@ -223,12 +222,12 @@ def test_t2_free_expansion_length(name, plane):
     dirichlet = {**{(i, 0): 0.0 for i in left}, (pin, 1): 0.0}
     W = np.stack([m.nodes[:, 0] / L, np.zeros(m.num_nodes)], axis=1)              # stretch: dL = 1
     tip = np.asarray([int(i) for i in m.boundary["right"]])
-    snapshot = freeze_temperature(m, np.full(m.num_nodes, 293.0 + dT))
+    snapshot = freeze_temperature(m, temperature=np.full(m.num_nodes, 293.0 + dT))
     strain = alpha * dT * (1.0 if plane == "stress" else 1.0 + nu)
 
     def delta(t):
-        r = solve_thermoelasticity(m, snapshot, reference_temperature_k=293.0, thermal_expansion_per_k=alpha,
-                                   young_modulus=80e9, poisson_ratio=nu, plane=plane, dirichlet=dirichlet,
+        r = solve_thermoelasticity(m, snapshot, stress_free_temperature=293.0, linear_expansion_coefficient=alpha,
+                                   youngs_modulus=80e9, poisson_ratio=nu, plane=plane, prescribed_displacement=dirichlet,
                                    motion=MeshMotion(design_velocity=W, t=t))
         return xp.mean(r.displacement[tip, 0])
 
@@ -289,10 +288,10 @@ def test_t3_thick_cylinder_heat_chained(name):
 
         def force(t):
             r = solve_steady_thermoelasticity(
-                mesh, units=UNITS, conductivity=1.0, thermal_dirichlet=heat, young_modulus=E, poisson_ratio=nu,
-                plane="strain", thermal_expansion_per_k=alpha, reference_temperature_k=Tref,
-                mechanical_dirichlet=clamp, motion=MeshMotion(design_velocity=W, t=t))
-            return xp.sum(r.mechanics.reaction[nodes] * xp.asarray(radial))
+                mesh, thermal_conductivity=1.0, prescribed_temperature=heat, youngs_modulus=E, poisson_ratio=nu,
+                plane="strain", linear_expansion_coefficient=alpha, stress_free_temperature=Tref,
+                prescribed_displacement=clamp, motion=MeshMotion(design_velocity=W, t=t))
+            return xp.sum(r.mechanics.reaction_force_per_depth[nodes] * xp.asarray(radial))
 
         value, grad = _gradient(name, force)
         errors.append(rel(grad, exact))
@@ -315,12 +314,12 @@ def test_t4_clamped_series_bar_interface(name):
     dirichlet = {**{(i, 0): 0.0 for i in ends}, **{(i, 1): 0.0 for i in rollers}}
     x = m.nodes[:, 0]
     W = np.stack([np.where(x <= L1, x / L1, (L - x) / (L - L1)), np.zeros(m.num_nodes)], axis=1)
-    snapshot = freeze_temperature(m, np.full(m.num_nodes, 300.0 + dT))
+    snapshot = freeze_temperature(m, temperature=np.full(m.num_nodes, 300.0 + dT))
 
     def sigma(t):
-        r = solve_thermoelasticity(m, snapshot, reference_temperature_k=300.0,
-                                   thermal_expansion_per_k={"a": a1, "b": a2}, young_modulus={"a": E1, "b": E2},
-                                   poisson_ratio=0.0, plane="stress", dirichlet=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
+        r = solve_thermoelasticity(m, snapshot, stress_free_temperature=300.0,
+                                   linear_expansion_coefficient={"a": a1, "b": a2}, youngs_modulus={"a": E1, "b": E2},
+                                   poisson_ratio=0.0, plane="stress", prescribed_displacement=dirichlet, motion=MeshMotion(design_velocity=W, t=t))
         return r.stress[0, 0]
 
     def exact(L1):
@@ -343,7 +342,7 @@ def test_t5_rigid_translation(name, path, functional):
 
     def objective(t):
         r = _snapshot_solve(m, W, t) if path == "snapshot" else _workflow_solve(m, W, t).mechanics
-        return r.physical_elastic_energy if functional == "energy" else xp.sum(r.displacement)
+        return r.strain_energy_per_depth if functional == "energy" else xp.sum(r.displacement)
 
     value, grad = _gradient(name, objective)
     assert abs(grad) <= 1e-12 * abs(value)
@@ -359,9 +358,9 @@ def test_t6_reduces_to_elasticity_without_temperature_change(name, plane):
     tip = int(np.argmin(np.hypot(m.nodes[:, 0] - 1.0, m.nodes[:, 1] - 0.2)))
     left = np.asarray([int(i) for i in m.boundary["left"]])
     uniform = np.full(m.num_nodes, 290.0)
-    elastic = dict(young_modulus=MATERIALS["young_modulus"], poisson_ratio=MATERIALS["poisson_ratio"], plane=plane,
-                   dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)})
-    for pick in (lambda r: r.displacement[tip, 1], lambda r: xp.sum(r.reaction[left, 0])):
+    elastic = dict(youngs_modulus=MATERIALS["youngs_modulus"], poisson_ratio=MATERIALS["poisson_ratio"], plane=plane,
+                   prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)})
+    for pick in (lambda r: r.displacement[tip, 1], lambda r: xp.sum(r.reaction_force_per_depth[left, 0])):
         _v, d_thermo = _gradient(name, lambda t: pick(_snapshot_solve(m, W, t, plane, uniform, tref=290.0)))
         _v, d_elastic = _gradient(name, lambda t: pick(solve_elasticity(m, motion=MeshMotion(design_velocity=W, t=t), **elastic)))
         assert rel(d_thermo, d_elastic) <= 1e-12, (d_thermo, d_elastic)
@@ -370,10 +369,10 @@ def test_t6_reduces_to_elasticity_without_temperature_change(name, plane):
 # ---------------------------------------------------------------- T7 unchanged without motion
 
 def _digest(r):
-    fields = ("displacement", "total_strain", "thermal_strain", "elastic_strain", "stress", "sigma_zz", "epsilon_zz",
-              "load_external", "load_thermal", "reaction", "residual")
+    fields = ("displacement", "strain", "thermal_strain", "elastic_strain", "stress", "stress_zz", "strain_zz",
+              "applied_force_per_depth", "thermal_equivalent_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth")
     parts = [np.ascontiguousarray(getattr(r, f), dtype=float).tobytes() for f in fields]
-    parts.append(np.float64(r.physical_elastic_energy).tobytes())
+    parts.append(np.float64(r.strain_energy_per_depth).tobytes())
     return hashlib.sha256(b"".join(parts)).hexdigest()
 
 
@@ -381,14 +380,14 @@ def test_t7_unchanged_without_motion():
     # main e9bb438 and this branch give the same sha256 for these problems (measured 2026-11-10; HQ record)
     m, W = _plate()
     assert _digest(_snapshot_solve(m, W, None)) == _digest(solve_thermoelasticity(
-        m, freeze_temperature(m, _plate_temperature(m)), reference_temperature_k=290.0, plane="stress",
-        dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)}, **MATERIALS))
+        m, freeze_temperature(m, temperature=_plate_temperature(m)), stress_free_temperature=290.0, plane="stress",
+        prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4), traction={"right": (1.0e6, -4.0e5)}, **MATERIALS))
     hot = {int(i): 400.0 for i in m.boundary["right"]}
     cold = {int(i): 300.0 for i in m.boundary["left"]}
     plain = solve_steady_thermoelasticity(
-        m, units=UNITS, conductivity={"host": 160.0, "core": 20.0}, thermal_dirichlet={**hot, **cold},
-        heat_source={"host": 0.0, "core": 5e6}, plane="stress", reference_temperature_k=300.0,
-        mechanical_dirichlet=_clamped_left(m), body_force=(0.0, -2.7e4), **MATERIALS)
+        m, thermal_conductivity={"host": 160.0, "core": 20.0}, prescribed_temperature={**hot, **cold},
+        heat_source_density={"host": 0.0, "core": 5e6}, plane="stress", stress_free_temperature=300.0,
+        prescribed_displacement=_clamped_left(m), body_force_density=(0.0, -2.7e4), **MATERIALS)
     with_none = _workflow_solve(m, W, None)
     assert _digest(plain.mechanics) == _digest(with_none.mechanics)
     assert plain.manifest_json == with_none.manifest_json
@@ -400,8 +399,8 @@ def test_t8_snapshot_refusals():
     xp = _xp("jax")
     m, W = _plate()
     t = xp.asarray(0.0)
-    snap = freeze_temperature(m, _plate_temperature(m))
-    common = dict(reference_temperature_k=290.0, plane="stress", dirichlet=_clamped_left(m), **MATERIALS)
+    snap = freeze_temperature(m, temperature=_plate_temperature(m))
+    common = dict(stress_free_temperature=290.0, plane="stress", prescribed_displacement=_clamped_left(m), **MATERIALS)
 
     def call(**over):
         kw = {**common, **over}
@@ -410,36 +409,36 @@ def test_t8_snapshot_refusals():
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)
-    with pytest.raises(TypeError, match="reference_temperature_k is live"):
-        call(reference_temperature_k=xp.asarray(290.0))
-    with pytest.raises(ValueError, match="reference_temperature_k is a callback; with a motion it must be a finite nonnegative"):
-        call(reference_temperature_k=lambda: 290.0)
-    with pytest.raises(TypeError, match="thermal_expansion_per_k is live"):
-        call(thermal_expansion_per_k={"host": xp.asarray(2.3e-5), "core": 1.2e-5})
-    with pytest.raises(ValueError, match="thermal_expansion_per_k is a callback; with a motion it must be a finite real scalar"):
-        call(thermal_expansion_per_k=lambda p: 1e-5)
-    with pytest.raises(TypeError, match="young_modulus is live"):
-        call(young_modulus=xp.asarray(70e9))
+    with pytest.raises(TypeError, match="stress_free_temperature is live"):
+        call(stress_free_temperature=xp.asarray(290.0))
+    with pytest.raises(ValueError, match="stress_free_temperature is a callback; with a motion it must be a finite nonnegative"):
+        call(stress_free_temperature=lambda: 290.0)
+    with pytest.raises(TypeError, match="linear_expansion_coefficient is live"):
+        call(linear_expansion_coefficient={"host": xp.asarray(2.3e-5), "core": 1.2e-5})
+    with pytest.raises(ValueError, match="linear_expansion_coefficient is a callback; with a motion it must be a finite real scalar"):
+        call(linear_expansion_coefficient=lambda p: 1e-5)
+    with pytest.raises(TypeError, match="youngs_modulus is live"):
+        call(youngs_modulus=xp.asarray(70e9))
     with pytest.raises(TypeError, match="poisson_ratio is live"):
         call(poisson_ratio=xp.asarray(0.3))
-    with pytest.raises(TypeError, match="body_force is live"):
-        call(body_force=(0.0, xp.asarray(-1.0)))
-    with pytest.raises(TypeError, match="body_force is a callback"):
-        call(body_force=lambda p: np.zeros((len(p), 2)))
+    with pytest.raises(TypeError, match="body_force_density is live"):
+        call(body_force_density=(0.0, xp.asarray(-1.0)))
+    with pytest.raises(TypeError, match="body_force_density is a callback"):
+        call(body_force_density=lambda p: np.zeros((len(p), 2)))
     with pytest.raises(TypeError, match=r"traction\['right'\] is live"):
         call(traction={"right": (xp.asarray(1.0), 0.0)})
     with pytest.raises(TypeError, match=r"traction\['right'\] is a callback"):
         call(traction={"right": lambda p, n: np.zeros((len(p), 2))})
-    with pytest.raises(TypeError, match="Dirichlet displacement is live"):
-        call(dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)})
-    with pytest.raises(TypeError, match="Dirichlet displacement is a callback; with a motion this slice takes"):
-        call(dirichlet={**_clamped_left(m), (int(m.boundary["right"][0]), 0): lambda: 1e-3})
-    with pytest.raises(TypeError, match="thermal_expansion_per_k is a callback; with a motion this slice takes"):
-        call(thermal_expansion_per_k={"host": lambda: 2.3e-5, "core": 1.2e-5})
-    with pytest.raises(ValueError, match="young_modulus is a callback; with a motion it must be"):
-        call(young_modulus=lambda: 70e9)
+    with pytest.raises(TypeError, match="prescribed_displacement is live"):
+        call(prescribed_displacement={**_clamped_left(m), (int(m.boundary["right"][0]), 0): xp.asarray(1e-3)})
+    with pytest.raises(TypeError, match="prescribed_displacement is a callback; with a motion this slice takes"):
+        call(prescribed_displacement={**_clamped_left(m), (int(m.boundary["right"][0]), 0): lambda: 1e-3})
+    with pytest.raises(TypeError, match="linear_expansion_coefficient is a callback; with a motion this slice takes"):
+        call(linear_expansion_coefficient={"host": lambda: 2.3e-5, "core": 1.2e-5})
+    with pytest.raises(ValueError, match="youngs_modulus is a callback; with a motion it must be"):
+        call(youngs_modulus=lambda: 70e9)
     with pytest.raises(ValueError, match="stale or mismatched mesh"):
-        call(snapshot=freeze_temperature(_moved(m, W, 0.01), _plate_temperature(m)))
+        call(snapshot=freeze_temperature(_moved(m, W, 0.01), temperature=_plate_temperature(m)))
     lo, hi = __import__("galerkin.shape", fromlist=["admissible_interval"]).admissible_interval(m, design_velocity=W)
     with pytest.raises(ElementInversion):
         call(t=xp.asarray(hi * 1.01))
@@ -451,8 +450,8 @@ def test_t8_workflow_refusals():
     t = xp.asarray(0.0)
     hot = {int(i): 400.0 for i in m.boundary["right"]}
     cold = {int(i): 300.0 for i in m.boundary["left"]}
-    common = dict(units=UNITS, conductivity=160.0, thermal_dirichlet={**hot, **cold}, plane="stress",
-                  reference_temperature_k=300.0, mechanical_dirichlet=_clamped_left(m), **MATERIALS)
+    common = dict(thermal_conductivity=160.0, prescribed_temperature={**hot, **cold}, plane="stress",
+                  stress_free_temperature=300.0, prescribed_displacement=_clamped_left(m), **MATERIALS)
 
     def call(**over):
         kw = {**common, **over}
@@ -460,22 +459,22 @@ def test_t8_workflow_refusals():
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)
-    with pytest.raises(TypeError, match="heat_source is a callback"):
-        call(heat_source=lambda p: np.zeros(len(p)))
-    with pytest.raises(TypeError, match="heat_source is live"):
-        call(heat_source=xp.asarray(1e5))
-    with pytest.raises(TypeError, match="conductivity is live"):
-        call(conductivity=xp.asarray(160.0))
-    with pytest.raises(TypeError, match="Dirichlet temperature is live"):
-        call(thermal_dirichlet={**hot, **cold, int(m.boundary["top"][3]): xp.asarray(350.0)})
-    with pytest.raises(ValueError, match="thermal_dirichlet must map"):
-        call(thermal_dirichlet=[(0, 300.0)])
-    with pytest.raises(TypeError, match="body_force is a callback"):
-        call(body_force=lambda p: np.zeros((len(p), 2)))
-    with pytest.raises(TypeError, match="reference_temperature_k is live"):
-        call(reference_temperature_k=xp.asarray(300.0))
-    with pytest.raises(TypeError, match="young_modulus is live"):
-        call(young_modulus=xp.asarray(70e9))
+    with pytest.raises(TypeError, match="heat_source_density is a callback"):
+        call(heat_source_density=lambda p: np.zeros(len(p)))
+    with pytest.raises(TypeError, match="heat_source_density is live"):
+        call(heat_source_density=xp.asarray(1e5))
+    with pytest.raises(TypeError, match="thermal_conductivity is live"):
+        call(thermal_conductivity=xp.asarray(160.0))
+    with pytest.raises(TypeError, match="prescribed_temperature is live"):
+        call(prescribed_temperature={**hot, **cold, int(m.boundary["top"][3]): xp.asarray(350.0)})
+    with pytest.raises(ValueError, match="prescribed_temperature must map"):
+        call(prescribed_temperature=[(0, 300.0)])
+    with pytest.raises(TypeError, match="body_force_density is a callback"):
+        call(body_force_density=lambda p: np.zeros((len(p), 2)))
+    with pytest.raises(TypeError, match="stress_free_temperature is live"):
+        call(stress_free_temperature=xp.asarray(300.0))
+    with pytest.raises(TypeError, match="youngs_modulus is live"):
+        call(youngs_modulus=xp.asarray(70e9))
 
 
 def test_t8_jax_without_x64_is_named():

@@ -294,15 +294,15 @@ def test_s8_refusals():
     xp = _xp("jax")
     m, W = _slab()
     left = [int(i) for i in m.boundary["left"]]
-    common = dict(conductivity={"a": 2.0, "b": 5.0}, dirichlet={i: 1.0 for i in left})
+    common = dict(thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={i: 1.0 for i in left})
     t = xp.asarray(0.0)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match="heat_source is a callback"):
+    with pytest.raises(TypeError, match="heat_source_density is a callback"):
         solve_steady_heat(m, **common, heat_source_density=lambda p: np.ones(len(p)), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match=r"outward_flux\['right'\] is a callback"):
+    with pytest.raises(TypeError, match=r"the heat flux on 'right' is a callback"):
         solve_steady_heat(m, **common, inward_heat_flux={"right": lambda p, n: -(np.ones(len(p)))}, motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="conductivity is live"):
+    with pytest.raises(TypeError, match="thermal_conductivity is live"):
         solve_steady_heat(m, thermal_conductivity={"a": xp.asarray(2.0), "b": 5.0}, prescribed_temperature={i: 1.0 for i in left},
                           motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(ValueError, match=r"velocity must have shape"):
@@ -323,7 +323,7 @@ def test_review_live_or_callable_values_inside_a_convection_pair_are_refused():
     torch = _torch()
     m, W = _slab()
     left = [int(i) for i in m.boundary["left"]]
-    common = dict(conductivity={"a": 2.0, "b": 5.0}, dirichlet={i: 1.0 for i in left})
+    common = dict(thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={i: 1.0 for i in left})
     t = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
     h = torch.tensor(8.0, dtype=torch.float64, requires_grad=True)
     # a list pair with a live h once ran and returned dJ/dh = 0 (the correction removed it)
@@ -361,7 +361,7 @@ def test_review_messages_name_the_input():
     m, W = _slab()
     with pytest.raises(ValueError, match="t must be finite"):
         solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={0: 1.0}, motion=MeshMotion(design_velocity=W, t=xp.asarray(np.nan)))
-    with pytest.raises(ValueError, match="dirichlet must map node indices"):
+    with pytest.raises(ValueError, match="prescribed_temperature must map node indices"):
         solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature=[(0, 1.0)], motion=MeshMotion(design_velocity=W, t=xp.asarray(0.0)))
 
 

@@ -93,6 +93,98 @@ def _convergence_error():
     return JouleConvergenceError, dict(reason="maximum iterations exceeded", history=(), temperature=[300.0, 301.0])
 
 
+def _square():
+    from galerkin.mesh import rectangle_mesh
+    return rectangle_mesh(1.0, 1.0, 2, 2)
+
+
+_ELASTIC = dict(youngs_modulus=70e9, poisson_ratio=0.3, plane="stress")
+
+
+def _held(mesh):
+    return {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
+
+
+def _constitutive_matrix():
+    from galerkin.elasticity import constitutive_matrix
+    return constitutive_matrix, dict(_ELASTIC)
+
+
+def _elasticity():
+    from galerkin.elasticity import solve_elasticity
+    mesh = _square()
+    return solve_elasticity, dict(_ELASTIC, mesh=mesh, prescribed_displacement=_held(mesh),
+                                  body_force_density=(0.0, -1e3), traction={"right": (1e5, 0.0)})
+
+
+def _snapshot():
+    import numpy as np
+    from galerkin.thermoelasticity import TemperatureSnapshot
+    mesh = _square()
+    return TemperatureSnapshot, dict(nodes=mesh.nodes, triangles=mesh.triangles, temperature=np.full(9, 310.0))
+
+
+def _freeze():
+    import numpy as np
+    from galerkin.thermoelasticity import freeze_temperature
+    return freeze_temperature, dict(mesh=_square(), temperature=np.full(9, 310.0))
+
+
+def _thermoelasticity():
+    import numpy as np
+    from galerkin.thermoelasticity import freeze_temperature, solve_thermoelasticity
+    mesh = _square()
+    return solve_thermoelasticity, dict(_ELASTIC, mesh=mesh,
+                                        temperature_snapshot=freeze_temperature(mesh, temperature=np.full(9, 310.0)),
+                                        stress_free_temperature=300.0, linear_expansion_coefficient=2e-5,
+                                        prescribed_displacement=_held(mesh), body_force_density=(0.0, -1e3),
+                                        traction={"right": (1e5, 0.0)})
+
+
+def _steady_thermoelasticity():
+    from galerkin.thermal_mechanical import solve_steady_thermoelasticity
+    mesh = _square()
+    return solve_steady_thermoelasticity, dict(_ELASTIC, mesh=mesh, thermal_conductivity=2.0,
+                                               prescribed_temperature={int(i): 310.0 for i in mesh.boundary["left"]},
+                                               heat_source_density=5.0, linear_expansion_coefficient=2e-5,
+                                               stress_free_temperature=300.0, prescribed_displacement=_held(mesh),
+                                               body_force_density=(0.0, -1e3))
+
+
+def _transient_thermoelasticity():
+    from galerkin.transient_thermal_mechanical import solve_transient_thermoelasticity
+    solve_transient_heat, kwargs = _transient_heat()
+    heat = solve_transient_heat(**kwargs)
+    return solve_transient_thermoelasticity, dict(_ELASTIC, mesh=kwargs["mesh"], heat=heat,
+                                                  linear_expansion_coefficient=2e-5, stress_free_temperature=300.0,
+                                                  prescribed_displacement=_held(kwargs["mesh"]),
+                                                  body_force_density=(0.0, -1e3))
+
+
+def _transient_thermoelastic_error():
+    from galerkin.transient_thermal_mechanical import TransientThermoelasticError
+    return TransientThermoelasticError, dict(stage="mechanics", time_index=1, time=0.5)
+
+
+def _mesh_motion():
+    import numpy as np
+    from galerkin.shape import MeshMotion
+    return MeshMotion, dict(design_velocity=np.zeros((9, 2)), t=0.0)
+
+
+def _admissible_interval():
+    import numpy as np
+    from galerkin.shape import admissible_interval
+    return admissible_interval, dict(mesh=_square(), design_velocity=np.zeros((9, 2)))
+
+
+def _motion_step_record():
+    import numpy as np
+    from galerkin.shape import MotionStep
+    mesh = _square()
+    return MotionStep, dict(xp=np, t=0.0, design_velocity=np.zeros((9, 2)), moved=mesh)
+
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
@@ -101,7 +193,20 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.electric:solve_steady_electric": _steady_electric,
                 "galerkin.joule_heating:solve_steady_joule_heat": _steady_joule_heat,
                 "galerkin.temperature_joule_heating:solve_temperature_joule_heat": _temperature_joule_heat,
-                "galerkin.temperature_joule_heating:JouleConvergenceError": _convergence_error}
+                "galerkin.temperature_joule_heating:JouleConvergenceError": _convergence_error,
+                # L2 commit 8 emptied elasticity, thermoelasticity, the two workflows, shape and coupling (whose
+                # parameters are all structural)
+                "galerkin.elasticity:constitutive_matrix": _constitutive_matrix,
+                "galerkin.elasticity:solve_elasticity": _elasticity,
+                "galerkin.thermoelasticity:TemperatureSnapshot": _snapshot,
+                "galerkin.thermoelasticity:freeze_temperature": _freeze,
+                "galerkin.thermoelasticity:solve_thermoelasticity": _thermoelasticity,
+                "galerkin.thermal_mechanical:solve_steady_thermoelasticity": _steady_thermoelasticity,
+                "galerkin.transient_thermal_mechanical:solve_transient_thermoelasticity": _transient_thermoelasticity,
+                "galerkin.transient_thermal_mechanical:TransientThermoelasticError": _transient_thermoelastic_error,
+                "galerkin.shape:MeshMotion": _mesh_motion,
+                "galerkin.shape:admissible_interval": _admissible_interval,
+                "galerkin.shape:MotionStep": _motion_step_record}
 
 
 @pytest.fixture(scope="module")
@@ -165,6 +270,11 @@ MOVED_HELPERS = {"elasticity": ["lame", "constitutive", "element_materials", "el
 
 
 HEAT_KERNELS = {"scalar_boundary_system", "source_load_3d", "dirichlet_from_faces"}
+# L2 commit 8: the mechanics helpers and the moving-mesh solves left the clean modules for the package-private
+# galerkin._mechanics_kernels and galerkin._moving
+DEFINING = {**{n: "galerkin._heat_kernels" for n in HEAT_KERNELS},
+            **{n: "galerkin._mechanics_kernels" for n in MOVED_HELPERS["elasticity"] + MOVED_HELPERS["thermoelasticity"]},
+            **{n: "galerkin._moving" for n in MOVED_HELPERS["shape"]}}
 
 
 def test_kernels_reexport_the_moved_names_unchanged(rules):
@@ -174,9 +284,9 @@ def test_kernels_reexport_the_moved_names_unchanged(rules):
     assert sorted(kernels.__all__) == sorted(n for names in moved.values() for n in names)
     for module, names in moved.items():
         for name in names:
-            # L2 commit 6: the heat helpers moved to the package-private galerkin._heat_kernels (the clean heat
-            # modules hold no removed name); galerkin.kernels re-exports them from there
-            defining = importlib.import_module("galerkin._heat_kernels" if name in HEAT_KERNELS else f"galerkin.{module}")
+            # L2 commits 6 and 8: the heat and mechanics helpers and the moving-mesh solves moved to package-private
+            # modules (the clean modules hold no removed name); galerkin.kernels re-exports them from there
+            defining = importlib.import_module(DEFINING.get(name, f"galerkin.{module}"))
             assert getattr(kernels, name) is getattr(defining, name), name
     for name in (n for names in MOVED_TOP_LEVEL.values() for n in names):
         assert name not in galerkin.__all__ and not hasattr(galerkin, name), name

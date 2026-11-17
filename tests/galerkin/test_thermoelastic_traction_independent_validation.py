@@ -4,6 +4,7 @@
 from dataclasses import fields,replace,MISSING
 import json
 from unittest.mock import patch as mockpatch
+from types import MappingProxyType
 import numpy as np
 import pytest
 from galerkin.mesh import Mesh
@@ -14,10 +15,11 @@ from thermoelastic_traction_independent_oracle import (
     nodal_edge_force,continuum_ledger)
 
 STRAIN=max(C0,ALPHA*20);STRESS=E*STRAIN;ENERGY=E*STRAIN**2
-OLD_FIELDS=('displacement','total_strain','thermal_strain','elastic_strain','stress',
- 'sigma_zz','epsilon_zz','load_external','load_thermal','reaction','residual',
- 'physical_elastic_energy','temperature_snapshot','reference_temperature_k',
- 'thermal_expansion_per_k','young_modulus','poisson_ratio','plane')
+OLD_FIELDS=('displacement','strain','thermal_strain','elastic_strain','stress',
+ 'stress_zz','strain_zz','applied_force_per_depth','thermal_equivalent_force_per_depth','reaction_force_per_depth',
+ 'residual_force_per_depth',
+ 'strain_energy_per_depth','temperature_snapshot','stress_free_temperature',
+ 'linear_expansion_coefficient','youngs_modulus','poisson_ratio','plane')
 
 
 def mesh_from_raw(p,t,ring=False):
@@ -41,13 +43,13 @@ def square(n=4):
 
 
 def solve_case(mesh,field,plane,alpha=ALPHA,tref=TREF,overlap=False):
-    values=field(mesh.nodes);snapshot=production.freeze_temperature(mesh,tref+values['theta'])
+    values=field(mesh.nodes);snapshot=production.freeze_temperature(mesh,temperature=tref+values['theta'])
     if 'left' in mesh.boundary:
         fixed={(int(i),c):float(values['u'][i,c]) for i in mesh.boundary['left'] for c in (0,1)}
     else:fixed={(0,0):float(values['u'][0,0]),(0,1):float(values['u'][0,1]),(1,1):float(values['u'][1,1])}
     traction=lambda p,n:np.einsum('qij,qj->qi',field(p)['state']['stress'][...,:2,:2],n)
-    cfg=dict(reference_temperature_k=tref,thermal_expansion_per_k=alpha,young_modulus=E,
-             poisson_ratio=NU,plane=plane,dirichlet=fixed,body_force=lambda p:field(p)['body'],
+    cfg=dict(stress_free_temperature=tref,linear_expansion_coefficient=alpha,youngs_modulus=E,
+             poisson_ratio=NU,plane=plane,prescribed_displacement=fixed,body_force_density=lambda p:field(p)['body'],
              traction={tag:traction for tag in mesh.boundary_edges if overlap or tag!='left'})
     return snapshot,cfg
 
@@ -79,36 +81,37 @@ def direct_line_load(mesh,mapping):
 def audit(mesh,snapshot,r,cfg,length=1.):
     """Direct independent original-pencil action/RHS/full3D energy audit."""
     tri=mesh.triangles;bary,w,p,g=triangle_rule(mesh.nodes[tri],8)
-    u=r.displacement;eps=engineering(grad(mesh,u));plane=cfg['plane'];alpha=cfg['thermal_expansion_per_k'];tref=cfg['reference_temperature_k']
-    aq=alpha*(np.einsum('qa,ta->tq',bary,snapshot.temperature_k[tri])-tref)
+    u=r.displacement;eps=engineering(grad(mesh,u));plane=cfg['plane'];alpha=cfg['linear_expansion_coefficient'];tref=cfg['stress_free_temperature']
+    aq=alpha*(np.einsum('qa,ta->tq',bary,snapshot.temperature[tri])-tref)
     full=parent(eps[:,None],aq,plane);cold=parent(eps,0.,plane);thermal=parent(np.zeros((*w.shape,3)),aq,plane)
     scale=max(C0,abs(alpha)*20);s=E*scale;fscale=s*length;escale=E*scale**2*length**2
-    body=cfg['body_force'](p.reshape(-1,2)).reshape(p.shape) if callable(cfg['body_force']) else np.broadcast_to(cfg['body_force'],p.shape)
+    body=cfg['body_force_density'](p.reshape(-1,2)).reshape(p.shape) if callable(cfg['body_force_density']) else np.broadcast_to(cfg['body_force_density'],p.shape)
     fbody=np.zeros_like(mesh.nodes);fthermal=fbody.copy();ku=fbody.copy()
     for dest,local in [(fbody,np.einsum('qa,tq,tqi->tai',bary,w,body)),(fthermal,-np.einsum('tq,tqij,taj->tai',w,thermal['stress'][...,:2,:2],g)),(ku,w.sum(1)[:,None,None]*np.einsum('tij,taj->tai',cold['stress'][...,:2,:2],g))]:np.add.at(dest,tri.ravel(),local.reshape(-1,2))
     fline=direct_line_load(mesh,cfg.get('traction') or {})
-    near('load_body',r.load_body,fbody,fscale);near('load_traction',r.load_traction,fline,fscale)
-    near('load_external',r.load_external,fbody+fline,fscale);near('load_thermal',r.load_thermal,fthermal,fscale)
-    near('load_total',r.load_total,fbody+fline+fthermal,fscale)
+    near('applied_body_force_per_depth',r.applied_body_force_per_depth,fbody,fscale);near('applied_traction_force_per_depth',r.applied_traction_force_per_depth,fline,fscale)
+    near('applied_force_per_depth',r.applied_force_per_depth,fbody+fline,fscale);near('thermal_equivalent_force_per_depth',r.thermal_equivalent_force_per_depth,fthermal,fscale)
+    # load_total (dropped in the galerkin step, D27) was this sum
+    near('load_total',r.applied_force_per_depth+r.thermal_equivalent_force_per_depth,fbody+fline+fthermal,fscale)
     residual=ku-fbody-fline-fthermal;fixed=np.zeros_like(u,dtype=bool)
-    for key,value in cfg['dirichlet'].items():fixed[key]=True;near('prescribed_component',u[key],value,max(C0*length,abs(value)))
-    near('residual',r.residual,residual,fscale,1e-9);near('free_residual',residual[~fixed],0,fscale,1e-9)
-    near('reaction',r.reaction,np.where(fixed,residual,0),fscale,1e-9)
-    near('physical_force',np.sum(fbody+fline+r.reaction,axis=0),0,fscale,1e-9)
-    physical=fbody+fline+r.reaction
+    for key,value in cfg['prescribed_displacement'].items():fixed[key]=True;near('prescribed_component',u[key],value,max(C0*length,abs(value)))
+    near('residual',r.residual_force_per_depth,residual,fscale,1e-9);near('free_residual',residual[~fixed],0,fscale,1e-9)
+    near('reaction',r.reaction_force_per_depth,np.where(fixed,residual,0),fscale,1e-9)
+    near('physical_force',np.sum(fbody+fline+r.reaction_force_per_depth,axis=0),0,fscale,1e-9)
+    physical=fbody+fline+r.reaction_force_per_depth
     near('physical_moment',np.sum(mesh.nodes[:,0]*physical[:,1]-mesh.nodes[:,1]*physical[:,0]),0,fscale*length,1e-9)
     near('thermal_rigid_force',fthermal.sum(0),0,fscale)
     near('thermal_rigid_moment',np.sum(mesh.nodes[:,0]*fthermal[:,1]-mesh.nodes[:,1]*fthermal[:,0]),0,fscale*length)
-    ac=alpha*(snapshot.temperature_k[tri].mean(1)-tref);centroid=parent(eps,ac,plane)
-    near('total_strain',r.total_strain,eps,scale)
+    ac=alpha*(snapshot.temperature[tri].mean(1)-tref);centroid=parent(eps,ac,plane)
+    near('strain',r.strain,eps,scale)
     near('thermal_strain',r.thermal_strain,np.column_stack((ac,ac,np.zeros_like(ac))),scale)
     near('elastic_strain',r.elastic_strain,eps-r.thermal_strain,scale)
     near('centroid_stress',r.stress,inplane(centroid['stress']),s)
-    near('sigma_zz',r.sigma_zz,centroid['stress'][...,2,2],s)
-    near('epsilon_zz',r.epsilon_zz,centroid['total'][...,2,2],scale)
+    near('stress_zz',r.stress_zz,centroid['stress'][...,2,2],s)
+    near('strain_zz',r.strain_zz,centroid['total'][...,2,2],scale)
     energy=float(np.sum(w*full['energy']));ct=float(np.sum(w*thermal['energy']))
-    uku=float(np.sum(u*ku));ug=float(np.sum(u*fthermal));external=float(np.sum(u*(fbody+fline)));support=float(np.sum(u*r.reaction))
-    near('physical_energy',r.physical_elastic_energy,energy,escale)
+    uku=float(np.sum(u*ku));ug=float(np.sum(u*fthermal));external=float(np.sum(u*(fbody+fline)));support=float(np.sum(u*r.reaction_force_per_depth))
+    near('physical_energy',r.strain_energy_per_depth,energy,escale)
     near('parent_endpoint_energy',energy,.5*uku-ug+ct,escale)
     near('support_work_energy',2*energy,external+support-ug+2*ct,escale)
     near('physical_virtualwork',uku-ug,external+support,escale)
@@ -119,7 +122,7 @@ def audit(mesh,snapshot,r,cfg,length=1.):
 def errors(mesh,r,field,plane,order=8,alpha=ALPHA):
     tri=mesh.triangles;bary,w,p,g=triangle_rule(mesh.nodes[tri],order);truth=field(p)
     uq=np.einsum('qa,tai->tqi',bary,r.displacement[tri]);gu=grad(mesh,r.displacement)[:,None]
-    a=alpha*(np.einsum('qa,ta->tq',bary,r.temperature_snapshot.temperature_k[tri])-TREF)
+    a=alpha*(np.einsum('qa,ta->tq',bary,r.temperature_snapshot.temperature[tri])-TREF)
     de=engineering(gu)-truth['strain'];ds=parent(engineering(gu),a,plane)['stress']-truth['state']['stress']
     norm=lambda value:float(np.sqrt(np.sum(w*value)))
     return dict(u_L2=norm(np.sum((uq-truth['u'])**2,axis=-1)),u_H1=norm(np.sum((gu-truth['gradient'])**2,axis=(-1,-2))),strain=norm(de[...,0]**2+de[...,1]**2+.5*de[...,2]**2),full_stress=norm(np.sum(ds*ds,axis=(-1,-2))),energy_norm=norm(2*parent(de,0.,plane)['energy']))
@@ -135,8 +138,8 @@ def test_thermoelastic_traction_independent_uniform_combined(plane,theta,alpha,o
     near('uniform_u',r.displacement,truth['u'],max(C0,abs(alpha)*20))
     ex=field(mesh.nodes[mesh.triangles].mean(1))
     near('uniform_stress',r.stress,inplane(ex['state']['stress']),STRESS)
-    near('uniform_energy',r.physical_elastic_energy,ex['state']['energy'][0],ENERGY)
-    if overlap:near('uniform_overlap_zero_reaction',r.reaction,0,STRESS)
+    near('uniform_energy',r.strain_energy_per_depth,ex['state']['energy'][0],ENERGY)
+    if overlap:near('uniform_overlap_zero_reaction',r.reaction_force_per_depth,0,STRESS)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -174,13 +177,13 @@ def test_thermoelastic_traction_independent_overlap_and_v2_translation(plane):
     overlap={**cfg,'traction':{**cfg['traction'],'left':traction}}
     added=direct_line_load(mesh,{'left':traction});s=production.solve_thermoelasticity(mesh,snapshot,**overlap);audit(mesh,snapshot,s,overlap)
     near('overlap_same_u',s.displacement,r.displacement,C0)
-    near('overlap_reaction',s.reaction-r.reaction,-added,STRESS)
+    near('overlap_reaction',s.reaction_force_per_depth-r.reaction_force_per_depth,-added,STRESS)
     assert abs(a['support'])>1.
-    oldfield=lambda p:polynomial(p,plane,translation=np.zeros(2));oldcfg={**cfg,'dirichlet':{(i,c):float(oldfield(mesh.nodes)['u'][i,c]) for i,c in cfg['dirichlet']}}
+    oldfield=lambda p:polynomial(p,plane,translation=np.zeros(2));oldcfg={**cfg,'prescribed_displacement':{(i,c):float(oldfield(mesh.nodes)['u'][i,c]) for i,c in cfg['prescribed_displacement']}}
     old=production.solve_thermoelasticity(mesh,snapshot,**oldcfg);aa=audit(mesh,snapshot,old,oldcfg)
     near('v2_rigid_translation',r.displacement-old.displacement,np.broadcast_to(TRANSLATION,r.displacement.shape),C0)
     near('v2_same_stress',r.stress,old.stress,STRESS);near('v2_same_energy',a['U'],aa['U'],ENERGY)
-    near('v2_support_work_change',a['support']-aa['support'],np.sum(TRANSLATION*old.reaction.sum(0)),ENERGY)
+    near('v2_support_work_change',a['support']-aa['support'],np.sum(TRANSLATION*old.reaction_force_per_depth.sum(0)),ENERGY)
     # Exact zero-work is the original CONTINUUM case, not assumed for FE reactions.
     v,t=square_geometry();near('original_continuum_zero_work',continuum_ledger(v,t,oldfield,plane)['support_work'],0,ENERGY)
 
@@ -190,19 +193,19 @@ def test_thermoelastic_traction_independent_legacy_none_empty_and_shift():
     cfg['traction']=None;r=production.solve_thermoelasticity(mesh,snapshot,**cfg)
     empty=production.solve_thermoelasticity(mesh,snapshot,**{**cfg,'traction':{}})
     names=[f.name for f in fields(production.ThermoelasticResult)]
-    assert names==list(OLD_FIELDS)+['load_body','load_traction']
+    assert names==list(OLD_FIELDS)+['applied_body_force_per_depth','applied_traction_force_per_depth']
     assert all(f.default is None for f in fields(production.ThermoelasticResult)[18:])
     manual=production.ThermoelasticResult(*(getattr(r,name) for name in OLD_FIELDS))
-    assert manual.load_body is None and manual.load_traction is None
+    assert manual.applied_body_force_per_depth is None and manual.applied_traction_force_per_depth is None
     for name in OLD_FIELDS:
         x,y=getattr(r,name),getattr(empty,name)
         if isinstance(x,np.ndarray):assert np.array_equal(x,y),name
         else:assert x==y,name
         assert getattr(manual,name) is x or np.array_equal(getattr(manual,name),x)
-    audit(mesh,snapshot,r,cfg);near('no_traction_array',r.load_traction,0,STRESS)
-    shift=production.freeze_temperature(mesh,snapshot.temperature_k+100.)
-    shifted=production.solve_thermoelasticity(mesh,shift,**{**cfg,'reference_temperature_k':TREF+100.})
-    near('T_Tref_shift',shifted.displacement,r.displacement,C0);near('shift_U',shifted.physical_elastic_energy,r.physical_elastic_energy,ENERGY)
+    audit(mesh,snapshot,r,cfg);near('no_traction_array',r.applied_traction_force_per_depth,0,STRESS)
+    shift=production.freeze_temperature(mesh,temperature=snapshot.temperature+100.)
+    shifted=production.solve_thermoelasticity(mesh,shift,**{**cfg,'stress_free_temperature':TREF+100.})
+    near('T_Tref_shift',shifted.displacement,r.displacement,C0);near('shift_U',shifted.strain_energy_per_depth,r.strain_energy_per_depth,ENERGY)
 
 
 @pytest.mark.parametrize('plane',['stress','strain'])
@@ -221,8 +224,8 @@ def test_thermoelastic_traction_independent_frame_order_similarity(plane,kind):
             return dict(u=scale*f['u']@rotation.T,gradient=gu,strain=eng,theta=f['theta'],body=f['body']@rotation.T/scale,state=parent(eng,ALPHA*f['theta'],plane))
         sn,kw=solve_case(mesh,moved,plane);r=production.solve_thermoelasticity(mesh,sn,**kw);audit(mesh,sn,r,kw,scale)
         near('frame_u',r.displacement[inverse]@rotation/scale,original.displacement,C0)
-        near('frame_U',r.physical_elastic_energy/scale**2,original.physical_elastic_energy,ENERGY)
-        for name in ('load_body','load_traction','load_thermal','reaction'):
+        near('frame_U',r.strain_energy_per_depth/scale**2,original.strain_energy_per_depth,ENERGY)
+        for name in ('applied_body_force_per_depth','applied_traction_force_per_depth','thermal_equivalent_force_per_depth','reaction_force_per_depth'):
             near('frame_'+name,getattr(r,name)[inverse]@rotation/scale,getattr(original,name),STRESS)
 
 
@@ -241,8 +244,8 @@ def test_thermoelastic_traction_independent_ring_hole_normals(plane,pressure):
     r=production.solve_thermoelasticity(mesh,snapshot,**cfg);audit(mesh,snapshot,r,cfg)
     assert calls;near('ring_exact_u',r.displacement,field(p)['u'],C0)
     expected=float(field(p)['state']['energy'][0])*(4-.8**2)
-    near('ring_exact_U',r.physical_elastic_energy,expected,ENERGY)
-    near('ring_exact_reaction',r.reaction,0,STRESS)
+    near('ring_exact_U',r.strain_energy_per_depth,expected,ENERGY)
+    near('ring_exact_reaction',r.reaction_force_per_depth,0,STRESS)
 
 
 @pytest.mark.parametrize('degree',range(7))
@@ -250,15 +253,15 @@ def test_thermoelastic_traction_independent_direct_edge_moments(degree):
     p=np.array([[-.2,.1],[1.4,.8],[0.,1.5]]);mesh=Mesh(p,np.array([[0,1,2]]),{'all':np.arange(3)},{'segment':np.array([[0,1]])})
     d=p[1]-p[0];length=np.linalg.norm(d);vector=np.array([3e6,-2e6])
     callback=lambda pp,nn:(((pp-p[0])@d/(d@d))**degree)[:,None]*vector
-    snapshot=production.freeze_temperature(mesh,np.full(3,TREF+20));cfg=dict(reference_temperature_k=TREF,thermal_expansion_per_k=ALPHA,young_modulus=E,poisson_ratio=NU,plane='strain',dirichlet={(i,c):0. for i in range(3) for c in (0,1)},body_force=(0.,0.),traction={'segment':callback})
+    snapshot=production.freeze_temperature(mesh,temperature=np.full(3,TREF+20));cfg=dict(stress_free_temperature=TREF,linear_expansion_coefficient=ALPHA,youngs_modulus=E,poisson_ratio=NU,plane='strain',prescribed_displacement={(i,c):0. for i in range(3) for c in (0,1)},body_force_density=(0.,0.),traction={'segment':callback})
     r=production.solve_thermoelasticity(mesh,snapshot,**cfg);audit(mesh,snapshot,r,cfg)
     expected=np.zeros((3,2));expected[:2]=length*np.array([1/((degree+1)*(degree+2)),1/(degree+2)])[:,None]*vector
-    near('direct_line_moment',r.load_traction,expected,STRESS)
+    near('direct_line_moment',r.applied_traction_force_per_depth,expected,STRESS)
     cold=production.solve_thermoelasticity(mesh,snapshot,**{**cfg,'traction':None})
-    near('retained_fixed_edge_load',r.reaction-cold.reaction,-expected,STRESS)
+    near('retained_fixed_edge_load',r.reaction_force_per_depth-cold.reaction_force_per_depth,-expected,STRESS)
     mesh.boundary_edges['segment']=mesh.boundary_edges['segment'][:,::-1]
     reverse=production.solve_thermoelasticity(mesh,snapshot,**cfg)
-    near('edge_endpoint_order',reverse.load_traction,expected,STRESS)
+    near('edge_endpoint_order',reverse.applied_traction_force_per_depth,expected,STRESS)
 
 
 def test_thermoelastic_traction_independent_tags_not_snapshot_hash_and_lifetime():
@@ -268,11 +271,11 @@ def test_thermoelastic_traction_independent_tags_not_snapshot_hash_and_lifetime(
     first=production.solve_thermoelasticity(mesh,snapshot,**kw);audit(mesh,snapshot,first,kw)
     mesh.boundary_edges['editable']=mesh.boundary_edges['top'].copy()
     second=production.solve_thermoelasticity(mesh,snapshot,**kw);audit(mesh,snapshot,second,kw)
-    assert not np.array_equal(first.load_traction,second.load_traction)
+    assert not np.array_equal(first.applied_traction_force_per_depth,second.applied_traction_force_per_depth)
     assert hashes==(snapshot.mesh_hash,snapshot.temperature_hash,snapshot.snapshot_hash)
-    initial=np.full(len(mesh.nodes),TREF+20);sn=production.freeze_temperature(mesh,initial);saved=sn.temperature_k.copy();initial[:]=0
-    assert np.array_equal(sn.temperature_k,saved)
-    for a in (sn.nodes,sn.triangles,sn.temperature_k):
+    initial=np.full(len(mesh.nodes),TREF+20);sn=production.freeze_temperature(mesh,temperature=initial);saved=sn.temperature.copy();initial[:]=0
+    assert np.array_equal(sn.temperature,saved)
+    for a in (sn.nodes,sn.triangles,sn.temperature):
         with pytest.raises(ValueError):a.setflags(write=True)
     # Geometry binding remains separate from the current mutable tag maps.
     mesh.boundary_edges['editable']=np.array([[0,6]])
@@ -288,12 +291,14 @@ def test_thermoelastic_traction_independent_snapshot_refusal(bad):
     elif bad=='cell_order':mesh.triangles=mesh.triangles[::-1].copy()
     elif bad in ('scale','collision'):mesh.nodes*=1.001
     elif bad=='schema':object.__setattr__(snapshot,'schema_version',2)
-    elif bad=='unit':object.__setattr__(snapshot,'temperature_unit','C')
-    elif bad=='temperature':object.__setattr__(snapshot,'temperature_k',np.frombuffer((snapshot.temperature_k+1.).tobytes(),dtype='<f8'))
-    else:object.__setattr__(snapshot,'temperature_k',snapshot.temperature_k.copy())
+    elif bad=='unit':object.__setattr__(snapshot,'units',MappingProxyType({'nodes':'m','temperature':'C'}))
+    elif bad=='temperature':object.__setattr__(snapshot,'temperature',np.frombuffer((snapshot.temperature+1.).tobytes(),dtype='<f8'))
+    else:object.__setattr__(snapshot,'temperature',snapshot.temperature.copy())
     if bad=='collision':
         expected=(snapshot.mesh_hash,snapshot.temperature_hash,snapshot.snapshot_hash)
-        with mockpatch.object(production,'_hashes',return_value=expected),mockpatch.object(production,'_fingerprint',return_value=snapshot.mesh_hash):
+        # the snapshot check lives in galerkin._mechanics_kernels since the galerkin step (L2 commit 8)
+        import galerkin._mechanics_kernels as checks
+        with mockpatch.object(checks,'snapshot_hashes',return_value=expected),mockpatch.object(checks,'fingerprint',return_value=snapshot.mesh_hash):
             with pytest.raises(ValueError,match='stale|mismatch'):production.solve_thermoelasticity(mesh,snapshot,**cfg)
     else:
         with pytest.raises(ValueError):production.solve_thermoelasticity(mesh,snapshot,**cfg)
@@ -327,7 +332,7 @@ def test_thermoelastic_traction_independent_traction_field_refusal(bad):
     values={'scalar':1.,'vector3':[1.,2.,3.],'complex':[1+1j,2.],'bool':[True,False],'nan':[np.nan,1.],'infinity':[np.inf,1.],
       'callback_vector':lambda p,n:np.array([1.,2.]),'callback_column':lambda p,n:np.ones((len(p),1)),
       'callback_complex':lambda p,n:np.ones(p.shape,complex),'callback_bool':lambda p,n:np.ones(p.shape,bool),'callback_nan':lambda p,n:np.full(p.shape,np.nan),'overflow':[np.finfo(float).max,np.finfo(float).max]}
-    if bad=='overflow':mesh.nodes*=10.;snapshot=production.freeze_temperature(mesh,np.full(len(mesh.nodes),TREF+20))
+    if bad=='overflow':mesh.nodes*=10.;snapshot=production.freeze_temperature(mesh,temperature=np.full(len(mesh.nodes),TREF+20))
     with np.errstate(over='ignore',invalid='ignore'):
         with pytest.raises(ValueError):production.solve_thermoelasticity(mesh,snapshot,**{**cfg,'traction':{'right':values[bad]}})
 
@@ -337,14 +342,14 @@ def test_thermoelastic_traction_independent_components_and_rigid_rank(plane):
     base=square(2);n=len(base.nodes);p=np.r_[base.nodes,base.nodes+[2.,0.]];t=np.r_[base.triangles,base.triangles+n]
     mesh=Mesh(p,t,{'all':np.r_[np.unique(np.concatenate(list(base.boundary.values()))),np.unique(np.concatenate(list(base.boundary.values())))+n]},
               {'all':np.r_[np.concatenate(list(base.boundary_edges.values())),np.concatenate(list(base.boundary_edges.values()))+n]})
-    field=lambda pp:patch(pp,plane);snapshot=production.freeze_temperature(mesh,TREF+field(p)['theta']);values=field(p)['u']
+    field=lambda pp:patch(pp,plane);snapshot=production.freeze_temperature(mesh,temperature=TREF+field(p)['theta']);values=field(p)['u']
     fixed={(i,c):values[i,c] for i,c in [(0,0),(0,1),(2,1),(n,0),(n,1),(n+2,1)]}
     traction=lambda pp,nn:nn@TARGET.T
-    cfg=dict(reference_temperature_k=TREF,thermal_expansion_per_k=ALPHA,young_modulus=E,poisson_ratio=NU,plane=plane,dirichlet=fixed,body_force=(0.,0.),traction={'all':traction})
+    cfg=dict(stress_free_temperature=TREF,linear_expansion_coefficient=ALPHA,youngs_modulus=E,poisson_ratio=NU,plane=plane,prescribed_displacement=fixed,body_force_density=(0.,0.),traction={'all':traction})
     r=production.solve_thermoelasticity(mesh,snapshot,**cfg);audit(mesh,snapshot,r,cfg)
     near('components_exact_patch',r.displacement,values,C0)
     for keys in [[],[(0,0),(0,1),(2,1)],[(0,0),(0,1),(2,0),(n,0),(n,1),(n+2,1)]]:
-        with pytest.raises(ValueError):production.solve_thermoelasticity(mesh,snapshot,**{**cfg,'dirichlet':{k:fixed.get(k,0.) for k in keys}})
+        with pytest.raises(ValueError):production.solve_thermoelasticity(mesh,snapshot,**{**cfg,'prescribed_displacement':{k:fixed.get(k,0.) for k in keys}})
 
 
 @pytest.mark.parametrize('wrong',['thermal_sign','omit_g','add_qn','subtract_qn','three_alpha','naive_PE','PE_as_PS','zz_omission','PE_residual_U','centroid_T_squared','support_work_omission','line_weight','endpoint_lumping','drop_fixed_line','flipped_hole','thermal_as_external','swap_body_line'])
@@ -357,10 +362,10 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
     thermal_real,line_real=production._thermal_load,production.traction_load
     expected='physical_energy';altered={**cfg}
     if wrong in ('three_alpha','naive_PE','PE_as_PS'):
-        if wrong=='three_alpha':altered['thermal_expansion_per_k']*=3
-        elif wrong=='naive_PE':altered['thermal_expansion_per_k']/=1+NU
+        if wrong=='three_alpha':altered['linear_expansion_coefficient']*=3
+        elif wrong=='naive_PE':altered['linear_expansion_coefficient']/=1+NU
         else:altered['plane']='stress'
-        expected='load_thermal'
+        expected='thermal_equivalent_force_per_depth'
     def badthermal(*args,**kw):
         result=thermal_real(*args,**kw)
         return -result if wrong=='thermal_sign' else np.zeros_like(result) if wrong=='omit_g' else result
@@ -378,22 +383,22 @@ def test_thermoelastic_traction_independent_wrong_runtime(wrong):
         if wrong=='line_weight':load=1.1*load
         elif wrong=='drop_fixed_line':
             load=load.copy()
-            for i,c in cfg['dirichlet']:load[2*i+c]=0.
+            for i,c in cfg['prescribed_displacement']:load[2*i+c]=0.
         elif wrong in ('add_qn','subtract_qn'):
             extra=direct_line_load(m,{tag:(lambda pp,nn:-(parent(np.zeros(3),ALPHA*20,'strain')['stress'][:2,:2]@nn.T).T) for tag in mapping})
             load=load+(1 if wrong=='add_qn' else -1)*extra.ravel()
         return load
-    if wrong in ('thermal_sign','omit_g'):expected='load_thermal'
-    if wrong in ('add_qn','subtract_qn','line_weight','endpoint_lumping','drop_fixed_line','flipped_hole'):expected='load_traction'
+    if wrong in ('thermal_sign','omit_g'):expected='thermal_equivalent_force_per_depth'
+    if wrong in ('add_qn','subtract_qn','line_weight','endpoint_lumping','drop_fixed_line','flipped_hole'):expected='applied_traction_force_per_depth'
     with mockpatch.object(production,'_thermal_load',badthermal),mockpatch.object(production,'traction_load',badline):r=production.solve_thermoelasticity(mesh,snapshot,**altered)
-    if wrong=='zz_omission':r.sigma_zz=np.zeros_like(r.sigma_zz);expected='sigma_zz'
+    if wrong=='zz_omission':r.stress_zz=np.zeros_like(r.stress_zz);expected='stress_zz'
     elif wrong=='PE_residual_U':
-        b,w,_,_=triangle_rule(mesh.nodes[mesh.triangles],8);a=ALPHA*(np.einsum('qa,ta->tq',b,snapshot.temperature_k[mesh.triangles])-TREF)
-        r.physical_elastic_energy-=float(np.sum(w*.5*E*a*a))
+        b,w,_,_=triangle_rule(mesh.nodes[mesh.triangles],8);a=ALPHA*(np.einsum('qa,ta->tq',b,snapshot.temperature[mesh.triangles])-TREF)
+        r.strain_energy_per_depth-=float(np.sum(w*.5*E*a*a))
     elif wrong=='centroid_T_squared':
-        _,w,_,_=triangle_rule(mesh.nodes[mesh.triangles],2);a=ALPHA*(snapshot.temperature_k[mesh.triangles].mean(1)-TREF)
-        r.physical_elastic_energy=float(np.sum(w.sum(1)*parent(r.total_strain,a,'strain')['energy']))
-    elif wrong=='support_work_omission':r.physical_elastic_energy-=.5*float(np.sum(r.displacement*r.reaction))
-    elif wrong=='thermal_as_external':r.load_external=r.load_external+r.load_thermal;expected='load_external'
-    elif wrong=='swap_body_line':r.load_body,r.load_traction=r.load_traction,r.load_body;expected='load_body'
+        _,w,_,_=triangle_rule(mesh.nodes[mesh.triangles],2);a=ALPHA*(snapshot.temperature[mesh.triangles].mean(1)-TREF)
+        r.strain_energy_per_depth=float(np.sum(w.sum(1)*parent(r.strain,a,'strain')['energy']))
+    elif wrong=='support_work_omission':r.strain_energy_per_depth-=.5*float(np.sum(r.displacement*r.reaction_force_per_depth))
+    elif wrong=='thermal_as_external':r.applied_force_per_depth=r.applied_force_per_depth+r.thermal_equivalent_force_per_depth;expected='applied_force_per_depth'
+    elif wrong=='swap_body_line':r.applied_body_force_per_depth,r.applied_traction_force_per_depth=r.applied_traction_force_per_depth,r.applied_body_force_per_depth;expected='applied_body_force_per_depth'
     with pytest.raises(AssertionError,match=expected):audit(mesh,snapshot,r,cfg)

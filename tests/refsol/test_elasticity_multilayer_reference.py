@@ -9,8 +9,8 @@ import pytest
 
 from refsol.elasticity_multilayer import composite_cylinder, laminate_axial, series_bar
 
-CYL = dict(inner_radius=.02, interfaces=[.03, .045, .05], young_moduli=[200e9, 3e9, 70e9],
-           poisson_ratios=[.3, .38, .33])
+CYL = dict(position=[.02, .03, .045, .05], youngs_modulus=[200e9, 3e9, 70e9],
+           poisson_ratio=[.3, .38, .33], gauge_pressure=(0., 0.))
 
 
 def law(e, nu, plane):
@@ -35,19 +35,19 @@ def stress_from_displacement(field, x, e, nu, plane, alpha=0., dT=lambda p: 0., 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
 def test_laminate_is_traction_free_on_faces_and_satisfies_the_law(plane):
-    kw = dict(y_interfaces=[.002, .005, .006], young_moduli=[70e9, 3e9, 200e9],
-              poisson_ratios=[.33, .4, .29], axial_strain=1e-3, plane=plane)
+    kw = dict(position=[0., .002, .005, .006], youngs_modulus=[70e9, 3e9, 200e9],
+              poisson_ratio=[.33, .4, .29], strain_xx=1e-3, plane=plane)
     for y, i in ((.001, 0), (.0035, 1), (.0058, 2)):
         x = np.array([.13, y])
         f = laminate_axial(x[None], **kw)
         assert f.layer[0] == i
         local = stress_from_displacement(lambda q: laminate_axial(q[None], **kw, layer=np.array([i])).displacement[0],
-                                         x, kw['young_moduli'][i], kw['poisson_ratios'][i], plane)
+                                         x, kw['youngs_modulus'][i], kw['poisson_ratio'][i], plane)
         np.testing.assert_allclose(local, f.stress[0], rtol=1e-6, atol=1e-6*abs(f.stress[0, 0]))
     for y in (.002, .005):   # displacement continuous across interfaces
         a = laminate_axial([[.1, y-1e-13], [.1, y+1e-13]], **kw).displacement
         np.testing.assert_allclose(a[0], a[1], rtol=0, atol=1e-15)
-    e, nu = np.array(kw['young_moduli']), np.array(kw['poisson_ratios'])
+    e, nu = np.array(kw['youngs_modulus']), np.array(kw['poisson_ratio'])
     resultant = np.sum((e if plane == 'stress' else e/(1-nu**2))*np.diff([0, .002, .005, .006]))*1e-3
     pts = np.column_stack([np.full(3, .1), [.001, .0035, .0058]])
     f = laminate_axial(pts, **kw)
@@ -63,7 +63,7 @@ def test_series_bar_with_matched_lateral_strain_and_rejects_mismatch(plane):
         target = .3*1.3/200e9
         nu2 = (-1+np.sqrt(1+4*target*100e9))/2
         nu = np.array([.3, nu2])
-    kw = dict(x_interfaces=[.04, .1], young_moduli=e, poisson_ratios=nu, axial_stress=5e7, plane=plane)
+    kw = dict(position=[0., .04, .1], youngs_modulus=e, poisson_ratio=nu, stress_xx=5e7, plane=plane)
     for x, i in ((.02, 0), (.07, 1)):
         p = np.array([x, .01])
         f = series_bar(p[None], **kw)
@@ -73,7 +73,7 @@ def test_series_bar_with_matched_lateral_strain_and_rejects_mismatch(plane):
     a = series_bar([[.04-1e-13, .01], [.04+1e-13, .01]], **kw).displacement
     np.testing.assert_allclose(a[0], a[1], rtol=0, atol=1e-15)
     with pytest.raises(ValueError, match='laterally'):
-        series_bar([[.01, 0.]], **{**kw, 'poisson_ratios': [.3, .3]})
+        series_bar([[.01, 0.]], **{**kw, 'poisson_ratio': [.3, .3]})
 
 
 def lame_single(r, a, b, p_in, p_out):
@@ -85,12 +85,12 @@ def lame_single(r, a, b, p_in, p_out):
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
 def test_single_shell_matches_textbook_lame(plane):
     r = np.linspace(.02, .05, 7)
-    f = composite_cylinder(np.column_stack([r, 0*r]), inner_radius=.02, interfaces=[.05],
-                           young_moduli=[200e9], poisson_ratios=[.3], plane=plane,
-                           inner_pressure=3e7, outer_pressure=1e6)
+    f = composite_cylinder(np.column_stack([r, 0*r]), position=[.02, .05],
+                           youngs_modulus=[200e9], poisson_ratio=[.3], plane=plane,
+                           gauge_pressure=(3e7, 1e6))
     srr, stt = lame_single(r, .02, .05, 3e7, 1e6)
-    np.testing.assert_allclose(f.radial_stress, srr, rtol=1e-12, atol=1e-6)
-    np.testing.assert_allclose(f.hoop_stress, stt, rtol=1e-12)
+    np.testing.assert_allclose(f.stress_rr, srr, rtol=1e-12, atol=1e-6)
+    np.testing.assert_allclose(f.stress_hoop, stt, rtol=1e-12)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -108,23 +108,23 @@ def test_single_shell_log_temperature_matches_timoshenko_thermal_stresses(plane)
     total = integral(a, b)
     srr = np.array([scale/ri**2*((ri**2-a**2)/(b**2-a**2)*total-integral(a, ri)) for ri in r])
     stt = np.array([scale/ri**2*((ri**2+a**2)/(b**2-a**2)*total+integral(a, ri)-T(ri)*ri**2) for ri in r])
-    f = composite_cylinder(np.column_stack([r, 0*r]), inner_radius=a, interfaces=[b],
-                           young_moduli=[e], poisson_ratios=[nu], plane=plane,
-                           thermal_expansions=[alpha], temperature_change=[[c0, c1]])
-    np.testing.assert_allclose(f.radial_stress, srr, rtol=1e-10, atol=1e-8*abs(stt).max())
-    np.testing.assert_allclose(f.hoop_stress, stt, rtol=1e-10, atol=1e-8*abs(stt).max())
+    f = composite_cylinder(np.column_stack([r, 0*r]), position=[a, b],
+                           youngs_modulus=[e], poisson_ratio=[nu], plane=plane, gauge_pressure=(0., 0.),
+                           linear_expansion_coefficient=[alpha], temperature_change=[[c0, c1]])
+    np.testing.assert_allclose(f.stress_rr, srr, rtol=1e-10, atol=1e-8*abs(stt).max())
+    np.testing.assert_allclose(f.stress_hoop, stt, rtol=1e-10, atol=1e-8*abs(stt).max())
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
 def test_uniform_heating_of_one_material_is_stress_free_in_plane(plane):
-    f = composite_cylinder([[.025, 0.], [0., .045]], **{**CYL, 'young_moduli': [70e9]*3,
-                           'poisson_ratios': [.33]*3}, plane=plane,
-                           thermal_expansions=[2.3e-5]*3, temperature_change=[[100., 0.]]*3)
+    f = composite_cylinder([[.025, 0.], [0., .045]], **{**CYL, 'youngs_modulus': [70e9]*3,
+                           'poisson_ratio': [.33]*3}, plane=plane,
+                           linear_expansion_coefficient=[2.3e-5]*3, temperature_change=[[100., 0.]]*3)
     assert np.max(abs(f.stress)) < 1e-6
     expected = 2.3e-5*100*(1+.33 if plane == 'strain' else 1.)
-    np.testing.assert_allclose(f.radial_displacement/np.array([.025, .045]), expected, rtol=1e-12)
+    np.testing.assert_allclose(f.displacement_r/np.array([.025, .045]), expected, rtol=1e-12)
     if plane == 'strain':
-        np.testing.assert_allclose(f.out_of_plane_stress, -70e9*2.3e-5*100, rtol=1e-12)
+        np.testing.assert_allclose(f.stress_zz, -70e9*2.3e-5*100, rtol=1e-12)
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -132,29 +132,29 @@ def test_uniform_heating_of_one_material_is_stress_free_in_plane(plane):
 def test_composite_cylinder_equilibrium_interfaces_and_boundaries(plane, load):
     kw = dict(CYL, plane=plane)
     if load == 'pressure':
-        kw.update(inner_pressure=4e7, outer_pressure=5e6)
+        kw.update(gauge_pressure=(4e7, 5e6))
     else:
-        kw.update(thermal_expansions=[1.2e-5, 7e-5, 2.3e-5],
+        kw.update(linear_expansion_coefficient=[1.2e-5, 7e-5, 2.3e-5],
                   temperature_change=[[120., 0.]]*3 if load == 'mismatch'
                   else [[150., -20.], [140., -60.], [110., -5.]])
     edges = [.02, .03, .045, .05]
     f = composite_cylinder([[.02, 0.], [0., .05]], **kw)
-    np.testing.assert_allclose(f.radial_stress, [-kw.get('inner_pressure', 0.), -kw.get('outer_pressure', 0.)],
-                               atol=1e-6*np.max(abs(f.hoop_stress)))
+    np.testing.assert_allclose(f.stress_rr, [-kw['gauge_pressure'][0], -kw['gauge_pressure'][1]],
+                               atol=1e-6*np.max(abs(f.stress_hoop)))
     for r in edges[1:-1]:
         g = composite_cylinder([[r-1e-13, 0.], [r+1e-13, 0.]], **kw)
         assert g.layer[0] != g.layer[1]
-        np.testing.assert_allclose(g.radial_displacement[0], g.radial_displacement[1], rtol=1e-9)
-        np.testing.assert_allclose(g.radial_stress[0], g.radial_stress[1], rtol=1e-8,
-                                   atol=1e-9*np.max(abs(g.hoop_stress)))
-    alpha = kw.get('thermal_expansions', [0.]*3)
+        np.testing.assert_allclose(g.displacement_r[0], g.displacement_r[1], rtol=1e-9)
+        np.testing.assert_allclose(g.stress_rr[0], g.stress_rr[1], rtol=1e-8,
+                                   atol=1e-9*np.max(abs(g.stress_hoop)))
+    alpha = kw.get('linear_expansion_coefficient', [0.]*3)
     dt = np.asarray(kw.get('temperature_change', [[0., 0.]]*3))
     for i, r in enumerate((.025, .037, .048)):
         angle = .4+i
         x = r*np.array([np.cos(angle), np.sin(angle)])
         sel = np.array([i])
         field = lambda q: composite_cylinder(q[None], **kw, layer=sel).displacement[0]
-        local = stress_from_displacement(field, x, CYL['young_moduli'][i], CYL['poisson_ratios'][i], plane,
+        local = stress_from_displacement(field, x, CYL['youngs_modulus'][i], CYL['poisson_ratio'][i], plane,
                                          alpha[i], lambda q: dt[i, 0]+dt[i, 1]*np.log(np.hypot(*q)/.02))
         here = composite_cylinder(x[None], **kw).stress[0]
         np.testing.assert_allclose(local, here, rtol=1e-5, atol=1e-5*np.max(abs(here)))
@@ -170,9 +170,10 @@ def test_composite_cylinder_equilibrium_interfaces_and_boundaries(plane, load):
         assert np.max(abs(div)) < 1e-5*np.max(abs(here))/r
 
 
-@pytest.mark.parametrize('change', [dict(young_moduli=[1., 0., 1.]), dict(poisson_ratios=[.3, .5, .3]),
-                                    dict(interfaces=[.03, .03, .05]), dict(plane='auto'),
-                                    dict(temperature_change=[[1., 0.]]), dict(thermal_expansions=[1., np.nan, 1.])])
+@pytest.mark.parametrize('change', [dict(youngs_modulus=[1., 0., 1.]), dict(poisson_ratio=[.3, .5, .3]),
+                                    dict(position=[.02, .03, .03, .05]), dict(plane='auto'),
+                                    dict(temperature_change=[[1., 0.]]),
+                                    dict(linear_expansion_coefficient=[1., np.nan, 1.])])
 def test_cylinder_rejects_invalid_layers(change):
     with pytest.raises(ValueError):
         composite_cylinder([[.03, 0.]], **{**CYL, 'plane': 'stress', **change})
@@ -183,4 +184,4 @@ def test_reference_has_no_engine_solver_or_assembly_imports():
     for node in ast.walk(ast.parse(Path(module.__file__).read_text())):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             names = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or '']
-            assert all(n.split('.')[0] in ('numpy', 'dataclasses') for n in names)
+            assert all(n.split('.')[0] in ('numpy', 'dataclasses', '_checks') for n in names)   # _checks: refsol's own

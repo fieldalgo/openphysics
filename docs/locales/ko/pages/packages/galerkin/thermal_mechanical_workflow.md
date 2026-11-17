@@ -22,36 +22,39 @@ mesh = rectangle_mesh(1., 1., n, n)
 thermal = {int(i): 303.15 for i in mesh.boundary['left']}
 thermal.update({int(i): 323.15 for i in mesh.boundary['right']})
 result = solve_steady_thermoelasticity(
-    mesh, units={'length': 'm', 'temperature': 'K'},
-    conductivity=10., thermal_dirichlet=thermal, heat_source=0.,
-    young_modulus=70e9, poisson_ratio=.3, plane='strain',
-    thermal_expansion_per_k=12e-6, reference_temperature_k=293.15,
-    mechanical_dirichlet={(0, 0): 0., (0, 1): 0., (n, 1): 0.},
-    body_force=(0., 0.))
+    mesh, thermal_conductivity=10., prescribed_temperature=thermal,
+    heat_source_density=0., youngs_modulus=70e9, poisson_ratio=.3, plane='strain',
+    linear_expansion_coefficient=12e-6, stress_free_temperature=293.15,
+    prescribed_displacement={(0, 0): 0., (0, 1): 0., (n, 1): 0.},
+    body_force_density=(0., 0.))
 ```
 
 전체 signature는 다음과 같습니다.
 
 ```python
 solve_steady_thermoelasticity(
-    mesh, *, units, conductivity, thermal_dirichlet, heat_source=0.0,
-    young_modulus, poisson_ratio, plane, thermal_expansion_per_k,
-    reference_temperature_k, mechanical_dirichlet, body_force=(0., 0.))
+    mesh, *, thermal_conductivity, prescribed_temperature,
+    heat_source_density=None, youngs_modulus, poisson_ratio, plane,
+    linear_expansion_coefficient, stress_free_temperature,
+    prescribed_displacement, body_force_density=None, motion=None)
 ```
 
 | 입력 | 의미와 검증 |
 | --- | --- |
 | mesh | galerkin Mesh, nodes (N,2) m, 정수 triangles (M,3); 기준 형상 |
-| units | 정확히 `{'length':'m','temperature':'K'}`; 추가 키·자동 변환 없음 |
-| conductivity | 유한한 상수 k>0, W/(m K), 또는 `mesh.region_names` 전체에 대한 `{영역 이름: k}` |
-| thermal_dirichlet | 외벽 정수 절점 → 유한한 절대 K; 나머지 단열 |
-| heat_source | 유한한 부호 있는 scalar, `{영역 이름: Q}`, 또는 (Q,2) 미터 좌표 → (Q,) W/m³ callback |
-| young_modulus / poisson_ratio | 유한한 E>0 Pa / -1<nu<0.5; 각각 scalar 또는 `{영역 이름: 값}` |
+| thermal_conductivity | 유한한 상수 k>0, W/(m K), 또는 `mesh.region_names` 전체에 대한 `{영역 이름: k}` |
+| prescribed_temperature | 외벽 정수 절점 → 유한한 절대 K; 나머지 단열 |
+| heat_source_density | `None`(열원 없음), 유한한 부호 있는 scalar, `{영역 이름: Q}`, 또는 (Q,2) 미터 좌표 → (Q,) W/m³ callback |
+| youngs_modulus / poisson_ratio | 유한한 E>0 Pa / -1<nu<0.5; 각각 scalar 또는 `{영역 이름: 값}` |
 | plane | 명시적인 `stress` 또는 `strain` |
-| thermal_expansion_per_k | 유한한 부호 있는 **선팽창** alpha, 1/K; 0·음수 허용; scalar 또는 `{영역 이름: alpha}` |
-| reference_temperature_k | 필수 유한 비음수 절대 K; 자동 기준값 없음 |
-| mechanical_dirichlet | 외벽 (node,component) → 변위 m; component0=x,1=y |
-| body_force | 유한한 (2,) 또는 (Q,2) 미터 좌표 → (Q,2) N/m³ callback |
+| linear_expansion_coefficient | 유한한 부호 있는 **선팽창** alpha, 1/K; 0·음수 허용; scalar 또는 `{영역 이름: alpha}` |
+| stress_free_temperature | 필수 유한 비음수 절대 K; 자동 기준값 없음 |
+| prescribed_displacement | 외벽 (node,component) → 변위 m; component0=x,1=y |
+| body_force_density | `None`(없음), 유한한 (2,) 또는 (Q,2) 미터 좌표 → (Q,2) N/m³ callback |
+| motion | `None` 또는 `galerkin.shape.MeshMotion`([형상 미분](shape_derivative.md)) |
+
+모든 물리량은 SI 단위의 숫자입니다. `units=` 인자와 단위 변환은 없으며 `str` 값
+(예: `"10 W/(m K)"`)은 `TypeError`를 냅니다.
 
 열 연결 성분마다 Dirichlet anchor가 필요하고 기계 성분마다 독립적인 강체 구속3개가
 필요합니다. 나머지 기계 성분에는 탄성 성분만의 traction 0이 아닌 **전체 열탄성 자연
@@ -110,17 +113,24 @@ Boundary/configuration은 snapshot 메시 checksum으로 인증하지 않고 man
 
 ```python
 metadata = result.manifest
-metadata['units']['length'] = 'mm'
-assert result.manifest['units']['length'] == 'm'
+metadata['units']['node_coordinates'] = 'mm'
+assert result.manifest['units']['node_coordinates'] == 'm'
 assert result.mechanics.temperature_snapshot is result.temperature_snapshot
 ```
 
 JSON은 정렬된 키·compact separator·유한한 수치를 사용합니다. Schema는
-`galerkin-steady-thermoelasticity-v1`입니다. 선언한 SI 단위, 재료(float, 또는 키를 정렬한
-`{영역 이름: float}` 사전), 기준온도·plane, 정렬된 구속, 열원·body force(`{'kind': 'constant',
-'value': ...}`, 영역 열원은 `{'kind': 'per_region', 'value': {...}}`, 또는 callable label), 메시 개수·boundary·region
-metadata, 메시·온도·snapshot hash, 정확 복사 전달 정책, 완료 단계 상태, 물리량 단위를
-기록합니다. 이동하는 Git revision을 전체 runtime 버전이라고 주장하지 않습니다.
+`galerkin-steady-thermoelasticity-v2`이며 모든 키는 registry 이름입니다. `units`는 각 입력
+물리량(`node_coordinates`, `thermal_conductivity`, `youngs_modulus`, `poisson_ratio`,
+`linear_expansion_coefficient`, `stress_free_temperature`, `prescribed_temperature`,
+`prescribed_displacement`, `heat_source_density`, `body_force_density`)과 `heat`·`mechanics`의
+각 필드(각자의 `.units`)를 SI 단위로 매핑합니다. `inputs`는 재료(`thermal_conductivity`,
+`youngs_modulus`, `poisson_ratio`, `linear_expansion_coefficient`는 각각 float 또는 키를 정렬한
+`{영역 이름: float}` 사전, 그리고 `stress_free_temperature`와 `plane`), 정렬된
+`prescribed_temperature`와 `prescribed_displacement`, `heat_source_density`·`body_force_density`
+(`{'kind': 'constant', 'value': ...}`, 영역 열원은 `{'kind': 'per_region', 'value': {...}}`, 또는
+callable label)를 기록합니다. 그 밖에 메시 개수·boundary·region metadata, 메시·온도·snapshot
+hash, 정확 복사 전달 정책, 완료 단계 상태를 기록합니다. Schema v1(단위 접미사 키, `units`
+인자, `quantity_units`)은 더 이상 쓰지 않습니다. 이동하는 Git revision을 전체 runtime 버전이라고 주장하지 않습니다.
 정확한 source manifest는 외부 검증 근거에 속합니다.
 
 Origin은 `workflow_owned_heat_call`로 이 호출이 heat component를 실행했다는 뜻입니다.
@@ -171,15 +181,17 @@ q는 PS에서 E a/(1-nu), PE에서 E a/(1-2nu)입니다. PS는 sigma_zz=0과
 Body-force-only 대체는 경계항과 균일 자유 팽창을 빠뜨립니다. 물리적 열변형률은 z를
 포함한3D에서 여전히 aI이며, PE의 유효 (1+nu)a는 축약 하중 표현일 뿐입니다.
 
-전체 변형률은 요소별 상수입니다. thermal/elastic strain, stress, sigma_zz와 epsilon_zz는
-중심 표본입니다. T가 P1이므로 응력은 일반적으로 요소 안에서 선형입니다. Snapshot의 P1 T와
+전체 변형률(`strain`)은 요소별 상수입니다. thermal/elastic strain, stress, `stress_zz`와
+`strain_zz`는 중심 표본입니다. T가 P1이므로 응력은 일반적으로 요소 안에서 선형입니다. Snapshot의 P1 T와
 요소 변위 변형률로 점별 응력을 복원해야 하며 중심값을 전체 상수 장으로 해석하면 안 됩니다.
 Plane stress는 국소 축약이며 복원한3D warping이 아닙니다.
 
-기계 external load·thermal-equivalent load·reaction·residual은 분리된 깊이당 N/m입니다.
-`load_total`은 external+thermal입니다. 반력은 고정 성분에서 Ku-f-g, 자유 성분에서0이며
-전체 residual은 모든 성분을 유지합니다. 물리적 탄성 에너지 U는 원래3D 탄성 에너지에서
-구하는 J/m입니다.
+기계 external load(`applied_force_per_depth`)·thermal-equivalent load
+(`thermal_equivalent_force_per_depth`)·reaction(`reaction_force_per_depth`)·residual
+(`residual_force_per_depth`)은 분리된 깊이당 N/m입니다. 전체 하중은 external+thermal이며
+별도 필드는 없습니다. 반력은 고정 성분에서 Ku-f-g, 자유 성분에서0이며
+전체 residual은 모든 성분을 유지합니다. 물리적 탄성 에너지 U(`strain_energy_per_depth`)는 원래3D 탄성
+에너지에서 구하는 J/m입니다.
 
 ```text
 PS: psi=.5(e-a m)^T Dps(e-a m)

@@ -414,6 +414,19 @@ electric defaults the public function forwards (`reference_potential`, `motion`)
 `electrical_result`. The temperature-dependent call is compared at the public frame: seven kind
 2 entries rename its keywords and two kind 3 entries negate the current density and the flux.
 
+**The mechanics, thermoelastic and workflow APIs in SI (L2 commit 8).**
+`galerkin.elasticity.solve_elasticity`, `galerkin.thermoelasticity.freeze_temperature` and
+`.solve_thermoelasticity` and the two heat-to-mechanics workflows take registry names; mechanics
+has no inward or outward quantity, so nothing is negated and there is no outward-form body: the
+public functions keep their code and are compared at the public frame. simcase hands them the
+same doubles under the new keywords. Eight kind 2 entries rename the keywords simcase passes
+(`young_modulus`, `dirichlet`, `body_force`, and for thermoelasticity also
+`reference_temperature_k` and `thermal_expansion_per_k`), one renames `freeze_temperature`'s
+`temperature_k` (keyword-only now), and four kind 5 entries map the `TemperatureSnapshot` that
+`solve_thermoelasticity` receives: `temperature_k` becomes `temperature`, and `length_unit` and
+`temperature_unit` give way to the one read-only `units` map; its arrays and three hashes are
+unchanged. The workflows are not recorded targets (simcase does not call them).
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

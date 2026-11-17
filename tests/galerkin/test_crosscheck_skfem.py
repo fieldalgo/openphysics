@@ -145,8 +145,8 @@ def test_elasticity_p1_same_mesh(skfem, plane):
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane=plane,
-                                dirichlet=dirichlet, body_force=body)
+        ours = solve_elasticity(mesh, youngs_modulus=young, poisson_ratio=poisson, plane=plane,
+                                prescribed_displacement=dirichlet, body_force_density=body)
     with clock("reference"):
         basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP1(), young, poisson, plane, body)
     displacement = theirs[basis.nodal_dofs].T
@@ -170,8 +170,8 @@ def test_elasticity_p2_reference_is_reported(skfem):
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane="stress",
-                                dirichlet=dirichlet, body_force=body)
+        ours = solve_elasticity(mesh, youngs_modulus=young, poisson_ratio=poisson, plane="stress",
+                                prescribed_displacement=dirichlet, body_force_density=body)
     with clock("reference"):
         basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP2(), young, poisson, "stress", body)
     tip = int(np.argmin(np.hypot(mesh.nodes[:, 0] - 2.0, mesh.nodes[:, 1] - 0.25)))

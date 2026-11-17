@@ -46,8 +46,8 @@ segment normal과8점 선적분으로 생산4점 loader를 감사합니다. 추�
 monomial을 정확 유리 모멘트 L/[(k+1)(k+2)], L/(k+2)와 대조하므로 단순히 두 구적
 구현끼리 비교한 것이 아닙니다.
 
-Full3D stress/energy에는 PE sigma_zz와 잔여 .5Ea²가 필요합니다. 반환 total strain은 요소
-상수, thermal/elastic strain/stress/sigma_zz/epsilon_zz는 centroid 표본으로 해당 위치에서
+Full3D stress/energy에는 PE sigma_zz와 잔여 .5Ea²가 필요합니다. 반환 `strain`은 요소
+상수, thermal/elastic strain/stress/`stress_zz`/`strain_zz`는 centroid 표본으로 해당 위치에서
 검사합니다. Full stress norm은 실제 P1 T의 내부 원 법칙 복원을 사용하며 centroid-T²는
 에너지 적분이 아닙니다. 비영 처방 변위에는 support work가 필요하고 독립 적분 U,
 .5uKu-u.g+CT, endpoint 외력/support work가 일치합니다.
@@ -129,8 +129,9 @@ left load, 비영 support-work 항등식을 포함합니다. 사각 ring hole no
 
 ## Runtime 호환·음성 대조
 
-ThermoelasticResult 기존18개 field 위치를 유지하고 load_body/load_traction(defaultNone)을
-뒤에 추가합니다. 실제18-positional 생성에서 기존 의미와 새None을 확인합니다. 정상 출력은
+ThermoelasticResult 앞18개 field 위치(registry 이름)를 유지하고 applied_body_force_per_depth/
+applied_traction_force_per_depth(defaultNone)가 뒤에 옵니다. 실제18-positional 생성에서 마지막 두
+필드가 None임을 확인합니다. 정상 출력은
 (N,2) 배열, external=body+traction, total=external+g이고 None/{}는 기존18개 수치 필드를
 정확 보존합니다. 출력 배열은 가변이고 snapshot은 불변 bytes 복사본이며 반환 후 가변
 결과를 재인증하지 않습니다.

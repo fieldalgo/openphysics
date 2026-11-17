@@ -8,7 +8,7 @@ from galerkin.mesh import Mesh, rectangle_mesh, annulus_mesh
 from galerkin.elasticity import solve_elasticity
 from refsol import elasticity_traction as oracle
 
-MATERIAL = dict(young_modulus=70000., poisson_ratio=.3)
+MATERIAL = dict(youngs_modulus=70000., poisson_ratio=.3)
 
 
 def solve(mesh, plane="stress", **kwargs):
@@ -25,8 +25,8 @@ def all_boundary_fixed(mesh, values=None):
 
 
 def force_moment_work(mesh, result):
-    total = result.load+result.reaction
-    scale = max(np.linalg.norm(result.load, axis=1).sum(), np.finfo(float).tiny)
+    total = result.applied_force_per_depth+result.reaction_force_per_depth
+    scale = max(np.linalg.norm(result.applied_force_per_depth, axis=1).sum(), np.finfo(float).tiny)
     assert np.linalg.norm(total.sum(axis=0))/scale <= 1e-9
     moment = np.sum(mesh.nodes[:, 0]*total[:, 1]-mesh.nodes[:, 1]*total[:, 0])
     size = np.linalg.norm(np.ptp(mesh.nodes, axis=0))
@@ -40,14 +40,14 @@ def force_moment_work(mesh, result):
 @pytest.mark.parametrize("plane", ["stress", "strain"])
 def test_traction_uniform_uniaxial_closed_form(plane):
     m = rectangle_mesh(1.2, .7, 6, 5)
-    exact = oracle.uniaxial(m.nodes, 123., **MATERIAL, plane=plane)
+    exact = oracle.uniaxial(m.nodes, stress_xx=123., **MATERIAL, plane=plane)
     bc = {(int(i), 0): 0. for i in m.boundary["left"]}
     bc.update({(int(i), 1): 0. for i in m.boundary["bottom"]})
-    r = solve(m, plane, dirichlet=bc, traction={"right": (123., 0.)})
+    r = solve(m, plane, prescribed_displacement=bc, traction={"right": (123., 0.)})
     assert_allclose(r.displacement, exact.displacement, rtol=1e-10, atol=1e-14)
     assert_allclose(r.strain, np.tile(exact.strain[0], (m.num_triangles, 1)), rtol=1e-10, atol=1e-14)
     assert_allclose(r.stress, np.tile([123., 0, 0], (m.num_triangles, 1)), rtol=1e-10, atol=1e-10)
-    assert_allclose(r.load.sum(axis=0), [123*.7, 0], rtol=1e-12, atol=1e-12)
+    assert_allclose(r.applied_force_per_depth.sum(axis=0), [123*.7, 0], rtol=1e-12, atol=1e-12)
     expected_energy = .5*123*exact.strain[0, 0]*1.2*.7
     assert_allclose(force_moment_work(m, r), expected_energy, rtol=1e-10)
 
@@ -55,8 +55,8 @@ def test_traction_uniform_uniaxial_closed_form(plane):
 @pytest.mark.parametrize("plane", ["stress", "strain"])
 def test_traction_uniform_shear_closed_form(plane):
     m = rectangle_mesh(1.2, .7, 6, 5)
-    exact = oracle.shear(m.nodes, 87., **MATERIAL, plane=plane)
-    r = solve(m, plane, dirichlet=fixed(m, "bottom"),
+    exact = oracle.shear(m.nodes, stress_xy=87., **MATERIAL, plane=plane)
+    r = solve(m, plane, prescribed_displacement=fixed(m, "bottom"),
               traction={"top": (87., 0.), "right": (0., 87.), "left": (0., -87.)})
     assert_allclose(r.displacement, exact.displacement, rtol=1e-10, atol=1e-14)
     assert_allclose(r.strain, np.tile([0, 0, exact.strain[0, 2]], (m.num_triangles, 1)), atol=1e-13)
@@ -75,38 +75,38 @@ def test_traction_consistent_nodal_weights_and_origin_moment(degree):
         field = lambda p, n: np.column_stack([p[:, 1]**6, p[:, 1]**5])
         expected = [[1/56, 1/42], [1/8, 1/7]]
         moment = 1/24
-    r = solve(m, dirichlet=all_boundary_fixed(m), traction={"right": field})
-    assert_allclose(r.load[m.boundary["right"]], expected, rtol=1e-12, atol=1e-14)
-    assert_allclose(np.sum(m.nodes[:, 0]*r.load[:, 1]-m.nodes[:, 1]*r.load[:, 0]), moment, atol=1e-13)
-    assert_allclose(r.reaction, -r.load, rtol=0, atol=0)
+    r = solve(m, prescribed_displacement=all_boundary_fixed(m), traction={"right": field})
+    assert_allclose(r.applied_force_per_depth[m.boundary["right"]], expected, rtol=1e-12, atol=1e-14)
+    assert_allclose(np.sum(m.nodes[:, 0]*r.applied_force_per_depth[:, 1]-m.nodes[:, 1]*r.applied_force_per_depth[:, 0]), moment, atol=1e-13)
+    assert_allclose(r.reaction_force_per_depth, -r.applied_force_per_depth, rtol=0, atol=0)
 
 
 def test_traction_dirichlet_overlap_preserves_load_and_support_work():
     m = rectangle_mesh(1, .8, 4, 4)
     values = m.nodes @ np.array([[.002, -.001], [.003, .0005]]).T + [.001, -.002]
     bc = all_boundary_fixed(m, values)
-    zero = solve(m, dirichlet=bc)
-    r = solve(m, dirichlet=bc, traction={"right": (5., -7.), "left": (-3., 4.)})
+    zero = solve(m, prescribed_displacement=bc)
+    r = solve(m, prescribed_displacement=bc, traction={"right": (5., -7.), "left": (-3., 4.)})
     assert_allclose(r.displacement, zero.displacement, rtol=0, atol=0)
-    assert_allclose(r.reaction, zero.reaction-r.load, atol=1e-12)
-    assert np.linalg.norm(r.load) > 0
+    assert_allclose(r.reaction_force_per_depth, zero.reaction_force_per_depth-r.applied_force_per_depth, atol=1e-12)
+    assert np.linalg.norm(r.applied_force_per_depth) > 0
     force_moment_work(m, r)
     # Ignoring prescribed-displacement reaction work is an incorrect work law.
     energy = .5*np.sum(m.areas()*np.sum(r.strain*r.stress, axis=1))
-    assert abs(.5*np.sum(r.displacement*r.load)-energy) > .1*energy
+    assert abs(.5*np.sum(r.displacement*r.applied_force_per_depth)-energy) > .1*energy
 
 
 def test_traction_zero_default_and_constant_callback_agree():
     m = rectangle_mesh(1, 1, 3, 3)
     bc = fixed(m, "left")
-    a = solve(m, dirichlet=bc, body_force=(0., -2.))
+    a = solve(m, prescribed_displacement=bc, body_force_density=(0., -2.))
     for traction in (None, {}):
-        b = solve(m, dirichlet=bc, body_force=(0., -2.), traction=traction)
-        for name in ("displacement", "strain", "stress", "load", "reaction", "residual"):
+        b = solve(m, prescribed_displacement=bc, body_force_density=(0., -2.), traction=traction)
+        for name in ("displacement", "strain", "stress", "applied_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth"):
             assert np.array_equal(getattr(a, name), getattr(b, name))
-    a = solve(m, dirichlet=bc, traction={"right": (3., 5.)})
-    b = solve(m, dirichlet=bc, traction={"right": lambda p, n: np.tile([3., 5.], (len(p), 1))})
-    assert_allclose(a.load, b.load, rtol=0, atol=0)
+    a = solve(m, prescribed_displacement=bc, traction={"right": (3., 5.)})
+    b = solve(m, prescribed_displacement=bc, traction={"right": lambda p, n: np.tile([3., 5.], (len(p), 1))})
+    assert_allclose(a.applied_force_per_depth, b.applied_force_per_depth, rtol=0, atol=0)
     assert_allclose(a.displacement, b.displacement, rtol=0, atol=0)
 
 
@@ -117,15 +117,15 @@ def test_traction_normal_sign_edge_direction_and_triangle_orientation():
     for tag, normal in expected_normal.items():
         def field(p, n, normal=normal):
             assert_allclose(n, np.tile(normal, (len(p), 1)), rtol=0, atol=1e-14)
-            return oracle.traction_from_stress(np.tile([11., -5., 3.], (len(p), 1)), n)
+            return oracle.traction_from_stress(n, stress=np.tile([11., -5., 3.], (len(p), 1)))
         fields[tag] = field
-    a = solve(m, dirichlet=all_boundary_fixed(m), traction=fields)
+    a = solve(m, prescribed_displacement=all_boundary_fixed(m), traction=fields)
     m.triangles = m.triangles[:, ::-1]
     m.boundary_edges = {tag: edges[::-1, ::-1] for tag, edges in m.boundary_edges.items()}
-    b = solve(m, dirichlet=all_boundary_fixed(m), traction=dict(reversed(list(fields.items()))))
-    assert_allclose(a.load, b.load, rtol=0, atol=1e-13)
-    assert_allclose(a.load.sum(axis=0), 0, atol=1e-13)
-    assert_allclose(np.sum(m.nodes[:,0]*a.load[:,1]-m.nodes[:,1]*a.load[:,0]), 0, atol=1e-13)
+    b = solve(m, prescribed_displacement=all_boundary_fixed(m), traction=dict(reversed(list(fields.items()))))
+    assert_allclose(a.applied_force_per_depth, b.applied_force_per_depth, rtol=0, atol=1e-13)
+    assert_allclose(a.applied_force_per_depth.sum(axis=0), 0, atol=1e-13)
+    assert_allclose(np.sum(m.nodes[:,0]*a.applied_force_per_depth[:,1]-m.nodes[:,1]*a.applied_force_per_depth[:,0]), 0, atol=1e-13)
 
 
 def test_traction_hole_normals_point_into_hole():
@@ -136,25 +136,25 @@ def test_traction_hole_normals_point_into_hole():
         assert np.all(np.sum(p*n, axis=1) < 0)
         seen.append(len(p))
         return np.tile([2., -3.], (len(p), 1))
-    r = solve(m, dirichlet=fixed(m, "outer"), traction={"inner": field})
+    r = solve(m, prescribed_displacement=fixed(m, "outer"), traction={"inner": field})
     circumference = 2*16*.4*np.sin(np.pi/16)
     assert seen == [16*4]
-    assert_allclose(r.load.sum(axis=0), circumference*np.array([2., -3.]), rtol=1e-12)
+    assert_allclose(r.applied_force_per_depth.sum(axis=0), circumference*np.array([2., -3.]), rtol=1e-12)
     force_moment_work(m, r)
 
 
 @pytest.mark.parametrize("plane", ["stress", "strain"])
 def test_traction_rigid_rotation_translation_and_length_units(plane):
     m = rectangle_mesh(1, .8, 5, 4)
-    exact = oracle.uniaxial(m.nodes, 123., **MATERIAL, plane=plane)
-    a = solve(m, plane, dirichlet=fixed(m, "left", exact.displacement), traction={"right": (123., 0.)})
+    exact = oracle.uniaxial(m.nodes, stress_xx=123., **MATERIAL, plane=plane)
+    a = solve(m, plane, prescribed_displacement=fixed(m, "left", exact.displacement), traction={"right": (123., 0.)})
     angle = .37
     rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     m.nodes = 2*m.nodes @ rotation.T + [3., -5.]
     target = 2*exact.displacement @ rotation.T
-    b = solve(m, plane, dirichlet=fixed(m, "left", target), traction={"right": rotation @ [123., 0.]})
+    b = solve(m, plane, prescribed_displacement=fixed(m, "left", target), traction={"right": rotation @ [123., 0.]})
     assert_allclose(b.displacement, 2*a.displacement @ rotation.T, rtol=1e-10, atol=1e-13)
-    assert_allclose(b.load, 2*a.load @ rotation.T, rtol=1e-10, atol=1e-12)
+    assert_allclose(b.applied_force_per_depth, 2*a.applied_force_per_depth @ rotation.T, rtol=1e-10, atol=1e-12)
     sigma = rotation @ np.diag([123., 0.]) @ rotation.T
     assert_allclose(b.stress, np.tile([sigma[0,0],sigma[1,1],sigma[0,1]], (m.num_triangles,1)), atol=1e-9)
     assert_allclose(force_moment_work(m, b), 4*force_moment_work(rectangle_mesh(1,.8,5,4), a), rtol=1e-10)
@@ -177,10 +177,10 @@ def test_traction_nonuniform_polynomial_manufactured_convergence(plane):
         m = rectangle_mesh(1, 1, n, n)
         field = lambda p: oracle.polynomial_manufactured(p, **MATERIAL, plane=plane)
         tr = lambda p, normal: oracle.polynomial_traction(p, normal, **MATERIAL, plane=plane)
-        r = solve(m, plane, dirichlet=fixed(m, "left"), body_force=lambda p: field(p).body_force,
+        r = solve(m, plane, prescribed_displacement=fixed(m, "left"), body_force_density=lambda p: field(p).body_force_density,
                   traction={tag: tr for tag in ("right", "top", "bottom")})
-        assert_allclose(r.load.sum(axis=0), force_exact, rtol=1e-12, atol=1e-12)
-        assert_allclose(np.sum(m.nodes[:,0]*r.load[:,1]-m.nodes[:,1]*r.load[:,0]), moment_exact, rtol=1e-12)
+        assert_allclose(r.applied_force_per_depth.sum(axis=0), force_exact, rtol=1e-12, atol=1e-12)
+        assert_allclose(np.sum(m.nodes[:,0]*r.applied_force_per_depth[:,1]-m.nodes[:,1]*r.applied_force_per_depth[:,0]), moment_exact, rtol=1e-12)
         energy = force_moment_work(m, r)
         p = np.einsum("qa,tad->tqd", bary, m.nodes[m.triangles])
         exact = field(p.reshape(-1,2))
@@ -211,7 +211,7 @@ def test_traction_nonuniform_polynomial_manufactured_convergence(plane):
 def test_traction_reject_invalid_inputs(traction):
     m = rectangle_mesh(1,1,2,2)
     with pytest.raises(ValueError):
-        solve(m, dirichlet=fixed(m,"left"), traction=traction)
+        solve(m, prescribed_displacement=fixed(m,"left"), traction=traction)
 
 
 @pytest.mark.parametrize("edges", [[], np.empty((0,2),dtype=int), [1,2], [[0,1,2]],
@@ -220,20 +220,20 @@ def test_traction_reject_invalid_selected_edges(edges):
     m = rectangle_mesh(1,1,2,2)
     m.boundary_edges["selected"] = np.asarray(edges)
     with pytest.raises(ValueError):
-        solve(m, dirichlet=fixed(m,"left"), traction={"selected": (1,2)})
+        solve(m, prescribed_displacement=fixed(m,"left"), traction={"selected": (1,2)})
 
 
 def test_traction_duplicate_selected_tags_and_node_only_tag_rejected():
     m = rectangle_mesh(1,1,2,2)
     m.boundary_edges["alias"] = m.boundary_edges["right"].copy()
     with pytest.raises(ValueError, match="duplicate traction edge"):
-        solve(m, dirichlet=fixed(m,"left"), traction={"right": (1,0), "alias": (0,1)})
+        solve(m, prescribed_displacement=fixed(m,"left"), traction={"right": (1,0), "alias": (0,1)})
     m.boundary["node_only"] = m.boundary["right"]
     with pytest.raises(ValueError, match="no boundary_edges"):
-        solve(m, dirichlet=fixed(m,"left"), traction={"node_only": (1,0)})
+        solve(m, prescribed_displacement=fixed(m,"left"), traction={"node_only": (1,0)})
 
 
 def test_traction_balanced_pure_load_does_not_remove_rigid_modes():
     m = rectangle_mesh(1,1,2,2)
     with pytest.raises(ValueError, match="rigid modes"):
-        solve(m, dirichlet={}, traction={"left": (-1,0), "right": (1,0)})
+        solve(m, prescribed_displacement={}, traction={"left": (-1,0), "right": (1,0)})

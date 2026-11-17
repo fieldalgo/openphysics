@@ -299,9 +299,9 @@ def test_elasticity_p1_traction_same_mesh(skfem, plane):
                 "top": lambda p, n: np.column_stack(_t_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1]))}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=ELASTIC["e"], poisson_ratio=ELASTIC["nu"], plane=plane,
-                                dirichlet=dirichlet, body_force=ELASTIC["body"], traction=traction)
-        energy = 0.5 * np.sum(ours.displacement * (ours.load + ours.reaction))
+        ours = solve_elasticity(mesh, youngs_modulus=ELASTIC["e"], poisson_ratio=ELASTIC["nu"], plane=plane,
+                                prescribed_displacement=dirichlet, body_force_density=ELASTIC["body"], traction=traction)
+        energy = 0.5 * np.sum(ours.displacement * (ours.applied_force_per_depth + ours.reaction_force_per_depth))
     with clock("reference"):
         theirs = _skfem_elasticity(skfem, mesh, plane)
     emit(make_record(
@@ -325,9 +325,9 @@ def test_elasticity_p1_traction_same_mesh(skfem, plane):
             observable("element stress (sxx, syy, sxy)", "Pa", "max relative difference",
                        relative_difference(ours.stress, theirs["stress"]), SAME),
             observable("body plus traction load", "N/m", "max relative difference",
-                       relative_difference(ours.load, theirs["load"]), SAME),
+                       relative_difference(ours.applied_force_per_depth, theirs["load"]), SAME),
             observable("reaction at the prescribed DOFs", "N/m", "max relative difference",
-                       relative_difference(ours.reaction, theirs["reaction"]), SAME),
+                       relative_difference(ours.reaction_force_per_depth, theirs["reaction"]), SAME),
             observable("strain energy 0.5 u . (load + reaction) vs 0.5 u . K u", "J/m", "relative difference",
                        abs(energy - theirs["energy"]) / abs(theirs["energy"]), SAME)]))
 

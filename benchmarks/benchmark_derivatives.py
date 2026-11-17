@@ -130,8 +130,8 @@ def elasticity_problem(n, library):
     right = np.asarray(mesh.boundary["right"], dtype=int)  # an int array: JAX refuses list indexing
 
     def objective(e, nu, tx, ty):
-        result = solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu, plane="stress",
-                                  dirichlet=dirichlet, traction={"right": library.stack((tx, ty))})
+        result = solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu, plane="stress",
+                                  prescribed_displacement=dirichlet, traction={"right": library.stack((tx, ty))})
         return library.module.mean(result.displacement[right, 0])
     return mesh, objective, dict(objective="mean x displacement of the right end, m",
                                  parameters="E, nu and the two traction components on the right end")

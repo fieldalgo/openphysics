@@ -62,7 +62,7 @@ for the three-dimensional constitutive reduction and energy definition.
 
 Copy the script to a local working file outside `packages/`, then make one change at a time.
 
-- Set `thermal_expansion_per_k=0.`. With the example's zero displacement supports
+- Set `linear_expansion_coefficient=0.`. With the example's zero displacement supports
   and no body force, displacement, stress and elastic energy become zero;
   the heat result stays unchanged.
 - Double alpha to `24e-6` with all other inputs fixed. In this linear problem,
