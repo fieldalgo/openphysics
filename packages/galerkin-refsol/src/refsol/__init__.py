@@ -12,7 +12,7 @@ Modules
 -------
 slab        planar (slab) dielectric waveguide TE/TM modes, symmetric or asymmetric
 lossy_slab  multilayer slab with complex permittivity: bound absorbing and substrate-leaky
-            complex effective indices, exp(+i omega t) convention, documented sheet choice
+            complex effective indices, exp(-i omega t) as the rest of refsol, documented sheet choice
 fiber       step-index optical fiber: scalar LP modes and exact vector modes
 metallic    hollow metallic waveguide cutoffs, cavity resonances, coaxial potential
 electrostatics  coaxial and two-layer parallel-plate capacitance per unit length
