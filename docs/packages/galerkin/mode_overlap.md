@@ -4,7 +4,7 @@
 
 [galerkin overview](overview.md) · [Eigenspace reliability](eigenspace_reliability.md) · [Derivatives](differentiation.md)
 
-`galerkin.mode_overlap` post-processes the modes of `galerkin.waveguide.solve_modes`
+`galerkin.mode_overlap` post-processes the modes of `galerkin.kernels.solve_modes`
 (full-vector, edge `et` and nodal `ez`) and scalar P1 mode functions on a `Mesh`:
 guided power, field overlaps, normalisation, coupling efficiency, confinement
 factor and effective area. Every integral is an exact mass- or coupling-matrix
@@ -144,7 +144,8 @@ take `n_eff` explicitly because `beta` enters `H_t`; `solve_modes` returns
 
 ```python
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_overlap import normalize_vector, coupling_efficiency, confinement_factor, interpolate_vector_field
 
 n_eff, space, et, ez = solve_modes(mesh, eps_r, k0, n_target=n_core, num_modes=4)

@@ -14,7 +14,7 @@ tracking remain unsupported.
 Documents and results use `exp(-i omega t+i beta z)`, with
 `beta = (2*pi/lambda0)*n_eff`. Forward passive absorption has **Im n_eff > 0**, and a
 material written as `n + i k` absorbs for k ≥ 0 (a negative k is gain and is refused with
-`E-GAIN`). The mode kernel, the low-level `galerkin.solve_modes(..., eps_r, ...)` and the
+`E-GAIN`). The mode kernel, the low-level `galerkin.kernels.solve_modes(..., eps_r, ...)` and the
 kernel-frame `simcase.physics_em_modes2d.solve(..., eps_tri, ...)`, keeps
 `exp(+i omega t-i beta z)`, where passive epsilon has a negative imaginary part: simcase
 conjugates every material value once on the way in and every complex result once on the way
@@ -78,7 +78,7 @@ This is a candidate filter, not a proof of confinement or search completeness.
 For non-positive Re epsilon, explicitly set the physics `target_effective_index` to a positive
 real index: candidates nearest this target are selected and then sorted by
 Re n_eff. No dielectric upper bound is applied. `effective_index_threshold` remains required for
-vector documents. Low-level `galerkin.solve_modes` additionally accepts a complex
+vector documents. Low-level `galerkin.kernels.solve_modes` additionally accepts a complex
 shift target. Refine both the mesh and the outer window before interpreting a
 candidate as a guided mode. There is no automatic attenuation cutoff.
 

@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 from scipy.sparse.linalg import ArpackNoConvergence
 
-from galerkin import EdgeSpace, Mesh, eval_edge_field
+from galerkin import EdgeSpace, Mesh
+from galerkin.kernels import eval_edge_field
 from refsol import slab
 from simcase import Document, DocumentError, ModeTrackingError, examples, run
 from simcase.cli import main

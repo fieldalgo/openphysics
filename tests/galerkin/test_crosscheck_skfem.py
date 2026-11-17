@@ -18,7 +18,7 @@ from galerkin.cavity import solve_cavity_box
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.thermal import solve_steady_heat
-from galerkin.waveguide import solve_modes
+from galerkin.kernels import solve_modes
 
 SAME = 1e-9  # identical discretizations: relative difference gate
 

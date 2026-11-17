@@ -12,7 +12,7 @@ full-vector를 사용하세요. PML·방사/누설·일정 반경 굽힘은 [별
 
 문서와 결과는 `exp(-i omega t+i beta z)`, `beta=(2*pi/lambda0)*n_eff` 규약을 씁니다.
 +z 수동 감쇠는 **Im n_eff > 0**이고, `n + i k`로 쓴 재료는 k ≥ 0이면 흡수입니다(음수 k는
-이득이며 `E-GAIN`으로 거절). 모드 커널, 저수준 `galerkin.solve_modes(..., eps_r, ...)`, 커널
+이득이며 `E-GAIN`으로 거절). 모드 커널, 저수준 `galerkin.kernels.solve_modes(..., eps_r, ...)`, 커널
 기준틀의 `simcase.physics_em_modes2d.solve(..., eps_tri, ...)`는 `exp(+i omega t-i beta z)`를
 유지하며 여기서 손실 유전율의 허수부는 음수입니다. simcase는 들어갈 때 모든 재료 값을, 나올 때
 모든 복소 결과를 한 번씩 켤레로 바꿉니다. 문서 재료나 결과를 사용자가 다시 켤레 변환하지
@@ -73,7 +73,7 @@ VTK에도 복소 배열이 없으므로 `simcase.export`는 복소 스칼라 모
 Re epsilon이 양수가 아닌 매질은 physics에 양의 실수 `target_effective_index`를 명시합니다.
 목표에 가까운 후보를 선택한 후 Re n_eff 순으로 정렬하며 유전체 상한을
 적용하지 않습니다. Vector 문서는 `effective_index_threshold`도 계속 필요합니다.
-저수준 `galerkin.solve_modes`는 복소 목표값도 받습니다. 메시와 계산창을
+저수준 `galerkin.kernels.solve_modes`는 복소 목표값도 받습니다. 메시와 계산창을
 각각 수렴시켜야 하며 자동 손실 상한 필터는 없습니다.
 
 Scalar는 최대 계수를 1로, vector는 최대 중심점 |E|를 1로 정규화합니다.

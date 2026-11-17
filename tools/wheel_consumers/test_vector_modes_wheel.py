@@ -3,7 +3,7 @@
 
 """Installed full-vector and PML waveguide-mode consumer, copied outside the checkout.
 
-Runs the installed ``galerkin.solve_modes`` full-vector formulation on small
+Runs the installed ``galerkin.kernels.solve_modes`` full-vector formulation on small
 slab meshes against the analytic references of the installed ``refsol`` wheel
 (``refsol.slab``) and against the outgoing-root dispersion equation of the
 leaky slab used by ``tests/galerkin/test_pml_modes.py``, with complex-coordinate
@@ -25,7 +25,8 @@ import pytest
 from scipy.optimize import root
 
 import galerkin
-from galerkin import eval_edge_field, rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 from galerkin.mode_coordinates import mode_coordinates
 import refsol
 import simcase

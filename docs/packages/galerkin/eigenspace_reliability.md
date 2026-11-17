@@ -15,7 +15,8 @@ On Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, reproduce from the repository root
 
 ```python
 import numpy as np
-from galerkin import disk_mesh, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import solve_modes
 from galerkin.edge import assemble_edge_mass
 from galerkin.assembly import assemble_mass
 

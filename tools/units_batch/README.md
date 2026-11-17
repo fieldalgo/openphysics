@@ -435,6 +435,15 @@ the other 13 (kinds 7, 8, 3 and 5) still match a recorded call and misalign the 
 documents. Commit 9 therefore empties `phase3_rules.json`; it changes only the registry, so no
 call changes and all 87 documents compare equal with no entry.
 
+**The electromagnetic kernels in galerkin.kernels (L3 commit 11a).** The em kernels leave
+the top level for `galerkin.kernels` (route K: simcase's `em.modes2d` keeps calling them with
+its micrometre doubles). `solve_modes` and `assemble_mode_system` move unchanged from the public
+`galerkin.waveguide` to the package-private `galerkin._waveguide_kernels`, so the targets
+`galerkin.waveguide:solve_modes` and `:assemble_mode_system` become
+`galerkin._waveguide_kernels:solve_modes` and `:assemble_mode_system`, and two kind 1 entries
+map the baseline's calls to them; every other recorded em kernel (`galerkin.mode_coordinates`,
+`galerkin.mode_overlap`, `galerkin.assembly`) keeps its module and name.
+
 **P3-6, sipi's example outputs against the baseline.** `sipi_outputs_check.py` is the landing
 check that `packages/sipi` keeps working, byte for byte, while the galerkin step moves the
 names it uses. `run` executes every `examples/sipi/*.py` of one tree in a fresh interpreter

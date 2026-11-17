@@ -8,7 +8,7 @@
 (`galerkin.electric.solve_steady_electric`), 과도 열전도
 (`galerkin.transient_heat.solve_transient_heat`), 탄성(`galerkin.elasticity.solve_elasticity`),
 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`), 도파관 모드
-(`galerkin.waveguide.solve_modes`), PEC 상자 공진기(`galerkin.cavity.solve_cavity_box`)는
+(`galerkin.kernels.solve_modes`), PEC 상자 공진기(`galerkin.cavity.solve_cavity_box`)는
 NumPy 숫자 대신 JAX나
 PyTorch 값을 받습니다. 그러면 결과 배열도 그 라이브러리의 배열이 되고, 그 입력에 대한 미분이
 풀이를 거쳐 흐릅니다. 기본값은 여전히 NumPy이며 계산은 이전과 똑같습니다.

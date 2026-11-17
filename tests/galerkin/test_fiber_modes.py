@@ -12,7 +12,8 @@ splitting is the whole point of a vector formulation.
 import numpy as np
 import pytest
 
-from galerkin import disk_mesh, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import solve_modes
 from conftest import assert_second_order, rate
 
 A, N1, N2, WL = 4.0, 1.45, 1.44, 1.55

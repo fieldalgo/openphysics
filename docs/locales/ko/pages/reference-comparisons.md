@@ -73,7 +73,7 @@ OPENPHYSICS_CROSSCHECK_DIR=.validation/crosscheck \
 | `heat-p1-slab` | `thermal.solve_steady_heat`, P1 | `ElementTriP1` | 절점 온도, 요소 열유속 | 2.1e-15, 4.0e-14 | 1e-9 |
 | `elasticity-p1-plane-strain-cantilever` | `elasticity.solve_elasticity`, P1 | `ElementVector(ElementTriP1)` | 절점 변위 | 4.5e-13 | 1e-9 |
 | `elasticity-p1-plane-stress-cantilever` | 같음, 평면응력 | 같음 | 절점 변위 | 8.2e-14 | 1e-9 |
-| `waveguide-vector-rect-core` | `waveguide.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | 유효 굴절률, 도파 모드 4개 | 1.5e-15 | 1e-9 |
+| `waveguide-vector-rect-core` | `kernels.solve_modes`, Nedelec x P1 | `ElementTriN1 * ElementTriP1` | 유효 굴절률, 도파 모드 4개 | 1.5e-15 | 1e-9 |
 | `cavity-pec-box` | `cavity.solve_cavity_box`, Nedelec 사면체 | `ElementTetN0` | 가장 낮은 고유값 k^2 8개 | 1.4e-14 | 1e-9 |
 | `cavity-lossy-slab` | `material_cavity.solve_material_cavity_box`, 사면체별 복소 eps/mu | `ElementTetN0`, 재료별 조립 | 복소 k^2 6개; Q | 4.1e-15; 9.2e-14 | 1e-9 |
 | `cavity-impedance-walls` | 같음, z1·x0 Leontovich 벽 | `ElementTetN0` + `FacetBasis` 접선 질량, galerkin의 `k0`에서 고정한 `T(k)` | 고정점의 복소 k^2 3개 | 6.8e-13 | 1e-9 |

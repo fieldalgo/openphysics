@@ -29,7 +29,8 @@ import math
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_coordinates import mode_coordinates, solve_scalar_coordinates
 from conftest import rate
 

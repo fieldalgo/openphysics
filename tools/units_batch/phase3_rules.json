@@ -1,5 +1,18 @@
 {
  "format": "openphysics-units-batch-phase3-rules-v1",
  "description": "The rule entries of the phase-3 comparison (README \"Phase 3\"): how each recorded call of the baseline maps to the head's, by the closed kinds 1-9. Entries describe the baseline (the merge base with main) against the head, so a landing starts with an empty list and each commit appends the entries it needs, listed in its commit message by kind.",
- "entries": []
+ "entries": [
+  {
+   "kind": 1,
+   "old": "galerkin.waveguide.solve_modes",
+   "new": "galerkin._waveguide_kernels.solve_modes",
+   "note": "L3 commit 11 (route K, D1): the mode kernel moved unchanged from the public galerkin.waveguide to the package-private galerkin._waveguide_kernels, which galerkin.kernels re-exports and simcase's em.modes2d imports; the same function, the same arguments and doubles"
+  },
+  {
+   "kind": 1,
+   "old": "galerkin.waveguide.assemble_mode_system",
+   "new": "galerkin._waveguide_kernels.assemble_mode_system",
+   "note": "L3 commit 11 (route K, D1): the mode pencil kernel moved with solve_modes"
+  }
+ ]
 }

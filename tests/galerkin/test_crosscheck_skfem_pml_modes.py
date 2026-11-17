@@ -4,7 +4,8 @@
 import numpy as np
 import pytest
 import scipy.linalg as la
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_coordinates import mode_coordinates, solve_scalar_coordinates
 from crosscheck import require_tool, Stopwatch, emit, make_record, observable
 

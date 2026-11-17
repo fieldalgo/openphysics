@@ -9,7 +9,8 @@ import json
 import numpy as np
 import pytest
 
-from galerkin import EdgeSpace, Mesh, assemble_mode_system, eval_edge_field
+from galerkin import EdgeSpace, Mesh
+from galerkin.kernels import assemble_mode_system, eval_edge_field
 from refsol import benchmarks, fiber, slab
 from simcase import Document, DocumentError, build_mesh, examples, run, solve_point
 

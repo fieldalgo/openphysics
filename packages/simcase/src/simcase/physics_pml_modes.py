@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Open-boundary candidates; diagnostics never certify a physical resonance."""
 import numpy as np
-from galerkin import Mesh, EdgeSpace, eval_edge_field, assemble_edge_mass
-from galerkin.kernels import assemble_mass
-from galerkin.waveguide import solve_modes, assemble_mode_system
-from galerkin.mode_coordinates import mode_coordinates, solve_scalar_coordinates, scalar_coordinate_system
+from galerkin import Mesh, EdgeSpace
+from galerkin.kernels import (assemble_edge_mass, assemble_mass, assemble_mode_system, eval_edge_field,
+                              mode_coordinates, scalar_coordinate_system, solve_modes, solve_scalar_coordinates)
 from .fields import VectorField
 
 

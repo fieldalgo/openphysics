@@ -11,7 +11,8 @@ tracker's own output.
 import numpy as np
 import pytest
 
-from galerkin import EdgeSpace, Mesh, eval_edge_field, rectangle_mesh
+from galerkin import EdgeSpace, Mesh, rectangle_mesh
+from galerkin.kernels import eval_edge_field
 from simcase.fields import VectorField
 from simcase.subspace_tracking import (ElectricMetric, SUBSPACE_METHOD, SubspaceTracker, assign_clusters,
                                        columns, partition, principal_values, projection_sin_max_angle,

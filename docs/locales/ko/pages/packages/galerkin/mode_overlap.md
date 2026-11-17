@@ -4,7 +4,7 @@
 
 [galerkin 개요](overview.md) · [고유공간 신뢰성](eigenspace_reliability.md) · [미분](differentiation.md)
 
-`galerkin.mode_overlap`은 `galerkin.waveguide.solve_modes`의 모드(전체 벡터, edge `et`와
+`galerkin.mode_overlap`은 `galerkin.kernels.solve_modes`의 모드(전체 벡터, edge `et`와
 절점 `ez`)와 `Mesh` 위의 스칼라 P1 모드 함수를 후처리합니다: 도파 전력, 장 중첩,
 정규화, 결합 효율, 구속 계수, 유효 면적. 모든 적분은 유한요소 계수의 정확한 질량·결합
 행렬 곱이며, 유효 면적의 `int |E|^4`만 대칭 삼각형 구적 규칙으로 정확히 적분합니다.
@@ -128,7 +128,8 @@ Whitney/P1 보간을 규칙의 점에서 평가해 적분합니다. `E_t`(Whitne
 
 ```python
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_overlap import normalize_vector, coupling_efficiency, confinement_factor, interpolate_vector_field
 
 n_eff, space, et, ez = solve_modes(mesh, eps_r, k0, n_target=n_core, num_modes=4)

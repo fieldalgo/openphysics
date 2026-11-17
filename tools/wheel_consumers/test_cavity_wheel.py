@@ -18,7 +18,8 @@ import numpy as np
 import pytest
 
 import galerkin
-from galerkin import CavityResult, EdgeSpace3D, Mesh3D, eval_edge_field_3d, solve_cavity_box
+from galerkin import CavityResult, EdgeSpace3D, Mesh3D, solve_cavity_box
+from galerkin.kernels import eval_edge_field_3d
 import simcase
 from simcase import Document
 

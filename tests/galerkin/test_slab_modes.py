@@ -28,7 +28,8 @@ stalls at 3.6e-4.
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from conftest import assert_second_order
 
 N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55   # SOI, 220 nm
@@ -66,7 +67,7 @@ def test_fundamental_slab_mode(refsol, pol):
 def test_the_side_walls_really_do_select_the_polarization(refsol, pol):
     """The mode found under each side-wall condition must be the one intended,
     checked by where its energy sits rather than by which number came out."""
-    from galerkin import eval_edge_field
+    from galerkin.kernels import eval_edge_field
 
     mesh, space, et, _ = solve(pol, 1)
     E = eval_edge_field(space, et[0])

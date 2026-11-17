@@ -6,8 +6,8 @@
 import numpy as np
 import pytest
 
-from galerkin import (CavityMaterialRegion as Region, assemble_curlcurl_3d,
-                      assemble_edge_mass_3d, solve_cavity_box, solve_material_cavity_box)
+from galerkin import CavityMaterialRegion as Region, solve_cavity_box, solve_material_cavity_box
+from galerkin.kernels import assemble_curlcurl_3d, assemble_edge_mass_3d
 from galerkin.material_cavity import WALLS, _wall_faces, _wall_mass
 from conftest import rate
 

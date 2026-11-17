@@ -12,7 +12,7 @@ elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10),
 thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10),
 transient Cartesian heat (`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10) and waveguide modes (`galerkin.waveguide.solve_modes`, 2026-11-11). The
+2026-11-10) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11). The
 other
 solvers follow the same frame later.
 

@@ -16,7 +16,7 @@
 양수여야 합니다. `h=1+(q_tilde-bend_origin)/bend_radius`에는 PML 내부의
 적분된 복소 좌표도 들어갑니다. 곡률이 일정한 모델입니다.
 
-`coordinates.factors`를 `galerkin.solve_modes` 또는 `assemble_mode_system`의
+`coordinates.factors`를 `galerkin.kernels.solve_modes` 또는 `assemble_mode_system`의
 `coordinate_factors`에 전달합니다. 벡터식은 유전율과 투자율을 함께
 변환합니다. 반환 edge/nodal 계수는 계산 좌표의 공변 성분입니다.
 PML 밖의 물리 종방향 전기장은 `1j*ez/h`입니다.
