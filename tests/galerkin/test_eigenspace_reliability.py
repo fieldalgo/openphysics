@@ -122,7 +122,8 @@ def test_eigenspace_reliability_phase_order_and_complex_basis(monkeypatch):
 
 
 def test_eigenspace_reliability_analytic_oracle_interface_and_maxwell(refsol):
-    mode = next(m for m in refsol.fiber.vector_modes(4, 1.45, 1.44, 1.5) if m.label == 'HE11')
+    mode = next(m for m in refsol.fiber.vector_modes(radius=4, refractive_index=(1.45, 1.44),
+                                                      vacuum_wavelength=1.5) if m.label == 'HE11')
     # At phi=0 the Cartesian components are Er, Ephi, Ez.
     sides = fiber_electric(np.array([[4-1e-8, 0.], [4+1e-8, 0.]]), mode)
     assert np.allclose(sides[0, 1:], sides[1, 1:], rtol=1e-7, atol=1e-8)
@@ -136,7 +137,7 @@ def test_eigenspace_reliability_analytic_oracle_interface_and_maxwell(refsol):
         plus, minus = fiber_electric(points+step, mode), fiber_electric(points-step, mode)
         derivatives.append((plus-minus)/(2*h))
         laplacian += (plus-2*e+minus)/h**2
-    beta = 2*np.pi/1.5*mode.neff
+    beta = 2*np.pi/1.5*mode.effective_index
     divergence = derivatives[0][:, 0]+derivatives[1][:, 1]-1j*beta*e[:, 2]
     assert np.linalg.norm(divergence)/np.linalg.norm(e) < 1e-7
     q2 = (2*np.pi/1.5)**2*np.array([1.45**2, 1.44**2])-beta**2
@@ -145,7 +146,8 @@ def test_eigenspace_reliability_analytic_oracle_interface_and_maxwell(refsol):
 
 @pytest.mark.slow
 def test_eigenspace_reliability_analytic_degenerate_span_converges(refsol):
-    mode = next(m for m in refsol.fiber.vector_modes(4, 1.45, 1.44, 1.5) if m.label == 'HE11')
+    mode = next(m for m in refsol.fiber.vector_modes(radius=4, refractive_index=(1.45, 1.44),
+                                                      vacuum_wavelength=1.5) if m.label == 'HE11')
     errors = []
     for scale in (1, 2, 3):
         mesh, eps = fixture(scale)

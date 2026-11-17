@@ -405,6 +405,61 @@ def test_clean_module_clauses(rules, tmp_path, make_package):
         "apiscan_clean.guarded is the kernel apiscan_clean.kernels.same_object"]
 
 
+SCOPED_OLD = '''
+"""The module a name was removed from."""
+__all__ = ["solve", "radius"]
+
+
+def solve(*, radius):
+    return radius
+
+
+def radius():
+    return None
+'''
+SCOPED_NEW = '''
+"""A module where the same name is a registry quantity."""
+__all__ = ["solve"]
+
+
+def solve(*, radius):
+    return radius
+'''
+
+
+def test_a_scoped_removed_name_is_asserted_absent_only_in_its_modules(rules, tmp_path, make_package):
+    # L3 commit 11d: refsol.bent_slab's former radius is scoped there, since radius names the fiber's core radius
+    make_package("apiscan_scoped", {"__init__.py": '"""Two public modules."""\n__all__ = []\n',
+                                    "old.py": SCOPED_OLD, "new.py": SCOPED_NEW})
+    public = ["apiscan_scoped.old", "apiscan_scoped.new"]
+    empty = _allowlist(tmp_path, "apiscan_scoped", [])
+    everywhere = [api_scan.Removed("apiscan_scoped", "parameter", "radius", "test"),
+                  api_scan.Removed("apiscan_scoped", "name", "radius", "test")]
+    scoped = [api_scan.Removed("apiscan_scoped", "parameter", "radius", "test", ("apiscan_scoped.old",)),
+              api_scan.Removed("apiscan_scoped", "name", "radius", "test", ("apiscan_scoped.old",))]
+    found = api_scan.removed_name_problems("apiscan_scoped", empty, _rules(rules, "apiscan_scoped", public,
+                                                                          removed=everywhere))
+    assert sorted(found) == ["apiscan_scoped.new:solve still takes radius (test)",
+                             "apiscan_scoped.old.radius still exists (test)",
+                             "apiscan_scoped.old:solve still takes radius (test)"]
+    found = api_scan.removed_name_problems("apiscan_scoped", empty, _rules(rules, "apiscan_scoped", public,
+                                                                          removed=scoped))
+    assert sorted(found) == ["apiscan_scoped.old.radius still exists (test)",
+                             "apiscan_scoped.old:solve still takes radius (test)"]
+    # the file form: a scope needs a scope_note and modules of the entry's package
+    entry = {"package": "refsol", "kind": "parameter", "name": "radius", "source": "test"}
+    for extra, ok in (({}, True), ({"scope": ["refsol.bent_slab"], "scope_note": "why"}, True),
+                      ({"scope": ["refsol.bent_slab"]}, False),
+                      ({"scope": ["galerkin.waveguide"], "scope_note": "why"}, False)):
+        path = tmp_path / "removed.json"
+        path.write_text(json.dumps({"entries": [{**entry, **extra}]}), encoding="utf-8")
+        if ok:
+            assert api_scan.load_removed(path)[0].scope == tuple(extra.get("scope", ()))
+        else:
+            with pytest.raises(ValueError, match="scope"):
+                api_scan.load_removed(path)
+
+
 def test_constructors_of_builtin_bases_and_methods_are_handled(rules, tmp_path, make_package):
     make_package("apiscan_classes", {"__init__.py": '''
         """Classes whose constructor or methods come from elsewhere."""

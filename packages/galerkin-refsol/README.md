@@ -31,7 +31,7 @@ The Python package name is `refsol` (`from refsol import fiber`).
 | `refsol.elasticity` | Homogeneous isotropic plane stress/strain: affine fields, closed-form stress and a smooth manufactured solution | Material coefficients, engineering shear and independent force differentiation |
 | `refsol.slab` | planar dielectric waveguide TE/TM modes, symmetric or asymmetric; TE field profile | mode count vs cutoff formula, even-mode equation, interface continuity |
 | `refsol.lossy_slab` | multilayer slab with complex permittivity, public values in `exp(-i omega t)` (the transfer matrix computes in `exp(+i omega t - i beta z)` and converts once): transfer-matrix characteristic function, bound absorbing modes continued from the lossless `slab` roots, substrate-leaky modes on the outgoing sheet, field profiles | lossless limit equals `slab`, normalized residual ≤ 1e-12, first-order perturbation theory (TE confinement factor, TM vector formula) to O(n''^2), interface and layer equations by finite differences, exp(-2 k0 gamma gap) tunnelling rate, path-independent continuation |
-| `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, optional material dispersion) and exact vector mode fields (`vector_mode_field`) | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots, residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r) |
+| `refsol.fiber` | step-index fiber: scalar LP modes (Gloge), exact vector modes TE/TM/HE/EH, and exact vector group index by implicit differentiation (`vector_group_index`, indices frozen at the wavelength) and exact vector mode fields (`vector_mode_field`, public values in `exp(-i omega t)`: computed in galerkin's kernel frame and converted once); keyword-only SI registry names (`radius` the core radius, `refractive_index` the pair (core, cladding), `vacuum_wavelength`, `points` (Q,2)), lossless | LP count vs Bessel cutoffs, LP11 cutoff at 2.4048, HE11 ≈ LP01 in weak guidance, LP11 group degeneracy, Rudolph–Neumann approximation; group index vs Richardson-extrapolated refined roots (with material dispersion through the tests' internal form), residual partials vs central differences; field continuity singular at the root, interface conditions (E_phi, E_z, n^2 E_r), `div E = 0` with `+i beta E_z` |
 | `refsol.metallic` | rectangular waveguide cutoffs, rectangular cavity resonances, coaxial potential and field (`coax_potential(points, *, position, prescribed_electric_potential)`, SI registry names since L3 commit 10) | closed forms |
 | `refsol.electrostatics` | coaxial-line capacitance `2 pi eps0 eps_r / ln(b/a)` and two-layer parallel-plate series capacitance per metre of depth (`capacitance_per_depth`), real or complex `relative_permittivity` (`exp(-i omega t)`, loss `Im >= 0`); keyword-only SI registry names (`position` for the radii, `thickness` and `relative_permittivity` per layer, `length`); re-exports the coaxial potential | closed forms; the plate case is exact in P1 |
 | `refsol.cavity` | every vacuum PEC box mode up to a frequency ceiling, with polarization and geometric degeneracy, SI | independent Cartesian enumeration, no solver or mesh |
@@ -85,8 +85,8 @@ describes boundary constraints, per-thickness loads and locking limitations.
 ```python
 from refsol import fiber, slab, lossy_slab, scattering, benchmarks
 
-# exact HE11 effective index of a step-index fiber
-n_eff = fiber.fundamental_neff(a=4.0, n1=1.45, n2=1.44, wavelength=1.55)
+# exact HE11 effective index of a step-index fiber: core radius 4 um, indices (core, cladding), lengths in m
+n_eff = fiber.fundamental_neff(radius=4e-6, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55e-6)
 
 # all guided TE modes of a 220 nm SOI slab: layers (substrate, film, cover), lengths in m
 slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22e-6, vacuum_wavelength=1.55e-6, pol="TE")
@@ -273,6 +273,7 @@ graders for another solver.
 - Lengths in any consistent unit (the wavelength sets the scale).
 - Effective index `n_eff = beta / k0`.
 - `refsol.lossy_slab` and `refsol.bent_slab` follow `exp(-i omega t)` like galerkin's public mode functions (galerkin step, L3 commit 11c): passive `Im eps >= 0`, attenuated or radiating `Im n_eff > 0`. Their formulas are written in `exp(+i omega t)` and convert once in `refsol._conventions`.
+- `refsol.fiber.vector_mode_field` follows `exp(-i omega t)` (galerkin step, L3 commit 11d): a forward mode varies as `exp(i (beta z - omega t))`, so `dEx/dx + dEy/dy + i beta E_z = 0`. The field is computed in galerkin's kernel frame `exp(+i omega t - i beta z)` and converted once in `refsol._conventions`; a test that compares it with a mode kernel conjugates once at the comparison. The fiber's other values are real.
 - `refsol.material_cavity` uses `exp(+i omega t)` like the galerkin cavity kernels: passive `Im eps <= 0`, decaying resonance `Im omega > 0`. Conjugate to convert.
 
 ## References

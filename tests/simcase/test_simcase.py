@@ -499,9 +499,9 @@ def test_slab_te_matches_refsol_through_the_whole_chain():
 
 def test_fiber_scalar_matches_lp_modes():
     res = run(Document.from_dict(examples.FIBER), verbose=False)
-    lp = fiber.lp_modes(4.0, 1.45, 1.44, 1.55)
-    assert abs(res.effective_index[0, 0] - lp[0].neff) < 2e-4         # LP01
-    assert abs(res.effective_index[0, 1] - lp[1].neff) < 2e-4         # LP11
+    lp = fiber.lp_modes(radius=4.0, refractive_index=(1.45, 1.44), vacuum_wavelength=1.55)
+    assert abs(res.effective_index[0, 0] - lp[0].effective_index) < 2e-4    # LP01
+    assert abs(res.effective_index[0, 1] - lp[1].effective_index) < 2e-4    # LP11
 
 
 def test_rib_scalar_is_near_hadley():

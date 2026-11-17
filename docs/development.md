@@ -133,7 +133,10 @@ that exist today. Entries may only be removed: a new violation fails, and so doe
 entry that no longer matches one. physmat's allowlist is empty, so every name of its
 removed-name list is asserted absent and a `str` given to any of its public quantity
 parameters must raise `TypeError`; for galerkin and refsol these two clauses apply to each
-public module once it has no allowlist entry. `galerkin.kernels` and `physmat.kernels` are
+public module once it has no allowlist entry. A removed name with a scope (and a note that
+says why) is asserted absent only in those modules: `refsol.bent_slab` no longer takes
+`radius` (now `bend_radius`), while `refsol.fiber` takes the registry name `radius`.
+`galerkin.kernels` and `physmat.kernels` are
 internal namespaces that re-export kernels in consistent units for simcase and sipi: no
 public name equals one of their names, and no public name is one of their objects. A structural name added after the list was frozen
 carries a reviewer note; the category "deferred to the materials step" (physmat's record

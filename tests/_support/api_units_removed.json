@@ -1,6 +1,6 @@
 {
   "schema": "openphysics.api-units-removed/1",
-  "description": "Appendix B of the phase-3 units spec: names removed from the public API, asserted absent from every public module of their package that has no allowlist entries. kind 'name' is a module attribute or __all__ name, 'parameter' a parameter of any public callable, 'member' a 'Class.attribute'. It starts empty; the commit that removes a name adds it here.",
+  "description": "Appendix B of the phase-3 units spec: names removed from the public API, asserted absent from every public module of their package that has no allowlist entries. kind 'name' is a module attribute or __all__ name, 'parameter' a parameter of any public callable, 'member' a 'Class.attribute'. An entry with a 'scope' (module prefixes, with a 'scope_note' that says why) is asserted absent only there; for a parameter, in callables defined there. It starts empty; the commit that removes a name adds it here.",
   "entries": [
     {"package": "physmat", "kind": "name", "name": "get", "source": "D34: physmat.material(name), exact"},
     {"package": "physmat", "kind": "name", "name": "constant", "source": "spec 4.2: constant_model(*, refractive_index)"},
@@ -429,7 +429,16 @@
     {"package": "refsol", "kind": "parameter", "name": "steps", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): subdivision_count"},
     {"package": "refsol", "kind": "parameter", "name": "tol", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): relative_tolerance"},
     {"package": "refsol", "kind": "parameter", "name": "max_newton", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): iteration_limit"},
-    {"package": "refsol", "kind": "parameter", "name": "radius", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): bend_radius"},
-    {"package": "refsol", "kind": "parameter", "name": "order", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): mode_index"}
+    {"package": "refsol", "kind": "parameter", "name": "radius", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): bend_radius", "scope": ["refsol.bent_slab"], "scope_note": "L3 commit 11d: radius is a registry name since L3 commit 11d0 (the fiber core and scattering cylinder radii), so the absence of bent_slab's former radius is asserted in refsol.bent_slab, the only module that took it"},
+    {"package": "refsol", "kind": "parameter", "name": "order", "source": "L3 commit 11c, M3 1.2 slab, lossy_slab, bent_slab (D36-D38, D45): mode_index"},
+    {"package": "refsol", "kind": "parameter", "name": "n1", "source": "L3 commit 11d, M3 1.2 fiber (D36-D38, D45): refractive_index, the pair (core, cladding) (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "n2", "source": "L3 commit 11d, M3 1.2 fiber (D36-D38, D45): refractive_index, the pair (core, cladding) (D38)"},
+    {"package": "refsol", "kind": "parameter", "name": "y", "source": "L3 commit 11d, M3 1.2 fiber (D36-D38, D45): points (Q,2) (D36)"},
+    {"package": "refsol", "kind": "parameter", "name": "dn1_dwavelength", "source": "L3 commit 11d, M3 1.2 fiber (D36-D38, D45): the dispersive group index is private (rule R(2): no registry name, only tests pass it)"},
+    {"package": "refsol", "kind": "parameter", "name": "dn2_dwavelength", "source": "L3 commit 11d, M3 1.2 fiber (D36-D38, D45): the dispersive group index is private (rule R(2): no registry name, only tests pass it)"},
+    {"package": "refsol", "kind": "member", "name": "Mode.neff", "source": "L3 commit 11d, M3 2.2 fiber: effective_index"},
+    {"package": "refsol", "kind": "member", "name": "Mode.u", "source": "L3 commit 11d, M3 2.2 fiber, spec 4.1: the normalized fiber quantities are internal (Mode._u)"},
+    {"package": "refsol", "kind": "member", "name": "Mode.w", "source": "L3 commit 11d, M3 2.2 fiber, spec 4.1: the normalized fiber quantities are internal (Mode._w)"},
+    {"package": "refsol", "kind": "member", "name": "Mode.b", "source": "L3 commit 11d, M3 2.2 fiber, spec 4.1: the normalized fiber quantities are internal (Mode._b)"}
   ]
 }

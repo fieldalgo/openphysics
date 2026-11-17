@@ -40,7 +40,9 @@ matches one. Entries may only be removed, never added.
 Once no allowlist entry belongs to a public module, two more clauses apply to it: every
 removed name (``api_units_removed.json``) is absent from it, and a ``str`` passed to each
 of its quantity parameters raises ``TypeError``. That second clause needs a valid call
-per callable, supplied by the package's test as a string-refusal case.
+per callable, supplied by the package's test as a string-refusal case. A removed name with
+a scope is asserted absent only in those modules (a parameter: in callables defined in
+them), so a name removed from one module may later name a registry quantity in another.
 """
 
 from __future__ import annotations
@@ -86,7 +88,8 @@ INTERNAL_DOCSTRING = "Internal module, consistent units"
 # Allowlist counts: physmat after L1 commit 3, which emptied it (107 on f693ae3a); galerkin after L3 commit 11a,
 # whose em kernels left the top level and galerkin.waveguide for galerkin.kernels and whose EdgeSpace method
 # argument node_set became structural (98 before), so only the cavity modules keep entries; refsol after L3
-# commit 11c, which emptied slab, lossy_slab and bent_slab (222 before; 240 before L3 commit 10, which emptied
+# commit 11d, which emptied fiber (120 before; 222 before L3 commit 11c, which emptied slab, lossy_slab and
+# bent_slab; 240 before L3 commit 10, which emptied
 # galerkin's electrostatics and refsol's electrostatics with the coax potential and field of refsol.metallic it
 # re-exports, galerkin 102 before). L2 commit 8 had emptied
 # galerkin's elasticity, thermoelasticity, the two thermal-mechanical workflows, shape and coupling and refsol's
@@ -95,7 +98,7 @@ INTERNAL_DOCSTRING = "Internal module, consistent units"
 # L2 commit 6, which emptied the heat modules, 154 after L2 commit 7, which emptied electric, joule_heating and
 # temperature_joule_heating; refsol 549 on f693ae3a, 394 after L2 commit 6, 354 after L2 commit 7, which
 # emptied joule_slab). They never grow.
-BASELINE_COUNTS = {"galerkin": 25, "physmat": 0, "refsol": 120}
+BASELINE_COUNTS = {"galerkin": 25, "physmat": 0, "refsol": 91}
 
 _KEYWORD = (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD)
 
@@ -121,6 +124,7 @@ class Removed:
     kind: str        # "name" (module attribute), "parameter" or "member" ("Class.attribute")
     name: str
     source: str
+    scope: tuple[str, ...] = ()   # module prefixes where it is asserted absent; empty means every module
 
 
 @dataclasses.dataclass(frozen=True)
@@ -181,10 +185,13 @@ def load_structural(path: Path = STRUCTURAL_FILE) -> dict[str, Structural]:
 
 def load_removed(path: Path = REMOVED_FILE) -> tuple[Removed, ...]:
     data = _read(path)
-    out = tuple(Removed(e["package"], e["kind"], e["name"], e["source"]) for e in data["entries"])
-    for r in out:
+    out = tuple(Removed(e["package"], e["kind"], e["name"], e["source"], tuple(e.get("scope", ())))
+                for e in data["entries"])
+    for r, e in zip(out, data["entries"]):
         if r.kind not in ("name", "parameter", "member") or (r.kind == "member") != ("." in r.name):
             raise ValueError(f"{path.name}: bad entry {r}")
+        if r.scope and (not e.get("scope_note") or any(not _within(m, (r.package,)) for m in r.scope)):
+            raise ValueError(f"{path.name}: the scope of {r.name!r} needs a scope_note and modules of {r.package}")
     return out
 
 
@@ -611,12 +618,14 @@ def removed_in_module(module: types.ModuleType, items: list[Item], entries: Iter
     problems = []
     names = set(public_names(module))
     for r in entries:
+        if r.scope and r.kind != "parameter" and not _within(module.__name__, r.scope):
+            continue
         if r.kind == "name":
             if r.name in names or hasattr(module, r.name):
                 problems.append(f"{module.__name__}.{r.name} still exists ({r.source})")
         elif r.kind == "parameter":
             for item in items:
-                if r.name in item.signature.parameters:
+                if r.name in item.signature.parameters and (not r.scope or _within(item.module, r.scope)):
                     problems.append(f"{item.module}:{item.name} still takes {r.name} ({r.source})")
         else:
             cls_name, attr = r.name.split(".", 1)
