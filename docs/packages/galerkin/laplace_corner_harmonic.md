@@ -57,3 +57,5 @@ constant and linear density families and their separate contracts.
 See the separate [harmonic interaction contracts](laplace_corner_harmonic_interactions.md) for explicit far, shared-origin, separated and mixed-source blocks.
 
 [Private physical moments](laplace_corner_harmonic_moments.md) retain the same masses through polynomial and plane Fourier projection; they do not expose a field solver.
+
+The separate [three-mode self integrals](laplace_corner_quadratic.md) add a quadratic radial branch while preserving this two-mode block exactly. Panel interactions and field integration remain separate.
