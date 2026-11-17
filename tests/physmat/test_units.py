@@ -1232,8 +1232,10 @@ PHASE3_L3_MENUS = {"box_size": L_MENU, "lower_corner_position": L_MENU, "upper_c
 PHASE3_L3_OUTPUT_ONLY = {"electric_flux_density": "C/m^2", "applied_charge_per_depth": "C/m",
                          "reaction_charge_per_depth": "C/m", "residual_charge_per_depth": "C/m",
                          "free_charge_per_depth": "C/m"}
-#: output entries that also have an api place (P3_L3_NAMES pins their places); their menu is still checked
-OUTPUT_AND_API = ("unnormalized_electric_field", "unnormalized_electric_field_line_integral")
+#: output entries that also have an api place (P3_L3_NAMES and P3_L3_CAVITY_API pin their places); their menu is
+#: still checked. resonant_frequency and wavenumber_squared gain theirs in L3 commit 12b0.
+OUTPUT_AND_API = ("unnormalized_electric_field", "unnormalized_electric_field_line_integral", "resonant_frequency",
+                  "wavenumber_squared")
 # The registry addition of L3 commit 11d0 (spec rule R(3), map M3 Q18's first name): the fiber core and
 # scattering cylinder radii.
 PHASE3_L3_RADIUS_MENUS = {"radius": L_MENU}
@@ -1591,6 +1593,30 @@ def test_p3_l3_radius_is_legal_with_its_unit_and_places():
     assert q("4 um", "radius") == 4e-6 and q("0.5 mm", "radius") == 0.0005
     assert convert("0 m", "radius").error.code == "E-DOMAIN" and convert("-1 um", "radius").error.code == "E-DOMAIN"
     assert convert("4 s", "radius").error.code == "E-UNIT-DIMENSION"
+
+
+# L3 commit 12b0: the api places that refsol.material_cavity's closed forms need (quality_factor takes a
+# resonant_frequency, complex_frequency_from_eigenvalue and uniformly_filled_eigenvalue a wavenumber_squared), as
+# L1 commit 3 gave the Sellmeier names theirs. name: (canonical unit, places); nothing else about them changes.
+P3_L3_CAVITY_API = {"resonant_frequency": ("Hz", ("api", "result")), "wavenumber_squared": ("1/m^2", ("api", "result"))}
+
+
+def test_p3_l3_cavity_closed_form_arguments_have_an_api_place():
+    for name, (unit, places) in P3_L3_CAVITY_API.items():
+        qo = units.quantity(name)
+        assert (qo.unit, qo.places) == (unit, places), (name, qo.unit, qo.places)
+        assert qo.base == name and qo.rank == ("scalar",) and qo.kind == "ordinary" and qo.complex, name
+        assert qo.domain is None and units.menu(name) == (unit,), name           # an output's menu: the unit only
+        assert qo.description["en"].endswith(
+            "(output; also an argument of the material cavity closed forms of galerkin-refsol)."), name
+        assert qo.description["ko"].endswith("(출력. galerkin-refsol 재료 공진기 닫힌 형식 해의 인수이기도 함)."), name
+    assert dict(units.quantity("resonant_frequency").dimension) == {"T": -1}
+    assert dict(units.quantity("wavenumber_squared").dimension) == {"L": -2}
+    assert "Im < 0 decays" in units.quantity("resonant_frequency").sign["en"]
+    assert units.quantity("wavenumber_squared").sign is None
+    assert units.quantity("quality_factor").places == ("result",)          # a closed form returns it, none takes it
+    assert q("1.5e8 Hz", "resonant_frequency") == 1.5e8 and q("2 1/m^2", "wavenumber_squared") == 2.0
+    assert convert("1 GHz", "resonant_frequency").error.code == "E-UNIT-NOT-ACCEPTED"   # the menu is unchanged
 
 
 def test_p2_r2_r5_temperatures_and_potentials():
