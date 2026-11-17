@@ -95,10 +95,13 @@ def kernel_point(doc):
 @pytest.fixture(scope="module")
 def reference():
     """quad integrals of the exact TE0 profile, never through the module under test."""
-    n_eff = refsol.slab.modes(N_FILM, N_CLAD, N_CLAD, THICKNESS, WAVELENGTH, "TE")[0]
+    n_eff = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                              vacuum_wavelength=WAVELENGTH, pol="TE")[0]
 
     def profile(y):
-        return refsol.slab.field_te(y - THICKNESS / 2, n_eff, N_FILM, N_CLAD, N_CLAD, THICKNESS, WAVELENGTH)
+        return refsol.slab.field_te(y - THICKNESS / 2, effective_index=n_eff,
+                                    refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                                    vacuum_wavelength=WAVELENGTH)
     pieces = [(-PAD, 0.0, N_CLAD ** 2), (0.0, THICKNESS, N_FILM ** 2), (THICKNESS, THICKNESS + PAD, N_CLAD ** 2)]
     energy = [quad(lambda y: profile(y) ** 2, a, b)[0] for a, b, _ in pieces]
     norm2 = sum(energy)

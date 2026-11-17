@@ -46,7 +46,7 @@ def analytic_te(wavelength, dispersive=False, mode=0):
     if dispersive:
         nf = np.sqrt(1 + 11 * wavelength**2 / (wavelength**2 - 0.02))
         dnf = -11 * 0.02 * wavelength / (nf * (wavelength**2 - 0.02)**2)
-    n = slab.modes(nf, nc, nc, thickness, wavelength, "TE")[mode]
+    n = slab.modes(refractive_index=(nc, nf, nc), thickness=thickness, vacuum_wavelength=wavelength, pol="TE")[mode]
     p, q = np.sqrt(nf**2 - n**2), np.sqrt(n**2 - nc**2)
     kd = 2 * np.pi * thickness / wavelength
     partial_n = -kd * n / p - 2 * n / (p * q)
@@ -124,7 +124,8 @@ def test_vector_sweep_units_saved_tracking_and_raw_fields(unit, ratio, tmp_path)
 def test_actual_slab_cutoff_fails_at_the_lost_point_and_cli_writes_no_result(tmp_path, capsys):
     d = sweep_data(values=[1.25, 1.35, 1.45])
     d["physics"]["em1"]["mode_count"] = 2
-    assert [len(slab.modes(3.48, 1.444, 1.444, .22, wl)) for wl in d["study"]["values"]["values"]] == [2, 2, 1]
+    assert [len(slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=.22, vacuum_wavelength=wl))
+            for wl in d["study"]["values"]["values"]] == [2, 2, 1]
     model = tmp_path / "cutoff.json"
     Document.from_dict(d).save(model)
     output = tmp_path / "out"

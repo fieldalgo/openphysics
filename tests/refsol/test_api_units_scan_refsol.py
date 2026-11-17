@@ -178,10 +178,38 @@ _ELECTROSTATICS = [
     ("metallic", "coax_potential", dict(_COAX, points=P2)),
     ("metallic", "coax_field_magnitude", dict(_COAX, points=P2)),
 ]
+_SOI = dict(refractive_index=(1.444, 3.48, 1.444), thickness=0.22e-6, vacuum_wavelength=1.55e-6)
+_LOSSY = dict(relative_permittivity=[1.444 ** 2, 3.48 ** 2 + 0.07j, 1.444 ** 2], thickness=[0.22e-6],
+              vacuum_wavelength=1.55e-6)
+_BENT = dict(refractive_index=(1.444, 3.48, 1.444), thickness=0.22e-6, bend_radius=2e-6, vacuum_wavelength=1.55e-6)
+_EM_PLANAR = [
+    ("slab", "modes", dict(_SOI, mode_count=5)),
+    ("slab", "num_modes_symmetric", dict(_SOI)),
+    ("slab", "field_te", dict(_SOI, points=[0.0, 0.2e-6], effective_index=2.85)),
+    ("lossy_slab", "exterior_root", dict(relative_permittivity=1.444 ** 2, effective_index=2.85 + 0.01j,
+                                         branch="decay")),
+    ("lossy_slab", "characteristic", dict(_LOSSY, effective_index=2.85 + 0.01j)),
+    ("lossy_slab", "residual", dict(_LOSSY, effective_index=2.85 + 0.01j)),
+    ("lossy_slab", "solve", dict(_LOSSY, target_effective_index=2.85 + 0.01j, relative_tolerance=1e-10,
+                                 iteration_limit=12)),
+    ("lossy_slab", "continued_root", dict(path=lambda t: ([1.444 ** 2, 3.48 ** 2 + 0.07j * t, 1.444 ** 2],
+                                                          [0.22e-6]),
+                                          vacuum_wavelength=1.55e-6, effective_index=2.8517, subdivision_count=2,
+                                          relative_tolerance=1e-10)),
+    ("lossy_slab", "three_layer_modes", dict(_SOI, mode_count=1, subdivision_count=2, relative_tolerance=1e-10)),
+    ("lossy_slab", "substrate_leaky_mode", dict(refractive_index=(1.444, 3.48, 1.444, 3.48),
+                                                thickness=(0.22e-6, 0.25e-6), vacuum_wavelength=1.55e-6, mode_index=0,
+                                                subdivision_count=12, relative_tolerance=1e-10)),
+    ("lossy_slab", "field", dict(_LOSSY, points=[0.0, 0.1e-6], effective_index=2.85 + 0.01j)),
+    ("bent_slab", "characteristic", dict(_BENT, effective_index=3.0 + 1e-9j)),
+    ("bent_slab", "residual", dict(_BENT, effective_index=3.0 + 1e-9j)),
+    ("bent_slab", "mode", dict(_BENT, mode_index=0, target_effective_index=3.013, relative_tolerance=1e-10)),
+]
 # L2 commit 6 emptied refsol's eight heat modules, L2 commit 7 joule_slab, L2 commit 8 the six mechanics and
-# thermoelastic modules and L3 commit 10 electrostatics: each callable that takes a quantity has a case.
+# thermoelastic modules, L3 commit 10 electrostatics and L3 commit 11c slab, lossy_slab and bent_slab: each callable
+# that takes a quantity has a case.
 STRING_CASES = {f"refsol.{module}:{name}": _case(module, name, **kwargs)
-                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS}
+                for module, name, kwargs in _HEAT + _JOULE + _MECHANICS + _ELECTROSTATICS + _EM_PLANAR}
 
 
 @pytest.fixture(scope="module")

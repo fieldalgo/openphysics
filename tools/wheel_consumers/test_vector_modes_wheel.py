@@ -50,8 +50,8 @@ def cli(*args, check=True):
 
 
 def slab_reference(pol):
-    modes = refsol.slab.modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD, d=THICKNESS,
-                              wavelength=WAVELENGTH, pol=pol)
+    modes = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                              vacuum_wavelength=WAVELENGTH, pol=pol)
     assert len(modes) == 1, modes   # single-mode at 220 nm
     return float(modes[0])
 

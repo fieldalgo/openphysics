@@ -19,8 +19,9 @@ adopts (spec D3): sipi keeps its own convention until its own step, and tests/ i
   source line (comment and spacing removed) with the count of sites on it, never by line number,
   so unrelated edits keep it; an entry that no longer matches fails, and so does any other site.
 - **Passivity** of each public complex output on a passive lossy input, from the commit that
-  converts it: electrostatics (L3 commit 10) and the modes (L3 commit 11b: Im(effective_index) >= 0);
-  the cavity clause comes with L3 commit 12, which converts its outputs.
+  converts it: electrostatics (L3 commit 10), the modes (L3 commit 11b: Im(effective_index) >= 0) and
+  refsol's planar mode references (L3 commit 11c); the cavity clause comes with L3 commit 12, which
+  converts its outputs.
 - **Live arrays.** A JAX and a PyTorch gradient pass through ``to_public`` and ``to_kernel``, on a
   synthetic product (L3 commit 10) and through a mode solve (L3 commit 11b).
 """
@@ -48,7 +49,7 @@ ALLOWLIST = HERE / "conventions_allowlist.json"
 SCHEMA = "openphysics.conventions-allowlist/1"
 PACKAGES = {name: Path(module.__file__).resolve().parent
             for name, module in (("galerkin", galerkin), ("refsol", refsol), ("simcase", simcase))}
-#: the module of each package that converts between conventions (refsol's comes with its first conversion)
+#: the module of each package that converts between conventions (refsol's since its first conversion, L3 commit 11c)
 CONVENTIONS = "_conventions.py"
 SIMCASE_P2_15 = HERE.parent / "simcase" / "test_units_em.py"
 
@@ -199,8 +200,11 @@ def test_the_allowlist_is_closed_and_complete():
     listed = {(s.package, s.file, s.lineno) for s in package_sites() if not allowed_place(s, boundary)}
     assert Counter(package for package, _, _ in listed) == {"galerkin": 31, "simcase": 17, "refsol": 1}
     conventions = [s for s in package_sites() if s.file == CONVENTIONS]
-    assert {s.package for s in conventions} == {"galerkin"} and {s.function for s in conventions} == {
-        "to_kernel", "to_public"}
+    # galerkin._conventions (L3 commit 10) and refsol._conventions (L3 commit 11c), each converting in exactly
+    # to_kernel and to_public
+    assert {s.package for s in conventions} == {"galerkin", "refsol"}
+    for package in ("galerkin", "refsol"):
+        assert {s.function for s in conventions if s.package == package} == {"to_kernel", "to_public"}, package
     assert boundary == {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate",
                                       "_shown"}, "cavity.py": {"_to_kernel", "_to_public"}}
 
@@ -290,6 +294,22 @@ def test_electrostatics_lossless_is_real_and_a_gain_is_refused():
     assert C.dtype == float and np.all(np.linalg.eigvalsh(C) > 0)
     with pytest.raises(ValueError, match="Im >= 0"):
         capacitance_matrix(mesh, relative_permittivity=2.2 * (1 - 0.02j), conductors=conductors, ground=ground)
+
+
+def test_refsol_lossy_slab_modes_have_the_passive_sign():
+    """refsol's planar mode references follow exp(-i omega t) since L3 commit 11c: an absorbing film gives
+    Im n_eff > 0, a substrate-leaky mode too, the decaying exterior root has Im Q >= 0, and a gain is refused."""
+    from refsol import lossy_slab
+    film = lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 + 0.01j, 1.444), thickness=0.22e-6,
+                                       vacuum_wavelength=1.55e-6)
+    assert film and all(n.imag > 0 for n in film)
+    leaky = lossy_slab.substrate_leaky_mode(refractive_index=(1.444, 3.48, 1.444, 3.48), thickness=(0.22e-6, 0.25e-6),
+                                            vacuum_wavelength=1.55e-6)
+    assert leaky.imag > 0
+    assert lossy_slab.exterior_root(relative_permittivity=1.444 ** 2, effective_index=film[0], branch="decay").imag >= 0
+    with pytest.raises(ValueError, match="Im >= 0"):
+        lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 - 0.01j, 1.444), thickness=0.22e-6,
+                                     vacuum_wavelength=1.55e-6)
 
 
 def test_refsol_electrostatics_has_the_passive_sign():

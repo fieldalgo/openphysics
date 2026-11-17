@@ -485,7 +485,7 @@ def test_sellmeier_slab_matches_refsol_across_units(symbol, factor_text):
     res = run(Document.from_dict(d), verbose=False)
     n_film = np.sqrt(1 + 11 * 1.55**2 / (1.55**2 - 0.01))
     n_clad = physmat.material("SiO2").refractive_index(vacuum_wavelength=1.55e-6).real
-    exact = slab.modes(n_film, n_clad, n_clad, 0.22, 1.55, "TE")[0]
+    exact = slab.modes(refractive_index=(n_clad, n_film, n_clad), thickness=0.22, vacuum_wavelength=1.55, pol="TE")[0]
     assert abs(res.effective_index[0, 0] - exact) < 1.5e-3
 
 
@@ -493,7 +493,7 @@ def test_slab_te_matches_refsol_through_the_whole_chain():
     doc = Document.from_dict(examples.SLAB_TE_CHECK)
     res = run(doc, verbose=False)
     n_si, n_ox = (physmat.material(name).refractive_index(vacuum_wavelength=1.55e-6).real for name in ("Si", "SiO2"))
-    exact = slab.modes(n_si, n_ox, n_ox, 0.22, 1.55, "TE")[0]
+    exact = slab.modes(refractive_index=(n_ox, n_si, n_ox), thickness=0.22, vacuum_wavelength=1.55, pol="TE")[0]
     assert abs(res.effective_index[0, 0] - exact) < 1.5e-3            # P1, h = 10 nm in the film
 
 

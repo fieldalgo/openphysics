@@ -77,10 +77,12 @@ def _scalar_slab(nx):
 
 @pytest.fixture(scope="module")
 def slab_reference(refsol):
-    n_eff = refsol.slab.modes(N_FILM, N_CLAD, N_CLAD, THICKNESS, WAVELENGTH, "TE")[0]
+    n_eff = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                              vacuum_wavelength=WAVELENGTH, pol="TE")[0]
 
     def profile(x):
-        return refsol.slab.field_te(x, n_eff, N_FILM, N_CLAD, N_CLAD, THICKNESS, WAVELENGTH)
+        return refsol.slab.field_te(x, effective_index=n_eff, refractive_index=(N_CLAD, N_FILM, N_CLAD),
+                                    thickness=THICKNESS, vacuum_wavelength=WAVELENGTH)
     pieces = [(-20.0, -THICKNESS / 2), (-THICKNESS / 2, THICKNESS / 2), (THICKNESS / 2, 20.0)]
     norm2 = sum(quad(lambda x: profile(x) ** 2, a, b)[0] for a, b in pieces)   # whole line, per unit y
     gamma_film = quad(lambda x: profile(x) ** 2, -THICKNESS / 2, THICKNESS / 2)[0] / norm2
