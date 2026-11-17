@@ -46,3 +46,6 @@ Fourier 차수·구적 수렴을 먼저 검사한 뒤 유한21각형 결과를 �
 [두 접지 전계](two-ground.md) ·
 [Compact 기하](laplace_corner_compact_geometry.md) ·
 [English](../../../../../packages/galerkin/laplace_corner_harmonic_field.md)
+
+
+별도 [두 활성 도체와 고정 전위 가드 API](laplace_corner_harmonic_guard_field.md)는 두 활성 전류 좌표를 선택하고 유도 가드 전류를 유지합니다. 위의 세 활성 도체 계약은 바꾸지 않습니다.
