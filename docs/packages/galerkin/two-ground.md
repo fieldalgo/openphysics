@@ -78,3 +78,5 @@ The separate [straight-edge API](two-ground-edges.md) exposes conductor-edge
 current factors while retaining this whole-surface result.
 
 The [private compact geometry](laplace_corner_compact_geometry.md) has independent partition checks and does not change any existing field solver.
+
+[Explicit three-active corner-harmonic fields](laplace_corner_harmonic_field.md) preserve separate controls and finite comparison evidence.

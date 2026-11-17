@@ -55,3 +55,5 @@ BSD-3-Clause scikit-fem을 사용한다. 정확한 설치 버전·wheel 해시·
 도체 모서리별 전류 계수를 제공한다.
 
 [비공개 간결한 기하 분할](laplace_corner_compact_geometry.md)은 독립 분할 검사를 갖추며 기존 장 솔버를 바꾸지 않습니다.
+
+[세 활성 도체의 명시적 코너 조화기저 전계](laplace_corner_harmonic_field.md)는 별도 제어와 유한 비교 근거를 유지한다.
