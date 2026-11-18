@@ -20,7 +20,7 @@ import galerkin.elasticity as elasticity
 import galerkin.waveguide as waveguide
 import refsol.elasticity as reference
 from galerkin import EdgeSpace, disk_mesh
-from galerkin.kernels import eval_edge_field
+from galerkin.kernels import eval_edge_field, solve_modes
 from galerkin.mesh import rectangle_mesh
 from simcase import Document, examples
 from simcase.fields import VectorField
@@ -105,7 +105,7 @@ def test_english_elasticity_example_runs_with_installed_packages():
 def test_installed_vector_solver_and_complex_serialization(tmp_path):
     mesh = disk_mesh((4, 8, 24), (4, 4, 16), 32)
     eps = mesh.by_region([1.45**2, 1.44**2, 1.44**2])
-    neff, _, et, ez = waveguide.solve_modes(mesh, eps, 2 * np.pi / 1.5, 1.45, 2)
+    neff, _, et, ez = solve_modes(mesh, eps, 2 * np.pi / 1.5, 1.45, 2)
     assert len(neff) == 2 and np.isfinite(neff).all()
     assert np.iscomplexobj(et) and np.iscomplexobj(ez)
     # physics_em_modes2d.solve is the kernel (micrometres, exp(+i omega t)); RunResult holds SI under
