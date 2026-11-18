@@ -178,7 +178,8 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
 
 
 def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
-             region_points=None) -> dict:
+             region_points=None, h: float | None = None, ratio: float | None = None, alpha: float = 1.0,
+             max_points: int = 0) -> dict:
     """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
     regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
@@ -240,7 +241,8 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
               np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
-        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds)
+        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
+                                     float(ratio or 0.0), float(alpha), int(max_points))
     except ValueError as e:
         if len(e.args) != 3:
             raise
@@ -250,7 +252,8 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
                                   "facets": tuple(int(x) for x in ids[2:])}) from None
         if kind == "RegionSeed":
             raise RegionError(msg) from None
-        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError}.get(kind, MeshError)
+        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError,
+               "RefineFail": RefineError}.get(kind, MeshError)
         raise cls(msg) from None
 
     def i64(b, *shape):
@@ -365,6 +368,12 @@ class RecoveryError(MeshError):
     """Boundary recovery failed (a cavity without a filling, the depth limit)."""
 
     kind = "RecoveryFail"
+
+
+class RefineError(MeshError):
+    """Refinement failed: the point cap was reached, or an insertion failed."""
+
+    kind = "RefineFail"
 
 
 class RoundingError(MeshError):

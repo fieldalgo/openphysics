@@ -39,10 +39,10 @@ use crate::delaunay::Geom;
 use crate::mixed::{MixedCounters, MixedPoints};
 use crate::predicates::P3;
 
-const NONE: u32 = u32::MAX;
+pub(crate) const NONE: u32 = u32::MAX;
 /// For each vertex slot i of a positive tetrahedron, its opposite face oriented so
 /// that the tetrahedron lies on the positive side.
-const INWARD: [[usize; 3]; 4] = [[1, 3, 2], [0, 2, 3], [0, 3, 1], [0, 1, 2]];
+pub(crate) const INWARD: [[usize; 3]; 4] = [[1, 3, 2], [0, 2, 3], [0, 3, 1], [0, 1, 2]];
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FacetStats {
@@ -62,7 +62,7 @@ pub struct FacetStats {
     pub wrapped: u32,
 }
 
-fn key(f: [u32; 3]) -> [u32; 3] {
+pub(crate) fn key(f: [u32; 3]) -> [u32; 3] {
     let mut k = f;
     k.sort_unstable();
     k
@@ -73,19 +73,19 @@ fn rotate_min(f: [u32; 3]) -> [u32; 3] {
     [f[i], f[(i + 1) % 3], f[(i + 2) % 3]]
 }
 
-fn face(t: &[u32; 4], i: usize) -> [u32; 3] {
+pub(crate) fn face(t: &[u32; 4], i: usize) -> [u32; 3] {
     INWARD[i].map(|j| t[j])
 }
 
-struct Complex {
-    tets: Vec<[u32; 4]>,
-    alive: Vec<bool>,
-    faces: HashMap<[u32; 3], [u32; 2]>,
-    star: Vec<Vec<u32>>,
+pub(crate) struct Complex {
+    pub(crate) tets: Vec<[u32; 4]>,
+    pub(crate) alive: Vec<bool>,
+    pub(crate) faces: HashMap<[u32; 3], [u32; 2]>,
+    pub(crate) star: Vec<Vec<u32>>,
 }
 
 impl Complex {
-    fn new(n: usize, tets: &[[u32; 4]]) -> Complex {
+    pub(crate) fn new(n: usize, tets: &[[u32; 4]]) -> Complex {
         let mut c = Complex { tets: Vec::new(), alive: Vec::new(), faces: HashMap::new(), star: vec![Vec::new(); n] };
         for t in tets {
             c.add(*t);
@@ -93,7 +93,7 @@ impl Complex {
         c
     }
 
-    fn add(&mut self, v: [u32; 4]) -> u32 {
+    pub(crate) fn add(&mut self, v: [u32; 4]) -> u32 {
         let id = self.tets.len() as u32;
         self.tets.push(v);
         self.alive.push(true);
@@ -105,7 +105,7 @@ impl Complex {
         id
     }
 
-    fn remove(&mut self, t: u32) {
+    pub(crate) fn remove(&mut self, t: u32) {
         self.alive[t as usize] = false;
         let v = self.tets[t as usize];
         for i in 0..4 {
@@ -123,7 +123,7 @@ impl Complex {
         }
     }
 
-    fn neighbor(&self, t: u32, k: &[u32; 3]) -> u32 {
+    pub(crate) fn neighbor(&self, t: u32, k: &[u32; 3]) -> u32 {
         match self.faces.get(k) {
             Some(e) if e[0] == t => e[1],
             Some(e) => e[0],
@@ -131,7 +131,7 @@ impl Complex {
         }
     }
 
-    fn live(&self) -> Vec<[u32; 4]> {
+    pub(crate) fn live(&self) -> Vec<[u32; 4]> {
         self.tets.iter().zip(&self.alive).filter(|(_, &a)| a).map(|(t, _)| *t).collect()
     }
 }
