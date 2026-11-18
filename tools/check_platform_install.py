@@ -204,6 +204,7 @@ def main():
             # repair of what rounding inverts, checked against V1-V4 (same inputs everywhere)
             ROOT / "tests/meshloom/test_repair.py": tests / "test_meshloom_repair.py",
             ROOT / "tests/meshloom/test_regions.py": tests / "test_meshloom_regions.py",
+            ROOT / "tests/meshloom/test_refine.py": tests / "test_meshloom_refine.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
             ROOT / "tests/simcase/test_transient_headless_windows.py":
@@ -251,6 +252,7 @@ def main():
             tests / "test_meshloom_fuzz.py",
             tests / "test_meshloom_repair.py",
             tests / "test_meshloom_regions.py",
+            tests / "test_meshloom_refine.py",
             tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)

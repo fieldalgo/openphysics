@@ -72,7 +72,6 @@ struct State<'a> {
     small_apex: Vec<bool>,
     /// the subfacets being split on the current call chain
     splitting: Vec<[u32; 3]>,
-    dbg_open: bool,
     /// per facet: three input points spanning its plane, and the projection axis
     frame: Vec<([u32; 3], usize)>,
     opt: RefineOptions,
@@ -681,13 +680,6 @@ impl State<'_> {
                     continue;
                 }
                 if o <= 0 {
-                    if std::env::var_os("MESHLOOM_DEBUG_REFINE").is_some() {
-                        let fl = self.sub.get(&k).cloned();
-                        let segs: Vec<bool> = (0..3).map(|j| self.seg.contains_key(&ekey(k[j], k[(j + 1) % 3]))).collect();
-                        let col: Vec<bool> = (0..3).map(|j| self.g.collinear(k[j], k[(j + 1) % 3], p)).collect();
-                        eprintln!("DEBUG p {p} face {k:?} orient {o} sub {fl:?} segs {segs:?} collinear {col:?} cav {} plane {} u {}",
-                                  cav.len(), plane.len(), u);
-                    }
                     return Ok(false);
                 }
                 new.push((tet, label));
@@ -739,33 +731,9 @@ impl State<'_> {
             // or its old face would be left open (the cavity shrank on one side of the facet)
             let one_sided = plane.iter().any(|k| self.cx.faces.get(k).is_some_and(|o| o.iter().any(|&t| t != NONE && self.inside[t as usize] && !set.contains(&t))));
             if swallowed_face || swallowed_edge || one_sided {
-                if std::env::var_os("MESHLOOM_DEBUG_REFINE").is_some() {
-                    eprintln!("DEBUG swallow p {p} face {swallowed_face} edge {swallowed_edge} cav {} plane {}",
-                              cav.len(), plane.len());
-                }
                 return Ok(false);
             }
             if !bad.is_empty() {
-                if std::env::var_os("MESHLOOM_DEBUG_REFINE").is_some() {
-                    let e = bad[0];
-                    // the cavity tetrahedra with that edge, and what became of their faces through it
-                    let around: Vec<String> = cav.iter().filter(|&&t| {
-                        let v = self.cx.tets[t as usize];
-                        v.contains(&e.0) && v.contains(&e.1)
-                    }).map(|&t| {
-                        let v = self.cx.tets[t as usize];
-                        let w: Vec<u32> = v.iter().copied().filter(|&x| x != e.0 && x != e.1).collect();
-                        let fs: Vec<String> = w.iter().map(|&z| {
-                            let k = key([e.0, e.1, z]);
-                            let u = self.cx.neighbor(t, &k);
-                            format!("[{z}: plane {} sub {} u {} in {}]", plane.contains(&k), self.sub.contains_key(&k),
-                                    u, u != NONE && set.contains(&u))
-                        }).collect();
-                        format!("t{t} {}", fs.join(" "))
-                    }).collect();
-                    eprintln!("DEBUG unsplit p {p} edge {e:?} cav {} plane {} around {}", cav.len(), plane.len(),
-                              around.join(" | "));
-                }
                 return Ok(false);
             }
         }
@@ -867,27 +835,6 @@ impl State<'_> {
                 }
             }
             self.queue_tet(id);
-        }
-        if std::env::var_os("MESHLOOM_DEBUG_REFINE_CHECK").is_some() {
-            let open = self.cx.faces.iter().find(|(k, o)| (o[0] == NONE || o[1] == NONE) && !self.sub.contains_key(*k)
-                && o.iter().any(|&t| t != NONE && self.inside[t as usize]));
-            let nopen = self.cx.faces.iter().filter(|(k, o)| (o[0] == NONE || o[1] == NONE) && !self.sub.contains_key(*k)
-                && o.iter().any(|&t| t != NONE && self.inside[t as usize])).count();
-            let sp0 = self.g.s[p as usize - self.g.input.len()];
-            eprintln!("DEBUG nopen {nopen} after p {p} {:?} {:?} cav {} plane {} minimal {}", sp0.kind(), self.xyz[p as usize], cav.len(), plane.len(), self.stats.minimal);
-            if let Some((k, _)) = open {
-                if !self.dbg_open {
-                    self.dbg_open = true;
-                    let sp = self.g.s[p as usize - self.g.input.len()];
-                    eprintln!("DEBUG open face after p {p} kind {:?} at {:?}: {k:?} {:?}; cav {} plane {} minimal {}",
-                              sp.kind(), self.xyz[p as usize], k.map(|x| self.xyz[x as usize]), cav.len(), plane.len(), self.stats.minimal);
-                }
-            }
-            if let Some(k) = self.sub.keys().find(|k| !self.cx.faces.contains_key(*k)) {
-                let sp = self.g.s[p as usize - self.g.input.len()];
-                eprintln!("DEBUG corrupt after p {p} kind {:?}: subfacet {k:?} is not a face; cav {} plane {:?}",
-                          sp.kind(), cav.len(), plane);
-            }
         }
         if self.g.s.len() > self.opt.max_points {
             let s = &self.stats;
@@ -1256,7 +1203,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
     // the point cap (the M5 stop rule: a typed error, never a hang): given, or derived from
     // the size field, 20 x (volume inside / h^3) + 200 x (facet area / h^2) + 100 x (vertices at
     // the start), at least 1000 (boundary points scale with area, so thin layers need the area
-    // term); with no size field, 100 x the vertices at the start
+    // term); with no size field, 100 x the vertices at the start; with a ratio bound, plus
+    // 200 x (facet area / shortest input edge^2); at most 5,000,000
     let mut opt = opt;
     if opt.max_points == 0 {
         let vol: f64 = cx.tets.iter().enumerate().filter(|(t, _)| cx.alive[*t] && inside[*t]).map(|(_, v)| {
@@ -1270,11 +1218,19 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
             dot(&c, &c).sqrt() / 2.0
         }).sum();
         let n0 = xyz.len() as f64;
-        let est = if opt.h > 0.0 {
+        let mut est = if opt.h > 0.0 {
             20.0 * vol / opt.h.powi(3) + 200.0 * area / opt.h.powi(2) + 100.0 * n0
         } else {
             100.0 * n0
         };
+        if opt.ratio > 0.0 {
+            // the ratio bound grades the mesh down to the input's shortest edge, whatever h is:
+            // the area term again at that edge length
+            let lmin = rins.iter().copied().filter(|r| r.is_finite() && *r > 0.0).fold(f64::INFINITY, f64::min);
+            if lmin.is_finite() {
+                est += 200.0 * area / (lmin * lmin);
+            }
+        }
         opt.max_points = (est.min(5.0e6) as usize).max(1000);
     }
     // input vertices where two segments meet at less than 60 degrees: the apexes of the
@@ -1299,7 +1255,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
         }
     }
     let mut st = State {
-        g, cx, xyz, rins, inside, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), dbg_open: false, frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };

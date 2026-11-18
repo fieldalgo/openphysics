@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+import math
+
 import numpy as np
 
 from . import KernelUnavailable, _IMPORT_ERROR, _kernel
@@ -180,8 +182,8 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
 def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
              region_points=None, h: float | None = None, ratio: float | None = None, alpha: float = 1.0,
              max_points: int = 0) -> dict:
-    """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
-    regions, rounding and certification. ``domain="regions"`` makes every bounded
+    """A tetrahedral mesh of a PLC: ``recover_boundary``, then (with ``h`` or ``ratio``)
+    refinement, then regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
     ``domain="parity"`` makes the even-odd domain of closed surfaces one region. S points
     are rounded once to the nearest double. Tetrahedra that rounding makes flat or
@@ -205,14 +207,34 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     in the order the names first appear, and ``region_names`` lists them. Without it,
     regions are named ``"region i"`` by first appearance.
 
+    Refinement (constrained Delaunay refinement, before rounding) runs when ``h`` (a
+    uniform size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split) or
+    ``ratio`` (a bound B on the radius-edge ratio, circumradius over shortest edge) is
+    given. It splits encroached subsegments and subfacets and bad tetrahedra at their
+    circumcentres until none is left. Near input angles below 60 degrees (segments or
+    facets) it leaves skinny tetrahedra and encroached subsegments or subfacets, counted in
+    ``stats`` as ``exempt_subsegments`` and ``exempt_subfacets``, so that it terminates;
+    elsewhere every tetrahedron meets ``ratio``. ``max_points`` caps the points it inserts
+    (0: derived from the size field, at least 1000); reaching it raises ``RefineError``.
+    ``stats`` then also counts segment, facet and volume points, rejected circumcentres and
+    insertions that fell back to the smallest cavity (``minimal_cavities``).
+
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
-    witness type 6), ``RecoveryError``, ``RoundingError``, ``RegionError`` (a region point
-    outside every region, on a facet, two names in one region, or a region without a
-    point), or ``MeshError`` for an internal failure; all are ``ValueError``.
+    witness type 6), ``RecoveryError``, ``RefineError``, ``RoundingError``, ``RegionError``
+    (a region point outside every region, on a facet, two names in one region, or a region
+    without a point), or ``MeshError`` for an internal failure; all are ``ValueError``.
     """
     kernel = _require()
     if domain not in ("regions", "parity"):
         raise ValueError("domain must be 'regions' or 'parity'")
+    for name, value in (("h", h), ("ratio", ratio)):
+        if value is not None and not (isinstance(value, (int, float, np.integer, np.floating))
+                                      and math.isfinite(value) and value > 0):
+            raise ValueError(f"{name} must be a finite number > 0 or None, got {value!r}")
+    if not (isinstance(alpha, (int, float, np.integer, np.floating)) and math.isfinite(alpha) and alpha > 0):
+        raise ValueError(f"alpha must be a finite number > 0, got {alpha!r}")
+    if isinstance(max_points, bool) or not isinstance(max_points, (int, np.integer)) or max_points < 0:
+        raise ValueError(f"max_points must be an integer >= 0, got {max_points!r}")
     p = _points(points)
     s = np.ascontiguousarray(np.asarray(np.zeros((0, 2)) if segments is None else segments,
                                         dtype="<i8").reshape(-1, 2))
