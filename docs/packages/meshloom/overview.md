@@ -133,7 +133,7 @@ names may change before the mesher's public API.
   opposite windings, and the faces used once exactly the domain's boundary. It returns `nodes`, `tetrahedra`, `regions`,
   `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
   outward), and `interfaces` by region pair (wound from the lower region to the
-  higher). There is no refinement: the mesh has the input points and the points
+  higher). Without refinement (below) the mesh has the input points and the points
   boundary recovery needed. The plan's C10 adversarial inputs are meshed this way
   and checked against V1–V4 on every platform's installed wheel (the Schönhardt
   prism and the Chazelle polyhedron, which need Steiner points, a cospherical prism
@@ -142,6 +142,28 @@ names may change before the mesher's public API.
   200 seeded assemblies of dyadic boxes and n-gon prisms, some with 1-ulp jitter, in a
   child process with a 60 s progress limit: each must give a valid mesh or a typed
   error.
+- **Refinement.** `mesh_plc(..., h=None, ratio=None, alpha=1.0, max_points=0)` refines
+  the recovered mesh before rounding when `h` or `ratio` is given (constrained Delaunay
+  refinement): an encroached subsegment splits at its midpoint, an encroached subfacet
+  at its circumcentre, and a tetrahedron whose circumradius exceeds `alpha·h` or whose
+  radius-edge ratio (circumradius over shortest edge) exceeds `ratio` at its
+  circumcentre, unless that point encroaches a subsegment or subfacet, which splits
+  instead. Points are exact (on a segment, on a facet, or in the volume) and rounded
+  once with the rest. Each insertion removes the tetrahedra whose circumspheres hold the
+  point and that it sees: a cavity never holds both sides of a subfacet it does not
+  replace, and it holds both sides of every subfacet it does. Near input angles below
+  60° the rules of Shewchuk (1998, 2002) and Ruppert (1995) stop the cascades: concentric
+  shells on segments meeting at such an angle, no split of a subfacet for a vertex of a
+  facet meeting it there, and no ratio split of a tetrahedron that is skinny because of
+  the angle. Those tetrahedra and the subsegments and subfacets left encroached are
+  counted in `stats` (`exempt_subsegments`, `exempt_subfacets`). A cap on inserted
+  points (`max_points`, or by default 20·V/h³ + 200·A/h² + 100·n₀, plus 200·A/ℓ² with a
+  ratio where ℓ is the shortest input edge, between 1,000 and 5,000,000) ends refinement
+  with `RefineError` instead of a hang. All 14 C10 inputs refine to the end at h = ¼ of
+  their size with ratio 2 and pass V1–V4. V7 (guaranteed mode, ratio 2, max ratio ≤
+  2(1 + 10⁻⁹)) passes on C2 at h = 0.12, 0.06 and 0.03 (max 0.923, 1.198, 1.356) and on
+  C3 at h = 0.8, 0.4 and 0.2 (max 1.553, 1.565, 1.593). C9 is not run: the plan does not
+  give its dimensions yet.
 
 ```python
 import numpy as np
@@ -194,8 +216,10 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No refinement or quality improvement yet: `mesh_plc` returns the boundary-conforming
-  mesh of the input and recovery points (and the few points repair adds) only. A
+- No sizing beyond a uniform `h`, no practical-mode tuning and no quality improvement
+  (sliver removal) yet. Refinement is slow: about 19,000 nodes in 25 s on stacked
+  layers. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
+  input and recovery points (and the few points repair adds) only. A
   tetrahedron that rounding to doubles makes flat or inverted and that repair cannot fix
   raises `RoundingError`. Near-coplanar facets meeting at a segment are the hard case: in
   a seeded test of rotated prisms with points within 1e-13 of a facet, 42 of 60 inputs
