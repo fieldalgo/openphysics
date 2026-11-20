@@ -105,6 +105,12 @@ struct State<'a> {
 const DIHEDRAL_MIN: f64 = 15.0;
 const SLIVER_FILTER: f64 = 0.7;
 const SLIVER_CAP: f64 = 0.10;
+/// Boundary size (M6 design note; turned on after sliver removal, the owner's decision of
+/// 2026-11-20): a subsegment longer than SEG_C alpha h, or a subfacet whose circumradius
+/// exceeds FAC_C alpha h (h of the regions around them), is split even when not
+/// encroached, so the boundary is discretized to the size before the volume.
+const SEG_C: f64 = 1.0;
+const FAC_C: f64 = 0.75;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -675,6 +681,37 @@ impl State<'_> {
             }
         }
         m
+    }
+
+    /// The size at a boundary simplex: the smallest positive size of the tetrahedra (inside
+    /// the domain) in `ts`; 0 when none has one.
+    fn local_h(&self, ts: impl Iterator<Item = u32>) -> f64 {
+        ts.filter(|&t| t != NONE && self.inside[t as usize]).map(|t| self.hsz[t as usize])
+            .filter(|h| *h > 0.0).fold(0.0, |a: f64, h| if a == 0.0 { h } else { a.min(h) })
+    }
+
+    /// Boundary size: a subsegment longer than SEG_C alpha h of the regions around it.
+    fn segment_too_long(&self, e: (u32, u32)) -> bool {
+        let ts = self.cx.star[e.0 as usize].iter().copied()
+            .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&e.1));
+        let h = self.local_h(ts);
+        let d = sub3(&self.xyz[e.1 as usize], &self.xyz[e.0 as usize]);
+        h > 0.0 && dot(&d, &d).sqrt() > SEG_C * self.opt.alpha * h
+    }
+
+    /// Boundary size: a subfacet whose circumradius exceeds FAC_C alpha h of its regions.
+    fn subfacet_too_large(&self, f: [u32; 3]) -> bool {
+        let Some(o) = self.cx.faces.get(&f) else { return false };
+        let h = self.local_h(o.iter().copied());
+        if !(h > 0.0) {
+            return false;
+        }
+        let x = f.map(|v| self.xyz[v as usize]);
+        let (a, b) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]));
+        let n = cross(&a, &b);
+        let nn = dot(&n, &n);
+        let cc = sub3(&a, &b);
+        nn > 0.0 && (dot(&a, &a) * dot(&b, &b) * dot(&cc, &cc)).sqrt() / (2.0 * nn.sqrt()) > FAC_C * self.opt.alpha * h
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -1499,8 +1536,11 @@ impl State<'_> {
         let found = loop {
             steps += 1;
             if steps > 100_000 {
+                // a straight walk can cycle in a constrained, non-Delaunay triangulation:
+                // leave this tetrahedron (counted as a rejected point)
                 self.drop_point(p);
-                return Err("refinement: the walk to a circumcentre did not end".into());
+                self.stats.rejected += 1;
+                return Ok(());
             }
             let w = self.cx.tets[cur as usize];
             let mut moved = false;
@@ -1767,7 +1807,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
-                if st.segment_encroacher(e).is_some() {
+                if st.segment_encroacher(e).is_some() || st.segment_too_long(e) {
                     st.split_segment(e)?;
                 }
             }
@@ -1781,6 +1821,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                     } else {
                         st.split_subfacet(f)?;
                     }
+                } else if st.subfacet_too_large(f) {
+                    st.split_subfacet(f)?;
                 }
             }
             continue;
