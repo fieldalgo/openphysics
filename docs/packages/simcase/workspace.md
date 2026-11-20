@@ -17,14 +17,20 @@ New to the workspace? Start with the [quick start](workspace_quickstart.md). For
 
 The workbench has a command ribbon, a model builder and adjacent Settings panel
 on the left, a large Graphics workspace on the right, and a Study/Messages dock
-below. The ribbon groups Project, Edit, Model setup and Compute. **Geometry**,
+below. The ribbon groups Project, Edit, Model setup, Physics and Compute. **Geometry**,
 **Materials**, **Mesh** and **Study** open the same settings as the model tree.
-The optical workflow strip shows the current step without hiding the model.
+**Physics → Installed** opens [Installed physics](#installed-physics). Compute holds
+the run command of the chosen application: **Run optical study**, **Run heat study**
+or **Run Joule heating study**. The optical workflow strip shows the current step
+without hiding the model. The dock shows the study sequence and Messages; after a
+Joule heating run, Results adds its **Solver log** there.
 
 **Save** and **Open** keep their session semantics, including completed optical
 runs and comparisons. **More** contains input-only files, browser drafts and
 Reset design. **Workspace tools** in the bottom status bar contains connection,
-recovery and Reset layout. Heat results remain in the current tab only.
+recovery and Reset layout; **Installed physics** sits next to it. Both open above the
+status bar, one at a time, on every page including Applications. Heat and Joule heating
+results remain in the current tab only.
 
 Settings and Graphics scroll independently on wide screens. The default
 Model builder/Settings widths are 240/320 px; saved widths are retained. Drag
@@ -47,7 +53,11 @@ wires. Excluded interfaces lose their dependent wires, and wires follow the
 ports when panels resize. Small screens scroll the graph horizontally.
 Ports inspect settings; arbitrary wiring, field transfer and coupled execution
 remain unavailable. Single-physics optical and heat studies retain their existing
-solver contracts.
+solver contracts. For the Joule heating application the diagram shows its two
+interfaces, Electric currents and Heat transfer, solved together by one study (the badge
+names `joule.steady2d` or `joule.temperature2d`): a rose Joule heat → heat source wire,
+and, when a used material has σ(T), an amber temperature → conductivity wire that
+returns below the nodes. It has no interface checkboxes; the wires cannot be rewired.
 
 ## First optical study
 
@@ -218,9 +228,12 @@ limits; a refusal (for example two potentials at one corner, a mesh over the nod
 cap, an iteration that does not converge) is shown with its text. Results show
 temperature and electric potential (P1) or current density |J|, Joule power density
 and heat flux |q| (per triangle, with optional arrows) on the actual mesh with
-region boundaries, the balances (supplied electric power, Joule power, outward heat,
-temperature range and the current through each fixed side, per metre of depth),
-the Picard history and the value at a clicked point. A result keeps its inputs;
+region boundaries in Graphics, the balances (supplied electric power, Joule power,
+outward heat, temperature range and the current through each fixed side, per metre of
+depth) in Settings, the value at a clicked point, and the **Solver log** in the study
+dock: its line gives the Picard iteration count, the last temperature and conductivity
+changes and the three power balances, and opening it lists every Picard iteration
+(|ΔT|, Δσ/σ, maximum T). With constant materials it says the problem was solved once. A result keeps its inputs;
 **Restore run inputs** brings them back. Joule inputs are saved in input files,
 sessions, drafts, recovery and undo history (version 7); Joule results stay in the
 tab, as heat results do. A run that ends after you switch to another application waits in
@@ -575,7 +588,8 @@ replacement prompt. Import runs continues to preserve current model inputs.
 
 ## Installed physics
 
-**Installed physics**, below the connection and recovery help, lists the physics
+**Installed physics**, in the status bar next to Workspace tools and opened from the
+ribbon with **Physics → Installed** (Escape closes it), lists the physics
 providers installed with Studio ([physics providers](providers.md)): each provider's
 name, version, distribution, status and physics kinds, built-in provider
 (`openphysics-fem`, distribution `simcase`) first. A provider that could not be loaded
@@ -591,8 +605,8 @@ kind names, no other manifest content and no entry-point target. The error text 
 sent as `providers()` reports it, so it can name a file, such as the module an
 import failed in; Studio serves only this computer by default (see the
 [package overview](overview.md)). If the list itself cannot be read, the panel
-says so and the server log holds the details. The workspace capability contract is unchanged
-(`/api/workspace/capabilities/v6`). Installed providers are not yet offered as
+says so and the server log holds the details. The panel does not change the workspace
+capability contract (now `/api/workspace/capabilities/v7`, for the Joule heating inputs). Installed providers are not yet offered as
 workspace physics; the list only shows what is installed.
 
 Checks: `tests/simcase/test_studio_providers.py` (the built-in provider alone, an

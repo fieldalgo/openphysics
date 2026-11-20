@@ -56,7 +56,11 @@ p{margin:8px 0 14px;color:var(--muted)}
 #workflow{display:flex;flex:none;padding:0 16px;background:#f6f8fb;border-bottom:1px solid var(--line);gap:0;min-height:45px}
 .workflow-step{display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding:6px 14px;border:0;border-right:1px solid #dfe5ed;border-radius:0;background:transparent;text-align:left}
 .workflow-step strong{font-size:12px;font-weight:600;white-space:nowrap}
-#installed-physics{border-bottom:1px solid var(--line)}#installed-physics>summary{cursor:pointer;padding:7px 22px;color:var(--muted);font-size:12px}#installed-physics>summary:focus-visible{outline:2px solid var(--accent)}#provider-list{overflow-x:auto;max-width:100%}table.providers{border-collapse:collapse;font-size:12px}table.providers th,table.providers td{padding:4px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;overflow-wrap:anywhere}tr.provider-unavailable td{color:#f1b58f}tr.provider-error td{color:#f1b58f;font-family:monospace}
+/* Installed physics: a status-bar popover like Workspace tools, also opened from the ribbon. */
+#installed-physics{position:relative;flex:none}#installed-physics>summary{cursor:pointer;font-size:10px;list-style:none;color:#355d92;padding:0 5px;white-space:nowrap}.installed-physics-content{position:absolute;bottom:24px;right:0;width:640px;max-width:calc(100vw - 24px);max-height:60vh;overflow:auto;background:#fff;border:1px solid #bbc8db;box-shadow:0 -8px 30px #1e345e22;padding:16px;font-size:12px;color:var(--text)}.installed-physics-content>p{margin:0 0 10px;color:#586c87}#provider-list{overflow-x:auto;max-width:100%}table.providers{border-collapse:collapse;font-size:11px;width:100%}table.providers th,table.providers td{padding:5px 8px;border-bottom:1px solid #dfe5ee;text-align:left;vertical-align:top;overflow-wrap:anywhere}table.providers td:nth-child(n+2):nth-child(-n+4){white-space:nowrap}table.providers th{font-weight:600;color:#586c87;background:#f3f6fa;white-space:nowrap}tr.provider-unavailable td{color:#9c3d1c}tr.provider-error td{color:#9c3d1c;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+/* Joule heating solver log in the study dock: Picard history and the power balance of the shown result. */
+.dock-log{border-top:1px solid #e4e9ef;font-size:10px}.dock-log>summary{cursor:pointer;padding:5px 16px;color:#33475f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dock-log>summary b{font-weight:600;margin-right:12px}.dock-log-body{max-height:150px;overflow:auto;padding:0 16px 8px}.dock-log-body table{border-collapse:collapse;font-size:10px;font-variant-numeric:tabular-nums}.dock-log-body th,.dock-log-body td{padding:2px 12px 2px 0;text-align:right;border-bottom:1px solid #edf1f6}.dock-log-body th{color:#586c87;font-weight:600;position:sticky;top:0;background:#fff}
+@media(max-width:600px){.installed-physics-content{position:fixed;left:12px;right:12px;bottom:12px;width:auto}.dock-log>summary{white-space:normal}}
 .workflow-step span{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .workflow-step[aria-current=step]{background:#e8f0fc;box-shadow:inset 0 -2px var(--accent)}
 .workflow-step[data-state=attention] span{color:var(--warning)}
@@ -292,3 +296,6 @@ dialog::backdrop{background:#162a4b66}
  .viewport-tools output{flex-basis:100%;padding:4px 0}.note{font-size:9px}#autosave-status{margin-left:0}
  .document-tab{font-size:11px}#view-detail{font-size:9px}.file-menu-items{top:180px}
 }
+/* Joule heating connections: two interfaces solved by one study. */
+.joule-stage{height:320px}.joule-stage .graph-key{left:auto;right:20px}.joule-stage .node-electric{left:56px}.joule-stage .node-heat{top:120px;left:auto;right:calc(50% - 250px)}
+.setup-badge.solved{background:#e8f1fb;border-color:#bcd2ee;color:#255da9}

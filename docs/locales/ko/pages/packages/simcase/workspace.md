@@ -15,12 +15,18 @@
 
 작업대는 상단 명령 리본, 왼쪽 모델 트리와 인접한 Settings, 오른쪽의 넓은
 Graphics, 하단 Study/Messages 영역으로 구성됩니다. 리본은 Project, Edit,
-Model setup, Compute로 묶습니다. **Geometry**, **Materials**, **Mesh**, **Study**는
-모델 트리와 같은 설정을 엽니다. 광학 작업 순서는 모델을 가리지 않는 별도 줄에 표시합니다.
+Model setup, Physics, Compute로 묶습니다. **Geometry**, **Materials**, **Mesh**, **Study**는
+모델 트리와 같은 설정을 엽니다. **Physics → Installed**는 [설치된 물리](#설치된-물리)를 엽니다.
+Compute에는 고른 애플리케이션의 실행 명령(**Run optical study**, **Run heat study**,
+**Run Joule heating study**)이 있습니다. 광학 작업 순서는 모델을 가리지 않는 별도 줄에 표시합니다.
+하단 영역은 해석 순서와 Messages를 보여 주며, Joule 가열을 실행한 뒤 Results에서는
+**Solver log**가 함께 나옵니다.
 
 **Save**와 **Open**은 완료된 광학 실행과 비교를 포함하는 세션 저장/열기입니다.
 **More**에 입력 전용 파일, 브라우저 초안, Reset design이 있습니다. 하단 상태줄의
-**Workspace tools**에서 연결, 복구, Reset layout에 접근합니다. 열 결과는 현재 탭에만 남습니다.
+**Workspace tools**에서 연결, 복구, Reset layout에 접근하고, 그 옆에 **Installed physics**가 있습니다.
+둘 다 상태줄 위로 열리며 한 번에 하나만 열립니다. Applications를 포함한 모든 페이지에서 쓸 수
+있습니다. 열 결과와 Joule 가열 결과는 현재 탭에만 남습니다.
 
 넓은 화면에서 Settings와 Graphics는 독립적으로 스크롤됩니다. 모델 트리/Settings의
 기본 폭은 240/320 px이며 기존 저장 폭을 유지합니다. 두 구분선 모두 오른쪽으로
@@ -39,7 +45,11 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 주황색, 형상 갱신은 보라색 점선입니다. 제외한 물리에 의존하는 선은 사라지고
 패널 폭이 바뀌면 포트 위치를 따라갑니다. 작은 화면에서는 그래프를 가로로 스크롤합니다.
 포트는 설정 확인용이며 임의 배선, 장 전달, 연성 실행은 미지원입니다.
-광학·열 단일 물리 계산의 기존 솔버 계약은 유지합니다.
+광학·열 단일 물리 계산의 기존 솔버 계약은 유지합니다. Joule 가열 애플리케이션에서는
+하나의 해석이 함께 푸는 두 인터페이스, Electric currents와 Heat transfer를 보여 줍니다(배지에
+`joule.steady2d` 또는 `joule.temperature2d` 표시). 분홍색 Joule heat → heat source 선이 있고,
+사용하는 재료에 σ(T)가 있으면 노드 아래로 돌아가는 주황색 온도 → 전도율 선이 더해집니다.
+인터페이스 체크 상자는 없으며 선을 다시 연결할 수 없습니다.
 
 ## 첫 광학 해석
 
@@ -183,9 +193,12 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 **Run Joule heating study**는 문서(**Study**에 표시)를 만들어 Studio의
 [Joule route](electric_joule.md#studio-영역-문서)에서 그 영역·메시 한도로 검증하고 실행합니다. 거부(예:
 한 모서리의 두 전위, 절점 상한을 넘는 메시, 수렴하지 않는 반복)는 그 문장으로 보여 줍니다.
-결과는 실제 메시와 영역 경계 위에 온도와 전위(P1) 또는 전류 밀도 |J|, Joule 전력 밀도, 열유속
-|q|(삼각형마다, 화살표 선택)를 그리고, 수지(공급 전력, Joule 전력, 바깥으로 나가는 열, 온도 범위,
-고정 변마다 흐르는 전류, 깊이 1 m당), Picard 이력, 클릭한 지점의 값을 보여 줍니다. 결과는 입력을
+결과는 Graphics의 실제 메시와 영역 경계 위에 온도와 전위(P1) 또는 전류 밀도 |J|, Joule 전력 밀도,
+열유속 |q|(삼각형마다, 화살표 선택)를 그리고, Settings에 수지(공급 전력, Joule 전력, 바깥으로
+나가는 열, 온도 범위, 고정 변마다 흐르는 전류, 깊이 1 m당)를, 클릭한 지점의 값을 보여 줍니다.
+하단 영역의 **Solver log** 줄은 Picard 반복 횟수, 마지막 온도·전도율 변화, 세 전력 수지를 보여 주고,
+펼치면 Picard 반복마다 |ΔT|, Δσ/σ, 최고 온도를 나열합니다. 재료가 모두 상수이면 한 번에 풀었다고
+표시합니다. 결과는 입력을
 유지하며 **Restore run inputs**로 되돌립니다. Joule 입력은 입력 파일·세션·초안·복구·실행 취소
 기록에 저장되고(버전 7), Joule 결과는 열 결과처럼 탭 안에만 남습니다. 다른 애플리케이션으로 옮긴 뒤 끝난 실행의 결과는
 Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 작업을 계속 따라가고, 파일을 열면 그 결과를
@@ -496,7 +509,8 @@ Import runs는 계속 현재 모델 입력을 유지합니다.
 
 ## 설치된 물리
 
-연결·복구 도움말 아래의 **Installed physics**(설치된 물리)는 Studio와 함께 설치된
+상태줄의 Workspace tools 옆에 있고 리본의 **Physics → Installed**로도 여는(Escape로 닫음)
+**Installed physics**(설치된 물리)는 Studio와 함께 설치된
 물리 공급자([물리 공급자](providers.md))를 나열합니다. 각 공급자의 이름·버전·배포판·상태·
 물리 종류를 보여 주며 내장 공급자(`openphysics-fem`, 배포판 `simcase`)가 맨 앞에 옵니다.
 불러오지 못한 공급자는 *Unavailable*(사용 불가)로 표시하고, 그 오류를
@@ -511,7 +525,8 @@ entry point 대상은 보내지 않습니다. 오류 텍스트는 `providers()`�
 보내므로 가져오기에 실패한 모듈 같은 파일 이름이 들어 있을 수 있습니다. Studio는
 기본적으로 이 컴퓨터에만 제공됩니다([패키지 개요](overview.md) 참고). 목록 자체를 읽지
 못하면 패널에 그렇게 표시하고 자세한 내용은 서버 로그에 남깁니다.
-작업공간 capability 계약은 바뀌지 않습니다(`/api/workspace/capabilities/v6`).
+이 패널은 작업공간 capability 계약을 바꾸지 않습니다(지금은 Joule 가열 입력 때문에
+`/api/workspace/capabilities/v7`).
 설치된 공급자를 아직 작업공간의 물리로 제공하지는 않으며, 이 목록은 설치 상태만 보여 줍니다.
 
 검사: `tests/simcase/test_studio_providers.py`(내장 공급자만, 주입한 공급자, 사용 불가

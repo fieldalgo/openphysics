@@ -81,8 +81,8 @@ py -3.12 -m venv "$HOME\op-studio"
 
 ## 5. 작업 남기기
 
-- 첫 번째 저장 버튼인 **Save session**은 입력, 완료한 실행 전부, 이름과 고정, 비교를 파일
-  하나에 씁니다. 끄기 전에 쓰세요. **Save inputs only**는 결과 없이 모델만 저장합니다.
+- 리본 Project 묶음의 **Save**(Save session)는 입력, 완료한 실행 전부, 이름과 고정, 비교를
+  파일 하나에 씁니다. 끄기 전에 쓰세요. **More → Save inputs only**는 결과 없이 모델만 저장합니다.
 - 새로고침하거나 다시 켜면 시작 화면에 **Continue where you left off**가 나옵니다. 마지막
   세션이나 이전 세션을 복구하거나, 세션 파일을 엽니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
@@ -104,3 +104,5 @@ capability 확인이 버전 6이 된 뒤 2026-11-10에 Linux에서
 4·5단계, 재시작, 복구를 다시 확인했습니다. 위의 `openphysics` 설치로 확인한 것은 아닙니다.
 2026-11-16에 파일과 capability 확인이 버전 7이 된 뒤 같은 스크립트가 Linux에서 소스 트리(headless
 Chromium, Python 3.13)에 대해 통과했습니다. 설치한 wheel로 확인한 것은 아닙니다.
+2026-11-20에 작업대 배치(리본, 모델 빌더 옆 Settings, 하단 해석 영역)로 바뀐 뒤 같은 스크립트가
+Linux에서 소스 트리의 편집 가능 설치(headless Chromium, Python 3.12)에 대해 다시 통과했습니다.
