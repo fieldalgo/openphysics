@@ -3,6 +3,7 @@
 import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
  usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,JouleRunner} from './workspace-joule.mjs';
 import {shapeCorners} from './workspace-shapes.mjs';
+import {renderJouleGraph} from './workspace-graph.mjs';
 
 export const JOULE_NODES=Object.freeze(['Geometry','Materials','Electric currents','Heat transfer','Mesh','Study']);
 const FILLS=['#5b7f95','#b5784f','#7c9a5a','#9a6a9e','#c9a64a','#4f8f8a'];
@@ -102,14 +103,14 @@ export function createJouleView(ctx){
  }
  function svg(){
   const s=j(),scale=Math.min(440/s.width,230/s.height),w=s.width*scale,h=s.height*scale,x0=300-w/2,y0=175-h/2,X=x=>x0+x*scale,Y=y=>y0+h-y*scale;
-  const shapes=s.shapes.map((sh,i)=>{const attrs=`fill="${fill(sh.material)}" stroke="${ui.selection==='Geometry'&&i===shapeIndex?'#fff0a8':'#e2e9ed'}" stroke-width="${i===shapeIndex?2:1}" data-joule-pick="${i}" role="button" tabindex="0" aria-label="Select shape ${esc(sh.name)}"`;
+  const shapes=s.shapes.map((sh,i)=>{const attrs=`fill="${fill(sh.material)}" stroke="${ui.selection==='Geometry'&&i===shapeIndex?'#2860bd':'#ffffff'}" stroke-width="${i===shapeIndex?2:1}" data-joule-pick="${i}" role="button" tabindex="0" aria-label="Select shape ${esc(sh.name)}"`;
    if(sh.type==='circle')return `<circle cx="${X(sh.cx)}" cy="${Y(sh.cy)}" r="${sh.r*scale}" ${attrs}/>`;
    return `<polygon points="${shapeCorners(sh).map(([x,y])=>X(x)+','+Y(y)).join(' ')}" ${attrs}/>`;}).join('');
   const edges={left:[x0,y0,x0,y0+h],right:[x0+w,y0,x0+w,y0+h],bottom:[x0,y0+h,x0+w,y0+h],top:[x0,y0,x0+w,y0]};
   const labels={left:[x0-8,y0+h/2,'end'],right:[x0+w+8,y0+h/2,'start'],bottom:[300,y0+h+18,'middle'],top:[300,y0-10,'middle']};
   const sides=SIDES.map(side=>{const [a,b,c,d]=edges[side],[lx,ly,anchor]=labels[side],e=s.sides[side].electric,t=s.sides[side].thermal,text=`${electricText(e)} · ${thermalText(t)}`;
-   return `<g data-joule-side="${side}" role="button" tabindex="0" aria-label="Select ${side} side: ${esc(text)}"><path d="M${a} ${b} L${c} ${d}" stroke="transparent" stroke-width="14"/><path d="M${a} ${b} L${c} ${d}" stroke="${e.type==='potential'?'#f0c36b':'#7a939f'}" stroke-width="2.5" pointer-events="none"/><text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#e2e9ed" font-size="9" pointer-events="none">${esc(text)}</text></g>`;}).join('');
-  return `<svg data-geometry-view="joule" viewBox="0 0 600 350" role="group" aria-label="Joule heating regions, ${esc(jouleSummary(s))}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="${fill(s.background)}" stroke="none"/>${shapes}${sides}<text x="300" y="22" text-anchor="middle" fill="#e2e9ed" font-size="11">${esc(jouleSummary(s))} · element ${fmt(s.elementSize)} mm</text><text x="${x0}" y="${y0+h+32}" fill="#a2b2bd" font-size="10">(0, 0)</text><text x="${x0+w}" y="${y0-22}" text-anchor="end" fill="#a2b2bd" font-size="10">(${fmt(s.width)}, ${fmt(s.height)}) mm</text></svg>`;
+   return `<g data-joule-side="${side}" role="button" tabindex="0" aria-label="Select ${side} side: ${esc(text)}"><path d="M${a} ${b} L${c} ${d}" stroke="transparent" stroke-width="14"/><path d="M${a} ${b} L${c} ${d}" stroke="${e.type==='potential'?'#b9772c':'#7a939f'}" stroke-width="2.5" pointer-events="none"/><text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#34445b" font-size="9" pointer-events="none">${esc(text)}</text></g>`;}).join('');
+  return `<svg data-geometry-view="joule" viewBox="0 0 600 350" role="group" aria-label="Joule heating regions, ${esc(jouleSummary(s))}"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="${fill(s.background)}" stroke="none"/>${shapes}${sides}<text x="300" y="22" text-anchor="middle" fill="#34445b" font-size="11">${esc(jouleSummary(s))} · element ${fmt(s.elementSize)} mm</text><text x="${x0}" y="${y0+h+32}" fill="#5b6d82" font-size="10">(0, 0)</text><text x="${x0+w}" y="${y0-22}" text-anchor="end" fill="#5b6d82" font-size="10">(${fmt(s.width)}, ${fmt(s.height)}) mm</text></svg>`;
  }
  function bindSvg(){
   const bind=(el,fn)=>{el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};};
@@ -145,9 +146,16 @@ export function createJouleView(ctx){
   const rows=balanceRows(summary),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—';
   $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
    '<h3>Balances per metre of depth</h3>'+rows.map(([l,v])=>pair(esc(l),esc(v))).join('')+
-   (history.length?`<h3>Picard iterations (${history.length})</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>|ΔT| [K]</th><th>Δσ/σ</th><th>T max [K]</th></tr></thead><tbody>${history.map(r=>`<tr><td>${r[0]}</td><td>${num(r[1])}</td><td>${num(r[2])}</td><td>${num(r[3])}</td></tr>`).join('')}</tbody></table></div>`:'<p>One coupled solve (constant conductivities).</p>')+
+   '<h3>Solution</h3>'+(history.length?pair('Picard iterations',history.length)+'<p>The iteration history is in the Solver log of the study dock.</p>':'<p>One coupled solve (constant conductivities).</p>')+
    pair('Completed',new Date(run.completedAt).toLocaleTimeString());
   const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>ctx.commit(clone(run.input),'Joule inputs restored from the run.');$('inspector').append(restore);
+ }
+ // The study dock's solver log: Picard history and the power balance of the shown result.
+ function solverLog(){
+  const log=$('solver-log');if(!log)return;const show=ui.page==='Results'&&!!result;log.hidden=!show;if(!show)return;
+  const summary=result.payload.summary,rows=balanceRows(summary).slice(0,3),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—',last=history.at(-1);
+  log.querySelector('summary').innerHTML='<b>Solver log</b>'+(history.length?`Picard ${history.length} iterations · last |ΔT| ${num(last[1])} K · Δσ/σ ${num(last[2])}`:'One coupled solve · constant conductivities')+' · '+rows.map(([l,v])=>esc(l)+' '+esc(v)).join(' · ');
+  log.querySelector('.dock-log-body').innerHTML=history.length?`<table aria-label="Picard iterations"><thead><tr><th scope="col">#</th><th scope="col">|ΔT| [K]</th><th scope="col">Δσ/σ</th><th scope="col">T max [K]</th></tr></thead><tbody>${history.map(r=>`<tr><td>${r[0]}</td><td>${num(r[1])}</td><td>${num(r[2])}</td><td>${num(r[3])}</td></tr>`).join('')}</tbody></table>`:'<p>The conductivities are constant, so the electric and heat problems were solved once without iteration.</p>';
  }
  function refreshControls(){
   const button=$('run-joule');if(!button)return;const on=ctx.active();button.hidden=!on;if(!on)return;$('run-optical').hidden=true;$('run-heat').hidden=true;
@@ -171,12 +179,13 @@ export function createJouleView(ctx){
   document.querySelector('main').classList.remove('comparing');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
   $('sequence').innerHTML=`<span>Joule heating · ${jouleKind(j())}</span><span>Run validates the current inputs, then solves</span><span>Mesh convergence not certified</span>`;
   document.querySelector('.workspace > .toolbar').style.display=ui.page==='Model'?'flex':'none';
-  document.querySelector('.workspace > .note').textContent=ui.page==='Results'?'Joule heating results belong to the inputs captured at Run.':'Lengths in mm, temperatures in K, other quantities in SI. Select a side or a shape in the drawing.';
+  document.querySelector('.workspace > .note').textContent=ui.page==='Results'?'Joule heating results belong to the inputs captured at Run.':ui.page==='Connections'?'One Joule heating study solves both interfaces; the wires show the quantities it passes between them.':'Lengths in mm, temperatures in K, other quantities in SI. Select a side or a shape in the drawing.';
   if(ui.page==='Model'&&ui.selection==='Study')study();
   if(ui.page==='Results')results();
   if(ui.page==='Compare')$('canvas').innerHTML='<h2>Compare</h2><p>Comparison is available for optical runs. Joule heating results are shown one at a time in Results.</p>';
-  if(ui.page==='Connections')$('canvas').innerHTML='<h2>Joule heating model</h2><p>One coupled model: the electric current heats the conductor (Joule heating), and for temperature-dependent materials the temperature changes the conductivity. No mechanical or optical coupling is configured.</p>';
-  bindSvg();refreshControls();
+  if(ui.page==='Connections'){const kind=jouleKind(j());$('canvas').innerHTML=renderJouleGraph(ui.selection,kind===TEMPERATURE,kind);
+   document.querySelectorAll('[data-joule-node]').forEach(b=>b.onclick=()=>{ui.selection=b.dataset.jouleNode;ctx.render();});}
+  bindSvg();solverLog();refreshControls();
  }
  return {svg,inspector,bindInspector,page,run,refreshControls,loadCapability,// undo/redo: drafts go, the run and its result stay (labelled an earlier snapshot)
   clearDrafts:()=>{drafts.clear();error=null;refreshControls();},

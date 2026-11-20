@@ -16,6 +16,11 @@ export function curvePath(from,to){
  const reach=to.x<from.x?24:Math.max(36,(to.x-from.x)*.5);
  return `M ${from.x} ${from.y} C ${from.x+reach} ${from.y}, ${to.x-reach} ${to.y}, ${to.x} ${to.y}`;
 }
+// A feedback wire that returns below both nodes: out of the source socket, down to the
+// channel at height y, back along it and up into the target socket from its outer side.
+export function loopPath(from,to,y,reach=32){
+ return `M ${from.x} ${from.y} C ${from.x+reach} ${from.y}, ${from.x+reach} ${y}, ${from.x} ${y} L ${to.x} ${y} C ${to.x-reach} ${y}, ${to.x-reach} ${to.y}, ${to.x} ${to.y}`;
+}
 export function renderConnectionGraph(state,selection,sequence,optionsOpen=false){
  const port=(id,name,label,quantity,color,side)=>`<button class="graph-port ${side} ${color}" data-port="${id}" data-select="${name}" aria-label="Inspect ${name}: ${label}, ${quantity}"><i class="port-dot" aria-hidden="true"></i><span>${label}<small>${quantity}</small></span></button>`;
  const node=(id,name,field,enabled,ports)=>`<article class="graph-node node-${id} ${enabled?'':'excluded'} ${selection===name?'selected':''}"><button class="graph-node-title" data-select="${name}" aria-pressed="${selection===name}">${name}<small>${field} · ${enabled?'Setup interface':'Not included'}</small></button><div class="graph-ports">${ports}</div></article>`;
@@ -36,24 +41,45 @@ export function renderConnectionGraph(state,selection,sequence,optionsOpen=false
  <label><input data-toggle="optics" type="checkbox" ${state.optics?'checked':''}> Optical modes · material / geometry update</label>
  </div></details>`;
 }
+// The Joule heating application's own coupling: one study solves both interfaces. The
+// temperature feedback wire is drawn only when a used material has σ(T) (joule.temperature2d).
+export function jouleConnections(temperatureDependent){
+ const edges=[['electric-out','heat-in','power','Joule heat → heat source']];
+ if(temperatureDependent)edges.push(['heat-out','electric-sigma','temperature','Temperature → conductivity σ(T)','below']);
+ return edges;
+}
+export function renderJouleGraph(selection,temperatureDependent,kind){
+ const port=(id,name,label,quantity,color,side)=>`<button class="graph-port ${side} ${color}" data-port="${id}" data-joule-node="${name}" aria-label="Inspect ${name}: ${label}, ${quantity}"><i class="port-dot" aria-hidden="true"></i><span>${label}<small>${quantity}</small></span></button>`;
+ const node=(id,name,field,ports)=>`<article class="graph-node node-${id} ${selection===name?'selected':''}"><button class="graph-node-title" data-joule-node="${name}" aria-pressed="${selection===name}">${name}<small>${field} · Joule heating study</small></button><div class="graph-ports">${ports}</div></article>`;
+ return `<div class="graph-heading"><h2>Physics connections</h2><span class="setup-badge solved">Solved together · ${kind}</span></div><p class="graph-intro">Select a node or port to inspect its settings. The tree and diagram share the same model.</p>
+ <div class="graph-scroll" tabindex="0" role="region" aria-label="Joule heating connection diagram; scroll horizontally on small screens">
+ <div class="graph-stage joule-stage" data-edges='${JSON.stringify(jouleConnections(temperatureDependent))}'>
+ <svg class="graph-wires" aria-hidden="true"></svg>
+ ${node('electric','Electric currents','Electrical',port('electric-in','Electric currents','Side conditions','V · A/m²','voltage','input')+port('electric-out','Electric currents','Joule heat','W/m³','power','output')+(temperatureDependent?port('electric-sigma','Electric currents','Conductivity σ(T)','S/m','temperature','input'):''))}
+ ${node('heat','Heat transfer','Thermal',port('heat-in','Heat transfer','Heat source','W/m³','power','input')+port('heat-out','Heat transfer','Temperature T','K','temperature','output'))}
+ <div class="graph-key"><span class="power">● Heat source</span>${temperatureDependent?'<span class="temperature">● Temperature</span>':''}</div>
+ </div></div>
+ <div class="graph-summary"><section><h3>Study · ${kind}</h3><p>${temperatureDependent?'Picard iteration: the electric and heat problems are solved in turn until the temperature and conductivity settle.':'One coupled solve: the conductivities are constant, so the electric problem is solved once and its Joule heat drives the heat problem.'}</p></section><section><h3>Not in this model</h3><p>No mechanical or optical coupling is configured. Wires show the quantities the study passes; they cannot be rewired.</p></section></div>`;
+}
 export function installConnectionGraph(host,onOptions=()=>{}){
  const stage=host.querySelector('.graph-stage');if(!stage)return ()=>{};
  const options=host.querySelector('.graph-options');
- const toggle=()=>onOptions(options.open);options.addEventListener('toggle',toggle);
+ const toggle=()=>onOptions(options.open);options?.addEventListener('toggle',toggle);
  const svg=stage.querySelector('.graph-wires');
  const edges=JSON.parse(stage.dataset.edges);
  const draw=()=>{
   const bounds=stage.getBoundingClientRect();
   svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
   const point=id=>{const r=stage.querySelector(`[data-port="${id}"] .port-dot`).getBoundingClientRect();return {x:r.x+r.width/2-bounds.x,y:r.y+r.height/2-bounds.y};};
-  svg.replaceChildren(...edges.map(([from,to,color,label])=>{
+  const channel=Math.max(0,...[...stage.querySelectorAll('.graph-node')].map(n=>n.getBoundingClientRect().bottom-bounds.y))+24;
+  svg.replaceChildren(...edges.map(([from,to,color,label,route])=>{
    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-   path.setAttribute('d',curvePath(point(from),point(to)));path.setAttribute('class',color);
+   path.setAttribute('d',route==='below'?loopPath(point(from),point(to),channel):curvePath(point(from),point(to)));path.setAttribute('class',color);
    path.dataset.from=from;path.dataset.to=to;
    const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label;path.append(title);return path;
   }));
  };
  const observer=new ResizeObserver(draw);observer.observe(stage);
  stage.querySelectorAll('.graph-node').forEach(node=>observer.observe(node));
- draw();return ()=>{observer.disconnect();options.removeEventListener('toggle',toggle);};
+ draw();return ()=>{observer.disconnect();options?.removeEventListener('toggle',toggle);};
 }

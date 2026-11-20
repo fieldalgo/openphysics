@@ -74,6 +74,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `simcase`: Studio's workbench places the Joule heating application and Installed physics: **Run Joule heating study** in the ribbon's Compute group; a **Physics → Installed** ribbon command opens **Installed physics**, now a status-bar panel next to Workspace tools (one open at a time, on every page); after a Joule run the study dock's **Solver log** gives the Picard iteration count, the last |ΔT| and Δσ/σ and the three power balances and lists every iteration, while Settings keeps the balances; Connections draws the two Joule interfaces as nodes with a Joule heat wire and, for σ(T) materials, a temperature → conductivity wire, without the setup-only badge or interface checkboxes; the region drawing uses the light palette. File meaning, units, routes and the Joule and provider contracts are unchanged.
+
 - Studio results: fit optical plots to the available desktop height and hide inactive job actions after completion.
 
 - Studio: rebuild the workspace as a light CAE workbench with a command ribbon, adjacent model/settings panes, Graphics, a study/message dock, paired dimension fields and accessible panel resizing. Existing solver, file and connection behavior is retained.
@@ -330,6 +332,8 @@ What each package implements, and its limits, is in the
 - Add headless rectangle electric and constant/temperature-dependent Joule JSON/CLI documents, SI result snapshots and failed-iteration evidence; reuse the existing solvers.
 
 - Scalar/full-vector modal PML and constant-radius bends, with complex candidate diagnostics, physical-window tracking, total attenuation, Studio controls and independent slab/cylindrical validation.
+
+
 
 - Add temperature-dependent 2D steady Joule heating with bounded material models,
   relaxed Picard iteration, failure histories and independent reference tests.

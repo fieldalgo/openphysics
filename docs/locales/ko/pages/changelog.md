@@ -68,6 +68,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `simcase`: Studio 작업대에 Joule 가열 애플리케이션과 Installed physics를 배치했습니다. **Run Joule heating study**는 리본 Compute 묶음에 있고, 리본의 **Physics → Installed**가 **Installed physics**를 엽니다. 이 패널은 이제 Workspace tools 옆 상태줄 패널입니다(한 번에 하나만, 모든 페이지에서). Joule 실행 뒤 하단 해석 영역의 **Solver log**가 Picard 반복 횟수, 마지막 |ΔT|와 Δσ/σ, 세 전력 수지를 보여 주고 반복마다 나열하며, Settings에는 수지가 남습니다. Connections는 Joule의 두 인터페이스를 노드로 그리고 Joule heat 선과, σ(T) 재료가 있으면 온도 → 전도율 선을 더합니다(설정 전용 배지와 인터페이스 체크 상자 없음). 영역 그림은 밝은 색을 씁니다. 파일 의미, 단위, route, Joule·공급자 계약은 바뀌지 않습니다.
+
 - Studio 결과: 광학 그래프 높이를 데스크톱 작업 영역에 맞추고 완료 후 비활성 작업 버튼을 숨깁니다.
 
 - Studio: 명령 리본, 인접한 모델/설정 패널, Graphics, 스터디/메시지 영역, 두 열 치수 입력과 키보드 패널 크기 조절을 갖춘 밝은 CAE 작업대로 재설계했습니다. 기존 솔버·파일·연결 동작은 유지합니다.
