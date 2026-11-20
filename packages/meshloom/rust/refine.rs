@@ -63,6 +63,9 @@ struct State<'a> {
     /// an inserted point's distance to its nearest neighbour when inserted (small-angle rule)
     rins: Vec<f64>,
     inside: Vec<bool>,
+    /// per tetrahedron: the size h of its region (0: no size bound; negative: a hole, not
+    /// refined for quality or size)
+    hsz: Vec<f64>,
     /// subfacet -> its facets (two where touching shells share it)
     sub: HashMap<[u32; 3], Vec<u32>>,
     /// subsegment -> chain index
@@ -136,7 +139,12 @@ impl State<'_> {
         (0..3).all(|k| self.proj(axis, f[k], f[(k + 1) % 3], p) * s0 >= 0)
     }
 
-    fn quality(&self, t: &[u32; 4]) -> Option<f64> {
+    fn quality(&self, id: u32) -> Option<f64> {
+        let hs = self.hsz[id as usize];
+        if hs < 0.0 {
+            return None; // a hole
+        }
+        let t = &self.cx.tets[id as usize];
         let p = t.map(|v| self.xyz[v as usize]);
         let c = circumcentre(p)?;
         let r = dot(&sub3(&c, &p[0]), &sub3(&c, &p[0])).sqrt();
@@ -161,8 +169,8 @@ impl State<'_> {
                 bad = bad.max(r / lmin / self.opt.ratio);
             }
         }
-        if self.opt.h > 0.0 {
-            bad = bad.max(r / (self.opt.alpha * self.opt.h));
+        if hs > 0.0 {
+            bad = bad.max(r / (self.opt.alpha * hs));
         }
         (bad > 1.0).then_some(bad)
     }
@@ -202,7 +210,7 @@ impl State<'_> {
             return;
         }
         let v = self.cx.tets[t as usize];
-        if let Some(bad) = self.quality(&v) {
+        if let Some(bad) = self.quality(t) {
             let mut s = v;
             s.sort_unstable();
             self.tetq.push((bad.to_bits(), std::cmp::Reverse(s), t));
@@ -654,7 +662,7 @@ impl State<'_> {
         let mut touched: Vec<[u32; 3]> = Vec::new();
         for &t in cav {
             let v = self.cx.tets[t as usize];
-            let label = self.inside[t as usize];
+            let label = (self.inside[t as usize], self.hsz[t as usize]);
             for i in 0..4 {
                 let f = face(&v, i);
                 let k = key(f);
@@ -691,7 +699,7 @@ impl State<'_> {
         // caller can fall back to the minimal cavity.
         {
             let made: std::collections::HashSet<[u32; 3]> = new.iter()
-                .flat_map(|(tet, _): &([u32; 4], bool)| (0..4).map(move |i| key(face(tet, i))))
+                .flat_map(|(tet, _): &([u32; 4], (bool, f64))| (0..4).map(move |i| key(face(tet, i))))
                 .filter(|k| k.contains(&p)).collect();
             let mut ec: HashMap<(u32, u32), u32> = HashMap::new();
             for k in plane {
@@ -718,7 +726,7 @@ impl State<'_> {
                 })
             });
             let new_edges: std::collections::HashSet<(u32, u32)> = new.iter()
-                .flat_map(|(tet, _): &([u32; 4], bool)| (0..4).flat_map(move |k| (k + 1..4).map(move |l| ekey(tet[k], tet[l]))))
+                .flat_map(|(tet, _): &([u32; 4], (bool, f64))| (0..4).flat_map(move |k| (k + 1..4).map(move |l| ekey(tet[k], tet[l]))))
                 .collect();
             let swallowed_edge = cav.iter().any(|&t| {
                 let v = self.cx.tets[t as usize];
@@ -751,8 +759,10 @@ impl State<'_> {
             let id = self.cx.add(tet);
             if id as usize >= self.inside.len() {
                 self.inside.resize(id as usize + 1, false);
+                self.hsz.resize(id as usize + 1, 0.0);
             }
-            self.inside[id as usize] = label;
+            self.inside[id as usize] = label.0;
+            self.hsz[id as usize] = label.1;
             added.push(id);
         }
         // subsegments containing p: the S point's segment piece
@@ -1115,7 +1125,13 @@ impl State<'_> {
 /// Refines the result of boundary recovery in place: its tetrahedra, Steiner points,
 /// subfacets and segment chains change; every other tetrahedron of the convex hull is
 /// kept.
-pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Result<RefineStats, String> {
+/// `seeds` and `label_h` (regions mode): the region seeds of `mesh::build` and a size per
+/// seed label; a component holding a seed with label L is refined to `label_h[L]` (the
+/// smallest if several seeds name it; `opt.h` where `label_h[L]` is not positive), a hole
+/// (label < 0) is not refined for quality or size, and every other component to `opt.h`.
+/// A seed that `mesh::build` would refuse is refused here with the same message.
+pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds: &[crate::mesh::Seed],
+              label_h: &[f64]) -> Result<RefineStats, String> {
     let mut g = MixedPoints::new(plc.points.clone());
     for s in &b.plc.rec.s {
         g.push(*s);
@@ -1186,6 +1202,25 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
         }
     }
     let inside: Vec<bool> = comp.iter().map(|&c| !outside[c as usize]).collect();
+    // the size of each component: opt.h, or its seeds' (regions mode)
+    let mut comp_h = vec![opt.h; outside.len()];
+    if !seeds.is_empty() {
+        let at = crate::mesh::locate_seeds(&plc.points, b, &comp, &outside, seeds)?;
+        let mut set = vec![false; outside.len()];
+        for (sd, &c) in seeds.iter().zip(&at) {
+            let c = c as usize;
+            let h = if sd.label < 0 {
+                -1.0
+            } else {
+                label_h.get(sd.label as usize).copied().filter(|h| *h > 0.0).unwrap_or(opt.h)
+            };
+            // a hole stays a hole (build refuses a hole and a name together); else the smallest
+            comp_h[c] = if !set[c] || h < 0.0 { h } else if comp_h[c] < 0.0 { comp_h[c] } else { comp_h[c].min(h) };
+            set[c] = true;
+        }
+    }
+    let hsz: Vec<f64> = comp.iter().map(|&c| comp_h[c as usize]).collect();
+    let hmin = comp_h.iter().copied().filter(|h| *h > 0.0).fold(f64::INFINITY, f64::min);
     let mut rins = vec![f64::INFINITY; xyz.len()];
     for (t, v) in cx.tets.iter().enumerate() {
         if !cx.alive[t] {
@@ -1218,8 +1253,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
             dot(&c, &c).sqrt() / 2.0
         }).sum();
         let n0 = xyz.len() as f64;
-        let mut est = if opt.h > 0.0 {
-            20.0 * vol / opt.h.powi(3) + 200.0 * area / opt.h.powi(2) + 100.0 * n0
+        let mut est = if hmin.is_finite() {
+            20.0 * vol / hmin.powi(3) + 200.0 * area / hmin.powi(2) + 100.0 * n0
         } else {
             100.0 * n0
         };
@@ -1255,7 +1290,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
         }
     }
     let mut st = State {
-        g, cx, xyz, rins, inside, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
@@ -1292,7 +1327,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions) -> Re
         if let Some((_, std::cmp::Reverse(s), t)) = st.tetq.pop() {
             let mut v = st.cx.tets[t as usize];
             v.sort_unstable();
-            if st.cx.alive[t as usize] && v == s && st.quality(&st.cx.tets[t as usize]).is_some() {
+            if st.cx.alive[t as usize] && v == s && st.quality(t).is_some() {
                 let before = st.g.s.len();
                 st.split_tet(t)?;
                 if st.g.s.len() > before && st.cx.alive[t as usize] {

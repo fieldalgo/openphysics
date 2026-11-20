@@ -13,12 +13,16 @@ Rows of docs/packages/meshine/validation3d.md:
 - V7: on C2 (unit cube) and C3 (chip package, 3 regions) at the sizes of the plan, in
   guaranteed mode (B = 2), every tetrahedron has radius-edge ratio (circumradius over
   shortest edge) at most 2(1 + 1e-9), decided exactly in rational arithmetic on the
-  output doubles for every tetrahedron whose ratio in doubles exceeds 1.9 (below that
-  the rounding error of the double evaluation cannot reach the bound). C9 has no
+  output doubles for every tetrahedron whose ratio in doubles exceeds 0.95 of the bound
+  (below that the rounding error of the double evaluation cannot reach it). C9 has no
   dimensions in the plan yet and is not run. The coarsest sizes also pass V1-V4 with
   the exact region volumes. C2 at h = 0.03 and C3 at h = 0.2 run with the slow studies.
 - V26 (part): refinement is deterministic: C2 at h = 0.1, C3 at h = 0.8 and two C10
   inputs give byte-identical arrays in 3 fresh processes and 2 runs in this process.
+- Sizes per region: C3 with the die at h/2 (V8's die case) refines the die and
+  keeps V7; a mapping of sizes needs every region name.
+- ``meshloom.generate3d``: the documented cube example (V1-V4), facet tags, and the
+  practical and guaranteed bounds on C3 at h = 0.4.
 - The cap: a small ``max_points`` raises ``RefineError``; bad arguments are refused.
 """
 
@@ -127,10 +131,10 @@ def test_v18_c10_refines_to_the_end(name, k, record_property):
 
 def exactly_within(m, rho, bound):
     """Indices of the tetrahedra whose radius-edge ratio exceeds ``bound``, decided exactly
-    on the output doubles for those whose ratio in doubles exceeds 1.9."""
+    on the output doubles for those whose ratio in doubles exceeds 0.95 bound."""
     b2 = Fraction(bound) ** 2
     over = []
-    for t in np.flatnonzero(rho > 1.9):
+    for t in np.flatnonzero(rho > 0.95 * bound):
         p = [[Fraction(float(c)) for c in m["nodes"][v]] for v in m["tetrahedra"][t]]
         a = [[p[i][j] - p[0][j] for j in range(3)] for i in (1, 2, 3)]
         r = [sum(x * x for x in row) / 2 for row in a]  # circumcentre o - p0 solves a (o - p0) = r
@@ -231,3 +235,51 @@ def test_v26_refinement_is_deterministic():
     inproc = [v26_digests() for _ in range(2)]
     assert all(len(d) == len(V26_CASES) for d in fresh + inproc)
     assert all(d == inproc[0] for d in fresh + inproc), fresh + inproc
+
+
+C3_SEEDS = [((5.0, 5.0, 0.5), "substrate"), ((5.0, 5.0, 1.25), "die"), ((1.0, 1.0, 2.0), "mold")]
+
+
+def test_sizes_per_region():
+    (pts, facets), _ = c3()
+
+    def median_edges(m):
+        x = m["nodes"][m["tetrahedra"]]
+        e = np.linalg.norm(x[:, 1] - x[:, 0], axis=1)
+        return [float(np.median(e[m["regions"] == r])) for r in range(3)]
+
+    uniform = mesh_plc(pts, facets, h=0.8, ratio=2.0, region_points=C3_SEEDS)
+    die = mesh_plc(pts, facets, h={"substrate": 0.8, "die": 0.4, "mold": 0.8}, ratio=2.0, region_points=C3_SEEDS)
+    assert die["region_names"] == ["substrate", "die", "mold"]
+    u, d = median_edges(uniform), median_edges(die)
+    assert d[1] < 0.75 * u[1], (u, d)  # the die is finer (at h = 0.8 its 0.5 height already limits it)
+    assert 0.9 < d[0] / u[0] < 1.1 and 0.9 < d[2] / u[2] < 1.1, (u, d)
+    assert not exactly_within(die, radius_edge(die), V7_BOUND)
+    got = A.check(die, pts, facets, [100.0, 8.0, 142.0], True, euler=True)
+    assert sorted(float(v) for v in got) == [8.0, 100.0, 142.0]
+    with pytest.raises(ValueError, match="missing"):
+        mesh_plc(pts, facets, h={"substrate": 0.4, "die": 0.2}, ratio=2.0, region_points=C3_SEEDS)
+    with pytest.raises(ValueError, match="region_points"):
+        mesh_plc(pts, facets, h={"die": 0.2}, ratio=2.0)
+
+
+def test_generate3d():
+    cube = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], float)
+    faces = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]], [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+    m = meshloom.generate3d(cube, faces, h=0.1)  # the example of the meshloom page
+    assert sorted(m["boundary_faces"], key=int) == [str(i) for i in range(6)]  # facet tags, by default str(i)
+    by_index = dict(m, boundary_faces={int(k): v for k, v in m["boundary_faces"].items()},
+                    boundary_nodes={int(k): v for k, v in m["boundary_nodes"].items()})
+    A.check(by_index, cube, faces, [1.0], True, euler=True)
+    tagged = meshloom.generate3d(cube, faces, h=0.1, facet_tags=["bottom", "top"] + ["side"] * 4)
+    assert sorted(tagged["boundary_faces"]) == ["bottom", "side", "top"]
+    assert len(tagged["boundary_faces"]["side"]) == sum(len(m["boundary_faces"][str(i)]) for i in range(2, 6))
+    with pytest.raises(ValueError, match="facet_tags"):
+        meshloom.generate3d(cube, faces, h=0.1, facet_tags=["a"])
+    (pts, facets), _ = c3()
+    for quality, bound in (("practical", meshloom.PRACTICAL_RATIO), ("guaranteed", meshloom.GUARANTEED_RATIO)):
+        m = meshloom.generate3d(pts, facets, h=0.4, quality=quality, region_points=C3_SEEDS)
+        assert m["region_names"] == ["substrate", "die", "mold"]
+        assert not exactly_within(m, radius_edge(m), bound * (1 + 1e-9)), quality
+    with pytest.raises(meshloom.RefineError):
+        meshloom.generate3d(pts, facets, h=0.2, max_points=50)

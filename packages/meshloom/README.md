@@ -3,11 +3,13 @@
 Tetrahedral meshing for [OpenPhysics](https://github.com/fieldalgo/openphysics)
 with an exact-arithmetic compiled kernel (Rust, through PyO3). Apache-2.0.
 
-**There is no mesher yet.** The compiled kernel has its first stages, exact
-geometric predicates and the Delaunay tetrahedralization of point sets, as internal
-building blocks (`meshloom._core`); `meshloom.generate3d` raises
-`NotImplementedError`. For layered geometry today use `meshine.extrude`; for other
-shapes use Gmsh through `gmshio`.
+**First mesher, not yet accepted.** `meshloom.generate3d(points, facets, h=...)`
+meshes a piecewise-linear complex (closed polyhedral surfaces, several regions,
+tagged facets) with constrained Delaunay refinement to a size and a radius-edge bound
+(`quality="practical"` or `"guaranteed"`), and returns the tetrahedral mesh fields that
+`galerkin.from_mesher` reads. It has no sliver removal, graded sizes or curved surfaces
+yet and is not yet graded by the plan's acceptance gates; for layered geometry
+`meshine.extrude` and for other shapes Gmsh through `gmshio` stay the tested routes.
 
 ```python
 import meshloom
