@@ -633,7 +633,8 @@ def test_port_only_the_region_kinds_take_mesh_limits():
     # 2026-11-09) mesh like region heat; mechanics since 2026-11-09: its region documents
     # (elasticity and thermoelasticity) too
     assert takes == {'thermal.steady2d', 'thermal.transient2d', 'electric_joule', 'mechanics'}
-    for name in ('thermal_regions', 'transient_thermal_regions', 'elastic_regions', 'thermoelastic_regions'):
+    for name in ('thermal_regions', 'transient_thermal_regions', 'elastic_regions', 'thermoelastic_regions',
+                 'joule_temperature_regions'):
         data = examples.EXAMPLES[name]
         assert registry.kind_of(data).accepts_mesh_limits(data)
     for name in ('thermal_slab', 'thermal_boundary', 'transient_thermal_uniform', 'electric_rectangle',
