@@ -158,8 +158,9 @@ def test_t1_series_strip_converges_to_the_closed_form():
     assert current[-1] <= 5e-3, current
 
 
-def _direct(raw):
-    """galerkin's solve_temperature_joule_heat on the adapter's mesh, with inputs written here."""
+def _direct(raw, method="picard"):
+    """galerkin's solve_temperature_joule_heat on the adapter's mesh, with inputs written here
+    (``method``: test_joule_temperature_newton.py N5 passes ``"newton"``)."""
     from galerkin.temperature_joule_heating import ConductivityModel, solve_temperature_joule_heat
     from simcase.thermal_regions import build_region_mesh, handoff_03
     doc = Document.from_dict(raw)
@@ -174,7 +175,7 @@ def _direct(raw):
         mesh, electrical_conductivity=models, thermal_conductivity={r: KAPPA[m] for r, m in region_materials.items()},
         prescribed_electric_potential=dict(sorted(electric.items())),
         prescribed_temperature=dict(sorted(thermal.items())),
-        initial_temperature=300.0, inward_current_density={}, inward_heat_flux={}, convection={}, method="picard",
+        initial_temperature=300.0, inward_current_density={}, inward_heat_flux={}, convection={}, method=method,
         relaxation_factor=0.5, relative_tolerance=1e-10, iteration_limit=100, temperature_tolerance=1e-9)
 
 

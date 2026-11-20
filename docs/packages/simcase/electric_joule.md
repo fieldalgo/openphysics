@@ -84,8 +84,22 @@ integer). The existing relaxed Picard loop checks the **unrelaxed** temperature 
 changes and the refreshed nonlinear thermal residual (<=1e-8); its stopping test is
 `|dT| <= temperature_tolerance + relative_tolerance max(|T_i|, |H(T_i)|)`. Electrical/thermal
 linear residual and conservation gates are unchanged. See the linked solver contract for
-normalization and stopping rules. Documents always use the Picard loop; the Python API's
-`method="newton"` is not part of this format.
+normalization and stopping rules.
+
+`iteration.method` (optional) is `"picard"` or `"newton"`; absent means `"picard"`, the
+meaning of every document written before the key existed. It has no table default, so a
+document without it records nothing in `defaults_applied` and its result is byte for byte
+what it was before. `"newton"` passes `method="newton"` to galerkin's
+`solve_temperature_joule_heat`: Newton steps of the potential and temperature together, with
+step halving, decided by the same convergence tests ([Newton method](../galerkin/temperature_joule_heating.md#newton-method)).
+Newton takes no relaxation, so a `relaxation_factor` written beside `"method": "newton"` is
+refused by name (`E-CONTRACT` at `iteration.relaxation_factor`); the resolved document still
+holds the default 0.5, listed in `defaults_applied`, which Newton does not use.
+`iteration_limit` bounds the accepted Newton steps, each of which evaluates up to 31
+candidates. Any other value, including `"Newton"`, is `E-VALUE-FORM` at
+`iteration.method`. Use `"newton"` when Picard is slow or stops at `iteration_limit` under
+strong temperature feedback (the [galerkin contract](../galerkin/temperature_joule_heating.md)
+says when); Picard stays the default and the path the installation checks run.
 
 Format 0.2 keys are refused with their new names (`E-KEY-UNKNOWN`); for the two outward inputs
 the message says to write the negated value, and no automatic fix is offered because the
@@ -231,7 +245,8 @@ boundary names of [region steady Joule heating](#material-regions-steady-joule-h
   receives it as a model of constant value on [0 K, largest double] (galerkin refuses an
   infinite range, and no finite temperature reaches that bound).
 - An axisymmetric component and a void background are refused; the region mesh limits apply.
-  The iteration is Picard, with the rectangle options and convergence tests; a failed
+  The iteration is the rectangle's: Picard, or Newton with `iteration.method: "newton"`, with
+  the same options, refusals and convergence tests; a failed
   iteration raises the solver's `JouleConvergenceError` with its history (the CLI prints the
   same failure evidence as for a rectangle).
 
@@ -263,13 +278,37 @@ joule_temperature_regions`): a 2 x 1 mm strip in mm, a `linear_resistivity` meta
 500 S/m resistor on the right, 0.2 V across the ends held at 300 and 320 K, element size
 0.125 mm (288 nodes; 30 Picard iterations).
 
+### Newton iteration on documents
+
+Independent checks (`tests/simcase/test_joule_temperature_newton.py`, pre-registered N1 to
+N8). Where both methods converge they must agree as in galerkin's Newton tests: temperature
+and potential within 2e-8 (K, V), and conductivity within 1e-10 relative as in its
+every-boundary-kind test. Picard stops when its last relative conductivity step is at most
+1e-10, but its remaining error is q/(1-q) times that step, with q its contraction a step, so
+the conductivity is compared with Picard at `relative_tolerance` 1e-11; temperature and
+potential are also compared with Picard as given.
+
+| Check | Reference | Result (2026-11-20, Linux) |
+|---|---|---|
+| The `joule_temperature` example with `"method": "newton"` | the example as shipped (Picard, relaxation 0.5) | 3 against 26 iterations; differences 9.0e-12 K, 4.6e-12 V, 7.2e-11 relative |
+| The two-material strip above, 0.125 mm | the same document with Picard | 3 against 31 iterations; 3.0e-10 K, 3.4e-12 V, 8.5e-11 relative |
+| galerkin's current-driven thermistor as a rectangle (16 x 4, 1 A/m^2, a = 7 1/K) | default Picard; Picard with relaxation 1 | default Picard stops at 100 iterations; Newton converges in 4; against relaxation 1 (63 iterations) 1.0e-10 K and 6.5e-10 V, conductivity 2.6e-10 relative, which is that Picard's own remaining error (it contracts by 0.70 a step: about 1.8e-10); with its `relative_tolerance` at 1e-11, 3.1e-11 (the pre-registered check compared the conductivity with Picard as given; that comparison is recorded here as failed) |
+| The same thermistor at a = 0.5 1/K | default Picard | 3 against 33 iterations |
+| The strip's closed form with Newton | as above | temperature 8.5e-3, 2.0e-3, 4.6e-4 of the rise at 0.25, 0.125, 0.0625 mm (order 2.1); terminal current 2.3e-5 relative at the finest; 3 iterations each |
+| Direct galerkin call with `method="newton"` | the region strip; the rectangle example with a separately written sigma(T) | bit for bit; fields within 1e-12 relative (potential 1e-12 V) and the same iteration count |
+| Picard documents | results before this change (measured with the commit, not a test) | the example and three region strips: saved arrays and summary (without timings) hashes equal to the commit before |
+| `"method": "picard"` written | the same document without it | arrays and summary (without timings) byte for byte equal, rectangle and regions |
+| Refusals | | `"secant"`, `"Newton"`, `1`, `null`, a `relaxation_factor` beside `"newton"`, `method` outside `iteration`, on a rectangle and on regions |
+
 ## Studio (region documents)
 
 Studio validates and runs `joule.steady2d` and `joule.temperature2d` documents with material
 regions on `POST /api/joule/validate` and `POST /api/joule/run`, with the request envelope of
 the heat routes (`{"doc", "client_revision", "request_seq"}`). A rectangle electric document,
 an `electric.steady2d` document and any other physics are refused by name
-(`unsupported_geometry`, `unsupported_physics`). The routes take the
+(`unsupported_geometry`, `unsupported_physics`), and so is a `joule.temperature2d` document
+with `iteration.method: "newton"` (`unsupported_iteration_method`, 400): Studio's iteration
+cap and its error text count Picard steps. The routes take the
 [Studio region path](thermal_studio.md#region-documents) step by step: the same region limits
 (`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`,
 `max_input_vertices`) are checked before the document is read, and the job runs with the node
@@ -374,11 +413,17 @@ maps, `mesh` (`nodes`, `triangles`), `study` and `balance`, every value as
 
 With a `depth` each `*_per_depth` value is followed by its total (`joule_power`,
 `outward_current.<name>`, ..., per depth × depth). `joule.temperature2d` adds `iterations`, one
-record per Picard step with `iteration_count`, `temperature_change` (K),
+record per Picard step or accepted Newton step, with `iteration_count`, `temperature_change` (K),
 `relative_electrical_conductivity_change`, `minimum_temperature`, `maximum_temperature`,
 `maximum_residual_current_per_depth`, `maximum_residual_heat_rate_per_depth`,
 `relative_residual` and the balance columns of that step; each value carries its unit, so the
-0.2 `iteration_units` table is gone, as are `units` and `mesh_length_unit`.
+0.2 `iteration_units` table is gone, as are `units` and `mesh_length_unit`. A Newton solve
+writes `"iteration_method": "newton"` just before `iterations`; a Picard summary has no such
+key (absent means Picard), so it keeps the bytes it had before the key existed. The key is
+an additive field of the existing result formats, which keep their identifiers: a reader that
+ignores it reads the records as iterations of an unnamed method, and a reader that needs to
+tell Newton steps from Picard steps checks it. The
+summary's `resolved_inputs` lists quantities only, not `iteration.method`.
 
 Invalid input: CLI exit 2. Solve, convergence or I/O failure: exit 1. Success:
 exit 0. Nonconvergence/range failure propagates `JouleConvergenceError` in Python
@@ -398,8 +443,8 @@ depth totals, the refusals and the result names are checked in
 `tests/simcase/test_units_electric_joule.py`. Existing solver independent
 reference-tool comparisons remain in force; this adapter adds no discretization.
 
-Only the above rectangle and region subsets with a single study are exposed. Newton
-iteration on documents, interface potentials, axisymmetric conduction, arbitrary
+Only the above rectangle and region subsets with a single study are exposed. Studio
+execution of Newton documents, interface potentials, axisymmetric conduction, arbitrary
 sigma callbacks, gauge-only currents, terminal totals, transient physics, 3D, Studio
 execution of rectangle documents and release publishing are outside this contract. Saved fields can be viewed in
 ParaView through `simcase.export` ([Viewing in ParaView](overview.md#viewing-in-paraview));

@@ -466,9 +466,12 @@ def _iteration_options(iteration) -> dict:
     """The ``iteration`` options of ``joule.temperature2d`` keyed as galerkin takes them (since the
     galerkin step, L2 commit 7, the document's own names: ``relaxation_factor``,
     ``relative_tolerance``, ``iteration_limit``, ``temperature_tolerance``), in the order galerkin
-    received before the units batch: the tolerance last."""
-    options = {k: v for k, v in iteration.items() if k != "temperature_tolerance"}
+    received before the units batch: the tolerance last, then ``method`` (``"picard"`` when the
+    document does not give one). With ``"newton"`` galerkin ignores ``relaxation_factor`` (its
+    default 0.5 here: the validation refuses an authored one)."""
+    options = {k: v for k, v in iteration.items() if k not in ("temperature_tolerance", "method")}
     options["temperature_tolerance"] = iteration["temperature_tolerance"]
+    options["method"] = iteration.get("method", "picard")
     return options
 
 

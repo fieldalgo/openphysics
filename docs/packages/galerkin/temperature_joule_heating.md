@@ -63,7 +63,7 @@ adaptive relaxation; the [Newton method](#newton-method) states its own bound.
 Tolerances are finite positive, iteration_limit is a positive integer. Multiple solutions, uniqueness and convergence are not guaranteed.
 
 **Choosing a method.** Start with the default, `"picard"`: it is the established
-path, the one JSON documents use, and the one the macOS and Windows installation
+path, the one JSON documents use unless they set `iteration.method`, and the one the macOS and Windows installation
 checks run (through the simcase `joule_temperature` example). With weak feedback
 it converges in a few iterations, and an iteration costs less than a Newton state. Use `"newton"` when
 Picard is slow or stops at `iteration_limit` under strong feedback; for the
