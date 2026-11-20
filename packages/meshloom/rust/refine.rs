@@ -1612,6 +1612,14 @@ impl State<'_> {
             }
             return self.split_subfacet(fs[0]);
         }
+        if !cav.contains(&t) {
+            // the cavity p sees leaves t: inserting p would not remove t, and a neighbour with
+            // nearly the same circumsphere would then insert a point next to p (an edge far
+            // below h, and a ratio cascade from it); leave t
+            self.drop_point(p);
+            self.stats.rejected += 1;
+            return Ok(());
+        }
         if !self.insert(p, &cav, &[])? && !self.insert_minimal(p, &[found])? {
             self.drop_point(p);
             self.stats.rejected += 1;
