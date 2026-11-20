@@ -251,6 +251,13 @@ def test_h7_unchanged_without_motion():
 
 # ---------------------------------------------------------------- H8 refusals
 
+def test_h8_t_dtype_refused(bad_motion_t):
+    t, pattern = bad_motion_t
+    m, W = _plate()
+    with pytest.raises(TypeError, match=pattern):
+        solve_transient_heat(m, motion=MeshMotion(design_velocity=W, t=t), **_plate_inputs(m))
+
+
 def test_h8_refusals():
     xp = _xp("jax")
     m, W = _plate()

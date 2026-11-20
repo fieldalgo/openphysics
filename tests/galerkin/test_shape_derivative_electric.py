@@ -247,6 +247,15 @@ def test_e7_neumann_component_with_a_gauge(name):
 
 # ---------------------------------------------------------------- E8 refusals
 
+def test_e8_t_dtype_refused(bad_motion_t):
+    t, pattern = bad_motion_t
+    m, W = _plate()
+    left = [int(i) for i in m.boundary["left"]]
+    with pytest.raises(TypeError, match=pattern):
+        solve_steady_electric(m, electrical_conductivity=2.0e3, prescribed_electric_potential={i: 0.0 for i in left},
+                              motion=MeshMotion(design_velocity=W, t=t))
+
+
 def test_e8_refusals():
     xp = _xp("jax")
     m, W = _plate()

@@ -290,6 +290,30 @@ def test_s7_unchanged_without_motion():
 
 # ---------------------------------------------------------------- S8 refusals
 
+def test_s8_t_dtype_refused(bad_motion_t):
+    t, pattern = bad_motion_t
+    m, W = _slab()
+    left = [int(i) for i in m.boundary["left"]]
+    with pytest.raises(TypeError, match=pattern):
+        solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0}, prescribed_temperature={i: 1.0 for i in left},
+                          motion=MeshMotion(design_velocity=W, t=t))
+
+
+def test_s8_jax_without_x64_keeps_its_refusal():
+    jax = _jax()
+    m, W = _slab()
+    left = [int(i) for i in m.boundary["left"]]
+    jax.config.update("jax_enable_x64", False)
+    try:
+        t = jax.numpy.asarray(0.0)
+        with pytest.raises(ValueError, match="motion: t: JAX computes in float32 unless jax_enable_x64 is set; "
+                                             "galerkin needs float64"):
+            solve_steady_heat(m, thermal_conductivity={"a": 2.0, "b": 5.0},
+                              prescribed_temperature={i: 1.0 for i in left}, motion=MeshMotion(design_velocity=W, t=t))
+    finally:
+        jax.config.update("jax_enable_x64", True)
+
+
 def test_s8_refusals():
     xp = _xp("jax")
     m, W = _slab()
