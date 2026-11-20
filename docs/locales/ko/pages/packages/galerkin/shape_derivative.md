@@ -155,6 +155,8 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 
 각 거부는 이유를 밝힙니다.
 - NumPy `t`(`TypeError`): NumPy는 미분하지 않습니다. 옮겨진 메시에서 풀려면 노드를 옮겨 그 메시를 푸십시오.
+- 실수 float64 스칼라가 아닌 `t`(`TypeError`, dtype을 밝힘): 복소 `t`는 허수부를 잃고, float32·float16·bfloat16 `t`는
+  승격하지 않으므로 미분이 다른 정밀도로 계산되는 일이 없습니다. `jax_enable_x64`가 꺼진 JAX는 원래의 거부(`ValueError`)를 그대로 받습니다.
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·경계 열유속·convection·전류밀도·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),

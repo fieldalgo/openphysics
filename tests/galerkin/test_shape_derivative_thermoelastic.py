@@ -395,6 +395,23 @@ def test_t7_unchanged_without_motion():
 
 # ---------------------------------------------------------------- T8 refusals
 
+def test_t8_t_dtype_refused_on_both_paths(bad_motion_t):
+    t, pattern = bad_motion_t
+    m, W = _plate()
+    snap = freeze_temperature(m, temperature=_plate_temperature(m))
+    with pytest.raises(TypeError, match=pattern):
+        solve_thermoelasticity(m, snap, stress_free_temperature=290.0, plane="stress",
+                               prescribed_displacement=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t),
+                               **MATERIALS)
+    hot = {int(i): 400.0 for i in m.boundary["right"]}
+    cold = {int(i): 300.0 for i in m.boundary["left"]}
+    with pytest.raises(TypeError, match=pattern):
+        solve_steady_thermoelasticity(m, thermal_conductivity=160.0, prescribed_temperature={**hot, **cold},
+                                      plane="stress", stress_free_temperature=300.0,
+                                      prescribed_displacement=_clamped_left(m),
+                                      motion=MeshMotion(design_velocity=W, t=t), **MATERIALS)
+
+
 def test_t8_snapshot_refusals():
     xp = _xp("jax")
     m, W = _plate()

@@ -219,6 +219,10 @@ convergence errors below.
 Each refusal names the reason:
 - a NumPy `t` (`TypeError`): NumPy does not differentiate. To solve on a moved
   mesh, move the nodes and solve that mesh;
+- a `t` that is not a real float64 scalar (`TypeError`, naming its dtype): a complex
+  `t` would lose its imaginary part, and a float32, float16 or bfloat16 `t` is not
+  promoted, so the derivative is never taken in another precision. JAX without
+  `jax_enable_x64` keeps its own refusal (`ValueError`);
 - a live mesh velocity; a velocity of the wrong shape, or one that is not finite;
 - a step outside the admissible interval (`ElementInversion`);
 - coordinate callbacks for the heat source, boundary heat flux, convection, current

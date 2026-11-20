@@ -20,7 +20,7 @@ import pytest
 
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.shape import ElementInversion, MeshMotion, admissible_interval, extend_velocity
-from galerkin.waveguide import DegenerateModeWarning
+from galerkin.waveguide import DegenerateModeWarning, solve_waveguide_modes
 from galerkin.kernels import solve_modes
 
 BACKENDS = ["jax", "torch"]
@@ -270,6 +270,17 @@ def test_w7_unchanged_without_motion(strip):
 
 
 # ---------------------------------------------------------------- W8 refusals
+
+def test_w8_t_dtype_refused(strip, bad_motion_t):
+    t, pattern = bad_motion_t
+    mesh, W, core = strip
+    with pytest.raises(TypeError, match=pattern):
+        solve_modes(mesh, _eps(core), K0, N_CORE, motion=MeshMotion(design_velocity=W, t=t))
+    with pytest.raises(TypeError, match=pattern):
+        solve_waveguide_modes(mesh, relative_permittivity=_eps(core), vacuum_angular_wavenumber=K0,
+                              target_effective_index=N_CORE, search_mode_count=1,
+                              motion=MeshMotion(design_velocity=W, t=t))
+
 
 def test_w8_refusals(strip):
     xp = _xp("jax")

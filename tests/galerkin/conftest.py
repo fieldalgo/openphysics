@@ -42,3 +42,29 @@ def assert_second_order(errors, refinement=2.0, floor=1.8, name="quantity"):
 def refsol():
     return pytest.importorskip(
         "refsol", reason="install the answer key: pip install -e packages/galerkin-refsol")
+
+
+# A motion's t must be a real float64 JAX or PyTorch scalar. Each case is a t that
+# is refused by name, and the message that names it (shape-derivative files, *8).
+_BAD_MOTION_T = {
+    "jax-complex128": ("jax", "complex128", r"real float64 scalar, got complex128; .*imaginary part"),
+    "torch-complex128": ("torch", "complex128", r"real float64 scalar, got complex128; .*imaginary part"),
+    "jax-float32-x64-on": ("jax", "float32", r"float64 scalar, got float32; .*does not promote t"),
+    "torch-float32": ("torch", "float32", r"float64 scalar, got float32; .*does not promote t"),
+    "torch-float16": ("torch", "float16", r"float64 scalar, got float16; .*does not promote t"),
+    "torch-bfloat16": ("torch", "bfloat16", r"float64 scalar, got bfloat16; .*does not promote t"),
+}
+
+
+@pytest.fixture(params=sorted(_BAD_MOTION_T))
+def bad_motion_t(request):
+    """(t, message pattern): a motion t of the wrong dtype and its refusal."""
+    backend, dtype, pattern = _BAD_MOTION_T[request.param]
+    if backend == "jax":
+        jax = pytest.importorskip("jax")
+        jax.config.update("jax_enable_x64", True)
+        t = jax.numpy.asarray(0.0, dtype=getattr(jax.numpy, dtype))
+    else:
+        torch = pytest.importorskip("torch")
+        t = torch.tensor(0.0, dtype=getattr(torch, dtype), requires_grad=True)
+    return t, pattern

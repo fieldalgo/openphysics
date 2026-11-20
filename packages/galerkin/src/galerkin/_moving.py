@@ -29,7 +29,7 @@ import numpy as np
 
 from . import _mechanics_kernels as _mechanics
 from .core import solve as core_solve
-from .core.backend import Backend, backend_of, is_live, lift, namespace, require_float64, scatter_add, to_numpy
+from .core.backend import is_live, lift, namespace, require_float64, scatter_add, to_numpy
 from .core.materials import is_per_region, region_property
 from .core.sparse import CooMatrix
 from .mesh import Mesh
@@ -724,7 +724,15 @@ def _live_t(t):
     require_float64(xp, "motion: t")
     if tuple(getattr(t, "shape", ())) != ():
         raise ValueError("motion: t must be a scalar")
-    return xp, xp.astype(t, xp.float64) if backend_of(xp) is not Backend.NUMPY else t
+    dtype = str(t.dtype).removeprefix("torch.")
+    if dtype.startswith("complex"):
+        raise TypeError(f"motion: t must be a real float64 scalar, got {dtype}; the step of a mesh motion is "
+                        "real, and a complex t would lose its imaginary part")
+    if dtype != "float64":
+        raise TypeError(f"motion: t must be a float64 scalar, got {dtype}; galerkin needs float64 and does not "
+                        "promote t, since the derivative would then be taken in another precision. "
+                        "Create t as float64")
+    return xp, t
 
 
 def _velocity(mesh: Mesh, velocity):

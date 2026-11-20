@@ -278,6 +278,14 @@ def test_m7_unchanged_without_motion():
 
 # ---------------------------------------------------------------- M8 refusals
 
+def test_m8_t_dtype_refused(bad_motion_t):
+    t, pattern = bad_motion_t
+    m, W = _plate()
+    with pytest.raises(TypeError, match=pattern):
+        solve_elasticity(m, youngs_modulus=70e9, poisson_ratio=0.33, plane="stress",
+                         prescribed_displacement=_clamped_left(m), motion=MeshMotion(design_velocity=W, t=t))
+
+
 def test_m8_refusals():
     xp = _xp("jax")
     m, W = _plate()
