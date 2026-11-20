@@ -61,6 +61,8 @@ pub struct RefineStats {
     pub sliver_moves: u32,
     /// volume vertex moves by smoothing (M6 step 3)
     pub smooth_moves: u32,
+    /// 2-3 and 3-2 flips that improved quality (M6 step 3)
+    pub flips: u32,
 }
 
 struct State<'a> {
@@ -457,6 +459,205 @@ impl State<'_> {
         let n = self.g.input.len();
         self.g.s[v as usize - n] = SPoint::vol(p);
         self.xyz[v as usize] = p;
+    }
+
+    /// (smallest dihedral angle in degrees, q) of four vertices, positive or not (doubles).
+    fn shape(&self, v: [u32; 4]) -> (f64, f64) {
+        let x = v.map(|i| self.xyz[i as usize]);
+        let mut m = 180.0f64;
+        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+            let e = sub3(&x[j], &x[i]);
+            let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
+            let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
+            if !(d > 0.0) {
+                return (0.0, 0.0);
+            }
+            m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+        }
+        let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
+        let v6 = dot(&a, &cross(&b, &c)).abs();
+        let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
+        let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
+        let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
+                                               + dot(&c, &c) * cross(&a, &b)[k]);
+        let r = dot(&num, &num).sqrt() / (2.0 * v6);
+        (m, if r > 0.0 { 3.0 * (v6 / 2.0 / s) / r } else { 0.0 })
+    }
+
+    /// The worst (dihedral, q) of a set of tetrahedra, compared dihedral first (below 15
+    /// degrees), then q.
+    fn worst_shape(&self, ts: &[[u32; 4]]) -> (f64, f64) {
+        ts.iter().map(|t| self.shape(*t)).fold((180.0, 1.0), |a, b| (a.0.min(b.0), a.1.min(b.1)))
+    }
+
+    fn better(new: (f64, f64), old: (f64, f64)) -> bool {
+        let (nd, od) = (new.0.min(DIHEDRAL_MIN), old.0.min(DIHEDRAL_MIN));
+        nd > od + 1e-9 || (nd >= od && new.1 > old.1 + 1e-9)
+    }
+
+    /// Orders four vertices so that orient3d is positive; None if they are coplanar.
+    fn positive(&mut self, mut v: [u32; 4]) -> Option<[u32; 4]> {
+        match self.orient(v) {
+            o if o > 0 => Some(v),
+            o if o < 0 => {
+                v.swap(0, 1);
+                Some(v)
+            }
+            _ => None,
+        }
+    }
+
+    fn replace(&mut self, old: &[u32], new: &[[u32; 4]]) {
+        let (ins, hs) = (self.inside[old[0] as usize], self.hsz[old[0] as usize]);
+        for &t in old {
+            self.cx.remove(t);
+        }
+        for &v in new {
+            let id = self.cx.add(v);
+            if id as usize >= self.inside.len() {
+                self.inside.resize(id as usize + 1, false);
+                self.hsz.resize(id as usize + 1, 0.0);
+            }
+            self.inside[id as usize] = ins;
+            self.hsz[id as usize] = hs;
+        }
+    }
+
+    /// M6 step 3 (second part): 2-3 and 3-2 flips inside the domain that raise the worst
+    /// (dihedral, q) of the tetrahedra they replace, never across a subfacet or removing a
+    /// subsegment; exact orient3d for every new tetrahedron. Faces and edges are visited in
+    /// sorted order (deterministic); up to four passes.
+    fn flip_improve(&mut self) {
+        for _pass in 0..4 {
+            let mut done = 0u32;
+            // 2-3 across interior faces
+            let mut faces: Vec<[u32; 3]> = self.cx.faces.iter()
+                .filter(|(k, o)| o[0] != NONE && o[1] != NONE && !self.sub.contains_key(*k))
+                .map(|(k, _)| *k).collect();
+            faces.sort_unstable();
+            for k in faces {
+                let Some(o) = self.cx.faces.get(&k).copied() else { continue };
+                if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
+                    continue;
+                }
+                let (t1, t2) = (o[0], o[1]);
+                if !self.inside[t1 as usize] || !self.inside[t2 as usize] || self.hsz[t1 as usize] != self.hsz[t2 as usize] {
+                    continue;
+                }
+                let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
+                let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
+                let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
+                let old = self.worst_shape(&[v1, v2]);
+                if old.0 >= DIHEDRAL_MIN && old.1 > 0.5 {
+                    continue; // not worth a flip
+                }
+                let mut new = Vec::with_capacity(3);
+                for j in 0..3 {
+                    match self.positive([k[j], k[(j + 1) % 3], d, e]) {
+                        Some(t) => new.push(t),
+                        None => break,
+                    }
+                }
+                if new.len() != 3 || !self.convex_23(&k, d, e) {
+                    continue;
+                }
+                if Self::better(self.worst_shape(&new), old) && self.rho_ok(&[v1, v2], &new) {
+                    self.replace(&[t1, t2], &new);
+                    done += 1;
+                }
+            }
+            // 3-2 removing an edge with three tetrahedra
+            let mut edges: Vec<(u32, u32)> = Vec::new();
+            for t in 0..self.cx.tets.len() as u32 {
+                if !self.cx.alive[t as usize] || !self.inside[t as usize] {
+                    continue;
+                }
+                let v = self.cx.tets[t as usize];
+                for a in 0..4 {
+                    for b in a + 1..4 {
+                        edges.push(ekey(v[a], v[b]));
+                    }
+                }
+            }
+            edges.sort_unstable();
+            edges.dedup();
+            for (a, b) in edges {
+                if self.seg.contains_key(&(a, b)) {
+                    continue;
+                }
+                let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+                    .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+                if ring.len() != 3 || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
+                    continue;
+                }
+                // the faces through the edge must not be constraints, and the edge must be interior
+                let mut others: Vec<u32> = Vec::new();
+                let mut bad = false;
+                for &t in &ring {
+                    let v = self.cx.tets[t as usize];
+                    for i in 0..4 {
+                        let k = key(face(&v, i));
+                        if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
+                            bad = true;
+                        }
+                    }
+                    others.extend(v.iter().copied().filter(|&x| x != a && x != b));
+                }
+                others.sort_unstable();
+                others.dedup();
+                if bad || others.len() != 3 {
+                    continue;
+                }
+                let oldv: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
+                let old = self.worst_shape(&oldv);
+                if old.0 >= DIHEDRAL_MIN && old.1 > 0.5 {
+                    continue;
+                }
+                let tri = [others[0], others[1], others[2]];
+                let (Some(n1), Some(n2)) = (self.positive([tri[0], tri[1], tri[2], a]), self.positive([tri[0], tri[1], tri[2], b])) else { continue };
+                // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
+                let (sa, sb) = (self.orient([tri[0], tri[1], tri[2], a]), self.orient([tri[0], tri[1], tri[2], b]));
+                if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
+                    continue; // the edge must pass through the triangle's interior
+                }
+                if Self::better(self.worst_shape(&[n1, n2]), old) && self.rho_ok(&oldv, &[n1, n2]) {
+                    self.replace(&ring, &[n1, n2]);
+                    done += 1;
+                }
+            }
+            self.stats.flips += done;
+            if done == 0 {
+                break;
+            }
+        }
+    }
+
+    /// A flip keeps V7: its new tetrahedra stay within the refinement bound, or within the
+    /// worst ratio of the tetrahedra it replaces when that is already above it.
+    fn rho_ok(&self, old: &[[u32; 4]], new: &[[u32; 4]]) -> bool {
+        if !(self.opt.ratio > 0.0) {
+            return true;
+        }
+        let rho = |v: &[u32; 4]| {
+            let x = v.map(|i| self.xyz[i as usize]);
+            match circumcentre(x) {
+                Some(c) => {
+                    let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+                    let l = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                        .map(|(a, b)| dot(&sub3(&x[a], &x[b]), &sub3(&x[a], &x[b])).sqrt()).fold(f64::INFINITY, f64::min);
+                    r / l
+                }
+                None => f64::INFINITY,
+            }
+        };
+        let cap = old.iter().map(rho).fold(0.0f64, f64::max).max(self.opt.ratio);
+        new.iter().all(|v| rho(v) <= cap)
+    }
+
+    /// Whether the edge d-e crosses the interior of triangle k (a 2-3 flip is valid).
+    fn convex_23(&mut self, k: &[u32; 3], d: u32, e: u32) -> bool {
+        let o = self.orient([k[0], k[1], d, e]);
+        o != 0 && (1..3).all(|j| self.orient([k[j], k[(j + 1) % 3], d, e]) == o)
     }
 
     /// The smallest dihedral angle of tetrahedron t, in degrees (doubles).
@@ -1630,7 +1831,9 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         break;
     }
     st.perturb_slivers();
+    st.flip_improve();
     st.smooth();
+    st.flip_improve();
     st.perturb_slivers();
     st.stats.slivers_left = (0..st.cx.tets.len() as u32)
         .filter(|&t| st.cx.alive[t as usize] && st.inside[t as usize] && st.hsz[t as usize] > 0.0
