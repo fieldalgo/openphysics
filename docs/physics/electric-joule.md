@@ -14,7 +14,7 @@ Distinguish a DC electric solve, one-way electric-to-heat transfer and temperatu
 
 ## Execution routes and limits
 
-The Python electric API supports region conductivity and explicit Neumann gauges. JSON/CLI documents are [format 0.3](../packages/simcase/document_format.md): every value carries its unit, and `inward_current_density` and `inward_heat_flux` are positive entering the body. They take homogeneous rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d` and material regions for the first two; they have no sweeps, plots or Studio execution. Temperature-dependent JSON gives `electrical_conductivity` as the declared `linear_resistivity` model, not arbitrary Python callbacks, and always uses the Picard loop; Newton's method (`method="newton"`) is Python only.
+The Python electric API supports region conductivity and explicit Neumann gauges. JSON/CLI documents are [format 0.3](../packages/simcase/document_format.md): every value carries its unit, and `inward_current_density` and `inward_heat_flux` are positive entering the body. They take homogeneous rectangles for `electric.steady2d`, `joule.steady2d` and `joule.temperature2d` and material regions for all three; they have no sweeps or plots, and Studio runs only the region Joule documents ([Studio](../packages/simcase/electric_joule.md#studio-region-documents)). Temperature-dependent JSON gives `electrical_conductivity` as the declared `linear_resistivity` model, not arbitrary Python callbacks, and uses the Picard loop unless `iteration.method` is `"newton"` ([Newton iteration on documents](../packages/simcase/electric_joule.md#newton-iteration-on-documents)).
 
 ## Model documents and workflows
 

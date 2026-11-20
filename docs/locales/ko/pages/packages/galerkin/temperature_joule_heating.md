@@ -37,7 +37,7 @@ Picard는 결합 해석을 최대 `iteration_limit`번 하며 자동 재시도·
 Newton의 한계는 [아래](#newton-방법)에 적는다. 유일해는 보장하지 않는다.
 
 **방법 고르기.** 처음에는 기본값인 `"picard"`를 쓴다.
-오래 써 온 경로이고, JSON 문서가 쓰며, macOS·Windows 설치 검사가 simcase `joule_temperature` 예제로
+오래 써 온 경로이고, JSON 문서가 `iteration.method`를 쓰지 않으면 쓰는 방법이며, macOS·Windows 설치 검사가 simcase `joule_temperature` 예제로
 돌리는 방법이다. 피드백이 약하면 몇 번 안에 수렴하고, 반복 한 번이 Newton 상태 하나보다 싸다.
 Picard가 느리거나 강한 피드백에서 `iteration_limit`에 걸리면 `"newton"`을 쓴다. 계약 서미스터의
 alpha = 7, 9 /K에서 Newton은 4개 상태면 된다([검증](#검증)). dσ/dT를 알면 `derivative`를 준다.

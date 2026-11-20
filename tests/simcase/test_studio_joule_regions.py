@@ -350,6 +350,21 @@ def test_js3_iteration_limit_over_studio_cap_is_refused_before_a_job(client):
     assert_idle(server._thermal_jobs)
 
 
+def test_js3_a_newton_document_is_refused_by_name_before_a_job(client):
+    # N8 (test_joule_temperature_newton.py): Studio's iteration cap and texts count Picard steps
+    doc = strip()
+    doc["physics"]["j"]["iteration"]["method"] = "newton"
+    for action in ("validate", "run"):
+        reply = client.post("/api/joule/"+action, json=envelope(doc))
+        assert reply.status_code == 400, reply.text
+        error = reply.json()["error"]
+        assert error["code"] == "unsupported_iteration_method" and "Picard iteration only" in error["message"]
+        assert error["path"] == "physics.j.iteration.method"
+    doc["physics"]["j"]["iteration"]["method"] = "picard"
+    assert client.post("/api/joule/validate", json=envelope(doc)).json()["ok"] is True
+    assert_idle(server._thermal_jobs)
+
+
 def test_js3_a_long_iteration_fits_the_result(client):
     # relaxation 0.2 needs more Picard steps than the 64 KiB metadata budget would hold records for
     doc = strip(size=0.25)

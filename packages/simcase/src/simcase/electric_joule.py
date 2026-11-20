@@ -32,6 +32,9 @@ from . import joule_regions, joule_temperature_regions
 TYPES = {'electric.steady2d', 'joule.steady2d', 'joule.temperature2d'}
 FIELD_LAYOUT = 'electric-joule2d-p1-v2'
 MAX_TRIANGLES = 200_000
+#: the values of ``joule.temperature2d`` ``iteration.method`` (galerkin.temperature_joule_heating.METHODS);
+#: absent means ``"picard"``
+ITERATION_METHODS = ('picard', 'newton')
 _FORMAT_02 = ('format 0.2 electric and Joule documents are not read: units now travel with each value ("1 V", '
               '"2 S/m", "300 K") and the geometry declares its length_unit. Write "openphysics": "0.3" '
               '(docs/packages/simcase/electric_joule.md)')
@@ -167,7 +170,10 @@ def electric_slots():
                     q('iteration.relative_tolerance', 'relative_tolerance', ('BD', 'AV'), default=1e-10,
                       default_reason='dimensionless default of the nonlinear solve'),
                     q('iteration.iteration_limit', 'iteration_limit', ('BC',), default=100,
-                      default_reason='count default of the nonlinear solve')]
+                      default_reason='count default of the nonlinear solve'),
+                    # no table default: absent means "picard" (the meaning before the key), and a
+                    # default would add an entry to every Picard result's defaults_applied
+                    {'pattern': f'{p}.iteration.method', 'kind': 'enum', 'values': list(ITERATION_METHODS)}]
         else:
             out.append(q('electrical_conductivity', 'electrical_conductivity', slot_kind='material_property',
                          model_message=_MODEL_REFUSED))
@@ -338,7 +344,7 @@ def validate_rectangle_03(doc):
                     '(linear_resistivity), not one value', f'{path}.electrical_conductivity', 'E-VALUE-FORM')
         _model_checks(spec, path)
         temperatures_in_range_03(p, path, *spec['valid']['temperature'], "the conductivity model's")
-        iteration_checks_03(p, path)
+        iteration_checks_03(doc, name, p, path)
 
 
 def temperatures_in_range_03(p, path, lo, hi, owner):
@@ -354,9 +360,20 @@ def temperatures_in_range_03(p, path, lo, hi, owner):
                     f'{path}.{where}', 'E-OUTSIDE-VALID')
 
 
-def iteration_checks_03(p, path):
-    """The Picard iteration options of ``joule.temperature2d`` beyond the registry ranges."""
+def iteration_method_03(p):
+    """``iteration.method`` of a validated ``joule.temperature2d`` entry: ``"picard"`` when absent."""
+    return p['iteration'].get('method', 'picard')
+
+
+def iteration_checks_03(doc, name, p, path):
+    """The iteration options of ``joule.temperature2d`` beyond the registry ranges. Newton takes
+    no relaxation: an authored ``relaxation_factor`` beside ``method: "newton"`` is refused by name
+    (the resolved tree always holds its default 0.5, so the authored tree decides)."""
     iteration = p['iteration']
+    if iteration_method_03(p) == 'newton' and 'relaxation_factor' in doc.data['physics'][name]['iteration']:
+        _refuse(f'{path}.iteration.relaxation_factor: relaxation_factor relaxes Picard steps only; '
+                'method "newton" takes no relaxation_factor (remove it, or use method "picard")',
+                f'{path}.iteration.relaxation_factor')
     if not iteration['relaxation_factor'] <= 1:
         _refuse('relaxation_factor: this kind takes 0 < relaxation_factor <= 1', f'{path}.iteration.relaxation_factor',
                 'E-DOMAIN')
@@ -496,9 +513,11 @@ def result_arrays(mesh, electric, electric_fixed, *, regions=None, heat=None, he
 
 
 def summary_03(doc, *, result_format, field_layout, arrays, balance, timings, mesh, depth, extra=None,
-               history=(), minimum_angle=None):
+               history=(), minimum_angle=None, method='picard'):
     """The section 5.3.2 summary: the common envelope, the field maps, ``balance`` (value objects;
-    with a depth, each per-depth value is followed by its total) and the iteration records."""
+    with a depth, each per-depth value is followed by its total) and the iteration records. A
+    Newton solve adds ``iteration_method: "newton"`` before them; a Picard summary has no such key
+    (its bytes are those of the summary before ``iteration.method`` existed)."""
     import galerkin
     import scipy
     from . import __version__
@@ -532,7 +551,8 @@ def summary_03(doc, *, result_format, field_layout, arrays, balance, timings, me
            **results_common.envelope(doc, result_format=result_format, field_layout=field_layout,
                                      timing_=results_common.timing(timings['mesh'], timings['solve'])),
            **maps, 'mesh': mesh_block, 'study': {'type': 'single'}, **(extra or {}),
-           'balance': values, 'iterations': [iteration_record(i) for i in history],
+           'balance': values, **({'iteration_method': method} if method != 'picard' else {}),
+           'iterations': [iteration_record(i) for i in history],
            'software_versions': dict(simcase=__version__, galerkin=galerkin.__version__, numpy=np.__version__,
                                      scipy=scipy.__version__)}
     results_common.dumps_summary(out)                # finite JSON only
@@ -655,7 +675,7 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
             prescribed_electric_potential=electric_kw['prescribed_electric_potential'],
             prescribed_temperature=heat_kw['prescribed_temperature'], initial_temperature=inputs.initial_temperature,
             inward_current_density=electric_kw['inward_current_density'], inward_heat_flux=heat_kw['inward_heat_flux'],
-            convection=heat_kw['convection'], method='picard', **inputs.iteration)
+            convection=heat_kw['convection'], **inputs.iteration)
         coupled = nonlinear.coupled
         electric = coupled.electrical
     else:
@@ -673,7 +693,8 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
         balance.update(heat_balance(coupled, heat_args['dirichlet'], mesh))
     metadata = summary_03(doc, result_format=kind+'-result-v2', field_layout=FIELD_LAYOUT, arrays=arrays,
                           balance=balance, timings={'mesh': mesh_time, 'solve': solve_time}, mesh=mesh,
-                          depth=rect_geometry_03(doc)[2], history=() if nonlinear is None else nonlinear.history)
+                          depth=rect_geometry_03(doc)[2], history=() if nonlinear is None else nonlinear.history,
+                          method=iteration_method_03(p) if nonlinear is not None else 'picard')
     printed = [doc.summary(), f'Solved {mesh.num_nodes} nodes, {mesh.num_triangles} triangles; '
                f'joule_power_per_depth {electric.joule_power_per_depth:.12g} W/m']
     if verbose:

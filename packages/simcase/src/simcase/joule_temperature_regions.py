@@ -19,8 +19,8 @@ infinite range, and every finite temperature from 0 K up lies in this one, so it
 The initial, prescribed and ambient temperatures must lie inside every model material's
 ``valid.temperature`` (their intersection; an empty intersection is refused). Conductivities on
 the physics entry, ``heat_source_density``, an axisymmetric component and a void background
-are refused by name. Picard iteration only, as on a rectangle; a failed iteration raises
-``JouleConvergenceError`` with its history, unchanged.
+are refused by name. ``iteration.method`` chooses Picard (the default, when absent) or Newton,
+as on a rectangle; a failed iteration raises ``JouleConvergenceError`` with its history, unchanged.
 
 Format 0.3: the mesh is the region heat hand-off's (``handoff_03``); galerkin's solves compute
 with ``0.0 - inward_current_density`` and ``0.0 - inward_heat_flux`` (H1; galerkin takes the inward
@@ -103,7 +103,7 @@ def validate_region_joule_temperature(doc):
     valid = valid_range_03(doc, used)
     if valid is not None:
         temperatures_in_range_03(p, path, *valid)
-    iteration_checks_03(p, path)
+    iteration_checks_03(doc, name, p, path)
     single_study_03(doc, PHYSICS)
 
 
@@ -126,13 +126,16 @@ def _material_line(doc, mname, spec):
 
 
 def region_summary(doc):
+    from .electric_joule import iteration_method_03
     from .thermal import _authored
     out = summary_lines_03(doc, f'{PHYSICS}, temperature-dependent Joule heating, named material regions',
                            (*ELECTRIC_KEYS, *HEAT_KEYS), _material_line)
     name = next(iter(doc.si['physics']))
     it = f'physics.{name}.iteration'
-    out += [f'  initial_temperature {_authored(doc, f"physics.{name}.initial_temperature")}; Picard iteration: '
-            + ', '.join(f'{k} {_authored(doc, f"{it}.{k}")}' for k in doc.data['physics'][name]['iteration'])
+    method = iteration_method_03(doc.si['physics'][name]).capitalize()
+    out += [f'  initial_temperature {_authored(doc, f"physics.{name}.initial_temperature")}; {method} iteration: '
+            + ', '.join(f'{k} {_authored(doc, f"{it}.{k}")}' for k in doc.data['physics'][name]['iteration']
+                        if k != 'method')
             + ' (other options at their defaults)',
             '  other exterior boundaries electrically insulating and insulated',
             f'  result: {RESULT_FORMAT}; layout: {FIELD_LAYOUT}',
@@ -178,7 +181,7 @@ def solver_inputs(doc, mesh, region_materials):
                   initial_temperature=electric.initial_temperature,
                   inward_current_density=electric_kw['inward_current_density'],
                   inward_heat_flux=heat_kw['inward_heat_flux'],
-                  convection=heat_kw['convection'], method='picard', **electric.iteration)
+                  convection=heat_kw['convection'], **electric.iteration)
     return kwargs, fixed_by
 
 
@@ -221,12 +224,12 @@ def run_region_joule_temperature(doc, verbose=True, *, mesh_limits=None):
     metadata = summary_03(doc, result_format=RESULT_FORMAT, field_layout=FIELD_LAYOUT, arrays=arrays, balance=balance,
                           timings={'mesh': t_mesh, 'solve': t_solve}, mesh=mesh, depth=depth_03(doc),
                           extra=regions_block_03(doc, mesh, region_materials), history=nonlinear.history,
-                          minimum_angle=math.radians(float(tri.min_angle())))
+                          minimum_angle=math.radians(float(tri.min_angle())), method=kwargs['method'])
     covered = covered_shapes(h, mesh)
     printed = [doc.summary(),
                f'mesh: {mesh.num_nodes} nodes, {len(mesh.triangles)} triangles, regions {mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-               f'converged in {len(nonlinear.history)} Picard iterations; joule_power_per_depth '
+               f'converged in {len(nonlinear.history)} {kwargs["method"].capitalize()} iterations; joule_power_per_depth '
                f'{electric.joule_power_per_depth:.12g} W/m; temperature: {float(np.min(heat.temperature)):.12g} K to '
                f'{float(np.max(heat.temperature)):.12g} K']
     if verbose:

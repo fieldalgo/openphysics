@@ -74,8 +74,19 @@ import는 없다. 미터 단위 메시를 한 번 만들고, 각 삼각형 세 �
 `relative_tolerance`(기본 1e-10, 1 이하), `iteration_limit`(기본 100, 양의 정수). 기존 완화
 Picard 반복이 **완화 전** 온도·전도도 변화와 전기 재평가를 통한 비선형 열 잔차(≤1e-8)를
 검사한다. 정지 조건은 `|ΔT| ≤ temperature_tolerance + relative_tolerance max(|T_i|, |H(T_i)|)`다.
-선형 잔차·보존 gate는 바꾸지 않는다. 정규화와 정지식은 위 솔버 계약을 참조한다. 문서는 항상
-Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
+선형 잔차·보존 gate는 바꾸지 않는다. 정규화와 정지식은 위 솔버 계약을 참조한다.
+
+`iteration.method`(선택)는 `"picard"` 또는 `"newton"`이다. 없으면 `"picard"`이며, 이 키가 생기기 전에
+쓴 모든 문서의 뜻 그대로다. slot 표 기본값이 없으므로 이 키가 없는 문서는 `defaults_applied`에 아무것도
+남기지 않고 결과도 전과 바이트 단위로 같다. `"newton"`은 galerkin `solve_temperature_joule_heat`에
+`method="newton"`을 넘긴다. 전위와 온도를 함께 푸는 Newton 걸음(걸음 반감 포함)이며 같은 수렴 검사로
+판정한다([Newton 방법](../galerkin/temperature_joule_heating.md#newton-방법)). Newton은 완화를 쓰지
+않으므로 `"method": "newton"` 옆에 쓴 `relaxation_factor`는 이름을 밝혀 거부한다(`iteration.relaxation_factor`에서
+`E-CONTRACT`). 해석된 문서에는 여전히 기본값 0.5가 있고 `defaults_applied`에 남지만 Newton은 쓰지 않는다.
+`iteration_limit`는 받아들인 Newton 걸음 수를 제한하며, 걸음 하나는 후보를 최대 31번 평가한다. 그 밖의
+값(`"Newton"` 포함)은 `iteration.method`에서 `E-VALUE-FORM`이다. 강한 온도 피드백에서 Picard가 느리거나
+`iteration_limit`에 걸리면 `"newton"`을 쓴다([galerkin 계약](../galerkin/temperature_joule_heating.md)이 언제인지
+적는다). 기본값과 설치 검사 경로는 Picard 그대로다.
 
 형식 0.2 키는 새 이름을 알려 주며 거부한다(`E-KEY-UNKNOWN`). 두 outward 입력은 부호를 뒤집은
 값을 쓰라고 안내하며, 뜻이 바뀌므로 자동 수정은 없다.
@@ -182,7 +193,7 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 - **온도 범위**
   - `initial_temperature`, 모든 고정 온도, 모든 주위 온도는 모든 모델 재료의 `valid.temperature` 안, 곧 그 교집합 안에 있어야 한다(그 값에서 `E-OUTSIDE-VALID`). 공통 온도가 없는 범위는 교집합을 비게 만드는 첫 재료에서 거부한다.
   - 상수 재료는 범위를 두지 않는다. galerkin은 이를 [0 K, 가장 큰 double] 위의 상수 모델로 받는다(galerkin은 무한 범위를 거부하고, 유한한 온도는 그 끝에 닿지 않는다).
-- **그 밖**: 축대칭 구성 요소와 빈 공간 배경은 거부하며, 영역 메시 한도가 적용된다. 반복은 Picard이며 직사각형과 같은 옵션·수렴 판정을 쓴다. 반복이 실패하면 솔버의 `JouleConvergenceError`가 이력과 함께 그대로 나간다(CLI는 직사각형과 같은 실패 증거를 출력한다).
+- **그 밖**: 축대칭 구성 요소와 빈 공간 배경은 거부하며, 영역 메시 한도가 적용된다. 반복은 직사각형과 같다. Picard이거나 `iteration.method: "newton"`이면 Newton이며, 같은 옵션·거부·수렴 판정을 쓴다. 반복이 실패하면 솔버의 `JouleConvergenceError`가 이력과 함께 그대로 나간다(CLI는 직사각형과 같은 실패 증거를 출력한다).
 
 솔버는 각 영역의 전도도를 반복값의 요소 평균 온도(저장되는 `evaluation_temperature`)에서 평가한다.
 
@@ -207,12 +218,33 @@ mm 단위 2 × 1 mm 띠로, 왼쪽 절반의 `linear_resistivity` 금속(300 K�
 유효 범위 250–600 K)과 오른쪽 절반의 500 S/m 저항체가 직렬이고, 300 K와 320 K로 고정한 양 끝 사이에
 0.2 V를 건다. 요소 크기는 0.125 mm다(절점 288개, Picard 반복 30회).
 
+### 문서에서의 Newton 반복
+
+독립 검증(`tests/simcase/test_joule_temperature_newton.py`, 미리 등록한 N1–N8). 두 방법이 모두
+수렴하는 곳에서는 galerkin Newton 시험과 같은 기준으로 맞아야 한다. 온도·전위 2e-8(K, V) 이내,
+전도도는 그 every-boundary-kind 시험처럼 상대 1e-10 이내. Picard는 마지막 상대 전도도 걸음이 1e-10
+이하일 때 멈추지만 남은 오차는 그 걸음의 q/(1−q)배(q는 걸음마다 줄어드는 비율)이므로, 전도도는
+`relative_tolerance` 1e-11인 Picard와 비교한다. 온도·전위는 주어진 그대로의 Picard와도 비교한다.
+
+| 확인 | 기준 | 결과(2026-11-20, Linux) |
+|---|---|---|
+| `"method": "newton"`을 쓴 `joule_temperature` 예제 | 출하 예제 그대로(Picard, 완화 0.5) | 반복 3 대 26; 차이 9.0e-12 K, 4.6e-12 V, 상대 7.2e-11 |
+| 위의 두 재료 띠, 0.125 mm | 같은 문서의 Picard | 반복 3 대 31; 3.0e-10 K, 3.4e-12 V, 상대 8.5e-11 |
+| galerkin의 전류 구동 서미스터를 직사각형으로(16 × 4, 1 A/m², a = 7 1/K) | 기본 Picard; 완화 1 Picard | 기본 Picard는 100번에서 멈춤; Newton은 4번에 수렴; 완화 1(63번)과 1.0e-10 K, 6.5e-10 V, 전도도 상대 2.6e-10. 이는 그 Picard 자신의 남은 오차다(한 걸음마다 0.70배로 줄어 약 1.8e-10). 그 `relative_tolerance`를 1e-11로 하면 3.1e-11(사전 등록 검사는 주어진 그대로의 Picard와 전도도를 비교했고, 그 비교는 실패로 여기 기록한다) |
+| 같은 서미스터, a = 0.5 1/K | 기본 Picard | 반복 3 대 33 |
+| Newton으로 띠의 닫힌 해 | 위와 같음 | 0.25, 0.125, 0.0625 mm에서 온도 오차가 상승의 8.5e-3, 2.0e-3, 4.6e-4(차수 2.1); 가장 고운 메시에서 단자 전류 상대 2.3e-5; 각각 반복 3 |
+| `method="newton"` galerkin 직접 호출 | 영역 띠; σ(T)를 따로 쓴 직사각형 예제 | 비트 단위로 같음; 필드 상대 1e-12 이내(전위 1e-12 V), 반복 수 같음 |
+| Picard 문서 | 이 변경 전 결과(커밋과 함께 측정, 시험 아님) | 예제와 영역 띠 셋: 저장 배열·요약(시간 제외) 해시가 직전 커밋과 같음 |
+| `"method": "picard"`를 씀 | 그 키가 없는 같은 문서 | 배열·요약(시간 제외)이 바이트 단위로 같음, 직사각형과 영역 |
+| 거부 | | `"secant"`, `"Newton"`, `1`, `null`, `"newton"` 옆의 `relaxation_factor`, `iteration` 밖의 `method`; 직사각형과 영역 모두 |
+
 ## Studio (영역 문서)
 
 Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서를 `POST /api/joule/validate`와
 `POST /api/joule/run`에서 열전도 route와 같은 요청 봉투(`{"doc", "client_revision", "request_seq"}`)로
 검증·실행한다. 직사각형 전기 문서, `electric.steady2d` 문서, 다른 물리는 이름을 밝혀 거부한다
-(`unsupported_geometry`, `unsupported_physics`). 이 route는
+(`unsupported_geometry`, `unsupported_physics`). `iteration.method: "newton"`인 `joule.temperature2d` 문서도
+거부한다(`unsupported_iteration_method`, 400). Studio의 반복 상한과 오류 문장이 Picard 걸음을 센다. 이 route는
 [Studio 영역 경로](thermal_studio.md#영역-문서)를 단계마다 그대로 따른다. 같은 영역 한도
 (`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`, `max_input_vertices`)를
 문서를 읽기 전에 검사하고, 작업은 절점·삼각형 상한(`max_nodes`, `max_triangles`)으로 실행하므로 너무
@@ -304,11 +336,16 @@ Python은 `Document.from_dict`/`Document.load`, `run(document)`,
 | 영역: `outward_current_per_depth.<name>` | 고정 경계마다, 밖으로 양수 | A/m |
 
 `depth`가 있으면 `*_per_depth` 값마다 그 총량(`joule_power`, `outward_current.<name>`, …, 깊이당
-값 × 깊이)이 뒤따른다. `joule.temperature2d`는 `iterations`를 더한다. Picard 단계마다 기록 하나이며
+값 × 깊이)이 뒤따른다. `joule.temperature2d`는 `iterations`를 더한다. Picard 단계 또는 받아들인 Newton 걸음마다 기록 하나이며
 `iteration_count`, `temperature_change`(K), `relative_electrical_conductivity_change`,
 `minimum_temperature`, `maximum_temperature`, `maximum_residual_current_per_depth`,
 `maximum_residual_heat_rate_per_depth`, `relative_residual`과 그 단계의 수지 열을 담는다. 값마다
-단위가 붙으므로 0.2의 `iteration_units` 표는 없어졌고, `units`와 `mesh_length_unit`도 없다.
+단위가 붙으므로 0.2의 `iteration_units` 표는 없어졌고, `units`와 `mesh_length_unit`도 없다. Newton으로
+풀면 `iterations` 바로 앞에 `"iteration_method": "newton"`을 쓴다. Picard 요약에는 이 키가 없으며(없으면
+Picard) 키가 생기기 전의 바이트를 그대로 유지한다. 이 키는 기존 결과 형식에 더해지는 필드이며 형식
+식별자는 그대로다. 이 키를 무시하는 독자는 기록을 이름 없는 방법의 반복으로 읽고, Newton 걸음과
+Picard 걸음을 가려야 하는 독자는 이 키를 확인한다. 요약의 `resolved_inputs`는 수량만 담으므로
+`iteration.method`는 거기에 없다.
 
 CLI 종료값: 입력 오류 2, 풀이·비수렴·I/O 오류 1, 성공 0.
 비수렴·범위 이탈은 Python에서 `JouleConvergenceError`로 이유·완료 이력·마지막
@@ -326,7 +363,7 @@ redirect해 보존한다.
 `tests/simcase/test_units_electric_joule.py`가 검사한다. 기존 솔버의 독립 도구 비교는 유지하며
 새로운 이산화는 추가하지 않는다.
 
-이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 문서에서의 Newton 반복,
+이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. Newton 문서의 Studio 실행,
 경계면 전위, 축대칭 전도, 임의 σ 함수, 기준 전위만 주는 전류 조건, 단자 총량, 과도, 3D,
 직사각형 문서의 Studio 실행, 릴리스는 제외한다. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수 있다
 ([ParaView로 보기](overview.md#paraview로-보기)). 그 내보내기는 저장된 배열을 복사하고 FieldData

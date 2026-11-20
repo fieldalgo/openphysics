@@ -331,6 +331,7 @@
 {"forms": ["QS", "AV"], "kind": "quantity", "pattern": "physics.*{joule.temperature2d}.inward_heat_flux.*", "physics_kind": "electric_joule", "quantity": "inward_heat_flux"},
 {"forms": ["OBJECT"], "kind": "structural", "pattern": "physics.*{joule.temperature2d}.iteration", "physics_kind": "electric_joule", "required": true},
 {"default": 100, "default_reason": "count default of the nonlinear solve", "forms": ["BC"], "kind": "quantity", "pattern": "physics.*{joule.temperature2d}.iteration.iteration_limit", "physics_kind": "electric_joule", "quantity": "iteration_limit"},
+{"kind": "enum", "pattern": "physics.*{joule.temperature2d}.iteration.method", "physics_kind": "electric_joule", "values": ["picard", "newton"]},
 {"default": 1e-10, "default_reason": "dimensionless default of the nonlinear solve", "forms": ["BD", "AV"], "kind": "quantity", "pattern": "physics.*{joule.temperature2d}.iteration.relative_tolerance", "physics_kind": "electric_joule", "quantity": "relative_tolerance"},
 {"default": 0.5, "default_reason": "dimensionless default: the Picard relaxation", "forms": ["BD", "AV"], "kind": "quantity", "pattern": "physics.*{joule.temperature2d}.iteration.relaxation_factor", "physics_kind": "electric_joule", "quantity": "relaxation_factor"},
 {"forms": ["QS", "AV"], "kind": "quantity", "pattern": "physics.*{joule.temperature2d}.iteration.temperature_tolerance", "physics_kind": "electric_joule", "quantity": "temperature_tolerance", "required": true},

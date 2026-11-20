@@ -19,6 +19,9 @@ budget, retention and pins. A finished job's payload holds every array of the pu
 (SI, under their registry names), the summary, and the display length; it is checked before it is
 published (shapes and units against the summary, connectivity, region ids and materials).
 
+A ``joule.temperature2d`` document with ``iteration.method: "newton"`` is refused by name
+(``unsupported_iteration_method``): the iteration cap and the error text count Picard steps.
+
 Errors follow Studio's policy: document, geometry and limit refusals keep their text; a Picard
 iteration that does not converge is reported with the solver's reason and iteration count; any
 other failure replies with the fixed message and logs its traceback.
@@ -121,6 +124,13 @@ def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
                                          400 if for_run else 200) from exc
         if kind == TEMPERATURE:
             name, p = next(iter(doc.si["physics"].items()))
+            if p["iteration"].get("method", "picard") != "picard":
+                # Studio's cost cap and its not_converged text count Picard steps; a Newton step
+                # evaluates up to 31 candidates (galerkin halves a step up to 30 times)
+                raise common.ThermalAPIError(
+                    "unsupported_iteration_method", f'physics.{name}.iteration.method "{p["iteration"]["method"]}": '
+                    "Studio runs the Picard iteration only; run a Newton document with simcase",
+                    path=f"physics.{name}.iteration.method")
             limit = p["iteration"]["iteration_limit"]
             if limit > MAX_ITERATIONS:
                 raise common.ThermalAPIError(
