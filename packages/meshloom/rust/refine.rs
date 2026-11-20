@@ -53,6 +53,12 @@ pub struct RefineStats {
     pub exempt: u32,
     /// encroached subfacets left unsplit by the small-angle rule
     pub exempt_faces: u32,
+    /// points inserted to remove slivers (dihedral refinement, M6 step 1)
+    pub sliver_points: u32,
+    /// slivers left: below the dihedral bound when refinement ended
+    pub slivers_left: u32,
+    /// volume vertices moved to remove slivers (M6 step 2)
+    pub sliver_moves: u32,
 }
 
 struct State<'a> {
@@ -82,9 +88,19 @@ struct State<'a> {
     segq: VecDeque<(u32, u32)>,
     subq: VecDeque<[u32; 3]>,
     tetq: BinaryHeap<(u64, std::cmp::Reverse<[u32; 4]>, u32)>,
+    /// slivers (minimum dihedral below DIHEDRAL_MIN), the lowest priority, worst first
+    dihq: BinaryHeap<(std::cmp::Reverse<u64>, std::cmp::Reverse<[u32; 4]>, u32)>,
     n: MixedCounters,
     _p: std::marker::PhantomData<&'a ()>,
 }
+
+/// M6 step 1: a tetrahedron (with a size) whose smallest dihedral angle is below this many
+/// degrees is split at the lowest priority, unless its circumradius is below
+/// SLIVER_FILTER h (its circumcentre would come too close to a vertex), up to
+/// SLIVER_CAP times the points refinement inserted before (lfs-free cap).
+const DIHEDRAL_MIN: f64 = 15.0;
+const SLIVER_FILTER: f64 = 0.7;
+const SLIVER_CAP: f64 = 0.10;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -214,7 +230,134 @@ impl State<'_> {
             let mut s = v;
             s.sort_unstable();
             self.tetq.push((bad.to_bits(), std::cmp::Reverse(s), t));
+        } else if self.hsz[t as usize] > 0.0 {
+            let d = self.min_dihedral(t);
+            if d < DIHEDRAL_MIN {
+                let mut s = v;
+                s.sort_unstable();
+                self.dihq.push((std::cmp::Reverse(d.to_bits()), std::cmp::Reverse(s), t));
+            }
         }
+    }
+
+    /// M6 step 2: move volume vertices of the slivers left (deterministic directions:
+    /// away from the opposite face, then towards the centroid of the vertex's star), keeping
+    /// the connectivity; a move is kept only if every tetrahedron around the vertex stays
+    /// positive (exact orient3d) and the smallest dihedral angle around it grows. Volume
+    /// points are triples of doubles, so the moved point is exact. The mesh is no longer
+    /// Delaunay there; it stays constrained (no constraint vertex moves).
+    fn perturb_slivers(&mut self) {
+        let n = self.g.input.len();
+        for _round in 0..4 {
+            let mut sl: Vec<([u32; 4], u32)> = (0..self.cx.tets.len() as u32)
+                .filter(|&t| self.cx.alive[t as usize] && self.inside[t as usize] && self.hsz[t as usize] > 0.0
+                    && self.min_dihedral(t) < DIHEDRAL_MIN)
+                .map(|t| {
+                    let mut k = self.cx.tets[t as usize];
+                    k.sort_unstable();
+                    (k, t)
+                }).collect();
+            sl.sort_unstable();
+            let mut moved = 0;
+            for (_, t) in sl {
+                if !self.cx.alive[t as usize] || self.min_dihedral(t) >= DIHEDRAL_MIN {
+                    continue;
+                }
+                let tv = self.cx.tets[t as usize];
+                for (i, &v) in tv.iter().enumerate() {
+                    if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Volume {
+                        continue;
+                    }
+                    let star: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                        .filter(|&u| self.cx.alive[u as usize]).collect();
+                    let base = star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min);
+                    let p0 = self.xyz[v as usize];
+                    // away from the opposite face of t (raises its volume)
+                    let o: Vec<P3> = (0..4).filter(|&j| j != i).map(|j| self.xyz[tv[j] as usize]).collect();
+                    let nrm = cross(&sub3(&o[1], &o[0]), &sub3(&o[2], &o[0]));
+                    let nn = dot(&nrm, &nrm).sqrt();
+                    let side = dot(&nrm, &sub3(&p0, &o[0]));
+                    let lmin = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                        .map(|(a, b)| dot(&sub3(&self.xyz[tv[a] as usize], &self.xyz[tv[b] as usize]),
+                                          &sub3(&self.xyz[tv[a] as usize], &self.xyz[tv[b] as usize])).sqrt())
+                        .fold(f64::INFINITY, f64::min);
+                    let mut cands: Vec<P3> = Vec::new();
+                    if nn > 0.0 {
+                        let u = nrm.map(|x| x / nn * side.signum());
+                        for f in [0.5, 0.25, 0.1] {
+                            cands.push(std::array::from_fn(|k| p0[k] + f * lmin * u[k]));
+                        }
+                    }
+                    let mut cen = [0.0; 3];
+                    let mut cnt = 0.0;
+                    for &u in &star {
+                        for &w in &self.cx.tets[u as usize] {
+                            if w != v {
+                                let q = self.xyz[w as usize];
+                                for k in 0..3 {
+                                    cen[k] += q[k];
+                                }
+                                cnt += 1.0;
+                            }
+                        }
+                    }
+                    if cnt > 0.0 {
+                        for f in [1.0, 0.5, 0.25] {
+                            cands.push(std::array::from_fn(|k| p0[k] + f * (cen[k] / cnt - p0[k])));
+                        }
+                    }
+                    let mut done = false;
+                    for c in cands {
+                        if !c.iter().all(|x| x.is_finite()) {
+                            continue;
+                        }
+                        self.set_volume_point(v, c);
+                        let ok = star.iter().all(|&u| {
+                            let w = self.cx.tets[u as usize];
+                            self.orient(w) > 0
+                        });
+                        if ok && star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min) > base + 1e-9 {
+                            done = true;
+                            break;
+                        }
+                        self.set_volume_point(v, p0);
+                    }
+                    if done {
+                        moved += 1;
+                        if self.min_dihedral(t) >= DIHEDRAL_MIN {
+                            break;
+                        }
+                    }
+                }
+            }
+            if moved == 0 {
+                break;
+            }
+            self.stats.sliver_moves += moved;
+        }
+    }
+
+    fn set_volume_point(&mut self, v: u32, p: P3) {
+        let n = self.g.input.len();
+        self.g.s[v as usize - n] = SPoint::vol(p);
+        self.xyz[v as usize] = p;
+    }
+
+    /// The smallest dihedral angle of tetrahedron t, in degrees (doubles).
+    fn min_dihedral(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let mut m = 180.0f64;
+        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+            let e = sub3(&x[j], &x[i]);
+            let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
+            let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
+            if d > 0.0 {
+                m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+            } else {
+                return 0.0;
+            }
+        }
+        m
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -1291,7 +1434,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     }
     let mut st = State {
         g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
-        segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), n: MixedCounters::default(),
+        segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
     let mut keys: Vec<(u32, u32)> = st.seg.keys().copied().collect();
@@ -1303,6 +1446,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     for t in 0..st.cx.tets.len() as u32 {
         st.queue_tet(t);
     }
+    let mut sliver_budget: Option<u32> = None;
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
@@ -1337,8 +1481,43 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             }
             continue;
         }
+        // M6 step 1: slivers, once nothing else is left, within the cap
+        if let Some((_, std::cmp::Reverse(s), t)) = st.dihq.pop() {
+            if sliver_budget.is_none() {
+                sliver_budget = Some(((st.g.s.len() as f64) * SLIVER_CAP).ceil() as u32);
+            }
+            let mut v = st.cx.tets[t as usize];
+            v.sort_unstable();
+            if !st.cx.alive[t as usize] || v != s || st.stats.sliver_points >= sliver_budget.unwrap() {
+                continue;
+            }
+            let hs = st.hsz[t as usize];
+            if !(hs > 0.0) || st.min_dihedral(t) >= DIHEDRAL_MIN {
+                continue;
+            }
+            let x = st.cx.tets[t as usize].map(|q| st.xyz[q as usize]);
+            let Some(c) = circumcentre(x) else { continue };
+            let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+            if r < SLIVER_FILTER * st.opt.alpha * hs {
+                continue;
+            }
+            let before = (st.g.s.len(), st.stats.volume_points);
+            st.split_tet(t)?;
+            if st.g.s.len() > before.0 {
+                st.stats.sliver_points += 1;
+                if st.stats.volume_points > before.1 {
+                    st.stats.volume_points -= 1; // counted as a sliver point instead
+                }
+            }
+            continue;
+        }
         break;
     }
+    st.perturb_slivers();
+    st.stats.slivers_left = (0..st.cx.tets.len() as u32)
+        .filter(|&t| st.cx.alive[t as usize] && st.inside[t as usize] && st.hsz[t as usize] > 0.0
+            && st.min_dihedral(t) < DIHEDRAL_MIN)
+        .count() as u32;
     // write back
     b.tets = st.cx.live();
     let mut subs: Vec<Vec<[u32; 3]>> = vec![Vec::new(); plc.facets.len()];
