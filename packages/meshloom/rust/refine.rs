@@ -66,6 +66,9 @@ struct State<'a> {
     /// per tetrahedron: the size h of its region (0: no size bound; negative: a hole, not
     /// refined for quality or size)
     hsz: Vec<f64>,
+    /// boundary size factors (experiment): subsegment length and subfacet circumradius
+    seg_c: f64,
+    fac_c: f64,
     /// subfacet -> its facets (two where touching shells share it)
     sub: HashMap<[u32; 3], Vec<u32>>,
     /// subsegment -> chain index
@@ -215,6 +218,45 @@ impl State<'_> {
             s.sort_unstable();
             self.tetq.push((bad.to_bits(), std::cmp::Reverse(s), t));
         }
+    }
+
+    /// The size at a boundary simplex: the smallest positive size of the tetrahedra (inside
+    /// the domain) in `ts`; 0 when none has one.
+    fn local_h(&self, ts: impl Iterator<Item = u32>) -> f64 {
+        ts.filter(|&t| t != NONE && self.inside[t as usize]).map(|t| self.hsz[t as usize])
+            .filter(|h| *h > 0.0).fold(0.0, |a: f64, h| if a == 0.0 { h } else { a.min(h) })
+    }
+
+    /// Boundary size: a subsegment longer than SEG_C alpha h of the regions around it.
+    fn segment_too_long(&self, e: (u32, u32)) -> bool {
+        let c = self.seg_c;
+        if !(c > 0.0) {
+            return false;
+        }
+        let ts = self.cx.star[e.0 as usize].iter().copied()
+            .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&e.1));
+        let h = self.local_h(ts);
+        let d = sub3(&self.xyz[e.1 as usize], &self.xyz[e.0 as usize]);
+        h > 0.0 && dot(&d, &d).sqrt() > c * self.opt.alpha * h
+    }
+
+    /// Boundary size: a subfacet whose circumradius exceeds FAC_C alpha h of its regions.
+    fn subfacet_too_large(&self, f: [u32; 3]) -> bool {
+        let c = self.fac_c;
+        if !(c > 0.0) {
+            return false;
+        }
+        let Some(o) = self.cx.faces.get(&f) else { return false };
+        let h = self.local_h(o.iter().copied());
+        if !(h > 0.0) {
+            return false;
+        }
+        let x = f.map(|v| self.xyz[v as usize]);
+        let (a, b) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]));
+        let n = cross(&a, &b);
+        let nn = dot(&n, &n);
+        let cc = sub3(&a, &b);
+        nn > 0.0 && (dot(&a, &a) * dot(&b, &b) * dot(&cc, &cc)).sqrt() / (2.0 * nn.sqrt()) > c * self.opt.alpha * h
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -1290,7 +1332,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         }
     }
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg_c: std::env::var("MESHLOOM_SEG_C").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0), fac_c: std::env::var("MESHLOOM_FAC_C").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0), seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
@@ -1306,7 +1348,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
-                if st.segment_encroacher(e).is_some() {
+                if st.segment_encroacher(e).is_some() || st.segment_too_long(e) {
                     st.split_segment(e)?;
                 }
             }
@@ -1320,6 +1362,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                     } else {
                         st.split_subfacet(f)?;
                     }
+                } else if st.subfacet_too_large(f) {
+                    st.split_subfacet(f)?;
                 }
             }
             continue;
