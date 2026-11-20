@@ -255,6 +255,13 @@ Independent checks (`tests/simcase/test_joule_temperature_regions.py`, pre-regis
 | Power | supplied, Joule and outward heat | agree to 4e-14 relative |
 | Zero coefficients, and constant materials | region `joule.steady2d` on the same document | temperature and potential equal (difference 0) |
 | Rectangle documents | results before this change | `joule_rectangle`, `joule_temperature` saved arrays, summary (without timings) and model hashes equal to the commit before (checked when this was written) |
+| Shipped example `joule_temperature_regions` | the T1 strip with material B a constant 500 S/m: theta_A as in T1, and k_B T'' = -J^2 rho_B (a parabola) in B, with continuous T and k dT/dx and J by the same root | temperature 1.9e-3 of the rise at the example's 0.125 mm (8.4e-3, 1.9e-3, 4.5e-4 at 0.25, 0.125, 0.0625 mm); terminal current 1.3e-6 relative |
+
+The shipped example is `joule_temperature_regions` (`python -m simcase example
+joule_temperature_regions`): a 2 x 1 mm strip in mm, a `linear_resistivity` metal
+(2000 S/m at 300 K, 0.004 1/K, valid 250 to 600 K) on the left half in series with a
+500 S/m resistor on the right, 0.2 V across the ends held at 300 and 320 K, element size
+0.125 mm (288 nodes; 30 Picard iterations).
 
 ## Studio (region documents)
 

@@ -423,3 +423,47 @@ def test_a_rectangle_keeps_refusing_a_constant_on_its_physics_entry():
         Document.from_dict(raw)
     assert [(d.code, d.path) for d in error.value.diagnostics if d.severity == "error"] == [
         ("E-VALUE-FORM", "physics.electric.electrical_conductivity")]
+
+
+def test_the_shipped_example_is_the_t1_strip_with_a_constant_resistor():
+    """``joule_temperature_regions`` (examples/simcase): the T1 strip with material B held at a
+    constant 500 S/m. Reference written here, independent of the solve: in A theta_A as in T1;
+    in B, k_B T'' = -J^2 rho_B with rho_B constant, so T_B(s) = t0 + g s - q s^2 / 2,
+    q = J^2 rho_B / k_B. T(2 L) = T_RIGHT, continuity of T and of k T' at x = L are linear in
+    (b_A, t0, g); J is the bracketed root of V = J (rho0_A integral theta_A + rho_B L)."""
+    from simcase.examples import EXAMPLES
+    raw = copy.deepcopy(EXAMPLES["joule_temperature_regions"])
+    assert raw["materials"]["metal"]["electrical_conductivity"]["reference_conductivity"] == f"{SIGMA['A']:g} S/m"
+    assert raw["materials"]["resistor"]["electrical_conductivity"] == f"{SIGMA['B']:g} S/m"
+    rho_a, rho_b, alpha = 1.0 / SIGMA["A"], 1.0 / SIGMA["B"], ALPHA["A"]
+    a_a = 1.0 + alpha * (T_LEFT - T_REF)
+
+    def solution(j):
+        m = alpha * j * j * rho_a / KAPPA["A"]
+        q = j * j * rho_b / KAPPA["B"]
+        c, d, ic, id_ = _basis(m, L)
+        rows = [[0.0, 1.0, L], [d / alpha, -1.0, 0.0], [KAPPA["A"] * c / alpha, 0.0, -KAPPA["B"]]]
+        rhs = [T_RIGHT + q * L * L / 2, (1.0 - a_a * c) / alpha - T_REF, KAPPA["A"] * m * a_a * d / alpha]
+        b_a, t0, g = np.linalg.solve(np.array(rows), np.array(rhs))
+        return (m, b_a, t0, g, q), j * (rho_a * (a_a * ic + b_a * id_) + rho_b * L)
+
+    linear = VOLTS / (L * (rho_a + rho_b))
+    j = brentq(lambda j: solution(j)[1] - VOLTS, 0.5 * linear, 2.0 * linear, xtol=1e-14, rtol=1e-15)
+    (m, b_a, t0, g, q), _ = solution(j)
+    result = run(Document.from_dict(raw), verbose=False)
+    fields = result.fields
+    x = fields["node_coordinates"][:, 0]
+    exact = np.empty_like(x)
+    for i, xi in enumerate(x):
+        if xi <= L:
+            c, d, _, _ = _basis(m, xi)
+            exact[i] = T_REF + (a_a * c + b_a * d - 1.0) / alpha
+        else:
+            s = xi - L
+            exact[i] = t0 + g * s - q * s * s / 2
+    rise = float(np.max(exact) - np.min(exact))
+    error = float(np.max(np.abs(fields["temperature"] - exact))) / rise
+    current = result.summary()["balance"]["outward_current_per_depth"]["right"]["value"]
+    # measured at the example's 0.125 mm: temperature 1.9e-3 of the rise, current 1.3e-6 relative
+    assert error <= 5e-3, error
+    assert abs(current - j * H) <= 1e-4 * j * H, (current, j * H)

@@ -57,6 +57,7 @@ prints a supplied example.
 | `electric.steady2d` | Steady conduction: a homogeneous rectangle, or material regions of a geometry block | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.steady2d` | Constant-property steady Joule heating: a homogeneous rectangle, or material regions | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | Temperature-dependent steady Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
+| `joule.temperature2d` with regions | Temperature-dependent steady Joule heating with named material regions (a constant or `linear_resistivity` electrical conductivity per material) | `joule_temperature_regions` | [Region documents](electric_joule.md#material-regions-temperature-dependent-joule-heating) |
 | `mechanics.elasticity2d` | Static linear elasticity of a homogeneous rectangle: plane stress or strain, side displacement components, Cartesian side tractions, constant body force | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | Steady heat with side-constant boundary data, then thermal stress on the same mesh with total side tractions | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.elasticity2d` with regions | Static linear elasticity with named material regions (E and ν from the materials table) and the boundary names of region heat: displacements, Cartesian tractions and gauge pressures | `elastic_regions` | [Region documents](mechanics2d.md#material-regions-and-named-boundaries) |

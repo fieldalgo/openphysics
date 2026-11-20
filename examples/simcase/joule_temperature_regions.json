@@ -1,0 +1,88 @@
+{
+  "openphysics": "0.3",
+  "name": "Metal and resistor in series with temperature-dependent Joule heating",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "strip": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 2.0,
+          "ymin": 0.0,
+          "ymax": 1.0
+        },
+        "background": {
+          "material": "metal"
+        },
+        "features": [
+          {
+            "name": "resistor",
+            "type": "rect",
+            "x": 1.0,
+            "y": 0.0,
+            "w": 1.0,
+            "h": 1.0,
+            "material": "resistor"
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "materials": {
+    "metal": {
+      "electrical_conductivity": {
+        "model": "linear_resistivity",
+        "reference_conductivity": "2000 S/m",
+        "reference_temperature": "300 K",
+        "resistivity_temperature_coefficient": "0.004 1/K",
+        "valid": {
+          "temperature": [
+            "250 K",
+            "600 K"
+          ]
+        }
+      },
+      "thermal_conductivity": "1.5 W/(m K)",
+      "source": "document value"
+    },
+    "resistor": {
+      "electrical_conductivity": "500 S/m",
+      "thermal_conductivity": "0.25 W/(m K)",
+      "source": "document value"
+    }
+  },
+  "mesh": {
+    "element_size": "0.125 mm"
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "joule": {
+      "type": "joule.temperature2d",
+      "prescribed_electric_potential": {
+        "left": "0.2 V",
+        "right": "0 V"
+      },
+      "prescribed_temperature": {
+        "left": "300 K",
+        "right": "320 K"
+      },
+      "initial_temperature": "300 K",
+      "iteration": {
+        "relaxation_factor": 0.5,
+        "temperature_tolerance": "1e-8 K",
+        "relative_tolerance": 1e-10,
+        "iteration_limit": 100
+      }
+    }
+  }
+}

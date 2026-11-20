@@ -242,9 +242,9 @@ TRANSIENT_THERMAL_BOUNDARY = {
 }
 EXAMPLES['transient_thermal_boundary'] = TRANSIENT_THERMAL_BOUNDARY
 
-from .electric_examples import ELECTRIC_RECTANGLE, JOULE_RECTANGLE, JOULE_TEMPERATURE
+from .electric_examples import ELECTRIC_RECTANGLE, JOULE_RECTANGLE, JOULE_TEMPERATURE, JOULE_TEMPERATURE_REGIONS
 EXAMPLES.update(electric_rectangle=ELECTRIC_RECTANGLE, joule_rectangle=JOULE_RECTANGLE,
-                joule_temperature=JOULE_TEMPERATURE)
+                joule_temperature=JOULE_TEMPERATURE, joule_temperature_regions=JOULE_TEMPERATURE_REGIONS)
 
 from .mechanics_examples import ELASTIC_PLATE, ELASTIC_REGIONS, THERMOELASTIC_BAR, THERMOELASTIC_REGIONS
 EXAMPLES.update(elastic_plate=ELASTIC_PLATE, thermoelastic_bar=THERMOELASTIC_BAR,

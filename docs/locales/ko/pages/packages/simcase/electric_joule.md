@@ -200,6 +200,12 @@ Picard 반복을 쓰며 Python API의 `method="newton"`은 이 형식에 없다.
 | 전력 | 공급, Joule, 바깥으로 나가는 열 | 상대 4e-14까지 같음 |
 | 계수 0, 그리고 상수 재료 | 같은 문서의 영역 `joule.steady2d` | 온도·전위가 같음(차이 0) |
 | 직사각형 문서 | 이 변경 전 결과 | `joule_rectangle`, `joule_temperature`의 저장 배열·요약(시간 제외)·모델 해시가 직전 커밋과 같음(작성 때 확인) |
+| 제공 예제 `joule_temperature_regions` | 재료 B를 상수 500 S/m로 둔 T1 띠: A의 θ는 T1과 같고, B에서는 k_B T'' = −J² ρ_B(포물선), T와 k dT/dx가 연속, J는 같은 근 | 예제 메시 0.125 mm에서 온도 오차가 상승의 1.9e-3(0.25, 0.125, 0.0625 mm에서 8.4e-3, 1.9e-3, 4.5e-4), 단자 전류 상대 1.3e-6 |
+
+제공 예제는 `joule_temperature_regions`(`python -m simcase example joule_temperature_regions`)다.
+mm 단위 2 × 1 mm 띠로, 왼쪽 절반의 `linear_resistivity` 금속(300 K에서 2000 S/m, 0.004 1/K,
+유효 범위 250–600 K)과 오른쪽 절반의 500 S/m 저항체가 직렬이고, 300 K와 320 K로 고정한 양 끝 사이에
+0.2 V를 건다. 요소 크기는 0.125 mm다(절점 288개, Picard 반복 30회).
 
 ## Studio (영역 문서)
 

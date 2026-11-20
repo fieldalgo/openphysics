@@ -30,6 +30,7 @@ python -m simcase geometry model.json                     # 버전 1 형상 블�
 | `electric.steady2d` | 정상 전기전도: 균질 직사각형, 또는 형상 블록의 재료 영역 | `electric_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.steady2d` | 상수 물성 정상 Joule heating: 균질 직사각형, 또는 재료 영역 | `joule_rectangle` | [JSON/CLI](electric_joule.md) |
 | `joule.temperature2d` | 온도 의존 정상 Joule heating | `joule_temperature` | [JSON/CLI](electric_joule.md) |
+| 영역이 있는 `joule.temperature2d` | 이름 있는 재료 영역의 온도 의존 정상 Joule heating(재료마다 상수 또는 `linear_resistivity` 전기전도도) | `joule_temperature_regions` | [영역 문서](electric_joule.md#재료-영역-온도-의존-joule-가열) |
 | `mechanics.elasticity2d` | 균질 직사각형의 정적 선형탄성: 평면응력·평면변형률, 변별 변위 성분, 직교좌표계 변 traction, 상수 체적력 | `elastic_plate` | [JSON/CLI](mechanics2d.md) |
 | `mechanics.thermoelastic2d` | 변별 상수 경계 데이터의 정상 열전도 후 같은 메시의 열응력, 전체 변 traction | `thermoelastic_bar` | [JSON/CLI](mechanics2d.md) |
 | 영역이 있는 `mechanics.elasticity2d` | 이름 있는 재료 영역의 정적 선형탄성(E·ν는 재료 표에서), 영역 열전도와 같은 경계 이름의 변위·직교좌표계 traction·계기압 | `elastic_regions` | [영역 문서](mechanics2d.md#재료-영역과-이름-있는-경계) |
