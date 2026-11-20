@@ -226,7 +226,11 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No sizing beyond a uniform `h`, no practical-mode tuning and no quality improvement
+- Not yet accepted: V21 fails at the plan's CI sizes (it passes at {0.2, 0.1, 0.05}, the
+  sizes the extruder's amendment uses); V8 fails on C2 at h = 0.12 and on C3 with the
+  die at h/2 (meshloom is coarser than the baseline at coarse sizes and in thin layers);
+  the unstructured-cavity refinement ladder (V32) does not decrease monotonically.
+- No graded or callable sizes (one size per region only), and no quality improvement
   (sliver removal) yet. Refinement is slow: about 19,000 nodes in 25 s on stacked
   layers. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
   input and recovery points (and the few points repair adds) only. A

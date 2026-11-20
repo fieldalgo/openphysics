@@ -45,16 +45,22 @@ GUARANTEED_RATIO = 2.0
 #: radius-edge bound of quality="practical" (the default): better shaped tetrahedra, with
 #: no termination proof; the point cap ends it with RefineError instead of a hang
 PRACTICAL_RATIO = 1.4
+#: default size factor: a tetrahedron is split when its circumradius exceeds ALPHA * h.
+#: Calibrated once (2026-11-20) so that the median edge over h on the unit cube at
+#: h = 0.06 matches the plan's baseline (1.245; 1.356 with factor 1), so that "size h"
+#: means the same as the baseline's MeshSizeMax (validation3d.md, size convention)
+ALPHA = 0.9181
 
 
 def generate3d(points, facets, segments=None, *, h, domain="regions", region_points=None, facet_tags=None,
-               quality="practical", alpha=1.0, max_points=0):
+               quality="practical", alpha=ALPHA, max_points=0):
     """Tetrahedral mesh of a piecewise-linear complex.
 
     ``points`` (n x 3) and ``facets`` (each a list of loops of point indices, the first
     loop the outer boundary) describe the input; ``segments`` (m x 2) adds edges. ``h``
     is the target size, one number or (with ``region_points``) a mapping from region
-    name to size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split.
+    name to size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split
+    (``ALPHA`` by default, calibrated against the plan's baseline).
     ``quality`` bounds the radius-edge ratio, circumradius over shortest edge:
     ``"guaranteed"`` (``GUARANTEED_RATIO``, provably terminating without input angles
     below 90 degrees) or ``"practical"`` (``PRACTICAL_RATIO``). Near input angles below
@@ -106,5 +112,5 @@ def __getattr__(name):  # the typed errors, without importing _core at package i
 
 _ERRORS = ("InvalidPLC", "MeshError", "NotClosed", "RecoveryError", "RefineError", "RegionError", "RoundingError")
 
-__all__ = ["GUARANTEED_RATIO", "KernelUnavailable", "PRACTICAL_RATIO", "generate3d", "kernel_available", "kernel_version",
+__all__ = ["ALPHA", "GUARANTEED_RATIO", "KernelUnavailable", "PRACTICAL_RATIO", "generate3d", "kernel_available", "kernel_version",
            "__version__", *_ERRORS]
