@@ -43,6 +43,8 @@ def test_two_product_is_exact():
         assert Fraction(p) + Fraction(e) == Fraction(a) * Fraction(b), (a, b, p, e)
 
 
-def test_generate3d_is_not_implemented_yet():
-    with pytest.raises(NotImplementedError, match="not implemented yet"):
-        meshloom.generate3d()
+def test_generate3d_needs_a_size_and_a_known_quality():
+    with pytest.raises(ValueError, match="h is required"):
+        meshloom.generate3d([[0, 0, 0]], [], h=None)
+    with pytest.raises(ValueError, match="quality"):
+        meshloom.generate3d([[0, 0, 0]], [], h=1.0, quality="best")
