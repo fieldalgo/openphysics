@@ -21,8 +21,8 @@ Rows of docs/packages/meshine/validation3d.md:
   inputs give byte-identical arrays in 3 fresh processes and 2 runs in this process.
 - Sizes per region: C3 with the die at h/2 (V8's die case) refines the die and
   keeps V7; a mapping of sizes needs every region name.
-- ``meshloom.generate3d``: the documented cube example, and the practical and guaranteed
-  bounds on C3 at h = 0.4.
+- ``meshloom.generate3d``: the documented cube example (V1-V4), facet tags, and the
+  practical and guaranteed bounds on C3 at h = 0.4.
 - The cap: a small ``max_points`` raises ``RefineError``; bad arguments are refused.
 """
 
@@ -267,8 +267,15 @@ def test_generate3d():
     cube = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], float)
     faces = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]], [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
     m = meshloom.generate3d(cube, faces, h=0.1)  # the example of the meshloom page
-    A.check(m, cube, faces, [1.0], True, euler=True)
-    assert sorted(m["boundary_faces"]) == list(range(6))
+    assert sorted(m["boundary_faces"], key=int) == [str(i) for i in range(6)]  # facet tags, by default str(i)
+    by_index = dict(m, boundary_faces={int(k): v for k, v in m["boundary_faces"].items()},
+                    boundary_nodes={int(k): v for k, v in m["boundary_nodes"].items()})
+    A.check(by_index, cube, faces, [1.0], True, euler=True)
+    tagged = meshloom.generate3d(cube, faces, h=0.1, facet_tags=["bottom", "top"] + ["side"] * 4)
+    assert sorted(tagged["boundary_faces"]) == ["bottom", "side", "top"]
+    assert len(tagged["boundary_faces"]["side"]) == sum(len(m["boundary_faces"][str(i)]) for i in range(2, 6))
+    with pytest.raises(ValueError, match="facet_tags"):
+        meshloom.generate3d(cube, faces, h=0.1, facet_tags=["a"])
     (pts, facets), _ = c3()
     for quality, bound in (("practical", meshloom.PRACTICAL_RATIO), ("guaranteed", meshloom.GUARANTEED_RATIO)):
         m = meshloom.generate3d(pts, facets, h=0.4, quality=quality, region_points=C3_SEEDS)
