@@ -114,6 +114,8 @@ const FAC_C: f64 = 0.75;
 /// Smoothing takes a move that raises the mean q of the star while its worst q stays at
 /// least min(before, SMOOTH_FLOOR) (and the dihedral and ratio rules hold).
 const SMOOTH_FLOOR: f64 = 0.5;
+/// How often a tetrahedron whose circumcentre split a constraint instead is tried again.
+const MAX_RETRIES: u8 = 3;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -2010,6 +2012,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         st.queue_tet(t);
     }
     let mut sliver_budget: Option<u32> = None;
+    let mut retries: HashMap<[u32; 4], u8> = HashMap::new();
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
@@ -2040,8 +2043,16 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                 let before = st.g.s.len();
                 st.split_tet(t)?;
                 if st.g.s.len() > before && st.cx.alive[t as usize] {
-                    // a rejected circumcentre split a subsegment or subfacet that left t: retry t
-                    st.queue_tet(t);
+                    // a rejected circumcentre split a subsegment or subfacet that left t: retry t,
+                    // a few times only (a circumcentre on a facet whose splits never reach t
+                    // would otherwise split ever smaller subfacets around one point)
+                    let n = retries.entry(s).or_insert(0u8);
+                    *n += 1;
+                    if *n <= MAX_RETRIES {
+                        st.queue_tet(t);
+                    } else {
+                        st.stats.exempt += 1;
+                    }
                 }
             }
             continue;
