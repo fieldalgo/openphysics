@@ -153,7 +153,7 @@ fn closed(n: usize, b: &Boundary) -> Result<(), MeshError> {
 /// The bounded component that each seed lies strictly inside, exactly: a seed is located
 /// in every tetrahedron whose closed region holds it (all four orientations >= 0), with
 /// the S points unrounded; one component must hold it.
-fn locate_seeds(points: &[P3], b: &Boundary, comp: &[u32], outside: &[bool], seeds: &[Seed])
+pub(crate) fn locate_seeds(points: &[P3], b: &Boundary, comp: &[u32], outside: &[bool], seeds: &[Seed])
                 -> Result<Vec<u32>, String> {
     let n = points.len() as u32;
     let mut ext = points.to_vec();

@@ -4,25 +4,35 @@
 
 [Documentation home](../../README.md)
 
-**Status: kernel building blocks, no mesher yet.** meshloom will be OpenPhysics's
-general tetrahedral mesher for multi-material piecewise-linear inputs: constrained
-Delaunay tetrahedralization with exact predicates, boundary recovery, quality
-refinement and mesh improvement, in a compiled Rust kernel. The kernel now has its
-first two stages, exact geometric predicates and the Delaunay tetrahedralization
-of a point set (below). They are internal building blocks for the mesher, not
-public API yet. `generate3d` raises `NotImplementedError`.
+**Status: first mesher, not yet accepted.** meshloom is OpenPhysics's general
+tetrahedral mesher for multi-material piecewise-linear inputs: constrained Delaunay
+tetrahedralization with exact predicates, boundary recovery, quality refinement and
+(later) mesh improvement, in a compiled Rust kernel. `meshloom.generate3d` meshes a
+piecewise-linear complex to a size `h` (one number, or one per named region) with a
+radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
+`quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades). It is not yet
+graded by the acceptance gates of M6 (quality against the baseline, speed), it has no
+sliver removal, graded sizes or curved surfaces, and it is slow (see Limits).
 
 ```python
+import numpy as np
 import meshloom
-meshloom.kernel_available()   # True when the compiled kernel loaded
-meshloom.kernel_version()     # the kernel's version, equal to meshloom.__version__
+
+points = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=float)
+facets = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]],
+          [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+mesh = meshloom.generate3d(points, facets, h=0.1)
+mesh["nodes"], mesh["tetrahedra"], mesh["boundary_faces"]   # the output contract
 ```
 
-Use [`meshine.extrude`](../meshine/overview.md#layered-tetrahedral-meshes) for layered
-geometry and Gmsh through [`gmshio`](../gmshio/overview.md) for other shapes until
-meshloom generates meshes. The criteria it will be accepted by are fixed in
-advance in the [pre-registered 3D validation plan](../meshine/validation3d.md); its
-output will have the fields `galerkin.from_mesher` reads, like `meshine.TetMesh`.
+Errors are typed `ValueError` subclasses exported by the package (`InvalidPLC` with a
+witness, `NotClosed`, `RecoveryError`, `RefineError`, `RoundingError`, `RegionError`,
+`MeshError`). `meshloom.kernel_available()` and `meshloom.kernel_version()` report the
+compiled kernel. The criteria meshloom is accepted by are fixed in advance in the
+[pre-registered 3D validation plan](../meshine/validation3d.md). Until it passes them,
+[`meshine.extrude`](../meshine/overview.md#layered-tetrahedral-meshes) (layered
+geometry) and Gmsh through [`gmshio`](../gmshio/overview.md) stay the tested routes.
 
 ## Kernel building blocks
 

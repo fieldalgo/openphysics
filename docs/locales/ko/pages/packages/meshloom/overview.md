@@ -4,22 +4,30 @@
 
 [문서 홈](../../index.md)
 
-**상태: 커널 구성 요소만 있고 메셔는 아직 없음.** meshloom은 여러 재료로 된 조각별 선형 입력을 위한
-OpenPhysics의 일반 사면체 메셔가 될 패키지입니다. 정확 술어를 쓰는 제약 Delaunay 사면체 분할, 경계
-복원, 품질 세분화, 메시 개선을 컴파일된 Rust 커널로 합니다. 커널에는 이제 첫 두 단계, 정확한 기하
-술어와 점 집합의 Delaunay 사면체 분할이 있습니다(아래). 메셔를 위한 내부 구성 요소이며 아직 공개 API가
-아닙니다. `generate3d`는 `NotImplementedError`를 냅니다.
+**상태: 첫 메셔, 아직 합격 전.** meshloom은 여러 재료로 된 조각별 선형 입력을 위한 OpenPhysics의 일반
+사면체 메셔입니다. 정확 술어를 쓰는 제약 Delaunay 사면체 분할, 경계 복원, 품질 세분화, (나중에) 메시 개선을
+컴파일된 Rust 커널로 합니다. `meshloom.generate3d`는 조각별 선형 복합체를 크기 `h`(숫자 하나, 또는 이름 붙은
+영역마다 하나)와 반지름-변 비 한도로 메시합니다. `quality="practical"`(기본값, `PRACTICAL_RATIO` = 1.4) 또는
+`quality="guaranteed"`(`GUARANTEED_RATIO` = 2, V7이 채점하는 한도)를 고릅니다. M6의 합격 기준(기준선 대비
+품질, 속도)으로는 아직 채점되지 않았고, sliver 제거·단계적 크기·곡면이 없으며 느립니다(한계 참고).
 
 ```python
+import numpy as np
 import meshloom
-meshloom.kernel_available()   # 컴파일 커널이 로드되면 True
-meshloom.kernel_version()     # 커널 버전, meshloom.__version__과 같음
+
+points = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=float)
+facets = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]],
+          [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+mesh = meshloom.generate3d(points, facets, h=0.1)
+mesh["nodes"], mesh["tetrahedra"], mesh["boundary_faces"]   # 출력 계약
 ```
 
-meshloom이 메시를 만들기 전까지 적층 형상에는 [`meshine.extrude`](../meshine/overview.md#적층-사면체-메시)를,
-다른 형상에는 [`gmshio`](../gmshio/overview.md)를 통한 Gmsh를 쓰세요. 합격 기준은
-[사전 등록 3D 검증 계획](../meshine/validation3d.md)에 미리 고정했습니다. 출력은 `meshine.TetMesh`처럼
-`galerkin.from_mesher`가 읽는 필드를 가질 것입니다.
+오류는 패키지가 내보내는 타입 있는 `ValueError` 하위 클래스입니다(증인이 붙은 `InvalidPLC`, `NotClosed`,
+`RecoveryError`, `RefineError`, `RoundingError`, `RegionError`, `MeshError`). `meshloom.kernel_available()`과
+`meshloom.kernel_version()`은 컴파일 커널을 알려 줍니다. 합격 기준은 [사전 등록한 3D 검증 계획](../meshine/validation3d.md)에
+미리 정해 두었습니다. 그 기준을 통과하기 전까지는 [`meshine.extrude`](../meshine/overview.md#적층-사면체-메시)(적층 형상)와
+[`gmshio`](../gmshio/overview.md)를 통한 Gmsh가 시험된 경로입니다.
 
 ## 커널 구성 요소
 

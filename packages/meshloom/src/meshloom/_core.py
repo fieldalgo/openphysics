@@ -10,6 +10,7 @@ benchmark; the public mesher API comes with a later release and may change them.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 
 import math
@@ -180,7 +181,7 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
 
 
 def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
-             region_points=None, h: float | None = None, ratio: float | None = None, alpha: float = 1.0,
+             region_points=None, h=None, ratio: float | None = None, alpha: float = 1.0,
              max_points: int = 0) -> dict:
     """A tetrahedral mesh of a PLC: ``recover_boundary``, then (with ``h`` or ``ratio``)
     refinement, then regions, rounding and certification. ``domain="regions"`` makes every bounded
@@ -208,7 +209,9 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     regions are named ``"region i"`` by first appearance.
 
     Refinement (constrained Delaunay refinement, before rounding) runs when ``h`` (a
-    uniform size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split) or
+    size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split; one number, or
+    with ``region_points`` a mapping from region name to size, which every named region
+    must have; holes are not refined) or
     ``ratio`` (a bound B on the radius-edge ratio, circumradius over shortest edge) is
     given. It splits encroached subsegments and subfacets and bad tetrahedra at their
     circumcentres until none is left. Near input angles below 60 degrees (segments or
@@ -227,9 +230,20 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     kernel = _require()
     if domain not in ("regions", "parity"):
         raise ValueError("domain must be 'regions' or 'parity'")
+    def _number(value):
+        return isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool)
+
+    region_h = None
+    if isinstance(h, Mapping):
+        if region_points is None:
+            raise ValueError("h as a mapping of region names needs region_points")
+        region_h = dict(h)
+        for key, value in region_h.items():
+            if not (_number(value) and math.isfinite(value) and value > 0):
+                raise ValueError(f"h[{key!r}] must be a finite number > 0, got {value!r}")
+        h = None
     for name, value in (("h", h), ("ratio", ratio)):
-        if value is not None and not (isinstance(value, (int, float, np.integer, np.floating))
-                                      and math.isfinite(value) and value > 0):
+        if value is not None and not (_number(value) and math.isfinite(value) and value > 0):
             raise ValueError(f"{name} must be a finite number > 0 or None, got {value!r}")
     if not (isinstance(alpha, (int, float, np.integer, np.floating)) and math.isfinite(alpha) and alpha > 0):
         raise ValueError(f"alpha must be a finite number > 0, got {alpha!r}")
@@ -258,13 +272,20 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
             seed_label.append(-1 if name is None else names.index(name))
         if not seed_xyz:
             raise ValueError("region_points is empty")
+    label_h = None
+    if region_h is not None:
+        unknown = sorted(set(region_h) - set(names), key=str)
+        missing = [n for n in names if n not in region_h]
+        if unknown or missing:
+            raise ValueError(f"h names regions {names!r}; unknown {unknown!r}, missing {missing!r}")
+        label_h = [float(region_h[n]) for n in names]
     check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
     seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
               np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
         out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
-                                     float(ratio or 0.0), float(alpha), int(max_points))
+                                     float(ratio or 0.0), float(alpha), int(max_points), label_h)
     except ValueError as e:
         if len(e.args) != 3:
             raise
