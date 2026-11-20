@@ -94,6 +94,52 @@ def test_volume_mesh_from_meshine():
     assert len(mesh.boundary_faces()) == int((count == 1).sum())
 
 
+def _meshloom_box(a, b, d, h):
+    meshloom = pytest.importorskip("meshloom")
+    if not meshloom.kernel_available():
+        pytest.skip("meshloom's compiled kernel is not built here")
+    pts = np.array([[0, 0, 0], [a, 0, 0], [a, b, 0], [0, b, 0], [0, 0, d], [a, 0, d], [a, b, d], [0, b, d]], float)
+    faces = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]], [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+    return meshloom.generate3d(pts, faces, h=h, region_points=[((a / 2, b / 2, d / 2), "cavity")],
+                               facet_tags=["pec"] * 6)
+
+
+def test_volume_mesh_from_meshloom():
+    """Gmsh-free twin of the gmshio volume test on OpenPhysics's own mesher (V32)."""
+    fem = _meshloom_box(1.0, 0.8, 0.6, 0.25)
+    mesh = from_mesher(fem)
+    assert mesh.nodes.shape[1] == 3
+    assert mesh.num_tets == len(fem["tetrahedra"])
+    assert abs(mesh.volumes().sum() - 1.0 * 0.8 * 0.6) < 1e-9
+    assert (mesh.volumes() > 0).all(), "the adapter must leave orientations valid"
+    assert set(mesh.boundary) == set(fem["boundary_faces"])
+
+    # boundary faces really are the surface: every one belongs to a single tet
+    _, count = mesh.faces()
+    assert len(mesh.boundary_faces()) == int((count == 1).sum())
+
+
+def test_box_cavity_from_meshloom_is_watertight():
+    """Twin of gmshio's box-cavity generation test on meshloom (V32)."""
+    a, b, d = 1.0, 0.5, 0.75
+    fem = _meshloom_box(a, b, d, 0.2)
+    assert fem["region_names"] == ["cavity"]
+    T, X = fem["tetrahedra"], fem["nodes"]
+    vol = np.einsum("ij,ij->i", X[T[:, 1]] - X[T[:, 0]], np.cross(X[T[:, 2]] - X[T[:, 0]], X[T[:, 3]] - X[T[:, 0]])) / 6
+    assert (vol > 0).all()
+    assert abs(vol.sum() - a * b * d) < 1e-9
+    f = np.vstack([T[:, [0, 1, 2]], T[:, [0, 1, 3]], T[:, [0, 2, 3]], T[:, [1, 2, 3]]])
+    f.sort(axis=1)
+    uniq, counts = np.unique(f, axis=0, return_counts=True)
+    assert set(counts) == {1, 2}
+    single = {tuple(r) for r in uniq[counts == 1]}
+    tagged = {tuple(sorted(r)) for r in fem["boundary_faces"]["pec"]}
+    assert single == tagged
+    p = X[fem["boundary_nodes"]["pec"]]
+    on = (np.abs(p) < 1e-9) | (np.abs(p - [a, b, d]) < 1e-9)
+    assert on.any(axis=1).all()
+
+
 def test_adapter_accepts_a_plain_dict_of_arrays():
     """Nothing about the adapter should depend on a particular class."""
     nodes = np.array([[0., 0], [1, 0], [0, 1], [1, 1]])

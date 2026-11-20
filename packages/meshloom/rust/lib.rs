@@ -396,12 +396,12 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
 #[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None, h=0.0, ratio=0.0,
-                    alpha=1.0, max_points=0))]
+                    alpha=1.0, max_points=0, label_h=None))]
 #[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
                  facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
                  seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>, h: f64,
-                 ratio: f64, alpha: f64, max_points: usize)
+                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
@@ -440,7 +440,11 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
         let mut rs = refine::RefineStats::default();
         if h > 0.0 || ratio > 0.0 {
             let opt = refine::RefineOptions { h, alpha, ratio, max_points };  // 0: refine() derives the cap from the size field
-            rs = refine::refine(&plc, &mut b, opt).map_err(|e| ("RefineFail", e, vec![]))?;
+            let lh = label_h.unwrap_or_default();
+            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh).map_err(|e| match e.strip_prefix("seed: ") {
+                Some(m) => ("RegionSeed", m.to_string(), vec![]),
+                None => ("RefineFail", e, vec![]),
+            })?;
         }
         let m = mesh::build(&plc.points, &b, domain, &seeds).map_err(|e| match &e {
             mesh::MeshError::NotClosed { segment, facets } => {
