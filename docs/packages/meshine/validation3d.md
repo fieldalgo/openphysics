@@ -84,7 +84,7 @@ and θ (bins of 5°); counts of tetrahedra with any θ below 10° and below 30°
 | C6 | Fichera corner: [−1,1]³ minus [0,1]³ |
 | C7 | prism of length 1 over an isosceles triangle with legs 1 and a 15° apex |
 | C8 | thin-layer stack, aspect ratio 1:50 |
-| C9 | box cavity with a dielectric block |
+| C9 | box cavity [0,1]³ with a dielectric block [0.25, 0.75] × [0.25, 0.75] × [0, 0.5] standing on its floor; 2 regions |
 | C10 | adversarial inputs: Schönhardt prism; Chazelle polyhedron; cospherical prism with an interior vertex; near-coplanar quadrilaterals; stacked layers; a 4³ cospherical box lattice; 5° and 30° wedges; a 1:100 slab; closed surfaces, meshed as their parity domain (see "C14 protocol"), with each configuration the C14 validity rule makes valid: a vertex inside an edge, a vertex inside a facet, an edge inside a facet, a T-junction, nested shells, two shells touching at a vertex, an edge with four facets, two closed shells where a facet of one lies inside a coplanar facet of the other (a box standing on a larger box) |
 | C11 | concentric-sphere capacitor: a = 0.5, b = 0.75, c = 1 |
 | C12 | Delaunay point sets: uniform 10³–10⁶ points, a 50³ lattice, cospherical shells, coplanar sets |
@@ -94,7 +94,7 @@ and θ (bins of 5°); counts of tetrahedra with any θ below 10° and below 30°
 
 Sizes for C1–C7: C1 h ∈ {0.2, 0.1, 0.05}; C2 {0.12, 0.06, 0.03}; C3 {0.8, 0.4, 0.2};
 C3 with the die at h/2 {0.96, 0.48, 0.24}; C4 {0.2, 0.1, 0.05}; C5 and C6
-{0.24, 0.12, 0.06}; C7 {0.06, 0.03, 0.015}.
+{0.24, 0.12, 0.06}; C7 {0.06, 0.03, 0.015}. C9 uses the sizes of C2, {0.12, 0.06, 0.03}.
 
 ## Baseline
 
@@ -400,6 +400,14 @@ was opened. These rules were adopted on 2026-11-06 and 2026-11-07, before any me
 **The C14 freeze condition was missed:** this text was to land before the first boundary-recovery pull request, but
 that pull request (segment recovery, #205) was opened and merged on 2026-11-07, before this text landed. It touches no
 C14 file, and no mesher has been run on one; V20 has not been run. The project owner approved this change.
+
+**2026-11-20, C9 dimensions.** Old: C9 "box cavity with a dielectric block", with no dimensions and no sizes. New:
+C9 is the box cavity [0,1]³ (the outer boundary) with a dielectric block [0.25, 0.75] × [0.25, 0.75] × [0, 0.5]
+standing on its floor, 2 regions, at the sizes of C2, {0.12, 0.06, 0.03}. All its input angles are 90°, as V7
+requires. Reason: without dimensions C9 could not be built, so V7, V26 and V29 could not be run on it; this fills in
+the definition and changes no threshold or other case. The block stands on the floor, as a dielectric resonator
+does, so the case also tests a facet inside a facet. The project owner chose these dimensions on 2026-11-20, before
+any mesher run on C9.
 
 ## Limits
 
