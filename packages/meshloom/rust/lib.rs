@@ -488,6 +488,7 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     d.set_item("sliver_points", rs.sliver_points)?;
     d.set_item("slivers_left", rs.slivers_left)?;
     d.set_item("sliver_moves", rs.sliver_moves)?;
+    d.set_item("smooth_moves", rs.smooth_moves)?;
     d.set_item("inverted_after_rounding", m.repair.inverted)?;
     d.set_item("flips23", m.repair.flips23)?;
     d.set_item("flips32", m.repair.flips32)?;

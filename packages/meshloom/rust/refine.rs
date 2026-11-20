@@ -59,6 +59,8 @@ pub struct RefineStats {
     pub slivers_left: u32,
     /// volume vertices moved to remove slivers (M6 step 2)
     pub sliver_moves: u32,
+    /// volume vertex moves by smoothing (M6 step 3)
+    pub smooth_moves: u32,
 }
 
 struct State<'a> {
@@ -247,7 +249,6 @@ impl State<'_> {
     /// points are triples of doubles, so the moved point is exact. The mesh is no longer
     /// Delaunay there; it stays constrained (no constraint vertex moves).
     fn perturb_slivers(&mut self) {
-        let n = self.g.input.len();
         for _round in 0..4 {
             let mut sl: Vec<([u32; 4], u32)> = (0..self.cx.tets.len() as u32)
                 .filter(|&t| self.cx.alive[t as usize] && self.inside[t as usize] && self.hsz[t as usize] > 0.0
@@ -265,12 +266,13 @@ impl State<'_> {
                 }
                 let tv = self.cx.tets[t as usize];
                 for (i, &v) in tv.iter().enumerate() {
-                    if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Volume {
+                    if !self.movable(v) {
                         continue;
                     }
                     let star: Vec<u32> = self.cx.star[v as usize].iter().copied()
                         .filter(|&u| self.cx.alive[u as usize]).collect();
                     let base = star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min);
+                    let rcap = self.rho_cap(&star);
                     let p0 = self.xyz[v as usize];
                     // away from the opposite face of t (raises its volume)
                     let o: Vec<P3> = (0..4).filter(|&j| j != i).map(|j| self.xyz[tv[j] as usize]).collect();
@@ -316,7 +318,8 @@ impl State<'_> {
                             let w = self.cx.tets[u as usize];
                             self.orient(w) > 0
                         });
-                        if ok && star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min) > base + 1e-9 {
+                        if ok && star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min) > base + 1e-9
+                            && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
                             done = true;
                             break;
                         }
@@ -335,6 +338,119 @@ impl State<'_> {
             }
             self.stats.sliver_moves += moved;
         }
+    }
+
+    /// Quality q = 3 r_in / R of tetrahedron t (1 for the regular tetrahedron; doubles).
+    fn tet_q(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
+        let v6 = dot(&a, &cross(&b, &c));
+        if !(v6 > 0.0) {
+            return 0.0;
+        }
+        let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
+        let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
+        let rin = 3.0 * (v6 / 6.0) / s;
+        let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
+                                               + dot(&c, &c) * cross(&a, &b)[k]);
+        let r = dot(&num, &num).sqrt() / (2.0 * v6);
+        3.0 * rin / r
+    }
+
+    /// M6 step 3 (first part): smoothing. Each volume vertex, in index order, moves towards
+    /// the centroid of its star's other vertices (by 1, 1/2 or 1/4 of the way) when every
+    /// tetrahedron around it stays positive (exact orient3d), the worst quality q around it
+    /// grows and the smallest dihedral angle around it does not fall (below 15 degrees);
+    /// three passes. Constraint vertices do not move.
+    fn smooth(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..3 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                if !self.movable(v) {
+                    continue;
+                }
+                let star: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                if star.is_empty() || star.iter().any(|&u| !self.inside[u as usize]) {
+                    continue;
+                }
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let base = worst(self);
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let dbase = dmin(self).min(DIHEDRAL_MIN);
+                let rcap = self.rho_cap(&star);
+                let p0 = self.xyz[v as usize];
+                let mut cen = [0.0; 3];
+                let mut cnt = 0.0;
+                for &u in &star {
+                    for &w in &self.cx.tets[u as usize] {
+                        if w != v {
+                            let q = self.xyz[w as usize];
+                            for k in 0..3 {
+                                cen[k] += q[k];
+                            }
+                            cnt += 1.0;
+                        }
+                    }
+                }
+                for f in [1.0, 0.5, 0.25] {
+                    let c: P3 = std::array::from_fn(|k| p0[k] + f * (cen[k] / cnt - p0[k]));
+                    self.set_volume_point(v, c);
+                    let ok = star.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    if ok && worst(self) > base + 1e-12 && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_volume_point(v, p0);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Whether vertex v may move: a volume point whose tetrahedra are all inside the domain
+    /// and none of whose faces through v is a subfacet (a volume point can lie on a facet's
+    /// plane, or be a vertex of a face shared with another shell).
+    fn movable(&self, v: u32) -> bool {
+        let n = self.g.input.len();
+        if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Volume {
+            return false;
+        }
+        self.cx.star[v as usize].iter().filter(|&&u| self.cx.alive[u as usize]).all(|&u| {
+            self.inside[u as usize] && {
+                let w = self.cx.tets[u as usize];
+                (0..4).all(|i| {
+                    let k = key(face(&w, i));
+                    !k.contains(&v) || !self.sub.contains_key(&k)
+                })
+            }
+        })
+    }
+
+    /// Radius-edge ratio of tetrahedron t (doubles).
+    fn tet_rho(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let Some(c) = circumcentre(x) else { return f64::INFINITY };
+        let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+        let l = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+            .map(|(a, b)| dot(&sub3(&x[a], &x[b]), &sub3(&x[a], &x[b])).sqrt()).fold(f64::INFINITY, f64::min);
+        r / l
+    }
+
+    /// The largest radius-edge ratio a move may leave around a vertex: the bound of
+    /// refinement, or what was there before when that is already above it (exempt
+    /// tetrahedra near small angles); improvement never breaks V7.
+    fn rho_cap(&self, star: &[u32]) -> f64 {
+        let before = star.iter().map(|&u| self.tet_rho(u)).fold(0.0f64, f64::max);
+        if self.opt.ratio > 0.0 { before.max(self.opt.ratio) } else { f64::INFINITY }
     }
 
     fn set_volume_point(&mut self, v: u32, p: P3) {
@@ -1513,6 +1629,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         }
         break;
     }
+    st.perturb_slivers();
+    st.smooth();
     st.perturb_slivers();
     st.stats.slivers_left = (0..st.cx.tets.len() as u32)
         .filter(|&t| st.cx.alive[t as usize] && st.inside[t as usize] && st.hsz[t as usize] > 0.0
