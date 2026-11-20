@@ -244,21 +244,21 @@ jobs:
           mv openphysics-* ../last/
           test -z "$(ls -A | grep -v '^SHA256SUMS$')"
           ls -l ../first ../second ../last
-      # Pinned to the v1.14.2 commit, not to the annotated tag's object ID: the action runs a
+      # Pinned to the v1.14.3 commit, not to the annotated tag's object ID: the action runs a
       # container image named after the ref it is invoked with, and ghcr.io has an image for the
       # commit but none for the tag object ("manifest unknown").
       - name: Upload galerkin, galerkin-refsol, meshine, meshloom, gmshio and physmat
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: first/
           print-hash: true
       - name: Upload simcase and sipi
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: second/
           print-hash: true
       - name: Upload the openphysics meta distribution
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: last/
           print-hash: true
