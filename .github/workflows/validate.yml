@@ -161,9 +161,10 @@ jobs:
     # outside the checkout. No test is selected by name.
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
-    # Build, install and the whole suite: about 30 min on the Intel runner class and
-    # 47 min on AMD EPYC runners (2026-11-03); the limit only stops hung jobs.
-    timeout-minutes: 75
+    # Build, install and the whole suite: the test step took 39-71 min on 2026-11-20,
+    # following the runner CPU (EPYC 9V45 39, Xeon 8573C 51, EPYC 7763 63 and over 74,
+    # Xeon 8370C 71). The limit only stops hung jobs; keep it above the slowest class.
+    timeout-minutes: 90
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
