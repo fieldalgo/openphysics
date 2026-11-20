@@ -1700,6 +1700,16 @@ impl State<'_> {
             return Ok(());
         }
         let plane = self.plane_cavity(p, &[cur]);
+        if !plane.contains(&f) {
+            // the 2D cavity p sees leaves f (an obtuse f whose circumcentre lies in another
+            // subfacet, past a facet triangulation that is not Delaunay): inserting p would
+            // not remove f, and every later try at f would find p there while tetrahedra
+            // next to f split towards the facet without end; leave f
+            self.drop_point(p);
+            self.stats.rejected += 1;
+            self.stats.exempt_faces += 1;
+            return Ok(());
+        }
         let seeds: Vec<u32> = plane.iter().flat_map(|k| self.cx.faces[k]).filter(|&t| t != NONE).collect();
         let cav = self.cavity(p, &seeds, &plane);
         let (_, es) = self.encroached_by(p, &cav);
