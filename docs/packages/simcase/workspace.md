@@ -29,7 +29,9 @@ Joule heating run, Results adds its **Solver log** there.
 runs and comparisons. **More** contains input-only files, browser drafts and
 Reset design. **Workspace tools** in the bottom status bar contains connection,
 recovery and Reset layout; **Installed physics** sits next to it. Both open above the
-status bar, one at a time, on every page including Applications. Heat and Joule heating
+status bar, one at a time, on every page including Applications; Escape closes the open
+one. Below 1000 px the ribbon leaves out the Physics group, so its Compute commands stay in
+view; Installed physics remains in the status bar. Heat and Joule heating
 results remain in the current tab only.
 
 Settings and Graphics scroll independently on wide screens. The default

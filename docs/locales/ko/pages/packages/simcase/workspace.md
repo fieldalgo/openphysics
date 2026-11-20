@@ -25,8 +25,9 @@ Compute에는 고른 애플리케이션의 실행 명령(**Run optical study**, 
 **Save**와 **Open**은 완료된 광학 실행과 비교를 포함하는 세션 저장/열기입니다.
 **More**에 입력 전용 파일, 브라우저 초안, Reset design이 있습니다. 하단 상태줄의
 **Workspace tools**에서 연결, 복구, Reset layout에 접근하고, 그 옆에 **Installed physics**가 있습니다.
-둘 다 상태줄 위로 열리며 한 번에 하나만 열립니다. Applications를 포함한 모든 페이지에서 쓸 수
-있습니다. 열 결과와 Joule 가열 결과는 현재 탭에만 남습니다.
+둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Applications를
+포함한 모든 페이지에서 쓸 수 있습니다. 1000 px보다 좁으면 Compute 명령이 보이도록 리본에서
+Physics 묶음을 뺍니다. Installed physics는 상태줄에 그대로 있습니다. 열 결과와 Joule 가열 결과는 현재 탭에만 남습니다.
 
 넓은 화면에서 Settings와 Graphics는 독립적으로 스크롤됩니다. 모델 트리/Settings의
 기본 폭은 240/320 px이며 기존 저장 폭을 유지합니다. 두 구분선 모두 오른쪽으로

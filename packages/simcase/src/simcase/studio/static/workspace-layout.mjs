@@ -46,3 +46,17 @@ export function installLayout(root,reset,status){
  reset.onclick=()=>{cancel();layout={...DEFAULT_LAYOUT};paint();save();status.textContent+=' Default widths restored.';};
  paint();
 }
+// The status-bar panels (Workspace tools, Installed physics) open above the status bar:
+// one at a time, Escape closes the open one and returns focus to its summary. `opener`
+// (the ribbon's Physics → Installed) toggles `panels[target]` and mirrors aria-expanded.
+export function installStatusPanels(panels,opener=null,target=0){
+ const summary=panel=>panel.querySelector('summary');
+ panels.forEach((panel,i)=>{
+  panel.addEventListener('toggle',()=>{
+   if(panel.open)panels.forEach((other,j)=>{if(j!==i&&other.open)other.open=false;});
+   if(i===target)opener?.setAttribute('aria-expanded',String(panel.open));
+  });
+  panel.addEventListener('keydown',event=>{if(event.key==='Escape'&&panel.open){panel.open=false;summary(panel)?.focus({preventScroll:true});}});
+ });
+ if(opener)opener.onclick=()=>{const panel=panels[target];panel.open=!panel.open;if(panel.open)summary(panel)?.focus({preventScroll:true});};
+}

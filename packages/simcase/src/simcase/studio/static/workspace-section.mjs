@@ -28,11 +28,11 @@ export function sectionSvg(shapes,{selected=0,selectedEdge=null,mode='Bodies'}={
   const {tag,attrs}=shapeSvgAttributes(s),on=i===selected;
   const label=`Select shape ${s.name} (${s.type}, ${s.material||'unassigned material'})`;
   const a=Object.entries(attrs).map(([k,v])=>`${k}="${v}"`).join(' ');
-  return `<${tag} data-pick-shape="${i}" ${pickable?`role="button" tabindex="0" aria-label="${escape(label)}"`:'role="img" aria-label="'+escape(s.name)+'"'} ${a} fill="${MATERIAL_FILL[s.material]}" fill-opacity="${s.material==='Air'?1:.92}" stroke="${on&&pickable?'#245bb0':'#73859d'}" stroke-width="${on&&pickable?2:1}" ${s.material==='Air'?'stroke-dasharray="3 2"':''} vector-effect="non-scaling-stroke"/>`;
+  return `<${tag} data-pick-shape="${i}" ${pickable?`role="button" tabindex="0" aria-label="${escape(label)}"`:'role="img" aria-label="'+escape(s.name)+'"'} ${a} fill="${MATERIAL_FILL[s.material]}" fill-opacity="${s.material==='Air'?1:.92}" stroke="${on&&pickable?'#d9480f':'#73859d'}" stroke-width="${on&&pickable?2.5:1}" ${s.material==='Air'?'stroke-dasharray="3 2"':''} vector-effect="non-scaling-stroke"/>`;
  }).join('');
  const paths={left:`M${dx} ${dy} v${dh}`,right:`M${dx+dw} ${dy} v${dh}`,top:`M${dx} ${dy} h${dw}`,bottom:`M${dx} ${dy+dh} h${dw}`};
  const hits={left:{x:dx-6,y:dy,w:12,h:dh},right:{x:dx+dw-6,y:dy,w:12,h:dh},top:{x:dx,y:dy-6,w:dw,h:12},bottom:{x:dx,y:dy+dh-6,w:dw,h:12}};
- const edges=mode==='Boundaries'?Object.entries(paths).map(([side,path])=>`<g data-pick-edge="optical-${side}" role="button" tabindex="0" aria-label="Select optical ${side} PEC boundary"><rect x="${hits[side].x}" y="${hits[side].y}" width="${hits[side].w}" height="${hits[side].h}" fill="transparent"/><path d="${path}" fill="none" stroke="transparent" stroke-width="12"/><path d="${path}" fill="none" stroke="${selectedEdge==='optical-'+side?'#245bb0':'#2860bd'}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/></g>`).join(''):'';
+ const edges=mode==='Boundaries'?Object.entries(paths).map(([side,path])=>`<g data-pick-edge="optical-${side}" role="button" tabindex="0" aria-label="Select optical ${side} PEC boundary"><rect x="${hits[side].x}" y="${hits[side].y}" width="${hits[side].w}" height="${hits[side].h}" fill="transparent"/><path d="${path}" fill="none" stroke="transparent" stroke-width="12"/><path d="${path}" fill="none" stroke="${selectedEdge==='optical-'+side?'#d9480f':'#2860bd'}" stroke-width="${selectedEdge==='optical-'+side?3.5:2}" vector-effect="non-scaling-stroke" pointer-events="none"/></g>`).join(''):'';
  const chosen=shapes[selected];let dims='';
  if(chosen&&pickable){
   const b=shapeBounds(chosen),[x0,y0]=toSvg(b.xmin,b.ymax),[x1,y1]=toSvg(b.xmax,b.ymin);
