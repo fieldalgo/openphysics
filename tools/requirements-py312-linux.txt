@@ -38,7 +38,7 @@ more-itertools==11.2.1
 mpmath==1.3.0
 nh3==0.3.7
 numpy==2.5.4
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
 packaging==26.3
 pandas==3.0.3
 pillow==13.0.0
