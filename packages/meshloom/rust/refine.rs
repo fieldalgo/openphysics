@@ -111,6 +111,9 @@ const SLIVER_CAP: f64 = 0.10;
 /// encroached, so the boundary is discretized to the size before the volume.
 const SEG_C: f64 = 1.0;
 const FAC_C: f64 = 0.75;
+/// Smoothing takes a move that raises the mean q of the star while its worst q stays at
+/// least min(before, SMOOTH_FLOOR) (and the dihedral and ratio rules hold).
+const SMOOTH_FLOOR: f64 = 0.5;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -372,7 +375,7 @@ impl State<'_> {
     /// three passes. Constraint vertices do not move.
     fn smooth(&mut self) {
         let n = self.g.input.len();
-        for _pass in 0..3 {
+        for _pass in 0..5 {
             let mut moved = 0u32;
             for v in n as u32..(n + self.g.s.len()) as u32 {
                 if !self.movable(v) {
@@ -384,7 +387,9 @@ impl State<'_> {
                     continue;
                 }
                 let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
                 let base = worst(self);
+                let mbase = mean(self);
                 let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
                 let dbase = dmin(self).min(DIHEDRAL_MIN);
                 let rcap = self.rho_cap(&star);
@@ -409,7 +414,9 @@ impl State<'_> {
                         let w = self.cx.tets[u as usize];
                         self.orient(w) > 0
                     });
-                    if ok && worst(self) > base + 1e-12 && dmin(self) >= dbase
+                    // a better worst tetrahedron, or the same worst and a better star on average
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
                         && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
                         moved += 1;
                         break;
@@ -459,6 +466,197 @@ impl State<'_> {
     fn rho_cap(&self, star: &[u32]) -> f64 {
         let before = star.iter().map(|&u| self.tet_rho(u)).fold(0.0f64, f64::max);
         if self.opt.ratio > 0.0 { before.max(self.opt.ratio) } else { f64::INFINITY }
+    }
+
+    /// Whether facet point v may slide in its facet's plane: an F point not on a subsegment
+    /// whose subfacets all belong to the same facets (one facet, or the shared facet of
+    /// touching shells). Every tetrahedron around it stays, inside the domain or not.
+    fn slidable(&self, v: u32) -> bool {
+        let n = self.g.input.len();
+        if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Facet {
+            return false;
+        }
+        let mut owner: Option<&Vec<u32>> = None;
+        for &u in self.cx.star[v as usize].iter().filter(|&&u| self.cx.alive[u as usize]) {
+            let w = self.cx.tets[u as usize];
+            for i in 0..4 {
+                let k = key(face(&w, i));
+                if !k.contains(&v) {
+                    continue;
+                }
+                if let Some(l) = self.sub.get(&k) {
+                    match owner {
+                        None => owner = Some(l),
+                        Some(o) if o != l => return false,
+                        _ => {}
+                    }
+                }
+            }
+            for a in 0..4 {
+                if w[a] != v && self.seg.contains_key(&ekey(v, w[a])) {
+                    return false;
+                }
+            }
+        }
+        owner.is_some()
+    }
+
+    /// Moves facet point v to (about) p, keeping it exactly in its plane: p as
+    /// a + s (b - a) + r (c - a) on v's own three input points, least squares in doubles.
+    fn set_facet_point(&mut self, v: u32, sp: SPoint) {
+        let n = self.g.input.len();
+        self.g.s[v as usize - n] = sp;
+        let m = self.g.view();
+        self.xyz[v as usize] = m.rounded(m.from_id(v));
+    }
+
+    fn facet_point_at(&self, v: u32, p: P3) -> Option<SPoint> {
+        let n = self.g.input.len();
+        let old = self.g.s[v as usize - n];
+        let (pa, pb, pc) = (self.xyz[old.a as usize], self.xyz[old.b as usize], self.xyz[old.c as usize]);
+        let (e1, e2, d) = (sub3(&pb, &pa), sub3(&pc, &pa), sub3(&p, &pa));
+        let (g11, g12, g22) = (dot(&e1, &e1), dot(&e1, &e2), dot(&e2, &e2));
+        let (r1, r2) = (dot(&e1, &d), dot(&e2, &d));
+        let det = g11 * g22 - g12 * g12;
+        let (s, r) = ((r1 * g22 - r2 * g12) / det, (g11 * r2 - g12 * r1) / det);
+        (s.is_finite() && r.is_finite()).then(|| SPoint::fac(old.a, old.b, old.c, s, r))
+    }
+
+    /// Smoothing of facet points in their planes, by the rules of `smooth` on the
+    /// tetrahedra inside the domain; every tetrahedron around the point keeps its orientation.
+    fn slide_facets(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..5 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                if !self.slidable(v) {
+                    continue;
+                }
+                let all: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                let star: Vec<u32> = all.iter().copied().filter(|&u| self.inside[u as usize]).collect();
+                if star.is_empty() {
+                    continue;
+                }
+                // the target: the centroid of v's neighbours in the facet (the other vertices
+                // of its subfacets), which lies in the facet's plane
+                let mut ring: Vec<u32> = Vec::new();
+                for &u in &all {
+                    let w = self.cx.tets[u as usize];
+                    for i in 0..4 {
+                        let k = key(face(&w, i));
+                        if k.contains(&v) && self.sub.contains_key(&k) {
+                            ring.extend(k.iter().copied().filter(|&x| x != v));
+                        }
+                    }
+                }
+                ring.sort_unstable();
+                ring.dedup();
+                if ring.len() < 3 {
+                    continue;
+                }
+                let mut cen = [0.0; 3];
+                for &w in &ring {
+                    for k in 0..3 {
+                        cen[k] += self.xyz[w as usize][k] / ring.len() as f64;
+                    }
+                }
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let (base, mbase, dbase) = (worst(self), mean(self), dmin(self).min(DIHEDRAL_MIN));
+                let rcap = self.rho_cap(&star);
+                let old = self.g.s[v as usize - n];
+                let p0 = self.xyz[v as usize];
+                for f in [1.0, 0.5, 0.25] {
+                    let c: P3 = std::array::from_fn(|k| p0[k] + f * (cen[k] - p0[k]));
+                    let Some(sp) = self.facet_point_at(v, c) else { break };
+                    self.set_facet_point(v, sp);
+                    let ok = all.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_facet_point(v, old);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Smoothing of segment points along their segments, by the rules of `slide_facets`:
+    /// the target is the centroid of the point's neighbours projected on the segment,
+    /// strictly between the two vertices next to it on the segment.
+    fn slide_segments(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..5 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                let old = self.g.s[v as usize - n];
+                if old.kind() != crate::mixed::Kind::Segment {
+                    continue;
+                }
+                let all: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                let star: Vec<u32> = all.iter().copied().filter(|&u| self.inside[u as usize]).collect();
+                if star.is_empty() {
+                    continue;
+                }
+                let mut nb: Vec<u32> = all.iter().flat_map(|&u| self.cx.tets[u as usize]).filter(|&x| x != v).collect();
+                nb.sort_unstable();
+                nb.dedup();
+                let ends: Vec<u32> = nb.iter().copied().filter(|&x| self.seg.contains_key(&ekey(v, x))).collect();
+                if ends.len() != 2 {
+                    continue;
+                }
+                let (pa, pb) = (self.xyz[old.a as usize], self.xyz[old.b as usize]);
+                let d = sub3(&pb, &pa);
+                let dd = dot(&d, &d);
+                let par = |x: &P3| dot(&sub3(x, &pa), &d) / dd;
+                let (t0, t1) = {
+                    let (u, w) = (par(&self.xyz[ends[0] as usize]), par(&self.xyz[ends[1] as usize]));
+                    (u.min(w), u.max(w))
+                };
+                let tc = nb.iter().map(|&x| par(&self.xyz[x as usize])).sum::<f64>() / nb.len() as f64;
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let (base, mbase, dbase) = (worst(self), mean(self), dmin(self).min(DIHEDRAL_MIN));
+                let rcap = self.rho_cap(&star);
+                for f in [1.0, 0.5, 0.25] {
+                    let t = old.t + f * (tc - old.t);
+                    let lo = t0 + 0.1 * (t1 - t0);
+                    let hi = t1 - 0.1 * (t1 - t0);
+                    if !(t > lo && t < hi && t > 0.0 && t < 1.0) {
+                        continue;
+                    }
+                    self.set_facet_point(v, SPoint::seg(old.a, old.b, t));
+                    let ok = all.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_facet_point(v, old);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
     }
 
     fn set_volume_point(&mut self, v: u32, p: P3) {
@@ -1865,7 +2063,11 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             let x = st.cx.tets[t as usize].map(|q| st.xyz[q as usize]);
             let Some(c) = circumcentre(x) else { continue };
             let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
-            if r < SLIVER_FILTER * st.opt.alpha * hs {
+            // the filter leaves small slivers to the perturbation, which moves volume vertices
+            // only: a sliver with none (its vertices all on the boundary, as across a layer
+            // thinner than h) is split whatever its size
+            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q));
+            if r < SLIVER_FILTER * st.opt.alpha * hs && !fixed {
                 continue;
             }
             let before = (st.g.s.len(), st.stats.volume_points);
@@ -1880,10 +2082,14 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         }
         break;
     }
-    st.perturb_slivers();
-    st.flip_improve();
-    st.smooth();
-    st.flip_improve();
+    for _ in 0..2 {
+        st.perturb_slivers();
+        st.flip_improve();
+        st.smooth();
+        st.slide_facets();
+        st.slide_segments();
+        st.flip_improve();
+    }
     st.perturb_slivers();
     st.stats.slivers_left = (0..st.cx.tets.len() as u32)
         .filter(|&t| st.cx.alive[t as usize] && st.inside[t as usize] && st.hsz[t as usize] > 0.0
