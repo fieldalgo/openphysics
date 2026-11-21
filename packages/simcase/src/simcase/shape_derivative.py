@@ -230,13 +230,9 @@ def _solve_modes(arguments, motion):
                        p.n_cladding, n_target=p.n_target, motion=kernel_motion)
     except ValueError as exc:
         raise ValueError(modes_document.public_kernel_message(str(exc))) from exc
-    return {"effective_index": _to_public(result["neff"])}
-
-
-def _to_public(kernel_index):
-    """The kernel's effective index (exp(+i omega t)) under exp(-i omega t): its conjugate, the one
-    conversion of this module (real for a lossless guide), in the library of t."""
-    return kernel_index.conj()
+    # runner._to_public is the one kernel-to-public boundary of the mode path (P2-15)
+    from .runner import _to_public
+    return {"effective_index": _to_public(None, None, result, point=True)["effective_index"]}
 
 
 def _check_same_complex(meshed, moving):

@@ -591,10 +591,8 @@ KERNEL_FRAME = {
 #: from _to_public), and _shown (the log text of a kernel index under exp(-i omega t)). cavity.py
 #: (em.cavity3d) has none since the galerkin step's route S (D2): it calls galerkin's public SI
 #: cavity functions, which take and return exp(-i omega t), so it converts nothing (units batch C9's
-#: _to_kernel and _to_public are gone). shape_derivative.py: _to_public, the live effective index of
-#: a moving-mesh mode solve under exp(-i omega t) (its permittivity comes from runner._to_kernel).
-BOUNDARY = {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"},
-            "shape_derivative.py": {"_to_public"}}
+#: _to_kernel and _to_public are gone).
+BOUNDARY = {"runner.py": {"_to_kernel", "_to_public", "_public_open_boundary", "_public_candidate", "_shown"}}
 CONJUGATION = re.compile(r"np\.conj(?:ugate)?\(|\.conj\(\)|0\.0 - [\w\[\]\"'.]*imag|-\s*\w+\.imag\b")
 
 

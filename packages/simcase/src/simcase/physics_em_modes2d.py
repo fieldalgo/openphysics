@@ -90,7 +90,7 @@ def _numbers(value):
     import sys
     torch = sys.modules.get("torch")
     if torch is not None and isinstance(value, torch.Tensor):
-        return value.detach().cpu().resolve_conj().numpy()
+        return np.asarray(value.detach().cpu().tolist())     # a few indices; tolist needs no conjugate bit
     jax = sys.modules.get("jax")
     if jax is not None and isinstance(value, jax.Array):
         return np.asarray(jax.lax.stop_gradient(value))
