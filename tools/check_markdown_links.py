@@ -5,7 +5,9 @@
 Every inline link or image whose target is not a URL must name an existing file
 or directory, and a #fragment pointing into a Markdown file must match one of its
 headings (GitHub slug rules) or an explicit HTML id/name. Links inside code
-blocks and inline code are ignored. External URLs are not fetched.
+blocks and inline code are ignored. External URLs are not fetched. Changelog
+fragments (changelog.d/) are skipped: their links are relative to the changelogs
+they are assembled into, and tools/changelog.py --check resolves them there.
 
 Usage: python tools/check_markdown_links.py [--root DIR]
 Exits 1 and lists each broken link when any is found.
@@ -81,7 +83,7 @@ def markdown_files(root: Path) -> list[Path]:
         files = [root / name for name in out.split("\0") if name]
     except (OSError, ValueError, subprocess.CalledProcessError):
         files = [p for p in root.rglob("*.md") if ".git" not in p.relative_to(root).parts]
-    return sorted(p for p in files if p.is_file())
+    return sorted(p for p in files if p.is_file() and p.relative_to(root).parts[0] != "changelog.d")
 
 
 def check(root: Path) -> tuple[int, list[str]]:

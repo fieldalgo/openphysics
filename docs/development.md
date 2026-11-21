@@ -162,6 +162,7 @@ python tools/run_installed_tests.py        # every Python test in tests/ against
 python tools/check_licenses.py             # installed licenses vs. the reviewed inventory
 python tools/check_markdown_links.py       # relative links and #anchors in all Markdown files
 python tools/check_release_version.py      # one version across the nine distributions
+python tools/changelog.py --check          # changelog fragments in changelog.d/
 ```
 
 For a quick loop, run the tests related to your change and leave the full suite
@@ -193,7 +194,7 @@ not run it. It has five parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | License, release-version, meshloom kernel and Markdown link checks; fast preflight groups; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
+| `linux-py312` | Ubuntu 24.04 | License, release-version, changelog fragment, meshloom kernel and Markdown link checks; fast preflight groups; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
 | `linux-py312-tests` | Ubuntu 24.04, eight jobs | The full source suite with the pinned RII database, in eight time-balanced parts run at the same time |
 | `installed-tests` | Ubuntu 24.04, eight jobs | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout, in eight time-balanced parts run at the same time |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
@@ -204,10 +205,11 @@ succeed (all eight jobs of each split part among them); a failed, cancelled or s
 documentation, needs it.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
-the nine distributions share one version (see [Publishing](#publishing)), then a
+the nine distributions share one version (see [Publishing](#publishing)) and
+`tools/changelog.py --check` checks the [changelog fragments](#changelog-fragments), then a
 Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
-are not fetched). Preflight groups (steady boundary, transient documents, steady
+are not fetched; fragment links are resolved by the fragment check). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
 contract fails within minutes. The distribution checks, the Studio Node checks
 and the resource observations follow. Without the source suite the job took 8 to
@@ -524,10 +526,11 @@ sets it in every `packages/<name>/pyproject.toml` and in each import package's
 `__version__`, and meshloom's `Cargo.toml`, keeps the requirements between our own distributions inside that
 minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x), except that `simcase` pins
 `physmat` and `galerkin`, and `sipi` pins `galerkin`, to the exact version (`physmat==0.0.2`,
-`galerkin==0.0.2`) because they call the internal `physmat.kernels` and `galerkin.kernels`, and renames the
+`galerkin==0.0.2`) because they call the internal `physmat.kernels` and `galerkin.kernels`, runs
+`python tools/changelog.py --assemble` to merge the [changelog fragments](#changelog-fragments), and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
-release, and also refuses package READMEs and documentation pages (other than
+release (it refuses a tag while `changelog.d/` still holds a fragment), and also refuses package READMEs and documentation pages (other than
 changelogs) that still say the release is not on PyPI yet, because a package README
 becomes its PyPI description; without `--tag`, as required CI runs it, it accepts an
 `[Unreleased]` section and that wording. The changelog also says what 0.x keeps stable.
@@ -549,6 +552,37 @@ A wheel built from an unpacked sdist reuses the sdist's description.
 and that no relative link is left in any package description. `meshloom` is built by
 maturin, which does not run `setup.py`, so its README uses absolute links only; the
 same test checks that.
+
+### Changelog fragments
+
+A change does not edit `CHANGELOG.md`: each commit carries its changelog entry as
+one fragment, `changelog.d/<slug>.md`, so concurrent PRs do not conflict at the top
+of `[Unreleased]`. The slug is a short name in lowercase letters, digits and hyphens
+(no PR number is needed). The `#` heading is one Keep a Changelog category (`Added`,
+`Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`), and the two sections hold
+the English and Korean bullets exactly as they will appear in the
+[changelog](../CHANGELOG.md) and its [Korean page](locales/ko/pages/changelog.md),
+with links relative to that page:
+
+```markdown
+# Fixed
+
+## English
+
+- `galerkin`: what changed and why, with the checks. [Shape derivatives](docs/packages/galerkin/shape_derivative.md).
+
+## 한국어
+
+- `galerkin`: 바뀐 내용과 이유, 검사. [형상 미분](packages/galerkin/shape_derivative.md).
+```
+
+`python tools/changelog.py --check` (run in CI) checks the name, the category, both
+sections and the links. The version-change PR runs `python tools/changelog.py --assemble`:
+it inserts each category's bullets, in slug order, at the top of that `###`
+subsection of `[Unreleased]` in both pages (adding the subsection when it is missing)
+and deletes the fragments. Lines already in `[Unreleased]` stay where they are,
+including the bullets above its first `###` subsection, which have no category.
+`changelog.d/` holds only fragments.
 
 ## Stored-value test support
 

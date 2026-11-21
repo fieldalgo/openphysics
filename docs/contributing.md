@@ -50,6 +50,11 @@ optional skips; a passing subset does not replace the required CI check.
   why from the commits. Do not commit
   credentials, generated build directories, local environment files or private
   research material.
+- **Changelog.** Each commit carries its changelog entry as a fragment,
+  `changelog.d/<slug>.md`, with English and Korean bullets under one Keep a
+  Changelog category; it does not edit `CHANGELOG.md`. The
+  [development guide](development.md#changelog-fragments) has the format and an
+  example. Lines already in `[Unreleased]` stay where they are.
 - **Licensing.** Preserve upstream notices and verify the terms and provenance of
   any added dependency, data or copied code against the policy in
   [third-party software](third-party.md), including what its wheels bundle.
@@ -96,9 +101,11 @@ record or the behavior on `main` before reporting it missing.
 ## Releases
 
 All nine distributions share one version. The version change sets it in every
-package, keeps the requirements between them inside that minor series and dates
+package, keeps the requirements between them inside that minor series, assembles
+the changelog fragments (`python tools/changelog.py --assemble`) and dates
 the [changelog](../CHANGELOG.md)'s `[Unreleased]` section; `tools/check_release_version.py`
-checks it. Land the version change through the same PR process, wait for the required
+checks it and refuses a release tag while fragments remain.
+Land the version change through the same PR process, wait for the required
 checks on the resulting `main` commit, then tag it `vX.Y.Z` and publish release
 notes and verified artifacts. Build release artifacts with `OPENPHYSICS_DOCS_REF` set
 to that tag so the PyPI description links to the released files (see the

@@ -70,6 +70,8 @@ jobs:
           python tools/check_licenses.py --report .validation/licenses-validation-env.json
       - name: Check that the distributions share one release version
         run: python tools/check_release_version.py
+      - name: Check changelog fragments
+        run: python tools/changelog.py --check
       - name: Check meshloom's kernel unit tests and third-party notices
         run: |
           (cd packages/meshloom && cargo test --locked --release)

@@ -123,3 +123,12 @@ def test_release_refuses_pages_that_say_the_release_is_not_on_pypi(tmp_path):
     assert errors == [
         "docs/locales/ko/pages/packages/suite/overview.md still says the release is not on PyPI; update it before tagging",
         "packages/suite/README.md still says the release is not on PyPI; update it before tagging"]
+
+
+def test_release_refuses_unassembled_changelog_fragments(tmp_path):
+    tree(tmp_path, changelog="## [0.1.0] - 2026-10-21\n")
+    write(tmp_path, "changelog.d/new-thing.md", "# Added\n")
+    assert release.check(tmp_path) == ("0.1.0", [])  # CI without a tag accepts fragments
+    _, errors = release.check(tmp_path, "v0.1.0")
+    assert errors == ["changelog.d still holds 1 fragment(s) (new-thing.md); "
+                      "run python tools/changelog.py --assemble in the version-change PR"]

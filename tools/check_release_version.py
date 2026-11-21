@@ -13,8 +13,9 @@ All distributions under packages/ release in lockstep. This check fails unless
   that version and stops before the next minor series, and
 - CHANGELOG.md has a ``## [Unreleased]`` section or a section for that version.
 
-With ``--tag`` it also refuses Markdown under packages/ and docs/ that still says the
-release is not on PyPI yet (a package README becomes the PyPI description).
+With ``--tag`` it also refuses changelog fragments left in changelog.d/ (the
+version-change PR assembles them with ``tools/changelog.py --assemble``) and
+Markdown under packages/ and docs/ that still says the release is not on PyPI yet (a package README becomes the PyPI description).
 
 With ``--tag vX.Y.Z`` (a release), the tag must name that version and
 CHANGELOG.md must have a dated ``## [X.Y.Z] - YYYY-MM-DD`` section. Run it from
@@ -111,6 +112,10 @@ def check(root=ROOT, tag=None):
             errors.append(f"tag {tag!r} does not name version {version!r}; expected v{version}")
         if not sections.get(version):
             errors.append(f"CHANGELOG.md has no dated '## [{version}] - YYYY-MM-DD' section")
+        left = sorted(p.name for p in (root / "changelog.d").glob("*") if p.is_file())
+        if left:
+            errors.append(f"changelog.d still holds {len(left)} fragment(s) ({', '.join(left)}); "
+                          "run python tools/changelog.py --assemble in the version-change PR")
         for page in sorted([*(root / "packages").glob("**/*.md"), *(root / "docs").glob("**/*.md")]):
             # a changelog records history, which may quote the wording
             if page.name != "changelog.md" and NOT_PUBLISHED.search(page.read_text(encoding="utf-8")):
