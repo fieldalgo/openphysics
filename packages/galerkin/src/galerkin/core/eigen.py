@@ -71,6 +71,31 @@ def neighbour_gap(a, b, lam0):
     return float(distance[1] / scale)
 
 
+def nearest_eigenvalues(a, b, lam, k):
+    """The k eigenvalues of a x = lam b x nearest to ``lam``, or None if shift-invert Arnoldi fails.
+
+    a and b are SciPy sparse matrices of numbers; small pencils are solved densely.
+    """
+    n = a.shape[0]
+    if n <= _DENSE_LIMIT:
+        values = la.eigvals(a.toarray(), b.toarray())
+        return list(values[np.argsort(np.abs(values - lam))[:k]])
+    scale = abs(lam) if lam != 0 else 1.0
+    sigma = lam + 1e-10 * scale
+    if not np.iscomplexobj(a) and not np.iscomplexobj(b) and sigma.imag == 0:
+        sigma = sigma.real
+    dtype = np.result_type(a.dtype, b.dtype, np.complex128 if np.iscomplexobj(sigma) else np.float64)
+    try:
+        lu = spla.splu((a - sigma * b).tocsc().astype(dtype))
+        operator = spla.LinearOperator((n, n), matvec=lambda v: lu.solve(b @ v), dtype=dtype)
+        nu = spla.eigs(operator, k=min(k, n - 2), which="LM", v0=np.random.default_rng(0).standard_normal(n),
+                       return_eigenvectors=False, tol=1e-12)
+    except (RuntimeError, spla.ArpackError):
+        return None
+    with np.errstate(divide="ignore"):
+        return list(sigma + 1.0 / nu)
+
+
 def degenerate_modes(a, b, eigenvalues):
     """Indices of the returned eigenvalues that are multiple to DEGENERATE_GAP."""
     eigenvalues = np.asarray(eigenvalues)

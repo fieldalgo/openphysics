@@ -96,7 +96,6 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
-import scipy.linalg as la
 from scipy.linalg import eig as la_eig
 
 from .mesh import Mesh
@@ -519,35 +518,13 @@ def _check_group(A0, B0, lam0, group, tolerance):
             if abs(a - b) > tolerance * max(abs(a), abs(b), tiny):
                 raise ValueError(f"degenerate_branch_derivatives: modes {tuple(int(i) for i in group)} chain beyond "
                                  "tolerance (some pairs are farther apart than it); lower tolerance")
-    nearby = _nearest_eigenvalues(A0, B0, complex(np.mean(members)), len(group) + 1)
+    nearby = eigen.nearest_eigenvalues(A0, B0, complex(np.mean(members)), len(group) + 1)
     close = [] if nearby is None else [v for v in nearby
                                        if any(abs(v - a) <= tolerance * max(abs(a), tiny) for a in members)]
     if nearby is None or len(close) > len(group):
         reason = "could not be certified complete" if nearby is None else "has a member that was not returned"
         raise ValueError(f"degenerate_branch_derivatives: the group of modes {tuple(int(i) for i in group)} "
                          f"{reason}; ask for more modes (num_modes) so that its whole group is solved")
-
-
-def _nearest_eigenvalues(a, b, lam, k):
-    """The k eigenvalues of a x = lam b x nearest to ``lam`` (dense for small pencils), or None."""
-    n = a.shape[0]
-    if n <= eigen._DENSE_LIMIT:
-        values = la.eigvals(a.toarray(), b.toarray())
-        return list(values[np.argsort(np.abs(values - lam))[:k]])
-    scale = abs(lam) if lam != 0 else 1.0
-    sigma = lam + 1e-10 * scale
-    if not np.iscomplexobj(a) and not np.iscomplexobj(b) and sigma.imag == 0:
-        sigma = sigma.real
-    dtype = np.result_type(a.dtype, b.dtype, np.complex128 if np.iscomplexobj(sigma) else np.float64)
-    try:
-        lu = spla.splu((a - sigma * b).tocsc().astype(dtype))
-        operator = spla.LinearOperator((n, n), matvec=lambda v: lu.solve(b @ v), dtype=dtype)
-        nu = spla.eigs(operator, k=min(k, n - 2), which="LM", v0=np.random.default_rng(0).standard_normal(n),
-                       return_eigenvectors=False, tol=1e-12)
-    except (RuntimeError, spla.ArpackError):
-        return None
-    with np.errstate(divide="ignore"):
-        return list(sigma + 1.0 / nu)
 
 
 def _jacobian(xp, function, t0):
