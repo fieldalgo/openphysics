@@ -10,9 +10,11 @@ tetrahedralization with exact predicates, boundary recovery, quality refinement 
 (later) mesh improvement, in a compiled Rust kernel. `meshloom.generate3d` meshes a
 piecewise-linear complex to a size `h` (one number, or one per named region) with a
 radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
-`quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades). It is not yet
-graded by the acceptance gates of M6 (quality against the baseline, speed), it has no
-sliver removal, graded sizes or curved surfaces, and it is slow (see Limits).
+`quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades), then improves
+the mesh (sliver removal, smoothing and flips). It meets the quality gates measured so
+far on polyhedral inputs (V10 on C2, C3 and C6; V7, V8, V21, V23, V32), but has no
+graded or curved-surface sizing yet, so V10 is not graded on all of its cases, and it
+is slower than the baseline (see Limits).
 
 ```python
 import numpy as np
@@ -169,11 +171,36 @@ names may change before the mesher's public API.
   counted in `stats` (`exempt_subsegments`, `exempt_subfacets`). A cap on inserted
   points (`max_points`, or by default 20·V/h³ + 200·A/h² + 100·n₀, plus 200·A/ℓ² with a
   ratio where ℓ is the shortest input edge, between 1,000 and 5,000,000) ends refinement
-  with `RefineError` instead of a hang. All 14 C10 inputs refine to the end at h = ¼ of
-  their size with ratio 2 and pass V1–V4. V7 (guaranteed mode, ratio 2, max ratio ≤
-  2(1 + 10⁻⁹)) passes on C2 at h = 0.12, 0.06 and 0.03 (max 0.923, 1.198, 1.356) and on
-  C3 at h = 0.8, 0.4 and 0.2 (max 1.553, 1.565, 1.593). C9 is not run: the plan does not
-  give its dimensions yet.
+  with `RefineError` instead of a hang. All 14 C10 inputs refine to the end at h = ½, ¼
+  and ⅛ of their size with ratio 2 and pass V1–V4. V7 (guaranteed mode, ratio 2, max
+  ratio ≤ 2(1 + 10⁻⁹), decided exactly) passes on C2 at h = 0.12, 0.06 and 0.03 (max
+  1.970, 1.993, 1.914), on C3 at h = 0.8, 0.4 and 0.2 (1.888, 1.892, 1.763) and on C9 at
+  C2's sizes (1.990, 1.998, 1.997).
+- **Boundary size and robustness (M6).** Refinement first drops the tetrahedra outside
+  the domain (the rest of the convex hull, and holes): every face between them and the
+  domain is a subfacet, so the boundary becomes a hull boundary, as a convex domain's
+  is. Kept, that filling had to be retriangulated around every boundary point, and on
+  re-entrant inputs (C6) it became non-Delaunay and left no valid cavity. A subsegment
+  longer than `alpha·h`, a subfacet with circumradius above 0.68 `alpha·h` or with
+  radius-edge ratio above 1.5 is split even when nothing encroaches it, so the boundary
+  is discretized to the size first. After each insertion, Lawson 2-3/3-2 flips restore
+  the Delaunay property where a cavity was cut short. A tetrahedron whose circumcentre
+  cannot be inserted is retried at most 3 times; one far above the size whose
+  circumcentre lies beyond a subfacet is split at that point's projection on the facet.
+- **Mesh improvement (M6).** Once refinement ends: tetrahedra with a dihedral angle
+  below 15° are split at their circumcentres (only those with circumradius at least 0.7
+  `alpha·h`, unless no vertex of the sliver can move; at most 10% more points);
+  remaining slivers' volume vertices are moved in fixed directions; volume vertices are
+  smoothed towards their neighbours' centroid, facet points within their facet's plane
+  (exact facet coordinates) and segment points along their segment; 2-3 and 3-2 flips
+  and edge removal (rings of 4 to 7 tetrahedra, the best triangulation of the ring by
+  dynamic programming) change the connectivity. A change is kept when it raises the
+  worst (dihedral angle, q) of the tetrahedra it touches, or keeps that worst shape at
+  least 15° and q 0.5 and lowers their total badness (sum of 1/q − 1); it never moves a
+  constraint off its segment or facet, never flips across a subfacet, and keeps V7's
+  bound. These passes run twice. `stats` counts each (`sliver_points`, `slivers_left`,
+  `sliver_moves`, `smooth_moves`, `quality_flips`, `quality_edge_removals`,
+  `lawson_flips`).
 
 ```python
 import numpy as np
@@ -226,17 +253,18 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- Not yet accepted: V21 fails at the plan's CI sizes (it passes at {0.2, 0.1, 0.05}, the
-  sizes the extruder's amendment uses); V8 fails on C2 at h = 0.12 and on C3 with the
-  die at h/2 (meshloom is coarser than the baseline at coarse sizes and in thin layers);
-  the unstructured-cavity refinement ladder (V32) does not decrease monotonically.
-  These gates are open. A boundary size field (subsegments and subfacets split to the
-  local size) brings V8's medians into their windows but creates slivers (dihedral
-  angles near 0°) that break V23, so it waits for sliver removal (M6); the gates are
-  graded again after it.
-- No graded or callable sizes (one size per region only), and no quality improvement
-  (sliver removal) yet. Refinement is slow: about 19,000 nodes in 25 s on stacked
-  layers. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
+- Not yet accepted. Measured with the defaults (2026-11-21), every row run so far
+  passes: V10 on C2, C3 and C6 at the plan's three sizes (smallest dihedral angle
+  15.4–23.1°, mean q 0.767–0.855, T within its window); V8 on C2 at three sizes and on C3
+  with the die at h/2 (every region); V21 at the plan's CI sizes (L2 slope 2.08, H1 1.05);
+  V23 and the V32 refinement ladder of the unstructured cavity (first-cluster errors
+  0.0130, 0.0027, 0.0005); V7 on C2, C3 and C9. V10 is graded on C2–C6 and C4 and C5
+  have curved surfaces, which meshloom does not mesh yet, so V10 is not complete.
+  `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's
+  C2 and C3 rows, so V8 does not check them independently.
+- No graded or callable sizes (one size per region only) and no curved surfaces.
+  Meshing is slow: the unit cube at h = 0.03 (190,000 tetrahedra) takes about 2 minutes
+  on one core. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
   input and recovery points (and the few points repair adds) only. A
   tetrahedron that rounding to doubles makes flat or inverted and that repair cannot fix
   raises `RoundingError`. Near-coplanar facets meeting at a segment are the hard case: in

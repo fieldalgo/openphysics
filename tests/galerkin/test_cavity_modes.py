@@ -278,10 +278,7 @@ def test_extruded_cavity_improves_under_refinement(refsol):
 
 # --------------------------------------------------------------------------
 # The same assertions on a mesh from OpenPhysics's own general mesher (V23, V32):
-# meshloom.generate3d meshes the cube from its six faces. This runs without Gmsh.
-# The refinement ladder above (0.25, 0.16, 0.11) does not hold on meshloom yet: the
-# first-cluster errors are 0.0009, 0.0102 and 0.0067 (the coarsest mesh happens to be
-# the most accurate), so V32 fails there; see the meshloom page's limits.
+# meshloom.generate3d meshes the cube from its six faces. These run without Gmsh.
 # --------------------------------------------------------------------------
 meshloom = pytest.importorskip("meshloom")
 needs_meshloom = pytest.mark.skipif(not meshloom.kernel_available(),
@@ -325,3 +322,16 @@ def test_meshloom_cavity_matches_the_analytic_spectrum(refsol):
     for value in vals[:len(flat)]:
         assert min(abs(value - k) / k for k in flat) < 0.06, (
             f"{value:.4f} falls between the analytic resonances — spurious")
+
+
+@needs_meshloom
+@pytest.mark.slow
+def test_meshloom_cavity_improves_under_refinement(refsol):
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
+                                                             n_max=3))
+    first = []
+    for h in (0.25, 0.16, 0.11):
+        _, vals = _meshloom_cavity(h, sigma=1.3 * exact[0][0])
+        first.append(abs(vals[:exact[0][1]].mean() - exact[0][0]) / exact[0][0])
+    assert first[0] > first[1] > first[2], f"not converging: {first}"
+    assert first[-1] < 1e-2, f"finest meshloom mesh still {first[-1]:.2e} off"
