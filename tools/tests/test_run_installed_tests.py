@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for the --shard parts of tools/run_installed_tests.py.
 
-The four installed-test jobs must together run every test file under tests/
+The eight installed-test jobs must together run every test file under tests/
 once, and each part's result check must require results from its own files
 only.
 """
@@ -33,7 +33,7 @@ def junit(path, classnames, skipped=()):
 def test_the_parts_of_the_checkout_cover_every_test_file_once():
     tests = ROOT / "tests"
     every = [p.relative_to(ROOT).as_posix() for p in installed.collected_files(tests)]
-    parts = [installed.shard_files(tests, f"{k}/4") for k in range(1, 5)]
+    parts = [installed.shard_files(tests, f"{k}/8") for k in range(1, 9)]
     files = [part[0] for part in parts]
     assert sorted(sum(files, [])) == sorted(every)
     assert all(part[2] == every for part in parts)

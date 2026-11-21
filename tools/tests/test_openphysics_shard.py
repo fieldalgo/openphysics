@@ -58,13 +58,22 @@ def test_a_file_missing_from_the_table_counts_as_the_median():
         "d.py": 0, "a.py": 1, "c.py": 1, "b.py": 1}
 
 
-def test_the_stored_table_balances_four_parts():
+@pytest.mark.parametrize("parts", [4, 8])
+def test_the_stored_table_balances_the_parts(parts):
     seconds = shard.load_durations()
-    plan = shard.assign(list(seconds), seconds, 4)
-    load = [sum(seconds[f] for f, i in plan.items() if i == part) for part in range(4)]
+    plan = shard.assign(list(seconds), seconds, parts)
+    load = [sum(seconds[f] for f, i in plan.items() if i == part) for part in range(parts)]
     # Greedy largest-first: no part exceeds the even share by more than the largest file.
-    assert max(load) <= sum(load) / 4 + max(seconds.values())
+    assert max(load) <= sum(load) / parts + max(seconds.values())
     assert all(value > 0 for value in load)
+
+
+def test_no_file_is_much_longer_than_an_eighth_of_the_suite():
+    # CI runs eight parts and assigns whole files, so a file far above an eighth of the
+    # suite would set the run's floor; split such a file instead.
+    seconds = shard.load_durations()
+    eighth = sum(seconds.values()) / 8
+    assert max(seconds.values()) <= 1.1 * eighth, max(seconds, key=seconds.get)
 
 
 def test_the_stored_table_names_existing_test_files():

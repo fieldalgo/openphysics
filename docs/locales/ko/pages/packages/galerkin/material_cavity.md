@@ -382,6 +382,9 @@ electrical_conductivity=None, mode_count=6, target_frequency)`는 영역과 바�
 | 같은 판, 0.15 m, 5.8e7 S/m 바닥(두 경로 모두 `electrical_conductivity={"z0": ...}`) | 5e-2 이내, 유한한 Q, 임피던스 반복 1회 이상 | 통과 |
 | 상자 솔버 자신의 2x2x2 메시에 판을 영역으로, `x1` 손실 벽을 두 경로로 | 상대 차 <= 1e-10, Q는 1e-8 | 2.99e-16 |
 
+M3 세밀화 연구는 `tests/galerkin/test_cavity_mesh_slab_refinement.py`에, 나머지 두 행은
+`tests/galerkin/test_cavity_mesh.py`에 있습니다.
+
 ## 한계
 
 - 유한 전도도 벽은 상자 벽 전체에 적용하는 국소 Leontovich 임피던스이며 정답은 1차

@@ -417,6 +417,9 @@ with regions and tagged outward faces (checked on entry), coordinates in metres.
 | the same slab at 0.15 m with a 5.8e7 S/m floor (`electrical_conductivity={"z0": ...}` on both routes) | within 5e-2, finite Q, at least one impedance iteration | passes |
 | the box solver's own 2x2x2 mesh with the slab as regions and `x1` lossy, through both routes | relative difference <= 1e-10, Q to 1e-8 | 2.99e-16 |
 
+The M3 refinement study is `tests/galerkin/test_cavity_mesh_slab_refinement.py`; the
+other two rows are in `tests/galerkin/test_cavity_mesh.py`.
+
 ## Limitations
 
 - Finite-conductivity walls are local Leontovich impedances on whole box walls, with

@@ -1,11 +1,12 @@
 {
- "source": "Validate packages run 44781086131 (main c402ea96, 2026-11-20), linux-py312 source-tests.xml",
+ "source": "Validate packages run 44781086131 (main c402ea96, 2026-11-20), linux-py312 source-tests.xml; tests/galerkin/test_cavity_mesh.py split by test case when test_m3_dielectric_slab_layer_matches_the_box_solver_on_refinement (331.7 s) moved to test_cavity_mesh_slab_refinement.py",
  "seconds": {
   "tests/galerkin/test_api_units_scan_galerkin.py": 0.1,
   "tests/galerkin/test_cavity3d_mesh_validation.py": 0.2,
   "tests/galerkin/test_cavity3d_validation.py": 18.3,
   "tests/galerkin/test_cavity_gradients.py": 16.8,
-  "tests/galerkin/test_cavity_mesh.py": 369.2,
+  "tests/galerkin/test_cavity_mesh.py": 37.5,
+  "tests/galerkin/test_cavity_mesh_slab_refinement.py": 331.7,
   "tests/galerkin/test_cavity_modes.py": 19.5,
   "tests/galerkin/test_cavity_public_frames.py": 0.7,
   "tests/galerkin/test_cavity_result_surface.py": 0.0,

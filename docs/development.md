@@ -194,13 +194,13 @@ not run it. It has five parts, run in parallel:
 | Job | Platform | What it checks |
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | License, release-version, meshloom kernel and Markdown link checks; fast preflight groups; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
-| `linux-py312-tests` | Ubuntu 24.04, four jobs | The full source suite with the pinned RII database, in four time-balanced parts run at the same time |
-| `installed-tests` | Ubuntu 24.04, four jobs | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout, in four time-balanced parts run at the same time |
+| `linux-py312-tests` | Ubuntu 24.04, eight jobs | The full source suite with the pinned RII database, in eight time-balanced parts run at the same time |
+| `installed-tests` | Ubuntu 24.04, eight jobs | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout, in eight time-balanced parts run at the same time |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
 The single required check is **`tests`**. It passes only when all five parts
-succeed (all four jobs of each split part among them); a failed, cancelled or skipped part fails it. Every change, including
+succeed (all eight jobs of each split part among them); a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
@@ -215,29 +215,34 @@ and the resource observations follow. Without the source suite the job took 8 to
 runner speed varies.
 
 **Source tests** (`linux-py312-tests`). The whole suite, `python -m pytest` with
-the root configuration (every test in `tests/` and `tools/tests/`), runs in four
+the root configuration (every test in `tests/` and `tools/tests/`), runs in eight
 jobs at once. Each job collects the whole suite and keeps the test files that
 `tools/shards/openphysics_shard.py` assigns to its part: whole files, largest
 first, each to the part with the least time so far, by the per-file seconds in
 `tools/shards/durations.json` (a file missing from the table counts as the
 median). Every part computes the same assignment from the same collected files,
-so together the four run every collected test exactly once; no test is
+so together the eight run every collected test exactly once; no test is
 selected by name. The end of each log names the part's files, tests and
 estimated time. On one job the suite took 44 to 70 minutes on 2026-11-20,
-depending on the runner CPU; a part is about 11 minutes of tests plus about 3
-minutes of setup, and its 45-minute limit only stops hung runs. To run a part
-locally:
+depending on the runner CPU, and its four parts 10 to 21 minutes on 2026-11-21;
+a part of eight is about 5.5 minutes of tests by the table plus about 3 minutes
+of setup, and its 45-minute limit only stops hung runs. Since files are
+assigned whole, the largest file is a part's floor
+(`tools/tests/test_examples_smoke.py`, 5.7 minutes, whose examples run in an
+order that the file keeps); the 5.5-minute M3 slab refinement study has its own
+file (`tests/galerkin/test_cavity_mesh_slab_refinement.py`) for this reason. To
+run a part locally:
 
 ```bash
-PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/4
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/8
 ```
 
 When the suite's balance drifts, rebuild the table from the JUnit files of one
-complete run (the four `source-tests-<k>-of-4` artifacts), from the repository
-root:
+complete run (the eight `source-tests-<k>-of-8` artifacts, unpacked in one
+folder), from the repository root:
 
 ```bash
-python tools/shards/openphysics_shard.py --update source-tests-1.xml source-tests-2.xml source-tests-3.xml source-tests-4.xml --source "Validate packages run <id> (main <sha>)"
+python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
 ```
 
 **Distribution checks** (`tools/check_distributions.py`). Builds all nine packages
@@ -296,15 +301,16 @@ and `PHYSMAT_RII_PATH`, because tests that need them skip otherwise and a skip
 fails the run. It is verified on Linux only. The source suite runs in
 `linux-py312-tests`.
 
-In CI the job runs as four parts, `installed-tests (1/4)` to `(4/4)`, with
-`--shard K/4`. Each part builds and installs its own wheels (about 2 minutes)
+In CI the job runs as eight parts, `installed-tests (1/8)` to `(8/8)`, with
+`--shard K/8`. Each part builds and installs its own wheels (about 2 minutes)
 and passes pytest the test files `tools/shards/openphysics_shard.py` assigns to
 it from every copied test file, by the same table as the source tests; the
-result check then requires results from each of those files. The four parts
+result check then requires results from each of those files. The eight parts
 together run every test file once, and each writes `shard.json` with its files
 and estimated time. In one job the run took 39 to 71 minutes on 2026-11-20,
-depending on the runner CPU; the parts of a 63-minute run would be 15.5 to 17
-minutes each, and the 45-minute limit only stops hung runs. Without `--shard`,
+depending on the runner CPU; the eight parts of a 63-minute run would be 7.1 to
+10.9 minutes each, the longest being the M3 slab refinement study alone, and
+the 45-minute limit only stops hung runs. Without `--shard`,
 as locally, the script runs every test file.
 
 **Licenses** (`tools/check_licenses.py`). Before the tests, the pinned validation
@@ -409,10 +415,10 @@ Each job uploads its artifacts, even after a failure:
 - Linux: `distributions-and-test-results`, the `.validation/` directory with
   JUnit XML per preflight group, distribution checksums and reports, and
   `numeric-runtime.json`.
-- Source tests: `source-tests-<k>-of-4` for each part, the `.validation/`
+- Source tests: `source-tests-<k>-of-8` for each part, the `.validation/`
   directory with `source-tests-<k>.xml`, the cross-check records and
   `numeric-runtime.json`.
-- Installed tests: `installed-test-results-<k>-of-4` for each part, the
+- Installed tests: `installed-test-results-<k>-of-8` for each part, the
   `.validation/` directory with the built distributions, `installed-tests.xml`,
   `shard.json`, `installed-origins.json`, `suite-file-hashes.json`, the license
   report and the cross-check records.
