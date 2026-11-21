@@ -50,11 +50,16 @@ def load_durations(path=DURATIONS):
     return seconds
 
 
+def weights(files, seconds):
+    """Seconds per file; a file missing from the table counts as the median of those listed."""
+    known = [seconds[f] for f in set(files) if f in seconds]
+    default = statistics.median(known) if known else 1.0
+    return {f: seconds.get(f, default) for f in set(files)}
+
+
 def assign(files, seconds, parts):
     """Map each file to a part index in range(parts); the result depends only on the set of files."""
-    known = [seconds[f] for f in files if f in seconds]
-    default = statistics.median(known) if known else 1.0
-    weight = {f: seconds.get(f, default) for f in set(files)}
+    weight = weights(files, seconds)
     load = [0.0] * parts
     result = {}
     for f in sorted(weight, key=lambda name: (-weight[name], name)):
@@ -105,11 +110,10 @@ def pytest_collection_modifyitems(session, config, items):
         config.hook.pytest_deselected(items=drop)
     items[:] = keep
     mine = sorted(f for f, index in plan.items() if index == part - 1)
-    known = [seconds[f] for f in files if f in seconds]
-    default = statistics.median(known) if known else 1.0
+    weight = weights(files, seconds)
     config._openphysics_shard_summary = (
         f"shard {part}/{parts}: {len(mine)} of {len(files)} test files, {len(keep)} of "
-        f"{len(keep) + len(drop)} tests, about {sum(seconds.get(f, default) for f in mine) / 60:.1f} min "
+        f"{len(keep) + len(drop)} tests, about {sum(weight[f] for f in mine) / 60:.1f} min "
         f"by {DURATIONS.name} ({len(files - set(seconds))} files not in it)")
 
 

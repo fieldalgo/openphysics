@@ -226,13 +226,21 @@ jobs:
 
   installed-tests:
     # The whole tests/ folder against wheels built from the sdists and installed
-    # outside the checkout. No test is selected by name.
+    # outside the checkout, in four parts on four runners at once. Each part builds and
+    # installs its own wheels (about 2 min) and runs the test files that
+    # tools/shards/openphysics_shard.py assigns to it from every copied test file, so the
+    # parts together run every test file once. No test is selected by name.
+    name: installed-tests (${{ matrix.shard }}/4)
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
-    # Build, install and the whole suite: the test step took 39-71 min on 2026-11-20,
-    # following the runner CPU (EPYC 9V45 39, Xeon 8573C 51, EPYC 7763 63 and over 74,
-    # Xeon 8370C 71). The limit only stops hung jobs; keep it above the slowest class.
-    timeout-minutes: 90
+    # In one job the step took 39-71 min on 2026-11-20, following the runner CPU (EPYC
+    # 9V45 39, Xeon 8573C 51, EPYC 7763 63 and over 74, Xeon 8370C 71); the four parts of
+    # the 63-min run would be 15.5-17.0 min. The limit only stops hung jobs.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
@@ -257,16 +265,16 @@ jobs:
           python tools/report_numeric_runtime.py --json .validation/installed-numeric-runtime.json
       - name: Fetch pinned RII database
         run: python tools/fetch_rii.py "$RUNNER_TEMP/rii"
-      - name: Run every test against the installed wheels
+      - name: Run part ${{ matrix.shard }} of 4 of the tests against the installed wheels
         env:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
           OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
           OPENPHYSICS_CROSSCHECK_DIR: .validation/installed-crosscheck
-        run: python tools/run_installed_tests.py --output .validation/installed
+        run: python tools/run_installed_tests.py --output .validation/installed --shard ${{ matrix.shard }}/4
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: installed-test-results
+          name: installed-test-results-${{ matrix.shard }}-of-4
           path: .validation/
           include-hidden-files: true
           if-no-files-found: warn
