@@ -74,12 +74,15 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    각 실행(이름, 크기, λ)이 표시됩니다.
 6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
    파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
-   `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드 폴더에 저장됩니다.
-   Messages에 *Session saved as …*가 나오고, 다음 편집이나 실행 전까지 헤더에
-   *Saved as … · 시각*이 표시됩니다. **Save inputs only**는 결과 없이 모델만 저장합니다.
-   완료한 실행이 세션 파일에 없으면 헤더에 *Results not saved*(저장한 파일이 있었다면
-   *Changed since …*)가 표시됩니다. 브라우저 복구는 마지막으로 저장한 파일 이름과 시각을
-   함께 보관하므로, 그 파일과 같던 세션을 복구하면 다시 *Saved as …*가 나옵니다. 로컬 복구를
+   `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어갑니다. Studio는
+   파일을 브라우저에 넘길 뿐 실제로 보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음)
+   Messages에 *Session file … sent to the browser's downloads (check your Downloads folder)*가
+   나오고, 다음 편집이나 실행 전까지 헤더에 *Session file … · 시각*이 표시됩니다.
+   **Save inputs only**는 결과 없이 모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 헤더에
+   *Results not saved*(세션 파일이 있었다면 *Changed since session file …*)가 표시됩니다.
+   브라우저 복구는 마지막 세션 파일 이름과 시각을 함께 보관하므로, 그 파일과 같던 세션을
+   복구하면 *Last session file … (시각)*이 나옵니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   0.5 nm 단위가 됩니다. 중심은 정확히 유지되며 입력한 값은 드래그 간격에 맞춰지지 않습니다. 로컬 복구를
    사용하려면 **Browser recovery saved**를 확인합니다. 새로고침하거나 Studio를 다시
    켜면 시작 화면에 **Continue where you left off** 카드가 마지막 브라우저 세션과 이전
    세션을 보여 줍니다. 하나를 골라 복구하거나, 세션 파일을 열거나, 새로 시작합니다.

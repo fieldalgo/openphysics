@@ -16,11 +16,13 @@ export function validateSavedFile(value){
  if(typeof value!=='object'||typeof value.name!=='string'||!/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(value.name)||typeof value.savedAt!=='string'||!Number.isFinite(Date.parse(value.savedAt))||typeof value.current!=='boolean')return null;
  return {name:value.name,savedAt:value.savedAt,current:value.current};
 }
-// The title bar's persistence state. saved: {name, savedAt, current} or null.
+// The title bar's persistence state. saved: {name, savedAt, current, recovered} or null.
+// Studio hands the file to the browser's downloads and cannot know it was kept, so the
+// title names the session file and never claims it was saved.
 export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
- if(saved?.current)return `Saved as ${saved.name} · ${when(saved.savedAt)}`;
- if(runsUnsaved)return saved?`Changed since ${saved.name} (${when(saved.savedAt)}) · use Save session`:'Results not saved · use Save session';
+ if(saved?.current)return saved.recovered?`Last session file ${saved.name} (${when(saved.savedAt)})`:`Session file ${saved.name} · ${when(saved.savedAt)}`;
+ if(runsUnsaved)return saved?`Changed since session file ${saved.name} (${when(saved.savedAt)}) · use Save session`:'Results not saved · use Save session';
  return clean?'Input snapshot unchanged':'Unsaved inputs';
 }
 const PHYSICS=[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']];
