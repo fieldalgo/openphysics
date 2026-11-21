@@ -18,7 +18,8 @@ from multiphysics_fixtures import heated_slab, relay_document, relay_kind
 def relays(monkeypatch):
     """Test-local relay kinds (input x, output y; K, and mK for a unit mismatch), registered for one test."""
     registry.kinds()
-    for kind in (relay_kind("test.relay"), relay_kind("test.relaymk", unit="mK")):
+    for kind in (relay_kind("test.relay"), relay_kind("test.relaymk", unit="mK"),
+                 relay_kind("test.relaypower", unit="W/m^3", quantity="heat_source_density")):
         monkeypatch.setitem(registry._KINDS, kind.name, kind)
 
 
@@ -143,8 +144,8 @@ def test_thermo_optic_keys_without_a_coupled_temperature_are_unused():
      ["heat1.temperature is an output port", "to names an input port"]),
     ("from", "modes1.temperature", "E-CONTRACT", "couplings.heat_to_optics.from",
      ["modes1.temperature is an input port", "from names an output port"]),
-    ("from", "heat1.heat_flux", "E-COUPLING-PAIR", "couplings.heat_to_optics",
-     ["carries heat_flux", "takes temperature", "same quantity"]),
+    ("from", "heat1.heat_flux", "E-CONTRACT", "couplings.heat_to_optics.from",
+     ["heat1.heat_flux is an output thermal.steady2d saves but does not couple", "coupled outputs: temperature"]),
     ("transfer", "conservative", "E-CONTRACT", "couplings.heat_to_optics.transfer",
      ['"conservative" is not a transfer', 'write "same_mesh"']),
     ("from", "heat1", "E-VALUE-FORM", "couplings.heat_to_optics.from", ["<physics name>.<output port>"]),
@@ -295,7 +296,10 @@ def _loop(**change):
 @pytest.mark.parametrize("loop, code, path, words", [
     (_loop(physics=["a"]), "E-CONTRACT", "study.loops[0].physics", ["a is not a cycle of the couplings"]),
     (_loop(method="newton"), "E-CONTRACT", "study.loops[0].method", ['"newton" is not a loop method']),
-    (_loop(max_iterations=0), "E-VALUE-FORM", "study.loops[0].max_iterations", ["at least 1"]),
+    (_loop(max_iterations=0), "E-VALUE-FORM", "study.loops[0].max_iterations", ["at least 2"]),
+    (_loop(max_iterations=1), "E-VALUE-FORM", "study.loops[0].max_iterations", ["at least 2"]),
+    (_loop(tolerance={"port": "a.y", "norm": "max_abs", "value": "1e-3 degC"}), "E-DEGC-NOT-ABSOLUTE",
+     "study.loops[0].tolerance.value", []),
     (_loop(relaxation=1.5), "E-DOMAIN", "study.loops[0].relaxation", ["(0, 1]"]),
     (_loop(tolerance={"port": "a.x", "norm": "max_abs", "value": "1e-6 K"}), "E-CONTRACT",
      "study.loops[0].tolerance.port", ["a has no output port 'x'"]),
@@ -376,7 +380,108 @@ def test_a_loop_that_reaches_max_iterations_fails_with_its_history(relays):
     with pytest.raises(multiphysics.LoopNotConverged) as caught:
         _run_cycle(2.0, relaxation=1.0, max_iterations=8)
     error = caught.value
+    assert (error.code, error.path) == ("E-LOOP-DIVERGED", "study.loops")
     assert len(error.history) == 7 and error.unit == "K"
     assert all(b > a for a, b in zip(error.history, error.history[1:]))       # diverging: never a result
     assert "the loop of a, b did not converge in 8 iterations" in str(error)
     assert "no result is returned" in str(error)
+
+
+def test_a_multiphysics_sweep_is_validated_and_not_run():
+    tree = heated_slab()
+    tree["study"] = {"type": "sweep", "parameter": "physics.modes1.vacuum_wavelength",
+                     "values": {"unit": "um", "values": [1.5, 1.55]}}
+    assert errors(tree) == []
+    doc = Document.from_dict(tree)
+    assert doc.si["study"]["type"] == "sweep"
+    with pytest.raises(DocumentError) as caught:
+        multiphysics.run(doc, verbose=False)
+    assert (caught.value.code, caught.value.path) == ("E-CONTRACT", "study.type")
+    assert "a multiphysics sweep is validated but not run in this release" in str(caught.value)
+
+
+@pytest.mark.parametrize("parameter, path", [
+    ("physics.optics9.vacuum_wavelength", "study.parameter"),
+    ("mesh.element_size", "study.parameter"),
+    ("physics.modes1.no_such_value", "study.parameter"),
+])
+def test_a_multiphysics_sweep_parameter_names_a_value_of_one_physics(parameter, path):
+    tree = heated_slab()
+    tree["study"] = {"type": "sweep", "parameter": parameter, "values": {"unit": "um", "values": [1.5, 1.55]}}
+    found = errors(tree)
+    assert found and found[0][:2] == ("E-CONTRACT", path), found
+
+
+def test_a_quantity_mismatch_is_named(relays):
+    tree = relay_document({"a": ("test.relaypower", 1, 1), "b": ("test.relay", 0.5, 2)}, {"ab": ("a.y", "b.x")})
+    tree["physics"]["a"]["offset"] = "1 K"
+    found = [f for f in errors(tree) if f[0] == "E-COUPLING-PAIR"]
+    assert found and found[0][1] == "couplings.ab"
+    assert "carries heat_source_density" in found[0][2] and "takes temperature" in found[0][2]
+
+
+def test_a_converged_loop_is_at_its_fixed_point_whatever_the_relaxation(relays):
+    """The residual is |G(x) - x| of the coupled field, so a small relaxation does not stop the
+    loop early: gain 0.9 both ways, w 0.02, tolerance 1e-3 K (fixed point y_a = 2.8 / 0.19 K)."""
+    tree = relay_document({"a": ("test.relay", 0.9, 1), "b": ("test.relay", 0.9, 2)},
+                          {"ab": ("a.y", "b.x"), "ba": ("b.y", "a.x")},
+                          [_loop(relaxation=0.02, max_iterations=5000,
+                                 tolerance={"port": "a.y", "norm": "max_abs", "value": "1e-3 K"})])
+    result = multiphysics.run(Document.from_dict(tree), verbose=False)
+    exact = (1 + 0.9 * 2) / (1 - 0.81)
+    assert result.loops[0]["converged"] and result.loops[0]["iterations"] > 100
+    assert np.max(np.abs(result.results["a"].y - exact)) <= 1e-2
+
+
+def test_a_tolerance_port_not_carried_inside_the_loop_is_named(relays):
+    tree = relay_document({"a": ("test.relay", 0.5, 1), "b": ("test.relay", 0.5, 2), "c": ("test.relay", 1, 1)},
+                          {"ab": ("a.y", "b.x"), "ba": ("b.y", "a.x"), "bc": ("b.y", "c.x")},
+                          [_loop(tolerance={"port": "a.y", "norm": "max_abs", "value": "1e-6 K"})])
+    assert errors(tree) == []
+    tree["couplings"] = {"ab": {"from": "a.y", "to": "b.x", "transfer": "same_mesh"},
+                         "ba": {"from": "b.y", "to": "a.x", "transfer": "same_mesh"}}
+    tree["study"]["loops"][0]["tolerance"]["port"] = "b.y"
+    assert errors(tree) == []
+
+
+@pytest.mark.parametrize("tree", [
+    {"openphysics": "0.3", "geometry": {}, "physics": {"a": {"type": ["x"]}}},
+    {"openphysics": "0.3", "geometry": {}, "physics": {"a": {"type": {"x": 1}}}},
+])
+def test_a_single_physics_document_with_an_unhashable_type_is_still_named(tree):
+    code, path, _m = errors(tree)[0]
+    assert (code, path) == ("E-VALUE-FORM", "physics.a.type")
+
+
+def test_empty_couplings_count_as_no_couplings():
+    tree = heated_slab()
+    del tree["physics"]["heat1"]
+    tree["couplings"] = {}
+    code, path, message = only_error(tree)
+    assert (code, path) == ("E-FORMAT", "openphysics") and 'write "openphysics": "0.3"' in message
+    tree["openphysics"] = "0.3"
+    assert ("E-KEY-UNKNOWN", "couplings") in [f[:2] for f in errors(tree)]
+
+
+@pytest.mark.parametrize("change, path", [
+    (lambda t: t.update(study={"type": 2.5}), "study.type"),
+    (lambda t: t.update(study={"type": "single", "typo": 1}), "study.typo"),
+    (lambda t: t.update(study={"type": "single", "parameter": "physics.modes1.vacuum_wavelength"}),
+     "study.parameter"),
+    (lambda t: t.update(study={"type": "sweep"}), "study.parameter"),
+    (lambda t: t.update(study={"type": "sweep", "parameter": 7, "values": [1]}), "study.parameter"),
+    (lambda t: t["materials"]["core"].update(thermo_optic_coefficient=[5]),
+     "materials.core.thermo_optic_coefficient"),
+])
+def test_malformed_values_are_named_not_raised(change, path):
+    tree = heated_slab()
+    change(tree)
+    text = json.dumps(tree).replace('"type": 2.5', '"type": 2.5')
+    found = resolve.resolve_text(text).diagnostics.errors
+    assert found and path in [d.path for d in found], [(d.code, d.path) for d in found]
+
+
+def test_a_malformed_loop_method_or_norm_is_named_not_raised(relays):
+    for change in ({"method": 1.5}, {"tolerance": {"port": "a.y", "norm": 2.5, "value": "1e-6 K"}}):
+        found = resolve.resolve_text(json.dumps(_cycle([_loop(**change)]))).diagnostics.errors
+        assert found

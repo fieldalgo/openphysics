@@ -220,6 +220,7 @@
   "E-COUPLING-PAIR": {"severity": "error", "en": "A coupling pair is not in the registry's coupling table.", "ko": "등록부의 결합 표에 없는 결합 쌍."},
   "E-COUPLING-CYCLE": {"severity": "error", "en": "Couplings form a cycle without an iteration.", "ko": "반복 없이 결합이 순환함."},
   "E-COUPLING-NO-EFFECT": {"severity": "error", "en": "A coupling has no effect.", "ko": "효과가 없는 결합."},
+  "E-LOOP-DIVERGED": {"severity": "error", "en": "An accepted coupling loop reached its iteration limit without meeting its tolerance.", "ko": "받아들인 결합 반복이 허용 오차에 이르지 못하고 반복 한도에 닿음."},
   "E-TEMPERATURE-NONPOSITIVE": {"severity": "error", "en": "A solved temperature is at or below 0 K.", "ko": "풀이 결과 온도가 0 K 이하."},
   "E-FORMAT": {"severity": "error", "en": "Missing or unsupported document format.", "ko": "문서 형식 표시가 없거나 지원하지 않는 형식."},
   "E-JSON": {"severity": "error", "en": "Not valid JSON (NaN, Infinity and undecodable bytes included).", "ko": "올바른 JSON이 아님(NaN, Infinity, 해독할 수 없는 바이트 포함)."},
