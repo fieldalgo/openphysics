@@ -270,10 +270,10 @@ def test_mixed_physics_rejected_and_detection_is_narrow():
     with pytest.raises(DocumentError, match="more than one"):
         Document.from_dict(raw)
     del raw["physics"]["heat2"]
-    raw["physics"]["em1"] = {"type": "em.modes2d"}     # not a kind of format 0.3 yet
+    raw["physics"]["em1"] = {"type": "em.modes2d"}     # two kinds: the multiphysics envelope (D2)
     with pytest.raises(DocumentError) as caught:
         Document.from_dict(raw)
-    assert errors(caught) == [("E-KEY-UNKNOWN", "physics.em1.type")]
+    assert errors(caught) == [("E-FORMAT", "openphysics")]
     assert is_transient_thermal(raw)
     for value in [None, [], {"physics": []}, {"physics": {"heat": {"type": "thermal.steady2d"}}}]:
         assert not is_transient_thermal(value)
