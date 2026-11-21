@@ -290,7 +290,7 @@ expressions:
 constraints. It returns:
 - the V of each node on a curve;
 - the curve and the vertex each node lies on;
-- zero for interior nodes, which galerkin moves. galerkin does not read this yet.
+- zero for interior nodes, which galerkin moves (`galerkin.shape.extend_velocity`).
 
 **Refused.** `TopologyChange` is a `GeometryError`. Its `features` hold the ids
 of the features involved (`domain` for a domain side), and the message names
@@ -319,6 +319,64 @@ D1–D8, 2026-11-08):
 | Topology | touching rects, a corner leaving a domain side, tangent circles, a segment through a corner, a moving closed-path start: refused with the features; a touch linked by an expression is not refused | pass |
 | Unchanged outputs | `parse` and `evaluate` unchanged; the complex is equal before and after a derivative | pass |
 | Node velocity | circle nodes V·n = dr/dp within 1e-12, tangential 0; vertex nodes equal the vertex V | pass |
+
+### Shape derivative of a document
+
+`simcase.shape_derivative.shape_problem(document, parameter)` takes a document and
+the name of one of its length parameters, and returns everything a gradient
+needs:
+
+```python
+import jax
+from simcase.shape_derivative import shape_problem
+
+jax.config.update("jax_enable_x64", True)
+problem = shape_problem(document, "a")              # a Document or its dict
+inner = problem.mesh.boundary["inner"]              # a selection of the document
+value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner].sum())
+# slope = d value / d a, per metre of a; backend="torch" for PyTorch
+```
+
+The helper does four things:
+- It meshes the document as `run` does: the same galerkin mesh in metres, the
+  same nodes in the same order, the same solver inputs.
+- It gives the curve nodes their design velocity with `node_velocity`, read from
+  the complex that was meshed.
+- It moves the interior nodes with galerkin's harmonic `extend_velocity`.
+- Its `solve(t)` runs the document's steady heat solve with
+  `motion=MeshMotion(design_velocity=W, t=t)`.
+
+`problem.design_velocity` (W), `on_curve`, `arguments` (the solver's keyword
+arguments) and `admissible_interval` are public. t is the change of the
+parameter in metres, so every derivative is per metre of the parameter, whatever
+unit the document writes it in. No element inverts for t inside
+`admissible_interval`. galerkin never remeshes: for a larger step, change the
+parameter in the document and call `shape_problem` again.
+
+Covered: steady heat (`thermal.steady2d`) on the material regions of a version 1
+`2d` component. Refused by name (`DocumentError`):
+- a flat geometry block;
+- an `axisymmetric` component;
+- another physics;
+- the parameters the design velocity refuses, including a topology change at p.
+
+Checked (`tests/simcase/test_shape_problem.py`, pre-registered C1–C6 on
+2026-11-21, measured that day on Linux with JAX 0.12.0.1 and PyTorch 2.14.1):
+
+| Check | Criterion | Result |
+|---|---|---|
+| C1 annulus a < r < b, inner radius | dQ/da → 2πkΔT/(a ln²(b/a)): order ≥ 1.5, ≤ 1e-3 at the finest mesh (JAX, PyTorch) | 7.9e-3, 2.1e-3, 5.8e-4 at 0.8, 0.4, 0.2 µm (order 1.9) |
+| C2 two-material series strip, interface position | Q and dQ/dL1 within 1e-9 (exact for P1) | ≤ 1.7e-14 and ≤ 7.8e-14 |
+| C3 equal to `run` | mesh, inputs and plain solve bit for bit; at t = 0 temperature and reactions within 1e-12 | mesh, inputs, solve, temperature pass; reactions **fail**, 2.0e-12 (below) |
+| C4 same-mesh central difference | within 1e-6 | 9.7e-9 |
+| C5 refusals | as listed above (a sweep was pre-registered too: steady heat validation refuses it first) | pass |
+| C6 `run` unchanged | the region heat, Joule, mechanics and electric tests | pass |
+
+C3 pre-registered the reactions at t = 0 within 1e-12 of `run`'s, relative to
+their largest value. Measured: 2.0e-12. The reaction K T − f cancels, and T is
+about 300 K over a 1 K range, so the live correction step's rounding, of the order
+of max |T|, enters a value of the order of the range. The test keeps the failure on
+record and asserts 64 ε · max |T| / range instead (4.3e-12 here).
 
 ## Validation
 

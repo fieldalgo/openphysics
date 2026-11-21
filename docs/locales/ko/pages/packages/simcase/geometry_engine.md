@@ -208,7 +208,7 @@ nv.values, nv.curve, nv.vertex           # (N, 2) 곡선 위 노드의 V; 놓인
 계면, 내부 제약). 다음을 돌려줍니다.
 - 곡선 위 각 노드의 V;
 - 각 노드가 놓인 곡선과 꼭짓점;
-- 내부 노드는 0. 내부 노드는 galerkin이 움직입니다. galerkin은 아직 이 값을 읽지 않습니다.
+- 내부 노드는 0. 내부 노드는 galerkin이 움직입니다(`galerkin.shape.extend_velocity`).
 
 **거부.** `TopologyChange`는 `GeometryError`의 하위입니다. `features`에 관련 피처 id(도메인
 변은 `domain`)를 담고, 메시지에 피처와 위치를 밝힙니다. 다음 경우에 일어납니다.
@@ -232,6 +232,54 @@ nv.values, nv.curve, nv.vertex           # (N, 2) 곡선 위 노드의 V; 놓인
 | 위상 | 맞닿은 사각형, 도메인 변을 떠나는 모서리, 접하는 원, 모서리를 지나는 segment, 움직이는 닫힌 path 시작점: 피처를 밝혀 거부; 식으로 묶인 닿음은 거부하지 않음 | 통과 |
 | 출력 무변경 | `parse`·`evaluate` 그대로; 미분 전후 복합체가 같음 | 통과 |
 | 노드 속도 | 원 노드 V·n = dr/dp 1e-12 이내, 접선 0; 꼭짓점 노드 = 꼭짓점 V | 통과 |
+
+### 문서의 형상 미분
+
+`simcase.shape_derivative.shape_problem(document, parameter)`는 문서와 그 길이 파라미터 하나의 이름을 받아, 기울기에 필요한
+것을 모두 돌려줍니다.
+
+```python
+import jax
+from simcase.shape_derivative import shape_problem
+
+jax.config.update("jax_enable_x64", True)
+problem = shape_problem(document, "a")              # Document 또는 그 dict
+inner = problem.mesh.boundary["inner"]              # 문서의 selection
+value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner].sum())
+# slope = d value / d a, a 1 m당; PyTorch는 backend="torch"
+```
+
+도우미가 하는 일은 넷입니다.
+- `run`과 같이 문서를 메시합니다. 미터 단위의 같은 galerkin 메시, 같은 순서의 같은 노드, 같은 풀이 입력입니다.
+- 메시한 복합체에서 읽은 `node_velocity`로 곡선 위 노드에 설계 속도를 줍니다.
+- galerkin의 조화 `extend_velocity`로 내부 노드를 움직입니다.
+- `solve(t)`는 문서의 정상 열 풀이를 `motion=MeshMotion(design_velocity=W, t=t)`로 돌립니다.
+
+`problem.design_velocity`(W), `on_curve`, `arguments`(풀이기 키워드 인수), `admissible_interval`은 공개입니다. t는 파라미터의
+변화를 미터로 나타낸 값이므로, 문서가 파라미터를 어떤 단위로 쓰든 모든 미분은 파라미터 1 m당입니다. t가 `admissible_interval`
+안이면 어떤 요소도 뒤집히지 않습니다. galerkin은 재메시하지 않습니다. 더 큰 스텝은 문서의 파라미터를 바꾸고 `shape_problem`을
+다시 부르십시오.
+
+다루는 범위는 버전 1 `2d` 성분의 재료 영역 위 정상 열(`thermal.steady2d`)입니다. 다음은 이름을 밝혀 거부합니다(`DocumentError`).
+- flat 형상 블록;
+- `axisymmetric` 성분;
+- 다른 물리;
+- 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).
+
+검사(`tests/simcase/test_shape_problem.py`, C1–C6을 2026-11-21에 사전 등록, 같은 날 Linux, JAX 0.12.0.1, PyTorch 2.14.1에서 측정):
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| C1 환형 a < r < b, 안 반지름 | dQ/da → 2πkΔT/(a ln²(b/a)): 차수 ≥ 1.5, 가장 고운 메시 ≤ 1e-3 (JAX, PyTorch) | 0.8, 0.4, 0.2 µm에서 7.9e-3, 2.1e-3, 5.8e-4 (차수 1.9) |
+| C2 두 재료 직렬 띠, 계면 위치 | Q와 dQ/dL1 1e-9 이내 (P1에서 정확) | ≤ 1.7e-14, ≤ 7.8e-14 |
+| C3 `run`과 같음 | 메시·입력·일반 풀이가 비트 단위로 같음; t = 0 온도·반력 1e-12 이내 | 메시·입력·풀이·온도 통과; 반력 **실패**, 2.0e-12(아래) |
+| C4 같은 메시 중앙 차분 | 1e-6 이내 | 9.7e-9 |
+| C5 거부 | 위 목록대로(sweep도 사전 등록했으나 정상 열 검증이 먼저 거부) | 통과 |
+| C6 `run` 불변 | 영역 열·Joule·역학·전기 시험 | 통과 |
+
+C3은 t = 0 반력을 가장 큰 값 대비 `run`의 것과 1e-12 이내로 사전 등록했습니다. 측정값은 2.0e-12입니다. 반력 K T − f는
+상쇄되는 합이고 T는 약 300 K에 범위 1 K이므로, max |T| 크기인 live 보정 스텝의 반올림이 범위 크기의 값에 들어갑니다. 시험은
+이 실패를 기록으로 남기고, 대신 64 ε · max |T| / 범위(여기서 4.3e-12)를 검사합니다.
 
 ## 검증
 

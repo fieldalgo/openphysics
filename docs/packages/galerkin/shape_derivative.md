@@ -185,7 +185,9 @@ p).node_velocity(meshine_mesh)` gives them
 ([design velocity](../simcase/geometry_engine.md#design-velocity-stage-4)). Its
 `values` are dimensionless (∂x/∂p, with x and p in the document unit), so t is
 then the parameter change in the mesh's length unit. `galerkin.interop.from_mesher`
-keeps the meshine node order.
+keeps the meshine node order. For a steady heat document whose runner builds the
+mesh, `simcase.shape_derivative.shape_problem(document, p)` joins these steps in one
+call ([document shape derivative](../simcase/geometry_engine.md#shape-derivative-of-a-document)).
 
 `extend_velocity(mesh, values, known, method="harmonic")` moves every other node.
 It solves a Laplace problem per component on the same mesh, with the known
