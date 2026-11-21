@@ -24,6 +24,8 @@
 live 풀이 한 번이 미분을 붙입니다: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). A(t)와 b(t)는 X₀ + t·W로 live 라이브러리에서 조립하며
 (P1 강성, 영역 열원, 움직이는 변의 flux·Robin 항), T는 반올림 안에서 T₀와 같습니다. `temperature`·`heat_flux`·
 `generated_heat_rate_per_depth`·`reaction_heat_rate_per_depth`·`residual_heat_rate_per_depth`가 미분을 나릅니다.
+솔버처럼 온도를 각 성분의 오프셋(첫 Dirichlet 값, 없으면 h > 0인 첫 convection 변의 ambient)에 대한 값으로 다루므로, 큰 공통
+온도가 반력·convection·유속과 그 미분에 섞이지 않습니다(S9).
 
 ```python
 import jax
@@ -186,6 +188,7 @@ PyTorch 2.14.1+cpu로 측정했습니다.
 | S6 뒤집힘 한계 | 구간이 정확한 근과 같음; 넘는 스텝은 거부 | 통과 |
 | S7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 결과 배열 sha256이 main `627eb28`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | S8 거부 | 위 목록대로 | 통과 |
+| S9 큰 온도 오프셋(2026-11-21) | 오프셋 300 K, 1e6 K, 1e9 K. Dirichlet 양쪽, Dirichlet과 convection, convection만: t = 0 반력·convection·유속이 일반 풀이와 가장 큰 값의 1e-12 이내; dQ/dt가 오프셋 없는 값과 1e-9 이내; JAX·PyTorch | 통과(약 1e-15). 수정 전 오차는 ε·c로 커졌음: 1e9 K에서 유속 2e-8, dQ/dt 7e-8 |
 
 `tests/galerkin/test_shape_derivative_electric.py`에 정상 전기 전도의 검사 E1–E8이 있습니다. 2026-11-10에 사전 등록하고 같은 날
 같은 버전으로 측정했습니다.

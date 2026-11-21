@@ -341,6 +341,57 @@ def test_s8_refusals():
         solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=xp.asarray(W), t=t))
 
 
+# ---------------------------------------------------------------- S9 large temperature offset (2026-11-21)
+
+def _offset_case(c, kind):
+    """A 2 x 1 strip stretched in x, conduction with a source, all temperatures offset by c (K)."""
+    m = rectangle_mesh(2.0, 1.0, 16, 8)
+    W = np.zeros_like(m.nodes)
+    W[:, 0] = m.nodes[:, 0] / 2.0
+    left = [int(i) for i in m.boundary["left"]]
+    right = [int(i) for i in m.boundary["right"]]
+    kw = dict(thermal_conductivity=3.0, heat_source_density=50.0)
+    if kind == "dirichlet":
+        kw.update(prescribed_temperature={**{i: c + 1.0 for i in left}, **{i: c for i in right}})
+    elif kind == "robin":
+        kw.update(prescribed_temperature={i: c + 1.0 for i in left}, convection={"right": (7.0, c)})
+    else:                                    # convection only: the component is anchored at its ambient
+        kw.update(prescribed_temperature={}, convection={"right": (7.0, c), "left": (2.0, c + 1.0)})
+    return m, W, kw, left if kind != "robin_only" else None
+
+
+@pytest.mark.parametrize("name", BACKENDS)
+@pytest.mark.parametrize("kind", ["dirichlet", "robin", "robin_only"])
+def test_s9_a_large_temperature_offset_changes_nothing(name, kind):
+    """Pre-registered O1-O2 (follow-up 3): with offsets up to 1e9 K, the t = 0 reactions,
+    convection and flux equal the plain solve's within 1e-12 of their largest value, and the
+    derivative equals the offset-free one within 1e-9. Before the fix (main 91b0acc6) the
+    error grew as eps c: 2e-8 in flux and 7e-8 in dQ/dt at 1e9 K."""
+    xp = _xp(name)
+    from galerkin.core.backend import to_numpy
+    _m, _W, _kw, nodes = _offset_case(0.0, kind)
+
+    def objective(m, W, kw, nodes):
+        def f(t):
+            r = solve_steady_heat(m, **kw, motion=MeshMotion(design_velocity=W, t=t))
+            q = r.reaction_heat_rate_per_depth if nodes is not None else r.outward_convective_heat_rate_per_depth
+            return xp.sum(q[np.asarray(nodes)]) if nodes is not None else xp.sum(q)
+        return f
+    _value, reference = _gradient(name, objective(_m, _W, _kw, nodes))
+    for c in (300.0, 1e6, 1e9):
+        m, W, kw, nodes = _offset_case(c, kind)
+        plain = solve_steady_heat(m, **kw)
+        t0 = _jax().numpy.asarray(0.0, dtype=_jax().numpy.float64) if name == "jax" else \
+            _torch().tensor(0.0, dtype=_torch().float64, requires_grad=True)
+        r = solve_steady_heat(m, **kw, motion=MeshMotion(design_velocity=W, t=t0))
+        for field in ("reaction_heat_rate_per_depth", "outward_convective_heat_rate_per_depth", "heat_flux"):
+            got, want = to_numpy(getattr(r, field)), getattr(plain, field)
+            scale = max(np.max(np.abs(want)), np.finfo(float).tiny)
+            assert np.max(np.abs(got - want)) <= 1e-12 * scale, (c, field)
+        _value, slope = _gradient(name, objective(m, W, kw, nodes))
+        assert rel(slope, reference) <= 1e-9, (c, slope, reference)
+
+
 # ---------------------------------------------------------------- independent review regressions (2026-11-09)
 
 def test_review_live_or_callable_values_inside_a_convection_pair_are_refused():
