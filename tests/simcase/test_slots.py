@@ -152,6 +152,14 @@ if (HARNESS / "convert_v02.py").is_file():
             data, _writer = _converter().convert(data)
         tree = json.loads(json.dumps(data))
         kind = registry.kind_of(tree)
+        from simcase import multiphysics
+        if kind is multiphysics.KIND:
+            # each physics entry is read as its own kind's single-physics view (D2)
+            for name, entry in tree["physics"].items():
+                entry_kind = registry.kind_of_type(entry["type"])
+                view = multiphysics._view_tree(tree, name, entry_kind)
+                assert _check_closure(view, slots.table_for(entry_kind), f"{path.stem}.{name}", skip=()) > 10
+            return
         if kind.slots is None:
             assert _check_closure(tree, slots.table_for(None), path.stem) > 5
         else:

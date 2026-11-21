@@ -34,7 +34,10 @@ import units_toy_kind as toy
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = sorted((ROOT / "examples" / "simcase").glob("*.json"))
 EXAMPLES_03 = [p for p in EXAMPLES if json.loads(p.read_text(encoding="utf-8"))["openphysics"] == "0.3"]
-EXAMPLES_02 = [p for p in EXAMPLES if p not in EXAMPLES_03]
+#: multiphysics documents (D2) declare their own envelope; tests/simcase/test_multiphysics_* read them
+EXAMPLES_MULTIPHYSICS = [p for p in EXAMPLES if json.loads(p.read_text(encoding="utf-8"))["openphysics"]
+                         == "0.3/multiphysics.1"]
+EXAMPLES_02 = [p for p in EXAMPLES if p not in EXAMPLES_03 and p not in EXAMPLES_MULTIPHYSICS]
 FIXTURES = ROOT / "tools" / "units_batch" / "fixtures" / "v02"
 FIXTURES_03 = ROOT / "tools" / "units_batch" / "fixtures" / "v03"
 

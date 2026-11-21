@@ -120,13 +120,17 @@ def test_builtin_manifest_is_valid_json_data():
 
 def test_builtin_ports_are_registry_quantities_with_their_si_unit():
     from physmat import units
+    inputs = []
     for name, entry in providers.BuiltinProvider().manifest()["kinds"].items():
         assert entry["ports"], name
         for port in entry["ports"]:
             q = units.quantity(port["quantity"])
             assert port["unit"] == q.unit
-            assert port["direction"] == "output"                     # no built-in kind reads another's field yet
             assert "result" in q.places, (name, port)
+            if port["direction"] == "input":
+                inputs.append((name, port["name"], port["location"], port["combine"]))
+    # the one built-in input port (multiphysics documents, D2): em.modes2d's coupled temperature
+    assert inputs == [("em.modes2d", "temperature", "element", "single")]
 
 
 @pytest.mark.parametrize("name", ["thermal_slab", "thermal_regions", "thermal_boundary", "transient_thermal_uniform",
@@ -148,7 +152,7 @@ def test_builtin_ports_are_saved_under_their_name(name, tmp_path):
         axis = 1 if kind.name == "thermal.transient2d" else 0
         if axis:
             assert fields["temperature"].shape[0] == fields["time"].shape[0]
-        for port in entry["ports"]:
+        for port in (p for p in entry["ports"] if p["direction"] == "output"):
             values = fields[port["name"]]
             assert np.issubdtype(values.dtype, np.number), port
             if port["location"] == "node":

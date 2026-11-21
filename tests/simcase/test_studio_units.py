@@ -105,7 +105,7 @@ OPTICAL_EXAMPLES = [name for name in STUDIO_EXAMPLES
 
 def test_the_round_trip_covers_the_studio_examples():
     # every em.modes2d, em.cavity3d and heat example has a Studio validation route
-    assert len(STUDIO_EXAMPLES) == 25 and len(OPTICAL_EXAMPLES) == 16, STUDIO_EXAMPLES
+    assert len(STUDIO_EXAMPLES) == 26 and len(OPTICAL_EXAMPLES) == 16, STUDIO_EXAMPLES
     assert {"soi_strip.json", "cavity_box.json", "thermal_regions.json",
             "transient_thermal_uniform.json"} <= set(STUDIO_EXAMPLES)
 
@@ -120,8 +120,10 @@ def test_an_unchanged_authored_document_round_trips_byte_identical(client, name)
     reply, found = reader.parse(r.content)
     assert not found
     if not reply["ok"]:
-        # Studio's transient page shows prescribed-temperature and insulated sides only
-        assert name == "transient_thermal_boundary.json" and reply["error"]["code"] == "unsupported_physics"
+        # Studio's transient page shows prescribed-temperature and insulated sides only, and its
+        # thermal page one thermal.steady2d entry (a multiphysics document is not a Studio page yet)
+        assert name in ("transient_thermal_boundary.json", "multiphysics_heated_slab.json")
+        assert reply["error"]["code"] == "unsupported_physics"
         return
     authored = _without_whitespace(raw.decode("utf-8"))
     assert ('"doc":' + authored + ',"diagnostics":').encode("utf-8") in r.content

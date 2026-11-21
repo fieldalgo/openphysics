@@ -235,8 +235,9 @@ def _out(name: str, quantity: str, unit: str, location: str) -> dict:
 
 #: the outputs every document of a built-in kind saves in its fields.npz under the port's
 #: name when it saves fields (``results.save_fields``, true by default; false saves no
-#: fields.npz). A "scalar" port is not on the mesh: one value per mode, for example. Inputs from other kinds come with multiphysics documents (D2); today no built-in
-#: kind reads a field another kind computes.
+#: fields.npz). A "scalar" port is not on the mesh: one value per mode, for example. An input
+#: port is read in a multiphysics document (``simcase.multiphysics``) from the coupling into it:
+#: em.modes2d takes a node temperature (K) and uses its mean over each triangle.
 _THERMAL_PORTS = [_out("temperature", "temperature", "K", "node"),
                   _out("heat_flux", "heat_flux", "W/m^2", "element")]
 _BUILTIN_MANIFEST = {
@@ -258,7 +259,9 @@ _BUILTIN_MANIFEST = {
     "em.cavity3d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",
                     "ports": [_out("resonant_frequency", "resonant_frequency", "Hz", "scalar")]},
     "em.modes2d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",
-                   "ports": [_out("effective_index", "effective_index", "1", "scalar")]},
+                   "ports": [_out("effective_index", "effective_index", "1", "scalar"),
+                             {"name": "temperature", "direction": "input", "quantity": "temperature", "unit": "K",
+                              "location": "element", "combine": "single"}]},
 }
 
 

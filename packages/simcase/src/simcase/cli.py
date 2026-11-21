@@ -113,6 +113,10 @@ def _run(args, doc) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     results = data.get("results", {})
+    if doc.views is not None:                    # a multiphysics run: one folder per physics
+        folders = ", ".join(f"{name}/" for name in doc.views)
+        print(f"results written to {out}/  (summary.json, log.txt, model.json, {folders})")
+        return 0
     files = ["summary.json", "log.txt", "model.json"]
     if results.get("save_fields", True):
         files.append("fields.npz")
@@ -249,7 +253,8 @@ def _geometry(path: str, component: str | None) -> int:
     except (OSError, json.JSONDecodeError, DocumentError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    if isinstance(data, dict) and data.get("openphysics") != "0.3":
+    from .multiphysics import ENVELOPE
+    if isinstance(data, dict) and data.get("openphysics") not in ("0.3", ENVELOPE):
         from .resolve import format_refusal
         print(f"error: {format_refusal(data).message}", file=sys.stderr)       # refused by name (E-FORMAT)
         return 2
