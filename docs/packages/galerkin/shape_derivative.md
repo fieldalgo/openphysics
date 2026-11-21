@@ -31,7 +31,8 @@ finite-difference truncation.
 
 The solve runs once on the moved mesh with the ordinary solver, so every input
 check, residual tolerance and heat balance applies unchanged. One more live
-solve then attaches the derivative: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). Here A(t)
+solve then attaches the derivative: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀), computed on
+the increments over the offsets below. Here A(t)
 and b(t) are assembled from X₀ + t·W in the live library (P1 stiffness, region
 sources, and the flux and Robin terms on the moving edges), and T equals T₀ up to
 rounding. `temperature`, `heat_flux`, `generated_heat_rate_per_depth`,
