@@ -22,6 +22,7 @@ Python and JSON/CLI support rectangular and region models. Studio supports recta
 - [Steady outward-flux and convection documents](../packages/simcase/thermal_steady_boundary2d.md)
 - [Headless transient heat in a rectangle](../packages/simcase/thermal_transient2d.md)
 - [Heat documents with material regions](../packages/simcase/thermal_regions2d.md)
+- [Multiphysics documents: steady heat coupled to the optical modes](../packages/simcase/multiphysics_document.md)
 - [Steady heat in Studio](../packages/simcase/thermal_studio.md)
 - [Transient heat in Studio](../packages/simcase/thermal_transient_studio.md)
 

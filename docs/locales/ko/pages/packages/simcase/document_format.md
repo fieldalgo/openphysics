@@ -59,6 +59,11 @@
 종류는 `physics.<이름>.type`에서 `E-CONTRACT`로 거부하고, 어떤 종류도 맡지 않는 유형은 그 자리에서
 이 릴리스가 읽는 물리 유형을 밝히며 `E-VALUE-FORM`입니다.
 
+`couplings`가 있거나 물리 항목이 둘 이상의 종류에 속하는 문서는 [다중물리 문서](multiphysics_document.md)입니다.
+이런 문서는 형식 0.3 위에 envelope `"openphysics": "0.3/multiphysics.1"`을 밝히며, 이런 모양의 `"0.3"`
+문서는 envelope를 밝히며 `openphysics`에서 `E-FORMAT`입니다. 그 물리 항목은 각각 자기 종류가 여기
+적은 대로 읽습니다.
+
 최상위 키: `openphysics name geometry materials physics mesh study results display_units`.
 `units`는 "units travel with each value"와 함께 `E-KEY-UNKNOWN`입니다. `display_units`(선택)는
 물리량 이름이나 표시 묶음 `length`를 그 메뉴의 단위에 대응시킵니다. 어떤 값도 바꾸지 않고

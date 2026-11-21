@@ -61,6 +61,12 @@ not read by this reader. The document's physics types choose its kind as today; 
 does not read format 0.3 yet refuses with `E-CONTRACT` at `physics.<name>.type`, and a type that
 no kind claims is `E-VALUE-FORM` there, naming the physics types this release reads.
 
+A document with `couplings`, or with physics entries of more than one kind, is a
+[multiphysics document](multiphysics_document.md): it declares the envelope
+`"openphysics": "0.3/multiphysics.1"` on top of format 0.3, and a `"0.3"` document of that
+shape is `E-FORMAT` at `openphysics`, naming the envelope. Its physics entries are each read
+by their own kind as described here.
+
 Top-level keys: `openphysics name geometry materials physics mesh study results
 display_units`. `units` is `E-KEY-UNKNOWN` with "units travel with each value".
 `display_units` (optional) maps a quantity name or the display group `length` to a unit on

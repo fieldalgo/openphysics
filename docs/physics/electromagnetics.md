@@ -13,6 +13,7 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 ## Model documents and workflows
 
 - [Tutorial: analyse your own waveguide](../packages/simcase/waveguide_tutorial.md)
+- [Multiphysics documents: a steady temperature into the optical modes, n(T)](../packages/simcase/multiphysics_document.md)
 - [Absorbing waveguide modes](../packages/simcase/lossy_modes.md)
 - [PML, leaky and constant-radius modes](../packages/simcase/pml_modes.md)
 - [Opt-in subspace tracking for vector wavelength sweeps](../packages/simcase/vector_subspace_tracking.md)
