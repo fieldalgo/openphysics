@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Shape derivatives of axisymmetric steady and transient heat (follow-up 5, slice 1).
+"""Shape derivatives of axisymmetric steady and transient heat (2026-11-21).
 
 A1-A8 were pre-registered in the HQ work record (2026-11-21) before the implementation ran:
 A1 the motion's numbers equal the ordinary solve on the moved mesh (relative 1e-12);
@@ -208,6 +208,25 @@ def test_a7_refusals():
     with pytest.raises(ValueError, match="coordinate_system must be"):
         solve_steady_heat(m, thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in bottom},
                           coordinate_system="polar", motion=MeshMotion(design_velocity=W, t=jnp.asarray(0.0)))
+
+
+def test_review_the_axis_is_taken_at_the_step_t():
+    """Independent review 2026-11-21: the axis test uses X0 + t W, not X0."""
+    jnp = _jax().numpy
+    m = rectangle_mesh(1.0, 0.5, 8, 4)
+    W = np.zeros((m.num_nodes, 2))
+    W[:, 0] = 1.0
+    hot = [int(i) for i in m.boundary["right"]]
+    kw = dict(thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in hot},
+              convection={"left": (5.0, 290.0)}, coordinate_system="axisymmetric")
+    # a ring r in [0.1, 1.1] at t = 0.1: nothing lies on the axis there
+    ring = solve_steady_heat(m, **kw, motion=MeshMotion(design_velocity=W, t=jnp.asarray(0.1)))
+    assert ring.coordinate_system == "axisymmetric"
+    # r in [-0.1, 0.9] reaches the axis exactly at t = 0.1 and moves off it
+    shifted = Mesh(m.nodes - np.array([0.1, 0.0]), m.triangles, m.boundary, m.boundary_edges)
+    with pytest.raises(ValueError, match="symmetry axis off it"):
+        solve_steady_heat(shifted, **{**kw, "convection": None},
+                          motion=MeshMotion(design_velocity=W, t=jnp.asarray(0.1)))
 
 
 # ---------------------------------------------------------------- A8 unchanged without a motion

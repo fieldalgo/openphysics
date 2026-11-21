@@ -65,7 +65,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
 
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
-    axisymmetric = _axisymmetric(mesh, W, coordinate_system)
+    axisymmetric = _axisymmetric(mesh, W, coordinate_system, t)
     _coefficient(conductivity, "thermal_conductivity")
     _numpy_data(heat_source, "heat_source_density")
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
@@ -305,7 +305,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         outward_heat_flux)
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
-    axisymmetric = _axisymmetric(mesh, W, coordinate_system)
+    axisymmetric = _axisymmetric(mesh, W, coordinate_system, t)
     if checkpoint_every is not None:
         raise ValueError("motion: checkpoint_every is not supported with a motion in this slice; every step is "
                          "kept")
@@ -711,17 +711,20 @@ def _checked_step(mesh, W, t):
 
 # ----------------------------------------------------------------------------- helpers
 
-def _axisymmetric(mesh, W, coordinate_system):
-    """True for an axisymmetric heat motion; nodes on the symmetry axis must stay on it."""
+def _axisymmetric(mesh, W, coordinate_system, t):
+    """True for an axisymmetric heat motion; nodes on the symmetry axis at the step t must stay on it."""
     if coordinate_system not in ("cartesian", "axisymmetric"):
         raise ValueError("coordinate_system must be 'cartesian' or 'axisymmetric'")
     if coordinate_system == "cartesian":
         return False
-    on_axis = np.flatnonzero(mesh.nodes[:, 0] == 0)
+    t0 = float(to_numpy(t))
+    if not math.isfinite(t0):
+        return True                     # the step check refuses it by name
+    on_axis = np.flatnonzero((mesh.nodes[:, 0] + t0 * W[:, 0]) == 0)
     moving = on_axis[W[on_axis, 0] != 0]
     if len(moving):
         raise ValueError(f"motion: the design velocity moves {len(moving)} node(s) on the symmetry axis off it "
-                         f"(first {int(moving[0])}); its radial component must be 0 on r = 0")
+                         f"(first {int(moving[0])}); its radial component must be 0 where r = 0 at the step t")
     return True
 
 
