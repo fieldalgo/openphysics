@@ -84,6 +84,19 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     return {"neff": neff, "guided": guided, "fields": fields}
 
 
+def _numbers(value):
+    """The NumPy numbers of a JAX or PyTorch array, no derivative attached: the mode choice of a
+    moving-mesh solve reads them (galerkin.core stays out of simcase)."""
+    import sys
+    torch = sys.modules.get("torch")
+    if torch is not None and isinstance(value, torch.Tensor):
+        return value.detach().cpu().resolve_conj().numpy()
+    jax = sys.modules.get("jax")
+    if jax is not None and isinstance(value, jax.Array):
+        return np.asarray(jax.lax.stop_gradient(value))
+    return np.asarray(value)
+
+
 def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target=None, motion=None):
     """The vector modes of ``solve``. With ``motion`` (a galerkin MeshMotion of the nodes in the
     mesh's unit, internal: simcase.shape_derivative), the modes are chosen from the numbers as
@@ -115,8 +128,7 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_
     neff, space, et, ez = solve_modes(scaled, eps_tri, 2 * np.pi, n_target=n_core if n_target is None else n_target,
                                      num_modes=candidates, pec_nodes=pec, pec_edges=pec_edges, motion=scaled_motion)
     if motion is not None:
-        from galerkin.core.backend import to_numpy
-        live, neff = neff, to_numpy(neff)
+        live, neff = neff, _numbers(neff)
     if n_target is None:
         keep = np.flatnonzero(np.isfinite(neff) & (neff.real > n_cladding) & (neff.real < n_core))[:num_modes]
     else:
