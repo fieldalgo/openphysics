@@ -888,7 +888,11 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
         return out
 
     if point:
-        out = {"effective_index": np.conj(kernel["neff"]), "guided": kernel["guided"]}
+        neff = kernel["neff"]
+        # a moving-mesh solve (simcase.shape_derivative) hands a live JAX or PyTorch index: conjugate it
+        # in its own library so the derivative passes; NumPy values take np.conj as always
+        public = np.conj(neff) if isinstance(neff, np.ndarray) else neff.conj()
+        out = {"effective_index": public, "guided": kernel["guided"]}
         if "fields" in kernel:
             out["unnormalized_mode_field"] = np.conj(kernel["fields"])
         if "vector_field" in kernel:

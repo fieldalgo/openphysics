@@ -363,11 +363,15 @@ names the kind, and `solve(t)` returns that solver's result):
 | `electric.steady2d` | `electric.solve_steady_electric` |
 | `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
 | `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: the heat stage is solved again on the moving mesh, so the temperature moves with the geometry |
+| `em.modes2d`, vector formulation | the runner's vector solve (`galerkin.kernels.solve_modes` on the mesh over the wavelength) and its choice of modes; `solve(t)` returns `{"effective_index": ...}` under exp(−iωt). A degenerate mode's derivative is NaN with a `DegenerateModeWarning`, as in galerkin |
 
 Refused by name (`DocumentError`):
 - a flat geometry block;
 - an `axisymmetric` component;
-- another physics, including waveguide modes (their runner meshes differently) and Joule heating;
+- another physics, such as Joule heating;
+- for modes: the scalar formulation (simcase's own eigensolver has no moving-mesh
+  path), a PML or bend (their coordinate factors depend on the nodes), a sweep and
+  mode tracking;
 - a `mechanics.thermoelastic2d` document with an inward heat flux, a convection or
   a traction: the workflow takes Dirichlet temperatures, a heat source and
   insulation, prescribed displacements and a body force only;
@@ -398,7 +402,27 @@ strip of two materials split at x = L1, the parameter:
 | P3 thermoelastic, 400 K / 300 K ends | heat stage derivative equals the steady heat problem's within 1e-12; end displacement derivative vs a same-mesh central difference within 1e-6; flux, convection and traction refused | pass; 2.2e-9 |
 | P4 transient heat with a source, 0–1000 s | heat out at 1000 s: derivative equals the steady problem's within 1e-6; same-mesh central difference within 1e-6 | 2.9e-9; 7.6e-10 |
 | P5 equal to `run` | nodes and triangles bit for bit; t = 0 fields within 1e-12 | pass, all four |
-| P6 refusals | waveguide modes, Joule heating and a gauge pressure by name | pass |
+| P6 refusals | Joule heating and a gauge pressure by name (modes were refused here until the modes checks below) | pass |
+
+Modes are checked in `tests/simcase/test_shape_problem_modes.py` (pre-registered
+Q1–Q5 on 2026-11-21, measured that day as above) on a 0.22 µm silicon strip in
+oxide at 1.55 µm, the parameter its width w = 0.5 µm:
+
+| Check | Criterion | Result |
+|---|---|---|
+| Q1 dn_eff/dw | same-mesh Richardson difference within 1e-6 (JAX, PyTorch) | 1.58 per µm; 6.5e-11 (a plain central difference is 2.7e-5 off) |
+| Q2 equal to `run` | n_eff at t = 0 within 1e-12 | 1.8e-15 |
+| Q3 document unit | the strip in µm and in nm: the same mesh bit for bit, the same derivative per metre within 1e-12 | equal |
+| Q4 refusals | scalar formulation, PML, sweep, flat geometry | pass |
+| Q5 other kinds unchanged | the C and P checks | pass |
+| Q6 (added after the review, not pre-registered) | `run` at w ± 0.01 µm, each meshed anew: the gap of that difference to the derivative at least halves from 0.1 to 0.05 µm and is ≤ 2 % at 0.05 µm | 4.9 %, 0.65 % |
+
+Q2 also runs a lossy core (k = 0.01): Im n_eff > 0 and equal to `run`'s, so a wrong
+conjugation would show. A degenerate pair is galerkin's rule (NaN with a
+`DegenerateModeWarning`) and is not tested separately here. For modes, `arguments`
+holds the runner's kernel inputs (the micrometre mesh, whose nodes move with
+1e6 W, the kernel permittivity and the solve point), and `solve` cannot run under
+`jax.jit`: the mode choice reads numbers.
 
 P3 and P4 replace the plan's analytic references, which P1 does not reproduce. For
 P3, a temperature linear in x gives a quadratic displacement, and a jump of α or

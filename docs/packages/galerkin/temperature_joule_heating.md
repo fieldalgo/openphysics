@@ -69,8 +69,11 @@ it converges in a few iterations, and an iteration costs less than a Newton stat
 Picard is slow or stops at `iteration_limit` under strong feedback; for the
 contract thermistor at alpha = 7 or 9 per K Newton needs 4 states (see
 [Validation](#validation)). Pass `derivative` when dsigma/dT is known. Both
-methods return a result only through the same convergence tests. Newton has been
-run on Linux only.
+methods return a result only through the same convergence tests. On macOS and
+Windows the installation checks run Newton through simcase only: the two shipped
+`joule_temperature` examples (weak feedback, a few steps, no `derivative`) through the
+installed CLI and the Studio workspace's Joule application in a browser. This page's own
+Newton tests (strong feedback, `derivative`, step halving, failures) run on Linux only.
 
 ## Newton method
 

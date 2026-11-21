@@ -182,6 +182,10 @@ hi]}, "reference_medium": "vacuum"}`도 받습니다.
 | `materials.*.refractive_index.constant` | `1` |
 | 종류마다의 기본값(`name`, `study`, `results`, 개수, 경계 조건) | 그 종류와 함께 |
 
+종류는 풀이에 쓰지 않는 기본값을 빼고 보고할 수 있습니다. `iteration.method: "newton"`인 `joule.temperature2d`
+문서는 SI 트리에 `iteration.relaxation_factor` 0.5를 그대로 갖지만 `defaults_applied`와 `explain`에는 적지
+않습니다([전기·Joule](electric_joule.md)).
+
 ## 교차 검사와 extent 줄
 
 메시를 만들기 전에 형상 구성 요소마다 그 숫자가 무엇을 뜻하는지 말하는 **extent 줄**이 하나씩

@@ -976,10 +976,11 @@ def record_document(doc_id: str, path: Path, out: Path, root: Path) -> dict:
     except Exception as exc:
         entry["run"] = {"status": "error", "exception": [_qualname(exc), _scrub(str(exc), path, root, out)]}
         try:
-            from simcase.electric_joule import failure_evidence
+            from simcase.electric_joule import document_iteration_method, failure_evidence
             from galerkin.temperature_joule_heating import JouleConvergenceError
             if isinstance(exc, JouleConvergenceError):
-                entry["run"]["failure_evidence"] = json.loads(json.dumps(failure_evidence(exc)))
+                entry["run"]["failure_evidence"] = json.loads(json.dumps(
+                    failure_evidence(exc, method=document_iteration_method(doc))))
         except ImportError:
             pass
     else:

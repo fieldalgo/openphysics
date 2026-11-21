@@ -53,6 +53,20 @@ pub struct RefineStats {
     pub exempt: u32,
     /// encroached subfacets left unsplit by the small-angle rule
     pub exempt_faces: u32,
+    /// points inserted to remove slivers (dihedral refinement, M6 step 1)
+    pub sliver_points: u32,
+    /// slivers left: below the dihedral bound when refinement ended
+    pub slivers_left: u32,
+    /// volume vertices moved to remove slivers (M6 step 2)
+    pub sliver_moves: u32,
+    /// volume vertex moves by smoothing (M6 step 3)
+    pub smooth_moves: u32,
+    /// 2-3 and 3-2 flips that improved quality (M6 step 3)
+    pub flips: u32,
+    /// edge removals (rings of 4 or more tetrahedra) that improved quality
+    pub edge_removals: u32,
+    /// Lawson flips restoring the Delaunay property after insertions.
+    pub lawson_flips: u32,
 }
 
 struct State<'a> {
@@ -82,9 +96,45 @@ struct State<'a> {
     segq: VecDeque<(u32, u32)>,
     subq: VecDeque<[u32; 3]>,
     tetq: BinaryHeap<(u64, std::cmp::Reverse<[u32; 4]>, u32)>,
+    /// slivers (minimum dihedral below DIHEDRAL_MIN), the lowest priority, worst first
+    dihq: BinaryHeap<(std::cmp::Reverse<u64>, std::cmp::Reverse<[u32; 4]>, u32)>,
     n: MixedCounters,
     _p: std::marker::PhantomData<&'a ()>,
 }
+
+/// M6 step 1: a tetrahedron (with a size) whose smallest dihedral angle is below this many
+/// degrees is split at the lowest priority, unless its circumradius is below
+/// SLIVER_FILTER h (its circumcentre would come too close to a vertex), up to
+/// SLIVER_CAP times the points refinement inserted before (lfs-free cap).
+const DIHEDRAL_MIN: f64 = 15.0;
+const SLIVER_FILTER: f64 = 0.7;
+const SLIVER_CAP: f64 = 0.10;
+/// Boundary size (M6 design note; turned on after sliver removal, the owner's decision of
+/// 2026-11-20): a subsegment longer than SEG_C alpha h, or a subfacet whose circumradius
+/// exceeds FAC_C alpha h (h of the regions around them), is split even when not
+/// encroached, so the boundary is discretized to the size before the volume.
+/// FAC_C and ALPHA (Python) were chosen together on V8's C2 and C3 rows (2026-11-21:
+/// FAC_C 0.68 with ALPHA 0.99-1.0 and 0.7 with 1.0 meet all of them, 0.5 and 0.75 do not), so V8 is
+/// not an independent check of them.
+const SEG_C: f64 = 1.0;
+const FAC_C: f64 = 0.68;
+/// Smoothing takes a move that raises the mean q of the star while its worst q stays at
+/// least min(before, SMOOTH_FLOOR) (and the dihedral and ratio rules hold).
+const SMOOTH_FLOOR: f64 = 0.5;
+/// How often a tetrahedron whose circumcentre split a constraint instead is tried again.
+const MAX_RETRIES: u8 = 3;
+/// A tetrahedron whose circumcentre lies beyond a subfacet it may not split is split at the
+/// circumcentre's projection on the facet when its longest edge exceeds LARGE_EDGE alpha h
+/// and no vertex is within PROJECT_GAP alpha h of that point.
+const LARGE_EDGE: f64 = 1.5;
+const PROJECT_GAP: f64 = 0.5;
+/// Lawson flips after one insertion, at most (they end on their own; this is a guard).
+const LAWSON_CAP: u32 = 10_000;
+/// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
+/// sqrt(2) with a margin).
+const SUB_RATIO: f64 = 1.5;
+/// Edge removal: the largest ring of tetrahedra around an edge it considers.
+const EDGE_RING_MAX: usize = 7;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -214,7 +264,982 @@ impl State<'_> {
             let mut s = v;
             s.sort_unstable();
             self.tetq.push((bad.to_bits(), std::cmp::Reverse(s), t));
+        } else if self.hsz[t as usize] > 0.0 {
+            let d = self.min_dihedral(t);
+            if d < DIHEDRAL_MIN {
+                let mut s = v;
+                s.sort_unstable();
+                self.dihq.push((std::cmp::Reverse(d.to_bits()), std::cmp::Reverse(s), t));
+            }
         }
+    }
+
+    /// M6 step 2: move volume vertices of the slivers left (deterministic directions:
+    /// away from the opposite face, then towards the centroid of the vertex's star), keeping
+    /// the connectivity; a move is kept only if every tetrahedron around the vertex stays
+    /// positive (exact orient3d) and the smallest dihedral angle around it grows. Volume
+    /// points are triples of doubles, so the moved point is exact. The mesh is no longer
+    /// Delaunay there; it stays constrained (no constraint vertex moves).
+    fn perturb_slivers(&mut self) {
+        for _round in 0..4 {
+            let mut sl: Vec<([u32; 4], u32)> = (0..self.cx.tets.len() as u32)
+                .filter(|&t| self.cx.alive[t as usize] && self.inside[t as usize] && self.hsz[t as usize] > 0.0
+                    && self.min_dihedral(t) < DIHEDRAL_MIN)
+                .map(|t| {
+                    let mut k = self.cx.tets[t as usize];
+                    k.sort_unstable();
+                    (k, t)
+                }).collect();
+            sl.sort_unstable();
+            let mut moved = 0;
+            for (_, t) in sl {
+                if !self.cx.alive[t as usize] || self.min_dihedral(t) >= DIHEDRAL_MIN {
+                    continue;
+                }
+                let tv = self.cx.tets[t as usize];
+                for (i, &v) in tv.iter().enumerate() {
+                    if !self.movable(v) {
+                        continue;
+                    }
+                    let star: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                        .filter(|&u| self.cx.alive[u as usize]).collect();
+                    let base = star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min);
+                    let rcap = self.rho_cap(&star);
+                    let p0 = self.xyz[v as usize];
+                    // away from the opposite face of t (raises its volume)
+                    let o: Vec<P3> = (0..4).filter(|&j| j != i).map(|j| self.xyz[tv[j] as usize]).collect();
+                    let nrm = cross(&sub3(&o[1], &o[0]), &sub3(&o[2], &o[0]));
+                    let nn = dot(&nrm, &nrm).sqrt();
+                    let side = dot(&nrm, &sub3(&p0, &o[0]));
+                    let lmin = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                        .map(|(a, b)| dot(&sub3(&self.xyz[tv[a] as usize], &self.xyz[tv[b] as usize]),
+                                          &sub3(&self.xyz[tv[a] as usize], &self.xyz[tv[b] as usize])).sqrt())
+                        .fold(f64::INFINITY, f64::min);
+                    let mut cands: Vec<P3> = Vec::new();
+                    if nn > 0.0 {
+                        let u = nrm.map(|x| x / nn * side.signum());
+                        for f in [0.5, 0.25, 0.1] {
+                            cands.push(std::array::from_fn(|k| p0[k] + f * lmin * u[k]));
+                        }
+                    }
+                    let mut cen = [0.0; 3];
+                    let mut cnt = 0.0;
+                    for &u in &star {
+                        for &w in &self.cx.tets[u as usize] {
+                            if w != v {
+                                let q = self.xyz[w as usize];
+                                for k in 0..3 {
+                                    cen[k] += q[k];
+                                }
+                                cnt += 1.0;
+                            }
+                        }
+                    }
+                    if cnt > 0.0 {
+                        for f in [1.0, 0.5, 0.25] {
+                            cands.push(std::array::from_fn(|k| p0[k] + f * (cen[k] / cnt - p0[k])));
+                        }
+                    }
+                    let mut done = false;
+                    for c in cands {
+                        if !c.iter().all(|x| x.is_finite()) {
+                            continue;
+                        }
+                        self.set_volume_point(v, c);
+                        let ok = star.iter().all(|&u| {
+                            let w = self.cx.tets[u as usize];
+                            self.orient(w) > 0
+                        });
+                        if ok && star.iter().map(|&u| self.min_dihedral(u)).fold(180.0, f64::min) > base + 1e-9
+                            && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                            done = true;
+                            break;
+                        }
+                        self.set_volume_point(v, p0);
+                    }
+                    if done {
+                        moved += 1;
+                        if self.min_dihedral(t) >= DIHEDRAL_MIN {
+                            break;
+                        }
+                    }
+                }
+            }
+            if moved == 0 {
+                break;
+            }
+            self.stats.sliver_moves += moved;
+        }
+    }
+
+    /// Quality q = 3 r_in / R of tetrahedron t (1 for the regular tetrahedron; doubles).
+    fn tet_q(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
+        let v6 = dot(&a, &cross(&b, &c));
+        if !(v6 > 0.0) {
+            return 0.0;
+        }
+        let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
+        let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
+        let rin = 3.0 * (v6 / 6.0) / s;
+        let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
+                                               + dot(&c, &c) * cross(&a, &b)[k]);
+        let r = dot(&num, &num).sqrt() / (2.0 * v6);
+        3.0 * rin / r
+    }
+
+    /// M6 step 3 (first part): smoothing. Each volume vertex, in index order, moves towards
+    /// the centroid of its star's other vertices (by 1, 1/2 or 1/4 of the way) when every
+    /// tetrahedron around it stays positive (exact orient3d), the worst quality q around it
+    /// grows and the smallest dihedral angle around it does not fall (below 15 degrees);
+    /// three passes. Constraint vertices do not move.
+    fn smooth(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..5 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                if !self.movable(v) {
+                    continue;
+                }
+                let star: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                if star.is_empty() || star.iter().any(|&u| !self.inside[u as usize]) {
+                    continue;
+                }
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
+                let base = worst(self);
+                let mbase = mean(self);
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let dbase = dmin(self).min(DIHEDRAL_MIN);
+                let rcap = self.rho_cap(&star);
+                let p0 = self.xyz[v as usize];
+                let mut cen = [0.0; 3];
+                let mut cnt = 0.0;
+                for &u in &star {
+                    for &w in &self.cx.tets[u as usize] {
+                        if w != v {
+                            let q = self.xyz[w as usize];
+                            for k in 0..3 {
+                                cen[k] += q[k];
+                            }
+                            cnt += 1.0;
+                        }
+                    }
+                }
+                for f in [1.0, 0.5, 0.25] {
+                    let c: P3 = std::array::from_fn(|k| p0[k] + f * (cen[k] / cnt - p0[k]));
+                    self.set_volume_point(v, c);
+                    let ok = star.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    // a better worst tetrahedron, or the same worst and a better star on average
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_volume_point(v, p0);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Whether vertex v may move: a volume point whose tetrahedra are all inside the domain
+    /// and none of whose faces through v is a subfacet (a volume point can lie on a facet's
+    /// plane, or be a vertex of a face shared with another shell).
+    fn movable(&self, v: u32) -> bool {
+        let n = self.g.input.len();
+        if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Volume {
+            return false;
+        }
+        self.cx.star[v as usize].iter().filter(|&&u| self.cx.alive[u as usize]).all(|&u| {
+            self.inside[u as usize] && {
+                let w = self.cx.tets[u as usize];
+                (0..4).all(|i| {
+                    let k = key(face(&w, i));
+                    !k.contains(&v) || !self.sub.contains_key(&k)
+                })
+            }
+        })
+    }
+
+    /// Radius-edge ratio of tetrahedron t (doubles).
+    fn tet_rho(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let Some(c) = circumcentre(x) else { return f64::INFINITY };
+        let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+        let l = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+            .map(|(a, b)| dot(&sub3(&x[a], &x[b]), &sub3(&x[a], &x[b])).sqrt()).fold(f64::INFINITY, f64::min);
+        r / l
+    }
+
+    /// The largest radius-edge ratio a move may leave around a vertex: the bound of
+    /// refinement, or what was there before when that is already above it (exempt
+    /// tetrahedra near small angles); improvement never breaks V7.
+    fn rho_cap(&self, star: &[u32]) -> f64 {
+        let before = star.iter().map(|&u| self.tet_rho(u)).fold(0.0f64, f64::max);
+        if self.opt.ratio > 0.0 { before.max(self.opt.ratio) } else { f64::INFINITY }
+    }
+
+    /// Whether facet point v may slide in its facet's plane: an F point not on a subsegment
+    /// whose subfacets all belong to the same facets (one facet, or the shared facet of
+    /// touching shells). Every tetrahedron around it stays, inside the domain or not.
+    fn slidable(&self, v: u32) -> bool {
+        let n = self.g.input.len();
+        if (v as usize) < n || self.g.s[v as usize - n].kind() != crate::mixed::Kind::Facet {
+            return false;
+        }
+        let mut owner: Option<&Vec<u32>> = None;
+        for &u in self.cx.star[v as usize].iter().filter(|&&u| self.cx.alive[u as usize]) {
+            let w = self.cx.tets[u as usize];
+            for i in 0..4 {
+                let k = key(face(&w, i));
+                if !k.contains(&v) {
+                    continue;
+                }
+                if let Some(l) = self.sub.get(&k) {
+                    match owner {
+                        None => owner = Some(l),
+                        Some(o) if o != l => return false,
+                        _ => {}
+                    }
+                }
+            }
+            for a in 0..4 {
+                if w[a] != v && self.seg.contains_key(&ekey(v, w[a])) {
+                    return false;
+                }
+            }
+        }
+        owner.is_some()
+    }
+
+    /// Moves facet point v to (about) p, keeping it exactly in its plane: p as
+    /// a + s (b - a) + r (c - a) on v's own three input points, least squares in doubles.
+    fn set_facet_point(&mut self, v: u32, sp: SPoint) {
+        let n = self.g.input.len();
+        self.g.s[v as usize - n] = sp;
+        let m = self.g.view();
+        self.xyz[v as usize] = m.rounded(m.from_id(v));
+    }
+
+    fn facet_point_at(&self, v: u32, p: P3) -> Option<SPoint> {
+        let n = self.g.input.len();
+        let old = self.g.s[v as usize - n];
+        let (pa, pb, pc) = (self.xyz[old.a as usize], self.xyz[old.b as usize], self.xyz[old.c as usize]);
+        let (e1, e2, d) = (sub3(&pb, &pa), sub3(&pc, &pa), sub3(&p, &pa));
+        let (g11, g12, g22) = (dot(&e1, &e1), dot(&e1, &e2), dot(&e2, &e2));
+        let (r1, r2) = (dot(&e1, &d), dot(&e2, &d));
+        let det = g11 * g22 - g12 * g12;
+        let (s, r) = ((r1 * g22 - r2 * g12) / det, (g11 * r2 - g12 * r1) / det);
+        (s.is_finite() && r.is_finite()).then(|| SPoint::fac(old.a, old.b, old.c, s, r))
+    }
+
+    /// Smoothing of facet points in their planes, by the rules of `smooth` on the
+    /// tetrahedra inside the domain; every tetrahedron around the point keeps its orientation.
+    fn slide_facets(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..5 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                if !self.slidable(v) {
+                    continue;
+                }
+                let all: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                let star: Vec<u32> = all.iter().copied().filter(|&u| self.inside[u as usize]).collect();
+                if star.is_empty() {
+                    continue;
+                }
+                // the target: the centroid of v's neighbours in the facet (the other vertices
+                // of its subfacets), which lies in the facet's plane
+                let mut ring: Vec<u32> = Vec::new();
+                for &u in &all {
+                    let w = self.cx.tets[u as usize];
+                    for i in 0..4 {
+                        let k = key(face(&w, i));
+                        if k.contains(&v) && self.sub.contains_key(&k) {
+                            ring.extend(k.iter().copied().filter(|&x| x != v));
+                        }
+                    }
+                }
+                ring.sort_unstable();
+                ring.dedup();
+                if ring.len() < 3 {
+                    continue;
+                }
+                let mut cen = [0.0; 3];
+                for &w in &ring {
+                    for k in 0..3 {
+                        cen[k] += self.xyz[w as usize][k] / ring.len() as f64;
+                    }
+                }
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let (base, mbase, dbase) = (worst(self), mean(self), dmin(self).min(DIHEDRAL_MIN));
+                let rcap = self.rho_cap(&star);
+                let old = self.g.s[v as usize - n];
+                let p0 = self.xyz[v as usize];
+                for f in [1.0, 0.5, 0.25] {
+                    let c: P3 = std::array::from_fn(|k| p0[k] + f * (cen[k] - p0[k]));
+                    let Some(sp) = self.facet_point_at(v, c) else { break };
+                    self.set_facet_point(v, sp);
+                    let ok = all.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_facet_point(v, old);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Smoothing of segment points along their segments, by the rules of `slide_facets`:
+    /// the target is the centroid of the point's neighbours projected on the segment,
+    /// strictly between the two vertices next to it on the segment.
+    fn slide_segments(&mut self) {
+        let n = self.g.input.len();
+        for _pass in 0..5 {
+            let mut moved = 0u32;
+            for v in n as u32..(n + self.g.s.len()) as u32 {
+                let old = self.g.s[v as usize - n];
+                if old.kind() != crate::mixed::Kind::Segment {
+                    continue;
+                }
+                let all: Vec<u32> = self.cx.star[v as usize].iter().copied()
+                    .filter(|&u| self.cx.alive[u as usize]).collect();
+                let star: Vec<u32> = all.iter().copied().filter(|&u| self.inside[u as usize]).collect();
+                if star.is_empty() {
+                    continue;
+                }
+                let mut nb: Vec<u32> = all.iter().flat_map(|&u| self.cx.tets[u as usize]).filter(|&x| x != v).collect();
+                nb.sort_unstable();
+                nb.dedup();
+                let ends: Vec<u32> = nb.iter().copied().filter(|&x| self.seg.contains_key(&ekey(v, x))).collect();
+                if ends.len() != 2 {
+                    continue;
+                }
+                let (pa, pb) = (self.xyz[old.a as usize], self.xyz[old.b as usize]);
+                let d = sub3(&pb, &pa);
+                let dd = dot(&d, &d);
+                let par = |x: &P3| dot(&sub3(x, &pa), &d) / dd;
+                let (t0, t1) = {
+                    let (u, w) = (par(&self.xyz[ends[0] as usize]), par(&self.xyz[ends[1] as usize]));
+                    (u.min(w), u.max(w))
+                };
+                let tc = nb.iter().map(|&x| par(&self.xyz[x as usize])).sum::<f64>() / nb.len() as f64;
+                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
+                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
+                let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
+                let (base, mbase, dbase) = (worst(self), mean(self), dmin(self).min(DIHEDRAL_MIN));
+                let rcap = self.rho_cap(&star);
+                for f in [1.0, 0.5, 0.25] {
+                    let t = old.t + f * (tc - old.t);
+                    let lo = t0 + 0.1 * (t1 - t0);
+                    let hi = t1 - 0.1 * (t1 - t0);
+                    if !(t > lo && t < hi && t > 0.0 && t < 1.0) {
+                        continue;
+                    }
+                    self.set_facet_point(v, SPoint::seg(old.a, old.b, t));
+                    let ok = all.iter().all(|&u| {
+                        let w = self.cx.tets[u as usize];
+                        self.orient(w) > 0
+                    });
+                    let w = if ok { worst(self) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                        && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
+                        moved += 1;
+                        break;
+                    }
+                    self.set_facet_point(v, old);
+                }
+            }
+            self.stats.smooth_moves += moved;
+            if moved == 0 {
+                break;
+            }
+        }
+    }
+
+    fn set_volume_point(&mut self, v: u32, p: P3) {
+        let n = self.g.input.len();
+        self.g.s[v as usize - n] = SPoint::vol(p);
+        self.xyz[v as usize] = p;
+    }
+
+    /// (smallest dihedral angle in degrees, q) of four vertices, positive or not (doubles).
+    fn shape(&self, v: [u32; 4]) -> (f64, f64) {
+        let x = v.map(|i| self.xyz[i as usize]);
+        let mut m = 180.0f64;
+        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+            let e = sub3(&x[j], &x[i]);
+            let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
+            let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
+            if !(d > 0.0) {
+                return (0.0, 0.0);
+            }
+            m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+        }
+        let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
+        let v6 = dot(&a, &cross(&b, &c)).abs();
+        let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
+        let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
+        let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
+                                               + dot(&c, &c) * cross(&a, &b)[k]);
+        let r = dot(&num, &num).sqrt() / (2.0 * v6);
+        (m, if r > 0.0 { 3.0 * (v6 / 2.0 / s) / r } else { 0.0 })
+    }
+
+    /// The worst (dihedral, q) of a set of tetrahedra, compared dihedral first (below 15
+    /// degrees), then q.
+    fn worst_shape(&self, ts: &[[u32; 4]]) -> (f64, f64) {
+        ts.iter().map(|t| self.shape(*t)).fold((180.0, 1.0), |a, b| (a.0.min(b.0), a.1.min(b.1)))
+    }
+
+    /// The sum of badness 1/q - 1 over tetrahedra (0 for regular ones): the energy that
+    /// flips lower when they keep the worst shape at least min(before, SMOOTH_FLOOR).
+    fn badness(&self, ts: &[[u32; 4]]) -> f64 {
+        ts.iter().map(|t| { let q = self.shape(*t).1; if q > 0.0 { 1.0 / q - 1.0 } else { f64::INFINITY } }).sum()
+    }
+
+    /// A replacement is taken when it raises the worst (dihedral, q), or keeps the worst at
+    /// least the floors and lowers the total badness.
+    fn accept(&self, old: &[[u32; 4]], new: &[[u32; 4]]) -> bool {
+        let (wn, wo) = (self.worst_shape(new), self.worst_shape(old));
+        if Self::better(wn, wo) {
+            return true;
+        }
+        wn.0 >= wo.0.min(DIHEDRAL_MIN) && wn.1 >= wo.1.min(SMOOTH_FLOOR) && self.badness(new) < self.badness(old) - 1e-9
+    }
+
+    fn better(new: (f64, f64), old: (f64, f64)) -> bool {
+        let (nd, od) = (new.0.min(DIHEDRAL_MIN), old.0.min(DIHEDRAL_MIN));
+        nd > od + 1e-9 || (nd >= od && new.1 > old.1 + 1e-9)
+    }
+
+    /// Orders four vertices so that orient3d is positive; None if they are coplanar.
+    fn positive(&mut self, mut v: [u32; 4]) -> Option<[u32; 4]> {
+        match self.orient(v) {
+            o if o > 0 => Some(v),
+            o if o < 0 => {
+                v.swap(0, 1);
+                Some(v)
+            }
+            _ => None,
+        }
+    }
+
+    fn replace(&mut self, old: &[u32], new: &[[u32; 4]]) {
+        let (ins, hs) = (self.inside[old[0] as usize], self.hsz[old[0] as usize]);
+        for &t in old {
+            self.cx.remove(t);
+        }
+        for &v in new {
+            let id = self.cx.add(v);
+            if id as usize >= self.inside.len() {
+                self.inside.resize(id as usize + 1, false);
+                self.hsz.resize(id as usize + 1, 0.0);
+            }
+            self.inside[id as usize] = ins;
+            self.hsz[id as usize] = hs;
+        }
+    }
+
+    /// M6 step 3 (second part): 2-3 and 3-2 flips inside the domain that raise the worst
+    /// (dihedral, q) of the tetrahedra they replace, never across a subfacet or removing a
+    /// subsegment; exact orient3d for every new tetrahedron. Faces and edges are visited in
+    /// sorted order (deterministic); up to four passes.
+    fn flip_improve(&mut self) {
+        for _pass in 0..4 {
+            let mut done = 0u32;
+            // 2-3 across interior faces
+            let mut faces: Vec<[u32; 3]> = self.cx.faces.iter()
+                .filter(|(k, o)| o[0] != NONE && o[1] != NONE && !self.sub.contains_key(*k))
+                .map(|(k, _)| *k).collect();
+            faces.sort_unstable();
+            for k in faces {
+                let Some(o) = self.cx.faces.get(&k).copied() else { continue };
+                if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
+                    continue;
+                }
+                let (t1, t2) = (o[0], o[1]);
+                if !self.inside[t1 as usize] || !self.inside[t2 as usize] || self.hsz[t1 as usize] != self.hsz[t2 as usize] {
+                    continue;
+                }
+                let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
+                let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
+                let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
+                let old = self.worst_shape(&[v1, v2]);
+                if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
+                    continue; // not worth a flip
+                }
+                let mut new = Vec::with_capacity(3);
+                for j in 0..3 {
+                    match self.positive([k[j], k[(j + 1) % 3], d, e]) {
+                        Some(t) => new.push(t),
+                        None => break,
+                    }
+                }
+                if new.len() != 3 || !self.convex_23(&k, d, e) {
+                    continue;
+                }
+                if self.accept(&[v1, v2], &new) && self.rho_ok(&[v1, v2], &new) {
+                    self.replace(&[t1, t2], &new);
+                    done += 1;
+                }
+            }
+            // 3-2 removing an edge with three tetrahedra
+            let mut edges: Vec<(u32, u32)> = Vec::new();
+            for t in 0..self.cx.tets.len() as u32 {
+                if !self.cx.alive[t as usize] || !self.inside[t as usize] {
+                    continue;
+                }
+                let v = self.cx.tets[t as usize];
+                for a in 0..4 {
+                    for b in a + 1..4 {
+                        edges.push(ekey(v[a], v[b]));
+                    }
+                }
+            }
+            edges.sort_unstable();
+            edges.dedup();
+            for (a, b) in edges {
+                if self.seg.contains_key(&(a, b)) {
+                    continue;
+                }
+                let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+                    .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+                if ring.len() != 3 || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
+                    continue;
+                }
+                // the faces through the edge must not be constraints, and the edge must be interior
+                let mut others: Vec<u32> = Vec::new();
+                let mut bad = false;
+                for &t in &ring {
+                    let v = self.cx.tets[t as usize];
+                    for i in 0..4 {
+                        let k = key(face(&v, i));
+                        if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
+                            bad = true;
+                        }
+                    }
+                    others.extend(v.iter().copied().filter(|&x| x != a && x != b));
+                }
+                others.sort_unstable();
+                others.dedup();
+                if bad || others.len() != 3 {
+                    continue;
+                }
+                let oldv: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
+                let old = self.worst_shape(&oldv);
+                if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
+                    continue;
+                }
+                let tri = [others[0], others[1], others[2]];
+                let (Some(n1), Some(n2)) = (self.positive([tri[0], tri[1], tri[2], a]), self.positive([tri[0], tri[1], tri[2], b])) else { continue };
+                // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
+                let (sa, sb) = (self.orient([tri[0], tri[1], tri[2], a]), self.orient([tri[0], tri[1], tri[2], b]));
+                if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
+                    continue; // the edge must pass through the triangle's interior
+                }
+                if self.accept(&oldv, &[n1, n2]) && self.rho_ok(&oldv, &[n1, n2]) {
+                    self.replace(&ring, &[n1, n2]);
+                    done += 1;
+                }
+            }
+            done += self.edge_removal();
+            self.stats.flips += done;
+            if done == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Edge removal: an interior edge ab (not a subsegment, no subfacet through it) with a
+    /// ring of 4 to EDGE_RING_MAX tetrahedra of one region is replaced by the 2(n - 2)
+    /// tetrahedra joining a and b to a triangulation of its ring polygon, chosen by dynamic
+    /// programming for the best worst q, when that raises the ring's worst (dihedral, q) and
+    /// keeps V7. Every new tetrahedron has exact orient3d of the ring's sign.
+    fn edge_removal(&mut self) -> u32 {
+        let mut edges: Vec<(u32, u32)> = Vec::new();
+        for t in 0..self.cx.tets.len() as u32 {
+            if !self.cx.alive[t as usize] || !self.inside[t as usize] {
+                continue;
+            }
+            let (d, q) = self.shape(self.cx.tets[t as usize]);
+            if d >= DIHEDRAL_MIN && q > 0.9 {
+                continue;
+            }
+            let v = self.cx.tets[t as usize];
+            for a in 0..4 {
+                for b in a + 1..4 {
+                    edges.push(ekey(v[a], v[b]));
+                }
+            }
+        }
+        edges.sort_unstable();
+        edges.dedup();
+        let mut done = 0;
+        for (a, b) in edges {
+            if self.seg.contains_key(&(a, b)) {
+                continue;
+            }
+            let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+                .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+            let n = ring.len();
+            if n < 4 || n > EDGE_RING_MAX
+                || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
+                continue;
+            }
+            // the ring polygon in cyclic order: each tetrahedron joins two consecutive vertices
+            let mut pairs: Vec<(u32, u32)> = Vec::with_capacity(n);
+            let mut bad = false;
+            for &t in &ring {
+                let v = self.cx.tets[t as usize];
+                let o: Vec<u32> = v.iter().copied().filter(|&x| x != a && x != b).collect();
+                pairs.push((o[0], o[1]));
+                for i in 0..4 {
+                    let k = key(face(&v, i));
+                    if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
+                        bad = true;
+                    }
+                }
+            }
+            if bad {
+                continue;
+            }
+            let mut poly: Vec<u32> = vec![pairs[0].0, pairs[0].1];
+            let mut used = vec![false; n];
+            used[0] = true;
+            while poly.len() < n {
+                let last = *poly.last().unwrap();
+                let Some(i) = (0..n).find(|&i| !used[i] && (pairs[i].0 == last || pairs[i].1 == last)) else { break };
+                used[i] = true;
+                poly.push(if pairs[i].0 == last { pairs[i].1 } else { pairs[i].0 });
+            }
+            let closes = (0..n).any(|i| !used[i] && {
+                let (x, y) = pairs[i];
+                (x == poly[n - 1] && y == poly[0]) || (y == poly[n - 1] && x == poly[0])
+            });
+            if poly.len() != n || !closes {
+                continue;
+            }
+            let old: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
+            // the sign a must have against every triangle of the polygon, from a fan triangle
+            // of the ring (consecutive vertices keep the orientation of the cycle)
+            let sa = self.orient([poly[0], poly[1], poly[2], a]);
+            if sa == 0 {
+                continue;
+            }
+            // best[i][j]: (worst q, split k) of the polygon chain i..j, triangles (i, k, j)
+            let mut tri_q: HashMap<(usize, usize, usize), f64> = HashMap::new();
+            let mut best = vec![vec![(f64::NEG_INFINITY, usize::MAX); n]; n];
+            for i in 0..n - 1 {
+                best[i][i + 1] = (f64::INFINITY, usize::MAX);
+            }
+            for len in 2..n {
+                for i in 0..n - len {
+                    let j = i + len;
+                    for k in i + 1..j {
+                        let q = *tri_q.entry((i, k, j)).or_insert_with(|| {
+                            let tr = [poly[i], poly[k], poly[j]];
+                            if self.g.orient3d([tr[0], tr[1], tr[2], a]) != sa || self.g.orient3d([tr[0], tr[1], tr[2], b]) != -sa {
+                                return f64::NEG_INFINITY;
+                            }
+                            let ta = if sa > 0 { [tr[0], tr[1], tr[2], a] } else { [tr[1], tr[0], tr[2], a] };
+                            let tb = if sa > 0 { [tr[1], tr[0], tr[2], b] } else { [tr[0], tr[1], tr[2], b] };
+                            self.shape(ta).1.min(self.shape(tb).1)
+                        });
+                        let v = q.min(best[i][k].0).min(best[k][j].0);
+                        if v > best[i][j].0 {
+                            best[i][j] = (v, k);
+                        }
+                    }
+                }
+            }
+            if !(best[0][n - 1].0 > 0.0) {
+                continue;
+            }
+            let mut tris: Vec<[u32; 3]> = Vec::new();
+            let mut st = vec![(0usize, n - 1)];
+            while let Some((i, j)) = st.pop() {
+                if j <= i + 1 {
+                    continue;
+                }
+                let k = best[i][j].1;
+                tris.push([poly[i], poly[k], poly[j]]);
+                st.push((i, k));
+                st.push((k, j));
+            }
+            let mut new: Vec<[u32; 4]> = Vec::with_capacity(2 * tris.len());
+            for tr in &tris {
+                if sa > 0 {
+                    new.push([tr[0], tr[1], tr[2], a]);
+                    new.push([tr[1], tr[0], tr[2], b]);
+                } else {
+                    new.push([tr[1], tr[0], tr[2], a]);
+                    new.push([tr[0], tr[1], tr[2], b]);
+                }
+            }
+            if new.iter().any(|t| self.orient(*t) <= 0) {
+                continue;
+            }
+            if self.accept(&old, &new) && self.rho_ok(&old, &new) {
+                self.replace(&ring, &new);
+                done += 1;
+            }
+        }
+        self.stats.edge_removals += done;
+        done
+    }
+
+    /// Replaces tetrahedra `old` by `new` (labels of old[0]) and returns the new ids.
+    fn replace_ids(&mut self, old: &[u32], new: &[[u32; 4]]) -> Vec<u32> {
+        let (ins, hs) = (self.inside[old[0] as usize], self.hsz[old[0] as usize]);
+        for &t in old {
+            self.cx.remove(t);
+        }
+        new.iter().map(|&v| {
+            let id = self.cx.add(v);
+            if id as usize >= self.inside.len() {
+                self.inside.resize(id as usize + 1, false);
+                self.hsz.resize(id as usize + 1, 0.0);
+            }
+            self.inside[id as usize] = ins;
+            self.hsz[id as usize] = hs;
+            id
+        }).collect()
+    }
+
+    /// Restores the constrained Delaunay property around new tetrahedra after an insertion
+    /// whose cavity was cut short (it grows only across faces the point sees): Lawson's
+    /// 2-3 and 3-2 flips of interior faces whose neighbour's apex lies in the circumsphere
+    /// (exact insphere with symbolic perturbation), never across a subfacet, never removing
+    /// a subsegment, between tetrahedra of the same region; outside the domain too, where
+    /// a non-Delaunay filling makes the cavities of later facet points non-star-shaped. Each such flip lowers the lifted
+    /// triangulation, so the flips end; LAWSON_CAP bounds them all the same. Returns the
+    /// tetrahedra that replace `start`, for the queues.
+    fn lawson(&mut self, start: Vec<u32>) -> Vec<u32> {
+        let mut made: Vec<u32> = start.clone();
+        let mut stack: Vec<[u32; 3]> = Vec::new();
+        let push = |st: &Self, t: u32, stack: &mut Vec<[u32; 3]>| {
+            let v = st.cx.tets[t as usize];
+            for i in 0..4 {
+                stack.push(key(face(&v, i)));
+            }
+        };
+        for &t in &start {
+            push(self, t, &mut stack);
+        }
+        let mut flips = 0u32;
+        while let Some(k) = stack.pop() {
+            if flips >= LAWSON_CAP {
+                break;
+            }
+            if self.sub.contains_key(&k) {
+                continue;
+            }
+            let Some(o) = self.cx.faces.get(&k).copied() else { continue };
+            if o[0] == NONE || o[1] == NONE {
+                continue;
+            }
+            let (t1, t2) = (o[0], o[1]);
+            if !self.cx.alive[t1 as usize] || !self.cx.alive[t2 as usize] || self.inside[t1 as usize] != self.inside[t2 as usize]
+                || self.hsz[t1 as usize] != self.hsz[t2 as usize] {
+                continue;
+            }
+            let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
+            let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
+            let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
+            if self.g.insphere_sos([v1[0], v1[1], v1[2], v1[3], e]) <= 0 {
+                continue;
+            }
+            // 2-3: the edge de crosses the face's interior
+            if self.convex_23(&k, d, e) {
+                let mut new = Vec::with_capacity(3);
+                for j in 0..3 {
+                    if let Some(t) = self.positive([k[j], k[(j + 1) % 3], d, e]) {
+                        new.push(t);
+                    }
+                }
+                if new.len() == 3 {
+                    let ids = self.replace_ids(&[t1, t2], &new);
+                    for &t in &ids {
+                        push(self, t, &mut stack);
+                    }
+                    made.extend(ids);
+                    flips += 1;
+                    continue;
+                }
+            }
+            // 3-2: an edge of the face with exactly three tetrahedra around it
+            for j in 0..3 {
+                let (a, b) = (k[j], k[(j + 1) % 3]);
+                if self.seg.contains_key(&ekey(a, b)) {
+                    continue;
+                }
+                let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+                    .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+                if ring.len() != 3 || ring.iter().any(|&t| self.inside[t as usize] != self.inside[t1 as usize] || self.hsz[t as usize] != self.hsz[t1 as usize]) {
+                    continue;
+                }
+                let mut others: Vec<u32> = Vec::new();
+                let mut bad = false;
+                for &t in &ring {
+                    let v = self.cx.tets[t as usize];
+                    for i in 0..4 {
+                        let f = key(face(&v, i));
+                        if f.contains(&a) && f.contains(&b) && (self.sub.contains_key(&f) || self.cx.neighbor(t, &f) == NONE) {
+                            bad = true;
+                        }
+                    }
+                    others.extend(v.iter().copied().filter(|&x| x != a && x != b));
+                }
+                others.sort_unstable();
+                others.dedup();
+                if bad || others.len() != 3 {
+                    continue;
+                }
+                let tri = [others[0], others[1], others[2]];
+                let (sa, sb) = (self.orient([tri[0], tri[1], tri[2], a]), self.orient([tri[0], tri[1], tri[2], b]));
+                if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
+                    continue;
+                }
+                let (Some(n1), Some(n2)) = (self.positive([tri[0], tri[1], tri[2], a]), self.positive([tri[0], tri[1], tri[2], b])) else { continue };
+                let ids = self.replace_ids(&ring, &[n1, n2]);
+                for &t in &ids {
+                    push(self, t, &mut stack);
+                }
+                made.extend(ids);
+                flips += 1;
+                break;
+            }
+        }
+        self.stats.lawson_flips += flips;
+        made.retain(|&t| self.cx.alive[t as usize]);
+        made.sort_unstable();
+        made.dedup();
+        made
+    }
+
+    /// A flip keeps V7: its new tetrahedra stay within the refinement bound, or within the
+    /// worst ratio of the tetrahedra it replaces when that is already above it.
+    fn rho_ok(&self, old: &[[u32; 4]], new: &[[u32; 4]]) -> bool {
+        if !(self.opt.ratio > 0.0) {
+            return true;
+        }
+        let rho = |v: &[u32; 4]| {
+            let x = v.map(|i| self.xyz[i as usize]);
+            match circumcentre(x) {
+                Some(c) => {
+                    let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+                    let l = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                        .map(|(a, b)| dot(&sub3(&x[a], &x[b]), &sub3(&x[a], &x[b])).sqrt()).fold(f64::INFINITY, f64::min);
+                    r / l
+                }
+                None => f64::INFINITY,
+            }
+        };
+        let cap = old.iter().map(rho).fold(0.0f64, f64::max).max(self.opt.ratio);
+        new.iter().all(|v| rho(v) <= cap)
+    }
+
+    /// Whether the edge d-e crosses the interior of triangle k (a 2-3 flip is valid).
+    fn convex_23(&mut self, k: &[u32; 3], d: u32, e: u32) -> bool {
+        let o = self.orient([k[0], k[1], d, e]);
+        o != 0 && (1..3).all(|j| self.orient([k[j], k[(j + 1) % 3], d, e]) == o)
+    }
+
+    /// The smallest dihedral angle of tetrahedron t, in degrees (doubles).
+    fn min_dihedral(&self, t: u32) -> f64 {
+        let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
+        let mut m = 180.0f64;
+        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+            let e = sub3(&x[j], &x[i]);
+            let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
+            let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
+            if d > 0.0 {
+                m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+            } else {
+                return 0.0;
+            }
+        }
+        m
+    }
+
+    /// The size at a boundary simplex: the smallest positive size of the tetrahedra (inside
+    /// the domain) in `ts`; 0 when none has one.
+    fn local_h(&self, ts: impl Iterator<Item = u32>) -> f64 {
+        ts.filter(|&t| t != NONE && self.inside[t as usize]).map(|t| self.hsz[t as usize])
+            .filter(|h| *h > 0.0).fold(0.0, |a: f64, h| if a == 0.0 { h } else { a.min(h) })
+    }
+
+    /// Boundary size: a subsegment longer than SEG_C alpha h of the regions around it.
+    fn segment_too_long(&self, e: (u32, u32)) -> bool {
+        let ts = self.cx.star[e.0 as usize].iter().copied()
+            .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&e.1));
+        let h = self.local_h(ts);
+        let d = sub3(&self.xyz[e.1 as usize], &self.xyz[e.0 as usize]);
+        h > 0.0 && dot(&d, &d).sqrt() > SEG_C * self.opt.alpha * h
+    }
+
+    /// Boundary size: a subfacet whose circumradius exceeds FAC_C alpha h of its regions.
+    fn subfacet_too_large(&self, f: [u32; 3]) -> bool {
+        let Some(o) = self.cx.faces.get(&f) else { return false };
+        let h = self.local_h(o.iter().copied());
+        if !(h > 0.0) {
+            return false;
+        }
+        let x = f.map(|v| self.xyz[v as usize]);
+        let (a, b) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]));
+        let n = cross(&a, &b);
+        let nn = dot(&n, &n);
+        let cc = sub3(&a, &b);
+        nn > 0.0 && (dot(&a, &a) * dot(&b, &b) * dot(&cc, &cc)).sqrt() / (2.0 * nn.sqrt()) > FAC_C * self.opt.alpha * h
+    }
+
+    /// Facet quality: a subfacet whose radius-edge ratio (circumradius over its shortest
+    /// edge) exceeds SUB_RATIO, when refinement has a ratio bound and none of its vertices
+    /// is the apex of a small input angle. A skinny subfacet makes every tetrahedron on it
+    /// a sliver or a needle that no interior move can repair.
+    fn subfacet_skinny(&self, f: [u32; 3]) -> bool {
+        if !(self.opt.ratio > 0.0) || f.iter().any(|&v| (v as usize) < self.small_apex.len() && self.small_apex[v as usize]) {
+            return false;
+        }
+        let Some(o) = self.cx.faces.get(&f) else { return false };
+        if !(self.local_h(o.iter().copied()) > 0.0) {
+            return false;
+        }
+        let x = f.map(|v| self.xyz[v as usize]);
+        let (a, b) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]));
+        let n = cross(&a, &b);
+        let nn = dot(&n, &n);
+        let c = sub3(&a, &b);
+        let (la, lb, lc) = (dot(&a, &a), dot(&b, &b), dot(&c, &c));
+        if !(nn > 0.0) {
+            return false;
+        }
+        let rc = (la * lb * lc).sqrt() / (2.0 * nn.sqrt());
+        rc > SUB_RATIO * la.min(lb).min(lc).sqrt()
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -830,6 +1855,7 @@ impl State<'_> {
         for k in touched {
             self.subq.push_back(k);
         }
+        let added = self.lawson(added);
         for id in added {
             let v = self.cx.tets[id as usize];
             for i in 0..4 {
@@ -921,6 +1947,13 @@ impl State<'_> {
     }
 
     fn split_subfacet_at(&mut self, f: [u32; 3]) -> Result<(), String> {
+        self.split_facet_toward(f, None)
+    }
+
+    /// Splits subfacet f's facet at f's circumcentre or, with a target (q, gap), at q's
+    /// projection on the facet's plane when no vertex of the subfacet holding it is nearer
+    /// than gap.
+    fn split_facet_toward(&mut self, f: [u32; 3], target: Option<(P3, f64)>) -> Result<(), String> {
         let fi = self.sub[&f][0];
         let ([a, b, c], _axis) = self.frame[fi as usize];
         let x = f.map(|v| self.xyz[v as usize]);
@@ -933,6 +1966,8 @@ impl State<'_> {
         }
         let (wn, nu) = (cross(&w, &nrm), cross(&nrm, &u));
         let o: P3 = std::array::from_fn(|k| x[0][k] + (dot(&u, &u) * wn[k] + dot(&w, &w) * nu[k]) / (2.0 * nn));
+        // a target's coordinates: the least-squares frame below projects them on the plane
+        let o: P3 = target.map(|q| q.0).unwrap_or(o);
         // the circumcentre as a + s (b - a) + r (c - a), least squares in doubles
         let (pa, pb, pc) = (self.xyz[a as usize], self.xyz[b as usize], self.xyz[c as usize]);
         let (e1, e2, d) = (sub3(&pb, &pa), sub3(&pc, &pa), sub3(&o, &pa));
@@ -995,6 +2030,14 @@ impl State<'_> {
                 }
             }
         }
+        if let Some((_, gap)) = target {
+            let pp = self.xyz[p as usize];
+            if cur.iter().any(|&v| { let d = sub3(&self.xyz[v as usize], &pp); dot(&d, &d) < gap * gap }) {
+                self.drop_point(p);
+                self.stats.exempt_faces += 1;
+                return Ok(());
+            }
+        }
         if cur.iter().any(|&v| self.xyz[v as usize] == self.xyz[p as usize]) {
             // the circumcentre is (in doubles) a vertex already: an earlier split at the same
             // point could not remove f
@@ -1003,6 +2046,16 @@ impl State<'_> {
             return Ok(());
         }
         let plane = self.plane_cavity(p, &[cur]);
+        if target.is_none() && !plane.contains(&f) {
+            // the 2D cavity p sees leaves f (an obtuse f whose circumcentre lies in another
+            // subfacet, past a facet triangulation that is not Delaunay): inserting p would
+            // not remove f, and every later try at f would find p there while tetrahedra
+            // next to f split towards the facet without end; leave f
+            self.drop_point(p);
+            self.stats.rejected += 1;
+            self.stats.exempt_faces += 1;
+            return Ok(());
+        }
         let seeds: Vec<u32> = plane.iter().flat_map(|k| self.cx.faces[k]).filter(|&t| t != NONE).collect();
         let cav = self.cavity(p, &seeds, &plane);
         let (_, es) = self.encroached_by(p, &cav);
@@ -1039,8 +2092,11 @@ impl State<'_> {
         let found = loop {
             steps += 1;
             if steps > 100_000 {
+                // a straight walk can cycle in a constrained, non-Delaunay triangulation:
+                // leave this tetrahedron (counted as a rejected point)
                 self.drop_point(p);
-                return Err("refinement: the walk to a circumcentre did not end".into());
+                self.stats.rejected += 1;
+                return Ok(());
             }
             let w = self.cx.tets[cur as usize];
             let mut moved = false;
@@ -1059,6 +2115,18 @@ impl State<'_> {
                             // meets a small subfacet, and splitting it would cascade; leave both
                             if self.subfacet_exempt_r(k, rt) || v.iter().any(|&x| self.small_angle(x, &k)) {
                                 self.stats.exempt_faces += 1;
+                                // a tetrahedron far above the size field is not left: the
+                                // circumcentre's projection on the facet lies in its
+                                // circumsphere, so a facet point there removes it
+                                let hs = self.hsz[t as usize];
+                                let xs = v.map(|q| self.xyz[q as usize]);
+                                let longest = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                                    .map(|(a, b)| dot(&sub3(&xs[a], &xs[b]), &sub3(&xs[a], &xs[b])).sqrt())
+                                    .fold(0.0f64, f64::max);
+                                if hs > 0.0 && longest > LARGE_EDGE * self.opt.alpha * hs
+                                    && !v.iter().any(|&x| self.small_angle(x, &k)) {
+                                    return self.split_facet_toward(k, Some((c, PROJECT_GAP * self.opt.alpha * hs)));
+                                }
                                 return Ok(());
                             }
                             return self.split_subfacet(k);
@@ -1111,6 +2179,14 @@ impl State<'_> {
                 return Ok(());
             }
             return self.split_subfacet(fs[0]);
+        }
+        if !cav.contains(&t) {
+            // the cavity p sees leaves t: inserting p would not remove t, and a neighbour with
+            // nearly the same circumsphere would then insert a point next to p (an edge far
+            // below h, and a ratio cascade from it); leave t
+            self.drop_point(p);
+            self.stats.rejected += 1;
+            return Ok(());
         }
         if !self.insert(p, &cav, &[])? && !self.insert_minimal(p, &[found])? {
             self.drop_point(p);
@@ -1291,9 +2367,19 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     }
     let mut st = State {
         g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
-        segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), n: MixedCounters::default(),
+        segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
+    // the tetrahedra outside the domain (the rest of the convex hull and the holes) take no
+    // part: every face between them and the domain is a subfacet, so without them the
+    // domain's boundary is a hull boundary, as a convex domain's always is. Kept, their
+    // filling had to be retriangulated around every facet point on the boundary, where its
+    // flat, non-Delaunay tetrahedra (grid points, coplanar sets) left no star-shaped cavity
+    for t in 0..st.cx.tets.len() as u32 {
+        if st.cx.alive[t as usize] && !st.inside[t as usize] {
+            st.cx.remove(t);
+        }
+    }
     let mut keys: Vec<(u32, u32)> = st.seg.keys().copied().collect();
     keys.sort_unstable();
     st.segq.extend(keys);
@@ -1303,10 +2389,12 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     for t in 0..st.cx.tets.len() as u32 {
         st.queue_tet(t);
     }
+    let mut sliver_budget: Option<u32> = None;
+    let mut retries: HashMap<[u32; 4], u8> = HashMap::new();
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
-                if st.segment_encroacher(e).is_some() {
+                if st.segment_encroacher(e).is_some() || st.segment_too_long(e) {
                     st.split_segment(e)?;
                 }
             }
@@ -1320,6 +2408,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                     } else {
                         st.split_subfacet(f)?;
                     }
+                } else if st.subfacet_too_large(f) || st.subfacet_skinny(f) {
+                    st.split_subfacet(f)?;
                 }
             }
             continue;
@@ -1331,14 +2421,86 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                 let before = st.g.s.len();
                 st.split_tet(t)?;
                 if st.g.s.len() > before && st.cx.alive[t as usize] {
-                    // a rejected circumcentre split a subsegment or subfacet that left t: retry t
-                    st.queue_tet(t);
+                    // a rejected circumcentre split a subsegment or subfacet that left t: retry t,
+                    // a few times only (a circumcentre on a facet whose splits never reach t
+                    // would otherwise split ever smaller subfacets around one point)
+                    let n = retries.entry(s).or_insert(0u8);
+                    *n += 1;
+                    if *n <= MAX_RETRIES {
+                        st.queue_tet(t);
+                    } else {
+                        st.stats.exempt += 1;
+                    }
+                }
+            }
+            continue;
+        }
+        // M6 step 1: slivers, once nothing else is left, within the cap
+        if let Some((_, std::cmp::Reverse(s), t)) = st.dihq.pop() {
+            if sliver_budget.is_none() {
+                sliver_budget = Some(((st.g.s.len() as f64) * SLIVER_CAP).ceil() as u32);
+            }
+            let mut v = st.cx.tets[t as usize];
+            v.sort_unstable();
+            if !st.cx.alive[t as usize] || v != s || st.stats.sliver_points >= sliver_budget.unwrap() {
+                continue;
+            }
+            let hs = st.hsz[t as usize];
+            if !(hs > 0.0) || st.min_dihedral(t) >= DIHEDRAL_MIN {
+                continue;
+            }
+            let x = st.cx.tets[t as usize].map(|q| st.xyz[q as usize]);
+            let Some(c) = circumcentre(x) else { continue };
+            let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+            // the filter leaves small slivers to the perturbation, which moves volume vertices
+            // only: a sliver with none (its vertices all on the boundary, as across a layer
+            // thinner than h) is split whatever its size
+            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q));
+            if r < SLIVER_FILTER * st.opt.alpha * hs && !fixed {
+                continue;
+            }
+            let before = (st.g.s.len(), st.stats.volume_points);
+            st.split_tet(t)?;
+            if st.g.s.len() > before.0 {
+                st.stats.sliver_points += 1;
+                if st.stats.volume_points > before.1 {
+                    st.stats.volume_points -= 1; // counted as a sliver point instead
                 }
             }
             continue;
         }
         break;
     }
+    if std::env::var("MESHLOOM_DIAG").is_ok() {
+        let (mut faces, mut bad) = (0u64, 0u64);
+        for t in 0..st.cx.tets.len() as u32 {
+            if !st.cx.alive[t as usize] || !st.inside[t as usize] { continue; }
+            let w = st.cx.tets[t as usize];
+            for i in 0..4 {
+                let k = key(face(&w, i));
+                if st.sub.contains_key(&k) { continue; }
+                let u = st.cx.neighbor(t, &k);
+                if u == NONE || u < t || !st.inside[u as usize] { continue; }
+                faces += 1;
+                let o = *st.cx.tets[u as usize].iter().find(|x| !k.contains(x)).unwrap();
+                if st.g.insphere_sos([w[0], w[1], w[2], w[3], o]) > 0 { bad += 1; }
+            }
+        }
+        eprintln!("DIAG interior faces {faces} non-Delaunay {bad}");
+    }
+    for _ in 0..2 {
+        st.perturb_slivers();
+        st.flip_improve();
+        st.smooth();
+        st.slide_facets();
+        st.slide_segments();
+        st.flip_improve();
+    }
+    st.perturb_slivers();
+    st.stats.slivers_left = (0..st.cx.tets.len() as u32)
+        .filter(|&t| st.cx.alive[t as usize] && st.inside[t as usize] && st.hsz[t as usize] > 0.0
+            && st.min_dihedral(t) < DIHEDRAL_MIN)
+        .count() as u32;
     // write back
     b.tets = st.cx.live();
     let mut subs: Vec<Vec<[u32; 3]>> = vec![Vec::new(); plc.facets.len()];
