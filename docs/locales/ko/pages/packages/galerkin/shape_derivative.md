@@ -126,6 +126,16 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
   메시 크기 0.02 µm, 2차 한쪽 차분; 유한차분 모드 solver modesolverpy는 0.01 µm 격자에서 2.25와 5.53)에서 위쪽 모드의 폭에
   대한 한쪽 기울기는 2.28과
   5.70 µm⁻¹입니다.
+- 교차점을 지나는 각 분기는 매끄러우며, `galerkin.kernels.degenerate_branch_derivatives(mesh, eps_r, k0, n_target,
+  num_modes, *, motion, ..., tolerance=DEGENERATE_GAP)`가 그 기울기를 줍니다(2026-11-21 결정). 서로 `tolerance` 안에 있는 반환 모드 묶음에서
+  V를 그 고유벡터라 하면:
+  - M = Vᵀ(dA/dt − λ dB/dt)V, N = VᵀBV(켤레 없음);
+  - (M, N)의 일반화 고유값이 분기의 dλ/dt이고, dn_eff/dt = −dλ/dt / (2 k0² n_eff);
+  - 그 고유벡터는 반환 모드를 분기 모드로 엮습니다.
+
+  묶음마다 `DegenerateBranches(modes, effective_index, slopes, combinations)` 하나(기울기는 큰 것부터, t 한 단위당 NumPy 수)
+  또는 빈 목록을 돌려줍니다. dA/dt와 dB/dt는 t의 라이브러리에서 구합니다. 짝이 반환되지 않은 축퇴 모드는 거부합니다(모드를 더
+  요청하십시오). `DEGENERATE_GAP`보다 큰 `tolerance`는 거의 축퇴인 모드도 묶습니다.
 - `coordinate_factors`(PML, 굽힘)는 노드 위치에 따라 달라지므로 motion과 함께 거부합니다.
 
 ## 메시 속도
@@ -272,6 +282,17 @@ h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값 d(ΣR_y)/
 | W6 축퇴 모드 | 정사각 대칭 메시에서 기본 짝은 NaN과 경고; 같은 호출의 비축퇴 모드는 유한 | 통과 |
 | W7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 실수·흡수 코어에서 n_eff·et·ez sha256이 main `e6c5826`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | W8 거부 | 위 목록대로 | 통과 |
+
+`tests/galerkin/test_degenerate_branches.py`에 분기 검사 D1–D6이 있습니다(2026-11-21 사전 등록, 같은 날 위와 같이 측정).
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| D1 대칭 정사각(W6 문제) | 정렬 기울기가 양쪽에서 정렬 지수의 한쪽 차분(Richardson 두 단계, h = 5e-4)과 1e-6 이내 | 단위당 5.6403, 2.2760; ≤ 3.2e-9 |
+| D2 매끄러운 합 | 기울기의 합이 n₁ + n₂의 중앙 차분(Richardson 한 단계)과 1e-6 이내 | 통과(h = 5e-4의 단순 중앙 차분은 절단 오차로 2.2e-6 차이) |
+| D3 비축퇴 strip | 묶음 없음 | 통과 |
+| D4 거부 | 반환되지 않은 짝; (0, 1) 밖 tolerance | 통과 |
+| D5 라이브러리 | JAX와 PyTorch가 1e-12 이내 | 통과 |
+| D6 2026-11-11 정사각(형상 엔진 motion, 메시 0.02 µm, 짝 간격 3.1e-5, tolerance 1e-4) | 그날 galerkin 차분(5.70–5.82, 2.276–2.283 µm⁻¹)과 3 %, modesolverpy(5.53–5.63, 2.251–2.254)와 5 % 이내 | 5.696, 2.280 µm⁻¹ |
 
 W1: 사전 등록은 h = 1e-4의 단순 중심차분을 정했습니다. 흡수 모드 0의 허부에서는 그 절단 오차가 1.5e-6입니다(2계 미분이
 큼). h를 1e-2에서 1e-4로 줄이면 미분으로 수렴하고, h와 h/2의 Richardson 외삽은 6.1e-10으로 맞습니다. 시험은 모든 경우에

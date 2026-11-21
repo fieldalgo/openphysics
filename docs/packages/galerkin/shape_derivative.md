@@ -179,6 +179,21 @@ without a motion, and numbers for k0 and n_target.
   0.3 × 0.3 µm silicon core in silica, λ = 1.55 µm, a 3 × 3 µm PEC window, mesh
   size 0.02 µm, second-order one-sided differences; the finite-difference mode
   solver modesolverpy gave 2.25 and 5.53 on a 0.01 µm grid).
+- Each branch through the crossing is smooth, and
+  `galerkin.kernels.degenerate_branch_derivatives(mesh, eps_r, k0, n_target,
+  num_modes, *, motion, ..., tolerance=DEGENERATE_GAP)` gives its slope (decision
+  2026-11-21). For a group of returned modes within `tolerance` of each other,
+  with V their eigenvectors:
+  - M = Vᵀ(dA/dt − λ dB/dt)V and N = VᵀBV (no conjugate);
+  - the generalized eigenvalues of (M, N) are dλ/dt of the branches, and
+    dn_eff/dt = −dλ/dt / (2 k0² n_eff);
+  - their eigenvectors combine the returned modes into the branch modes.
+
+  The result is one `DegenerateBranches(modes, effective_index, slopes,
+  combinations)` per group (slopes largest first, NumPy numbers per unit of t),
+  or an empty list. dA/dt and dB/dt are taken in t's library. A degenerate mode
+  whose partner was not returned is refused (ask for more modes). A
+  `tolerance` above `DEGENERATE_GAP` also groups nearly degenerate modes.
 - `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
   positions.
 
@@ -365,6 +380,18 @@ the same versions.
 | W6 degenerate modes | on a mesh with the square's symmetry the fundamental pair gets NaN and a warning; the non-degenerate mode of the same call stays finite | pass |
 | W7 unchanged | without `motion` the result equals the previous code | sha256 of n_eff, et and ez equal to main `e6c5826` for a real and a lossy core (measured); `motion=None` equals no keyword (test) |
 | W8 refusals | as listed above | pass |
+
+`tests/galerkin/test_degenerate_branches.py` holds the branch checks D1–D6,
+pre-registered on 2026-11-21 and measured that day as above:
+
+| Check | Criterion | Result |
+|---|---|---|
+| D1 symmetric square (W6 problem) | sorted slopes equal one-sided differences of the sorted indices on both sides (two Richardson levels, h = 5e-4) within 1e-6 | 5.6403 and 2.2760 per unit; ≤ 3.2e-9 |
+| D2 smooth sum | the slopes' sum equals the central difference of n₁ + n₂ (one Richardson level) within 1e-6 | pass (a plain central difference at h = 5e-4 is 2.2e-6 off by truncation) |
+| D3 nondegenerate strip | no group | pass |
+| D4 refusals | a partner that was not returned; a tolerance outside (0, 1) | pass |
+| D5 libraries | JAX and PyTorch within 1e-12 | pass |
+| D6 the 2026-11-11 square (geometry-engine motion, mesh 0.02 µm, pair split by 3.1e-5, tolerance 1e-4) | slopes within 3 % of that day's galerkin differences (5.70–5.82, 2.276–2.283 µm⁻¹) and 5 % of modesolverpy's (5.53–5.63, 2.251–2.254) | 5.696 and 2.280 µm⁻¹ |
 
 W1: the pre-registration named the plain central difference at h = 1e-4. For the
 imaginary part of the lossy mode 0 its truncation error is 1.5e-6 (the second

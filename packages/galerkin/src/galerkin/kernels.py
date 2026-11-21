@@ -54,8 +54,9 @@ matrices these assembly functions place, for galerkin's own modules.
   ``assemble_edge_mass``, ``assemble_edge_grad`` and ``eval_edge_field``
   (``galerkin.edge``) and their 3D counterparts ``assemble_curlcurl_3d``,
   ``assemble_edge_mass_3d``, ``assemble_edge_grad_3d`` and ``eval_edge_field_3d``
-  (``galerkin.edge3d``); the mode solve ``solve_modes`` and its pencil
-  ``assemble_mode_system`` (the package-private ``galerkin._waveguide_kernels``); the
+  (``galerkin.edge3d``); the mode solve ``solve_modes``, its pencil
+  ``assemble_mode_system`` and the branch slopes of degenerate modes under a shape motion,
+  ``degenerate_branch_derivatives`` (the package-private ``galerkin._waveguide_kernels``); the
   modal PML and bend coordinates ``mode_coordinates`` and the scalar mode solve in them,
   ``scalar_coordinate_system`` and ``solve_scalar_coordinates``
   (``galerkin.mode_coordinates``); the 16 power, overlap, normalisation, coupling,
@@ -95,7 +96,8 @@ from ._mechanics_kernels import (at_fixed, body_load, check_solution, constituti
 from ._moving import (solve_elasticity_moving, solve_steady_electric_moving, solve_steady_heat_moving,
                       solve_steady_thermoelasticity_moving, solve_thermoelasticity_moving,
                       solve_transient_heat_moving)
-from ._waveguide_kernels import assemble_mode_system, solve_modes
+from ._waveguide_kernels import (DegenerateBranches, assemble_mode_system, degenerate_branch_derivatives,
+                                 solve_modes)
 
 __all__ = [
     # P1 assembly and the Dirichlet solve
@@ -113,7 +115,7 @@ __all__ = [
     # electromagnetics: edge elements, mode solve and coordinates, mode overlaps, radial PML
     "assemble_curlcurl", "assemble_edge_mass", "assemble_edge_grad", "eval_edge_field",
     "assemble_curlcurl_3d", "assemble_edge_mass_3d", "assemble_edge_grad_3d", "eval_edge_field_3d",
-    "solve_modes", "assemble_mode_system", "mode_coordinates", "scalar_coordinate_system",
+    "solve_modes", "assemble_mode_system", "degenerate_branch_derivatives", "DegenerateBranches", "mode_coordinates", "scalar_coordinate_system",
     "solve_scalar_coordinates",
     "vector_power", "vector_cross_power", "vector_field_overlap", "normalize_vector", "coupling_efficiency",
     "confinement_factor", "overlap_matrix", "centroid_field", "interpolate_vector_field", "effective_area",
