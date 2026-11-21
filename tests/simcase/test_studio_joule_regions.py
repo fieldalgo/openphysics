@@ -8,6 +8,13 @@ same document, array for array and bit for bit (J-S1); refusals reach the reply 
 text and an unexpected failure with the fixed message (J-S2); the region limits and the shared job
 slot apply (J-S3); a result that disagrees with its summary or document is refused (J-S4). The
 documents are the two-material strip of tests/simcase/test_joule_temperature_regions.py (T1).
+
+Newton documents (``iteration.method: "newton"``), pre-registered checks SN1 to SN6 (HQ work record
+``work/openphysics-studio-joule-newton.md``, 2026-11-21, recorded before the implementation): the
+Studio result equals ``simcase.run`` bit for bit (SN1); Picard results and texts are unchanged
+(SN2: the J-S checks above); Studio's Newton step cap (SN3); the reader's refusals keep their text
+(SN4); a Newton iteration that does not converge names its method and keeps the solver's reasons
+for users only (SN5); the payload passes the same capture checks (SN6, through SN1).
 """
 import copy
 import logging
@@ -177,6 +184,7 @@ def test_js1_capabilities_name_the_routes_and_the_region_limits(client):
         assert block["result_formats"] == [joule.PAIRS[kind][0]]
         limits = dict(block["limits"])
         assert limits.pop("max_iterations", None) == (joule.MAX_ITERATIONS if kind == joule.TEMPERATURE else None)
+        assert limits.pop("max_newton_iterations", None) == (17 if kind == joule.TEMPERATURE else None)
         assert limits == caps["thermal.steady2d"]["regions"]["limits"]
 
 
@@ -350,21 +358,6 @@ def test_js3_iteration_limit_over_studio_cap_is_refused_before_a_job(client):
     assert_idle(server._thermal_jobs)
 
 
-def test_js3_a_newton_document_is_refused_by_name_before_a_job(client):
-    # N8 (test_joule_temperature_newton.py): Studio's iteration cap and texts count Picard steps
-    doc = strip()
-    doc["physics"]["j"]["iteration"]["method"] = "newton"
-    for action in ("validate", "run"):
-        reply = client.post("/api/joule/"+action, json=envelope(doc))
-        assert reply.status_code == 400, reply.text
-        error = reply.json()["error"]
-        assert error["code"] == "unsupported_iteration_method" and "Picard iteration only" in error["message"]
-        assert error["path"] == "physics.j.iteration.method"
-    doc["physics"]["j"]["iteration"]["method"] = "picard"
-    assert client.post("/api/joule/validate", json=envelope(doc)).json()["ok"] is True
-    assert_idle(server._thermal_jobs)
-
-
 def test_js3_a_long_iteration_fits_the_result(client):
     # relaxation 0.2 needs more Picard steps than the 64 KiB metadata budget would hold records for
     doc = strip(size=0.25)
@@ -408,3 +401,144 @@ def pair(result):
 def test_js4_a_result_that_disagrees_is_refused(client, monkeypatch, change, expected):
     monkeypatch.setattr(server.joule, "capture", tampered(change))
     assert job_error(client, strip(), "invalid_result") == expected
+
+
+# ---- SN1 to SN6: Newton documents ------------------------------------------------------------
+
+def newton(doc, limit=17):
+    """``doc`` with the Newton method, without the relaxation factor the reader refuses beside it."""
+    iteration = doc["physics"]["j"]["iteration"]
+    iteration.pop("relaxation_factor", None)
+    iteration.update(method="newton")
+    if limit is not None:
+        iteration["iteration_limit"] = limit
+    return doc
+
+
+#: workspace-joule.mjs jouleDocument with iteration.method "newton" and the form's limit 17
+#: (studio_workspace_joule.cjs asserts the builder writes exactly this)
+WORKSPACE_NEWTON = copy.deepcopy(WORKSPACE_DEFAULT)
+WORKSPACE_NEWTON["physics"]["j"]["iteration"] = {"method": "newton", "temperature_tolerance": "1e-9 K",
+                                                 "relative_tolerance": 1e-10, "iteration_limit": 17}
+
+
+@pytest.mark.parametrize("name", ["strip", "workspace"])
+def test_sn1_a_newton_payload_equals_simcase_run_bit_for_bit(client, name):
+    doc = newton(strip()) if name == "strip" else copy.deepcopy(WORKSPACE_NEWTON)
+    identity, status = finished(client, doc)
+    assert status["status"] == "done", status
+    payload = client.get("/api/jobs/"+identity["job"]+"/result").json()
+    assert (payload["result_format"], payload["field_layout"]) == joule.PAIRS[joule.TEMPERATURE]
+    reference = run(Document.from_dict(doc), verbose=False)
+    fields = reference.fields
+    assert set(payload["arrays"]) == set(fields)
+    for key, value in fields.items():
+        sent = np.array(payload["arrays"][key], dtype=value.dtype)
+        assert sent.shape == value.shape and sent.tobytes() == value.tobytes(), key
+    summary, expected = payload["summary"], thermal.json_value(reference.summary())
+    for s in (summary, expected):
+        s.pop("timing")
+    assert summary == expected
+    assert summary["iteration_method"] == "newton"
+    assert len(summary["iterations"]) == 3       # measured before the implementation (HQ, 2026-11-21)
+    # Newton and Picard agree on this strip as in test_joule_temperature_newton.py (T within 2e-8 K)
+    picard = run(Document.from_dict(WORKSPACE_DEFAULT if name == "workspace" else strip()), verbose=False).fields
+    assert np.max(np.abs(fields["temperature"]-picard["temperature"])) <= 2e-8
+
+
+def test_sn3_newton_steps_are_capped_at_17(client):
+    assert joule.MAX_NEWTON_ITERATIONS == 17
+    # the first evaluation and 31 candidates per further step stay within 500 evaluations
+    assert 1 + 31*(17-1) <= joule.MAX_ITERATIONS < 1 + 31*(18-1)
+    for doc in (newton(strip(), 18), newton(strip(), None)):     # None: the default limit, 100
+        for action in ("validate", "run"):
+            reply = client.post("/api/joule/"+action, json=envelope(doc))
+            assert reply.status_code == 413, reply.text
+            error = reply.json()["error"]
+            assert error["code"] == "iteration_limit_exceeded" and error["path"] == "physics.j.iteration.iteration_limit"
+            assert "max_newton_iterations=17" in error["message"] and "write iteration_limit" in error["message"]
+    assert client.post("/api/joule/validate", json=envelope(newton(strip(), 17))).json()["ok"] is True
+    assert_idle(server._thermal_jobs)
+
+
+@pytest.mark.parametrize("change", ["relaxation", "Newton", "secant"])
+def test_sn4_the_reader_refusals_of_a_method_keep_their_text(client, change):
+    doc = newton(strip())
+    if change == "relaxation":
+        doc["physics"]["j"]["iteration"]["relaxation_factor"] = 0.5
+    else:
+        doc["physics"]["j"]["iteration"]["method"] = change
+    with pytest.raises(Exception) as refused:
+        Document.from_dict(doc)
+    error = client.post("/api/joule/validate", json=envelope(doc)).json()["error"]
+    assert error["code"] == "invalid_document" and error["message"] == str(refused.value)
+    reply = client.post("/api/joule/run", json=envelope(doc))
+    assert reply.status_code == 400 and reply.json()["error"]["message"] == str(refused.value)
+    assert_idle(server._thermal_jobs)
+
+
+def test_sn5_newton_non_convergence_names_the_method_and_the_step_count(client):
+    from simcase import JouleConvergenceError
+    doc = newton(strip(), 1)
+    with pytest.raises(JouleConvergenceError) as headless:
+        run(Document.from_dict(doc), verbose=False)
+    steps = len(headless.value.history)
+    message = job_error(client, doc, "not_converged")
+    assert message == f"the Newton iteration did not converge after {steps} steps: maximum iterations exceeded"
+    assert steps == 1
+
+
+def test_sn5_a_newton_start_outside_a_model_range_keeps_the_solver_text(client):
+    doc = newton(strip())
+    doc["physics"]["j"]["prescribed_electric_potential"]["left"] = "2 V"
+    message = job_error(client, doc, "not_converged")
+    assert message.startswith("the Newton iteration did not converge after ")
+    assert "K outside [250.0, 600.0] K" in message and FIXED not in message
+
+
+RANGE = "material 'A': temperature [250.0, 700.0] K outside [250.0, 600.0] K"
+NO_DECREASE = "Newton step does not reduce the temperature defect (1.5 K)"
+
+
+@pytest.mark.parametrize("reason, cause, shown", [
+    (NO_DECREASE, None, True),
+    (NO_DECREASE+"; last candidate failed: "+RANGE, ValueError(RANGE), True),
+    ("singular or ill-conditioned Newton system", ValueError("singular or ill-conditioned Newton system"), True),
+    ("nonfinite Newton step", ValueError("nonfinite Newton step"), True),
+    (NO_DECREASE+"; last candidate failed: "+MARKER, ValueError(MARKER), False),
+    (NO_DECREASE+"; last candidate failed: "+RANGE, RuntimeError(RANGE), False),
+    ("nonfinite Newton step "+MARKER, ValueError("nonfinite Newton step "+MARKER), False),
+    (MARKER, KeyError(MARKER), False),
+])
+def test_sn5_newton_reasons_for_users_only(client, monkeypatch, caplog, reason, cause, shown):
+    from galerkin import temperature_joule_heating as tj
+
+    def fail(*args, **kwargs):
+        error = tj.JouleConvergenceError(reason, (), temperature=np.zeros(1))
+        if cause is None:
+            raise error
+        raise error from cause
+    monkeypatch.setattr(tj, "solve_temperature_joule_heat", fail)
+    with caplog.at_level(logging.WARNING, logger="simcase.studio"):
+        message = job_error(client, newton(strip()), "not_converged")
+    assert message.startswith("the Newton iteration did not converge after 0 steps: ")
+    if shown:
+        assert message.endswith(": "+reason) and FIXED not in message
+    else:
+        assert message.endswith(": "+FIXED) and MARKER not in message
+        assert "Joule iteration failed unexpectedly" in caplog.text and (MARKER in caplog.text or MARKER not in reason)
+
+
+@pytest.mark.parametrize("first, second", [("newton", "heat"), ("heat", "newton")])
+def test_sn6_a_newton_job_shares_the_one_active_job(client, monkeypatch, first, second):
+    held = []
+    monkeypatch.setattr(server, "_start_thermal_thread", lambda target, args: held.append((target, args)))
+    routes = {"newton": ("/api/joule/run", newton(strip())), "heat": ("/api/thermal/run", HEAT)}
+    accepted = client.post(routes[first][0], json=envelope(routes[first][1]))
+    assert accepted.status_code == 200, accepted.text
+    refused = client.post(routes[second][0], json=envelope(routes[second][1]))
+    assert refused.status_code == 429 and refused.json()["error"]["code"] == "capacity_exceeded"
+    target, args = held.pop()
+    target(*args)
+    assert client.get("/api/jobs/"+accepted.json()["job"]).json()["status"] == "done"
+    assert_idle(server._thermal_jobs)

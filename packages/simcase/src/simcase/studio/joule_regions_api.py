@@ -19,12 +19,15 @@ budget, retention and pins. A finished job's payload holds every array of the pu
 (SI, under their registry names), the summary, and the display length; it is checked before it is
 published (shapes and units against the summary, connectivity, region ids and materials).
 
-A ``joule.temperature2d`` document with ``iteration.method: "newton"`` is refused by name
-(``unsupported_iteration_method``): the iteration cap and the error text count Picard steps.
+A ``joule.temperature2d`` document runs by Picard or, with ``iteration.method: "newton"``, by
+Newton. Studio bounds a job by its worst-case number of iteration evaluations (one evaluation is
+two electric solves and one heat solve, a Picard step): ``iteration_limit`` up to
+``MAX_ITERATIONS`` Picard steps, or up to ``MAX_NEWTON_ITERATIONS`` Newton steps, whose first
+evaluation and up to 31 candidates per step fit the same budget.
 
-Errors follow Studio's policy: document, geometry and limit refusals keep their text; a Picard
-iteration that does not converge is reported with the solver's reason and iteration count; any
-other failure replies with the fixed message and logs its traceback.
+Errors follow Studio's policy: document, geometry and limit refusals keep their text; an
+iteration that does not converge is reported with its method, the solver's reason and the
+iteration count; any other failure replies with the fixed message and logs its traceback.
 """
 from __future__ import annotations
 
@@ -56,9 +59,20 @@ REQUIRED = ("node_coordinates", "triangles", "triangle_regions", "electric_poten
 #: Studio's cap on a joule.temperature2d document's ``iteration.iteration_limit``: a job's cost is
 #: its mesh's cost times its Picard iterations, and its records (about 1 kB each) go to the result
 MAX_ITERATIONS = 500
+#: galerkin halves a Newton step at most 30 times (temperature_joule_heating._HALVINGS), so a step
+#: evaluates at most 31 candidates
+NEWTON_CANDIDATES = 31
+#: Studio's cap on a Newton document's ``iteration.iteration_limit``: the first evaluation and
+#: NEWTON_CANDIDATES per further step stay within MAX_ITERATIONS evaluations
+MAX_NEWTON_ITERATIONS = 1 + (MAX_ITERATIONS-1) // NEWTON_CANDIDATES
 #: the one galerkin refusal inside a Picard iteration that is written for users: a material
 #: model's valid temperature range left by an iterate
 _RANGE_LEFT = re.compile(r"material '[^']*': temperature \[[^\]]*\] K outside \[[^\]]*\] K")
+#: galerkin's Newton refusals written for users: a step that does not reduce the defect (no cause,
+#: or a last candidate that failed) and a Newton system it cannot solve (a ValueError cause)
+_NO_DECREASE = re.compile(r"Newton step does not reduce the temperature defect \([^()]*\)")
+_CANDIDATE = "; last candidate failed: "
+_NEWTON_SYSTEM = ("singular or ill-conditioned Newton system", "nonfinite Newton step")
 FORMAT_03 = ('Joule Studio reads format 0.3 region documents ("openphysics": "0.3", values with their units, '
              'element_size quantities)')
 RECTANGLE = ("Studio runs Joule heating on named material regions only (geometry with shapes or background, or a "
@@ -110,7 +124,9 @@ def capability(kind, limits, rlimits):
             "run": "/api/joule/run", "input": "json", "geometry": "regions",
             "result_formats": [PAIRS[kind][0]], "field_layouts": [PAIRS[kind][1]], "payload_formats": [PAYLOAD],
             "resource_policy": "candidate-unmeasured",
-            "limits": {**asdict(rlimits), **({"max_iterations": MAX_ITERATIONS} if kind == TEMPERATURE else {})}}
+            "limits": {**asdict(rlimits), **({"max_iterations": MAX_ITERATIONS,
+                                               "max_newton_iterations": MAX_NEWTON_ITERATIONS}
+                                              if kind == TEMPERATURE else {})}}
 
 
 def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
@@ -124,15 +140,15 @@ def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
                                          400 if for_run else 200) from exc
         if kind == TEMPERATURE:
             name, p = next(iter(doc.si["physics"].items()))
-            if p["iteration"].get("method", "picard") != "picard":
-                # Studio's cost cap and its not_converged text count Picard steps; a Newton step
-                # evaluates up to 31 candidates (galerkin halves a step up to 30 times)
-                raise common.ThermalAPIError(
-                    "unsupported_iteration_method", f'physics.{name}.iteration.method "{p["iteration"]["method"]}": '
-                    "Studio runs the Picard iteration only; run a Newton document with simcase",
-                    path=f"physics.{name}.iteration.method")
             limit = p["iteration"]["iteration_limit"]
-            if limit > MAX_ITERATIONS:
+            if p["iteration"].get("method", "picard") == "newton":
+                if limit > MAX_NEWTON_ITERATIONS:
+                    raise common.ThermalAPIError(
+                        "iteration_limit_exceeded", f"physics.{name}.iteration.iteration_limit is {limit}, more than "
+                        f"Studio's limit for Newton steps max_newton_iterations={MAX_NEWTON_ITERATIONS} (a Newton step "
+                        f"evaluates up to {NEWTON_CANDIDATES} candidates; the default limit is 100, so write "
+                        f"iteration_limit)", 413, path=f"physics.{name}.iteration.iteration_limit")
+            elif limit > MAX_ITERATIONS:
                 raise common.ThermalAPIError(
                     "iteration_limit_exceeded", f"physics.{name}.iteration.iteration_limit is {limit}, more than "
                     f"Studio's limit max_iterations={MAX_ITERATIONS}", 413, path=f"physics.{name}.iteration.iteration_limit")
@@ -170,18 +186,38 @@ class Route:
         return await regions._wait_for_thread(_accept, raw, kind, self.limits, self.rlimits, tags, for_run, exact)
 
 
-def job_error(exc, plan):
+def method(doc):
+    """The iteration method of an accepted joule.temperature2d document: "picard" or "newton"."""
+    return next(iter(doc.si["physics"].values()))["iteration"].get("method", "picard")
+
+
+def _user_reason(reason, cause):
+    """Whether a reason the iteration raised is written for users (see the module docstring)."""
+    if cause is None:
+        return True
+    if type(cause) is not ValueError:
+        return False
+    if _RANGE_LEFT.fullmatch(reason) or reason in _NEWTON_SYSTEM:
+        return True
+    head, sep, tail = reason.partition(_CANDIDATE)
+    return bool(sep) and _NO_DECREASE.fullmatch(head) is not None and _RANGE_LEFT.fullmatch(tail) is not None
+
+
+def job_error(exc, spec):
     """The Studio error for a failed Joule region run, or None for an unexpected failure."""
-    mapped = regions.job_error(exc, plan)
+    mapped = regions.job_error(exc, spec.plan)
     if mapped is not None:
         return mapped
     if isinstance(exc, JouleConvergenceError):
-        cause = exc.__cause__
-        # the solver's own reasons are for users: the iteration count (no cause) and a material
-        # range left by an iterate; any other exception the iteration wrapped is unexpected
+        # the solver's own reasons are for users: the iteration count, a Newton step that does not
+        # reduce the defect, a material range left by an iterate or a candidate, and a Newton
+        # system it cannot solve; any other exception the iteration wrapped is unexpected
         reason = str(exc.reason)
-        if cause is not None and not (type(cause) is ValueError and _RANGE_LEFT.fullmatch(reason)):
+        if not _user_reason(reason, exc.__cause__):
             reason = unexpected(exc, "Joule iteration")
+        if method(spec.doc) == "newton":
+            return common.ThermalAPIError("not_converged", f"the Newton iteration did not converge after "
+                                          f"{len(exc.history)} steps: {reason}", 422)
         return common.ThermalAPIError("not_converged", f"the Picard iteration did not converge after "
                                       f"{len(exc.history)} iterations: {reason}", 422)
     return None
