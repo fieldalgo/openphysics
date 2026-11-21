@@ -391,7 +391,7 @@ function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inp
   workspaceLoads.invalidate();
   pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
-  if(untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun?1:0)+(jouleView.hasResult()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
+  if(untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
   const text=session?sessionLoadText(session,{runs:runs.length,unsaved:runs.length>0&&savedRunsState!==runsStamp()},source):null;
   $('load-confirm').querySelector('h2').textContent=text?text.title:'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=text?text.description:'Save your current design first if you want to keep it.';
@@ -421,10 +421,11 @@ function completeLoad(pending){
   const file=pending.source==='file'?null:pending.savedFile,matched=file?.current===true;
   applyProject(session.input,{saved:pending.saved||matched,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();
   savedNotebookState=pending.source==='file'||matched?notebookStamp():null;savedRunsState=pending.source==='file'||matched?runsStamp():null;
-  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:pending.source==='file'?null:lastSavedFile;
+  // a record without a session file belongs to a notebook never saved: no file name carries over
+  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:null;
   refreshPersistence();
   notice(pending.source==='file'?`Session restored from ${pending.label}. Imported results were loaded from file, not recomputed; input undo history starts here.`:`Session recovered from ${pending.label}, not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo history starts here.`:'Save session for a portable file; input undo history starts here.'));
- }else{applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored from ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
@@ -477,7 +478,8 @@ let notebookRecoveryRecord=null,notebookLoadVersion=0;
 // The last session file saved (or recovered as saved): {name, savedAt, stamp}; stamp is the
 // inputs and runs it held, so the title shows it as saved until the next edit or run.
 let lastSavedFile=null;
-const saveStamp=()=>JSON.stringify([edits.signature,runsStamp()]);
+// The whole notebook a session file holds: inputs, runs, selection, comparison and view.
+const saveStamp=()=>notebookStamp();
 const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp(),recovered:lastSavedFile.recovered===true}:null;
 const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduction':isJoule()?'joule-heating':state.electric===undefined?'workspace':'multiphysics';
 // Browser recovery also keeps the last saved file, so its stamp includes it.
@@ -632,7 +634,7 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].detail)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · lengths in µm';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }

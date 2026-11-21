@@ -14,7 +14,7 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
   {id:'Geometry',state:invalid?'attention':'ready',detail:invalid?'Correct input draft':designSummary(input.model)},
   {id:'Materials',state:materialOK?'ready':'attention',detail:materialOK?[...new Set(input.model.shapes.map(s=>s.material))].join(', ')+' in silica':'Assign supported materials'},
   {id:'Mesh',state:mesh?.signature===signature?'ready':mesh?'attention':'optional',detail:mesh?.signature===signature?'Preview current':mesh?'Preview earlier inputs':'Optional preview'},
-  {id:'Study',state:invalid?'attention':busy?'busy':pending||block?'attention':'ready',detail:study},
+  {id:'Study',state:invalid?'attention':busy?'busy':pending||block?'attention':'ready',detail:study,summary:state},
   {id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Current input result':runs.length?'Earlier inputs only':'No completed run'}
  ];
 }

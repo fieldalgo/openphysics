@@ -21,5 +21,7 @@ test('the Study step leads with the wavelength of the optical inputs',()=>{
  const doc=input();doc.model.wavelength=1550;
  assert.equal(opticalWorkflow({input:doc})[3].detail,'λ 1550 nm · Ready to run');
  assert.equal(opticalWorkflow({input:doc,busy:true})[3].detail,'λ 1550 nm · Computing');
+ // the state alone, for panels that show the wavelength in a row of its own
+ assert.equal(opticalWorkflow({input:doc})[3].summary,'Ready to run');
  doc.model.wavelength=1310.5;assert.equal(opticalWorkflow({input:doc,block:'offline'})[3].detail,'λ 1310.5 nm · Unavailable');
 });
