@@ -1006,7 +1006,8 @@ def _coupling_check(view, name, coupled, materials):
 
 def _coupling():
     from .multiphysics import CouplingHook
-    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check)
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check,
+                        outputs=frozenset())
 
 
 #: the kind this module registers; the built-in provider openphysics-fem reads it here

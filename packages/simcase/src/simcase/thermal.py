@@ -821,7 +821,8 @@ def _coupling_solve(state, inputs, verbose):
 def _coupling():
     from .multiphysics import CouplingHook
     # mesh.grading (the em.modes2d radial grading) is not read: a heat region mesh is built without it
-    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, ignored_mesh_keys=frozenset({'grading'}))
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, ignored_mesh_keys=frozenset({'grading'}),
+                        outputs=frozenset({'temperature'}))
 
 
 #: the kind this module registers; the built-in provider openphysics-fem reads it here

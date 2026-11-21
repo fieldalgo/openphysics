@@ -72,6 +72,11 @@ LIBRARY_REFERENCE_TEMPERATURE = 300.0
 LOOP_DEFAULTS = {"method": "fixed_point", "norm": "max_abs", "value": "1e-6", "max_iterations": 30,
                  "relaxation": 0.5}
 LOOP_KEYS = ("physics", "method", "tolerance", "max_iterations", "relaxation")
+#: the keys of a multiphysics ``study``
+STUDY_KEYS = ("type", "parameter", "values", "tracking", "loops")
+#: the quantity a tolerance of a port is read as: a change of a temperature is a temperature
+#: difference (K or mK; a degC value would be read as an absolute temperature)
+_DIFFERENCE = {"temperature": "temperature_difference"}
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 #: the registry dimensions of a power quantity: W, W/m, W/m^2 and W/m^3 (M L^k T^-3)
 _POWER = [{"M": 1, "L": k, "T": -3} for k in (2, 1, 0, -1)]
@@ -102,6 +107,8 @@ class CouplingHook:
     check: Any = None
     ignored_mesh_keys: frozenset = frozenset()
     ports: tuple = ()
+    #: the output ports ``solve`` produces; None for every output port of the kind
+    outputs: frozenset | None = None
 
 
 def ports_of(kind) -> dict[str, dict]:
@@ -124,7 +131,7 @@ def _kinds_of(tree) -> list:
     physics = tree.get("physics") if isinstance(tree, dict) else None
     out = []
     for entry in (physics.values() if isinstance(physics, dict) else ()):
-        kind = kind_of_type(entry.get("type")) if isinstance(entry, dict) else None
+        kind = kind_of_type(entry["type"]) if isinstance(entry, dict) and isinstance(entry.get("type"), str) else None
         if kind is not None and kind not in out:
             out.append(kind)
     return out
@@ -134,7 +141,7 @@ def envelope_refusal(tree: dict) -> Diagnostic | None:
     """``E-FORMAT`` at ``openphysics`` for a format 0.3 document that needs the multiphysics
     envelope: it has ``couplings``, or physics entries of more than one kind. None otherwise."""
     kinds = _kinds_of(tree)
-    if "couplings" in tree:
+    if isinstance(tree.get("couplings"), dict) and tree["couplings"]:
         why = "has couplings"
     elif len(kinds) > 1:
         why = "has physics of more than one kind (" + ", ".join(k.name for k in kinds) + ")"
@@ -199,7 +206,7 @@ def resolve_envelope(tree: dict, result) -> Any:
     if result.diagnostics.errors:
         return result
     kinds = _kinds_of(tree)
-    if "couplings" not in tree and len(kinds) == 1:
+    if not tree.get("couplings") and len(kinds) == 1:
         checks.add("E-FORMAT", "openphysics", f'the document has no couplings and its physics are all of kind '
                                               f'{kinds[0].name}; write "openphysics": "0.3", the single-physics form')
         return result
@@ -262,9 +269,24 @@ def _check_blocks(tree, checks: _Checks) -> None:
         if not isinstance(study, dict):
             checks.add("E-VALUE-FORM", ["study"], "expected an object")
         else:
+            for k in study:
+                if k not in STUDY_KEYS:
+                    checks.add("E-KEY-UNKNOWN", ["study", k], f'unknown key "{k}" in study. Keys here: '
+                                                              + ", ".join(STUDY_KEYS) + ".")
             kind = study.get("type", "single")
-            if kind not in ("single", "sweep"):
-                checks.add("E-CONTRACT", ["study", "type"], f"{json.dumps(kind)} is not a study of a multiphysics "
+            if kind == "single":
+                for k in ("parameter", "values", "tracking"):
+                    if k in study:
+                        checks.add("E-CONTRACT", ["study", k], f'study.{k} belongs to a sweep; a "single" study '
+                                                               "solves once")
+            if kind == "sweep":
+                for k in ("parameter", "values"):
+                    if k not in study:
+                        checks.add("E-KEY-MISSING", ["study", k], f"a sweep needs study.{k}")
+                if "parameter" in study and not isinstance(study["parameter"], str):
+                    checks.add("E-VALUE-FORM", ["study", "parameter"], "expected the dotted path of the swept value")
+            if not isinstance(kind, str) or kind not in ("single", "sweep"):
+                checks.add("E-CONTRACT", ["study", "type"], f"{json.dumps(kind, default=str)} is not a study of a multiphysics "
                                                             'document, which reads "single" and "sweep"')
             parameter = study.get("parameter")
             if kind == "sweep" and isinstance(parameter, str):
@@ -395,7 +417,12 @@ def _check_materials(tree, result, checks: _Checks) -> None:
                       "reference_temperature": "reference_temperature"}
         for k in given:
             path = ["materials", mname, k]
-            c = units.convert(record[k], quantities[k], path=display_path(path))
+            try:
+                c = units.convert(record[k], quantities[k], path=display_path(path))
+            except TypeError:
+                checks.add("E-VALUE-FORM", path, f"{k} is a value with its unit, such as "
+                                                 + ('"1.8e-4 1/K"' if k == "thermo_optic_coefficient" else '"300 K"'))
+                continue
             for d in c.diagnostics:
                 result.diagnostics.append(d)
             if c.ok:
@@ -414,11 +441,11 @@ def _port(spec, checks: _Checks, path, physics, views, direction):
     """``(physics name, port name, port)`` of a ``<physics>.<port>`` string, or None (reported)."""
     from .registry import kind_of_type
     if "." not in spec:
-        checks.add("E-VALUE-FORM", path, f'{json.dumps(spec)} is not "<physics name>.<{direction} port>"')
+        checks.add("E-VALUE-FORM", path, f'{json.dumps(spec, default=str)} is not "<physics name>.<{direction} port>"')
         return None
     pname, port = spec.split(".", 1)
     if pname not in physics:
-        checks.add("E-CONTRACT", path, f"{json.dumps(spec)} names the physics {pname!r}, which this document does "
+        checks.add("E-CONTRACT", path, f"{json.dumps(spec, default=str)} names the physics {pname!r}, which this document does "
                                        "not have; physics here: " + ", ".join(physics))
         return None
     kind = kind_of_type(physics[pname]["type"])
@@ -431,6 +458,11 @@ def _port(spec, checks: _Checks, path, physics, views, direction):
     if ports[port]["direction"] != direction:
         checks.add("E-CONTRACT", path, f"{spec} is an {ports[port]['direction']} port; "
                                        f"{'from' if direction == 'output' else 'to'} names an {direction} port")
+        return None
+    produced = kind.coupling.outputs
+    if direction == "output" and produced is not None and port not in produced:
+        checks.add("E-CONTRACT", path, f"{spec} is an output {kind.name} saves but does not couple in this release; "
+                                       "its coupled outputs: " + (", ".join(sorted(produced)) or "none"))
         return None
     return pname, port, ports[port]
 
@@ -479,7 +511,7 @@ def _check_couplings(tree, views, checks: _Checks):
                        "element input")
             continue
         if c["transfer"] not in TRANSFERS:
-            checks.add("E-CONTRACT", path + ["transfer"], f"{json.dumps(c['transfer'])} is not a transfer this "
+            checks.add("E-CONTRACT", path + ["transfer"], f"{json.dumps(c['transfer'], default=str)} is not a transfer this "
                                                           'release reads; write "same_mesh" (the identity on one '
                                                           "mesh)")
             continue
@@ -618,11 +650,12 @@ def _check_order(tree, edges, checks: _Checks) -> None:
             continue
         claimed[key] = i
         if loop["method"] != "fixed_point":
-            checks.add("E-CONTRACT", path + ["method"], f"{json.dumps(loop['method'])} is not a loop method this "
+            checks.add("E-CONTRACT", path + ["method"], f"{json.dumps(loop['method'], default=str)} is not a loop method this "
                                                         'release reads; write "fixed_point"')
         n = loop["max_iterations"]
-        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-            checks.add("E-VALUE-FORM", path + ["max_iterations"], "expected a whole number of at least 1")
+        if isinstance(n, bool) or not isinstance(n, int) or n < 2:
+            checks.add("E-VALUE-FORM", path + ["max_iterations"], "expected a whole number of at least 2 (the first "
+                                                                  "residual is measured at the second iteration)")
         w = loop["relaxation"]
         if isinstance(w, bool) or not isinstance(w, (int, float, Decimal)) or not 0 < float(w) <= 1:
             checks.add("E-DOMAIN", display_path(path + ["relaxation"]),
@@ -638,20 +671,27 @@ def _check_order(tree, edges, checks: _Checks) -> None:
         if any(k not in tol for k in ("port", "norm", "value")):
             continue
         if tol["norm"] != "max_abs":
-            checks.add("E-CONTRACT", tpath + ["norm"], f'{json.dumps(tol["norm"])} is not a norm this release '
+            checks.add("E-CONTRACT", tpath + ["norm"], f'{json.dumps(tol["norm"], default=str)} is not a norm this release '
                                                        'reads; write "max_abs"')
         spec = tol["port"]
         pname, _, port = spec.partition(".") if isinstance(spec, str) else ("", "", "")
         if pname not in group:
-            checks.add("E-CONTRACT", tpath + ["port"], f"{json.dumps(spec)} is not an output of a physics of this "
+            checks.add("E-CONTRACT", tpath + ["port"], f"{json.dumps(spec, default=str)} is not an output of a physics of this "
                                                        f"loop ({', '.join(group)})")
             continue
         ports = ports_of(kind_of_type(tree["physics"][pname]["type"]))
         if port not in ports or ports[port]["direction"] != "output":
             checks.add("E-CONTRACT", tpath + ["port"], f"{pname} has no output port {port!r}")
             continue
+        carried = sorted(f"{e.source}.{e.output}" for e in edges if e.source in group and e.target in group)
+        if spec not in carried:
+            checks.add("E-CONTRACT", tpath + ["port"], f"{spec} is not carried by a coupling inside the loop; the "
+                                                       "residual is measured on a coupled field: "
+                                                       + ", ".join(dict.fromkeys(carried)))
+            continue
         try:
-            c = units.convert(tol["value"], ports[port]["quantity"], path=display_path(tpath + ["value"]))
+            c = units.convert(tol["value"], _DIFFERENCE.get(ports[port]["quantity"], ports[port]["quantity"]),
+                              path=display_path(tpath + ["value"]))
         except TypeError:
             checks.add("E-VALUE-FORM", tpath + ["value"], "expected a value with the port's unit")
             continue
@@ -759,10 +799,11 @@ def _edges(doc) -> list[_Edge]:
 # running
 
 class LoopNotConverged(DocumentError):
-    """A loop reached ``max_iterations``; ``history`` holds its residuals in the port's unit."""
+    """``E-LOOP-DIVERGED``: a loop reached ``max_iterations`` without meeting its tolerance;
+    ``history`` holds its residuals in the port's unit. No result is returned."""
 
     def __init__(self, message: str, history: list[float], unit: str):
-        super().__init__(message, path="study.loops")
+        super().__init__(message, path="study.loops", code="E-LOOP-DIVERGED")
         self.history = list(history)
         self.unit = unit
 
@@ -904,14 +945,15 @@ def _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, 
     port_name = spec["port"]
     pname, _, port = port_name.partition(".")
     port_info = ports_of(kind_of_type(doc.si["physics"][pname]["type"]))[port]
-    tolerance = units.convert(spec["value"], port_info["quantity"]).value
+    tolerance = units.convert(spec["value"], _DIFFERENCE.get(port_info["quantity"], port_info["quantity"])).value
     kinds = {n: kind_of_type(doc.si["physics"][n]["type"]) for n in group}
     t0 = time.perf_counter()
     states = {n: kinds[n].coupling.prepare(doc, n) for n in group}
     relaxed = {e.name: None for e in inside}
-    previous, history = None, []
+    history = []
     say(f"loop {', '.join(group)}: fixed_point, relaxation {w:g}, tolerance {spec['value']} on {port_name}")
     for iteration in range(1, int(loop["max_iterations"]) + 1):
+        residual = None
         for n in group:
             inputs = _inputs(n, kinds[n], states[n], edges, outputs, records, relaxed)
             results[n], produced = kinds[n].coupling.solve(states[n], inputs, False)
@@ -921,24 +963,25 @@ def _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, 
                 if e.source == n:
                     received, records[e.name] = _transfer(e, outputs[(n, e.output)], states[e.target])
                     old = relaxed[e.name]
+                    if old is not None and f"{e.source}.{e.output}" == port_name:
+                        # the fixed-point residual |G(x) - x| of this coupling's field, whatever w is
+                        change = np.abs(np.asarray(received.values) - np.asarray(old.values))
+                        residual = max(residual or 0.0, float(np.max(change)) if change.size else 0.0)
                     relaxed[e.name] = received if old is None else Field(
                         states[e.target].mesh, (1 - w) * np.asarray(old.values) + w * np.asarray(received.values),
                         location=received.location, unit=received.unit, name=e.name)
-        current = np.asarray(outputs[(pname, port)].values, dtype=float)
-        if previous is not None:
-            residual = float(np.max(np.abs(current - previous))) if current.size else 0.0
+        if residual is not None:
             history.append(residual)
-            say(f"  iteration {iteration}: max_abs change of {port_name} {residual!r} {port_info['unit']}")
+            say(f"  iteration {iteration}: max_abs |G(x) - x| of {port_name} {residual!r} {port_info['unit']}")
             if residual <= tolerance:
                 for n in group:
                     timings[n] = (time.perf_counter() - t0) / len(group)
                 return {"physics": list(group), "method": "fixed_point", "tolerance": copy.deepcopy(spec),
                         "relaxation": w, "iterations": iteration, "converged": True,
                         "residuals": [{"value": r, "unit": port_info["unit"]} for r in history]}
-        previous = current
     shown = ", ".join(f"{r:.3e}" for r in history) or "none (one iteration gives no change to measure)"
     raise LoopNotConverged(f"study.loops: the loop of {', '.join(group)} did not converge in "
-                           f"{loop['max_iterations']} iterations: max_abs change of {port_name} per iteration "
+                           f"{loop['max_iterations']} iterations: max_abs |G(x) - x| of {port_name} per iteration "
                            f"({port_info['unit']}): {shown}; no result is returned. Raise max_iterations, lower "
                            "relaxation or check the couplings", history, port_info["unit"])
 
