@@ -109,8 +109,7 @@ from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 from .core.spaces import TRI_LOCAL_EDGES
 
-__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning", "DegenerateBranches",
-           "degenerate_branch_derivatives"]
+__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning"]
 
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
@@ -384,7 +383,7 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
 
 
 @dataclass(frozen=True)
-class DegenerateBranches:
+class KernelBranches:
     """One group of degenerate modes and the branches a shape motion splits it into.
 
     ``modes`` are the indices of the group among the returned modes, ``effective_index`` their
@@ -400,7 +399,10 @@ class DegenerateBranches:
 
 def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_modes: int = 6, *, motion,
                                   mu_r=1.0, pec_nodes=None, pec_edges=None, tolerance=DEGENERATE_GAP):
-    """The branch slopes of degenerate modes under a shape motion (NumPy numbers).
+    """The branch slopes of degenerate modes under a shape motion (NumPy numbers, kernel frame).
+
+    The kernel of ``galerkin.waveguide.degenerate_branch_derivatives`` (public, SI, exp(-i omega t)):
+    eps_r, n_target and the results are under the kernel's exp(+i omega t).
 
     ``solve_modes(..., motion=motion)`` gives a degenerate mode NaN derivatives: the sorted
     effective indices have a kink where branches cross. Each branch is smooth, though, and its
@@ -414,7 +416,7 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
     A group is a set of returned modes whose eigenvalues lie within ``tolerance`` (relative)
     of each other; ``tolerance`` larger than DEGENERATE_GAP also groups nearly degenerate modes,
     whose slopes are then those of the projected pencil. A degenerate mode whose partner was
-    not returned is refused by name (ask for more modes). Returns one ``DegenerateBranches`` per
+    not returned is refused by name (ask for more modes). Returns one ``KernelBranches`` per
     group, an empty list when no mode is degenerate. The same inputs as ``solve_modes`` with a
     motion: no coordinate factors, NumPy material data.
     """
@@ -466,7 +468,7 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
         if not np.iscomplexobj(n0):
             slopes = slopes.real
         order = np.argsort(-np.real(slopes))
-        out.append(DegenerateBranches(tuple(int(i) for i in group), n0.copy(), slopes[order], combos[:, order]))
+        out.append(KernelBranches(tuple(int(i) for i in group), n0.copy(), slopes[order], combos[:, order]))
     return out
 
 

@@ -12,6 +12,7 @@
     {"module": "galerkin.electric", "class": "SteadyElectricResult", "reason": "returned by solve_steady_electric"},
     {"module": "galerkin.electrostatics", "class": "ElectrostaticsResult", "reason": "returned by solve_electrostatics"},
     {"module": "galerkin.waveguide", "class": "WaveguideModes", "reason": "returned by solve_waveguide_modes (L3 commit 11b)"},
+    {"module": "galerkin.waveguide", "class": "DegenerateModeBranches", "reason": "returned by degenerate_branch_derivatives (shape-derivative follow-up 4, 2026-11-21)"},
     {"module": "galerkin.joule_heating", "class": "SteadyJouleHeatResult", "reason": "returned by solve_steady_joule_heat"},
     {"module": "galerkin.temperature_joule_heating", "class": "TemperatureJouleHeatResult", "reason": "returned by solve_temperature_joule_heat"},
     {"module": "galerkin.temperature_joule_heating", "class": "JouleIteration", "reason": "one iteration record of solve_temperature_joule_heat's history"},

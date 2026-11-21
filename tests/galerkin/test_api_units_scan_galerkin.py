@@ -212,6 +212,20 @@ def _waveguide_modes():
                                        target_effective_index=1.4, search_mode_count=2, relative_permeability=1.0)
 
 
+def _degenerate_branches():
+    import jax
+    jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from galerkin.mesh import rectangle_mesh
+    from galerkin.shape import MeshMotion
+    from galerkin.waveguide import degenerate_branch_derivatives
+    mesh = rectangle_mesh(2e-6, 1e-6, 8, 4)
+    motion = MeshMotion(design_velocity=np.zeros((mesh.num_nodes, 2)), t=jax.numpy.asarray(0.0))
+    return degenerate_branch_derivatives, dict(mesh=mesh, relative_permittivity=2.25, vacuum_wavelength=1.55e-6,
+                                               target_effective_index=1.4, search_mode_count=2,
+                                               relative_permeability=1.0, motion=motion, relative_tolerance=1e-8)
+
+
 def _modal_pml():
     from galerkin.waveguide import ModalPML
     return ModalPML, dict(pml_thickness={"left": 2e-7, "right": 2e-7}, pml_strength=3.0, pml_order=2)
@@ -283,6 +297,8 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.electrostatics:capacitance_matrix": _capacitance,
                 # L3 commit 11b: the public mode functions (the others take no quantity)
                 "galerkin.waveguide:solve_waveguide_modes": _waveguide_modes,
+                # shape-derivative follow-up 4 (2026-11-21): the branch slopes of degenerate modes
+                "galerkin.waveguide:degenerate_branch_derivatives": _degenerate_branches,
                 "galerkin.waveguide:ModalPML": _modal_pml,
                 "galerkin.waveguide:Bend": _bend,
                 # L3 commit 12: the public cavity functions in SI
