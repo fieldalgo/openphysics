@@ -55,7 +55,10 @@ python -m simcase run examples/simcase/multiphysics_heated_slab.json -o heated_s
   할 envelope를 밝힙니다.
 - 한 종류의 항목만 있고 결합이 없는 envelope 문서도 `E-FORMAT`입니다. 이런 문서는 단일 물리 형식
   `"0.3"`으로 씁니다. 문서마다 쓰는 방법은 하나입니다.
-- 단일 물리 문서는 바뀌지 않습니다. 읽기, 슬롯 표, 검증, 결과가 모두 같습니다.
+- 단일 물리 문서는 바뀌지 않습니다. 계속 `"0.3"`이고 읽기, 슬롯 표, 검증, 결과가 모두 같습니다.
+
+envelope는 바탕 형식과 자기 버전을 밝힙니다. 다중물리 envelope를 나중에 바꾸면 `"0.3/multiphysics.2"`,
+바탕 형식이 바뀐 뒤의 envelope는 `"0.4/multiphysics.1"`이 됩니다.
 
 최상위 키: `openphysics name display_units geometry materials physics mesh study results
 couplings`. 형상은 버전 1 블록입니다([형상 문서](geometry_document.md)). 물리들은 그 영역과 메시
@@ -103,6 +106,7 @@ couplings`. 형상은 버전 1 블록입니다([형상 문서](geometry_document
 |---|---|
 | 문서에 없는 물리 이름이나 포트 이름 | `couplings.<이름>.from` / `.to`에서 `E-CONTRACT`, 있는 물리나 포트를 나열 |
 | `from`에 입력, `to`에 출력 | `couplings.<이름>.from` / `.to`에서 `E-CONTRACT` |
+| 종류가 저장하지만 이 릴리스에서 결합하지 않는 출력(`thermal.steady2d`는 `heat_flux`가 아니라 `temperature`를 결합) | `couplings.<이름>.from`에서 `E-CONTRACT` |
 | 물리량, 단위, 위치가 맞지 않음 | `couplings.<이름>`에서 `E-COUPLING-PAIR` |
 | `single` 입력으로 들어오는 두 번째 결합 | `couplings.<이름>.to`에서 `E-CONTRACT`, 이미 있는 결합을 밝힘 |
 | 자기 결합 | `couplings.<이름>`에서 `E-CONTRACT` |
@@ -139,9 +143,11 @@ k는 그대로입니다. 굴절률 변화가 정확히 0인 삼각형은 재료�
 
 이 결합의 한계:
 
-- `thermal.steady2d`는 라이브러리 재료를 읽지 않고(라이브러리 정책은 바뀌지 않았습니다) 열은 영역
-  전체를 덮으므로, 열 → 모드 문서는 재료를 로컬 기록으로 씁니다. `physmat:Si`와 `physmat:SiO2`는
-  광학 쪽에서 열광학 모델을 줍니다.
+- **열 → 모드 문서는 아직 `physmat:Si`나 `physmat:SiO2`를 쓸 수 없습니다.** 이 릴리스에서 열은
+  라이브러리 재료를 거부하고(라이브러리 정책은 바뀌지 않았습니다) 영역 전체를 덮으므로, 열 → 모드
+  문서의 재료는 모두 `refractive_index`, `thermal_conductivity`, `thermo_optic_coefficient`,
+  `reference_temperature`를 가진 로컬 기록입니다. `physmat:Si`와 `physmat:SiO2`의 열광학 모델은
+  광학 쪽에 들어와 있어, 라이브러리 재료를 읽지 않는 물리가 준 온도에 씁니다.
 - physmat의 Sellmeier 자료는 293.15 K(SiO2)와 299.15 K(Si) 기준입니다. 열광학 변화는 300 K에서 재고,
   n₀는 실행 파장의 Sellmeier 값입니다.
 - 열광학 모델은 T에 선형입니다. 열팽창이나 응력 광학 효과는 없습니다.
@@ -165,10 +171,20 @@ k는 그대로입니다. 굴절률 변화가 정확히 0인 삼각형은 재료�
 항목을 제안으로 줍니다(기본값: `fixed_point`, 순환 안에서 첫 물리의 첫 출력에 `max_abs`와 그 포트
 단위의 `1e-6`, 30회, relaxation 0.5). 반복 항목은 다음을 검사합니다. 물리가 정확히 순환 하나이고,
 순환마다 항목 하나, `method`는 `"fixed_point"`, tolerance 포트는 그 반복의 출력이며 값은 그 포트
-단위의 양수, `norm`은 `"max_abs"`, `max_iterations`는 1 이상의 정수, `relaxation`은 (0, 1]입니다.
+단위의 양수, `norm`은 `"max_abs"`, `max_iterations`는 2 이상의 정수, `relaxation`은 (0, 1]입니다.
+tolerance 포트는 반복 안 결합의 출발점이고, 그 값은 변화량입니다. 온도 tolerance는 온도 차이입니다
+(`"1e-6 K"`나 mK. `degC`는 모호하므로 거부합니다).
 
-내장 종류의 쌍 가운데 아직 순환을 이루는 것은 없습니다. 이 릴리스에서 받아들인 반복은 검증하지만
-실행하지 않습니다. `simcase run`이 이름을 밝혀 거부합니다.
+받아들인 반복은 순환 안 결합의 필드에 대한 완화 고정점 반복 x ← (1 − w) x + w G(x)로 실행합니다.
+반복마다 구성 물리를 그 순서대로 풀고, 반복 안 결합의 필드는 w로 완화해 다음 풀이에 넣습니다(첫
+반복은 보낸 그대로). 반복의 잔차는 tolerance 포트가 보내는 필드의 고정점 잔차 |G(x) − x|입니다. 그
+포트가 지금 보내는 값과 이번 반복에 넣은 완화 필드의 가장 큰 차이(`max_abs`, 그 포트 단위)입니다. 완화가
+작아도 줄지 않으므로 작은 w로 반복이 일찍 끝나지 않습니다. 첫 잔차는 두 번째 반복에서 잽니다. 잔차가
+tolerance 이하이면 수렴이고, 결과에 잔차를 모두 적습니다. `max_iterations`에
+닿은 반복은 `study.loops`에서 잔차 이력과 함께 `E-LOOP-DIVERGED`로 실패합니다. 마지막 반복값을
+결과로 돌려주지 않으며 아무것도 쓰지 않습니다.
+
+내장 종류의 쌍 가운데 아직 순환을 이루는 것은 없습니다. 반복은 시험 전용 종류로만 시험합니다.
 
 ## 결과: `multiphysics-run-v1`
 
@@ -178,7 +194,8 @@ k는 그대로입니다. 굴절률 변화가 정확히 0인 삼각형은 재료�
                   solve_order, physics, couplings, loops, timing
   model.json      읽은 그대로의 문서
   log.txt
-  heat1/          열 결과, 그 자체 식별자와 함께(summary.json, fields.npz, log.txt)
+  heat1/          열 결과, 그 자체 식별자와 함께(summary.json, fields.npz, log.txt;
+                  results.plots가 true이고 그 종류가 그림을 그리면 results.png)
   modes1/         모드 결과, 그 자체 식별자와 함께
 ```
 
@@ -192,7 +209,9 @@ k는 그대로입니다. 굴절률 변화가 정확히 0인 삼각형은 재료�
   `{"value": 0.0, "unit": "K"}`, 0이 아니면 실행 실패)를 적습니다. `conservation_residual`은 일률
   물리량(W, W/m, W/m², W/m³; 요소 필드는 값 × 넓이, 절점 필드는 집중 P1 적분)에서
   |Σ 보냄 − Σ 받음| / |Σ 보냄|이고, 온도를 비롯한 다른 물리량에서는 null입니다.
-- `loops`는 반복마다의 이력입니다(반복을 실행하지 않는 동안 비어 있음).
+- `loops`는 실행한 반복마다 `physics`, `method`, `tolerance`, `relaxation`, `iterations`,
+  `converged`, `residuals`(첫 반복 다음부터 반복마다 `{"value", "unit"}` 하나)를 적습니다. 순환이
+  없는 문서에서는 비어 있습니다.
 - 모드 폴더의 `fields.npz`에는 결합 입력이 더해집니다. `temperature`(K, 삼각형마다 값 하나, 쓴 P1
   평균)와 `refractive_index`(연구 지점마다 행 하나, 삼각형마다 값 하나, 손실이 있으면 exp(−iωt)의
   n + i k)입니다.
@@ -238,8 +257,9 @@ n₀ 1.444, dn/dT 1.0e-5 1/K인 클래딩으로 된 2.4 µm 창의 폭 1.0 µm �
 
 ## 이 릴리스에 없는 것
 
-- 받아들인 반복의 실행과 다중물리 sweep의 실행(`study.type: "sweep"`은 검증하고 `simcase run`이
-  이름을 밝혀 거부합니다).
+- 다중물리 sweep의 실행. `study.type: "sweep"`과 그 매개변수 경로(물리 항목 하나의 값,
+  `physics.<이름>.…`)는 검증하고, `simcase run`은 sweep을 `study.type`에서 `E-CONTRACT`("a multiphysics
+  sweep is validated but not run in this release")로 거부합니다.
 - `same_mesh`가 아닌 전달.
 - Studio: 아직 다중물리 문서를 편집하거나 보여 주지 않습니다.
 - 결합에 참여하는 다른 공급자의 종류(훅은 내부용입니다).

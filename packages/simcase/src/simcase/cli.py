@@ -115,6 +115,8 @@ def _run(args, doc) -> int:
     results = data.get("results", {})
     if doc.views is not None:                    # a multiphysics run: one folder per physics
         folders = ", ".join(f"{name}/" for name in doc.views)
+        if results.get("plots"):
+            folders += " (each with results.png where its kind plots)"
         print(f"results written to {out}/  (summary.json, log.txt, model.json, {folders})")
         return 0
     files = ["summary.json", "log.txt", "model.json"]

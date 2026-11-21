@@ -898,9 +898,10 @@ def test_each_path_gets_exactly_one_error():
 def test_diagnostic_codes_are_the_closed_list_with_en_and_ko_text():
     codes = units.DIAGNOSTIC_CODES
     # 58 codes of the design, plus the 8 of the document reader (R-1): E-FORMAT, E-JSON, E-VALUE-FORM,
-    # E-MATERIAL-UNKNOWN, E-CONTRACT, W-SHAPE-DROPPED, W-PIECE-DROPPED, I-MESH-CONTROL-RAISED.
-    assert len(codes) == 66
-    assert sum(1 for c in codes.values() if c["severity"] == "error") == 37
+    # E-MATERIAL-UNKNOWN, E-CONTRACT, W-SHAPE-DROPPED, W-PIECE-DROPPED, I-MESH-CONTROL-RAISED, and
+    # E-LOOP-DIVERGED of multiphysics loops (D2).
+    assert len(codes) == 67
+    assert sum(1 for c in codes.values() if c["severity"] == "error") == 38
     assert sum(1 for c in codes.values() if c["severity"] == "warning") == 18
     assert sum(1 for c in codes.values() if c["severity"] == "info") == 11
     for code, c in codes.items():

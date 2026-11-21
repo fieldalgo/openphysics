@@ -57,7 +57,12 @@ coupling is never dropped silently.
   `openphysics`, naming the envelope to write.
 - An envelope document with entries of one kind and no couplings is `E-FORMAT` too: it is
   written in the single-physics form, `"0.3"`. Every document has one spelling.
-- Single-physics documents are unchanged: the same reader, slot table, validation and results.
+- Single-physics documents are unchanged: they stay `"0.3"`, with the same reader, slot
+  table, validation and results.
+
+The envelope names its base format and its own version. A later change of the multiphysics
+envelope would be `"0.3/multiphysics.2"`, and the envelope on a later base format
+`"0.4/multiphysics.1"`.
 
 Top-level keys: `openphysics name display_units geometry materials physics mesh study
 results couplings`. The geometry is a version 1 block ([geometry documents](geometry_document.md));
@@ -111,6 +116,7 @@ physics and what to change:
 |---|---|
 | a physics or port name the document does not have | `E-CONTRACT` at `couplings.<name>.from` / `.to`, listing the physics or ports there are |
 | an input named in `from`, an output in `to` | `E-CONTRACT` at `couplings.<name>.from` / `.to` |
+| an output the kind saves but does not couple in this release (`thermal.steady2d` couples `temperature`, not `heat_flux`) | `E-CONTRACT` at `couplings.<name>.from` |
 | a quantity, unit or location mismatch | `E-COUPLING-PAIR` at `couplings.<name>` |
 | a second coupling into a `single` input | `E-CONTRACT` at `couplings.<name>.to`, naming the coupling already there |
 | a self-coupling | `E-CONTRACT` at `couplings.<name>` |
@@ -152,9 +158,12 @@ and reported unused.
 
 Limitations of this coupling:
 
-- `thermal.steady2d` reads no library material (its library policy is unchanged), and heat
-  covers the whole domain, so a heat → modes document describes its materials as local
-  records. `physmat:Si` and `physmat:SiO2` carry the thermo-optic model on the optical side.
+- **A heat → modes document cannot use `physmat:Si` or `physmat:SiO2` yet.** Heat refuses
+  library materials in this release (its library policy is unchanged), and heat covers the
+  whole domain, so every material of a heat → modes document is a local record with
+  `refractive_index`, `thermal_conductivity`, `thermo_optic_coefficient` and
+  `reference_temperature`. The thermo-optic models of `physmat:Si` and `physmat:SiO2` are in
+  place on the optical side, for a temperature from a physics that reads no library material.
 - physmat's Sellmeier data are given at 293.15 K (SiO2) and 299.15 K (Si); the thermo-optic
   shift is taken from 300 K, and n₀ is the Sellmeier value at the run's wavelength.
 - The thermo-optic model is linear in T; there is no thermal expansion or stress-optic effect.
@@ -181,10 +190,23 @@ first member's first output in the cycle with `max_abs` and `1e-6` in that port'
 iterations, relaxation 0.5). A loop entry is checked: its physics are exactly one cycle, one
 entry per cycle, `method` `"fixed_point"`, a tolerance port that is an output of the loop with
 a positive value in that port's unit, `norm` `"max_abs"`, `max_iterations` a whole number of at
-least 1 and `relaxation` in (0, 1].
+least 2 and `relaxation` in (0, 1]. The tolerance port is the source of a coupling inside the
+loop, and its value is a change: a temperature tolerance is a temperature difference (`"1e-6 K"`
+or mK; `degC` is refused as ambiguous).
 
-No pair of built-in kinds forms a cycle yet. In this release an accepted loop is validated
-but not run: `simcase run` refuses it by name.
+An accepted loop runs as an under-relaxed fixed point, x ← (1 − w) x + w G(x), on the fields of
+the couplings inside the cycle. Each iteration solves the members in their order; the field of
+a coupling inside the loop enters the next solve relaxed by w (the first iteration takes it as
+sent). The residual of an iteration is the fixed-point residual |G(x) − x| of the field the
+tolerance port sends: the largest difference (`max_abs`, in that port's unit) between what the
+port sends now and the relaxed field the loop carried into this iteration. It does not shrink
+with a small relaxation, so a small w cannot end the loop early. The first residual is
+measured at the second iteration. The loop has converged when the residual is at most the
+tolerance; the result then records each residual. A loop that reaches
+`max_iterations` fails with `E-LOOP-DIVERGED` at `study.loops` and its residual history; it
+never returns the last iterate as a result, and nothing is written.
+
+No pair of built-in kinds forms a cycle yet: the loop is tested with test-local kinds only.
 
 ## Results: `multiphysics-run-v1`
 
@@ -194,7 +216,8 @@ but not run: `simcase run` refuses it by name.
                   solve_order, physics, couplings, loops, timing
   model.json      the document as read
   log.txt
-  heat1/          the heat result, with its own identifier (summary.json, fields.npz, log.txt)
+  heat1/          the heat result, with its own identifier (summary.json, fields.npz, log.txt;
+                  results.png when results.plots is true and the kind plots)
   modes1/         the modes result, with its own identifier
 ```
 
@@ -210,7 +233,9 @@ but not run: `simcase run` refuses it by name.
   `conservation_residual` is |Σ sent − Σ received| / |Σ sent| for a power quantity (W, W/m,
   W/m², W/m³: an element field integrated as value × area, a node field as its lumped P1
   integral); it is null for any other quantity, temperature included.
-- `loops` lists each loop's iteration history (empty while no loop runs).
+- `loops` lists each loop that ran: `physics`, `method`, `tolerance`, `relaxation`,
+  `iterations`, `converged` and `residuals` (one `{"value", "unit"}` per iteration after the
+  first). It is empty for a document without cycles.
 - The modes folder's `fields.npz` adds the coupled input: `temperature` (K, one value per
   triangle, the P1 mean used) and `refractive_index` (one row per study point, one value per
   triangle, n + i k under exp(−iωt) when lossy).
@@ -258,8 +283,10 @@ and [`tests/simcase/test_multiphysics_document.py`](../../../tests/simcase/test_
 
 ## Not in this release
 
-- Running an accepted loop, and running a multiphysics sweep (`study.type: "sweep"` is
-  validated, and `simcase run` refuses it by name).
+- Running a multiphysics sweep: `study.type: "sweep"` and its parameter path (a value of one
+  physics entry, `physics.<name>.…`) are validated, and `simcase run` refuses the sweep with
+  `E-CONTRACT` at `study.type` ("a multiphysics sweep is validated but not run in this
+  release").
 - Transfers other than `same_mesh`.
 - Studio: it does not edit or show multiphysics documents yet.
 - Other providers' kinds in couplings (the hook is internal).

@@ -95,7 +95,7 @@ class RelayResult:
         np.save(outdir / "y.npy", self.y)
 
 
-def relay_kind(name="test.relay", unit="K", calls=None):
+def relay_kind(name="test.relay", unit="K", calls=None, quantity="temperature"):
     """A kind with input ``x`` (temperature, ``unit``, node, sum) and output ``y`` on ``MESH``."""
     from galerkin.coupling import Field
 
@@ -110,9 +110,9 @@ def relay_kind(name="test.relay", unit="K", calls=None):
             calls.append((state.name, x.copy()))
         return RelayResult(state.view, y), {"y": Field(MESH, y, location="node", unit=unit)}
 
-    ports = ({"name": "x", "direction": "input", "quantity": "temperature", "unit": unit, "location": "node",
+    ports = ({"name": "x", "direction": "input", "quantity": quantity, "unit": unit, "location": "node",
               "combine": "sum"},
-             {"name": "y", "direction": "output", "quantity": "temperature", "unit": unit, "location": "node"})
+             {"name": "y", "direction": "output", "quantity": quantity, "unit": unit, "location": "node"})
     return registry.PhysicsKind(
         name=name, types=frozenset({name}), precedence=60, validate=lambda doc: None,
         run=lambda doc, verbose=True: None, summary=lambda doc: f"{name} relay",
