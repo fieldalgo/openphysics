@@ -90,15 +90,17 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 - **Save** in the ribbon's Project group (Save session) writes one file with the inputs,
   all completed runs, their names and pins, and the comparison. Use it before you stop.
   The file is named after the application and the local time, for example
-  `optical-waveguide-session-2026-11-21-1305.json`, and goes to your browser's download
-  folder (the browser may add a number if that name exists). Messages reports
-  *Session saved as …* and the title shows *Saved as …* until your next edit or run.
+  `optical-waveguide-session-2026-11-21-1305.json`, and is handed to your browser's
+  downloads (the browser may ask where to save it, or add a number if that name exists).
+  Messages reports *Session file … sent to the browser's downloads (check your Downloads
+  folder)* and the title shows *Session file … · time* until your next edit or run.
   **More → Save inputs only** keeps the model without results.
 - After a reload or a restart, the start page shows **Continue where you left off**.
   Recover the last session, an earlier one, or open a session file. On a fresh page
   (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
-  runs and the comparison that come back and what is replaced. A recovered session that
-  matched its saved file shows *Saved as …* in the title again.
+  runs and the comparison that come back and what is replaced. Messages names what was
+  opened. A recovered session that matched its session file shows *Last session file …*
+  in the title.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
 - Input and session files are version 7 (the Joule heating inputs added); version 6 files are

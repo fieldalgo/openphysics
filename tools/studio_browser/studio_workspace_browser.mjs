@@ -195,8 +195,8 @@ try {
   stage('session saved', {file: sessionFile, runs: session.runs?.length, header: savedHeader, message: savedMessage});
   assert.equal(session.runs?.length, 2);
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
-  assert.ok(savedMessage.startsWith(`Session saved as ${sessionFile} (your browser's download folder)`), savedMessage);
-  assert.ok(savedHeader.includes(`Saved as ${sessionFile}`), savedHeader);
+  assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to the browser's downloads (check your Downloads folder)`), savedMessage);
+  assert.ok(savedHeader.includes(`Session file ${sessionFile} · `), savedHeader);
   await page.until("/Browser recovery saved/.test(document.getElementById('autosave-status').textContent)", 'browser recovery saved', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
@@ -220,7 +220,7 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
-  assert.ok(recoveredHeader.includes(`Saved as ${sessionFile}`), 'the recovered title names the saved file: ' + recoveredHeader);
+  assert.ok(recoveredHeader.includes(`Last session file ${sessionFile} (`), 'the recovered title names the session file: ' + recoveredHeader);
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and

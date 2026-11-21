@@ -21,9 +21,11 @@ test('a session file name holds the application and the local date-time to the m
 
 test('the title shows the saved file until the next edit, and after recovery what the record kept',()=>{
  const when=()=>'13:05',saved={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
- assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Saved as optical-waveguide-session-2026-11-21-1305.json · 13:05');
+ assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Session file optical-waveguide-session-2026-11-21-1305.json · 13:05');
+ assert.equal(P.persistenceTitle({saved:{...saved,recovered:true}},when),'Last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
+ for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved:{...saved,recovered:true}},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false},when),'Unsaved inputs');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since optical-waveguide-session-2026-11-21-1305.json (13:05) · use Save session');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · use Save session');
  assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Results not saved · use Save session');
  assert.equal(P.persistenceTitle({}),'Input snapshot unchanged');
  // an invalid draft outranks a saved state
