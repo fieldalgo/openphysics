@@ -92,6 +92,8 @@ What each package implements, and its limits, is in the
 
 - `simcase`: the workspace's Heat and Joule request-failure messages end the server's reason with a full stop before "Inputs and earlier results are unchanged." when the reason has none (it read "…maximum iterations exceeded Inputs and earlier results are unchanged."); `requestFailedText` in `workspace-connection.mjs`, with a Node test, and the Joule browser check now asserts the whole line.
 
+- `simcase`: **region meshes are the same on every platform where only the candidate tie order differed**: the region path (`thermal_regions`: heat, elastic, electric and Joule region documents) asks meshine for `candidate_order="stable"`, so refinement candidates with equal circumradii keep their input order instead of NumPy's quicksort order, which differs by CPU. Before, the workspace's Joule strip meshed to 289 nodes and 528 triangles on macOS arm64 and to 288 and 526 on Linux and Windows. On Linux the shipped `thermal_regions` example's mesh changes (same 595 nodes); the Joule, transient-heat and elastic region examples and the workspace strip are byte-identical. The Joule browser check again requires the 288-node mesh and its values on every platform. Not covered: Qhull or floating-point differences, and the optical path (`runner.py`), which keeps the legacy order.
+
 - Studio results: fit optical plots to the available desktop height and hide inactive job actions after completion.
 
 - Studio: rebuild the workspace as a light CAE workbench with a command ribbon, adjacent model/settings panes, Graphics, a study/message dock, paired dimension fields and accessible panel resizing. Existing solver, file and connection behavior is retained.

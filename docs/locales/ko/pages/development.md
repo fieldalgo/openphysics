@@ -293,7 +293,7 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
 설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구, 그다음 Joule 가열
 애플리케이션: 기본 띠를 Picard와 Newton으로(반복 횟수, 수지, 온도·전위 범위, 두 방법의 1e-6 K 이내 일치. 영역
-메시가 macOS arm64와 다른 플랫폼에서 달라서 메시에 따라 달라지는 값은 이산화 오차 안에서 확인),
+메시가 meshine의 stable 후보 순서를 쓰므로 모든 플랫폼에서 같은 288 절점 메시와 값),
 수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).
 잡히지 않은 페이지 예외와 `console.error` 호출이 있으면 검사가 실패합니다(그 밖의 브라우저 로그 항목은 모으지 않습니다).
 

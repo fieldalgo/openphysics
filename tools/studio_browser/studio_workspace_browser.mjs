@@ -207,14 +207,11 @@ try {
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
-  // constant materials. The region mesh of the same document is not the same on every platform
-  // (Linux x86-64: 288 nodes, 526 triangles; macOS arm64: 289, 528), so values that depend on the
-  // mesh are checked within the discretization error at this element size (about 2e-3 of the
-  // temperature rise in the strip convergence study of test_joule_temperature_regions.py, so about
-  // 0.04 K of this 22 K rise; 0.01 K is allowed), and the checks that do
-  // not depend on it stay tight: the power balance on each mesh, Newton against Picard on the same
-  // mesh, the potential's fixed values and the uniform strip's exact power. Bit-for-bit equality
-  // with simcase.run on one mesh is tests/simcase/test_studio_joule_regions.py.
+  // constant materials. Region meshes use meshine's stable candidate order (since 2026-11-21;
+  // before, macOS arm64 meshed this strip to 289 nodes and Linux and Windows to 288), so the
+  // mesh and the values are expected to be the same on every platform (check RM1); the
+  // iteration counts keep a range. Bit-for-bit equality with simcase.run on one platform is
+  // tests/simcase/test_studio_joule_regions.py.
   const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
   const canvasRange = async () => {
     const label = await page.eval("document.getElementById('joule-field-canvas')?.getAttribute('aria-label')||''");
@@ -247,14 +244,14 @@ try {
   // the displayed values (7 significant digits), parsed and compared within a tolerance
   const shown = (settings, label, unit) => Number(settings.match(new RegExp(label + ' (\\S+) ' + unit))?.[1]);
   const nodes = shown(picardSettings, 'Nodes', 'Triangles'), triangles = Number(picardSettings.match(/Triangles (\d+)/)?.[1]);
-  assert.ok(nodes >= 270 && nodes <= 310 && triangles >= 500 && triangles <= 560, `mesh ${nodes} nodes, ${triangles} triangles`);
+  assert.deepEqual([nodes, triangles], [288, 526], 'the same mesh on every platform (RM1)');
   const balances = ['Supplied electric power', 'Joule power', 'Outward heat'].map(label => shown(picardSettings, label, 'W/m'));
-  // the balance on each mesh to the display's resolution; the value within 1e-4 of Linux's 16.67289 W/m
-  assert.ok(Math.max(...balances) - Math.min(...balances) <= 2e-5 && Math.abs(balances[0] - 16.67289) <= 16.67289e-4, 'balances ' + balances);
+  for (const value of balances) assert.ok(Math.abs(value - 16.67289) <= 2e-5, 'balances ' + balances);
   const tmax = shown(picardSettings, 'Maximum temperature', 'K');
-  assert.ok(Math.abs(tmax - 321.827) <= 0.01, 'maximum temperature ' + tmax);
+  assert.ok(Math.abs(tmax - 321.8271) <= 2e-4, 'maximum temperature ' + tmax);
   assert.equal(picardT.field, 'Temperature T'); assert.equal(picardT.unit, 'K');
-  assert.ok(Math.abs(picardT.min - 300) <= 1e-9 && Math.abs(picardT.max - tmax) <= 1e-4, 'temperature range ' + JSON.stringify(picardT));
+  // Linux and Windows gave 321.8270939810071 K; 1e-6 K allows other BLAS builds on the same mesh
+  assert.ok(Math.abs(picardT.min - 300) <= 1e-9 && Math.abs(picardT.max - 321.8270939810) <= 1e-6, 'temperature range ' + JSON.stringify(picardT));
   await page.screenshot('joule-picard');
   await page.choose('#joule-field', 'electric_potential'); await sleep(300);
   const potential = await canvasRange();

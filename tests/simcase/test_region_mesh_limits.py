@@ -314,11 +314,14 @@ RUNS = {**{f'steady example, size {s}': (lambda s=s: F.steady_example(s)) for s 
 # ---- C-1: no limits, no change ---------------------------------------------------------------
 
 @pytest.mark.parametrize('case', ['steady example, size 2.0', 'transient example, size 2.0'])
-def test_c1_without_limits_meshine_gets_only_the_minimum_angle(monkeypatch, case):
+def test_c1_without_limits_meshine_gets_the_minimum_angle_and_the_stable_order(monkeypatch, case):
+    # and, since 2026-11-21, candidate_order="stable" on every call: equal circumradii keep their
+    # input order, so the mesh does not depend on the platform's quicksort (macOS arm64 meshed the
+    # workspace Joule strip to 289 nodes, Linux and Windows to 288); no limit adds anything else
     calls = spy_generate(monkeypatch)
     run(Document.from_dict(RUNS[case]()), verbose=False)
     run(Document.from_dict(RUNS[case]()), False, max_nodes=None, max_triangles=None, max_input_vertices=None)
-    assert [set(kwargs) for kwargs in calls] == [{'min_angle'}, {'min_angle'}]
+    assert calls == [{'min_angle': 28.0, 'candidate_order': 'stable'}] * 2
 
 
 # ---- C-4, C-5: loop vertices -----------------------------------------------------------------
@@ -412,7 +415,8 @@ def test_c6b_each_limit_alone(monkeypatch, tmp_path, limit):
     calls = spy_generate(monkeypatch)
     alone = run(Document.from_dict(build()), verbose=False, **{limit: exact})
     assert_same_result(alone, unlimited, tmp_path)
-    assert calls == [{'min_angle': 28.0, **({'max_points': exact} if limit == 'max_nodes' else {})}]
+    assert calls == [{'min_angle': 28.0, 'candidate_order': 'stable',
+                      **({'max_points': exact} if limit == 'max_nodes' else {})}]
     forbid_solvers(monkeypatch)
     with pytest.raises(MeshLimitError) as refused:
         run(Document.from_dict(build()), verbose=False, **{limit: exact - 1})

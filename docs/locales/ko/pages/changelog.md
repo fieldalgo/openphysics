@@ -86,6 +86,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `simcase`: 작업 공간의 Heat·Joule 요청 실패 메시지가 서버 이유에 마침표가 없으면 "Inputs and earlier results are unchanged." 앞에 마침표를 붙입니다(전에는 "…maximum iterations exceeded Inputs and earlier results are unchanged."로 읽혔습니다). `workspace-connection.mjs`의 `requestFailedText`와 Node 시험을 더했고, Joule 브라우저 검사가 이제 줄 전체를 확인합니다.
 
+- `simcase`: **후보 동점 순서만 다르던 곳에서 영역 메시가 모든 플랫폼에서 같습니다**: 영역 경로(`thermal_regions`: 열·탄성·전기·Joule 영역 문서)가 meshine에 `candidate_order="stable"`을 요청하므로, 외접원 반지름이 같은 세분 후보가 CPU마다 다른 NumPy quicksort 순서가 아니라 입력 순서를 유지합니다. 전에는 작업 공간 Joule 띠가 macOS arm64에서 289 절점·528 삼각형, Linux·Windows에서 288·526으로 메시됐습니다. Linux에서는 제공 예제 `thermal_regions`의 메시가 바뀌고(절점 595 그대로), Joule·과도 열·탄성 영역 예제와 작업 공간 띠는 바이트 단위로 같습니다. Joule 브라우저 검사는 다시 모든 플랫폼에서 288 절점 메시와 그 값을 요구합니다. 다루지 않는 것: Qhull·부동소수점 차이, 기존 순서를 유지하는 광학 경로(`runner.py`).
+
 - Studio 결과: 광학 그래프 높이를 데스크톱 작업 영역에 맞추고 완료 후 비활성 작업 버튼을 숨깁니다.
 
 - Studio: 명령 리본, 인접한 모델/설정 패널, Graphics, 스터디/메시지 영역, 두 열 치수 입력과 키보드 패널 크기 조절을 갖춘 밝은 CAE 작업대로 재설계했습니다. 기존 솔버·파일·연결 동작은 유지합니다.

@@ -115,7 +115,11 @@ Geometry and global/per-region element sizes first go to micrometres from the
 document's exact values, as for electromagnetic documents: each shape number from
 its picometre count, each size from its exact value.
 meshine then performs constrained Delaunay refinement with the requested
-minimum angle. Its canonical coordinates are converted directly to SI metres
+minimum angle and `candidate_order="stable"` (since 2026-11-21), so refinement candidates with
+equal circumradii keep their input order instead of the platform's quicksort order: before,
+the workspace's Joule strip meshed to 289 nodes on macOS arm64 and 288 on Linux and Windows.
+This removes that source of platform difference; it does not promise identical meshes across
+every Qhull or floating-point build ([meshine overview](../meshine/overview.md)). Its canonical coordinates are converted directly to SI metres
 for the heat solver, without a round trip through the document unit.
 Every shape boundary is a chain of element edges, so each triangle lies in
 one region. Curved boundaries are inscribed polygons: the meshed area of a

@@ -616,7 +616,7 @@ def region_mesh_um(doc, limits=None):
     canonical = grid.canonical
     if limits is None:
         domain, namer, region_materials = build_domain(canonical)
-        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, **_grading(canonical))
+        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, candidate_order="stable", **_grading(canonical))
     else:
         tri, region_materials = _limited_mesh(grid, limits, generate)
     # the frame is made fresh for this mesh: its notes are the mesher's findings on it
@@ -690,10 +690,10 @@ def _limited_mesh(grid, limits, generate):
         doc, max_input_vertices=limits.max_input_vertices)
     grading = _grading(doc)
     if limits.max_nodes is None:
-        return generate(domain, namer, min_angle=grid.minimum_angle_deg, **grading), region_materials
+        return generate(domain, namer, min_angle=grid.minimum_angle_deg, candidate_order="stable", **grading), region_materials
     from meshine import MeshSizeLimitError     # here: an older meshine fails only limited runs
     try:
-        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, max_points=limits.max_nodes,
+        tri = generate(domain, namer, min_angle=grid.minimum_angle_deg, candidate_order="stable", max_points=limits.max_nodes,
                        **grading)
     except MeshSizeLimitError as exc:
         raise MeshLimitError('nodes', limits.max_nodes) from exc

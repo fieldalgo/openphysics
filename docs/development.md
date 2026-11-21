@@ -341,9 +341,9 @@ Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
 session, a server restart with the page open and recovery from the start page, then the
 Joule heating application: the default strip by Picard and by Newton (iteration counts,
-balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the region
-mesh differs between macOS arm64 and the other platforms, so mesh-dependent values are
-checked within the discretization error), a
+balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the same
+288-node mesh and values on every platform, since region meshes use meshine's stable candidate
+order), a
 non-converging Newton run whose refusal is shown with its text, and constant materials
 (`joule.steady2d`, 20 W/m, the uniform strip's exact power). Uncaught page exceptions and
 `console.error` calls fail the check (other browser log entries are not collected).
