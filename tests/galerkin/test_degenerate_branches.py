@@ -13,7 +13,10 @@ central difference of the smooth sum within 1e-6; D3 a nondegenerate problem has
 D4 a degenerate mode without its partner is refused; D5 JAX and PyTorch agree within 1e-12;
 D6 the square core of the 2026-11-11 comparison (geometry-engine node velocities, nearly
 degenerate on its mesh) against that day's galerkin one-sided differences within 3 % and the
-modesolverpy slopes within 5 %.
+modesolverpy slopes within 5 %. D7-D9, pre-registered after the independent review: D7 a group
+with a member that was not returned, or chained beyond the tolerance, is refused; D8 named
+refusals, and ElementInversion passes unchanged; D9 a lossy core's slopes in the public
+convention equal one-sided differences of the public indices within 1e-6.
 """
 
 from __future__ import annotations
@@ -126,7 +129,6 @@ def test_d3_a_nondegenerate_problem_has_no_group():
     core = np.all((np.abs(mesh.nodes[mesh.triangles][..., 0] - 1.5) <= 0.25 + 1e-9)
                   & (np.abs(mesh.nodes[mesh.triangles][..., 1] - 1.5) <= 0.1 + 1e-9), axis=1)    # 0.5 x 0.2
     eps = np.where(core, N_CORE ** 2, N_CLAD ** 2)
-    _m, _e, W = _square()
     W = np.zeros((mesh.num_nodes, 2))
     W[:, 0] = np.clip(mesh.nodes[:, 0] - 1.5, -0.25, 0.25) * 0.1
     assert _branches(mesh, eps, W, "jax", num_modes=2) == []
@@ -138,6 +140,70 @@ def test_d4_a_partner_that_was_not_returned_is_refused(square):
         _branches(mesh, eps, W, "jax", num_modes=1)
     with pytest.raises(ValueError, match="relative_tolerance must lie in"):
         _branches(mesh, eps, W, "jax", relative_tolerance=0.0)
+
+
+# ---------------------------------------------------------------- D7 incomplete or chained groups, D8 refusals
+
+def test_d7_a_group_must_be_complete_and_within_tolerance():
+    import scipy.sparse as sp
+
+    from galerkin._waveguide_kernels import _check_group, _groups
+    a, b = sp.diags([1.0, 1.0, 1.0, 2.0]).tocsr(), sp.identity(4, format="csr")
+    with pytest.raises(ValueError, match="has a member that was not returned"):
+        _check_group(a, b, np.array([1.0, 1.0]), (0, 1), 1e-8)
+    _check_group(a, b, np.array([1.0, 1.0, 1.0]), (0, 1, 2), 1e-8)
+    lam = np.array([1.0, 1.0 + 6e-4, 1.0 + 1.2e-3])
+    (group,) = _groups(lam, 1e-3)
+    assert group == (0, 1, 2)
+    with pytest.raises(ValueError, match="chain beyond tolerance"):
+        _check_group(sp.diags(np.append(lam, 2.0)).tocsr(), b, lam, group, 1e-3)
+
+
+def test_d8_named_refusals_and_element_inversion(square):
+    from galerkin.shape import ElementInversion
+    mesh, eps, W = square
+    with pytest.raises(ValueError, match=r"relative_tolerance must lie in \(0, 0.001\]"):
+        _branches(mesh, eps, W, "jax", relative_tolerance=2e-3)
+    with pytest.raises(TypeError, match="relative_tolerance must be a real number"):
+        _branches(mesh, eps, W, "jax", relative_tolerance=None)
+    with pytest.raises(TypeError, match="motion must be a MeshMotion"):
+        degenerate_branch_derivatives(mesh, relative_permittivity=eps, vacuum_angular_wavenumber=K0,
+                                      target_effective_index=N_CORE, search_mode_count=3, motion=None)
+    jax = pytest.importorskip("jax")
+    jax.config.update("jax_enable_x64", True)
+    with pytest.raises(ElementInversion):
+        degenerate_branch_derivatives(mesh, relative_permittivity=eps, vacuum_angular_wavenumber=K0,
+                                      target_effective_index=N_CORE, search_mode_count=3,
+                                      motion=MeshMotion(design_velocity=W, t=jax.numpy.asarray(2.0)))
+
+
+# ---------------------------------------------------------------- D9 a lossy core through the public frame
+
+def test_d9_lossy_branch_slopes_in_the_public_convention(square):
+    from galerkin.waveguide import solve_waveguide_modes
+    mesh, eps, W = square
+    lossy = np.where(eps == N_CORE ** 2, N_CORE ** 2 + 0.01j, eps)
+
+    def pair(h):
+        moved = Mesh(mesh.nodes + h * W, mesh.triangles, mesh.boundary)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            n = solve_waveguide_modes(moved, relative_permittivity=lossy, vacuum_angular_wavenumber=K0,
+                                      target_effective_index=N_CORE, search_mode_count=3).effective_index[:2]
+        return n[np.argsort(-np.real(n))]
+    (group,) = _branches(mesh, lossy, W, "jax")
+    slopes = group.effective_index_derivative
+    assert np.all(np.imag(slopes) != 0)
+    n0 = pair(0.0)
+
+    def one_sided(h):
+        d = {s: (pair(s) - n0) / s for s in (h, h / 2, h / 4)}
+        r1, r2 = 2 * d[h / 2] - d[h], 2 * d[h / 4] - d[h / 2]
+        return (4 * r2 - r1) / 3
+    h = 5e-4
+    plus, minus = one_sided(h), one_sided(-h)
+    assert np.max(np.abs(plus - slopes) / np.abs(slopes)) <= 1e-6, (plus, slopes)
+    assert np.max(np.abs(minus[::-1] - slopes) / np.abs(slopes)) <= 1e-6, (minus, slopes)
 
 
 # ---------------------------------------------------------------- D6 the 2026-11-11 comparison

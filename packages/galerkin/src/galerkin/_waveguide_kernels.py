@@ -96,6 +96,7 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+import scipy.linalg as la
 from scipy.linalg import eig as la_eig
 
 from .mesh import Mesh
@@ -382,6 +383,9 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
     return _refined_modes(xp, A, B, (step.t,), free, space, float(k0), n_eff0, et0, ez0)
 
 
+BRANCH_TOLERANCE_LIMIT = 1e-3     # widest relative group taken as degenerate by degenerate_branch_derivatives
+
+
 @dataclass(frozen=True)
 class KernelBranches:
     """One group of degenerate modes and the branches a shape motion splits it into.
@@ -413,10 +417,14 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
     dn_eff = -d lambda / (2 k0^2 n_eff). dA/dt and dB/dt are the derivative of the live
     assembly at t, taken in the library of ``motion.t`` (JAX or PyTorch).
 
-    A group is a set of returned modes whose eigenvalues lie within ``tolerance`` (relative)
-    of each other; ``tolerance`` larger than DEGENERATE_GAP also groups nearly degenerate modes,
-    whose slopes are then those of the projected pencil. A degenerate mode whose partner was
-    not returned is refused by name (ask for more modes). Returns one ``KernelBranches`` per
+    A group is a set of returned modes whose eigenvalues lie within ``tolerance`` (relative,
+    at most BRANCH_TOLERANCE_LIMIT) of each other. ``tolerance`` larger than DEGENERATE_GAP also
+    groups nearly degenerate modes (a mesh that splits a symmetric pair): their slopes are then
+    those of the exactly degenerate limit, which the modes follow for steps much larger than the
+    split, not d n_eff / dt at t of either returned mode (``solve_modes`` with the motion gives
+    those). Refused by name: a group with a member that was not returned, or a mode with a
+    degenerate partner that was not returned (ask for more modes); a group whose members chain
+    beyond ``tolerance``; complex slopes on a real problem. Returns one ``KernelBranches`` per
     group, an empty list when no mode is degenerate. The same inputs as ``solve_modes`` with a
     motion: no coordinate factors, NumPy material data.
     """
@@ -427,8 +435,13 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
             raise TypeError(f"degenerate_branch_derivatives: {name} must be a number or a per-element array")
         if contains_live(value):
             raise TypeError(f"degenerate_branch_derivatives: {name} is live; only the motion's t is")
-    if not (np.isfinite(tolerance) and 0 < tolerance < 1):
-        raise ValueError(f"degenerate_branch_derivatives: tolerance must lie in (0, 1), got {tolerance!r}")
+    if isinstance(tolerance, (bool, np.bool_)) or not isinstance(tolerance, (int, float, np.integer, np.floating)):
+        raise TypeError(f"degenerate_branch_derivatives: tolerance must be a real number, got {tolerance!r}")
+    if not (np.isfinite(tolerance) and 0 < tolerance <= BRANCH_TOLERANCE_LIMIT):
+        raise ValueError(f"degenerate_branch_derivatives: tolerance must lie in (0, {BRANCH_TOLERANCE_LIMIT:g}], "
+                         f"got {tolerance!r}; a wider group is not degenerate and its slopes are not derivatives")
+    if not isinstance(motion, MeshMotion):
+        raise TypeError("degenerate_branch_derivatives: motion must be a MeshMotion (design velocity and live t)")
     step = motion_step(mesh, motion)
     t0 = float(to_numpy(step.t))
     k0 = float(k0)
@@ -443,6 +456,8 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
         if i not in grouped and eigen.neighbour_gap(A0, B0, lam) <= tolerance:
             raise ValueError(f"degenerate_branch_derivatives: mode {i} is degenerate with a mode that was not "
                              "returned; ask for more modes (num_modes) so that its whole group is solved")
+    for group in groups:
+        _check_group(A0, B0, lam0, group, tolerance)
     design_velocity = motion.design_velocity
     out = []
     for group in groups:
@@ -466,6 +481,9 @@ def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_mo
         n_mean = complex(np.mean(n0)) if np.iscomplexobj(n0) else float(np.mean(n0))
         slopes = -dlam / (2.0 * k0 ** 2 * n_mean)
         if not np.iscomplexobj(n0):
+            if np.max(np.abs(slopes.imag)) > 1e-8 * max(np.max(np.abs(slopes)), np.finfo(float).tiny):
+                raise ValueError(f"degenerate_branch_derivatives: modes {tuple(int(i) for i in group)} of a real "
+                                 "problem gave complex branch slopes (the projected B is indefinite on the group)")
             slopes = slopes.real
         order = np.argsort(-np.real(slopes))
         out.append(KernelBranches(tuple(int(i) for i in group), n0.copy(), slopes[order], combos[:, order]))
@@ -490,6 +508,46 @@ def _groups(lam0, tolerance):
     for i in range(count):
         sets.setdefault(root(i), []).append(i)
     return [tuple(g) for g in sets.values() if len(g) >= 2]
+
+
+def _check_group(A0, B0, lam0, group, tolerance):
+    """Refuse a group that chains beyond ``tolerance`` or has a member that was not returned."""
+    members = np.asarray(lam0)[list(group)]
+    tiny = np.finfo(float).tiny
+    for a in members:
+        for b in members:
+            if abs(a - b) > tolerance * max(abs(a), abs(b), tiny):
+                raise ValueError(f"degenerate_branch_derivatives: modes {tuple(int(i) for i in group)} chain beyond "
+                                 "tolerance (some pairs are farther apart than it); lower tolerance")
+    nearby = _nearest_eigenvalues(A0, B0, complex(np.mean(members)), len(group) + 1)
+    close = [] if nearby is None else [v for v in nearby
+                                       if any(abs(v - a) <= tolerance * max(abs(a), tiny) for a in members)]
+    if nearby is None or len(close) > len(group):
+        reason = "could not be certified complete" if nearby is None else "has a member that was not returned"
+        raise ValueError(f"degenerate_branch_derivatives: the group of modes {tuple(int(i) for i in group)} "
+                         f"{reason}; ask for more modes (num_modes) so that its whole group is solved")
+
+
+def _nearest_eigenvalues(a, b, lam, k):
+    """The k eigenvalues of a x = lam b x nearest to ``lam`` (dense for small pencils), or None."""
+    n = a.shape[0]
+    if n <= eigen._DENSE_LIMIT:
+        values = la.eigvals(a.toarray(), b.toarray())
+        return list(values[np.argsort(np.abs(values - lam))[:k]])
+    scale = abs(lam) if lam != 0 else 1.0
+    sigma = lam + 1e-10 * scale
+    if not np.iscomplexobj(a) and not np.iscomplexobj(b) and sigma.imag == 0:
+        sigma = sigma.real
+    dtype = np.result_type(a.dtype, b.dtype, np.complex128 if np.iscomplexobj(sigma) else np.float64)
+    try:
+        lu = spla.splu((a - sigma * b).tocsc().astype(dtype))
+        operator = spla.LinearOperator((n, n), matvec=lambda v: lu.solve(b @ v), dtype=dtype)
+        nu = spla.eigs(operator, k=min(k, n - 2), which="LM", v0=np.random.default_rng(0).standard_normal(n),
+                       return_eigenvectors=False, tol=1e-12)
+    except (RuntimeError, spla.ArpackError):
+        return None
+    with np.errstate(divide="ignore"):
+        return list(sigma + 1.0 / nu)
 
 
 def _jacobian(xp, function, t0):
