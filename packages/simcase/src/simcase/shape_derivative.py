@@ -32,8 +32,11 @@ Covered, on the material regions of a version 1 ``2d`` component (``run``'s regi
 - ``mechanics.elasticity2d``: ``galerkin.elasticity.solve_elasticity``;
 - ``mechanics.thermoelastic2d``: ``galerkin.thermal_mechanical.solve_steady_thermoelasticity``,
   which solves the heat stage again on the moving mesh (the temperature moves with the
-  geometry). It takes Dirichlet temperatures and insulation only, so a document with an
-  inward heat flux, a convection or a traction is refused.
+  geometry). It takes Dirichlet temperatures, a heat source and insulation, so a document
+  with an inward heat flux, a convection or a traction is refused.
+
+A ``gauge_pressure`` of either mechanics kind is refused: simcase applies it as a traction
+callback of the normals, and a motion takes constant tractions only.
 
 Refused by name, as ``DocumentError``: a flat geometry block, an ``axisymmetric`` component,
 another physics (waveguide modes have their own runner), and every parameter the design
@@ -196,19 +199,25 @@ def _arguments(kind, name, doc, mesh, region_materials):
         from .electric_regions import region_inputs as electric_inputs
         return views.galerkin_electric_arguments(electric_inputs(doc, mesh, region_materials)[0])
     from .mechanics_regions import region_mechanics_inputs
+    _, physics = doc.sole_physics()
+    if physics.get("gauge_pressure"):
+        # simcase turns a gauge pressure into a traction callback of the normals, and a motion takes
+        # constant tractions only (the normals move with the mesh)
+        raise DocumentError(f"shape_problem: physics.{name} has gauge_pressure; a shape motion takes constant "
+                            "tractions only (a pressure follows the moving normals). Write the load as a "
+                            "traction vector, or leave the pressured boundary out of the motion")
     inputs = region_mechanics_inputs(doc, mesh, region_materials)
     if kind == ELASTICITY:
         return inputs
-    heat = views.galerkin_heat_arguments(region_inputs(doc, mesh, region_materials, views.region_heat_03(doc),
-                                                       NAMES_03))
-    refused = [key for key, given in (("inward_heat_flux", heat.get("inward_heat_flux")),
-                                      ("convection", heat.get("convection")),
-                                      ("traction", inputs.get("traction"))) if given]
+    refused = [key for key in ("inward_heat_flux", "convection", "traction") if physics.get(key)]
     if refused:
         raise DocumentError(f"shape_problem: physics.{name} has {' and '.join(refused)}; the shape derivative of "
                             f"{THERMOELASTIC} solves heat and mechanics again on the moving mesh "
                             "(galerkin.thermal_mechanical.solve_steady_thermoelasticity), which takes Dirichlet "
-                            "temperatures and insulation, prescribed displacements and a body force only")
+                            "temperatures, a heat source and insulation, prescribed displacements and a body "
+                            "force only")
+    heat = views.galerkin_heat_arguments(region_inputs(doc, mesh, region_materials, views.region_heat_03(doc),
+                                                       NAMES_03))
     mechanics = {k: v for k, v in inputs.items() if k != "traction"}
     return dict(thermal_conductivity=heat["thermal_conductivity"], prescribed_temperature=heat["prescribed_temperature"],
                 heat_source_density=heat["heat_source_density"], **mechanics)
