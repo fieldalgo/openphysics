@@ -68,6 +68,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- CI: Ubuntu, macOS, Windows의 설치 플랫폼 검사를 차례로가 아니라 동시에 돌립니다. run 44870205876에서 셋을 차례로 돌리는 데 19.6분이 걸려 검증 실행 전체의 길이를 정했습니다. 검사 내용은 그대로입니다. [개발 안내](development.md#ci가-돌리는-것).
+
 - CI: `installed-tests`도 시간이 고르게 나뉜 여덟 부분으로 돌립니다(`installed-tests (1/8)` … `(8/8)`). `tools/run_installed_tests.py --shard K/N`은 전처럼 wheel을 빌드·설치한 뒤, 복사한 시험 파일 전체에서 `tools/shards/openphysics_shard.py`가 K번째 부분에 배정한 시험 파일을 pytest에 넘기고, 그 파일마다 결과가 있는지 확인하며 `shard.json`을 씁니다. `--shard`가 없으면 모든 시험 파일을 돌립니다. job 하나로는 2026-11-20에 39~71분 걸렸고, 63분 실행을 여덟으로 나누면 부분마다 7.1~10.9분입니다. 시험과 결과는 바뀌지 않습니다. [개발 안내](development.md#ci가-돌리는-것).
 
 - CI: Linux 소스 시험 전체를 시간이 고르게 나뉜 여덟 부분으로 동시에 돌립니다(`linux-py312 tests (1/8)` … `(8/8)`). `linux-py312`에는 라이선스·release 버전·meshloom·링크·사전 검사·배포물·Studio Node·자원 검사가 남고, 필수 검사 `tests`는 이 job들이 모두 성공해야 통과합니다. 각 부분은 수집한 전체 시험에서 `tools/shards/openphysics_shard.py`가 `tools/shards/durations.json`의 파일별 시간으로 배정한 시험 파일을 통째로 남기므로, 여덟 부분을 합치면 수집한 시험을 정확히 한 번씩 돌립니다. 러너 하나에서는 2026-11-20에 44~70분 걸렸고, 한 부분은 표 기준 시험 약 5.5분입니다. 외부 메시 공진기 기준 M3의 판 세밀화 연구는 그대로 `tests/galerkin/test_cavity_mesh.py`에서 자기 파일 `test_cavity_mesh_slab_refinement.py`로 옮겼습니다. 그 파일 시간의 9할이고 파일은 통째로 배정되기 때문입니다. 시험과 결과는 바뀌지 않습니다. [개발 안내](development.md#ci가-돌리는-것).
