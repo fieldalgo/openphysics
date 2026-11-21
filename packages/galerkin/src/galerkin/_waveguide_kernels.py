@@ -91,10 +91,12 @@ derivatives and a DegenerateModeWarning.
 from __future__ import annotations
 
 import warnings
+from dataclasses import dataclass
 
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+from scipy.linalg import eig as la_eig
 
 from .mesh import Mesh
 from .edge import EdgeSpace
@@ -107,7 +109,8 @@ from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 from .core.spaces import TRI_LOCAL_EDGES
 
-__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning"]
+__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning", "DegenerateBranches",
+           "degenerate_branch_derivatives"]
 
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
@@ -363,7 +366,7 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
     Newton step of the live-input path with A(t) and B(t) assembled from the live node
     coordinates: the same element matrices as galerkin.core.kernels, written in the
     barycentric gradients and areas of X0 + t W."""
-    from .shape import live_triangle_geometry, motion_step
+    from .shape import motion_step
 
     if coordinate_factors is not None:
         raise ValueError("motion: coordinate_factors (PML, bends) depend on node positions and are refused "
@@ -374,9 +377,132 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
         if contains_live(value):
             raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
     step = motion_step(mesh, motion)
-    xp, t = step.xp, step.t
     n_eff0, space, et0, ez0 = _solve_modes_numpy(step.moved, eps_r, k0, n_target, num_modes, mu_r, pec_nodes,
                                                  pec_edges=pec_edges)
+    xp, A, B, free = _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges)
+    return _refined_modes(xp, A, B, (step.t,), free, space, float(k0), n_eff0, et0, ez0)
+
+
+@dataclass(frozen=True)
+class DegenerateBranches:
+    """One group of degenerate modes and the branches a shape motion splits it into.
+
+    ``modes`` are the indices of the group among the returned modes, ``effective_index`` their
+    values at t, ``slopes`` d n_eff / dt of each branch, largest first (per unit of t), and
+    ``combinations`` (len(modes), len(modes)): column k holds the coefficients of branch k in
+    the returned eigenvectors of ``modes`` (the fields of the branch are those combinations).
+    """
+    modes: tuple
+    effective_index: np.ndarray
+    slopes: np.ndarray
+    combinations: np.ndarray
+
+
+def degenerate_branch_derivatives(mesh: Mesh, eps_r, k0: float, n_target, num_modes: int = 6, *, motion,
+                                  mu_r=1.0, pec_nodes=None, pec_edges=None, tolerance=DEGENERATE_GAP):
+    """The branch slopes of degenerate modes under a shape motion (NumPy numbers).
+
+    ``solve_modes(..., motion=motion)`` gives a degenerate mode NaN derivatives: the sorted
+    effective indices have a kink where branches cross. Each branch is smooth, though, and its
+    slope is an eigenvalue of the motion's derivative projected onto the degenerate subspace:
+    with V the returned eigenvectors of a group, M = V^T (dA/dt - lambda dB/dt) V and
+    N = V^T B V, the generalized eigenvalues of (M, N) are d lambda / dt of the branches and
+    the eigenvectors their combinations (no conjugate: the pencil is complex symmetric).
+    dn_eff = -d lambda / (2 k0^2 n_eff). dA/dt and dB/dt are the derivative of the live
+    assembly at t, taken in the library of ``motion.t`` (JAX or PyTorch).
+
+    A group is a set of returned modes whose eigenvalues lie within ``tolerance`` (relative)
+    of each other; ``tolerance`` larger than DEGENERATE_GAP also groups nearly degenerate modes,
+    whose slopes are then those of the projected pencil. A degenerate mode whose partner was
+    not returned is refused by name (ask for more modes). Returns one ``DegenerateBranches`` per
+    group, an empty list when no mode is degenerate. The same inputs as ``solve_modes`` with a
+    motion: no coordinate factors, NumPy material data.
+    """
+    from .shape import MeshMotion, motion_step
+
+    for name, value in (("eps_r", eps_r), ("mu_r", mu_r), ("k0", k0), ("n_target", n_target)):
+        if callable(value):
+            raise TypeError(f"degenerate_branch_derivatives: {name} must be a number or a per-element array")
+        if contains_live(value):
+            raise TypeError(f"degenerate_branch_derivatives: {name} is live; only the motion's t is")
+    if not (np.isfinite(tolerance) and 0 < tolerance < 1):
+        raise ValueError(f"degenerate_branch_derivatives: tolerance must lie in (0, 1), got {tolerance!r}")
+    step = motion_step(mesh, motion)
+    t0 = float(to_numpy(step.t))
+    k0 = float(k0)
+    n_eff0, space, et0, ez0 = _solve_modes_numpy(step.moved, eps_r, k0, n_target, num_modes, mu_r, pec_nodes,
+                                                 pec_edges=pec_edges)
+    xp, A, B, free = _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges)
+    A0, B0 = eigen.scipy_matrix(A), eigen.scipy_matrix(B)
+    lam0 = -(k0 * np.asarray(n_eff0)) ** 2
+    groups = _groups(lam0, tolerance)
+    grouped = {i for g in groups for i in g}
+    for i, lam in enumerate(lam0):
+        if i not in grouped and eigen.neighbour_gap(A0, B0, lam) <= tolerance:
+            raise ValueError(f"degenerate_branch_derivatives: mode {i} is degenerate with a mode that was not "
+                             "returned; ask for more modes (num_modes) so that its whole group is solved")
+    design_velocity = motion.design_velocity
+    out = []
+    for group in groups:
+        V = np.stack([np.concatenate([et0[i] * (k0 * n_eff0[i]), ez0[i]])[free] for i in group], axis=1)
+        lam = complex(np.mean(lam0[list(group)])) if np.iscomplexobj(lam0) else float(np.mean(lam0[list(group)]))
+        m = len(group)
+
+        def projected(s, V=V, lam=lam, m=m):
+            moved = motion_step(mesh, MeshMotion(design_velocity=design_velocity, t=s))
+            xs, A_s, B_s, _free = _moving_system(mesh, moved, space, eps_r, k0, mu_r, pec_nodes, pec_edges)
+            Vl = lift(xs, V)
+            rows = [Vl[:, j] @ (A_s.matvec(Vl[:, i]) - lam * B_s.matvec(Vl[:, i])) for j in range(m) for i in range(m)]
+            entries = xs.stack(rows)
+            return xs.stack([xs.real(entries), xs.imag(entries)]) if "complex" in str(entries.dtype) else entries
+        derivative = _jacobian(xp, projected, t0)
+        dM = (derivative[0] + 1j * derivative[1]) if derivative.ndim == 2 else derivative
+        dM = dM.reshape(m, m)
+        N = V.T @ (B0 @ V)
+        dlam, combos = la_eig(dM, N)
+        n0 = np.asarray(n_eff0)[list(group)]
+        n_mean = complex(np.mean(n0)) if np.iscomplexobj(n0) else float(np.mean(n0))
+        slopes = -dlam / (2.0 * k0 ** 2 * n_mean)
+        if not np.iscomplexobj(n0):
+            slopes = slopes.real
+        order = np.argsort(-np.real(slopes))
+        out.append(DegenerateBranches(tuple(int(i) for i in group), n0.copy(), slopes[order], combos[:, order]))
+    return out
+
+
+def _groups(lam0, tolerance):
+    """Sets of returned eigenvalues within ``tolerance`` (relative) of each other, two or more each."""
+    count = len(lam0)
+    parent = list(range(count))
+
+    def root(i):
+        while parent[i] != i:
+            i = parent[i]
+        return i
+    for i in range(count):
+        for j in range(i + 1, count):
+            scale = max(abs(lam0[i]), abs(lam0[j]), np.finfo(float).tiny)
+            if abs(lam0[i] - lam0[j]) <= tolerance * scale:
+                parent[root(j)] = root(i)
+    sets = {}
+    for i in range(count):
+        sets.setdefault(root(i), []).append(i)
+    return [tuple(g) for g in sets.values() if len(g) >= 2]
+
+
+def _jacobian(xp, function, t0):
+    """d function / dt at t0 as NumPy numbers, in the library of ``xp`` (JAX or PyTorch)."""
+    if backend_of(xp) is Backend.JAX:
+        import jax
+        return np.asarray(jax.jacrev(function)(xp.asarray(t0, dtype=xp.float64)))
+    import torch
+    return torch.autograd.functional.jacobian(function, torch.tensor(t0, dtype=torch.float64)).detach().numpy()
+
+
+def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges):
+    """(xp, A, B, free): the restricted pencil assembled from the live node coordinates of ``step``."""
+    from .shape import live_triangle_geometry
+    xp = step.xp
     cells = space.mesh.triangles
     b, c, area = live_triangle_geometry(xp, mesh, cells, step)
     g = xp.stack([b, c], axis=2) / (2.0 * area)[:, None, None]                      # (T, 3, 2)
@@ -413,7 +539,7 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
     position = np.full(n_e + n_n, -1)
     position[free] = np.arange(len(free))
     A, B = (_restricted(m, position, len(free)) for m in _joined_system(xp, blocks, space, float(k0)))
-    return _refined_modes(xp, A, B, (t,), free, space, float(k0), n_eff0, et0, ez0)
+    return xp, A, B, free
 
 
 def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
