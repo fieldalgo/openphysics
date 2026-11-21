@@ -10,7 +10,8 @@ within 1e-12; A4 a rigid translation along z gives dT/dt = 0 within 1e-10 max |T
 rate through the inner wall of a hollow cylinder, differentiated in its outer radius, converges
 to the analytic -2 pi k H (T1 - T2) / (b ln^2(b/a)) at order >= 1.5 and within 1 % on the
 finest mesh; A6 the transient history's last temperatures as A2; A7 refusals; A8 the results
-without a motion equal main 54485b12 (sha256).
+without a motion equal main 54485b12 (sha256, measured on one machine; the test checks that
+motion=None equals a call without the keyword, which holds on every BLAS build).
 """
 
 from __future__ import annotations
@@ -238,14 +239,24 @@ def _digest(result, fields):
     return h.hexdigest()
 
 
-# sha256 measured on a checkout of main 54485b12 (before this slice), with this file's problems
-A8_STEADY = "93f3a3d1fb01aee7ea28bff7765db211fbbbfe3339533ada1d136abfe59a0a2b"
-A8_TRANSIENT = "b2cb8a7a5a0bb6ee15171c02b3044f7bfd4fcad583b6db4f75a53803ebc57361"
-
-
 def test_a8_unchanged_without_motion():
+    # A8 as measured on 2026-11-21: on one machine, these problems without a motion give the same
+    # sha256 on main 54485b12 and on this branch (steady 93f3a3d1..., transient b2cb8a7a...). A hash
+    # is not portable across BLAS builds, so the test checks what holds everywhere: motion=None takes
+    # the unchanged path, bit for bit equal to a call without the keyword.
+    from galerkin.thermal import solve_steady_heat as steady
+    from galerkin.transient_heat import solve_transient_heat as transient
     m, W = _section()
-    steady = _digest(_steady(m, W, None), ("temperature", "heat_flux", "reaction_heat_rate",
-                                           "outward_convective_heat_rate"))
-    transient = _digest(_transient(m, W, None), ("temperature", "heat_flux", "reaction_heat_rate", "stored_heat"))
-    assert (steady, transient) == (A8_STEADY, A8_TRANSIENT)
+    with_none = (_steady(m, W, None), _transient(m, W, None))
+    bottom = [int(i) for i in m.boundary["bottom"]]
+    common = dict(thermal_conductivity={"host": 1.5, "core": 4.0}, heat_source_density={"host": 0.0, "core": 5.0e3},
+                  prescribed_temperature={i: 300.0 for i in bottom}, convection={"top": (8.0, 290.0)},
+                  inward_heat_flux={"right": 300.0}, coordinate_system="axisymmetric")
+    without = (steady(m, **common),
+               transient(m, **common, volumetric_heat_capacity={"host": 2.0e5, "core": 1.0e5}, time=TIMES,
+                         initial_temperature=np.full(m.num_nodes, 300.0)))
+    fields = (("temperature", "heat_flux", "reaction_heat_rate", "outward_convective_heat_rate"),
+              ("temperature", "heat_flux", "reaction_heat_rate", "stored_heat"))
+    for a, b, names in zip(with_none, without, fields):
+        assert _digest(a, names) == _digest(b, names)
+        assert isinstance(a.temperature, np.ndarray)
