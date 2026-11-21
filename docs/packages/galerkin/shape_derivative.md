@@ -193,9 +193,24 @@ without a motion, and numbers for k0 and n_target.
   The result is one `DegenerateModeBranches(mode_index, effective_index,
   effective_index_derivative, mode_combination)` per group, or an empty list.
   The slopes come largest first, as NumPy numbers per unit of t, under
-  exp(−iωt). dA/dt and dB/dt are taken in t's library. A degenerate mode whose
-  partner was not returned is refused (raise `search_mode_count`). A
-  `relative_tolerance` above `DEGENERATE_GAP` also groups nearly degenerate modes.
+  exp(−iωt). dA/dt and dB/dt are taken in t's library.
+- Refused by name:
+  - a group with a member that was not returned (raise `search_mode_count`);
+  - a group whose members chain farther apart than `relative_tolerance`;
+  - a `relative_tolerance` outside (0, 1e-3];
+  - complex slopes on a real problem.
+
+  `ElementInversion` from the motion passes unchanged.
+- A `relative_tolerance` above `DEGENERATE_GAP` also groups nearly degenerate
+  modes, such as a symmetric pair that a mesh splits slightly. Their slopes are
+  then those of the exactly degenerate limit, which the modes follow over steps
+  much larger than the split. They are not the derivatives at t of either
+  returned mode; `solve_waveguide_modes` with the motion gives those, without NaN,
+  once the split exceeds `DEGENERATE_GAP`. On the D6 mesh (split 3.1e-5) the
+  branches are 5.696 and 2.280 µm⁻¹, while the sorted modes' derivatives at t = 0
+  are 2.300 (upper) and 5.676 (lower), with the same sum (independent review,
+  2026-11-21). Finite differences pass from one regime to the other near a step
+  of 1e-5 µm.
 - `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
   positions.
 
@@ -383,7 +398,7 @@ the same versions.
 | W7 unchanged | without `motion` the result equals the previous code | sha256 of n_eff, et and ez equal to main `e6c5826` for a real and a lossy core (measured); `motion=None` equals no keyword (test) |
 | W8 refusals | as listed above | pass |
 
-`tests/galerkin/test_degenerate_branches.py` holds the branch checks D1–D6,
+`tests/galerkin/test_degenerate_branches.py` holds the branch checks D1–D9 (D7–D9 pre-registered after the independent review),
 pre-registered on 2026-11-21 and measured that day as above (micrometre meshes,
 k0 in rad/µm, so the slopes are per micrometre):
 
@@ -392,9 +407,12 @@ k0 in rad/µm, so the slopes are per micrometre):
 | D1 symmetric square (W6 problem) | sorted slopes equal one-sided differences of the sorted indices on both sides (two Richardson levels, h = 5e-4) within 1e-6 | 5.6403 and 2.2760 per unit; ≤ 3.2e-9 |
 | D2 smooth sum | the slopes' sum equals the central difference of n₁ + n₂ (one Richardson level) within 1e-6 | pass (a plain central difference at h = 5e-4 is 2.2e-6 off by truncation) |
 | D3 nondegenerate strip | no group | pass |
-| D4 refusals | a partner that was not returned; a `relative_tolerance` outside (0, 1) | pass |
+| D4 refusals | a partner that was not returned; a `relative_tolerance` of 0 | pass |
 | D5 libraries | JAX and PyTorch within 1e-12 | pass |
-| D6 the 2026-11-11 square (geometry-engine motion, mesh 0.02 µm, pair split by 3.1e-5, tolerance 1e-4) | slopes within 3 % of that day's galerkin differences (5.70–5.82, 2.276–2.283 µm⁻¹) and 5 % of modesolverpy's (5.53–5.63, 2.251–2.254) | 5.696 and 2.280 µm⁻¹ |
+| D6 the 2026-11-11 square (geometry-engine motion, mesh 0.02 µm, pair split by 3.1e-5, tolerance 1e-4) | slopes within 3 % of that day's galerkin differences (5.70–5.82, 2.276–2.283 µm⁻¹) and 5 % of modesolverpy's (5.53–5.63, 2.251–2.254) | 5.696 and 2.280 µm⁻¹ (the degenerate limit, see above) |
+| D7 incomplete or chained group (pre-registered after the review) | a group of 2 from a triple eigenvalue, and 1, 1 + 6e-4, 1 + 1.2e-3 at tolerance 1e-3, are refused | pass |
+| D8 refusals | `relative_tolerance` 2e-3 or `None`, `motion=None` by name; t = 2 raises `ElementInversion` unchanged | pass |
+| D9 lossy core (public ε = 3.48² + 0.01i) | public slopes equal one-sided differences of the public indices on both sides (two Richardson levels, h = 5e-4) within 1e-6 | 5.6403 + 0.0059i and 2.2760 + 0.0022i per unit; ≤ 3.2e-9 |
 
 W1: the pre-registration named the plain central difference at h = 1e-4. For the
 imaginary part of the lossy mode 0 its truncation error is 1.5e-6 (the second

@@ -135,8 +135,18 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
 
   묶음마다 `DegenerateModeBranches(mode_index, effective_index, effective_index_derivative, mode_combination)` 하나 또는 빈 목록을
   돌려줍니다. 기울기는 큰 것부터이고, exp(−iωt) 기준으로 t 한 단위당 NumPy 수입니다. dA/dt와 dB/dt는 t의 라이브러리에서 구합니다.
-  짝이 반환되지 않은 축퇴 모드는 거부합니다(`search_mode_count`를 늘리십시오). `DEGENERATE_GAP`보다 큰 `relative_tolerance`는 거의 축퇴인
-  모드도 묶습니다.
+- 이름을 밝혀 거부하는 경우:
+  - 반환되지 않은 구성원이 있는 묶음(`search_mode_count`를 늘리십시오);
+  - 구성원끼리 `relative_tolerance`보다 멀리 이어진 묶음;
+  - (0, 1e-3] 밖의 `relative_tolerance`;
+  - 실수 문제의 복소 기울기.
+
+  motion의 `ElementInversion`은 그대로 전달합니다.
+- `DEGENERATE_GAP`보다 큰 `relative_tolerance`는 메시가 조금 갈라 놓은 대칭 쌍처럼 거의 축퇴인 모드도 묶습니다. 그 기울기는 정확 축퇴
+  극한의 기울기로, 간격보다 훨씬 큰 걸음에서 모드가 따르는 값입니다. 반환 모드 각각의 t에서의 미분이 아닙니다. 그 미분은 간격이
+  `DEGENERATE_GAP`보다 크면 motion을 준 `solve_waveguide_modes`가 NaN 없이 줍니다. D6 메시(간격 3.1e-5)에서 분기는 5.696, 2.280 µm⁻¹이고,
+  정렬 모드의 t = 0 미분은 2.300(위), 5.676(아래)이며 합은 같습니다(2026-11-21 독립 검토). 유한 차분은 걸음 1e-5 µm 근처에서 한 체제에서
+  다른 체제로 넘어갑니다.
 - `coordinate_factors`(PML, 굽힘)는 노드 위치에 따라 달라지므로 motion과 함께 거부합니다.
 
 ## 메시 속도
@@ -284,7 +294,7 @@ h를 키우면 차이가 줄고(h = 1e-2: 4.8e-9), 미분은 평형값 d(ΣR_y)/
 | W7 무변경 | `motion` 없이 결과가 이전 코드와 같음 | 실수·흡수 코어에서 n_eff·et·ez sha256이 main `e6c5826`과 같음(측정); `motion=None`과 키워드 없음이 같음(시험) |
 | W8 거부 | 위 목록대로 | 통과 |
 
-`tests/galerkin/test_degenerate_branches.py`에 분기 검사 D1–D6이 있습니다(2026-11-21 사전 등록, 같은 날 위와 같이 측정; 마이크로미터 메시와
+`tests/galerkin/test_degenerate_branches.py`에 분기 검사 D1–D9가 있습니다(D7–D9는 독립 검토 뒤 2026-11-21 사전 등록, 같은 날 위와 같이 측정; 마이크로미터 메시와
 rad/µm k0이므로 기울기는 마이크로미터당).
 
 | 검사 | 기준 | 결과 |
@@ -292,9 +302,12 @@ rad/µm k0이므로 기울기는 마이크로미터당).
 | D1 대칭 정사각(W6 문제) | 정렬 기울기가 양쪽에서 정렬 지수의 한쪽 차분(Richardson 두 단계, h = 5e-4)과 1e-6 이내 | 단위당 5.6403, 2.2760; ≤ 3.2e-9 |
 | D2 매끄러운 합 | 기울기의 합이 n₁ + n₂의 중앙 차분(Richardson 한 단계)과 1e-6 이내 | 통과(h = 5e-4의 단순 중앙 차분은 절단 오차로 2.2e-6 차이) |
 | D3 비축퇴 strip | 묶음 없음 | 통과 |
-| D4 거부 | 반환되지 않은 짝; (0, 1) 밖 `relative_tolerance` | 통과 |
+| D4 거부 | 반환되지 않은 짝; 0인 `relative_tolerance` | 통과 |
 | D5 라이브러리 | JAX와 PyTorch가 1e-12 이내 | 통과 |
-| D6 2026-11-11 정사각(형상 엔진 motion, 메시 0.02 µm, 짝 간격 3.1e-5, tolerance 1e-4) | 그날 galerkin 차분(5.70–5.82, 2.276–2.283 µm⁻¹)과 3 %, modesolverpy(5.53–5.63, 2.251–2.254)와 5 % 이내 | 5.696, 2.280 µm⁻¹ |
+| D6 2026-11-11 정사각(형상 엔진 motion, 메시 0.02 µm, 짝 간격 3.1e-5, tolerance 1e-4) | 그날 galerkin 차분(5.70–5.82, 2.276–2.283 µm⁻¹)과 3 %, modesolverpy(5.53–5.63, 2.251–2.254)와 5 % 이내 | 5.696, 2.280 µm⁻¹(축퇴 극한, 위 참고) |
+| D7 불완전·이어진 묶음(검토 뒤 사전 등록) | 삼중 고유값 중 2개 묶음, tolerance 1e-3에서 1, 1 + 6e-4, 1 + 1.2e-3을 거부 | 통과 |
+| D8 거부 | `relative_tolerance` 2e-3·`None`, `motion=None`을 이름 밝혀 거부; t = 2는 `ElementInversion`을 그대로 | 통과 |
+| D9 손실 코어(공개 ε = 3.48² + 0.01i) | 공개 기울기가 양쪽에서 공개 지수의 한쪽 차분(Richardson 두 단계, h = 5e-4)과 1e-6 이내 | 단위당 5.6403 + 0.0059i, 2.2760 + 0.0022i; ≤ 3.2e-9 |
 
 W1: 사전 등록은 h = 1e-4의 단순 중심차분을 정했습니다. 흡수 모드 0의 허부에서는 그 절단 오차가 1.5e-6입니다(2계 미분이
 큼). h를 1e-2에서 1e-4로 줄이면 미분으로 수렴하고, h와 h/2의 Richardson 외삽은 6.1e-10으로 맞습니다. 시험은 모든 경우에

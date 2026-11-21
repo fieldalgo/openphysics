@@ -8,6 +8,8 @@ nodal elements; the formulation is in docs/packages/galerkin/waveguide_formulati
 frozen ``WaveguideModes``; ``mode_power``, ``cross_power``, ``field_overlap``,
 ``mode_coupling_efficiency``, ``mode_confinement_factor`` and ``mode_effective_area`` post-process
 its modes. ``ModalPML`` and ``Bend`` describe a perfectly matched layer and a constant-radius bend.
+``degenerate_branch_derivatives`` returns, as frozen ``DegenerateModeBranches``, the branch slopes
+under a shape motion of degenerate modes, which ``solve_waveguide_modes`` with that motion leaves NaN.
 
 Units and convention
 --------------------
@@ -34,6 +36,7 @@ and the other functions then integrate those components over the whole window, P
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -310,12 +313,19 @@ def degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelen
     an eigenvalue of the motion's derivative projected onto the degenerate subspace. This takes the
     inputs of ``solve_waveguide_modes`` with a motion (no PML or bend; NumPy material data) and returns
     one ``DegenerateModeBranches`` per group of returned modes whose eigenvalues lie within
-    ``relative_tolerance`` of each other (a value above DEGENERATE_GAP also groups nearly degenerate
-    modes), or an empty list. The numbers are NumPy values; the slopes are taken in the library of
-    the motion's t. A degenerate mode whose partner was not returned is refused (raise
-    ``search_mode_count``).
+    ``relative_tolerance`` (at most 1e-3) of each other, or an empty list. The numbers are NumPy
+    values; the slopes are taken in the library of the motion's t.
+
+    A value above DEGENERATE_GAP also groups nearly degenerate modes, such as a symmetric pair a
+    mesh splits slightly. Their slopes are then those of the exactly degenerate limit, which the
+    modes follow over steps much larger than the split; they are not d n_eff / dt at t of either
+    returned mode (``solve_waveguide_modes`` with the motion gives those, without NaN, when the
+    split exceeds DEGENERATE_GAP). Refused by name: a group with a member that was not returned
+    (raise ``search_mode_count``), a group that chains beyond ``relative_tolerance``, and complex
+    slopes on a real problem. ``ElementInversion`` from the motion is raised unchanged.
     """
     from ._waveguide_kernels import degenerate_branch_derivatives as _branches
+    from .shape import MeshMotion
     count = mesh.num_triangles
     eps = _material(relative_permittivity, "relative_permittivity", count)
     mu = _material(relative_permeability, "relative_permeability", count)
@@ -326,6 +336,11 @@ def degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelen
             or search_mode_count < 1:
         raise ValueError("search_mode_count must be a positive integer")
     refuse_text("relative_tolerance", relative_tolerance)
+    if isinstance(relative_tolerance, (bool, np.bool_)) or not isinstance(relative_tolerance,
+                                                                          (int, float, np.integer, np.floating)):
+        raise TypeError(f"relative_tolerance must be a real number, got {relative_tolerance!r}")
+    if not isinstance(motion, MeshMotion):
+        raise TypeError("motion must be a MeshMotion (design velocity and a JAX or PyTorch t)")
     for name, value in (("relative_permittivity", eps), ("relative_permeability", mu),
                         ("vacuum_wavelength or vacuum_angular_wavenumber", k0)):
         if contains_live(value):
@@ -336,8 +351,11 @@ def degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelen
                            mu_r=to_kernel(mu), pec_nodes=pec_nodes, pec_edges=pec_edges,
                            tolerance=float(relative_tolerance))
     except ValueError as exc:
-        raise ValueError(str(exc).replace("degenerate_branch_derivatives: ", "")
-                         .replace("tolerance", "relative_tolerance").replace("num_modes", "search_mode_count")) from exc
+        prefix = "degenerate_branch_derivatives: "
+        if type(exc) is not ValueError or not str(exc).startswith(prefix):
+            raise                       # ElementInversion and the motion's own refusals, unchanged
+        text = re.sub(r"\btolerance\b", "relative_tolerance", str(exc)[len(prefix):])
+        raise ValueError(re.sub(r"\bnum_modes\b", "search_mode_count", text)) from exc
     return [DegenerateModeBranches(g.modes, to_public(g.effective_index), to_public(g.slopes),
                                    to_public(g.combinations)) for g in groups]
 
