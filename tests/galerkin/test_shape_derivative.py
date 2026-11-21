@@ -357,7 +357,7 @@ def _offset_case(c, kind):
         kw.update(prescribed_temperature={i: c + 1.0 for i in left}, convection={"right": (7.0, c)})
     else:                                    # convection only: the component is anchored at its ambient
         kw.update(prescribed_temperature={}, convection={"right": (7.0, c), "left": (2.0, c + 1.0)})
-    return m, W, kw, left if kind != "robin_only" else None
+    return m, W, kw, (left if kind != "robin_only" else [int(i) for i in np.unique(m.boundary_edges["right"])])
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -374,8 +374,10 @@ def test_s9_a_large_temperature_offset_changes_nothing(name, kind):
     def objective(m, W, kw, nodes):
         def f(t):
             r = solve_steady_heat(m, **kw, motion=MeshMotion(design_velocity=W, t=t))
-            q = r.reaction_heat_rate_per_depth if nodes is not None else r.outward_convective_heat_rate_per_depth
-            return xp.sum(q[np.asarray(nodes)]) if nodes is not None else xp.sum(q)
+            # heat in at the Dirichlet side; with convection only, the heat out through the right side
+            # (not the total, which balance fixes at the integral of the source whatever T is)
+            q = r.outward_convective_heat_rate_per_depth if kind == "robin_only" else r.reaction_heat_rate_per_depth
+            return xp.sum(q[np.asarray(nodes)])
         return f
     _value, reference = _gradient(name, objective(_m, _W, _kw, nodes))
     for c in (300.0, 1e6, 1e9):
@@ -384,9 +386,13 @@ def test_s9_a_large_temperature_offset_changes_nothing(name, kind):
         t0 = _jax().numpy.asarray(0.0, dtype=_jax().numpy.float64) if name == "jax" else \
             _torch().tensor(0.0, dtype=_torch().float64, requires_grad=True)
         r = solve_steady_heat(m, **kw, motion=MeshMotion(design_velocity=W, t=t0))
-        for field in ("reaction_heat_rate_per_depth", "outward_convective_heat_rate_per_depth", "heat_flux"):
+        # (the residual at free nodes is rounding in both solves; at fixed nodes it is the reaction)
+        for field in ("temperature", "reaction_heat_rate_per_depth", "outward_convective_heat_rate_per_depth",
+                      "heat_flux"):
             got, want = to_numpy(getattr(r, field)), getattr(plain, field)
-            scale = max(np.max(np.abs(want)), np.finfo(float).tiny)
+            # the temperature against its range (its absolute size is the offset itself); a field
+            # that is zero in the plain solve (no reactions, no convection) must be zero
+            scale = np.ptp(want) if field == "temperature" else max(np.max(np.abs(want)), np.finfo(float).tiny)
             assert np.max(np.abs(got - want)) <= 1e-12 * scale, (c, field)
         _value, slope = _gradient(name, objective(m, W, kw, nodes))
         assert rel(slope, reference) <= 1e-9, (c, slope, reference)

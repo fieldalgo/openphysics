@@ -54,7 +54,8 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     negated the inward flux, so this takes the outward heat flux (positive leaves the body).
     The numbers come from the ordinary solve on the moved mesh, with all its checks;
     the derivative is attached by one more live solve of the system assembled from
-    the live node coordinates: T = T0 + A(t)^-1 (b(t) - A(t) T0), equal to T0 up to
+    the live node coordinates, on the increment over each component's offset (as the
+    solver): u = u0 + A(t)^-1 (b_shifted(t) - A(t) u0), T = u + offset, equal to T0 up to
     rounding."""
     from . import thermal
     from .shape import ElementInversion, admissible_interval
@@ -100,8 +101,8 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     # Work with the increment over each component's offset, as thermal.py does: K annihilates
     # constants, so a large common temperature times a rounding-level sum must not reach the
     # residual, reactions, convection or flux. The offset of a component is its first Dirichlet
-    # value, else the ambient of its first convection edge with h > 0 (thermal.py's anchors),
-    # else its temperature at its first node.
+    # value, else the ambient of its first convection edge with h > 0 (thermal.py's anchors).
+    # The plain solve above refuses a component with neither, so the last rule is only a guard.
     from .core.triangles import triangle_geometry
     _p, _t, _a, _b, count, labels = triangle_geometry(moved)
     offsets = np.zeros(count)
