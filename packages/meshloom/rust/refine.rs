@@ -114,10 +114,10 @@ const SLIVER_CAP: f64 = 0.10;
 /// exceeds FAC_C alpha h (h of the regions around them), is split even when not
 /// encroached, so the boundary is discretized to the size before the volume.
 /// FAC_C and ALPHA (Python) were chosen together on V8's C2 and C3 rows (2026-11-21:
-/// FAC_C 0.65 with ALPHA 0.99-1.01 meets all of them, 0.5 and 0.75 do not), so V8 is
+/// FAC_C 0.68 with ALPHA 0.99-1.0 and 0.7 with 1.0 meet all of them, 0.5 and 0.75 do not), so V8 is
 /// not an independent check of them.
 const SEG_C: f64 = 1.0;
-const FAC_C: f64 = 0.65;
+const FAC_C: f64 = 0.68;
 /// Smoothing takes a move that raises the mean q of the star while its worst q stays at
 /// least min(before, SMOOTH_FLOOR) (and the dihedral and ratio rules hold).
 const SMOOTH_FLOOR: f64 = 0.5;
