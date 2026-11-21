@@ -221,9 +221,13 @@ def _solve_modes(arguments, motion):
     kernel_motion = MeshMotion(design_velocity=1e6 * np.asarray(motion.design_velocity, dtype=float), t=motion.t)
     result = _solve_vector(arguments["mesh"], np.asarray(arguments["eps"]), p.wavelength, p.boundary, p.num_modes,
                            p.n_cladding, p.n_target, motion=kernel_motion)
-    neff = result["neff"]
-    # the kernel is under exp(+i omega t); the public value is its conjugate (real for a lossless guide)
-    return {"effective_index": neff.conj() if hasattr(neff, "conj") else neff}
+    return {"effective_index": _to_public(result["neff"])}
+
+
+def _to_public(kernel_index):
+    """The kernel's effective index (exp(+i omega t)) under exp(-i omega t): its conjugate, the one
+    conversion of this module (real for a lossless guide), in the library of t."""
+    return kernel_index.conj()
 
 
 def _check_same_complex(meshed, moving):
