@@ -95,6 +95,7 @@ and θ (bins of 5°); counts of tetrahedra with any θ below 10° and below 30°
 Sizes for C1–C7: C1 h ∈ {0.2, 0.1, 0.05}; C2 {0.12, 0.06, 0.03}; C3 {0.8, 0.4, 0.2};
 C3 with the die at h/2 {0.96, 0.48, 0.24}; C4 {0.2, 0.1, 0.05}; C5 and C6
 {0.24, 0.12, 0.06}; C7 {0.06, 0.03, 0.015}. C9 uses the sizes of C2, {0.12, 0.06, 0.03}.
+C11 {0.1, 0.05, 0.025}.
 
 ## Baseline
 
@@ -408,6 +409,16 @@ requires. Reason: without dimensions C9 could not be built, so V7, V26 and V29 c
 the definition and changes no threshold or other case. The block stands on the floor, as a dielectric resonator
 does, so the case also tests a facet inside a facet. The project owner chose these dimensions on 2026-11-20, before
 any mesher run on C9.
+
+**2026-11-21, C11 sizes.** Old: C11 (concentric-sphere capacitor, a = 0.5, b = 0.75, c = 1) has no sizes. New: C11
+uses h ∈ {0.1, 0.05, 0.025}. Reason: without sizes, V5 and V24 could not be graded on C11. Each of C11's two shells
+is 0.25 thick, so even the coarsest size has at least 2.5 tetrahedra across a shell. At C1's sizes, the coarsest
+(h = 0.2) would leave about 1.25, a size not yet in the asymptotic range that could pull V24's slope down. This
+fills in the definition and changes no threshold (V5 ≤ 1e-15, V24 ≥ 1.6) or other case. The project owner chose
+these sizes on 2026-11-21. Disclosure: before that decision, while the sizes were assumed to be C1's, meshloom was
+run on C11 at h = 0.2, 0.1 and 0.05 (relative capacitance errors 3.25e-2, 1.05e-2 and 2.07e-3, recorded in the work
+log). No run at h = 0.025 had been made. V24 is graded on the new sizes, and the sizes are not changed after it is
+measured.
 
 ## Limits
 
