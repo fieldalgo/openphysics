@@ -370,7 +370,7 @@ Refused by name (`DocumentError`):
 - an `axisymmetric` component;
 - another physics, such as Joule heating;
 - for modes: the scalar formulation (simcase's own eigensolver has no moving-mesh
-  path), a PML or bend (their coordinate factors depend on the nodes), a sweep and
+  path), a PML or bend (not yet wired into simcase's modes document path), a sweep and
   mode tracking;
 - a `mechanics.thermoelastic2d` document with an inward heat flux, a convection or
   a traction: the workflow takes Dirichlet temperatures, a heat source and

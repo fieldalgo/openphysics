@@ -275,7 +275,7 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 - flat 형상 블록;
 - `axisymmetric` 성분;
 - 다른 물리(예: Joule 가열);
-- 모드에서: scalar formulation(simcase 자체 고유값 풀이기라 움직이는 메시 경로가 없음), PML·bend(좌표 인자가 노드에 따름), sweep, 모드 추적;
+- 모드에서: scalar formulation(simcase 자체 고유값 풀이기라 움직이는 메시 경로가 없음), PML·bend(simcase 모드 문서 경로에 아직 연결하지 않음), sweep, 모드 추적;
 - 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도, 열원, 단열, 처방 변위, 체적력만 받습니다;
 - 두 역학 종류의 `gauge_pressure`. simcase는 이를 법선을 따르는 traction으로 적용하는데, motion은 일정한 traction만 받습니다;
 - 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).

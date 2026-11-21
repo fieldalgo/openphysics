@@ -189,7 +189,8 @@ on 2026-11-21 before the implementation ran, and measured that day:
 
 The public `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`
 passes the motion to its kernel with the converted inputs; it refuses a motion together with a
-`ModalPML` or `Bend`, and live materials or a live wavelength with a motion. The kernel:
+`Bend`, and live materials or a live wavelength with a motion (a `ModalPML` takes a motion that
+leaves the layer in place, below). The kernel:
 
 `solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))` takes eps_r
 and mu_r as scalars or per-element arrays (real or complex), PEC nodes and edges as
@@ -250,6 +251,13 @@ without a motion, and numbers for k0 and n_target.
   with `solve_modes`.
   - The design velocity must be 0 on every node of an element whose factors are
     not 1. Otherwise it is refused by name.
+  - With a `ModalPML`, the outer faces must stay where they are: a normal velocity on
+    a node of the left, right, bottom or top face is refused by name. Moving one
+    would leave the rectangular window that the layer needs, and the solve would be
+    undefined at every t ≠ 0 (independent review, 2026-11-21).
+  - At kernel level, `solve_modes(..., coordinate_factors=f, motion=)` takes f as
+    the factors of the mesh at the step t, held fixed. The rule above applies, and
+    f carries no derivative.
   - Each PML element then keeps its centroid and so its factors. The factors of the
     physical window are 1, and the profile (order ≥ 2) is flat where the window
     ends. The factors therefore carry no derivative.
