@@ -16,12 +16,13 @@ transient heat (`galerkin.transient_heat.solve_transient_heat`, Cartesian
 2026-11-10, axisymmetric 2026-11-21) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11; with a modal PML
 2026-11-21). The
 other
-solvers follow the same frame later.
+solvers follow the same frame later. In 3D it covers steady heat
+(`galerkin.thermal3d.solve_steady_heat_3d`, 2026-11-21).
 
 ## What is differentiated
 
 A design parameter t moves every node: **X(t) = X₀ + t·W**.
-- **W** is a fixed NumPy mesh velocity of shape (N, 2), `MeshMotion.design_velocity`
+- **W** is a fixed NumPy mesh velocity of shape (N, 2) ((N, 3) on a `Mesh3D`), `MeshMotion.design_velocity`
   (keyword-only, like `t`): node motion in the mesh's length unit per unit of t.
 - **t** is the only live value, a JAX or PyTorch scalar. Its number is the step
   at which the solve runs, usually 0, i.e. the mesh as given.
@@ -284,6 +285,41 @@ without a motion, and numbers for k0 and n_target.
   at 0.25 µm, while the motion keeps the substrate at 0.47 µm. Once the root
   used the moved geometry (gap 0.47 − d₁), the criteria were met as
   pre-registered.
+
+## 3D steady heat
+
+`solve_steady_heat_3d(mesh3d, ..., motion=MeshMotion(design_velocity=W, t=t))` takes a
+`Mesh3D` with an (N, 3) design velocity and the solver's own inputs. Those are a region
+or scalar conductivity, a region or scalar heat source, and Dirichlet values attached to
+their nodes (the 3D solver has no flux or convection).
+- The numbers come from the ordinary solve on the moved `Mesh3D`.
+- The live correction assembles the P1 system from the live coordinates. The barycentric
+  gradients are the cofactor rows (e₂ × e₃, e₃ × e₁, e₁ × e₂)/det and the volume is
+  det/6. The stiffness is kV GGᵀ and the source load QV/4.
+- As in 2D, the correction is solved on the increment over each component's first
+  Dirichlet value.
+- `admissible_interval` and `extend_velocity` take a `Mesh3D`.
+  - A tetrahedron's volume is a cubic in t. Its real roots, polished by Newton steps,
+    bound the interval.
+  - The extension solves the P1 Laplace problem in 3D per component (`"stiffened"`
+    divides by the volume).
+- A source callback is refused with a motion: its sample points move.
+
+`tests/galerkin/test_shape_derivative_3d.py` holds T1–T10, pre-registered on
+2026-11-21 before the implementation ran, and measured that day:
+
+| Check | Criterion | Result |
+|---|---|---|
+| T1 numbers | temperatures, rates and flux equal the ordinary solve on the moved mesh, relative 1e-12 | 5.7e-14 |
+| T2 consistency | two-region box with a source, interior bump plus a moving face: dT/dt against a Richardson central difference of moved meshes (h = 2e-3) within 1e-8 · max \|dT/dt\| | 1.2e-10 |
+| T3 libraries | JAX and PyTorch within 1e-12 | 2.3e-16 |
+| T4 rigid motions | a translation and an infinitesimal rotation ω × x: dT/dt = 0 within 1e-10 · max \|T\| | 1.5e-16, 5.4e-17 |
+| T5 two-layer box | dQ/dL₁ = −AΔT (1/k₁ − 1/k₂)/R², relative 1e-10 | 4.7e-15 |
+| T6 hollow cylinder | inner radius a against 2πkH(T₁ − T₂)/(a ln²(b/a)); order ≥ 1.5, finest within 1e-2 | 9.7e-3, 2.4e-3, 5.9e-4 at 4 × 16, 8 × 32, 16 × 64 cells; order 2.03 and 2.01 |
+| T7 inversion interval | volumes positive at (1 − 1e-9) of each end, some ≤ 0 at (1 + 1e-9); a step beyond is refused | pass |
+| T8 extension | linear data reproduced within 1e-12 (harmonic and stiffened) | pass |
+| T9 refusals | a 2-column velocity, live conductivity or Dirichlet value, a source callback, a NumPy t | pass |
+| T10 unchanged | `motion=None` equals no keyword bit for bit | pass |
 
 ## The mesh velocity
 

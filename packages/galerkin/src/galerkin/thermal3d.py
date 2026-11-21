@@ -112,7 +112,7 @@ def _source(mesh, heat_source):
 
 
 def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_temperature,
-                         heat_source_density=None) -> SteadyHeat3DResult:
+                         heat_source_density=None, motion=None) -> SteadyHeat3DResult:
     """Solve -div(k grad T) = Q with prescribed nodal temperatures; other faces insulated.
 
     mesh: ``galerkin.Mesh3D`` in metres (``from_mesher`` of a meshine or gmshio
@@ -126,7 +126,12 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
         (T, 3) tetrahedron centroids (read-only) and returning (T,) values; None
         (the default) is no source.
 
-    NumPy only: JAX or PyTorch values raise TypeError, and so does a str for a
+    motion: ``galerkin.shape.MeshMotion(design_velocity=W, t=t)`` with W (N, 3) solves on
+        the nodes X0 + t W and carries the derivative with respect to the JAX or PyTorch
+        scalar t (a shape derivative; docs/packages/galerkin/shape_derivative.md). The
+        inputs stay NumPy constants or region tables; a source callback is refused.
+
+    NumPy only otherwise: JAX or PyTorch values raise TypeError, and so does a str for a
     quantity (SI numbers only). Raises ValueError on invalid input, a singular
     system, or a failed residual or heat-balance check.
     """
@@ -136,6 +141,11 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
         refuse_text(name, value)
     if not isinstance(mesh, Mesh3D):
         raise TypeError("solve_steady_heat_3d takes a galerkin.Mesh3D (use from_mesher)")
+    if motion is not None:
+        from ._moving import solve_steady_heat_3d_moving
+        return solve_steady_heat_3d_moving(mesh, motion, thermal_conductivity=thermal_conductivity,
+                                           prescribed_temperature=prescribed_temperature,
+                                           heat_source_density=heat_source_density)
     k = _per_region(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
     source = _source(mesh, 0.0 if heat_source_density is None else heat_source_density)
     dirichlet = prescribed_temperature

@@ -59,8 +59,8 @@ result = solve_steady_heat_3d(
 
 절점 열량은 깊이당이 아닌 W이므로 필드에 `_per_depth`가 없습니다(물으면 이유를 말하는
 `AttributeError`). `.units`가 각 물리량 필드의 SI 단위를 줍니다. 자유 잔차가 계 규모의 `1e-10`을 넘거나 열수지가
-`1e-10`을 넘으면 `ValueError`를 던지므로, 반환된 결과는 둘을 통과한 것입니다. NumPy
-전용: JAX·PyTorch 값은 `TypeError`이며 미분 경로는 없습니다.
+`1e-10`을 넘으면 `ValueError`를 던지므로, 반환된 결과는 둘을 통과한 것입니다.
+JAX·PyTorch 값은 `TypeError`이며, 미분 경로는 JAX·PyTorch t를 준 형상 미분 `motion=MeshMotion(...)` 하나뿐입니다([형상 미분](shape_derivative.md#3d-정상-열)).
 
 ## 검증
 
