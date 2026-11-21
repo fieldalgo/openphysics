@@ -5,14 +5,15 @@
 [galerkin overview](overview.md) · [Derivatives with JAX and PyTorch](differentiation.md)
 
 `galerkin.shape` gives derivatives with respect to a design parameter that moves
-the mesh, such as a layer thickness or a hole radius. It covers steady Cartesian
-heat (`galerkin.thermal.solve_steady_heat`, 2026-11-09), steady electric
+the mesh, such as a layer thickness or a hole radius. It covers steady heat
+(`galerkin.thermal.solve_steady_heat`, Cartesian 2026-11-09, axisymmetric
+2026-11-21), steady electric
 conduction (`galerkin.electric.solve_steady_electric`, 2026-11-10), linear
 elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10),
 thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10),
-transient Cartesian heat (`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11). The
+transient heat (`galerkin.transient_heat.solve_transient_heat`, Cartesian
+2026-11-10, axisymmetric 2026-11-21) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11). The
 other
 solvers follow the same frame later.
 
@@ -151,6 +152,39 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
   live time-dependent h.) Callbacks of coordinates are refused, as everywhere.
 - `checkpoint_every` is refused with a motion: every step is kept.
 
+## Axisymmetric heat
+
+`solve_steady_heat` and `solve_transient_heat` with `coordinate_system="axisymmetric"`
+take a motion with the same inputs as the Cartesian solves (decision 2026-11-21,
+follow-up 5, slice 1). The coordinates are (r, z), and the 2πr measure moves with the
+nodes. The live assembly uses exact closed forms, since r is linear on each triangle and
+edge (no quadrature):
+- stiffness k(bbᵀ + ccᵀ)/(4A) · 2πr̄, with r̄ the mean of the three vertex radii;
+- region source 2πQA(2rᵢ + rⱼ + rₖ)/12;
+- edge flux and convection ambient 2πgL(2rₐ + r_b)/6;
+- Robin edge matrix 2πhL/12 · [[3rₐ + r_b, rₐ + r_b], [rₐ + r_b, rₐ + 3r_b]];
+- consistent mass 2πcA Σₘ rₘ ∫φᵢφⱼφₘ/A, the cubic moments of the NumPy mass.
+
+Nodes on the symmetry axis (r = 0) must stay on it: a design velocity with a radial
+component there is refused by name. Negative radii and Dirichlet values only on the
+axis keep the ordinary solve's refusals on the moved mesh. Results are the
+axisymmetric classes, with rates in W over the full revolution; they carry the
+derivative as in the Cartesian solves.
+
+`tests/galerkin/test_shape_derivative_axisymmetric.py` holds A1–A8, pre-registered
+on 2026-11-21 before the implementation ran, and measured that day:
+
+| Check | Criterion | Result |
+|---|---|---|
+| A1 numbers | the motion's temperature and rates equal the ordinary solve on the moved mesh, relative 1e-12 | 5.3e-16 |
+| A2 steady consistency | r–z section with a region source, inward flux and convection on moving sides: dT/dt against a Richardson central difference of moved meshes (h = 2e-3), within 1e-8 · max \|dT/dt\| | 3.1e-12 |
+| A3 libraries | JAX and PyTorch within 1e-12 | 1.9e-15 |
+| A4 rigid translation along z | dT/dt = 0 within 1e-10 · max \|T\| | 2.3e-16 |
+| A5 hollow cylinder | a = 1, b = 2, T(a) = 400, T(b) = 300: the inner-wall heat rate differentiated in b against −2πkH(T₁ − T₂)/(b ln²(b/a)); order ≥ 1.5, finest within 1 % | 8.6e-4, 2.2e-4, 5.4e-5 at 8, 16, 32 radial cells; order 1.99 and 2.00 |
+| A6 transient | the same section, five backward-Euler steps: the last temperatures as A2 | 2.4e-10 |
+| A7 refusals | a radial velocity on the axis (steady and transient), a live conductivity, an unknown coordinate system | pass |
+| A8 unchanged | without a motion the results equal main `54485b12` | sha256 equal (steady and transient) |
+
 ## Waveguide modes
 
 The public `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`
@@ -276,8 +310,8 @@ Each refusal names the reason:
   with a motion: t is the one live input of such a call;
 - a temperature snapshot of another mesh, including the moved one: the snapshot
   belongs to the mesh as given;
-- `coordinate_system="axisymmetric"`; `checkpoint_every` in transient heat;
-  `coordinate_factors` in waveguide modes;
+- a radial design velocity on the symmetry axis with `coordinate_system="axisymmetric"`;
+  `checkpoint_every` in transient heat; `coordinate_factors` in waveguide modes;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
   ([refused](differentiation.md#refused-not-approximated)).

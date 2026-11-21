@@ -4,11 +4,11 @@
 
 [galerkin 개요](overview.md) · [JAX·PyTorch로 미분하기](differentiation.md)
 
-`galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 Cartesian 열
-(`galerkin.thermal.solve_steady_heat`, 2026-11-09), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
+`galerkin.shape`는 층 두께나 구멍 반지름처럼 메시를 움직이는 설계 변수에 대한 미분을 줍니다. 정상 열
+(`galerkin.thermal.solve_steady_heat`, Cartesian 2026-11-09, 축대칭 2026-11-21), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
-`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 Cartesian 열(`galerkin.transient_heat.solve_transient_heat`,
-2026-11-10), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+`galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 열(`galerkin.transient_heat.solve_transient_heat`, Cartesian
+2026-11-10, 축대칭 2026-11-21), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -105,6 +105,34 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
   어디서나처럼 거부합니다.
 - motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
 
+## 축대칭 열
+
+`coordinate_system="axisymmetric"`인 `solve_steady_heat`와 `solve_transient_heat`도 Cartesian 풀이와 같은 입력으로 motion을
+받습니다(2026-11-21 결정, 후속 5 조각 1). 좌표는 (r, z)이고 2πr 측도가 노드와 함께 움직입니다. r이 각 삼각형과 변에서 선형이므로 live
+조립은 구적 없이 정확한 식을 씁니다:
+- 강성 k(bbᵀ + ccᵀ)/(4A) · 2πr̄, r̄는 세 꼭짓점 반지름의 평균;
+- 영역 열원 2πQA(2rᵢ + rⱼ + rₖ)/12;
+- 변 열유속과 대류 주변 항 2πgL(2rₐ + r_b)/6;
+- Robin 변 행렬 2πhL/12 · [[3rₐ + r_b, rₐ + r_b], [rₐ + r_b, rₐ + 3r_b]];
+- 일관 질량 2πcA Σₘ rₘ ∫φᵢφⱼφₘ/A, NumPy 질량과 같은 3차 moment.
+
+대칭축(r = 0) 위 노드는 축에 머물러야 합니다. 그곳에 반지름 방향 성분이 있는 설계 속도는 이름을 밝혀 거부합니다. 음의 반지름과 축
+위에만 있는 Dirichlet 값은 이동 메시의 보통 풀이가 그대로 거부합니다. 결과는 한 바퀴 전체에 대한 W 단위 비율을 가진 축대칭 클래스이며,
+Cartesian 풀이처럼 미분을 실어 나릅니다.
+
+`tests/galerkin/test_shape_derivative_axisymmetric.py`에 A1–A8이 있습니다(2026-11-21 구현 실행 전 사전 등록, 같은 날 측정):
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| A1 수치 | motion의 온도와 비율이 이동 메시의 보통 풀이와 상대 1e-12 이내 | 5.3e-16 |
+| A2 정상 일관성 | 열원·유입 열유속·움직이는 변의 대류가 있는 r–z 단면: dT/dt가 이동 메시 중앙 차분 Richardson(h = 2e-3)과 1e-8 · max \|dT/dt\| 이내 | 3.1e-12 |
+| A3 라이브러리 | JAX와 PyTorch가 1e-12 이내 | 1.9e-15 |
+| A4 z 방향 강체 이동 | dT/dt = 0, 1e-10 · max \|T\| 이내 | 2.3e-16 |
+| A5 속 빈 원통 | a = 1, b = 2, T(a) = 400, T(b) = 300: 안쪽 벽 열량의 b 미분을 −2πkH(T₁ − T₂)/(b ln²(b/a))와 비교; 차수 ≥ 1.5, 가장 고운 메시 1 % 이내 | 반지름 셀 8, 16, 32에서 8.6e-4, 2.2e-4, 5.4e-5; 차수 1.99, 2.00 |
+| A6 과도 | 같은 단면, 후진 Euler 5 step: 마지막 온도를 A2처럼 | 2.4e-10 |
+| A7 거부 | 축 위 반지름 방향 속도(정상·과도), live 전도도, 모르는 좌표계 | 통과 |
+| A8 불변 | motion 없이 풀면 main `54485b12`과 같음 | sha256 같음(정상·과도) |
+
 ## 도파관 모드
 
 공개 함수 `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`는
@@ -189,7 +217,7 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
   그런 호출에서 live 입력은 t 하나입니다.
 - 다른 메시(옮겨진 메시 포함)의 온도 스냅샷: 스냅샷은 주어진 메시의 것입니다.
-- `coordinate_system="axisymmetric"`; 과도 열의 `checkpoint_every`; 도파관 모드의 `coordinate_factors`.
+- `coordinate_system="axisymmetric"`에서 대칭축 위의 반지름 방향 설계 속도; 과도 열의 `checkpoint_every`; 도파관 모드의 `coordinate_factors`.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
   ([거부 목록](differentiation.md#근사하지-않고-거부하는-것)).

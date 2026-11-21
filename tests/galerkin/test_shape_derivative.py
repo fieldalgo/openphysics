@@ -335,8 +335,10 @@ def test_s8_refusals():
     bad[0, 0] = np.nan
     with pytest.raises(ValueError, match="velocity must be finite"):
         solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=bad, t=t))
-    with pytest.raises(ValueError, match="axisymmetric is refused"):
-        solve_steady_heat(m, **common, coordinate_system="axisymmetric", motion=MeshMotion(design_velocity=W, t=t))
+    # axisymmetric heat takes a motion since 2026-11-21 (follow-up 5); a node leaving the axis is refused
+    with pytest.raises(ValueError, match="symmetry axis off it"):
+        solve_steady_heat(m, **common, coordinate_system="axisymmetric",
+                          motion=MeshMotion(design_velocity=W + np.array([1.0, 0.0]), t=t))
     with pytest.raises(TypeError, match="only t is live"):
         solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=xp.asarray(W), t=t))
 

@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- `galerkin`: **shape derivatives of axisymmetric heat.** `solve_steady_heat` and `solve_transient_heat` with `coordinate_system="axisymmetric"` now take `motion=MeshMotion(design_velocity=W, t=t)` with the inputs of the Cartesian motion (region conductivity and heat capacity, constant or region sources, inward flux and convection on moving edges, Dirichlet values attached to their nodes). The live assembly moves the 2πr measure with the nodes in exact closed forms (r is linear on each triangle and edge), and the results are the axisymmetric classes, rates in W over the full revolution. A design velocity that moves a node off the symmetry axis is refused by name. Checked (A1-A8, pre-registered): the numbers equal the moved-mesh solve (5.3e-16); steady and transient derivatives match Richardson differences of moved meshes within 3.1e-12 and 2.4e-10 of max |dT/dt|; JAX and PyTorch agree within 1.9e-15; the inner-wall heat rate of a hollow cylinder, differentiated in its outer radius, converges to the analytic value at order 2.0 (5.4e-5 on the finest mesh); results without a motion are unchanged (sha256). [Shape derivatives](docs/packages/galerkin/shape_derivative.md#axisymmetric-heat).
+
+## 한국어
+
+- `galerkin`: **축대칭 열의 형상 미분.** `coordinate_system="axisymmetric"`인 `solve_steady_heat`와 `solve_transient_heat`가 이제 Cartesian motion과 같은 입력(영역 전도도와 열용량, 상수 또는 영역 열원, 움직이는 변의 유입 열유속과 대류, 노드에 붙은 Dirichlet 값)으로 `motion=MeshMotion(design_velocity=W, t=t)`를 받습니다. live 조립은 2πr 측도를 노드와 함께 정확한 식으로 움직이며(r은 각 삼각형과 변에서 선형), 결과는 한 바퀴 전체에 대한 W 단위 비율을 가진 축대칭 클래스입니다. 노드를 대칭축 밖으로 움직이는 설계 속도는 이름을 밝혀 거부합니다. 검사(A1-A8, 사전 등록): 수치가 이동 메시 풀이와 같고(5.3e-16), 정상·과도 미분이 이동 메시 Richardson 차분과 max |dT/dt|의 3.1e-12, 2.4e-10 이내, JAX와 PyTorch가 1.9e-15 이내로 같으며, 속 빈 원통 안쪽 벽 열량의 바깥 반지름 미분은 해석값으로 차수 2.0으로 수렴하고(가장 고운 메시 5.4e-5), motion 없는 결과는 그대로입니다(sha256). [형상 미분](packages/galerkin/shape_derivative.md#축대칭-열).

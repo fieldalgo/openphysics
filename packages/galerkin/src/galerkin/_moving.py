@@ -65,8 +65,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
 
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
-    if coordinate_system != "cartesian":
-        raise ValueError("motion: shape derivatives cover Cartesian heat in this slice; axisymmetric is refused")
+    axisymmetric = _axisymmetric(mesh, W, coordinate_system)
     _coefficient(conductivity, "thermal_conductivity")
     _numpy_data(heat_source, "heat_source_density")
     for name, table in (("outward_flux", outward_flux), ("convection", convection)):
@@ -85,7 +84,8 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
                                f"({lo:g}, {hi:g}))")
     moved = _moved_mesh(mesh, W, t0)
     base = thermal.solve_steady_heat_outward(moved, conductivity=conductivity, dirichlet=dirichlet,
-                                      heat_source=heat_source, outward_flux=outward_flux, convection=convection)
+                                      heat_source=heat_source, outward_flux=outward_flux, convection=convection,
+                                      coordinate_system=coordinate_system)
     n = mesh.num_nodes
     X = lift(xp, mesh.nodes) + t * lift(xp, W)
     tris = mesh.triangles
@@ -94,10 +94,12 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     Q = _per_triangle(mesh, heat_source, "heat_source_density")
     kk = lift(xp, k)[:, None, None]
     element = kk * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) / (4.0 * area)[:, None, None]
+    if axisymmetric:
+        element = element * _cell_factor(xp, X, tris)[:, None, None]
     K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
                   xp.reshape(element, (-1,)), (n, n))
-    load = scatter_add(xp, n, tris.ravel(), xp.reshape((lift(xp, Q) * area / 3.0)[:, None] * xp.ones((1, 3),
-                                                       dtype=xp.float64), (-1,)))
+    load = scatter_add(xp, n, tris.ravel(), xp.reshape(_cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric),
+                                                       (-1,)))
     # Work with the increment over each component's offset, as thermal.py does: K annihilates
     # constants, so a large common temperature times a rounding-level sum must not reach the
     # residual, reactions, convection or flux. The offset of a component is its first Dirichlet
@@ -120,19 +122,20 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     H_terms, B, shifted_B, G = [], None, None, None
     for tag, g in (outward_flux or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
-        G = scatter_add(xp, n, edges.ravel(), xp.reshape((float(g) * length / 2.0)[:, None]
-                                                          * xp.ones((1, 2), dtype=xp.float64), (-1,)), base=G)
+        G = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length, float(g), axisymmetric),
+                                                          (-1,)), base=G)
     for tag, (h, ambient) in (convection or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
-        local = float(h) * length[:, None, None] * lift(xp, _EDGE_MASS)[None, :, :]
+        local = _edge_mass(xp, X, edges, length, float(h), axisymmetric)
         H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
                                  xp.reshape(local, (-1,)), (n, n)))
-        B = scatter_add(xp, n, edges.ravel(), xp.reshape((float(h) * float(ambient) * length / 2.0)[:, None]
-                                                         * xp.ones((1, 2), dtype=xp.float64), (-1,)), base=B)
+        B = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length,
+                                                                    float(h) * float(ambient), axisymmetric),
+                                                         (-1,)), base=B)
         # h (ambient - offset): an edge lies in one component, so both its nodes share the offset
         shift = float(h) * (float(ambient) - offsets[labels[edges[:, 0]]])
-        shifted_B = scatter_add(xp, n, edges.ravel(), xp.reshape((lift(xp, shift) * length / 2.0)[:, None]
-                                                                 * xp.ones((1, 2), dtype=xp.float64), (-1,)),
+        shifted_B = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length, lift(xp, shift),
+                                                                            axisymmetric), (-1,)),
                                 base=shifted_B)
     zero = xp.zeros(n, dtype=xp.float64)
     G = zero if G is None else G
@@ -156,7 +159,8 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     grad_x = xp.sum(b * increment[tris], axis=1) / (2.0 * area)
     grad_y = xp.sum(c * increment[tris], axis=1) / (2.0 * area)
     flux = -lift(xp, k)[:, None] * xp.stack([grad_x, grad_y], axis=1)
-    return thermal.PlanarSteadyHeatResult(temperature, flux, load, reaction, residual, G, B, convective, rhs)
+    result = thermal.AxisymmetricSteadyHeatResult if axisymmetric else thermal.PlanarSteadyHeatResult
+    return result(temperature, flux, load, reaction, residual, G, B, convective, rhs)
 
 
 # ----------------------------------------------------------------------------- steady electric
@@ -301,9 +305,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         outward_heat_flux)
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
-    if coordinate_system != "cartesian":
-        raise ValueError("motion: shape derivatives cover Cartesian transient heat in this slice; axisymmetric "
-                         "is refused")
+    axisymmetric = _axisymmetric(mesh, W, coordinate_system)
     if checkpoint_every is not None:
         raise ValueError("motion: checkpoint_every is not supported with a motion in this slice; every step is "
                          "kept")
@@ -329,7 +331,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     base = transient_heat.solve_transient_heat_outward(
         moved, conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity, time_s=time_s,
         initial_temperature_k=initial_temperature_k, dirichlet=dirichlet, heat_source=heat_source,
-        outward_flux=outward_flux, convection=convection)
+        outward_flux=outward_flux, convection=convection, coordinate_system=coordinate_system)
     if is_live(base.temperature):
         raise TypeError("motion: a callback returned a JAX or PyTorch value; with a motion, callbacks of time "
                         "must return NumPy numbers (t is the one live input)")
@@ -352,11 +354,13 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     rows, cols = np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel()
     stiff_e = lift(xp, k)[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
         / (4.0 * area)[:, None, None]
-    mass_e = (lift(xp, capacity) * area / 12.0)[:, None, None] * lift(xp, np.ones((3, 3)) + np.eye(3))[None]
+    if axisymmetric:
+        stiff_e = stiff_e * _cell_factor(xp, X, tris)[:, None, None]
+    mass_e = _cell_mass(xp, X, tris, area, lift(xp, capacity), axisymmetric)
     K = CooMatrix(rows, cols, xp.reshape(stiff_e, (-1,)), (n, n))
     M = CooMatrix(rows, cols, xp.reshape(mass_e, (-1,)), (n, n))
-    load = scatter_add(xp, n, tris.ravel(), xp.reshape((lift(xp, Q) * area / 3.0)[:, None]
-                                                       * xp.ones((1, 3), dtype=xp.float64), (-1,)))
+    load = scatter_add(xp, n, tris.ravel(), xp.reshape(_cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric),
+                                                       (-1,)))
     edges_of = {}
     for name in ("outward_flux", "convection"):
         for tag in tables[name]:
@@ -373,18 +377,18 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         H_terms = []
         for tag, g in tables["outward_flux"].items():
             edges, length = edges_of[tag]
-            G = scatter_add(xp, n, edges.ravel(), xp.reshape((at(g, now) * length / 2.0)[:, None]
-                                                             * xp.ones((1, 2), dtype=xp.float64), (-1,)), base=G)
+            G = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length, at(g, now),
+                                                                        axisymmetric), (-1,)), base=G)
         for tag, (h, ambient) in tables["convection"].items():
             edges, length = edges_of[tag]
             h_now, ambient_now = at(h, now), at(ambient, now)
-            local = h_now * length[:, None, None] * lift(xp, _EDGE_MASS)[None, :, :]
+            local = _edge_mass(xp, X, edges, length, h_now, axisymmetric)
             H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
                                      xp.reshape(local, (-1,)), (n, n)))
             shift = h_now * (ambient_now - offsets[edges[:, 0]])
-            shifted = scatter_add(xp, n, edges.ravel(), xp.reshape((lift(xp, shift) * length / 2.0)[:, None]
-                                                                   * xp.ones((1, 2), dtype=xp.float64), (-1,)),
-                                  base=shifted)
+            shifted = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length,
+                                                                              lift(xp, shift), axisymmetric),
+                                                                   (-1,)), base=shifted)
         return H_terms, G, shifted
 
     has_natural = bool(tables["outward_flux"] or tables["convection"])
@@ -443,7 +447,9 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     stack = xp.stack
     loads = stack([load] * len(times))
     extra = (stack(history["G"]), stack(history["C"])) if has_natural else ()
-    return transient_heat.PlanarTransientHeatResult(
+    result = transient_heat.AxisymmetricTransientHeatResult if axisymmetric else \
+        transient_heat.PlanarTransientHeatResult
+    return result(
         times, stack(history["T"]), stack(history["flux"]), loads, stack(history["reaction"]),
         stack(history["residual"]), stack(history["storage"]), stack(history["content"]),
         stack(history["quadratic"]), fixed, bc_history, np.asarray(base.node_coordinates),
@@ -704,6 +710,64 @@ def _checked_step(mesh, W, t):
     return _moved_mesh(mesh, W, t0)
 
 # ----------------------------------------------------------------------------- helpers
+
+def _axisymmetric(mesh, W, coordinate_system):
+    """True for an axisymmetric heat motion; nodes on the symmetry axis must stay on it."""
+    if coordinate_system not in ("cartesian", "axisymmetric"):
+        raise ValueError("coordinate_system must be 'cartesian' or 'axisymmetric'")
+    if coordinate_system == "cartesian":
+        return False
+    on_axis = np.flatnonzero(mesh.nodes[:, 0] == 0)
+    moving = on_axis[W[on_axis, 0] != 0]
+    if len(moving):
+        raise ValueError(f"motion: the design velocity moves {len(moving)} node(s) on the symmetry axis off it "
+                         f"(first {int(moving[0])}); its radial component must be 0 on r = 0")
+    return True
+
+
+# int_T phi_i phi_j phi_m / |T| = a! b! c! / 60 for the multiplicities of the vertices (core.kernels has the
+# same table for the NumPy mass); row m of the (3, 9) matrix holds the (i, j) entries of vertex m.
+_CUBIC_MOMENTS = np.array([[math.prod(math.factorial(int(c)) for c in np.bincount([i, j, m], minlength=3)) / 60.0
+                            for i in range(3) for j in range(3)] for m in range(3)])
+
+
+def _cell_factor(xp, X, tris):
+    """2 pi r at each live centroid: the exact cell factor of the axisymmetric stiffness (r linear)."""
+    return 2.0 * math.pi * xp.sum(X[:, 0][tris], axis=1) / 3.0
+
+
+def _cell_load(xp, X, tris, area, values, axisymmetric):
+    """(T, 3) element loads of per-triangle constants: |T|/3 each, or the exact moment of 2 pi r."""
+    if not axisymmetric:
+        return (values * area / 3.0)[:, None] * xp.ones((1, 3), dtype=xp.float64)
+    r = X[:, 0][tris]
+    return (2.0 * math.pi * values * area / 12.0)[:, None] * (r + xp.sum(r, axis=1)[:, None])
+
+
+def _cell_mass(xp, X, tris, area, capacity, axisymmetric):
+    """(T, 3, 3) consistent element masses, with the exact cubic moments of 2 pi r when axisymmetric."""
+    if not axisymmetric:
+        return (capacity * area / 12.0)[:, None, None] * lift(xp, np.ones((3, 3)) + np.eye(3))[None]
+    moments = xp.reshape(X[:, 0][tris] @ lift(xp, _CUBIC_MOMENTS), (-1, 3, 3))
+    return (2.0 * math.pi * capacity * area)[:, None, None] * moments
+
+
+def _edge_load(xp, X, edges, length, value, axisymmetric):
+    """(E, 2) edge loads of constants: L/2 each, or the exact moment of 2 pi r."""
+    if not axisymmetric:
+        return (value * length / 2.0)[:, None] * xp.ones((1, 2), dtype=xp.float64)
+    r = X[:, 0][edges]
+    return (2.0 * math.pi * value * length / 6.0)[:, None] * (r + xp.sum(r, axis=1)[:, None])
+
+
+def _edge_mass(xp, X, edges, length, h, axisymmetric):
+    """(E, 2, 2) Robin edge matrices: h L [[2, 1], [1, 2]] / 6, or with the exact moments of 2 pi r."""
+    if not axisymmetric:
+        return h * length[:, None, None] * lift(xp, _EDGE_MASS)[None, :, :]
+    ra, rb = X[:, 0][edges[:, 0]], X[:, 0][edges[:, 1]]
+    m = xp.stack([xp.stack([3.0 * ra + rb, ra + rb], axis=1), xp.stack([ra + rb, ra + 3.0 * rb], axis=1)], axis=1)
+    return (2.0 * math.pi * h * length / 12.0)[:, None, None] * m
+
 
 def _tags(table, name):
     """A boundary-data table as a mapping; anything else gets the solver's own refusal."""
