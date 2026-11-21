@@ -87,6 +87,10 @@ struct State<'a> {
     chains: Vec<Vec<u32>>,
     /// per input vertex: whether two segments meet there at less than 60 degrees
     small_apex: Vec<bool>,
+    /// facets the caller locked (curved surfaces sampled on the surface): no point is
+    /// inserted on them or on their edges
+    locked_facet: Vec<bool>,
+    locked_edge: std::collections::HashSet<(u32, u32)>,
     /// the subfacets being split on the current call chain
     splitting: Vec<[u32; 3]>,
     /// per facet: three input points spanning its plane, and the projection axis
@@ -1883,6 +1887,11 @@ impl State<'_> {
     }
 
     fn split_segment(&mut self, e: (u32, u32)) -> Result<(), String> {
+        if self.locked_edge.contains(&e) {
+            // an edge of a locked (curved) facet: a point on it would lie off the surface
+            self.stats.exempt += 1;
+            return Ok(());
+        }
         let c = self.seg[&e];
         let chain = &self.chains[c as usize];
         let (a, b) = (chain[0], chain[chain.len() - 1]);
@@ -1954,6 +1963,11 @@ impl State<'_> {
     /// projection on the facet's plane when no vertex of the subfacet holding it is nearer
     /// than gap.
     fn split_facet_toward(&mut self, f: [u32; 3], target: Option<(P3, f64)>) -> Result<(), String> {
+        if self.sub[&f].iter().any(|&fi| self.locked_facet[fi as usize]) {
+            // a subfacet of a locked (curved) facet is never split
+            self.stats.exempt_faces += 1;
+            return Ok(());
+        }
         let fi = self.sub[&f][0];
         let ([a, b, c], _axis) = self.frame[fi as usize];
         let x = f.map(|v| self.xyz[v as usize]);
@@ -2207,7 +2221,7 @@ impl State<'_> {
 /// (label < 0) is not refined for quality or size, and every other component to `opt.h`.
 /// A seed that `mesh::build` would refuse is refused here with the same message.
 pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds: &[crate::mesh::Seed],
-              label_h: &[f64]) -> Result<RefineStats, String> {
+              label_h: &[f64], locked: &[u32]) -> Result<RefineStats, String> {
     let mut g = MixedPoints::new(plc.points.clone());
     for s in &b.plc.rec.s {
         g.push(*s);
@@ -2365,8 +2379,19 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             small_apex[v as usize] = small;
         }
     }
+    let mut locked_facet = vec![false; plc.facets.len()];
+    let mut locked_edge: std::collections::HashSet<(u32, u32)> = std::collections::HashSet::new();
+    for &fi in locked {
+        let Some(f) = plc.facets.get(fi as usize) else { return Err(format!("locked facet {fi} does not exist")) };
+        locked_facet[fi as usize] = true;
+        for lp in f {
+            for j in 0..lp.len() {
+                locked_edge.insert(ekey(lp[j], lp[(j + 1) % lp.len()]));
+            }
+        }
+    }
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
