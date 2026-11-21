@@ -490,6 +490,8 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     d.set_item("sliver_moves", rs.sliver_moves)?;
     d.set_item("smooth_moves", rs.smooth_moves)?;
     d.set_item("quality_flips", rs.flips)?;
+    d.set_item("lawson_flips", rs.lawson_flips)?;
+    d.set_item("quality_edge_removals", rs.edge_removals)?;
     d.set_item("inverted_after_rounding", m.repair.inverted)?;
     d.set_item("flips23", m.repair.flips23)?;
     d.set_item("flips32", m.repair.flips32)?;
