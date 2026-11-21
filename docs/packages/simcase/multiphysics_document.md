@@ -254,6 +254,11 @@ result.couplings["heat_to_optics"]        # the coupling record
 result.save("heated_slab_results")
 ```
 
+`multiphysics.run(doc, on_event=callback)` calls `callback` with one JSON-data dict per step,
+in order, for a progress display: `physics_started` and `physics_finished` (with `seconds`)
+for each physics, and for an accepted loop `loop_started`, one `loop_iteration` per measured
+residual (`iteration`, `residual`, `unit`) and `loop_finished` (`iterations`).
+
 ## The coupling hook is internal
 
 A kind takes part in a multiphysics document through its coupling hook

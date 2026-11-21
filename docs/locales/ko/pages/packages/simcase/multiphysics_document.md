@@ -230,6 +230,11 @@ result.couplings["heat_to_optics"]        # 결합 기록
 result.save("heated_slab_results")
 ```
 
+`multiphysics.run(doc, on_event=callback)`은 진행 표시를 위해 단계마다 JSON 데이터 dict 하나로
+`callback`을 순서대로 부릅니다. 물리마다 `physics_started`와 `physics_finished`(`seconds` 포함),
+받아들인 반복에서는 `loop_started`, 잰 잔차마다 `loop_iteration`(`iteration`, `residual`, `unit`),
+`loop_finished`(`iterations`)입니다.
+
 ## 결합 훅은 내부용입니다
 
 종류는 결합 훅(`PhysicsKind.coupling`, `multiphysics.CouplingHook`)으로 다중물리 문서에 참여합니다.

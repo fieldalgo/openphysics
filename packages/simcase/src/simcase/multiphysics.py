@@ -869,11 +869,20 @@ def _combine(port: dict, fields: list, mesh):
     return Field(mesh, total, location=fields[0].location, unit=fields[0].unit, name=port["name"])
 
 
-def run(doc, verbose: bool = True) -> "MultiphysicsRunResult":
-    """Solve a validated multiphysics document in its solve order."""
+def run(doc, verbose: bool = True, *, on_event=None) -> "MultiphysicsRunResult":
+    """Solve a validated multiphysics document in its solve order.
+
+    ``on_event``, when given, is called with one JSON-data dict per step, in order, so that a
+    caller can show progress: ``{"event": "physics_started", "physics": name}``,
+    ``{"event": "physics_finished", "physics": name, "seconds": t}``, and for an accepted loop
+    ``{"event": "loop_started", "physics": [...]}``, one ``{"event": "loop_iteration",
+    "physics": [...], "iteration": k, "residual": r, "unit": u}`` per iteration that measures a
+    residual, and ``{"event": "loop_finished", "physics": [...], "iterations": n}``. A failing
+    loop raises after its last ``loop_iteration``."""
     from .registry import kind_of_type
     _validate(doc)
     log: list[str] = []
+    emit = on_event if on_event is not None else (lambda event: None)
 
     def say(msg):
         log.append(msg)
@@ -893,16 +902,21 @@ def run(doc, verbose: bool = True) -> "MultiphysicsRunResult":
     for group in order:
         if len(group) > 1:
             loop = loops[tuple(sorted(group))]
-            histories.append(_run_loop(doc, group, loop, edges, outputs, results, records, timings, say, verbose))
+            emit({"event": "loop_started", "physics": list(group)})
+            history = _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, verbose, emit)
+            histories.append(history)
+            emit({"event": "loop_finished", "physics": list(group), "iterations": history["iterations"]})
             continue
         name = group[0]
         kind = kind_of_type(doc.si["physics"][name]["type"])
+        emit({"event": "physics_started", "physics": name})
         t0 = time.perf_counter()
         state = kind.coupling.prepare(doc, name)
         inputs = _inputs(name, kind, state, edges, outputs, records)
         say(f"physics {name} ({kind.name})" + (": inputs " + ", ".join(sorted(inputs)) if inputs else ""))
         result, produced = kind.coupling.solve(state, inputs, verbose)
         timings[name] = time.perf_counter() - t0
+        emit({"event": "physics_finished", "physics": name, "seconds": timings[name]})
         results[name] = result
         for port, f in produced.items():
             outputs[(name, port)] = f
@@ -930,7 +944,7 @@ def _inputs(name, kind, state, edges, outputs, records, relaxed=None) -> dict:
     return {port: _combine(ports[port], fields, state.mesh) for port, fields in incoming.items()}
 
 
-def _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, verbose) -> dict:
+def _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, verbose, emit) -> dict:
     """An accepted loop: the under-relaxed fixed point x <- (1 - w) x + w G(x) on the fields of the
     couplings inside ``group``. Each iteration solves the members in their order; a coupling's
     field enters the next iteration relaxed. The residual is the largest change (``max_abs``) of
@@ -972,6 +986,8 @@ def _run_loop(doc, group, loop, edges, outputs, results, records, timings, say, 
                         location=received.location, unit=received.unit, name=e.name)
         if residual is not None:
             history.append(residual)
+            emit({"event": "loop_iteration", "physics": list(group), "iteration": iteration, "residual": residual,
+                  "unit": port_info["unit"]})
             say(f"  iteration {iteration}: max_abs |G(x) - x| of {port_name} {residual!r} {port_info['unit']}")
             if residual <= tolerance:
                 for n in group:
