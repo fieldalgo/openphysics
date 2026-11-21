@@ -596,12 +596,22 @@ def build_region_mesh(doc, limits=None):
     as max_points, and compares the exact node and triangle counts after meshing; each
     check whose limit is None is skipped, and without limits the mesh is made exactly as
     before."""
+    mesh, region_materials, tri, _canonical = region_mesh_um(doc, limits)
+    # Keep the diagnostic triangulation in the component's length unit, as before.
+    tri = replace(tri, nodes=views.from_micrometres(tri.nodes, doc.length_unit))
+    return mesh, region_materials, tri
+
+
+def region_mesh_um(doc, limits=None):
+    """``build_region_mesh`` with the meshine mesh as generated, in micrometres, and the
+    micrometre frame it was generated from (whose ``geometry_complex`` is the meshed complex of
+    a version 1 block). The galerkin mesh's nodes are the meshine mesh's, in the same order."""
     from galerkin.mesh import Mesh
     from meshine import generate
     from .geometry import build_domain
     if not getattr(doc, 'is_handoff', False):
-        raise TypeError('build_region_mesh takes the region hand-off of a format 0.3 document (handoff_03); '
-                        'use build_region_mesh_03(document)')
+        raise TypeError('build_region_mesh and region_mesh_um take the region hand-off of a format 0.3 document '
+                        '(handoff_03); use build_region_mesh_03(document)')
     grid = views.region_mesh(doc)
     canonical = grid.canonical
     if limits is None:
@@ -657,9 +667,7 @@ def build_region_mesh(doc, limits=None):
                 regions=np.asarray(tri.regions), region_names=list(tri.region_names),
                 provenance_edges=provenance_edges_of(canonical, tri), selection_edges=selections)
     region_materials = {r: region_materials[r] for r in mesh.region_names}
-    # Keep the diagnostic triangulation in the component's length unit, as before.
-    tri = replace(tri, nodes=views.from_micrometres(tri.nodes, doc.length_unit))
-    return mesh, region_materials, tri
+    return mesh, region_materials, tri, canonical
 
 
 def _grading(canonical):

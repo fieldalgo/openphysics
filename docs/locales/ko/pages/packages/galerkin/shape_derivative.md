@@ -131,7 +131,8 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
 형상의 곡선 위 노드는 설계가 움직이는 대로 움직입니다. 버전 1 형상 문서라면 `simcase.geometry_velocity.design_velocity(document,
 p).node_velocity(meshine_mesh)`가 그 값을 줍니다([설계 속도](../simcase/geometry_engine.md#설계-속도-4단계)). 그 `values`는 무차원이므로
 (∂x/∂p, x와 p 모두 문서 단위), 이때 t는 메시 길이 단위로 나타낸 파라미터 변화입니다. `galerkin.interop.from_mesher`는 meshine
-노드 순서를 유지합니다.
+노드 순서를 유지합니다. runner가 메시를 만드는 정상 열 문서라면 `simcase.shape_derivative.shape_problem(document, p)`가 이
+단계를 한 번에 잇습니다([문서의 형상 미분](../simcase/geometry_engine.md#문서의-형상-미분)).
 
 `extend_velocity(mesh, values, known, method="harmonic")`가 나머지 노드를 움직입니다. 같은 메시에서 성분별 라플라스 문제를
 풀며, known 노드의 값이 Dirichlet 자료입니다.
