@@ -225,7 +225,10 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
 
     coordinate_factors: optional per-element diagonal coordinate Jacobian.
     Returned fields then are covariant computational components; for a bend
-    the physical longitudinal field outside PML is 1j*ez/h.
+    the physical longitudinal field outside PML is 1j*ez/h. With a motion they
+    are the factors of the mesh at the step t, held fixed (no derivative), and
+    the design velocity must be 0 on every node of an element whose factors are
+    not 1.
 
     Returns (n_eff, space, et, ez) sorted by descending effective index:
       n_eff (m,)      beta / k0

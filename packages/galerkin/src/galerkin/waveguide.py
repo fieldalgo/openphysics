@@ -274,7 +274,16 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
         placed = mesh
         if motion is not None:
             from .shape import motion_step
-            placed = motion_step(mesh, motion).moved
+            step = motion_step(mesh, motion)
+            # the layer needs the rectangular window: the outer faces may slide along themselves only
+            for side, axis in (("left", 0), ("right", 0), ("bottom", 1), ("top", 1)):
+                nodes = np.asarray(mesh.boundary.get(side, []), dtype=int)
+                moving = nodes[np.asarray(step.design_velocity)[nodes, axis] != 0]
+                if len(moving):
+                    raise ValueError(f"motion: the design velocity moves {len(moving)} node(s) of the {side} face "
+                                     f"along its normal (first {int(moving[0])}); with a pml the outer faces "
+                                     "must stay in place")
+            placed = step.moved
         coordinates = _mode_coordinates(
             placed, thickness=dict(pml.pml_thickness), strength=pml.pml_strength, order=pml.pml_order,
             bend_radius=None if bend is None else bend.bend_radius,

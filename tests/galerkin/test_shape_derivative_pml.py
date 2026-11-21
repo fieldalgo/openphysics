@@ -140,7 +140,8 @@ def test_p4_refusals(strip):
     mesh, eps, W, _mode, _fd = strip
     t = _t("jax")
     into_layer = W.copy()
-    into_layer[np.argmin(mesh.nodes[:, 0] + mesh.nodes[:, 1]), 0] = 0.1          # the corner (0, 0) lies in the PML
+    inside = int(np.argmin(np.hypot(mesh.nodes[:, 0] - 0.2, mesh.nodes[:, 1] - 1.0)))   # (0.2, 1.0): inside the layer
+    into_layer[inside, 0] = 0.1
     with pytest.raises(ValueError, match=r"moves 1 node\(s\) of PML or bend elements"):
         _fundamental(mesh, eps, MeshMotion(design_velocity=into_layer, t=t))
     shifted = Mesh(mesh.nodes + np.array([4.0, 0.0]), mesh.triangles, mesh.boundary, mesh.boundary_edges)
@@ -148,6 +149,17 @@ def test_p4_refusals(strip):
         _quiet(lambda: solve_waveguide_modes(shifted, relative_permittivity=eps, vacuum_angular_wavenumber=K0,
                                              target_effective_index=2.6, search_mode_count=4, pml=PML,
                                              bend=Bend(bend_radius=20.0, bend_origin=0.0), motion=MeshMotion(design_velocity=W, t=t)))
+
+
+def test_review_an_outer_face_without_a_layer_stays_in_place(strip):
+    """Independent review 2026-11-21: moving a face without PML broke the window at every t != 0."""
+    mesh, eps, W, _mode, _fd = strip
+    sides = ModalPML(pml_thickness={"left": 0.5, "right": 0.5})
+    bulge = W.copy()
+    top = np.asarray(mesh.boundary["top"], dtype=int)
+    bulge[top, 1] = np.sin(np.pi * mesh.nodes[top, 0] / 3.0) * (np.abs(mesh.nodes[top, 0] - 1.5) < 1.0)
+    with pytest.raises(ValueError, match="of the top face along its normal"):
+        _fundamental(mesh, eps, MeshMotion(design_velocity=bulge, t=_t("jax")), pml=sides)
 
 
 def test_p5_unchanged_without_motion(strip):

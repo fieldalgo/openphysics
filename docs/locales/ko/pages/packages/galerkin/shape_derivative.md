@@ -136,8 +136,8 @@ Cartesian 풀이처럼 미분을 실어 나릅니다.
 ## 도파관 모드
 
 공개 함수 `galerkin.solve_waveguide_modes(mesh, *, ..., motion=MeshMotion(design_velocity=W, t=t))`는
-변환한 입력과 함께 motion을 커널에 넘깁니다. `ModalPML`·`Bend`와 motion을 함께 주거나, motion과 함께
-live 재료나 live 파장을 주면 거부합니다. 커널은 다음과 같습니다.
+변환한 입력과 함께 motion을 커널에 넘깁니다. `Bend`와 motion을 함께 주거나, motion과 함께
+live 재료나 live 파장을 주면 거부합니다(`ModalPML`은 층을 제자리에 두는 motion을 받습니다, 아래 참고). 커널은 다음과 같습니다.
 
 `solve_modes(mesh, eps_r, k0, n_target, ..., motion=MeshMotion(design_velocity=W, t=t))`는 스칼라 또는 요소별 배열(실수·복소)인 eps_r·mu_r,
 motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습니다.
@@ -178,6 +178,10 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
 - modal PML은 층을 제자리에 두는 motion을 받습니다(2026-11-21): `solve_waveguide_modes(..., pml=ModalPML(...), motion=)`, 또는
   `solve_modes`의 `coordinate_factors`.
   - 인자가 1이 아닌 요소의 모든 노드에서 설계 속도는 0이어야 합니다. 아니면 이름을 밝혀 거부합니다.
+  - `ModalPML`이 있으면 바깥 면은 제자리에 있어야 합니다. 왼쪽·오른쪽·아래·위 면 노드의 법선 방향 속도는 이름을 밝혀 거부합니다.
+    면을 움직이면 층에 필요한 직사각형 창이 깨지고, t ≠ 0인 모든 곳에서 풀이가 정의되지 않습니다(2026-11-21 독립 검토).
+  - 커널에서 `solve_modes(..., coordinate_factors=f, motion=)`는 f를 걸음 t의 메시의 인자로 보고 고정해 둡니다. 위 규칙이 적용되며
+    f는 미분을 갖지 않습니다.
   - 그러면 PML 요소는 중심이 움직이지 않으므로 인자도 그대로입니다. 물리 창의 인자는 1이고, profile(차수 ≥ 2)은 창이 끝나는 곳에서
     평평합니다. 따라서 인자는 미분을 갖지 않습니다.
   - 공개 함수는 걸음 t의 메시에 층을 놓습니다. 움직이는 pencil은 인자를 수로 두고, 정적 조립과 같은 계수로 블록에 가중을 줍니다.
