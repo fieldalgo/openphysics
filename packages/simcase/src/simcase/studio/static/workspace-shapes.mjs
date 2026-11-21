@@ -146,3 +146,10 @@ export function alignShape(shape,action,reference=null){
  const moved=translateShape(shape,dx,dy);
  try{return validateShape(moved);}catch{throw new Error(`${ALIGN_ACTIONS[action]}${reference?' '+reference.name:''} would move ${shape.name} outside the window.`);}
 }
+// A rectangle's Width edit keeps its horizontal centre (Left x = centre − W/2, rounded once in nm)
+// and a Height edit keeps its bottom edge, so a core resting on y = 0 stays there. Other
+// properties are set as given. The caller validates the result (window, minimum size).
+export function editShapeProperty(shape,prop,value){
+ if(shape.type==='rect'&&prop==='w')return {...shape,x:tidy(shape.x+shape.w/2-value/2),w:value};
+ return {...shape,[prop]:value};
+}

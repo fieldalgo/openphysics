@@ -196,5 +196,5 @@ export function createJouleView(ctx){
   clearDrafts:()=>{drafts.clear();error=null;refreshControls();},
   // a file or recovery replaces the design: drafts, result and error go; a running job is still
   // followed to its end (it holds the server's job slot) and its result discarded
-  reset:()=>{drafts.clear();result=null;error=null;epoch++;refreshControls();},busy:()=>runner.busy,hasDrafts:()=>drafts.size>0,disconnect:()=>resize?.disconnect()};
+  reset:()=>{drafts.clear();result=null;error=null;epoch++;refreshControls();},busy:()=>runner.busy,hasDrafts:()=>drafts.size>0,hasResult:()=>result!==null,disconnect:()=>resize?.disconnect()};
 }

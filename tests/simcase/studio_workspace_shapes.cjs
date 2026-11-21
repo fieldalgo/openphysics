@@ -93,3 +93,17 @@ test('added materials map to physmat names, guide only above silica and keep run
  const newer=make('Lithium niobate (ordinary)');newer.run.settings=opticalSettings();
  assert.equal(parseSession(JSON.stringify(createSession(newer.input,[newer.run],'abcdef12',['abcdef12',null]))).runs[0].settings.adapter,'optical-shapes-v7');
 });
+
+test('a rectangle Width edit keeps its horizontal centre and a Height edit its bottom edge; the window rule still refuses',()=>{
+ const core=rect('Core',-250,0,500,220);
+ const wider=S.editShapeProperty(core,'w',600);assert.deepEqual(wider,{...core,x:-300,w:600});
+ assert.deepEqual(S.editShapeProperty(wider,'w',700),{...core,x:-350,w:700});
+ assert.deepEqual(S.editShapeProperty(core,'h',300),{...core,h:300});
+ // an off-centre shape keeps its own centre, rounded once in nm
+ assert.deepEqual(S.editShapeProperty(rect('R',100,50,400,200),'w',333),rect('R',133.5,50,333,200));
+ assert.equal(S.validateShape(S.editShapeProperty(core,'w',3000)).x,-1500);
+ assert.throws(()=>S.validateShape(S.editShapeProperty(rect('R',1000,0,400,200),'w',1000)),/inside the window/);
+ // other properties and shapes are set as given
+ assert.deepEqual(S.editShapeProperty(core,'x',-100),{...core,x:-100});
+ const circle={name:'C',type:'circle',material:'Silicon',cx:0,cy:0,r:100};assert.deepEqual(S.editShapeProperty(circle,'r',150),{...circle,r:150});
+});

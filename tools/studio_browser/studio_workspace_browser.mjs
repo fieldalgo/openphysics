@@ -1,8 +1,9 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 // Real-browser check of the installed Studio workspace (/workspace) on this OS:
-// two optical designs, Compare, Save session, a server restart with the page
-// open, recovery from the start page; then the Joule heating application (Picard,
+// two optical designs (a Width edit keeps the core centred), Compare with its n_eff
+// table, Save session under a dated name, a server restart with the page open,
+// recovery from the start page without a confirmation; then the Joule heating application (Picard,
 // Newton, a refusal shown, constant materials). Drives a preinstalled Chrome through the
 // DevTools protocol with Node's built-in fetch and WebSocket; no npm package and
 // no browser download. Fails, never skips, when no browser is found.
@@ -166,21 +167,36 @@ try {
 
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
-  stage('start page', {heading: await page.eval("document.querySelector('#canvas h2').textContent"), resumeCard: await page.eval("!!document.querySelector('.resume-card')")});
+  const startPage = await page.eval("({heading:document.querySelector('#canvas h2').textContent,resumeCard:!!document.querySelector('.resume-card'),status:document.getElementById('status').textContent,steps:document.querySelectorAll('#sequence b').length})");
+  stage('start page', startPage);
+  // before an application is chosen: a neutral status and no study steps
+  assert.equal(startPage.status, 'Choose an application to start'); assert.equal(startPage.steps, 0);
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
-  await page.type('#shape-w', 600); await page.type('#shape-h', 300); await runAndWait();
-  await toGeometry(); await page.type('#shape-w', 700); await runAndWait();
+  await page.type('#shape-w', 600); await page.type('#shape-h', 300);
+  // a Width edit keeps the core centred on x = 0; a Height edit keeps it on y = 0
+  const sized = await page.eval("({x:document.getElementById('shape-x').value,y:document.getElementById('shape-y').value,study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' ')})");
+  stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /λ 1550 nm · Ready to run/);
+  await runAndWait();
+  await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350'); await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
-  stage('two designs compared', {deltaNeff: before});
+  const neffTable = await page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent))}})()");
+  stage('two designs compared', {deltaNeff: before, table: neffTable});
+  assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
+  assert.match(neffTable.head[1], /^n_eff A 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[2], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
+  assert.equal(neffTable.rows[0][3], before, 'the table and the sentence give the same Δn_eff');
   await page.screenshot('compare');
   await page.click('#save-session');
   let sessionFile;
   for (let i = 0; i < 100 && !sessionFile; i++) { sessionFile = (await readdir(downloads)).find(f => f.endsWith('.json')); if (!sessionFile) await sleep(100); }
   assert.ok(sessionFile, 'Save session downloaded a file');
   const session = JSON.parse(await readFile(join(downloads, sessionFile), 'utf8'));
-  stage('session saved', {file: sessionFile, runs: session.runs?.length, header: await page.eval("document.getElementById('project').textContent")});
+  const savedHeader = await page.eval("document.getElementById('project').textContent"), savedMessage = await page.eval("document.getElementById('file-status').textContent");
+  stage('session saved', {file: sessionFile, runs: session.runs?.length, header: savedHeader, message: savedMessage});
   assert.equal(session.runs?.length, 2);
+  assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+  assert.ok(savedMessage.startsWith(`Session saved as ${sessionFile} (your browser's download folder)`), savedMessage);
+  assert.ok(savedHeader.includes(`Saved as ${sessionFile}`), savedHeader);
   await page.until("/Browser recovery saved/.test(document.getElementById('autosave-status').textContent)", 'browser recovery saved', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
@@ -199,11 +215,12 @@ try {
   const card = await page.eval("(()=>{const r=document.querySelector('.resume-card').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
   stage('resume card', card); assert.ok(card.inView, 'resume card inside the first viewport');
   await page.screenshot('resume-card');
-  await page.click('#resume-latest'); await page.until("!!document.querySelector('dialog[open] #confirm-load')", 'replacement dialog');
-  await page.click('dialog[open] #confirm-load'); await sleep(800);
-  await page.click('nav [data-page=Compare]'); await sleep(500);
-  const after = await delta();
-  stage('comparison recovered', {deltaNeff: after}); assert.equal(after, before);
+  // a fresh page holds nothing an open would lose, so recovery asks nothing
+  await page.click('#resume-latest'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
+  assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
+  const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
+  stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
+  assert.ok(recoveredHeader.includes(`Saved as ${sessionFile}`), 'the recovered title names the saved file: ' + recoveredHeader);
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
