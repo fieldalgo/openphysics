@@ -247,7 +247,10 @@ Joule results stay in the
 tab, as heat results do. A run that ends after you switch to another application waits in
 the Joule application; undo keeps following a running job, and opening a file discards its
 result. In the multiphysics preview the interface boxes cannot leave electric currents and
-heat alone: that combination is the Joule heating application.
+heat alone: that combination is the Joule heating application. CI runs this application in a
+real browser on Linux, macOS and Windows against installed wheels
+([development guide](../../development.md)): Picard and Newton runs of the default model, a
+refused Newton run shown with its text, and constant materials.
 
 ## Results and files
 
