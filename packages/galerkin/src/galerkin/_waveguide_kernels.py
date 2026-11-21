@@ -367,19 +367,41 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
     barycentric gradients and areas of X0 + t W."""
     from .shape import motion_step
 
-    if coordinate_factors is not None:
-        raise ValueError("motion: coordinate_factors (PML, bends) depend on node positions and are refused "
-                         "with a motion in this slice")
     for name, value in (("eps_r", eps_r), ("mu_r", mu_r), ("k0", k0), ("n_target", n_target)):
         if callable(value):
             raise TypeError(f"motion: {name} must be a number or a per-element array")
         if contains_live(value):
             raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
     step = motion_step(mesh, motion)
+    if coordinate_factors is not None:
+        coordinate_factors = _fixed_coordinate_factors(mesh, step.design_velocity, coordinate_factors)
     n_eff0, space, et0, ez0 = _solve_modes_numpy(step.moved, eps_r, k0, n_target, num_modes, mu_r, pec_nodes,
-                                                 pec_edges=pec_edges)
-    xp, A, B, free = _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges)
+                                                 pec_edges=pec_edges, coordinate_factors=coordinate_factors)
+    xp, A, B, free = _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges,
+                                    coordinate_factors=coordinate_factors)
     return _refined_modes(xp, A, B, (step.t,), free, space, float(k0), n_eff0, et0, ez0)
+
+
+def _fixed_coordinate_factors(mesh, W, coordinate_factors):
+    """Coordinate factors that a motion leaves unchanged, or a refusal by name.
+
+    The factors are those of the moved mesh at the step t (diagonal (sx, sy, h) per element). A PML
+    element (a factor other than 1) keeps its centroid, and so its factors, when every one of its nodes
+    has zero design velocity; an element of the physical window has factors 1, whose derivative is 0
+    (the PML profile has order >= 2, so it is flat where the window ends). The factors then carry no
+    derivative, and the moving pencil keeps them as numbers."""
+    f = np.asarray(coordinate_factors)
+    if contains_live(coordinate_factors) or f.shape != (mesh.num_triangles, 3) or not np.isfinite(f).all() \
+            or np.any(f == 0):
+        raise ValueError("motion: coordinate_factors must be finite nonzero NumPy numbers (triangles, 3)")
+    stretched = np.any(f != 1, axis=1)
+    nodes = np.unique(mesh.triangles[stretched])
+    moving = nodes[np.any(np.asarray(W)[nodes] != 0, axis=1)]
+    if len(moving):
+        raise ValueError(f"motion: the design velocity moves {len(moving)} node(s) of PML or bend elements "
+                         f"(first {int(moving[0])}); with coordinate factors it must be 0 on every node of an "
+                         "element whose factors are not 1")
+    return f
 
 
 BRANCH_TOLERANCE_LIMIT = 1e-3     # widest relative group taken as degenerate by degenerate_branch_derivatives
@@ -537,8 +559,11 @@ def _jacobian(xp, function, t0):
     return torch.autograd.functional.jacobian(function, torch.tensor(t0, dtype=torch.float64)).detach().numpy()
 
 
-def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges):
-    """(xp, A, B, free): the restricted pencil assembled from the live node coordinates of ``step``."""
+def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, coordinate_factors=None):
+    """(xp, A, B, free): the restricted pencil assembled from the live node coordinates of ``step``.
+
+    ``coordinate_factors`` (NumPy (T, 3), sx, sy, h) weigh the blocks as in ``_mode_blocks``; a motion
+    leaves them fixed (``_fixed_coordinate_factors``)."""
     from .shape import live_triangle_geometry
     xp = step.xp
     cells = space.mesh.triangles
@@ -564,14 +589,36 @@ def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges):
     bb = b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]
     p1_mass = lift(xp, (np.ones((3, 3)) + np.eye(3)) / 12.0)
     te, n_e, n_n = space.tri_edges, space.num_edges, mesh.num_nodes
+    if coordinate_factors is None:
+        mass_eps, mass_mu = WW * (eps * area / 3.0)[:, None, None], WW * (inv_mu * area / 3.0)[:, None, None]
+        grad = Gd * (inv_mu * area / 3.0)[:, None, None]
+        stiff = (inv_mu / (4.0 * area))[:, None, None] * bb
+        curl, mass = inv_mu, eps
+    else:
+        # J = diag(sx, sy, h): the coefficients of _mode_blocks, with the 2 x 2 diagonal tensors written
+        # per component (x: the b / first components, y: the c / second ones)
+        sx, sy, h = (lift(xp, column) for column in np.asarray(coordinate_factors).T)
+        dx, dy = inv_mu * sy / (sx * h), inv_mu * sx / (sy * h)
+
+        def weighted(cx, cy):
+            return (xp.sum(W[:, :, None, :, 0] * W[:, None, :, :, 0], axis=3) * cx[:, None, None]
+                    + xp.sum(W[:, :, None, :, 1] * W[:, None, :, :, 1], axis=3) * cy[:, None, None])
+        mass_eps = weighted(eps * sy * h / sx, eps * sx * h / sy) * (area / 3.0)[:, None, None]
+        mass_mu = weighted(dx, dy) * (area / 3.0)[:, None, None]
+        grad = (diff[:, :, None, 0] * g[:, None, :, 0] * dx[:, None, None]
+                + diff[:, :, None, 1] * g[:, None, :, 1] * dy[:, None, None]) * signs[:, :, None] \
+            * (area / 3.0)[:, None, None]
+        stiff = (b[:, :, None] * b[:, None, :] * dx[:, None, None]
+                 + c[:, :, None] * c[:, None, :] * dy[:, None, None]) / (4.0 * area)[:, None, None]
+        curl, mass = inv_mu * h / (sx * sy), eps * sx * sy / h
     blocks = {
-        "S": forms.matrix(te, te, (inv_mu * area)[:, None, None] * curls[:, :, None] * curls[:, None, :],
+        "S": forms.matrix(te, te, (curl * area)[:, None, None] * curls[:, :, None] * curls[:, None, :],
                           (n_e, n_e)),
-        "Mt_eps": forms.matrix(te, te, WW * (eps * area / 3.0)[:, None, None], (n_e, n_e)),
-        "Mt_mu": forms.matrix(te, te, WW * (inv_mu * area / 3.0)[:, None, None], (n_e, n_e)),
-        "G": forms.matrix(te, cells, Gd * (inv_mu * area / 3.0)[:, None, None], (n_e, n_n)),
-        "K": forms.matrix(cells, cells, (inv_mu / (4.0 * area))[:, None, None] * bb, (n_n, n_n)),
-        "M": forms.matrix(cells, cells, (eps * area)[:, None, None] * p1_mass[None], (n_n, n_n)),
+        "Mt_eps": forms.matrix(te, te, mass_eps, (n_e, n_e)),
+        "Mt_mu": forms.matrix(te, te, mass_mu, (n_e, n_e)),
+        "G": forms.matrix(te, cells, grad, (n_e, n_n)),
+        "K": forms.matrix(cells, cells, stiff, (n_n, n_n)),
+        "M": forms.matrix(cells, cells, (mass * area)[:, None, None] * p1_mass[None], (n_n, n_n)),
     }
     free = _free_dofs(step.moved, space, pec_nodes, pec_edges)
     position = np.full(n_e + n_n, -1)

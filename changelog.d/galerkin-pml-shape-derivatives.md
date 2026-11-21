@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- `galerkin`: **shape derivatives of waveguide modes with a modal PML.** `solve_waveguide_modes(..., pml=ModalPML(...), motion=MeshMotion(design_velocity=W, t=t))` now gives dn_eff/dt and the field derivatives when the motion leaves the layer in place: W must be 0 on every node of an element whose coordinate factors are not 1, which is refused by name otherwise (the kernel `solve_modes` takes `coordinate_factors` with a motion on the same rule). The layer is placed on the mesh at the step t and its factors carry no derivative; a motion with a `Bend` stays refused, since the bend factor depends on every node position. Checked (P1-P7, pre-registered): the numbers equal the moved-mesh PML solve (3.9e-15); on a strip in a PML window the complex slope matches Richardson differences of moved meshes within 8.5e-10, JAX and PyTorch within 6.9e-16; on the outgoing slab pole of the PML tests the slope in the first core thickness converges to the analytic root's (4.7e-4 on the finest mesh, imaginary part 1.1e-3) and changes by at most 3.2e-6 with the PML thickness and strength. [Shape derivatives](docs/packages/galerkin/shape_derivative.md#waveguide-modes).
+
+## 한국어
+
+- `galerkin`: **modal PML이 있는 도파관 모드의 형상 미분.** motion이 층을 제자리에 두면 `solve_waveguide_modes(..., pml=ModalPML(...), motion=MeshMotion(design_velocity=W, t=t))`가 이제 dn_eff/dt와 필드 미분을 줍니다. 좌표 인자가 1이 아닌 요소의 모든 노드에서 W는 0이어야 하며, 아니면 이름을 밝혀 거부합니다(커널 `solve_modes`도 같은 규칙으로 motion과 함께 `coordinate_factors`를 받습니다). 층은 걸음 t의 메시에 놓이고 그 인자는 미분을 갖지 않습니다. 굽힘 인자는 모든 노드 위치에 달려 있으므로 `Bend`와 motion은 계속 거부합니다. 검사(P1-P7, 사전 등록): 수치가 이동 메시 PML 풀이와 같고(3.9e-15), PML 창 안 strip에서 복소 기울기가 이동 메시 Richardson 차분과 8.5e-10, JAX와 PyTorch가 6.9e-16 이내이며, PML 시험의 외향 slab 극점에서 첫 코어 두께에 대한 기울기가 해석 근의 기울기로 수렴하고(가장 고운 메시 4.7e-4, 허수부 1.1e-3) PML 두께와 강도에 따라 최대 3.2e-6만 바뀝니다. [형상 미분](packages/galerkin/shape_derivative.md#도파관-모드).

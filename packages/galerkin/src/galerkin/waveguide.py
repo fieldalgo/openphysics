@@ -238,8 +238,9 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
     pml: a ``ModalPML``; bend: a ``Bend`` (it needs a ``pml``). Every returned candidate is kept with a
         PML: classifying physical modes is the caller's task.
     motion: ``galerkin.shape.MeshMotion(design_velocity=..., t=...)`` solves on the nodes
-        X0 + t design_velocity, with the derivative with respect to a JAX or PyTorch t (not with a
-        pml or bend).
+        X0 + t design_velocity, with the derivative with respect to a JAX or PyTorch t. With a ``pml``
+        the design velocity must be 0 on every node of a PML element (the layer stays put); a motion
+        is refused with a ``bend``.
 
     Returns a ``WaveguideModes``. A mode whose eigenvalue lies within a relative ``DEGENERATE_GAP`` of
     another one has NaN derivatives and raises ``DegenerateModeWarning``.
@@ -261,15 +262,21 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
         raise ValueError("a bend needs a ModalPML: its coordinates are built with the layer")
     factors = None
     if pml is not None:
-        if motion is not None:
-            raise ValueError("motion: the PML and bend coordinates depend on the node positions; a motion is "
-                             "refused with a pml or bend")
+        if motion is not None and bend is not None:
+            raise ValueError("motion: the bend coordinates depend on every node position; a motion is refused "
+                             "with a bend")
         if bend is not None:
             axis = 0 if bend.bend_axis == "x" else 1
             if not bend.bend_radius + mesh.nodes[:, axis].min() - bend.bend_origin > 0:
                 raise ValueError("bend_radius and bend_origin must put every node of the mesh at a positive radius")
+        # with a motion, the layer is placed on the mesh at the step t; _solve_modes then requires the
+        # design velocity to vanish on every node of a PML element, so the factors carry no derivative
+        placed = mesh
+        if motion is not None:
+            from .shape import motion_step
+            placed = motion_step(mesh, motion).moved
         coordinates = _mode_coordinates(
-            mesh, thickness=dict(pml.pml_thickness), strength=pml.pml_strength, order=pml.pml_order,
+            placed, thickness=dict(pml.pml_thickness), strength=pml.pml_strength, order=pml.pml_order,
             bend_radius=None if bend is None else bend.bend_radius,
             bend_axis="x" if bend is None else bend.bend_axis, bend_origin=0.0 if bend is None else bend.bend_origin)
         factors = coordinates.factors
