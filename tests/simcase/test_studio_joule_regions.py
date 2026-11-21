@@ -18,6 +18,7 @@ for users only (SN5); the payload passes the same capture checks (SN6, through S
 """
 import copy
 import logging
+import re
 
 import numpy as np
 import pytest
@@ -450,13 +451,15 @@ def test_sn3_newton_steps_are_capped_at_17(client):
     assert joule.MAX_NEWTON_ITERATIONS == 17
     # the first evaluation and 31 candidates per further step stay within 500 evaluations
     assert 1 + 31*(17-1) <= joule.MAX_ITERATIONS < 1 + 31*(18-1)
-    for doc in (newton(strip(), 18), newton(strip(), None)):     # None: the default limit, 100
+    for doc, written in ((newton(strip(), 18), True), (newton(strip(), None), False)):   # None: the default, 100
         for action in ("validate", "run"):
             reply = client.post("/api/joule/"+action, json=envelope(doc))
             assert reply.status_code == 413, reply.text
             error = reply.json()["error"]
             assert error["code"] == "iteration_limit_exceeded" and error["path"] == "physics.j.iteration.iteration_limit"
-            assert "max_newton_iterations=17" in error["message"] and "write iteration_limit" in error["message"]
+            assert "max_newton_iterations=17" in error["message"]
+            # only a limit the document did not write is explained by the default
+            assert ("the default is 100, so write iteration_limit" in error["message"]) is not written
     assert client.post("/api/joule/validate", json=envelope(newton(strip(), 17))).json()["ok"] is True
     assert_idle(server._thermal_jobs)
 
@@ -500,15 +503,21 @@ RANGE = "material 'A': temperature [250.0, 700.0] K outside [250.0, 600.0] K"
 NO_DECREASE = "Newton step does not reduce the temperature defect (1.5 K)"
 
 
+CANDIDATE = NO_DECREASE+"; last candidate failed: "
+HIDDEN = "hidden"       # the expected reason is the fixed message
+
+
 @pytest.mark.parametrize("reason, cause, shown", [
-    (NO_DECREASE, None, True),
-    (NO_DECREASE+"; last candidate failed: "+RANGE, ValueError(RANGE), True),
-    ("singular or ill-conditioned Newton system", ValueError("singular or ill-conditioned Newton system"), True),
-    ("nonfinite Newton step", ValueError("nonfinite Newton step"), True),
-    (NO_DECREASE+"; last candidate failed: "+MARKER, ValueError(MARKER), False),
-    (NO_DECREASE+"; last candidate failed: "+RANGE, RuntimeError(RANGE), False),
-    ("nonfinite Newton step "+MARKER, ValueError("nonfinite Newton step "+MARKER), False),
-    (MARKER, KeyError(MARKER), False),
+    (NO_DECREASE, None, NO_DECREASE),
+    (CANDIDATE+RANGE, ValueError(RANGE), CANDIDATE+RANGE),
+    ("singular or ill-conditioned Newton system", ValueError("singular or ill-conditioned Newton system"),
+     "singular or ill-conditioned Newton system"),
+    ("nonfinite Newton step", ValueError("nonfinite Newton step"), "nonfinite Newton step"),
+    # a hidden last-candidate failure keeps the solver's head
+    (CANDIDATE+MARKER, ValueError(MARKER), CANDIDATE+FIXED),
+    (CANDIDATE+RANGE, RuntimeError(RANGE), CANDIDATE+FIXED),
+    ("nonfinite Newton step "+MARKER, ValueError("nonfinite Newton step "+MARKER), HIDDEN),
+    (MARKER, KeyError(MARKER), HIDDEN),
 ])
 def test_sn5_newton_reasons_for_users_only(client, monkeypatch, caplog, reason, cause, shown):
     from galerkin import temperature_joule_heating as tj
@@ -521,12 +530,32 @@ def test_sn5_newton_reasons_for_users_only(client, monkeypatch, caplog, reason, 
     monkeypatch.setattr(tj, "solve_temperature_joule_heat", fail)
     with caplog.at_level(logging.WARNING, logger="simcase.studio"):
         message = job_error(client, newton(strip()), "not_converged")
-    assert message.startswith("the Newton iteration did not converge after 0 steps: ")
-    if shown:
-        assert message.endswith(": "+reason) and FIXED not in message
-    else:
-        assert message.endswith(": "+FIXED) and MARKER not in message
+    prefix = "the Newton iteration did not converge after 0 steps: "
+    assert message == prefix+(FIXED if shown == HIDDEN else shown) and MARKER not in message
+    if FIXED in message:
         assert "Joule iteration failed unexpectedly" in caplog.text and (MARKER in caplog.text or MARKER not in reason)
+
+
+def test_sn5_galerkin_s_own_newton_texts_are_shown(client, monkeypatch):
+    # the real format strings of temperature_joule_heating, not hand-written ones: a step that
+    # points away from the solution (no decrease), the same with two halvings, so every candidate
+    # leaves the material range (its range text as the cause), and a nonfinite Jacobian
+    from galerkin import temperature_joule_heating as tj
+    step = tj._JointNewton.step
+    away = lambda self, T, *rest: np.where(step(self, T, *rest) == 0, 0., -1e4)
+    cases = [(away, 30, r"Newton step does not reduce the temperature defect \([^()]*\)"),
+             (away, 2, r"Newton step does not reduce the temperature defect \([^()]*\); last candidate failed: "
+                       r"material '[^']*': temperature \[[^\]]*\] K outside \[250\.0, 600\.0\] K"),
+             (lambda self, T, s, ds, *rest: step(self, T, s, ds*np.nan, *rest), 30,
+              r"singular or ill-conditioned Newton system|nonfinite Newton step")]
+    for patched, halvings, expected in cases:
+        monkeypatch.setattr(tj._JointNewton, "step", patched)
+        monkeypatch.setattr(tj, "_HALVINGS", halvings)
+        with pytest.raises(tj.JouleConvergenceError) as headless:
+            run(Document.from_dict(newton(strip())), verbose=False)
+        assert re.fullmatch(expected, headless.value.reason), headless.value.reason
+        message = job_error(client, newton(strip()), "not_converged")
+        assert message == f"the Newton iteration did not converge after 1 steps: {headless.value.reason}"
 
 
 @pytest.mark.parametrize("first, second", [("newton", "heat"), ("heat", "newton")])

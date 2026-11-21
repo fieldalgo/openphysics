@@ -187,3 +187,16 @@ test('result texts name the method from the summary',()=>{
  assert.equal(J.iterationText({iteration_method:'newton',iterations:records(1)}),'Newton 1 step');
  assert.equal(J.checkJoulePayload(payload(p=>{p.summary.iteration_method='newton';}),owner,'joule.temperature2d').summary.iteration_method,'newton');
 });
+test('choosing a method caps Newton at 17 and returns Picard to the default limit; the server must name the cap',()=>{
+ const it=J.validateJoule(inputs(j=>j.iteration.iteration_limit=500)).iteration;
+ const n=J.withMethod(it,'newton');assert.deepEqual(n,{...it,method:'newton',iteration_limit:17});
+ assert.equal(J.withMethod({...it,iteration_limit:5},'newton').iteration_limit,5);
+ assert.deepEqual(J.withMethod(n,'picard'),{...it,method:'picard',iteration_limit:100});
+ assert.equal(J.withMethod(n,'picard').relaxation_factor,0.5);
+ assert.throws(()=>J.withMethod(it,'secant'),/Picard or the Newton/);
+ const limits={max_iterations:500,max_newton_iterations:17};
+ assert.equal(J.iterationBlock(n,limits),'');assert.equal(J.iterationBlock(it,limits),'');
+ assert.equal(J.iterationBlock(n,{max_iterations:500}),'This Studio server does not run the Newton iteration; choose Picard.');
+ assert.equal(J.iterationBlock({...n,iteration_limit:17},{...limits,max_newton_iterations:10}),"The iteration limit exceeds this server's 10 Newton steps.");
+ assert.equal(J.iterationBlock(it,{...limits,max_iterations:200}),"The iteration limit exceeds this server's 200.");
+});

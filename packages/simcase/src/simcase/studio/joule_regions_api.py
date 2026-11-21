@@ -143,11 +143,13 @@ def _accept(raw, kind, limits, rlimits, tags, for_run, exact=None):
             limit = p["iteration"]["iteration_limit"]
             if p["iteration"].get("method", "picard") == "newton":
                 if limit > MAX_NEWTON_ITERATIONS:
+                    authored = (raw if exact is None else exact)["physics"][name].get("iteration", {})
+                    default = "" if "iteration_limit" in authored else f"; the default is {limit}, so write iteration_limit"
                     raise common.ThermalAPIError(
                         "iteration_limit_exceeded", f"physics.{name}.iteration.iteration_limit is {limit}, more than "
                         f"Studio's limit for Newton steps max_newton_iterations={MAX_NEWTON_ITERATIONS} (a Newton step "
-                        f"evaluates up to {NEWTON_CANDIDATES} candidates; the default limit is 100, so write "
-                        f"iteration_limit)", 413, path=f"physics.{name}.iteration.iteration_limit")
+                        f"evaluates up to {NEWTON_CANDIDATES} candidates{default})", 413,
+                        path=f"physics.{name}.iteration.iteration_limit")
             elif limit > MAX_ITERATIONS:
                 raise common.ThermalAPIError(
                     "iteration_limit_exceeded", f"physics.{name}.iteration.iteration_limit is {limit}, more than "
@@ -191,16 +193,21 @@ def method(doc):
     return next(iter(doc.si["physics"].values()))["iteration"].get("method", "picard")
 
 
-def _user_reason(reason, cause):
-    """Whether a reason the iteration raised is written for users (see the module docstring)."""
+def _shown_reason(exc):
+    """The reason of a JouleConvergenceError as users see it: the solver's own text when it is
+    written for users, else the fixed message (traceback logged). A Newton step that does not
+    reduce the defect keeps that text when only its last candidate's failure is hidden."""
+    reason, cause = str(exc.reason), exc.__cause__
     if cause is None:
-        return True
-    if type(cause) is not ValueError:
-        return False
-    if _RANGE_LEFT.fullmatch(reason) or reason in _NEWTON_SYSTEM:
-        return True
+        return reason
+    if type(cause) is ValueError and (_RANGE_LEFT.fullmatch(reason) or reason in _NEWTON_SYSTEM):
+        return reason
     head, sep, tail = reason.partition(_CANDIDATE)
-    return bool(sep) and _NO_DECREASE.fullmatch(head) is not None and _RANGE_LEFT.fullmatch(tail) is not None
+    if sep and _NO_DECREASE.fullmatch(head):
+        if type(cause) is ValueError and _RANGE_LEFT.fullmatch(tail):
+            return reason
+        return head + sep + unexpected(exc, "Joule iteration")
+    return unexpected(exc, "Joule iteration")
 
 
 def job_error(exc, spec):
@@ -212,9 +219,7 @@ def job_error(exc, spec):
         # the solver's own reasons are for users: the iteration count, a Newton step that does not
         # reduce the defect, a material range left by an iterate or a candidate, and a Newton
         # system it cannot solve; any other exception the iteration wrapped is unexpected
-        reason = str(exc.reason)
-        if not _user_reason(reason, exc.__cause__):
-            reason = unexpected(exc, "Joule iteration")
+        reason = _shown_reason(exc)
         if method(spec.doc) == "newton":
             return common.ThermalAPIError("not_converged", f"the Newton iteration did not converge after "
                                           f"{len(exc.history)} steps: {reason}", 422)
