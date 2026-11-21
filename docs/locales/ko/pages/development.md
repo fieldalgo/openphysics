@@ -145,6 +145,7 @@ python tools/run_installed_tests.py        # 설치된 wheel로 tests/의 Python
 python tools/check_licenses.py             # 설치된 라이선스를 검토 목록과 대조
 python tools/check_markdown_links.py       # 모든 Markdown 파일의 상대 링크와 #앵커
 python tools/check_release_version.py      # 배포판 아홉 개의 버전이 하나인지
+python tools/changelog.py --check          # changelog.d/의 변경 기록 조각
 ```
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
@@ -176,7 +177,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
+| `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·변경 기록 조각·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
 | `linux-py312-tests` | Ubuntu 24.04, job 여덟 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 여덟 부분으로 동시에 실행 |
 | `installed-tests` | Ubuntu 24.04, job 여덟 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 여덟 부분으로 동시에 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
@@ -186,8 +187,8 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
-하나인지 확인하고([배포](#배포pypi) 참고), 이어 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
-링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
+하나인지 확인하고([배포](#배포pypi) 참고) `tools/changelog.py --check`가 [변경 기록 조각](#변경-기록-조각)을 확인한 뒤, Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
+링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다. 조각의 링크는 조각 검사가 풉니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
 이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그 뒤 배포 검사, Studio Node 검사,
 자원 관측이 돕니다. 소스 시험을 뺀 이 job은 2026-11-20에 8~11분 걸렸습니다. 45분 제한은
 멈춘 실행을 끊기 위한 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
@@ -446,8 +447,10 @@ python -m twine check --strict .validation/simcase/*
 사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두되 `simcase`는 내부
 `physmat.kernels`와 `galerkin.kernels`를 부르므로 `physmat`과 `galerkin`을, `sipi`는 내부 `galerkin.kernels`를
 부르므로 `galerkin`을 정확한 버전(`physmat==0.0.2`, `galerkin==0.0.2`)으로 고정하고,
+`python tools/changelog.py --assemble`로 [변경 기록 조각](#변경-기록-조각)을 합친 뒤
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
-릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
+릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다
+(`changelog.d/`에 조각이 남아 있으면 태그를 거부합니다).
 또 패키지 README와 문서 페이지(변경 기록 제외)에 "아직 PyPI에 없다"는 문구가 남아 있으면
 거부합니다. 패키지 README가 그대로 PyPI 설명이 되기 때문입니다. 필수 CI처럼 `--tag` 없이
 돌리면 `[Unreleased]` 절과 그 문구를 받아들입니다. 0.x에서 안정적으로
@@ -468,6 +471,33 @@ OPENPHYSICS_DOCS_REF=v0.2.0 python -m build --no-isolation --outdir .validation/
 `tools/tests/test_readme_links.py`는 여덟 `setup.py`가 같은지, 패키지 설명에 상대 링크가 남지
 않았는지 검사합니다. `meshloom`은 `setup.py`를 실행하지 않는 maturin으로 빌드하므로 README에
 절대 링크만 쓰며, 같은 시험이 이를 확인합니다.
+
+### 변경 기록 조각
+
+변경은 `CHANGELOG.md`를 직접 고치지 않습니다. 커밋마다 변경 기록 항목을 조각 하나,
+`changelog.d/<slug>.md`로 담아서 동시에 열린 PR이 `[Unreleased]` 맨 위에서 충돌하지 않게 합니다.
+slug는 영문 소문자·숫자·하이픈으로 된 짧은 이름입니다(PR 번호는 필요 없습니다). `#` 제목은
+Keep a Changelog 분류 하나(`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`)이고,
+두 절에는 [영어 변경 기록](../../../../CHANGELOG.md)과 [한국어 변경 기록](changelog.md)에 들어갈
+그대로의 영어·한국어 항목을 쓰며, 링크는 그 페이지 기준 상대 경로입니다:
+
+```markdown
+# Fixed
+
+## English
+
+- `galerkin`: what changed and why, with the checks. [Shape derivatives](docs/packages/galerkin/shape_derivative.md).
+
+## 한국어
+
+- `galerkin`: 바뀐 내용과 이유, 검사. [형상 미분](packages/galerkin/shape_derivative.md).
+```
+
+`python tools/changelog.py --check`(CI에서 실행)가 이름, 분류, 두 절, 링크를 확인합니다.
+버전 변경 PR은 `python tools/changelog.py --assemble`을 돌립니다. 이 명령은 분류마다 항목을
+slug 순서로 두 페이지 `[Unreleased]`의 해당 `###` 하위 절 맨 위에 넣고(하위 절이 없으면 만들고)
+조각을 지웁니다. `[Unreleased]`에 이미 있는 줄은 첫 `###` 하위 절 위에 분류 없이 놓인 항목을
+포함해 그 자리에 그대로 둡니다. `changelog.d/`에는 조각만 둡니다.
 
 ## 저장값 시험 지원
 
