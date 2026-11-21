@@ -91,7 +91,7 @@ def _run(args, doc) -> int:
     if subspace and os.path.lexists(out):
         print(f"error: subspace sweep output already exists: {out}; choose a fresh output directory", file=sys.stderr)
         return 1
-    from .electric_joule import failure_evidence
+    from .electric_joule import document_iteration_method, failure_evidence
     from galerkin.temperature_joule_heating import JouleConvergenceError
     if kind_of(doc.data).fresh_output:
         try:
@@ -102,7 +102,7 @@ def _run(args, doc) -> int:
     try:
         result = run(doc, verbose=not args.quiet)
     except JouleConvergenceError as exc:
-        print(json.dumps(failure_evidence(exc), allow_nan=False), file=sys.stderr)
+        print(json.dumps(failure_evidence(exc, method=document_iteration_method(doc)), allow_nan=False), file=sys.stderr)
         return 1
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -270,3 +270,68 @@ def test_n8_the_region_texts_name_the_method():
     result = run(doc, verbose=False)
     log = "\n".join(result._log)
     assert f"converged in {len(result.summary()['iterations'])} Newton iterations" in log
+
+
+# Follow-ups F1 and F2 (HQ work record, 2026-11-21, pre-registered C1 to C5 before the change).
+
+@pytest.mark.parametrize("form", ["regions", "rectangle"])
+def test_c2_a_newton_document_reports_no_relaxation_default(form, tmp_path):
+    raw = strip() if form == "regions" else example()
+    name = next(iter(raw["physics"]))
+    unused = f"physics.{name}.iteration.relaxation_factor"
+    if form == "rectangle":                   # the example writes 0.5; drop it for the Picard side too
+        raw["physics"][name]["iteration"].pop("relaxation_factor")
+    picard, solved = Document.from_dict(raw), Document.from_dict(newton(raw))
+    assert unused in [d["path"] for d in picard.defaults_applied]
+    assert [d for d in picard.defaults_applied if d["path"] != unused] == solved.defaults_applied
+    copied = solved.copy()
+    copied.validate()                         # validating again keeps it out
+    assert unused not in [d["path"] for d in copied.defaults_applied]
+    summary = run(solved, verbose=False).summary()
+    assert unused not in [d["path"] for d in summary["defaults_applied"]]
+    # the reader's report agrees with the summary
+    source = tmp_path / "model.json"
+    source.write_text(json.dumps(newton(raw)), encoding="utf-8")
+    from simcase.cli import main
+    import contextlib, io
+    text = io.StringIO()
+    with contextlib.redirect_stdout(text):
+        assert main(["validate", "--json", str(source)]) == 0
+    assert json.loads(text.getvalue())["defaults_applied"] == summary["defaults_applied"]
+    from simcase.cli import explain_rows
+    from simcase.resolve import resolve_text
+    rows = explain_rows(resolve_text(source.read_bytes()))
+    assert unused not in [r["path"] for r in rows if r["default"]]
+
+
+def test_c3_the_rectangle_texts_name_newton_and_leave_picard_unchanged():
+    solved = Document.from_dict(newton(example()))
+    assert "  Newton iteration: temperature_tolerance 1e-8 K" in solved.summary()
+    assert "Newton" not in Document.from_dict(example()).summary()
+    result = run(solved, verbose=False)
+    assert f"converged in {len(result.summary()['iterations'])} Newton iterations" in result._log
+    picard = run(Document.from_dict(example()), verbose=False)
+    assert not any("converged in" in line for line in picard._log)
+
+
+@pytest.mark.parametrize("form", ["rectangle", "regions"])
+@pytest.mark.parametrize("method", ["picard", "newton"])
+def test_c4_the_cli_failure_evidence_names_newton(method, form, tmp_path, capsys):
+    from simcase.cli import main
+    raw = example() if form == "rectangle" else strip()
+    if method == "newton":
+        raw = newton(raw)
+    iteration = next(iter(raw["physics"].values()))["iteration"]
+    iteration["iteration_limit"] = 1
+    if method == "picard":
+        iteration["relaxation_factor"] = 1e-12
+    source = tmp_path / "model.json"
+    source.write_text(json.dumps(raw), encoding="utf-8")
+    assert main(["run", str(source), "-o", str(tmp_path / "out"), "-q"]) == 1
+    evidence = json.loads(capsys.readouterr().err)
+    assert evidence["status"] == "failed" and len(evidence["iterations"]) == 1
+    if method == "newton":
+        assert list(evidence)[:3] == ["status", "reason", "iteration_method"]
+        assert evidence["iteration_method"] == "newton"
+    else:
+        assert "iteration_method" not in evidence

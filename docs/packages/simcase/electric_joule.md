@@ -76,7 +76,7 @@ element sigma is evaluated at the arithmetic mean of its three nodal temperature
 checking all three against the range. Thermal conductivity is constant.
 
 `iteration` (required, because `temperature_tolerance` has no dimensional default):
-`relaxation_factor` (default 0.5, echoed in `defaults_applied`; this kind takes
+`relaxation_factor` (Picard; default 0.5, echoed in `defaults_applied`; this kind takes
 0 < value <= 1 although the registry allows up to 2), `temperature_tolerance` (required, such
 as `"1e-8 K"` or `"1e-5 mK"`; `"1e-8 degC"` is refused with a suggestion only),
 `relative_tolerance` (default 1e-10, at most 1) and `iteration_limit` (default 100, a positive
@@ -94,12 +94,15 @@ what it was before. `"newton"` passes `method="newton"` to galerkin's
 step halving, decided by the same convergence tests ([Newton method](../galerkin/temperature_joule_heating.md#newton-method)).
 Newton takes no relaxation, so a `relaxation_factor` written beside `"method": "newton"` is
 refused by name (`E-CONTRACT` at `iteration.relaxation_factor`); the resolved document still
-holds the default 0.5, listed in `defaults_applied`, which Newton does not use.
+holds the default 0.5, which Newton does not use, so a Newton document does not list it in
+`defaults_applied` (not in its summary, `simcase validate --json` or `simcase explain`). The summary
+text and the run log of a Newton document say "Newton iteration" (a Picard rectangle's text is
+unchanged; a region document names the method either way).
 `iteration_limit` bounds the accepted Newton steps, each of which evaluates up to 31
 candidates. Any other value, including `"Newton"`, is `E-VALUE-FORM` at
 `iteration.method`. Use `"newton"` when Picard is slow or stops at `iteration_limit` under
 strong temperature feedback (the [galerkin contract](../galerkin/temperature_joule_heating.md)
-says when); Picard stays the default and the path the installation checks run.
+says when); Picard stays the default; the installation checks run both.
 
 Format 0.2 keys are refused with their new names (`E-KEY-UNKNOWN`); for the two outward inputs
 the message says to write the negated value, and no automatic fix is offered because the
@@ -299,6 +302,8 @@ potential are also compared with Picard as given.
 | Picard documents | results before this change (measured with the commit, not a test) | the example and three region strips: saved arrays and summary (without timings) hashes equal to the commit before |
 | `"method": "picard"` written | the same document without it | arrays and summary (without timings) byte for byte equal, rectangle and regions |
 | Refusals | | `"secant"`, `"Newton"`, `1`, `null`, a `relaxation_factor` beside `"newton"`, `method` outside `iteration`, on a rectangle and on regions |
+| Installed CLI on Linux, macOS and Windows (`tools/wheel_consumers/test_electric_joule_wheel.py`, run by the installation checks) | Picard on the same mesh, both shipped examples | temperature and potential within 2e-8 (K, V), fewer iterations, `iteration_method` recorded |
+| Newton's own reporting (2026-11-21) | the same document with Picard | no `relaxation_factor` entry in `defaults_applied`; texts and CLI failure evidence name Newton; Picard results, texts, logs and failure evidence byte for byte unchanged (measured against the commit before) |
 
 ## Studio (region documents)
 
@@ -448,7 +453,8 @@ summary's `resolved_inputs` lists quantities only, not `iteration.method`.
 Invalid input: CLI exit 2. Solve, convergence or I/O failure: exit 1. Success:
 exit 0. Nonconvergence/range failure propagates `JouleConvergenceError` in Python
 with reason, completed history and last nodal temperature. The CLI emits that evidence
-as one JSON object on stderr: `status: "failed"`, `reason`, `iterations` (the records above),
+as one JSON object on stderr: `status: "failed"`, `reason`, for a Newton solve
+`iteration_method: "newton"`, `iterations` (the records above),
 `last_iterate: {"temperature": {"unit": "K", "values": [...]}}` with non-finite values as
 `null`, and `nonfinite_temperature_count`. It creates **no success output directory**.
 Redirect stderr to retain a failed run. It never returns partial success.

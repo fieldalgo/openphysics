@@ -41,7 +41,10 @@ Newton의 한계는 [아래](#newton-방법)에 적는다. 유일해는 보장�
 돌리는 방법이다. 피드백이 약하면 몇 번 안에 수렴하고, 반복 한 번이 Newton 상태 하나보다 싸다.
 Picard가 느리거나 강한 피드백에서 `iteration_limit`에 걸리면 `"newton"`을 쓴다. 계약 서미스터의
 alpha = 7, 9 /K에서 Newton은 4개 상태면 된다([검증](#검증)). dσ/dT를 알면 `derivative`를 준다.
-두 방법 모두 같은 수렴 검사를 통과해야 결과를 낸다. Newton은 Linux에서만 실행해 보았다.
+두 방법 모두 같은 수렴 검사를 통과해야 결과를 낸다. macOS·Windows의 설치 검사는 Newton을 simcase를 통해서만
+돌린다. 출하 `joule_temperature` 예제 둘(약한 피드백, 몇 걸음, `derivative` 없음)을 설치 CLI로, Studio 작업 공간의
+Joule 애플리케이션을 브라우저로 실행한다. 이 문서의 Newton 시험(강한 피드백, `derivative`, 걸음 반감, 실패)은
+Linux에서만 돈다.
 
 ## Newton 방법
 

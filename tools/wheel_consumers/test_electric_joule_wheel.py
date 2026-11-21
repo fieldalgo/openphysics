@@ -49,3 +49,29 @@ def test_installed_failure(tmp_path):
     evidence=json.loads(failed.stderr)
     assert evidence['status']=='failed' and len(evidence['iterations'])==1
     assert len(evidence['last_iterate']['temperature']['values'])==175
+
+
+@pytest.mark.parametrize('example', ['joule_temperature', 'joule_temperature_regions'])
+def test_installed_newton_agrees_with_picard(example, tmp_path):
+    """iteration.method "newton" through the installed CLI on this OS, against Picard on the same
+    mesh: temperature and potential within 2e-8 (K, V), the tolerance of galerkin's Newton tests."""
+    picard = json.loads(cli('example', example).stdout)
+    name = next(iter(picard['physics']))
+    newton = json.loads(json.dumps(picard))
+    newton['physics'][name]['iteration'].pop('relaxation_factor', None)
+    newton['physics'][name]['iteration']['method'] = 'newton'
+    fields, summaries = {}, {}
+    for method, doc in (('picard', picard), ('newton', newton)):
+        source = tmp_path/f'{method}.json'; source.write_text(json.dumps(doc), encoding='utf-8')
+        out = tmp_path/method
+        solve = cli('run', source, '-o', out, '-q')
+        assert solve.returncode == 0, solve.stderr
+        summaries[method] = json.loads((out/'summary.json').read_text(encoding='utf-8'))
+        with np.load(out/'fields.npz', allow_pickle=False) as f:
+            fields[method] = {k: f[k] for k in ('node_coordinates', 'temperature', 'electric_potential')}
+    assert summaries['newton']['status'] == 'converged' and summaries['newton']['iteration_method'] == 'newton'
+    assert 'iteration_method' not in summaries['picard']
+    assert len(summaries['newton']['iterations']) < len(summaries['picard']['iterations'])
+    np.testing.assert_array_equal(fields['newton']['node_coordinates'], fields['picard']['node_coordinates'])
+    for key in ('temperature', 'electric_potential'):
+        np.testing.assert_allclose(fields['newton'][key], fields['picard'][key], rtol=0, atol=2e-8, err_msg=key)

@@ -190,6 +190,10 @@ No dimensioned value has a default. The reader applies only these, and echoes ea
 | `materials.*.refractive_index.constant` | `1` |
 | each kind's own (`name`, `study`, `results`, counts, boundary conditions) | with that kind |
 
+A kind may leave out a default its solve does not use: a `joule.temperature2d` document with
+`iteration.method: "newton"` still holds `iteration.relaxation_factor` 0.5 in its SI tree but does
+not list it in `defaults_applied` or `explain` ([electric and Joule](electric_joule.md)).
+
 ## Cross-checks and the extent line
 
 Before anything is meshed, each geometry component gets one **extent line**, which says
