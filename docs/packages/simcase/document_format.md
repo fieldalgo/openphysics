@@ -178,8 +178,10 @@ A **material reference** is a local name, which resolves only to its record
 (`E-MATERIAL-UNKNOWN` otherwise, suggesting `"physmat:<Name>"` for a library name), or
 `physmat:<Name>`, matched exactly against `physmat.names()` without case folding or aliases
 (`E-LIBRARY-UNKNOWN` with "did you mean": `physmat:sio2` → `physmat:SiO2`). Each kind sets
-which library references its documents may use (waveguide modes: any; the cavity:
-`physmat:vacuum`; heat, electric, Joule and mechanics: none, `E-CONTRACT`). A library record
+which library references its documents may use (waveguide modes: any; steady heat: any
+library material with a constant `thermal_conductivity`, its 300 K handbook value
+([heat regions](thermal_regions2d.md)); the cavity: `physmat:vacuum`; transient heat,
+electric, Joule and mechanics: none, `E-CONTRACT`). A library record
 whose source states no temperature is `I-DATUM-ASSUMED` at the reference.
 
 ## Defaults

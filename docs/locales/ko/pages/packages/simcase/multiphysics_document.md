@@ -143,11 +143,9 @@ k는 그대로입니다. 굴절률 변화가 정확히 0인 삼각형은 재료�
 
 이 결합의 한계:
 
-- **열 → 모드 문서는 아직 `physmat:Si`나 `physmat:SiO2`를 쓸 수 없습니다.** 이 릴리스에서 열은
-  라이브러리 재료를 거부하고(라이브러리 정책은 바뀌지 않았습니다) 영역 전체를 덮으므로, 열 → 모드
-  문서의 재료는 모두 `refractive_index`, `thermal_conductivity`, `thermo_optic_coefficient`,
-  `reference_temperature`를 가진 로컬 기록입니다. `physmat:Si`와 `physmat:SiO2`의 열광학 모델은
-  광학 쪽에 들어와 있어, 라이브러리 재료를 읽지 않는 물리가 준 온도에 씁니다.
+- 열 → 모드 문서는 `physmat:Si`와 `physmat:SiO2`를 쓸 수 있습니다. 정상 열전도는 그 300 K 핸드북
+  상숫값 `thermal_conductivity`(148, 1.38 W/(m K); [열 영역](thermal_regions2d.md))를, 모드 종류는 그
+  열광학 모델을 읽습니다. 전도도는 온도를 따라 바뀌지 않으므로 온도 상승이 크면 로컬 기록을 쓰십시오.
 - physmat의 Sellmeier 자료는 293.15 K(SiO2)와 299.15 K(Si) 기준입니다. 열광학 변화는 300 K에서 재고,
   n₀는 실행 파장의 Sellmeier 값입니다.
 - 열광학 모델은 T에 선형입니다. 열팽창이나 응력 광학 효과는 없습니다.

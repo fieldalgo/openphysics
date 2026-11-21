@@ -222,7 +222,10 @@ def heat_slots(physics_type, *, transient=False):
                 q("initial_temperature.temperature_gradient", "temperature_gradient", ("SL", "TA"), required=True)]
     reads = ["thermal_conductivity", "volumetric_heat_capacity"] if transient else ["thermal_conductivity"]
     results = {"save_fields": True, "plots": False}
-    out += [{"pattern": "materials.*", "kind": "override", "library": "none", "reads": {physics_type: reads}},
+    # steady heat reads a library material's constant thermal_conductivity (physmat's 300 K handbook
+    # value); transient heat also needs volumetric_heat_capacity, which the library does not give
+    library = {"library": "none"} if transient else {"library": "any", "library_properties": ["thermal_conductivity"]}
+    out += [{"pattern": "materials.*", "kind": "override", **library, "reads": {physics_type: reads}},
             {"pattern": "name", "kind": "override", "default": "untitled",
              "default_reason": "structural default: the document has no name"},
             {"pattern": "results", "kind": "override", "default": results,

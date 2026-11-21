@@ -165,7 +165,8 @@ hi]}, "reference_medium": "vacuum"}`도 받습니다.
 이름이면 `"physmat:<Name>"`을 권함) `physmat:<Name>`입니다. 후자는 대소문자 접기나 별칭 없이
 `physmat.names()`와 정확히 맞춥니다(`E-LIBRARY-UNKNOWN`과 "did you mean": `physmat:sio2` →
 `physmat:SiO2`). 어떤 라이브러리 참조를 쓸 수 있는지는 종류마다 정합니다(도파 모드: 모두; 공진기:
-`physmat:vacuum`; 열·전기·Joule·역학: 없음, `E-CONTRACT`). 출처가 온도를 밝히지 않은 라이브러리
+`physmat:vacuum`; 정상 열전도: `thermal_conductivity`가 상수인 라이브러리 재료, 그 300 K 핸드북 값
+([열 영역](thermal_regions2d.md)); 과도 열·전기·Joule·역학: 없음, `E-CONTRACT`). 출처가 온도를 밝히지 않은 라이브러리
 기록은 그 참조에서 `I-DATUM-ASSUMED`입니다.
 
 ## 기본값

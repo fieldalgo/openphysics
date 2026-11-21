@@ -98,6 +98,30 @@ def resolve_reference(ref, local: dict, path: str, policy: str) -> tuple[tuple |
     return None, [Diagnostic("E-MATERIAL-UNKNOWN", path, msg, suggestions=_ref_suggestions(hints))]
 
 
+#: the physmat property names of the registry quantities a kind may read from the library
+_LIBRARY_PROPERTY = {"thermal_conductivity": ("thermal_conductivity", "W/(m K)")}
+
+
+def library_constant(name: str, key: str) -> float | None:
+    """The SI value of a library material's property ``key`` when physmat gives it as one constant
+    number in its SI unit (``Si``: thermal_conductivity 148.0, a 300 K handbook value); None for a
+    property physmat gives as a temperature model (``Cu``, ``Al``) or does not give."""
+    prop_name, unit = _LIBRARY_PROPERTY[key]
+    prop = physmat.material(name).properties.get(prop_name)
+    if prop is None or prop.unit != unit or isinstance(prop.value, bool) or not isinstance(prop.value, (int, float)):
+        return None
+    return float(prop.value)
+
+
+def library_property_note(name: str, key: str) -> str:
+    """Why a library material gives no usable ``key``: a model, or nothing."""
+    prop = physmat.material(name).properties.get(_LIBRARY_PROPERTY[key][0])
+    if prop is None:
+        return f'"{LIBRARY_PREFIX}{name}" gives no {key} in the library'
+    return (f'"{LIBRARY_PREFIX}{name}" gives {key} as a temperature model ({type(prop.value).__name__}), which '
+            "this physics does not read")
+
+
 def datum_diagnostic(name: str, path: str) -> Diagnostic | None:
     """``I-DATUM-ASSUMED`` for a library record whose source states no reference temperature."""
     material = physmat.material(name)

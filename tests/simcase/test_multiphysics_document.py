@@ -218,7 +218,7 @@ def test_one_thermo_optic_key_without_the_other_is_named():
 
 def test_library_materials_with_and_without_a_thermo_optic_model(relays):
     """physmat:Si and physmat:SiO2 carry dn/dT (T_ref 300 K); another library material does not.
-    A relay is the temperature source here, since thermal.steady2d reads no library material."""
+    A relay is the temperature source here, so that only the optical side reads the library."""
     from multiphysics_fixtures import geometry, modes_entry
     tree = relay_document({"src": ("test.relay", 0, 300)}, {"t": ("src.y", "modes1.temperature")})
     tree["geometry"] = geometry(background="physmat:SiO2", core="physmat:Si")

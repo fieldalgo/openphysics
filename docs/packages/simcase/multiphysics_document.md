@@ -158,12 +158,10 @@ and reported unused.
 
 Limitations of this coupling:
 
-- **A heat → modes document cannot use `physmat:Si` or `physmat:SiO2` yet.** Heat refuses
-  library materials in this release (its library policy is unchanged), and heat covers the
-  whole domain, so every material of a heat → modes document is a local record with
-  `refractive_index`, `thermal_conductivity`, `thermo_optic_coefficient` and
-  `reference_temperature`. The thermo-optic models of `physmat:Si` and `physmat:SiO2` are in
-  place on the optical side, for a temperature from a physics that reads no library material.
+- A heat → modes document may use `physmat:Si` and `physmat:SiO2`: steady heat reads their
+  constant 300 K handbook `thermal_conductivity` (148 and 1.38 W/(m K);
+  [heat regions](thermal_regions2d.md)), and the modes kind their thermo-optic model. The
+  conductivity does not follow the temperature; where the rise is large, write local records.
 - physmat's Sellmeier data are given at 293.15 K (SiO2) and 299.15 K (Si); the thermo-optic
   shift is taken from 300 K, and n₀ is the Sellmeier value at the run's wavelength.
 - The thermo-optic model is linear in T; there is no thermal expansion or stress-optic effect.

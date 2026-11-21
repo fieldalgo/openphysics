@@ -384,6 +384,14 @@ def region_materials_table_03(doc, h, required, label, properties='thermal prope
     used += [(f'geometry.shapes[{i}].material' if not h.is_version_1 else f'region {r["name"]!r}', r['material'])
              for i, r in enumerate(h.regions()) if r['material'] is not None]
     for where, mname in used:
+        if mname.startswith('physmat:'):
+            from .materials import library_property_note
+            for key in required:
+                if key not in (materials.get(mname) or {}):
+                    _refuse(f'{where}: {library_property_note(mname[len("physmat:"):], key)}; {label} needs one '
+                            f'constant {key}: describe the material as a local record in materials with your '
+                            'value', where if where.startswith('geometry') else 'materials', 'E-PROPERTY-MISSING')
+            continue
         if mname not in materials:
             _refuse(f'{where}: material {mname!r} is not defined in materials ({properties} are never taken '
                     'from library materials)', where if where.startswith('geometry') else 'materials',
@@ -548,7 +556,10 @@ def region_summary_03(doc, label, lines, versions):
     out += [f'  region {r["name"]}: {r["type"]}, {r["material"] if r["material"] is not None else "void (hole)"}'
             for r in h.regions()]
     for mname, spec in doc.si['materials'].items():
-        props = ', '.join(f'{k} {_authored(doc, f"materials.{mname}.{k}")}' for k in spec if k != 'source')
+        if mname.startswith('physmat:'):
+            props = ', '.join(f'{k} {spec[k]:g} W/(m K) (physmat, constant 300 K handbook value)' for k in spec)
+        else:
+            props = ', '.join(f'{k} {_authored(doc, f"materials.{mname}.{k}")}' for k in spec if k != 'source')
         out.append(f'  material {mname}: {props}')
     source = p.get('heat_source_density')
     if source is None:
