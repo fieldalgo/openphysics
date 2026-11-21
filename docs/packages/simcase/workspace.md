@@ -85,12 +85,16 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 6. **Save session**, the first save button, creates a portable file with the model,
    retained results and view settings, named from the application and the local
    date-time (for example `optical-waveguide-session-2026-11-21-1305.json`) in the
-   browser's download folder. Messages reports *Session saved as …*, and the header
-   shows *Saved as … · time* until the next edit or run. **Save inputs only** keeps the
-   model without results; while completed runs are not in a session file, the header says
-   *Results not saved* (or *Changed since …* after a saved file). Browser recovery keeps
-   the last saved file name and time, so a recovered session that matched it shows
-   *Saved as …* again. Wait for **Browser recovery saved** before relying on local
+   browser's downloads. Studio hands the file to the browser and cannot know that it was
+   kept (a download can be cancelled), so Messages reports *Session file … sent to the
+   browser's downloads (check your Downloads folder)* and the header shows *Session file
+   … · time* until the next edit or run. **Save inputs only** keeps the model without
+   results; while completed runs are not in a session file, the header says *Results not
+   saved* (or *Changed since session file …* after one). Browser recovery keeps the last
+   session file name and time, so a recovered session that matched it shows *Last
+   session file … (time)*. A Width edit by an odd number of nanometres gives a
+   half-nanometre Left x: the centre is kept exactly, and typed values are not snapped
+   to the drag step. Wait for **Browser recovery saved** before relying on local
    recovery. After a reload or a Studio restart, the start page shows **Continue
    where you left off** with the last browser session and any earlier ones; choose
    one to recover it, open a session file, or start new. Over a workspace with default

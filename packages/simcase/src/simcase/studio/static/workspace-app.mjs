@@ -283,7 +283,7 @@ function shapeInspector(){
  const overlaps=overlappingPairs(state.shapes).map(([a,b])=>`<li>${escapeHtml(state.shapes[a].name)} and ${escapeHtml(state.shapes[b].name)} may overlap; ${escapeHtml(state.shapes[b].name)} (drawn later) wins there.</li>`).join('');
  const block=shapesBlock(state.shapes);
  return `<div class="shape-list" role="group" aria-label="Shapes in draw order">${list}</div>`+
-  `<h3 class="property-heading">${escapeHtml(shape.name)} · ${shape.type==='rect'?'rectangle':shape.type}</h3><div class="property-grid"><div><label>Name<input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></label></div><div><label>Material<select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></label></div>${props.map(key=>'<div>'+field(key)+'</div>').join('')}</div>${shape.type==='rect'?'<p class="input-hint" id="shape-size-hint">Width keeps the shape centred where it is (Left x moves by half the change); Height keeps the bottom edge, so a core resting on y = 0 stays there. Left x and Bottom y move the shape.</p>':''}${vertices}`+
+  `<h3 class="property-heading">${escapeHtml(shape.name)} · ${shape.type==='rect'?'rectangle':shape.type}</h3><div class="property-grid"><div><label>Name<input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></label></div><div><label>Material<select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></label></div>${props.map(key=>'<div>'+field(key)+'</div>').join('')}</div>${shape.type==='rect'?'<p class="input-hint" id="shape-size-hint">Width keeps the shape centred where it is: Left x moves by half the change, so an odd change gives a half-nanometre Left x (the centre is exact; typed values are not snapped to the drag step). Height keeps the bottom edge, so a core resting on y = 0 stays there. Left x and Bottom y move the shape.</p>':''}${vertices}`+
   `<h3>Geometry tools</h3><div class="toolbar shape-actions">${add}<button type="button" id="duplicate-shape" ${n>=MAX_SHAPES?'disabled':''}>Duplicate</button><button type="button" id="delete-shape" ${n<=1?'disabled':''}>Delete</button><button type="button" id="shape-earlier" ${ui.shape===0?'disabled':''}>Draw earlier</button><button type="button" id="shape-later" ${ui.shape===n-1?'disabled':''}>Draw later</button></div>`+
   alignControls(shape)+pair('Draw order',`${ui.shape+1} of ${n} · later shapes win where they overlap`)+(block?`<p class="validation-warning">${escapeHtml(block)}</p>`:'')+(overlaps?`<ul class="shape-notes">${overlaps}</ul>`:'')+pair('Background','Silica · fills the rest of the window')+pair('Up to',`${MAX_SHAPES} shapes inside x ±1500 nm, y ±1200 nm`);
 }
@@ -389,7 +389,7 @@ const DEFAULT_INPUTS=current();
 const applicationChosen=()=>state.electric!==undefined;
 function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   if(untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun?1:0)+(jouleView.hasResult()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
   const text=session?sessionLoadText(session,{runs:runs.length,unsaved:runs.length>0&&savedRunsState!==runsStamp()},source):null;
@@ -421,10 +421,10 @@ function completeLoad(pending){
   const file=pending.source==='file'?null:pending.savedFile,matched=file?.current===true;
   applyProject(session.input,{saved:pending.saved||matched,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();
   savedNotebookState=pending.source==='file'||matched?notebookStamp():null;savedRunsState=pending.source==='file'||matched?runsStamp():null;
-  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null}:pending.source==='file'?null:lastSavedFile;
+  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:pending.source==='file'?null:lastSavedFile;
   refreshPersistence();
-  notice(pending.source==='file'?'Session restored. Imported results were loaded from file, not recomputed; input undo history starts here.':'Session recovered from browser storage, not recomputed. '+(file?`Last saved as ${file.name}${matched?'':'; changed since'}. Input undo history starts here.`:'Save session for a portable file; input undo history starts here.'));
- }else applyProject(pending.input,{saved:pending.saved});
+  notice(pending.source==='file'?`Session restored from ${pending.label}. Imported results were loaded from file, not recomputed; input undo history starts here.`:`Session recovered from ${pending.label}, not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo history starts here.`:'Save session for a portable file; input undo history starts here.'));
+ }else{applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored from ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
@@ -478,7 +478,7 @@ let notebookRecoveryRecord=null,notebookLoadVersion=0;
 // inputs and runs it held, so the title shows it as saved until the next edit or run.
 let lastSavedFile=null;
 const saveStamp=()=>JSON.stringify([edits.signature,runsStamp()]);
-const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp()}:null;
+const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp(),recovered:lastSavedFile.recovered===true}:null;
 const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduction':isJoule()?'joule-heating':state.electric===undefined?'workspace':'multiphysics';
 // Browser recovery also keeps the last saved file, so its stamp includes it.
 const autosaveStamp=()=>notebookStamp()+JSON.stringify(savedFile());
@@ -825,7 +825,7 @@ $('confirm-run-import').onclick=()=>{
  compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
 };
 
-$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp()};refreshPersistence();notice(`Session saved as ${name} (your browser's download folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
+$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});
