@@ -3,6 +3,7 @@
 import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,MAX_NEWTON_ITERATIONS,METHODS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
  usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,iterationMethod,iterationText,withMethod,iterationBlock,JouleRunner} from './workspace-joule.mjs';
 import {shapeCorners} from './workspace-shapes.mjs';
+import {requestFailedText} from './workspace-connection.mjs';
 import {renderJouleGraph} from './workspace-graph.mjs';
 
 export const JOULE_NODES=Object.freeze(['Geometry','Materials','Electric currents','Heat transfer','Mesh','Study']);
@@ -165,7 +166,7 @@ export function createJouleView(ctx){
   const button=$('run-joule');if(!button)return;const on=ctx.active();button.hidden=!on;if(!on)return;$('run-optical').hidden=true;$('run-heat').hidden=true;
   const b=block();button.disabled=!!b||runner.busy;button.textContent=runner.busy?'Computing…':'Run Joule heating study';
   $('status').textContent=drafts.size?'Input errors · correct or restore the last valid values':runner.busy?'Joule heating calculation running':b?'Joule input not ready · '+b:'Joule heating solver ready · explicit Run required';
-  const message=$('joule-message');if(message)message.textContent=error?'Joule request failed: '+error+' Inputs and earlier results are unchanged.':runner.busy?phase:'';
+  const message=$('joule-message');if(message)message.textContent=error?requestFailedText('Joule',error):runner.busy?phase:'';
  }
  async function run(){
   if(runner.busy||block())return;

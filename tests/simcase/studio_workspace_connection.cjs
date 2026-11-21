@@ -21,3 +21,10 @@ test('a failed request is classified as a restart, a lost server or an ordinary 
  assert.equal(connectionFailure(Object.assign(new Error('aborted'),{name:'AbortError'})),'request');
  assert.equal(connectionFailure(undefined),'request');
 });
+test('a failed request reads as sentences: a full stop is added only when the reason has none',async()=>{
+ const {requestFailedText}=await import('../../packages/simcase/src/simcase/studio/static/workspace-connection.mjs');
+ assert.equal(requestFailedText('Joule','the Newton iteration did not converge after 1 steps: maximum iterations exceeded'),
+  'Joule request failed: the Newton iteration did not converge after 1 steps: maximum iterations exceeded. Inputs and earlier results are unchanged.');
+ assert.equal(requestFailedText('Heat','The document was refused.'),'Heat request failed: The document was refused. Inputs and earlier results are unchanged.');
+ assert.equal(requestFailedText('Joule','Stop? '),'Joule request failed: Stop? Inputs and earlier results are unchanged.');
+});
