@@ -189,10 +189,11 @@ def test_thermal_schema_boundary_cases():
         assert [(x.code,x.path) for x in caught.value.diagnostics]==[('E-KEY-MISSING','geometry.'+key)]
     d=model();d['physics']['heat2']=copy.deepcopy(d['physics']['heat1'])
     with pytest.raises(DocumentError,match='more than one'):Document.from_dict(d)
-    # an entry of a type the document's kind does not read is an unknown key (rule 2.10)
+    # entries of two kinds need the multiphysics envelope (D2), which the refusal names
     d=model();d['physics']['em1']={'type':'em.modes2d'}
     with pytest.raises(DocumentError) as caught:Document.from_dict(d)
-    assert ('E-KEY-UNKNOWN','physics.em1.type') in [(x.code,x.path) for x in caught.value.diagnostics]
+    assert [(x.code,x.path) for x in caught.value.diagnostics]==[('E-FORMAT','openphysics')]
+    assert '0.3/multiphysics.1' in caught.value.diagnostics[0].message
     d=model();del d['physics']['heat1']['heat_source_density']
     doc=Document.from_dict(d)
     assert 'heat_source_density' not in doc.si['physics']['heat1']
