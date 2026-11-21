@@ -781,6 +781,16 @@ def _checked_step(mesh, W, t):
     if not lo < t0 < hi:
         raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (admissible interval "
                                f"({lo:g}, {hi:g}))")
+    from .mesh3d import Mesh3D
+    if isinstance(mesh, Mesh3D):
+        # the cubic's roots are rounded: test the moved volumes themselves (same sign as at t = 0)
+        p0, p1 = mesh.nodes[mesh.tets], (mesh.nodes + t0 * W)[mesh.tets]
+
+        def volumes(p):
+            return np.einsum("td,td->t", p[:, 1] - p[:, 0], np.cross(p[:, 2] - p[:, 0], p[:, 3] - p[:, 0]))
+        if np.any(volumes(p1) * np.sign(volumes(p0)) <= 0):
+            raise ElementInversion(f"motion: the step t = {t0:g} inverts an element (a moved tetrahedron has "
+                                   "zero or reversed volume)")
     return _moved_mesh(mesh, W, t0)
 
 # ----------------------------------------------------------------------------- helpers
@@ -944,7 +954,9 @@ def _per_triangle(mesh, value, label, *, positive=False):
 def _moved_mesh(mesh: Mesh, W, t0: float) -> Mesh:
     from .mesh3d import Mesh3D
     if isinstance(mesh, Mesh3D):
-        return Mesh3D(mesh.nodes + t0 * W, mesh.tets, mesh.boundary, mesh.regions, mesh.region_names,
+        # copies: Mesh3D keeps its arrays and reorients tetrahedra in place
+        return Mesh3D(mesh.nodes + t0 * W, mesh.tets.copy(), mesh.boundary,
+                      None if mesh.regions is None else mesh.regions.copy(), mesh.region_names,
                       mesh.tagged_faces or None, mesh.interfaces or None)
     return Mesh(mesh.nodes + t0 * W, mesh.triangles, mesh.boundary, mesh.boundary_edges, mesh.regions,
                 mesh.region_names, mesh.provenance_edges, mesh.selection_edges)

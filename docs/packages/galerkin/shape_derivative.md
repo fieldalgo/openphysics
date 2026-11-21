@@ -300,7 +300,11 @@ their nodes (the 3D solver has no flux or convection).
   Dirichlet value.
 - `admissible_interval` and `extend_velocity` take a `Mesh3D`.
   - A tetrahedron's volume is a cubic in t. Its real roots, polished by Newton steps,
-    bound the interval.
+    bound the interval (vectorized over the tetrahedra). A cluster of roots, as in a
+    uniform scaling, splits under rounding into a real root and a nearly real complex
+    pair. Those real parts count too, so there the interval is conservative (inside
+    the true one). The moved volumes are also tested directly, so an inverted step is
+    always refused.
   - The extension solves the P1 Laplace problem in 3D per component (`"stiffened"`
     divides by the volume).
 - A source callback is refused with a motion: its sample points move.
@@ -316,8 +320,8 @@ their nodes (the 3D solver has no flux or convection).
 | T4 rigid motions | a translation and an infinitesimal rotation ω × x: dT/dt = 0 within 1e-10 · max \|T\| | 1.5e-16, 5.4e-17 |
 | T5 two-layer box | dQ/dL₁ = −AΔT (1/k₁ − 1/k₂)/R², relative 1e-10 | 4.7e-15 |
 | T6 hollow cylinder | inner radius a against 2πkH(T₁ − T₂)/(a ln²(b/a)); order ≥ 1.5, finest within 1e-2 | 9.7e-3, 2.4e-3, 5.9e-4 at 4 × 16, 8 × 32, 16 × 64 cells; order 2.03 and 2.01 |
-| T7 inversion interval | volumes positive at (1 − 1e-9) of each end, some ≤ 0 at (1 + 1e-9); a step beyond is refused | pass |
-| T8 extension | linear data reproduced within 1e-12 (harmonic and stiffened) | pass |
+| T7 inversion interval | volumes positive at (1 − 1e-9) of each end, some ≤ 0 at (1 + 1e-9); a step beyond is refused | pass; a triple root (uniform contraction) gives a bound 4e-6 inside the root and a step past it is refused (independent review) |
+| T8 extension | harmonic: linear data reproduced within 1e-12 | pass on a perturbed mesh; `"stiffened"` reproduces constants and differs from harmonic there (it does not reproduce linear data, by design) |
 | T9 refusals | a 2-column velocity, live conductivity or Dirichlet value, a source callback, a NumPy t | pass |
 | T10 unchanged | `motion=None` equals no keyword bit for bit | pass |
 
