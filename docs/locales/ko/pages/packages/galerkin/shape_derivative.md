@@ -21,7 +21,7 @@
 값이 나옵니다.
 
 풀이는 옮겨진 메시에서 일반 솔버로 한 번 돌기 때문에, 모든 입력 검사·잔차 허용치·열수지가 그대로 적용됩니다. 그다음
-live 풀이 한 번이 미분을 붙입니다: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀). A(t)와 b(t)는 X₀ + t·W로 live 라이브러리에서 조립하며
+live 풀이 한 번이 미분을 붙입니다: T = T₀ + A(t)⁻¹ (b(t) − A(t) T₀)이며, 아래 오프셋에 대한 증분으로 계산합니다. A(t)와 b(t)는 X₀ + t·W로 live 라이브러리에서 조립하며
 (P1 강성, 영역 열원, 움직이는 변의 flux·Robin 항), T는 반올림 안에서 T₀와 같습니다. `temperature`·`heat_flux`·
 `generated_heat_rate_per_depth`·`reaction_heat_rate_per_depth`·`residual_heat_rate_per_depth`가 미분을 나릅니다.
 솔버처럼 온도를 각 성분의 오프셋(첫 Dirichlet 값, 없으면 h > 0인 첫 convection 변의 ambient)에 대한 값으로 다루므로, 큰 공통
