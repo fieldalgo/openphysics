@@ -12,7 +12,7 @@ import {installShapeEditor,SNAP_STEPS} from './workspace-shape-editor.mjs';
 import {sectionSvg,MATERIAL_FILL,WINDOW_VIEW,shapesView} from './workspace-section.mjs';
 import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS} from './workspace-shapes.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
-import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHABLE_MESSAGE,RECONNECTED_MESSAGE} from './workspace-connection.mjs';
+import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHABLE_MESSAGE,RECONNECTED_MESSAGE,requestFailedText} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
@@ -158,7 +158,7 @@ function refreshHeatControls(){
  const block=heatBlock();button.disabled=!!block||heatState.busy;button.textContent=heatState.busy?'Computing…':'Run heat study';
  if(numericDrafts.invalid||heatDrafts.size)$('status').textContent='Input errors · correct or restore the last valid values';
  else $('status').textContent=heatState.busy?'Heat calculation running':block?'Heat input not ready · '+block:'Heat solver ready · explicit Run required';
- const message=$('heat-message');if(message)message.textContent=heatState.error?'Heat request failed: '+heatState.error+' Inputs and earlier results are unchanged.':heatState.busy?'Validating and solving the current inputs…':'';
+ const message=$('heat-message');if(message)message.textContent=heatState.error?requestFailedText('Heat',heatState.error):heatState.busy?'Validating and solving the current inputs…':'';
 }
 async function runHeat(){
  if(!heatController||heatState.busy||heatBlock())return;

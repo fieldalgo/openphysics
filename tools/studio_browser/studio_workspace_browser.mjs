@@ -283,7 +283,7 @@ try {
   await page.until("/Newton iteration did not converge/.test(document.body.innerText)&&document.getElementById('run-joule').textContent==='Run Joule heating study'", 'Newton refusal shown', 120000);
   const refusal = await page.eval("(document.body.innerText.match(/the Newton iteration did not converge[^\\n]*/)||[''])[0]");
   stage('JB5 refusal shown', {message: refusal});
-  assert.match(refusal, /^the Newton iteration did not converge after 1 steps: maximum iterations exceeded/);
+  assert.match(refusal, /^the Newton iteration did not converge after 1 steps: maximum iterations exceeded\. Inputs and earlier results are unchanged\.$/);
   await page.click('nav [data-page=Results]'); await sleep(300);
   assert.match(await text('#solver-log summary'), new RegExp('Newton ' + newtonM + ' step'), 'the earlier result is kept');
 

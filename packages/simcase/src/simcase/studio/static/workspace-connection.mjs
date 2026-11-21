@@ -23,4 +23,11 @@ export function connectionFailure(error){
 }
 export const RESTARTED_MESSAGE='Studio was restarted. This page reconnected to the new server; your inputs and retained results are unchanged. Select Run optical study again.';
 export const UNREACHABLE_MESSAGE='Studio server is not reachable. Start Studio again with the same command and keep this address; this page reconnects by itself.';
+// A refused or failed request as one line: "<what> request failed: <reason>. Inputs and earlier
+// results are unchanged." The server's reason ends with no full stop of its own (for example
+// "...: maximum iterations exceeded"), so one is added when it has none.
+export function requestFailedText(what,reason){
+ const text=String(reason).trim();
+ return `${what} request failed: ${text}${/[.!?]$/.test(text)?'':'.'} Inputs and earlier results are unchanged.`;
+}
 export const RECONNECTED_MESSAGE='Reconnected to Studio. Your inputs and retained results are unchanged.';

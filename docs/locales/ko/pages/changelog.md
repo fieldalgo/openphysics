@@ -83,6 +83,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `simcase`: 설치된 Studio 작업 공간 브라우저 검사(`tools/studio_browser/studio_workspace_browser.mjs`, `tools/check_platform_install.py`가 Linux·macOS·Windows에서 실행)가 이제 **Joule 가열 애플리케이션**도 조작합니다: 기본 띠를 Picard(28–34번, Linux 31)와 Newton(2–5걸음, Linux 3)으로, 세 수지의 서로 일치, 수지 값(Linux·Windows 16.67289 W/m)과 최고 온도(같은 곳 321.8271 K)는 메시의 이산화 오차 안에서, 전위 범위 0…0.2 V, 같은 메시에서 두 방법의 1e-6 K 이내 일치, `iteration_limit` 1인 Newton 실행의 `not_converged` 문장 표시와 이전 결과 유지, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m). 이제 `console.error` 호출도 검사를 실패시킵니다(잡히지 않은 페이지 예외는 이미 그랬고, 그 밖의 브라우저 로그 항목은 모으지 않습니다). 사전 등록 검사 JB1–JB7. 같은 문서가 macOS-15 arm64에서는 289 절점·528 삼각형으로, Linux·Windows에서는 288·526으로 메시되므로 메시에 따라 달라지는 값은 자릿수까지 비교하지 않습니다.
 
+- `simcase`: 작업 공간의 Heat·Joule 요청 실패 메시지가 서버 이유에 마침표가 없으면 "Inputs and earlier results are unchanged." 앞에 마침표를 붙입니다(전에는 "…maximum iterations exceeded Inputs and earlier results are unchanged."로 읽혔습니다). `workspace-connection.mjs`의 `requestFailedText`와 Node 시험을 더했고, Joule 브라우저 검사가 이제 줄 전체를 확인합니다.
+
 - Studio 결과: 광학 그래프 높이를 데스크톱 작업 영역에 맞추고 완료 후 비활성 작업 버튼을 숨깁니다.
 
 - Studio: 명령 리본, 인접한 모델/설정 패널, Graphics, 스터디/메시지 영역, 두 열 치수 입력과 키보드 패널 크기 조절을 갖춘 밝은 CAE 작업대로 재설계했습니다. 기존 솔버·파일·연결 동작은 유지합니다.
