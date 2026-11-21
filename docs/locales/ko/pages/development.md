@@ -171,26 +171,48 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 ## CI가 돌리는 것
 
 `Validate packages` 워크플로(`.github/workflows/validate.yml`)는 main push, Ready PR,
-수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 네 부분이 병렬로
+수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 다섯 부분이 병렬로
 실행됩니다.
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
+| `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
+| `linux-py312-tests` | Ubuntu 24.04, job 네 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 네 부분으로 동시에 실행 |
 | `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
-필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
+필수 검사는 **`tests`** 하나입니다. 다섯 부분이(소스 시험 job 네 개 모두 포함) 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
 하나인지 확인하고([배포](#배포pypi) 참고), 이어 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
 링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
-이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
-돌립니다. 소스 시험이 실패해도 배포 검사와 Node 검사는 근거를 남기려고 계속 돌지만,
-job은 실패로 남습니다. 보통 23~45분 걸립니다. 90분 제한은 멈춘 실행을 끊기 위한
-것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
+이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그 뒤 배포 검사, Studio Node 검사,
+자원 관측이 돕니다. 소스 시험을 뺀 이 job은 2026-11-20에 8~11분 걸렸습니다. 45분 제한은
+멈춘 실행을 끊기 위한 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
+
+**소스 시험** (`linux-py312-tests`). 루트 설정의 `python -m pytest` 전체(`tests/`와
+`tools/tests/`의 모든 시험)를 job 네 개에서 동시에 돌립니다. 각 job은 전체를 수집한 뒤
+`tools/shards/openphysics_shard.py`가 자기 부분에 배정한 시험 파일만 남깁니다. 파일은 통째로,
+큰 것부터, 그때까지 시간이 가장 적은 부분에 배정하며, 시간은
+`tools/shards/durations.json`의 파일별 초를 씁니다(표에 없는 파일은 중앙값으로 셉니다).
+모든 부분이 같은 수집 결과에서 같은 배정을 계산하므로, 네 부분을 합치면 수집한 시험을
+빠짐없이 정확히 한 번씩 돌립니다. 이름으로 고르는 시험은 없습니다. 각 로그 끝에 그 부분의
+파일 수, 시험 수, 예상 시간이 나옵니다. job 하나로 돌리던 때 전체 시험은 2026-11-20에 러너
+CPU에 따라 44~70분 걸렸습니다. 한 부분은 시험 약 11분과 준비 약 3분이며, 45분 제한은 멈춘
+실행을 끊기 위한 것입니다. 로컬에서 한 부분만 돌리려면:
+
+```bash
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/4
+```
+
+시험 시간의 균형이 어긋나면, 한 번의 완전한 실행에서 나온 JUnit 파일(artifact
+`source-tests-<k>-of-4` 네 개)로 저장소 루트에서 표를 다시 만듭니다.
+
+```bash
+python tools/shards/openphysics_shard.py --update source-tests-1.xml source-tests-2.xml source-tests-3.xml source-tests-4.xml --source "Validate packages run <id> (main <sha>)"
+```
 
 **배포 검사** (`tools/check_distributions.py`). 패키지 아홉 개(`openphysics` 메타
 배포판 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
@@ -233,7 +255,7 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬 Linux 실행에서 25분쯤
 걸렸고, 50분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬에서 돌리려면 Gmsh와
 `PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
-실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 계속 `linux-py312`에서 돕니다.
+실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 `linux-py312-tests`에서 돕니다.
 
 **라이선스** (`tools/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
 환경마다 `tools/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
@@ -314,7 +336,9 @@ notices, slow 연구.
 
 각 job은 실패해도 artifact를 올립니다.
 
-- Linux: `distributions-and-test-results`. 단계별 JUnit XML, 배포물 체크섬과 보고서,
+- Linux: `distributions-and-test-results`. 사전 검사 묶음별 JUnit XML, 배포물 체크섬과 보고서,
+  `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
+- 소스 시험: 부분마다 `source-tests-<k>-of-4`. `source-tests-<k>.xml`, 교차 검사 기록,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
 - 설치 시험: `installed-test-results`. 빌드한 배포물, `installed-tests.xml`,
   `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사 기록이 든

@@ -189,17 +189,18 @@ preinstalled Chrome, Chromium or Edge (found in the usual places, or named by
 
 The `Validate packages` workflow (`.github/workflows/validate.yml`) runs on main
 pushes, Ready pull requests and manual dispatch. Branch pushes and draft PRs do
-not run it. It has four parts, run in parallel:
+not run it. It has five parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
+| `linux-py312` | Ubuntu 24.04 | License, release-version, meshloom kernel and Markdown link checks; fast preflight groups; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
+| `linux-py312-tests` | Ubuntu 24.04, four jobs | The full source suite with the pinned RII database, in four time-balanced parts run at the same time |
 | `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
-The single required check is **`tests`**. It passes only when all four parts
-succeed; a failed, cancelled or skipped part fails it. Every change, including
+The single required check is **`tests`**. It passes only when all five parts
+succeed (all four source-test jobs among them); a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
@@ -208,11 +209,36 @@ Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
 are not fetched). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
-contract fails within minutes. The full suite then runs everything again. The
-distribution and Node steps still run after a failed source suite so their
-evidence is kept, but the job stays failed. The job usually takes 23 to 45
-minutes; its 90-minute limit only stops hung runs, since hosted runner speed
-varies.
+contract fails within minutes. The distribution checks, the Studio Node checks
+and the resource observations follow. Without the source suite the job took 8 to
+11 minutes on 2026-11-20; its 45-minute limit only stops hung runs, since hosted
+runner speed varies.
+
+**Source tests** (`linux-py312-tests`). The whole suite, `python -m pytest` with
+the root configuration (every test in `tests/` and `tools/tests/`), runs in four
+jobs at once. Each job collects the whole suite and keeps the test files that
+`tools/shards/openphysics_shard.py` assigns to its part: whole files, largest
+first, each to the part with the least time so far, by the per-file seconds in
+`tools/shards/durations.json` (a file missing from the table counts as the
+median). Every part computes the same assignment from the same collected files,
+so together the four run every collected test exactly once; no test is
+selected by name. The end of each log names the part's files, tests and
+estimated time. On one job the suite took 44 to 70 minutes on 2026-11-20,
+depending on the runner CPU; a part is about 11 minutes of tests plus about 3
+minutes of setup, and its 45-minute limit only stops hung runs. To run a part
+locally:
+
+```bash
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/4
+```
+
+When the suite's balance drifts, rebuild the table from the JUnit files of one
+complete run (the four `source-tests-<k>-of-4` artifacts), from the repository
+root:
+
+```bash
+python tools/shards/openphysics_shard.py --update source-tests-1.xml source-tests-2.xml source-tests-3.xml source-tests-4.xml --source "Validate packages run <id> (main <sha>)"
+```
 
 **Distribution checks** (`tools/check_distributions.py`). Builds all nine packages
 (including the `openphysics` meta distribution), each wheel from its sdist,
@@ -268,8 +294,8 @@ the pinned RII database and required reference cross-checks
 (`OPENPHYSICS_REQUIRE_CROSSCHECK=1`). A local Linux run took about 25
 minutes; the 50-minute limit only stops hung runs. Running it locally needs Gmsh
 and `PHYSMAT_RII_PATH`, because tests that need them skip otherwise and a skip
-fails the run. It is verified on Linux only. The source suite still runs in
-`linux-py312`.
+fails the run. It is verified on Linux only. The source suite runs in
+`linux-py312-tests`.
 
 **Licenses** (`tools/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the
@@ -371,7 +397,10 @@ reviewed change that reruns the source and distribution checks.
 Each job uploads its artifacts, even after a failure:
 
 - Linux: `distributions-and-test-results`, the `.validation/` directory with
-  JUnit XML per stage, distribution checksums and reports, and
+  JUnit XML per preflight group, distribution checksums and reports, and
+  `numeric-runtime.json`.
+- Source tests: `source-tests-<k>-of-4` for each part, the `.validation/`
+  directory with `source-tests-<k>.xml`, the cross-check records and
   `numeric-runtime.json`.
 - Installed tests: `installed-test-results`, the `.validation/` directory with
   the built distributions, `installed-tests.xml`, `installed-origins.json`,

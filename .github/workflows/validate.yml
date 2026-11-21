@@ -18,12 +18,16 @@ concurrency:
 
 jobs:
   linux-py312:
+    # Everything on Linux except the source suite, which linux-py312-tests runs in four
+    # parts at the same time: licenses, release version, meshloom's kernel, links, the
+    # preflight groups, all nine distributions, Studio Node checks and the resource
+    # observations.
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
-    # Usually 23-45 min (2026-10-27); slow hosted runners were cancelled at 30 min
-    # on 2026-10-19 and at 45 min on 2026-10-27, both after every step had passed.
-    # The limit only stops hung jobs, so keep about twice the norm.
-    timeout-minutes: 90
+    # Without the source suite this job took 8.4 and 11.0 min on 2026-11-20 (runs
+    # 44781086131 and 44710194170, the second on an AMD EPYC 7763); the limit only stops
+    # hung jobs.
+    timeout-minutes: 45
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
@@ -122,22 +126,11 @@ jobs:
             tests/simcase/test_studio_transient_thermal_acceptance.py \
             tests/simcase/test_studio_transient_lifecycle.py \
             tests/simcase/test_studio_region_acceptance.py
-      - name: Run all Python tests including RII and convergence studies
-        id: source_tests
-        env:
-          PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
-          # Reference-tool comparisons must run, not skip, and keep their records.
-          OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
-          OPENPHYSICS_CROSSCHECK_DIR: .validation/crosscheck
-        run: python -m pytest -q -ra --junitxml=.validation/source-tests.xml
       - name: Build sdists and validate installed wheels
-        # Preserve a failing source gate while collecting independent package evidence.
-        if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: |
           python tools/check_distributions.py
           python tools/audit_distribution_artifacts.py --artifacts .validation/dist --report .validation/distribution-audit.json
       - name: Check all Studio JavaScript contracts
-        if: ${{ !cancelled() && (steps.source_tests.outcome == 'success' || steps.source_tests.outcome == 'failure') }}
         run: node --test tests/simcase/*.cjs
       - name: Observe exact steady thermal Studio resources once
         if: ${{ success() }}
@@ -152,6 +145,81 @@ jobs:
         if: always()
         with:
           name: distributions-and-test-results
+          path: .validation/
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  linux-py312-tests:
+    # The whole source suite (python -m pytest, every test in tests/ and tools/tests/) in
+    # four parts on four runners at once. Each part collects the whole suite and keeps the
+    # test files tools/shards/openphysics_shard.py assigns to it, balanced by the per-file
+    # times in tools/shards/durations.json; together the parts run every collected test
+    # exactly once. No test is selected by name.
+    name: linux-py312 tests (${{ matrix.shard }}/4)
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    # About 11 min of tests per part by the table (the whole suite took 44-70 min in one
+    # job on 2026-11-20, depending on the runner CPU), plus about 3 min of setup; the limit
+    # only stops hung jobs.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      MPLBACKEND: Agg
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12.14"
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.19.0"
+      - name: Install Gmsh system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxinerama1
+      # meshloom's compiled kernel: the toolchain pinned in packages/meshloom/rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install 1.97.0 --profile minimal --component rust-src --no-self-update
+      - name: Install pinned validation environment
+        run: |
+          python -m pip install -r tools/requirements-py312-linux.txt
+          # Optional array libraries for galerkin[jax] and galerkin[torch]; torch is
+          # the CPU build (the PyPI Linux wheel pulls CUDA packages).
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1+cpu
+          python -m pip install -r tools/requirements-py312-linux-backends.txt
+          python -m pip install --no-deps --no-build-isolation \
+            -e packages/galerkin -e packages/galerkin-refsol -e packages/meshine \
+            -e packages/meshloom \
+            -e packages/gmshio -e packages/physmat -e packages/simcase -e packages/sipi
+          python -m pip check
+          gmsh --version
+      # The backend tests skip when a library is absent; here an absent one must
+      # fail the job instead of turning those tests into silent skips.
+      - name: Verify the optional array libraries import
+        run: python -c "import array_api_compat, jax, torch; print(jax.__version__, torch.__version__)"
+      - name: Record CPU model and BLAS kernel
+        run: |
+          mkdir -p .validation
+          python tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
+      - name: Fetch pinned RII database
+        run: python tools/fetch_rii.py "$RUNNER_TEMP/rii"
+      - name: Run part ${{ matrix.shard }} of 4 of all Python tests including RII and convergence studies
+        env:
+          PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
+          # Reference-tool comparisons must run, not skip, and keep their records.
+          OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
+          OPENPHYSICS_CROSSCHECK_DIR: .validation/crosscheck
+          PYTHONPATH: ${{ github.workspace }}/tools/shards
+        run: python -m pytest -q -ra -p openphysics_shard --shard ${{ matrix.shard }}/4 --junitxml=.validation/source-tests-${{ matrix.shard }}.xml
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: source-tests-${{ matrix.shard }}-of-4
           path: .validation/
           include-hidden-files: true
           if-no-files-found: warn
@@ -263,7 +331,7 @@ jobs:
 
   tests:
     name: tests
-    needs: [linux-py312, installed-tests, blas-kernels, installed-platforms]
+    needs: [linux-py312, linux-py312-tests, installed-tests, blas-kernels, installed-platforms]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -271,11 +339,13 @@ jobs:
       - name: Require complete Linux and installed-platform validation
         env:
           VALIDATION_RESULT: ${{ needs.linux-py312.result }}
+          SOURCE_TESTS_RESULT: ${{ needs.linux-py312-tests.result }}
           INSTALLED_RESULT: ${{ needs.installed-tests.result }}
           KERNEL_RESULT: ${{ needs.blas-kernels.result }}
           PLATFORM_RESULT: ${{ needs.installed-platforms.result }}
         run: |
           test "$VALIDATION_RESULT" = success
+          test "$SOURCE_TESTS_RESULT" = success
           test "$INSTALLED_RESULT" = success
           test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success
