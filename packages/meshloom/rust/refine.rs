@@ -109,13 +109,21 @@ const SLIVER_CAP: f64 = 0.10;
 /// 2026-11-20): a subsegment longer than SEG_C alpha h, or a subfacet whose circumradius
 /// exceeds FAC_C alpha h (h of the regions around them), is split even when not
 /// encroached, so the boundary is discretized to the size before the volume.
-const SEG_C: f64 = 1.0;
-const FAC_C: f64 = 0.75;
+/// Measured 2026-11-21: subfacet sizing (FAC_C 0.75) and SEG_C 1.0 left slivers of 0.2-0.6
+/// degrees on C6 (Fichera corner) next to its re-entrant facets; SEG_C 1.2 alone keeps
+/// V21 and C6, so subfacets are not sized (FAC_C infinite).
+const SEG_C: f64 = 1.2;
+const FAC_C: f64 = f64::INFINITY;
 /// Smoothing takes a move that raises the mean q of the star while its worst q stays at
 /// least min(before, SMOOTH_FLOOR) (and the dihedral and ratio rules hold).
 const SMOOTH_FLOOR: f64 = 0.5;
 /// How often a tetrahedron whose circumcentre split a constraint instead is tried again.
 const MAX_RETRIES: u8 = 3;
+/// A tetrahedron whose circumcentre lies beyond a subfacet it may not split is split at the
+/// circumcentre's projection on the facet when its longest edge exceeds LARGE_EDGE alpha h
+/// and no vertex is within PROJECT_GAP alpha h of that point.
+const LARGE_EDGE: f64 = 1.5;
+const PROJECT_GAP: f64 = 0.5;
 
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
@@ -1618,6 +1626,13 @@ impl State<'_> {
     }
 
     fn split_subfacet_at(&mut self, f: [u32; 3]) -> Result<(), String> {
+        self.split_facet_toward(f, None)
+    }
+
+    /// Splits subfacet f's facet at f's circumcentre or, with a target (q, gap), at q's
+    /// projection on the facet's plane when no vertex of the subfacet holding it is nearer
+    /// than gap.
+    fn split_facet_toward(&mut self, f: [u32; 3], target: Option<(P3, f64)>) -> Result<(), String> {
         let fi = self.sub[&f][0];
         let ([a, b, c], _axis) = self.frame[fi as usize];
         let x = f.map(|v| self.xyz[v as usize]);
@@ -1630,6 +1645,8 @@ impl State<'_> {
         }
         let (wn, nu) = (cross(&w, &nrm), cross(&nrm, &u));
         let o: P3 = std::array::from_fn(|k| x[0][k] + (dot(&u, &u) * wn[k] + dot(&w, &w) * nu[k]) / (2.0 * nn));
+        // a target's coordinates: the least-squares frame below projects them on the plane
+        let o: P3 = target.map(|q| q.0).unwrap_or(o);
         // the circumcentre as a + s (b - a) + r (c - a), least squares in doubles
         let (pa, pb, pc) = (self.xyz[a as usize], self.xyz[b as usize], self.xyz[c as usize]);
         let (e1, e2, d) = (sub3(&pb, &pa), sub3(&pc, &pa), sub3(&o, &pa));
@@ -1692,6 +1709,14 @@ impl State<'_> {
                 }
             }
         }
+        if let Some((_, gap)) = target {
+            let pp = self.xyz[p as usize];
+            if cur.iter().any(|&v| { let d = sub3(&self.xyz[v as usize], &pp); dot(&d, &d) < gap * gap }) {
+                self.drop_point(p);
+                self.stats.exempt_faces += 1;
+                return Ok(());
+            }
+        }
         if cur.iter().any(|&v| self.xyz[v as usize] == self.xyz[p as usize]) {
             // the circumcentre is (in doubles) a vertex already: an earlier split at the same
             // point could not remove f
@@ -1700,7 +1725,7 @@ impl State<'_> {
             return Ok(());
         }
         let plane = self.plane_cavity(p, &[cur]);
-        if !plane.contains(&f) {
+        if target.is_none() && !plane.contains(&f) {
             // the 2D cavity p sees leaves f (an obtuse f whose circumcentre lies in another
             // subfacet, past a facet triangulation that is not Delaunay): inserting p would
             // not remove f, and every later try at f would find p there while tetrahedra
@@ -1769,6 +1794,18 @@ impl State<'_> {
                             // meets a small subfacet, and splitting it would cascade; leave both
                             if self.subfacet_exempt_r(k, rt) || v.iter().any(|&x| self.small_angle(x, &k)) {
                                 self.stats.exempt_faces += 1;
+                                // a tetrahedron far above the size field is not left: the
+                                // circumcentre's projection on the facet lies in its
+                                // circumsphere, so a facet point there removes it
+                                let hs = self.hsz[t as usize];
+                                let xs = v.map(|q| self.xyz[q as usize]);
+                                let longest = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
+                                    .map(|(a, b)| dot(&sub3(&xs[a], &xs[b]), &sub3(&xs[a], &xs[b])).sqrt())
+                                    .fold(0.0f64, f64::max);
+                                if hs > 0.0 && longest > LARGE_EDGE * self.opt.alpha * hs
+                                    && !v.iter().any(|&x| self.small_angle(x, &k)) {
+                                    return self.split_facet_toward(k, Some((c, PROJECT_GAP * self.opt.alpha * hs)));
+                                }
                                 return Ok(());
                             }
                             return self.split_subfacet(k);
