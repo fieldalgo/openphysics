@@ -178,11 +178,11 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
 | `linux-py312-tests` | Ubuntu 24.04, job 네 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 네 부분으로 동시에 실행 |
-| `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
+| `installed-tests` | Ubuntu 24.04, job 네 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 네 부분으로 동시에 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
-필수 검사는 **`tests`** 하나입니다. 다섯 부분이(소스 시험 job 네 개 모두 포함) 모두 성공해야 통과하며, 하나라도
+필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 네 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
@@ -252,10 +252,18 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가
 없는 시험 파일(`test_*.py`, `*_test.py`)이 있으면 실패합니다. 설치된 환경은 `tools/check_licenses.py`도
 통과해야 합니다. 이 job은 고정 requirements, Gmsh, 고정 RII 데이터베이스, 필수 레퍼런스
-교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬 Linux 실행에서 25분쯤
-걸렸고, 50분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬에서 돌리려면 Gmsh와
+교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬에서 돌리려면 Gmsh와
 `PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
 실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 `linux-py312-tests`에서 돕니다.
+
+CI에서는 이 job을 `--shard K/4`로 네 부분, `installed-tests (1/4)`~`(4/4)`로 돌립니다.
+각 부분은 자기 wheel을 빌드·설치하고(약 2분), 복사한 시험 파일 전체에서
+`tools/shards/openphysics_shard.py`가 소스 시험과 같은 표로 자기에게 배정한 시험 파일을 pytest에
+넘깁니다. 결과 검사는 그 파일마다 결과가 있는지 확인합니다. 네 부분을 합치면 모든 시험 파일을
+한 번씩 돌리며, 각 부분은 자기 파일과 예상 시간을 `shard.json`에 남깁니다. job 하나로 돌리던 때는
+2026-11-20에 러너 CPU에 따라 39~71분 걸렸고, 63분 실행을 나누면 부분마다 15.5~17분입니다.
+45분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬처럼 `--shard` 없이 실행하면 모든 시험 파일을
+돌립니다.
 
 **라이선스** (`tools/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
 환경마다 `tools/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
@@ -340,9 +348,9 @@ notices, slow 연구.
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
 - 소스 시험: 부분마다 `source-tests-<k>-of-4`. `source-tests-<k>.xml`, 교차 검사 기록,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
-- 설치 시험: `installed-test-results`. 빌드한 배포물, `installed-tests.xml`,
-  `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사 기록이 든
-  `.validation/` 디렉터리입니다.
+- 설치 시험: 부분마다 `installed-test-results-<k>-of-4`. 빌드한 배포물, `installed-tests.xml`,
+  `shard.json`, `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사
+  기록이 든 `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
   환경 정보, 체크섬, 설치 위치, JUnit XML, `numeric-runtime.json`이 들어 있습니다.
 - 단위 배치 동등성(수동 실행 전용): `units-batch-equivalence-<os>-<run_id>`. 비교
