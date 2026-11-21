@@ -163,6 +163,80 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     return result(temperature, flux, load, reaction, residual, G, B, convective, rhs)
 
 
+def solve_steady_heat_3d_moving(mesh, motion: MeshMotion, *, thermal_conductivity, prescribed_temperature,
+                                heat_source_density=None):
+    """``thermal3d.solve_steady_heat_3d`` on X0 + t W with the derivative with respect to ``motion.t``.
+
+    Internal: reached through ``motion=``. The ordinary solve on the moved Mesh3D gives the
+    numbers and every check; one more live solve of the P1 system assembled from the live node
+    coordinates attaches the derivative, on the increment over each component's first
+    Dirichlet value: u = u0 + K(t)^-1 (b(t) - K(t) u0), T = u + offset. The barycentric
+    gradients are the cofactor rows (e2 x e3, e3 x e1, e1 x e2) / det, the volume det / 6."""
+    from . import thermal3d
+
+    xp, t = _live_t(motion.t)
+    W = _velocity(mesh, motion.design_velocity)
+    _coefficient(thermal_conductivity, "thermal_conductivity")
+    source = 0.0 if heat_source_density is None else heat_source_density
+    if callable(source) and not is_per_region(source):
+        raise TypeError("motion: heat_source_density is a callback; with a moving mesh its sample points move "
+                        "too, which this slice does not differentiate. Give a scalar or a region table")
+    _numpy_data(source, "heat_source_density")
+    if not isinstance(prescribed_temperature, Mapping):
+        raise ValueError("prescribed_temperature must map exterior node indices to temperatures in K")
+    for node, value in prescribed_temperature.items():
+        _numpy_data(value, "prescribed_temperature", sampled=False)
+    moved = _checked_step(mesh, W, t)
+    base = thermal3d.solve_steady_heat_3d(moved, thermal_conductivity=thermal_conductivity,
+                                          prescribed_temperature=prescribed_temperature,
+                                          heat_source_density=heat_source_density)
+    n = mesh.num_nodes
+    tets = mesh.tets
+    X = lift(xp, mesh.nodes) + t * lift(xp, W)
+    p = [X[tets[:, i]] for i in range(4)]
+    e1, e2, e3 = p[1] - p[0], p[2] - p[0], p[3] - p[0]
+    rows = [_cross3(xp, e2, e3), _cross3(xp, e3, e1), _cross3(xp, e1, e2)]
+    det = xp.sum(e1 * rows[0], axis=1)
+    g = xp.stack(rows, axis=1) / det[:, None, None]                                  # (T, 3, 3)
+    grads = xp.concatenate([-xp.sum(g, axis=1)[:, None, :], g], axis=1)              # (T, 4, 3)
+    volume = det / 6.0
+    k = lift(xp, np.asarray(base.thermal_conductivity, dtype=float))
+    Q = lift(xp, np.asarray(base.heat_source_density, dtype=float))
+    element = (k * volume)[:, None, None] * xp.sum(grads[:, :, None, :] * grads[:, None, :, :], axis=3)
+    K = CooMatrix(np.repeat(tets, 4, axis=1).ravel(), np.tile(tets, (1, 4)).ravel(),
+                  xp.reshape(element, (-1,)), (n, n))
+    load = scatter_add(xp, n, tets.ravel(), xp.reshape((Q * volume / 4.0)[:, None]
+                                                       * xp.ones((1, 4), dtype=xp.float64), (-1,)))
+    # increments over each component's first Dirichlet value (K annihilates constants)
+    from scipy.sparse.csgraph import connected_components
+    import scipy.sparse as _sp
+    pairs = tets[:, [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]].reshape(-1, 2)
+    graph = _sp.coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(n, n))
+    count, labels = connected_components(graph, directed=False)
+    offsets = np.zeros(count)
+    anchored = np.zeros(count, dtype=bool)
+    for node, value in prescribed_temperature.items():
+        if not anchored[labels[int(node)]]:
+            offsets[labels[int(node)]], anchored[labels[int(node)]] = float(value), True
+    u0 = lift(xp, np.asarray(base.temperature, dtype=float) - offsets[labels])
+    fixed = {(int(node),): 0.0 for node in prescribed_temperature}
+    delta = core_solve.solve_dirichlet([K], load - K.matvec(u0), fixed)
+    increment = u0 + delta
+    temperature = increment + lift(xp, offsets[labels])
+    residual = K.matvec(increment) - load
+    fixed_nodes = np.asarray(base.prescribed_node_ids, dtype=int)
+    reaction = scatter_add(xp, n, fixed_nodes, residual[fixed_nodes])
+    flux = -k[:, None] * xp.sum(grads * increment[tets][:, :, None], axis=1)
+    return thermal3d.SteadyHeat3DResult(temperature, flux, load, reaction, residual, base.thermal_conductivity,
+                                        base.heat_source_density, base.relative_conservation_residual,
+                                        base.prescribed_node_ids)
+
+
+def _cross3(xp, u, v):
+    return xp.stack([u[:, 1] * v[:, 2] - u[:, 2] * v[:, 1], u[:, 2] * v[:, 0] - u[:, 0] * v[:, 2],
+                     u[:, 0] * v[:, 1] - u[:, 1] * v[:, 0]], axis=1)
+
+
 # ----------------------------------------------------------------------------- steady electric
 
 def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, electrical_conductivity,
@@ -835,8 +909,9 @@ def _velocity(mesh: Mesh, velocity):
     if is_live(velocity):
         raise TypeError("motion: the mesh velocity is NumPy structure; only t is live")
     W = np.asarray(velocity, dtype=float)
-    if W.shape != (mesh.num_nodes, 2):
-        raise ValueError(f"motion: velocity must have shape ({mesh.num_nodes}, 2), got {W.shape}")
+    dim = mesh.nodes.shape[1]           # 2 for a Mesh, 3 for a Mesh3D
+    if W.shape != (mesh.num_nodes, dim):
+        raise ValueError(f"motion: velocity must have shape ({mesh.num_nodes}, {dim}), got {W.shape}")
     if not np.all(np.isfinite(W)):
         raise ValueError("motion: velocity must be finite")
     return W
@@ -867,6 +942,10 @@ def _per_triangle(mesh, value, label, *, positive=False):
 
 
 def _moved_mesh(mesh: Mesh, W, t0: float) -> Mesh:
+    from .mesh3d import Mesh3D
+    if isinstance(mesh, Mesh3D):
+        return Mesh3D(mesh.nodes + t0 * W, mesh.tets, mesh.boundary, mesh.regions, mesh.region_names,
+                      mesh.tagged_faces or None, mesh.interfaces or None)
     return Mesh(mesh.nodes + t0 * W, mesh.triangles, mesh.boundary, mesh.boundary_edges, mesh.regions,
                 mesh.region_names, mesh.provenance_edges, mesh.selection_edges)
 

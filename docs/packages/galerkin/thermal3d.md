@@ -64,8 +64,9 @@ Nodal heat rates are watts, not per depth, so the fields have no `_per_depth`
 (asking for one raises an `AttributeError` that says why); `.units` maps each
 quantity field to its SI unit. The solver raises `ValueError` when
 the free residual exceeds `1e-10` of the system scale or the heat balance exceeds
-`1e-10`, so a returned result has passed both. NumPy only: JAX or PyTorch values
-raise `TypeError`; no derivative path exists here.
+`1e-10`, so a returned result has passed both. JAX or PyTorch values raise
+`TypeError`; the one derivative path is a shape derivative, `motion=MeshMotion(...)` with a
+JAX or PyTorch t ([shape derivatives](shape_derivative.md#3d-steady-heat)).
 
 ## Validation
 

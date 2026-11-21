@@ -8,12 +8,12 @@
 (`galerkin.thermal.solve_steady_heat`, Cartesian 2026-11-09, 축대칭 2026-11-21), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 열(`galerkin.transient_heat.solve_transient_heat`, Cartesian
-2026-11-10, 축대칭 2026-11-21), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11; modal PML과 함께 2026-11-21)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+2026-11-10, 축대칭 2026-11-21), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11; modal PML과 함께 2026-11-21)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다. 3D에서는 정상 열(`galerkin.thermal3d.solve_steady_heat_3d`, 2026-11-21)을 다룹니다.
 
 ## 무엇을 미분하나
 
 설계 변수 t가 모든 노드를 움직입니다: **X(t) = X₀ + t·W**.
-- **W**는 (N, 2) 모양의 고정된 NumPy 메시 속도 `MeshMotion.design_velocity`입니다(`t`처럼 키워드 전용). t 한 단위당 노드가 메시 길이 단위로 움직이는 양입니다.
+- **W**는 (N, 2) 모양(`Mesh3D`에서는 (N, 3))의 고정된 NumPy 메시 속도 `MeshMotion.design_velocity`입니다(`t`처럼 키워드 전용). t 한 단위당 노드가 메시 길이 단위로 움직이는 양입니다.
 - **t**만 live 값입니다(JAX·PyTorch 스칼라). 그 수치는 풀이가 이루어지는 스텝이며, 보통 0(주어진 메시)입니다.
 - 연결·태그·영역은 고정입니다.
 
@@ -201,6 +201,35 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
 
   해석 기울기는 커널의 exp(+iωt) 규약이고 공개 지수는 그 켤레입니다. P6은 처음에 실패했습니다(2026-11-21). 기준 근은 간격을 0.25 µm로
   두었지만, motion은 기판을 0.47 µm에 둡니다. 근이 움직인 기하(간격 0.47 − d₁)를 쓰자 사전 등록한 기준을 충족했습니다.
+
+## 3D 정상 열
+
+`solve_steady_heat_3d(mesh3d, ..., motion=MeshMotion(design_velocity=W, t=t))`는 (N, 3) 설계 속도의 `Mesh3D`와 솔버 자신의
+입력을 받습니다. 그 입력은 영역 또는 스칼라 전도도, 영역 또는 스칼라 열원, 노드에 붙은 Dirichlet 값입니다(3D 솔버에는 열유속과
+대류가 없습니다).
+- 수치는 움직인 `Mesh3D`에서 보통 풀이가 줍니다.
+- live 보정은 live 좌표로 P1 계를 조립합니다. 무게중심 기울기는 여인수 행 (e₂ × e₃, e₃ × e₁, e₁ × e₂)/det이고 부피는 det/6입니다.
+  강성은 kV GGᵀ, 열원 하중은 QV/4입니다.
+- 2D처럼 보정은 각 성분의 첫 Dirichlet 값에 대한 증분으로 풉니다.
+- `admissible_interval`과 `extend_velocity`가 `Mesh3D`를 받습니다.
+  - 사면체 부피는 t의 3차식이며, Newton 단계로 다듬은 실근이 구간을 정합니다.
+  - 확장은 성분마다 3D P1 Laplace 문제를 풉니다(`"stiffened"`는 부피로 나눔).
+- 열원 콜백은 표본점이 움직이므로 motion과 함께 거부합니다.
+
+`tests/galerkin/test_shape_derivative_3d.py`에 T1–T10이 있습니다(2026-11-21 구현 실행 전 사전 등록, 같은 날 측정):
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| T1 수치 | 온도·비율·열유속이 이동 메시의 보통 풀이와 상대 1e-12 이내 | 5.7e-14 |
+| T2 일관성 | 열원이 있는 두 영역 상자, 내부 bump와 움직이는 면: dT/dt가 이동 메시 중앙 차분 Richardson(h = 2e-3)과 1e-8 · max \|dT/dt\| 이내 | 1.2e-10 |
+| T3 라이브러리 | JAX와 PyTorch가 1e-12 이내 | 2.3e-16 |
+| T4 강체 운동 | 평행 이동과 무한소 회전 ω × x: dT/dt = 0, 1e-10 · max \|T\| 이내 | 1.5e-16, 5.4e-17 |
+| T5 두 층 상자 | dQ/dL₁ = −AΔT (1/k₁ − 1/k₂)/R², 상대 1e-10 | 4.7e-15 |
+| T6 속 빈 원통 | 안쪽 반지름 a를 2πkH(T₁ − T₂)/(a ln²(b/a))와 비교; 차수 ≥ 1.5, 가장 고운 메시 1e-2 이내 | 4 × 16, 8 × 32, 16 × 64 셀에서 9.7e-3, 2.4e-3, 5.9e-4; 차수 2.03, 2.01 |
+| T7 뒤집힘 구간 | 각 끝의 (1 − 1e-9)에서 부피가 모두 양수, (1 + 1e-9)에서 어떤 부피 ≤ 0; 구간 밖 걸음은 거부 | 통과 |
+| T8 확장 | 선형 자료를 1e-12 이내로 재현(harmonic, stiffened) | 통과 |
+| T9 거부 | 2열 속도, live 전도도·Dirichlet 값, 열원 콜백, NumPy t | 통과 |
+| T10 불변 | `motion=None`이 키워드 없는 호출과 비트까지 같음 | 통과 |
 
 ## 메시 속도
 
