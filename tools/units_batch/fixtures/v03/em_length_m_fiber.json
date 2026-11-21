@@ -1,0 +1,65 @@
+{
+  "openphysics": "0.3",
+  "name": "step-index fiber a = 4 um, n1 = 1.45, n2 = 1.44",
+  "geometry": {
+    "length_unit": "m",
+    "depth": null,
+    "domain": {
+      "xmin": -2e-05,
+      "xmax": 2e-05,
+      "ymin": -2e-05,
+      "ymax": 2e-05
+    },
+    "background": {
+      "material": "clad"
+    },
+    "shapes": [
+      {
+        "name": "core",
+        "type": "circle",
+        "cx": 0.0,
+        "cy": 0.0,
+        "r": 4e-06,
+        "material": "core",
+        "element_size": "0.0000005 m"
+      }
+    ]
+  },
+  "materials": {
+    "core": {
+      "refractive_index": 1.45
+    },
+    "clad": {
+      "refractive_index": 1.44
+    }
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "vacuum_wavelength": "0.00000155 m",
+      "mode_count": 2,
+      "boundary": {
+        "left": "pec",
+        "right": "pec",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "0.000003 m",
+    "grading": {
+      "position": [
+        "0 m",
+        "0 m"
+      ],
+      "near": "0.0000005 m",
+      "far": "0.000003 m",
+      "refinement_distance": "0.000012 m"
+    }
+  },
+  "study": {
+    "type": "single"
+  }
+}

@@ -52,8 +52,8 @@ Independent owner-side segment normals and8-point line integrals audit the4-poin
 production loader. Degree0..6 traction monomials additionally use exact rational
 nodal moments L/[(k+1)(k+2)] and L/(k+2), not a second quadrature implementation.
 
-Full3D stress/energy includes PE sigma_zz and residual .5Ea². Returned total strain
-is element constant, while thermal/elastic strain, stress, sigma_zz and epsilon_zz
+Full3D stress/energy includes PE sigma_zz and residual .5Ea². Returned `strain`
+is element constant, while thermal/elastic strain, stress, `stress_zz` and `strain_zz`
 are centroid samples, checked at those locations. Full stress norms use interior
 parent-law reconstruction with actual P1 T; centroid-T squared is not an energy
 integral. Nonzero prescribed displacement requires support work. Independently
@@ -146,9 +146,9 @@ loads, an unanchored second component and three distinct but rank2 scalar suppor
 
 ## Runtime compatibility and negative controls
 
-All original18 ThermoelasticResult field positions are preserved, followed by
-load_body/load_traction with defaultNone. A real18-positional construction retains
-old meanings and leaves new fields None. Normal solver outputs have(N,2) arrays,
+The first18 ThermoelasticResult field positions keep their order (under their
+registry names), followed by applied_body_force_per_depth/applied_traction_force_per_depth
+with defaultNone. A real18-positional construction leaves the last two fields None. Normal solver outputs have(N,2) arrays,
 external=body+traction and total=external+g. None/{} preserve original18 numerical
 fields exactly. Output arrays remain mutable; snapshot is an independent immutable
 bytes copy rather than a post-return certification of mutable results.

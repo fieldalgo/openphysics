@@ -47,7 +47,7 @@ be read without profiling:
 - `stiffness_assembly_seconds`, `mass_assembly_seconds`, `load_assembly_seconds`:
   `assemble_stiffness`, `assemble_mass` and `assemble_load` on the mesh with the
   case's coefficients (`stiffness_nonzeros` records the matrix size).
-- `dirichlet_solve_seconds`: `galerkin.solve_dirichlet` of that stiffness matrix
+- `dirichlet_solve_seconds`: `galerkin.kernels.solve_dirichlet` of that stiffness matrix
   and load with the left edge fixed: one sparse factorization and solve, without
   convection, checks or postprocessing.
 - `solver_call_seconds`: the complete `solve_steady_heat` or

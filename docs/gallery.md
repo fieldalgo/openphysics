@@ -49,8 +49,8 @@ P1 elements on four meshes and plots the L2 error against the radial element
 size. The error falls from 2.4 × 10⁻² to 4.1 × 10⁻⁴ and the last rate is 1.99,
 matching the expected second order.
 
-- Inputs: Python API (`annulus_mesh`, `assemble_stiffness`, `solve_dirichlet`,
-  `l2_error`), as in [`coax_convergence.py`](../examples/galerkin/coax_convergence.py).
+- Inputs: Python API (`annulus_mesh`, `l2_error` and the internal kernels
+  `galerkin.kernels.assemble_stiffness` and `solve_dirichlet`), as in [`coax_convergence.py`](../examples/galerkin/coax_convergence.py).
 - Validation: milestone M1 in [solver validation](packages/galerkin/milestone_validation.md).
 
 ## Modes of a 3D box cavity

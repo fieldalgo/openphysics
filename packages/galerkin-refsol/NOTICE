@@ -12,7 +12,8 @@ is distributed with this product in the file LICENSE, and is also available at
 --------------------------------------------------------------------------------
 THIRD-PARTY MATERIAL
 
-The benchmark values in refsol/benchmarks.py are numerical results published in:
+The benchmark values in refsol/_published.py (read through refsol/benchmarks.py)
+are numerical results published in:
 
     G. R. Hadley, "High-accuracy finite-difference equations for dielectric
     waveguide analysis II: dielectric corners", J. Lightwave Technol. 20(7),
@@ -26,8 +27,9 @@ from femwell is included in or derived from this package, and this package is
 not a derivative work of femwell.
 
 The NAFEMS T4 problem statement and its target temperature (18.3 degC at
-(0.6, 0.2) m) in refsol/thermal_convection.py are published benchmark facts,
-reproduced as quoted by two public documents that cite NAFEMS:
+(0.6, 0.2) m) in refsol/_published.py (read through
+refsol/thermal_convection.py) are published benchmark facts, reproduced as
+quoted by two public documents that cite NAFEMS:
 
     DIANA FEA, "Two-Dimensional Heat Transfer with Convection",
     https://tutorials.dianafea.com/2DHeatTransferConvection.pdf

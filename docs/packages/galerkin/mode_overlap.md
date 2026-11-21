@@ -4,7 +4,7 @@
 
 [galerkin overview](overview.md) · [Eigenspace reliability](eigenspace_reliability.md) · [Derivatives](differentiation.md)
 
-`galerkin.mode_overlap` post-processes the modes of `galerkin.waveguide.solve_modes`
+`galerkin.mode_overlap` post-processes the modes of `galerkin.kernels.solve_modes`
 (full-vector, edge `et` and nodal `ez`) and scalar P1 mode functions on a `Mesh`:
 guided power, field overlaps, normalisation, coupling efficiency, confinement
 factor and effective area. Every integral is an exact mass- or coupling-matrix
@@ -138,13 +138,15 @@ All functions are NumPy only; JAX and PyTorch values raise `TypeError`
 | `scalar_confinement_factor(mesh, phi, triangles)` | `int_R |phi|^2 / int |phi|^2` |
 | `scalar_effective_area(mesh, phi)` | `(int |phi|^2 dA)^2 / int |phi|^4 dA` |
 
-The public names are also exported from `galerkin`. The vector power functions
+These are kernels (consistent units, exp(+iωt)): the internal `galerkin.kernels`
+re-exports them, and the public SI functions are [below](#public-si-functions). The vector power functions
 take `n_eff` explicitly because `beta` enters `H_t`; `solve_modes` returns
 `(n_eff, space, et, ez)`, so `vector_power(space, et[i], ez[i], n_eff[i], k0)`.
 
 ```python
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_overlap import normalize_vector, coupling_efficiency, confinement_factor, interpolate_vector_field
 
 n_eff, space, et, ez = solve_modes(mesh, eps_r, k0, n_target=n_core, num_modes=4)
@@ -153,6 +155,42 @@ gamma = confinement_factor(space, et0, ez0, eps_r, mesh.regions == 0)   # energy
 et_in, _ = interpolate_vector_field(space, lambda x, y: np.stack([np.exp(-(x**2 + y**2) / w0**2),
                                                                   np.zeros_like(x)], axis=-1))
 eta = coupling_efficiency(space, et[:2], ez[:2], et_in)                 # Gaussian into a degenerate pair
+```
+
+## Public SI functions
+
+`galerkin.waveguide` (re-exported by `galerkin`) is the public surface of the modes in SI units and
+exp(−iωt) (units and naming, galerkin step). Its functions wrap the kernels above and convert in one
+place, `galerkin._conventions`: a complex input reaches a kernel through `to_kernel` (Im negated as
+`0.0 - Im`), a complex output is `to_public` (`conj`) of the kernel's, never re-derived, so a public
+value equals the conjugate of the kernel value bit for bit
+(`tests/galerkin/test_waveguide_public_frames.py`, check P3-5).
+
+| Function | Returns |
+|---|---|
+| `solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None, target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None, pec_edges=None, pml=None, bend=None, motion=None)` | a frozen `WaveguideModes`: `effective_index` (Im ≥ 0 for a forward mode of a passive lossy guide), `unnormalized_electric_field_line_integral` (m, the line integrals of `E_t` along the edges of `space`), `unnormalized_electric_field_z` (`E_z` itself), `space`, `vacuum_angular_wavenumber`, the materials and `.units`; the mesh is in metres, exactly one of the wavelength (m) and k0 (rad/m) is given, and k0 = 2π/λ |
+| `ModalPML(*, pml_thickness={side: m}, pml_strength=3.0, pml_order=2)`, `Bend(*, bend_radius, bend_origin, bend_axis="x")` | the layer and the bend ([modal coordinates](modal_coordinates.md)); the solver builds the coordinate factors itself |
+| `mode_power(modes, mode)` | complex `P` (W for fields in V/m); `Re P` is the +z power |
+| `cross_power(modes_a, mode_a, modes_b, mode_b)` | `P_ab`, `H` of mode `b` (same mesh and k0) |
+| `field_overlap(modes_a, mode_a, modes_b, mode_b)` | `<E_a, E_b>` in m^2 (both components) |
+| `mode_coupling_efficiency(modes, mode, incident, incident_mode)` | `eta` of mode `incident_mode` of `incident` into `mode` (or the span of several modes) |
+| `mode_confinement_factor(modes, mode, regions)` | `Gamma_R`; `regions` region names of the mesh, a mask or triangle indices |
+| `mode_effective_area(modes, mode, *, include_longitudinal=False)` | `A_eff` in m^2 |
+
+The fields keep the solver's arbitrary amplitude and phase. With a `ModalPML` or a `Bend` they are
+covariant components in the stretched or bent coordinates, and the post-processing functions integrate
+them over the whole window. The scalar functions, `normalize_vector`, `overlap_matrix`,
+`centroid_field` and `interpolate_vector_field` stay kernel-only in this step.
+
+```python
+import numpy as np
+from galerkin import mode_confinement_factor, mode_power, solve_waveguide_modes
+
+modes = solve_waveguide_modes(mesh, relative_permittivity=eps_r, vacuum_wavelength=1.55e-6,
+                              target_effective_index=n_core, search_mode_count=4)    # mesh in m
+loss_db_per_m = 40 * np.pi / np.log(10) * modes.effective_index[0].imag / 1.55e-6   # Im n_eff >= 0: a loss
+power = mode_power(modes, 0)                                                         # W per (V/m)^2
+gamma = mode_confinement_factor(modes, 0, mesh.regions == 0)                         # energy in region 0
 ```
 
 ## Validation

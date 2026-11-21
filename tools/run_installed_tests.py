@@ -5,8 +5,10 @@
 
 Builds every package (each wheel from its sdist) and installs the wheels, with
 all of their extras, into a fresh venv in a temporary directory outside the
-checkout. The tracked files under tests/, examples/ and docs/ and the root
-pyproject.toml are copied next to it; nothing under packages/ is copied.
+checkout. The tracked files under tests/, examples/ and docs/, the units
+batch's fixture documents (tools/units_batch/fixtures/, JSON data the tests
+read) and the root pyproject.toml are copied next to it; nothing under
+packages/ and no other file under tools/ is copied.
 pytest then runs every test with `python -I`, so only the installed packages
 can be imported. No test is selected by name: a test that cannot run against
 the installed packages fails here.
@@ -15,10 +17,17 @@ The run fails if a first-party module does not import from the venv, if any
 test is skipped or expected to fail (xfail), or if a test file produced no
 results. Run it with Gmsh and the pinned RII data (PHYSMAT_RII_PATH) available:
 tests that need them skip otherwise, and a skip fails the run.
+
+With --shard K/N only part K of the test files runs, assigned by
+tools/shards/openphysics_shard.py from the copied test files (whole files,
+balanced by tools/shards/durations.json); the N parts together run every test
+file once, and shard.json in the output names the part's files. Each part
+builds and installs its own wheels.
 """
 
 import argparse
 import hashlib
+import importlib.util
 from email.parser import BytesParser
 import json
 import os
@@ -36,7 +45,8 @@ from packaging.utils import parse_wheel_filename
 import check_distributions as distributions
 
 ROOT = distributions.ROOT
-COPIED_ROOTS = ("tests/", "examples/", "docs/")
+# tools/units_batch/fixtures/ holds JSON documents only; the harness code beside it stays behind.
+COPIED_ROOTS = ("tests/", "examples/", "docs/", "tools/units_batch/fixtures/")
 
 
 def wheel_extras(wheel):
@@ -48,7 +58,8 @@ def wheel_extras(wheel):
 
 
 def copied_sources():
-    """Tracked files the installed run needs: tests, examples, docs and the pytest config."""
+    """Tracked files the installed run needs: tests, examples, docs, the units batch's fixture
+    documents and the pytest config."""
     return ["pyproject.toml", *sorted(p for p in distributions.tracked_repository()
                                       if p.startswith(COPIED_ROOTS))]
 
@@ -58,8 +69,35 @@ def collected_files(tests):
     return sorted({*tests.rglob("test_*.py"), *tests.rglob("*_test.py")})
 
 
-def check_results(junit, tests):
-    """Every test file produced results, and nothing was skipped or xfailed."""
+def load_shards():
+    """tools/shards/openphysics_shard.py, loaded by path (tools/ is not a package)."""
+    spec = importlib.util.spec_from_file_location(
+        "openphysics_shard", ROOT / "tools" / "shards" / "openphysics_shard.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def shard_files(tests, shard):
+    """The test files of part K of N under tests/, as paths relative to its parent.
+
+    Whole files are assigned from every file pytest collects by default, so the parts
+    cover every file once; returns (files, estimated seconds, all files)."""
+    shards = load_shards()
+    part, parts = shards.parse_shard(shard)
+    every = [p.relative_to(tests.parent).as_posix() for p in collected_files(tests)]
+    seconds = shards.load_durations()
+    plan = shards.assign(every, seconds, parts)
+    mine = sorted(f for f in every if plan[f] == part - 1)
+    if not mine:
+        raise RuntimeError(f"shard {shard} has no test files")
+    weight = shards.weights(every, seconds)
+    return mine, sum(weight[f] for f in mine), every
+
+
+def check_results(junit, tests, files=None):
+    """Every test file (of the part, if files is given) produced results, and nothing was
+    skipped or xfailed."""
     root = ET.parse(junit).getroot()
     cases = list(root.iter("testcase"))
     # pytest writes both skips and xfails as <skipped>.
@@ -71,7 +109,8 @@ def check_results(junit, tests):
         raise RuntimeError("no test results")
     reported = {c.get("classname", "") for c in cases}
     silent = []
-    for path in collected_files(tests):
+    paths = collected_files(tests) if files is None else [tests.parent / f for f in files]
+    for path in paths:
         module = path.relative_to(tests.parent).with_suffix("").as_posix().replace("/", ".")
         if not any(name == module or name.startswith(module + ".") for name in reported):
             silent.append(path.relative_to(tests.parent).as_posix())
@@ -83,7 +122,14 @@ def check_results(junit, tests):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".validation" / "installed")
+    parser.add_argument("--shard", metavar="K/N", default=None,
+                        help="run only part K of N time-balanced parts of the test files")
     args = parser.parse_args()
+    if args.shard is not None:
+        try:
+            load_shards().parse_shard(args.shard)
+        except ValueError as error:
+            parser.error(str(error))
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
@@ -140,7 +186,8 @@ def main():
         distributions.run(sys.executable, ROOT / "tools" / "check_licenses.py", "--python", python,
                           "--report", output / "licenses-installed.json", cwd=ROOT)
 
-        # Tests, examples and docs come from this checkout's tracked files; no package code.
+        # Tests, examples, docs and fixture documents come from this checkout's tracked files;
+        # no package code.
         suite = work / "suite"
         copied = {}
         for relative in copied_sources():
@@ -174,14 +221,24 @@ def main():
         distributions.run(python, "-I", probe, output / "installed-origins.json", suite,
                           cwd=suite, env=env)
 
+        targets, files = ["tests"], None
+        if args.shard is not None:
+            files, estimate, every = shard_files(suite / "tests", args.shard)
+            targets = files
+            (output / "shard.json").write_text(json.dumps(
+                {"shard": args.shard, "estimated_seconds": round(estimate, 1),
+                 "all_files": len(every), "files": files}, indent=2) + "\n", encoding="utf-8")
+            print(f"shard {args.shard}: {len(files)} of {len(every)} test files, "
+                  f"about {estimate / 60:.1f} min by durations.json")
         junit = output / "installed-tests.xml"
         # Keep what passing tests print (numerical diagnostics) in the JUnit file.
         distributions.run(python, "-I", "-m", "pytest", "-q", "-ra", "-p", "no:cacheprovider",
                           "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true",
-                          "--confcutdir", suite / "tests", f"--junitxml={junit}", "tests",
+                          "--confcutdir", suite / "tests", f"--junitxml={junit}", *targets,
                           cwd=suite, env=env)
-        count = check_results(junit, suite / "tests")
-    print(f"{count} tests passed against {len(wheels)} installed wheels; artifacts: {output}")
+        count = check_results(junit, suite / "tests", files)
+    part = f" (shard {args.shard})" if args.shard else ""
+    print(f"{count} tests passed against {len(wheels)} installed wheels{part}; artifacts: {output}")
 
 
 if __name__ == "__main__":

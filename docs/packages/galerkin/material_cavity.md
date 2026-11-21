@@ -6,17 +6,18 @@
 from galerkin import CavityMaterialRegion, solve_material_cavity_box
 
 slab = CavityMaterialRegion(
-    bounds_m=((0.0, 1.0), (0.0, 0.8), (0.0, 0.3)),
-    relative_permittivity=4.0 - 0.04j,      # eps' (1 - j tan_delta), tan_delta = 0.01
+    lower_corner_position=(0.0, 0.0, 0.0),  # m
+    upper_corner_position=(1.0, 0.8, 0.3),
+    relative_permittivity=4.0 + 0.04j,      # eps' (1 + i tan_delta), tan_delta = 0.01, exp(-i omega t)
 )
 result = solve_material_cavity_box(
-    lengths_m=(1.0, 0.8, 0.6),
-    subdivisions=(8, 8, 8),
+    box_size=(1.0, 0.8, 0.6),               # m
+    subdivision_count=(8, 8, 8),
     regions=[slab],
-    num_modes=4,
-    target_frequency_hz=150e6,
+    mode_count=4,
+    target_frequency=150e6,                 # Hz
 )
-print(result.resonant_frequencies_hz, result.quality_factors)
+print(result.resonant_frequency, result.quality_factor)   # Im f < 0: the modes decay
 ```
 
 This API extends the [vacuum PEC box solver](cavity_solver.md) with piecewise-constant,
@@ -29,70 +30,82 @@ not included. `solve_cavity_box` and its contract are unchanged.
 
 ## Conventions
 
-Fields vary in time as **`exp(+j*omega*t)`**. A passive material has
+The public functions follow **`exp(-i omega t)`**, galerkin's public convention. A passive
+material has
 
-    eps_r = eps' - j*eps'',  eps'' >= 0,    mu_r = mu' - j*mu'',  mu'' >= 0,
+    eps_r = eps' + i eps'',  eps'' >= 0,    mu_r = mu' + i mu'',  mu'' >= 0,
 
-so a dielectric with loss tangent `tan_delta` is `eps' * (1 - 1j*tan_delta)`.
-Inputs with negative real part or positive imaginary part (gain) are rejected.
-A decaying resonance has `Im(omega) > 0`. The quality factor is
+so a dielectric with loss tangent `tan_delta` is `eps' * (1 + 1j*tan_delta)`.
+Inputs with negative real part or negative imaginary part (gain) are rejected.
+A decaying resonance has `Im(omega) < 0`, so `Im(resonant_frequency) < 0`. The quality factor is
 
-    Q = Re(omega) / (2 * Im(omega)) = Re(f) / (2 * Im(f)),
+    Q = Re(omega) / (-2 * Im(omega)) = Re(f) / (-2 * Im(f)),
 
 the ratio of the phase rate to the energy decay rate. It is infinite when every
-material is lossless. For a cavity uniformly filled with `eps' (1 - j tan_delta)`
+material is lossless. For a cavity uniformly filled with `eps' (1 + i tan_delta)`
 and real `mu_r`, `Q = (1 + sqrt(1 + tan_delta**2)) / (2 tan_delta)`, about `1/tan_delta`.
+
+The solver computes in **`exp(+j*omega*t)`** (passive `eps' - j*eps''`, decay `Im(omega) > 0`,
+`Q = Re(f) / (2 Im(f))`). The public functions convert in one place, `galerkin._conventions`:
+each complex input reaches the private body (`_solve_material_cavity_box`,
+`_solve_material_cavity`) through `to_kernel` (`complex(re, 0.0 - im)`, so a real value keeps
+an imaginary part of +0.0), and each complex output is `to_public` (the conjugate) of the body's,
+never re-derived. The quality factor is the same double in both conventions. There is no kernel
+export of the cavity solvers.
 
 The weak form of `curl(mu_r^-1 curl E) = k0^2 eps_r E` with PEC walls gives the
 complex-symmetric (non-Hermitian) generalized problem
 
     S(1/mu_r) q = k0^2 M(eps_r) q,
 
-with `k0^2` complex. `frequencies_hz = c0 * sqrt(k0^2) / (2*pi)` uses the principal
+with `k0^2` complex. `resonant_frequency = c0 * sqrt(k0^2) / (2*pi)` uses the principal
 square root, so `Re f > 0`.
 
 ## Arguments
 
-`solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=6,
-target_frequency_hz, wall_conductivity_s_per_m=None)` returns a `MaterialCavityResult`. `lengths_m`, `subdivisions`,
-`num_modes` and `target_frequency_hz` have the vacuum solver's meaning and validation,
-except that JAX and PyTorch values are refused (below), and the mesh is the same
-alternating Kuhn mesh.
+`solve_material_cavity_box(*, box_size, subdivision_count, regions=(), mode_count=6,
+target_frequency, electrical_conductivity=None)` returns a `MaterialCavityResult`. `box_size`,
+`subdivision_count`, `mode_count` and `target_frequency` have the vacuum solver's meaning and
+validation, except that JAX and PyTorch values are refused (below), and the mesh is the same
+alternating Kuhn mesh. Quantities are keyword-only SI registry names; text for a quantity raises
+`TypeError`.
 
-`regions` is a sequence of `CavityMaterialRegion(bounds_m, relative_permittivity=1,
-relative_permeability=1)`. `bounds_m` is `((x0, x1), (y0, y1), (z0, z1))` in metres
-from the box origin. Space outside all regions is vacuum; where regions overlap
-the later one wins. Each tetrahedron takes the material containing its centroid.
+`regions` is a sequence of `CavityMaterialRegion(*, lower_corner_position, upper_corner_position,
+relative_permittivity=1.0, relative_permeability=1.0)`, a frozen spec object. The corners
+`(x0, y0, z0)` and `(x1, y1, z1)` are in metres from the box origin; the constants are complex
+under `exp(-i omega t)` and checked on construction (finite, `Re > 0`, `Im >= 0`). Space outside
+all regions is vacuum; where regions overlap the later one wins. Each tetrahedron takes the
+material containing its centroid.
 
-Every bound must be a mesh grid plane, a multiple of `length/subdivisions` on its
-axis (relative tolerance `1e-9` of one cell), so material interfaces coincide with
-mesh faces. Otherwise `ValueError` names the bound and the grid spacing; change
-the subdivisions rather than relying on a staircase approximation.
+Every corner coordinate must be a mesh grid plane, a multiple of `box_size/subdivision_count`
+on its axis (relative tolerance `1e-9` of one cell), with `0 <= lower < upper <= box_size`, so
+material interfaces coincide with mesh faces. Otherwise `ValueError` names the bound and the grid
+spacing; change the subdivision count rather than relying on a staircase approximation.
 
 ## Result
 
 Let K be the requested mode count, E the edge count and T the tetrahedron count.
+`MaterialCavityResult` is frozen; its fields are registry names, and `result.units` maps each
+quantity field to its SI unit. Complex values follow `exp(-i omega t)`.
 
 | Attribute | Shape / meaning | Units |
 | --- | --- | --- |
-| `frequencies_hz` | `(K,)` complex, `Im > 0` when lossy | Hz |
-| `resonant_frequencies_hz` | `(K,)` `Re(frequencies_hz)`, ascending | Hz |
-| `quality_factors` | `(K,)` `Re f / (2 Im f)`; `inf` when lossless | dimensionless |
-| `eigenvalues_m2` | `(K,)` complex `k0^2` | m^-2 |
-| `edge_coefficients` | `(E,K)` complex, exact zeros on PEC edges | m^-1/2 |
-| `electric_field` | `(K,T,3)` complex, tetrahedron centroids | m^-3/2 |
-| `relative_residuals` | `(K,)` free-edge equations | dimensionless |
-| `pec_edge_ids`, `mesh`, `space` | as in the vacuum solver | |
-| `tet_relative_permittivity`, `tet_relative_permeability` | `(T,)` complex per tetrahedron | dimensionless |
+| `resonant_frequency` | `(K,)` complex, ascending real part, `Im < 0` when lossy | Hz |
+| `quality_factor` | `(K,)` `Re f / (-2 Im f)`; `inf` when lossless | dimensionless |
+| `wavenumber_squared` | `(K,)` complex `k0^2` | m^-2 |
+| `mass_normalized_electric_field_line_integral` | `(E,K)` complex, exact zeros on PEC edges | m^-1/2 |
+| `mass_normalized_electric_field` | `(K,T,3)` complex, tetrahedron centroids | m^-3/2 |
+| `relative_residual` | `(K,)` free-edge equations | dimensionless |
+| `pec_edges`, `mesh`, `space`, `mode_count`, `target_frequency`, `gradient_kernel_dimension` | as in the vacuum solver | |
+| `relative_permittivity`, `relative_permeability` | `(T,)` complex per tetrahedron | dimensionless |
 | `lossless` | every material constant is real and every wall is PEC | bool |
-| `time_convention` | `"exp(+j*omega*t)"` | metadata |
-| `wall_conductivity_s_per_m` | dict over `WALLS`; `None` means PEC | S/m |
-| `fixed_point_iterations` | `(K,)`; zero without finite-conductivity walls | count |
+| `electrical_conductivity` | read-only map over `WALLS` (or face tags); `None` means PEC | S/m |
+| `iteration_count` | `(K,)`; zero without finite-conductivity walls | count |
 
-`search`, `cluster_completeness` and `mode_count_policy` carry the vacuum solver's
-values and meaning. When `lossless` is true, the solve is still complex; returned
-eigenvalues are checked to have `|Im k0^2| <= 1e-9 |k0^2|` and their imaginary
-parts are then set to zero.
+`time_convention` is the constant `"exp(-i omega t)"`; `search`, `cluster_completeness` and
+`mode_count_policy` carry the vacuum solver's values and meaning. When `lossless` is true, the
+solve is still complex; returned eigenvalues are checked to have `|Im k0^2| <= 1e-9 |k0^2|` and
+their imaginary parts are then set to zero.
 
 Each mode is normalized with the Hermitian **vacuum** edge mass `M0` on the returned
 SI mesh, `q^H M0 q = 1`, and its largest-magnitude coefficient is made real and
@@ -132,6 +145,11 @@ and JAX or PyTorch values raise `TypeError` (the solver computes with NumPy).
 
 ## Validation
 
+The tables and the comparisons below record complex values as they were measured, in the solver's
+frame `exp(+j omega t)`: a material `eps' - j eps''` and a decaying resonance `Im f > 0`. The
+public functions take and return their conjugates (`eps' + i eps''`, `Im f < 0`), and the tests
+pass the public values.
+
 From the repository root:
 
 ```bash
@@ -142,6 +160,8 @@ python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
 ```
 
 The references are in `refsol.material_cavity` and `refsol.wall_loss` and use no mesh or FEM code.
+Their public values follow `exp(-i omega t)` as the solver's do (galerkin step, L3 commit 12), so the
+tests compare the two as they are.
 
 **Uniform filling.** A homogeneous cavity has the vacuum fields and
 `k0^2 = k_vac^2 / (eps_r mu_r)` exactly, and the discrete problem rescales the same way.
@@ -211,14 +231,15 @@ bounds, gain, non-positive real parts, malformed bounds and wrong types.
 
 ## Finite-conductivity walls
 
-`wall_conductivity_s_per_m` is `None` (all six walls PEC), one positive conductivity
+`electrical_conductivity` is `None` (all six walls PEC), one positive conductivity
 for every wall, or a dict over `galerkin.material_cavity.WALLS`
 (`"x0", "x1", "y0", "y1", "z0", "z1"`, the walls at the low and high end of each
 axis). Missing or `None` entries are PEC. Values are finite positive S/m; zero,
 negative, infinite, boolean and unknown wall names raise `ValueError`.
 
 A finite wall uses the Leontovich condition `E_t = Zs H x n` (n outward from the
-cavity), with the good-conductor impedance
+cavity), with the good-conductor impedance, written in the solver's `exp(+j omega t)`
+(under `exp(-i omega t)` it is `(1 - i) Rs`),
 
     Zs = sqrt(j omega mu0 / sigma) = (1 + j) Rs,   Rs = sqrt(omega mu0 / (2 sigma)).
 
@@ -268,7 +289,8 @@ all three indices are positive, the two polarizations are degenerate. Wall loss
 is then a quadratic form on the amplitude plane, and its eigenvectors give two Q
 values. The Leontovich reactance lowers the real frequency by as much as the loss
 raises the imaginary part: `omega = omega0 (1 + (j - 1)/(2 Q_c))`. The neglected
-terms are of relative order `1/Q_c`.
+terms are of relative order `1/Q_c`. The public `resonant_frequency` of `refsol.wall_loss` is its
+conjugate under `exp(-i omega t)`, `f0 (1 - (1 + i)/(2 Q_c))`.
 
 Reference self-checks: TE101 equals Pozar's closed form (*Microwave Engineering*,
 4th ed., eq. 6.46) at `1e-12`. Every mode of `(1, 0.8, 0.6) m` up to 400 MHz,
@@ -370,20 +392,21 @@ and the reference's first-order term.
 
 ## External meshes
 
-`solve_material_cavity(mesh, *, regions, walls=None, num_modes=6, target_frequency_hz)`
-runs the same assembly, search, impedance iteration and checks on any mesh of the
-[tetrahedral mesh format](mesh3d_format.md) with regions and tagged outward faces
-(checked on entry), coordinates in metres.
+`solve_material_cavity(mesh, *, relative_permittivity, relative_permeability=None,
+electrical_conductivity=None, mode_count=6, target_frequency)` runs the same assembly, search,
+impedance iteration and checks on any mesh of the [tetrahedral mesh format](mesh3d_format.md)
+with regions and tagged outward faces (checked on entry), coordinates in metres.
 
-- `regions`: `{region name: (eps_r, mu_r)}`, or `{name: eps_r}` for `mu_r = 1`,
-  with exactly the entries of `mesh.region_names`; the same passivity checks as
-  `CavityMaterialRegion`. A material interface is wherever two regions meet, so
-  a dielectric slab is an extruded layer region, not a grid-plane box.
-- `walls`: `None` (every tagged face PEC) or `{face tag: conductivity S/m or None}`;
+- `relative_permittivity`: `{region name: eps_r}` with exactly the entries of
+  `mesh.region_names`; `relative_permeability`: `None` (`mu_r = 1` everywhere) or
+  `{region name: mu_r}`, the regions left out nonmagnetic. Complex under `exp(-i omega t)`,
+  with the same passivity checks as `CavityMaterialRegion`. A material interface is wherever
+  two regions meet, so a dielectric slab is an extruded layer region, not a grid-plane box.
+- `electrical_conductivity`: `None` (every tagged face PEC) or `{face tag: conductivity S/m or None}`;
   tags not listed are PEC, unknown tags raise `ValueError`. Listed conductivities
   take the Leontovich condition above on exactly those faces.
 - JAX or PyTorch values raise `TypeError`; the result's `mesh` is the one given,
-  `wall_conductivity_s_per_m` is keyed by face tag and `gradient_kernel_dimension`
+  `electrical_conductivity` is keyed by face tag and `gradient_kernel_dimension`
   records the counted kernel: every tagged face is a wall, so the kernel is spanned
   by the potentials constant on each boundary component, as for
   [`solve_cavity`](cavity_solver.md#external-meshes).
@@ -391,8 +414,11 @@ runs the same assembly, search, impedance iteration and checks on any mesh of th
 | Gate | Requirement | Measured (Linux, this change) |
 | --- | --- | --- |
 | M3 slab `eps_r = 2.2 - 0.02j` in `0 <= z <= 0.3 m` of the 1.0 x 0.8 x 0.6 m box as an extruded layer region, sizes 0.15, 0.1, 0.05 m, against `solve_material_cavity_box` with the same slab as a `CavityMaterialRegion` at matching subdivisions, three modes | finest relative frequency difference <= 5e-3 | 9.72e-3, 2.12e-3, 4.69e-4 |
-| the same slab at 0.15 m with a 5.8e7 S/m floor (`walls={"z0": ...}` and `wall_conductivity_s_per_m={"z0": ...}`) | within 5e-2, finite Q, at least one impedance iteration | passes |
+| the same slab at 0.15 m with a 5.8e7 S/m floor (`electrical_conductivity={"z0": ...}` on both routes) | within 5e-2, finite Q, at least one impedance iteration | passes |
 | the box solver's own 2x2x2 mesh with the slab as regions and `x1` lossy, through both routes | relative difference <= 1e-10, Q to 1e-8 | 2.99e-16 |
+
+The M3 refinement study is `tests/galerkin/test_cavity_mesh_slab_refinement.py`; the
+other two rows are in `tests/galerkin/test_cavity_mesh.py`.
 
 ## Limitations
 

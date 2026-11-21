@@ -11,12 +11,12 @@ def main():
     bc = {(int(i), 0): 0. for i in mesh.boundary["left"]}
     bc.update({(int(i), 1): 0. for i in mesh.boundary["bottom"]})
     for plane in ("stress", "strain"):
-        r = solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3,
-                             plane=plane, dirichlet=bc, traction={"right": (123., 0.)})
+        r = solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3,
+                             plane=plane, prescribed_displacement=bc, traction={"right": (123., 0.)})
         energy = .5*np.sum(mesh.areas()*np.sum(r.strain*r.stress, axis=1))
-        work = .5*np.sum(r.displacement*(r.load+r.reaction))
+        work = .5*np.sum(r.displacement*(r.applied_force_per_depth+r.reaction_force_per_depth))
         print(plane, "max ux (m):", r.displacement[:, 0].max())
-        print("load / reaction per thickness (N/m):", r.load.sum(axis=0), r.reaction.sum(axis=0))
+        print("load / reaction per thickness (N/m):", r.applied_force_per_depth.sum(axis=0), r.reaction_force_per_depth.sum(axis=0))
         print("energy / proportional external work per thickness (J/m):", energy, work)
 
 

@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 import simcase
-from simcase import FORMAT, examples
+from simcase import examples
 
 STUDIO = Path(simcase.__file__).parent / "studio"
 
@@ -67,22 +67,37 @@ def test_index_and_examples(client):
     ex = client.get("/api/examples").json()["examples"]
     assert "soi_strip" in ex
     doc = client.get("/api/examples/soi_strip").json()
-    assert doc["openphysics"] == FORMAT and doc["geometry"]["shapes"][0]["name"] == "core"
+    assert doc["openphysics"] == "0.3" and doc["geometry"]["shapes"][0]["name"] == "core"
     assert client.get("/api/examples/nope").status_code == 404
 
 
 def test_materials_and_preview(client):
-    mats = client.get("/api/materials").json()["materials"]
-    assert any(m["name"] == "Si" for m in mats)
-    prev = client.post("/api/materials/preview", json={"name": "SiO2", "wl_min": 0.5, "wl_max": 1.6}).json()
-    assert len(prev["wavelength"]) == 100 and 1.44 < prev["n"][-1] < 1.46
-    assert client.post("/api/materials/preview", json={"name": "Si", "wl_min": 0.3, "wl_max": 0.4}).status_code == 400
+    """Library materials under the names a format 0.3 document writes, no aliases, ranges in m."""
+    mats = {m["name"]: m for m in client.get("/api/materials").json()["materials"]}
+    assert "physmat:Si" in mats and "Si" not in mats and all("aliases" not in m for m in mats.values())
+    assert mats["physmat:Si"]["valid"]["vacuum_wavelength"]["unit"] == "m"
+    lo, hi = mats["physmat:Si"]["valid"]["vacuum_wavelength"]["values"]
+    assert 1e-7 < lo < 1.55e-6 < hi < 1e-4
+    prev = client.post("/api/materials/preview", json={"name": "physmat:SiO2", "vacuum_wavelength_minimum": 5e-7,
+                                                       "vacuum_wavelength_maximum": 1.6e-6}).json()
+    assert prev["vacuum_wavelength"]["unit"] == "m" and len(prev["vacuum_wavelength"]["values"]) == 100
+    assert 1.44 < prev["refractive_index"]["n"][-1] < 1.46 and prev["refractive_index"]["k"][-1] == 0
+    assert client.post("/api/materials/preview", json={"name": "physmat:Si", "vacuum_wavelength_minimum": 3e-7,
+                                                       "vacuum_wavelength_maximum": 4e-7}).status_code == 400
+    assert client.post("/api/materials/preview", json={"name": "Si"}).status_code == 404     # not a library name
 
 
-def test_units_vocabulary_comes_from_the_engine(client):
-    served = client.get("/api/units").json()
-    assert served == simcase.unit_vocabulary()
-    assert "length" in served["dimensions"] and "um" in served["symbols"]["length"]
+def test_quantities_come_from_the_registry(client):
+    """/api/quantities (was /api/units, units batch C10): every registry quantity with its canonical
+    unit and its menu, from simcase.quantities."""
+    served = client.get("/api/quantities").json()
+    assert set(served["quantities"]) == set(simcase.quantities.names())
+    for name, entry in served["quantities"].items():
+        assert entry == {"unit": simcase.quantities.quantity(name).unit,
+                         "menu": list(simcase.quantities.menu(name))}, name
+    assert served["quantities"]["vacuum_wavelength"] == {"unit": "m", "menu": ["nm", "um", "m"]}
+    assert served["length_units"] == list(simcase.quantities.LENGTH_UNITS)
+    assert client.get("/api/units").status_code == 404
 
 
 def _leaves(node, path=""):
@@ -93,32 +108,49 @@ def _leaves(node, path=""):
         yield path, node
 
 
-def test_the_server_never_drops_the_units_declaration(client):
+def _in_nm(doc):
+    """SLAB_TE_CHECK with its shape numbers written in nm (exact decimals; tagged sizes keep um)."""
+    from decimal import Decimal
+    d = copy.deepcopy(doc)
+    g = d["geometry"]
+    g["length_unit"] = "nm"
+    g["domain"] = {k: float(Decimal(repr(v)) * 1000) for k, v in g["domain"].items()}
+    for shape in g["shapes"]:
+        for k in ("x", "y", "w", "h"):
+            shape[k] = float(Decimal(repr(shape[k])) * 1000)
+    return d
+
+
+def test_the_server_never_drops_the_length_unit(client):
     """Read the numbers out, write them back: that is where a unit system dies.
 
-    The declaration is the only thing that says what every other number means, and
-    it is the one field an editor has no reason to touch, so losing it turns a
-    document that meant nanometres into one that means metres with every number
-    still looking right. Commercial FEA loses units on exactly this path - the
-    export and scripting route, not the solver - so the studio checks it rather
-    than assuming it.
+    The length_unit is the only thing that says what the shape numbers mean, and it is
+    the one field an editor has no reason to touch, so losing it turns a document that
+    meant nanometres into one that means micrometres with every number still looking
+    right. Commercial FEA loses units on exactly this path - the export and scripting
+    route, not the solver - so the studio checks it rather than assuming it.
     """
     served = client.get("/api/examples/soi_strip").json()
-    assert served["units"] == {"length": "um"}
+    assert served["geometry"]["length_unit"] == "um" and "units" not in served
 
-    doc = dict(copy.deepcopy(examples.SLAB_TE_CHECK), units={"length": "nm"})
+    doc = _in_nm(examples.SLAB_TE_CHECK)
     back = client.post("/api/validate", json={"doc": doc}).json()
-    assert back["ok"] and back["doc"]["units"] == {"length": "nm"}
-    assert "lambda 1.55 nm," in back["summary"]
+    assert back["ok"] and back["doc"]["geometry"]["length_unit"] == "nm"
+    assert "(length_unit nm)" in back["summary"] and back["diagnostics"] == []
 
     sent, returned = dict(_leaves(doc)), dict(_leaves(back["doc"]))
     assert not sent.keys() - returned.keys(), "the server dropped fields the page sent"
     assert all(returned[k] == v for k, v in sent.items()), "the server altered a value it was given"
 
     # The page edits whatever validate hands back and posts it again, so that loop
-    # has to be a fixed point: defaults are filled in once, never re-interpreted.
+    # has to be a fixed point: nothing is re-interpreted.
     again = client.post("/api/validate", json={"doc": back["doc"]}).json()
     assert again["doc"] == back["doc"]
+    # a scale slip is reported with its code, and the document stays valid
+    slip = copy.deepcopy(examples.SLAB_TE_CHECK)
+    slip["geometry"]["length_unit"] = "nm"
+    warned = client.post("/api/validate", json={"doc": slip}).json()
+    assert warned["ok"] and [d["code"] for d in warned["diagnostics"]] == ["W-GEOMETRY-SCALE"]
 
 
 def test_validate_reports_errors(client):
@@ -133,7 +165,11 @@ def test_mesh_preview(client):
     r = client.post("/api/mesh", json={"doc": examples.FIBER})
     assert r.status_code == 200
     m = r.json()
-    assert m["units"] == examples.FIBER["units"]
+    assert "units" not in m and m["field_units"] == {"node_coordinates": "m"}
+    assert m["display"] == {"length_unit": "um", "metres_per_length_unit": 1e-6}
+    assert m["diagnostics"] == []
+    nodes = np.array(m["node_coordinates"])
+    assert np.abs(nodes).max() == pytest.approx(20e-6, rel=1e-12)            # the 40 um window, in metres
     assert m["stats"]["triangles"] == len(m["triangles"]) > 500
     assert set(m["region_names"]) == {"core", "background"}
     assert m["stats"]["min_angle"] >= 28 - 1e-6
@@ -149,11 +185,23 @@ def test_run_job_roundtrip(client):
         time.sleep(0.1)
     assert st["status"] == "done", st
     res = client.get(f"/api/jobs/{job}/result").json()
-    assert res["summary"]["units"] == doc["units"]
-    assert abs(res["neff"][0][0] - 2.8487) < 2e-3
-    assert len(res["fields"][0][0]) == len(res["nodes"])
+    assert "units" not in res["summary"] and res["field_units"] == {"node_coordinates": "m"}
+    assert res["vacuum_wavelength"] == {"unit": "m", "values": [1.55e-6]} == res["summary"]["vacuum_wavelength"]
+    assert res["effective_index"]["unit"] == "1"
+    assert abs(res["effective_index"]["values"][0][0] - 2.8487) < 2e-3
+    field = res["unnormalized_mode_field"][0]
+    assert field["imag"] is None and len(field["real"][0]) == len(res["node_coordinates"])
     assert any("n_eff" in line for line in st["log"])
     assert client.get("/api/jobs/zzz").status_code == 404
+
+
+def _done(client, job, rounds=300, pause=0.05):
+    for _ in range(rounds):
+        status = client.get(f"/api/jobs/{job}").json()
+        if status["status"] in ("done", "error"):
+            return status
+        time.sleep(pause)
+    pytest.fail("job did not complete")
 
 
 def test_vector_job_preserves_complex_components_and_uses_element_samples(client):
@@ -161,38 +209,38 @@ def test_vector_job_preserves_complex_components_and_uses_element_samples(client
     doc["physics"]["em1"]["boundary"].update(left="pmc", right="pmc")
     assert client.post("/api/validate", json={"doc": doc}).json()["ok"]
     job = client.post("/api/run", json={"doc": doc}).json()["job"]
-    for _ in range(300):
-        status = client.get(f"/api/jobs/{job}").json()
-        if status["status"] in ("done", "error"):
-            break
-        time.sleep(0.05)
+    status = _done(client, job)
     assert status["status"] == "done", status
     res = client.get(f"/api/jobs/{job}/result").json()
-    assert res["fields"] == [] and res["group_index"] is None
+    assert res["unnormalized_mode_field"] == [] and res["group_index"] is None
     assert res["summary"]["formulation"] == "vector"
     field = res["vector_fields"][0]
-    assert field["components"] == ["Ex", "Ey", "Ez"]
-    assert field["location"] == "triangle_centroids"
+    assert field["name"] == "unnormalized_electric_field" and field["components"] == ["x", "y", "z"]
+    assert field["location"] == "triangle_centroids" and field["unit"] == "1"
+    assert field["time_convention"] == "exp(-i omega t)" and "amplitude_unit" not in field
     E = np.array(field["real"]) + 1j * np.array(field["imag"])
     assert E.shape == (1, len(res["triangles"]), 3)
     assert np.max(abs(E[:, :, 2].imag)) > 0.1
-    assert abs(res["neff"][0][0] - 2.0562883300990773) < 1e-3
-    doc["study"] = dict(type="sweep", parameter="physics.em1.wavelength", values=[1.5, 1.6])
+    assert abs(res["effective_index"]["values"][0][0] - 2.0562883300990773) < 1e-3
+    doc["study"] = dict(type="sweep", parameter="physics.em1.vacuum_wavelength",
+                        values={"unit": "um", "values": [1.5, 1.6]})
     rejected = client.post("/api/run", json={"doc": doc})
     assert rejected.status_code == 400 and "at least 3" in rejected.json()["detail"]
 
 
 def test_sellmeier_json_edit_roundtrip_and_validation(client):
-    doc = copy.deepcopy(examples.SLAB_TE_CHECK)
-    doc["units"] = {"length": "nm"}
-    doc["materials"] = {"glass": {"sellmeier": {"B": [1.0], "C": [10000.0], "range": [500, 2000]}}}
+    doc = _in_nm(examples.SLAB_TE_CHECK)
+    doc["materials"] = {"glass": {"refractive_index": {
+        "model": "sellmeier", "terms": [{"strength": 1.0, "resonance_wavelength_squared": "10000 nm^2"}],
+        "valid": {"vacuum_wavelength": ["500 nm", "2000 nm"]}, "reference_medium": "vacuum"}}}
+    doc["geometry"]["background"] = {"material": "glass"}
     back = client.post("/api/validate", json={"doc": doc}).json()
     assert back["ok"], back
     assert back["doc"]["materials"] == doc["materials"]
     assert client.post("/api/validate", json={"doc": back["doc"]}).json()["doc"] == back["doc"]
-    doc["materials"]["glass"]["sellmeier"]["C"].append(20000.0)
+    doc["materials"]["glass"]["refractive_index"]["terms"].append({"strength": 1.0})
     bad = client.post("/api/validate", json={"doc": doc}).json()
-    assert not bad["ok"] and "materials.glass.sellmeier" in bad["error"]
+    assert not bad["ok"] and "materials.glass.refractive_index.terms[1].resonance_wavelength_squared" in bad["error"]
     assert client.post("/api/run", json={"doc": doc}).status_code == 400
     assert client.post("/api/mesh", json={"doc": doc}).status_code == 400
 
@@ -201,84 +249,92 @@ def _finished_job(client, doc):
     response = client.post("/api/run", json={"doc": doc})
     assert response.status_code == 200, response.json()
     job = response.json()["job"]
-    for _ in range(600):
-        status = client.get(f"/api/jobs/{job}").json()
-        if status["status"] in ("done", "error"):
-            return job, status
-        time.sleep(0.05)
-    pytest.fail("vector sweep job did not complete")
+    return job, _done(client, job, 600)
 
 
 @pytest.mark.parametrize("formulation", ["scalar", "vector"])
 def test_absorbing_modes_preserve_complex_results_in_studio(client, formulation):
     doc = copy.deepcopy(examples.VECTOR_SLAB)
-    doc["materials"]["film"] = {"n": 3.48, "k": .01}
+    doc["materials"]["film"] = {"refractive_index": {"n": 3.48, "k": .01}}
     doc["physics"]["em1"]["formulation"] = formulation
     if formulation == "scalar":
         doc["physics"]["em1"]["boundary"].update(left="pmc", right="pmc")
+        del doc["physics"]["em1"]["effective_index_threshold"]
     job, status = _finished_job(client, doc)
     assert status["status"] == "done", status
     payload = client.get(f"/api/jobs/{job}/result").json()
-    assert payload["summary"]["mode_result_schema"] == "openphysics.modes2d/2"
-    assert payload["neff_imag"][0][0] < 0
-    assert payload["propagation_loss_db_cm"][0][0] > 0
-    assert payload["neff_imag"] == payload["summary"]["neff_imag"]
+    assert payload["summary"]["mode_result_schema"] == "openphysics.modes2d/3"
+    index = payload["effective_index"]
+    assert index["time_convention"] == "exp(-i omega t)" and index["im"][0][0] > 0     # loss: Im n_eff > 0
+    assert payload["propagation_loss"]["unit"] == "dB/m" and payload["propagation_loss"]["values"][0][0] > 0
+    assert index == payload["summary"]["effective_index"]
     if formulation == "scalar":
-        assert payload["scalar_fields_complex"][0]["imag"]
+        assert payload["unnormalized_mode_field"][0]["imag"]
 
 
 def test_tracked_vector_sweep_api_returns_branches_fields_and_group_indices(client):
     doc = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
-    doc["physics"]["em1"]["num_modes"] = 2
-    doc["study"]["values"] = [1.20, 1.25, 1.30]
+    doc["physics"]["em1"]["mode_count"] = 2
+    doc["study"]["values"] = {"unit": "um", "values": [1.20, 1.25, 1.30]}
     job, status = _finished_job(client, doc)
     assert status["status"] == "done", status
     result = client.get(f"/api/jobs/{job}/result").json()
-    assert np.shape(result["neff"]) == np.shape(result["group_index"]) == (3, 2)
-    assert np.isfinite(result["group_index"]).all()
-    assert len(result["vector_fields"]) == 3 and result["fields"] == []
+    assert np.shape(result["effective_index"]["values"]) == np.shape(result["group_index"]["values"]) == (3, 2)
+    assert np.isfinite(result["group_index"]["values"]).all()
+    assert len(result["vector_fields"]) == 3 and result["unnormalized_mode_field"] == []
     points = result["summary"]["mode_tracking"]["points"]
     assert points[0]["overlaps"] is None
     assert all(len(p["candidate_ranks"]) == 2 for p in points)
     assert min(points[1]["overlaps"]) > 0.8
-    assert abs(result["neff"][1][0] - 2.9965406807) < 0.002
+    assert abs(result["effective_index"]["values"][1][0] - 2.9965406807) < 0.002
 
 
 @pytest.mark.parametrize("failure", ["degenerate", "cutoff"])
 def test_vector_tracking_errors_have_wavelength_and_no_result(client, failure):
     doc = copy.deepcopy(examples.VECTOR_FIBER if failure == "degenerate" else examples.VECTOR_SLAB)
-    doc["physics"]["em1"]["num_modes"] = 1 if failure == "degenerate" else 2
-    doc["study"] = dict(type="sweep", parameter="physics.em1.wavelength",
-                        values=[1.5, 1.55, 1.6] if failure == "degenerate" else [1.25, 1.35, 1.45])
+    doc["physics"]["em1"]["mode_count"] = 1 if failure == "degenerate" else 2
+    doc["study"] = dict(type="sweep", parameter="physics.em1.vacuum_wavelength",
+                        values={"unit": "um", "values": [1.5, 1.55, 1.6] if failure == "degenerate"
+                                else [1.25, 1.35, 1.45]})
     job, status = _finished_job(client, doc)
     assert status["status"] == "error" and not status["has_result"]
-    assert failure in status["error"] and "wavelength" in status["error"] and "um" in status["error"]
+    assert failure in status["error"] and "vacuum_wavelength" in status["error"] and "um" in status["error"]
     assert client.get(f"/api/jobs/{job}/result").status_code == 409
 
 
 def test_vector_sweep_rejects_path_beyond_numeric_leaf_with_http_400(client):
     doc = copy.deepcopy(examples.VECTOR_SLAB_SWEEP)
-    doc["study"]["parameter"] = "physics.em1.wavelength.extra"
+    doc["study"]["parameter"] = "physics.em1.vacuum_wavelength.extra"
     response = client.post("/api/run", json={"doc": doc})
     assert response.status_code == 400
-    assert "does not exist" in response.json()["detail"]
+    assert "names no value under physics" in response.json()["detail"]
 
 
 def test_pml_studio_returns_candidate_diagnostics_and_bend_loss(client):
+    import json
     from test_pml_contract import document
-    doc = document('vector', True).data
-    response = client.post('/api/run', json={'doc':doc})
+    doc = json.loads(document('vector', True).canonical_json())
+    response = client.post('/api/run', json={'doc': doc})
     assert response.status_code == 200
-    job = response.json()['job']
-    for _ in range(400):
-        status = client.get(f'/api/jobs/{job}').json()
-        if status['status'] in ('done','error'): break
-        time.sleep(.025)
+    status = _done(client, response.json()['job'], 400, .025)
     assert status['status'] == 'done', status
-    summary = client.get(f'/api/jobs/{job}/result').json()['summary']
+    summary = client.get(f"/api/jobs/{response.json()['job']}/result").json()['summary']
     assert summary['open_boundary'][0]['stability'] == 'not_checked'
-    assert summary['bend_loss_db_90deg'][0][0] > 0
-    assert summary['field_representation'] == 'pml-vector-edge-nodal-v1'
+    assert summary['bend_loss']['unit'] == 'dB/(90 deg)' and summary['bend_loss']['values'][0][0] > 0
+    assert summary['field_representation'] == 'pml-vector-edge-nodal-v2'
+
+
+def test_subspace_job_returns_cluster_means_under_the_new_names(client):
+    job, status = _finished_job(client, copy.deepcopy(examples.VECTOR_FIBER_SUBSPACE_SWEEP))
+    assert status["status"] == "done", status
+    result = client.get(f"/api/jobs/{job}/result").json()
+    sub = result["subspace"]
+    assert sub["field_representation"] == "vector-subspace-edge-nodal-v2"
+    assert result["effective_index"] is None and result["unnormalized_mode_field"] == []
+    assert np.shape(sub["effective_index"]) == (5, 2) and np.shape(sub["mean_effective_index"]) == (5, 1)
+    assert sub["mean_effective_index"] == result["summary"]["mean_effective_index"]["values"]
+    assert sub["mean_group_index"] == result["summary"]["mean_group_index"]["values"]
+    assert len(sub["density"]) == 5 and len(sub["density"][0][0]) == len(result["triangles"])
 
 
 def test_the_openphysics_command_opens_the_workspace_and_simcase_studio_the_classic_page():

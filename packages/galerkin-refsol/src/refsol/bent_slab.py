@@ -31,6 +31,16 @@ exterior field grows transversally like every leaky wave (Marcuse 1976).
 Large ``R`` recovers the straight slab root of ``refsol.slab`` with the loss
 vanishing exponentially in ``R``.
 
+Public API (galerkin step, L3 commit 11c). The public functions take SI keyword-only
+registry names: ``refractive_index`` the three regions in order of increasing ``r``,
+``(cladding, film, cladding)`` with the two claddings equal; ``thickness`` the film's and
+``bend_radius`` (``R``) in m; ``vacuum_wavelength`` in m; ``effective_index``,
+``target_effective_index``, ``mode_index`` and ``relative_tolerance``; ``dps`` is mpmath's
+working precision in decimal digits. Their complex values follow exp(-i omega t), as the rest
+of refsol: a bent mode radiates and has ``Im n_eff > 0``. The matching above is written in
+exp(+i omega t) and is unchanged: the public functions convert the complex index with
+``refsol._conventions.to_kernel`` and return ``to_public`` (the conjugate) of the result.
+
 Sources. D. Marcuse, "Curvature loss formula for optical fibers," J. Opt. Soc.
 Am. 66, 216 (1976); K. R. Hiremath, M. Hammer, R. Stoffer, L. Prkna and
 J. Čtyroký, "Analytic approach to dielectric optical bent slab waveguides,"
@@ -43,6 +53,10 @@ from __future__ import annotations
 import math
 
 from . import slab as _slab
+from ._checks import refuse_text
+from ._conventions import to_kernel, to_public
+
+__all__ = ["characteristic", "residual", "mode"]
 
 
 def _mpmath():
@@ -58,7 +72,8 @@ def _check(n_f, n_clad, d, radius, wavelength, pol):
     pol = pol.upper()
     if pol not in ("TE", "TM"):
         raise ValueError("pol must be 'TE' or 'TM'")
-    for name, value in (("n_f", n_f), ("n_clad", n_clad), ("d", d), ("radius", radius), ("wavelength", wavelength)):
+    for name, value in (("refractive_index[1] (the film)", n_f), ("refractive_index[0] (the cladding)", n_clad),
+                        ("thickness", d), ("bend_radius", radius), ("vacuum_wavelength", wavelength)):
         if not (isinstance(value, (int, float)) and math.isfinite(value) and value > 0):
             raise ValueError(f"{name} must be a finite positive real number")
     if not n_f > n_clad:
@@ -88,7 +103,7 @@ def _mismatch(mp, neff, n_f, n_clad, d, radius, k0, pol):
     return state[1] - ratio * state[0], abs(state[1]) + abs(ratio * state[0])
 
 
-def characteristic(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -> complex:
+def _characteristic(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -> complex:
     """Characteristic function at ``neff``; zeros are the bent-slab poles."""
     pol = _check(n_f, n_clad, d, radius, wavelength, pol)
     mp = _mpmath()
@@ -97,7 +112,7 @@ def characteristic(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -
         return complex(value)
 
 
-def residual(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -> float:
+def _residual(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -> float:
     """``|F|`` relative to the magnitude of its two terms."""
     pol = _check(n_f, n_clad, d, radius, wavelength, pol)
     mp = _mpmath()
@@ -106,7 +121,7 @@ def residual(neff, n_f, n_clad, d, radius, wavelength, pol="TE", dps=40) -> floa
         return float(abs(value) / scale) if scale > 0 else math.inf
 
 
-def mode(n_f, n_clad, d, radius, wavelength, pol="TE", order=0, guess=None, dps=40,
+def _mode(n_f, n_clad, d, radius, wavelength, pol="TE", order=0, guess=None, dps=40,
          tol=1e-12) -> complex:
     """Complex effective index (referred to ``radius``) of bent mode ``order``.
 
@@ -119,7 +134,7 @@ def mode(n_f, n_clad, d, radius, wavelength, pol="TE", order=0, guess=None, dps=
     mp = _mpmath()
     k0 = 2 * math.pi / wavelength
     if guess is None:
-        straight = _slab.modes(n_f, n_clad, n_clad, d, wavelength, pol)
+        straight = _slab._modes(n_f, n_clad, n_clad, d, wavelength, pol)
         if order >= len(straight):
             raise ValueError(f"the straight slab guides only {len(straight)} {pol} mode(s)")
         guess = complex(straight[order])
@@ -133,5 +148,55 @@ def mode(n_f, n_clad, d, radius, wavelength, pol="TE", order=0, guess=None, dps=
         _, scale = _mismatch(mp, root, n_f, n_clad, d, radius, k0, pol)
         normalized = float(abs(f(root)) / scale)
     if not normalized <= tol:
-        raise RuntimeError(f"no bent-slab pole near {guess}: residual {normalized:.3e} > {tol:.1e}")
+        # the message shows the caller's value: public exp(-i omega t), as every public input and output
+        raise RuntimeError(f"no bent-slab pole near {to_public(guess)}: residual {normalized:.3e} > {tol:.1e}")
     return value
+
+
+# -- public API: SI registry names and exp(-i omega t) ---------------------------------------------------------
+
+def _regions(refractive_index):
+    """(film, cladding) from the regions (cladding, film, cladding) in order of increasing r."""
+    if isinstance(refractive_index, (str, bytes)) or len(refractive_index) != 3:
+        raise ValueError("refractive_index must hold the three regions (cladding, film, cladding)")
+    inner, film, outer = refractive_index
+    if inner != outer:
+        raise ValueError("the bent slab has one cladding: refractive_index[0] == refractive_index[2]")
+    return film, inner
+
+
+def characteristic(*, effective_index, refractive_index, thickness, bend_radius, vacuum_wavelength, pol="TE",
+                   dps=40) -> complex:
+    """Characteristic function at ``effective_index``; zeros are the bent-slab poles (exp(-i omega t))."""
+    refuse_text(effective_index=effective_index, refractive_index=refractive_index, thickness=thickness,
+                bend_radius=bend_radius, vacuum_wavelength=vacuum_wavelength)
+    n_f, n_clad = _regions(refractive_index)
+    return to_public(_characteristic(to_kernel(complex(effective_index)), n_f, n_clad, thickness, bend_radius,
+                                     vacuum_wavelength, pol, dps))
+
+
+def residual(*, effective_index, refractive_index, thickness, bend_radius, vacuum_wavelength, pol="TE",
+             dps=40) -> float:
+    """``|F|`` relative to the magnitude of its two terms."""
+    refuse_text(effective_index=effective_index, refractive_index=refractive_index, thickness=thickness,
+                bend_radius=bend_radius, vacuum_wavelength=vacuum_wavelength)
+    n_f, n_clad = _regions(refractive_index)
+    return _residual(to_kernel(complex(effective_index)), n_f, n_clad, thickness, bend_radius, vacuum_wavelength,
+                     pol, dps)
+
+
+def mode(*, refractive_index, thickness, bend_radius, vacuum_wavelength, pol="TE", mode_index=0,
+         target_effective_index=None, dps=40, relative_tolerance=1e-12) -> complex:
+    """Complex effective index (referred to ``bend_radius``) of bent mode ``mode_index``; exp(-i omega t).
+
+    Starts a secant iteration from the straight-slab root of that order (or ``target_effective_index``)
+    and raises ``RuntimeError`` when the normalized ``residual`` of the result exceeds
+    ``relative_tolerance``. The returned value has ``Im n_eff >= 0``.
+    """
+    refuse_text(refractive_index=refractive_index, thickness=thickness, bend_radius=bend_radius,
+                vacuum_wavelength=vacuum_wavelength, mode_index=mode_index,
+                target_effective_index=target_effective_index, relative_tolerance=relative_tolerance)
+    n_f, n_clad = _regions(refractive_index)
+    guess = None if target_effective_index is None else to_kernel(complex(target_effective_index))
+    return to_public(_mode(n_f, n_clad, thickness, bend_radius, vacuum_wavelength, pol, mode_index, guess, dps,
+                           relative_tolerance))

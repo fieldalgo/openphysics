@@ -27,9 +27,11 @@ def test_electric_same_mesh_independent_forms(case):
                {'right': lambda p, n: 1.+p[:, 1]} if case == 'mixed' else None)
     clock = Stopwatch()
     with clock('openphysics'):
-        ours = solve_steady_electric(mesh, conductivity=sigma, dirichlet=bc,
-                                     outward_current=imposed,
-                                     reference_potential={0: 0.} if pure else None)
+        # galerkin takes the inward current density: the outward data above, as 0.0 - g
+        inward = None if imposed is None else {tag: (lambda p, n, g=g: 0.0 - g(p, n)) for tag, g in imposed.items()}
+        ours = solve_steady_electric(mesh, electrical_conductivity=sigma, prescribed_electric_potential=bc,
+                                     inward_current_density=inward,
+                                     reference_electric_potential={0: 0.} if pure else None)
     with clock('reference'):
         m = sk.MeshTri(mesh.nodes.T.copy(), mesh.triangles.T.copy())
         basis = sk.Basis(m, sk.ElementTriP1())
@@ -67,15 +69,15 @@ def test_electric_same_mesh_independent_forms(case):
             reaction[fixed] = (K@potential+G)[fixed]
         power = float(np.sum(basis.dx*Q[:, None]))
     obs = [observable(name, unit, 'max relative difference', relative_difference(a, b), 1e-10)
-           for name, unit, a, b in [('potential', 'V', ours.potential, potential),
+           for name, unit, a, b in [('potential', 'V', ours.electric_potential, potential),
                                     ('electric field', 'V/m', ours.electric_field, E),
                                     ('current density', 'A/m^2', ours.current_density, J),
-                                    ('Joule heating', 'W/m^3', ours.joule_heating, Q),
-                                    ('heat load', 'W/m', ours.joule_load, heat_load),
-                                    ('power', 'W/m', ours.joule_power_per_length, power)]]
+                                    ('Joule heating', 'W/m^3', ours.joule_power_density, Q),
+                                    ('heat load', 'W/m', ours.generated_heat_rate_per_depth, heat_load),
+                                    ('power', 'W/m', ours.joule_power_per_depth, power)]]
     if not pure:
         obs.append(observable('electrode reaction', 'A/m', 'max relative difference',
-                              relative_difference(ours.reaction, reaction), 1e-10))
+                              relative_difference(ours.reaction_current_per_depth, reaction), 1e-10))
     emit(make_record(case='electric-p1-'+case, physics='2D steady electric conduction',
                      api='galerkin.electric.solve_steady_electric', discretization='P1 triangles',
                      tool='scikit-fem', tool_discretization='ElementTriP1, FacetBasis order 7',

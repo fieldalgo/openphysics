@@ -33,9 +33,13 @@ export function lineProfile(field,values,axis,coordinate){
  return segments;
 }
 
+// The profile table (units and naming batch): every quantity column is `name [unit]` with its SI value,
+// the page's micrometre values moved by their decimal point (a correctly rounded parse, not a product;
+// a text that already has an exponent moves that exponent); identifier and text columns carry no unit.
+const metres=um=>{const [digits,power='0']=String(um).split(/e/i);return Number(`${digits}e${Number(power)-6}`);};
 export function profileCsv(series,axis,coordinate,mode,component){
- const rows=['job,origin,candidate,component,axis,fixed_coordinate_um,start_um,end_um,triangle,centroid_x_um,centroid_y_um,relative_amplitude'];
- for(const item of series)for(const s of item.segments)rows.push([item.run.job,item.run.origin,mode+1,component,axis,coordinate,s.start,s.end,s.index+1,...s.centroid,s.value].join(','));
+ const rows=['job,origin,candidate,component,axis,fixed_coordinate [m],start [m],end [m],triangle,centroid_x [m],centroid_y [m],relative_amplitude [1]'];
+ for(const item of series)for(const s of item.segments)rows.push([item.run.job,item.run.origin,mode+1,component,axis,metres(coordinate),metres(s.start),metres(s.end),s.index+1,...s.centroid.map(metres),s.value].join(','));
  return rows.join('\n')+'\n';
 }
 

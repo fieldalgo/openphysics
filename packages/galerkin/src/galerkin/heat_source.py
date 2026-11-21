@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Explicit elementwise volumetric heat sources, bound to one mesh ordering."""
+"""Explicit elementwise volumetric heat sources, bound to one mesh ordering.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 
 from .coupling import Field

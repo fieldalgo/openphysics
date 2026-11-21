@@ -1,7 +1,11 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Self-checks of the conductor-loss perturbation reference."""
+"""Self-checks of the conductor-loss perturbation reference.
+
+The public functions take SI registry names and follow exp(-i omega t) since the galerkin step
+(L3 commit 12): a lossy wall gives ``Im(resonant_frequency) < 0``.
+"""
 
 import math
 
@@ -17,12 +21,13 @@ COPPER = 5.8e7
 def test_te101_matches_pozar(lengths):
     a, b, d = lengths
     f101 = wl.C0 / 2 * math.hypot(1 / a, 1 / d)
-    modes = [m for m in wl.wall_loss_modes(lengths, f101 * 1.0001, COPPER)
+    modes = [m for m in wl.wall_loss_modes(box_size=lengths, frequency_limit=f101 * 1.0001,
+                                           electrical_conductivity=COPPER)
              if m.indices == (1, 0, 1)]
     assert len(modes) == 1
     assert modes[0].polarization == (0.0, 1.0, 0.0)
     assert modes[0].quality_factor == pytest.approx(
-        wl.pozar_te101_quality_factor(a, b, d, COPPER), rel=1e-12)
+        wl.pozar_te101_quality_factor(box_size=(a, b, d), electrical_conductivity=COPPER), rel=1e-12)
 
 
 def _numerical_q(lengths, indices, amplitude, sigma, points=12):
@@ -69,7 +74,7 @@ def _numerical_q(lengths, indices, amplitude, sigma, points=12):
 
 def test_closed_forms_match_numerical_quadrature_including_split_polarizations():
     lengths = (1.0, 0.8, 0.6)
-    modes = wl.wall_loss_modes(lengths, 400e6, COPPER)
+    modes = wl.wall_loss_modes(box_size=lengths, frequency_limit=400e6, electrical_conductivity=COPPER)
     checked = 0
     for mode in modes:
         numeric = _numerical_q(lengths, mode.indices, mode.polarization, COPPER)
@@ -85,7 +90,7 @@ def test_closed_forms_match_numerical_quadrature_including_split_polarizations()
 
 
 def test_cube_triplet_and_doublet_are_degenerate():
-    modes = wl.wall_loss_modes((1, 1, 1), 300e6, COPPER)
+    modes = wl.wall_loss_modes(box_size=(1, 1, 1), frequency_limit=300e6, electrical_conductivity=COPPER)
     q = [m.quality_factor for m in modes]
     assert len(modes) == 5
     np.testing.assert_allclose(q[:3], q[0], rtol=1e-13)
@@ -95,34 +100,50 @@ def test_cube_triplet_and_doublet_are_degenerate():
 
 def test_wall_losses_add_and_scale_with_conductivity():
     lengths = (1.0, 0.45, 0.8)
-    total = wl.wall_loss_modes(lengths, 400e6, COPPER)
-    per_wall = [wl.wall_loss_modes(lengths, 400e6, {w: COPPER}) for w in wl.WALLS]
+    box = dict(box_size=lengths, frequency_limit=400e6)
+    total = wl.wall_loss_modes(**box, electrical_conductivity=COPPER)
+    per_wall = [wl.wall_loss_modes(**box, electrical_conductivity={w: COPPER}) for w in wl.WALLS]
     for i, mode in enumerate(total):
         assert sum(1 / modes[i].quality_factor for modes in per_wall) == pytest.approx(
             1 / mode.quality_factor, rel=1e-12)
-    quadruple = wl.wall_loss_modes(lengths, 400e6, 4 * COPPER)
+    quadruple = wl.wall_loss_modes(**box, electrical_conductivity=4 * COPPER)
     np.testing.assert_allclose([m.quality_factor for m in quadruple],
                                [2 * m.quality_factor for m in total], rtol=1e-12)
     mode = total[0]
-    assert mode.complex_frequency_hz == pytest.approx(
-        mode.frequency_hz * (1 + (1j - 1) / (2 * mode.quality_factor)), rel=1e-15)
-    pec = wl.wall_loss_modes(lengths, 400e6, {"x0": None})
+    # exp(-i omega t): f = f0 (1 - (1 + i) / (2 Q)), the conjugate of exp(+j omega t)'s f0 (1 + (j - 1) / (2 Q))
+    assert mode.resonant_frequency == pytest.approx(
+        mode.frequency * (1 - (1 + 1j) / (2 * mode.quality_factor)), rel=1e-15)
+    assert mode.resonant_frequency.imag < 0                                    # a lossy wall decays
+    pec = wl.wall_loss_modes(**box, electrical_conductivity={"x0": None})
     assert all(m.quality_factor == math.inf for m in pec)
 
 
 def test_uniform_filling_rescales_frequency_and_quality_factor():
     lengths, eps, mu = (1.0, 0.45, 0.8), 2.2, 1.3
-    vacuum = wl.wall_loss_modes(lengths, 400e6, COPPER)
-    filled = wl.wall_loss_modes(lengths, 400e6 / math.sqrt(eps * mu), COPPER,
-                                relative_permittivity=eps, relative_permeability=mu)
+    vacuum = wl.wall_loss_modes(box_size=lengths, frequency_limit=400e6, electrical_conductivity=COPPER)
+    filled = wl.wall_loss_modes(box_size=lengths, frequency_limit=400e6 / math.sqrt(eps * mu),
+                                electrical_conductivity=COPPER, relative_permittivity=eps, relative_permeability=mu)
     assert len(filled) == len(vacuum)
     for v, f in zip(vacuum, filled):
-        assert f.frequency_hz == pytest.approx(v.frequency_hz / math.sqrt(eps * mu), rel=1e-13)
+        assert f.frequency == pytest.approx(v.frequency / math.sqrt(eps * mu), rel=1e-13)
         assert f.quality_factor == pytest.approx(
             v.quality_factor * mu * (eps * mu) ** -0.25, rel=1e-12)
 
 
 @pytest.mark.parametrize("sigma", [0.0, -1.0, True, {"top": 1.0}, {"x0": -2.0}])
 def test_invalid_conductivity(sigma):
-    with pytest.raises(ValueError):
-        wl.wall_loss_modes((1, 1, 1), 300e6, sigma)
+    with pytest.raises(ValueError, match="electrical_conductivity"):
+        wl.wall_loss_modes(box_size=(1, 1, 1), frequency_limit=300e6, electrical_conductivity=sigma)
+
+
+@pytest.mark.parametrize("call,name", [
+    (lambda: wl.wall_loss_modes(box_size=(1, 1, "1"), frequency_limit=300e6, electrical_conductivity=COPPER),
+     "box_size"),
+    (lambda: wl.wall_loss_modes(box_size=(1, 1, 1), frequency_limit="300 MHz", electrical_conductivity=COPPER),
+     "frequency_limit"),
+    (lambda: wl.pozar_te101_quality_factor(box_size=(1, 0.5, 0.8), electrical_conductivity="58 MS/m"),
+     "electrical_conductivity"),
+])
+def test_text_for_a_quantity_is_a_type_error(call, name):
+    with pytest.raises(TypeError, match=name):
+        call()

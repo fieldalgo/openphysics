@@ -21,8 +21,9 @@ import numpy as np
 import pytest
 
 from crosscheck import Stopwatch, emit, make_record, observable, relative_difference, require_tool
-from galerkin import (annulus_mesh, assemble_boundary_mass, assemble_mass, assemble_stiffness,
-                      solve_dirichlet)
+from galerkin import annulus_mesh
+from galerkin.kernels import (assemble_boundary_mass, assemble_mass, assemble_stiffness,
+                              solve_dirichlet)
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import rectangle_mesh
 from galerkin.thermal import solve_steady_heat
@@ -70,9 +71,12 @@ def _ambient_bottom(x, y):
 
 
 def _heat_data(mesh, case):
-    """galerkin's boundary arguments: edge-tag keyed scalars and (points, normals) callbacks."""
-    flux = {"right": HEAT["g_right"],
-            "top": lambda p, n: _g_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1])}
+    """galerkin's boundary arguments: edge-tag keyed scalars and (points, normals) callbacks.
+
+    The flux is galerkin's inward heat flux, the negated outward flux g of the reference
+    (whose load G keeps the outward sign)."""
+    flux = {"right": -HEAT["g_right"],
+            "top": lambda p, n: -_g_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1])}
     convection = {"right": (HEAT["h_right"], HEAT["ambient_right"]),
                   "bottom": (lambda p, n: _h_bottom(p[:, 0], p[:, 1]),
                              lambda p, n: _ambient_bottom(p[:, 0], p[:, 1]))}
@@ -168,8 +172,8 @@ def test_heat_p1_flux_robin_same_mesh(skfem, case):
     dirichlet, flux, convection = _heat_data(mesh, case)
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=HEAT["k"], dirichlet=dirichlet,
-                                 heat_source=HEAT["q"], outward_flux=flux, convection=convection)
+        ours = solve_steady_heat(mesh, thermal_conductivity=HEAT["k"], prescribed_temperature=dirichlet,
+                                 heat_source_density=HEAT["q"], inward_heat_flux=flux, convection=convection)
         K = assemble_stiffness(mesh, HEAT["k"])
         H_right = assemble_boundary_mass(mesh, mesh.boundary_edges["right"], HEAT["h_right"])
     with clock("reference"):
@@ -185,18 +189,18 @@ def test_heat_p1_flux_robin_same_mesh(skfem, case):
                    "max relative difference", relative_difference(_dense(H_right), _dense(theirs["H_right"])),
                    SAME),
         observable("volumetric load fQ", "W/m", "max relative difference",
-                   relative_difference(ours.load, theirs["f"]), SAME),
+                   relative_difference(ours.generated_heat_rate_per_depth, theirs["f"]), SAME),
         observable("prescribed outward load G", "W/m", "max relative difference",
-                   relative_difference(ours.prescribed_outward_load, theirs["G"]), SAME),
+                   relative_difference(ours.outward_prescribed_heat_rate_per_depth, theirs["G"]), SAME),
         observable("ambient load B", "W/m", "max relative difference",
-                   relative_difference(ours.ambient_load, theirs["B"]), SAME),
+                   relative_difference(ours.ambient_convective_heat_rate_per_depth, theirs["B"]), SAME),
         observable("system right-hand side fQ + B - G", "W/m", "max relative difference",
-                   relative_difference(ours.system_rhs, theirs["rhs"]), SAME),
+                   relative_difference(ours.applied_heat_rate_per_depth, theirs["rhs"]), SAME),
         observable("convective outward rate C = H T - B", "W/m", "max relative difference",
-                   relative_difference(ours.convective_outward, theirs["C"]), SAME)]
+                   relative_difference(ours.outward_convective_heat_rate_per_depth, theirs["C"]), SAME)]
     if case == "mixed":
         observables.append(observable("reaction at the Dirichlet nodes", "W/m", "max relative difference",
-                                      relative_difference(ours.reaction, theirs["reaction"]), SAME))
+                                      relative_difference(ours.reaction_heat_rate_per_depth, theirs["reaction"]), SAME))
     anchor = ("Dirichlet 320 K on the left edge" if case == "mixed"
               else "no Dirichlet node; convection h = 8 W/(m^2 K), ambient 320 K on the left edge")
     emit(make_record(
@@ -295,9 +299,9 @@ def test_elasticity_p1_traction_same_mesh(skfem, plane):
                 "top": lambda p, n: np.column_stack(_t_top(p[:, 0], p[:, 1], n[:, 0], n[:, 1]))}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=ELASTIC["e"], poisson_ratio=ELASTIC["nu"], plane=plane,
-                                dirichlet=dirichlet, body_force=ELASTIC["body"], traction=traction)
-        energy = 0.5 * np.sum(ours.displacement * (ours.load + ours.reaction))
+        ours = solve_elasticity(mesh, youngs_modulus=ELASTIC["e"], poisson_ratio=ELASTIC["nu"], plane=plane,
+                                prescribed_displacement=dirichlet, body_force_density=ELASTIC["body"], traction=traction)
+        energy = 0.5 * np.sum(ours.displacement * (ours.applied_force_per_depth + ours.reaction_force_per_depth))
     with clock("reference"):
         theirs = _skfem_elasticity(skfem, mesh, plane)
     emit(make_record(
@@ -321,9 +325,9 @@ def test_elasticity_p1_traction_same_mesh(skfem, plane):
             observable("element stress (sxx, syy, sxy)", "Pa", "max relative difference",
                        relative_difference(ours.stress, theirs["stress"]), SAME),
             observable("body plus traction load", "N/m", "max relative difference",
-                       relative_difference(ours.load, theirs["load"]), SAME),
+                       relative_difference(ours.applied_force_per_depth, theirs["load"]), SAME),
             observable("reaction at the prescribed DOFs", "N/m", "max relative difference",
-                       relative_difference(ours.reaction, theirs["reaction"]), SAME),
+                       relative_difference(ours.reaction_force_per_depth, theirs["reaction"]), SAME),
             observable("strain energy 0.5 u . (load + reaction) vs 0.5 u . K u", "J/m", "relative difference",
                        abs(energy - theirs["energy"]) / abs(theirs["energy"]), SAME)]))
 
@@ -370,7 +374,7 @@ def test_helmholtz_p1_absorbing_boundary_same_mesh(skfem):
         stopwatch=clock,
         physics="2D Helmholtz scattering off a sound-soft cylinder (k = pi, a = 1 m, R = 4 m), "
                 "curvature-corrected first-order absorbing boundary",
-        api="galerkin.assemble_stiffness, assemble_mass, assemble_boundary_mass, solve_dirichlet",
+        api="galerkin.kernels.assemble_stiffness, assemble_mass, assemble_boundary_mass, solve_dirichlet",
         discretization="P1 Lagrange triangles; absorbing term -(ik - 1/(2R)) B on the outer edges",
         tool="scikit-fem", tool_discretization="ElementTriP1, FacetBasis boundary mass on the same edges",
         matched=["same nodes and triangles (annulus_mesh 1 m to 4 m, 10 x 40)",

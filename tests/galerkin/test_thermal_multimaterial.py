@@ -15,10 +15,10 @@ from galerkin.thermal import solve_steady_heat
 from refsol.thermal_multilayer import composite_cylinder, layered_slab
 
 NAMES = ['copper', 'insulation', 'steel']
-SLAB = dict(interfaces=[.02, .05, .06], conductivities=[15., .8, 45.],
-            left_temperature=420., right_temperature=300., sources=[2e5, -3e4, 6e5])
-CYL = dict(inner_radius=.01, interfaces=[.015, .03, .034], conductivities=[50., .25, 16.],
-           inner_temperature=500., outer_temperature=310., sources=[1e6, 0., -2e5])
+SLAB = dict(position=[0., .02, .05, .06], thermal_conductivity=[15., .8, 45.],
+            prescribed_temperature=(420., 300.), heat_source_density=[2e5, -3e4, 6e5])
+CYL = dict(position=[.01, .015, .03, .034], thermal_conductivity=[50., .25, 16.],
+           prescribed_temperature=(500., 310.), heat_source_density=[1e6, 0., -2e5])
 
 
 def _by_name(values):
@@ -26,21 +26,21 @@ def _by_name(values):
 
 
 def _slab(n, sources=True):
-    mesh = layered_rectangle_mesh(SLAB['interfaces'], .02, [2*n, 3*n, n], 2*n, NAMES)
-    bc = {int(i): SLAB['left_temperature'] for i in mesh.boundary['left']}
-    bc.update({int(i): SLAB['right_temperature'] for i in mesh.boundary['right']})
-    source = _by_name(SLAB['sources']) if sources else 0.
-    result = solve_steady_heat(mesh, conductivity=_by_name(SLAB['conductivities']),
-                               dirichlet=bc, heat_source=source)
+    mesh = layered_rectangle_mesh(SLAB['position'][1:], .02, [2*n, 3*n, n], 2*n, NAMES)
+    bc = {int(i): SLAB['prescribed_temperature'][0] for i in mesh.boundary['left']}
+    bc.update({int(i): SLAB['prescribed_temperature'][1] for i in mesh.boundary['right']})
+    source = _by_name(SLAB['heat_source_density']) if sources else 0.
+    result = solve_steady_heat(mesh, thermal_conductivity=_by_name(SLAB['thermal_conductivity']),
+                               prescribed_temperature=bc, heat_source_density=source)
     return mesh, result
 
 
 def _cylinder(n):
-    mesh = layered_annulus_mesh(CYL['inner_radius'], CYL['interfaces'], [2*n, 4*n, 2*n], 24*n, NAMES)
-    bc = {int(i): CYL['inner_temperature'] for i in mesh.boundary['inner']}
-    bc.update({int(i): CYL['outer_temperature'] for i in mesh.boundary['outer']})
-    result = solve_steady_heat(mesh, conductivity=_by_name(CYL['conductivities']),
-                               dirichlet=bc, heat_source=_by_name(CYL['sources']))
+    mesh = layered_annulus_mesh(CYL['position'][0], CYL['position'][1:], [2*n, 4*n, 2*n], 24*n, NAMES)
+    bc = {int(i): CYL['prescribed_temperature'][0] for i in mesh.boundary['inner']}
+    bc.update({int(i): CYL['prescribed_temperature'][1] for i in mesh.boundary['outer']})
+    result = solve_steady_heat(mesh, thermal_conductivity=_by_name(CYL['thermal_conductivity']),
+                               prescribed_temperature=bc, heat_source_density=_by_name(CYL['heat_source_density']))
     return mesh, result
 
 
@@ -77,8 +77,8 @@ def _interface_rate(mesh, result, case, region_ids, interface_nodes):
     """
     keep = np.isin(mesh.regions, region_ids)
     part = Mesh(mesh.nodes, mesh.triangles[keep], {})
-    k = mesh.by_region(_by_name(case['conductivities']))[keep]
-    q = mesh.by_region(_by_name(case['sources']))[keep]
+    k = mesh.by_region(_by_name(case['thermal_conductivity']))[keep]
+    q = mesh.by_region(_by_name(case['heat_source_density']))[keep]
     residual = assemble_stiffness(part, k)@result.temperature-assemble_load(part, q)
     return -float(np.sum(residual[interface_nodes]))
 
@@ -87,10 +87,11 @@ def test_uniform_region_mapping_reproduces_the_scalar_solution_bit_for_bit():
     mesh = layered_rectangle_mesh([.3, 1.], .5, [3, 5], 4, ['a', 'b'])
     bc = {int(i): 350. for i in mesh.boundary['left']}
     bc.update({int(i): 300. for i in mesh.boundary['right']})
-    scalar = solve_steady_heat(mesh, conductivity=12., dirichlet=bc, heat_source=4e3)
-    mapped = solve_steady_heat(mesh, conductivity={'a': 12., 'b': 12.}, dirichlet=bc,
-                               heat_source={'a': 4e3, 'b': 4e3})
-    for field in ('temperature', 'heat_flux', 'load', 'reaction', 'residual'):
+    scalar = solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc, heat_source_density=4e3)
+    mapped = solve_steady_heat(mesh, thermal_conductivity={'a': 12., 'b': 12.}, prescribed_temperature=bc,
+                               heat_source_density={'a': 4e3, 'b': 4e3})
+    for field in ('temperature', 'heat_flux', 'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
+                  'residual_heat_rate_per_depth'):
         np.testing.assert_array_equal(getattr(mapped, field), getattr(scalar, field))
 
 
@@ -99,24 +100,24 @@ def test_scalar_input_on_a_mesh_without_regions_is_unchanged():
     assert mesh.regions is None
     bc = {int(i): 350. for i in mesh.boundary['left']}
     bc.update({int(i): 300. for i in mesh.boundary['right']})
-    r = solve_steady_heat(mesh, conductivity=12., dirichlet=bc)
+    r = solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc)
     np.testing.assert_allclose(r.heat_flux, np.broadcast_to([300., 0.], r.heat_flux.shape),
                                rtol=0, atol=300e-10)
 
 
 def test_series_wall_without_source_is_reproduced_exactly():
     mesh, r = _slab(2, sources=False)
-    exact = layered_slab(mesh.nodes, **{**SLAB, 'sources': None})
+    exact = layered_slab(mesh.nodes, **{**SLAB, 'heat_source_density': None})
     assert np.max(abs(r.temperature-exact.temperature))/420. < 1e-10
-    k = mesh.by_region(_by_name(SLAB['conductivities']))
-    centroid = layered_slab(mesh.nodes[mesh.triangles].mean(axis=1), **{**SLAB, 'sources': None})
+    k = mesh.by_region(_by_name(SLAB['thermal_conductivity']))
+    centroid = layered_slab(mesh.nodes[mesh.triangles].mean(axis=1), **{**SLAB, 'heat_source_density': None})
     np.testing.assert_allclose(r.heat_flux, centroid.heat_flux, rtol=0,
                                atol=1e-9*np.max(abs(centroid.heat_flux)))
     # The flux is one value across all three materials, the gradient is not.
     assert np.ptp(k) > 40 and np.ptp(r.heat_flux[:, 0]) < 1e-9*abs(r.heat_flux[0, 0])
     rate = centroid.heat_flux[0, 0]*.02
-    np.testing.assert_allclose(sum(r.reaction[mesh.boundary['left']]), rate, rtol=1e-10)
-    np.testing.assert_allclose(sum(r.reaction[mesh.boundary['right']]), -rate, rtol=1e-10)
+    np.testing.assert_allclose(sum(r.reaction_heat_rate_per_depth[mesh.boundary['left']]), rate, rtol=1e-10)
+    np.testing.assert_allclose(sum(r.reaction_heat_rate_per_depth[mesh.boundary['right']]), -rate, rtol=1e-10)
 
 
 @pytest.mark.slow
@@ -128,7 +129,7 @@ def test_series_wall_with_layer_sources_converges_and_conserves_interface_heat()
         t_err.append(a)
         q_err.append(b)
         worst = 0.
-        for i, x in enumerate(SLAB['interfaces'][:-1]):
+        for i, x in enumerate(SLAB['position'][1:-1]):
             nodes = np.flatnonzero(abs(mesh.nodes[:, 0]-x) < 1e-12)
             exact = layered_slab([[x, 0.]], **SLAB).heat_flux[0, 0]*.02
             left = _interface_rate(mesh, r, SLAB, list(range(i+1)), nodes)
@@ -152,7 +153,7 @@ def test_composite_cylinder_converges_and_flux_is_continuous_across_interfaces()
         q_err.append(b)
         radius = np.hypot(*mesh.nodes.T)
         worst_rate, worst_jump = 0., 0.
-        for i, ri in enumerate(CYL['interfaces'][:-1]):
+        for i, ri in enumerate(CYL['position'][1:-1]):
             nodes = np.flatnonzero(abs(radius-ri) < 1e-9*ri)
             exact_qr = composite_cylinder([[ri, 0.]], **CYL).heat_flux[0, 0]
             exact = 2*np.pi*ri*exact_qr
@@ -178,10 +179,10 @@ def test_composite_cylinder_converges_and_flux_is_continuous_across_interfaces()
 def test_region_heat_source_matches_an_equivalent_callable_load():
     mesh = layered_rectangle_mesh([.3, 1.], .5, [3, 5], 4, ['a', 'b'])
     bc = {int(i): 300. for i in np.unique(np.concatenate(list(mesh.boundary.values())))}
-    mapped = solve_steady_heat(mesh, conductivity={'a': 2., 'b': 7.}, dirichlet=bc,
-                               heat_source={'a': 5e3, 'b': -1e3})
-    np.testing.assert_allclose(sum(mapped.load), 5e3*.3*.5-1e3*.7*.5, rtol=1e-13)
-    assert abs(sum(mapped.load+mapped.reaction)) < 1e-10*sum(abs(mapped.load))
+    mapped = solve_steady_heat(mesh, thermal_conductivity={'a': 2., 'b': 7.}, prescribed_temperature=bc,
+                               heat_source_density={'a': 5e3, 'b': -1e3})
+    np.testing.assert_allclose(sum(mapped.generated_heat_rate_per_depth), 5e3*.3*.5-1e3*.7*.5, rtol=1e-13)
+    assert abs(sum(mapped.generated_heat_rate_per_depth+mapped.reaction_heat_rate_per_depth)) < 1e-10*sum(abs(mapped.generated_heat_rate_per_depth))
 
 
 def _region_mesh():
@@ -194,25 +195,25 @@ def _region_mesh():
 def test_invalid_region_conductivity(k):
     mesh = _region_mesh()
     with pytest.raises(ValueError):
-        solve_steady_heat(mesh, conductivity=k, dirichlet={0: 300.})
+        solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature={0: 300.})
 
 
 @pytest.mark.parametrize('q', [{'a': 1.}, {'a': 1., 'b': np.inf}, {'a': 1., 'b': 1j}, {'a': 1., 'x': 1.}])
 def test_invalid_region_source(q):
     with pytest.raises(ValueError):
-        solve_steady_heat(_region_mesh(), conductivity=1., dirichlet={0: 300.}, heat_source=q)
+        solve_steady_heat(_region_mesh(), thermal_conductivity=1., prescribed_temperature={0: 300.}, heat_source_density=q)
 
 
 def test_region_mapping_needs_region_data_and_bare_arrays_stay_rejected():
     plain = rectangle_mesh(1., 1., 1, 1)
     with pytest.raises(ValueError):
-        solve_steady_heat(plain, conductivity={'a': 1.}, dirichlet={0: 300.})
+        solve_steady_heat(plain, thermal_conductivity={'a': 1.}, prescribed_temperature={0: 300.})
     with pytest.raises(ValueError):
-        solve_steady_heat(_region_mesh(), conductivity=[1., 2.], dirichlet={0: 300.})
+        solve_steady_heat(_region_mesh(), thermal_conductivity=[1., 2.], prescribed_temperature={0: 300.})
     broken = _region_mesh()
     broken.regions = np.array([0, 0, 1, 5])
     with pytest.raises(ValueError):
-        solve_steady_heat(broken, conductivity={'a': 1., 'b': 2.}, dirichlet={0: 300.})
+        solve_steady_heat(broken, thermal_conductivity={'a': 1., 'b': 2.}, prescribed_temperature={0: 300.})
 
 
 def test_layered_meshes_put_interfaces_on_mesh_lines_and_name_regions():

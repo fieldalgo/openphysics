@@ -5,7 +5,8 @@
 
 import numpy as np
 
-from galerkin import disk_mesh, eval_edge_field, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 from simcase.fields import VectorField
 from simcase.subspace_tracking import SubspaceTracker, columns
 from simcase.tracking import tracking_settings
@@ -126,7 +127,10 @@ def field_space_sin_angles(scale, label="HE11", fe_columns=(0, 1)):
     area = 0.5 * np.abs(d1[:, 0] * d2[:, 1] - d1[:, 1] * d2[:, 0])
     pts = np.stack([sum(lam[k] * corners[:, k, :] for k in range(3)) for lam, _ in _QUADRATURE], axis=1)
     polarizations = (0, 1) if fiber.mode_l(label) else (0,)
-    exact = np.stack([fiber.vector_mode_field(A, N1, N2, 1.55, label, pts[..., 0], pts[..., 1], p)
+    # refsol's public field follows exp(-i omega t) and the kernel's eigenvectors exp(+i omega t): conjugated
+    # once here, at the comparison (D8), which gives the former kernel-frame field bit for bit
+    exact = np.stack([fiber.vector_mode_field(pts, radius=A, refractive_index=(N1, N2), vacuum_wavelength=1.55,
+                                              label=label, polarization=p).conj()
                       for p in polarizations], axis=2)
 
     def whitened(x):

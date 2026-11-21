@@ -17,7 +17,7 @@
     k² = π²[(m/a)² + (n/b)² + (p/d)²]
     f_Hz = 299792458 sqrt(k²) / (2π).
 
-`refsol.metallic.rect_cavity_resonances`는 Hz가 아니라 k²를 반환합니다. TE index 규칙은 p >= 1, (m,n) != (0,0)이고 TM은 m,n >= 1, p >= 0입니다. 이와 독립적으로 정재파 진폭을 보면 양의 index가 정확히 두 개일 때 편광 하나, 세 개 모두 양수일 때 편광 두 개가 있습니다. 양의 index가 0개 또는 1개이면 물리 모드가 없습니다. 기준 구현·솔버와 독립된 두 번째 열거로 유용합니다.
+`refsol.metallic.rect_cavity_resonances(*, box_size, n_max=3)`(상자 (a, b, d)는 m)는 Hz가 아니라 1/m² 단위 k²를 반환합니다. TE index 규칙은 p >= 1, (m,n) != (0,0)이고 TM은 m,n >= 1, p >= 0입니다. 이와 독립적으로 정재파 진폭을 보면 양의 index가 정확히 두 개일 때 편광 하나, 세 개 모두 양수일 때 편광 두 개가 있습니다. 양의 index가 0개 또는 1개이면 물리 모드가 없습니다. 기준 구현·솔버와 독립된 두 번째 열거로 유용합니다.
 
 단위 정육면체에는 k²/π² = 2, 3, 5의 완전한 낮은 cluster가 있고 중복도는 3, 2, 6입니다. 직육면체 (1, 0.8, 0.6) 사례는 처음 세 단순 모드와 TE111/TM111 쌍을 시험합니다. 유한한 index 상한은 생략된 가장 작은 index의 k²가 비교 대역보다 클 때만 충분합니다. index 상한 N에 대해 π²(N+1)² / max(a,b,d)²가 보수적인 하한입니다.
 
@@ -91,7 +91,7 @@ root = Path.cwd()
 for package in (root / "packages").iterdir():
     if (package / "pyproject.toml").exists():
         sys.path.insert(0, str(package))
-sys.path.insert(0, str(root / "packages/galerkin/examples"))
+sys.path.insert(0, str(root / "examples/galerkin"))
 import cavity_modes as example
 from refsol.metallic import rect_cavity_resonances
 
@@ -105,7 +105,7 @@ for sides in ((1, 1, 1), (1, .8, .6)):
         multiplicity = {0: 0, 1: 0, 2: 1, 3: 2}[positive]
         k2 = sum((np.pi * i / a)**2 for i, a in zip(indices, sides))
         independent.extend([k2] * multiplicity)
-    expected = [k2 for k2, _ in rect_cavity_resonances(*sides, n_max=4)]
+    expected = [k2 for k2, _ in rect_cavity_resonances(box_size=sides, n_max=4)]
     assert len(independent) == len(expected) == 176
     assert np.allclose(sorted(independent), sorted(expected), rtol=1e-13, atol=0)
     if sides == (1, 1, 1):
@@ -126,7 +126,7 @@ PY
 
 ## 승인된 기술 계약과 실행 가능한 시험
 
-호출 형식은 `galerkin.solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`입니다. 길이와 mesh 좌표는 SI m, 주파수는 Hz입니다. 선택은 제곱 주파수 기준 `near_target`이며 성공하면 요청한 개수를 정확히 반환합니다. 축퇴 cluster를 가를 수 있습니다. 결과와 저장 metadata는 `cluster_completeness="not_certified"`, `mode_count_policy="exact_count_may_split_cluster"`를 선언합니다. 저장 데이터는 `field_layout="cavity3d-edge-v1"`을 선언하고 pickle 없이 load되어야 합니다. `save_fields=false`이면 raw 에지/centroid 배열은 생략하고 spectrum과 검색/정규화 metadata는 유지합니다.
+호출 형식은 `galerkin.solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`입니다(galerkin 단계부터 SI registry 이름. 그 전에는 `lengths_m`, `subdivisions`, `num_modes`, `target_frequency_hz`). 길이와 mesh 좌표는 SI m, 주파수는 Hz입니다. 선택은 제곱 주파수 기준 `near_target`이며 성공하면 요청한 개수를 정확히 반환합니다. 축퇴 cluster를 가를 수 있습니다. 결과와 저장 metadata는 `cluster_completeness="not_certified"`, `mode_count_policy="exact_count_may_split_cluster"`를 선언합니다. 저장 데이터는 `field_layout="cavity3d-edge-v1"`을 선언하고 pickle 없이 load되어야 합니다. `save_fields=false`이면 raw 에지/centroid 배열은 생략하고 spectrum과 검색/정규화 metadata는 유지합니다.
 
 공개 솔버의 거절 한계는 잔차 1e-8, 질량 직교성 1e-7입니다. 표의 더 엄격한 독립 benchmark 한계 1e-9와 1e-8은 그대로입니다. 정규화 계수는 Q* M_SI Q = I를 만족합니다. 에지 계수는 임의 정규화 단위 m^-1/2, centroid 장은 m^-3/2이며 보정된 V/m가 아닙니다.
 
@@ -138,7 +138,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q \
   packages/simcase/tests/test_cavity3d_persistence_validation.py
 ```
 
-수렴 fixture는 원래 고정 shift sigma = 해석 기본 k²의 1.3배를 target_frequency_hz로 표현해 사용합니다. gradient kernel에서 떨어져 있으면서 시험 대상인 완전한 기준 cluster를 유지합니다. 수치 gate를 바꾸거나 다른 목표에서의 완전성을 보장하지 않습니다. raw 복원 시험은 저장한 primitive 배열에서 Mesh3D/EdgeSpace3D를 재구성하며 제품 load API를 요구하거나 만들어 내지 않습니다.
+수렴 fixture는 원래 고정 shift sigma = 해석 기본 k²의 1.3배를 target_frequency로 표현해 사용합니다. gradient kernel에서 떨어져 있으면서 시험 대상인 완전한 기준 cluster를 유지합니다. 수치 gate를 바꾸거나 다른 목표에서의 완전성을 보장하지 않습니다. raw 복원 시험은 저장한 primitive 배열에서 Mesh3D/EdgeSpace3D를 재구성하며 제품 load API를 요구하거나 만들어 내지 않습니다.
 
 ## 측정한 후보 결과(2026-10-15)
 

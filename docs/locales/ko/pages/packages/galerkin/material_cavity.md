@@ -6,17 +6,18 @@
 from galerkin import CavityMaterialRegion, solve_material_cavity_box
 
 slab = CavityMaterialRegion(
-    bounds_m=((0.0, 1.0), (0.0, 0.8), (0.0, 0.3)),
-    relative_permittivity=4.0 - 0.04j,      # eps' (1 - j tan_delta), tan_delta = 0.01
+    lower_corner_position=(0.0, 0.0, 0.0),  # m
+    upper_corner_position=(1.0, 0.8, 0.3),
+    relative_permittivity=4.0 + 0.04j,      # eps' (1 + i tan_delta), tan_delta = 0.01, exp(-i omega t)
 )
 result = solve_material_cavity_box(
-    lengths_m=(1.0, 0.8, 0.6),
-    subdivisions=(8, 8, 8),
+    box_size=(1.0, 0.8, 0.6),               # m
+    subdivision_count=(8, 8, 8),
     regions=[slab],
-    num_modes=4,
-    target_frequency_hz=150e6,
+    mode_count=4,
+    target_frequency=150e6,                 # Hz
 )
-print(result.resonant_frequencies_hz, result.quality_factors)
+print(result.resonant_frequency, result.quality_factor)   # Im f < 0: 모드가 감쇠
 ```
 
 이 API는 [진공 PEC 상자 솔버](cavity_solver.md)에 축 정렬 직육면체 영역별로 일정한
@@ -27,66 +28,76 @@ print(result.resonant_frequencies_hz, result.quality_factors)
 
 ## 규약
 
-시간 의존성은 **`exp(+j*omega*t)`**입니다. 수동(passive) 재료는
+공개 함수는 galerkin의 공개 규약 **`exp(-i omega t)`**를 따릅니다. 수동(passive) 재료는
 
-    eps_r = eps' - j*eps'',  eps'' >= 0,    mu_r = mu' - j*mu'',  mu'' >= 0
+    eps_r = eps' + i eps'',  eps'' >= 0,    mu_r = mu' + i mu'',  mu'' >= 0
 
-이므로 손실 탄젠트 `tan_delta`인 유전체는 `eps' * (1 - 1j*tan_delta)`입니다. 실수부가
-양수가 아니거나 허수부가 양수(이득)인 입력은 거부합니다. 감쇠하는 공진은
-`Im(omega) > 0`이며 Q는
+이므로 손실 탄젠트 `tan_delta`인 유전체는 `eps' * (1 + 1j*tan_delta)`입니다. 실수부가
+양수가 아니거나 허수부가 음수(이득)인 입력은 거부합니다. 감쇠하는 공진은
+`Im(omega) < 0`, 즉 `Im(resonant_frequency) < 0`이며 Q는
 
-    Q = Re(omega) / (2 * Im(omega)) = Re(f) / (2 * Im(f))
+    Q = Re(omega) / (-2 * Im(omega)) = Re(f) / (-2 * Im(f))
 
 로, 위상 변화율과 에너지 감쇠율의 비입니다. 모든 재료가 무손실이면 무한대입니다.
-`eps' (1 - j tan_delta)`와 실수 `mu_r`로 균일하게 채운 공동은
+`eps' (1 + i tan_delta)`와 실수 `mu_r`로 균일하게 채운 공동은
 `Q = (1 + sqrt(1 + tan_delta**2)) / (2 tan_delta)`, 약 `1/tan_delta`입니다.
+
+솔버는 **`exp(+j*omega*t)`**로 계산합니다(수동 재료 `eps' - j*eps''`, 감쇠 `Im(omega) > 0`,
+`Q = Re(f) / (2 Im(f))`). 공개 함수는 한 곳, `galerkin._conventions`에서만 변환합니다. 복소
+입력은 `to_kernel`(`complex(re, 0.0 - im)`; 실수 값의 허수부는 +0.0)을 거쳐 private 본체
+(`_solve_material_cavity_box`, `_solve_material_cavity`)에 들어가고, 복소 출력은 본체 출력의
+`to_public`(켤레)이며 다시 유도하지 않습니다. Q는 두 규약에서 같은 double입니다. 공동 솔버의
+kernel export는 없습니다.
 
 PEC 벽에서 `curl(mu_r^-1 curl E) = k0^2 eps_r E`의 약형식은 복소 대칭(비에르미트)
 일반화 고유값 문제
 
     S(1/mu_r) q = k0^2 M(eps_r) q
 
-가 되며 `k0^2`는 복소수입니다. `frequencies_hz = c0 * sqrt(k0^2) / (2*pi)`는 주
+가 되며 `k0^2`는 복소수입니다. `resonant_frequency = c0 * sqrt(k0^2) / (2*pi)`는 주
 제곱근을 써서 `Re f > 0`입니다.
 
 ## 인수
 
-`solve_material_cavity_box(lengths_m, subdivisions, *, regions=(), num_modes=6,
-target_frequency_hz, wall_conductivity_s_per_m=None)`는 `MaterialCavityResult`를 반환합니다. `lengths_m`,
-`subdivisions`, `num_modes`, `target_frequency_hz`의 의미와 검증은 진공 솔버와 같으나
-JAX·PyTorch 값은 거부하며(아래), mesh도 같은 교대 Kuhn mesh입니다.
+`solve_material_cavity_box(*, box_size, subdivision_count, regions=(), mode_count=6,
+target_frequency, electrical_conductivity=None)`는 `MaterialCavityResult`를 반환합니다. `box_size`,
+`subdivision_count`, `mode_count`, `target_frequency`의 의미와 검증은 진공 솔버와 같으나
+JAX·PyTorch 값은 거부하며(아래), mesh도 같은 교대 Kuhn mesh입니다. 양은 키워드 전용 SI
+registry 이름이며 양에 문자열을 주면 `TypeError`입니다.
 
-`regions`는 `CavityMaterialRegion(bounds_m, relative_permittivity=1,
-relative_permeability=1)`의 시퀀스입니다. `bounds_m`은 상자 원점 기준 m 단위
-`((x0, x1), (y0, y1), (z0, z1))`입니다. 어느 영역에도 속하지 않는 공간은 진공이고,
+`regions`는 frozen spec 객체 `CavityMaterialRegion(*, lower_corner_position,
+upper_corner_position, relative_permittivity=1.0, relative_permeability=1.0)`의 시퀀스입니다.
+모서리 `(x0, y0, z0)`, `(x1, y1, z1)`은 상자 원점 기준 m이고, 상수는 `exp(-i omega t)` 복소수로
+생성할 때 검사합니다(유한, `Re > 0`, `Im >= 0`). 어느 영역에도 속하지 않는 공간은 진공이고,
 영역이 겹치면 뒤의 영역이 우선합니다. 각 사면체는 무게중심이 속한 재료를 가집니다.
 
-모든 경계값은 mesh 격자 평면, 즉 그 축의 `length/subdivisions` 배수여야 합니다(한
-cell의 상대 허용치 `1e-9`). 따라서 재료 경계면이 mesh 면과 일치합니다. 그렇지 않으면
-`ValueError`가 해당 경계값과 격자 간격을 알려 줍니다. 계단 근사에 기대지 말고
-subdivisions를 바꾸세요.
+모서리의 모든 좌표는 mesh 격자 평면, 즉 그 축의 `box_size/subdivision_count` 배수여야 하며(한
+cell의 상대 허용치 `1e-9`) `0 <= lower < upper <= box_size`입니다. 따라서 재료 경계면이 mesh
+면과 일치합니다. 그렇지 않으면 `ValueError`가 해당 경계값과 격자 간격을 알려 줍니다. 계단
+근사에 기대지 말고 분할 수를 바꾸세요.
 
 ## 결과
 
-K는 요청 모드 수, E는 에지 수, T는 사면체 수입니다.
+K는 요청 모드 수, E는 에지 수, T는 사면체 수입니다. `MaterialCavityResult`는 frozen이고
+필드 이름은 registry 이름이며, `result.units`가 각 양 필드의 SI 단위를 줍니다. 복소 값은
+`exp(-i omega t)`를 따릅니다.
 
 | 속성 | 형태 / 의미 | 단위 |
 | --- | --- | --- |
-| `frequencies_hz` | `(K,)` 복소수, 손실이 있으면 `Im > 0` | Hz |
-| `resonant_frequencies_hz` | `(K,)` `Re(frequencies_hz)`, 오름차순 | Hz |
-| `quality_factors` | `(K,)` `Re f / (2 Im f)`; 무손실이면 `inf` | 무차원 |
-| `eigenvalues_m2` | `(K,)` 복소 `k0^2` | m^-2 |
-| `edge_coefficients` | `(E,K)` 복소수, PEC 에지는 정확히 0 | m^-1/2 |
-| `electric_field` | `(K,T,3)` 복소수, 사면체 무게중심 | m^-3/2 |
-| `relative_residuals` | `(K,)` 자유 에지 방정식 | 무차원 |
-| `pec_edge_ids`, `mesh`, `space` | 진공 솔버와 같음 | |
-| `tet_relative_permittivity`, `tet_relative_permeability` | `(T,)` 사면체별 복소수 | 무차원 |
+| `resonant_frequency` | `(K,)` 복소수, 실수부 오름차순, 손실이 있으면 `Im < 0` | Hz |
+| `quality_factor` | `(K,)` `Re f / (-2 Im f)`; 무손실이면 `inf` | 무차원 |
+| `wavenumber_squared` | `(K,)` 복소 `k0^2` | m^-2 |
+| `mass_normalized_electric_field_line_integral` | `(E,K)` 복소수, PEC 에지는 정확히 0 | m^-1/2 |
+| `mass_normalized_electric_field` | `(K,T,3)` 복소수, 사면체 무게중심 | m^-3/2 |
+| `relative_residual` | `(K,)` 자유 에지 방정식 | 무차원 |
+| `pec_edges`, `mesh`, `space`, `mode_count`, `target_frequency`, `gradient_kernel_dimension` | 진공 솔버와 같음 | |
+| `relative_permittivity`, `relative_permeability` | `(T,)` 사면체별 복소수 | 무차원 |
 | `lossless` | 모든 재료 상수가 실수이고 모든 벽이 PEC인지 여부 | bool |
-| `time_convention` | `"exp(+j*omega*t)"` | 메타데이터 |
-| `wall_conductivity_s_per_m` | `WALLS`별 dict; `None`은 PEC | S/m |
-| `fixed_point_iterations` | `(K,)`; 유한 전도도 벽이 없으면 0 | 횟수 |
+| `electrical_conductivity` | `WALLS`(또는 면 태그)별 읽기 전용 map; `None`은 PEC | S/m |
+| `iteration_count` | `(K,)`; 유한 전도도 벽이 없으면 0 | 횟수 |
 
-`search`, `cluster_completeness`, `mode_count_policy`는 진공 솔버와 같은 값과 의미입니다.
+`time_convention`은 상수 `"exp(-i omega t)"`이고, `search`, `cluster_completeness`,
+`mode_count_policy`는 진공 솔버와 같은 값과 의미입니다.
 `lossless`가 참이어도 계산은 복소수로 하며, 반환 고유값이
 `|Im k0^2| <= 1e-9 |k0^2|`임을 확인한 뒤 허수부를 0으로 둡니다.
 
@@ -125,6 +136,10 @@ S와 M은 서로 다른 재료마다 실수 지시함수 가중 조립에 복소
 
 ## 검증
 
+아래 표와 비교는 복소 값을 측정한 그대로, 솔버 기준 `exp(+j omega t)`로 적습니다. 재료는
+`eps' - j eps''`, 감쇠하는 공진은 `Im f > 0`입니다. 공개 함수는 그 켤레(`eps' + i eps''`,
+`Im f < 0`)를 받고 돌려주며, 테스트는 공개 값을 넘깁니다.
+
 저장소 루트에서:
 
 ```bash
@@ -135,6 +150,8 @@ python -m pytest -c pyproject.toml -q tests/galerkin/test_material_cavity.py \
 ```
 
 정답은 `refsol.material_cavity`와 `refsol.wall_loss`에 있으며 mesh나 FEM 코드를 쓰지 않습니다.
+정답의 공개 값도 솔버처럼 `exp(-i omega t)`를 따르므로(galerkin 단계, L3 커밋 12) 테스트는 둘을
+그대로 비교합니다.
 
 **균일 충전.** 균질 공동은 진공 장을 그대로 가지고 `k0^2 = k_vac^2 / (eps_r mu_r)`가
 정확하며, 이산 문제도 똑같이 축척됩니다. 시험은 재료 솔버를 진공 솔버에 이 인자를 곱한
@@ -195,12 +212,13 @@ z 적층 정답과 일치(n = 8에서 고유값 1.5%, Q 0.3% 이내); 영역 우
 
 ## 유한 전도도 벽
 
-`wall_conductivity_s_per_m`는 `None`(여섯 벽 모두 PEC), 모든 벽에 같은 양의 전도도 하나,
+`electrical_conductivity`는 `None`(여섯 벽 모두 PEC), 모든 벽에 같은 양의 전도도 하나,
 또는 `galerkin.material_cavity.WALLS`(`"x0", "x1", "y0", "y1", "z0", "z1"`, 각 축의 낮은
 쪽·높은 쪽 벽)를 키로 하는 dict입니다. 없거나 `None`인 항목은 PEC입니다. 값은 유한한
 양의 S/m이어야 하며 0, 음수, 무한대, bool, 알 수 없는 벽 이름은 `ValueError`입니다.
 
-유한 전도도 벽은 Leontovich 조건 `E_t = Zs H x n`(n은 공동 밖을 향함)과 양도체 임피던스
+유한 전도도 벽은 Leontovich 조건 `E_t = Zs H x n`(n은 공동 밖을 향함)과, 솔버의
+`exp(+j omega t)`로 적은(`exp(-i omega t)`에서는 `(1 - i) Rs`) 양도체 임피던스
 
     Zs = sqrt(j omega mu0 / sigma) = (1 + j) Rs,   Rs = sqrt(omega mu0 / (2 sigma))
 
@@ -244,6 +262,8 @@ z 적층 정답과 일치(n = 8에서 고유값 1.5%, Q 0.3% 이내); 영역 우
 이때 벽 손실은 진폭 평면의 이차형식이고, 그 고유벡터가 두 Q 값을 줍니다. Leontovich
 리액턴스는 손실이 허수부를 올리는 만큼 실수 주파수를 낮춥니다:
 `omega = omega0 (1 + (j - 1)/(2 Q_c))`. 무시한 항의 상대 크기는 `1/Q_c`입니다.
+`refsol.wall_loss`의 공개 `resonant_frequency`는 `exp(-i omega t)`에서 그 켤레인
+`f0 (1 - (1 + i)/(2 Q_c))`입니다.
 
 정답 자체 검사: TE101이 Pozar 닫힌 식(*Microwave Engineering*, 4판, 식 6.46)과 `1e-12`로
 같습니다. `(1, 0.8, 0.6) m`의 400 MHz 이하 모든 모드(분리된 111 이중 모드 포함)가 유한차분
@@ -339,26 +359,31 @@ Arnoldi 벡터 14개로는 `eps = 4 - 0.04j` 경우의 4차 실행에서 여섯�
 
 ## 외부 메시
 
-`solve_material_cavity(mesh, *, regions, walls=None, num_modes=6, target_frequency_hz)`는
-영역과 바깥 방향 면 태그를 가진 [사면체 메시 형식](mesh3d_format.md)의 어떤 메시에서든
-(진입 시 검사, 좌표 m) 같은 조립·검색·임피던스 반복·검사를 실행합니다.
+`solve_material_cavity(mesh, *, relative_permittivity, relative_permeability=None,
+electrical_conductivity=None, mode_count=6, target_frequency)`는 영역과 바깥 방향 면 태그를
+가진 [사면체 메시 형식](mesh3d_format.md)의 어떤 메시에서든 (진입 시 검사, 좌표 m) 같은
+조립·검색·임피던스 반복·검사를 실행합니다.
 
-- `regions`: `{영역 이름: (eps_r, mu_r)}` 또는 `mu_r = 1`인 `{이름: eps_r}`,
-  `mesh.region_names`와 정확히 같은 항목. `CavityMaterialRegion`과 같은 수동성 검사.
+- `relative_permittivity`: `mesh.region_names`와 정확히 같은 항목의 `{영역 이름: eps_r}`.
+  `relative_permeability`: `None`(모든 곳 `mu_r = 1`) 또는 `{영역 이름: mu_r}`, 빠진 영역은
+  비자성. `exp(-i omega t)` 복소수이며 `CavityMaterialRegion`과 같은 수동성 검사.
   재료 경계면은 두 영역이 만나는 곳이므로 유전체 판은 격자 평면 상자가 아니라 쌓은
   층 영역입니다.
-- `walls`: `None`(모든 태그 면 PEC) 또는 `{면 태그: 전도도 S/m 또는 None}`. 적지 않은
-  태그는 PEC, 모르는 태그는 `ValueError`. 적은 전도도는 바로 그 면에 위의 Leontovich
-  조건을 둡니다.
-- JAX·PyTorch 값은 `TypeError`. 결과의 `mesh`는 받은 메시, `wall_conductivity_s_per_m`은
+- `electrical_conductivity`: `None`(모든 태그 면 PEC) 또는 `{면 태그: 전도도 S/m 또는 None}`.
+  적지 않은 태그는 PEC, 모르는 태그는 `ValueError`. 적은 전도도는 바로 그 면에 위의
+  Leontovich 조건을 둡니다.
+- JAX·PyTorch 값은 `TypeError`. 결과의 `mesh`는 받은 메시, `electrical_conductivity`는
   면 태그가 키이고 `gradient_kernel_dimension`은 셈한 kernel입니다. 모든 태그 면이
   벽이므로 kernel은 각 경계 성분에서 상수인 전위가 생성합니다([`solve_cavity`](cavity_solver.md) 참조).
 
 | Gate | 요구 | 측정(Linux, 이 변경) |
 | --- | --- | --- |
 | M3 1.0 x 0.8 x 0.6 m 상자의 `0 <= z <= 0.3 m`에 `eps_r = 2.2 - 0.02j` 판을 쌓은 층 영역으로, 크기 0.15, 0.1, 0.05 m, 같은 판을 `CavityMaterialRegion`으로 둔 같은 분할의 `solve_material_cavity_box` 대비, 모드 셋 | 최세밀 상대 주파수 차 <= 5e-3 | 9.72e-3, 2.12e-3, 4.69e-4 |
-| 같은 판, 0.15 m, 5.8e7 S/m 바닥(`walls={"z0": ...}`과 `wall_conductivity_s_per_m={"z0": ...}`) | 5e-2 이내, 유한한 Q, 임피던스 반복 1회 이상 | 통과 |
+| 같은 판, 0.15 m, 5.8e7 S/m 바닥(두 경로 모두 `electrical_conductivity={"z0": ...}`) | 5e-2 이내, 유한한 Q, 임피던스 반복 1회 이상 | 통과 |
 | 상자 솔버 자신의 2x2x2 메시에 판을 영역으로, `x1` 손실 벽을 두 경로로 | 상대 차 <= 1e-10, Q는 1e-8 | 2.99e-16 |
+
+M3 세밀화 연구는 `tests/galerkin/test_cavity_mesh_slab_refinement.py`에, 나머지 두 행은
+`tests/galerkin/test_cavity_mesh.py`에 있습니다.
 
 ## 한계
 

@@ -59,6 +59,8 @@ import numpy as np
 from .mesh import Mesh
 from .mesh3d import Mesh3D
 
+__all__ = ["GmshFormatError", "read_msh", "write_msh"]
+
 _LINE, _TRI, _TET, _POINT = 1, 2, 4, 15
 _NODES_PER_TYPE = {_LINE: 2, _TRI: 3, _TET: 4, _POINT: 1}
 

@@ -19,9 +19,9 @@ def problem(n=8, alpha=.5, **options):
     thermal = {int(i): 300. for i in np.r_[left, right]}
     model = ConductivityModel(lambda t: 1/(1+alpha*(t-300)), (300., 400.))
     args = dict(electrical_conductivity=model, thermal_conductivity=1.,
-                electric_dirichlet={int(i): 0. for i in left},
-                thermal_dirichlet=thermal, initial_temperature=300.,
-                outward_current={'right': 1.}, relaxation=1., max_iterations=200, method='picard')
+                prescribed_electric_potential={int(i): 0. for i in left},
+                prescribed_temperature=thermal, initial_temperature=300., temperature_tolerance=1e-8,
+                inward_current_density={'right': -1.}, relaxation_factor=1., iteration_limit=200, method='picard')
     args.update(options)
     return mesh, args
 
@@ -30,18 +30,19 @@ def problem(n=8, alpha=.5, **options):
 def test_constant_limit_and_balances(method):
     mesh, args = problem(alpha=0., method=method)
     actual = solve_temperature_joule_heat(mesh, **args)
-    e = solve_steady_electric(mesh, conductivity=1., dirichlet=args['electric_dirichlet'],
-                             outward_current=args['outward_current'])
-    expected = solve_steady_joule_heat(mesh, electrical_result=e, conductivity=1.,
-                                     dirichlet=args['thermal_dirichlet'])
+    e = solve_steady_electric(mesh, electrical_conductivity=1.,
+                              prescribed_electric_potential=args['prescribed_electric_potential'],
+                              inward_current_density=args['inward_current_density'])
+    expected = solve_steady_joule_heat(mesh, electrical_result=e, thermal_conductivity=1.,
+                                       prescribed_temperature=args['prescribed_temperature'])
     assert_allclose(actual.coupled.thermal.temperature, expected.thermal.temperature, rtol=1e-10)
-    assert_allclose(actual.coupled.electrical.potential, expected.electrical.potential, rtol=1e-10)
+    assert_allclose(actual.coupled.electrical.electric_potential, expected.electrical.electric_potential, rtol=1e-10)
     assert len(actual.history) == 2
     for row in actual.history:
-        assert abs(row.current_balance) < 1e-10
-        assert abs(row.electric_power_defect) < 1e-10
-        assert abs(row.heat_power_defect) < 1e-10
-    assert not actual.evaluated_temperature.flags.writeable
+        assert abs(row.current_imbalance_per_depth) < 1e-10
+        assert abs(row.electric_power_imbalance_per_depth) < 1e-10
+        assert abs(row.heat_rate_imbalance_per_depth) < 1e-10
+    assert not actual.evaluation_temperature.flags.writeable
 
 
 @pytest.mark.parametrize('method', METHODS)
@@ -61,12 +62,12 @@ def test_analytic_mesh_convergence(method):
         exact_q = 300+(np.cos(np.sqrt(.5)*(xq-.5))/np.cos(np.sqrt(.5)/2)-1)/.5
         errors.append(np.sqrt(np.mean((tq-exact_q)**2)))
         v_exact = -(np.sin(np.sqrt(.5)*(x-.5))+np.sin(np.sqrt(.5)/2))/(np.sqrt(.5)*np.cos(np.sqrt(.5)/2))
-        assert np.max(abs(result.coupled.electrical.potential-v_exact)) < .003
+        assert np.max(abs(result.coupled.electrical.electric_potential-v_exact)) < .003
         exact_power = .25*2*np.tan(np.sqrt(.5)/2)/np.sqrt(.5)
-        assert abs(result.coupled.source_power_per_length/exact_power-1) < .003
+        assert abs(result.coupled.generated_heat_rate_per_depth/exact_power-1) < .003
         current_errors.append(np.max(abs(result.coupled.electrical.current_density[:, 0]-1)))
-        assert abs(result.history[-1].current_balance) < 1e-10
-        assert abs(result.history[-1].heat_power_defect) < 1e-10
+        assert abs(result.history[-1].current_imbalance_per_depth) < 1e-10
+        assert abs(result.history[-1].heat_rate_imbalance_per_depth) < 1e-10
     assert np.log2(errors[-2]/errors[-1]) > 1.8
     assert errors[-1] < 2e-4
     assert np.sqrt(np.mean((result.coupled.thermal.temperature-exact)**2)) < 2e-5
@@ -76,20 +77,20 @@ def test_analytic_mesh_convergence(method):
 def test_strong_feedback_and_relaxation():
     results = []
     for relaxation in (1., .5):
-        mesh, args = problem(alpha=7., relaxation=relaxation, max_iterations=300)
+        mesh, args = problem(alpha=7., relaxation_factor=relaxation, iteration_limit=300)
         result = solve_temperature_joule_heat(mesh, **args)
         results.append(result.coupled.thermal.temperature)
-        assert result.history[-1].conductivity_defect <= 1e-10
-        assert result.history[-1].nonlinear_heat_residual <= 1e-8
+        assert result.history[-1].relative_electrical_conductivity_change <= 1e-10
+        assert result.history[-1].relative_residual <= 1e-8
     assert_allclose(*results, rtol=0., atol=2e-8)
 
 
 def test_nonconvergence_and_small_relaxation_preserve_evidence():
-    mesh, args = problem(alpha=7., max_iterations=2, relaxation=1e-12)
+    mesh, args = problem(alpha=7., iteration_limit=2, relaxation_factor=1e-12)
     with pytest.raises(JouleConvergenceError, match='maximum iterations') as exc:
         solve_temperature_joule_heat(mesh, **args)
     assert len(exc.value.history) == 2
-    assert exc.value.history[-1].temperature_defect > .1
+    assert exc.value.history[-1].temperature_change > .1
     assert not exc.value.last_temperature.flags.writeable
 
 
@@ -124,9 +125,9 @@ def test_invalid_thermal_conductivity_is_wrapped_with_its_cause(conductivity, me
     assert np.array_equal(exc.value.last_temperature, expected)
 
 
-@pytest.mark.parametrize('option,value', [('relaxation', 0), ('relaxation', 1.1),
-    ('relative_tolerance', 0), ('temperature_atol', np.nan),
-    ('max_iterations', True), ('max_iterations', 1.5), ('initial_temperature', [300, 301])])
+@pytest.mark.parametrize('option,value', [('relaxation_factor', 0), ('relaxation_factor', 1.1),
+    ('relative_tolerance', 0), ('temperature_tolerance', np.nan),
+    ('iteration_limit', True), ('iteration_limit', 1.5), ('initial_temperature', [300, 301])])
 def test_invalid_options(option, value):
     mesh, args = problem(**{option: value})
     with pytest.raises(ValueError):
@@ -144,7 +145,8 @@ def test_element_conductivity_binding():
         with pytest.raises(ValueError):
             ElementConductivity(mesh, bad)
     with pytest.raises(ValueError):
-        solve_steady_electric(mesh, conductivity=field.values, dirichlet=args['electric_dirichlet'])
+        solve_steady_electric(mesh, electrical_conductivity=field.values,
+                              prescribed_electric_potential=args['prescribed_electric_potential'])
 
 
 def test_element_conductivity_is_labelled_as_conductivity():
@@ -174,8 +176,8 @@ def test_regions_interface_ranges_and_element_mean(method):
     model = ConductivityModel(evaluate, (300., 400.))
     args['electrical_conductivity'] = {'a': model, 'b': model}
     result = solve_temperature_joule_heat(mesh, **args)
-    expected = 1/(1+.5*(result.evaluated_temperature[mesh.triangles].mean(axis=1)-300))
-    assert_allclose(result.coupled.electrical.conductivity, expected, rtol=1e-13)
+    expected = 1/(1+.5*(result.evaluation_temperature[mesh.triangles].mean(axis=1)-300))
+    assert_allclose(result.coupled.electrical.electrical_conductivity, expected, rtol=1e-13)
     args['electrical_conductivity']['b'] = ConductivityModel(evaluate, (300., 300.001))
     with pytest.raises(JouleConvergenceError, match="material 'b'"):
         solve_temperature_joule_heat(mesh, **args)
@@ -186,10 +188,10 @@ def test_regions_interface_ranges_and_element_mean(method):
 
 @pytest.mark.parametrize('method', METHODS)
 def test_zero_voltage(method):
-    mesh, args = problem(outward_current=None, method=method)
+    mesh, args = problem(inward_current_density=None, method=method)
     result = solve_temperature_joule_heat(mesh, **args)
     assert len(result.history) == 1
-    assert result.coupled.source_power_per_length == 0
+    assert result.coupled.generated_heat_rate_per_depth == 0
 
 
 @pytest.mark.parametrize('bounds', [(300, 300), (-1, 400), (0, np.inf), (0,), (0, 1j)])
@@ -214,9 +216,9 @@ def test_initial_range_and_callback_exception(method):
 
 @pytest.mark.parametrize('method', METHODS)
 def test_zero_power_with_nonuniform_thermal_boundary(method):
-    mesh, args = problem(outward_current=None, method=method)
+    mesh, args = problem(inward_current_density=None, method=method)
     for i in mesh.boundary['right']:
-        args['thermal_dirichlet'][int(i)] = 301.
+        args['prescribed_temperature'][int(i)] = 301.
     result = solve_temperature_joule_heat(mesh, **args)
     assert_allclose(result.coupled.thermal.temperature, 300+mesh.nodes[:, 0], atol=1e-10)
-    assert result.history[-1].nonlinear_heat_residual <= 1e-8
+    assert result.history[-1].relative_residual <= 1e-8

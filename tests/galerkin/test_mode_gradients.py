@@ -17,7 +17,8 @@ import warnings
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.core.backend import TracedValueError
 from galerkin.mesh import Mesh
 from galerkin.waveguide import DegenerateModeWarning

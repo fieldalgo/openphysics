@@ -45,9 +45,10 @@ def solve(n, alpha, drop, temperatures, reference):
     left, right = mesh.boundary["left"], mesh.boundary["right"]
     result = solve_temperature_joule_heat(
         mesh, electrical_conductivity=model, thermal_conductivity=K,
-        electric_dirichlet={**{int(i): drop for i in left}, **{int(i): 0.0 for i in right}},
-        thermal_dirichlet={**{int(i): temperatures[0] for i in left}, **{int(i): temperatures[1] for i in right}},
-        initial_temperature=T0, relaxation=1.0, max_iterations=300, method="picard")
+        prescribed_electric_potential={**{int(i): drop for i in left}, **{int(i): 0.0 for i in right}},
+        prescribed_temperature={**{int(i): temperatures[0] for i in left}, **{int(i): temperatures[1] for i in right}},
+        initial_temperature=T0, temperature_tolerance=1e-8, relaxation_factor=1.0, iteration_limit=300,
+        method="picard")
     return mesh, result
 
 
@@ -58,17 +59,21 @@ def rms(mesh, nodal, exact):
 
 @pytest.mark.parametrize("alpha,drop,temperatures,bound", CASES)
 def test_temperature_and_power_converge_to_the_slab_reference(refsol, alpha, drop, temperatures, bound):
-    reference = refsol.joule_slab.voltage_driven(1.0, (drop, 0.0), temperatures, SIGMA0, alpha, T0, K)
+    reference = refsol.joule_slab.voltage_driven(
+        length=1.0, prescribed_electric_potential=(drop, 0.0), prescribed_temperature=temperatures,
+        reference_conductivity=SIGMA0, conductivity_temperature_coefficient=alpha, reference_temperature=T0,
+        thermal_conductivity=K)
     assert reference.current_density > 0
     errors, potential_errors, power_errors, current_errors = [], [], [], []
     for n in (8, 16, 32):
         mesh, result = solve(n, alpha, drop, temperatures, reference)
         errors.append(rms(mesh, result.coupled.thermal.temperature, reference.temperature))
-        potential_errors.append(rms(mesh, result.coupled.electrical.potential, reference.potential))
-        power_errors.append(abs(result.coupled.source_power_per_length / (reference.joule_power * WIDTH) - 1))
+        potential_errors.append(rms(mesh, result.coupled.electrical.electric_potential, reference.electric_potential))
+        # the slab's dissipated power per face area is private (refsol, rule R(2): no registry name)
+        power_errors.append(abs(result.coupled.generated_heat_rate_per_depth / (reference._joule_power * WIDTH) - 1))
         current_errors.append(np.max(abs(result.coupled.electrical.current_density[:, 0] - reference.current_density)))
-        assert abs(result.history[-1].current_balance) < 1e-10
-        assert result.history[-1].nonlinear_heat_residual <= 1e-8
+        assert abs(result.history[-1].current_imbalance_per_depth) < 1e-10
+        assert result.history[-1].relative_residual <= 1e-8
     assert errors[0] > errors[1] > errors[2]
     assert rate(errors)[-1] > 1.8, f"orders {rate(errors)} for errors {errors}"
     assert errors[-1] < bound
@@ -79,8 +84,13 @@ def test_temperature_and_power_converge_to_the_slab_reference(refsol, alpha, dro
 
 
 def test_constant_conductivity_limit_matches_the_closed_form(refsol):
-    reference = refsol.joule_slab.voltage_driven(1.0, (2.0, 0.0), (300.0, 304.0), SIGMA0, 0.0, T0, K)
-    closed = refsol.joule_slab.constant_conductivity(1.0, (2.0, 0.0), (300.0, 304.0), SIGMA0, K)
+    reference = refsol.joule_slab.voltage_driven(
+        length=1.0, prescribed_electric_potential=(2.0, 0.0), prescribed_temperature=(300.0, 304.0),
+        reference_conductivity=SIGMA0, conductivity_temperature_coefficient=0.0, reference_temperature=T0,
+        thermal_conductivity=K)
+    closed = refsol.joule_slab.constant_conductivity(
+        length=1.0, prescribed_electric_potential=(2.0, 0.0), prescribed_temperature=(300.0, 304.0),
+        electrical_conductivity=SIGMA0, thermal_conductivity=K)
     x = np.linspace(0, 1, 11)
     assert np.array_equal(reference.temperature(x), closed.temperature(x))
     errors = []
@@ -88,6 +98,6 @@ def test_constant_conductivity_limit_matches_the_closed_form(refsol):
         mesh, result = solve(n, 0.0, 2.0, (300.0, 304.0), reference)
         errors.append(rms(mesh, result.coupled.thermal.temperature, reference.temperature))
         # the potential of a constant conductivity is affine and exact on P1
-        assert rms(mesh, result.coupled.electrical.potential, reference.potential) < 1e-12
-        assert abs(result.coupled.source_power_per_length / (reference.joule_power * WIDTH) - 1) < 1e-12
+        assert rms(mesh, result.coupled.electrical.electric_potential, reference.electric_potential) < 1e-12
+        assert abs(result.coupled.generated_heat_rate_per_depth / (reference._joule_power * WIDTH) - 1) < 1e-12
     assert rate(errors)[-1] > 1.9 and errors[-1] < 1e-3

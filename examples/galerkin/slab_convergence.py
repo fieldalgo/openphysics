@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Compare a vector TE slab with an independent infinite-cladding reference."""
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from refsol.slab import modes
 
 N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55
@@ -25,8 +26,8 @@ def solve(scale, pad):
 
 
 def main():
-    reference = modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                      d=THICKNESS, wavelength=WAVELENGTH, pol='TE')[0]
+    reference = modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS, vacuum_wavelength=WAVELENGTH,
+                      pol='TE')[0]
     print(f'Infinite-cladding TE0 reference: {reference:.9f}')
     rows = []
     for study, settings in (

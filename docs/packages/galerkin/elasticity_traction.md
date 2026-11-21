@@ -20,15 +20,16 @@ from galerkin.elasticity import solve_elasticity
 mesh = rectangle_mesh(1.2, .7, 12, 7)  # metres
 bc = {(int(i), 0): 0. for i in mesh.boundary["left"]}
 bc.update({(int(i), 1): 0. for i in mesh.boundary["bottom"]})
-r = solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3,
-                     plane="stress", dirichlet=bc,
+r = solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3,
+                     plane="stress", prescribed_displacement=bc,
                      traction={"right": (123., 0.)})
-print(r.load.sum(axis=0), r.reaction.sum(axis=0))  # N/m of thickness
+print(r.applied_force_per_depth.sum(axis=0),
+      r.reaction_force_per_depth.sum(axis=0))  # N/m of thickness
 ```
 
 `traction=None` (the default) or `{}` preserves the previous zero-traction
-behavior. The existing `body_force` parameter and component-wise Dirichlet
-mapping are unchanged. Nonselected boundaries carry zero applied traction
+behavior. The `body_force_density` parameter and the component-wise
+`prescribed_displacement` mapping are unchanged. Nonselected boundaries carry zero applied traction
 on their unconstrained components. E and nu remain homogeneous; plane must
 be explicitly `"stress"` or `"strain"`.
 
@@ -39,8 +40,8 @@ be explicitly `"stress"` or `"strain"`.
 | Edge integration measure | ds | m |
 | Consistent boundary nodal load | integral(N_i*t)ds | N/m of thickness |
 | Body force | existing volume density b | N/m^3 |
-| result.load | **total body plus boundary** nodal load, `(N,2)` | N/m of thickness |
-| result.reaction / residual | original K*u-load, reaction only at prescribed DOFs | N/m of thickness |
+| result.applied_force_per_depth | **total body plus boundary** nodal load, `(N,2)` | N/m of thickness |
+| result.reaction_force_per_depth / residual_force_per_depth | original K*u-load, reaction only at prescribed DOFs | N/m of thickness |
 | Moment about an in-plane point | sum(r_x*f_y-r_y*f_x) | N = (N*m)/m of thickness |
 | Elastic strain energy / external work | per thickness | J/m = N |
 
@@ -129,8 +130,9 @@ to overwrite the Dirichlet value. This also applies to shared corner nodes
 and to a fully prescribed edge. Increasing a load at a fixed DOF changes its
 reaction; if all affected DOFs are fixed, it need not change displacement.
 
-`result.load` includes both body and boundary loads, even at constrained
-DOFs. `result.reaction` is zero at free DOFs. `result.residual` retains K*u-load
+`result.applied_force_per_depth` includes both body and boundary loads, even at
+constrained DOFs. `result.reaction_force_per_depth` is zero at free DOFs.
+`result.residual_force_per_depth` retains K*u-load
 at all DOFs; its prescribed entries are physical reactions. Force and moment
 balance use **load plus reaction**, not either term alone.
 

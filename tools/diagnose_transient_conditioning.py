@@ -39,14 +39,14 @@ def case(name, source, ramp=False, n=8):
         result["last_step_eigenvalue_extrema"] = [float(eigenvalues[0]), float(eigenvalues[-1])]
         result["last_step_condition_estimate"] = float(eigenvalues[-1]/eigenvalues[0])
     try:
-        solved = solve_transient_heat(mesh, conductivity=2.5, volumetric_heat_capacity=4.,
-                    time_s=times, initial_temperature_k=np.full(mesh.num_nodes, initial),
-                    dirichlet=boundary, heat_source=source)
+        solved = solve_transient_heat(mesh, thermal_conductivity=2.5, volumetric_heat_capacity=4.,
+                    time=times, initial_temperature=np.full(mesh.num_nodes, initial),
+                    prescribed_temperature=boundary, heat_source_density=source)
         exact = initial + (3. if ramp else source/4.) * (times-times[0])
-        result.update(status="returned", temperature_max_error=float(np.max(abs(solved.temperature_k-exact[:, None]))),
-                      flux_max=float(np.max(abs(solved.heat_flux_w_m2))),
-                      balance_max=float(np.max(abs((solved.storage_rate_w_per_m-
-                          solved.source_load_w_per_m[1:]-solved.reaction_w_per_m).sum(axis=1)))))
+        result.update(status="returned", temperature_max_error=float(np.max(abs(solved.temperature-exact[:, None]))),
+                      flux_max=float(np.max(abs(solved.heat_flux))),
+                      balance_max=float(np.max(abs((solved.heat_storage_rate_per_depth-
+                          solved.generated_heat_rate_per_depth[1:]-solved.reaction_heat_rate_per_depth).sum(axis=1)))))
     except Exception as error:
         result.update(status="raised", error=repr(error), cause=repr(error.__cause__))
         chain = error
@@ -55,7 +55,7 @@ def case(name, source, ramp=False, n=8):
             while trace is not None:
                 frame = trace.tb_frame
                 local = frame.f_locals
-                if frame.f_code.co_name == "solve_transient_heat" and "current" in local:
+                if frame.f_code.co_name == "solve_transient_heat_outward" and "current" in local:   # the solver body
                     current = np.array(local["current"], copy=True)
                     result["failure_step"] = int(local["index"])
                     for key in ("balance", "balance_scale", "scale"):

@@ -25,10 +25,10 @@ def mesh_of(x, cells):
 
 def solve(x, cells, times, initial, bc=None, source=0.0, **options):
     return engine.solve_transient_heat(
-        mesh_of(x, cells), conductivity=options.pop("conductivity", K_SI),
+        mesh_of(x, cells), thermal_conductivity=options.pop("thermal_conductivity", K_SI),
         volumetric_heat_capacity=options.pop("volumetric_heat_capacity", C_SI),
-        time_s=times, initial_temperature_k=initial,
-        dirichlet={} if bc is None else bc, heat_source=source, **options)
+        time=times, initial_temperature=initial,
+        prescribed_temperature={} if bc is None else bc, heat_source_density=source, **options)
 
 
 def affine_bc(x, fixed, start=0.0, shift=0.0):
@@ -63,31 +63,31 @@ def components(cells, count):
 
 def audit(result, element, source, check_load=True):
     """Truth uses only copied geometry, original polynomial tensors and fields."""
-    ts, states = result.time_s, result.temperature_k
-    fixed = np.asarray(result.dirichlet_node_ids)
+    ts, states = result.time, result.temperature
+    fixed = np.asarray(result.prescribed_node_ids)
     free = np.setdiff1d(np.arange(len(element.xy)), fixed)
     for j, (t, state) in enumerate(zip(ts, states)):
-        require_close(result.heat_flux_w_m2[j], element.flux(state),
+        require_close(result.heat_flux[j], element.flux(state),
                       max(1.0, element.k*max(np.ptp(state), 1.0)), "flux")
-        require_close(np.asarray(result.heat_content_j_per_m[j]),
+        require_close(np.asarray(result.stored_heat_per_depth[j]),
                       np.asarray(np.sum(element.mass(state))),
                       max(1.0, element.c*np.sum(element.area)*max(np.max(np.abs(state)), 1)),
                       "H linear content")
-        require_close(np.asarray(result.quadratic_functional_jk_per_m[j]),
+        require_close(np.asarray(result.thermal_energy_functional_per_depth[j]),
                       np.asarray(state@element.mass(state)/2),
                       max(1.0, abs(state@element.mass(state)/2)), "V quadratic")
         if check_load:
             expected = element.load(source, t, 8)
-            require_close(result.source_load_w_per_m[j], expected,
+            require_close(result.generated_heat_rate_per_depth[j], expected,
                           max(1, np.sum(np.abs(expected))), "independent source load")
     for j, dt in enumerate(np.diff(ts)):
-        load = element.load(source, ts[j+1], 8) if check_load else result.source_load_w_per_m[j+1]
+        load = element.load(source, ts[j+1], 8) if check_load else result.generated_heat_rate_per_depth[j+1]
         d = element.diagnostics(states[j], states[j+1], load, dt, fixed)
         scale = max(1.0, np.sum(np.abs(load))+np.sum(np.abs(d["storage"]))
                     +np.sum(np.abs(d["reaction"])))
-        require_close(result.storage_rate_w_per_m[j], d["storage"], scale, "storage")
-        require_close(result.residual_w_per_m[j], d["residual"], scale, "original residual")
-        require_close(result.reaction_w_per_m[j], d["reaction"], scale, "reaction")
+        require_close(result.heat_storage_rate_per_depth[j], d["storage"], scale, "storage")
+        require_close(result.residual_heat_rate_per_depth[j], d["residual"], scale, "original residual")
+        require_close(result.reaction_heat_rate_per_depth[j], d["reaction"], scale, "reaction")
         require_close(d["residual"][free], np.zeros(len(free)), scale, "free residual")
         require_close(np.asarray(d["heat_balance"]), np.asarray(0.0), scale, "heat balance")
         for ids in components(element.cells, len(element.xy)):
@@ -111,7 +111,7 @@ def step_error(case, action, index, time, cause_type=None):
         action()
     error = caught.exception
     case.assertEqual(error.time_index, index)
-    case.assertEqual(error.time_s, float(time))
+    case.assertEqual(error.time, float(time))
     case.assertIsNotNone(error.__cause__)
     if cause_type is not None:
         case.assertIsInstance(error.__cause__, cause_type)
@@ -131,14 +131,14 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
                 with self.subTest(disconnected=separate, source=q):
                     r = solve(x, cells, times, initial, source=q)
                     exact = initial[None, :]+q*times[:, None]/C_SI
-                    require_close(r.temperature_k, exact, max(1, abs(q)/C_SI), "uniform")
-                    require_close(r.heat_flux_w_m2, np.zeros_like(r.heat_flux_w_m2),
+                    require_close(r.temperature, exact, max(1, abs(q)/C_SI), "uniform")
+                    require_close(r.heat_flux, np.zeros_like(r.heat_flux),
                                   2.5, "uniform zero flux")
                     audit(r, element, constant_source(q))
-                    self.assertEqual(r.dirichlet_temperatures_k.shape, (len(times), 0))
-                    self.assertEqual(r.reaction_w_per_m.shape, (len(times)-1, len(x)))
+                    self.assertEqual(r.prescribed_temperature.shape, (len(times), 0))
+                    self.assertEqual(r.reaction_heat_rate_per_depth.shape, (len(times)-1, len(x)))
                     if q < 0:
-                        self.assertLess(float(np.min(r.temperature_k)), 0)
+                        self.assertLess(float(np.min(r.temperature)), 0)
 
     def test_moving_affine_n8_irregular_time_and_nonzero_start(self):
         x, cells, fixed = square(8)
@@ -147,7 +147,7 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
             initial = moving_affine(x, 0)
             r = solve(x, cells, ts, initial, affine_bc(x, fixed, start), 3*C_SI)
             expected = np.array([moving_affine(x, t-start) for t in ts])
-            require_close(r.temperature_k, expected, 5.0, "moving affine")
+            require_close(r.temperature, expected, 5.0, "moving affine")
             audit(r, Elements(x, cells), constant_source(3*C_SI))
 
     def test_actual_initial_mismatch_old_fixed_mass_R2(self):
@@ -159,12 +159,12 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
         ts = np.array([0.0, 1e-12])
         bc = {int(i): 0.0 for i in fixed}
         r = solve(x, cells, ts, initial, bc)
-        self.assertTrue(np.array_equal(r.temperature_k[0], initial))
-        self.assertEqual(r.dirichlet_temperatures_k[0, 1], 0)
+        self.assertTrue(np.array_equal(r.temperature[0], initial))
+        self.assertEqual(r.prescribed_temperature[0, 1], 0)
         load = [np.zeros(len(x)), np.zeros(len(x))]
         expected = small_be(m, k, ts, initial, fixed, lambda t: np.zeros(len(fixed)), load)
         exact_storage = e.mass((expected[1]-initial)/ts[1])
-        require_close(r.storage_rate_w_per_m[0], exact_storage, 1.0, "R2 actual old M_FC")
+        require_close(r.heat_storage_rate_per_depth[0], exact_storage, 1.0, "R2 actual old M_FC")
         self.assertGreater(float(np.max(np.abs(exact_storage))), 1e-6)
         audit(r, e, constant_source(0))
         invalid = initial.copy()
@@ -180,10 +180,10 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
         source = lambda p, t: np.full(len(p), q[float(t)])
         r = solve(x, cells, times, np.full(len(x), 300.0), source=source)
         exact = 300+2*times+7*times**2
-        require_close(r.temperature_k, np.repeat(exact[:, None], len(x), axis=1),
+        require_close(r.temperature, np.repeat(exact[:, None], len(x), axis=1),
                       9.0, "discrete endpoint R6")
         audit(r, Elements(x, cells), source)
-        self.assertGreater(float(np.sum(r.source_load_w_per_m[0])), 0)
+        self.assertGreater(float(np.sum(r.generated_heat_rate_per_depth[0])), 0)
 
     def test_shift_SI_frame_and_node_cell_order(self):
         x, cells, fixed = square(3)
@@ -191,28 +191,28 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
         initial = moving_affine(x, 0)
         original = solve(x, cells, times, initial, affine_bc(x, fixed), 3*C_SI)
         shifted = solve(x, cells, times, initial+17, affine_bc(x, fixed, shift=17), 3*C_SI)
-        for field in ("heat_flux_w_m2", "storage_rate_w_per_m", "reaction_w_per_m"):
+        for field in ("heat_flux", "heat_storage_rate_per_depth", "reaction_heat_rate_per_depth"):
             require_close(getattr(shifted, field), getattr(original, field), 20.0, "shift "+field)
-        require_close(shifted.heat_content_j_per_m-original.heat_content_j_per_m,
+        require_close(shifted.stored_heat_per_depth-original.stored_heat_per_depth,
                       np.full(len(times), 17*C_SI), 17*C_SI, "H shift")
         xm = (x*1000)*1e-3
         si = solve(xm, cells, times, initial, affine_bc(xm, fixed), 3*C_SI)
-        require_close(si.temperature_k, original.temperature_k, 5, "explicit SI", limit=1e-9)
+        require_close(si.temperature, original.temperature, 5, "explicit SI", limit=1e-9)
         angle = .41
         rotation = np.array([[math.cos(angle), -math.sin(angle)],
                              [math.sin(angle), math.cos(angle)]])
         moved = x@rotation.T+np.array([3.0, -2.0])
         bc = {int(i): (lambda t, ii=int(i): float(initial[ii]+3*t)) for i in fixed}
         frame = solve(moved, cells, times, initial, bc, 3*C_SI)
-        require_close(frame.temperature_k, original.temperature_k, 5.0, "frame T")
-        require_close(frame.heat_flux_w_m2, original.heat_flux_w_m2@rotation.T, 12.5, "frame q")
+        require_close(frame.temperature, original.temperature, 5.0, "frame T")
+        require_close(frame.heat_flux, original.heat_flux@rotation.T, 12.5, "frame q")
         permutation = np.arange(len(x))[::-1]
         inverse = np.argsort(permutation)
         reordered_cells = inverse[cells[::-1]][:, [1, 2, 0]]
         rb = {int(inverse[i]): v for i, v in bc.items()}
         rr = solve(x[permutation], reordered_cells, times, initial[permutation], rb, 3*C_SI)
-        require_close(rr.temperature_k[:, inverse], original.temperature_k, 5.0, "node order")
-        require_close(rr.heat_flux_w_m2[:, ::-1], original.heat_flux_w_m2, 12.5, "cell order")
+        require_close(rr.temperature[:, inverse], original.temperature, 5.0, "node order")
+        require_close(rr.heat_flux[:, ::-1], original.heat_flux, 12.5, "cell order")
 
     def test_n8_temporal_eigenmode_fixed_gates(self):
         e, m, k, fixed, lam, phi = mode_truth(8)
@@ -222,8 +222,8 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
             r = solve(e.xy, e.cells, ts, 300+phi, {int(i): 300.0 for i in fixed})
             product = np.r_[1.0, np.cumprod(1/(1+lam*np.diff(ts)))]
             expected = 300+product[:, None]*phi
-            require_close(r.temperature_k, expected, 1.0, "n8 BE product")
-            delta = r.temperature_k[-1]-300-math.exp(-1)*phi
+            require_close(r.temperature, expected, 1.0, "n8 BE product")
+            delta = r.temperature[-1]-300-math.exp(-1)*phi
             errors.append(math.sqrt(float(delta@m@delta)))
             audit(r, e, constant_source(0))
         rate = orders(errors)
@@ -232,7 +232,7 @@ class TestTransientHeatIndependentCore(unittest.TestCase):
         ts = np.array([0, .03, .1, .4, 1.0])/lam
         r = solve(e.xy, e.cells, ts, 300+phi, {int(i): 300.0 for i in fixed})
         product = np.r_[1.0, np.cumprod(1/(1+lam*np.diff(ts)))]
-        require_close(r.temperature_k, 300+product[:, None]*phi, 1, "irregular dt mode")
+        require_close(r.temperature, 300+product[:, None]*phi, 1, "irregular dt mode")
 
 
 class TestTransientHeatIndependentPDE(unittest.TestCase):
@@ -248,23 +248,23 @@ class TestTransientHeatIndependentPDE(unittest.TestCase):
             row8, row10 = [], []
             for time in (.25, .5, 1.0):
                 index = int(round(time*256))
-                row8.append(e.errors(r.temperature_k[index], time, 8))
-                row10.append(e.errors(r.temperature_k[index], time, 10))
+                row8.append(e.errors(r.temperature[index], time, 8))
+                row10.append(e.errors(r.temperature[index], time, 10))
                 # Independently audit nonzero source on observation steps.
                 sub = SimpleNamespace(**{name: getattr(r, name)[index-1:index+1]
-                                         for name in ("time_s", "temperature_k", "heat_flux_w_m2",
-                                                      "source_load_w_per_m", "heat_content_j_per_m",
-                                                      "quadratic_functional_jk_per_m")})
-                for name in ("storage_rate_w_per_m", "residual_w_per_m", "reaction_w_per_m"):
+                                         for name in ("time", "temperature", "heat_flux",
+                                                      "generated_heat_rate_per_depth", "stored_heat_per_depth",
+                                                      "thermal_energy_functional_per_depth")})
+                for name in ("heat_storage_rate_per_depth", "residual_heat_rate_per_depth", "reaction_heat_rate_per_depth"):
                     setattr(sub, name, getattr(r, name)[index-1:index])
-                sub.dirichlet_node_ids = r.dirichlet_node_ids
+                sub.prescribed_node_ids = r.prescribed_node_ids
                 audit(sub, e, sine_source)
             primary.append(row8)
             quad10.append(row10)
             if n == 64:
                 half = solve(x, cells, np.arange(513)/512, initial,
                              {int(i): 300.0 for i in fixed}, sine_source)
-                companion = [e.errors(half.temperature_k[int(round(t*512))], t, 8)
+                companion = [e.errors(half.temperature[int(round(t*512))], t, 8)
                              for t in (.25, .5, 1.0)]
         print(json.dumps(dict(gate="independent_PDE", primary=primary,
                               quadrature10=quad10, companion=companion)))
@@ -289,15 +289,15 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
         def source(p, t):
             calls[t] = calls.get(t, 0)+len(p)
             return np.full(len(p), 3*C_SI)
-        r = engine.solve_transient_heat(mesh, conductivity=K_SI,
-            volumetric_heat_capacity=C_SI, time_s=ts, initial_temperature_k=initial,
-            dirichlet=conditions, heat_source=source)
-        shapes = dict(time_s=(3,), temperature_k=(3, len(x)),
-            heat_flux_w_m2=(3, len(cells), 2), source_load_w_per_m=(3, len(x)),
-            reaction_w_per_m=(2, len(x)), residual_w_per_m=(2, len(x)),
-            storage_rate_w_per_m=(2, len(x)), heat_content_j_per_m=(3,),
-            quadratic_functional_jk_per_m=(3,), dirichlet_node_ids=(len(fixed),),
-            dirichlet_temperatures_k=(3, len(fixed)), nodes_m=x.shape, triangles=cells.shape)
+        r = engine.solve_transient_heat(mesh, thermal_conductivity=K_SI,
+            volumetric_heat_capacity=C_SI, time=ts, initial_temperature=initial,
+            prescribed_temperature=conditions, heat_source_density=source)
+        shapes = dict(time=(3,), temperature=(3, len(x)),
+            heat_flux=(3, len(cells), 2), generated_heat_rate_per_depth=(3, len(x)),
+            reaction_heat_rate_per_depth=(2, len(x)), residual_heat_rate_per_depth=(2, len(x)),
+            heat_storage_rate_per_depth=(2, len(x)), stored_heat_per_depth=(3,),
+            thermal_energy_functional_per_depth=(3,), prescribed_node_ids=(len(fixed),),
+            prescribed_temperature=(3, len(fixed)), node_coordinates=x.shape, triangles=cells.shape)
         saved = {}
         for name, shape in shapes.items():
             value = getattr(r, name)
@@ -313,8 +313,8 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
         self.assertEqual(set(calls), set(ts))
         self.assertEqual(len(set(calls.values())), 1)
         self.assertEqual(boundary_calls, {(int(i), float(t)): 1 for i in fixed for t in ts})
-        self.assertEqual(r.conductivity_w_mk, K_SI)
-        self.assertEqual(r.volumetric_heat_capacity_j_m3k, C_SI)
+        self.assertEqual(r.thermal_conductivity, K_SI)
+        self.assertEqual(r.volumetric_heat_capacity, C_SI)
         mesh.nodes[:] += 100
         mesh.triangles[:] = 0
         ts[:] += 20
@@ -322,7 +322,7 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
         for name, old in saved.items():
             self.assertTrue(np.array_equal(getattr(r, name), old))
         with self.assertRaises(dataclasses.FrozenInstanceError):
-            r.time_s = np.array([4.0])
+            r.time = np.array([4.0])
 
     def test_sampling_geometry_capture_and_no_partial_failure(self):
         x, cells, fixed = square(3)
@@ -338,9 +338,9 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
                 raise Sentinel("independent stage failure")
             return np.zeros(len(p))
         error = step_error(self, lambda: engine.solve_transient_heat(
-            mesh, conductivity=K_SI, volumetric_heat_capacity=C_SI,
-            time_s=ts, initial_temperature_k=initial, dirichlet={},
-            heat_source=source), 2, .3, Sentinel)
+            mesh, thermal_conductivity=K_SI, volumetric_heat_capacity=C_SI,
+            time=ts, initial_temperature=initial, prescribed_temperature={},
+            heat_source_density=source), 2, .3, Sentinel)
         self.assertIn("index 2", str(error))
         self.assertEqual(set(seen), {0.0, .1, .3})
         self.assertTrue(np.array_equal(initial, np.full(len(x), 300.0)))
@@ -352,48 +352,48 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
                 initial[:] = -10
                 ts[:] = 99
             return np.zeros(len(p))
-        r = engine.solve_transient_heat(mesh_of(x, cells), conductivity=K_SI,
-            volumetric_heat_capacity=C_SI, time_s=np.array([0.0, .1, .3]),
-            initial_temperature_k=np.full(len(x), 300.0), dirichlet={},
-            heat_source=lambda p, t: np.zeros(len(p)))
-        require_close(r.temperature_k, np.full((3, len(x)), 300.0), 1, "captured baseline")
+        r = engine.solve_transient_heat(mesh_of(x, cells), thermal_conductivity=K_SI,
+            volumetric_heat_capacity=C_SI, time=np.array([0.0, .1, .3]),
+            initial_temperature=np.full(len(x), 300.0), prescribed_temperature={},
+            heat_source_density=lambda p, t: np.zeros(len(p)))
+        require_close(r.temperature, np.full((3, len(x)), 300.0), 1, "captured baseline")
         # Actual caller objects used by the second solve, captured before callback.
         mesh = mesh_of(x, cells)
         ts = np.array([0.0, .1, .3])
         initial = np.full(len(x), 300.0)
-        r = engine.solve_transient_heat(mesh, conductivity=K_SI,
-            volumetric_heat_capacity=C_SI, time_s=ts, initial_temperature_k=initial,
-            dirichlet={}, heat_source=mutate)
-        self.assertTrue(np.array_equal(r.nodes_m, x))
-        self.assertTrue(np.array_equal(r.time_s, [0.0, .1, .3]))
-        require_close(r.temperature_k, np.full((3, len(x)), 300.0), 1, "captured before callbacks")
+        r = engine.solve_transient_heat(mesh, thermal_conductivity=K_SI,
+            volumetric_heat_capacity=C_SI, time=ts, initial_temperature=initial,
+            prescribed_temperature={}, heat_source_density=mutate)
+        self.assertTrue(np.array_equal(r.node_coordinates, x))
+        self.assertTrue(np.array_equal(r.time, [0.0, .1, .3]))
+        require_close(r.temperature, np.full((3, len(x)), 300.0), 1, "captured before callbacks")
 
     def test_finite_negative_K_and_initial_rate_alignment(self):
         x, cells, fixed = square(3)
         r = solve(x, cells, [0, .1], np.full(len(x), -5.0),
                   {int(i): -5.0 for i in fixed})
-        require_close(r.temperature_k, np.full((2, len(x)), -5), 1, "negative mathematical K")
-        self.assertEqual(r.reaction_w_per_m.shape, (1, len(x)))
-        self.assertEqual(r.source_load_w_per_m.shape, (2, len(x)))
+        require_close(r.temperature, np.full((2, len(x)), -5), 1, "negative mathematical K")
+        self.assertEqual(r.reaction_heat_rate_per_depth.shape, (1, len(x)))
+        self.assertEqual(r.generated_heat_rate_per_depth.shape, (2, len(x)))
 
     def test_invalid_inputs_R5_and_used_node_boundary(self):
         x, cells, fixed = square(3)
-        base = dict(conductivity=K_SI, volumetric_heat_capacity=C_SI,
-                    time_s=[0, .1], initial_temperature_k=np.zeros(len(x)), dirichlet={})
+        base = dict(thermal_conductivity=K_SI, volumetric_heat_capacity=C_SI,
+                    time=[0, .1], initial_temperature=np.zeros(len(x)), prescribed_temperature={})
         changes = [
-            ("conductivity", True), ("conductivity", 0), ("conductivity", -1),
-            ("conductivity", complex(2, 0)), ("conductivity", np.inf),
+            ("thermal_conductivity", True), ("thermal_conductivity", 0), ("thermal_conductivity", -1),
+            ("thermal_conductivity", complex(2, 0)), ("thermal_conductivity", np.inf),
             ("volumetric_heat_capacity", False), ("volumetric_heat_capacity", 0),
-            ("time_s", [0, True]), ("time_s", [0, 0]), ("time_s", [.1, 0]),
-            ("time_s", [-1, 0]), ("time_s", [0, np.nan]), ("time_s", [[0, .1]]),
-            ("time_s", [0]), ("initial_temperature_k", [0]*(len(x)-1)),
-            ("initial_temperature_k", [True]+[0]*(len(x)-1)),
-            ("initial_temperature_k", np.full(len(x), np.inf)),
-            ("initial_temperature_k", np.zeros(len(x), dtype=complex)),
-            ("dirichlet", {True: 0}), ("dirichlet", {1.5: 0}),
-            ("dirichlet", {len(x): 0}), ("dirichlet", {-1: 0}), ("dirichlet", []),   # an interior node is valid since 2026-11-08
-            ("heat_source", True), ("heat_source", complex(1, 0)),
-            ("heat_source", np.nan)]
+            ("time", [0, True]), ("time", [0, 0]), ("time", [.1, 0]),
+            ("time", [-1, 0]), ("time", [0, np.nan]), ("time", [[0, .1]]),
+            ("time", [0]), ("initial_temperature", [0]*(len(x)-1)),
+            ("initial_temperature", [True]+[0]*(len(x)-1)),
+            ("initial_temperature", np.full(len(x), np.inf)),
+            ("initial_temperature", np.zeros(len(x), dtype=complex)),
+            ("prescribed_temperature", {True: 0}), ("prescribed_temperature", {1.5: 0}),
+            ("prescribed_temperature", {len(x): 0}), ("prescribed_temperature", {-1: 0}), ("prescribed_temperature", []),   # an interior node is valid since 2026-11-08
+            ("heat_source_density", True), ("heat_source_density", complex(1, 0)),
+            ("heat_source_density", np.nan)]
         for key, value in changes:
             with self.subTest(key=key, value=repr(value)):
                 kw = dict(base)
@@ -402,7 +402,7 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
                     engine.solve_transient_heat(mesh_of(x, cells), **kw)
         mesh = mesh_of(x, cells)
         mesh.nodes = np.vstack((mesh.nodes, [4.0, 4.0]))
-        kw = dict(base, initial_temperature_k=np.zeros(len(x)+1))
+        kw = dict(base, initial_temperature=np.zeros(len(x)+1))
         with self.assertRaises(ValueError):
             engine.solve_transient_heat(mesh, **kw)
         mesh = mesh_of(x, cells)
@@ -440,15 +440,15 @@ class TestTransientHeatIndependentContract(unittest.TestCase):
     def test_derived_overflow_is_rejected_not_partial_history_R5(self):
         x, cells, _ = square(3)
         for kwargs in (
-            dict(time_s=[0.0, np.nextafter(0.0, 1.0)]),
-            dict(conductivity=np.finfo(float).max),
-            dict(initial_temperature_k=np.full(len(x), 1e200)),
-            dict(heat_source=np.finfo(float).max),
+            dict(time=[0.0, np.nextafter(0.0, 1.0)]),
+            dict(thermal_conductivity=np.finfo(float).max),
+            dict(initial_temperature=np.full(len(x), 1e200)),
+            dict(heat_source_density=np.finfo(float).max),
         ):
             with self.subTest(kwargs=list(kwargs)):
-                base = dict(conductivity=K_SI, volumetric_heat_capacity=C_SI,
-                            time_s=[0, 10.0], initial_temperature_k=np.zeros(len(x)),
-                            dirichlet={})
+                base = dict(thermal_conductivity=K_SI, volumetric_heat_capacity=C_SI,
+                            time=[0, 10.0], initial_temperature=np.zeros(len(x)),
+                            prescribed_temperature={})
                 base.update(kwargs)
                 with self.assertRaises(ValueError):
                     engine.solve_transient_heat(mesh_of(x, cells), **base)
@@ -471,7 +471,7 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
             r = solve(e.xy, e.cells, ts, 300+phi, {int(i): 300.0 for i in fixed})
         product = np.r_[1.0, np.cumprod(1/(1+lam*np.diff(ts)))]
         with self.assertRaisesRegex(AssertionError, "wrong mass"):
-            require_close(r.temperature_k, 300+product[:, None]*phi, 1, "wrong mass")
+            require_close(r.temperature, 300+product[:, None]*phi, 1, "wrong mass")
 
     def test_real_solve_wrong_endpoint_inputs_R6(self):
         x, cells, _ = square(3)
@@ -490,7 +490,7 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
             r = solve(x, cells, times, np.full(len(x), 300.0),
                       source=lambda p, t: np.full(len(p), lookup[t]))
             with self.assertRaisesRegex(AssertionError, "wrong endpoint"):
-                require_close(r.temperature_k, expected, 9.0, "wrong endpoint "+variant)
+                require_close(r.temperature, expected, 9.0, "wrong endpoint "+variant)
 
     def test_real_result_wrong_storage_sign_HV_and_projection(self):
         x, cells, fixed = square(3)
@@ -498,11 +498,11 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
         r = solve(x, cells, ts, moving_affine(x, 0), affine_bc(x, fixed), 3*C_SI)
         fields = {f.name: getattr(r, f.name) for f in dataclasses.fields(r)}
         mutations = [
-            ("storage_rate_w_per_m", np.zeros_like(r.storage_rate_w_per_m), "storage"),
-            ("residual_w_per_m", np.array([Elements(x, cells).stiffness(t)-f
-             for t, f in zip(r.temperature_k[1:], r.source_load_w_per_m[1:])]), "original residual"),
-            ("reaction_w_per_m", -r.reaction_w_per_m, "reaction"),
-            ("heat_content_j_per_m", r.quadratic_functional_jk_per_m, "H linear"),
+            ("heat_storage_rate_per_depth", np.zeros_like(r.heat_storage_rate_per_depth), "storage"),
+            ("residual_heat_rate_per_depth", np.array([Elements(x, cells).stiffness(t)-f
+             for t, f in zip(r.temperature[1:], r.generated_heat_rate_per_depth[1:])]), "original residual"),
+            ("reaction_heat_rate_per_depth", -r.reaction_heat_rate_per_depth, "reaction"),
+            ("stored_heat_per_depth", r.thermal_energy_functional_per_depth, "H linear"),
         ]
         for name, value, witness in mutations:
             fake = SimpleNamespace(**dict(fields, **{name: value}))
@@ -522,7 +522,7 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
         projected[fixed] = 0
         bad = solve(x, cells, time, projected, {int(i): 0.0 for i in fixed})
         with self.assertRaisesRegex(AssertionError, "R2 projection"):
-            require_close(bad.storage_rate_w_per_m[0], expected_storage,
+            require_close(bad.heat_storage_rate_per_depth[0], expected_storage,
                           1.0, "R2 projection")
         # Omitted-old/new/both FC matrix actors are independent wrong alternatives,
         # not runtime injections; preserve this distinction in reports.
@@ -533,7 +533,7 @@ class TestTransientHeatIndependentWrongRuntime(unittest.TestCase):
             wrong = small_be(m, k, ts, moving_affine(x, 0), fixed,
                              lambda t: moving_affine(x[fixed], t), loads, variant)
             with self.assertRaisesRegex(AssertionError, "wrong MFC"):
-                require_close(wrong, r.temperature_k, 5.0, "wrong MFC "+variant)
+                require_close(wrong, r.temperature, 5.0, "wrong MFC "+variant)
 
     def test_runtime_omitted_MFC_actors_fail_original_system(self):
         x, cells, fixed = square(3)

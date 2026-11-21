@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 
 from waveguide_modes import solve_nedelec, exact_cutoffs, A_WG, B_WG
-from galerkin import eval_edge_field
+from galerkin.kernels import eval_edge_field
 
 INK = "#1a1f2e"; MUTED = "#6b7280"
 BLUE = "#2563eb"; ORANGE = "#d97706"; GRAY_REF = "#9ca3af"

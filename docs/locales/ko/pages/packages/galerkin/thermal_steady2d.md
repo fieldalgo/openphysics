@@ -25,18 +25,18 @@ from galerkin.thermal import solve_steady_heat
 
 result = solve_steady_heat(
     mesh,
-    conductivity=12.0,
-    dirichlet={0: 350.0, 1: 300.0},  # Example node IDs; select actual boundary nodes.
-    heat_source=0.0,
+    thermal_conductivity=12.0,
+    prescribed_temperature={0: 350.0, 1: 300.0},  # Example node IDs; select actual boundary nodes.
+    heat_source_density=0.0,
 )
 ```
 
 | 입력 | 계약/단위 |
 | --- | --- |
 | mesh | `galerkin.mesh.Mesh`, 기준 좌표 `(N,2)` m, 정수 삼각형 `(M,3)` |
-| conductivity | 필수 유한 실수 스칼라 k>0, W/(m K), 또는 `mesh.region_names` 위 구간 상수 `{영역 이름: k}`([multimaterial](multimaterial.md)). tensor·영역 안에서 변하는 k 없음 |
-| dirichlet | 정수 절점 ID(외부나 내부)→유한 스칼라 온도 K 매핑 |
-| heat_source | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백 또는 메시 사본에 결합한 요소별 `(M,)` W/m^3의 `ElementHeatSource(mesh, values)`. 기본값 0 |
+| thermal_conductivity | 필수 유한 실수 스칼라 k>0, W/(m K), 또는 `mesh.region_names` 위 구간 상수 `{영역 이름: k}`([multimaterial](multimaterial.md)). tensor·영역 안에서 변하는 k 없음 |
+| prescribed_temperature | 정수 절점 ID(외부나 내부)→유한 스칼라 온도 K 매핑 |
+| heat_source_density | 유한 실수 스칼라 Q, `{영역 이름: Q}` 또는 `(Qpoints,2)` m 좌표→정확히 `(Qpoints,)` W/m^3 콜백 또는 메시 사본에 결합한 요소별 `(M,)` W/m^3의 `ElementHeatSource(mesh, values)`. 기본값 `None`(열원 없음) |
 
 기본 단열 경계에서는 연결 성분마다 적어도 하나의 처방 온도가 필요하며, 선택적 Robin
 확장도 성분을 고정할 수 있습니다. 절점을 몰래 pin하지 않고 spring이나 최소제곱
@@ -44,7 +44,7 @@ result = solve_steady_heat(
 절점 번호로 검증합니다. 내부 절점도 고정할 수 있으며(내부 표면의 처방 온도) 그 reaction은 그
 표면이 주입하는 열로, 열수지 항등식이 다른 온도 조절점처럼 셉니다(2026-11-08; 전기·Joule·3D
 솔버는 외부 규칙 유지). 선택하지 않은 자연 edge는 단열입니다. 경계 절점 tag로 Dirichlet 매핑을 만들 수 있습니다. 선택적
-처방 외향 flux·Robin edge-tag 입력, 추가 결과 필드와 바뀐 열수지 방정식은 소스 트리의
+처방 내향 열유속(`inward_heat_flux`)·대류 edge-tag 입력, 추가 결과 필드와 바뀐 열수지 방정식은 소스 트리의
 `docs/packages/galerkin/thermal_flux_robin.md`를 보십시오. 해당 가이드·예제는 배포본에
 포함되지 않습니다. 한국어 설명은 [flux·Robin 가이드](thermal_flux_robin.md)에 있습니다.
 아래 방정식은 그 입력들을 생략한 기본 경우를 설명합니다.
@@ -54,17 +54,20 @@ result = solve_steady_heat(
 비선형성 또는 계산 온도의 양성을 강제하지 않습니다. 물리적으로 의미 있는 SI 데이터를
 제공해야 합니다.
 
-`SteadyHeatResult`는 다음을 포함합니다.
+Cartesian 풀이는 `PlanarSteadyHeatResult`를 돌려줍니다([축대칭](thermal_axisymmetric.md)
+풀이는 `AxisymmetricSteadyHeatResult`, 둘 다 `SteadyHeatResult`). 필드는 registry 이름이고
+`.units`가 각 필드의 SI 단위를 줍니다.
 
 | 필드 | shape | 단위/위치 |
 | --- | --- | --- |
 | temperature | `(N,)` | mesh 절점 K |
 | heat_flux | `(M,2)` | 각 P1 삼각형에서 일정한 벡터, W/m^2 |
-| load | `(N,)` | 면외 두께당 W/m, 적분 체적 열원 |
-| reaction | `(N,)` | 두께당 W/m, 고정 절점의 경계 열 입력. 자유 절점에서 정확히 0 |
-| residual | `(N,)` | 두께당 W/m, 모든 절점의 K*T-load |
+| generated_heat_rate_per_depth | `(N,)` | 면외 두께당 W/m, 적분 체적 열원(load) |
+| reaction_heat_rate_per_depth | `(N,)` | 두께당 W/m, 고정 절점의 경계 열 입력. 자유 절점에서 정확히 0 |
+| residual_heat_rate_per_depth | `(N,)` | 두께당 W/m, 모든 절점의 K*T-load |
 
-2D 약형은 **면외 단위 두께당**입니다. `load`와 `reaction`은 총 W가 아닙니다.
+2D 약형은 **면외 단위 두께당**이고 `_per_depth` 이름이 이를 말합니다. 생성·reaction 열률은
+총 W가 아닙니다(평면 결과에 `generated_heat_rate`를 물으면 그 이유를 말하는 `AttributeError`).
 총량이 필요하면 명시적 외부 계산에서 실제 두께(m)를 곱합니다. 암묵적인 두께 인자나
 스케일링은 없습니다.
 

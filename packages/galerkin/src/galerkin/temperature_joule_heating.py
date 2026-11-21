@@ -10,11 +10,12 @@ docs/packages/galerkin/temperature_joule_heating.md for the contract.
 import copy
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 
-from .electric import ElementConductivity, solve_steady_electric
-from .joule_heating import solve_steady_joule_heat, SteadyJouleHeatResult
+from .electric import ElementConductivity, solve_steady_electric_outward
+from .joule_heating import solve_steady_joule_heat_outward, SteadyJouleHeatResult
 from .materials import region_index, region_property
 from .core import forms, kernels
 from .core import solve as core_solve
@@ -23,7 +24,12 @@ from .core.boundary import scalar_boundary_samples
 from .core.checks import finite_scalar, one_of, readonly_copy, real_array, refuse_live
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
-from .thermal import scalar_boundary_system
+from ._heat_kernels import scalar_boundary_system as _scalar_boundary_system
+from ._public import ResultSurface, outward_from_inward, refuse_text
+
+# Public names. Internal: solve_temperature_joule_heat_outward, the outward-form body (outside __all__).
+__all__ = ["METHODS", "ConductivityModel", "JouleIteration", "TemperatureJouleHeatResult",
+           "JouleConvergenceError", "solve_temperature_joule_heat"]
 
 METHODS = ("picard", "newton")
 # Difference step for dsigma/dT, relative to max(1 K, |T|): eps**(1/3), about
@@ -64,33 +70,73 @@ class ConductivityModel:
 
 
 @dataclass(frozen=True)
-class JouleIteration:
-    iteration: int
-    temperature_defect: float
-    conductivity_defect: float
+class JouleIteration(ResultSurface):
+    """One iteration of solve_temperature_joule_heat, judged at the temperature T_i it starts from.
+
+    iteration_count is the iteration's number (1-based). temperature_change is the
+    largest |H(T_i) - T_i| (K) and relative_electrical_conductivity_change the
+    largest relative change of sigma between T_i and H(T_i); minimum_temperature and
+    maximum_temperature bound H(T_i). The free-node residuals are the largest
+    nodal ones, maximum_residual_current_per_depth (A/m) and
+    maximum_residual_heat_rate_per_depth (W/m); relative_residual is the nonlinear
+    heat residual at H(T_i), relative to the Joule and thermal boundary loads.
+    current_imbalance_per_depth (A/m) is the net prescribed-node and prescribed
+    current; inward_electric_power_per_depth, joule_power_per_depth and
+    outward_heat_rate_per_depth (W/m) are the supplied, dissipated and outgoing
+    power, and electric_power_imbalance_per_depth and heat_rate_imbalance_per_depth
+    their differences from the dissipated power. Every rate is per metre of depth.
+    """
+    iteration_count: int
+    temperature_change: float
+    relative_electrical_conductivity_change: float
     minimum_temperature: float
     maximum_temperature: float
-    electric_free_residual: float
-    thermal_free_residual: float
-    nonlinear_heat_residual: float
-    current_balance: float
-    supplied_power_per_length: float
-    joule_power_per_length: float
-    outward_heat_per_length: float
-    electric_power_defect: float
-    heat_power_defect: float
+    maximum_residual_current_per_depth: float
+    maximum_residual_heat_rate_per_depth: float
+    relative_residual: float
+    current_imbalance_per_depth: float
+    inward_electric_power_per_depth: float
+    joule_power_per_depth: float
+    outward_heat_rate_per_depth: float
+    electric_power_imbalance_per_depth: float
+    heat_rate_imbalance_per_depth: float
+
+    BASIS = "planar"
+    UNITS = MappingProxyType({
+        "iteration_count": "1", "temperature_change": "K", "relative_electrical_conductivity_change": "1",
+        "minimum_temperature": "K", "maximum_temperature": "K", "maximum_residual_current_per_depth": "A/m",
+        "maximum_residual_heat_rate_per_depth": "W/m", "relative_residual": "1",
+        "current_imbalance_per_depth": "A/m", "inward_electric_power_per_depth": "W/m",
+        "joule_power_per_depth": "W/m", "outward_heat_rate_per_depth": "W/m",
+        "electric_power_imbalance_per_depth": "W/m", "heat_rate_imbalance_per_depth": "W/m"})
 
 
 @dataclass(frozen=True)
-class TemperatureJouleHeatResult:
+class TemperatureJouleHeatResult(ResultSurface):
+    """The converged state of solve_temperature_joule_heat (planar).
+
+    ``coupled`` is the SteadyJouleHeatResult at the returned temperature,
+    evaluation_temperature (N,) K the temperature at which sigma was evaluated for
+    it, and ``history`` the JouleIteration records in order. ``.units`` maps
+    evaluation_temperature to K.
+    """
     coupled: SteadyJouleHeatResult
-    evaluated_temperature: np.ndarray
+    evaluation_temperature: np.ndarray
     history: tuple[JouleIteration, ...]
+
+    BASIS = "planar"
+    UNITS = MappingProxyType({"evaluation_temperature": "K"})
 
 
 class JouleConvergenceError(RuntimeError):
-    """No successful result; completed iterations and failed state are retained."""
-    def __init__(self, reason, history, temperature):
+    """No successful result; completed iterations and failed state are retained.
+
+    ``reason`` is the message, ``history`` the completed JouleIteration records and
+    ``last_temperature`` a read-only copy of the failed state's nodal temperature in K
+    (the keyword ``temperature``).
+    """
+    def __init__(self, reason, history, *, temperature):
+        refuse_text("temperature", temperature)
         super().__init__(reason)
         self.reason = reason
         self.history = tuple(history)
@@ -130,7 +176,7 @@ def _models(mesh, value):
         raise ValueError("electrical_conductivity must be a ConductivityModel or region table")
     regions, names = region_index(mesh)
     if set(value) != set(names) or not all(isinstance(v, ConductivityModel) for v in value.values()):
-        raise ValueError("conductivity models must match mesh region names exactly")
+        raise ValueError("electrical_conductivity models must match mesh region names exactly")
     return [(name, np.flatnonzero(regions == i), value[name]) for i, name in enumerate(names)]
 
 
@@ -227,8 +273,8 @@ class _JointNewton:
         p, t, _, _, count, labels = triangle_geometry(mesh)
         n = mesh.num_nodes
         samples = scalar_boundary_samples(mesh, p, t, thermal_dirichlet, outward_flux, convection)
-        H, G, B, _ = scalar_boundary_system(samples, n, labels, [0.]*count, np.zeros(count, dtype=bool))
-        k = region_property(mesh, thermal_conductivity, "conductivity", positive=True)
+        H, G, B, _ = _scalar_boundary_system(samples, n, labels, [0.]*count, np.zeros(count, dtype=bool))
+        k = region_property(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
         cells = np.asarray(mesh.triangles)
         heat = forms.matrix(cells, cells, kernels.p1_stiffness(mesh, k), (n, n)).to_scipy()+H
         self.mesh, self.n, self.cells = mesh, n, cells
@@ -280,8 +326,8 @@ class _JointNewton:
         Joule load the heat solve used, so R_V vanishes up to that solve and
         R_T is the heat residual of T itself.
         """
-        potential = np.asarray(electrical.potential)
-        residual = np.concatenate([np.asarray(electrical.residual),
+        potential = np.asarray(electrical.electric_potential)
+        residual = np.concatenate([np.asarray(electrical.residual_current_per_depth),
                                    self.heat_operator@temperature-heat_load-self.heat_rhs])
         jacobian = self.jacobian(sigma, dsigma, potential)
         try:
@@ -295,11 +341,66 @@ class _JointNewton:
 
 def solve_temperature_joule_heat(
         mesh, *, electrical_conductivity, thermal_conductivity,
+        prescribed_electric_potential, prescribed_temperature, initial_temperature,
+        temperature_tolerance, inward_current_density=None, reference_electric_potential=None,
+        inward_heat_flux=None, convection=None, relaxation_factor=0.5,
+        relative_tolerance=1e-10, iteration_limit=100, method="picard"):
+    """Coupled solve by relaxed Picard or by Newton, in SI; see temperature_joule_heating.md for the contract.
+
+    electrical_conductivity is a ConductivityModel or {region name: ConductivityModel};
+    thermal_conductivity W/(m K), a scalar or {region name: value};
+    prescribed_electric_potential maps exterior nodes to V and prescribed_temperature
+    to K; initial_temperature is K (a scalar or (N,)); inward_current_density (A/m^2)
+    and inward_heat_flux (W/m^2) are positive into the body, as in
+    galerkin.electric.solve_steady_electric and galerkin.thermal.solve_steady_heat;
+    reference_electric_potential is the gauge of a component without a prescribed
+    potential. temperature_tolerance (K) is required: the absolute part of the
+    temperature test |H(T) - T| <= temperature_tolerance + relative_tolerance *
+    max(|T|, |H(T)|). relaxation_factor in (0, 1] relaxes Picard steps;
+    iteration_limit is the most iterations taken. ``method`` defaults to
+    ``"picard"``; the contract page says when to choose ``"newton"``. Returns a
+    TemperatureJouleHeatResult (rates per metre of depth); failures raise
+    JouleConvergenceError with its history.
+
+    A str for a quantity raises TypeError (SI numbers only), and so does a JAX or
+    PyTorch value (NumPy only, below). The two inward values are negated once, as
+    0.0 - x (a callback's checked float result likewise), and the outward-form
+    solve runs exactly as before; see galerkin._public.
+    """
+    quantities = (("electrical_conductivity", electrical_conductivity),
+                  ("thermal_conductivity", thermal_conductivity),
+                  ("prescribed_electric_potential", prescribed_electric_potential),
+                  ("prescribed_temperature", prescribed_temperature), ("initial_temperature", initial_temperature),
+                  ("temperature_tolerance", temperature_tolerance),
+                  ("inward_current_density", inward_current_density),
+                  ("reference_electric_potential", reference_electric_potential),
+                  ("inward_heat_flux", inward_heat_flux), ("convection", convection),
+                  ("relaxation_factor", relaxation_factor), ("relative_tolerance", relative_tolerance),
+                  ("iteration_limit", iteration_limit))
+    for name, value in quantities:
+        refuse_text(name, value)
+    # NumPy only: refuse a live value under its public name before anything negates it.
+    _refuse_live_inputs(**{name: value for name, value in quantities if name != "electrical_conductivity"})
+    outward_current = outward_from_inward(inward_current_density, "inward_current_density")
+    outward_flux = outward_from_inward(inward_heat_flux, "inward_heat_flux")
+    return solve_temperature_joule_heat_outward(
+        mesh, electrical_conductivity=electrical_conductivity, thermal_conductivity=thermal_conductivity,
+        electric_dirichlet=prescribed_electric_potential, thermal_dirichlet=prescribed_temperature,
+        initial_temperature=initial_temperature, outward_current=outward_current,
+        reference_potential=reference_electric_potential, outward_flux=outward_flux, convection=convection,
+        relaxation=relaxation_factor, temperature_atol=temperature_tolerance,
+        relative_tolerance=relative_tolerance, max_iterations=iteration_limit, method=method)
+
+
+def solve_temperature_joule_heat_outward(
+        mesh, *, electrical_conductivity, thermal_conductivity,
         electric_dirichlet, thermal_dirichlet, initial_temperature,
         outward_current=None, reference_potential=None, outward_flux=None,
         convection=None, relaxation=0.5, temperature_atol=1e-8,
         relative_tolerance=1e-10, max_iterations=100, method="picard"):
-    """Coupled solve by relaxed Picard or by Newton; see temperature_joule_heating.md for the contract.
+    """Coupled solve by relaxed Picard or by Newton (the outward form); see temperature_joule_heating.md.
+
+    The body of solve_temperature_joule_heat before the galerkin step, for galerkin's own callers.
 
     ``method`` defaults to ``"picard"``; the contract page says when to choose ``"newton"``.
 
@@ -315,21 +416,23 @@ def solve_temperature_joule_heat(
     anything is copied or solved; one returned by a callback surfaces as a
     JouleConvergenceError caused by that TypeError.
     """
+    # the public names; the flux and current density are the public layer's negated (outward) values
     _refuse_live_inputs(
-        thermal_conductivity=thermal_conductivity, electric_dirichlet=electric_dirichlet,
-        thermal_dirichlet=thermal_dirichlet, initial_temperature=initial_temperature,
-        outward_current=outward_current, reference_potential=reference_potential,
-        outward_flux=outward_flux, convection=convection, relaxation=relaxation,
-        temperature_atol=temperature_atol, relative_tolerance=relative_tolerance,
-        max_iterations=max_iterations)
+        thermal_conductivity=thermal_conductivity, prescribed_electric_potential=electric_dirichlet,
+        prescribed_temperature=thermal_dirichlet, initial_temperature=initial_temperature,
+        inward_current_density=outward_current, reference_electric_potential=reference_potential,
+        inward_heat_flux=outward_flux, convection=convection, relaxation_factor=relaxation,
+        temperature_tolerance=temperature_atol, relative_tolerance=relative_tolerance,
+        iteration_limit=max_iterations)
     one_of(method, METHODS, "method")
-    relaxation = finite_scalar(relaxation, "relaxation")
-    atol = finite_scalar(temperature_atol, "temperature_atol")
+    relaxation = finite_scalar(relaxation, "relaxation_factor")
+    atol = finite_scalar(temperature_atol, "temperature_tolerance")
     rtol = finite_scalar(relative_tolerance, "relative_tolerance")
     if not 0 < relaxation <= 1 or atol <= 0 or rtol <= 0:
-        raise ValueError("relaxation must be in (0,1]; tolerances must be positive")
+        raise ValueError("relaxation_factor must be in (0,1]; temperature_tolerance and relative_tolerance "
+                         "must be positive")
     if isinstance(max_iterations, (bool, np.bool_)) or not isinstance(max_iterations, (int, np.integer)) or max_iterations < 1:
-        raise ValueError("max_iterations must be a positive integer")
+        raise ValueError("iteration_limit must be a positive integer")
     mesh = copy.deepcopy(mesh)
     _, _, _, boundary, _, _ = triangle_geometry(mesh)
     models = _models(mesh, electrical_conductivity)
@@ -341,7 +444,7 @@ def solve_temperature_joule_heat(
     else:
         raise ValueError("initial_temperature must be scalar or shape (N,) in K")
     if not isinstance(thermal_dirichlet, Mapping):
-        raise ValueError("thermal_dirichlet must map exterior node indices to K")
+        raise ValueError("prescribed_temperature must map exterior node indices to K")
     thermal_dirichlet = dict(thermal_dirichlet)
     electric_dirichlet = copy.deepcopy(electric_dirichlet)
     thermal_conductivity = copy.deepcopy(thermal_conductivity)
@@ -349,12 +452,13 @@ def solve_temperature_joule_heat(
         (outward_current, reference_potential, outward_flux, convection))
     for node, value in thermal_dirichlet.items():
         if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)) or node not in boundary:
-            raise ValueError("thermal Dirichlet nodes must be exterior integer indices")
-        temperature[node] = finite_scalar(value, "thermal Dirichlet temperature")
+            raise ValueError("prescribed_temperature nodes must be exterior integer indices")
+        temperature[node] = finite_scalar(value, "prescribed_temperature value")
     free_t = np.setdiff1d(np.arange(mesh.num_nodes), list(thermal_dirichlet))
     history = []
+    # Each iteration calls the outward-form bodies (rule 6): the public function negated the inward data once.
     def electric(sigma):
-        return solve_steady_electric(mesh, conductivity=ElementConductivity(mesh, sigma),
+        return solve_steady_electric_outward(mesh, conductivity=ElementConductivity(mesh, sigma),
             dirichlet=electric_dirichlet, outward_current=outward_current,
             reference_potential=reference_potential)
 
@@ -368,7 +472,7 @@ def solve_temperature_joule_heat(
         try:
             sigma = _conductivity(mesh, models, temperature)
             electrical = electric(sigma)
-            coupled = solve_steady_joule_heat(mesh, electrical_result=electrical,
+            coupled = solve_steady_joule_heat_outward(mesh, electrical_result=electrical,
                 conductivity=thermal_conductivity, dirichlet=thermal_dirichlet,
                 outward_flux=outward_flux, convection=convection)
             heat = coupled.thermal
@@ -380,26 +484,29 @@ def solve_temperature_joule_heat(
             # Independent electrical refresh measures the nonlinear heat equation
             # at H(T_i), rather than only reporting linear subsolve residuals.
             refreshed = electric(trial_sigma)
-            nonlinear = heat.residual + heat.load - refreshed.joule_load
-            nonlinear_scale = max(_norm(heat.load), _norm(refreshed.joule_load),
-                _norm(heat.reaction), _norm(heat.prescribed_outward_load),
-                _norm(heat.convective_outward), np.finfo(float).tiny)
+            nonlinear = (heat.residual_heat_rate_per_depth + heat.generated_heat_rate_per_depth
+                         - refreshed.generated_heat_rate_per_depth)
+            nonlinear_scale = max(_norm(heat.generated_heat_rate_per_depth),
+                _norm(refreshed.generated_heat_rate_per_depth),
+                _norm(heat.reaction_heat_rate_per_depth), _norm(heat.outward_prescribed_heat_rate_per_depth),
+                _norm(heat.outward_convective_heat_rate_per_depth), np.finfo(float).tiny)
             nonlinear_residual = _norm(nonlinear[free_t])/nonlinear_scale
             free_e = np.setdiff1d(np.arange(mesh.num_nodes), list(electric_dirichlet))
             row = JouleIteration(iteration, defect, sigma_defect,
                 float(trial.min()), float(trial.max()),
-                _norm(electrical.residual[free_e]), _norm(heat.residual[free_t]),
+                _norm(electrical.residual_current_per_depth[free_e]),
+                _norm(heat.residual_heat_rate_per_depth[free_t]),
                 nonlinear_residual,
-                float(np.sum(electrical.reaction-electrical.prescribed_outward_load)),
-                electrical.supplied_power_per_length, coupled.source_power_per_length,
-                coupled.outward_heat_per_length,
-                electrical.supplied_power_per_length-coupled.source_power_per_length,
-                coupled.outward_heat_per_length-coupled.source_power_per_length)
+                float(np.sum(electrical.reaction_current_per_depth-electrical.outward_prescribed_current_per_depth)),
+                electrical.inward_electric_power_per_depth, coupled.generated_heat_rate_per_depth,
+                coupled.outward_heat_rate_per_depth,
+                electrical.inward_electric_power_per_depth-coupled.generated_heat_rate_per_depth,
+                coupled.outward_heat_rate_per_depth-coupled.generated_heat_rate_per_depth)
             converged = (defect <= atol + rtol*max(_norm(temperature), _norm(trial))
                          and sigma_defect <= rtol and nonlinear_residual <= 1e-8)
             return sigma, electrical, coupled, trial, row, converged
         except Exception as exc:
-            raise JouleConvergenceError(str(exc), history, failed_temperature) from exc
+            raise JouleConvergenceError(str(exc), history, temperature=failed_temperature) from exc
 
     if method == "picard":
         for iteration in range(1, max_iterations+1):
@@ -408,23 +515,24 @@ def solve_temperature_joule_heat(
             if converged:
                 return TemperatureJouleHeatResult(coupled, readonly_copy(temperature), tuple(history))
             temperature = (1-relaxation)*temperature + relaxation*trial
-        raise JouleConvergenceError("maximum iterations exceeded", history, temperature)
+        raise JouleConvergenceError("maximum iterations exceeded", history, temperature=temperature)
 
     sigma, electrical, coupled, trial, row, converged = evaluate(1, temperature)
     history.append(row)
     newton = None
     while not converged:
         if len(history) >= max_iterations:
-            raise JouleConvergenceError("maximum iterations exceeded", history, temperature)
+            raise JouleConvergenceError("maximum iterations exceeded", history, temperature=temperature)
         try:
             if newton is None:
                 newton = _JointNewton(mesh, thermal_conductivity, thermal_dirichlet,
                                       set(electric_dirichlet) | set(reference_potential or {}),
                                       outward_flux, convection)
             dsigma = _conductivity_derivative(mesh, models, temperature)
-            increment = newton.step(temperature, sigma, dsigma, electrical, coupled.thermal.load)
+            increment = newton.step(temperature, sigma, dsigma, electrical,
+                                    coupled.thermal.generated_heat_rate_per_depth)
         except Exception as exc:
-            raise JouleConvergenceError(str(exc), history, temperature) from exc
+            raise JouleConvergenceError(str(exc), history, temperature=temperature) from exc
         merit = _euclidean(trial-temperature)
         failure, accepted = None, None
         for halving in range(_HALVINGS+1):
@@ -444,10 +552,10 @@ def solve_temperature_joule_heat(
                 break
         if accepted is None:
             reason = (f"Newton step does not reduce the temperature defect "
-                      f"({history[-1].temperature_defect:.3g} K)")
+                      f"({history[-1].temperature_change:.3g} K)")
             if failure is not None:
                 reason += f"; last candidate failed: {failure.reason}"
-            raise JouleConvergenceError(reason, history, temperature) from (
+            raise JouleConvergenceError(reason, history, temperature=temperature) from (
                 failure.__cause__ if failure is not None else None)
         temperature, state = accepted
         sigma, electrical, coupled, trial, row, converged = state

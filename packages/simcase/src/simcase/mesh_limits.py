@@ -100,13 +100,11 @@ def _is_region_document(data) -> bool:
 def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     """The number of loop vertices a heat region document passes to meshine.
 
-    ``doc`` is a ``Document``. A run validates the document and meshes its micrometre copy
-    (``runner.micrometre_document``), so that copy is what is counted, and the count is the
-    one ``run(..., max_input_vertices=...)`` checks. The copy is made with the length unit
-    the document's validation resolved; a document whose resolved scale is not the one its
-    ``units`` declare, because it was never validated (``Document(data)``,
-    ``Document.copy()``) or its units changed since, is counted on a validated deep copy,
-    as a run of it would validate it first. A validated document is not validated again. A loop
+    ``doc`` is a ``Document``. A run validates the document and meshes its micrometre frame
+    (``views.region_mesh``), so that frame is what is counted, and the count is the one
+    ``run(..., max_input_vertices=...)`` checks. A document that was not read yet
+    (``Document(data)``) or that changed since it was read is counted on a validated copy, as
+    a run of it would validate it first. A validated document is not validated again. A loop
     vertex is one entry of a loop given to meshine's ``Domain.add_region``, outer rings and
     holes alike, after the shapes' booleans: a shape inside the background counts once as
     itself and once as the background's hole, a circle that another boundary touches or
@@ -118,15 +116,15 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     ``max_input_vertices``; an isolated circle whose own count alone passes it is refused
     before its vertices are made, with ``count`` None and the circle's own estimate, in
     micrometres, in the message. The domain is never built and the document is not
-    changed. The micrometre copy is validated, as in a run, so the shapes' booleans are
-    resolved twice: in that validation and for the count. ``TypeError`` for anything that
+    changed. The shapes' booleans are resolved twice: in the document's validation and for
+    the count. ``TypeError`` for anything that
     is not a ``Document``; ``ValueError`` for a document that is not a region document (steady or
     transient heat, electric conduction, steady Joule heating or mechanics), or a limit that is not a positive int; ``DocumentError`` for an
-    unvalidated document that its validation refuses.
+    unvalidated document that its validation refuses, and for a document that is not format 0.3
+    (refused by name with ``E-FORMAT``).
     """
     import copy
-    from . import units
-    from .schema import Document
+    from .schema import Document, not_read
     limit = _limit('max_input_vertices', max_input_vertices)
     if limit is None:
         raise ValueError('max_input_vertices: expected a positive int, got None')
@@ -135,16 +133,19 @@ def check_mesh_limits(doc, *, max_input_vertices: int) -> int:
     if not _is_region_document(doc.data):
         raise ValueError('check_mesh_limits: expected a region document (steady or transient heat, electric '
                          'conduction, steady Joule heating or mechanics, with region geometry)')
-    try:
-        declared = units.resolve(doc.data.get('units'))
-    except units.UnitError:
-        declared = None
-    if doc.scale != declared:
-        # Not validated, or changed since: its numbers have no resolved length unit, and the
-        # micrometre copy would be made with the wrong one. A run validates first; so do we,
-        # on a copy, and leave the document as it is.
-        doc = Document(copy.deepcopy(doc.data))
-        doc.validate()
+    from . import views
     from .geometry import _domain_from_regions
-    from .runner import micrometre_document
-    return _domain_from_regions(micrometre_document(doc), max_input_vertices=limit)[3]
+    from .schema import _is_v03
+    if doc.si is None and isinstance(doc.data, dict) and _is_v03(doc.data.get('openphysics')):
+        doc = Document(copy.deepcopy(doc.data))     # not read yet: read it, as a run would
+        doc.validate()
+    if doc.si is not None:
+        # a format 0.3 region document is meshed from its micrometre frame (views.region_mesh)
+        from .thermal_regions import handoff_03
+        if doc._read_json is not None and doc.canonical_json() != doc._read_json:
+            doc = doc.copy()
+            doc.validate()
+        return _domain_from_regions(views.region_mesh(handoff_03(doc)).canonical,
+                                    max_input_vertices=limit)[3]
+    # a document that is not format 0.3 is refused by name, as Document.from_dict refuses it
+    raise not_read(doc.data)

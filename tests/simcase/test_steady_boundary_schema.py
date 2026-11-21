@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Public document dispatch for steady boundary data; no runtime/save adapter."""
+"""Public document dispatch for steady boundary data (format 0.3); no runtime/save adapter."""
 import copy
 import json
 
@@ -8,29 +8,37 @@ import pytest
 
 from simcase.schema import Document, DocumentError
 from simcase.steady_boundary_contract import (
-    V1, V2, validate_steady_boundary, steady_result_versions,
+    V1_03 as V1, V2_03 as V2, validate_steady_boundary, steady_result_versions,
 )
 
 
 def raw():
+    # name, materials, study and results take their structural defaults
     return {
-        "name": "Steady boundary schema",
-        "units": {"length": "mm", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 1000, "ymin": 0, "ymax": 1000}},
+        "openphysics": "0.3",
+        "geometry": {"length_unit": "mm", "depth": None, "domain": {"xmin": 0, "xmax": 1000, "ymin": 0, "ymax": 1000}},
         "physics": {"heat1": {
-            "type": "thermal.steady2d", "conductivity_w_mk": 2.,
-            "dirichlet_temperature_k": {"left": 300.},
+            "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)",
+            "prescribed_temperature": {"left": "300 K"},
         }},
-        "mesh": {"subdivisions": [2, 2]},
+        "mesh": {"subdivision_count": [2, 2]},
     }
 
 
 def boundary_document():
     d = raw()
     d["physics"]["heat1"].update(
-        outward_flux_w_m2={"right": 2.},
-        convection={"right": {"h_w_m2k": 4., "ambient_temperature_k": 290.}})
+        inward_heat_flux={"right": "-2 W/m^2"},
+        convection={"right": {"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "290 K"}})
     return d
+
+
+def set_path(data, path, value):
+    node = data
+    parts = path.split(".")
+    for part in parts[:-1]:
+        node = node.setdefault(part, {})
+    node[parts[-1]] = value
 
 
 @pytest.mark.parametrize("presence", ["flux", "convection", "both"])
@@ -38,63 +46,68 @@ def test_empty_mapping_presence_enters_strict_path_without_implicit_keys(presenc
     data = raw()
     p = data["physics"]["heat1"]
     if presence in ("flux", "both"):
-        p["outward_flux_w_m2"] = {}
+        p["inward_heat_flux"] = {}
     if presence in ("convection", "both"):
         p["convection"] = {}
     before = copy.deepcopy(data)
     doc = Document.from_dict(data)
     assert data == before
     normalized = doc.sole_physics()[1]
-    assert ("outward_flux_w_m2" in normalized) == ("outward_flux_w_m2" in p)
+    assert ("inward_heat_flux" in normalized) == ("inward_heat_flux" in p)
     assert ("convection" in normalized) == ("convection" in p)
     assert steady_result_versions(doc) == V2
-    assert doc["openphysics"] == "0.2"
-    assert normalized["heat_source_w_m3"] == 0.
-    assert doc["study"] == {"type": "single"}
-    assert doc["results"] == {"save_fields": True, "plots": False}
-    assert doc.scale.to_si(1000, {"length": 1}) == 1.
-    assert "thermal.steady2d-result-v2" in doc.summary()
+    assert doc["openphysics"] == "0.3"
+    # no value is written back: the absent source and the structural defaults are echoed
+    assert "heat_source_density" not in normalized and "heat_source_density" not in doc.si["physics"]["heat1"]
+    assert sorted(d["path"] for d in doc.defaults_applied) == [
+        "materials", "name", "physics.heat1.heat_source_density", "results", "study"]
+    assert doc.si["study"] == {"type": "single"}
+    assert doc.si["results"] == {"save_fields": True, "plots": False}
+    assert doc.si["geometry"]["domain"]["xmax"] == 1.
+    assert V2[0] in doc.summary()
 
 
-def test_legacy_no_mapping_keeps_defaults_format_and_tuple_policy():
+def test_legacy_no_mapping_keeps_defaults_and_refuses_the_numeric_format():
     data = raw()
-    data["openphysics"] = .2  # Historical str(format) policy, unchanged.
-    data["mesh"]["subdivisions"] = (2, 2)  # Historical Python API policy.
+    data["mesh"]["subdivision_count"] = (2, 2)  # a tuple reads as the JSON list it writes
     doc = Document.from_dict(data)
-    assert doc["mesh"]["subdivisions"] == (2, 2)
-    assert doc["openphysics"] == .2
-    assert "outward_flux_w_m2" not in doc.sole_physics()[1]
+    assert doc.si["mesh"]["subdivision_count"] == [2, 2]
+    assert "inward_heat_flux" not in doc.sole_physics()[1]
     assert "convection" not in doc.sole_physics()[1]
     assert "remaining exterior insulated" in doc.summary()
-    assert "result-v2" not in doc.summary()
-    assert doc.sole_physics()[1]["heat_source_w_m3"] == 0.
+    assert V2[0] not in doc.summary() and V1[0] in doc.summary()
+    assert "heat_source_density" not in doc.si["physics"]["heat1"]
+    data["openphysics"] = .3  # the format is the JSON string "0.3", not a number
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(data)
+    assert [(d.code, d.path) for d in caught.value.diagnostics] == [("E-FORMAT", "openphysics")]
 
 
 @pytest.mark.parametrize("path,value", [
     ("openphysics", .2),
-    ("mesh.subdivisions", (2, 2)),
+    ("openphysics", "0.2"),
     ("physics.heat1.convection", None),
-    ("physics.heat1.outward_flux_w_m2", None),
-    ("physics.heat1.convection.right.h_w_m2k", True),
-    ("physics.heat1.convection.right.h_w_m2k", -1.),
-    ("physics.heat1.convection.right.ambient_temperature_k", -1.),
-    ("physics.heat1.convection.right.ambient_temperature_k", float("nan")),
-    ("physics.heat1.outward_flux_w_m2.right", float("inf")),
-    ("physics.heat1.dirichlet_temperature_k.left", True),
+    ("physics.heat1.inward_heat_flux", None),
+    ("physics.heat1.convection.right.heat_transfer_coefficient", True),
+    ("physics.heat1.convection.right.heat_transfer_coefficient", "-1 W/(m^2 K)"),
+    ("physics.heat1.convection.right.ambient_temperature", "-1 K"),
+    ("physics.heat1.convection.right.ambient_temperature", float("nan")),
+    ("physics.heat1.inward_heat_flux.right", float("inf")),
+    ("physics.heat1.prescribed_temperature.left", True),
     ("physics.heat1.convection.right.unknown", 0),
-    ("physics.heat1.outward_flux_w_m2.unknown", 0),
+    ("physics.heat1.inward_heat_flux.unknown", "0 W/m^2"),
     ("units.time", "s"),
     ("results.plots", True),
 ])
 def test_from_dict_rejects_invalid_new_contract(path, value):
-    d = Document.from_dict(boundary_document())
-    d.set_path(path, value)
-    data = copy.deepcopy(d.data)
+    data = boundary_document()
+    Document.from_dict(copy.deepcopy(data))
+    set_path(data, path, value)
     with pytest.raises(DocumentError):
         Document.from_dict(data)
 
 
-@pytest.mark.parametrize("key", ["outward_flux_w_m2", "convection"])
+@pytest.mark.parametrize("key", ["inward_heat_flux", "convection"])
 def test_even_null_mapping_is_presence_not_legacy_fallback(key):
     data = raw()
     data["physics"]["heat1"][key] = None
@@ -105,32 +118,32 @@ def test_even_null_mapping_is_presence_not_legacy_fallback(key):
 def test_robin_only_and_zero_h_anchor_policy():
     data = boundary_document()
     p = data["physics"]["heat1"]
-    p["dirichlet_temperature_k"] = {}
+    p["prescribed_temperature"] = {}
     doc = Document.from_dict(data)
-    assert doc.sole_physics()[1]["dirichlet_temperature_k"] == {}
-    assert "q.n = g_out + h*(T-T_ambient)" in doc.summary()
-    p["convection"]["right"]["h_w_m2k"] = 0
+    assert doc.sole_physics()[1]["prescribed_temperature"] == {}
+    assert "q.n = -inward_heat_flux + h (T - ambient_temperature)" in doc.summary()
+    p["convection"]["right"]["heat_transfer_coefficient"] = "0 W/(m^2 K)"
     with pytest.raises(DocumentError, match="anchor"):
         Document.from_dict(data)
 
 
 def test_legacy_empty_constraints_still_reject():
     data = raw()
-    data["physics"]["heat1"]["dirichlet_temperature_k"] = {}
+    data["physics"]["heat1"]["prescribed_temperature"] = {}
     with pytest.raises(DocumentError, match="at least one"):
         Document.from_dict(data)
 
 
 @pytest.mark.parametrize("entry", ["validate", "summary"])
 @pytest.mark.parametrize("path,value", [
-    ("physics.heat1.convection.right.h_w_m2k", -1),
-    ("physics.heat1.convection.right.ambient_temperature_k", True),
-    ("physics.heat1.outward_flux_w_m2.right", float("nan")),
-    ("physics.heat1.dirichlet_temperature_k.bottom", 301),
+    ("physics.heat1.convection.right.heat_transfer_coefficient", "-1 W/(m^2 K)"),
+    ("physics.heat1.convection.right.ambient_temperature", True),
+    ("physics.heat1.inward_heat_flux.right", float("nan")),
+    ("physics.heat1.prescribed_temperature.bottom", "301 K"),
 ])
 def test_direct_document_mutation_checked_at_validation_and_summary(entry, path, value):
     doc = Document.from_dict(boundary_document())
-    doc.set_path(path, value)
+    set_path(doc.data, path, value)       # a caller changing the authored tree after reading
     with pytest.raises(DocumentError):
         getattr(doc, entry)()
 
@@ -138,11 +151,11 @@ def test_direct_document_mutation_checked_at_validation_and_summary(entry, path,
 def test_summary_uses_new_boundary_meaning_and_never_legacy_insulation_claim():
     doc = Document.from_dict(boundary_document())
     summary = doc.summary()
-    assert "convection" in summary and "outward flux" in summary
+    assert "convection" in summary and "inward_heat_flux" in summary
     assert "unselected natural sides insulated" in summary
     assert "remaining exterior insulated" not in summary
     assert V2[0] in summary and V2[1] in summary
-    assert "nodal heat W/m of depth" in summary
+    assert "nodal heat rates W/m of depth" in summary
 
 
 def test_utf8_load_save_roundtrip_and_invalid_load(tmp_path):
@@ -152,50 +165,54 @@ def test_utf8_load_save_roundtrip_and_invalid_load(tmp_path):
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     doc = Document.load(path)
     doc.save(tmp_path/"saved.json")
+    assert (tmp_path/"saved.json").read_bytes() == path.read_bytes()    # the authored bytes
     other = Document.load(tmp_path/"saved.json")
     assert other.data == doc.data
     assert other.summary() == doc.summary()
-    data["physics"]["heat1"]["convection"]["right"]["h_w_m2k"] = -1
+    data["physics"]["heat1"]["convection"]["right"]["heat_transfer_coefficient"] = "-1 W/(m^2 K)"
     path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(DocumentError):
         Document.load(path)
 
 
-def test_validator_stays_non_mutating_and_schema_sets_only_normalization():
+def test_validator_stays_non_mutating_and_schema_writes_no_default():
     doc = Document.from_dict(boundary_document())
-    p = doc.sole_physics()[1]
-    del p["heat_source_w_m3"]
     before = copy.deepcopy(doc.data)
-    scale, notes = doc.scale, doc.notes
+    notes = doc.notes
     validate_steady_boundary(doc)
-    assert doc.data == before and doc.scale is scale and doc.notes is notes
+    assert doc.data == before and doc.notes is notes
     doc.validate()
-    assert p["heat_source_w_m3"] == 0.
-    assert doc.notes == []
+    assert doc.data == before and "heat_source_density" not in doc.sole_physics()[1]
+    assert not doc.diagnostics.errors
 
 
 def test_legacy_list_document_remains_v1():
     doc = Document.from_dict(raw())
     assert steady_result_versions(doc) == V1
-    assert "outward_flux_w_m2" not in doc.sole_physics()[1]
+    assert "inward_heat_flux" not in doc.sole_physics()[1]
 
 
-def test_p1_transient_dispatch_and_temperature_policy_remain_unchanged():
+def test_p1_transient_dispatch_and_temperature_policy():
     from simcase.examples import TRANSIENT_THERMAL_UNIFORM
     data = copy.deepcopy(TRANSIENT_THERMAL_UNIFORM)
-    data["physics"]["heat1"]["initial_temperature_k"] = -10.
     doc = Document.from_dict(data)
     assert doc.sole_physics()[1]["type"] == "thermal.transient2d"
-    assert "explicit times in s" in doc.summary()
-    # The transient contract reads the same boundary keys with its own layout pair;
-    # it keeps finite negative initial K while the shared nonnegative-ambient policy applies.
-    from simcase.transient_thermal_contract import V2, transient_result_versions
+    assert "explicit times" in doc.summary()
+    # absolute temperatures are above 0 K since the units batch: a negative initial is refused
+    data["physics"]["heat1"]["initial_temperature"] = "-10 K"
+    with pytest.raises(DocumentError) as caught:
+        Document.from_dict(data)
+    assert [(d.code, d.path) for d in caught.value.diagnostics if d.severity == "error"] == [
+        ("E-DOMAIN", "physics.heat1.initial_temperature")]
+    # The transient contract reads the same boundary keys with its own layout pair.
+    from simcase.transient_thermal_contract import V2_03, transient_result_versions
+    data["physics"]["heat1"]["initial_temperature"] = "300 K"
     data["physics"]["heat1"]["convection"] = {}
     doc = Document.from_dict(data)
-    assert transient_result_versions(doc) == V2
-    assert doc.sole_physics()[1]["initial_temperature_k"] == -10.
-    data["physics"]["heat1"]["convection"] = {"right": {"h_w_m2k": 1., "ambient_temperature_k": -1.}}
-    with pytest.raises(DocumentError, match="ambient_temperature_k"):
+    assert transient_result_versions(doc) == V2_03
+    data["physics"]["heat1"]["convection"] = {"right": {"heat_transfer_coefficient": "1 W/(m^2 K)",
+                                                        "ambient_temperature": "-1 K"}}
+    with pytest.raises(DocumentError, match="ambient_temperature"):
         Document.from_dict(data)
 
 

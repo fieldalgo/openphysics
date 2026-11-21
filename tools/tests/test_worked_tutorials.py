@@ -37,12 +37,12 @@ def test_first_heat_examples_match_independent_uniform_references():
     np.testing.assert_allclose(heat['result'].heat_flux[:, 0], 300., rtol=0, atol=1e-8)
     joule = runpy.run_path(str(ROOT / 'examples/galerkin/joule_heating.py'))['result']
     assert joule.thermal.temperature.max() == pytest.approx(300.3, abs=1e-8, rel=0)
-    assert joule.source_power_per_length == pytest.approx(6., abs=1e-8, rel=0)
+    assert joule.generated_heat_rate_per_depth == pytest.approx(6., abs=1e-8, rel=0)
     transient = runpy.run_path(str(ROOT / 'examples/galerkin/transient_heat_uniform.py'))['result']
-    expected = np.broadcast_to(300. + 2. * transient.time_s[:, None], transient.temperature_k.shape)
-    np.testing.assert_allclose(transient.temperature_k, expected, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(transient.heat_content_j_per_m - transient.heat_content_j_per_m[0],
-                               8. * transient.time_s, rtol=0, atol=1e-10)
+    expected = np.broadcast_to(300. + 2. * transient.time[:, None], transient.temperature.shape)
+    np.testing.assert_allclose(transient.temperature, expected, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(transient.stored_heat_per_depth - transient.stored_heat_per_depth[0],
+                               8. * transient.time, rtol=0, atol=1e-10)
 
 
 @pytest.mark.parametrize('size', [4., 2.])
@@ -53,13 +53,13 @@ def test_layered_wall_saved_fields_match_series_resistance(tmp_path, monkeypatch
     runpy.run_path(str(script), run_name='__main__')
     q = 50. / (.01 / 10. + .03 / 1. + 1. / 50.)
     with np.load(output / 'fields.npz', allow_pickle=False) as fields:
-        x = fields['nodes_m'][:, 0]
+        x = fields['node_coordinates'][:, 0]
         expected = 350. - q * (np.minimum(x, .01) / 10. + np.maximum(x - .01, 0.))
-        np.testing.assert_allclose(fields['temperature_k'], expected, rtol=0, atol=1e-9)
-        np.testing.assert_allclose(fields['heat_flux_w_m2'][:, 0], q, rtol=1e-9, atol=1e-8)
-        np.testing.assert_allclose(fields['heat_flux_w_m2'][:, 1], 0., rtol=0, atol=1e-8)
-        assert fields['reaction_w_per_m'].sum() == pytest.approx(q * .01, rel=1e-9)
-        assert fields['convective_outward_w_per_m'].sum() == pytest.approx(q * .01, rel=1e-9)
+        np.testing.assert_allclose(fields['temperature'], expected, rtol=0, atol=1e-9)
+        np.testing.assert_allclose(fields['heat_flux'][:, 0], q, rtol=1e-9, atol=1e-8)
+        np.testing.assert_allclose(fields['heat_flux'][:, 1], 0., rtol=0, atol=1e-8)
+        assert fields['reaction_heat_rate_per_depth'].sum() == pytest.approx(q * .01, rel=1e-9)
+        assert fields['outward_convective_heat_rate_per_depth'].sum() == pytest.approx(q * .01, rel=1e-9)
     summary = json.loads((output / 'summary.json').read_text(encoding='utf-8'))
     assert summary['regions']['left_layer']['material'] == 'high_k'
     assert summary['regions']['background']['material'] == 'low_k'
@@ -79,29 +79,33 @@ def test_saved_result_document_blocks_preserve_exported_fields(tmp_path, monkeyp
     with np.load(folder / 'fields.npz', allow_pickle=False) as fields:
         for name in ('view.vtu', 'second-view.vtu'):
             viewed = meshio.read(folder / name)
-            np.testing.assert_array_equal(viewed.points[:, :2], fields['nodes_m'])
-            np.testing.assert_array_equal(viewed.point_data['temperature_k'], fields['temperature_k'])
+            np.testing.assert_array_equal(viewed.points[:, :2], fields['node_coordinates'])
+            np.testing.assert_array_equal(viewed.point_data['temperature'], fields['temperature'])
             np.testing.assert_array_equal(viewed.cell_data['triangle_regions'][0], fields['triangle_regions'])
-            np.testing.assert_array_equal(viewed.cell_data['heat_flux_w_m2'][0][:, :2], fields['heat_flux_w_m2'])
+            np.testing.assert_array_equal(viewed.cell_data['heat_flux'][0][:, :2], fields['heat_flux'])
 
 
 def test_material_selection_document_checks_source_and_range():
     import physmat
     namespace = _execute_document_python('modeling/materials.md')
     si = namespace['si']
-    assert namespace['k_w_mk'] == 148.0
+    assert namespace['thermal_conductivity'] == 148.0
     assert si.properties['thermal_conductivity'].source
     assert si.source
-    assert si.get('thermal_conductivity', T=400.0) == namespace['k_w_mk']
+    assert si.property('thermal_conductivity', temperature=400.0) == namespace['thermal_conductivity']
+    assert namespace['vacuum_wavelength'] == 1.55e-6 and si.valid_vacuum_wavelength == (1.357e-6, 1.104e-5)
     with pytest.raises(physmat.OutOfRange):
-        si.index(0.5)
+        si.refractive_index(vacuum_wavelength=5e-7)
+    with pytest.raises(TypeError):
+        si.refractive_index(vacuum_wavelength='1550 nm')
 
 
 def test_waveguide_interpretation_document_has_passive_loss():
+    # exp(-i omega t): passive attenuation is Im n_eff > 0 and a positive loss in dB/m
     namespace = _execute_document_python('results/waveguide-modes.md')
-    assert np.all(np.isfinite(namespace['neff']))
-    assert np.all(namespace['neff'].imag < 0)
-    assert np.all(np.asarray(namespace['loss_db_cm']) > 0)
+    assert np.all(np.isfinite(namespace['effective_index']))
+    assert np.all(namespace['effective_index'].imag > 0)
+    assert np.all(np.asarray(namespace['loss_db_m']) > 0)
 
 
 def _execute_document_python(page):
@@ -137,12 +141,12 @@ def test_thermoelastic_controls_match_uniform_3d_reductions():
         np.testing.assert_allclose(r.displacement, factor * mesh.nodes, atol=1e-14, rtol=0)
         np.testing.assert_allclose(r.stress[:, :2], inplane, atol=1e-5, rtol=0)
         np.testing.assert_allclose(r.stress[:, 2], 0., atol=1e-5, rtol=0)
-        np.testing.assert_allclose(r.sigma_zz, zz, atol=1e-5, rtol=0)
-        assert r.physical_elastic_energy == pytest.approx(energy, abs=1e-8, rel=1e-12)
-        np.testing.assert_allclose(r.reaction.sum(axis=0), 0., atol=1e-5, rtol=0)
-        moment = np.sum(mesh.nodes[:, 0]*r.reaction[:, 1] - mesh.nodes[:, 1]*r.reaction[:, 0])
+        np.testing.assert_allclose(r.stress_zz, zz, atol=1e-5, rtol=0)
+        assert r.strain_energy_per_depth == pytest.approx(energy, abs=1e-8, rel=1e-12)
+        np.testing.assert_allclose(r.reaction_force_per_depth.sum(axis=0), 0., atol=1e-5, rtol=0)
+        moment = np.sum(mesh.nodes[:, 0]*r.reaction_force_per_depth[:, 1] - mesh.nodes[:, 1]*r.reaction_force_per_depth[:, 0])
         assert abs(moment) < 1e-5
-    assert np.linalg.norm(results['blocked_plane_strain'].reaction) > 1e6
+    assert np.linalg.norm(results['blocked_plane_strain'].reaction_force_per_depth) > 1e6
 
 
 def test_run_record_preserves_inputs_and_detects_changed_output(tmp_path, monkeypatch):

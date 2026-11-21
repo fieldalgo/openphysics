@@ -4,7 +4,7 @@
 
 **At a glance**
 
-- **What it does:** `galerkin.transient_heat.solve_transient_heat` advances 2D heat conduction, c·dT/dt − div(k·grad T) = Q, on a fixed conforming P1 triangle mesh with consistent mass and backward Euler. Inputs are constant isotropic k [W/(m K)] and c [J/(m³ K)], a source Q [W/m³], explicit times [s], an initial field [K], fixed Dirichlet nodes with time-dependent temperatures and, on tagged exterior edges, a prescribed outward flux g [W/m²] or convection h·(T − T_amb) with the steady solver's input forms, each constant, spatially varying or time-dependent; other boundaries are insulated.
+- **What it does:** `galerkin.transient_heat.solve_transient_heat` advances 2D heat conduction, c·dT/dt − div(k·grad T) = Q, on a fixed conforming P1 triangle mesh with consistent mass and backward Euler. Inputs are constant isotropic k [W/(m K)] and c [J/(m³ K)], a source Q [W/m³], explicit times [s], an initial field [K], fixed Dirichlet nodes with time-dependent temperatures and, on tagged exterior edges, a prescribed inward heat flux q_in [W/m²] (positive enters; g = −q_in below) or convection h·(T − T_amb) with the steady solver's input forms, each constant, spatially varying or time-dependent; other boundaries are insulated.
 - **Axisymmetric:** `coordinate_system="axisymmetric"` reads the mesh as (r, z) and integrates the full revolution with the measure of [axisymmetric steady heat](thermal_axisymmetric.md); see [Axisymmetric transient heat](#axisymmetric-transient-heat).
 - **Limits:** no radiation or temperature-dependent h; time-dependent boundary data are an engine feature only (the simcase document adapter takes constants); a time-dependent h is refused with JAX or PyTorch inputs; no restart or automatic heat-to-mechanics coupling. Finite negative Kelvin is not clamped, and no discrete maximum principle is promised.
 - **Validation:** the [validation contract](transient_heat_validation.md) and [independent acceptance](transient_heat_independent_validation.md) fix backward-Euler order 0.9–1.1 against the exact discrete eigenmode product, and temperature L2 order ≥ 1.8 and flux L2 order ≥ 0.9 on a manufactured sine solution; the [flux and convection gates](transient_heat_validation.md#outward-flux-and-convection-gates) compare convective and constant-flux slabs with independent series, the steady solver and the per-step heat balance, and the [time-dependent gates](transient_heat_validation.md#time-dependent-flux-and-convection-gates) compare a sinusoidal ambient temperature and a ramped flux with closed forms. For the result of a specific commit, see its CI run.
@@ -24,11 +24,11 @@ from galerkin.transient_heat import solve_transient_heat
 
 mesh = rectangle_mesh(1., 1., 4, 4)  # metres
 result = solve_transient_heat(
-    mesh, conductivity=2.5, volumetric_heat_capacity=4.0,
-    time_s=np.array([0., .1, .3]),
-    initial_temperature_k=np.full(mesh.num_nodes, 300.),
-    dirichlet={}, heat_source=8.0)
-outward_dirichlet_w_per_m = -result.reaction_w_per_m.sum(axis=1)
+    mesh, thermal_conductivity=2.5, volumetric_heat_capacity=4.0,
+    time=np.array([0., .1, .3]),
+    initial_temperature=np.full(mesh.num_nodes, 300.),
+    prescribed_temperature={}, heat_source_density=8.0)
+outward_dirichlet_per_depth = -result.reaction_heat_rate_per_depth.sum(axis=1)   # W/m
 ```
 
 The mathematical target in this insulated constant-source example is
@@ -39,10 +39,10 @@ The exact keyword-only API is:
 
 ```text
 solve_transient_heat(
-    mesh, *, conductivity, volumetric_heat_capacity,
-    time_s, initial_temperature_k, dirichlet, heat_source=0.0,
-    outward_flux=None, convection=None, checkpoint_every=None,
-    coordinate_system="cartesian")
+    mesh, *, thermal_conductivity, volumetric_heat_capacity,
+    time, initial_temperature, prescribed_temperature, heat_source_density=None,
+    inward_heat_flux=None, convection=None, checkpoint_every=None,
+    coordinate_system="cartesian", motion=None)
 ```
 
 Import this submodule explicitly; no automatic top-level export is added.
@@ -58,13 +58,13 @@ on valid used-node geometry. Do not copy a steady mandatory-anchor rule.
 | Input | Contract |
 |---|---|
 | mesh | galerkin Mesh, finite coordinates in m; used-node, conforming, nonoverlapping manifold CCW triangles |
-| conductivity | finite positive scalar k, W/(m K), or `{region name: k}` |
+| thermal_conductivity | finite positive scalar k, W/(m K), or `{region name: k}` |
 | volumetric_heat_capacity | finite positive scalar c, J/(m³ K), or `{region name: c}` |
-| time_s | finite real 1D seconds, at least two, nonnegative, strictly increasing with finite positive differences |
-| initial_temperature_k | finite real exactly (N,) K at time_s[0] |
-| dirichlet | fixed integer node (exterior or interior, as in [steady heat](thermal_steady2d.md)) -> scalar K or callback(time_s)->scalar K |
-| heat_source | finite scalar W/m³, `{region name: Q}`, or callback(points_m,time_s)->exactly (Q,) W/m³ |
-| outward_flux | `None` or `{boundary_edges tag: g}`, g in W/m² (positive removes heat); scalar, callback(points_m, outward_normals)->exactly (Q,), callback(time_s)->scalar or callback(points_m, outward_normals, time_s)->exactly (Q,) |
+| time | finite real 1D seconds, at least two, nonnegative, strictly increasing with finite positive differences |
+| initial_temperature | finite real exactly (N,) K at time[0] |
+| prescribed_temperature | fixed integer node (exterior or interior, as in [steady heat](thermal_steady2d.md)) -> scalar K or callback(time)->scalar K |
+| heat_source_density | `None` (no source, the default), finite scalar W/m³, `{region name: Q}`, or callback(position,time)->exactly (Q,) W/m³ |
+| inward_heat_flux | `None` or `{boundary_edges tag: q_in}`, q_in in W/m² (positive injects heat; the solver uses g = 0.0 − q_in, exactly); scalar, callback(position, outward_normal)->exactly (Q,), callback(time)->scalar or callback(position, outward_normal, time)->exactly (Q,) |
 | convection | `None` or `{boundary_edges tag: (h, T_amb)}`, h ≥ 0 in W/(m² K), T_amb in K; each a scalar or any of the same callback forms |
 
 A source callback receives (Q,2) metre coordinates and one scalar second value.
@@ -75,15 +75,15 @@ incident triangle, no duplicate or fully Dirichlet edge, h ≥ 0) and the same
 unit-length outward normals. Each of g, h and T_amb takes one of four forms,
 told apart by the number of required positional parameters of a callback: a
 scalar or a `callback(points_m, outward_normals)` is **static** and sampled once
-before stepping, exactly as before; a `callback(time_s)` returning a scalar or a
-`callback(points_m, outward_normals, time_s)` returning exactly (Q,) is
-**time-dependent**. Time-dependent values are sampled at `time_s[0]` for
+before stepping, exactly as before; a `callback(time)` returning a scalar or a
+`callback(position, outward_normal, time)` returning exactly (Q,) is
+**time-dependent**. Time-dependent values are sampled at `time[0]` for
 validation and then at the **end of every step, t_{n+1}**, the same instant at
 which Dirichlet and source callbacks are evaluated (backward Euler uses the
 right-endpoint data). Any other signature (no parameter, more than three,
 variadic positionals, or a two-parameter callback whose parameter is named
 `time_s`/`time`) is refused with ValueError before any sampling. Edge geometry
-and validation run once; sampling and assembly failures at `time_s[0]` are
+and validation run once; sampling and assembly failures at `time[0]` are
 chained at time index 0, later ones at their step. The Robin matrix H is
 assembled once unless h itself is time-dependent, in which case it is
 reassembled at every step; G and B are re-evaluated at every step whenever any
@@ -135,7 +135,7 @@ later caller changes do not change returned histories or captured geometry.
 The solve is eager and all-or-error. Structural input errors raise ValueError.
 Preparation, sampling, solve, derived-history and final-copy failures are
 chained as TransientHeatStepError, a ValueError subclass with time_index and
-time_s; __cause__ preserves the original exception. Preparation is index0;
+time; __cause__ preserves the original exception. Preparation is index0;
 final-copy failure uses the last index/time. No successful partial result is
 returned, and the accepted previous internal state is not replaced by a failed
 trial. External callback side effects are not rolled back.
@@ -146,7 +146,7 @@ trial. External callback side effects are not rolled back.
 M_e = c*A/12 * [[2,1,1],[1,2,1],[1,1,2]]
 K_ij = integral k*grad(N_i).grad(N_j)
 H_n,ij = integral_Gamma h(t_n)*N_i*N_j ds        (convection edges)
-G_n,i  = integral_Gamma g(t_n)*N_i ds            (outward_flux edges)
+G_n,i  = integral_Gamma g(t_n)*N_i ds            (inward_heat_flux edges, g = -q_in)
 B_n,i  = integral_Gamma h(t_n)*T_amb(t_n)*N_i ds
 f_i(t) = integral N_i*Q(x,t)
 A_n = M/h_n + K + H_n
@@ -178,33 +178,35 @@ checks raises rather than returning a successful invalid history.
 
 ## Result arrays, lifetime and memory
 
-TransientHeatResult has the following owned read-only copied arrays. N is
-nodes, M triangles, Nt requested times and D unique sorted prescribed nodes.
+A Cartesian solve returns a `PlanarTransientHeatResult` (frozen; a
+`TransientHeatResult`) with the following owned read-only copied arrays, named
+by the registry, and `.units` mapping each to its SI unit. N is nodes, M
+triangles, Nt requested times and D unique sorted prescribed nodes.
 
 | Field | Shape | Meaning / units |
 |---|---|---|
-| time_s | (Nt,) | requested seconds |
-| temperature_k | (Nt,N) | nodal K, including exact copied initial field |
-| heat_flux_w_m2 | (Nt,M,2) | element q=-k*grad(P1 T), W/m², including t0 |
-| source_load_w_per_m | (Nt,N) | nodal f, W/m; f0 is diagnostic only |
-| reaction_w_per_m | (Nt-1,N) | original residual at fixed nodes, zero at free, W/m |
-| residual_w_per_m | (Nt-1,N) | full original BE residual at all nodes, W/m |
-| storage_rate_w_per_m | (Nt-1,N) | M*(T_n-T_n-1)/h_n, W/m |
-| heat_content_j_per_m | (Nt,) | H=1ᵀ M T, J/m |
-| quadratic_functional_jk_per_m | (Nt,) | V=.5 Tᵀ M T, J K/m |
-| dirichlet_node_ids | (D,) | sorted unique fixed node indices |
-| dirichlet_temperatures_k | (Nt,D) | sampled prescribed K |
-| nodes_m / triangles | (N,2) / (M,3) | copied SI geometry/connectivity/order |
-| prescribed_outward_load_w_per_m | (Nt-1,N) or None | G_n per step, W/m; None without outward_flux/convection |
-| convective_outward_w_per_m | (Nt-1,N) or None | C_n = H_n*T_n-B_n, W/m; None without outward_flux/convection |
+| time | (Nt,) | requested seconds |
+| temperature | (Nt,N) | nodal K, including exact copied initial field |
+| heat_flux | (Nt,M,2) | element q=-k*grad(P1 T), W/m², including t0 |
+| generated_heat_rate_per_depth | (Nt,N) | nodal f, W/m; f0 is diagnostic only |
+| reaction_heat_rate_per_depth | (Nt-1,N) | original residual at fixed nodes, zero at free, W/m |
+| residual_heat_rate_per_depth | (Nt-1,N) | full original BE residual at all nodes, W/m |
+| heat_storage_rate_per_depth | (Nt-1,N) | M*(T_n-T_n-1)/h_n, W/m |
+| stored_heat_per_depth | (Nt,) | H=1ᵀ M T, J/m |
+| thermal_energy_functional_per_depth | (Nt,) | V=.5 Tᵀ M T, J K/m |
+| prescribed_node_ids | (D,) | sorted unique fixed node indices |
+| prescribed_temperature | (Nt,D) | sampled prescribed K |
+| node_coordinates / triangles | (N,2) / (M,3) | copied SI geometry/connectivity/order |
+| outward_prescribed_heat_rate_per_depth | (Nt-1,N) or None | G_n per step, W/m; None without inward_heat_flux/convection |
+| outward_convective_heat_rate_per_depth | (Nt-1,N) or None | C_n = H_n*T_n-B_n, W/m; None without inward_heat_flux/convection |
 
 The two boundary rates are positive outward. They are `None`, not zero arrays,
-when neither `outward_flux` nor `convection` is given, so a Dirichlet-only
-result keeps its fields and memory unchanged. `residual_w_per_m` and
-`reaction_w_per_m` include the H, G and B terms when they exist.
+when neither `inward_heat_flux` nor `convection` is given, so a Dirichlet-only
+result keeps its fields and memory unchanged. `residual_heat_rate_per_depth` and
+`reaction_heat_rate_per_depth` include the H, G and B terms when they exist.
 
-The two metadata fields conductivity_w_mk and
-volumetric_heat_capacity_j_m3k record the supplied constants (a float, or a
+The two metadata fields thermal_conductivity and
+volumetric_heat_capacity record the supplied constants (a float, or a
 `{region name: float}` copy for per-region input). No unit,
 provenance, hash or source-origin authentication is claimed. Read-only arrays
 and a frozen container are not cryptographic protection against hostile code.
@@ -266,12 +268,16 @@ consistent mass is the **exact cubic moment of the linear radius**,
 no quadrature; `∫ N_i N_j N_m = |T| a!b!c!/60` for the vertex multiplicities),
 the source and the flux and convection samples are weighted at the existing
 Gauss points, and the element flux stays `(q_r, q_z)` in W/m². Nodal rates
-(`source_load`, `reaction`, `residual`, `storage_rate`, the boundary loads) are
-then **W over the full revolution**, `heat_content` is J and the quadratic
-functional J K; the result records `coordinate_system` and `nodal_rate_unit`
-(`"W"`; the field names keep their Cartesian `_w_per_m` spelling, the
+(generated, reaction, residual and storage rates, the boundary rates) are
+then **W over the full revolution**, the stored heat is J and the energy
+functional J K: the solve returns an `AxisymmetricTransientHeatResult` whose rate
+and heat fields carry the plain registry names (`generated_heat_rate`,
+`reaction_heat_rate`, `residual_heat_rate`, `heat_storage_rate`, `stored_heat`,
+`thermal_energy_functional`, `outward_prescribed_heat_rate`,
+`outward_convective_heat_rate`), `.units` gives W, J and J K, and asking it for a
+`_per_depth` name raises an `AttributeError` that says why (the
 [simcase region adapter](../simcase/thermal_regions2d.md#axisymmetric-documents)
-renames them). The axis rules of the steady page apply: Dirichlet data on
+reads them by these names). The axis rules of the steady page apply: Dirichlet data on
 nodes lying only on the axis, and a nonzero flux or h on an axis edge, are
 refused (the boundary refusal is chained to the time index at which the
 offending value is first sampled: index 0 for static data, later for a

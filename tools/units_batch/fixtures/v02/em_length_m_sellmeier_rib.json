@@ -1,0 +1,111 @@
+{
+  "openphysics": "0.2",
+  "name": "220 nm Si slab, TE check against refsol",
+  "units": {
+    "length": "m"
+  },
+  "geometry": {
+    "domain": {
+      "xmin": -5e-07,
+      "xmax": 5e-07,
+      "ymin": -1.2e-06,
+      "ymax": 1.2e-06
+    },
+    "background": {
+      "material": "glass"
+    },
+    "shapes": [
+      {
+        "name": "film",
+        "type": "rect",
+        "x": -5e-07,
+        "y": 0.0,
+        "w": 1e-06,
+        "h": 2.2e-07,
+        "material": "Si",
+        "mesh_size": 1e-08
+      },
+      {
+        "name": "wedge",
+        "type": "polygon",
+        "material": "Si",
+        "points": [
+          [
+            -3e-07,
+            -6e-07
+          ],
+          [
+            3e-07,
+            -6e-07
+          ],
+          [
+            2e-07,
+            -3e-07
+          ],
+          [
+            -2e-07,
+            -3e-07
+          ]
+        ]
+      },
+      {
+        "name": "dot",
+        "type": "circle",
+        "cx": 2.5e-07,
+        "cy": -8e-07,
+        "r": 8e-08,
+        "material": "Si",
+        "mesh_size": 3e-08
+      }
+    ]
+  },
+  "physics": {
+    "em1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "wavelength": 1.55e-06,
+      "num_modes": 1,
+      "boundary": {
+        "left": "pmc",
+        "right": "pmc",
+        "top": "pec",
+        "bottom": "pec"
+      }
+    }
+  },
+  "mesh": {
+    "size": 2.5e-07,
+    "grading": {
+      "center": [
+        0.0,
+        1.1e-07
+      ],
+      "near": 1e-08,
+      "far": 8e-08,
+      "distance": 1e-06
+    }
+  },
+  "study": {
+    "type": "single"
+  },
+  "materials": {
+    "glass": {
+      "sellmeier": {
+        "B": [
+          0.6961663,
+          0.4079426,
+          0.8974794
+        ],
+        "C": [
+          4.67914825849e-15,
+          1.351206307396e-14,
+          9.7934002537921e-11
+        ],
+        "range": [
+          2.1e-07,
+          6.7e-06
+        ]
+      }
+    }
+  }
+}

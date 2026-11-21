@@ -34,6 +34,8 @@ from itertools import permutations
 
 import numpy as np
 
+__all__ = ["OUTWARD_FACES", "MeshCheckError", "Mesh3D", "tag_faces_by_node_sets", "box_mesh"]
+
 
 # Faces opposite local vertex 0..3, wound so that the normal points out of a
 # positively oriented tetrahedron (volume (p1-p0).((p2-p0)x(p3-p0)) > 0).

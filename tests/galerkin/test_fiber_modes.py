@@ -12,11 +12,15 @@ splitting is the whole point of a vector formulation.
 import numpy as np
 import pytest
 
-from galerkin import disk_mesh, solve_modes
+from galerkin import disk_mesh
+from galerkin.kernels import solve_modes
 from conftest import assert_second_order, rate
 
 A, N1, N2, WL = 4.0, 1.45, 1.44, 1.55
 K0 = 2.0 * np.pi / WL
+#: refsol's fiber in its SI registry names; the lengths are read in m (only k0 a enters, so the reference
+#: effective indices are those of the same fibre in um, bit for bit)
+FIBER = dict(radius=A, refractive_index=(N1, N2), vacuum_wavelength=WL)
 R_DOM = 6.0 * A          # truncation checked below: R = 10a gives the same answer
 ORDER = ("HE11", "TE01", "TM01", "HE21")
 
@@ -33,7 +37,7 @@ def solve(scale):
 
 
 def test_effective_indices_match_the_exact_vector_solution(refsol):
-    ref = {m.label: m.neff for m in refsol.fiber.vector_modes(A, N1, N2, WL)}
+    ref = {m.label: m.effective_index for m in refsol.fiber.vector_modes(**FIBER)}
     assert set(ORDER) <= set(ref), f"refsol returned {sorted(ref)}"
     _, _, got = solve(2)
     for label, value in zip(ORDER, got):
@@ -43,8 +47,8 @@ def test_effective_indices_match_the_exact_vector_solution(refsol):
 
 @pytest.mark.slow
 def test_effective_indices_converge_at_second_order(refsol):
-    ref = [m.neff for label in ORDER
-           for m in refsol.fiber.vector_modes(A, N1, N2, WL) if m.label == label]
+    ref = [m.effective_index for label in ORDER
+           for m in refsol.fiber.vector_modes(**FIBER) if m.label == label]
     scales = (1, 2, 3)
     errors = []
     for scale in scales:
@@ -62,7 +66,7 @@ def test_degenerate_pairs_stay_degenerate(refsol):
     """The polar mesh keeps an exact C_n symmetry, which protects the m = +-1 and
     m = +-2 pairs. Their residual splitting must be far below the physical
     TE01-HE21 splitting, or the measurement of that splitting means nothing."""
-    ref = {m.label: m.neff for m in refsol.fiber.vector_modes(A, N1, N2, WL)}
+    ref = {m.label: m.effective_index for m in refsol.fiber.vector_modes(**FIBER)}
     _, guided, _ = solve(2)
     numerical = max(abs(guided[0] - guided[1]), abs(guided[4] - guided[5]))
     physical = ref["TE01"] - ref["HE21"]
@@ -75,7 +79,7 @@ def test_scalar_solver_cannot_split_lp11(refsol):
     """Same fibre, scalar Helmholtz operator on the same engine: one degenerate
     LP11 where the vector solver resolves three distinct modes."""
     import scipy.sparse.linalg as spla
-    from galerkin import assemble_stiffness, assemble_mass
+    from galerkin.kernels import assemble_stiffness, assemble_mass
 
     mesh = disk_mesh((A, 2 * A, R_DOM), (8, 8, 32), 64)
     eps = mesh.by_region([N1 ** 2, N2 ** 2, N2 ** 2])
@@ -102,8 +106,9 @@ def test_the_example_analytic_solver_agrees_with_the_answer_key(refsol):
 
     mine = fiber_modes.exact_modes()
     wavelength = 2.0 * np.pi / fiber_modes.K0
-    theirs = {m.label: m.neff for m in refsol.fiber.vector_modes(
-        fiber_modes.A_CORE, fiber_modes.N_CO, fiber_modes.N_CL, wavelength)}
+    theirs = {m.label: m.effective_index for m in refsol.fiber.vector_modes(
+        radius=fiber_modes.A_CORE, refractive_index=(fiber_modes.N_CO, fiber_modes.N_CL),
+        vacuum_wavelength=wavelength)}
     assert set(mine) == set(theirs), f"{sorted(mine)} vs {sorted(theirs)}"
     for label, (value, _) in mine.items():
         assert abs(value - theirs[label]) < 1e-9, (

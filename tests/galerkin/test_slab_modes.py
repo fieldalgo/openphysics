@@ -28,7 +28,8 @@ stalls at 3.6e-4.
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from conftest import assert_second_order
 
 N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55   # SOI, 220 nm
@@ -55,8 +56,8 @@ def solve(pol, scale):
 
 @pytest.mark.parametrize("pol", ["TE", "TM"])
 def test_fundamental_slab_mode(refsol, pol):
-    reference = refsol.slab.modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                                  d=THICKNESS, wavelength=WAVELENGTH, pol=pol)[0]
+    reference = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                                  vacuum_wavelength=WAVELENGTH, pol=pol)[0]
     _, _, _, value = solve(pol, 2)
     rel = abs(value - reference) / reference
     assert rel < 1e-3, f"{pol}0: {value:.9f} vs {reference:.9f} ({rel:.2e})"
@@ -66,7 +67,7 @@ def test_fundamental_slab_mode(refsol, pol):
 def test_the_side_walls_really_do_select_the_polarization(refsol, pol):
     """The mode found under each side-wall condition must be the one intended,
     checked by where its energy sits rather than by which number came out."""
-    from galerkin import eval_edge_field
+    from galerkin.kernels import eval_edge_field
 
     mesh, space, et, _ = solve(pol, 1)
     E = eval_edge_field(space, et[0])
@@ -81,7 +82,7 @@ def test_the_side_walls_really_do_select_the_polarization(refsol, pol):
 
 @pytest.mark.parametrize("pol", ["TE", "TM"])
 def test_slab_mode_converges_at_second_order(refsol, pol):
-    reference = refsol.slab.modes(n_f=N_FILM, n_s=N_CLAD, n_c=N_CLAD,
-                                  d=THICKNESS, wavelength=WAVELENGTH, pol=pol)[0]
+    reference = refsol.slab.modes(refractive_index=(N_CLAD, N_FILM, N_CLAD), thickness=THICKNESS,
+                                  vacuum_wavelength=WAVELENGTH, pol=pol)[0]
     errors = [abs(solve(pol, s)[3] - reference) / reference for s in (1, 2, 4)]
     assert_second_order(errors, name=f"{pol}0 slab mode")

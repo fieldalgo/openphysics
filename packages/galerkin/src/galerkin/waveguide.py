@@ -1,365 +1,414 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""M3a: guided modes of a dielectric waveguide cross-section (full vector).
+"""Guided modes of a waveguide cross-section: galerkin's public mode API, in SI and exp(-i omega t).
 
-Physics
--------
-A guide that does not change along z carries fields of the form
+``solve_waveguide_modes`` solves the full-vector modes of a cross-section (mixed Nedelec edge and
+nodal elements; the formulation is in docs/packages/galerkin/waveguide_formulation.md) and returns a
+frozen ``WaveguideModes``; ``mode_power``, ``cross_power``, ``field_overlap``,
+``mode_coupling_efficiency``, ``mode_confinement_factor`` and ``mode_effective_area`` post-process
+its modes. ``ModalPML`` and ``Bend`` describe a perfectly matched layer and a constant-radius bend.
 
-    E(x, y, z, t) = [E_t(x, y) + zhat E_z(x, y)] exp(+i omega t-i beta z)
+Units and convention
+--------------------
+Quantities are keyword-only registry names in SI units: the mesh is in metres, the vacuum
+wavelength in m (or the vacuum angular wavenumber k0 in rad/m, exactly one of the two; k0 is
+``2 * pi / vacuum_wavelength``), the PML thicknesses, bend radius and origin in m.
+Complex values follow exp(-i omega t): a passive loss has Im(relative_permittivity) >= 0, and a
+forward mode of a lossy guide has Im(effective_index) >= 0 (it decays as exp(-k0 Im(n_eff) z)).
+The fields have arbitrary amplitude (the solver's gauge), not unit power.
 
-and the question is which propagation constants beta the cross-section supports.
-Unlike the PEC waveguide of M3-prep there is no metal wall here: the mode is held
-in by total internal reflection, so E_z cannot be dropped and the problem is
-genuinely vectorial. The eigenvalue sought is beta, not a cutoff k_c.
+These functions wrap the kernels of ``galerkin.kernels`` (``solve_modes``, ``mode_coordinates`` and
+the mode overlaps), which compute in consistent units and exp(+i omega t), and convert in one place,
+``galerkin._conventions``: every complex input reaches a kernel through ``to_kernel`` and every
+complex output is ``to_public`` of the kernel's output, never re-derived. The result's
+``unnormalized_electric_field_z`` is E_z itself (the kernel's ``ez`` has E_z = 1j * ez, a factor that
+changes sign under conjugation), and ``unnormalized_electric_field_line_integral`` holds the line
+integrals of E_t along the edges of ``space`` (low to high node id), in m for fields in V/m.
 
-Formulation
------------
-Put the ansatz into curl((1/mu_r) curl E) = k0^2 eps_r E, where the operator
-splits as grad = grad_t - i beta zhat, and rescale the unknowns
-
-    e_t = beta E_t     transverse   -> H(curl): Nedelec edge elements
-    e_z = -i E_z       longitudinal -> H1:      nodal P1 elements
-
-The scaling clears beta out of the interior of the curl term, leaving a *linear*
-generalized eigenvalue problem in beta^2 with transpose-symmetric matrices
-(complex symmetric, not Hermitian, when the permittivity is complex):
-
-    [ S(1/mu) - k0^2 Mt(eps)   0 ] [e_t]            [ Mt(1/mu)  G(1/mu)              ] [e_t]
-    [ 0                        0 ] [e_z]  =  -beta^2[ G(1/mu)^T K(1/mu) - k0^2 M(eps)] [e_z]
-
-    S   curl-curl edge matrix   int (1/mu_r) (curl W_e)(curl W_f)
-    Mt  edge mass               int c W_e . W_f          (c = eps_r or 1/mu_r)
-    G   edge-nodal coupling     int (1/mu_r) W_e . grad phi_n
-    K   nodal stiffness         int (1/mu_r) grad phi_m . grad phi_n
-    M   nodal mass              int eps_r phi_m phi_n
-
-Using the right space for each component is the entire point. Across a dielectric
-interface E_t is only tangentially continuous (edge elements enforce exactly that)
-while E_z is fully continuous (nodal elements). Mixing the pairing up is what
-manufactures spurious modes.
-
-The left matrix is singular: varying the functional with respect to e_z yields a
-constraint, not an eigenvalue equation, so beta^2 = 0 is an eigenvalue of high
-multiplicity. Guided modes sit far away from it, at n_clad < beta/k0 < n_core, and
-shift-inverting near the core index reaches them directly.
-
-Solving it
-----------
-The right-hand matrix is symmetric but *indefinite*, which ARPACK's generalized
-drivers assume away (scipy requires a positive semi-definite mass matrix). So the
-shift-invert operator (A - sigma B)^-1 B is formed explicitly and handed over as an
-ordinary standard eigenproblem, which carries no such assumption.
-
-Derivatives
------------
-eps_r, mu_r and k0 may be JAX or PyTorch values: solve_modes then returns n_eff,
-et and ez in that library with reverse-mode derivatives of the eigenvalues and of
-the fields (docs/packages/galerkin/differentiation.md). The NumPy eigensolve runs
-on their numbers first; each returned pair (lambda0, x0) then takes one Newton
-step on the eigenproblem bordered by the normalization x^T B x = 1,
-
-    [x; lambda] = [x0; lambda0] - J^{-1} F,   J = [[A - lambda0 B, -B x0], [-x0^T B, 0]],
-
-with the live A and B (galerkin.core.eigen): the values stay those of the NumPy
-solve up to its residual and the derivatives are the exact implicit ones. The
-returned gauge (unit 2-norm, largest entry real and positive) is then applied
-again, so field derivatives follow it; quantities that do not depend on the
-gauge (overlaps, power ratios) have gauge-free derivatives. A degenerate
-eigenvalue has no derivative: a mode whose eigenvalue lies within a relative
-DEGENERATE_GAP of another eigenvalue of the pencil, returned or not, gets NaN
-derivatives and a DegenerateModeWarning.
+With a ``ModalPML`` or a ``Bend`` the fields are covariant components in the stretched or bent
+coordinates; outside the PML of a straight guide they are the physical fields, and for a bend the
+physical E_z outside the PML is E_z / h with h = 1 + (x - bend_origin) / bend_radius. ``mode_power``
+and the other functions then integrate those components over the whole window, PML included.
 """
 
 from __future__ import annotations
 
-import warnings
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Any
 
 import numpy as np
-import scipy.sparse as sp
-import scipy.sparse.linalg as spla
 
-from .mesh import Mesh
+from ._conventions import to_kernel, to_public
+from ._public import refuse_text
+from ._waveguide_kernels import STATIC_ROOT_TOL, solve_modes as _solve_modes
+from .core.backend import is_live, to_numpy
+from .core.checks import contains_live
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (DEGENERATE_GAP is read here, as before)
 from .edge import EdgeSpace
-from .core import eigen, forms, kernels
-from .core import live as live_inputs
-from .core import solve as core_solve
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
-from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
-from .core.checks import contains_live, refuse_live
-from .core.sparse import CooMatrix
+from .mode_coordinates import mode_coordinates as _mode_coordinates
+from .mode_overlap import (confinement_factor as _confinement_factor, coupling_efficiency as _coupling_efficiency,
+                           effective_area as _effective_area, vector_cross_power as _vector_cross_power,
+                           vector_field_overlap as _vector_field_overlap, vector_power as _vector_power)
+
+__all__ = ["STATIC_ROOT_TOL", "DegenerateModeWarning", "ModalPML", "Bend", "WaveguideModes",
+           "solve_waveguide_modes", "mode_power", "cross_power", "field_overlap", "mode_coupling_efficiency",
+           "mode_confinement_factor", "mode_effective_area"]
+
+_SIDES = ("left", "right", "bottom", "top")
 
 
-def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
-                         space: EdgeSpace | None = None, *, coordinate_factors=None):
-    """Block matrices (A, B) of the mode eigenproblem A x = -beta^2 B x.
+def _finite_real(value, name, *, positive=False):
+    """A finite real Python or NumPy number as float (``refuse_text`` first: a str is a TypeError)."""
+    refuse_text(name, value)
+    if contains_live(value):
+        raise TypeError(f"{name}: a JAX or PyTorch value carries no derivative here; pass a number")
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise ValueError(f"{name} must be a finite real number" + (" > 0" if positive else "") + " in SI units")
+    value = float(value)
+    if not np.isfinite(value) or (positive and value <= 0):
+        raise ValueError(f"{name} must be a finite real number" + (" > 0" if positive else "") + " in SI units")
+    return value
 
-    eps_r, mu_r: scalar or per-triangle (T,) relative material parameters, real
-        or complex.
-    coordinate_factors: optional (T, 3) diagonal coordinate Jacobian (sx,sy,h).
-    Returns (A, B, space); x = (e_t over edges, e_z over nodes), no BC applied.
-    NumPy only: JAX and PyTorch values raise TypeError (solve_modes differentiates).
+
+@dataclass(frozen=True, kw_only=True)
+class ModalPML:
+    """A Cartesian perfectly matched layer inside the rectangular window of a mode solve.
+
+    pml_thickness: {side: m} for the sides "left", "right", "bottom" and "top" that carry a layer,
+        each > 0 (a side without a layer is left out); the layer is a strip of that width inside the
+        mesh, which must resolve it and keep a physical window.
+    pml_strength: the dimensionless strength of the coordinate stretch (default 3.0).
+    pml_order: the order 2, 3 or 4 of its profile (default 2).
+
+    In exp(-i omega t) the stretch is s = 1 + i pml_strength (depth / pml_thickness)^pml_order; the
+    solver builds the coordinate factors itself (in its kernels' convention), so no convention-bearing
+    array reaches the caller.
     """
-    for name, value in (("eps_r", eps_r), ("k0", k0), ("mu_r", mu_r), ("coordinate_factors", coordinate_factors)):
-        refuse_live(value, f"assemble_mode_system {name}")
-    space = space or EdgeSpace(mesh)
-    blocks = {name: m.to_scipy() for name, m in _mode_blocks(np, space, eps_r, mu_r, coordinate_factors).items()}
-    S, Mt_eps, Mt_mu, G, K, M = (blocks[n] for n in ("S", "Mt_eps", "Mt_mu", "G", "K", "M"))
-    n_e, n_n = space.num_edges, mesh.num_nodes
-    zero_en = sp.csr_matrix((n_e, n_n))
-    zero_nn = sp.csr_matrix((n_n, n_n))
 
-    A = sp.bmat([[S - k0 ** 2 * Mt_eps, zero_en],
-                 [zero_en.T,            zero_nn]]).tocsr()
-    B = sp.bmat([[Mt_mu, G],
-                 [G.T,   K - k0 ** 2 * M]]).tocsr()
-    return A, B, space
+    pml_thickness: Mapping[str, float]
+    pml_strength: float = 3.0
+    pml_order: int = 2
+
+    def __post_init__(self):
+        refuse_text("pml_thickness", self.pml_thickness)
+        if not isinstance(self.pml_thickness, Mapping) or not self.pml_thickness \
+                or set(self.pml_thickness) - set(_SIDES):
+            raise ValueError("pml_thickness must map one or more of 'left', 'right', 'bottom' and 'top' to a "
+                             "length in m")
+        widths = {side: _finite_real(value, f"pml_thickness[{side!r}]", positive=True)
+                  for side, value in self.pml_thickness.items()}
+        object.__setattr__(self, "pml_thickness", MappingProxyType(widths))
+        object.__setattr__(self, "pml_strength", _finite_real(self.pml_strength, "pml_strength", positive=True))
+        refuse_text("pml_order", self.pml_order)
+        if isinstance(self.pml_order, (bool, np.bool_)) or not isinstance(self.pml_order, (int, np.integer)) \
+                or self.pml_order not in (2, 3, 4):
+            raise ValueError("pml_order must be 2, 3 or 4")
+        object.__setattr__(self, "pml_order", int(self.pml_order))
 
 
-def _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors):
-    """The six blocks S, Mt_eps, Mt_mu, G, K, M of the mode system as CooMatrix in ``xp``.
+@dataclass(frozen=True, kw_only=True)
+class Bend:
+    """A constant-radius bend of the guide.
 
-    J = diag(sx, sy, h) maps eps' = eps det(J) J^-1 J^-T (likewise mu); the
-    transverse curl rotates axes, so beta and grad use (1/mu_y, 1/mu_x).
+    bend_radius: the radius in m of the reference arc, > 0, measured from ``bend_origin`` along
+        ``bend_axis``; z = bend_radius * theta is the arc length on it. Every point of the mesh
+        must lie at a positive radius.
+    bend_origin: the coordinate in m of the bend's centre on ``bend_axis`` (no default).
+    bend_axis: "x" (default) or "y", the outward axis of the bend.
     """
-    mesh = space.mesh
-    t = mesh.num_triangles
-    eps = xp.broadcast_to(lift(xp, eps_r), (t,))
-    inv_mu = xp.broadcast_to(1.0 / (np.asarray(mu_r) if backend_of(xp) is Backend.NUMPY
-                                     else lift(xp, mu_r)), (t,))
-    if coordinate_factors is None:
-        curl, mass_eps, mass_mu, grad = inv_mu, eps, inv_mu, inv_mu
-        stiff, mass = inv_mu, eps
+
+    bend_radius: float
+    bend_origin: float
+    bend_axis: str = "x"
+
+    def __post_init__(self):
+        object.__setattr__(self, "bend_radius", _finite_real(self.bend_radius, "bend_radius", positive=True))
+        object.__setattr__(self, "bend_origin", _finite_real(self.bend_origin, "bend_origin"))
+        if self.bend_axis not in ("x", "y"):
+            raise ValueError("bend_axis must be 'x' or 'y'")
+
+
+@dataclass(frozen=True)
+class WaveguideModes:
+    """The modes of ``solve_waveguide_modes``, sorted by descending Re(effective_index); frozen.
+
+    effective_index: (m,) beta / k0, real for a lossless guide, complex otherwise (exp(-i omega t):
+        Im >= 0 for a forward mode of a passive lossy guide).
+    unnormalized_electric_field_line_integral: (m, n_e) complex, the line integral of E_t along each
+        edge of ``space`` (from its lower to its higher node id), in m for fields in V/m.
+    unnormalized_electric_field_z: (m, n_n) complex, the longitudinal field E_z at the nodes.
+    space: the ``EdgeSpace`` of the mesh; ``galerkin.kernels.eval_edge_field`` evaluates E_t on it
+        (from the line integrals, in the kernels' convention).
+    vacuum_angular_wavenumber: k0 in rad/m.
+    relative_permittivity, relative_permeability: the materials of the solve, as given.
+
+    The fields have arbitrary amplitude and phase (the solver's gauge); ``mode_power`` gives the
+    power they carry. ``.units`` maps each quantity field to its SI unit.
+    """
+
+    effective_index: Any
+    unnormalized_electric_field_line_integral: Any
+    unnormalized_electric_field_z: Any
+    space: EdgeSpace
+    vacuum_angular_wavenumber: Any
+    relative_permittivity: Any
+    relative_permeability: Any = field(default=1.0)
+
+    UNITS = MappingProxyType({"effective_index": "1", "unnormalized_electric_field_line_integral": "m",
+                              "unnormalized_electric_field_z": "1", "vacuum_angular_wavenumber": "rad/m",
+                              "relative_permittivity": "1", "relative_permeability": "1"})
+
+    @property
+    def units(self):
+        """{field: canonical SI unit} of every quantity field (read-only)."""
+        return self.UNITS
+
+
+def _material(value, name, count):
+    """A relative permittivity or permeability: a number, a (T,) array or a live value; text is a TypeError."""
+    refuse_text(name, value)
+    if is_live(value):
+        return value
+    if isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a finite number or one per triangle")
+    if isinstance(value, (int, float, complex, np.number)):
+        if not np.isfinite(value):
+            raise ValueError(f"{name} must be finite")
+        return value
+    if contains_live(value):
+        raise TypeError(f"{name}: pass one JAX or PyTorch array, not a list of them")
+    a = np.asarray(value)
+    if a.dtype.kind not in "iufc" or a.shape not in ((), (count,)):
+        raise ValueError(f"{name} must be a finite number or an array of one value per triangle, shape ({count},)")
+    if not np.isfinite(a).all():
+        raise ValueError(f"{name} must be finite")
+    return a
+
+
+def _wavenumber(vacuum_wavelength, vacuum_angular_wavenumber):
+    """k0 in rad/m from exactly one of the two: k0 = 2 pi / vacuum_wavelength."""
+    refuse_text("vacuum_wavelength", vacuum_wavelength)
+    refuse_text("vacuum_angular_wavenumber", vacuum_angular_wavenumber)
+    if (vacuum_wavelength is None) == (vacuum_angular_wavenumber is None):
+        raise ValueError("give exactly one of vacuum_wavelength (m) and vacuum_angular_wavenumber (rad/m)")
+    name, value = (("vacuum_wavelength", vacuum_wavelength) if vacuum_wavelength is not None
+                   else ("vacuum_angular_wavenumber", vacuum_angular_wavenumber))
+    if is_live(value):
+        number = to_numpy(value)
+        if number.shape != () or number.dtype.kind not in "iuf" or not np.isfinite(number) or not number > 0:
+            raise ValueError(f"{name} must be a finite real number > 0 in SI units")
     else:
-        f = np.asarray(coordinate_factors)
-        if f.shape != (t, 3) or not np.isfinite(f).all() or np.any(f == 0):
-            raise ValueError("coordinate_factors must be finite nonzero (triangles, 3)")
-        sx, sy, h = (lift(xp, c) for c in f.T)
-
-        def diagonal(a, b):
-            zero = xp.zeros_like(a)
-            return xp.stack([xp.stack([a, zero], axis=-1), xp.stack([zero, b], axis=-1)], axis=-2)
-        d = diagonal(inv_mu * sy/(sx*h), inv_mu * sx/(sy*h))
-        curl, mass_eps = inv_mu*h/(sx*sy), diagonal(eps*sy*h/sx, eps*sx*h/sy)
-        mass_mu, grad, stiff, mass = d, d, d, eps*sx*sy/h
-    te, tn = space.tri_edges, mesh.triangles
-    n_e, n_n = space.num_edges, mesh.num_nodes
-    return {"S": forms.matrix(te, te, kernels.nedelec_curlcurl(space, curl), (n_e, n_e)),
-            "Mt_eps": forms.matrix(te, te, kernels.nedelec_mass(space, mass_eps), (n_e, n_e)),
-            "Mt_mu": forms.matrix(te, te, kernels.nedelec_mass(space, mass_mu), (n_e, n_e)),
-            "G": forms.matrix(te, tn, kernels.nedelec_grad(space, grad), (n_e, n_n)),
-            "K": forms.matrix(tn, tn, kernels.p1_stiffness(mesh, stiff), (n_n, n_n)),
-            "M": forms.matrix(tn, tn, kernels.p1_mass(mesh, mass), (n_n, n_n))}
+        value = _finite_real(value, name, positive=True)
+    return 2 * np.pi / value if name == "vacuum_wavelength" else value
 
 
-def _free_dofs(mesh, space, pec_nodes, pec_edges):
-    """Unconstrained DOFs of (e_t edges, e_z nodes) for the PEC nodes and edges."""
-    n_e = space.num_edges
-    if pec_nodes is None:
-        pec_nodes = np.unique(np.concatenate(
-            [mesh.boundary[k] for k in mesh.boundary]))
-    pec_nodes = np.asarray(pec_nodes, dtype=int)
-    if pec_edges is None:
-        pec_edges = space.boundary_edge_ids(pec_nodes)
-    pec_edges = np.asarray(pec_edges, dtype=int)
-    fixed = np.unique(np.concatenate(
-        [pec_edges, n_e + pec_nodes]))
-    return np.setdiff1d(np.arange(n_e + mesh.num_nodes), fixed)
+def _target(value):
+    refuse_text("target_effective_index", value)
+    if contains_live(value):
+        raise TypeError("target_effective_index only selects the modes and carries no derivative; pass a number")
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, complex, np.number)) \
+            or not np.isfinite(value) or not value.real > 0:
+        raise ValueError("target_effective_index must be a finite number with a positive real part")
+    return value
 
 
-def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
-                num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None):
-    """Guided modes with effective index near n_target.
+def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None,
+                          target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None,
+                          pec_edges=None, pml=None, bend=None, motion=None) -> WaveguideModes:
+    """Full-vector guided modes of a cross-section with effective index near ``target_effective_index``.
 
-    eps_r, mu_r and k0 may be JAX or PyTorch values; n_eff, et and ez are then
-    in that library with derivatives (see the module docstring for the method,
-    the field gauge and degenerate modes). coordinate_factors must be NumPy;
-    n_target only selects the modes and carries no derivative.
+    mesh: a ``Mesh`` in metres.
+    relative_permittivity, relative_permeability: a number or one value per triangle, real or complex
+        (exp(-i omega t): Im >= 0 is a loss); JAX or PyTorch values give the outputs derivatives.
+    vacuum_wavelength (m) or vacuum_angular_wavenumber (rad/m): exactly one; k0 = 2 pi / vacuum_wavelength.
+    target_effective_index: the shift of the eigensolve, real or complex; the core index is the
+        natural choice, since guided modes lie just below it.
+    search_mode_count: how many eigenpairs the shift-invert search computes; static roots
+        (beta^2 = 0) and, without a PML, backward or nonfinite roots are dropped, so at most this many
+        modes return.
+    pec_nodes, pec_edges: the nodes whose E_z and the edges whose tangential E are zero (PEC);
+        pec_nodes defaults to every boundary node, pec_edges to the boundary edges with both ends in
+        pec_nodes. An open guide is truncated by a PEC wall where the field has died, or by a ``ModalPML``.
+    pml: a ``ModalPML``; bend: a ``Bend`` (it needs a ``pml``). Every returned candidate is kept with a
+        PML: classifying physical modes is the caller's task.
+    motion: ``galerkin.shape.MeshMotion(design_velocity=..., t=...)`` solves on the nodes
+        X0 + t design_velocity, with the derivative with respect to a JAX or PyTorch t (not with a
+        pml or bend).
 
-    Complex eps_r and mu_r are expressed in the exp(+i omega t) convention:
-    passive absorption has Im eps_r < 0 (Im mu_r < 0) and the forward root has
-    Im n_eff < 0.
-    n_target may be complex. Lossy candidates keep their complex eigenvalues
-    and are ordered by descending Re n_eff; a finite PEC window and a shift
-    do not establish confinement or completeness. The real-material path is
-    retained. Returned fields have arbitrary amplitude, not unit power.
-
-    n_target: shift-invert target for beta/k0 — the core index is the natural
-              choice, since guided modes lie just below it.
-    pec_nodes: nodes carrying n x E = 0; defaults to every boundary node. An open
-              guide is truncated by putting this wall out where the evanescent
-              cladding field has already died.
-    pec_edges: explicit global EdgeSpace edge ids for tangential E constraints.
-              If omitted, boundary edges with both endpoints in pec_nodes are
-              fixed, preserving the original API. Supply explicit ids for mixed
-              walls: a one-edge PMC wall can have two PEC corner nodes without
-              being a PEC edge. pec_nodes still constrains the nodal E_z values.
-
-    coordinate_factors: optional per-element diagonal coordinate Jacobian.
-    Returned fields then are covariant computational components; for a bend
-    the physical longitudinal field outside PML is 1j*ez/h.
-
-    Returns (n_eff, space, et, ez) sorted by descending effective index:
-      n_eff (m,)      beta / k0
-      et    (m, n_e)  edge dofs of E_t  -> use eval_edge_field(space, et[i])
-      ez    (m, n_n)  nodal values with E_z = 1j * ez[i]
-
-    Both coefficient arrays are complex, preserving the eigensolver's full span.
-    The factor of i follows the variable transformation above. For a real basis,
-    the longitudinal component sits in quadrature with the transverse one; a
-    complex combination of degenerate modes need not have that componentwise
-    phase relation. The relative scaling, and hence |E_z|/|E_t|, is preserved.
+    Returns a ``WaveguideModes``. A mode whose eigenvalue lies within a relative ``DEGENERATE_GAP`` of
+    another one has NaN derivatives and raises ``DegenerateModeWarning``.
     """
-    if contains_live(coordinate_factors):
-        raise TypeError("coordinate_factors: derivatives with respect to modal coordinates are "
-                        "not provided; pass NumPy factors")
-    numeric = _solve_modes_numpy(mesh, live_inputs.numbers(eps_r), live_inputs.numbers(k0),
-                                 live_inputs.numbers(n_target), num_modes, live_inputs.numbers(mu_r),
-                                 pec_nodes, pec_edges=pec_edges, coordinate_factors=coordinate_factors)
-    if not any(contains_live(v) for v in (eps_r, k0, mu_r)):
-        return numeric
-    return _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors, *numeric)
+    count = mesh.num_triangles
+    eps = _material(relative_permittivity, "relative_permittivity", count)
+    mu = _material(relative_permeability, "relative_permeability", count)
+    k0 = _wavenumber(vacuum_wavelength, vacuum_angular_wavenumber)
+    target = _target(target_effective_index)
+    refuse_text("search_mode_count", search_mode_count)
+    if isinstance(search_mode_count, (bool, np.bool_)) or not isinstance(search_mode_count, (int, np.integer)) \
+            or search_mode_count < 1:
+        raise ValueError("search_mode_count must be a positive integer")
+    if pml is not None and not isinstance(pml, ModalPML):
+        raise TypeError("pml must be a galerkin.ModalPML")
+    if bend is not None and not isinstance(bend, Bend):
+        raise TypeError("bend must be a galerkin.Bend")
+    if bend is not None and pml is None:
+        raise ValueError("a bend needs a ModalPML: its coordinates are built with the layer")
+    factors = None
+    if pml is not None:
+        if motion is not None:
+            raise ValueError("motion: the PML and bend coordinates depend on the node positions; a motion is "
+                             "refused with a pml or bend")
+        if bend is not None:
+            axis = 0 if bend.bend_axis == "x" else 1
+            if not bend.bend_radius + mesh.nodes[:, axis].min() - bend.bend_origin > 0:
+                raise ValueError("bend_radius and bend_origin must put every node of the mesh at a positive radius")
+        coordinates = _mode_coordinates(
+            mesh, thickness=dict(pml.pml_thickness), strength=pml.pml_strength, order=pml.pml_order,
+            bend_radius=None if bend is None else bend.bend_radius,
+            bend_axis="x" if bend is None else bend.bend_axis, bend_origin=0.0 if bend is None else bend.bend_origin)
+        factors = coordinates.factors
+    if motion is not None:
+        for name, value in (("relative_permittivity", eps), ("relative_permeability", mu),
+                            ("vacuum_wavelength or vacuum_angular_wavenumber", k0)):
+            if contains_live(value):
+                raise TypeError(f"motion: {name} is a JAX or PyTorch value; with a motion only its t carries a "
+                                "derivative")
+    n_eff, space, et, ez = _solve_modes(mesh, to_kernel(eps), k0, to_kernel(target), int(search_mode_count),
+                                        to_kernel(mu), pec_nodes, pec_edges=pec_edges, coordinate_factors=factors,
+                                        motion=motion)
+    return WaveguideModes(to_public(n_eff), to_public(et), to_public(1j * ez), space, k0, eps, mu)
 
 
-def _live_blocks(xp, space, eps_r, mu_r, k0, coordinate_factors):
-    """(A, B) of ``assemble_mode_system`` in ``xp`` as coalesced CooMatrix, from ``_mode_blocks``."""
-    blocks = _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors)
-    n_e, n_n = space.num_edges, space.mesh.num_nodes
-    g = blocks["G"]
-    blocks_a = [(blocks["S"], 0, 0, 1.0), (blocks["Mt_eps"], 0, 0, -k0**2)]
-    blocks_b = [(blocks["Mt_mu"], 0, 0, 1.0), (g, 0, n_e, 1.0),
-                (CooMatrix(g.cols, g.rows, g.values, (n_n, n_e)), n_e, 0, 1.0),
-                (blocks["K"], n_e, n_e, 1.0), (blocks["M"], n_e, n_e, -k0**2)]
+# -- post-processing ---------------------------------------------------------------------------------------------
 
-    def joined(parts):
-        return CooMatrix(np.concatenate([b.rows + r for b, r, _, _ in parts]),
-                         np.concatenate([b.cols + c for b, _, c, _ in parts]),
-                         xp.concat([lift(xp, b.values) * scale for b, _, _, scale in parts]),
-                         (n_e + n_n, n_e + n_n)).coalesce()
-    return joined(blocks_a), joined(blocks_b)
+def _modes(value, name):
+    if not isinstance(value, WaveguideModes):
+        raise TypeError(f"{name} must be the WaveguideModes of solve_waveguide_modes")
+    return value
 
 
-def _pivot(v):
-    """The entry the NumPy solve made real and positive.
+def _index(modes, mode, name):
+    count = len(modes.effective_index)
+    if isinstance(mode, (bool, np.bool_)) or not isinstance(mode, (int, np.integer)) or not 0 <= mode < count:
+        raise ValueError(f"{name} must be a mode index in [0, {count})")
+    return int(mode)
 
-    It is the largest in magnitude; symmetric modes often have several equally
-    large entries, and the one the solve chose is the one left with zero phase.
+
+def _kernel_field(modes, mode):
+    """(et, ez, n_eff) of one mode in the kernels' convention: to_kernel of the public values, ez = E_z / 1j."""
+    return (to_kernel(modes.unnormalized_electric_field_line_integral[mode]),
+            -1j * to_kernel(modes.unnormalized_electric_field_z[mode]),
+            to_kernel(modes.effective_index[mode]))
+
+
+def _same_cross_section(a, b, name_a, name_b):
+    ma, mb = a.space.mesh, b.space.mesh
+    if ma is not mb and not (ma.nodes.shape == mb.nodes.shape and np.array_equal(ma.nodes, mb.nodes)
+                             and np.array_equal(ma.triangles, mb.triangles)):
+        raise ValueError(f"{name_a} and {name_b} must be solved on the same mesh")
+
+
+def mode_power(modes, mode) -> complex:
+    """The complex Poynting integral P = 1/2 int (E x H^*) . zhat dA of one mode, in W for fields in V/m.
+
+    Re P is the time-averaged power the mode carries in +z; for a lossless mode Im P is zero up to
+    rounding. exp(-i omega t). NumPy values only (``galerkin.kernels.vector_power``).
     """
-    size = np.abs(v)
-    candidates = np.flatnonzero(size >= size.max() * (1 - 1e-12))
-    return int(candidates[np.argmin(np.abs(np.angle(v[candidates])))])
+    modes = _modes(modes, "modes")
+    mode = _index(modes, mode, "mode")
+    et, ez, n_eff = _kernel_field(modes, mode)
+    return to_public(_vector_power(modes.space, et, ez, n_eff, modes.vacuum_angular_wavenumber,
+                                   to_kernel(modes.relative_permeability)))
 
 
-def _restricted(matrix, position, size):
-    keep = np.flatnonzero((position[matrix.rows] >= 0) & (position[matrix.cols] >= 0))
-    return CooMatrix(position[matrix.rows[keep]], position[matrix.cols[keep]],
-                     matrix.values[keep], (size, size))
+def cross_power(modes_a, mode_a, modes_b, mode_b) -> complex:
+    """P_ab = 1/2 int (E_a x H_b^*) . zhat dA, in W for fields in V/m; exp(-i omega t).
+
+    H_b is the magnetic field of mode ``mode_b`` of ``modes_b``, with its permeability. Both solves
+    must share the mesh and k0. For a = b this is ``mode_power``. NumPy values only.
+    """
+    modes_a, modes_b = _modes(modes_a, "modes_a"), _modes(modes_b, "modes_b")
+    mode_a, mode_b = _index(modes_a, mode_a, "mode_a"), _index(modes_b, mode_b, "mode_b")
+    _same_cross_section(modes_a, modes_b, "modes_a", "modes_b")
+    if modes_a.vacuum_angular_wavenumber != modes_b.vacuum_angular_wavenumber:
+        raise ValueError("modes_a and modes_b must be solved at the same vacuum wavelength")
+    et_a, ez_a, _ = _kernel_field(modes_a, mode_a)
+    et_b, ez_b, n_eff_b = _kernel_field(modes_b, mode_b)
+    return to_public(_vector_cross_power(modes_b.space, et_a, ez_a, et_b, ez_b, n_eff_b,
+                                         modes_b.vacuum_angular_wavenumber, to_kernel(modes_b.relative_permeability)))
 
 
-def _live_modes(mesh, eps_r, k0, mu_r, pec_nodes, pec_edges, coordinate_factors,
-                n_eff0, space, et0, ez0):
-    """The NumPy modes with derivatives: a bordered Newton step per mode (module docstring)."""
-    leaves = live_inputs.leaves(eps_r, k0, mu_r)
-    xp = live_namespace(*leaves)
-    complex_dtype = xp.complex128
-    n_e, n_n = space.num_edges, mesh.num_nodes
-    free = _free_dofs(mesh, space, pec_nodes, pec_edges)
-    position = np.full(n_e + n_n, -1)
-    position[free] = np.arange(len(free))
-    n = len(free)
-    k0_live = lift(xp, k0, xp.float64)
-    A, B = (_restricted(m, position, n) for m in _live_blocks(xp, space, eps_r, mu_r, k0_live,
-                                                              coordinate_factors))
-    A_numbers, B_numbers = eigen.scipy_matrix(A), eigen.scipy_matrix(B)
-    real_problem = np.isrealobj(n_eff0)
-    k0_number = float(to_numpy(k0_live))
-    lam0 = -(k0_number * np.asarray(n_eff0)) ** 2
-    degenerate = eigen.degenerate_modes(A_numbers, B_numbers, lam0)
-    if degenerate:
-        warnings.warn(f"modes {degenerate} belong to degenerate eigenvalues (relative gap <= "
-                      f"{DEGENERATE_GAP:g}); their derivatives are NaN", DegenerateModeWarning,
-                      stacklevel=3)
-    n_eff, et, ez = [], [], []
-    for i in range(len(lam0)):
-        beta0 = k0_number * n_eff0[i]
-        v = np.concatenate([et0[i] * beta0, ez0[i]])[free]
-        if i in degenerate:
-            n_eff.append(core_solve.nan_derivative(xp, np.asarray(n_eff0[i]), leaves))
-            et.append(core_solve.nan_derivative(xp, et0[i], leaves))
-            ez.append(core_solve.nan_derivative(xp, ez0[i], leaves))
-            continue
-        x, lam = eigen.refine(xp, A, B, v / np.sqrt(v @ (B_numbers @ v)), lam0[i])  # x0^T B x0 = 1
-        beta = xp.sqrt(-lam)
-        pivot = _pivot(v)
-        x = x * xp.conj(x[pivot]) / (xp.abs(x[pivot]) * xp.sqrt(xp.sum(xp.abs(x) ** 2)))
-        full = scatter_add(xp, n_e + n_n, free, x)
-        n_eff.append(xp.real(beta) / k0_live if real_problem else beta / k0_live)
-        et.append(full[:n_e] / beta)
-        ez.append(full[n_e:])
-    if not n_eff:
-        empty = (xp.zeros(0, dtype=xp.float64 if real_problem else complex_dtype),
-                 xp.zeros((0, n_e), dtype=complex_dtype), xp.zeros((0, n_n), dtype=complex_dtype))
-        return empty[0], space, empty[1], empty[2]
-    return xp.stack(n_eff), space, xp.stack(et), xp.stack(ez)
+def field_overlap(modes_a, mode_a, modes_b, mode_b) -> complex:
+    """<E_a, E_b> = int E_a^* . E_b dA over the cross-section, both components, in m^2 for fields in V/m.
+
+    exp(-i omega t). Both solves must share the mesh. NumPy values only.
+    """
+    modes_a, modes_b = _modes(modes_a, "modes_a"), _modes(modes_b, "modes_b")
+    mode_a, mode_b = _index(modes_a, mode_a, "mode_a"), _index(modes_b, mode_b, "mode_b")
+    _same_cross_section(modes_a, modes_b, "modes_a", "modes_b")
+    et_a, ez_a, _ = _kernel_field(modes_a, mode_a)
+    et_b, ez_b, _ = _kernel_field(modes_b, mode_b)
+    return to_public(_vector_field_overlap(modes_a.space, et_a, ez_a, et_b, ez_b))
 
 
-def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
-                       num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None,
-                       coordinate_factors=None):
-    """The NumPy eigensolve of ``solve_modes`` (NumPy inputs only)."""
-    eps_r, mu_r = np.asarray(eps_r), np.asarray(mu_r)
-    if not np.isfinite(eps_r).all():
-        raise ValueError("eps_r must be finite")
-    if not np.isfinite(mu_r).all():
-        raise ValueError("mu_r must be finite")
-    complex_problem = (bool(np.any(eps_r.imag != 0) or np.any(mu_r.imag != 0))
-                       or coordinate_factors is not None)
-    if not complex_problem:
-        eps_r, mu_r = eps_r.real, mu_r.real
-    A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r, coordinate_factors=coordinate_factors)
-    n_e, n_n = space.num_edges, mesh.num_nodes
+def mode_coupling_efficiency(modes, mode, incident, incident_mode) -> float:
+    """eta = |<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>) with the field overlap, both components.
 
-    free = _free_dofs(mesh, space, pec_nodes, pec_edges)
+    The incident field is mode ``incident_mode`` of the solve ``incident`` on the same mesh. ``mode``
+    may be a sequence of mode indices: eta is then the share of the incident field in their span (a
+    degenerate pair). Real and dimensionless. NumPy values only.
+    """
+    modes, incident = _modes(modes, "modes"), _modes(incident, "incident")
+    indices = [_index(modes, m, "mode") for m in (mode if isinstance(mode, Sequence) else [mode])]
+    if not indices:
+        raise ValueError("mode must name at least one mode")
+    incident_mode = _index(incident, incident_mode, "incident_mode")
+    _same_cross_section(modes, incident, "modes", "incident")
+    parts = [_kernel_field(modes, m) for m in indices]
+    et_in, ez_in, _ = _kernel_field(incident, incident_mode)
+    et_mode = np.stack([p[0] for p in parts]) if isinstance(mode, Sequence) else parts[0][0]
+    ez_mode = np.stack([p[1] for p in parts]) if isinstance(mode, Sequence) else parts[0][1]
+    return to_public(_coupling_efficiency(modes.space, et_mode, ez_mode, et_in, ez_in))
 
-    A, B = A[free][:, free].tocsc(), B[free][:, free].tocsc()
-    n = A.shape[0]
 
-    # Shift-invert as a standard problem: nu = 1 / (lam - sigma), lam = -beta^2
-    sigma = -(k0 * n_target) ** 2
-    lu = spla.splu((A - sigma * B).tocsc())
-    op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
-    nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
-                         ncv=min(n, max(4 * num_modes, 40)), maxiter=20000)
+def _region_mask(mesh, regions):
+    """A triangle mask from region names (a name or a sequence of names) or a mask or index array of triangles."""
+    names = [regions] if isinstance(regions, str) else regions
+    if isinstance(names, Sequence) and names and all(isinstance(n, str) for n in names):
+        if mesh.regions is None or mesh.region_names is None:
+            raise ValueError("regions names mesh regions, but the mesh carries no region names")
+        unknown = sorted(set(names) - set(mesh.region_names))
+        if unknown:
+            raise ValueError(f"regions {unknown} are not regions of the mesh ({mesh.region_names})")
+        ids = [mesh.region_names.index(n) for n in names]
+        return np.isin(mesh.regions, ids)
+    return regions
 
-    beta2 = -(sigma + 1.0 / nu)
-    if complex_problem:
-        beta = np.sqrt(beta2.astype(complex))
-        if coordinate_factors is not None:
-            if not np.isfinite(beta).all() or np.any(beta == 0):
-                raise RuntimeError("modal coordinate search returned a nonfinite or zero propagation root")
-            keep = np.arange(len(beta))  # let the caller record every candidate and exclusion
-        else:
-            keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0))
-        keep = keep[np.lexsort((beta[keep].imag, -beta[keep].real))]
-    else:
-        beta2 = beta2.real
-        keep = np.where(beta2 > 0.0)[0]
-        keep = keep[np.argsort(beta2[keep])[::-1]]
-        beta = np.sqrt(np.maximum(beta2, 0.0))
 
-    n_eff = beta[keep] / k0
-    et = np.zeros((len(keep), n_e), dtype=complex)
-    ez = np.zeros((len(keep), n_n), dtype=complex)
-    for i, j in enumerate(keep):
-        v = vecs[:, j]
-        pivot = v[np.argmax(np.abs(v))]
-        v = v * (pivot.conjugate() / abs(pivot))  # fix ARPACK's phase
-        # A real pencil can return complex bases of a degenerate eigenspace.
-        # Taking real parts column by column can collapse independent directions.
-        # Preserve each eigenvector; do not mix nearby, distinct eigenpairs.
-        x = np.zeros(n_e + n_n, dtype=complex)
-        x[free] = v
-        et[i] = x[:n_e] / beta[j]   # e_t = beta E_t  ->  E_t
-        ez[i] = x[n_e:]
-    return n_eff, space, et, ez
+def mode_confinement_factor(modes, mode, regions) -> float:
+    """Gamma = int_R Re(eps_r) |E|^2 dA / int Re(eps_r) |E|^2 dA, the energy share of one mode in R.
+
+    regions: a region name or a sequence of names of the mesh, or a boolean mask (T,) or an index
+    array of the triangles of R. Both E_t and E_z count; only the real part of the permittivity
+    weights the field. Real and dimensionless. NumPy values only.
+    """
+    modes = _modes(modes, "modes")
+    mode = _index(modes, mode, "mode")
+    et, ez, _ = _kernel_field(modes, mode)
+    return to_public(_confinement_factor(modes.space, et, ez, to_kernel(modes.relative_permittivity),
+                                         _region_mask(modes.space.mesh, regions)))
+
+
+def mode_effective_area(modes, mode, *, include_longitudinal=False) -> float:
+    """A_eff = (int |E|^2 dA)^2 / int |E|^4 dA of one mode, in m^2.
+
+    By default |E|^2 = |E_t|^2, the usual transverse definition; with include_longitudinal=True it is
+    |E_t|^2 + |E_z|^2. NumPy values only.
+    """
+    modes = _modes(modes, "modes")
+    mode = _index(modes, mode, "mode")
+    et, ez, _ = _kernel_field(modes, mode)
+    return to_public(_effective_area(modes.space, et, ez, include_longitudinal=include_longitudinal))

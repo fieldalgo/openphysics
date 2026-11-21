@@ -16,8 +16,9 @@ python examples/galerkin/temperature_joule_heating.py
 ```
 
 The [example](../../../examples/galerkin/temperature_joule_heating.py) uses a
-1 m × 0.25 m rectangle with 16 × 4 cells. The left potential is 0 V and the
-right outward current density is 1 A/m². The other electric natural boundaries
+1 m × 0.25 m rectangle with 16 × 4 cells. The left potential is 0 V and a
+current density of 1 A/m² leaves through the right edge (the example passes
+`inward_current_density={'right': -1.}`). The other electric natural boundaries
 are insulated. Both thermal ends are 300 K, the top/bottom are insulated,
 and k=1 W/(m K). Current density is not total current: the right edge carries
 0.25 A/m of extrusion depth.
@@ -32,7 +33,7 @@ is used to force a solution into the range.
 
 ## 2. Read a converged calculation
 
-A run with the example's `relaxation=1.` gives approximately:
+A run with the example's `relaxation_factor=1.` gives approximately:
 
 ```text
 Maximum temperature: 300.131806613 K
@@ -56,7 +57,7 @@ independent refinement evidence. A successful iteration alone is not that eviden
 ## 3. Understand the stopping checks
 
 Each Picard step computes a trial heat solution H(T) from conductivity evaluated
-at T, then updates `T_next=T+relaxation*(H(T)-T)`.
+at T, then updates `T_next=T+relaxation_factor*(H(T)-T)`.
 
 - The temperature defect measures **H(T)−T before relaxation**, in kelvin.
 - A separate relative conductivity-defect check must pass.
@@ -74,10 +75,10 @@ Copy the script outside `packages/` and change one setting at a time.
 
 | Change | What to examine |
 |---|---|
-| `relaxation=.5` | Same solution within tolerance; a local run took 33 iterations rather than 8 |
+| `relaxation_factor=.5` | Same solution within tolerance; a local run took 33 iterations rather than 8 |
 | Change `method='picard'` to `method='newton'` in the solver call | Same solution within tolerance in 3 states rather than 8 ([Newton method](temperature_joule_heating.md#newton-method)) |
 | Replace `.5*(t-300)` by `0.*(t-300)` | Constant sigma=1 S/m: maximum 300.125 K, power 0.25 W/m |
-| Add `max_iterations=1` to the solver call | `JouleConvergenceError`: the budget is insufficient; one completed history record is retained |
+| Add `iteration_limit=1` to the solver call | `JouleConvergenceError`: the budget is insufficient; one completed history record is retained |
 | Change the model range to `(300., 300.05)` | A trial exceeds the valid material range; no successful partial result is returned |
 
 For diagnostics, import `JouleConvergenceError` from

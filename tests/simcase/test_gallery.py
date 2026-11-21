@@ -34,10 +34,10 @@ def test_quick_gallery_renders_every_item(tmp_path):
     values = _gallery().main([str(out), "--quick"])
     assert json.loads((out / "gallery.json").read_text(encoding="utf-8")) == values
 
-    times = Document.load(EXAMPLES / "gallery_heated_plate.json")["study"]["time_s"][::8]
+    times = Document.load(EXAMPLES / "gallery_heated_plate.json").si["study"]["time"][::8]
     plate = values["heated_plate"]
-    assert plate["frames"] == len(times) and plate["end_time_s"] == times[-1]
-    assert plate["max_rise_k"] > 0
+    assert plate["frames"] == len(times) and plate["end_time"] == times[-1]
+    assert plate["maximum_temperature_rise"] > 0
     with Image.open(out / "heated_plate.webp") as animation:
         assert animation.is_animated and animation.n_frames == len(times)
     with Image.open(out / "heated_plate.png") as poster:

@@ -66,11 +66,11 @@ thickness parameter is accepted. This avoids hiding a length factor in loads.
 | E, stress | scalar E or `{region name: E}`; stress `(T,3)` | Pa = N/m^2 |
 | nu, strain | scalar nu or `{region name: nu}`; strain `(T,3)`, engineering shear | dimensionless |
 | Prescribed/result displacement | scalar per `(node,component)`; result `(N,2)` | m |
-| body_force | constant `(2,)`, or callback `(Q,2)->(Q,2)` | N/m^3 |
+| body_force_density | `None` (none), constant `(2,)`, or callback `(Q,2)->(Q,2)` | N/m^3 |
 | stiffness matrix, internal | `(2N,2N)` | N/m^2 |
-| result.load | total consistent body and boundary nodal load `(N,2)` | N/m of thickness |
-| result.reaction | support force ON the body, `(N,2)` | N/m of thickness |
-| result.residual | `K*u-load` at all DOFs, `(N,2)` | N/m of thickness |
+| result.applied_force_per_depth | total consistent body and boundary nodal load `(N,2)` | N/m of thickness |
+| result.reaction_force_per_depth | support force ON the body, `(N,2)` | N/m of thickness |
+| result.residual_force_per_depth | `K*u-load` at all DOFs, `(N,2)` | N/m of thickness |
 | `0.5*u.T*K*u`, if reconstructed | energy per thickness | J/m = N |
 
 For a physical thickness t in metres, multiply load, reaction and energy by t
@@ -87,14 +87,17 @@ from galerkin.elasticity import solve_elasticity
 
 mesh = rectangle_mesh(.1, .02, 20, 4)  # coordinates in metres
 bc = {(int(i), c): 0. for i in mesh.boundary["left"] for c in (0, 1)}
-r = solve_elasticity(mesh, young_modulus=70e9, poisson_ratio=.3,
-                     plane="stress", dirichlet=bc,
-                     body_force=(0., -2700*9.81))
+r = solve_elasticity(mesh, youngs_modulus=70e9, poisson_ratio=.3,
+                     plane="stress", prescribed_displacement=bc,
+                     body_force_density=(0., -2700*9.81))
 print(r.displacement[:, 1].min())
-print(r.load.sum(axis=0), r.reaction.sum(axis=0))
+print(r.applied_force_per_depth.sum(axis=0), r.reaction_force_per_depth.sum(axis=0))
 ```
 
-`dirichlet` is a mapping `{(node_index, component): value_in_metres}`;
+`solve_elasticity(mesh, *, youngs_modulus, poisson_ratio, plane,
+prescribed_displacement, body_force_density=None, traction=None, motion=None)`
+takes SI numbers under registry names; a `str` value raises `TypeError`.
+`prescribed_displacement` is a mapping `{(node_index, component): value_in_metres}`;
 component 0 is x, component 1 is y. Nonzero values are supported. Indices must
 be integers (not booleans), and nodes must be on the geometric boundary,
 including hole boundaries. It does not depend on the names in `mesh.boundary`.
@@ -114,8 +117,12 @@ callback is evaluated once; stateful callbacks are discouraged. Constant
 forces must have exactly shape `(2,)`. Arrays of per-node/per-element loads
 are not interpreted implicitly.
 
-`ElasticityResult` contains `displacement`, `strain`, `stress`, `load`,
-`reaction`, `residual`, and the explicit `plane` string. Reaction is `K*u-load`
+`ElasticityResult` (frozen) contains `displacement`, `strain`, `stress`,
+`applied_force_per_depth`, `reaction_force_per_depth`,
+`residual_force_per_depth`, and the explicit `plane` string; `result.units` maps
+each quantity field to its SI unit, and asking for a name without `_per_depth`
+(such as `reaction_force`) raises an `AttributeError` that names the per-depth
+field. Reaction is `K*u-load`
 at prescribed DOFs and zero at free DOFs. Residual at free DOFs should be small;
 its prescribed entries are physical reactions, not a convergence failure.
 For zero applied traction, `sum(reaction)+sum(load)=0`, up to solve roundoff.

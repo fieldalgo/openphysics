@@ -17,8 +17,9 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
-      # Run one platform at a time to share runner capacity; all three platform checks still run.
-      max-parallel: 1
+      # The three platforms run at the same time. One at a time (max-parallel: 1, set on
+      # 2026-10-17 to share runner capacity) took 19.6 min in run 44870205876 (Ubuntu 5:09,
+      # macOS 5:44, Windows 8:40) and set the length of the whole validation run.
       matrix:
         os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}

@@ -21,8 +21,8 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (rectangle_mesh, EdgeSpace, assemble_curlcurl,
-                      assemble_edge_mass, assemble_stiffness, assemble_mass)
+from galerkin import rectangle_mesh, EdgeSpace
+from galerkin.kernels import assemble_curlcurl, assemble_edge_mass, assemble_stiffness, assemble_mass
 
 A_WG, B_WG = 1.0, 0.5
 

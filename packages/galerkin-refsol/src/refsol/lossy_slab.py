@@ -7,15 +7,26 @@ Geometry. ``x`` is the layered direction and ``z`` the propagation direction.
 ``eps[0]`` fills the left half-space ``x < 0``, ``eps[j]`` for ``0 < j < N-1``
 the layer of thickness ``thickness[j-1]`` whose left face is at
 ``sum(thickness[:j-1])``, and ``eps[N-1]`` the right half-space beyond the last
-interface. Every material is isotropic and may be complex; lengths use the unit
-of ``wavelength``.
+interface. Every material is isotropic and may be complex.
 
-Convention. Fields vary as ``exp(+i omega t - i beta z)`` with
-``beta = k0 n_eff``, ``k0 = 2 pi / wavelength`` — the convention of the
-galerkin mode solvers. A passive material has ``Im eps <= 0`` (a refractive
-index ``n' - i n''`` with ``n'' >= 0``) and a mode attenuated along ``+z`` has
-``Im n_eff < 0``. ``refsol.slab`` and ``refsol.scattering`` use ``exp(-i omega t)``;
-their complex quantities are the conjugates of the ones here.
+Public API (galerkin step, L3 commit 11c). The public functions take SI
+keyword-only registry names: ``relative_permittivity`` one value per layer (left
+half-space first), ``thickness`` one value per interior layer in m,
+``vacuum_wavelength`` in m, ``effective_index`` and ``target_effective_index``;
+``points`` (x in m) leads ``field``. Their complex values follow exp(-i omega t),
+as the rest of refsol: a passive material has ``Im eps >= 0`` (a refractive index
+``n' + i n''`` with ``n'' >= 0``) and a mode attenuated along ``+z`` has
+``Im n_eff > 0``. The arithmetic below is written in exp(+i omega t), the
+convention of the galerkin mode kernels, and is unchanged: each public function
+converts its complex inputs with ``refsol._conventions.to_kernel`` and returns
+``to_public`` of the result, the conjugate, so the formulas and the branch rules
+below read with the signs of exp(+i omega t). On the public side ``"decay"`` has
+``Im Q >= 0`` and a leaky mode on ``"outgoing"`` has ``Im n_eff > 0``.
+
+Convention of the formulas below. Fields vary as ``exp(+i omega t - i beta z)`` with
+``beta = k0 n_eff``, ``k0 = 2 pi / wavelength``. A passive material has
+``Im eps <= 0`` (a refractive index ``n' - i n''`` with ``n'' >= 0``) and a mode
+attenuated along ``+z`` has ``Im n_eff < 0``.
 
 Equation. The principal field component ``phi`` is ``E_y`` for TE and ``H_y`` for
 TM. In each layer ``phi'' + k0**2 (eps - n_eff**2) phi = 0``, and at an interface
@@ -85,6 +96,11 @@ import numpy as np
 from scipy.optimize import root
 
 from . import slab as _slab
+from ._checks import pair, refuse_text
+from ._conventions import to_kernel, to_public
+
+__all__ = ["BRANCHES", "exterior_root", "characteristic", "residual", "solve", "continued_root",
+           "three_layer_modes", "substrate_leaky_mode", "field"]
 
 BRANCHES = ("decay", "outgoing")
 
@@ -117,7 +133,7 @@ def _branches(branches):
     return tuple(branches)
 
 
-def exterior_root(eps, neff, branch) -> complex:
+def _exterior_root(eps, neff, branch) -> complex:
     """``Q = sqrt(eps - neff**2)`` of a half-space on the ``"decay"`` or ``"outgoing"`` sheet.
 
     ``"decay"`` returns the root with ``Im Q <= 0``; ``"outgoing"`` the root with
@@ -150,17 +166,17 @@ def _transfer(neff, eps, w, d, k0, branches):
     ``scale`` sums the state magnitudes at every interface.
     """
     neff = complex(neff)
-    q0 = exterior_root(eps[0], neff, branches[0])
+    q0 = _exterior_root(eps[0], neff, branches[0])
     state = np.array([1.0, 1j * q0 / w[0]], dtype=complex)
     scale = abs(state[0]) + abs(state[1])
     for j in range(1, len(eps) - 1):
         state = _layer_matrix(eps[j], w[j], neff, k0 * d[j - 1]) @ state
         scale += abs(state[0]) + abs(state[1])
-    qr = exterior_root(eps[-1], neff, branches[1])
+    qr = _exterior_root(eps[-1], neff, branches[1])
     return state[0], state[1], qr / w[-1], scale
 
 
-def characteristic(neff, eps, thickness, wavelength, pol="TE",
+def _characteristic(neff, eps, thickness, wavelength, pol="TE",
                    branches=("decay", "decay")) -> complex:
     """``F(n_eff)``: the analytic characteristic function whose zeros are the modes."""
     eps, d = _stack(eps, thickness)
@@ -170,7 +186,7 @@ def characteristic(neff, eps, thickness, wavelength, pol="TE",
     return complex(psi + 1j * z * phi)
 
 
-def residual(neff, eps, thickness, wavelength, pol="TE", branches=("decay", "decay")) -> float:
+def _residual(neff, eps, thickness, wavelength, pol="TE", branches=("decay", "decay")) -> float:
     """``|F|`` relative to the magnitude of the quantities that formed it.
 
     The scale is ``(1 + |Q_R / w_R|)`` times the sum over all interfaces of the
@@ -188,7 +204,7 @@ def residual(neff, eps, thickness, wavelength, pol="TE", branches=("decay", "dec
     return float(abs(psi + 1j * z * phi) / scale) if scale > 0 else float("inf")
 
 
-def solve(eps, thickness, wavelength, guess, pol="TE", branches=("decay", "decay"),
+def _solve(eps, thickness, wavelength, guess, pol="TE", branches=("decay", "decay"),
           tol=1e-12, max_newton=12) -> complex:
     """Refine ``guess`` to a zero of ``F`` and verify it.
 
@@ -214,24 +230,25 @@ def solve(eps, thickness, wavelength, guess, pol="TE", branches=("decay", "decay
     answer = root(parts, [start.real, start.imag], method="hybr", tol=1e-13)
     n = complex(answer.x[0], answer.x[1]) if answer.success else start
     # Newton polish: F is analytic, so a complex central difference is its derivative.
-    best, best_res = n, residual(n, eps, d, wavelength, pol, br)
+    best, best_res = n, _residual(n, eps, d, wavelength, pol, br)
     for _ in range(max_newton):
         h = 1e-7 * max(1.0, abs(n))
         derivative = (f(n + h) - f(n - h)) / (2 * h)
         if derivative == 0:
             break
         n = n - f(n) / derivative
-        res = residual(n, eps, d, wavelength, pol, br)
+        res = _residual(n, eps, d, wavelength, pol, br)
         if res < best_res:
             best, best_res = n, res
         if res < 1e-16:
             break
     if not (best_res <= tol):
-        raise RuntimeError(f"no root near {start}: residual {best_res:.3e} > {tol:.1e} at {best}")
+        # the message shows the caller's values: public exp(-i omega t), as every public input and output
+        raise RuntimeError(f"no root near {to_public(start)}: residual {best_res:.3e} > {tol:.1e} at {to_public(best)}")
     return best
 
 
-def continued_root(path, wavelength, neff_start, pol="TE", branches=("decay", "decay"),
+def _continued_root(path, wavelength, neff_start, pol="TE", branches=("decay", "decay"),
                    steps=8, tol=1e-12) -> complex:
     """Follow one root of ``F`` along ``path(t) -> (eps, thickness)`` from ``t=0`` to ``t=1``.
 
@@ -240,12 +257,12 @@ def continued_root(path, wavelength, neff_start, pol="TE", branches=("decay", "d
     as the guess for ``solve``. Returns the root at ``t=1``.
     """
     if steps < 1:
-        raise ValueError("steps must be a positive integer")
+        raise ValueError("subdivision_count must be a positive integer")
     previous, current = None, complex(neff_start)
     for i in range(1, steps + 1):
         eps, d = path(i / steps)
         guess = current if previous is None else 2 * current - previous
-        found = solve(eps, d, wavelength, guess, pol, branches, tol=tol)
+        found = _solve(eps, d, wavelength, guess, pol, branches, tol=tol)
         previous, current = current, found
     return current
 
@@ -257,7 +274,7 @@ def _passive_index(value, name):
     return n
 
 
-def three_layer_modes(n_f, n_s, n_c, d, wavelength, pol="TE", max_modes=50,
+def _three_layer_modes(n_f, n_s, n_c, d, wavelength, pol="TE", max_modes=50,
                       steps=8, tol=1e-12) -> list[complex]:
     """Bound modes of an absorbing slab ``n_s | n_f | n_c`` (substrate at ``x<0``), m = 0 first.
 
@@ -270,18 +287,19 @@ def three_layer_modes(n_f, n_s, n_c, d, wavelength, pol="TE", max_modes=50,
     eps = np.array([ns * ns, nf * nf, nc * nc])
     real_index = np.sqrt(eps.real)
     if not real_index[1] > max(real_index[0], real_index[2]):
-        raise ValueError("Re(eps_f) must exceed Re(eps_s) and Re(eps_c): the lossless structure must guide")
-    lossless = _slab.modes(real_index[1], real_index[0], real_index[2], d, wavelength, pol, max_modes)
+        raise ValueError("Re of the film's permittivity must exceed the substrate's and the cover's: the lossless "
+                         "structure must guide")
+    lossless = _slab._modes(real_index[1], real_index[0], real_index[2], d, wavelength, pol, max_modes)
     if not np.any(eps.imag):
         return [complex(n) for n in lossless]
 
     def path(t):
         return eps.real + 1j * t * eps.imag, [d]
 
-    return [continued_root(path, wavelength, n, pol, ("decay", "decay"), steps, tol) for n in lossless]
+    return [_continued_root(path, wavelength, n, pol, ("decay", "decay"), steps, tol) for n in lossless]
 
 
-def substrate_leaky_mode(n_f, n_gap, n_sub, d, gap, wavelength, n_cover=None, pol="TE",
+def _substrate_leaky_mode(n_f, n_gap, n_sub, d, gap, wavelength, n_cover=None, pol="TE",
                          mode=0, steps=12, tol=1e-12) -> complex:
     """Leaky mode of ``cover | film d | gap material | substrate`` with ``Re n_sub > Re n_eff``.
 
@@ -299,17 +317,17 @@ def substrate_leaky_mode(n_f, n_gap, n_sub, d, gap, wavelength, n_cover=None, po
     ncov = ng if n_cover is None else _passive_index(n_cover, "n_cover")
     gap = float(gap)
     if not gap > 0:
-        raise ValueError("gap must be positive")
+        raise ValueError("thickness must hold a positive gap thickness")
     eps = np.array([ncov * ncov, nf * nf, ng * ng, nsub * nsub])
     real_index = np.sqrt(eps.real)
     if not real_index[1] > max(real_index[0], real_index[2]):
         raise ValueError("the lossless cover | film | gap slab must guide")
-    lossless = _slab.modes(real_index[1], real_index[0], real_index[2], d, wavelength, pol)
+    lossless = _slab._modes(real_index[1], real_index[0], real_index[2], d, wavelength, pol)
     if mode >= len(lossless):
         raise ValueError(f"the isolated slab guides only {len(lossless)} {pol} mode(s)")
     n0 = lossless[mode]
     if not real_index[3] > n0:
-        raise ValueError("Re n_sub must exceed the bound effective index for leakage into the substrate")
+        raise ValueError("the substrate's Re refractive_index must exceed the bound effective index for leakage")
     k0 = 2 * math.pi / float(wavelength)
     gamma = math.sqrt(n0 * n0 - real_index[2] ** 2)
     start_gap = max(gap, 8.0 / (k0 * gamma))
@@ -317,10 +335,10 @@ def substrate_leaky_mode(n_f, n_gap, n_sub, d, gap, wavelength, n_cover=None, po
     def path(t):
         return eps.real + 1j * t * eps.imag, [d, start_gap * (gap / start_gap) ** t]
 
-    return continued_root(path, wavelength, n0, pol, ("decay", "outgoing"), steps, tol)
+    return _continued_root(path, wavelength, n0, pol, ("decay", "outgoing"), steps, tol)
 
 
-def field(x, neff, eps, thickness, wavelength, pol="TE", branches=("decay", "decay")):
+def _field(x, neff, eps, thickness, wavelength, pol="TE", branches=("decay", "decay")):
     """Principal field ``phi(x)`` (``E_y`` for TE, ``H_y`` for TM) of a root ``neff``.
 
     Unit amplitude at the first interface ``x = 0``; complex array of ``x``'s shape.
@@ -334,7 +352,7 @@ def field(x, neff, eps, thickness, wavelength, pol="TE", branches=("decay", "dec
     x = np.asarray(x, dtype=float)
     faces = np.concatenate([[0.0], np.cumsum(d)])
     out = np.empty(x.shape, dtype=complex)
-    q0 = exterior_root(eps[0], neff, br[0])
+    q0 = _exterior_root(eps[0], neff, br[0])
     state = np.array([1.0, 1j * q0 / w[0]], dtype=complex)
     left = x < 0
     out[left] = np.exp(1j * k0 * q0 * x[left])
@@ -349,7 +367,134 @@ def field(x, neff, eps, thickness, wavelength, pol="TE", branches=("decay", "dec
                 out[inside] = (state[0] * np.cos(k0 * q * local)
                                + state[1] * (w[j] / q) * np.sin(k0 * q * local))
         state = _layer_matrix(eps[j], w[j], neff, k0 * d[j - 1]) @ state
-    qr = exterior_root(eps[-1], neff, br[1])
+    qr = _exterior_root(eps[-1], neff, br[1])
     right = x >= faces[-1]
     out[right] = state[0] * np.exp(-1j * k0 * qr * (x[right] - faces[-1]))
     return out
+
+
+# -- public API: SI registry names and exp(-i omega t) ---------------------------------------------------------
+
+def _public_permittivities(values, name="relative_permittivity"):
+    """The layer permittivities as a complex array in the internal convention (``to_kernel``)."""
+    if isinstance(values, (str, bytes)):
+        refuse_text(**{name: values})
+    return to_kernel(_complex_array(values, name))
+
+
+def _public_index(value, name):
+    """A passive refractive index n' + i n'' (exp(-i omega t), n'' >= 0), in the internal convention."""
+    n = complex(value)
+    if not (cmath.isfinite(n) and n.real > 0 and n.imag >= 0):
+        raise ValueError(f"{name} must be finite with Re > 0 and Im >= 0 (n' + i n'' under exp(-i omega t))")
+    return to_kernel(n)
+
+
+def exterior_root(*, relative_permittivity, effective_index, branch) -> complex:
+    """``Q = sqrt(eps - n_eff**2)`` of a half-space on the ``"decay"`` or ``"outgoing"`` sheet.
+
+    exp(-i omega t): ``"decay"`` returns the root with ``Im Q >= 0``; ``"outgoing"`` the root with
+    ``Re Q >= 0``. See the module docstring.
+    """
+    refuse_text(relative_permittivity=relative_permittivity, effective_index=effective_index)
+    return to_public(_exterior_root(to_kernel(complex(relative_permittivity)), to_kernel(complex(effective_index)),
+                                    branch))
+
+
+def characteristic(*, effective_index, relative_permittivity, thickness, vacuum_wavelength, pol="TE",
+                   branches=("decay", "decay")) -> complex:
+    """``F(n_eff)``: the analytic characteristic function whose zeros are the modes (exp(-i omega t))."""
+    refuse_text(effective_index=effective_index, relative_permittivity=relative_permittivity, thickness=thickness,
+                vacuum_wavelength=vacuum_wavelength)
+    return to_public(_characteristic(to_kernel(complex(effective_index)), _public_permittivities(relative_permittivity),
+                                     thickness, vacuum_wavelength, pol, branches))
+
+
+def residual(*, effective_index, relative_permittivity, thickness, vacuum_wavelength, pol="TE",
+             branches=("decay", "decay")) -> float:
+    """``|F|`` relative to the magnitude of the quantities that formed it (``_residual``)."""
+    refuse_text(effective_index=effective_index, relative_permittivity=relative_permittivity, thickness=thickness,
+                vacuum_wavelength=vacuum_wavelength)
+    return _residual(to_kernel(complex(effective_index)), _public_permittivities(relative_permittivity), thickness,
+                     vacuum_wavelength, pol, branches)
+
+
+def solve(*, relative_permittivity, thickness, vacuum_wavelength, target_effective_index, pol="TE",
+          branches=("decay", "decay"), relative_tolerance=1e-12, iteration_limit=12) -> complex:
+    """Refine ``target_effective_index`` to a zero of ``F`` and verify it (exp(-i omega t)).
+
+    ``scipy.optimize.root`` (hybr) and then at most ``iteration_limit`` complex Newton steps;
+    ``RuntimeError`` when the normalized ``residual`` exceeds ``relative_tolerance``.
+    """
+    refuse_text(relative_permittivity=relative_permittivity, thickness=thickness, vacuum_wavelength=vacuum_wavelength,
+                target_effective_index=target_effective_index, relative_tolerance=relative_tolerance,
+                iteration_limit=iteration_limit)
+    return to_public(_solve(_public_permittivities(relative_permittivity), thickness, vacuum_wavelength,
+                            to_kernel(complex(target_effective_index)), pol, branches, tol=relative_tolerance,
+                            max_newton=iteration_limit))
+
+
+def continued_root(path, *, vacuum_wavelength, effective_index, pol="TE", branches=("decay", "decay"),
+                   subdivision_count=8, relative_tolerance=1e-12) -> complex:
+    """Follow one root of ``F`` along ``path(t) -> (relative_permittivity, thickness)`` from t=0 to t=1.
+
+    ``effective_index`` is the root of the structure at ``t=0``; ``path`` returns permittivities in
+    exp(-i omega t). The path is taken in ``subdivision_count`` steps; returns the root at t=1.
+    """
+    refuse_text(vacuum_wavelength=vacuum_wavelength, effective_index=effective_index,
+                subdivision_count=subdivision_count, relative_tolerance=relative_tolerance)
+
+    def internal_path(t):
+        eps, d = path(t)
+        return _public_permittivities(eps), d
+
+    return to_public(_continued_root(internal_path, vacuum_wavelength, to_kernel(complex(effective_index)), pol,
+                                     branches, subdivision_count, relative_tolerance))
+
+
+def three_layer_modes(*, refractive_index, thickness, vacuum_wavelength, pol="TE", mode_count=50,
+                      subdivision_count=8, relative_tolerance=1e-12) -> list[complex]:
+    """Bound modes of an absorbing slab, m = 0 first; exp(-i omega t).
+
+    refractive_index: (substrate, film, cover), each ``n' + i n''`` with ``n'' >= 0`` (the substrate at
+    ``x < 0``); thickness: the film's, in m. The real-part structure must guide; each result has
+    ``Im n_eff >= 0``. See ``_three_layer_modes`` for the continuation.
+    """
+    refuse_text(refractive_index=refractive_index, thickness=thickness, vacuum_wavelength=vacuum_wavelength,
+                mode_count=mode_count, subdivision_count=subdivision_count, relative_tolerance=relative_tolerance)
+    if isinstance(refractive_index, (str, bytes)) or np.ndim(refractive_index) != 1 or len(refractive_index) != 3:
+        raise ValueError("refractive_index must hold the three indices (substrate, film, cover)")
+    ns, nf, nc = (_public_index(v, f"refractive_index[{i}]") for i, v in enumerate(refractive_index))
+    return [to_public(n) for n in _three_layer_modes(nf, ns, nc, thickness, vacuum_wavelength, pol, mode_count,
+                                                     subdivision_count, relative_tolerance)]
+
+
+def substrate_leaky_mode(*, refractive_index, thickness, vacuum_wavelength, pol="TE", mode_index=0,
+                         subdivision_count=12, relative_tolerance=1e-12) -> complex:
+    """Leaky mode of ``cover | film | gap material | substrate`` with ``Re n_sub > Re n_eff``; exp(-i omega t).
+
+    refractive_index: (cover, film, gap material, substrate), each ``n' + i n''`` with ``n'' >= 0``;
+    thickness: the pair (film, gap) in m. Continued from guided mode ``mode_index`` of the isolated slab
+    (``_substrate_leaky_mode``); the result has ``Im n_eff > 0`` on the outgoing sheet.
+    """
+    refuse_text(refractive_index=refractive_index, thickness=thickness, vacuum_wavelength=vacuum_wavelength,
+                mode_index=mode_index, subdivision_count=subdivision_count, relative_tolerance=relative_tolerance)
+    if isinstance(refractive_index, (str, bytes)) or np.ndim(refractive_index) != 1 or len(refractive_index) != 4:
+        raise ValueError("refractive_index must hold the four indices (cover, film, gap material, substrate)")
+    ncov, nf, ng, nsub = (_public_index(v, f"refractive_index[{i}]") for i, v in enumerate(refractive_index))
+    d, gap = pair(thickness, "thickness")
+    return to_public(_substrate_leaky_mode(nf, ng, nsub, d, gap, vacuum_wavelength, ncov, pol, mode_index,
+                                           subdivision_count, relative_tolerance))
+
+
+def field(points, *, effective_index, relative_permittivity, thickness, vacuum_wavelength, pol="TE",
+          branches=("decay", "decay")):
+    """Principal field ``phi(x)`` (``E_y`` for TE, ``H_y`` for TM) of a root, at positions ``points`` in m.
+
+    Unit amplitude at the first interface ``x = 0``; complex array of the points' shape, exp(-i omega t).
+    """
+    refuse_text(points=points, effective_index=effective_index, relative_permittivity=relative_permittivity,
+                thickness=thickness, vacuum_wavelength=vacuum_wavelength)
+    return to_public(_field(points, to_kernel(complex(effective_index)),
+                            _public_permittivities(relative_permittivity), thickness, vacuum_wavelength, pol,
+                            branches))

@@ -14,7 +14,9 @@ Studio check is deselected here; check_distributions.py runs it on Linux.
 Since 2026-11-08 it installs the Studio extra's pins (requirements-py312-studio.txt)
 and runs the installed workspace in the runner's Chrome on every platform
 (tools/studio_browser/studio_workspace_browser.mjs): two designs, Compare, Save
-session, a restart with the page open and recovery from the start page.
+session, a restart with the page open and recovery from the start page. Since
+2026-11-21 the same check also runs the Joule heating application (Picard, Newton, a refusal
+shown, constant materials).
 """
 import argparse
 from email.parser import BytesParser
@@ -201,6 +203,11 @@ def main():
             # the C10 adversarial inputs meshed and checked (V1-V4) on every platform
             ROOT / "tests/meshloom/test_adversarial.py": tests / "test_meshloom_adversarial.py",
             ROOT / "tests/meshloom/test_fuzz.py": tests / "test_meshloom_fuzz.py",
+            # repair of what rounding inverts, checked against V1-V4 (same inputs everywhere)
+            ROOT / "tests/meshloom/test_repair.py": tests / "test_meshloom_repair.py",
+            ROOT / "tests/meshloom/test_regions.py": tests / "test_meshloom_regions.py",
+            ROOT / "tests/meshloom/test_refine.py": tests / "test_meshloom_refine.py",
+            ROOT / "tests/meshloom/test_generate3d.py": tests / "test_meshloom_generate3d.py",
             # Save/I-O robustness consumers (see the module docstring).
             ROOT / "tests/simcase/test_thermal.py": tests / "test_shipped_thermal_io.py",
             ROOT / "tests/simcase/test_transient_headless_windows.py":
@@ -246,6 +253,10 @@ def main():
             tests / "test_meshloom_recovery.py",
             tests / "test_meshloom_adversarial.py",
             tests / "test_meshloom_fuzz.py",
+            tests / "test_meshloom_repair.py",
+            tests / "test_meshloom_regions.py",
+            tests / "test_meshloom_refine.py",
+            tests / "test_meshloom_generate3d.py",
             tests / "test_export_regions.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)

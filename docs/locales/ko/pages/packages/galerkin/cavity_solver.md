@@ -6,12 +6,12 @@
 from galerkin import solve_cavity_box
 
 result = solve_cavity_box(
-    lengths_m=(1.0, 1.0, 1.0),
-    subdivisions=(8, 8, 8),
-    num_modes=6,
-    target_frequency_hz=210e6,
+    box_size=(1.0, 1.0, 1.0),       # m
+    subdivision_count=(8, 8, 8),
+    mode_count=6,
+    target_frequency=210e6,         # Hz
 )
-print(result.frequencies_hz)
+print(result.resonant_frequency)    # Hz
 ```
 
 이 API는 `(0, 0, 0)`에서 시작하는 진공 직육면체의 여섯 벽 모두에 완전 전기 도체
@@ -24,14 +24,19 @@ print(result.frequencies_hz)
 
 ## 인수와 검색
 
-`solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`는
-`CavityResult`를 반환합니다.
+`solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`는
+`CavityResult`를 반환합니다. 양은 키워드 전용 SI registry 이름입니다. 양에 문자열을 주면
+`TypeError`, 그 밖의 잘못된 값은 그 양의 이름을 밝히는 `ValueError`입니다.
 
-- `lengths_m`: m 단위의 유한한 양의 실수 길이 세 개(Python 또는 NumPy 수치 scalar). JAX나
+- `box_size`: m 단위의 유한한 양의 실수 변 길이 세 개(Python 또는 NumPy 수치 scalar). JAX나
   PyTorch 값을 주면 길이에 대한 미분을 얻습니다([미분](differentiation.md#상자-공진기-길이에-대한-미분)).
-- `subdivisions`: 양의 정수 세 개
-- `num_modes`: 개별 고유벡터 수를 세는 양의 정수. 중복 고유값도 유지합니다. bool은 수치 입력으로 받지 않습니다.
-- `target_frequency_hz`: 필수인 유한한 양의 Hz 주파수
+- `subdivision_count`: 양의 정수 세 개
+- `mode_count`: 개별 고유벡터 수를 세는 양의 정수. 중복 고유값도 유지합니다. bool은 수치 입력으로 받지 않습니다.
+- `target_frequency`: 필수인 유한한 양의 Hz 주파수
+
+진공 PEC 공동은 손실이 없으므로 모든 결과가 실수이고 시간 규약이 없습니다. 이 함수는 솔버
+코드를 그대로 둔 private 본체 `galerkin.cavity._solve_cavity_box` 위의 얇은 공개 층이며,
+공동 솔버의 kernel export는 없습니다.
 
 검색은 `near_target`입니다. 유한한 계산 물리 후보에서 목표에 **제곱** 파수
 (동등하게 제곱 주파수)가 가장 가까운 요청 개수를 고르고, 주파수 오름차순으로
@@ -46,23 +51,27 @@ partner를 보장하지 않습니다. 특히 최소 반환 주파수가 기본 �
 ## 배열·방향·단위
 
 요청 모드 수 K, 전체 에지 수 E, 사면체 수 T로 둡니다. 모든 모드는 실수 정재파입니다.
+`CavityResult`는 frozen이고 필드 이름은 registry 이름이며, `result.units`가 각 양 필드의 SI
+단위를 줍니다.
 
 | 속성 | shape / 의미 | 단위 |
 |---|---|---|
 | `mesh` | `Mesh3D`, 절점과 사면체 connectivity | 절점 m |
 | `space` | 같은 mesh의 `EdgeSpace3D` | 방향 있는 topology |
-| `frequencies_hz` | `(K,)`, 양수·오름차순 | Hz |
-| `eigenvalues_m2` | `(K,)`, 제곱 파수 | m^-2 |
-| `edge_coefficients` | `(E,K)`, 정확한 PEC 0을 포함한 전체 벡터 | m^-1/2 |
-| `electric_field` | `(K,T,3)`, 사면체 centroid의 벡터 | m^-3/2 |
-| `relative_residuals` | `(K,)`, 자유 에지 방정식 | 무차원 |
-| `pec_edge_ids` | 전체 에지 순서의 index | index |
-| `requested_modes` | K | 개수 |
-| `target_frequency_hz` | 입력 목표 | Hz |
+| `resonant_frequency` | `(K,)`, 양수·오름차순 | Hz |
+| `wavenumber_squared` | `(K,)`, 제곱 파수 | m^-2 |
+| `mass_normalized_electric_field_line_integral` | `(E,K)`, 정확한 PEC 0을 포함한 전체 벡터 | m^-1/2 |
+| `mass_normalized_electric_field` | `(K,T,3)`, 사면체 centroid의 벡터 | m^-3/2 |
+| `relative_residual` | `(K,)`, 자유 에지 방정식 | 무차원 |
+| `pec_edges` | 전체 에지 순서의 index | index |
+| `pec_faces` | PEC를 두는 면 태그 | 태그 |
+| `gradient_kernel_dimension` | 이산 gradient kernel의 차원 | 개수 |
+| `mode_count` | K | 개수 |
+| `target_frequency` | 입력 목표 | Hz |
 | `search` | `"near_target"` | metadata |
 
-위 cluster 정책 속성 두 개도 `CavityResult`에 있습니다. 정확한 진공 광속은
-`c0 = 299792458 m/s`이고 `f = c0 * sqrt(eigenvalues_m2) / (2*pi)`입니다.
+위 cluster 정책 속성 두 개는 `search`처럼 `CavityResult`의 상수입니다. 정확한 진공 광속은
+`c0 = 299792458 m/s`이고 `f = c0 * sqrt(wavenumber_squared) / (2*pi)`입니다.
 
 전역 에지는 낮은 node ID에서 높은 ID로 향합니다. `space.edges`, `space.tet_edges`,
 `space.signs`가 순서와 local-to-global 방향을 설명합니다. 경계 에지는 경계 면에
@@ -74,10 +83,12 @@ partner를 보장하지 않습니다. 특히 최소 반환 주파수가 기본 �
 각 모드의 최대 절댓값 에지 계수를 양수로 합니다. 축퇴 부분공간은 해석 간 기저가
 회전할 수 있으므로 개별 편광 label·벡터 부호·고유벡터는 유일한 물리 식별자가 아닙니다.
 
-내부 좌표는 `L=max(lengths_m)`로 나눕니다. 반환 계수는 `q_normalized/sqrt(L)`,
+내부 좌표는 `L=max(box_size)`로 나눕니다. 반환 계수는 `q_normalized/sqrt(L)`,
 고유값은 `k2_normalized/L**2`, centroid 장은 `E_normalized/L**1.5`입니다.
 물리 크기를 균일하게 s배 하면 주파수는 s로 나눠집니다. 각 centroid 장은
-`eval_edge_field_3d(result.space, result.edge_coefficients[:, j])`로 복원합니다(NumPy 결과만; NumPy 계수만 받습니다). JAX·PyTorch 길이로 얻은 결과는 미분이 붙은 중심 필드를 `result.electric_field`에 이미 담고 있습니다.
+`galerkin.kernels.eval_edge_field_3d(result.space, result.mass_normalized_electric_field_line_integral[:, j])`로
+복원합니다(NumPy 결과만; NumPy 계수만 받습니다). JAX·PyTorch 길이로 얻은 결과는 미분이 붙은 중심 필드를
+`result.mass_normalized_electric_field`에 이미 담고 있습니다.
 
 직렬화는 호출자 책임입니다. 기술적 장 계약을 보존하려면 SI 좌표, 사면체, 에지
 순서/방향, PEC index, 선언한 정규화 및 검색 metadata와 전체 raw 계수를 저장합니다.
@@ -134,19 +145,19 @@ kernel 판정 scale은 정규화 좌표에서 해석 box 기본 k²의 `1e-8`배
 
 ## 외부 메시
 
-`solve_cavity(mesh, *, pec_faces=None, num_modes=6, target_frequency_hz)`는
+`solve_cavity(mesh, *, pec_faces=None, mode_count=6, target_frequency)`는
 [사면체 메시 형식](mesh3d_format.md)의 어떤 사면체 메시에서든 같은 조립·투영 검색·검사를
 실행합니다. 메시는 바깥 방향 면 태그를 가진 `galerkin.Mesh3D`(meshine·gmshio 메시의
 `from_mesher` 또는 `box_mesh`)이고 좌표는 m입니다. 진입 시 `Mesh3D.check`로 검사합니다.
 
 - `pec_faces`: 완전 도체를 두는 면 태그. `None`이면 모든 태그 면. 빠진 면은 자연
   조건 `n x curl E = 0`(완전 자기 도체)을 유지합니다. 모르는 태그는 `ValueError`.
-- `num_modes`, `target_frequency_hz`: 위와 같음. JAX·PyTorch 값은 `TypeError`:
-  미분 경로는 `solve_cavity_box`의 길이에만 있습니다.
+- `mode_count`, `target_frequency`: 위와 같음. JAX·PyTorch 값은 `TypeError`:
+  미분 경로는 `solve_cavity_box`의 `box_size`에만 있습니다.
 - 메시는 경계 상자의 가장 긴 변으로 정규화합니다. kernel 절단값 `1e-8 * fundamental`은
   그 경계 상자의 최저 TE 공진을 쓰므로 경계 상자보다 훨씬 작은 영역은 더 낮은(보수적인)
   절단값을 갖습니다.
-- 결과의 `mesh`는 받은 메시 그대로이고 `pec_face_tags`가 태그를, `gradient_kernel_dimension`이
+- 결과의 `mesh`는 받은 메시 그대로이고 `pec_faces`가 태그를, `gradient_kernel_dimension`이
   셈한 kernel을 기록합니다.
 
 gradient kernel은 상자 공식 대신 PEC 표면에서 셉니다. 자유 변 위의 curl-curl kernel은

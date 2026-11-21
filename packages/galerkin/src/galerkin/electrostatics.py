@@ -2,21 +2,31 @@
 # SPDX-License-Identifier: Apache-2.0
 """2D electrostatics with conductors as node sets and a Maxwell capacitance matrix.
 
-Solves ``-div(eps0 eps_r grad V) = rho`` on conforming P1 triangles per unit
-length along z; see docs/packages/galerkin/electrostatics.md for the SI
+Solves ``-div(eps0 eps_r grad V) = rho`` on conforming P1 triangles per metre of
+depth (planar); see docs/packages/galerkin/electrostatics.md for the SI
 contract. Conductors are node sets held at a potential (zero-thickness traces
 are interior node lines), the exterior boundary away from a conductor is
 insulated (zero normal D) and conductor charges are read from the assembled
 reactions, so the energy and charge forms of the capacitance agree to solver
 precision and are checked against each other.
 
-The relative permittivity (scalar or region table), conductor potentials,
-reference potentials and the charge density may be JAX or PyTorch values; the
-results are then in that library and carry derivatives. A complex permittivity
-``eps' (1 - j tan d)`` with ``Im <= 0`` is accepted on the NumPy path only.
+The public functions take keyword-only SI registry names (``relative_permittivity``,
+``free_charge_density``, ``reference_electric_potential``); a str for a quantity
+raises TypeError. Their complex values follow exp(-i omega t): a lossy dielectric
+is ``eps' (1 + i tan d)`` with ``Im >= 0``, accepted on the NumPy path only, and the
+complex capacitance has a positive semidefinite loss matrix ``Im C``. The solve
+itself computes in exp(+i omega t), its convention before the galerkin step: the
+permittivity is converted once on entry (``galerkin._conventions.to_kernel``) and
+every complex output once on exit (``to_public``), so the solve computes with the
+doubles it computed with before. The relative permittivity (scalar or region
+table), conductor potentials, reference potentials and the free charge density
+may be JAX or PyTorch values; the results are then in that library and carry
+derivatives.
 """
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Any, NamedTuple
 
 import numpy as np
 from scipy.constants import epsilon_0
@@ -32,6 +42,8 @@ from .core.backend import (Backend, backend_of, is_live, lift, live_namespace, n
 from .core.checks import readonly_copy, real_value
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
+from ._conventions import to_kernel, to_public
+from ._public import ResultSurface, refuse_text
 
 __all__ = ["ElementPermittivity", "ElectrostaticsResult", "solve_electrostatics",
            "capacitance_matrix"]
@@ -64,27 +76,60 @@ class ElementPermittivity:
 
 
 @dataclass(frozen=True)
-class ElectrostaticsResult:
-    """Nodal volts, element V/m and C/m², and per-unit-length charges (C/m) and energy (J/m).
+class ElectrostaticsResult(ResultSurface):
+    """A planar electrostatic result: nodal volts, element V/m and C/m^2; charges and
+    energy per metre of depth.
 
-    Arrays are independent read-only snapshots in the returned mesh's order (or
-    JAX/PyTorch arrays carrying derivatives). ``reaction`` is the charge at
-    conductor nodes only, never at reference-potential gauges; ``charge`` sums
-    it per conductor (``"ground"`` included when a ground was given). With a
-    complex permittivity the potential, fields, charges and energy are complex.
+    Fields: electric_potential (N,) V; electric_field (M,2) V/m and
+    electric_flux_density (M,2) C/m^2 (D = eps0 eps_r E) per element;
+    relative_permittivity (M,); stored_energy_per_depth, V^T K V / 2 in J/m (no
+    conjugate); the nodal charges in C/m: applied_charge_per_depth (the free charge
+    density's load int rho phi_i), reaction_charge_per_depth (the charge on conductor
+    nodes only, never at reference-potential gauges) and residual_charge_per_depth
+    (K V - f at every node); conductor_node_ids, {name: sorted node ids};
+    charge_per_depth, {name: C/m}, the reaction summed per conductor ("ground"
+    included when a ground was given); free_charge_per_depth, the sum of the applied
+    charge in C/m. Arrays are independent read-only snapshots in the returned mesh's
+    order (or JAX/PyTorch arrays carrying derivatives). With a complex permittivity
+    the potential, fields, charges and energy are complex, in exp(-i omega t).
+    ``.units`` maps every quantity field to its SI unit.
     """
     mesh: Mesh
-    potential: np.ndarray
+    electric_potential: np.ndarray
     electric_field: np.ndarray
-    displacement: np.ndarray
+    electric_flux_density: np.ndarray
     relative_permittivity: np.ndarray
-    energy_per_length: float
-    load: np.ndarray
-    reaction: np.ndarray
-    residual: np.ndarray
-    conductors: dict
+    stored_energy_per_depth: float
+    applied_charge_per_depth: np.ndarray
+    reaction_charge_per_depth: np.ndarray
+    residual_charge_per_depth: np.ndarray
+    conductor_node_ids: dict
+    charge_per_depth: dict
+    free_charge_per_depth: float
+
+    BASIS = "planar"
+    PER_DEPTH_KIND = "charges and energies"
+    UNITS = MappingProxyType({
+        "electric_potential": "V", "electric_field": "V/m", "electric_flux_density": "C/m^2",
+        "relative_permittivity": "1", "stored_energy_per_depth": "J/m", "applied_charge_per_depth": "C/m",
+        "reaction_charge_per_depth": "C/m", "residual_charge_per_depth": "C/m", "charge_per_depth": "C/m",
+        "free_charge_per_depth": "C/m"})
+
+
+class _Raw(NamedTuple):
+    """The outputs of ``_solve`` in the kernel convention, before ``to_public`` and the snapshots."""
+    mesh: Mesh
+    potential: Any
+    electric_field: Any
+    flux_density: Any
+    permittivity: Any
+    energy: Any
+    load: Any
+    reaction: Any
+    residual: Any
+    conductor_nodes: dict
     charge: dict
-    total_free_charge: float
+    total: Any
 
 
 def _snapshot(mesh):
@@ -119,7 +164,9 @@ def _is_index(key):
 # -- permittivity ---------------------------------------------------------------
 
 def _permittivity_scalar(value, label):
-    """One relative permittivity: float, complex with Im <= 0, or a live float64 0-d array."""
+    """One relative permittivity in the kernel convention (exp(+i omega t)): float, complex with
+    Im <= 0, or a live float64 0-d array. The messages state the public exp(-i omega t) rule
+    (Im >= 0), because the public functions convert each value once with to_kernel."""
     if is_live(value):
         xp = namespace(value)
         if xp.isdtype(value.dtype, "complex floating"):
@@ -136,15 +183,16 @@ def _permittivity_scalar(value, label):
         raise ValueError(f"{label} must not be a boolean")
     a = np.asarray(value)
     if a.shape != () or a.dtype.kind not in "iufc" or not np.isfinite(a):
-        raise ValueError(f"{label} must be a finite scalar with Re > 0 and Im <= 0")
+        raise ValueError(f"{label} must be a finite scalar with Re > 0 and Im >= 0")
     if a.dtype.kind == "c":
         c = complex(a)
         if not c.real > 0 or c.imag > 0:
-            raise ValueError(f"{label} must have Re > 0 and Im <= 0 (eps' (1 - j tan d))")
+            raise ValueError(f"{label} must have Re > 0 and Im >= 0 (exp(-i omega t): eps' (1 + i tan d) "
+                             "is a loss)")
         return c
     f = float(a)
     if not f > 0:
-        raise ValueError(f"{label} must be a finite scalar with Re > 0 and Im <= 0")
+        raise ValueError(f"{label} must be a finite scalar with Re > 0 and Im >= 0")
     return f
 
 
@@ -158,14 +206,14 @@ def _relative_permittivity(mesh, value):
         unknown = [k for k in value if k not in names]
         missing = [n for n in names if n not in value]
         if unknown or missing:
-            raise ValueError("permittivity regions must match mesh.region_names exactly; "
+            raise ValueError("relative_permittivity regions must match mesh.region_names exactly; "
                              f"missing {missing}, unknown {unknown}")
-        entries = [_permittivity_scalar(value[n], f"permittivity in region {n!r}") for n in names]
+        entries = [_permittivity_scalar(value[n], f"relative_permittivity in region {n!r}") for n in names]
         if any(is_live(e) for e in entries):
             xp = live_namespace(*entries)
             return xp.stack([lift(xp, e, xp.float64) for e in entries])[regions]
         return np.array(entries)[regions]
-    scalar = _permittivity_scalar(value, "permittivity")
+    scalar = _permittivity_scalar(value, "relative_permittivity")
     if is_live(scalar):
         return namespace(scalar).broadcast_to(scalar, (count,))
     return np.broadcast_to(np.asarray(scalar), (count,))
@@ -243,12 +291,12 @@ def _gauges(reference_potential, n):
     if reference_potential is None:
         return {}
     if not isinstance(reference_potential, Mapping):
-        raise ValueError("reference_potential must map node indices to scalar volts")
+        raise ValueError("reference_electric_potential must map node indices to scalar volts")
     out = {}
     for node, value in reference_potential.items():
         if not _is_index(node) or not 0 <= node < n:
-            raise ValueError("reference_potential node indices must be integers within the mesh")
-        out[int(node)] = _volts(value, "reference_potential")
+            raise ValueError("reference_electric_potential node indices must be integers within the mesh")
+        out[int(node)] = _volts(value, "reference_electric_potential")
     return out
 
 
@@ -257,11 +305,11 @@ def _charge_load(mesh, charge_density):
     count = len(mesh.triangles)
     if callable(charge_density):
         centroid = mesh.nodes[mesh.triangles].mean(axis=1)
-        rho = real_value(charge_density(centroid[:, 0], centroid[:, 1]), "charge_density")
+        rho = real_value(charge_density(centroid[:, 0], centroid[:, 1]), "free_charge_density")
         if tuple(rho.shape) not in ((), (count,)):
-            raise ValueError("charge_density callback must return a scalar or one value per triangle")
+            raise ValueError("free_charge_density callback must return a scalar or one value per triangle")
     else:
-        rho = region_property(mesh, charge_density, "charge_density", live=True)
+        rho = region_property(mesh, charge_density, "free_charge_density", live=True)
     rho = element_values(mesh, rho)
     cells = np.asarray(mesh.triangles)
     return forms.vector(cells, kernels.p1_load(mesh, rho), len(mesh.nodes), order="columns")
@@ -269,25 +317,68 @@ def _charge_load(mesh, charge_density):
 
 # -- solve ----------------------------------------------------------------------
 
-def solve_electrostatics(mesh, *, permittivity, conductors, ground=None, charge_density=0.0,
-                         reference_potential=None):
-    """Solve ``-div(eps0 eps_r grad V) = rho`` on a conforming 2D P1 mesh in metres.
+def _kernel_permittivity(value):
+    """The public relative permittivity in the kernel convention: each complex scalar or region
+    entry through ``to_kernel`` (real values, arrays and ElementPermittivity are unchanged)."""
+    if isinstance(value, Mapping):
+        return {name: to_kernel(entry) for name, entry in value.items()}
+    return to_kernel(value)
 
-    permittivity: relative permittivity eps_r: a scalar, an exact region-name
-        table or a mesh-bound ElementPermittivity. Real values are > 0; complex
-        values ``eps' (1 - j tan d)`` need Re > 0 and Im <= 0 and are accepted
-        on the NumPy path only. Bare element arrays remain invalid.
+
+def _refuse_text(relative_permittivity, conductors, free_charge_density=None, reference_electric_potential=None):
+    for name, value in (("relative_permittivity", relative_permittivity), ("conductors", conductors),
+                        ("free_charge_density", free_charge_density),
+                        ("reference_electric_potential", reference_electric_potential)):
+        refuse_text(name, value)
+
+
+def solve_electrostatics(mesh, *, relative_permittivity, conductors, ground=None, free_charge_density=None,
+                         reference_electric_potential=None):
+    """Solve ``-div(eps0 eps_r grad V) = rho`` on a conforming 2D P1 mesh in metres, in SI.
+
+    relative_permittivity: eps_r: a scalar, an exact region-name table or a
+        mesh-bound ElementPermittivity. Real values are > 0; complex values follow
+        exp(-i omega t), ``eps' (1 + i tan d)`` with Re > 0 and Im >= 0 (loss), and
+        are accepted on the NumPy path only. Bare element arrays remain invalid.
     conductors: ``{name: (node ids, volts)}`` node sets (any mesh nodes, so a
         zero-thickness trace is an interior node line), or a plain
         ``{node: volts}`` Dirichlet mapping whose charges are then reported
         per node. Conductors must not share nodes.
     ground: node ids held at 0 V, reported as conductor ``"ground"``.
-    charge_density: free charge rho in C/m³: scalar, region table or a callback
-        ``(x, y) -> rho`` evaluated at the triangle centroids.
-    reference_potential: node -> volts, exactly one gauge per connected
+    free_charge_density: free charge rho in C/m^3: scalar, region table or a
+        callback ``(x, y) -> rho`` evaluated at the triangle centroids; None (the
+        default) is no free charge.
+    reference_electric_potential: node -> volts, exactly one gauge per connected
         component without a conductor; such a component must carry zero net
         free charge to 1e-12 relative to ``sum(abs(load))``.
     Exterior boundary not on a conductor is insulated (zero normal D).
+
+    Returns an ElectrostaticsResult (planar: charges and energy per metre of
+    depth). A str for a quantity raises TypeError (SI numbers only). The solve runs
+    in exp(+i omega t); a complex permittivity is converted once on entry and every
+    complex output once on exit (galerkin._conventions), so the result is in
+    exp(-i omega t).
+    """
+    _refuse_text(relative_permittivity, conductors, free_charge_density, reference_electric_potential)
+    raw = _solve(mesh, permittivity=_kernel_permittivity(relative_permittivity), conductors=conductors,
+                 ground=ground, charge_density=0.0 if free_charge_density is None else free_charge_density,
+                 reference_potential=reference_electric_potential)
+    return ElectrostaticsResult(
+        raw.mesh, *(_frozen(to_public(v)) for v in (raw.potential, raw.electric_field, raw.flux_density,
+                                                    raw.permittivity)),
+        to_public(raw.energy), *(_frozen(to_public(v)) for v in (raw.load, raw.reaction, raw.residual)),
+        raw.conductor_nodes, {name: to_public(q) for name, q in raw.charge.items()}, to_public(raw.total))
+
+
+def _solve(mesh, *, permittivity, conductors, ground, charge_density, reference_potential):
+    """The electrostatic solve in the kernel convention, exp(+i omega t): the body of
+    solve_electrostatics before the galerkin step.
+
+    ``permittivity`` is in that convention (Im <= 0 for loss); the raw outputs (mesh
+    snapshot, potential, field, flux density, permittivity, energy, load, reaction,
+    residual, conductor node ids, conductor charges, total free charge) are too.
+    Only the public functions of this module call it, under the public names, so its
+    messages use them.
     """
     p, t, area, boundary, count, labels = triangle_geometry(mesh)
     n = len(p)
@@ -298,7 +389,7 @@ def solve_electrostatics(mesh, *, permittivity, conductors, ground=None, charge_
     prescribed = {int(node): volts for nodes, volts in sets.values() for node in nodes}
     for node in gauges:
         if node in prescribed:
-            raise ValueError("reference_potential is unnecessary on a conductor node")
+            raise ValueError("reference_electric_potential is unnecessary on a conductor node")
     anchored = np.zeros(count, dtype=bool)
     offsets = [0.0]*count
     for node, value in prescribed.items():
@@ -313,14 +404,14 @@ def solve_electrostatics(mesh, *, permittivity, conductors, ground=None, charge_
         selected = [node for node in gauges if labels[node] == component]
         if anchored[component]:
             if selected:
-                raise ValueError("reference_potential is unnecessary on a conductor component")
+                raise ValueError("reference_electric_potential is unnecessary on a conductor component")
         else:
             nodes = labels == component
             if abs(np.sum(load_numbers[nodes])) > 1e-12*np.sum(np.abs(load_numbers[nodes])):
                 raise ValueError(f"incompatible net free charge on component {component} "
                                  "without a conductor")
             if len(selected) != 1:
-                raise ValueError("exactly one reference_potential node is required per component "
+                raise ValueError("exactly one reference_electric_potential node is required per component "
                                  "without a conductor")
             offsets[component] = gauges[selected[0]]
     if any(is_live(o) for o in offsets):
@@ -362,28 +453,31 @@ def solve_electrostatics(mesh, *, permittivity, conductors, ground=None, charge_
         raise ValueError("electrostatic fields or energy exceed floating-point range")
     charge = {name: _number(xp.sum(reaction[nodes])) for name, (nodes, _) in sets.items()}
     conductor_nodes = {name: readonly_copy(nodes) for name, (nodes, _) in sets.items()}
-    return ElectrostaticsResult(
-        _snapshot(mesh), *map(_frozen, (potential, electric, displacement, eps_r)),
-        _number(energy), *map(_frozen, (load, reaction, residual)), conductor_nodes, charge,
-        _number(total))
+    return _Raw(_snapshot(mesh), potential, electric, displacement, eps_r, _number(energy), load, reaction, residual,
+                conductor_nodes, charge, _number(total))
 
 
 # -- capacitance ----------------------------------------------------------------
 
-def capacitance_matrix(mesh, *, permittivity, conductors, ground):
-    """Maxwell capacitance matrix (F/m) of the named conductors against ``ground``.
+def capacitance_matrix(mesh, *, relative_permittivity, conductors, ground):
+    """Maxwell capacitance matrix per metre of depth (F/m, capacitance_per_depth) of the
+    named conductors against ``ground``.
 
-    conductors: ``{name: node ids}`` in matrix order; ground: node ids at 0 V
-    (required, nonempty). Column j is the solve with conductor j at 1 V and
-    every other conductor and the ground at 0 V; entry (i, j) is the charge on
-    conductor i (the reaction sum). The energy form ``V_i^T K V_j`` is computed
-    as well and must agree with it to ``1e-10`` of the largest charge entry
-    (ValueError otherwise); the charge matrix is then symmetrised,
-    ``(C + C^T)/2``, and returned. A complex permittivity ``eps' (1 - j tan d)``
-    (NumPy only) gives a complex matrix whose loss matrix ``-Im C`` is positive
-    semidefinite (negative diagonal of ``Im C``); a live real
-    permittivity (JAX or PyTorch) gives a matrix carrying its derivative.
+    relative_permittivity: as for solve_electrostatics. conductors: ``{name: node
+    ids}`` in matrix order; ground: node ids at 0 V (required, nonempty). Column j
+    is the solve with conductor j at 1 V and every other conductor and the ground
+    at 0 V; entry (i, j) is the charge on conductor i (the reaction sum). The
+    energy form ``V_i^T K V_j`` is computed as well and must agree with it to
+    ``1e-10`` of the largest charge entry (ValueError otherwise); the charge matrix
+    is then symmetrised, ``(C + C^T)/2``, and returned. A complex permittivity
+    ``eps' (1 + i tan d)`` (exp(-i omega t), NumPy only) gives a complex matrix whose
+    loss matrix ``Im C`` is positive semidefinite (positive diagonal of ``Im C``);
+    a live real permittivity (JAX or PyTorch) gives a matrix carrying its
+    derivative. A str for a quantity raises TypeError. The matrix is computed in
+    exp(+i omega t) and converted once on exit (galerkin._conventions).
     """
+    _refuse_text(relative_permittivity, conductors)
+    permittivity = _kernel_permittivity(relative_permittivity)
     if (not isinstance(conductors, Mapping) or not conductors
             or not all(isinstance(k, str) for k in conductors)):
         raise ValueError("conductors must map at least one conductor name to its node ids")
@@ -395,8 +489,8 @@ def capacitance_matrix(mesh, *, permittivity, conductors, ground):
     results = []
     for excited in names:
         spec = {name: (nodes, 1.0 if name == excited else 0.0) for name, nodes in conductors.items()}
-        results.append(solve_electrostatics(mesh, permittivity=permittivity, conductors=spec,
-                                            ground=ground))
+        results.append(_solve(mesh, permittivity=permittivity, conductors=spec, ground=ground, charge_density=0.0,
+                              reference_potential=None))
     eps_r = _relative_permittivity(mesh, permittivity)
     xp = live_namespace(eps_r)
     stiffness, K_numbers = _stiffness(mesh, eps_r, xp)
@@ -413,4 +507,4 @@ def capacitance_matrix(mesh, *, permittivity, conductors, ground):
     if np.max(np.abs(energy_numbers-charge_numbers)) > _ROUTE_TOLERANCE*scale:
         raise ValueError("capacitance energy and charge routes disagree beyond 1e-10 of the "
                          "largest entry")
-    return 0.5*(charge+xp.matrix_transpose(charge))
+    return to_public(0.5*(charge+xp.matrix_transpose(charge)))

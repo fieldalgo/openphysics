@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Quadrature on triangles."""
+"""Quadrature on triangles.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 import numpy as np
 
 

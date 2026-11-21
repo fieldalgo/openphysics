@@ -15,6 +15,8 @@ from .core.backend import is_live, namespace
 from .core.checks import refuse_live
 from .mesh import Mesh
 
+__all__ = ["element_gradient", "l2_error"]
+
 
 def element_gradient(mesh: Mesh, V: np.ndarray) -> np.ndarray:
     """Per-triangle grad V as a (T, 2) array. The electric field is E = -grad V.

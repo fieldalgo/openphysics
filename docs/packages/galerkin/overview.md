@@ -18,10 +18,10 @@ references and fixed thresholds.
 
 | Problem | Entry point | Contract and validation | Example |
 |---|---|---|---|
-| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | `assemble_stiffness`, `solve_dirichlet`, `radial_pml_coeffs` | [Milestone validation](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
+| 2D electrostatics and frequency-domain waves with absorbing boundaries or a cylindrical PML | the internal `galerkin.kernels` (`radial_pml_coeffs`, `assemble_stiffness`, `solve_dirichlet`) | [Milestone validation](milestone_validation.md) | `examples/galerkin/coax_convergence.py`, `examples/galerkin/cylinder_scattering_pml.py` |
 | 2D electrostatics with conductors as node sets, free charge and insulated exterior; Maxwell capacitance matrix checked by the energy and charge routes, real or lossy complex permittivity | `solve_electrostatics`, `capacitance_matrix` | [Contract and gates](electrostatics.md) | — |
-| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_modes` | [Waveguide formulation](waveguide_formulation.md), [eigenspace reliability](eigenspace_reliability.md), [milestone validation](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
-| Mode power (Faraday-route Poynting integral), field overlaps, normalisation, coupling efficiency, confinement factor and effective area of vector and scalar modes | `galerkin.mode_overlap`: `vector_power`, `coupling_efficiency`, `confinement_factor`, `normalize_vector`, scalar twins | [Contract and validation](mode_overlap.md) | — |
+| Waveguide cutoffs and dielectric waveguide modes: scalar P1 and full-vector mixed Nédélec/nodal | `solve_waveguide_modes` (SI, exp(−iωt); `ModalPML`, `Bend`) → `WaveguideModes`; the kernel `galerkin.kernels.solve_modes` | [Waveguide formulation](waveguide_formulation.md), [eigenspace reliability](eigenspace_reliability.md), [milestone validation](milestone_validation.md) | `examples/galerkin/fiber_modes.py`, `examples/galerkin/waveguide_modes.py` |
+| Mode power (Faraday-route Poynting integral), field overlaps, normalisation, coupling efficiency, confinement factor and effective area of vector and scalar modes | `mode_power`, `cross_power`, `field_overlap`, `mode_coupling_efficiency`, `mode_confinement_factor`, `mode_effective_area` (SI, exp(−iωt)); the kernels of `galerkin.mode_overlap` in `galerkin.kernels` (`vector_power`, `normalize_vector`, scalar twins) | [Contract and validation](mode_overlap.md) | — |
 | 3D vacuum rectangular PEC cavity eigenmodes, SI frequencies and raw edge fields | `solve_cavity_box` | [Cavity API](cavity_solver.md) | `examples/galerkin/cavity_modes.py` |
 | 3D vacuum PEC cavity on an external tetrahedral mesh (meshine, gmshio), PEC on chosen face tags | `solve_cavity` | [Cavity API, external meshes](cavity_solver.md#external-meshes), [mesh format](mesh3d_format.md) | — |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](material_cavity.md) | — |
@@ -31,9 +31,10 @@ references and fixed thresholds.
 | Steady 2D electric conduction, isotropic region conductivity, voltage/current/insulation sides and explicit Neumann gauges: V, E, J and elementwise Joule heat | `galerkin.electric.solve_steady_electric` | [Contract and validation](electric_steady2d.md) | [electric_steady2d.py](../../../examples/galerkin/electric_steady2d.py) |
 | Same-mesh steady electric to heat (one-way) | `galerkin.joule_heating.solve_steady_joule_heat` | [API, units and validation](joule_heating.md) | [joule_heating.py](../../../examples/galerkin/joule_heating.py) |
 | Temperature-dependent steady Joule heating, bounded isotropic sigma(T) by relaxed Picard or Newton | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [Contract and validation](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../examples/galerkin/temperature_joule_heating.py) |
-| Prescribed outward flux and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_flux_robin.md), [validation](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../examples/galerkin/thermal_flux_robin.py) |
-| Derivatives with respect to materials, sources and boundary values on JAX or PyTorch: steady and transient heat, steady electric conduction, elasticity, thermoelasticity, and waveguide eigenvalues and fields, PEC box resonances with respect to the lengths | `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_modes` (its fields through `eval_edge_field`), `solve_cavity_box` with JAX or PyTorch inputs | [Contract and validation](differentiation.md) | — |
-| Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet, insulation and time-independent outward flux/convection | `galerkin.transient_heat.solve_transient_heat` | [Contract](transient_heat.md), [validation](transient_heat_validation.md), [independent validation](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../examples/galerkin/transient_heat_convergence.py) |
+| Prescribed boundary heat flux (inward) and Robin convection for steady heat | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_flux_robin.md), [validation](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../examples/galerkin/thermal_flux_robin.py) |
+| Derivatives with respect to materials, sources and boundary values on JAX or PyTorch: steady and transient heat, steady electric conduction, elasticity, thermoelasticity, and waveguide eigenvalues and fields, PEC box resonances with respect to the lengths | `solve_steady_heat`, `solve_steady_electric`, `solve_transient_heat`, `solve_elasticity`, `solve_thermoelasticity`, `solve_waveguide_modes` (its kernel `galerkin.kernels.solve_modes`, fields through `eval_edge_field`), `solve_cavity_box` with JAX or PyTorch inputs | [Contract and validation](differentiation.md) | — |
+| Shape derivatives of steady heat, steady electric conduction, linear elasticity, thermoelasticity, transient heat and waveguide modes: a design parameter moves the mesh (X₀ + t·W), harmonic extension of boundary velocities, exact element-inversion interval | `galerkin.shape.MeshMotion` with `solve_steady_heat(..., motion=)`, `solve_steady_electric(..., motion=)`, `solve_elasticity(..., motion=)`, `solve_thermoelasticity(..., motion=)`, `solve_steady_thermoelasticity(..., motion=)`, `solve_transient_heat(..., motion=)` and `solve_waveguide_modes(..., motion=)`, `extend_velocity`, `admissible_interval` | [Contract and validation](shape_derivative.md) | — |
+| Transient 2D heat: fixed P1, consistent mass, backward Euler, time-dependent Dirichlet, insulation and time-independent boundary heat flux/convection | `galerkin.transient_heat.solve_transient_heat` | [Contract](transient_heat.md), [validation](transient_heat_validation.md), [independent validation](transient_heat_independent_validation.md) | [transient_heat_convergence.py](../../../examples/galerkin/transient_heat_convergence.py) |
 | Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](elasticity2d.md), [validation](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../examples/galerkin/elasticity2d.py) |
 | Global Cartesian boundary traction for elasticity | `galerkin.elasticity.solve_elasticity` | [Contract](elasticity_traction.md), [validation](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../examples/galerkin/elasticity_traction.py) |
 | Mechanics under a prescribed same-mesh nodal Kelvin field | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](prescribed_temperature_thermoelasticity.md), [validation](prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
@@ -84,16 +85,18 @@ src/galerkin/
   mesh.py         # Mesh data structure (boundary nodes + edges) + structured mesh generators
   assembly.py     # Stiffness K (scalar/tensor coefficients), mass M, boundary B, load vector
   solver.py       # Dirichlet reduction + scipy sparse direct solve (real/complex)
+  kernels.py      # Internal: re-exports the assembly kernels, the Dirichlet solve, the physics helpers and the em kernels (consistent units)
   postprocess.py  # E = -grad V, L2 error (complex-aware)
   pml.py          # Cylindrical PML coefficients (Collino-Monk complex stretching)
   edge.py         # Lowest-order Nédélec (Whitney) edge elements: curl-curl, mass, edge-nodal coupling
-  waveguide.py    # Mixed edge/nodal vector mode solver, A x = -beta^2 B x
+  waveguide.py    # Public modes in SI and exp(-i omega t): solve_waveguide_modes, WaveguideModes, ModalPML, Bend, mode power and overlaps
+  _waveguide_kernels.py # Mixed edge/nodal vector mode solver, A x = -beta^2 B x (package-private; galerkin.kernels re-exports it)
   mode_overlap.py # Mode power, overlaps, normalisation, coupling efficiency, confinement (vector and scalar)
   mesh3d.py       # Mesh3D (tagged outward faces, region checks) + box_mesh (Kuhn subdivision, six tets per cube)
   assembly3d.py   # P1 tetrahedron stiffness (scalar/tensor) and mass, closed form
   edge3d.py       # Whitney edge elements on tetrahedra, all matrices closed form
-  cavity.py       # Vacuum PEC cavity, box or external mesh: SI output and projected gradient kernel
-  material_cavity.py # Cavity with lossy materials and impedance walls, box or external mesh: complex resonances and Q
+  cavity.py       # Public vacuum PEC cavity in SI, box or external mesh: CavityResult, projected gradient kernel
+  material_cavity.py # Public cavity with lossy materials and impedance walls in SI and exp(-i omega t): complex resonances and Q
   _cavity_common.py  # Box mesh, mesh normalization, gradient kernel count and limits the cavity solvers share (package-private)
   mode_coordinates.py # Cartesian modal PML and constant-radius bend coordinates
   thermal.py      # Steady heat: Dirichlet, insulation, prescribed flux, Robin
@@ -104,11 +107,16 @@ src/galerkin/
   heat_source.py  # Elementwise volumetric heat sources bound to one mesh
   joule_heating.py, temperature_joule_heating.py # Electric -> heat, constant and temperature-dependent
   transient_heat.py               # Transient heat, backward Euler
+  _heat_kernels.py                # Boundary system, 3D source load and face map the heat solvers share (package-private)
+  _public.py                      # Text refusal, inward-to-outward data and result surfaces of the public galerkin APIs (package-private)
+  _conventions.py                 # to_kernel/to_public: the one place a complex value changes time convention (package-private)
   elasticity.py                   # Static plane stress/strain elasticity and traction
   thermoelasticity.py             # Mechanics under a prescribed temperature field
   thermal_mechanical.py           # Steady heat -> mechanics workflow
   transient_thermal_mechanical.py # Stored transient heat -> quasistatic mechanics
   _thermal_mechanical_common.py   # Input isolation the two heat-to-mechanics workflows share (package-private)
+  _mechanics_kernels.py           # Elasticity/thermoelasticity helpers and the temperature-snapshot hashes (package-private)
+  _moving.py                      # The moving-mesh solves behind motion= (package-private)
   core/           # Shared layer: checks, edge numbering and signs, element kernels, assembly, sparse solve and eigen adjoints, array backends
   coupling/       # Fields on one mesh, same-mesh transfer, one-way chains
   gmsh.py         # Read/write Gmsh .msh (ASCII 2.2 and 4.1) — Gmsh never linked

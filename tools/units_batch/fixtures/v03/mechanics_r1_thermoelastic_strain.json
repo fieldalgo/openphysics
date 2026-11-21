@@ -1,0 +1,90 @@
+{
+  "openphysics": "0.3",
+  "name": "layers",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "main": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": null,
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 100.0,
+          "ymin": 0.0,
+          "ymax": 20.0
+        },
+        "background": {
+          "material": "steel"
+        },
+        "features": [
+          {
+            "name": "alu",
+            "type": "rect",
+            "material": "aluminium",
+            "x": 0.0,
+            "y": 10.0,
+            "w": 100.0,
+            "h": 10.0
+          }
+        ],
+        "finalize": "later_wins"
+      }
+    }
+  },
+  "materials": {
+    "steel": {
+      "youngs_modulus": "200000000000 Pa",
+      "poisson_ratio": 0.25,
+      "linear_expansion_coefficient": "1.2e-05 1/K",
+      "thermal_conductivity": "45 W/(m K)"
+    },
+    "aluminium": {
+      "youngs_modulus": "70000000000 Pa",
+      "poisson_ratio": 0.25,
+      "linear_expansion_coefficient": "2.3e-05 1/K",
+      "thermal_conductivity": "237 W/(m K)"
+    }
+  },
+  "mesh": {
+    "element_size": "4 mm"
+  },
+  "physics": {
+    "bar": {
+      "type": "mechanics.thermoelastic2d",
+      "plane": "strain",
+      "prescribed_displacement": {
+        "left": {
+          "x": "0 m",
+          "y": "0 m"
+        }
+      },
+      "traction": {
+        "right": [
+          "1000000 Pa",
+          "0 Pa"
+        ]
+      },
+      "body_force_density": [
+        "0 N/m^3",
+        "-10000 N/m^3"
+      ],
+      "heat_source_density": {
+        "alu": "2000000 W/m^3"
+      },
+      "prescribed_temperature": {
+        "left": "300 K"
+      },
+      "convection": {
+        "top": {
+          "heat_transfer_coefficient": "25 W/(m^2 K)",
+          "ambient_temperature": "290 K"
+        }
+      },
+      "inward_heat_flux": {
+        "bottom": "500 W/m^2"
+      },
+      "stress_free_temperature": "300 K"
+    }
+  }
+}

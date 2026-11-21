@@ -16,45 +16,61 @@ from transient_headless_independent_oracle import (
     COORD_ATOL_M, P1, TIMES_S, UNITS, require_close, uniform_heating, uniform_ramp)
 
 PHYSICS = "thermal.transient2d"
-FORMAT = "thermal.transient2d-result-v1"
-LAYOUT = "thermal2d-transient-p1-node-cell-v1"
+FORMAT = "thermal.transient2d-result-v3"
+LAYOUT = "thermal2d-transient-p1-node-cell-v2"
+# saved arrays (format 0.3 names) -> SI unit; None for the structural arrays, which carry none
 FIELD_UNITS = {
-    "nodes_m": "m", "triangles": "1", "time_s": "s", "temperature_k": "K",
-    "heat_flux_w_m2": "W/m^2", "source_load_w_per_m": "W/m",
-    "reaction_w_per_m": "W/m", "residual_w_per_m": "W/m",
-    "storage_rate_w_per_m": "W/m", "heat_content_j_per_m": "J/m",
-    "quadratic_functional_jk_per_m": "J K/m",
-    "dirichlet_node_ids": "1", "dirichlet_temperatures_k": "K",
+    "node_coordinates": "m", "triangles": None, "time": "s", "temperature": "K",
+    "heat_flux": "W/m^2", "generated_heat_rate_per_depth": "W/m",
+    "reaction_heat_rate_per_depth": "W/m", "residual_heat_rate_per_depth": "W/m",
+    "heat_storage_rate_per_depth": "W/m", "stored_heat_per_depth": "J/m",
+    "thermal_energy_functional_per_depth": "J K/m",
+    "prescribed_node_ids": None, "prescribed_temperature": "K",
 }
 
 
 FIELD_LOCATIONS = {
-    "nodes_m": "nodes", "triangles": "triangle_connectivity", "time_s": "requested_times",
-    "temperature_k": "nodes", "heat_flux_w_m2": "triangle_centroids",
-    "source_load_w_per_m": "nodes", "reaction_w_per_m": "nodes",
-    "residual_w_per_m": "nodes", "storage_rate_w_per_m": "nodes",
-    "heat_content_j_per_m": "domain", "quadratic_functional_jk_per_m": "domain",
-    "dirichlet_node_ids": "dirichlet_nodes", "dirichlet_temperatures_k": "dirichlet_nodes",
+    "node_coordinates": "nodes", "triangles": "triangle_connectivity", "time": "requested_times",
+    "temperature": "nodes", "heat_flux": "triangle_centroids",
+    "generated_heat_rate_per_depth": "nodes", "reaction_heat_rate_per_depth": "nodes",
+    "residual_heat_rate_per_depth": "nodes", "heat_storage_rate_per_depth": "nodes",
+    "stored_heat_per_depth": "domain", "thermal_energy_functional_per_depth": "domain",
+    "prescribed_node_ids": "prescribed_nodes", "prescribed_temperature": "prescribed_nodes",
 }
-STEP_FIELDS = {"reaction_w_per_m", "residual_w_per_m", "storage_rate_w_per_m"}
-STATIC_FIELDS = {"nodes_m", "triangles", "dirichlet_node_ids"}
+STEP_FIELDS = {"reaction_heat_rate_per_depth", "residual_heat_rate_per_depth", "heat_storage_rate_per_depth"}
+STATIC_FIELDS = {"node_coordinates", "triangles", "prescribed_node_ids"}
+
+
+def kelvin(value):
+    """A format 0.3 temperature: a constant as a quantity string, a 0.2-style
+    ``{"values_k": [...]}`` sample list as a tagged array."""
+    if isinstance(value, dict):
+        return {"unit": "K", "values": list(value["values_k"])}
+    return f"{value!r} K"
+
+
+def initial_temperature(value):
+    if isinstance(value, dict):
+        return {"type": "affine", "reference_temperature": kelvin(value["origin_temperature_k"]),
+                "temperature_gradient": {"unit": "K/m", "values": list(value["gradient_k_per_m"])}}
+    return kelvin(value)
 
 
 def model(unit="m", n=8, initial=300.0, q=8.0, bc=None):
     scale = UNITS[unit]
     return {
-        "openphysics": "0.2", "name": "Independent transient rectangle",
-        "units": {"length": unit, "temperature": "K", "time": "s"},
-        "geometry": {"domain": {"xmin": 0.0, "xmax": .002/scale,
-                                 "ymin": 0.0, "ymax": .001/scale}},
+        "openphysics": "0.3", "name": "Independent transient rectangle",
+        "geometry": {"length_unit": unit, "depth": None,
+                     "domain": {"xmin": 0.0, "xmax": .002/scale, "ymin": 0.0, "ymax": .001/scale}},
         "materials": {},
-        "physics": {"heat1": {"type": PHYSICS, "conductivity_w_mk": 2.5,
-            "volumetric_heat_capacity_j_m3k": 4.0,
-            "initial_temperature_k": copy.deepcopy(initial),
-            "dirichlet_temperature_k": copy.deepcopy({} if bc is None else bc),
-            "heat_source_w_m3": q}},
-        "mesh": {"subdivisions": [n, n]},
-        "study": {"type": "transient", "time_s": list(TIMES_S)},
+        "physics": {"heat1": {"type": PHYSICS, "thermal_conductivity": "2.5 W/(m K)",
+            "volumetric_heat_capacity": {"value": "4 J/(m^3 K)",
+                                         "accept": {"W-MAGNITUDE": "manufactured solution"}},
+            "initial_temperature": initial_temperature(copy.deepcopy(initial)),
+            "prescribed_temperature": {side: kelvin(v) for side, v in ({} if bc is None else bc).items()},
+            "heat_source_density": f"{float(q)!r} W/m^3"}},
+        "mesh": {"subdivision_count": [n, n]},
+        "study": {"type": "transient", "time": {"unit": "s", "values": list(TIMES_S)}},
         "results": {"save_fields": True, "plots": False},
     }
 
@@ -80,14 +96,14 @@ def read_saved(directory):
         raise AssertionError("NPZ/JSON metadata disagreement")
     for name, unit in FIELD_UNITS.items():
         a = arrays[name]
-        if summary["field_units"][name] != unit:
+        if summary["field_units"].get(name) != unit:
             raise AssertionError("field unit: "+name)
         if list(a.shape) != summary["field_shapes"][name]:
             raise AssertionError("field shape: "+name)
         if summary["field_locations"][name] != FIELD_LOCATIONS[name]:
             raise AssertionError("field location: "+name)
-        axis = "static" if name in STATIC_FIELDS else "time_s[1:]" if name in STEP_FIELDS else "time_s"
-        if summary["field_time_axes"][name] != axis:
+        axis = None if name in STATIC_FIELDS else "time[1:]" if name in STEP_FIELDS else "time"
+        if summary["field_time_axes"].get(name) != axis:
             raise AssertionError("field time axis: "+name)
         if a.dtype.kind not in "iuf" or not np.all(np.isfinite(a)):
             raise AssertionError("nonfinite/nonreal raw: "+name)
@@ -97,25 +113,28 @@ def read_saved(directory):
 
 
 def audit_summary(summary, arrays):
-    times = arrays["time_s"]
-    require_close(np.asarray(summary["study"]["time_s"]), times, 3, "summary requested times")
-    require_close(np.asarray(summary["rate_time_s"]), times[1:], 3, "summary rate times")
-    source = arrays["source_load_w_per_m"].sum(axis=1)
-    storage = arrays["storage_rate_w_per_m"].sum(axis=1)
-    reaction = arrays["reaction_w_per_m"].sum(axis=1)
+    times = arrays["time"]
+    if summary["study"]["time"]["unit"] != "s":
+        raise AssertionError("summary time unit")
+    require_close(np.asarray(summary["study"]["time"]["values"]), times, 3, "summary requested times")
+    source = arrays["generated_heat_rate_per_depth"].sum(axis=1)
+    storage = arrays["heat_storage_rate_per_depth"].sum(axis=1)
+    reaction = arrays["reaction_heat_rate_per_depth"].sum(axis=1)
     scale = max(24e-6, np.max(abs(source)), np.max(abs(storage)), np.max(abs(reaction)))
-    for name, expected in (
-        ("source_heat_w_per_m", source), ("storage_heat_w_per_m", storage),
-        ("outward_heat_w_per_m", -reaction),
-        ("heat_balance_defect_w_per_m", storage-source[1:]-reaction),
-        ("heat_content_j_per_m", arrays["heat_content_j_per_m"]),
-        ("quadratic_functional_jk_per_m", arrays["quadratic_functional_jk_per_m"])):
+    for name, unit, expected in (
+        ("generated_heat_rate_per_depth", "W/m", source), ("heat_storage_rate_per_depth", "W/m", storage),
+        ("outward_heat_rate_per_depth", "W/m", -reaction),
+        ("heat_rate_imbalance_per_depth", "W/m", storage-source[1:]-reaction),
+        ("stored_heat_per_depth", "J/m", arrays["stored_heat_per_depth"]),
+        ("thermal_energy_functional_per_depth", "J K/m", arrays["thermal_energy_functional_per_depth"])):
         physical_scale = max(scale, np.max(abs(expected))) if expected.size else scale
-        require_close(np.asarray(summary[name]), expected, physical_scale, "summary "+name)
+        if summary[name]["unit"] != unit:
+            raise AssertionError("summary unit: "+name)
+        require_close(np.asarray(summary[name]["values"]), expected, physical_scale, "summary "+name)
 
 
 def audit_arrays(a, kind, q, initial=300.0):
-    x, tri, ts = a["nodes_m"], a["triangles"], a["time_s"]
+    x, tri, ts = a["node_coordinates"], a["triangles"], a["time"]
     n, nt, m = len(x), len(ts), len(tri)
     require_close(ts, np.asarray(TIMES_S), 3, "explicit times")
     if np.max(np.abs(x.min(axis=0))) > COORD_ATOL_M:
@@ -136,8 +155,8 @@ def audit_arrays(a, kind, q, initial=300.0):
         expected = np.repeat((290+5000*x[:, 0])[None, :], nt, axis=0)
     else:
         raise AssertionError("unknown independent scenario")
-    require_close(a["temperature_k"], expected, max(1, np.max(abs(expected))), "analytic temperature")
-    fixed = a["dirichlet_node_ids"]
+    require_close(a["temperature"], expected, max(1, np.max(abs(expected))), "analytic temperature")
+    fixed = a["prescribed_node_ids"]
     if fixed.dtype.kind not in "iu" or fixed.ndim != 1:
         raise AssertionError("fixed integer IDs")
     if kind in ("ramp", "fixed"):
@@ -153,11 +172,11 @@ def audit_arrays(a, kind, q, initial=300.0):
     if not np.array_equal(fixed, selected):
         raise AssertionError("independent exterior Dirichlet selection")
     d = e.histories(expected, ts, q, fixed)
-    shape = {"temperature_k": (nt, n), "heat_flux_w_m2": (nt, m, 2),
-             "source_load_w_per_m": (nt, n), "reaction_w_per_m": (nt-1, n),
-             "residual_w_per_m": (nt-1, n), "storage_rate_w_per_m": (nt-1, n),
-             "heat_content_j_per_m": (nt,), "quadratic_functional_jk_per_m": (nt,),
-             "dirichlet_temperatures_k": (nt, len(fixed))}
+    shape = {"temperature": (nt, n), "heat_flux": (nt, m, 2),
+             "generated_heat_rate_per_depth": (nt, n), "reaction_heat_rate_per_depth": (nt-1, n),
+             "residual_heat_rate_per_depth": (nt-1, n), "heat_storage_rate_per_depth": (nt-1, n),
+             "stored_heat_per_depth": (nt,), "thermal_energy_functional_per_depth": (nt,),
+             "prescribed_temperature": (nt, len(fixed))}
     for key, value in shape.items():
         if a[key].shape != value:
             raise AssertionError("time/state/step shape: "+key)
@@ -166,19 +185,19 @@ def audit_arrays(a, kind, q, initial=300.0):
               "flux": max(1.0, 2.5*np.ptp(expected)/.001)}
     rate_scale = max(1e-30, abs(q)*2e-6, 12*2e-6,
                      float(np.max(np.sum(abs(d["reaction"]), axis=1))))
-    for field, key in (("source_load_w_per_m", "source"),
-                       ("storage_rate_w_per_m", "storage"),
-                       ("residual_w_per_m", "residual"),
-                       ("reaction_w_per_m", "reaction"),
-                       ("heat_flux_w_m2", "flux"),
-                       ("heat_content_j_per_m", "heat"),
-                       ("quadratic_functional_jk_per_m", "quadratic")):
+    for field, key in (("generated_heat_rate_per_depth", "source"),
+                       ("heat_storage_rate_per_depth", "storage"),
+                       ("residual_heat_rate_per_depth", "residual"),
+                       ("reaction_heat_rate_per_depth", "reaction"),
+                       ("heat_flux", "flux"),
+                       ("stored_heat_per_depth", "heat"),
+                       ("thermal_energy_functional_per_depth", "quadratic")):
         require_close(a[field], d[key], scales.get(key, rate_scale), field)
     require_close(d["balance"], np.zeros(nt-1), rate_scale, "heat balance")
     if kind == "heating" and len(fixed):
         raise AssertionError("insulated selection")
     if kind in ("ramp", "fixed"):
-        require_close(a["dirichlet_temperatures_k"], expected[:, fixed], 300, "DBC history")
+        require_close(a["prescribed_temperature"], expected[:, fixed], 300, "DBC history")
     return e
 
 
@@ -199,7 +218,7 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
                     summary, a = saved_run(model(unit, q=q), Path(tmp)/"out")
                     audit_arrays(a, "heating", q)
                     if q < 0:
-                        self.assertLess(a["temperature_k"].min(), 0)
+                        self.assertLess(a["temperature"].min(), 0)   # a solution may go below 0 K
 
     def test_sampled_ramp_and_nonzero_reaction(self):
         ramp = (290+3*(np.asarray(TIMES_S)-TIMES_S[0])).tolist()
@@ -209,7 +228,7 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
             audit_arrays(a, "ramp", 12, 290)
             _, b = saved_run(model(n=1, initial=290, q=2, bc=bc), Path(tmp)/"support")
             audit_arrays(b, "ramp", 2, 290)
-            require_close(b["reaction_w_per_m"].sum(axis=1), np.full(4, 20e-6),
+            require_close(b["reaction_heat_rate_per_depth"].sum(axis=1), np.full(4, 20e-6),
                           24e-6, "nonzero support sign")
 
     def test_affine_initial_and_fixed_source_support(self):
@@ -225,19 +244,20 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
 
     def test_strict_inputs_and_initial_boundary_mismatch(self):
         bad = []
-        for value in (True, 0, -1, float("inf")):
-            d = model();d["physics"]["heat1"]["volumetric_heat_capacity_j_m3k"] = value
+        for value in (True, "0 J/(m^3 K)", "-1 J/(m^3 K)", float("inf")):
+            d = model();d["physics"]["heat1"]["volumetric_heat_capacity"] = value
             bad.append(d)
         for times in ([0], [0, 0], [1, 0], [-1, 0], [0, True], [0, float("nan")]):
-            d=model();d["study"]["time_s"]=times;bad.append(d)
+            d=model();d["study"]["time"]["values"]=times;bad.append(d)
         for value in ({"left": 301}, {"left": {"values_k": [300]}},
                       {"left": {"values_k": [300, 301, 302, 303, 304]}, "bottom": 300}):
-            d=model();d["physics"]["heat1"]["dirichlet_temperature_k"]=value;bad.append(d)
-        for units in ({"length":"mm","temperature":"C","time":"s"},
-                      {"length":"mm","temperature":"K","time":"ms"}):
-            d=model();d["units"]=units;bad.append(d)
+            d=model();d["physics"]["heat1"]["prescribed_temperature"]={k: kelvin(v) for k, v in value.items()}
+            bad.append(d)
+        # format 0.3 carries units on the values: a units block is unknown, a time needs a time unit
+        d=model();d["units"]={"length":"mm","temperature":"K","time":"s"};bad.append(d)
+        d=model();d["study"]["time"]["unit"]="K";bad.append(d)
         d=model();d["physics"]["heat1"]["outward_flux"]={};bad.append(d)
-        d=model();d["physics"]["heat1"]["initial_temperature_k"]=[300]*81;bad.append(d)
+        d=model();d["physics"]["heat1"]["initial_temperature"]={"unit": "K", "values": [300]*81};bad.append(d)
         d=model();d["results"]["plots"]=True;bad.append(d)
         for i, data in enumerate(bad):
             with self.subTest(case=i), self.assertRaises(ValueError):
@@ -263,11 +283,11 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _, a=saved_run(model(),Path(tmp)/"out")
             mutations=[
-                ("heat_content_j_per_m",a["quadratic_functional_jk_per_m"]),
-                ("storage_rate_w_per_m",np.zeros_like(a["storage_rate_w_per_m"])),
-                ("time_s",a["time_s"][1:]),
-                ("temperature_k",a["temperature_k"][1:]),
-                ("nodes_m",a["nodes_m"]*1000),
+                ("stored_heat_per_depth",a["thermal_energy_functional_per_depth"]),
+                ("heat_storage_rate_per_depth",np.zeros_like(a["heat_storage_rate_per_depth"])),
+                ("time",a["time"][1:]),
+                ("temperature",a["temperature"][1:]),
+                ("node_coordinates",a["node_coordinates"]*1000),
             ]
             for name,value in mutations:
                 with self.subTest(field=name),self.assertRaises(AssertionError):
@@ -286,9 +306,9 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
                 elif variant=="layout":
                     altered["field_layout"]=np.asarray("wrong-field-layout")
                 elif variant=="units":
-                    metadata["field_units"]["heat_content_j_per_m"]="J K/m"
+                    metadata["field_units"]["stored_heat_per_depth"]="J K/m"
                 else:
-                    altered["temperature_k"]=np.asarray([[object()]],dtype=object)
+                    altered["temperature"]=np.asarray([[object()]],dtype=object)
                 (out/"summary.json").write_text(json.dumps(metadata),encoding="utf-8")
                 with (out/"fields.npz").open("wb") as stream:
                     np.savez(stream,**altered)
@@ -302,8 +322,8 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
         saved = {name: np.array(getattr(result, name), copy=True) for name in FIELD_UNITS}
         for name in FIELD_UNITS:
             self.assertFalse(getattr(result, name).flags.writeable, name)
-        document["study"]["time_s"][0] = 99
-        document["physics"]["heat1"]["initial_temperature_k"] = -900
+        document["study"]["time"]["values"][0] = 99
+        document["physics"]["heat1"]["initial_temperature"] = "-900 K"
         for name, expected in saved.items():
             self.assertTrue(np.array_equal(getattr(result, name), expected), name)
         with tempfile.TemporaryDirectory() as tmp:
@@ -316,7 +336,8 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
             self.assertFalse((Path(tmp)/"disabled"/"fields.npz").exists())
             summary = json.loads((Path(tmp)/"disabled"/"summary.json").read_text(encoding="utf-8"))
             self.assertFalse(summary["save_fields"])
-            self.assertEqual(summary["field_shapes"]["reaction_w_per_m"], [4, len(disabled.nodes_m)])
+            self.assertEqual(summary["field_shapes"]["reaction_heat_rate_per_depth"],
+                             [4, len(disabled.node_coordinates)])
 
     def test_accepted_initial_roundoff_is_not_projected(self):
         eps = np.finfo(float).eps
@@ -324,10 +345,10 @@ class TestTransientHeadlessIndependent(unittest.TestCase):
         bc = {s: 300.0 for s in ("left","right","bottom","top")}
         data = model(n=1, initial=initial, q=0, bc=bc)
         result = run(Document.from_dict(data), False)
-        self.assertTrue(np.array_equal(result.temperature_k[0], np.full(len(result.nodes_m), initial)))
-        expected = np.full_like(result.temperature_k, 300.0)
+        self.assertTrue(np.array_equal(result.temperature[0], np.full(len(result.node_coordinates), initial)))
+        expected = np.full_like(result.temperature, 300.0)
         expected[0] = initial
-        e = P1(result.nodes_m, result.triangles, 4, 2.5)
-        d = e.histories(expected, np.array(TIMES_S), 0, np.arange(len(result.nodes_m)))
+        e = P1(result.node_coordinates, result.triangles, 4, 2.5)
+        d = e.histories(expected, np.array(TIMES_S), 0, np.arange(len(result.node_coordinates)))
         scale = max(np.max(abs(d["storage"])), np.finfo(float).tiny)
-        require_close(result.storage_rate_w_per_m, d["storage"], scale, "accepted initial old mass")
+        require_close(result.heat_storage_rate_per_depth, d["storage"], scale, "accepted initial old mass")

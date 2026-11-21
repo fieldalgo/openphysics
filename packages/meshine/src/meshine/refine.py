@@ -20,9 +20,9 @@ Points are inserted in batches (with a separation filter so two new points do
 not land in each other's circumcircle) and the whole set is re-triangulated
 each round; that trades a little efficiency for a very small, robust code.
 
-Refinement ends with a RuntimeError instead of running on when the built input or an
-insertion would pass ``max_points`` (``MeshSizeLimitError``), after ``max_rounds`` rounds,
-or as soon as Qhull leaves a boundary point out of the triangulation: a segment that ends
+Refinement ends with a ``MeshingError`` (a RuntimeError) instead of running on when the built
+input or an insertion would pass ``max_points`` (``MeshSizeLimitError``), after ``max_rounds``
+rounds, or as soon as Qhull leaves a boundary point out of the triangulation: a segment that ends
 at such a point can never appear as an edge, however often it is split.
 
 Small input angles
@@ -85,7 +85,7 @@ from typing import NamedTuple
 import numpy as np
 from scipy.spatial import Delaunay, cKDTree
 
-from .geometry import Domain, Region, Segment, points_in_loops
+from .geometry import Domain, MeshInputError, Region, Segment, points_in_loops
 from .mesh import TriMesh
 
 #: A triangle is degenerate when twice its signed area is below ``AREA_EPS`` times its
@@ -111,10 +111,15 @@ SHARP_CORNER = math.radians(60.0)
 HALVING_SLACK = 1e-8
 
 
-class MeshSizeLimitError(RuntimeError):
+class MeshingError(RuntimeError):
+    """``generate`` cannot finish meshing this input; the message says why. A ``RuntimeError``,
+    so a caller that catches ``RuntimeError`` still catches it."""
+
+
+class MeshSizeLimitError(MeshingError):
     """``generate`` refused to pass ``max_points``: the input domain as built already has
-    more points, or an insertion would add more. A ``RuntimeError``, so a caller that catches
-    ``RuntimeError`` still catches it; the message starts with ``more than <max_points> points``."""
+    more points, or an insertion would add more. A ``MeshingError`` and so a ``RuntimeError``;
+    the message starts with ``more than <max_points> points``."""
 
 
 class _Corner(NamedTuple):
@@ -143,8 +148,8 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
               with the per-region sizes
     size_factor : a triangle is too big when circumradius > size_factor * h
                   (an equilateral triangle of edge h has circumradius 0.577 h)
-    max_rounds : RuntimeError when refinement has not finished after this many rounds
-    max_points : hard cap; MeshSizeLimitError (a RuntimeError) when the input domain as built
+    max_rounds : MeshingError (a RuntimeError) when refinement has not finished after this many rounds
+    max_points : hard cap; MeshSizeLimitError (a MeshingError) when the input domain as built
                  has more points, or before an insertion would pass it
     smooth : Laplacian smoothing sweeps of interior nodes after refinement
     candidate_order : "legacy" preserves the existing NumPy quicksort selection;
@@ -304,7 +309,7 @@ def generate(domain: Domain, boundary_names="outer", *, min_angle: float = 28.0,
             print(f"round {rnd}: {bad.sum()} bad, inserted {int(len(cand) and accepted.sum())}, "
                   f"split {len(seg_to_split)} segments, {len(P)} points")
     else:
-        raise RuntimeError(f"refinement did not converge in {max_rounds} rounds")
+        raise MeshingError(f"refinement did not converge in {max_rounds} rounds")
 
     update_loops()
     tri = Delaunay(P)
@@ -337,13 +342,13 @@ def _refuse_empty_mesh(P: np.ndarray, simp: np.ndarray, degenerate: np.ndarray,
     """
     n_deg = int(degenerate.sum())
     if n_deg == len(simp):
-        raise ValueError(
+        raise MeshInputError(
             f"meshine.generate produced 0 triangles and 0 nodes: all {len(simp)} triangles of "
             f"the final triangulation are degenerate. The {len(P)} mesh points span "
             f"{domain.extent():g} units, and at that extent they are collapsed onto a line or "
             f"a single point. This is a geometry problem, not a mesh-size one; check the "
             f"region coordinates and the unit they are written in.")
-    raise ValueError(
+    raise MeshInputError(
         f"meshine.generate produced 0 triangles and 0 nodes: of {len(simp)} triangles, "
         f"{n_deg} are degenerate and none of the remaining {len(simp) - n_deg} has its centroid "
         f"inside any of the {len(regions)} region(s) ({', '.join(sorted({r.name for r in regions}))}). "
@@ -361,7 +366,7 @@ def _refuse_unresolved_points(P: np.ndarray, coplanar: np.ndarray, domain: Domai
     calls compatible end here: they split each other toward the apex (module docstring).
     """
     i, _facet, j = (int(x) for x in coplanar[0])
-    raise RuntimeError(
+    raise MeshingError(
         f"meshine.generate: the triangulation cannot resolve {len(coplanar)} boundary point(s); "
         f"the first is ({P[i, 0]:.17g}, {P[i, 1]:.17g}), {np.linalg.norm(P[i] - P[j]):.3g} from its "
         f"neighbour in a domain of extent {domain.extent():.6g}. Two boundaries come closer than "

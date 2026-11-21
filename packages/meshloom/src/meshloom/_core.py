@@ -10,7 +10,10 @@ benchmark; the public mesher API comes with a later release and may change them.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
+
+import math
 
 import numpy as np
 
@@ -177,33 +180,112 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
             "subfacet_facet": i64(owner, -1), "stats": stats}
 
 
-def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60) -> dict:
-    """A tetrahedral mesh of a PLC without refinement: ``recover_boundary``, then
-    regions, rounding and certification. ``domain="regions"`` makes every bounded
+def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
+             region_points=None, h=None, ratio: float | None = None, alpha: float = 1.0,
+             max_points: int = 0) -> dict:
+    """A tetrahedral mesh of a PLC: ``recover_boundary``, then (with ``h`` or ``ratio``)
+    refinement, then regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
     ``domain="parity"`` makes the even-odd domain of closed surfaces one region. S points
-    are rounded once to the nearest double and every tetrahedron is certified with
-    exact ``orient3d > 0`` on the output doubles (no flip repair yet: a tetrahedron
-    that rounding inverts raises ``ValueError``). Returns the fields of the plan's
-    output contract: ``nodes``, ``tetrahedra``, ``regions``, ``region_names``,
-    ``boundary_faces`` and ``boundary_nodes`` by facet index (faces wound outward),
-    ``interfaces`` keyed by region pairs (a < b, wound from a to b), and ``node_source``
-    (each node's global point index: input points first, then S points).
+    are rounded once to the nearest double. Tetrahedra that rounding makes flat or
+    inverted are repaired: flips (2-3, edge removal), edge removals inside one facet that
+    re-triangulate it there, and, failing those, a cavity around the tetrahedron refilled
+    as a cone from one of its vertices or from one new point inside the domain. Every
+    tetrahedron is then certified with exact ``orient3d > 0`` on the output doubles, every
+    face lies in at most two tetrahedra with opposite windings, and the faces used once
+    are the domain's boundary; what repair cannot fix raises ``RoundingError``. Returns
+    the fields of the plan's output contract: ``nodes``, ``tetrahedra``, ``regions``,
+    ``region_names``, ``boundary_faces`` and ``boundary_nodes`` by facet index (faces
+    wound outward), ``interfaces`` keyed by region pairs (a < b, wound from a to b), and
+    ``node_source`` (each node's global point index: input points first, then S points;
+    -1 for a point the repair added), with ``stats`` counting the repair's operations.
+
+    ``region_points`` (regions mode only) names the regions: a sequence of ``(point,
+    name)`` pairs. The bounded component that holds a point is the region ``name``
+    (several components may share a name); ``name=None`` marks a hole, which is not meshed.
+    Every bounded component then needs a point, and each point must lie strictly inside one
+    bounded component, decided exactly against the unrounded points. Regions are numbered
+    in the order the names first appear, and ``region_names`` lists them. Without it,
+    regions are named ``"region i"`` by first appearance.
+
+    Refinement (constrained Delaunay refinement, before rounding) runs when ``h`` (a
+    size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split; one number, or
+    with ``region_points`` a mapping from region name to size, which every named region
+    must have; holes are not refined) or
+    ``ratio`` (a bound B on the radius-edge ratio, circumradius over shortest edge) is
+    given. It splits encroached subsegments and subfacets and bad tetrahedra at their
+    circumcentres until none is left. Near input angles below 60 degrees (segments or
+    facets) it leaves skinny tetrahedra and encroached subsegments or subfacets, counted in
+    ``stats`` as ``exempt_subsegments`` and ``exempt_subfacets``, so that it terminates;
+    elsewhere every tetrahedron meets ``ratio``. ``max_points`` caps the points it inserts
+    (0: derived from the size field, at least 1000); reaching it raises ``RefineError``.
+    ``stats`` then also counts segment, facet and volume points, rejected circumcentres and
+    insertions that fell back to the smallest cavity (``minimal_cavities``).
 
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
-    witness type 6), ``RecoveryError``, ``RoundingError``, or ``MeshError`` for an
-    internal failure; all are ``ValueError``.
+    witness type 6), ``RecoveryError``, ``RefineError``, ``RoundingError``, ``RegionError``
+    (a region point outside every region, on a facet, two names in one region, or a region
+    without a point), or ``MeshError`` for an internal failure; all are ``ValueError``.
     """
     kernel = _require()
     if domain not in ("regions", "parity"):
         raise ValueError("domain must be 'regions' or 'parity'")
+    def _number(value):
+        return isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool)
+
+    region_h = None
+    if isinstance(h, Mapping):
+        if region_points is None:
+            raise ValueError("h as a mapping of region names needs region_points")
+        region_h = dict(h)
+        for key, value in region_h.items():
+            if not (_number(value) and math.isfinite(value) and value > 0):
+                raise ValueError(f"h[{key!r}] must be a finite number > 0, got {value!r}")
+        h = None
+    for name, value in (("h", h), ("ratio", ratio)):
+        if value is not None and not (_number(value) and math.isfinite(value) and value > 0):
+            raise ValueError(f"{name} must be a finite number > 0 or None, got {value!r}")
+    if not (isinstance(alpha, (int, float, np.integer, np.floating)) and math.isfinite(alpha) and alpha > 0):
+        raise ValueError(f"alpha must be a finite number > 0, got {alpha!r}")
+    if isinstance(max_points, bool) or not isinstance(max_points, (int, np.integer)) or max_points < 0:
+        raise ValueError(f"max_points must be an integer >= 0, got {max_points!r}")
     p = _points(points)
     s = np.ascontiguousarray(np.asarray(np.zeros((0, 2)) if segments is None else segments,
                                         dtype="<i8").reshape(-1, 2))
+    names, seed_xyz, seed_label = [], [], []
+    if region_points is not None:
+        if domain != "regions":
+            raise ValueError("region_points needs domain='regions'")
+        for item in region_points:
+            try:
+                point, name = item
+            except (TypeError, ValueError):
+                raise ValueError("region_points holds (point, name) pairs") from None
+            xyz = np.asarray(point, dtype=np.float64).reshape(-1)
+            if xyz.shape != (3,) or not np.isfinite(xyz).all():
+                raise ValueError(f"a region point must be 3 finite coordinates, got {point!r}")
+            if name is not None and not isinstance(name, str):
+                raise ValueError(f"a region name must be a string or None (a hole), got {name!r}")
+            if name is not None and name not in names:
+                names.append(name)
+            seed_xyz.append(xyz)
+            seed_label.append(-1 if name is None else names.index(name))
+        if not seed_xyz:
+            raise ValueError("region_points is empty")
+    label_h = None
+    if region_h is not None:
+        unknown = sorted(set(region_h) - set(names), key=str)
+        missing = [n for n in names if n not in region_h]
+        if unknown or missing:
+            raise ValueError(f"h names regions {names!r}; unknown {unknown!r}, missing {missing!r}")
+        label_h = [float(region_h[n]) for n in names]
     check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
+    seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
+              np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
-        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth)
+        out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
+                                     float(ratio or 0.0), float(alpha), int(max_points), label_h)
     except ValueError as e:
         if len(e.args) != 3:
             raise
@@ -211,7 +293,10 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         if kind == "NotClosed":
             raise NotClosed(msg, {"type": 6, "segment": (int(ids[0]), int(ids[1])),
                                   "facets": tuple(int(x) for x in ids[2:])}) from None
-        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError}.get(kind, MeshError)
+        if kind == "RegionSeed":
+            raise RegionError(msg) from None
+        cls = {"RecoveryFail": RecoveryError, "RoundingFail": RoundingError,
+               "RefineFail": RefineError}.get(kind, MeshError)
         raise cls(msg) from None
 
     def i64(b, *shape):
@@ -226,7 +311,7 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     for (a, b), face in zip(ipair.tolist(), ifaces):
         interfaces.setdefault((a, b), []).append(face)
     return {"nodes": nodes, "tetrahedra": tets, "regions": regions,
-            "region_names": [f"region {i}" for i in range(stats["region_count"])],
+            "region_names": names if names else [f"region {i}" for i in range(stats["region_count"])],
             "boundary_faces": boundary, "boundary_nodes": {k: np.unique(v) for k, v in boundary.items()},
             "interfaces": {k: np.array(v, dtype=np.int64).reshape(-1, 3) for k, v in interfaces.items()},
             "node_source": i64(out[7], -1), "stats": stats}
@@ -328,10 +413,22 @@ class RecoveryError(MeshError):
     kind = "RecoveryFail"
 
 
+class RefineError(MeshError):
+    """Refinement failed: the point cap was reached, or an insertion failed."""
+
+    kind = "RefineFail"
+
+
 class RoundingError(MeshError):
-    """Rounding to doubles made points equal or tetrahedra that flips cannot repair."""
+    """Rounding to doubles made points equal or tetrahedra that repair cannot fix."""
 
     kind = "RoundingFail"
+
+
+class RegionError(ValueError):
+    """``region_points`` does not name the regions: a point outside every region or on a
+    facet between regions, two names (or a name and a hole) in one region, or a region
+    without a point. The message says which and where."""
 
 
 def _sub(a, b):

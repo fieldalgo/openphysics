@@ -27,7 +27,7 @@ All coordinates passed to this Python engine are metres; temperatures are kelvin
 
 The maintained [example](../../../examples/galerkin/thermal_steady2d.py) builds
 `rectangle_mesh(2., .7, 8, 5)`: 8 × 5 cells, each split into two P1 triangles.
-It selects actual left/right boundary node IDs for `dirichlet`; unselected
+It selects actual left/right boundary node IDs for `prescribed_temperature`; unselected
 natural edges are insulated. `solve_steady_heat` returns nodal temperature
 and one constant flux vector per triangle.
 

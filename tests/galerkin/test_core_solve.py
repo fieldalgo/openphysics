@@ -200,9 +200,27 @@ def test_torch_second_derivative_is_refused():
     n = b.size
     v = torch.as_tensor(values).requires_grad_()
     x = solve(CooMatrix(rows, cols, v, (n, n)), torch.as_tensor(b))
-    (grad,) = torch.autograd.grad((x ** 2).sum(), v, create_graph=True)
-    with pytest.raises(RuntimeError, match="once_differentiable"):
-        grad.sum().backward()
+    # a graph-building backward is refused at the solve (before 2026-11-09 the first pass
+    # ran and once_differentiable refused only the second one)
+    with pytest.raises(RuntimeError, match="second derivatives"):
+        torch.autograd.grad((x ** 2).sum(), v, create_graph=True)
+
+
+def test_torch_second_derivative_through_a_nonlinear_assembly_is_refused():
+    # The cotangent of x needs no grad here (a plain sum), but the matrix is nonlinear
+    # in p: once_differentiable did not fire and the second pass returned a partial
+    # number (review 2026-11-09). It must be refused, not wrong.
+    torch = _torch()
+    rows, cols, values, b = _system()
+    n = b.size
+    p = torch.tensor(1.3, dtype=torch.float64, requires_grad=True)
+    x = solve(CooMatrix(rows, cols, torch.as_tensor(values) * p ** 2, (n, n)), torch.as_tensor(b))
+    with pytest.raises(RuntimeError, match="second derivatives"):
+        torch.autograd.grad(x.sum(), p, create_graph=True)
+    # the first derivative still works
+    x = solve(CooMatrix(rows, cols, torch.as_tensor(values) * p ** 2, (n, n)), torch.as_tensor(b))
+    (g,) = torch.autograd.grad(x.sum(), p)
+    assert float(g) == pytest.approx(-2.0 / 1.3 * float(x.sum()), rel=1e-12)
 
 
 def _laplacian_terms(n=6):
@@ -303,8 +321,8 @@ def test_torch_solve_keeps_no_factor_on_the_graph():
 
 
 def test_a_singular_numpy_block_raises_and_the_public_solve_still_warns():
-    """The physics solvers' NumPy path raises for an exactly singular block; the public
-    galerkin.solve_dirichlet keeps SciPy's spsolve, which warns and returns NaN."""
+    """The physics solvers' NumPy path raises for an exactly singular block; the kernel
+    galerkin.kernels.solve_dirichlet keeps SciPy's spsolve, which warns and returns NaN."""
     from scipy.sparse.linalg import MatrixRankWarning
 
     from galerkin.core.solve import solve_dirichlet
@@ -338,13 +356,14 @@ def test_overlapping_numpy_solves_leave_the_warning_filters_alone(monkeypatch, p
     left = [int(i) for i in mesh.boundary["left"]]
     right = [int(i) for i in mesh.boundary["right"]]
     solves = {
-        "heat": lambda: solve_steady_heat(mesh, conductivity=2.0, dirichlet={i: 300.0 for i in left},
-                                          heat_source=1.0),
+        "heat": lambda: solve_steady_heat(mesh, thermal_conductivity=2.0, prescribed_temperature={i: 300.0 for i in left},
+                                          heat_source_density=1.0),
         "electric": lambda: solve_steady_electric(
-            mesh, conductivity=2.0, dirichlet={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
+            mesh, electrical_conductivity=2.0,
+            prescribed_electric_potential={**{i: 0.0 for i in left}, **{i: 1.0 for i in right}}),
         "elasticity": lambda: solve_elasticity(
-            mesh, young_modulus=2e3, poisson_ratio=0.3, plane="stress",
-            dirichlet={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),
+            mesh, youngs_modulus=2e3, poisson_ratio=0.3, plane="stress",
+            prescribed_displacement={(i, c): 0.0 for i in left for c in (0, 1)}, traction={"right": [1.0, 0.0]}),
     }
     original = core_solve.scipy_solve_dirichlet
     first_inside, first_done = threading.Event(), threading.Event()

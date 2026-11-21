@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 
 from fiber_modes import solve_vector, exact_modes, A_CORE, N_CO, N_CL, K0
-from galerkin import eval_edge_field
+from galerkin.kernels import eval_edge_field
 
 INK = "#1a1f2e"; MUTED = "#6b7280"
 BLUE = "#2563eb"; ORANGE = "#d97706"; GREEN = "#059669"; GRAY_REF = "#9ca3af"

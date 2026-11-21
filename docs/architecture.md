@@ -105,8 +105,22 @@ the mesh types (`mesh`, `mesh3d`), which import nothing else from galerkin. No m
 uses another module's private (underscore) names, imported or read as
 attributes, and only a class's own methods read its underscore members. What a family of modules
 shares lives in core, in the package-private `_thermal_mechanical_common` (the
-heat-to-mechanics workflows) and `_cavity_common` (the two box cavities), or in
-public names of the module that owns it (thermoelasticity builds on elasticity's). Material lookup lives in
+heat-to-mechanics workflows), `_cavity_common` (the two box cavities), `_heat_kernels`
+(the heat solvers' boundary system, 3D source load and face map), `_mechanics_kernels`
+(the elasticity and thermoelasticity helpers and the temperature-snapshot hashes),
+`_moving` (the moving-mesh solves behind `motion=`), `_public` (the public APIs'
+text refusal, inward data and result surfaces), `_conventions` (`to_kernel` and
+`to_public`, the one place a complex value changes between the public exp(−iωt) and
+a kernel's exp(+iωt)) and `_waveguide_kernels` (the mode solve `solve_modes` and its pencil
+`assemble_mode_system`, which `galerkin.kernels` re-exports),
+or in public names of the module that owns it (thermoelasticity builds on elasticity's;
+joule heating and the workflows call `galerkin.thermal.solve_steady_heat_outward`, and
+the temperature-dependent Joule iteration `galerkin.electric.solve_steady_electric_outward`
+and `galerkin.joule_heating.solve_steady_joule_heat_outward`: the internal outward-form
+bodies outside `__all__`). The cavity functions are thin public layers over private bodies
+in their own modules (`galerkin.cavity._solve_cavity_box`, `_solve_cavity`,
+`galerkin.material_cavity._solve_material_cavity_box`, `_solve_material_cavity`), which
+`galerkin.kernels` does not export. Material lookup lives in
 core (`galerkin.materials` keeps its public names), and a physics module hands
 core its mesh-bound containers as plain checked values (`core.loads.ElementSource`).
 `tests/galerkin/test_layers.py` fails if the mesh types, core, the public
@@ -139,9 +153,13 @@ flowchart TB
 | coupling | [`galerkin.coupling`](../packages/galerkin/src/galerkin/coupling/__init__.py) | Node and element `Field`s on one mesh with an SI unit, same-mesh `transfer` and the `OneWayChain` driver, which runs stages handed to it and imports no physics. The Joule and heat-to-mechanics workflows run on it. The [kernel interface](packages/galerkin/coupling.md) states what a solver must expose for another solver to consume its result. |
 
 Each element formula lives once, as a closed-form kernel in `core.kernels`. The
-public assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
+assembly functions (`assemble_stiffness`, `assemble_curlcurl_3d`, …)
 assemble those kernels with `core.forms` and return SciPy matrices; they take
-NumPy values and refuse JAX or PyTorch ones. Physics modules that differentiate
+NumPy values and refuse JAX or PyTorch ones. They, the Dirichlet solve, the physics
+modules' helpers and the electromagnetic kernels (the mode solve and coordinates, the
+mode overlaps and the radial PML) are reached through `galerkin.kernels`, an internal
+namespace (consistent units, not part of the public API) above every layer that only
+re-exports them for galerkin's modules, simcase and sipi. Physics modules that differentiate
 assemble the same kernels in the input's array library, and through that route
 seven solvers differentiate on JAX and PyTorch
 ([derivatives](packages/galerkin/differentiation.md)). The kernels are checked
@@ -190,7 +208,10 @@ grid-to-mesh projection waits for a second engine
    failure evidence of the temperature-dependent Joule workflow
    ([`simcase/cli.py`](../packages/simcase/src/simcase/cli.py)); a kind whose
    failures carry structured evidence adds it there. Python-only physics stays
-   out of documents until it is registered.
+   out of documents until it is registered. A kind from another distribution
+   comes through a provider: an entry point in the group `openphysics.providers`
+   whose provider returns the kinds and a data-only manifest
+   ([physics providers](packages/simcase/providers.md), unstable in 0.x).
 
 Keep English and Korean pages together, and keep numerical thresholds as
 validated ([contributing](../CONTRIBUTING.md)).
@@ -206,4 +227,6 @@ The map follows the [`simcase` dependencies](../packages/simcase/pyproject.toml)
 [physics registry](../packages/simcase/src/simcase/registry.py): each physics family
 registers its contract validation, runner, summary and result types there, so a new
 physics does not edit the runner or the schema ([adding a physics](#adding-a-physics)).
+The registry's kinds come from [providers](packages/simcase/providers.md): simcase's
+own kinds are the built-in provider `openphysics-fem`, loaded first.
 This architecture page adds no new implementation or numerical validation claim.

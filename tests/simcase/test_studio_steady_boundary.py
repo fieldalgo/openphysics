@@ -14,31 +14,31 @@ from simcase.studio import server
 
 def model(kind="flux-robin", *, save_fields=True):
     physics = {
-        "type": "thermal.steady2d", "conductivity_w_mk": 2,
-        "heat_source_w_m3": 0, "dirichlet_temperature_k": {"left": 300, "right": 293},
+        "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)",
+        "heat_source_density": "0 W/m^3", "prescribed_temperature": {"left": "300 K", "right": "293 K"},
     }
     if kind == "empty-flux":
-        physics["outward_flux_w_m2"] = {}
+        physics["inward_heat_flux"] = {}
     elif kind == "empty-convection":
         physics["convection"] = {}
     elif kind in ("robin-only", "flux-robin", "negative"):
-        physics["dirichlet_temperature_k"] = {"left": 300} if kind == "flux-robin" else {}
+        physics["prescribed_temperature"] = {"left": "300 K"} if kind == "flux-robin" else {}
         physics["convection"] = {
-            "right": {"h_w_m2k": 4, "ambient_temperature_k": 290}
+            "right": {"heat_transfer_coefficient": "4 W/(m^2 K)", "ambient_temperature": "290 K"}
         }
         if kind == "flux-robin":
-            physics["outward_flux_w_m2"] = {"right": 2}
+            physics["inward_heat_flux"] = {"right": "-2 W/m^2"}
         elif kind == "negative":
-            physics["outward_flux_w_m2"] = {"right": 50}
-            physics["convection"]["right"] = {"h_w_m2k": 2, "ambient_temperature_k": 10}
+            physics["inward_heat_flux"] = {"right": "-50 W/m^2"}
+            physics["convection"]["right"] = {"heat_transfer_coefficient": "2 W/(m^2 K)",
+                                              "ambient_temperature": "10 K"}
     elif kind != "legacy":
         raise AssertionError(kind)
     return {
-        "openphysics": "0.2", "name": "Steady boundary \u0394 \ud55c\uae00",
-        "units": {"length": "m", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+        "openphysics": "0.3", "name": "Steady boundary \u0394 \ud55c\uae00",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
         "materials": {}, "physics": {"heat1": physics},
-        "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
+        "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
         "results": {"save_fields": save_fields, "plots": False},
     }
 

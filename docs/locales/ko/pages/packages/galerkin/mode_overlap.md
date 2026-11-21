@@ -4,7 +4,7 @@
 
 [galerkin 개요](overview.md) · [고유공간 신뢰성](eigenspace_reliability.md) · [미분](differentiation.md)
 
-`galerkin.mode_overlap`은 `galerkin.waveguide.solve_modes`의 모드(전체 벡터, edge `et`와
+`galerkin.mode_overlap`은 `galerkin.kernels.solve_modes`의 모드(전체 벡터, edge `et`와
 절점 `ez`)와 `Mesh` 위의 스칼라 P1 모드 함수를 후처리합니다: 도파 전력, 장 중첩,
 정규화, 결합 효율, 구속 계수, 유효 면적. 모든 적분은 유한요소 계수의 정확한 질량·결합
 행렬 곱이며, 유효 면적의 `int |E|^4`만 대칭 삼각형 구적 규칙으로 정확히 적분합니다.
@@ -122,13 +122,15 @@ Whitney/P1 보간을 규칙의 점에서 평가해 적분합니다. `E_t`(Whitne
 | `scalar_confinement_factor(mesh, phi, triangles)` | `int_R |phi|^2 / int |phi|^2` |
 | `scalar_effective_area(mesh, phi)` | `(int |phi|^2 dA)^2 / int |phi|^4 dA` |
 
-공개 이름은 `galerkin`에서도 내보냅니다. 벡터 전력 함수는 `beta`가 `H_t`에 들어가므로
+이것은 커널입니다(일관 단위, exp(+iωt)). 내부 `galerkin.kernels`가 다시 내보내고, 공개 SI 함수는
+[아래](#공개-si-함수)에 있습니다. 벡터 전력 함수는 `beta`가 `H_t`에 들어가므로
 `n_eff`를 명시적으로 받습니다. `solve_modes`가 `(n_eff, space, et, ez)`를 돌려주므로
 `vector_power(space, et[i], ez[i], n_eff[i], k0)`입니다.
 
 ```python
 import numpy as np
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_overlap import normalize_vector, coupling_efficiency, confinement_factor, interpolate_vector_field
 
 n_eff, space, et, ez = solve_modes(mesh, eps_r, k0, n_target=n_core, num_modes=4)
@@ -137,6 +139,40 @@ gamma = confinement_factor(space, et0, ez0, eps_r, mesh.regions == 0)   # 영역
 et_in, _ = interpolate_vector_field(space, lambda x, y: np.stack([np.exp(-(x**2 + y**2) / w0**2),
                                                                   np.zeros_like(x)], axis=-1))
 eta = coupling_efficiency(space, et[:2], ez[:2], et_in)                 # 퇴화 쌍으로의 Gaussian 결합
+```
+
+## 공개 SI 함수
+
+`galerkin.waveguide`(`galerkin`이 다시 내보냄)는 모드의 공개 표면이며 SI 단위와 exp(−iωt)를
+따릅니다(단위·이름, galerkin 단계). 이 함수들은 위의 커널을 감싸고 한 곳 `galerkin._conventions`에서
+변환합니다. 복소 입력은 `to_kernel`(Im을 `0.0 - Im`으로 부호 반전)을 거쳐 커널에 들어가고, 복소 출력은
+커널 출력의 `to_public`(`conj`)이며 다시 유도하지 않습니다. 그래서 공개 값은 커널 값의 켤레와 비트까지
+같습니다(`tests/galerkin/test_waveguide_public_frames.py`, 점검 P3-5).
+
+| 함수 | 반환 |
+|---|---|
+| `solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None, target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None, pec_edges=None, pml=None, bend=None, motion=None)` | 고정된 `WaveguideModes`: `effective_index`(수동 손실 도파로의 전방 모드는 Im ≥ 0), `unnormalized_electric_field_line_integral`(m, `space`의 변을 따른 `E_t`의 선적분), `unnormalized_electric_field_z`(`E_z` 그대로), `space`, `vacuum_angular_wavenumber`, 재료와 `.units`. 메시는 미터, 파장(m)과 k0(rad/m) 중 정확히 하나를 주며 k0 = 2π/λ |
+| `ModalPML(*, pml_thickness={side: m}, pml_strength=3.0, pml_order=2)`, `Bend(*, bend_radius, bend_origin, bend_axis="x")` | 흡수층과 굽힘([모드 좌표](modal_coordinates.md)); 좌표 인자는 솔버가 직접 만듭니다 |
+| `mode_power(modes, mode)` | 복소 `P`(V/m 장이면 W); `Re P`가 +z 전력 |
+| `cross_power(modes_a, mode_a, modes_b, mode_b)` | `P_ab`, 모드 `b`의 `H`(같은 메시와 k0) |
+| `field_overlap(modes_a, mode_a, modes_b, mode_b)` | m^2의 `<E_a, E_b>`(두 성분) |
+| `mode_coupling_efficiency(modes, mode, incident, incident_mode)` | `incident`의 모드 `incident_mode`가 `mode`(또는 여러 모드의 생성 공간)로 가는 `eta` |
+| `mode_confinement_factor(modes, mode, regions)` | `Gamma_R`; `regions`는 메시의 영역 이름, 마스크 또는 삼각형 인덱스 |
+| `mode_effective_area(modes, mode, *, include_longitudinal=False)` | m^2의 `A_eff` |
+
+장은 솔버의 임의 진폭과 위상을 그대로 둡니다. `ModalPML`이나 `Bend`가 있으면 늘린 또는 굽힌 좌표의
+공변 성분이고, 후처리 함수는 이를 창 전체에서 적분합니다. 스칼라 함수, `normalize_vector`,
+`overlap_matrix`, `centroid_field`, `interpolate_vector_field`는 이 단계에서 커널로만 남습니다.
+
+```python
+import numpy as np
+from galerkin import mode_confinement_factor, mode_power, solve_waveguide_modes
+
+modes = solve_waveguide_modes(mesh, relative_permittivity=eps_r, vacuum_wavelength=1.55e-6,
+                              target_effective_index=n_core, search_mode_count=4)    # 메시는 m
+loss_db_per_m = 40 * np.pi / np.log(10) * modes.effective_index[0].imag / 1.55e-6   # Im n_eff >= 0: 손실
+power = mode_power(modes, 0)                                                         # (V/m)^2당 W
+gamma = mode_confinement_factor(modes, 0, mesh.regions == 0)                         # 영역 0의 에너지
 ```
 
 ## 검증

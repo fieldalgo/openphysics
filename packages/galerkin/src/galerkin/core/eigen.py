@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Derivatives of eigenpairs that a NumPy eigensolver has already found.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 An eigensolver returns numbers. ``refine`` attaches derivatives to one simple
 eigenpair (lambda0, x0) of A x = lambda B x, normalized x0^T B x0 = 1, by one
 Newton step on the eigenproblem bordered by that normalization,

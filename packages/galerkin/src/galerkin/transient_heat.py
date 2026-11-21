@@ -7,22 +7,28 @@ capacity and a constant source may be piecewise constant on named mesh regions
 (docs/packages/galerkin/multimaterial.md). Finite Kelvin values are
 mathematical inputs, not a physical material-domain or positivity certificate.
 
-Exterior edges may carry a prescribed outward flux g and convection h*(T-T_amb)
-with the steady solver's input forms and signs (docs/packages/galerkin/thermal_flux_robin.md).
-Each value may also depend on time, as callback(time_s) or callback(points_m,
-outward_normals, time_s); time-dependent data are sampled at the end of every
-backward-Euler step, like Dirichlet and source callbacks. H is assembled once
-unless h itself varies in time.
+Exterior edges may carry an inward heat flux and convection h*(T-T_amb) with the
+steady solver's input forms and signs (docs/packages/galerkin/thermal_flux_robin.md).
+Each value may also depend on time, as callback(time) or callback(position,
+outward_normal, time); time-dependent data are sampled at the end of every
+backward-Euler step, like prescribed-temperature and source callbacks. H is
+assembled once unless h itself varies in time.
 
 Material, source, Dirichlet, boundary and initial values may be JAX or PyTorch
 values (callbacks may return them); the histories are then arrays of that
 library and carry reverse-mode derivatives through every step (all steps are
 kept). NumPy inputs compute exactly as before.
+
+The public function takes keyword-only SI quantities under registry names, with the
+inward heat flux (positive enters the body). It negates the inward values once and
+calls the internal ``solve_transient_heat_outward`` (outside ``__all__``), which keeps
+the outward form galerkin's own callers use (the moving-mesh solve).
 """
 from dataclasses import dataclass, fields
 import importlib
 import inspect
 import sys
+from types import MappingProxyType
 from typing import Mapping
 
 import numpy as np
@@ -41,18 +47,26 @@ from .core.measure import ScalarMeasure
 from .core.sparse import CooMatrix
 from .core.triangles import triangle_geometry
 from .postprocess import element_gradient
-from .thermal import scalar_boundary_system
+from ._heat_kernels import scalar_boundary_system as _scalar_boundary_system
+from ._public import ResultSurface, outward_from_inward, refuse_text
+
+__all__ = ["TransientHeatStepError", "TransientHeatResult", "PlanarTransientHeatResult",
+           "AxisymmetricTransientHeatResult", "solve_transient_heat"]
 
 
 class TransientHeatStepError(ValueError):
-    """A chained sampling/solve/history failure; no successful partial result."""
+    """A chained sampling/solve/history failure; no successful partial result.
 
-    def __init__(self, time_index, time_s):
+    ``time_index`` is the index into the requested times and ``time`` that time in s.
+    """
+
+    def __init__(self, time_index, *, time):
+        refuse_text("time", time)
         self.time_index = int(time_index)
-        self.time_s = float(time_s)
+        self.time = float(time)
         super().__init__(
             f"transient heat failed at time index {self.time_index}, "
-            f"time_s={self.time_s!r}")
+            f"time={self.time!r}")
 
 
 def _scalar(value, name, positive=False):
@@ -93,20 +107,20 @@ def _owned(value, dtype):
     return np.frombuffer(a.tobytes(order="C"), dtype=dtype).reshape(a.shape)
 
 
-_BOUNDARY_FORMS = ("callback(time_s) -> scalar", "callback(points_m, outward_normals) -> (Q,)",
-                   "callback(points_m, outward_normals, time_s) -> (Q,)")
+_BOUNDARY_FORMS = ("callback(time) -> scalar", "callback(position, outward_normal) -> (Q,)",
+                   "callback(position, outward_normal, time) -> (Q,)")
 _TIMED = ("time", "field")
 
 
 def _boundary_forms(data, name):
     """Classify every value of a boundary mapping: {tag: tuple of forms}.
 
-    A value is "constant" (not callable), "static" (callback(points_m,
-    outward_normals), sampled once, as in steady heat), "time" (callback(time_s)
-    -> scalar) or "field" (callback(points_m, outward_normals, time_s) -> (Q,)),
+    A value is "constant" (not callable), "static" (callback(position,
+    outward_normal), sampled once, as in steady heat), "time" (callback(time)
+    -> scalar) or "field" (callback(position, outward_normal, time) -> (Q,)),
     told apart by the number of required positional parameters. A callback with
     another count, a variadic positional parameter, two parameters one of which
-    is named time_s/time, or no introspectable signature is refused here, before
+    is named time/time_s, or no introspectable signature is refused here, before
     any sampling.
     """
     if data is None:
@@ -152,7 +166,7 @@ def _bound(data, forms, name, now):
         bound = []
         for value, kind in zip(values, forms[tag]):
             if kind == "time":
-                bound.append(_value(value(now), f"{name}[{tag!r}] callback(time_s) value"))
+                bound.append(_value(value(now), f"{name}[{tag!r}] callback(time) value"))
             elif kind == "field":
                 bound.append(lambda points, normals, value=value: value(points, normals, now))
             else:
@@ -177,51 +191,106 @@ def _scipy(matrix):
     return CooMatrix(matrix.rows, matrix.cols, to_numpy(matrix.values), matrix.shape).to_scipy()
 
 
-@dataclass(frozen=True, eq=False)
-class TransientHeatResult:
-    """Full copied read-only histories, O(Nt*(N+M)) memory, no downsampling.
+class TransientHeatResult(ResultSurface):
+    """Base of the transient heat results: ``PlanarTransientHeatResult`` (``coordinate_system``
+    "cartesian", nodal rates per metre of depth) and ``AxisymmetricTransientHeatResult``
+    ("axisymmetric", rates and heat over the full revolution). Not constructed itself.
 
-    Node temperatures: K; element flux: W/m^2. All nodal rates: W/m depth
-    (coordinate_system "cartesian") or W over the full revolution
-    ("axisymmetric", nodal_rate_unit "W"; the field names keep their Cartesian
-    ``_w_per_m`` spelling). H is J/m (J), whereas quadratic V is J K/m (J K) and
-    is NOT stored heat.
-    Rates/reactions have no entry at t0. nodes_m/triangles capture the mesh.
-    conductivity_w_mk and volumetric_heat_capacity_j_m3k are floats, or
-    {region name: float} copies for per-region materials.
-    prescribed_outward_load_w_per_m (G_n) and convective_outward_w_per_m
-    (C_n = H_n*T_n-B_n) are (Nt-1,N) step rates when outward_flux or convection
-    was given and None otherwise; then storage_n = f_n+reaction_n-G_n-C_n.
-    Read-only arrays are not a cryptographic tamper/provenance guarantee.
+    Full copied read-only histories, O(Nt*(N+M)) memory, no downsampling. time (Nt,) s;
+    node temperature (Nt,N) K; element heat_flux (Nt,M,2) W/m^2; the nodal generated
+    heat rate (the source load, (Nt,N)), reaction, residual and heat storage rates
+    ((Nt-1,N): no entry at t0); stored heat H and the thermal energy functional V
+    ((Nt,), V in J K is NOT stored heat); prescribed_node_ids and their
+    prescribed_temperature history (Nt,len) K; node_coordinates and triangles capture
+    the mesh; thermal_conductivity and volumetric_heat_capacity are floats, or
+    {region name: float} copies for per-region materials. The outward prescribed
+    (G_n) and outward convective (C_n = H_n*T_n-B_n) heat rates are (Nt-1,N) step
+    rates when inward_heat_flux or convection was given and None otherwise; then
+    storage_n = generated_n+reaction_n-G_n-C_n. ``.units`` maps every quantity field
+    to its SI unit. Read-only arrays are not a cryptographic tamper/provenance guarantee.
     """
-    time_s: np.ndarray
-    temperature_k: np.ndarray
-    heat_flux_w_m2: np.ndarray
-    source_load_w_per_m: np.ndarray
-    reaction_w_per_m: np.ndarray
-    residual_w_per_m: np.ndarray
-    storage_rate_w_per_m: np.ndarray
-    heat_content_j_per_m: np.ndarray
-    quadratic_functional_jk_per_m: np.ndarray
-    dirichlet_node_ids: np.ndarray
-    dirichlet_temperatures_k: np.ndarray
-    nodes_m: np.ndarray
-    triangles: np.ndarray
-    conductivity_w_mk: float | dict
-    volumetric_heat_capacity_j_m3k: float | dict
-    prescribed_outward_load_w_per_m: np.ndarray | None = None
-    convective_outward_w_per_m: np.ndarray | None = None
-    coordinate_system: str = "cartesian"
-    nodal_rate_unit: str = "W/m"
 
     def __post_init__(self):
         # JAX and PyTorch histories are kept as they are (they carry derivatives).
-        integer = {"dirichlet_node_ids", "triangles"}
+        integer = {"prescribed_node_ids", "triangles"}
         for f in fields(self):
             value = getattr(self, f.name)
             if isinstance(value, np.ndarray):
                 dtype = np.dtype("<i8" if f.name in integer else "<f8")
                 object.__setattr__(self, f.name, _owned(value, dtype))
+
+
+_RATES = ("generated_heat_rate", "reaction_heat_rate", "residual_heat_rate", "heat_storage_rate",
+          "outward_prescribed_heat_rate", "outward_convective_heat_rate")
+_COMMON_UNITS = {"time": "s", "temperature": "K", "heat_flux": "W/m^2", "prescribed_temperature": "K",
+                 "node_coordinates": "m", "thermal_conductivity": "W/(m K)",
+                 "volumetric_heat_capacity": "J/(m^3 K)"}
+
+
+@dataclass(frozen=True, eq=False)
+class PlanarTransientHeatResult(TransientHeatResult):
+    """A Cartesian (planar) transient heat history: nodal rates in W and heat in J per metre of depth.
+
+    See ``TransientHeatResult``.
+    """
+    time: np.ndarray
+    temperature: np.ndarray
+    heat_flux: np.ndarray
+    generated_heat_rate_per_depth: np.ndarray
+    reaction_heat_rate_per_depth: np.ndarray
+    residual_heat_rate_per_depth: np.ndarray
+    heat_storage_rate_per_depth: np.ndarray
+    stored_heat_per_depth: np.ndarray
+    thermal_energy_functional_per_depth: np.ndarray
+    prescribed_node_ids: np.ndarray
+    prescribed_temperature: np.ndarray
+    node_coordinates: np.ndarray
+    triangles: np.ndarray
+    thermal_conductivity: float | dict
+    volumetric_heat_capacity: float | dict
+    outward_prescribed_heat_rate_per_depth: np.ndarray | None = None
+    outward_convective_heat_rate_per_depth: np.ndarray | None = None
+
+    coordinate_system = "cartesian"
+    BASIS = "planar"
+    UNITS = MappingProxyType({**_COMMON_UNITS, **{f"{name}_per_depth": "W/m" for name in _RATES},
+                              "stored_heat_per_depth": "J/m", "thermal_energy_functional_per_depth": "J K/m"})
+
+
+@dataclass(frozen=True, eq=False)
+class AxisymmetricTransientHeatResult(TransientHeatResult):
+    """An axisymmetric transient heat history: nodal rates in W and heat in J over the full revolution.
+
+    See ``TransientHeatResult``. Its fields have no ``_per_depth``; asking for one raises
+    AttributeError, which says why.
+    """
+    time: np.ndarray
+    temperature: np.ndarray
+    heat_flux: np.ndarray
+    generated_heat_rate: np.ndarray
+    reaction_heat_rate: np.ndarray
+    residual_heat_rate: np.ndarray
+    heat_storage_rate: np.ndarray
+    stored_heat: np.ndarray
+    thermal_energy_functional: np.ndarray
+    prescribed_node_ids: np.ndarray
+    prescribed_temperature: np.ndarray
+    node_coordinates: np.ndarray
+    triangles: np.ndarray
+    thermal_conductivity: float | dict
+    volumetric_heat_capacity: float | dict
+    outward_prescribed_heat_rate: np.ndarray | None = None
+    outward_convective_heat_rate: np.ndarray | None = None
+
+    coordinate_system = "axisymmetric"
+    BASIS = "axisymmetric"
+    UNITS = MappingProxyType({**_COMMON_UNITS, **{name: "W" for name in _RATES},
+                              "stored_heat": "J", "thermal_energy_functional": "J K"})
+
+
+def _transient_result(coordinate_system):
+    """The result class of a solve in ``coordinate_system`` (validated by ScalarMeasure)."""
+    return AxisymmetricTransientHeatResult if coordinate_system == "axisymmetric" else PlanarTransientHeatResult
 
 
 def _element_matrices(mesh, k, capacity, measure):
@@ -272,7 +341,7 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
         if natural is not None:
             robin = _coo(xp, natural)
     except Exception as exc:
-        raise TransientHeatStepError(0, times[0]) from exc
+        raise TransientHeatStepError(0, time=times[0]) from exc
 
     def centered(values):
         return values-values[representatives][labels]
@@ -328,7 +397,7 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
                 entry += (lift(xp, boundary[1]), lift(xp, boundary[2]))
             data.append(entry)
         except Exception as exc:
-            raise TransientHeatStepError(index, times[index]) from exc
+            raise TransientHeatStepError(index, time=times[index]) from exc
 
     # Pass 2: derivatives, in blocks of checkpoint_every steps (one block by default).
     try:
@@ -345,7 +414,7 @@ def _live_history(xp, mesh, k, capacity, initial, bc0, load0, times, steps, fixe
         nodal = [xp.concat([xp.stack([first[j]]), *(b[j] for b in blocks)]) for j in range(6)]
         stepped = [xp.concat([b[j] for b in blocks]) for j in range(6, 9 if natural is None else 11)]
     except Exception as exc:
-        raise TransientHeatStepError(len(times)-1, times[-1]) from exc
+        raise TransientHeatStepError(len(times)-1, time=times[-1]) from exc
     temperature, flux, loads, bcs, content, quadratic = nodal
     storage, residual, reaction = stepped[:3]
     return (temperature, flux, loads, reaction, residual, storage, content, quadratic, bcs,
@@ -362,11 +431,62 @@ def _checkpointed(xp, block, sizes):
     return lambda *args: checkpoint(run, *args, use_reentrant=False)
 
 
-def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
-                         time_s, initial_temperature_k, dirichlet,
-                         heat_source=0.0, outward_flux=None, convection=None,
-                         checkpoint_every=None, coordinate_system="cartesian"):
-    """Solve c*dT/dt-div(k*grad T)=Q, BE with consistent mass, SI units.
+def solve_transient_heat(mesh, *, thermal_conductivity, volumetric_heat_capacity, time, initial_temperature,
+                         prescribed_temperature, heat_source_density=None, inward_heat_flux=None,
+                         convection=None, checkpoint_every=None, coordinate_system="cartesian", motion=None):
+    """Solve c*dT/dt-div(k*grad T)=Q, backward Euler with consistent mass, in SI.
+
+    thermal_conductivity k>0 W/(m K) and volumetric_heat_capacity c>0 J/(m^3 K),
+    each a scalar or {region name: value} over mesh.region_names; time: explicit
+    increasing nonnegative seconds (at least two); initial_temperature: finite
+    (N,) K. Finite negative K and signed sources are allowed; no clamping,
+    maximum principle or physical temperature validity is implied.
+    prescribed_temperature: fixed integer node (exterior or interior) -> scalar
+    K or callback(time). heat_source_density: Q, a scalar W/m^3 (or {region
+    name: Q}) or callback(position, time)->exactly (Q,) W/m^3; None (the
+    default) is no source. inward_heat_flux maps mesh.boundary_edges tags to the
+    normal heat flux entering the body (W/m^2, positive in) and convection maps
+    tags to (h, ambient) with h>=0 (W/(m^2 K), K), as in
+    galerkin.thermal.solve_steady_heat. Each of them is a scalar, a
+    callback(position, outward_normal)->exactly (Q,) sampled once, a
+    callback(time)->scalar or a callback(position, outward_normal, time)
+    ->exactly (Q,); the last two are sampled at time[0] for validation and then
+    at the END of every step (like prescribed-temperature and source callbacks).
+    The form is decided by the number of required positional parameters (the
+    callbacks are called positionally); other signatures are refused before
+    sampling. A time-dependent h is refused with JAX or PyTorch inputs.
+    checkpoint_every, coordinate_system and motion are as below; an axisymmetric
+    solve returns an AxisymmetricTransientHeatResult (rates in W and heat in J over
+    the revolution), otherwise a PlanarTransientHeatResult (per metre of depth).
+    motion=galerkin.shape.MeshMotion(design_velocity, t) moves the nodes.
+
+    A str for a quantity raises TypeError (SI numbers only). The inward flux is
+    negated once, as 0.0 - x (a callback's checked float result likewise), and the
+    outward-form solve runs exactly as before; see galerkin._public.
+    """
+    outward_flux = outward_from_inward(inward_heat_flux, "inward_heat_flux")     # a non-mapping: ValueError
+    for name, value in (("thermal_conductivity", thermal_conductivity),
+                        ("volumetric_heat_capacity", volumetric_heat_capacity), ("time", time),
+                        ("initial_temperature", initial_temperature),
+                        ("prescribed_temperature", prescribed_temperature),
+                        ("heat_source_density", heat_source_density), ("inward_heat_flux", inward_heat_flux),
+                        ("convection", convection)):
+        refuse_text(name, value)
+    return solve_transient_heat_outward(
+        mesh, conductivity=thermal_conductivity, volumetric_heat_capacity=volumetric_heat_capacity, time_s=time,
+        initial_temperature_k=initial_temperature, dirichlet=prescribed_temperature,
+        heat_source=0.0 if heat_source_density is None else heat_source_density,
+        outward_flux=outward_flux, convection=convection,
+        checkpoint_every=checkpoint_every, coordinate_system=coordinate_system, motion=motion)
+
+
+def solve_transient_heat_outward(mesh, *, conductivity, volumetric_heat_capacity,
+                          time_s, initial_temperature_k, dirichlet,
+                          heat_source=0.0, outward_flux=None, convection=None,
+                          checkpoint_every=None, coordinate_system="cartesian", motion=None):
+    """Solve c*dT/dt-div(k*grad T)=Q, BE with consistent mass, SI units (the outward form).
+
+    The body of solve_transient_heat before the galerkin step, for galerkin's own callers.
 
     k>0 W/(m K), c>0 J/(m^3 K), explicit increasing nonnegative seconds,
     finite initial (N,) K. Finite negative K and signed sources are allowed;
@@ -404,22 +524,34 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     Cartesian spelling), the element flux stays W/m^2, Dirichlet data on the
     axis alone and nonzero flux or h on the axis are refused, and the axis
     needs no condition. The default is bit-for-bit the Cartesian solve.
+
+    motion=galerkin.shape.MeshMotion(design_velocity, t) solves on the nodes X0 +
+    t*design_velocity; the initial and Dirichlet temperatures move with their nodes and
+    every history carries the derivative with respect to the JAX or PyTorch
+    scalar t (docs/packages/galerkin/shape_derivative.md).
     """
+    if motion is not None:
+        from ._moving import solve_transient_heat_moving
+        return solve_transient_heat_moving(
+            mesh, motion, thermal_conductivity=conductivity, volumetric_heat_capacity=volumetric_heat_capacity,
+            time=time_s, initial_temperature=initial_temperature_k, prescribed_temperature=dirichlet,
+            heat_source_density=heat_source, outward_heat_flux=outward_flux, convection=convection,
+            checkpoint_every=checkpoint_every, coordinate_system=coordinate_system)
     if checkpoint_every is not None and (
             isinstance(checkpoint_every, (bool, np.bool_))
             or not isinstance(checkpoint_every, (int, np.integer)) or checkpoint_every < 1):
         raise ValueError("checkpoint_every must be None or an integer >= 1")
     regional = [is_per_region(v) for v in (conductivity, volumetric_heat_capacity, heat_source)]
-    k = conductivity if regional[0] else _value(conductivity, "conductivity", True)
+    k = conductivity if regional[0] else _value(conductivity, "thermal_conductivity", True)
     capacity = (volumetric_heat_capacity if regional[1]
                 else _value(volumetric_heat_capacity, "volumetric_heat_capacity", True))
-    times = real_array(time_s, "time_s").copy()
+    times = real_array(time_s, "time").copy()
     if times.ndim != 1 or len(times) < 2 or np.any(times < 0):
-        raise ValueError("time_s must be nonnegative 1D seconds with at least two entries")
+        raise ValueError("time must be nonnegative 1D seconds with at least two entries")
     with np.errstate(over="ignore", invalid="ignore"):
         steps = np.diff(times)
     if not np.all(np.isfinite(steps)) or np.any(steps <= 0):
-        raise ValueError("time_s differences must be finite and strictly positive")
+        raise ValueError("time differences must be finite and strictly positive")
 
     p, t, area, exterior, count, labels = triangle_geometry(mesh)
     measure = ScalarMeasure(mesh, coordinate_system)
@@ -432,7 +564,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                             region_names=list(names))
         # Validate before recording, so a bad value gets the labelled message.
         if regional[0]:
-            k = region_property(private_mesh, conductivity, "conductivity", positive=True,
+            k = region_property(private_mesh, conductivity, "thermal_conductivity", positive=True,
                                 live=True)
             record_k = {str(n): _recorded(conductivity[n]) for n in names}
         if regional[1]:
@@ -440,31 +572,32 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                                        "volumetric_heat_capacity", positive=True, live=True)
             record_c = {str(n): _recorded(volumetric_heat_capacity[n]) for n in names}
         if regional[2]:
-            region_property(private_mesh, heat_source, "heat_source", live=True)
+            region_property(private_mesh, heat_source, "heat_source_density", live=True)
     else:
         private_mesh = Mesh(p.copy(), t.copy(), boundary={})
     # Boundary edge selections are copied as given, so natural-condition
     # sampling validates the caller's actual arrays, as steady heat does.
     private_mesh.boundary_edges = {tag: np.array(edges) for tag, edges in mesh.boundary_edges.items()}
-    initial = real_value(initial_temperature_k, "initial_temperature_k")
+    initial = real_value(initial_temperature_k, "initial_temperature")
     initial = initial if is_live(initial) else initial.copy()
     if tuple(initial.shape) != (len(p),):
-        raise ValueError("initial_temperature_k must have exactly shape (N,)")
+        raise ValueError("initial_temperature must have exactly shape (N,)")
     if not isinstance(dirichlet, Mapping):
-        raise ValueError("dirichlet must map integer nodes to Kelvin values")
+        raise ValueError("prescribed_temperature must map integer nodes to Kelvin values")
     conditions = {}
     for node, value in dirichlet.items():
         if (isinstance(node, (bool, np.bool_))
                 or not isinstance(node, (int, np.integer))
                 or not 0 <= node < len(p)):
-            raise ValueError(f"Dirichlet nodes must be integer node indices inside the mesh's {len(p)} nodes")
-        conditions[int(node)] = value if callable(value) else _value(value, "Dirichlet temperature")
+            raise ValueError("prescribed_temperature nodes must be integer node indices inside the mesh's "
+                             f"{len(p)} nodes")
+        conditions[int(node)] = value if callable(value) else _value(value, "prescribed_temperature value")
     measure.check_axis_dirichlet(conditions)
     fixed = np.array(sorted(conditions), dtype=int)
     free = np.setdiff1d(np.arange(len(p)), fixed)
     source = (heat_source if callable(heat_source) or regional[2]
-              else _value(heat_source, "heat_source"))
-    flux_forms = _boundary_forms(outward_flux, "outward_flux")
+              else _value(heat_source, "heat_source_density"))
+    flux_forms = _boundary_forms(outward_flux, "inward_heat_flux")
     convection_forms = _boundary_forms(convection, "convection")
     natural = outward_flux is not None or convection is not None
     # Static data are sampled once, exactly as before; H is reassembled per step
@@ -488,13 +621,13 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         shifted by them as in steady heat: shifted_B integrates h*(ambient-offset
         of the component). The offsets are the initial temperatures throughout.
         """
-        flux_now = None if outward_flux is None else _bound(outward_flux, flux_forms, "outward_flux", now)
+        flux_now = None if outward_flux is None else _bound(outward_flux, flux_forms, "inward_heat_flux", now)
         convection_now = (None if convection is None
                           else _bound(convection, convection_forms, "convection", now))
         samples = measure.boundary_samples(
             evaluate_scalar_boundary(geometry, flux_now, convection_now, live=True))
         anchors = [initial_live[r] for r in representatives]
-        robin, outward, _, shifted = scalar_boundary_system(samples, len(p), labels, anchors,
+        robin, outward, _, shifted = _scalar_boundary_system(samples, len(p), labels, anchors,
                                                             np.ones(count, dtype=bool))
         return robin, outward, shifted
 
@@ -534,7 +667,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         convective_history = np.empty((nt-1, n)) if natural else None
         prescribed_history = np.empty((nt-1, n)) if natural else None
     except Exception as exc:
-        raise TransientHeatStepError(0, times[0]) from exc
+        raise TransientHeatStepError(0, time=times[0]) from exc
 
     def boundary_at(index):
         """(H as NumPy CSR, G, shifted_B) for the step ending at ``times[index]``.
@@ -558,7 +691,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
     def sample(index):
         """Dirichlet values, load and boundary data at ``times[index]``, live if an input is."""
         now = float(times[index])
-        values = [_value(conditions[int(node)](now), "Dirichlet callback")
+        values = [_value(conditions[int(node)](now), "prescribed_temperature callback")
                   if callable(conditions[int(node)]) else conditions[int(node)]
                   for node in fixed]
         if any(is_live(v) for v in values):
@@ -568,7 +701,7 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             bc = np.array(values, dtype=float)
         load = source_load(
             private_mesh, p, t, area,
-            (lambda points: real_value(source(points.copy(), now), "heat_source callback"))
+            (lambda points: real_value(source(points.copy(), now), "heat_source_density callback"))
             if callable(source) else source, live=True, measure=measure)
         _finite(to_numpy(bc), to_numpy(load))
         return bc, load, boundary_at(index)
@@ -710,18 +843,19 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
         bound = 32*np.finfo(float).eps*np.maximum(
             1., np.maximum(np.abs(initial[fixed]), np.abs(to_numpy(bc))))
         if np.any(np.abs(initial[fixed]-to_numpy(bc)) > bound):
-            raise ValueError("initial Dirichlet data mismatch (32 eps bound); no projection")
+            raise ValueError("initial_temperature and prescribed_temperature differ at a prescribed node at the "
+                             "first time (32 eps bound); no projection")
         previous = initial_increment.copy()
         record(0, previous, to_numpy(load), to_numpy(bc))
     except Exception as exc:
-        raise TransientHeatStepError(0, times[0]) from exc
+        raise TransientHeatStepError(0, time=times[0]) from exc
     if live:
         if timed_h:
             raise ValueError(
-                "time-dependent convection h (callback(time_s) or callback(points_m, "
-                "outward_normals, time_s)) is not supported with JAX or PyTorch inputs: H would "
+                "time-dependent convection h (callback(time) or callback(position, "
+                "outward_normal, time)) is not supported with JAX or PyTorch inputs: H would "
                 "have to be reassembled inside the differentiated steps; use NumPy inputs, or "
-                "keep h static and vary the ambient temperature and outward flux in time")
+                "keep h static and vary the ambient temperature and inward_heat_flux in time")
         history = _live_history(
             live_namespace(k_live, capacity_live, initial_live, bc, load,
                            *(natural_live[1:] if natural else ())), private_mesh,
@@ -729,12 +863,10 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
             representatives, sample, advance, record, previous, checkpoint_every,
             natural_live[0] if natural else None, measure)
         try:
-            return TransientHeatResult(times, *history[:8], fixed, history[8], p, t,
-                                       record_k, record_c, *history[9:],
-                                       coordinate_system=coordinate_system,
-                                       nodal_rate_unit=measure.nodal_rate_unit)
+            return _transient_result(coordinate_system)(times, *history[:8], fixed, history[8], p, t,
+                                                        record_k, record_c, *history[9:])
         except Exception as exc:
-            raise TransientHeatStepError(nt-1, times[-1]) from exc
+            raise TransientHeatStepError(nt-1, time=times[-1]) from exc
 
     for index, step in enumerate(steps, start=1):
         try:
@@ -754,17 +886,17 @@ def solve_transient_heat(mesh, *, conductivity, volumetric_heat_capacity,
                 prescribed_history[index-1] = boundary[1]
             previous = current.copy()
         except Exception as exc:
-            raise TransientHeatStepError(index, times[index]) from exc
+            raise TransientHeatStepError(index, time=times[index]) from exc
 
     try:
-        metadata = dict(coordinate_system=coordinate_system, nodal_rate_unit=measure.nodal_rate_unit)
+        result = _transient_result(coordinate_system)
         if not natural:
-            return TransientHeatResult(
+            return result(
                 times, temperature, flux, loads, reactions, residuals, storage,
-                content, quadratic, fixed, boundary_values, p, t, record_k, record_c, **metadata)
-        return TransientHeatResult(
+                content, quadratic, fixed, boundary_values, p, t, record_k, record_c)
+        return result(
             times, temperature, flux, loads, reactions, residuals, storage,
             content, quadratic, fixed, boundary_values, p, t, record_k, record_c,
-            prescribed_history, convective_history, **metadata)
+            prescribed_history, convective_history)
     except Exception as exc:
-        raise TransientHeatStepError(nt-1, times[-1]) from exc
+        raise TransientHeatStepError(nt-1, time=times[-1]) from exc

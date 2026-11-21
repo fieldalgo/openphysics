@@ -71,7 +71,7 @@ outward integrated heat = -sum(heat reaction)
 Both support work and the PE z/residual contribution are essential. P1 T varies
 inside elements, so physical U integrates T squared, rather than squaring the
 centroid T. Total strain is element constant; returned stress/thermal strain/
-elastic strain/epsilon_zz/sigma_zz are centroid samples and are checked there.
+elastic strain/`strain_zz`/`stress_zz` are centroid samples and are checked there.
 Full stress errors use the parent-law reconstruction with the actual P1 T at
 interior quadrature points. Heat load/reaction/residual has W/m, flux W/m²;
 mechanical forces have N/m and physical U has J/m. Heat quadratic work has

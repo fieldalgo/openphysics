@@ -1,6 +1,6 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Transient heat with prescribed outward flux and convection (pre-registered gates).
+"""Transient heat with a prescribed boundary heat flux and convection (pre-registered gates).
 
 T1 convective slab and T2 constant-flux slab against the independent series of
 refsol.transient_heat_robin: spatial order >= 1.8 over n=8/16/32 with 2000 steps
@@ -29,20 +29,22 @@ import transient_heat_dirichlet_cases as dirichlet_cases   # tests/galerkin is o
 
 L, K, C = 1.0, 2.5, 4.0
 H, AMBIENT, INITIAL = 5.0, 300.0, 350.0
-OUTWARD = -100.0                       # W/m^2, negative: heat enters at x = L
+INWARD = 100.0                         # W/m^2 inward heat flux, positive: heat enters at x = L
 T_END = 0.2
-CONVECTIVE = ConvectiveSlab(L, K, C, H, AMBIENT, INITIAL)
-FLUX = FluxSlab(L, K, C, OUTWARD, INITIAL)
+CONVECTIVE = ConvectiveSlab(length=L, thermal_conductivity=K, volumetric_heat_capacity=C, heat_transfer_coefficient=H,
+                            ambient_temperature=AMBIENT, initial_temperature=INITIAL)
+FLUX = FluxSlab(length=L, thermal_conductivity=K, volumetric_heat_capacity=C, inward_heat_flux=INWARD,
+                initial_temperature=INITIAL)
 
 
 def slab(n, steps, kind):
     """A one-cell-high strip of n squares; left insulated, right convective or prescribed."""
     mesh = rectangle_mesh(L, L/n, n, 1)
     natural = ({"convection": {"right": (H, AMBIENT)}} if kind == "convective"
-               else {"outward_flux": {"right": OUTWARD}})
+               else {"inward_heat_flux": {"right": INWARD}})
     result = solve_transient_heat(
-        mesh, conductivity=K, volumetric_heat_capacity=C, time_s=np.linspace(0.0, T_END, steps+1),
-        initial_temperature_k=np.full(mesh.num_nodes, INITIAL), dirichlet={}, **natural)
+        mesh, thermal_conductivity=K, volumetric_heat_capacity=C, time=np.linspace(0.0, T_END, steps+1),
+        initial_temperature=np.full(mesh.num_nodes, INITIAL), prescribed_temperature={}, **natural)
     return mesh, result
 
 
@@ -61,8 +63,8 @@ def l2_error(mesh, nodal, exact, scale):
 
 def reference(kind):
     series = CONVECTIVE if kind == "convective" else FLUX
-    scale = abs(INITIAL-AMBIENT) if kind == "convective" else abs(OUTWARD)*L/K
-    return (lambda x: series.temperature(x, T_END).temperature_k), scale
+    scale = abs(INITIAL-AMBIENT) if kind == "convective" else abs(INWARD)*L/K
+    return (lambda x: series.temperature(x, time=T_END).temperature), scale
 
 
 def orders(errors):
@@ -75,7 +77,7 @@ def test_t1_t2_spatial_convergence_with_tiny_steps(kind):
     errors = []
     for n in (8, 16, 32):
         mesh, result = slab(n, 2000, kind)
-        errors.append(l2_error(mesh, result.temperature_k[-1], exact, scale))
+        errors.append(l2_error(mesh, result.temperature[-1], exact, scale))
     observed = orders(errors)
     print(f"\n{kind} slab spatial errors n=8/16/32 (dt=1e-4 s): {errors}, orders {observed}")
     assert min(observed) >= 1.8
@@ -88,7 +90,7 @@ def test_t1_t2_temporal_convergence_on_fine_mesh(kind):
     errors = []
     for steps in (4, 8, 16):
         mesh, result = slab(128, steps, kind)
-        errors.append(l2_error(mesh, result.temperature_k[-1], exact, scale))
+        errors.append(l2_error(mesh, result.temperature[-1], exact, scale))
     observed = orders(errors)
     print(f"\n{kind} slab temporal errors 4/8/16 steps (n=128): {errors}, orders {observed}")
     assert min(observed) >= 0.9
@@ -98,28 +100,28 @@ def mixed_case():
     """Left Dirichlet, top prescribed inflow, right convection, uniform source."""
     mesh = rectangle_mesh(1.0, 0.5, 8, 4)
     left = {int(i): 320.0 for i in mesh.boundary["left"]}
-    data = dict(conductivity=K, heat_source=30.0, outward_flux={"top": -20.0},
+    data = dict(thermal_conductivity=K, heat_source_density=30.0, inward_heat_flux={"top": 20.0},
                 convection={"right": (H, AMBIENT)})
     return mesh, left, data
 
 
 def test_t3_long_time_limit_matches_steady_heat_on_the_same_operators():
     mesh, left, data = mixed_case()
-    steady = solve_steady_heat(mesh, dirichlet=left, **data)
+    steady = solve_steady_heat(mesh, prescribed_temperature=left, **data)
     times = np.r_[0.0, np.cumsum(np.full(8, 100.0))]
     transient = solve_transient_heat(
-        mesh, volumetric_heat_capacity=C, time_s=times,
-        initial_temperature_k=np.full(mesh.num_nodes, 320.0), dirichlet=left, **data)
+        mesh, volumetric_heat_capacity=C, time=times,
+        initial_temperature=np.full(mesh.num_nodes, 320.0), prescribed_temperature=left, **data)
     rise = max(np.max(abs(steady.temperature-320.0)), 1.0)
-    error = np.max(abs(transient.temperature_k[-1]-steady.temperature))/rise
-    rates = max(np.max(abs(steady.convective_outward)), np.max(abs(steady.reaction)),
-                np.max(abs(steady.prescribed_outward_load)))
-    convective = np.max(abs(transient.convective_outward_w_per_m[-1]-steady.convective_outward))/rates
-    reaction = np.max(abs(transient.reaction_w_per_m[-1]-steady.reaction))/rates
-    prescribed = np.max(abs(transient.prescribed_outward_load_w_per_m[-1]-steady.prescribed_outward_load))/rates
+    error = np.max(abs(transient.temperature[-1]-steady.temperature))/rise
+    rates = max(np.max(abs(steady.outward_convective_heat_rate_per_depth)), np.max(abs(steady.reaction_heat_rate_per_depth)),
+                np.max(abs(steady.outward_prescribed_heat_rate_per_depth)))
+    convective = np.max(abs(transient.outward_convective_heat_rate_per_depth[-1]-steady.outward_convective_heat_rate_per_depth))/rates
+    reaction = np.max(abs(transient.reaction_heat_rate_per_depth[-1]-steady.reaction_heat_rate_per_depth))/rates
+    prescribed = np.max(abs(transient.outward_prescribed_heat_rate_per_depth[-1]-steady.outward_prescribed_heat_rate_per_depth))/rates
     print(f"\nlong-time limit vs steady: T {error:.3e}, C {convective:.3e}, reaction {reaction:.3e}, G {prescribed:.3e}")
     assert error <= 1e-8 and convective <= 1e-8 and reaction <= 1e-8 and prescribed <= 1e-8
-    assert np.max(abs(transient.storage_rate_w_per_m[-1])) <= 1e-8*rates
+    assert np.max(abs(transient.heat_storage_rate_per_depth[-1])) <= 1e-8*rates
 
 
 def two_component_mesh():
@@ -137,10 +139,10 @@ def two_component_mesh():
 def balance(result):
     """Largest per-step imbalance storage-(f+reaction-G-C), relative to the largest term."""
     worst = 0.0
-    for i in range(len(result.time_s)-1):
-        terms = [result.storage_rate_w_per_m[i].sum(), result.source_load_w_per_m[i+1].sum(),
-                 result.reaction_w_per_m[i].sum(), result.prescribed_outward_load_w_per_m[i].sum(),
-                 result.convective_outward_w_per_m[i].sum()]
+    for i in range(len(result.time)-1):
+        terms = [result.heat_storage_rate_per_depth[i].sum(), result.generated_heat_rate_per_depth[i+1].sum(),
+                 result.reaction_heat_rate_per_depth[i].sum(), result.outward_prescribed_heat_rate_per_depth[i].sum(),
+                 result.outward_convective_heat_rate_per_depth[i].sum()]
         storage, source, reaction, prescribed, convective = terms
         worst = max(worst, abs(storage-(source+reaction-prescribed-convective))/max(map(abs, terms)))
     return worst
@@ -159,16 +161,16 @@ def line_matrices(mesh, edges, h, ambient, n):
 def test_t4_energy_balance_mixed_and_robin_only_components():
     mesh, left, data = mixed_case()
     times = np.array([0.0, 0.01, 0.03, 0.1, 0.25])
-    result = solve_transient_heat(mesh, volumetric_heat_capacity=C, time_s=times,
-                                  initial_temperature_k=np.full(mesh.num_nodes, 320.0),
-                                  dirichlet=left, **data)
+    result = solve_transient_heat(mesh, volumetric_heat_capacity=C, time=times,
+                                  initial_temperature=np.full(mesh.num_nodes, 320.0),
+                                  prescribed_temperature=left, **data)
     mixed = balance(result)
     # Two Robin-only components: offsets 350 K and -20 K, with a left inflow on the second.
     mesh2, shift = two_component_mesh()
     initial = np.r_[np.full(shift, 350.0), np.full(mesh2.num_nodes-shift, -20.0)]
     result2 = solve_transient_heat(
-        mesh2, conductivity=K, volumetric_heat_capacity=C, time_s=times, initial_temperature_k=initial,
-        dirichlet={}, heat_source=3.0, outward_flux={"left_b": -7.0, "top_a": lambda p, normal: 2.0*p[:, 0]},
+        mesh2, thermal_conductivity=K, volumetric_heat_capacity=C, time=times, initial_temperature=initial,
+        prescribed_temperature={}, heat_source_density=3.0, inward_heat_flux={"left_b": 7.0, "top_a": lambda p, normal: -2.0*p[:, 0]},
         convection={"right_a": (H, AMBIENT), "right_b": (lambda p, normal: 1.5+p[:, 1], 250.0)})
     robin_only = balance(result2)
     print(f"\nper-step balance: mixed {mixed:.3e}, two Robin-only components {robin_only:.3e}")
@@ -178,60 +180,60 @@ def test_t4_energy_balance_mixed_and_robin_only_components():
     nodes_a, nodes_b = np.arange(shift), np.arange(shift, n)
     robin_a, load_a = line_matrices(mesh2, mesh2.boundary_edges["right_a"], H, AMBIENT, n)
     for i in range(len(times)-1):
-        t = result2.temperature_k[i+1]
+        t = result2.temperature[i+1]
         expected_a = (robin_a@t-load_a)[nodes_a]
         scale = max(np.max(abs(expected_a)), 1e-300)
-        np.testing.assert_allclose(result2.convective_outward_w_per_m[i][nodes_a], expected_a,
+        np.testing.assert_allclose(result2.outward_convective_heat_rate_per_depth[i][nodes_a], expected_a,
                                    rtol=0, atol=1e-10*scale)
         for nodes in (nodes_a, nodes_b):
-            terms = [a[i+(1 if a is result2.source_load_w_per_m else 0)][nodes].sum()
-                     for a in (result2.storage_rate_w_per_m, result2.source_load_w_per_m,
-                               result2.reaction_w_per_m, result2.prescribed_outward_load_w_per_m,
-                               result2.convective_outward_w_per_m)]
+            terms = [a[i+(1 if a is result2.generated_heat_rate_per_depth else 0)][nodes].sum()
+                     for a in (result2.heat_storage_rate_per_depth, result2.generated_heat_rate_per_depth,
+                               result2.reaction_heat_rate_per_depth, result2.outward_prescribed_heat_rate_per_depth,
+                               result2.outward_convective_heat_rate_per_depth)]
             s, f, r, g, c = terms
             assert abs(s-(f+r-g-c)) <= 1e-10*max(map(abs, terms))
-    assert not result2.reaction_w_per_m.any()
-    assert result2.prescribed_outward_load_w_per_m.shape == result2.convective_outward_w_per_m.shape == (4, n)
-    assert result2.temperature_k[-1][nodes_b].min() < 0    # finite negative K is not clamped
+    assert not result2.reaction_heat_rate_per_depth.any()
+    assert result2.outward_prescribed_heat_rate_per_depth.shape == result2.outward_convective_heat_rate_per_depth.shape == (4, n)
+    assert result2.temperature[-1][nodes_b].min() < 0    # finite negative K is not clamped
 
 
 def test_contract_shapes_callbacks_and_refusals():
     mesh = rectangle_mesh(1.0, 0.5, 4, 2)
-    base = dict(conductivity=K, volumetric_heat_capacity=C, time_s=[0.0, 0.1, 0.3],
-                initial_temperature_k=np.full(mesh.num_nodes, INITIAL), dirichlet={})
-    constant = solve_transient_heat(mesh, convection={"right": (H, AMBIENT)}, outward_flux={"top": 3.0}, **base)
+    base = dict(thermal_conductivity=K, volumetric_heat_capacity=C, time=[0.0, 0.1, 0.3],
+                initial_temperature=np.full(mesh.num_nodes, INITIAL), prescribed_temperature={})
+    constant = solve_transient_heat(mesh, convection={"right": (H, AMBIENT)}, inward_heat_flux={"top": -3.0}, **base)
     sampled = solve_transient_heat(
         mesh, convection={"right": (lambda p, normal: np.full(len(p), H), lambda p, normal: np.full(len(p), AMBIENT))},
-        outward_flux={"top": lambda p, normal: 3.0*normal[:, 1]}, **base)
-    for name in ("temperature_k", "convective_outward_w_per_m", "prescribed_outward_load_w_per_m", "residual_w_per_m"):
+        inward_heat_flux={"top": lambda p, normal: -3.0*normal[:, 1]}, **base)
+    for name in ("temperature", "outward_convective_heat_rate_per_depth", "outward_prescribed_heat_rate_per_depth", "residual_heat_rate_per_depth"):
         np.testing.assert_allclose(getattr(sampled, name), getattr(constant, name), rtol=0,
                                    atol=1e-12*max(1.0, np.max(abs(getattr(constant, name)))))
         assert not getattr(constant, name).flags.writeable
-    assert constant.convective_outward_w_per_m.shape == (2, mesh.num_nodes)
-    assert constant.prescribed_outward_load_w_per_m.shape == (2, mesh.num_nodes)
+    assert constant.outward_convective_heat_rate_per_depth.shape == (2, mesh.num_nodes)
+    assert constant.outward_prescribed_heat_rate_per_depth.shape == (2, mesh.num_nodes)
     top = np.unique(mesh.boundary_edges["top"])
-    assert np.all(constant.prescribed_outward_load_w_per_m[0][top] > 0)
-    assert np.allclose(constant.prescribed_outward_load_w_per_m[0].sum(), 3.0*1.0)
-    assert np.all(constant.convective_outward_w_per_m[:, np.unique(mesh.boundary_edges["right"])] > 0)
+    assert np.all(constant.outward_prescribed_heat_rate_per_depth[0][top] > 0)
+    assert np.allclose(constant.outward_prescribed_heat_rate_per_depth[0].sum(), 3.0*1.0)
+    assert np.all(constant.outward_convective_heat_rate_per_depth[:, np.unique(mesh.boundary_edges["right"])] > 0)
     # Signatures other than the three callback forms are refused up front, before any
     # sampling (time-dependent forms themselves are covered in test_transient_heat_time_boundary.py).
     for bad in ({"right": (lambda p, normal, time_s, extra: H, AMBIENT)}, {"right": (H, lambda *a: AMBIENT)}):
         with pytest.raises(ValueError, match="exactly one of the forms"):
             solve_transient_heat(mesh, convection=bad, **base)
     with pytest.raises(ValueError, match="never time"):
-        solve_transient_heat(mesh, outward_flux={"top": lambda points, time: 3.0}, **base)
+        solve_transient_heat(mesh, inward_heat_flux={"top": lambda points, time: -3.0}, **base)
     with pytest.raises(ValueError, match="must map"):
-        solve_transient_heat(mesh, outward_flux=[("top", 3.0)], **base)
+        solve_transient_heat(mesh, inward_heat_flux=[("top", 3.0)], **base)
     # Steady-heat boundary validation is reused; failures are chained at index 0.
-    for bad in ({"outward_flux": {"nowhere": 1.0}}, {"convection": {"right": (-1.0, AMBIENT)}},
-                {"convection": {"right": H}}, {"outward_flux": {"top": lambda p, normal: 1.0}}):
+    for bad in ({"inward_heat_flux": {"nowhere": -1.0}}, {"convection": {"right": (-1.0, AMBIENT)}},
+                {"convection": {"right": H}}, {"inward_heat_flux": {"top": lambda p, normal: -1.0}}):
         with pytest.raises(TransientHeatStepError) as caught:
             solve_transient_heat(mesh, **bad, **base)
         assert caught.value.time_index == 0 and isinstance(caught.value.__cause__, ValueError)
     # A natural edge with both ends prescribed is refused, as in steady heat.
     fixed = {int(i): INITIAL for i in mesh.boundary["right"]}
     with pytest.raises(TransientHeatStepError):
-        solve_transient_heat(mesh, convection={"right": (H, AMBIENT)}, **(base | {"dirichlet": fixed}))
+        solve_transient_heat(mesh, convection={"right": (H, AMBIENT)}, **(base | {"prescribed_temperature": fixed}))
 
 
 def test_t6_dirichlet_only_histories_unchanged(monkeypatch):
@@ -239,13 +241,13 @@ def test_t6_dirichlet_only_histories_unchanged(monkeypatch):
     same_platform = environment == dirichlet_cases.environment()
 
     def forbidden(*args, **kwargs):
-        raise AssertionError("boundary sampling ran without outward_flux or convection")
+        raise AssertionError("boundary sampling ran without inward_heat_flux or convection")
     monkeypatch.setattr(module, "scalar_boundary_geometry", forbidden)
     monkeypatch.setattr(module, "evaluate_scalar_boundary", forbidden)
-    monkeypatch.setattr(module, "scalar_boundary_system", forbidden)
+    monkeypatch.setattr(module, "_scalar_boundary_system", forbidden)
     for name, case in dirichlet_cases.CASES.items():
         result = solve_transient_heat(**case())
-        assert result.prescribed_outward_load_w_per_m is None and result.convective_outward_w_per_m is None
+        assert result.outward_prescribed_heat_rate_per_depth is None and result.outward_convective_heat_rate_per_depth is None
         now = dirichlet_cases.arrays(case)
         assert set(now) == set(cases[name])
         for field, array in now.items():
@@ -264,10 +266,10 @@ def test_t6_dirichlet_only_histories_unchanged(monkeypatch):
 BACKENDS = ["jax", "torch"]
 LIVE_MESH = rectangle_mesh(1.0, 0.5, 6, 3)
 LIVE_TIMES = [0.0, 0.05, 0.1, 0.2]
-LIVE_FIELDS = ("temperature_k", "heat_flux_w_m2", "source_load_w_per_m", "reaction_w_per_m",
-               "residual_w_per_m", "storage_rate_w_per_m", "heat_content_j_per_m",
-               "quadratic_functional_jk_per_m", "dirichlet_temperatures_k",
-               "prescribed_outward_load_w_per_m", "convective_outward_w_per_m")
+LIVE_FIELDS = ("temperature", "heat_flux", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+               "residual_heat_rate_per_depth", "heat_storage_rate_per_depth", "stored_heat_per_depth",
+               "thermal_energy_functional_per_depth", "prescribed_temperature",
+               "outward_prescribed_heat_rate_per_depth", "outward_convective_heat_rate_per_depth")
 
 
 def _library(name):
@@ -309,16 +311,16 @@ def _central(objective, values, rel=1e-6):
     return out
 
 
-def _live_run(h, ambient, g, k):
-    """Right convection (h, ambient), top outward flux g, conductivity k; left ramp."""
+def _live_run(h, ambient, q, k):
+    """Right convection (h, ambient), top inward heat flux q, conductivity k; left ramp."""
     left = {int(i): (lambda s: 320.0+10.0*min(s/0.1, 1.0)) for i in LIVE_MESH.boundary["left"]}
     return solve_transient_heat(
-        LIVE_MESH, conductivity=k, volumetric_heat_capacity=C, time_s=LIVE_TIMES,
-        initial_temperature_k=np.full(LIVE_MESH.num_nodes, 320.0), dirichlet=left, heat_source=12.0,
-        outward_flux={"top": g}, convection={"right": (h, ambient)})
+        LIVE_MESH, thermal_conductivity=k, volumetric_heat_capacity=C, time=LIVE_TIMES,
+        initial_temperature=np.full(LIVE_MESH.num_nodes, 320.0), prescribed_temperature=left, heat_source_density=12.0,
+        inward_heat_flux={"top": q}, convection={"right": (h, ambient)})
 
 
-LIVE_VALUES = (H, AMBIENT, -15.0, K)
+LIVE_VALUES = (H, AMBIENT, 15.0, K)
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -336,8 +338,8 @@ def test_t5_live_histories_match_numpy(name):
 def test_t5_derivatives_in_h_ambient_flux_match_central_differences(name):
     def objective(*v):
         r = _live_run(*v)
-        return (r.temperature_k[-1]**2).mean()+r.convective_outward_w_per_m[-1].sum()*1e-2
+        return (r.temperature[-1]**2).mean()+r.outward_convective_heat_rate_per_depth[-1].sum()*1e-2
     got = _gradient(name, objective, LIVE_VALUES)
     want = _central(objective, LIVE_VALUES)
-    print(f"\n{name} derivatives d/d(h, ambient, g, k): {got} vs central {want}")
+    print(f"\n{name} derivatives d/d(h, ambient, q, k): {got} vs central {want}")
     np.testing.assert_allclose(got, want, rtol=1e-6, atol=1e-9)

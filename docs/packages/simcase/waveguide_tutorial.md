@@ -25,7 +25,7 @@ python -m simcase run strip.json -o strip_results
 `strip.json` describes a 500 × 220 nm silicon core in silica, solved as full
 vector modes at seven wavelengths from 1.40 to 1.70 µm. The run prints n_eff for
 two modes at each wavelength, for example
-`physics.em1.wavelength = 1.55 um: n_eff = 2.444060, 1.771237`, and writes
+`vacuum_wavelength 1.55 um: n_eff = 2.444060, 1.771237`, and writes
 `strip_results/` (step 7). The first mode is the TE-like mode (electric field
 mostly along x), the second the TM-like mode.
 
@@ -40,7 +40,7 @@ from simcase import Document, examples, run
 
 def solve(doc):
     result = run(Document.from_dict(doc), verbose=False)
-    return result.neff[0]
+    return result.effective_index[0]
 
 strip = copy.deepcopy(examples.SOI_STRIP)
 strip["study"] = {"type": "single"}
@@ -51,8 +51,9 @@ print(" ".join(f"{n:.4f}" for n in solve(strip)))
 2.4441 1.7712
 ```
 
-Lengths are in the declared unit, here `"units": {"length": "um"}`. Make the core
-450 nm wide by changing the rectangle (`x` is its left edge, `y` its bottom):
+Shape numbers are in the geometry's `length_unit`, here `"um"`; every other length carries
+its own unit (`"0.02 um"`, `"1550 nm"`). Make the core 450 nm wide by changing the rectangle
+(`x` is its left edge, `y` its bottom):
 
 ```python
 narrow = copy.deepcopy(strip)
@@ -74,11 +75,11 @@ across the whole window with the rib on top:
 rib = copy.deepcopy(strip)
 rib["geometry"]["shapes"] = [
     {"name": "slab", "type": "rect", "x": -1.5, "y": 0.0, "w": 3.0, "h": 0.09,
-     "material": "Si", "mesh_size": 0.02},
+     "material": "physmat:Si", "element_size": "0.02 um"},
     {"name": "rib", "type": "rect", "x": -0.25, "y": 0.0, "w": 0.5, "h": 0.22,
-     "material": "Si", "mesh_size": 0.02},
+     "material": "physmat:Si", "element_size": "0.02 um"},
 ]
-rib["physics"]["em1"]["num_modes"] = 1
+rib["physics"]["em1"]["mode_count"] = 1
 print(f"{solve(rib)[0]:.4f}")
 ```
 
@@ -93,7 +94,7 @@ at the top:
 ```python
 sloped = copy.deepcopy(strip)
 sloped["geometry"]["shapes"][0] = {
-    "name": "core", "type": "polygon", "material": "Si", "mesh_size": 0.02,
+    "name": "core", "type": "polygon", "material": "physmat:Si", "element_size": "0.02 um",
     "points": [[-0.25, 0.0], [0.25, 0.0], [0.22, 0.22], [-0.22, 0.22]],
 }
 print(" ".join(f"{n:.4f}" for n in solve(sloped)))
@@ -105,12 +106,12 @@ print(" ".join(f"{n:.4f}" for n in solve(sloped)))
 
 ## 4. Materials
 
-A material name is looked up first in the document's own `materials` table, then
-in the 19 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and
-`vacuum`. Built-in materials carry their dispersion, so each wavelength of a
-sweep uses its own index. For your own material give a constant index or
-Sellmeier coefficients. Sellmeier `C` values are in the document's length unit
-squared:
+A library material is written with its exact physmat name, such as `"physmat:Si"`; there
+are 19 built-in materials, which include `Si`, `SiO2`, `Si3N4`, `LiNbO3` and `vacuum`.
+Built-in materials carry their dispersion, so each wavelength of a sweep uses its own
+index. A bare name is a material of the document's own `materials` table: give it a
+`refractive_index` that is a constant or a Sellmeier model, whose resonance wavelengths
+carry their unit:
 
 ```python
 import physmat
@@ -118,13 +119,16 @@ import physmat
 print(len(physmat.names()), "built-in materials")
 nitride = copy.deepcopy(strip)
 nitride["materials"] = {
-    "my_sin": {"n": 2.0},
-    "my_glass": {"sellmeier": {"B": [0.6961663, 0.4079426, 0.8974794],
-                               "C": [0.0684043**2, 0.1162414**2, 9.896161**2]}},
+    "my_sin": {"refractive_index": 2.0},
+    "my_glass": {"refractive_index": {
+        "model": "sellmeier", "reference_medium": "vacuum",
+        "terms": [{"strength": 0.6961663, "resonance_wavelength": "0.0684043 um"},
+                  {"strength": 0.4079426, "resonance_wavelength": "0.1162414 um"},
+                  {"strength": 0.8974794, "resonance_wavelength": "9.896161 um"}]}},
 }
 nitride["geometry"]["background"]["material"] = "my_glass"
 nitride["geometry"]["shapes"][0].update(material="my_sin", x=-0.6, w=1.2, h=0.4)
-nitride["physics"]["em1"].update(n_cladding=1.45, num_modes=1)
+nitride["physics"]["em1"].update(effective_index_threshold=1.45, mode_count=1)
 print(f"{solve(nitride)[0]:.4f}")
 ```
 
@@ -134,8 +138,9 @@ print(f"{solve(nitride)[0]:.4f}")
 ```
 
 Both formulations accept passive absorbing materials. See [absorbing modes](lossy_modes.md)
-for an n+ik example, complex indices, positive dB/cm loss and the retained
-exp(+i omega t-i beta z) convention. Metals require explicit `n_target` selection;
+for an n+ik example, complex indices and the positive dB/m loss under the
+exp(−iωt) convention (Im n_eff > 0 is attenuation). Metals require explicit
+`target_effective_index` selection;
 use full-vector modes for surface plasmons. The refractiveindex.info database that `physmat` can read
 is not available from a document.
 
@@ -155,11 +160,11 @@ def wider_window(doc):
     doc["geometry"]["domain"] = {"xmin": -3.0, "xmax": 3.0, "ymin": -2.4, "ymax": 2.4}
 
 def finer_core(doc):
-    doc["geometry"]["shapes"][0]["mesh_size"] = 0.01
+    doc["geometry"]["shapes"][0]["element_size"] = "0.01 um"
 
 def finer_outside(doc):
-    doc["mesh"]["size"] = 0.125
-    doc["mesh"]["grading"].update(near=0.01, far=0.08)
+    doc["mesh"]["element_size"] = "0.125 um"
+    doc["mesh"]["grading"].update(near="0.01 um", far="0.08 um")
 
 def finer_both(doc):
     finer_core(doc)
@@ -182,8 +187,8 @@ both /2       2.44634
 
 For this strip the window is large enough (3e-4), but the supplied mesh is at
 least 2e-3 low (n_eff is still rising when both are refined), and most of that
-error is outside the core: `mesh_size` on a shape sets the element size inside
-that shape, while `mesh.size` and `mesh.grading` set it around the shape, where
+error is outside the core: `element_size` on a shape sets the element size inside
+that shape, while `mesh.element_size` and `mesh.grading` set it around the shape, where
 the field still varies quickly near the corners. Refine both
 together until n_eff stops changing at the precision you need. A field that
 reaches the window edge needs a larger window. These two checks are your
@@ -192,33 +197,33 @@ responsibility for every new geometry.
 ## 6. The rib trap: slab modes
 
 The slab of a rib guides modes of its own, and with electric walls at the window
-edges they appear as extra solutions. `n_cladding` is the lower bound of the
-n_eff search, and the strip example's 1.45 lets them in. Ask the rib for four
+edges they appear as extra solutions. `effective_index_threshold` is the lower bound of
+the n_eff search, and the strip example's 1.45 lets them in. Ask the rib for four
 modes and widen its window:
 
 ```python
-def rib_modes(half_width, n_cladding=1.45, modes=4):
+def rib_modes(half_width, threshold=1.45, modes=4):
     doc = copy.deepcopy(rib)
     doc["geometry"]["domain"].update(xmin=-half_width, xmax=half_width)
     doc["geometry"]["shapes"][0].update(x=-half_width, w=2 * half_width)
-    doc["physics"]["em1"].update(num_modes=modes, n_cladding=n_cladding)
+    doc["physics"]["em1"].update(mode_count=modes, effective_index_threshold=threshold)
     return " ".join(f"{n:.4f}" for n in solve(doc))
 
 print("half width 1.5:", rib_modes(1.5))
 print("half width 3.0:", rib_modes(3.0))
-print("n_cladding 2.2:", rib_modes(1.5, n_cladding=2.2))
+print("threshold 2.2: ", rib_modes(1.5, threshold=2.2))
 ```
 
 ```text
 half width 1.5: 2.5669 2.1157 2.0798 2.0422
 half width 3.0: 2.5668 2.1124 2.0952 2.0904
-n_cladding 2.2: 2.5669
+threshold 2.2:  2.5669
 ```
 
 The rib mode, 2.5669, hardly moves with the window. The others sit near the
 TE mode of a bare 90 nm slab (n_eff 2.104) and change with the window width:
 they are slab modes bounced between the walls, not modes of your rib. Set
-`n_cladding` above the slab's own n_eff to exclude them: with 2.2 the same request
+`effective_index_threshold` above the slab's own n_eff to exclude them: with 2.2 the same request
 for four modes returns only the rib mode, and the log says fewer were found.
 For a rib, also look at the field: a slab mode spreads across the whole slab.
 
@@ -230,8 +235,8 @@ sweep:
 
 ```python
 result = run(Document.from_dict(examples.SOI_STRIP), verbose=False)
-i = result.values.index(1.55)
-print(f"n_eff {result.neff[i, 0]:.4f}  n_g {result.group_index()[i, 0]:.4f}")
+i = list(result.vacuum_wavelength).index(1.55e-6)    # metres
+print(f"n_eff {result.effective_index[i, 0]:.4f}  n_g {result.group_index()[i, 0]:.4f}")
 ```
 
 ```text
@@ -246,8 +251,8 @@ from step 1:
 
 | File | Contents |
 |---|---|
-| `summary.json` | n_eff per study point and mode, group index, declared units, the saved layout `field_layout` with `mesh_length_unit` and `length_unit_to_m`, mesh statistics, timings, mode tracking, and `mode_postprocessing` (power, confinement, overlaps with units) |
-| `fields.npz` | mesh nodes and triangles (in the document unit), the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids, plus `mode_power`, `confinement` and `field_overlap`; load with `numpy.load(..., allow_pickle=False)` |
+| `summary.json` | SI values with their units: the vacuum wavelength and `effective_index` per study point and mode, `group_index`, the saved layout `field_layout`, mesh statistics, timings, mode tracking, diagnostics, `defaults_applied`, and `mode_postprocessing` (power, confinement, overlaps with units) |
+| `fields.npz` | `node_coordinates` (m) and triangles, the raw vector field coefficients and the electric field (Ex, Ey, Ez) at triangle centroids, plus `unnormalized_mode_power`, `confinement_factor` and `unnormalized_field_overlap`; load with `numpy.load(..., allow_pickle=False)` |
 | `results.png` | mesh, the first mode's \|E\| and the sweep |
 | `log.txt`, `model.json` | the run log and the exact document that was run |
 
@@ -257,14 +262,14 @@ describes the arrays.
 
 ### Mode post-processing
 
-`confinement[p, m]` in `fields.npz` holds the share of the mode's energy
+`confinement_factor[p, m]` in `fields.npz` holds the share of the mode's energy
 (`Re eps_r |E|^2`) in each region of `region_names`, so the strip's core
-confinement is the `core` entry; its rows sum to 1. `mode_power[p, m]` is the
-power the saved field carries when its amplitudes are read as volts per
-document unit (divide the field by `sqrt(Re mode_power)` for a 1 W mode), and
-`field_overlap` the matrix `int conj(E_a) . E_b dA`. Add
-`"results": {"mode_overlap": {"gaussian": {"waist": 0.3, "center": [0.0, 0.11]}}}`
-(document units) to the JSON to also save `coupling_efficiency`, the fraction
+confinement is the `core` entry; its rows sum to 1. `unnormalized_mode_power[p, m]` is the
+power in watts the saved field carries when its amplitudes are read as volts per
+metre (divide the field by `sqrt(Re unnormalized_mode_power)` for a 1 W mode), and
+`unnormalized_field_overlap` the matrix `int conj(E_a) . E_b dA` in m^2. Add
+`"results": {"mode_overlap": {"gaussian": {"beam_waist_radius": "0.3 um", "position": ["0 um", "0.11 um"]}}}`
+to the JSON to also save `coupling_efficiency`, the fraction
 of an x-polarised Gaussian beam of that 1/e radius that couples into each mode.
 The [package overview](overview.md#mode-post-processing) states the exact
 recipe and units.
@@ -277,10 +282,10 @@ from simcase.export import export_sweep
 export_sweep("strip_results/fields.npz", "strip_results/paraview")
 ```
 
-The collection's timestep is the wavelength in the document unit; the points
-are in metres, and each VTU holds `electric_field_mode_0_real`/`_imag` (cell
-data at centroids), `longitudinal_electric_mode_0_real`/`_imag` (point data)
-and `triangle_regions`. A single-point result goes through `export_fields`
+The collection's timestep is the vacuum wavelength in metres; the points
+are in metres, and each VTU holds `unnormalized_electric_field_mode_0_real`/`_imag` (cell
+data at centroids), `unnormalized_electric_field_z_mode_0_real`/`_imag` (point data)
+and `regions`. A single-point result goes through `export_fields`
 instead; see [viewing in ParaView](overview.md#viewing-in-paraview).
 
 ## 8. The same model in Studio
@@ -307,7 +312,7 @@ materials and the mesh, run, and view n_eff, the sweep and the \|E\|, \|Ex\|,
   perfectly matched layers, so bend and leakage losses are not computed.
 - Straight waveguides only: no bends, no propagation along the guide.
 - No automatic window or mesh convergence check: do step 5 yourself.
-- `n_cladding` is a search bound you choose; the solver does not prove that it
+- `effective_index_threshold` is a search bound you choose; the solver does not prove that it
   found every guided mode.
 - The scalar formulation (`"formulation": "scalar"`) is an approximation for
   high-contrast cores: 2.611 instead of 2.444 for this strip.

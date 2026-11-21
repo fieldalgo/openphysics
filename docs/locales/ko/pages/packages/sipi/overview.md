@@ -171,7 +171,8 @@ CPU 강하는 13.2 mV, 판 손실은 0.17 W입니다.
 ## 형상 문서로 쓰기
 
 `sipi.geometry_v1.to_geometry_v1(section)`은 단면을 [simcase 형상 문서](../simcase/geometry_document.md)의 버전 1 형상
-블록으로 쓰고, 재료·도체·상자 플래그를 함께 돌려줍니다. 결과는 단순한 사전이며 의존성을 더하지 않습니다.
+블록으로 형식 0.3에 맞게 쓰고(`length_unit` `"m"`, `depth` null인 구성 요소 하나), 재료(`relative_permittivity`,
+`loss_tangent`)·도체·상자 플래그를 함께 돌려줍니다. 결과는 단순한 사전이며 의존성을 더하지 않습니다.
 [어댑터](../simcase/geometry_reader.md#sipi와-meshine-어댑터)를 참고하세요.
 
 ## 구현하지 않은 것

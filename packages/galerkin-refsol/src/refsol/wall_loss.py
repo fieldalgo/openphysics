@@ -22,14 +22,30 @@ frequency by the same amount as the loss raises the imaginary part:
 
 No mesh or FEM code is used; all integrals are closed-form products of
 ``int sin^2`` and ``int cos^2`` over each side.
+
+Public API (galerkin step, L3 commit 12). ``wall_loss_modes(*, box_size, frequency_limit,
+electrical_conductivity, relative_permittivity=1.0, relative_permeability=1.0)`` and
+``pozar_te101_quality_factor(*, box_size, electrical_conductivity)`` take SI keyword-only
+registry names: the box (a, b, c) in m, the ceiling in Hz and the wall conductivity in S/m
+(one value for every wall or a mapping over ``WALLS``). A mode's complex
+``resonant_frequency`` follows exp(-i omega t), as the rest of refsol: it is ``to_public``
+(the conjugate, through ``refsol._conventions``) of the first-order omega above, so
+``f = f0 (1 - (1 + i) / (2 Q_c))`` with ``Im f < 0`` for a lossy wall (``Re f / (-2 Im f)``
+is Q_c to first order). The closed forms above are written in exp(+j omega t) and are
+unchanged.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import math
 
+from ._checks import refuse_text
+from ._conventions import to_public
 from .cavity import C0
+
+__all__ = ["MU0", "WALLS", "WallLossMode", "wall_loss_modes", "pozar_te101_quality_factor"]
 
 MU0 = 1.25663706212e-6  # vacuum permeability (CODATA 2018), H/m
 WALLS = ("x0", "x1", "y0", "y1", "z0", "z1")
@@ -37,13 +53,18 @@ WALLS = ("x0", "x1", "y0", "y1", "z0", "z1")
 
 @dataclass(frozen=True)
 class WallLossMode:
-    """One polarization of mode (m, n, p): frequency, Q_c and its amplitude vector."""
+    """One polarization of mode (m, n, p) (exp(-i omega t)).
+
+    ``polarization`` is the unit amplitude vector A, ``frequency`` the lossless PEC frequency f0
+    (Hz), ``quality_factor`` Q_c and ``resonant_frequency`` the first-order complex frequency
+    ``f0 (1 - (1 + i) / (2 Q_c))`` (Hz; Im < 0 for a lossy wall, f0 for a perfect one).
+    """
 
     indices: tuple[int, int, int]
     polarization: tuple[float, float, float]
-    frequency_hz: float
+    frequency: float
     quality_factor: float
-    complex_frequency_hz: complex
+    resonant_frequency: complex
 
 
 def _positive(value, name):
@@ -54,13 +75,13 @@ def _positive(value, name):
 
 
 def _conductivities(value):
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         unknown = set(value) - set(WALLS)
         if unknown:
-            raise ValueError(f"unknown walls {sorted(unknown)}; use {WALLS}")
-        return {w: (None if value.get(w) is None else _positive(value[w], f"sigma[{w}]"))
+            raise ValueError(f"unknown walls {sorted(unknown, key=str)} in electrical_conductivity; use {WALLS}")
+        return {w: (None if value.get(w) is None else _positive(value[w], f"electrical_conductivity[{w}]"))
                 for w in WALLS}
-    sigma = _positive(value, "wall_conductivity_s_per_m")
+    sigma = _positive(value, "electrical_conductivity")
     return dict.fromkeys(WALLS, sigma)
 
 
@@ -120,24 +141,35 @@ def _quadratic_forms(lengths, k, conductivities, rs_scale):
     return volume, wall
 
 
-def wall_loss_modes(lengths_m, max_frequency_hz, wall_conductivity_s_per_m, *,
-                    relative_permittivity=1.0, relative_permeability=1.0):
-    """Conductor-loss Q of every mode at or below the ceiling, with real ``eps_r, mu_r``.
+def wall_loss_modes(*, box_size, frequency_limit, electrical_conductivity, relative_permittivity=1.0,
+                    relative_permeability=1.0):
+    """Conductor-loss Q of every mode at or below ``frequency_limit`` (Hz), with real ``eps_r, mu_r``.
 
-    ``wall_conductivity_s_per_m`` is one conductivity for all walls or a dict over
-    ``WALLS`` ('x0', 'x1', ... 'z1'); a missing or None wall is a perfect conductor.
-    The filling only rescales k (``omega = c0 k / sqrt(eps_r mu_r)``) and the energy.
+    ``box_size`` is the box (a, b, c) in m. ``electrical_conductivity`` (S/m) is one
+    conductivity for all walls or a mapping over ``WALLS`` ('x0', 'x1', ... 'z1'); a missing
+    or None wall is a perfect conductor. The filling only rescales k
+    (``omega = c0 k / sqrt(eps_r mu_r)``) and the energy. Each mode's ``resonant_frequency``
+    follows exp(-i omega t) (Im < 0 for a lossy wall).
     """
+    refuse_text(box_size=box_size, frequency_limit=frequency_limit, electrical_conductivity=electrical_conductivity,
+                relative_permittivity=relative_permittivity, relative_permeability=relative_permeability)
     try:
-        lengths = tuple(_positive(v, "lengths_m") for v in lengths_m)
+        lengths = tuple(_positive(v, "box_size") for v in box_size)
     except TypeError as exc:
-        raise ValueError("lengths_m must contain three positive lengths") from exc
+        raise ValueError("box_size must contain three positive lengths in m") from exc
     if len(lengths) != 3:
-        raise ValueError("lengths_m must contain three positive lengths")
-    ceiling = _positive(max_frequency_hz, "max_frequency_hz")
-    sigma = _conductivities(wall_conductivity_s_per_m)
+        raise ValueError("box_size must contain three positive lengths in m")
+    ceiling = _positive(frequency_limit, "frequency_limit")
+    sigma = _conductivities(electrical_conductivity)
     eps = _positive(relative_permittivity, "relative_permittivity")
     mu = _positive(relative_permeability, "relative_permeability")
+    return [WallLossMode(indices, amplitude, frequency, q, to_public(complex_frequency))
+            for indices, amplitude, frequency, q, complex_frequency in _wall_loss_modes(lengths, ceiling, sigma,
+                                                                                         eps, mu)]
+
+
+def _wall_loss_modes(lengths, ceiling, sigma, eps, mu):
+    """The modes as (indices, amplitude, f0, Q_c, omega / (2 pi) in exp(+j omega t)), sorted."""
     speed = C0 / math.sqrt(eps * mu)
     bounds = [int(2 * ceiling * L / speed) + 1 for L in lengths]
     modes = []
@@ -165,9 +197,8 @@ def wall_loss_modes(lengths_m, max_frequency_hz, wall_conductivity_s_per_m, *,
             amplitude = tuple(v / norm for v in amplitude)
             q = math.inf if weight == 0 else omega * MU0 * mu / weight
             shift = 0 if q == math.inf else 1 / (2 * q)
-            modes.append(WallLossMode(indices, amplitude, frequency, q,
-                                      complex(frequency * (1 - shift), frequency * shift)))
-    return sorted(modes, key=lambda m: (m.frequency_hz, m.indices, m.quality_factor))
+            modes.append((indices, amplitude, frequency, q, complex(frequency * (1 - shift), frequency * shift)))
+    return sorted(modes, key=lambda m: (m[2], m[0], m[3]))
 
 
 def _transverse_basis(k, indices):
@@ -226,14 +257,22 @@ def _generalized_eigen(loss, energy):
     return pairs
 
 
-def pozar_te101_quality_factor(a_m, b_m, d_m, wall_conductivity_s_per_m):
-    """Textbook TE101 Q_c of an air-filled a x b x d box (b the field direction).
+def pozar_te101_quality_factor(*, box_size, electrical_conductivity):
+    """Textbook TE101 Q_c of an air-filled a x b x d box (``box_size`` (a, b, d) in m, b the field direction).
 
+    ``electrical_conductivity`` is the walls' sigma in S/m.
     Q_c = (k a d)^3 b eta0 / (2 pi^2 Rs) / (2 a^3 b + 2 b d^3 + a^3 d + a d^3)
     (D. M. Pozar, Microwave Engineering, 4th ed., eq. 6.46).
     """
-    a, b, d = (_positive(v, "length") for v in (a_m, b_m, d_m))
-    sigma = _positive(wall_conductivity_s_per_m, "wall_conductivity_s_per_m")
+    refuse_text(box_size=box_size, electrical_conductivity=electrical_conductivity)
+    try:
+        lengths = tuple(_positive(v, "box_size") for v in box_size)
+    except TypeError as exc:
+        raise ValueError("box_size must contain three positive lengths (a, b, d) in m") from exc
+    if len(lengths) != 3:
+        raise ValueError("box_size must contain three positive lengths (a, b, d) in m")
+    a, b, d = lengths
+    sigma = _positive(electrical_conductivity, "electrical_conductivity")
     k = math.pi * math.sqrt(1 / a**2 + 1 / d**2)
     omega = C0 * k
     rs = math.sqrt(omega * MU0 / (2 * sigma))

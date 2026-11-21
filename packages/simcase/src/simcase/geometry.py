@@ -1,13 +1,16 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Document geometry -> meshine Domain.
+"""Document geometry -> meshine Domain (internal; the stage API is ``simcase.build_domain``).
 
-Shapes are booleans on top of each other ("later wins"), clipped to the
-domain box; the background fills the remainder. shapely does the polygon
-arithmetic, the result goes to meshine as polygons with holes. A circle that no
-later shape overlaps and no other boundary touches is passed as a true
-meshine.Circle so its nodes stay on the exact circle (see _isolated_circle).
+The builder reads the micrometre frame of a format 0.3 document (``views.MicrometreFrame``,
+made by ``views.region_mesh`` and ``modes_document.kernel_document``). A version 1 block goes
+through the exact engine (``simcase.geometry_engine``). A flat block goes through shapely:
+shapes are booleans on top of each other ("later wins"), clipped to the domain box; the
+background fills the remainder, and the result goes to meshine as polygons with holes. A
+circle that no later shape overlaps and no other boundary touches is passed as a true
+meshine.Circle so its nodes stay on the exact circle (see _isolated_circle). The dropped-shape
+and dropped-feature checks also read the region view (``thermal_regions.handoff_03``).
 """
 
 from __future__ import annotations
@@ -148,14 +151,23 @@ def _rings(poly: Polygon):
     return outer, holes
 
 
-def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
-    """meshine Domain, boundary namer, and {region name: material name}.
+def _frame(doc, what: str) -> None:
+    """Refuse anything but a micrometre frame (``views.MicrometreFrame``) by name."""
+    from .views import MicrometreFrame
+    if not isinstance(doc, MicrometreFrame):
+        raise TypeError(f"geometry.{what} takes the micrometre frame of a format 0.3 document (views.region_mesh, "
+                        f"modes_document.kernel_document), got {type(doc).__name__}; the stage API is "
+                        "simcase.build_domain")
 
-    A document written with a version 1 geometry block is resolved by the exact
-    engine (``simcase.geometry_engine``) from its parsed model, so touches and
-    booleans are decided exactly and each coordinate is rounded once at the
-    hand-off; a 0.2 block goes through the shapely route as before.
+
+def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
+    """meshine Domain, boundary namer, and {region name: material name} of a micrometre frame.
+
+    A version 1 block is resolved by the exact engine (``simcase.geometry_engine``) from the
+    document's model, so touches and booleans are decided exactly and each coordinate is
+    rounded once at the hand-off; a flat block goes through the shapely route.
     """
+    _frame(doc, "build_domain")
     if getattr(doc, "geometry_model", None) is not None:
         return _domain_from_model(doc)[:3]
     return _domain_from_regions(doc)[:3]
@@ -164,12 +176,12 @@ def build_domain(doc: Document) -> tuple[Domain, callable, dict[str, str]]:
 def _domain_from_model(doc: Document, max_input_vertices: int | None = None
                        ) -> tuple[Domain, callable, dict[str, str], int]:
     """The engine route of ``build_domain``, with the loop vertex count meshine receives."""
-    from .geometry_document import GeometryError, pm_per_unit
+    from .geometry_document import GeometryError
     try:
         # an axisymmetric component is meshed as (r, z) in the same units; its r = 0 side is
         # tagged "axis" (geometry_engine), and each runner decides what it takes
         rc = doc.complex()
-        unit_pm = pm_per_unit(doc["units"])
+        unit_pm = doc._pm_per_unit()
         dom = doc.domain
         min_area_pm2 = AREA_EPS * (dom["xmax"] - dom["xmin"]) * (dom["ymax"] - dom["ymin"]) * float(unit_pm) ** 2
         domain, namer, materials = rc.to_domain(doc["mesh"]["size"], unit_pm=unit_pm, min_area=min_area_pm2,
@@ -189,7 +201,7 @@ def dropped_features(doc: Document) -> list[str]:
 
     A feature with no surviving piece in the complex is evaluated once more with only the
     features up to itself: if it has no piece even then (outside the domain, or under the
-    sliver limit ``AREA_EPS`` of the domain area), it is listed with the 0.2 wording; if it
+    sliver limit ``AREA_EPS`` of the domain area), it is listed as a dropped flat shape is; if it
     has one, later features cover it, which is allowed ("later wins")."""
     import dataclasses
     from .geometry_engine import evaluate_component
@@ -216,25 +228,23 @@ def dropped_features(doc: Document) -> list[str]:
 
 
 def size_function(doc: Document):
-    """The mesh size function of a version 1 document's ``mesh.controls`` distance gradings, in
-    the mesher's units, after ``build_domain(doc)``; None for a 0.2 document or without one.
-
-    The complex is shared with the document's micrometre copy, so after a run or a mesh-limit
-    check its last hand-off is in micrometres: this then refuses a document in another unit
-    rather than mixing units (call ``build_domain(doc)`` again first)."""
-    from .geometry_document import GeometryError, pm_per_unit
+    """The mesh size function of the ``mesh.controls`` distance gradings of a micrometre frame
+    with a version 1 block, in micrometres, after ``build_domain(doc)``; None for a flat block
+    or without a complex."""
+    from .geometry_document import GeometryError
+    _frame(doc, "size_function")
     rc = getattr(doc, "geometry_complex", None)
     if rc is None or getattr(doc, "geometry_model", None) is None:
         return None
     try:
-        return rc.size_function(doc.controls_pm(), unit_pm=pm_per_unit(doc["units"]))
+        return rc.size_function(doc.controls_pm(), unit_pm=doc._pm_per_unit())
     except GeometryError as exc:
         raise DocumentError(str(exc)) from None
 
 
 def selection_edges_of(doc: Document, tri) -> dict | None:
     """The contract's boundary selections of a version 1 document as mesh edges: {name: (E, 2)
-    node pairs} over the mesh generated from ``build_domain(doc)``; None for a 0.2 document."""
+    node pairs} over the mesh generated from ``build_domain(doc)``; None for a flat block."""
     from .geometry_document import GeometryError
     rc = getattr(doc, "geometry_complex", None)
     if rc is None or getattr(doc, "geometry_model", None) is None:
@@ -248,7 +258,7 @@ def selection_edges_of(doc: Document, tri) -> dict | None:
 
 def provenance_edges_of(doc: Document, tri) -> dict | None:
     """The contract's ``provenance_edges`` of a mesh generated from ``build_domain(doc)``,
-    or None for a 0.2 document (no complex, no provenance)."""
+    or None for a flat block (no complex, no provenance)."""
     from .geometry_document import GeometryError
     rc = getattr(doc, "geometry_complex", None)
     if rc is None:

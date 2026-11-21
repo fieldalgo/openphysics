@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Static integration measures for scalar P1 problems on 2D meshes.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Cartesian coordinates use unit thickness. Axisymmetric coordinates are (r,z)
 in metres and integrate the full revolution, with volume/surface weight 2*pi*r.
 The symmetry axis is not a physical boundary: finite P1 trial functions and
@@ -46,7 +49,7 @@ class ScalarMeasure:
         physical = exterior[np.any(self.nodes[exterior, 0] > 0, axis=1)]
         fixed = np.asarray(list(prescribed), dtype=int)
         if np.any((self.nodes[fixed, 0] == 0) & ~np.isin(fixed, physical)):
-            raise ValueError("Dirichlet data on the symmetry axis alone are not permitted")
+            raise ValueError("prescribed_temperature on the symmetry axis alone is not permitted")
 
     def boundary_samples(self, samples):
         """Weight prevalidated scalar boundary samples; reject nonregular axis data."""
@@ -58,7 +61,8 @@ class ScalarMeasure:
             on_axis = np.all(radius == 0, axis=1)
             # Flux or h on a zero-area axis must not silently disappear or anchor a solve.
             if np.any(to_numpy(values[0])[on_axis] != 0):
-                raise ValueError("nonzero flux or convection on the symmetry axis is not permitted")
+                raise ValueError("a nonzero inward_heat_flux or convection heat_transfer_coefficient on the "
+                                 "symmetry axis is not permitted")
             factor = 2*np.pi*np.einsum("qa,ea->eq", shape, radius)
             result.append((kind, edges, shape, weights*factor, values))
         return result

@@ -25,6 +25,18 @@ EH_{l,m} -> LP_{l+1,m}, which is how roots are labeled here.
 
 Root finding uses pole-free residuals (multiplied through by J_l K_l) for the
 scalar problem, and pole-skipping bracket scans for the vector problem.
+
+Units and names (galerkin step, L3 commit 11d). The public functions take SI
+keyword-only registry names: ``radius`` is the core radius a in m, ``refractive_index``
+the pair ``(core, cladding)`` = (n1, n2) of real indices by increasing radius,
+``vacuum_wavelength`` in m; ``points`` (Q,2) in m leads ``vector_mode_field``. Only
+k0 a enters, so any consistent scale gives the same modes. The normalized quantities
+V, u, w and b are internal (``num_lp_modes`` and ``lp_cutoff_v`` take V and the
+orders as structural arguments; a ``Mode`` carries its u and w as the private
+``_u`` and ``_w``). The complex fields follow exp(-i omega t), as the rest of refsol:
+a forward mode varies as exp(i (beta z - omega t)). They are computed in galerkin's
+kernel frame, exp(+i omega t - i beta z), and converted once by
+``refsol._conventions.to_public`` (the conjugate).
 """
 
 from __future__ import annotations
@@ -35,22 +47,56 @@ import numpy as np
 from scipy.optimize import brentq
 from scipy.special import jv, kve, jn_zeros
 
+from ._checks import pair, refuse_text
+from ._conventions import to_public
+
+__all__ = ["Mode", "v_number", "lp_modes", "lp_cutoff_v", "num_lp_modes", "vector_modes",
+           "fundamental_neff", "vector_group_index", "vector_mode_field", "mode_l"]
+
 
 @dataclass(frozen=True)
 class Mode:
+    """One guided mode: its label, azimuthal and radial orders and effective index.
+
+    ``_u`` and ``_w`` are the normalized core and cladding parameters u and w (internal:
+    the normalized fiber quantities have no registry name, spec 4.1); ``_b`` is b.
+    """
     label: str      # e.g. "LP01", "HE11", "TE01"
     l: int          # azimuthal order
     m: int          # radial order (1-based)
-    neff: float
-    u: float
-    w: float
+    effective_index: float
+    _u: float
+    _w: float
 
     @property
-    def b(self) -> float:
-        return self.w ** 2 / (self.u ** 2 + self.w ** 2)
+    def _b(self) -> float:
+        return self._w ** 2 / (self._u ** 2 + self._w ** 2)
 
 
-def v_number(a: float, n1: float, n2: float, wavelength: float) -> float:
+def _fiber(radius, refractive_index, vacuum_wavelength):
+    """The core radius a, the indices (n1, n2) and the wavelength as checked floats."""
+    refuse_text(radius=radius, refractive_index=refractive_index, vacuum_wavelength=vacuum_wavelength)
+    if np.iscomplexobj(refractive_index):
+        raise ValueError("refractive_index: real indices only (the fiber references are lossless)")
+    n1, n2 = (float(v) for v in pair(refractive_index, "refractive_index (core, cladding)"))
+    if not (np.isfinite(n1) and np.isfinite(n2) and n1 > n2 > 0):
+        raise ValueError("refractive_index must be (core, cladding) with core > cladding > 0")
+    if np.ndim(radius) != 0 or np.ndim(vacuum_wavelength) != 0 or np.iscomplexobj(radius) \
+            or np.iscomplexobj(vacuum_wavelength):
+        raise ValueError("radius (the core radius) and vacuum_wavelength are single real numbers in m")
+    a, wavelength = float(radius), float(vacuum_wavelength)
+    for name, value in (("radius", a), ("vacuum_wavelength", wavelength)):
+        if not (np.isfinite(value) and value > 0):
+            raise ValueError(f"{name} must be a finite positive number in SI units (m)")
+    return a, n1, n2, wavelength
+
+
+def v_number(*, radius, refractive_index, vacuum_wavelength) -> float:
+    """V = k0 a sqrt(n1^2 - n2^2) of a core of radius ``radius`` (m) and indices (core, cladding)."""
+    return _v_number(*_fiber(radius, refractive_index, vacuum_wavelength))
+
+
+def _v_number(a, n1, n2, wavelength):
     k0 = 2.0 * np.pi / wavelength
     return k0 * a * np.sqrt(n1 ** 2 - n2 ** 2)
 
@@ -85,15 +131,18 @@ def _scan_roots(F, lo, hi, n_grid, skip=None):
 # Scalar LP modes
 # --------------------------------------------------------------------------
 
-def lp_modes(a: float, n1: float, n2: float, wavelength: float,
-             l_max: int = 10) -> list[Mode]:
-    """All guided LP_lm modes, sorted by descending n_eff.
+def lp_modes(*, radius, refractive_index, vacuum_wavelength, l_max: int = 10) -> list[Mode]:
+    """All guided LP_lm modes (l <= ``l_max``), sorted by descending effective index.
 
     Pole-free residual for each l:
         F(u) = u J_{l-1}(u) K_l(w) + w K_{l-1}(w) J_l(u),   w = sqrt(V^2 - u^2)
     (K's are exponentially scaled by the same factor, which does not move roots).
     """
-    V = v_number(a, n1, n2, wavelength)
+    return _lp_modes(*_fiber(radius, refractive_index, vacuum_wavelength), l_max)
+
+
+def _lp_modes(a, n1, n2, wavelength, l_max=10):
+    V = _v_number(a, n1, n2, wavelength)
     modes = []
     for l in range(0, l_max + 1):
         def F(u, l=l):
@@ -106,7 +155,7 @@ def lp_modes(a: float, n1: float, n2: float, wavelength: float,
         for m, u in enumerate(roots, start=1):
             w = float(np.sqrt(V ** 2 - u ** 2))
             modes.append(Mode(f"LP{l}{m}", l, m, _neff_from_u(u, a, n1, wavelength), u, w))
-    return sorted(modes, key=lambda md: -md.neff)
+    return sorted(modes, key=lambda md: -md.effective_index)
 
 
 def lp_cutoff_v(l: int, m: int) -> float:
@@ -149,10 +198,13 @@ def _XY(l, u, w, q):
     return X, Y, Jl
 
 
-def vector_modes(a: float, n1: float, n2: float, wavelength: float,
-                 l_max: int = 6) -> list[Mode]:
-    """All guided exact vector modes (TE, TM, HE, EH), sorted by descending n_eff."""
-    V = v_number(a, n1, n2, wavelength)
+def vector_modes(*, radius, refractive_index, vacuum_wavelength, l_max: int = 6) -> list[Mode]:
+    """All guided exact vector modes (TE, TM, HE, EH; l <= ``l_max``), sorted by descending effective index."""
+    return _vector_modes(*_fiber(radius, refractive_index, vacuum_wavelength), l_max)
+
+
+def _vector_modes(a, n1, n2, wavelength, l_max=6):
+    V = _v_number(a, n1, n2, wavelength)
     q = (n2 / n1) ** 2
     modes = []
 
@@ -208,14 +260,18 @@ def vector_modes(a: float, n1: float, n2: float, wavelength: float,
                 m = eh_count
             modes.append(Mode(label, l, m, _neff_from_u(u, a, n1, wavelength), u, w))
 
-    return sorted(modes, key=lambda md: -md.neff)
+    return sorted(modes, key=lambda md: -md.effective_index)
 
 
-def fundamental_neff(a: float, n1: float, n2: float, wavelength: float) -> float:
-    """n_eff of the exact HE11 mode (always guided)."""
-    for md in vector_modes(a, n1, n2, wavelength, l_max=1):
+def fundamental_neff(*, radius, refractive_index, vacuum_wavelength) -> float:
+    """The effective index of the exact HE11 mode (always guided)."""
+    return _fundamental_neff(*_fiber(radius, refractive_index, vacuum_wavelength))
+
+
+def _fundamental_neff(a, n1, n2, wavelength):
+    for md in _vector_modes(a, n1, n2, wavelength, l_max=1):
         if md.label == "HE11":
-            return md.neff
+            return md.effective_index
     raise RuntimeError("HE11 not found — check parameters")
 
 
@@ -269,35 +325,46 @@ def _vector_residual_and_partials(family: str, l: int, n: float, wavelength: flo
     return float(F), {name: float(value) for name, value in partials.items()}
 
 
-def vector_group_index(a: float, n1: float, n2: float, wavelength: float, label: str,
-                       dn1_dwavelength: float = 0.0, dn2_dwavelength: float = 0.0) -> tuple[float, float]:
-    """(n_eff, n_g) of the exact vector mode ``label`` by implicit differentiation.
+def vector_group_index(*, radius, refractive_index, vacuum_wavelength, label: str) -> tuple[float, float]:
+    """(effective index, group index) of the exact vector mode ``label`` by implicit differentiation.
 
     For F(n, lambda, n1, n2) = 0,
-        dn/dlambda = -(F_lambda + F_n1 n1' + F_n2 n2') / F_n,   n_g = n - lambda dn/dlambda,
-    with analytic partials from the Bessel equations (_vector_residual_and_partials).
-    No FEM output and no finite differences are used. ``n1``, ``n2`` and their
-    wavelength derivatives are material values at ``wavelength``, in the length
-    unit of ``a``.
+        dn/dlambda = -F_lambda / F_n,   n_g = n - lambda dn/dlambda,
+    with analytic partials from the Bessel equations (_vector_residual_and_partials);
+    the indices (core, cladding) are frozen at ``vacuum_wavelength`` (the waveguide
+    group index). No FEM output and no finite differences are used.
 
     Raises ValueError near cutoff, near a Bessel pole of the residual, or when
     the implicit derivative is ill conditioned.
     """
-    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
+    if not isinstance(label, str):
+        raise ValueError("label must be a vector mode label such as 'HE11'")
+    return _vector_group_index(*_fiber(radius, refractive_index, vacuum_wavelength), label)
+
+
+def _vector_group_index(a, n1, n2, wavelength, label, dn1_dwavelength=0.0, dn2_dwavelength=0.0):
+    """``vector_group_index`` in the positional form, with material dispersion (private).
+
+    ``dn1_dwavelength`` and ``dn2_dwavelength`` are the derivatives of the core and
+    cladding indices by the vacuum wavelength, in the inverse length unit of ``a``;
+    then dn/dlambda = -(F_lambda + F_n1 n1' + F_n2 n2') / F_n. Rule R(2) of the
+    galerkin step: the index derivative has no registry name and only tests pass it.
+    """
+    mode = next((md for md in _vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
                  if md.label == label), None)
     if mode is None:
-        raise ValueError(f"{label} is not guided at wavelength {wavelength}")
-    V = v_number(a, n1, n2, wavelength)
-    if mode.w < 1e-3 * V:
-        raise ValueError(f"{label} is too close to cutoff for a reliable derivative (w = {mode.w:.3g})")
-    if abs(jv(mode.l, mode.u)) < 1e-6:
+        raise ValueError(f"{label} is not guided at vacuum_wavelength {wavelength}")
+    V = _v_number(a, n1, n2, wavelength)
+    if mode._w < 1e-3 * V:
+        raise ValueError(f"{label} is too close to cutoff for a reliable derivative (w = {mode._w:.3g})")
+    if abs(jv(mode.l, mode._u)) < 1e-6:
         raise ValueError(f"{label} root is too close to a pole of the residual")
-    _, d = _vector_residual_and_partials(label[:2], mode.l, mode.neff, wavelength, a, n1, n2)
+    _, d = _vector_residual_and_partials(label[:2], mode.l, mode.effective_index, wavelength, a, n1, n2)
     total = d["wavelength"] + d["n1"] * dn1_dwavelength + d["n2"] * dn2_dwavelength
     scale = abs(d["wavelength"]) * wavelength + abs(d["n1"]) * n1 + abs(d["n2"]) * n2
-    if not np.isfinite(d["n"]) or abs(d["n"]) * mode.neff < 1e-8 * scale:
+    if not np.isfinite(d["n"]) or abs(d["n"]) * mode.effective_index < 1e-8 * scale:
         raise ValueError(f"{label}: implicit derivative is ill conditioned (dF/dn = {d['n']:.3g})")
-    return mode.neff, float(mode.neff + wavelength * total / d["n"])
+    return mode.effective_index, float(mode.effective_index + wavelength * total / d["n"])
 
 
 # --------------------------------------------------------------------------
@@ -323,8 +390,8 @@ def _continuity_matrix(mode: Mode, a: float, n1: float, n2: float, wavelength: f
     J_l(U r/a), so Ez and Hz are continuous by construction.
     """
     k0 = 2 * np.pi / wavelength
-    beta = k0 * mode.neff
-    l, U, W = mode.l, mode.u, mode.w
+    beta = k0 * mode.effective_index
+    l, U, W = mode.l, mode._u, mode._w
     J, Jp, K, Kp = _bessel_parts(l, U, W)
     u, w = U / a, W / a
     # common factors at r = a; the angular factor sin(l phi + p) / cos(l phi + p) cancels
@@ -335,28 +402,47 @@ def _continuity_matrix(mode: Mode, a: float, n1: float, n2: float, wavelength: f
     return np.array([e_core - e_clad, h_core - h_clad])
 
 
-def vector_mode_field(a: float, n1: float, n2: float, wavelength: float, label: str,
-                      x: np.ndarray, y: np.ndarray, polarization: int = 0) -> np.ndarray:
-    """Exact electric field (Ex, Ey, Ez) of a guided vector mode at points (x, y).
+def vector_mode_field(points, *, radius, refractive_index, vacuum_wavelength, label: str,
+                      polarization: int = 0) -> np.ndarray:
+    """Exact electric field (Ex, Ey, Ez) of a guided vector mode at ``points`` (..., 2) in m.
 
     ``polarization`` 0 or 1 selects the angular phase p = 0 or pi/2 of the
     degenerate +-l pair. TE/TM modes have one polarization (TE uses p = pi/2
     so that Hz = B J_0 is nonzero, TM uses p = 0). The overall amplitude and
     phase are arbitrary; the core amplitudes come from the null vector of the
     tangential continuity conditions, whose singularity at the root is checked.
-    Returns complex array (len(x), 3); E_t is in quadrature with E_z for the
-    exp(-i beta z) convention used by galerkin.
+    Returns a complex array (..., 3) in exp(-i omega t): the forward mode varies as
+    exp(i (beta z - omega t)) and E_t is in quadrature with E_z, so
+    dEx/dx + dEy/dy + i beta Ez = 0. It is ``to_public`` (the conjugate) of the field
+    computed in galerkin's kernel frame exp(+i omega t - i beta z).
+    """
+    a, n1, n2, wavelength = _fiber(radius, refractive_index, vacuum_wavelength)
+    refuse_text(points=points)
+    p = np.asarray(points, dtype=float)
+    if p.ndim < 1 or p.shape[-1] != 2:
+        raise ValueError("points must be an array (..., 2) of x, y coordinates in m")
+    if not isinstance(label, str):
+        raise ValueError("label must be a vector mode label such as 'HE11'")
+    if polarization not in (0, 1) or isinstance(polarization, bool):
+        raise ValueError("polarization must be 0 or 1")
+    return to_public(_vector_mode_field(a, n1, n2, wavelength, label, p[..., 0], p[..., 1], polarization))
+
+
+def _vector_mode_field(a, n1, n2, wavelength, label, x, y, polarization=0):
+    """``vector_mode_field`` in galerkin's kernel frame exp(+i omega t - i beta z), positional (private).
+
+    E_t is in quadrature with E_z for the exp(-i beta z) convention of galerkin's mode kernels.
     """
     from scipy.special import kv
-    mode = next((md for md in vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
+    mode = next((md for md in _vector_modes(a, n1, n2, wavelength, l_max=max(1, mode_l(label)))
                  if md.label == label), None)
     if mode is None:
-        raise ValueError(f"{label} is not guided at wavelength {wavelength}")
-    l, U, W = mode.l, mode.u, mode.w
+        raise ValueError(f"{label} is not guided at vacuum_wavelength {wavelength}")
+    l, U, W = mode.l, mode._u, mode._w
     if l == 0 and polarization:
         raise ValueError(f"{label} has a single polarization")
     k0 = 2 * np.pi / wavelength
-    beta = k0 * mode.neff
+    beta = k0 * mode.effective_index
     matrix = _continuity_matrix(mode, a, n1, n2, wavelength)
     _, singular, vh = np.linalg.svd(matrix)
     if singular[-1] > 1e-8 * singular[0]:

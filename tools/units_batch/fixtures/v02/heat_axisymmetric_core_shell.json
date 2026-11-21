@@ -1,0 +1,68 @@
+{
+  "openphysics": "0.2",
+  "name": "axisymmetric cylinder",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "rod": {
+        "dimension": "axisymmetric",
+        "domain": {
+          "xmin": 0.0,
+          "xmax": 3.0,
+          "ymin": 0.0,
+          "ymax": 1.0
+        },
+        "background": {
+          "material": "pla"
+        },
+        "features": [
+          {
+            "name": "core",
+            "type": "rect",
+            "x": 0.0,
+            "y": 0.0,
+            "w": 1.0,
+            "h": 1.0,
+            "material": "copperish"
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "pla": {
+      "conductivity_w_mk": 0.5,
+      "source": "document value"
+    },
+    "copperish": {
+      "conductivity_w_mk": 2.0,
+      "source": "document value"
+    }
+  },
+  "physics": {
+    "heat1": {
+      "type": "thermal.steady2d",
+      "heat_source_w_m3": {
+        "core": 100000.0
+      },
+      "dirichlet_temperature_k": {
+        "right": 293.15
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.05,
+    "min_angle": 28.0
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

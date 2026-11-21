@@ -41,9 +41,9 @@ def ramp_case():
 
     def source(points, s):
         return 40.0*(1.0+points[:, 0]*s)
-    return dict(mesh=mesh, conductivity=2.0, volumetric_heat_capacity=3.0,
-                time_s=[0.0, 0.05, 0.1, 0.2, 0.35], initial_temperature_k=300.0+10.0*x,
-                dirichlet={int(i): wall for i in mesh.boundary["left"]}, heat_source=source)
+    return dict(mesh=mesh, thermal_conductivity=2.0, volumetric_heat_capacity=3.0,
+                time=[0.0, 0.05, 0.1, 0.2, 0.35], initial_temperature=300.0+10.0*x,
+                prescribed_temperature={int(i): wall for i in mesh.boundary["left"]}, heat_source_density=source)
 
 
 def affine_case():
@@ -52,8 +52,8 @@ def affine_case():
     times = np.array([0.2, 0.27, 0.5, 0.9])
     exterior = np.unique(np.concatenate(list(mesh.boundary.values())))
     bc = {int(i): (lambda s, x=mesh.nodes[i, 0]: 290+5*x+3*(s-times[0])) for i in exterior}
-    return dict(mesh=mesh, conductivity=2.5, volumetric_heat_capacity=4.0, time_s=times,
-                initial_temperature_k=290+5*mesh.nodes[:, 0], dirichlet=bc, heat_source=12.0)
+    return dict(mesh=mesh, thermal_conductivity=2.5, volumetric_heat_capacity=4.0, time=times,
+                initial_temperature=290+5*mesh.nodes[:, 0], prescribed_temperature=bc, heat_source_density=12.0)
 
 
 CASES = {"ramp": ramp_case, "affine": affine_case}
@@ -90,10 +90,23 @@ def environment():
             "numpy": np.__version__, "scipy": scipy.__version__, "blas": openblas_core()}
 
 
+#: The fixture keeps the field names of its recording (before the galerkin step renamed the
+#: result fields to registry names, L2 commit 6); today's field -> the recorded key.
+RECORDED_NAME = {"time": "time_s", "temperature": "temperature_k", "heat_flux": "heat_flux_w_m2",
+                 "generated_heat_rate_per_depth": "source_load_w_per_m",
+                 "reaction_heat_rate_per_depth": "reaction_w_per_m",
+                 "residual_heat_rate_per_depth": "residual_w_per_m",
+                 "heat_storage_rate_per_depth": "storage_rate_w_per_m",
+                 "stored_heat_per_depth": "heat_content_j_per_m",
+                 "thermal_energy_functional_per_depth": "quadratic_functional_jk_per_m",
+                 "prescribed_node_ids": "dirichlet_node_ids", "prescribed_temperature": "dirichlet_temperatures_k",
+                 "node_coordinates": "nodes_m", "triangles": "triangles"}
+
+
 def arrays(case):
-    """{field: float64 array} of every array field of the case's result."""
+    """{recorded field name: float64 array} of every array field of the case's result."""
     result = solve_transient_heat(**case())
-    return {f.name: np.asarray(getattr(result, f.name)) for f in dataclasses.fields(result)
+    return {RECORDED_NAME[f.name]: np.asarray(getattr(result, f.name)) for f in dataclasses.fields(result)
             if isinstance(getattr(result, f.name), np.ndarray)}
 
 

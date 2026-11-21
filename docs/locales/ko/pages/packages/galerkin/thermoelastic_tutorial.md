@@ -57,7 +57,7 @@ python examples/galerkin/thermal_mechanical_workflow.py
 
 스크립트를 `packages/` 밖의 로컬 작업 파일로 복사하고 한 번에 한 항목씩 바꾸세요.
 
-- `thermal_expansion_per_k=0.`으로 설정합니다. 예제처럼 변위 구속이 0이고 체적력이
+- `linear_expansion_coefficient=0.`으로 설정합니다. 예제처럼 변위 구속이 0이고 체적력이
   없으면 변위·응력·탄성 에너지가 0이 되며 열 결과는 그대로입니다.
 - 다른 입력을 유지한 채 alpha를 `24e-6`으로 두 배 늘립니다. 이 선형 문제에서는 변위와
   응력이 두 배, 탄성 에너지가 네 배입니다. 일관성 검사에는 유용하지만 구성법칙의 독립 검증은 아닙니다.

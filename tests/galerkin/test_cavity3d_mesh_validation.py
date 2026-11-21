@@ -14,6 +14,7 @@ import scipy.linalg as la
 import scipy.sparse as sp
 
 import galerkin
+import galerkin.kernels
 
 SIDES = np.array((1., .8, .6))
 FACES = ((1, 2, 3), (0, 3, 2), (0, 1, 3), (0, 2, 1))
@@ -54,8 +55,8 @@ class IndependentReturnedCavityMeshValidation(unittest.TestCase):
         fundamental = np.pi**2 * sum(sorted(1 / SIDES**2)[:2])
         for cells in ((2, 2, 2), (3, 3, 3), (4, 3, 2)):
             result = galerkin.solve_cavity_box(
-                SIDES, cells, num_modes=3,
-                target_frequency_hz=299792458 * np.sqrt(1.3 * fundamental)/(2*np.pi))
+                box_size=SIDES, subdivision_count=cells, mode_count=3,
+                target_frequency=299792458 * np.sqrt(1.3 * fundamental)/(2*np.pi))
             cls.results.append((np.asarray(cells), result))
 
     def test_counts_volume_oriented_faces_connectivity_and_six_walls(self):
@@ -130,9 +131,9 @@ class IndependentReturnedCavityMeshValidation(unittest.TestCase):
         for cells, result in self.results:
             with self.subTest(cells=cells.tolist()):
                 space, mesh = result.space, result.mesh
-                free = np.setdiff1d(np.arange(space.num_edges), result.pec_edge_ids)
-                stiff = galerkin.assemble_curlcurl_3d(space)[free][:, free]
-                mass = galerkin.assemble_edge_mass_3d(space)[free][:, free]
+                free = np.setdiff1d(np.arange(space.num_edges), result.pec_edges)
+                stiff = galerkin.kernels.assemble_curlcurl_3d(space)[free][:, free]
+                mass = galerkin.kernels.assemble_edge_mass_3d(space)[free][:, free]
                 values = la.eigvalsh(stiff.toarray(), mass.toarray())
                 tolerance = 1e-9 * max(abs(values))
                 self.assertFalse(np.any(values < -tolerance))

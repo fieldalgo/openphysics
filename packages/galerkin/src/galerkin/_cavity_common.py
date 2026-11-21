@@ -114,7 +114,7 @@ def refuse_live_mesh_inputs(name, *values):
         if contains_live(value):
             raise TypeError(f"{name} runs on NumPy and carries no derivative; pass NumPy numbers. "
                             "Derivatives with respect to the geometry are available only from the "
-                            "box solver's lengths_m")
+                            "box solver's box_size")
 
 
 def normalized_mesh(mesh, name):
@@ -162,10 +162,11 @@ def search_parameters(normalized_lengths, length_scale, target_frequency_hz, num
 
     sigma is the normalized squared wave number of the target, fundamental the
     lowest TE resonance of the normalized bounding box (the kernel cutoff
-    reference) and the two scales turn normalized results into SI.
+    reference) and the two scales turn normalized results into SI. Refusals name
+    the public quantities (``mode_count``, ``target_frequency``).
     """
-    count = positive_integer(num_modes, "num_modes")
-    target = positive_real(target_frequency_hz, "target_frequency_hz")
+    count = positive_integer(num_modes, "mode_count")
+    target = positive_real(target_frequency_hz, "target_frequency")
     with np.errstate(over="ignore", under="ignore", divide="ignore", invalid="ignore"):
         target_k = (2 * np.pi / C0) * target * length_scale
         sigma = target_k * target_k

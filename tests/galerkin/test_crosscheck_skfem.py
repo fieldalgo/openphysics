@@ -18,7 +18,7 @@ from galerkin.cavity import solve_cavity_box
 from galerkin.elasticity import solve_elasticity
 from galerkin.mesh import Mesh, rectangle_mesh
 from galerkin.thermal import solve_steady_heat
-from galerkin.waveguide import solve_modes
+from galerkin.kernels import solve_modes
 
 SAME = 1e-9  # identical discretizations: relative difference gate
 
@@ -65,7 +65,7 @@ def test_heat_p1_same_mesh(skfem):
     k, q = 3.0, 50.0
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet, heat_source=q)
+        ours = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet, heat_source_density=q)
     with clock("reference"):
         basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP1(), k, lambda x: q + 0 * x[0],
                                     dirichlet)
@@ -99,8 +99,8 @@ def test_heat_p2_reference_is_reported(skfem):
 
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_steady_heat(mesh, conductivity=k, dirichlet=dirichlet,
-                                 heat_source=lambda p: source(p.T))
+        ours = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature=dirichlet,
+                                 heat_source_density=lambda p: source(p.T))
     with clock("reference"):
         basis, theirs = _skfem_heat(skfem, mesh, skfem.ElementTriP2(), k, source, dirichlet)
     vertices = basis.nodal_dofs[0]
@@ -145,8 +145,8 @@ def test_elasticity_p1_same_mesh(skfem, plane):
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane=plane,
-                                dirichlet=dirichlet, body_force=body)
+        ours = solve_elasticity(mesh, youngs_modulus=young, poisson_ratio=poisson, plane=plane,
+                                prescribed_displacement=dirichlet, body_force_density=body)
     with clock("reference"):
         basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP1(), young, poisson, plane, body)
     displacement = theirs[basis.nodal_dofs].T
@@ -170,8 +170,8 @@ def test_elasticity_p2_reference_is_reported(skfem):
     dirichlet = {(int(i), c): 0.0 for i in mesh.boundary["left"] for c in (0, 1)}
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_elasticity(mesh, young_modulus=young, poisson_ratio=poisson, plane="stress",
-                                dirichlet=dirichlet, body_force=body)
+        ours = solve_elasticity(mesh, youngs_modulus=young, poisson_ratio=poisson, plane="stress",
+                                prescribed_displacement=dirichlet, body_force_density=body)
     with clock("reference"):
         basis, theirs = _skfem_elasticity(skfem, mesh, skfem.ElementTriP2(), young, poisson, "stress", body)
     tip = int(np.argmin(np.hypot(mesh.nodes[:, 0] - 2.0, mesh.nodes[:, 1] - 0.25)))
@@ -250,7 +250,7 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
     lengths, cells = (1.0, 0.7, 0.5), (4, 3, 2)
     clock = Stopwatch()
     with clock("openphysics"):
-        ours = solve_cavity_box(lengths, cells, num_modes=8, target_frequency_hz=1e8)
+        ours = solve_cavity_box(box_size=lengths, subdivision_count=cells, mode_count=8, target_frequency=1e8)
     mesh = skfem.MeshTet(ours.mesh.nodes.T.copy(), ours.mesh.tets.T.copy())
     basis = skfem.Basis(mesh, skfem.ElementTetN0())
 
@@ -277,7 +277,7 @@ def test_pec_cavity_eigenvalues_same_mesh(skfem):
         not_matched=["eigensolver (galerkin dense or shift-invert with gradient projection, "
                      "reference dense with a kernel cut-off)"],
         observables=[observable("eigenvalue k^2, lowest eight", "m^-2", "max relative difference",
-                                relative_difference(np.sort(ours.eigenvalues_m2), reference), SAME)]))
+                                relative_difference(np.sort(ours.wavenumber_squared), reference), SAME)]))
 
 
 def test_scalar_absorbing_waveguide_same_mesh(skfem):

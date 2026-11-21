@@ -17,16 +17,16 @@ def main():
     exact=np.column_stack([strain[0]*mesh.nodes[:,0]+strain[2]*mesh.nodes[:,1],
                            strain[1]*mesh.nodes[:,1]])+[2e-5,-1e-5]
     bc={(int(i),j):exact[i,j] for i in mesh.boundary['left'] for j in (0,1)}
-    result=solve_thermoelasticity(mesh,freeze_temperature(mesh,np.full(mesh.num_nodes,313.15)),
-        reference_temperature_k=293.15,thermal_expansion_per_k=alpha,young_modulus=e,
-        poisson_ratio=nu,plane='strain',dirichlet=bc,
+    result=solve_thermoelasticity(mesh,freeze_temperature(mesh,temperature=np.full(mesh.num_nodes,313.15)),
+        stress_free_temperature=293.15,linear_expansion_coefficient=alpha,youngs_modulus=e,
+        poisson_ratio=nu,plane='strain',prescribed_displacement=bc,
         traction={tag:lambda points,n:n@s.T for tag in ('right','top','bottom')})
     print(json.dumps({'max_displacement_error_m':float(np.abs(result.displacement-exact).max()),
-        'external_resultant_n_per_m':result.load_external.sum(0).tolist(),
-        'reaction_resultant_n_per_m':result.reaction.sum(0).tolist(),
-        'support_work_j_per_m':float(np.sum(result.displacement*result.reaction)),
-        'physical_elastic_energy_j_per_m':result.physical_elastic_energy,
-        'sigma_zz_range_pa':[float(result.sigma_zz.min()),float(result.sigma_zz.max())]},indent=2))
+        'external_resultant_n_per_m':result.applied_force_per_depth.sum(0).tolist(),
+        'reaction_resultant_n_per_m':result.reaction_force_per_depth.sum(0).tolist(),
+        'support_work_j_per_m':float(np.sum(result.displacement*result.reaction_force_per_depth)),
+        'physical_elastic_energy_j_per_m':result.strain_energy_per_depth,
+        'sigma_zz_range_pa':[float(result.stress_zz.min()),float(result.stress_zz.max())]},indent=2))
 
 
 if __name__=='__main__':main()

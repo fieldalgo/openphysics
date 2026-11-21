@@ -4,25 +4,35 @@
 
 [Documentation home](../../README.md)
 
-**Status: kernel building blocks, no mesher yet.** meshloom will be OpenPhysics's
-general tetrahedral mesher for multi-material piecewise-linear inputs: constrained
-Delaunay tetrahedralization with exact predicates, boundary recovery, quality
-refinement and mesh improvement, in a compiled Rust kernel. The kernel now has its
-first two stages, exact geometric predicates and the Delaunay tetrahedralization
-of a point set (below). They are internal building blocks for the mesher, not
-public API yet. `generate3d` raises `NotImplementedError`.
+**Status: first mesher, not yet accepted.** meshloom is OpenPhysics's general
+tetrahedral mesher for multi-material piecewise-linear inputs: constrained Delaunay
+tetrahedralization with exact predicates, boundary recovery, quality refinement and
+(later) mesh improvement, in a compiled Rust kernel. `meshloom.generate3d` meshes a
+piecewise-linear complex to a size `h` (one number, or one per named region) with a
+radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
+`quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades). It is not yet
+graded by the acceptance gates of M6 (quality against the baseline, speed), it has no
+sliver removal, graded sizes or curved surfaces, and it is slow (see Limits).
 
 ```python
+import numpy as np
 import meshloom
-meshloom.kernel_available()   # True when the compiled kernel loaded
-meshloom.kernel_version()     # the kernel's version, equal to meshloom.__version__
+
+points = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                   [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=float)
+facets = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]],
+          [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+mesh = meshloom.generate3d(points, facets, h=0.1)
+mesh["nodes"], mesh["tetrahedra"], mesh["boundary_faces"]   # the output contract
 ```
 
-Use [`meshine.extrude`](../meshine/overview.md#layered-tetrahedral-meshes) for layered
-geometry and Gmsh through [`gmshio`](../gmshio/overview.md) for other shapes until
-meshloom generates meshes. The criteria it will be accepted by are fixed in
-advance in the [pre-registered 3D validation plan](../meshine/validation3d.md); its
-output will have the fields `galerkin.from_mesher` reads, like `meshine.TetMesh`.
+Errors are typed `ValueError` subclasses exported by the package (`InvalidPLC` with a
+witness, `NotClosed`, `RecoveryError`, `RefineError`, `RoundingError`, `RegionError`,
+`MeshError`). `meshloom.kernel_available()` and `meshloom.kernel_version()` report the
+compiled kernel. The criteria meshloom is accepted by are fixed in advance in the
+[pre-registered 3D validation plan](../meshine/validation3d.md). Until it passes them,
+[`meshine.extrude`](../meshine/overview.md#layered-tetrahedral-meshes) (layered
+geometry) and Gmsh through [`gmshio`](../gmshio/overview.md) stay the tested routes.
 
 ## Kernel building blocks
 
@@ -110,20 +120,30 @@ names may change before the mesher's public API.
   `domain="regions"` every other component is a region (a multi-region PLC);
   with `domain="parity"` the components an odd number of facets away from the
   outside form one region (the even-odd domain of closed surfaces; a face shared by
-  two touching shells counts twice). Errors are typed, all `ValueError`: `InvalidPLC`
+  two touching shells counts twice). In regions mode, `region_points` names the regions:
+  `(point, name)` pairs, where the bounded component that holds a point is region `name`
+  (components may share a name) and `name=None` marks a hole that is not meshed. Every
+  bounded component then needs a point, each point must lie strictly inside one (decided
+  exactly, against the unrounded points), and regions are numbered in the order the
+  names first appear. Errors are typed, all `ValueError`: `InvalidPLC`
   from the input check with its witness, `NotClosed` in parity mode with witness type 6
   (an elementary segment on the boundary of an odd number of facets, such as an edge
-  with three facets), `RecoveryError`, `RoundingError`, and `MeshError` for anything
-  else. Points on
+  with three facets), `RecoveryError`, `RoundingError`, `RegionError` (a region point
+  outside every region or on a facet, two names in one region, or a region without a
+  point), and `MeshError` for anything else. Points on
   segments are rounded once to the nearest double, input points are kept bit for bit,
   unused points are dropped, and every tetrahedron is certified with exact
   `orient3d > 0` on the output doubles. Tetrahedra that rounding makes flat or
   inverted are repaired by 2-3 flips and edge removals (rings of three to seven
-  tetrahedra), which never remove a facet face or a segment edge and are applied only
-  when every new tetrahedron is positive and every face stays in at most two. It returns `nodes`, `tetrahedra`, `regions`,
+  tetrahedra, with one consistent fan), by edge removals inside one facet that
+  re-triangulate the facet there, and otherwise by refilling a small cavity around the
+  tetrahedron as a cone from one of its vertices or from one new point inside the domain
+  (`node_source` −1). None removes a segment edge or uncovers a facet. The result is
+  certified: every tetrahedron positive, every face in at most two tetrahedra with
+  opposite windings, and the faces used once exactly the domain's boundary. It returns `nodes`, `tetrahedra`, `regions`,
   `region_names`, `boundary_faces` and `boundary_nodes` by facet index (wound
   outward), and `interfaces` by region pair (wound from the lower region to the
-  higher). There is no refinement: the mesh has the input points and the points
+  higher). Without refinement (below) the mesh has the input points and the points
   boundary recovery needed. The plan's C10 adversarial inputs are meshed this way
   and checked against V1–V4 on every platform's installed wheel (the Schönhardt
   prism and the Chazelle polyhedron, which need Steiner points, a cospherical prism
@@ -132,6 +152,28 @@ names may change before the mesher's public API.
   200 seeded assemblies of dyadic boxes and n-gon prisms, some with 1-ulp jitter, in a
   child process with a 60 s progress limit: each must give a valid mesh or a typed
   error.
+- **Refinement.** `mesh_plc(..., h=None, ratio=None, alpha=1.0, max_points=0)` refines
+  the recovered mesh before rounding when `h` or `ratio` is given (constrained Delaunay
+  refinement): an encroached subsegment splits at its midpoint, an encroached subfacet
+  at its circumcentre, and a tetrahedron whose circumradius exceeds `alpha·h` or whose
+  radius-edge ratio (circumradius over shortest edge) exceeds `ratio` at its
+  circumcentre, unless that point encroaches a subsegment or subfacet, which splits
+  instead. Points are exact (on a segment, on a facet, or in the volume) and rounded
+  once with the rest. Each insertion removes the tetrahedra whose circumspheres hold the
+  point and that it sees: a cavity never holds both sides of a subfacet it does not
+  replace, and it holds both sides of every subfacet it does. Near input angles below
+  60° the rules of Shewchuk (1998, 2002) and Ruppert (1995) stop the cascades: concentric
+  shells on segments meeting at such an angle, no split of a subfacet for a vertex of a
+  facet meeting it there, and no ratio split of a tetrahedron that is skinny because of
+  the angle. Those tetrahedra and the subsegments and subfacets left encroached are
+  counted in `stats` (`exempt_subsegments`, `exempt_subfacets`). A cap on inserted
+  points (`max_points`, or by default 20·V/h³ + 200·A/h² + 100·n₀, plus 200·A/ℓ² with a
+  ratio where ℓ is the shortest input edge, between 1,000 and 5,000,000) ends refinement
+  with `RefineError` instead of a hang. All 14 C10 inputs refine to the end at h = ¼ of
+  their size with ratio 2 and pass V1–V4. V7 (guaranteed mode, ratio 2, max ratio ≤
+  2(1 + 10⁻⁹)) passes on C2 at h = 0.12, 0.06 and 0.03 (max 0.923, 1.198, 1.356) and on
+  C3 at h = 0.8, 0.4 and 0.2 (max 1.553, 1.565, 1.593). C9 is not run: the plan does not
+  give its dimensions yet.
 
 ```python
 import numpy as np
@@ -184,12 +226,25 @@ See [third-party software](../../third-party.md).
 
 ## Limits
 
-- No refinement or quality improvement yet: `mesh_plc` returns the boundary-conforming
-  mesh of the input and recovery points only. A tetrahedron that rounding to doubles
-  makes flat or inverted and that no flip repairs raises `ValueError`; flips cannot
-  repair an inversion against a facet face itself (in a synthetic test with points
-  snapped to a coarse grid, every interior inversion was repaired and inversions at
-  the fixed boundary were refused). No meshing test has needed a repair yet. A cavity without a constrained Delaunay filling
+- Not yet accepted: V21 fails at the plan's CI sizes (it passes at {0.2, 0.1, 0.05}, the
+  sizes the extruder's amendment uses); V8 fails on C2 at h = 0.12 and on C3 with the
+  die at h/2 (meshloom is coarser than the baseline at coarse sizes and in thin layers);
+  the unstructured-cavity refinement ladder (V32) does not decrease monotonically.
+  These gates are open. A boundary size field (subsegments and subfacets split to the
+  local size) brings V8's medians into their windows but creates slivers (dihedral
+  angles near 0°) that break V23, so it waits for sliver removal (M6); the gates are
+  graded again after it.
+- No graded or callable sizes (one size per region only), and no quality improvement
+  (sliver removal) yet. Refinement is slow: about 19,000 nodes in 25 s on stacked
+  layers. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
+  input and recovery points (and the few points repair adds) only. A
+  tetrahedron that rounding to doubles makes flat or inverted and that repair cannot fix
+  raises `RoundingError`. Near-coplanar facets meeting at a segment are the hard case: in
+  a seeded test of rotated prisms with points within 1e-13 of a facet, 42 of 60 inputs
+  mesh and 18 raise `RoundingError` (before this repair: 18 and 42); every mesh returned
+  passes V1–V4. Until 2026-11-11 the repair never ran inside `mesh_plc` (it was given a
+  label per tetrahedron, which forbade every flip) and its edge removal could orient a
+  fan inconsistently; both are fixed. A cavity without a constrained Delaunay filling
   (none so far in the tests) is an error, not yet repaired with extra points. The
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).

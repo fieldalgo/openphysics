@@ -9,11 +9,20 @@ import pytest
 from refsol import fiber
 
 A, N1, N2, WL = 4.0, 1.45, 1.44, 1.55
+#: the fiber's keyword arguments; the lengths are read in m (only k0 a enters, so the fields are those of
+#: the former call in any unit)
+FIBER = dict(radius=A, refractive_index=(N1, N2), vacuum_wavelength=WL)
 LABELS = ["HE11", "TE01", "TM01", "HE21"]
 
 
 def _mode(label):
-    return next(md for md in fiber.vector_modes(A, N1, N2, WL, l_max=3) if md.label == label)
+    return next(md for md in fiber.vector_modes(**FIBER, l_max=3) if md.label == label)
+
+
+def _field(label, x, y, polarization=0):
+    """The public field (exp(-i omega t)) at the points (x, y)."""
+    return fiber.vector_mode_field(np.stack([np.asarray(x, dtype=float), np.asarray(y, dtype=float)], axis=-1),
+                                   **FIBER, label=label, polarization=polarization)
 
 
 @pytest.mark.parametrize("label", LABELS)
@@ -21,9 +30,9 @@ def test_continuity_conditions_are_singular_exactly_at_the_root(label):
     mode = _mode(label)
     s = np.linalg.svd(fiber._continuity_matrix(mode, A, N1, N2, WL), compute_uv=False)
     assert s[-1] < 1e-9 * s[0]
-    shifted = fiber.Mode(mode.label, mode.l, mode.m, mode.neff + 1e-4,
+    shifted = fiber.Mode(mode.label, mode.l, mode.m, mode.effective_index + 1e-4,
                          *(lambda n: (2 * np.pi * A / WL * np.sqrt(N1 ** 2 - n ** 2),
-                                      2 * np.pi * A / WL * np.sqrt(n ** 2 - N2 ** 2)))(mode.neff + 1e-4))
+                                      2 * np.pi * A / WL * np.sqrt(n ** 2 - N2 ** 2)))(mode.effective_index + 1e-4))
     s_off = np.linalg.svd(fiber._continuity_matrix(shifted, A, N1, N2, WL), compute_uv=False)
     assert s_off[-1] > 1e3 * s[-1]
 
@@ -39,8 +48,8 @@ def test_interface_conditions_hold_across_the_core_boundary(label):
     phi = np.linspace(0.1, 2 * np.pi, 13)
     inner, outer = A * (1 - 1e-9), A * (1 + 1e-9)
     for p in range(1 if fiber.mode_l(label) == 0 else 2):
-        fi = fiber.vector_mode_field(A, N1, N2, WL, label, inner * np.cos(phi), inner * np.sin(phi), p)
-        fo = fiber.vector_mode_field(A, N1, N2, WL, label, outer * np.cos(phi), outer * np.sin(phi), p)
+        fi = _field(label, inner * np.cos(phi), inner * np.sin(phi), p)
+        fo = _field(label, outer * np.cos(phi), outer * np.sin(phi), p)
         (ri, ti, zi), (ro, to, zo) = _polar(fi, phi), _polar(fo, phi)
         scale = np.abs(fi).max()
         np.testing.assert_allclose(ti, to, atol=1e-7 * scale)
@@ -52,8 +61,8 @@ def test_interface_conditions_hold_across_the_core_boundary(label):
 
 def test_te_has_no_ez_and_tm_has_no_ephi():
     x, y = np.array([1.0, 2.5, 5.0]), np.array([0.5, -1.0, 3.0])
-    te = fiber.vector_mode_field(A, N1, N2, WL, "TE01", x, y)
-    tm = fiber.vector_mode_field(A, N1, N2, WL, "TM01", x, y)
+    te = _field("TE01", x, y)
+    tm = _field("TM01", x, y)
     phi = np.arctan2(y, x)
     assert np.abs(te).max() > 0 and np.abs(tm).max() > 0
     assert np.abs(te[:, 2]).max() < 1e-12 * np.abs(te).max()
@@ -66,11 +75,11 @@ def test_the_two_polarizations_are_independent_and_rotated(label):
     l = fiber.mode_l(label)
     rng = np.random.default_rng(1)
     r, phi = rng.uniform(0.5, 9, 20), rng.uniform(0, 2 * np.pi, 20)
-    f0 = fiber.vector_mode_field(A, N1, N2, WL, label, r * np.cos(phi), r * np.sin(phi), 0)
-    f1 = fiber.vector_mode_field(A, N1, N2, WL, label, r * np.cos(phi), r * np.sin(phi), 1)
+    f0 = _field(label, r * np.cos(phi), r * np.sin(phi), 0)
+    f1 = _field(label, r * np.cos(phi), r * np.sin(phi), 1)
     assert np.linalg.matrix_rank(np.stack([f0.ravel(), f1.ravel()]), tol=1e-6 * np.abs(f0).max()) == 2
     shift = np.pi / (2 * l)
-    rotated = fiber.vector_mode_field(A, N1, N2, WL, label, r * np.cos(phi + shift), r * np.sin(phi + shift), 0)
+    rotated = _field(label, r * np.cos(phi + shift), r * np.sin(phi + shift), 0)
     # field of p = pi/2 at angle phi equals the p = 0 field at phi + pi/(2l), with E_t rotated back
     rr0, rt0, rz0 = _polar(rotated, phi + shift)
     rr1, rt1, rz1 = _polar(f1, phi)
@@ -79,9 +88,9 @@ def test_the_two_polarizations_are_independent_and_rotated(label):
 
 def test_single_polarization_and_unguided_requests_are_refused():
     with pytest.raises(ValueError, match="single polarization"):
-        fiber.vector_mode_field(A, N1, N2, WL, "TE01", [1.0], [0.0], 1)
+        fiber.vector_mode_field([[1.0, 0.0]], **FIBER, label="TE01", polarization=1)
     with pytest.raises(ValueError, match="not guided"):
-        fiber.vector_mode_field(A, N1, N2, WL, "EH11", [1.0], [0.0])
+        fiber.vector_mode_field([[1.0, 0.0]], **FIBER, label="EH11")
 
 
 @pytest.mark.parametrize("label", ["HE", "HE1", "XY11", "HE1a"])

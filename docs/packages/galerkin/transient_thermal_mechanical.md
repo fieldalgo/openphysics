@@ -17,8 +17,11 @@ step then calls the per-region mechanical stage.
 `mesh` must have exactly the heat result's ordered coordinates in metres and
 triangle connectivity, including node and element order. A distinct but identical
 mesh object is allowed. No remeshing, mapping, unit conversion or unit inference
-is performed. `units` is required and must be exactly
-`{'length': 'm', 'time': 's', 'temperature': 'K'}`.
+is performed. The signature is `solve_transient_thermoelasticity(mesh, heat, *,
+time_indices=None, youngs_modulus, poisson_ratio, plane,
+linear_expansion_coefficient, stress_free_temperature, prescribed_displacement,
+body_force_density=None)`: SI numbers under registry names, with no `units=`
+argument; a `str` value raises `TypeError`.
 
 `heat` must be a `TransientHeatResult`. The consumed time, geometry and temperature
 fields are checked: at least two finite nonnegative strictly increasing seconds,
@@ -31,22 +34,22 @@ prove that the heat calculation completed or that its data are authentic.
 index 0. Otherwise supply a nonempty 1D list, tuple or array of strictly increasing
 integer indices. Booleans, floats, repeats, reversed order and out-of-range values
 are rejected. There is no nearest-time lookup. Nonuniform time grids and nonzero
-initial time are supported; `time_s[0]` is preserved without resetting the clock.
+initial time are supported; the heat result's `time[0]` is preserved without resetting the clock.
 The initial temperature is not advanced before its mechanical solve.
 
 Every selected temperature must be nonnegative absolute Kelvin. A selected
 negative value is rejected, never clipped. Unselected finite negative values are
-allowed, consistent with the mathematical heat API. `reference_temperature_k`
-is one finite nonnegative Kelvin scalar, fixed over the run. `thermal_expansion_per_k`
+allowed, consistent with the mathematical heat API. `stress_free_temperature`
+is one finite nonnegative Kelvin scalar, fixed over the run. `linear_expansion_coefficient`
 is a finite signed value in 1/K; zero and negative expansion are supported.
-`young_modulus` is finite positive Pa and `-1 < poisson_ratio < 0.5`. Each of the
+`youngs_modulus` is finite positive Pa and `-1 < poisson_ratio < 0.5`. Each of the
 three is a scalar or a `{region name: value}` mapping.
 `plane` is explicitly `'stress'` or `'strain'`.
 
-`mechanical_dirichlet` maps exterior `(node, component)` indices to fixed scalar
+`prescribed_displacement` maps exterior `(node, component)` indices to fixed scalar
 displacements in metres; component 0 is x and 1 is y. Every disconnected component
 must have enough independent constraints to remove its three rigid modes.
-`body_force` is a constant finite Cartesian pair in N/m³, default `(0.,0.)`.
+`body_force_density` is a constant finite Cartesian pair in N/m³; the default `None` is no body force.
 All other mechanical boundaries have zero **total physical traction**. Do not
 subtract a thermal traction. Time-dependent supports, body callbacks and applied
 traction are outside this minimal adapter; use the separate prescribed-temperature
@@ -56,17 +59,17 @@ force avoid introducing a second time-sampling protocol.
 ## Outputs, ownership and failures
 
 The frozen aggregate has `reference_mesh` and a tuple `steps`. `time_indices` and
-`time_s` return tuples in selection order. Each step stores the original
-`time_index`, exact stored `time_s`, immutable `temperature_snapshot` and
-`mechanics` (`ThermoelasticResult`). Displacement is m, in-plane stress and
-`sigma_zz` Pa; engineering strain order is `(exx,eyy,gamma_xy)`. Stress and thermal
+`time` return tuples in selection order. Each frozen step stores the original
+`time_index`, exact stored `time` (s; `step.units` is `{"time": "s"}`), immutable
+`temperature_snapshot` and `mechanics` (`ThermoelasticResult`, with its own
+`.units`). Displacement is m, in-plane stress and `stress_zz` Pa; engineering strain order is `(exx,eyy,gamma_xy)`. Stress and thermal
 strain arrays are sampled at triangle centroids. The physical stress generally
-varies within each P1 triangle. Loads/reactions/residuals are N/m of out-of-plane
-depth, and physical elastic energy is J/m.
+varies within each P1 triangle. Loads/reactions/residuals (`*_force_per_depth`) are N/m of out-of-plane
+depth, and physical elastic energy (`strain_energy_per_depth`) is J/m.
 
 For uniform unconstrained in-plane heating, plane stress gives `u=alpha*DeltaT*x`
 and zero stress. Plane strain gives `u=(1+nu)*alpha*DeltaT*x`, zero in-plane stress
-and `sigma_zz=-E*alpha*DeltaT`. Plane strain does not imply free expansion in z.
+and `stress_zz=-E*alpha*DeltaT`. Plane strain does not imply free expansion in z.
 Near-incompressible P1 locking remains possible; this adapter adds no remedy.
 
 The mesh, supports, parameters and consumed temperature history are copied.
@@ -77,7 +80,7 @@ The owned result mesh and mechanical arrays remain mutable and are not certified
 after return. Mutating them does not alter the immutable snapshots.
 
 `TransientThermoelasticError` provides `stage` (`input`, `transfer`, `mechanics`),
-`time_index` and `time_s`. Global input failures have no index/time. Selected
+`time_index` and `time` (s). Global input failures have no index/time. Selected
 transfer and mechanics failures carry the original stored index/time and chain
 the cause in `__cause__`. No successful partial aggregate is returned. A later
 mechanics failure can follow earlier completed solves; exception tracebacks may

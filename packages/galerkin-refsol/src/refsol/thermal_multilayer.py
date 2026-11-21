@@ -6,10 +6,14 @@ Two closed forms with piecewise-constant conductivity k_i and uniform source
 Q_i in each layer, temperature and normal heat flux continuous at every
 interface (perfect contact, no contact resistance):
 
-layered_slab        series wall 0 < x_1 < ... < x_n = L, T(0)=T_L, T(L)=T_R.
+layered_slab        series wall x_0 < x_1 < ... < x_n, T(x_0)=T_L, T(x_n)=T_R.
                     q(x) = q_0 + S(x), S' = Q; T' = -q/k.
 composite_cylinder  concentric shells r_0 < r_1 < ... < r_n, T(r_0)=T_i,
                     T(r_n)=T_o.  r q_r = C + W(r), W' = Q r; T' = -q_r/k.
+
+Each takes the layer boundaries as one ``position`` sequence (x_0 ... x_n, or the
+radii r_0 ... r_n, r_0 > 0), the per-layer ``thermal_conductivity`` and optional
+``heat_source_density``, and the end temperatures as the pair ``prescribed_temperature``.
 
 The unknown constant (q_0 or C) follows from the far boundary temperature;
 with Q = 0 this is the familiar series thermal-resistance formula
@@ -20,18 +24,23 @@ triangle holding each point; the layer's closed form is then evaluated as its
 analytic continuation, so the comparison keeps the O(h^2) polygon error
 instead of hiding it.
 
-All quantities are SI: m, K, W/(m K), W/m^3 and W/m^2.
+All quantities are SI: m, K, W/(m K), W/m^3 and W/m^2, keyword-only registry names
+after the leading positional ``points``; a str for a quantity raises TypeError.
 """
 from dataclasses import dataclass
 
 import numpy as np
+
+from ._checks import pair, refuse_text
+
+__all__ = ["LayeredHeatFields", "layered_slab", "composite_cylinder"]
 
 
 @dataclass
 class LayeredHeatFields:
     temperature: np.ndarray
     heat_flux: np.ndarray
-    heat_source: np.ndarray
+    heat_source_density: np.ndarray
     layer: np.ndarray
 
 
@@ -49,20 +58,20 @@ def _scalar(value, name):
     return float(a)
 
 
-def _layers(start, interfaces, conductivities, sources):
-    edges = np.asarray(interfaces)
+def _layers(position, conductivities, sources):
+    edges = np.asarray(position)
     k = np.asarray(conductivities)
-    if (edges.ndim != 1 or not len(edges) or edges.dtype.kind not in "iuf"
+    if (edges.ndim != 1 or len(edges) < 2 or edges.dtype.kind not in "iuf"
             or not np.all(np.isfinite(edges))):
-        raise ValueError("interfaces must be a nonempty finite 1D sequence")
-    edges = np.concatenate([[start], edges.astype(float)])
+        raise ValueError("position must be a finite 1D sequence of at least two layer boundaries")
+    edges = edges.astype(float)
     if np.any(np.diff(edges) <= 0):
-        raise ValueError("interfaces must increase strictly from the first face")
+        raise ValueError("position must increase strictly from the first face")
     if k.shape != (len(edges)-1,) or k.dtype.kind not in "iuf" or not np.all(np.isfinite(k)) or np.any(k <= 0):
-        raise ValueError("conductivities must be one finite value > 0 per layer")
+        raise ValueError("thermal_conductivity must be one finite value > 0 per layer")
     q = np.zeros(len(k)) if sources is None else np.asarray(sources)
     if q.shape != k.shape or q.dtype.kind not in "iuf" or not np.all(np.isfinite(q)):
-        raise ValueError("sources must be one finite value per layer")
+        raise ValueError("heat_source_density must be one finite value per layer")
     return edges, k.astype(float), q.astype(float)
 
 
@@ -78,13 +87,21 @@ def _locate(s, edges, label, layer=None):
     return np.clip(np.searchsorted(edges, s, side="right")-1, 0, len(edges)-2)
 
 
-def layered_slab(points, *, interfaces, conductivities, left_temperature,
-                 right_temperature, sources=None, layer=None):
-    """Exact 1D series-wall temperature and heat flux q=(q_x,0) at points."""
+def layered_slab(points, *, position, thermal_conductivity, prescribed_temperature,
+                 heat_source_density=None, layer=None):
+    """Exact 1D series-wall temperature and heat flux q=(q_x,0) at points.
+
+    position: x_0 < x_1 < ... < x_n, the faces of the wall and its interfaces;
+    prescribed_temperature: the pair (T_L, T_R) at x_0 and x_n; heat_source_density:
+    one value per layer, or None for none.
+    """
+    refuse_text(position=position, thermal_conductivity=thermal_conductivity,
+                prescribed_temperature=prescribed_temperature, heat_source_density=heat_source_density)
     p = _points(points)
-    edges, k, Q = _layers(0., interfaces, conductivities, sources)
-    left = _scalar(left_temperature, "left_temperature")
-    right = _scalar(right_temperature, "right_temperature")
+    edges, k, Q = _layers(position, thermal_conductivity, heat_source_density)
+    left, right = pair(prescribed_temperature, "prescribed_temperature")
+    left = _scalar(left, "prescribed_temperature[0]")
+    right = _scalar(right, "prescribed_temperature[1]")
     width = np.diff(edges)
     S = np.concatenate([[0.], np.cumsum(Q*width)])[:-1]       # integral of Q to layer start
     drop = (S*width+Q*width**2/2)/k                            # T drop from the source part
@@ -98,16 +115,23 @@ def layered_slab(points, *, interfaces, conductivities, left_temperature,
                              Q[i], i)
 
 
-def composite_cylinder(points, *, inner_radius, interfaces, conductivities,
-                       inner_temperature, outer_temperature, sources=None, layer=None):
-    """Exact radial conduction in concentric shells; heat_flux is the (Q,2) vector."""
+def composite_cylinder(points, *, position, thermal_conductivity, prescribed_temperature,
+                       heat_source_density=None, layer=None):
+    """Exact radial conduction in concentric shells; heat_flux is the (Q,2) vector.
+
+    position: the radii r_0 < r_1 < ... < r_n of the shell boundaries (r_0 > 0);
+    prescribed_temperature: the pair (T_i, T_o) at r_0 and r_n; heat_source_density:
+    one value per layer, or None for none.
+    """
+    refuse_text(position=position, thermal_conductivity=thermal_conductivity,
+                prescribed_temperature=prescribed_temperature, heat_source_density=heat_source_density)
     p = _points(points)
-    r0 = _scalar(inner_radius, "inner_radius")
-    if r0 <= 0:
-        raise ValueError("inner_radius must be > 0")
-    edges, k, Q = _layers(r0, interfaces, conductivities, sources)
-    t_in = _scalar(inner_temperature, "inner_temperature")
-    t_out = _scalar(outer_temperature, "outer_temperature")
+    edges, k, Q = _layers(position, thermal_conductivity, heat_source_density)
+    if edges[0] <= 0:
+        raise ValueError("position must start at an inner radius > 0")
+    t_in, t_out = pair(prescribed_temperature, "prescribed_temperature")
+    t_in = _scalar(t_in, "prescribed_temperature[0]")
+    t_out = _scalar(t_out, "prescribed_temperature[1]")
     a, b = edges[:-1], edges[1:]
     W = np.concatenate([[0.], np.cumsum(Q*(b**2-a**2)/2)])[:-1]   # integral of Q r to a_i
     offset = W-Q*a**2/2                     # r q_r = C + offset_i + Q_i r^2/2 in layer i

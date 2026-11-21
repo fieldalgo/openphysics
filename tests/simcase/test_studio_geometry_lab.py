@@ -45,7 +45,9 @@ def engine_view(doc, component=None):
     """What the page must show, computed here from the engine directly."""
     model = parse(doc)
     rc = evaluate(model, component)
-    scale = float(model.pm_per_unit)
+    # format 0.3: each component's own length_unit
+    unit_pm = model.components[component or next(iter(model.components))].pm_per_unit
+    scale = float(unit_pm)
     return {
         "regions": rc.region_names(),
         "selections": [[name, kind, sorted(chosen)] for name, (kind, chosen) in rc.selections.items()],
@@ -96,40 +98,47 @@ def test_gl1_starters_are_the_shipped_examples():
 # ---- GL-2: parameter edits re-evaluate exactly ------------------------------------------
 
 @pytest.mark.parametrize("name", sorted(EXAMPLES))
-@pytest.mark.parametrize("w", [0.3, 0.61, 0.9])
+@pytest.mark.parametrize("w", ["0.3", "0.61", "0.9"])
 def test_gl2_parameter_edits_equal_a_fresh_engine_run(client, name, w):
+    from fractions import Fraction
     doc = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
-    lo, hi = doc["geometry"]["parameters"]["w"]["range"]
-    assert lo <= w <= hi
-    doc["geometry"]["parameters"]["w"]["value"] = w
+    lo, hi = doc["geometry"]["parameters"]["w"]["range"]               # format 0.3: "0.3 um", "0.9 um"
+    assert Fraction(lo.removesuffix(" um")) <= Fraction(w) <= Fraction(hi.removesuffix(" um"))
+    doc["geometry"]["parameters"]["w"]["value"] = f"{w} um"
     view = lab(client, doc)
     assert view["ok"] is True
     assert page_view(view) == engine_view(copy.deepcopy(doc))      # floats compared with ==
-    assert next(p for p in view["parameters"] if p["name"] == "w")["value"] == w
+    shown = next(p for p in view["parameters"] if p["name"] == "w")
+    assert shown["unit"] == "m" and shown["value"] == float(Fraction(w) / 10 ** 6)     # SI, from the exact value
 
 
 def test_gl2_an_expression_is_evaluated_by_the_engine(client):
     doc = json.loads(EXAMPLES["geometry_v1_soi_strip"].read_text(encoding="utf-8"))
-    doc["geometry"]["parameters"]["w"]["value"] = "2 * t + 0.1"
+    doc["geometry"]["parameters"]["gap"] = {"value": "0.1 um"}     # a bare 0.1 has no unit outside a component
+    doc["geometry"]["parameters"]["w"]["value"] = "2 * t + gap"
     view = lab(client, doc)
     assert next(p for p in view["parameters"] if p["name"] == "w") == {
-        "name": "w", "kind": "length", "value": 0.54, "written": "2 * t + 0.1", "range": [0.3, 0.9]}
+        "name": "w", "kind": "length", "value": 5.4e-07, "written": "2 * t + gap", "range": ["0.3 um", "0.9 um"],
+        "unit": "m"}
     assert page_view(view) == engine_view(doc)
 
 
 # ---- GL-3: refusals by name -------------------------------------------------------------
 
 def _doc(features, params=None, selections=None, dimension="2d"):
-    comp = {"dimension": dimension, "domain": {"xmin": -3, "xmax": 3, "ymin": -3, "ymax": 3},
+    comp = {"dimension": dimension, "length_unit": "um",
+            "domain": {"xmin": -3, "xmax": 3, "ymin": -3, "ymax": 3},
             "background": {"material": "a"}, "features": features}
     if dimension == "3d":
         comp["domain"].update(zmin=0, zmax=1)
+    else:
+        comp["depth"] = None
     if selections:
         comp["selections"] = selections
     geometry = {"version": 1, "components": {"xs": comp}}
     if params:
         geometry["parameters"] = params
-    return {"units": {"length": "um"}, "geometry": geometry}
+    return {"openphysics": "0.3", "geometry": geometry}
 
 
 REFUSED = {
@@ -183,7 +192,7 @@ def test_gl3_a_component_is_named_or_the_first_2d_one_is_shown(client):
 
 def test_gl4_saved_json_round_trips_through_the_reader(client):
     doc = json.loads(EXAMPLES["geometry_v1_imprint_rib"].read_text(encoding="utf-8"))
-    doc["geometry"]["parameters"]["w"]["value"] = 0.42
+    doc["geometry"]["parameters"]["w"]["value"] = "0.42 um"
     doc["geometry"]["parameters"]["slab"]["value"] = "t / 2"
     saved = json.dumps(doc, indent=2) + "\n"       # serializeDocument: two-space JSON and a newline
     again = json.loads(saved)
@@ -256,8 +265,9 @@ def _loop_points(view, loop):
 
 
 def test_arcs_and_circles_are_drawn_on_their_circles_counter_clockwise(client):
-    doc = {"units": {"length": "nm"}, "geometry": {"version": 1, "components": {"xs": {
-        "dimension": "2d", "domain": {"xmin": -3000, "xmax": 3000, "ymin": -3000, "ymax": 3000},
+    doc = {"openphysics": "0.3", "geometry": {"version": 1, "components": {"xs": {
+        "dimension": "2d", "length_unit": "nm", "depth": None,
+        "domain": {"xmin": -3000, "xmax": 3000, "ymin": -3000, "ymax": 3000},
         "background": {"material": "a"},
         "features": [
             {"name": "disc", "type": "circle", "cx": -1500, "cy": 0, "r": 1000, "material": "b"},
@@ -291,8 +301,8 @@ def test_arcs_and_circles_are_drawn_on_their_circles_counter_clockwise(client):
 
 def test_lengths_and_areas_are_in_the_document_unit(client):
     def rect_doc(unit, scale):
-        return {"units": {"length": unit}, "geometry": {"version": 1, "components": {"xs": {
-            "dimension": "2d", "domain": {"xmin": -2 * scale, "xmax": 2 * scale, "ymin": -1 * scale, "ymax": 1 * scale},
+        return {"openphysics": "0.3", "geometry": {"version": 1, "components": {"xs": {
+            "dimension": "2d", "length_unit": unit, "depth": None, "domain": {"xmin": -2 * scale, "xmax": 2 * scale, "ymin": -1 * scale, "ymax": 1 * scale},
             "background": {"material": "a"},
             "features": [{"name": "r", "type": "rect", "x": -0.25 * scale, "y": -0.5 * scale, "w": 0.5 * scale,
                           "h": 0.75 * scale, "material": "b"}]}}}}
@@ -313,10 +323,16 @@ def test_only_engine_refusals_reach_the_page_never_a_traceback(monkeypatch):
     from fastapi.testclient import TestClient
     from simcase.studio import app, geometry_api
     quiet = TestClient(app, raise_server_exceptions=False)
-    # a units string was a reader bug (AttributeError) until 2026-11-09; it is now a refusal
+    # a units string was a reader bug (AttributeError) until 2026-11-09; since C11a such a document
+    # (no format key) is refused by name, and a length_unit that is not a unit symbol is a refusal
     doc = {"units": "um", "geometry": {"version": 1, "components": {}}}
     response = quiet.post("/api/geometry-lab/evaluate", json={"doc": doc})
-    assert response.status_code == 200 and response.json()["refused"].startswith("units: expected an object")
+    assert response.status_code == 200 and response.json()["refused"].startswith("the document has no format key")
+    doc = {"openphysics": "0.3", "geometry": {"version": 1, "components": {"xs": {
+        "dimension": "2d", "length_unit": ["um"], "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}}}}}
+    response = quiet.post("/api/geometry-lab/evaluate", json={"doc": doc})
+    assert response.status_code == 200 and response.json()["refused"].startswith(
+        "geometry.components.xs.length_unit: a length_unit is one of")
 
     def bug(*args, **kwargs):                                                # any other exception
         raise AttributeError("'str' object has no attribute 'get' in geometry_document.py")
@@ -326,4 +342,6 @@ def test_only_engine_refusals_reach_the_page_never_a_traceback(monkeypatch):
     assert response.text == "Internal Server Error"
     assert "Traceback" not in response.text and "AttributeError" not in response.text and ".py" not in response.text
     source = (Path(simcase.__file__).parent / "studio" / "geometry_api.py").read_text(encoding="utf-8")
-    assert source.count("except ") == 1 and "except GeometryError as exc:" in source
+    # the two specific refusals: the engine's, and the reader's for unreadable request bytes (units batch C10)
+    assert source.count("except ") == 2
+    assert "except GeometryError as exc:" in source and "except RequestRefused as exc:" in source

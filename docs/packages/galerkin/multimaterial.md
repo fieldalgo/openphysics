@@ -27,9 +27,9 @@ dirichlet = {int(i): 400.0 for i in mesh.boundary["left"]}
 dirichlet.update({int(i): 300.0 for i in mesh.boundary["right"]})
 result = solve_steady_heat(
     mesh,
-    conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
-    heat_source={"steel": 2e5, "foam": 0.0},      # W/m^3
-    dirichlet=dirichlet,
+    thermal_conductivity={"steel": 45.0, "foam": 0.04},   # W/(m K)
+    heat_source_density={"steel": 2e5, "foam": 0.0},      # W/m^3
+    prescribed_temperature=dirichlet,
 )
 ```
 
@@ -57,8 +57,8 @@ do); a region that cuts through triangles is not representable.
 
 ## Steady heat conduction
 
-`galerkin.thermal.solve_steady_heat` accepts per-region `conductivity` k > 0
-in W/(m K) and per-region constant `heat_source` Q in W/m^3. Scalars and the
+`galerkin.thermal.solve_steady_heat` accepts per-region `thermal_conductivity` k > 0
+in W/(m K) and per-region constant `heat_source_density` Q in W/m^3. Scalars and the
 existing coordinate callback for Q are unchanged. The weak form is the same
 with k and Q constant on each triangle:
 
@@ -79,12 +79,14 @@ those of [thermal_steady2d](thermal_steady2d.md) and
 
 `refsol.thermal_multilayer` evaluates two closed forms and imports only NumPy:
 
-- `layered_slab`: series wall 0 < x_1 < ... < x_n = L with k_i and uniform
-  Q_i per layer, T(0)=T_L, T(L)=T_R. The flux is q(x) = q_0 + integral of Q,
+- `layered_slab(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: series wall at `position` x_0 < x_1 < ... < x_n with k_i
+  and uniform Q_i per layer, `prescribed_temperature` (T_L, T_R) at x_0 and x_n. The flux is q(x) = q_0 + integral of Q,
   T' = -q/k, and q_0 follows from T(L); without sources this is the series
   thermal resistance q_0 = (T_L-T_R)/sum(L_i/k_i).
-- `composite_cylinder`: concentric shells r_0 < ... < r_n with k_i and Q_i,
-  T(r_0)=T_i, T(r_n)=T_o. r q_r = C + integral of Q r dr and
+- `composite_cylinder(points, *, position, thermal_conductivity, prescribed_temperature,
+  heat_source_density=None)`: concentric shells at `position` r_0 < ... < r_n with
+  k_i and Q_i, `prescribed_temperature` (T_i, T_o) at r_0 and r_n. r q_r = C + integral of Q r dr and
   T = A_i - (C + offset_i) ln(r)/k_i - Q_i r^2/(4 k_i) in each shell.
 
 The reference tests check, by finite differences only, Fourier's law and
@@ -135,13 +137,13 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ## Static elasticity
 
-`galerkin.elasticity.solve_elasticity` accepts `young_modulus` (Pa) and
+`galerkin.elasticity.solve_elasticity` accepts `youngs_modulus` (Pa) and
 `poisson_ratio` each as a scalar or a region mapping; one may be a scalar and
 the other a mapping. Each region must satisfy E > 0 and -1 < nu < 0.5, and
 `plane` ('stress' or 'strain') applies to every region. The element matrix is
 `K_e = A_e B_e^T D_e B_e` with the region's own `D_e`, and the reported stress
-is `D_e` times the element strain. Body force, traction, Dirichlet data,
-reactions and residual checks are unchanged
+is `D_e` times the element strain. Body force, traction, prescribed
+displacement, reactions and residual checks are unchanged
 ([elasticity2d](elasticity2d.md), [elasticity_traction](elasticity_traction.md)).
 Perfect bonding is assumed: displacement is continuous, and the traction
 `sigma.n` across an interface is continuous only in the limit (O(h) jump of the
@@ -150,15 +152,19 @@ dissimilar materials are physical and are not resolved by this element.
 
 `refsol.elasticity_multilayer` (NumPy only) gives three exact states:
 
-- `laminate_axial`: layers stacked across the load, uniform axial strain,
-  free faces. Displacement is continuous and piecewise linear, sigma_xx = E' eps
+- `laminate_axial(points, *, position, youngs_modulus, poisson_ratio, strain_xx,
+  plane)`: layers stacked across the load (`position` lists y_0 < ... < y_n, the
+  first face included), uniform axial strain, free faces. Displacement is continuous and piecewise linear, sigma_xx = E' eps
   per layer (E' = E in plane stress, E/(1-nu^2) in plane strain).
-- `series_bar`: layers in series under uniform sigma_xx. This is exact only
+- `series_bar(points, *, position, youngs_modulus, poisson_ratio, stress_xx, plane)`:
+  layers in series under uniform sigma_xx. This is exact only
   when every layer has the same lateral strain (plane stress nu/E equal; plane
   strain nu(1+nu)/E equal); other data are rejected because the true solution
   then has interface singularities.
-- `composite_cylinder`: concentric shells under inner and outer pressure,
-  u_r = A_i r + B_i/r per shell, with displacement and radial stress
+- `composite_cylinder(points, *, position, youngs_modulus, poisson_ratio, plane,
+  gauge_pressure, linear_expansion_coefficient=None, temperature_change=None)`:
+  concentric shells with radii `position` r_0 < ... < r_n under the gauge
+  pressure pair (inner, outer), u_r = A_i r + B_i/r per shell, with displacement and radial stress
   continuous; the 2n coefficients come from a small dense linear system.
 
 Their tests check the isotropic law by central differences of the displacement,
@@ -196,25 +202,25 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 ## Thermoelasticity and heat-to-mechanics coupling
 
 `galerkin.thermoelasticity.solve_thermoelasticity` accepts
-`thermal_expansion_per_k` (1/K), `young_modulus` and `poisson_ratio` each as a
+`linear_expansion_coefficient` (1/K), `youngs_modulus` and `poisson_ratio` each as a
 scalar or region mapping. With any mapping, triangle e uses its own
 `D_e` and thermal stress coefficient (E/(1-nu) in plane stress, E/(1-2nu) in
 plane strain), and the thermal strain at the element nodes is
-`alpha_e (T - T_ref)`. Thermal load, centroid fields, `sigma_zz`/`epsilon_zz` and
+`alpha_e (T - T_ref)`. Thermal load, centroid fields, `stress_zz`/`strain_zz` and
 the reduced physical energy use the same per-triangle values. The result echoes
 each material as a float or a `{region name: float}` copy. The all-scalar call
 keeps the original code path.
 
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity` accepts mappings for
-`conductivity`, `young_modulus`, `poisson_ratio`, `thermal_expansion_per_k` and
-a constant `heat_source`; they are validated at the `input` stage and passed to
-the heat and mechanical stages. The manifest records materials as sorted
-dictionaries and a per-region source as `{'kind': 'per_region', 'value': ...}`;
-scalar manifests are unchanged. `galerkin.transient_thermal_mechanical` accepts
+`thermal_conductivity`, `youngs_modulus`, `poisson_ratio`,
+`linear_expansion_coefficient` and a constant `heat_source_density`; they are
+validated at the `input` stage and passed to the heat and mechanical stages. The
+manifest records materials as sorted dictionaries and a per-region source as
+`{'kind': 'per_region', 'value': ...}`; scalar materials stay floats. `galerkin.transient_thermal_mechanical` accepts
 the same mechanical mappings (per-region transient heat is a separate step).
 
 **Reference.** `refsol.elasticity_multilayer.composite_cylinder` with
-`thermal_expansions` and `temperature_change` rows (a_i, b_i), dT = a_i +
+`linear_expansion_coefficient` per shell and `temperature_change` rows (a_i, b_i), dT = a_i +
 b_i ln(r/r_0): in each shell u_r = kappa_i I(r)/r + A_i r + B_i/r with
 I = integral of s dT ds and kappa_i = beta_i/(lambda_i+2 mu_i)
 (beta = (3 lambda + 2 mu) alpha in plane strain, E alpha/(1-nu) in plane stress).
@@ -257,13 +263,13 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -q -s \
 
 ## Transient heat conduction
 
-`galerkin.transient_heat.solve_transient_heat` accepts `conductivity` (W/(m K)),
-`volumetric_heat_capacity` (J/(m^3 K)) and a constant `heat_source` (W/m^3) as
+`galerkin.transient_heat.solve_transient_heat` accepts `thermal_conductivity` (W/(m K)),
+`volumetric_heat_capacity` (J/(m^3 K)) and a constant `heat_source_density` (W/m^3) as
 scalars or region mappings; callbacks for Q are unchanged. The consistent mass
 `M_e = c_e A_e/12 [[2,1,1],[1,2,1],[1,1,2]]` and the stiffness use each
 triangle's values; backward Euler, offsets, refinement and every residual and
 balance check are unchanged ([transient_heat](transient_heat.md)). The result
-records `conductivity_w_mk` and `volumetric_heat_capacity_j_m3k` as a float or
+records `thermal_conductivity` and `volumetric_heat_capacity` as a float or
 a `{region name: float}` copy.
 
 **Reference.** `refsol.transient_heat_multilayer.LayeredWall`: a layered wall

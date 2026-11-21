@@ -90,13 +90,13 @@ def _elastic(e, nu, ux, fy, tx, *, name=None):
 
     def shear(points, normals):
         return tx * _wrap(name, np.column_stack([np.zeros(len(points)), points[:, 1]]))
-    return solve_elasticity(MESH, young_modulus=e, poisson_ratio=nu, plane="stress",
-                            dirichlet={**{(i, 0): ux for i in LEFT}, (LEFT[0], 1): 0.0},
-                            body_force=body, traction={"right": [tx, 0.0], "top": shear})
+    return solve_elasticity(MESH, youngs_modulus=e, poisson_ratio=nu, plane="stress",
+                            prescribed_displacement={**{(i, 0): ux for i in LEFT}, (LEFT[0], 1): 0.0},
+                            body_force_density=body, traction={"right": [tx, 0.0], "top": shear})
 
 
 ELASTIC = (2e3, 0.3, 1e-3, -5.0, 7.0)
-ELASTIC_FIELDS = ("displacement", "strain", "stress", "load", "reaction", "residual")
+ELASTIC_FIELDS = ("displacement", "strain", "stress", "applied_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth")
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -119,8 +119,8 @@ def test_bar_under_end_traction_matches_the_closed_form(name):
     length, corner = 1.0, int(np.flatnonzero((MESH.nodes[:, 0] == 0) & (MESH.nodes[:, 1] == 0))[0])
 
     def tip(e, nu, sigma):
-        r = solve_elasticity(MESH, young_modulus=e, poisson_ratio=nu, plane="stress",
-                             dirichlet={**{(i, 0): 0.0 for i in LEFT}, (corner, 1): 0.0},
+        r = solve_elasticity(MESH, youngs_modulus=e, poisson_ratio=nu, plane="stress",
+                             prescribed_displacement={**{(i, 0): 0.0 for i in LEFT}, (corner, 1): 0.0},
                              traction={"right": [sigma, 0.0]})
         top_right = r.displacement[RIGHT[np.argmax(MESH.nodes[RIGHT, 1])]]
         return top_right[0] + top_right[1]          # sigma L / E - nu sigma H / E
@@ -136,9 +136,9 @@ def test_elasticity_region_tables(name):
     left = [int(i) for i in mesh.boundary["left"]]
 
     def objective(e0, e1, nu1, tx):
-        r = solve_elasticity(mesh, young_modulus={"layer0": e0, "layer1": e1},
+        r = solve_elasticity(mesh, youngs_modulus={"layer0": e0, "layer1": e1},
                              poisson_ratio={"layer0": 0.25, "layer1": nu1}, plane="strain",
-                             dirichlet={**{(i, 0): 0.0 for i in left}, (left[0], 1): 0.0},
+                             prescribed_displacement={**{(i, 0): 0.0 for i in left}, (left[0], 1): 0.0},
                              traction={"right": (tx, 0.5 * tx)})
         return (r.displacement**2).sum() * 1e6
     values = (2e3, 5e3, 0.35, 7.0)
@@ -150,18 +150,18 @@ def test_elasticity_region_tables(name):
 def _thermo(tref, alpha, e, nu, tx, *, regional=False, plane="strain"):
     mesh = layered_rectangle_mesh([0.4, 1.0], 0.5, [3, 4], 3) if regional else MESH
     table = (lambda a, b: {"layer0": a, "layer1": b}) if regional else (lambda a, b: a)
-    snapshot = freeze_temperature(mesh, 300.0 + 40.0 * mesh.nodes[:, 0] + 10.0 * mesh.nodes[:, 1]**2)
+    snapshot = freeze_temperature(mesh, temperature=300.0 + 40.0 * mesh.nodes[:, 0] + 10.0 * mesh.nodes[:, 1]**2)
     return solve_thermoelasticity(
-        mesh, snapshot, reference_temperature_k=tref, thermal_expansion_per_k=table(alpha, 2 * alpha),
-        young_modulus=table(e, 1.5 * e), poisson_ratio=nu, plane=plane,
-        dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0},
-        body_force=(0.0, -3.0), traction={"right": [tx, 0.0]})
+        mesh, snapshot, stress_free_temperature=tref, linear_expansion_coefficient=table(alpha, 2 * alpha),
+        youngs_modulus=table(e, 1.5 * e), poisson_ratio=nu, plane=plane,
+        prescribed_displacement={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0},
+        body_force_density=(0.0, -3.0), traction={"right": [tx, 0.0]})
 
 
 THERMO = (293.15, 1.2e-5, 7e4, 0.3, 50.0)
-THERMO_FIELDS = ("displacement", "total_strain", "thermal_strain", "elastic_strain", "stress",
-                 "sigma_zz", "epsilon_zz", "load_external", "load_thermal", "reaction", "residual",
-                 "physical_elastic_energy", "load_body", "load_traction")
+THERMO_FIELDS = ("displacement", "strain", "thermal_strain", "elastic_strain", "stress",
+                 "stress_zz", "strain_zz", "applied_force_per_depth", "thermal_equivalent_force_per_depth", "reaction_force_per_depth", "residual_force_per_depth",
+                 "strain_energy_per_depth", "applied_body_force_per_depth", "applied_traction_force_per_depth")
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -173,7 +173,7 @@ def test_thermoelasticity_values_and_gradients(name, regional, plane):
 
     def objective(*v):
         r = _thermo(*v, regional=regional, plane=plane)
-        return r.physical_elastic_energy * 1e3 + (r.displacement**2).sum() * 1e6
+        return r.strain_energy_per_depth * 1e3 + (r.displacement**2).sum() * 1e6
     np.testing.assert_allclose(_gradient(name, objective, THERMO), _central(objective, THERMO),
                                rtol=2e-6)
 
@@ -183,13 +183,13 @@ def test_free_thermal_expansion_matches_the_closed_form(name):
     """Uniform rise, rigid-body supports only, plane stress: u_x(L) = alpha (T - Tref) L, no stress."""
     corner = int(np.flatnonzero((MESH.nodes[:, 0] == 0) & (MESH.nodes[:, 1] == 0))[0])
     right_bottom = int(np.flatnonzero((MESH.nodes[:, 0] == 1) & (MESH.nodes[:, 1] == 0))[0])
-    snapshot = freeze_temperature(MESH, np.full(MESH.num_nodes, 340.0))
+    snapshot = freeze_temperature(MESH, temperature=np.full(MESH.num_nodes, 340.0))
 
     def tip(tref, alpha, e):
-        r = solve_thermoelasticity(MESH, snapshot, reference_temperature_k=tref,
-                                   thermal_expansion_per_k=alpha, young_modulus=e, poisson_ratio=0.3,
+        r = solve_thermoelasticity(MESH, snapshot, stress_free_temperature=tref,
+                                   linear_expansion_coefficient=alpha, youngs_modulus=e, poisson_ratio=0.3,
                                    plane="stress",
-                                   dirichlet={(corner, 0): 0.0, (corner, 1): 0.0, (right_bottom, 1): 0.0})
+                                   prescribed_displacement={(corner, 0): 0.0, (corner, 1): 0.0, (right_bottom, 1): 0.0})
         return r.displacement[right_bottom, 0]
     tref, alpha, e = 300.0, 1.2e-5, 7e4
     assert abs(float(_numbers(tip(tref, alpha, e))) - alpha * (340.0 - tref)) < 1e-15
@@ -209,7 +209,7 @@ def test_jit_is_refused():
 def test_temperature_snapshots_stay_numpy(name):
     """The snapshot is an immutable, hashed NumPy record: a live field is refused, not cut."""
     with pytest.raises(TypeError, match="cut the derivative"):
-        freeze_temperature(MESH, _wrap(name, np.full(MESH.num_nodes, 300.0)))
+        freeze_temperature(MESH, temperature=_wrap(name, np.full(MESH.num_nodes, 300.0)))
 
 
 @pytest.mark.parametrize("name", [None, *BACKENDS])
@@ -218,11 +218,11 @@ def test_a_singular_system_is_one_value_error(name):
     e = _wrap(name, 5e-324)
     with pytest.raises(ValueError, match="^singular or ill-conditioned constrained elasticity system$"):
         _elastic(e, *ELASTIC[1:])
-    snapshot = freeze_temperature(MESH, np.full(MESH.num_nodes, 340.0))
+    snapshot = freeze_temperature(MESH, temperature=np.full(MESH.num_nodes, 340.0))
     with pytest.raises(ValueError, match="^singular or ill-conditioned constrained thermoelastic system$"):
-        solve_thermoelasticity(MESH, snapshot, reference_temperature_k=300.0, thermal_expansion_per_k=1.2e-5,
-                               young_modulus=e, poisson_ratio=0.3, plane="stress",
-                               dirichlet={(i, c): 0.0 for i in LEFT for c in (0, 1)})
+        solve_thermoelasticity(MESH, snapshot, stress_free_temperature=300.0, linear_expansion_coefficient=1.2e-5,
+                               youngs_modulus=e, poisson_ratio=0.3, plane="stress",
+                               prescribed_displacement={(i, c): 0.0 for i in LEFT for c in (0, 1)})
 
 
 @pytest.mark.parametrize("name", [None, *BACKENDS])

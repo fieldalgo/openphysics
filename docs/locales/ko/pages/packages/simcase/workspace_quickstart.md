@@ -81,12 +81,15 @@ py -3.12 -m venv "$HOME\op-studio"
 
 ## 5. 작업 남기기
 
-- 첫 번째 저장 버튼인 **Save session**은 입력, 완료한 실행 전부, 이름과 고정, 비교를 파일
-  하나에 씁니다. 끄기 전에 쓰세요. **Save inputs only**는 결과 없이 모델만 저장합니다.
+- 리본 Project 묶음의 **Save**(Save session)는 입력, 완료한 실행 전부, 이름과 고정, 비교를
+  파일 하나에 씁니다. 끄기 전에 쓰세요. **More → Save inputs only**는 결과 없이 모델만 저장합니다.
 - 새로고침하거나 다시 켜면 시작 화면에 **Continue where you left off**가 나옵니다. 마지막
   세션이나 이전 세션을 복구하거나, 세션 파일을 엽니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
   안내가 나오면 Run을 다시 누르세요.
+- 입력·세션 파일은 버전 7입니다(Joule 가열 입력 추가). 버전 6 파일도 계속 읽습니다. 단위·이름 일괄 변경 이전 Studio가 저장한 파일(버전 1–5)은
+  버전을 밝힌 메시지와 함께 거부되고, 그 Studio의 브라우저 초안은 나타나지 않습니다. 설계를
+  다시 넣어 저장하세요.
 
 ## 검증한 플랫폼
 
@@ -95,4 +98,11 @@ py -3.12 -m venv "$HOME\op-studio"
 `openphysics --help`, `openphysics` 명령의 작업 공간 페이지, 4·5단계, **Ctrl+C**, 재시작,
 시작 화면에서의 복구까지 했고 비교가 그대로 돌아왔습니다. **macOS와
 Windows에서는 이 단계를 아직 확인하지 않았습니다.** 이전 Windows 확인 기록은
-[수용 점검표](workspace_acceptance.md)에 있습니다.
+[수용 점검표](workspace_acceptance.md)에 있습니다. 단위·이름 일괄 변경으로 파일 버전과
+capability 확인이 버전 6이 된 뒤 2026-11-10에 Linux에서
+`tools/studio_browser/studio_workspace_browser.mjs`로 설치한 simcase wheel(headless Chrome)에 대해
+4·5단계, 재시작, 복구를 다시 확인했습니다. 위의 `openphysics` 설치로 확인한 것은 아닙니다.
+2026-11-16에 파일과 capability 확인이 버전 7이 된 뒤 같은 스크립트가 Linux에서 소스 트리(headless
+Chromium, Python 3.13)에 대해 통과했습니다. 설치한 wheel로 확인한 것은 아닙니다.
+2026-11-20에 작업대 배치(리본, 모델 빌더 옆 Settings, 하단 해석 영역)로 바뀐 뒤 같은 스크립트가
+Linux에서 소스 트리의 편집 가능 설치(headless Chromium, Python 3.12)에 대해 다시 통과했습니다.

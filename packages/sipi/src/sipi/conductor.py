@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.constants import epsilon_0, mu_0
 
-from galerkin import assemble_stiffness, solve_dirichlet
+from galerkin.kernels import assemble_stiffness, solve_dirichlet
 from .network import _frequencies, _scalar, rlgc_network
 from .quasistatic import _node_set
 from .roughness import CausalHuray

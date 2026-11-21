@@ -25,20 +25,28 @@ def document_data(case):
 
     source = {"single": examples.VECTOR_SLAB, "fiber": examples.VECTOR_FIBER,
               "hadley": examples.HADLEY_RIB}.get(case, examples.VECTOR_SLAB_SWEEP)
-    data = copy.deepcopy(source)
+    data = copy.deepcopy(source)                          # format 0.3 documents
     if case == "tm":
         data["physics"]["em1"]["boundary"].update(left="pmc", right="pmc")
     elif case == "two_modes":
-        data["physics"]["em1"]["num_modes"] = 2
-        data["study"]["values"] = [1.20, 1.25, 1.30]
+        data["physics"]["em1"]["mode_count"] = 2
+        data["study"]["values"] = {"unit": "um", "values": [1.20, 1.25, 1.30]}
     elif case == "hadley":
-        data["physics"]["em1"].update(formulation="vector", n_cladding=3.4)
+        data["physics"]["em1"].update(formulation="vector", effective_index_threshold=3.4)
     elif case == "te_fine":
-        data["geometry"]["shapes"][0]["mesh_size"] *= 0.5
-        data["mesh"]["size"] *= 0.5
+        shape, mesh = data["geometry"]["shapes"][0], data["mesh"]
+        shape["element_size"] = half(shape["element_size"])
+        mesh["element_size"] = half(mesh["element_size"])
         for key in ("near", "far"):
-            data["mesh"]["grading"][key] *= 0.5
+            mesh["grading"][key] = half(mesh["grading"][key])
     return data
+
+
+def half(quantity):
+    """A quantity string "0.012 um" at half its value, as an exact decimal."""
+    from decimal import Decimal
+    number, unit = quantity.split(" ")
+    return f"{Decimal(number) / 2} {unit}"
 
 
 def measure(case, snapshot=None):
@@ -62,7 +70,7 @@ def measure(case, snapshot=None):
         rss_mib = rss / (1024**2 if sys.platform == "darwin" else 1024)
     except ImportError:  # Windows has no standard-library process peak RSS API.
         rss_mib = None
-    mesh = Mesh(result.mesh_nodes, result.mesh_triangles, {})
+    mesh = Mesh(result.node_coordinates, result.triangles, {})             # metres
     # Measure the complete topology constructor separately, outside run timing.
     topology = []
     for _ in range(21):
@@ -70,16 +78,17 @@ def measure(case, snapshot=None):
         space = EdgeSpace(mesh)
         topology.append(time.perf_counter() - start)
     if snapshot:
-        np.savez_compressed(snapshot, neff=result.neff, edges=space.edges,
-                            transverse=np.stack([f.transverse for f in result.vector_fields]),
-                            longitudinal=np.stack([f.longitudinal for f in result.vector_fields]),
-                            electric=np.stack([f.electric for f in result.vector_fields]))
+        np.savez_compressed(snapshot, effective_index=result.effective_index, edges=space.edges,
+                            unnormalized_electric_field_line_integral=np.stack(
+                                [f.transverse for f in result.vector_fields]),
+                            unnormalized_electric_field_z=np.stack([f.longitudinal for f in result.vector_fields]),
+                            unnormalized_electric_field=np.stack([f.electric for f in result.vector_fields]))
     return dict(case=case, document=data,
                 document_sha256=hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest(),
                 seconds=seconds, timings=result.timings, peak_rss_mib=rss_mib,
                 topology_seconds_median=statistics.median(topology),
                 nodes=mesh.num_nodes, triangles=mesh.num_triangles, edges=space.num_edges,
-                neff=result.neff.tolist(),
+                effective_index=result.effective_index.tolist(),
                 group_index=None if result.mode_tracking is None else result.group_index().tolist(),
                 mode_tracking=result.mode_tracking)
 
@@ -120,7 +129,8 @@ def main():
             print(f"{case} {repetition + 1}/{args.repeats}: {sample['seconds']:.3f} s", file=sys.stderr)
     git = lambda *args: subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
     from importlib.metadata import version
-    report = dict(schema_version=1, revision=git("rev-parse", "HEAD"),
+    # schema 2 (units batch): format 0.3 documents, effective_index and the unnormalized_* snapshot names
+    report = dict(schema_version=2, revision=git("rev-parse", "HEAD"),
                   checkout_dirty=bool(git("status", "--porcelain")),
                   python=sys.version, platform=platform.platform(),
                   versions={name: version(name) for name in ("numpy", "scipy", "shapely")},

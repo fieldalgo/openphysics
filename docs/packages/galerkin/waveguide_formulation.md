@@ -14,13 +14,18 @@ not a textbook's. The normative contracts, limits and measured validation stay
 in the pages this one links to: this page adds no accuracy claim and no new
 validation result.
 
+The functions named here are the kernels: consistent units and the phasor exp(+iωt) below, reached
+through the internal `galerkin.kernels`. The public surface is `galerkin.solve_waveguide_modes` and its
+post-processing functions, in SI units and exp(−iωt): each wraps these kernels, conjugates its complex
+inputs and outputs once and takes k0 = 2π/λ ([public SI functions](mode_overlap.md#public-si-functions)).
+
 ## 1. Problem statement and notation
 
 A guide that does not change along z carries fields of the form
 
     E(x, y, z, t) = [E_t(x, y) + zhat E_z(x, y)] exp(+i omega t - i beta z)
 
-(`packages/galerkin/src/galerkin/waveguide.py`, module docstring; the same phasor
+(`packages/galerkin/src/galerkin/_waveguide_kernels.py`, module docstring; the same phasor
 is stated in [absorbing modes](../simcase/lossy_modes.md) and
 [modal coordinates](modal_coordinates.md)). The cross-section Omega is a 2D
 domain meshed with P1 triangles (`galerkin.mesh.Mesh`); lengths are in the mesh
@@ -31,15 +36,15 @@ equations reduce to
 
 | Symbol | Meaning | In the code |
 |---|---|---|
-| `E_t`, `E_z` | transverse and longitudinal electric field of one mode | `et` (edge line integrals of `E_t`), `ez` with `E_z = 1j * ez` (`waveguide.py::solve_modes`) |
+| `E_t`, `E_z` | transverse and longitudinal electric field of one mode | `et` (edge line integrals of `E_t`), `ez` with `E_z = 1j * ez` (`_waveguide_kernels.py::solve_modes`) |
 | `eps_r` | relative permittivity, scalar or one value per triangle, real or complex | `eps_r` of `solve_modes`, `assemble_mode_system`; `eps_tri` in simcase |
-| `mu_r` | relative permeability, scalar or per triangle, real or complex; enters only as `1/mu_r` | `mu_r` (default 1.0); `inv_mu` in `waveguide.py::_mode_blocks` |
+| `mu_r` | relative permeability, scalar or per triangle, real or complex; enters only as `1/mu_r` | `mu_r` (default 1.0); `inv_mu` in `_waveguide_kernels.py::_mode_blocks` |
 | `k0 = 2 pi / lambda0` | vacuum wavenumber in inverse mesh length | `k0`; simcase scales the mesh by the wavelength and passes `k0 = 2 pi` (`simcase/physics_em_modes2d.py::_solve_vector`) |
 | `beta` | propagation constant along z | `beta = k0 * n_eff` |
 | `n_eff = beta / k0` | effective index, real or complex | `n_eff`, first return value of `solve_modes` |
 | `e_t = beta E_t`, `e_z = -i E_z` | scaled unknowns of the mixed formulation | the pencil vector `x = [beta * et; ez]` |
-| `lambda = -beta^2` | eigenvalue of the pencil `A x = lambda B x` | `lam0 = -(k0 n_eff)^2` in `waveguide.py::_live_modes` |
-| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert target and the eigenvalue ARPACK actually returns | `sigma`, `nu` in `waveguide.py::_solve_modes_numpy` |
+| `lambda = -beta^2` | eigenvalue of the pencil `A x = lambda B x` | `lam0 = -(k0 n_eff)^2` in `_waveguide_kernels.py::_live_modes` |
+| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert target and the eigenvalue ARPACK actually returns | `sigma`, `nu` in `_waveguide_kernels.py::_solve_modes_numpy` |
 | `(s_x, s_y, h)` | complex coordinate stretch of the two transverse axes and the bend metric, one triple per triangle | `coordinate_factors` (T, 3), from `mode_coordinates.py::mode_coordinates` |
 | `phi` | scalar (nodal) mode function of the scalar approximation | `fields` of `physics_em_modes2d.solve(formulation="scalar")` |
 
@@ -154,8 +159,8 @@ that is `A x = -beta^2 B x` with `x = [e_t; e_z]`,
     A = [ S - k0^2 Mt_eps   0 ]        B = [ Mt_mu   G            ]
         [ 0                 0 ]            [ G^T     K - k0^2 M   ].
 
-`waveguide.py::assemble_mode_system` builds exactly these blocks
-(`sp.bmat`), from `waveguide.py::_mode_blocks`:
+`_waveguide_kernels.py::assemble_mode_system` builds exactly these blocks
+(`sp.bmat`), from `_waveguide_kernels.py::_mode_blocks`:
 
 | Block | Integral | Kernel (`galerkin/core/kernels.py`) | Public assembly |
 |---|---|---|---|
@@ -170,18 +175,32 @@ The second row carries no `beta^2`-free term, so `A` has a zero `e_z` block: the
 weak longitudinal component of the curl-curl equation is a constraint, and
 `beta^2 = 0` is an eigenvalue of multiplicity about the number of free nodes
 (the discrete gradients). Guided modes lie at `n_clad < Re n_eff < n_core`, far
-from it, and the shift-invert search near `n_target` never meets this cluster.
+from it, and a shift-invert search near `n_target` meets this cluster only when
+it asks for more roots than lie closer to the target than `beta^2 = 0`.
 This is how the mixed pair suppresses spurious modes: the kernel of the curl is
 represented exactly by the edge space and parked at `beta^2 = 0`, instead of
 being smeared across the spectrum as nodal vector elements do
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
 
+When a search does reach the cluster, its computed roots usually have `|beta^2|`
+at rounding level (at most `1.2e-14 |sigma|` on the slabs of
+`tests/galerkin/test_waveguide_static_roots.py`, occasionally exactly 0), and
+`E_t = e_t / beta` is undefined for them. `solve_modes` returns no root with
+`|beta^2| <= STATIC_ROOT_TOL |sigma|` (`1e-10`, that is `|n_eff| <= 1e-5 |n_target|`)
+on any path, so such a search returns fewer roots than `num_modes`. Limitation:
+when the nodal block `K - k0^2 M` of `B` is nearly singular, that is `k0^2` is
+close to an eigenvalue of `K e_z = lambda M e_z` on the free nodes (a TM cutoff of
+the PEC box), the cluster is ill-conditioned and its computed roots can exceed the
+tolerance: `2.2e-10 |sigma|` and `6.8e-9 |sigma|` were measured at relative
+distances `1e-6` and `1e-8` from such a cutoff on a square guide. Those roots are
+returned, with almost no transverse field.
+
 `A` and `B` are transpose-symmetric. For real `eps_r`, `mu_r` they are real
 symmetric and `B` is indefinite; for complex materials or coordinate factors they
-are complex symmetric, not Hermitian (`waveguide.py` docstring).
+are complex symmetric, not Hermitian (`_waveguide_kernels.py` docstring).
 
 **Boundary conditions.** A PEC wall `n x E = 0` fixes two kinds of degrees of
-freedom to zero (`waveguide.py::_free_dofs`): the `e_z` values at `pec_nodes`
+freedom to zero (`_waveguide_kernels.py::_free_dofs`): the `e_z` values at `pec_nodes`
 (default: every node of every named boundary) and the `e_t` line integrals on
 `pec_edges`. By default `pec_edges` are the edges owned by exactly one triangle
 whose two endpoints are both in `pec_nodes`
@@ -197,7 +216,7 @@ A PMC wall is natural: no constraint, which is the weak statement
 **Eigensolve.** `B` is indefinite, so SciPy's generalized ARPACK drivers (which
 require a positive semi-definite mass) are not used. Instead the shift-invert
 operator is formed and handed over as a standard eigenproblem
-(`waveguide.py::_solve_modes_numpy`):
+(`_waveguide_kernels.py::_solve_modes_numpy`):
 
     sigma = -(k0 n_target)^2,    LU of (A - sigma B)   (scipy.sparse.linalg.splu),
     op(v) = (A - sigma B)^-1 B v,     eigs(op, k=num_modes, which="LM", v0=ones),
@@ -267,8 +286,9 @@ forward mode this gives `Im n_eff < 0`; the square-core guide of section 3 with
 first-order value `(d n_eff / d eps_core) Im eps_core` of section 5. Amplitude
 decays as `exp(-a z)` with `a = -Im beta`, power as `exp(-2 a z)`; the dB/cm
 conversion is in [absorbing modes](../simcase/lossy_modes.md). With coordinate
-factors every candidate is kept and a nonfinite or zero root is an error, so
-that the caller records every candidate and its exclusion reason.
+factors every candidate except the static `beta^2 = 0` roots (section 3) is kept
+and a nonfinite root is an error, so that the caller records every candidate and
+its exclusion reason.
 
 **PML as a complex coordinate stretch.** Open cross-sections are truncated by
 stretching the transverse coordinates into the complex plane (Bérenger 1994 for
@@ -337,7 +357,7 @@ solvers; do not combine its coefficients with the modal factors.
 ([derivatives](differentiation.md)). The NumPy eigensolve of section 3 runs on
 the numbers first. Then, for each returned simple eigenpair `(lambda0, x0)` on
 the free DOFs with `lambda0 = -(k0 n_eff)^2` and `x0 = [beta et; ez]`,
-`waveguide.py::_live_modes` rebuilds `A` and `B` in the live library from the
+`_waveguide_kernels.py::_live_modes` rebuilds `A` and `B` in the live library from the
 same kernels (`_live_blocks`, `_restricted`) and calls
 `galerkin.core.eigen.refine`, one Newton step on the eigenproblem bordered by
 the normalisation `x^T B x = 1` (transpose, no conjugate):
@@ -374,7 +394,7 @@ field derivatives. For `k0`, `dA/dk0 = -2 k0 Mt_eps`, `dB/dk0 = -2 k0 M`, and
 the division by `k0` adds `-n_eff/k0`.
 
 After the step the returned gauge is applied again: with the pivot `p` chosen
-as the entry the NumPy solve left real and positive (`waveguide.py::_pivot`,
+as the entry the NumPy solve left real and positive (`_waveguide_kernels.py::_pivot`,
 the largest-modulus entry with zero phase when several are equally large),
 
     x <- x conj(x_p) / ( |x_p| ||x||_2 ),    beta = sqrt(-lambda),    et = x_t / beta,    ez = x_z,
@@ -428,7 +448,7 @@ but not with the mode solver. From galerkin it uses
 | sipi module | galerkin pieces |
 |---|---|
 | `sipi/crosssection.py` (`CrossSection.mesh`) | `galerkin.Mesh`, `galerkin.from_mesher` on a meshine triangulation |
-| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.assemble_stiffness` (P1 `K` with real or complex `eps_r`), `galerkin.solve_dirichlet` |
+| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.kernels.assemble_stiffness` (P1 `K` with real or complex `eps_r`), `galerkin.kernels.solve_dirichlet` |
 | `sipi/conductor.py` (surface-impedance loss) | `assemble_stiffness`, `solve_dirichlet` on the perfect-conductor exterior field |
 | `sipi/conductor_diffusion.py` (DC/AC current diffusion) | `assemble_stiffness`, `assemble_mass`, `assemble_load` for the P1 `A_z` diffusion system |
 | `sipi/plane.py` (power-plane IR drop) | `galerkin.electric.solve_steady_electric` |
@@ -513,9 +533,11 @@ Limitations of the formulations as implemented:
   absorption and radiation.
 - Fields have relative amplitude: no power normalisation, no orthogonality or
   completeness guarantee, and no identity assignment within a degenerate pair.
-- Derivatives exist with respect to `eps_r`, `mu_r` and `k0` only; not with
-  respect to coordinates, PML parameters, `n_target`, node positions or PEC
-  sets, and not through a `Field`.
+- Derivatives exist with respect to `eps_r`, `mu_r` and `k0`, and with respect to
+  node positions along a design motion (`motion=`,
+  [shape derivatives](shape_derivative.md#waveguide-modes)); not with respect to
+  coordinate factors, PML parameters, `n_target` or PEC sets, and not through a
+  `Field`.
 - The scalar path is exact for the invariant-axis TE slab polarisation only.
 - `sipi` is quasi-static and non-magnetic (`mu = mu0` in `L`), with no
   full-wave dispersion, and its per-unit-length loss model is separate from the

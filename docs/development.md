@@ -98,7 +98,10 @@ Each package's pages (contracts and validation reports) are in
 the pinned validation environments, the reviewed license inventory and
 maintainer scripts such as `tools/build_physmat_tables.py`, which regenerates
 physmat's embedded tables; [tools/README.md](../tools/README.md) says which of
-them required CI runs. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
+them required CI runs. `physmat/unit_tables.json` is generated from
+`physmat/quantities.json` by `python -m physmat.units --write` (`--check`
+compares); the generator ships in the package, so that
+`tests/physmat/test_units.py` (R3) checks it against installed wheels too. [benchmarks/](../benchmarks/README.md) holds timing benchmarks and
 [studies/](../studies/README.md) diagnostic scripts; people run them and
 required CI does not. The `openphysics` meta distribution has no code, tests or examples; it requires seven packages (`simcase` with its `studio` and `export` extras, `physmat` with `rii`) and provides the `openphysics` command, which opens Studio.
 From the root, `python -m pytest` collects `tests/` and `tools/tests/`, the tests
@@ -115,6 +118,38 @@ python -m pytest -q tests/galerkin -m "not slow"   # without convergence studies
 python -m pytest -q tests/gmshio/test_msh.py       # one file
 node --test tests/simcase/*.cjs                    # Studio JavaScript checks
 ```
+
+**API units scan.** `tests/galerkin`, `tests/refsol` and `tests/physmat` each run
+`test_api_units_scan_<package>.py`, which checks every parameter of the public API (the
+`__all__` of the public modules) against the units convention. A parameter is either a
+`physmat.units` registry name with an `api` place, keyword-only and without a dimensional
+default, or a structural name, and no name ends in a unit token. Public methods include
+`__call__`; the constructors of the result classes that solvers return are not scanned.
+The shared logic and its data are in `tests/_support/`: `api_scan.py`, the public and
+internal module lists, the closed lists of structural names and result classes, and the
+removed names. Every other module is internal and says "Internal module, consistent
+units" in its docstring. Each package's `api_units_allowlist.json` is empty and may
+not grow: a new violation fails. So every public module is clean: every name
+of the removed-name list is asserted absent, and a `str` given to any public quantity
+parameter must raise `TypeError`. A removed name with a scope (and a note that
+says why) is asserted absent only in those modules: `refsol.bent_slab` no longer takes
+`radius` (now `bend_radius`), while `refsol.fiber` takes the registry name `radius`.
+`galerkin.kernels` and `physmat.kernels` are
+internal namespaces that re-export kernels in consistent units for simcase and sipi: no
+public name equals one of their names, and no public name is one of their objects. A structural name added after the list was frozen
+carries a reviewer note; the category "deferred to the materials step" (physmat's record
+arguments, such as `datum_temperature`) also names the condition that ends it.
+
+**Complex conventions.** Public complex values of galerkin and refsol follow
+exp(−iωt); a kernel that computes in exp(+iωt) is converted only by `to_kernel` and
+`to_public` of the package's private `_conventions` module.
+`tests/galerkin/test_conventions.py` reads the package code of galerkin, refsol and
+simcase (not sipi, not the tests) and allows a conjugation (`conj`, `conjugate`, or
+`0.0 - x.imag` and `-x.imag`) only there, in simcase's boundary functions, and on the
+closed list `tests/galerkin/conventions_allowlist.json` of mathematical conjugations,
+each with its function, source line and reason; an entry that no longer matches fails.
+It also checks the passive signs of each converted output (electrostatics so far) and
+that a JAX and a PyTorch gradient pass through the conversions.
 
 ## Running the checks
 
@@ -154,17 +189,18 @@ preinstalled Chrome, Chromium or Edge (found in the usual places, or named by
 
 The `Validate packages` workflow (`.github/workflows/validate.yml`) runs on main
 pushes, Ready pull requests and manual dispatch. Branch pushes and draft PRs do
-not run it. It has four parts, run in parallel:
+not run it. It has five parts, run in parallel:
 
 | Job | Platform | What it checks |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown link check, fast preflight groups, then the full source suite with the pinned RII database; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
-| `installed-tests` | Ubuntu 24.04 | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout |
+| `linux-py312` | Ubuntu 24.04 | License, release-version, meshloom kernel and Markdown link checks; fast preflight groups; all nine distributions; Studio Node checks; one steady, transient and region Studio resource observation each |
+| `linux-py312-tests` | Ubuntu 24.04, eight jobs | The full source suite with the pinned RII database, in eight time-balanced parts run at the same time |
+| `installed-tests` | Ubuntu 24.04, eight jobs | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout, in eight time-balanced parts run at the same time |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 
-The single required check is **`tests`**. It passes only when all four parts
-succeed; a failed, cancelled or skipped part fails it. Every change, including
+The single required check is **`tests`**. It passes only when all five parts
+succeed (all eight jobs of each split part among them); a failed, cancelled or skipped part fails it. Every change, including
 documentation, needs it.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
@@ -173,11 +209,41 @@ Markdown link check runs: every relative link and
 `#anchor` in the repository's tracked Markdown files must resolve (external URLs
 are not fetched). Preflight groups (steady boundary, transient documents, steady
 and transient Studio, transient thermomechanics) run next so a broken
-contract fails within minutes. The full suite then runs everything again. The
-distribution and Node steps still run after a failed source suite so their
-evidence is kept, but the job stays failed. The job usually takes 23 to 45
-minutes; its 90-minute limit only stops hung runs, since hosted runner speed
-varies.
+contract fails within minutes. The distribution checks, the Studio Node checks
+and the resource observations follow. Without the source suite the job took 8 to
+11 minutes on 2026-11-20; its 45-minute limit only stops hung runs, since hosted
+runner speed varies.
+
+**Source tests** (`linux-py312-tests`). The whole suite, `python -m pytest` with
+the root configuration (every test in `tests/` and `tools/tests/`), runs in eight
+jobs at once. Each job collects the whole suite and keeps the test files that
+`tools/shards/openphysics_shard.py` assigns to its part: whole files, largest
+first, each to the part with the least time so far, by the per-file seconds in
+`tools/shards/durations.json` (a file missing from the table counts as the
+median). Every part computes the same assignment from the same collected files,
+so together the eight run every collected test exactly once; no test is
+selected by name. The end of each log names the part's files, tests and
+estimated time. On one job the suite took 44 to 70 minutes on 2026-11-20,
+depending on the runner CPU, and its four parts 10 to 21 minutes on 2026-11-21;
+a part of eight is about 5.5 minutes of tests by the table plus about 3 minutes
+of setup, and its 45-minute limit only stops hung runs. Since files are
+assigned whole, the largest file is a part's floor
+(`tools/tests/test_examples_smoke.py`, 5.7 minutes, whose examples run in an
+order that the file keeps); the 5.5-minute M3 slab refinement study has its own
+file (`tests/galerkin/test_cavity_mesh_slab_refinement.py`) for this reason. To
+run a part locally:
+
+```bash
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/8
+```
+
+When the suite's balance drifts, rebuild the table from the JUnit files of one
+complete run (the eight `source-tests-<k>-of-8` artifacts, unpacked in one
+folder), from the repository root:
+
+```bash
+python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
+```
 
 **Distribution checks** (`tools/check_distributions.py`). Builds all nine packages
 (including the `openphysics` meta distribution), each wheel from its sdist,
@@ -220,19 +286,32 @@ wheel from its sdist, and checks the archives with the same rules as the
 distribution check. All nine wheels are installed, each with every extra its
 metadata declares, into a fresh environment in a temporary directory outside the
 checkout. Next to it, the script copies the tracked files under `tests/`,
-`examples/` and `docs/` and the root `pyproject.toml`, but nothing under
-`packages/`; their hashes are recorded in `suite-file-hashes.json`. Every
+`examples/` and `docs/`, the units batch's fixture documents
+(`tools/units_batch/fixtures/`, JSON data the tests read) and the root
+`pyproject.toml`, but nothing under `packages/` and no other file under `tools/`;
+their hashes are recorded in `suite-file-hashes.json`. Every
 Python test in `tests/` then runs with `python -I -m pytest`; no test is
 selected by name. Besides any failing test, the run fails if a first-party
 module does not load from the installed environment, if any test is skipped or
 xfailed, or if a test file (`test_*.py`, `*_test.py`) produced no results. The installed environment must
 also pass `tools/check_licenses.py`. The job uses the pinned requirements, Gmsh,
 the pinned RII database and required reference cross-checks
-(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`). A local Linux run took about 25
-minutes; the 50-minute limit only stops hung runs. Running it locally needs Gmsh
+(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`). Running it locally needs Gmsh
 and `PHYSMAT_RII_PATH`, because tests that need them skip otherwise and a skip
-fails the run. It is verified on Linux only. The source suite still runs in
-`linux-py312`.
+fails the run. It is verified on Linux only. The source suite runs in
+`linux-py312-tests`.
+
+In CI the job runs as eight parts, `installed-tests (1/8)` to `(8/8)`, with
+`--shard K/8`. Each part builds and installs its own wheels (about 2 minutes)
+and passes pytest the test files `tools/shards/openphysics_shard.py` assigns to
+it from every copied test file, by the same table as the source tests; the
+result check then requires results from each of those files. The eight parts
+together run every test file once, and each writes `shard.json` with its files
+and estimated time. In one job the run took 39 to 71 minutes on 2026-11-20,
+depending on the runner CPU; the eight parts of a 63-minute run would be 7.1 to
+10.9 minutes each, the longest being the M3 slab refinement study alone, and
+the 45-minute limit only stops hung runs. Without `--shard`,
+as locally, the script runs every test file.
 
 **Licenses** (`tools/check_licenses.py`). Before the tests, the pinned validation
 environment, and later each fresh installed environment, is compared with the
@@ -260,7 +339,14 @@ This is installed acceptance, not a full macOS or Windows regression.
 It also installs the Studio extra's pins (`tools/requirements-py312-studio.txt`, the
 Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
-session, a server restart with the page open and recovery from the start page.
+session, a server restart with the page open and recovery from the start page, then the
+Joule heating application: the default strip by Picard and by Newton (iteration counts,
+balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the region
+mesh differs between macOS arm64 and the other platforms, so mesh-dependent values are
+checked within the discretization error), a
+non-converging Newton run whose refusal is shown with its text, and constant materials
+(`joule.steady2d`, 20 W/m, the uniform strip's exact power). Uncaught page exceptions and
+`console.error` calls fail the check (other browser log entries are not collected).
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with
@@ -275,6 +361,21 @@ Timing and profiling commands for the solvers are in the
 [heat](benchmark_thermal.md), [elasticity](benchmark_elasticity.md),
 [electric](benchmark_electric.md) and [derivative](benchmark_derivatives.md)
 benchmark guides.
+
+**Units-batch equivalence (manual dispatch only).** The `units-batch-equivalence`
+job runs `tests/simcase/test_units_batch_equivalence.py` with
+`OPENPHYSICS_BATCH_BASELINE` set to the merge base with `main` and
+`OPENPHYSICS_BATCH_PHASE=3`, on Ubuntu 24.04, macOS 15 and Windows 2022, one
+platform at a time. It records every `examples/simcase` document and frozen
+fixture, the same documents, on the baseline and on the dispatched commit and
+requires the same saved bytes and the same solver and mesher inputs, compared by
+parameter name under the rule entries of the
+[units-batch harness](../tools/units_batch/README.md#phase-3-the-galerkin-step)
+(check P3-1 of the galerkin step). Phase 2 of the harness, the units batch's own
+check, needs that batch's baseline and runs locally. Only a manual dispatch runs
+the job (`gh workflow run validate.yml --ref <branch>`); pushes and pull requests
+skip it. It is not part of `tests`, so each platform's result is read on its own,
+from the run of the commit it is claimed for.
 
 **Queueing.** Main runs share one concurrency group per workflow with
 `queue: max` and are never cancelled by a newer push. Other refs use
@@ -319,14 +420,22 @@ reviewed change that reruns the source and distribution checks.
 Each job uploads its artifacts, even after a failure:
 
 - Linux: `distributions-and-test-results`, the `.validation/` directory with
-  JUnit XML per stage, distribution checksums and reports, and
+  JUnit XML per preflight group, distribution checksums and reports, and
   `numeric-runtime.json`.
-- Installed tests: `installed-test-results`, the `.validation/` directory with
-  the built distributions, `installed-tests.xml`, `installed-origins.json`,
-  `suite-file-hashes.json`, the license report and the cross-check records.
+- Source tests: `source-tests-<k>-of-8` for each part, the `.validation/`
+  directory with `source-tests-<k>.xml`, the cross-check records and
+  `numeric-runtime.json`.
+- Installed tests: `installed-test-results-<k>-of-8` for each part, the
+  `.validation/` directory with the built distributions, `installed-tests.xml`,
+  `shard.json`, `installed-origins.json`, `suite-file-hashes.json`, the license
+  report and the cross-check records.
 - Installed platforms: `installed-packages-<os>-<run_id>` with every command's
   exit and log, environment details, checksums, installed origins, JUnit XML and
   `numeric-runtime.json`.
+- Units-batch equivalence (manual dispatch only):
+  `units-batch-equivalence-<os>-<run_id>` with the comparison report (a SHA-256
+  table per document and array, and the rule entries applied), the document list
+  and both recording manifests.
 
 Some stages store the stdout of passing tests in JUnit `system-out`
 (`-o junit_logging=all -o junit_log_passing_tests=true`). This keeps numerical
@@ -413,7 +522,9 @@ python -m twine check --strict .validation/simcase/*
 All nine distributions release together under one version. A version change
 sets it in every `packages/<name>/pyproject.toml` and in each import package's
 `__version__`, and meshloom's `Cargo.toml`, keeps the requirements between our own distributions inside that
-minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x) and renames the
+minor series (`>=0.0.2,<0.1` for 0.0.2; `>=0.1.0,<0.2` for 0.1.x), except that `simcase` pins
+`physmat` and `galerkin`, and `sipi` pins `galerkin`, to the exact version (`physmat==0.0.2`,
+`galerkin==0.0.2`) because they call the internal `physmat.kernels` and `galerkin.kernels`, and renames the
 [changelog](../CHANGELOG.md)'s `[Unreleased]` section to `[X.Y.Z] - YYYY-MM-DD`.
 `python tools/check_release_version.py --tag vX.Y.Z` checks all of that for a
 release, and also refuses package READMEs and documentation pages (other than

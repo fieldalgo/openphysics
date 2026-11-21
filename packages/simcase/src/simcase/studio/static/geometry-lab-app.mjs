@@ -3,7 +3,7 @@
 // The experimental geometry lab page: holds one version 1 document, sends it whole to the
 // exact engine on every edit, and draws what the engine answers.
 import {areaLabel,cellPath,copyDocument,curvePath,highlightOf,isVersion1,newDocument,refusalText,
- regionColor,saveName,serializeDocument,setParameter,sliderOf,sliderValue,viewTransform} from './geometry-lab-model.mjs';
+ quantityOf,regionColor,saveName,serializeDocument,setParameter,sliderOf,sliderValue,viewTransform} from './geometry-lab-model.mjs';
 import {STARTERS} from './geometry-lab-starters.mjs';
 
 const $=id=>document.getElementById(id);
@@ -62,14 +62,15 @@ function renderParameters(){
   let range=null;
   if(slider){
    range=el('input',{type:'range',min:slider.min,max:slider.max,step:slider.step,'aria-label':name+' slider'});
-   range.value=String(entry.value);
-   range.addEventListener('input',()=>{const v=sliderValue(slider,range.value);text.value=String(v);edit(name,v);});
-   box.append(range,el('small',{},`range ${slider.min} … ${slider.max}`));
+   const unit=slider.unit?' '+slider.unit:'';
+   range.value=String(slider.unit?quantityOf(entry.value).number:entry.value);
+   range.addEventListener('input',()=>{const v=sliderValue(slider,range.value);text.value=String(v)+unit;edit(name,String(v)+unit);});
+   box.append(range,el('small',{},`range ${slider.min} … ${slider.max}${unit}`));
   }
   text.addEventListener('change',()=>{
    const ok=edit(name,text.value),held=state.doc.geometry.parameters[name].value;
    if(!ok)text.value=String(held);        // the field shows what the document holds; the refusal says why
-   else if(range&&typeof held==='number')range.value=String(held);
+   else if(range)range.value=String(typeof held==='number'?held:quantityOf(held)?.number??range.value);
   });
   box.append(el('small',{class:'evaluated',id:'value-'+name}));
   rows.append(box);
@@ -99,7 +100,8 @@ function render(){
   svg.append(p);
  }
  $('unit').textContent=`${v.component} (${v.dimension}) · lengths in ${v.unit}`;
- for(const p of v.parameters){const e=$('value-'+p.name);if(e)e.textContent=`= ${p.value} ${p.kind==='length'?v.unit:''}`;}
+ // format 0.3 parameters are evaluated in SI (p.unit "m"); format 0.2 ones in the component unit
+ for(const p of v.parameters){const e=$('value-'+p.name);if(e)e.textContent=`= ${p.value} ${p.kind==='length'?p.unit??v.unit:''}`;}
  const select=$('component');select.replaceChildren(...v.components.map(n=>{const o=el('option',{value:n},n);o.selected=n===v.component;return o;}));
  select.disabled=v.components.length<2;
  list('regions',v.regions.map(r=>({key:'region:'+r.name,swatch:r.void?null:regionColor(v,r.name),

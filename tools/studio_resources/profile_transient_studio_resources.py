@@ -29,6 +29,14 @@ from concurrent.futures import ThreadPoolExecutor
 from probe_transient_studio_resources import Observer, finite_json, MIB
 
 
+# the 13 public getters of a completed transient capture (transient_thermal_api.SPEC); the parent
+# reads the child's counts without importing simcase, the child checks this list against SPEC
+CAPTURE_GETTERS = ('node_coordinates', 'triangles', 'time', 'temperature', 'heat_flux',
+                   'generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth',
+                   'residual_heat_rate_per_depth', 'heat_storage_rate_per_depth', 'stored_heat_per_depth',
+                   'thermal_energy_functional_per_depth', 'prescribed_node_ids', 'prescribed_temperature')
+
+
 def memory():
     result = {"traced_live_bytes": tracemalloc.get_traced_memory()[0],
               "traced_phase_peak_bytes": tracemalloc.get_traced_memory()[1],
@@ -66,6 +74,8 @@ def child(args):
         from simcase.studio import server
         from simcase.studio import thermal_api as common
         from simcase.studio import transient_thermal_api as transient
+        if set(transient.SPEC) != set(CAPTURE_GETTERS):
+            raise AssertionError('CAPTURE_GETTERS must name the result spec: '+json.dumps(sorted(transient.SPEC)))
         counts, events = {}, []
         lock = threading.RLock()
         def hook(owner, name, label):
@@ -267,11 +277,7 @@ def parent(args):
                 'limitations':['not an exhaustive producer allocation inventory',
                                'native coverage and eviction/disconnect lifecycle proof remain separate']}
             after=rpc(process,'snapshot')['snapshot']
-            getter_counts={k:after['counts'].get('getter:'+k,0) for k in [
-                'nodes_m','triangles','time_s','temperature_k','heat_flux_w_m2',
-                'source_load_w_per_m','reaction_w_per_m','residual_w_per_m',
-                'storage_rate_w_per_m','heat_content_j_per_m','quadratic_functional_jk_per_m',
-                'dirichlet_node_ids','dirichlet_temperatures_k']}
+            getter_counts={k:after['counts'].get('getter:'+k,0) for k in CAPTURE_GETTERS}
             report['completed_capture_getters']=getter_counts
             if any(v!=1 for v in getter_counts.values()):
                 raise ValueError('each13 completed-capture getter must have count1')
@@ -281,8 +287,8 @@ def parent(args):
             manifest=next(finite_json((args.output/r['raw_file']).read_bytes()) for r in report['requests']
                           if r['path'].endswith('/result') and 'raw_file' in r)
             job=manifest['job']; rid=manifest['result_id']
-            path='/api/jobs/'+job+'/frame?'+urllib.parse.urlencode({'result_id':rid,'field':'temperature_k',
-                         'time_index':len(manifest['time_s'])-1,'frame_seq':77})
+            path='/api/jobs/'+job+'/frame?'+urllib.parse.urlencode({'result_id':rid,'field':'temperature',
+                         'time_index':len(manifest['time'])-1,'frame_seq':77})
             phase_started=time.perf_counter()
             before=rpc(process,'reset_peak')['snapshot']
             first_read,_=observer.request(path,save=True)

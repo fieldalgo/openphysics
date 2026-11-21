@@ -187,13 +187,12 @@ def test_lifecycle_thread_fixture_failure_is_not_worker_completion(stage):
 
 def steady_model():
     return {
-        "openphysics": "0.2", "name": "Thermal lifecycle \\u0394",
-        "units": {"length": "m", "temperature": "K"},
-        "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+        "openphysics": "0.3", "name": "Thermal lifecycle \\u0394",
+        "geometry": {"length_unit": "m", "depth": None, "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
         "materials": {}, "physics": {"heat1": {
-            "type": "thermal.steady2d", "conductivity_w_mk": 2,
-            "heat_source_w_m3": 0, "dirichlet_temperature_k": {"left": 300, "right": 293}}},
-        "mesh": {"subdivisions": [2, 2]}, "study": {"type": "single"},
+            "type": "thermal.steady2d", "thermal_conductivity": "2 W/(m K)",
+            "heat_source_density": "0 W/m^3", "prescribed_temperature": {"left": "300 K", "right": "293 K"}}},
+        "mesh": {"subdivision_count": [2, 2]}, "study": {"type": "single"},
         "results": {"save_fields": True, "plots": False},
     }
 
@@ -292,11 +291,11 @@ def test_thermal_success_cached_bytes_and_fixed_top_level_wire(lifecycle, monkey
     first = life.client.get(url)
     assert first.status_code == 200
     payload = first.json()
-    assert payload["display_length_in_m"] == 1.0
+    assert payload["display_length_in_m"] == 1.0 and payload["length_unit"] == "m"
     assert "coordinates" not in payload
     assert set(payload) == {
         "payload_format", "kind", "job", "result_id", "client_revision", "request_seq",
-        "result_format", "field_layout", "display_length_in_m", "summary", "arrays"}
+        "result_format", "field_layout", "length_unit", "display_length_in_m", "summary", "arrays"}
     for key, value in identity.items():
         assert payload[key] == value
 

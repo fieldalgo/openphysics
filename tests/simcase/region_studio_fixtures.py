@@ -9,7 +9,8 @@ says otherwise. The tests derive every count they check (loop vertices, nodes, b
 crossings) in-process from these documents; nothing here stores an expected value, and
 the sizes quoted in docstrings are descriptions, not criteria.
 
-The steady example's domain is 40 x 20 mm; the transient example's is 30 x 5 mm.
+The steady example's domain is 40 x 20 mm; the transient example's is 30 x 5 mm. Both are
+format 0.3: lengths outside the shapes carry their unit (``mm``), as do sources and angles.
 """
 import copy
 import math
@@ -18,11 +19,16 @@ import random
 from simcase import examples
 
 
+def mm(value):
+    """A length in millimetres, the examples' length_unit, as a quantity string."""
+    return f'{value!r} mm'
+
+
 def steady_example(size=None):
     """The shipped steady region example: a steel plate with a copper heater in insulation."""
     doc = copy.deepcopy(examples.EXAMPLES['thermal_regions'])
     if size is not None:
-        doc['mesh']['size'] = size
+        doc['mesh']['element_size'] = mm(size)
     return doc
 
 
@@ -31,23 +37,31 @@ def transient_example(size=None, times=None):
     another mesh size or with ``times`` requested times 5 s apart."""
     doc = copy.deepcopy(examples.EXAMPLES['transient_thermal_regions'])
     if size is not None:
-        doc['mesh']['size'] = size
+        doc['mesh']['element_size'] = mm(size)
     if times is not None:
-        doc['study']['time_s'] = [5.0 * i for i in range(times)]
+        doc['study']['time'] = {'unit': 's', 'values': [5.0 * i for i in range(times)]}
     return doc
 
 
+def _sized(extra):
+    """``mesh_size`` (a number in mm) as the shape's ``element_size`` quantity."""
+    if 'mesh_size' in extra:
+        extra = dict(extra)
+        extra['element_size'] = mm(extra.pop('mesh_size'))
+    return extra
+
+
 def rect(name, x, y, w, h, material='steel', **extra):
-    return {'name': name, 'type': 'rect', 'x': x, 'y': y, 'w': w, 'h': h, 'material': material, **extra}
+    return {'name': name, 'type': 'rect', 'x': x, 'y': y, 'w': w, 'h': h, 'material': material, **_sized(extra)}
 
 
 def circle(name, cx, cy, r, material='copper', **extra):
-    return {'name': name, 'type': 'circle', 'cx': cx, 'cy': cy, 'r': r, 'material': material, **extra}
+    return {'name': name, 'type': 'circle', 'cx': cx, 'cy': cy, 'r': r, 'material': material, **_sized(extra)}
 
 
 def polygon(name, points, material='steel', **extra):
     return {'name': name, 'type': 'polygon', 'points': [[float(x), float(y)] for x, y in points],
-            'material': material, **extra}
+            'material': material, **_sized(extra)}
 
 
 def regular_polygon(cx, cy, r, n, r2=None):
@@ -62,7 +76,8 @@ def with_shapes(shapes, heat=None, base=None):
     doc = steady_example() if base is None else base
     doc['geometry']['shapes'] = shapes
     name = next(iter(doc['physics']))
-    doc['physics'][name]['heat_source_w_m3'] = heat if heat else 0.0
+    doc['physics'][name]['heat_source_density'] = ({region: f'{value!r} W/m^3' for region, value in heat.items()}
+                                                   if heat else '0 W/m^3')
     return doc
 
 
@@ -70,11 +85,11 @@ def with_shapes(shapes, heat=None, base=None):
 
 def strip(width=0.2, size=0.06):
     """One copper strip from x = 1 to 39 mm, ``width`` high, centred in the steady domain,
-    meshed at ``size`` inside a background of mesh size 1000: the background's sides stay
+    meshed at ``size`` inside a background of element size 1000: the background's sides stay
     single long segments next to a fine mesh. 12 loop vertices."""
     doc = with_shapes([rect('heater', 1.0, 10.0 - width / 2, 38.0, width, 'copper', mesh_size=size)],
                       heat={'heater': 5e6})
-    doc['geometry']['background']['mesh_size'] = 1000.0
+    doc['geometry']['background']['element_size'] = mm(1000.0)
     return doc
 
 
@@ -117,12 +132,14 @@ def circles_rects_polygon():
 
 def tiny_global_size(size=0.0246):
     """The steady example with the background and the plate sized 2 mm and a tiny global
-    ``mesh.size``. The heater is an isolated circle, and an isolated circle takes its vertex
-    count from the global size, max(16, int(4 pi r / mesh.size)), even with its own
-    ``mesh_size``; it is counted twice, as itself and as the plate's hole."""
+    ``mesh.element_size``. The heater is an isolated circle, and an isolated circle takes its vertex
+    count from the global size, max(16, int(4 pi r / mesh.element_size)), even with its own
+    ``element_size``; it is counted twice, as itself and as the plate's hole."""
     doc = steady_example(size)
-    doc['geometry']['background']['mesh_size'] = 2.0
-    doc['geometry']['shapes'][0]['mesh_size'] = 2.0
+    doc['geometry']['background']['element_size'] = mm(2.0)
+    doc['geometry']['shapes'][0]['element_size'] = mm(2.0)
+    # the reader's triangle estimate (E-MESH-ESTIMATE) would refuse it before any mesh limit
+    doc['mesh']['element_count_limit'] = 10 ** 9
     return doc
 
 
@@ -232,12 +249,12 @@ def collinear_overlaps(rects=47, circles=16, points=512, y0=8.0, y1=12.0):
 def concentric_rings(count=7, r0=1.0, dr=0.3, size=0.15, min_angle=33.0):
     """``count`` concentric circles in the steady domain, radii r0 + k dr, larger ones
     first, so that each later circle cuts an annulus out of the one before (every circle
-    is a 128-gon), each with ``mesh_size`` ``size``, and ``min_angle``. At the defaults
+    is a 128-gon), each with ``element_size`` ``size``, and ``minimum_angle``. At the defaults
     meshine's refinement does not finish within its 80 rounds before the node cap."""
     shapes = [circle(f'c{k}', 20.0, 10.0, r0 + (count - 1 - k) * dr, 'copper' if k % 2 else 'steel',
                      mesh_size=size) for k in range(count)]
     doc = with_shapes(shapes)
-    doc['mesh']['min_angle'] = min_angle
+    doc['mesh']['minimum_angle'] = f'{min_angle!r} deg'
     return doc
 
 
@@ -344,7 +361,7 @@ def sawtooth(teeth=254, tip_angle_deg=None, jitter=0.0, seed=1, crossing_rects=0
     ``tip_angle_deg`` the valleys rise until the tips have that angle. ``jitter`` moves
     every tooth point up or down by up to that fraction of the tooth height (seeded),
     ``crossing_rects`` thin vertical rects of ``rect_width`` cross the tooth band, and
-    ``min_angle`` sets mesh.min_angle. Such inputs need very fine meshes near their tips."""
+    ``min_angle`` sets mesh.minimum_angle (degrees). Such inputs need very fine meshes near their tips."""
     x0, x1, ybase, yhi = 2.0, 38.0, 4.0, 16.0
     w = (x1 - x0) / teeth
     ylo = 8.0 if tip_angle_deg is None else yhi - (w / 2) / math.tan(math.radians(tip_angle_deg) / 2)
@@ -363,7 +380,7 @@ def sawtooth(teeth=254, tip_angle_deg=None, jitter=0.0, seed=1, crossing_rects=0
                            yhi - ylo + 0.6, 'copper'))
     doc = with_shapes(shapes)
     if min_angle is not None:
-        doc['mesh']['min_angle'] = min_angle
+        doc['mesh']['minimum_angle'] = f'{min_angle!r} deg'
     return doc
 
 

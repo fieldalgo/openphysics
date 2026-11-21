@@ -19,7 +19,8 @@ import pytest
 import galerkin.elasticity as elasticity
 import galerkin.waveguide as waveguide
 import refsol.elasticity as reference
-from galerkin import EdgeSpace, disk_mesh, eval_edge_field
+from galerkin import EdgeSpace, disk_mesh
+from galerkin.kernels import eval_edge_field, solve_modes
 from galerkin.mesh import rectangle_mesh
 from simcase import Document, examples
 from simcase.fields import VectorField
@@ -46,10 +47,10 @@ def test_installed_elasticity_uniaxial_closed_form(plane):
     bc = {(int(i), 0): 0. for i in mesh.boundary["left"]}
     bc.update({(int(i), 0): 2 * extension for i in mesh.boundary["right"]})
     bc.update({(int(i), 1): 0. for i in mesh.boundary["bottom"]})
-    result = elasticity.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu,
-                                        plane=plane, dirichlet=bc)
-    exact = reference.affine(mesh.nodes, np.diag([extension, lateral]),
-                             young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elasticity.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu,
+                                        plane=plane, prescribed_displacement=bc)
+    exact = reference.affine(mesh.nodes, displacement_gradient=np.diag([extension, lateral]), displacement=(0., 0.),
+                             youngs_modulus=e, poisson_ratio=nu, plane=plane)
     for u in (result.displacement, exact.displacement):
         np.testing.assert_allclose(u, expected_u, rtol=1e-10, atol=1e-14)
     for strain in (result.strain, exact.strain):
@@ -59,10 +60,10 @@ def test_installed_elasticity_uniaxial_closed_form(plane):
         np.testing.assert_allclose(stress, np.broadcast_to(expected_stress, stress.shape),
                                    rtol=1e-10, atol=1e-6)
     assert result.plane == plane
-    np.testing.assert_array_equal(result.load, 0.)
+    np.testing.assert_array_equal(result.applied_force_per_depth, 0.)
     # Reactions on opposite ends match the analytic stress times unit height.
     for side, sign in (("left", -1), ("right", 1)):
-        np.testing.assert_allclose(result.reaction[mesh.boundary[side], 0].sum(),
+        np.testing.assert_allclose(result.reaction_force_per_depth[mesh.boundary[side], 0].sum(),
                                    sign * axial_stress, rtol=1e-10)
 
 
@@ -73,8 +74,8 @@ def test_installed_elasticity_rejects_unremoved_rigid_modes(plane, constraints):
     node = int(mesh.boundary["left"][0])
     bc = {} if constraints == "none" else {(node, 0): 0., (node, 1): 0.}
     with pytest.raises(ValueError, match="rigid|singular"):
-        elasticity.solve_elasticity(mesh, young_modulus=70e9, poisson_ratio=.3,
-                                    plane=plane, dirichlet=bc)
+        elasticity.solve_elasticity(mesh, youngs_modulus=70e9, poisson_ratio=.3,
+                                    plane=plane, prescribed_displacement=bc)
 
 
 def test_english_elasticity_example_runs_with_installed_packages():
@@ -104,9 +105,11 @@ def test_english_elasticity_example_runs_with_installed_packages():
 def test_installed_vector_solver_and_complex_serialization(tmp_path):
     mesh = disk_mesh((4, 8, 24), (4, 4, 16), 32)
     eps = mesh.by_region([1.45**2, 1.44**2, 1.44**2])
-    neff, _, et, ez = waveguide.solve_modes(mesh, eps, 2 * np.pi / 1.5, 1.45, 2)
+    neff, _, et, ez = solve_modes(mesh, eps, 2 * np.pi / 1.5, 1.45, 2)
     assert len(neff) == 2 and np.isfinite(neff).all()
     assert np.iscomplexobj(et) and np.iscomplexobj(ez)
+    # physics_em_modes2d.solve is the kernel (micrometres, exp(+i omega t)); RunResult holds SI under
+    # exp(-i omega t), so the kernel values enter it as simcase's _to_public writes them
     point = solve(mesh, eps, 1.5, {"outer": "pec"}, 2, "vector", 1.44)
     original = point["vector_field"]
     assert original.electric.shape[1] == 2
@@ -118,29 +121,34 @@ def test_installed_vector_solver_and_complex_serialization(tmp_path):
     for array in (field.transverse, field.longitudinal, field.electric):
         assert np.iscomplexobj(array) and np.max(np.abs(array.imag)) > 1e-12
     doc_data = copy.deepcopy(examples.VECTOR_FIBER)
-    doc_data["physics"]["em1"].update(wavelength=1.5, num_modes=2)
+    doc_data["physics"]["em1"].update(vacuum_wavelength="1.5 um", mode_count=2)
     doc_data.setdefault("results", {}).update(plots=False, save_fields=True)
     doc = Document.from_dict(doc_data)
     names = ["core_region", "clad_region", "outer_region"]
     material_names = dict(zip(names, ["core", "clad", "clad"]))
-    result = RunResult(doc, mesh.nodes, mesh.triangles, mesh.regions, names,
-                       material_names, None, [1.5], point["neff"][None, :], [],
-                       vector_fields=[field])
+    public = VectorField(field.edges, np.conj(field.transverse) * 1e-6, np.conj(field.longitudinal),
+                         np.conj(field.electric), field.normalization)
+    result = RunResult(doc, mesh.nodes * 1e-6, mesh.triangles, mesh.regions, names,
+                       material_names, None, np.array([1.5e-6]), np.conj(point["neff"])[None, :], [],
+                       vector_fields=[public])
     output = result.save(tmp_path / "complex-vector")
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
-        for key, expected in (("vector_transverse", field.transverse),
-                              ("vector_longitudinal", field.longitudinal),
-                              ("vector_electric", field.electric)):
+        assert str(arrays["field_layout"]) == "em-modes2d-p1-node-centroid-v2"
+        for key, expected in (("unnormalized_electric_field_line_integral", public.transverse),
+                              ("unnormalized_electric_field_z", public.longitudinal),
+                              ("unnormalized_electric_field", public.electric)):
             assert arrays[key].dtype.kind == "c" and not arrays[key].dtype.hasobject
             np.testing.assert_array_equal(arrays[key][0], expected)
-        space = EdgeSpace(mesh)
+        space = EdgeSpace(mesh)                                   # the micrometre mesh: line integrals / 1e-6
         for j in range(2):
-            np.testing.assert_allclose(eval_edge_field(space, arrays["vector_transverse"][0, :, j]),
-                                       arrays["vector_electric"][0, :, j, :2], atol=1e-13)
-        np.testing.assert_allclose(arrays["vector_longitudinal"][0][mesh.triangles].mean(axis=1),
-                                   arrays["vector_electric"][0, :, :, 2], atol=1e-13)
-    payload = json.loads(json.dumps(field.to_dict()))
+            np.testing.assert_allclose(
+                eval_edge_field(space, arrays["unnormalized_electric_field_line_integral"][0, :, j] / 1e-6),
+                arrays["unnormalized_electric_field"][0, :, j, :2], atol=1e-13)
+        np.testing.assert_allclose(arrays["unnormalized_electric_field_z"][0][mesh.triangles].mean(axis=1),
+                                   arrays["unnormalized_electric_field"][0, :, :, 2], atol=1e-13)
+    payload = json.loads(json.dumps(public.to_dict()))
+    assert payload["components"] == ["x", "y", "z"] and payload["time_convention"] == "exp(-i omega t)"
     decoded = np.array(payload["real"]) + 1j * np.array(payload["imag"])
-    np.testing.assert_array_equal(decoded.transpose(1, 0, 2), field.electric)
+    np.testing.assert_array_equal(decoded.transpose(1, 0, 2), public.electric)
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
-    assert summary["field_representation"] == "vector-edge-nodal-v1"
+    assert summary["field_representation"] == "vector-edge-nodal-v2"

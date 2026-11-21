@@ -80,15 +80,15 @@ def system_checks(nodes,tris,result,bc,k,source,reference=T0):
     residual=matrix@theta-load
     # Norm of physical fluctuation terms, not the absolute Kelvin offset.
     scale=max(float(np.linalg.norm(abs(matrix)@abs(theta)+abs(load),np.inf)),np.finfo(float).tiny)
-    np.testing.assert_allclose(result.load,load,rtol=1e-10,atol=1e-10*max(abs(load).max(),np.finfo(float).tiny))
-    assert np.max(abs(result.residual-residual))/scale<=1e-10
+    np.testing.assert_allclose(result.generated_heat_rate_per_depth,load,rtol=1e-10,atol=1e-10*max(abs(load).max(),np.finfo(float).tiny))
+    assert np.max(abs(result.residual_heat_rate_per_depth-residual))/scale<=1e-10
     assert (np.max(abs(residual[free]))/scale if len(free) else 0)<=1e-10
-    np.testing.assert_array_equal(result.reaction[free],0.)
-    assert np.max(abs(result.reaction[fixed]-residual[fixed]))/scale<=1e-10
+    np.testing.assert_array_equal(result.reaction_heat_rate_per_depth[free],0.)
+    assert np.max(abs(result.reaction_heat_rate_per_depth[fixed]-residual[fixed]))/scale<=1e-10
     assert max(abs(result.temperature[i]-v) for i,v in bc.items())/AMP<=1e-10
-    balance=abs(np.sum(result.reaction)+np.sum(load))/max(np.sum(abs(result.reaction))+np.sum(abs(load)),np.finfo(float).tiny)
+    balance=abs(np.sum(result.reaction_heat_rate_per_depth)+np.sum(load))/max(np.sum(abs(result.reaction_heat_rate_per_depth))+np.sum(abs(load)),np.finfo(float).tiny)
     assert balance<=1e-10
-    left=float(theta@(matrix@theta));right=float(theta@load+theta[fixed]@result.reaction[fixed])
+    left=float(theta@(matrix@theta));right=float(theta@load+theta[fixed]@result.reaction_heat_rate_per_depth[fixed])
     assert abs(left-right)/max(abs(left)+abs(right),np.finfo(float).tiny)<=1e-10
     return {'balance':float(balance),'functional_left':left,'functional_right':right,
             'original_free_residual':float(np.max(abs(residual[free]))/scale if len(free) else 0)}

@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from scipy.optimize import root
 from galerkin.mesh import rectangle_mesh
-from galerkin.waveguide import solve_modes
+from galerkin.kernels import solve_modes
 from galerkin.mode_coordinates import mode_coordinates, solve_scalar_coordinates
 
 K0 = 2*np.pi/1.55
@@ -81,7 +81,7 @@ def test_pml_strength_thickness_and_window_stability(pol,vector):
 
 
 def test_identity_transform_preserves_vector_pencil():
-    from galerkin.waveguide import assemble_mode_system
+    from galerkin.kernels import assemble_mode_system
     mesh=rectangle_mesh(2.,1.,8,4)
     eps=np.full(mesh.num_triangles,2.25)
     a,b,_=assemble_mode_system(mesh,eps,K0)

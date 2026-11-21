@@ -79,15 +79,15 @@ def _run(k, c, q, t_left, t0, slope, *, name=None):
 
     def source(points, s):
         return q * (1.0 + _wrap(name, points[:, 0]) * s)
-    return solve_transient_heat(MESH, conductivity=k, volumetric_heat_capacity=c, time_s=TIMES,
-                                initial_temperature_k=t0 + slope * _wrap(name, X),
-                                dirichlet={i: wall for i in LEFT}, heat_source=source)
+    return solve_transient_heat(MESH, thermal_conductivity=k, volumetric_heat_capacity=c, time=TIMES,
+                                initial_temperature=t0 + slope * _wrap(name, X),
+                                prescribed_temperature={i: wall for i in LEFT}, heat_source_density=source)
 
 
 VALUES = (2.0, 3.0, 40.0, 320.0, 300.0, 10.0)
-FIELDS = ("temperature_k", "heat_flux_w_m2", "source_load_w_per_m", "reaction_w_per_m",
-          "residual_w_per_m", "storage_rate_w_per_m", "heat_content_j_per_m",
-          "quadratic_functional_jk_per_m", "dirichlet_temperatures_k")
+FIELDS = ("temperature", "heat_flux", "generated_heat_rate_per_depth", "reaction_heat_rate_per_depth",
+          "residual_heat_rate_per_depth", "heat_storage_rate_per_depth", "stored_heat_per_depth",
+          "thermal_energy_functional_per_depth", "prescribed_temperature")
 
 
 @pytest.mark.parametrize("name", BACKENDS)
@@ -99,15 +99,15 @@ def test_histories_match_numpy(name):
         assert type(getattr(live, field)).__module__.split(".")[0] in ("jax", "jaxlib", "torch")
         np.testing.assert_allclose(_numbers(getattr(live, field)), expected, rtol=1e-12,
                                    atol=1e-12 * max(1.0, np.max(abs(expected))))
-    np.testing.assert_array_equal(live.time_s, reference.time_s)
-    np.testing.assert_array_equal(live.dirichlet_node_ids, reference.dirichlet_node_ids)
+    np.testing.assert_array_equal(live.time, reference.time)
+    np.testing.assert_array_equal(live.prescribed_node_ids, reference.prescribed_node_ids)
 
 
 @pytest.mark.parametrize("name", BACKENDS)
 def test_gradients_match_central_differences(name):
     def objective(*v, live=None):
         r = _run(*v, name=live)
-        return (r.temperature_k[-1]**2).mean() + r.heat_content_j_per_m[2] * 1e-3
+        return (r.temperature[-1]**2).mean() + r.stored_heat_per_depth[2] * 1e-3
     got = _gradient(name, lambda *v: objective(*v, live=name), VALUES)
     np.testing.assert_allclose(got, _central(objective, VALUES), rtol=2e-6, atol=1e-8)
 
@@ -118,10 +118,10 @@ def test_insulated_uniform_heating_matches_the_exact_discrete_solution(name):
     t_end = TIMES[-1]
 
     def final(k, c, q, t0):
-        r = solve_transient_heat(MESH, conductivity=k, volumetric_heat_capacity=c, time_s=TIMES,
-                                 initial_temperature_k=t0 + 0.0 * _wrap(name if hasattr(t0, "shape") else None, X),
-                                 dirichlet={}, heat_source=q)
-        return r.temperature_k[-1].mean()
+        r = solve_transient_heat(MESH, thermal_conductivity=k, volumetric_heat_capacity=c, time=TIMES,
+                                 initial_temperature=t0 + 0.0 * _wrap(name if hasattr(t0, "shape") else None, X),
+                                 prescribed_temperature={}, heat_source_density=q)
+        return r.temperature[-1].mean()
     values = (2.0, 3.0, 40.0, 300.0)
     k, c, q, t0 = values
     assert abs(float(_numbers(final(*values))) - (t0 + q * t_end / c)) < 1e-12 * t0
@@ -135,12 +135,12 @@ def test_region_tables_and_constant_dirichlet(name):
     left = [int(i) for i in mesh.boundary["left"]]
 
     def objective(k0, k1, c0, c1, q1, t_left):
-        r = solve_transient_heat(mesh, conductivity={"layer0": k0, "layer1": k1},
+        r = solve_transient_heat(mesh, thermal_conductivity={"layer0": k0, "layer1": k1},
                                  volumetric_heat_capacity={"layer0": c0, "layer1": c1},
-                                 time_s=[0.0, 0.1, 0.3], initial_temperature_k=np.full(mesh.num_nodes, 300.0),
-                                 dirichlet={i: t_left for i in left},
-                                 heat_source={"layer0": 0.0, "layer1": q1})
-        return (r.temperature_k[-1] * r.temperature_k[1]).mean()
+                                 time=[0.0, 0.1, 0.3], initial_temperature=np.full(mesh.num_nodes, 300.0),
+                                 prescribed_temperature={i: t_left for i in left},
+                                 heat_source_density={"layer0": 0.0, "layer1": q1})
+        return (r.temperature[-1] * r.temperature[1]).mean()
     values = (1.5, 4.0, 2.0, 5.0, 30.0, 300.0)
     # t_left must equal the initial temperature on its nodes at t0, so it is not varied.
     got = _gradient(name, lambda *v: objective(*v[:5], 300.0), values[:5])
@@ -153,8 +153,8 @@ def test_jit_is_refused():
     for traced in ("initial", "source"):
         def history(q):
             if traced == "initial":                  # initial field traced: input check
-                return _run(2.0, 3.0, 40.0, 320.0, 300.0, q, name="jax").temperature_k
-            return _run(2.0, 3.0, q, 320.0, 300.0, 10.0).temperature_k   # source only: step 0
+                return _run(2.0, 3.0, 40.0, 320.0, 300.0, q, name="jax").temperature
+            return _run(2.0, 3.0, q, 320.0, 300.0, 10.0).temperature   # source only: step 0
         expected = TracedValueError if traced == "initial" else TransientHeatStepError
         with pytest.raises(expected) as error:
             jax.jit(history)(jax.numpy.asarray(40.0))
@@ -168,9 +168,9 @@ def test_live_callback_after_numpy_start_is_refused():
     def wall(s):
         return 300.0 if s == 0.0 else jax.numpy.asarray(310.0)
     with pytest.raises(TransientHeatStepError) as error:
-        solve_transient_heat(MESH, conductivity=2.0, volumetric_heat_capacity=3.0, time_s=TIMES,
-                             initial_temperature_k=np.full(MESH.num_nodes, 300.0),
-                             dirichlet={i: wall for i in LEFT})
+        solve_transient_heat(MESH, thermal_conductivity=2.0, volumetric_heat_capacity=3.0, time=TIMES,
+                             initial_temperature=np.full(MESH.num_nodes, 300.0),
+                             prescribed_temperature={i: wall for i in LEFT})
     assert error.value.time_index == 1
     assert isinstance(error.value.__cause__, TypeError) and "one array library" in str(error.value.__cause__)
 
@@ -182,9 +182,8 @@ def test_transient_mechanics_refuses_a_live_heat_history(name):
     heat = _run(*_live(name, VALUES), name=name)
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(
-            MESH, heat, units={"length": "m", "time": "s", "temperature": "K"},
-            young_modulus=70e9, poisson_ratio=0.3, plane="strain", thermal_expansion_per_k=12e-6,
-            reference_temperature_k=293.15, mechanical_dirichlet={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
+            MESH, heat, youngs_modulus=70e9, poisson_ratio=0.3, plane="strain", linear_expansion_coefficient=12e-6,
+            stress_free_temperature=293.15, prescribed_displacement={(0, 0): 0.0, (0, 1): 0.0, (3, 1): 0.0})
     assert isinstance(caught.value.__cause__, TypeError)
     assert "cut the derivative" in str(caught.value.__cause__)
 
@@ -194,12 +193,12 @@ def test_transient_mechanics_refuses_a_live_heat_history(name):
 def test_checkpointing_gives_the_same_values_and_gradients(name, every):
     """Blocks of 1 and 3 of the 4 steps (a shorter last block) against keeping every step."""
     def objective(*v, checkpoint_every=None):
-        r = solve_transient_heat(MESH, conductivity=v[0], volumetric_heat_capacity=v[1], time_s=TIMES,
-                                 initial_temperature_k=v[4] + 10.0 * _wrap(name, X),
-                                 dirichlet={i: v[3] for i in LEFT},
-                                 heat_source=lambda points, s: v[2] * (1.0 + _wrap(name, points[:, 0])),
+        r = solve_transient_heat(MESH, thermal_conductivity=v[0], volumetric_heat_capacity=v[1], time=TIMES,
+                                 initial_temperature=v[4] + 10.0 * _wrap(name, X),
+                                 prescribed_temperature={i: v[3] for i in LEFT},
+                                 heat_source_density=lambda points, s: v[2] * (1.0 + _wrap(name, points[:, 0])),
                                  checkpoint_every=checkpoint_every)
-        return (r.temperature_k[-1]**2).mean() + r.reaction_w_per_m.sum() + r.quadratic_functional_jk_per_m[-1]
+        return (r.temperature[-1]**2).mean() + r.reaction_heat_rate_per_depth.sum() + r.thermal_energy_functional_per_depth[-1]
     values = (2.0, 3.0, 40.0, 300.0, 300.0)
     kept = _gradient(name, objective, values)
     recomputed = _gradient(name, lambda *v: objective(*v, checkpoint_every=every), values)
@@ -212,15 +211,15 @@ def test_checkpointing_gives_the_same_values_and_gradients(name, every):
 def test_checkpoint_every_is_validated(bad):
     with pytest.raises(ValueError, match="checkpoint_every"):
         solve_transient_heat(
-            MESH, conductivity=2.0, volumetric_heat_capacity=3.0, time_s=TIMES,
-            initial_temperature_k=np.full(MESH.num_nodes, 300.0), dirichlet={}, checkpoint_every=bad)
+            MESH, thermal_conductivity=2.0, volumetric_heat_capacity=3.0, time=TIMES,
+            initial_temperature=np.full(MESH.num_nodes, 300.0), prescribed_temperature={}, checkpoint_every=bad)
 
 
 def test_checkpoint_every_does_not_change_numpy_results():
     def run(every):
-        return solve_transient_heat(MESH, conductivity=2.0, volumetric_heat_capacity=3.0, time_s=TIMES,
-                                    initial_temperature_k=300.0 + 10.0 * X,
-                                    dirichlet={i: 300.0 for i in LEFT}, heat_source=40.0,
+        return solve_transient_heat(MESH, thermal_conductivity=2.0, volumetric_heat_capacity=3.0, time=TIMES,
+                                    initial_temperature=300.0 + 10.0 * X,
+                                    prescribed_temperature={i: 300.0 for i in LEFT}, heat_source_density=40.0,
                                     checkpoint_every=every)
     a, b = run(None), run(2)
     for field in FIELDS:

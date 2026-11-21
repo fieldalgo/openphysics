@@ -4,9 +4,11 @@
 
 Heat is computed separately. No interpolation, inertia, damping or feedback.
 See docs/packages/galerkin/transient_thermal_mechanical.md for the validation and memory contract.
+Quantities are keyword-only registry names in SI units (the units convention of the
+galerkin step); a str for a quantity raises TypeError.
 """
-from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
 
@@ -18,16 +20,21 @@ from .materials import is_per_region, region_property
 from .thermoelasticity import (TemperatureSnapshot, ThermoelasticResult,
                               freeze_temperature, solve_thermoelasticity)
 from .transient_heat import TransientHeatResult
+from ._public import ResultSurface, refuse_text
+
+__all__ = ["TransientThermoelasticError", "TransientThermoelasticStep",
+           "TransientThermoelasticResult", "solve_transient_thermoelasticity"]
 
 
 class TransientThermoelasticError(ValueError):
     """Atomic input/transfer/mechanics failure, retaining the original cause."""
 
-    def __init__(self, stage, *, time_index=None, time_s=None):
+    def __init__(self, stage, *, time_index=None, time=None):
+        refuse_text("time", time)
         self.stage = stage
         self.time_index = time_index
-        self.time_s = time_s
-        where = "" if time_index is None else f" at time index {time_index}, time_s={time_s!r}"
+        self.time = time
+        where = "" if time_index is None else f" at time index {time_index}, time={time!r}"
         super().__init__(f"transient thermoelasticity [{stage}]{where}")
 
 
@@ -52,22 +59,30 @@ def _indices(value, count):
 
 
 @dataclass(frozen=True)
-class TransientThermoelasticStep:
-    """One exact stored index; snapshot immutable, mechanical fields mutable."""
+class TransientThermoelasticStep(ResultSurface):
+    """One exact stored index; snapshot immutable, mechanical fields mutable.
+
+    ``time`` is the stored heat time in s; ``.units`` maps it to its canonical unit.
+    """
+    UNITS = MappingProxyType({"time": "s"})
+    BASIS = "planar"
 
     time_index: int
-    time_s: float
+    time: float
     temperature_snapshot: TemperatureSnapshot
     mechanics: ThermoelasticResult
 
 
 @dataclass(frozen=True)
-class TransientThermoelasticResult:
+class TransientThermoelasticResult(ResultSurface):
     """Selected steps only; no heat-history reference or post-return certification.
 
     The owned reference_mesh and mechanics arrays remain mutable. Snapshots
     retain immutable geometry and temperature copies, O(S*(N+M)) total storage.
+    Its fields are objects (``.units`` is empty); ``time`` gives the steps' times in s.
     """
+    UNITS = MappingProxyType({})
+    BASIS = "planar"
 
     reference_mesh: Mesh
     steps: tuple[TransientThermoelasticStep, ...]
@@ -77,91 +92,101 @@ class TransientThermoelasticResult:
         return tuple(step.time_index for step in self.steps)
 
     @property
-    def time_s(self):
-        return tuple(step.time_s for step in self.steps)
+    def time(self):
+        """The selected steps' stored times in s."""
+        return tuple(step.time for step in self.steps)
+
+
+#: the quantity parameters of solve_transient_thermoelasticity, refused as text (SI numbers only)
+_QUANTITIES = ("youngs_modulus", "poisson_ratio", "linear_expansion_coefficient", "stress_free_temperature",
+               "prescribed_displacement", "body_force_density")
 
 
 def solve_transient_thermoelasticity(
-    mesh, heat, *, units, time_indices=None, young_modulus, poisson_ratio,
-    plane, thermal_expansion_per_k, reference_temperature_k,
-    mechanical_dirichlet, body_force=(0., 0.),
+    mesh, heat, *, time_indices=None, youngs_modulus, poisson_ratio,
+    plane, linear_expansion_coefficient, stress_free_temperature,
+    prescribed_displacement, body_force_density=None,
 ):
     """Apply existing static mechanics to selected temperatures of a heat result.
 
-    units must be exactly {'length':'m', 'time':'s', 'temperature':'K'}.
+    SI only: heat is a planar TransientHeatResult in m, s and K.
     time_indices=None selects every stored index including the initial state.
     Require identical ordered geometry/connectivity; no mesh/time interpolation.
-    Supports are fixed exterior (node,component)->displacement m; body_force is
-    a constant two-vector N/m^3. Natural total traction is zero. E is Pa, alpha
-    1/K, Tref nonnegative K; plane is 'stress' or 'strain'. E, nu and alpha may
-    each be {region name: value} over mesh.region_names. All selected Kelvin
-    snapshots are validated and frozen before any mechanics call. No partial
-    aggregate is returned after failure; exceptions chain the original cause.
+    prescribed_displacement maps fixed exterior (node, component) to displacement in m;
+    body_force_density is None (no body force) or a constant two-vector N/m^3. Natural
+    total traction is zero. youngs_modulus is Pa, linear_expansion_coefficient 1/K,
+    stress_free_temperature nonnegative K; plane is 'stress' or 'strain'.
+    youngs_modulus, poisson_ratio and linear_expansion_coefficient may each be
+    {region name: value} over mesh.region_names. All selected Kelvin snapshots are
+    validated and frozen before any mechanics call. No partial aggregate is returned
+    after failure; exceptions chain the original cause. A str for a quantity raises
+    TypeError.
     """
+    for name, value in zip(_QUANTITIES, (youngs_modulus, poisson_ratio, linear_expansion_coefficient,
+                                         stress_free_temperature, prescribed_displacement, body_force_density)):
+        refuse_text(name, value)
+    body_force = (0., 0.) if body_force_density is None else body_force_density
     chain = OneWayChain(_stage_error)
     with chain.stage("input"):
-        if not isinstance(units, Mapping) or dict(units) != {
-            'length': 'm', 'time': 's', 'temperature': 'K'
-        }:
-            raise ValueError("units must be exactly {'length':'m','time':'s','temperature':'K'}")
         if not isinstance(heat, TransientHeatResult):
             raise ValueError("heat must be a TransientHeatResult")
         owned = isolated_mesh(mesh)
         state = mesh_state(owned)
-        nodes = real_array(heat.nodes_m, "heat.nodes_m")
+        nodes = real_array(heat.node_coordinates, "heat.node_coordinates")
         triangles = np.asarray(heat.triangles)
         if (triangles.dtype.kind not in "iu"
                 or not np.array_equal(nodes, owned.nodes)
                 or not np.array_equal(triangles, owned.triangles)):
             raise ValueError("heat and mechanics require identical ordered nodes and triangles")
-        times = real_array(heat.time_s, "heat.time_s")
+        times = real_array(heat.time, "heat.time")
         with np.errstate(over="ignore", invalid="ignore"):
             differences = np.diff(times) if times.ndim == 1 else np.array([])
         if (times.ndim != 1 or len(times) < 2 or np.any(times < 0)
                 or not np.all(np.isfinite(differences)) or np.any(differences <= 0)):
-            raise ValueError("heat.time_s must have at least two strictly increasing nonnegative seconds")
+            raise ValueError("heat.time must have at least two strictly increasing nonnegative seconds")
         # Validate consumed fields only; heat diagnostics/provenance are not certified.
-        temperatures = real_array(heat.temperature_k, "heat.temperature_k")
+        temperatures = real_array(heat.temperature, "heat.temperature")
         if temperatures.shape != (len(times), len(owned.nodes)):
-            raise ValueError("heat.temperature_k must have shape (stored times, nodes)")
+            raise ValueError("heat.temperature must have shape (stored times, nodes)")
         selected = _indices(time_indices, len(times))
         def material(value, name, **bounds):
             if is_per_region(value):
                 region_property(owned, value, name, **bounds)
                 return {str(k): float(value[k]) for k in sorted(value)}
             return real_scalar(value, name)
-        e = material(young_modulus, "young_modulus", positive=True)
+        e = material(youngs_modulus, "youngs_modulus", positive=True)
         nu = material(poisson_ratio, "poisson_ratio", lower=-1., upper=.5)
-        alpha = material(thermal_expansion_per_k, "thermal_expansion_per_k")
-        tref = real_scalar(reference_temperature_k, "reference_temperature_k")
+        alpha = material(linear_expansion_coefficient, "linear_expansion_coefficient")
+        tref = real_scalar(stress_free_temperature, "stress_free_temperature")
         if ((not isinstance(e, dict) and e <= 0) or (not isinstance(nu, dict) and not -1 < nu < .5)
                 or tref < 0 or plane not in ("stress", "strain")):
-            raise ValueError("require E>0, -1<nu<.5, Tref>=0K and plane stress/strain")
-        supports = dirichlet_supports(mechanical_dirichlet, vector=True)
+            raise ValueError("require youngs_modulus > 0, -1 < poisson_ratio < 0.5, stress_free_temperature >= 0 K "
+                             "and plane 'stress' or 'strain'")
+        supports = dirichlet_supports(prescribed_displacement, vector=True)
         # Reject bool values explicitly before the shared support normalizer casts.
-        for value in mechanical_dirichlet.values():
-            real_scalar(value, "mechanical Dirichlet displacement")
-        body = real_array(body_force, "body_force")
+        for value in prescribed_displacement.values():
+            real_scalar(value, "prescribed_displacement")
+        body = real_array(body_force, "body_force_density")
         if body.shape != (2,):
-            raise ValueError("body_force must be a constant Cartesian (2,) vector")
+            raise ValueError("body_force_density must be a constant Cartesian (2,) vector")
 
     snapshots = []
     for index in selected:
-        with chain.stage("transfer", time_index=index, time_s=float(times[index])):
+        with chain.stage("transfer", time_index=index, time=float(times[index])):
             # Same-mesh identity transfer of the stored nodal Kelvin field.
             nodal = transfer(Field(owned, temperatures[index], location="node", unit="K",
-                                   name="heat.temperature_k"), owned)
-            snapshots.append(freeze_temperature(owned, nodal.values))
+                                   name="heat.temperature"), owned)
+            snapshots.append(freeze_temperature(owned, temperature=nodal.values))
     # The entire input history copy is temporary; only selected snapshots survive.
     del temperatures
     steps = []
     for index, snapshot in zip(selected, snapshots):
-        with chain.stage("mechanics", time_index=index, time_s=float(times[index])):
+        with chain.stage("mechanics", time_index=index, time=float(times[index])):
             mechanics = solve_thermoelasticity(
-                owned, snapshot, reference_temperature_k=tref,
-                thermal_expansion_per_k=alpha, young_modulus=e,
-                poisson_ratio=nu, plane=plane, dirichlet=supports,
-                body_force=body,
+                owned, snapshot, stress_free_temperature=tref,
+                linear_expansion_coefficient=alpha, youngs_modulus=e,
+                poisson_ratio=nu, plane=plane, prescribed_displacement=supports,
+                body_force_density=body,
             )
             check_mesh_unchanged(owned, state)
         steps.append(TransientThermoelasticStep(int(index), float(times[index]), snapshot, mechanics))

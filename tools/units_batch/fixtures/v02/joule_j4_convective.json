@@ -1,0 +1,74 @@
+{
+  "openphysics": "0.2",
+  "name": "joule strip",
+  "units": {
+    "length": "mm",
+    "temperature": "K"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0,
+          "xmax": 2,
+          "ymin": 0,
+          "ymax": 1
+        },
+        "background": {
+          "material": "A"
+        },
+        "features": [
+          {
+            "name": "b",
+            "type": "rect",
+            "x": 1,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "material": "B"
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "A": {
+      "electrical_conductivity_s_m": 2000.0,
+      "conductivity_w_mk": 1.5
+    },
+    "B": {
+      "electrical_conductivity_s_m": 500.0,
+      "conductivity_w_mk": 0.25
+    }
+  },
+  "physics": {
+    "j": {
+      "type": "joule.steady2d",
+      "dirichlet_potential_v": {
+        "left": 0.1,
+        "right": 0.0
+      },
+      "dirichlet_temperature_k": {
+        "left": 300.0
+      },
+      "convection": {
+        "right": {
+          "h_w_m2k": 500.0,
+          "ambient_temperature_k": 300.0
+        }
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.25
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}

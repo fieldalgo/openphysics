@@ -3,6 +3,9 @@
 
 """Lowest-order Nedelec (Whitney) edge elements — 2D H(curl).
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Why they exist
 --------------
 Maxwell's electric field E is only tangentially continuous across material

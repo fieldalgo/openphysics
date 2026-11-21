@@ -90,7 +90,7 @@ def test_studio_thermal_capabilities_and_original_generic_refusal(client):
     response=client.post("/api/thermal/validate",json=envelope(data))
     assert response.status_code==200 and response.json()["ok"] is True,response.text
     legacy=model()
-    legacy["physics"]["heat1"].pop("outward_flux_w_m2")
+    legacy["physics"]["heat1"].pop("inward_heat_flux")
     legacy["physics"]["heat1"].pop("convection")
     response=client.post("/api/validate",json={"doc":legacy})
     assert response.status_code==200 and response.json()["ok"] is False
@@ -107,9 +107,9 @@ def test_studio_thermal_linear_additive_units_and_signs(client,unit):
     assert len(a)==13
     # Expected fields come from analytic14W/m and original element integrals,
     # never from payload summary totals.
-    close(np.array(a["prescribed_outward_load_w_per_m"].sum()),np.array(2.),14.,"G")
-    close(np.array(a["convective_outward_w_per_m"].sum()),np.array(12.),14.,"C")
-    close(np.array(a["reaction_w_per_m"].sum()),np.array(14.),14.,"inward R")
+    close(np.array(a["outward_prescribed_heat_rate_per_depth"].sum()),np.array(2.),14.,"G")
+    close(np.array(a["outward_convective_heat_rate_per_depth"].sum()),np.array(12.),14.,"C")
+    close(np.array(a["reaction_heat_rate_per_depth"].sum()),np.array(14.),14.,"inward R")
 
 
 @pytest.mark.parametrize("case",("robin","zero_h"))
@@ -117,8 +117,8 @@ def test_studio_thermal_robin_empty_dirichlet(client,case):
     data=model(case)
     payload=finished_payload(client,data)
     a=audit_payload(payload,data,case)
-    assert a["dirichlet_node_ids"].shape==(0,)
-    assert a["dirichlet_temperature_k"].shape==(0,)
+    assert a["prescribed_node_ids"].shape==(0,)
+    assert a["prescribed_temperature"].shape==(0,)
 
 
 def test_studio_thermal_quadratic_original_spatial_gates(client):
@@ -129,10 +129,10 @@ def test_studio_thermal_quadratic_original_spatial_gates(client):
         a=audit_payload(payload,data,"quadratic")
         from steady_boundary_independent_oracle import Elements
         L,H,k,Q,aa,b,*_=slab("quadratic")
-        e=Elements(a["nodes_m"],a["triangles"],k,Q)
-        primary.append(e.errors(a["temperature_k"],L,aa,b,Q,.1,8))
-        quad.append(e.errors(a["temperature_k"],L,aa,b,Q,.1,10))
-        close(np.array(a["load_w_per_m"].sum()),np.array(60.),60.,"60W/m")
+        e=Elements(a["node_coordinates"],a["triangles"],k,Q)
+        primary.append(e.errors(a["temperature"],L,aa,b,Q,.1,8))
+        quad.append(e.errors(a["temperature"],L,aa,b,Q,.1,10))
+        close(np.array(a["generated_heat_rate_per_depth"].sum()),np.array(60.),60.,"60W/m")
     primary,quad=np.asarray(primary),np.asarray(quad)
     orders=np.log2(primary[:-1]/primary[1:])
     assert np.all(orders[-2:,0]>=1.8),orders
@@ -147,11 +147,11 @@ def test_studio_thermal_quadratic_original_spatial_gates(client):
 
 def test_studio_thermal_legacy_absence_and_v2_empty_presence(client):
     data=model()
-    data["physics"]["heat1"].pop("outward_flux_w_m2")
+    data["physics"]["heat1"].pop("inward_heat_flux")
     data["physics"]["heat1"].pop("convection")
     old=captured_arrays(finished_payload(client,data,301),version=1)
     assert set(old)==set(LEGACY)
-    for i,key in enumerate(("outward_flux_w_m2","convection")):
+    for i,key in enumerate(("inward_heat_flux","convection")):
         newer=copy.deepcopy(data);newer["physics"]["heat1"][key]={}
         new=captured_arrays(finished_payload(client,newer,302+i))
         assert len(new)==13
@@ -183,7 +183,7 @@ def test_studio_thermal_strict_envelope_preserves_rejection(client):
 
 def test_studio_thermal_independent_wire_negative_controls():
     # Parser/control evidence only; not an actual solver/browser pass.
-    assert captured_arrays(synthetic_wire())["heat_flux_w_m2"].shape==(4,2)
+    assert captured_arrays(synthetic_wire())["heat_flux"].shape==(4,2)
     for kind,payload in malformed_wires():
         with pytest.raises((AssertionError,KeyError,ValueError),match=None):
             captured_arrays(payload)
@@ -192,9 +192,7 @@ def test_studio_thermal_independent_wire_negative_controls():
 class PublicResultProbe(ThermalRunResult):
     """Deliberate malformed producer actor using only captured public properties."""
     def __init__(self,original,fault):
-        names={"nodes_m":"mesh_nodes_m","triangles":"mesh_triangles"}
-        self.captured={names.get(k,k):np.array(getattr(original,names.get(k,k)),copy=True)
-                       for k in FIELDS}
+        self.captured={k:np.array(getattr(original,k),copy=True) for k in FIELDS}
         self.captured.update(result_format=original.result_format,field_layout=original.field_layout)
         self.doc=original.doc.copy();self.doc.validate()
         self.log=list(original.log);self.timings=dict(original.timings)
@@ -202,11 +200,11 @@ class PublicResultProbe(ThermalRunResult):
         if fault=="layout":
             self.captured["field_layout"]="wrong-layout"
             self.metadata["field_layout"]="wrong-layout"
-        elif fault=="unit":self.metadata["field_units"]["load_w_per_m"]="W"
-        elif fault=="shape":self.captured["heat_flux_w_m2"]=np.zeros((1,2))
-        elif fault=="nonfinite":self.captured["temperature_k"][0]=np.nan
-        elif fault=="bool":self.captured["temperature_k"]=np.ones(len(original.temperature_k),dtype=bool)
-        elif fault=="index":self.captured["mesh_triangles"][0,0]=len(original.mesh_nodes_m)
+        elif fault=="unit":self.metadata["field_units"]["generated_heat_rate_per_depth"]="W"
+        elif fault=="shape":self.captured["heat_flux"]=np.zeros((1,2))
+        elif fault=="nonfinite":self.captured["temperature"][0]=np.nan
+        elif fault=="bool":self.captured["temperature"]=np.ones(len(original.temperature),dtype=bool)
+        elif fault=="index":self.captured["triangles"][0,0]=len(original.node_coordinates)
         else:raise AssertionError(fault)
 
     def __getattribute__(self,name):

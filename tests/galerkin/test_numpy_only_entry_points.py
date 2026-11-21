@@ -20,8 +20,9 @@ TypeError.
 import numpy as np
 import pytest
 
-from galerkin import (EdgeSpace3D, assemble_mode_system, assemble_stiffness, box_mesh, eval_edge_field_3d,
-                      l2_error, radial_pml_coeffs, rectangle_mesh, solve_dirichlet, solve_material_cavity_box)
+from galerkin import EdgeSpace3D, box_mesh, l2_error, rectangle_mesh, solve_material_cavity_box
+from galerkin.kernels import (assemble_mode_system, eval_edge_field_3d, radial_pml_coeffs, assemble_stiffness,
+                              solve_dirichlet)
 from galerkin.material_cavity import CavityMaterialRegion
 from galerkin.mesh import Mesh
 from galerkin.mode_coordinates import mode_coordinates, scalar_coordinate_system, solve_scalar_coordinates
@@ -32,33 +33,33 @@ MESH = rectangle_mesh(2.0, 1.5, 8, 6)
 PML = {"k": 2 * np.pi, "r0": 1.0, "d": 0.5, "sigma_max": 30.0}
 FACTORS = np.ones((MESH.num_triangles, 3))
 SIZE = [1.0, 0.7, 0.45]
-BOX = {"subdivisions": (2, 2, 2), "num_modes": 2, "target_frequency_hz": 2.2e8}
-SLAB = ((0.0, 0.5), (0.0, 0.35), (0.0, 0.45))
+BOX = {"subdivision_count": (2, 2, 2), "mode_count": 2, "target_frequency": 2.2e8}
+SLAB = {"lower_corner_position": (0.0, 0.0, 0.0), "upper_corner_position": (0.5, 0.35, 0.45)}
 SPACE3D = EdgeSpace3D(box_mesh(1.0, 0.7, 0.45, 2, 2, 2))
 
 
 def _cavity(**kw):
-    return solve_material_cavity_box(**{"lengths_m": SIZE, **BOX, **kw})
+    return solve_material_cavity_box(**{"box_size": SIZE, **BOX, **kw})
 
 
 def _region(**kw):
-    return [CavityMaterialRegion(kw.pop("bounds_m", SLAB), **kw)]
+    return [CavityMaterialRegion(**{**SLAB, **kw})]
 
 
 CASES = {
-    "solve_material_cavity_box lengths_m": lambda v: _cavity(lengths_m=[v(1.0), 0.7, 0.45]),
-    "solve_material_cavity_box target_frequency_hz": lambda v: _cavity(target_frequency_hz=v(2.2e8)),
-    "solve_material_cavity_box subdivisions": lambda v: _cavity(subdivisions=(v(2), 2, 2)),
-    "solve_material_cavity_box num_modes": lambda v: _cavity(num_modes=v(2)),
-    "solve_material_cavity_box region bounds": lambda v: _cavity(
-        regions=_region(bounds_m=((0.0, v(0.5)), (0.0, 0.35), (0.0, 0.45)))),
+    "solve_material_cavity_box box_size": lambda v: _cavity(box_size=[v(1.0), 0.7, 0.45]),
+    "solve_material_cavity_box target_frequency": lambda v: _cavity(target_frequency=v(2.2e8)),
+    "solve_material_cavity_box subdivision_count": lambda v: _cavity(subdivision_count=(v(2), 2, 2)),
+    "solve_material_cavity_box mode_count": lambda v: _cavity(mode_count=v(2)),
+    "solve_material_cavity_box region corner": lambda v: _cavity(
+        regions=_region(upper_corner_position=(v(0.5), 0.35, 0.45))),
     "solve_material_cavity_box region permittivity": lambda v: _cavity(
         regions=_region(relative_permittivity=v(2.0))),
     "solve_material_cavity_box region permeability": lambda v: _cavity(
         regions=_region(relative_permeability=v(2.0))),
-    "solve_material_cavity_box wall conductivity": lambda v: _cavity(wall_conductivity_s_per_m=v(5.8e7)),
+    "solve_material_cavity_box wall conductivity": lambda v: _cavity(electrical_conductivity=v(5.8e7)),
     "solve_material_cavity_box one wall's conductivity": lambda v: _cavity(
-        wall_conductivity_s_per_m={"x0": v(5.8e7)}),
+        electrical_conductivity={"x0": v(5.8e7)}),
     "mode_coordinates thickness": lambda v: mode_coordinates(MESH, thickness={"left": v(0.4)}),
     "mode_coordinates strength": lambda v: mode_coordinates(MESH, thickness={"left": 0.4}, strength=v(3.0)),
     "mode_coordinates order": lambda v: mode_coordinates(MESH, thickness={"left": 0.4}, order=v(2)),
@@ -130,8 +131,9 @@ def _joule(v, **kw):
     """The arguments of a small voltage-driven strip, with ``kw`` replacing some of them."""
     args = dict(electrical_conductivity=ConductivityModel(lambda t: 1 / (1 + 0.5 * (t - 300)), (0.0, 5000.0)),
                 thermal_conductivity=1.0,
-                electric_dirichlet={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in RIGHT}},
-                thermal_dirichlet={i: 300.0 for i in LEFT + RIGHT}, initial_temperature=300.0)
+                prescribed_electric_potential={**{i: 0.0 for i in LEFT}, **{i: 1.0 for i in RIGHT}},
+                prescribed_temperature={i: 300.0 for i in LEFT + RIGHT}, initial_temperature=300.0,
+                temperature_tolerance=1e-8)
     args.update(kw)
     return args
 
@@ -139,26 +141,27 @@ def _joule(v, **kw):
 # Every input that can hold a number, in each container it may come in. ``v``
 # turns a number into a live value of the library under test.
 JOULE_CASES = {
-    "electric_dirichlet": lambda v: _joule(v, electric_dirichlet={**{i: 0.0 for i in LEFT},
-                                                                  **{i: v(1.0) for i in RIGHT}}),
+    "prescribed_electric_potential": lambda v: _joule(v, prescribed_electric_potential={
+        **{i: 0.0 for i in LEFT}, **{i: v(1.0) for i in RIGHT}}),
     "thermal_conductivity scalar": lambda v: _joule(v, thermal_conductivity=v(1.0)),
     "thermal_conductivity region table": lambda v: _joule(v, thermal_conductivity={"a": 1.0, "b": v(2.0)}),
-    "outward_current": lambda v: _joule(v, electric_dirichlet={i: 0.0 for i in LEFT},
-                                        outward_current={"right": v(-1.0)}),
-    "reference_potential": lambda v: _joule(v, electric_dirichlet={}, reference_potential={LEFT[0]: v(0.0)},
-                                            outward_current={"left": -1.0, "right": 1.0}),
-    "outward_flux": lambda v: _joule(v, outward_flux={"top": v(1.0)}),
+    "inward_current_density": lambda v: _joule(v, prescribed_electric_potential={i: 0.0 for i in LEFT},
+                                               inward_current_density={"right": v(1.0)}),
+    "reference_electric_potential": lambda v: _joule(v, prescribed_electric_potential={},
+                                                     reference_electric_potential={LEFT[0]: v(0.0)},
+                                                     inward_current_density={"left": 1.0, "right": -1.0}),
+    "inward_heat_flux": lambda v: _joule(v, inward_heat_flux={"top": v(-1.0)}),
     "convection coefficient": lambda v: _joule(v, convection={"top": (v(2.0), 300.0)}),
     "convection ambient": lambda v: _joule(v, convection={"top": [2.0, v(300.0)]}),
-    "thermal_dirichlet": lambda v: _joule(v, thermal_dirichlet={**{i: 300.0 for i in LEFT},
-                                                                **{i: v(300.0) for i in RIGHT}}),
+    "prescribed_temperature": lambda v: _joule(v, prescribed_temperature={**{i: 300.0 for i in LEFT},
+                                                                          **{i: v(300.0) for i in RIGHT}}),
     "initial_temperature scalar": lambda v: _joule(v, initial_temperature=v(300.0)),
     "initial_temperature array": lambda v: _joule(v, initial_temperature=v(np.full(JOULE_MESH.num_nodes, 300.0))),
     "initial_temperature list": lambda v: _joule(v, initial_temperature=[v(300.0)] * JOULE_MESH.num_nodes),
-    "relaxation": lambda v: _joule(v, relaxation=v(0.5)),
-    "temperature_atol": lambda v: _joule(v, temperature_atol=v(1e-8)),
+    "relaxation_factor": lambda v: _joule(v, relaxation_factor=v(0.5)),
+    "temperature_tolerance": lambda v: _joule(v, temperature_tolerance=v(1e-8)),
     "relative_tolerance": lambda v: _joule(v, relative_tolerance=v(1e-10)),
-    "max_iterations": lambda v: _joule(v, max_iterations=v(100.0)),
+    "iteration_limit": lambda v: _joule(v, iteration_limit=v(100.0)),
 }
 
 
@@ -209,11 +212,11 @@ JOULE_CALLBACKS = {
     "derivative": (lambda v: _joule(v, electrical_conductivity=ConductivityModel(
         lambda t: 1 / (1 + 0.5 * (t - 300)), (0.0, 5000.0),
         derivative=lambda t: v(-0.5 / (1 + 0.5 * (t - 300)) ** 2))), 1),
-    "outward_flux": (lambda v: _joule(v, outward_flux={"top": _ones(v)}), 0),
+    "inward_heat_flux": (lambda v: _joule(v, inward_heat_flux={"top": _ones(v)}), 0),
     "convection coefficient": (lambda v: _joule(v, convection={"top": (_ones(v), 300.0)}), 0),
     "convection ambient": (lambda v: _joule(v, convection={"top": (2.0, _ones(v))}), 0),
-    "outward_current": (lambda v: _joule(v, electric_dirichlet={i: 0.0 for i in LEFT},
-                                         outward_current={"right": _ones(v)}), 0),
+    "inward_current_density": (lambda v: _joule(v, prescribed_electric_potential={i: 0.0 for i in LEFT},
+                                                inward_current_density={"right": _ones(v)}), 0),
 }
 
 

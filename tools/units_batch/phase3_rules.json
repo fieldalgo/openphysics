@@ -1,0 +1,38 @@
+{
+ "format": "openphysics-units-batch-phase3-rules-v1",
+ "description": "The rule entries of the phase-3 comparison (README \"Phase 3\"): how each recorded call of the baseline maps to the head's, by the closed kinds 1-9. Entries describe the baseline (the merge base with main) against the head, so a landing starts with an empty list and each commit appends the entries it needs, listed in its commit message by kind.",
+ "entries": [
+  {
+   "kind": 1,
+   "old": "galerkin.waveguide.solve_modes",
+   "new": "galerkin._waveguide_kernels.solve_modes",
+   "note": "L3 commit 11 (route K, D1): the mode kernel moved unchanged from the public galerkin.waveguide to the package-private galerkin._waveguide_kernels, which galerkin.kernels re-exports and simcase's em.modes2d imports; the same function, the same arguments and doubles"
+  },
+  {
+   "kind": 1,
+   "old": "galerkin.waveguide.assemble_mode_system",
+   "new": "galerkin._waveguide_kernels.assemble_mode_system",
+   "note": "L3 commit 11 (route K, D1): the mode pencil kernel moved with solve_modes"
+  },
+  {
+   "kind": 7,
+   "old": "galerkin.cavity.solve_cavity_box",
+   "wrapper": "galerkin.cavity.solve_cavity_box",
+   "kernel": "galerkin.cavity._solve_cavity_box",
+   "note": "L3 commit 12 (route S, D2): solve_cavity_box is a thin public function (box_size, subdivision_count, mode_count, target_frequency) over the private body _solve_cavity_box, which keeps the solver's code and names; every baseline call (simcase's em.cavity3d) is compared with the body call beneath, which receives the same arguments under the former names"
+  },
+  {
+   "kind": 7,
+   "old": "galerkin.material_cavity.solve_material_cavity_box",
+   "wrapper": "galerkin.material_cavity.solve_material_cavity_box",
+   "kernel": "galerkin.material_cavity._solve_material_cavity_box",
+   "note": "L3 commit 12 (route S, D2): the material cavity's public function converts each region's constants with galerkin._conventions.to_kernel (0.0 - Im, the operation simcase applied before) and calls the private body _solve_material_cavity_box with the former names and the regions as _KernelRegion"
+  },
+  {
+   "kind": 4,
+   "old": "galerkin.material_cavity.CavityMaterialRegion",
+   "new": "galerkin.material_cavity._KernelRegion",
+   "note": "L3 commit 12: the body takes each region as the private _KernelRegion (the former CavityMaterialRegion: bounds_m, relative_permittivity and relative_permeability under exp(+j omega t)), which the public function builds from the public CavityMaterialRegion (lower_corner_position, upper_corner_position, constants under exp(-i omega t))"
+  }
+ ]
+}

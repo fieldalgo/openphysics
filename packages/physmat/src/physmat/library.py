@@ -3,12 +3,16 @@
 
 """Built-in materials with their sources.
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 Optical models are taken from the refractiveindex.info database (CC0 1.0), which
 cites the original measurements; the citation of each record is kept in
 ``Material.source``. The one exception is ``standard_air``, computed from the
 published Ciddor (1996) equations (``physmat.air``) rather than from stored
-data. Sellmeier-type coefficients are stored as refractiveindex.info
-formulas so they can be compared 1:1 with the database. A handful of thermal and
+data; ``physmat.ciddor_air`` builds the same model at other conditions.
+Sellmeier-type coefficients are stored as refractiveindex.info formulas so they
+can be compared 1:1 with the database. A handful of thermal and
 mechanical constants (room temperature, order-of-magnitude reference values from
 standard handbooks) are attached to the most common materials as a starting
 point for multiphysics — check them against your own data before relying on them.
@@ -16,8 +20,13 @@ The thermal conductivity of Cu and Al is the Hust and Lankford (1984) equation o
 temperature and residual resistivity ratio (``physmat.thermal``) at RRR 100; the
 same module evaluates tungsten.
 
-Look-up is case-insensitive and accepts aliases: ``get("sio2")``, ``get("silica")``,
-``get("fused silica")`` all return the same material.
+Look-up is exact, without case folding or aliases: ``physmat.material("SiO2")``
+(``physmat.names()`` lists the names). A record's ``aliases`` are kept as data only.
+
+Each record states the temperature of its optical data, ``datum_temperature`` in K,
+as its refractiveindex.info record gives it (comments or conditions, database
+revision of ``tools/rii-revision.txt``). Where the source says only "room
+temperature" or nothing, ``datum_assumed`` is True instead.
 """
 
 from __future__ import annotations
@@ -26,7 +35,7 @@ import numpy as np
 
 from . import _tables, air, thermal
 from .dispersion import Constant, RIIFormula, Tabulated
-from .material import Material, Property
+from ._material import Material, Property
 
 RII_CITE = 'via refractiveindex.info (CC0): M. N. Polyanskiy, Sci. Data 11, 94 (2024)'
 
@@ -49,34 +58,20 @@ def _add(m: Material):
 
 
 # ---- vacuum / air ---------------------------------------------------------
-_add(Material("vacuum", Constant(1.0, 0.0, "vacuum"), "definition", aliases=("air",)))
+_add(Material("vacuum", Constant(1.0, 0.0, "vacuum"), "definition", aliases=("air",)))   # exact at every temperature
 
 
-def standard_air(temperature_c: float = air.STANDARD_TEMPERATURE_C, pressure_pa: float = air.STANDARD_PRESSURE_PA,
-                 humidity: float = 0.0, co2_ppm: float = air.STANDARD_CO2_PPM,
-                 vapour_pressure_pa: float | None = None, strict: bool = True, name: str | None = None) -> Material:
-    """Moist air after Ciddor (1996) at the given conditions: n(wavelength) for 0.3-1.69 um.
-
-    Defaults are Ciddor's standard dry air (15 C, 101325 Pa, 0 % RH, 450 ppm CO2).
-    ``humidity`` is the relative humidity as a fraction (0.5 = 50 %); alternatively
-    give the water-vapour partial pressure ``vapour_pressure_pa``. ``strict=False``
-    accepts conditions outside the stated validity ranges. The ``density`` property
-    (kg/m^3, temperature in kelvin like every ``Property``) is the BIPM 1981/91
-    moist-air density at the same pressure, humidity and CO2.
-    """
-    model = air.CiddorAir(temperature_c, pressure_pa, humidity, co2_ppm, vapour_pressure_pa, strict)
-    cond = f"{temperature_c:g} C, {pressure_pa:g} Pa, "
-    cond += (f"pv = {vapour_pressure_pa:g} Pa" if vapour_pressure_pa is not None else f"RH {100 * humidity:g} %")
-    cond += f", {co2_ppm:g} ppm CO2"
-    props = {"density": Property(lambda T: model.density(np.asarray(T, dtype=float) - 273.15), "kg/m^3",
-                                 "BIPM 1981/91 moist-air density equation (R. S. Davis, Metrologia 29, 67 (1992)) "
-                                 f"at {cond.split(', ', 1)[1]}")}
-    return Material(name or f"standard_air ({cond})", model, f"{air.CITATION} [{cond}]", properties=props)
+def _density_property(model: air.CiddorAir, conditions: str) -> Property:
+    """The BIPM 1981/91 moist-air density of ``model`` as a Property of temperature in kelvin, at the
+    model's pressure, humidity and CO2 (``conditions`` names them for the source)."""
+    return Property(lambda T: model.density(np.asarray(T, dtype=float) - 273.15), "kg/m^3",
+                    "BIPM 1981/91 moist-air density equation (R. S. Davis, Metrologia 29, 67 (1992)) "
+                    f"at {conditions}")
 
 
 _add(Material("standard_air", air.CiddorAir(), air.CITATION + " [15 C, 101325 Pa, RH 0 %, 450 ppm CO2]",
-              properties=standard_air().properties,
-              aliases=("standard air", "Ciddor air", "air (Ciddor)", "moist air")))
+              properties={"density": _density_property(air.CiddorAir(), "101325 Pa, RH 0 %, 450 ppm CO2")},
+              aliases=("standard air", "Ciddor air", "air (Ciddor)", "moist air"), datum_temperature=288.15))
 
 # ---- dielectrics: Sellmeier-type formulas ----------------------------------
 _add(Material(
@@ -91,7 +86,7 @@ _add(Material(
         "thermal_expansion": Property(0.55e-6, "1/K", "handbook value, 300 K"),
         "thermo_optic_dn_dT": Property(1.0e-5, "1/K", "typical value at 1.55 um, 300 K"),
     },
-    aliases=("silica", "fused silica", "silicon dioxide", "glass")))
+    aliases=("silica", "fused silica", "silicon dioxide", "glass"), datum_temperature=293.15))   # 20 C
 
 _add(Material(
     "Si", _f(1, [0, 10.6684293, 0.301516485, 0.0030434748, 1.13475115, 1.54133408, 1104], 1.357, 11.04, "Si:Salzberg"),
@@ -105,11 +100,11 @@ _add(Material(
         "thermal_expansion": Property(2.6e-6, "1/K", "handbook value, 300 K"),
         "thermo_optic_dn_dT": Property(1.8e-4, "1/K", "typical value at 1.55 um, 300 K"),
     },
-    aliases=("silicon", "c-Si")))
+    aliases=("silicon", "c-Si"), datum_temperature=299.15))   # RII: 26 C
 
 _si_green, _si_green_ref = _tab("Si_Green2008", "Si:Green2008")
 _add(Material("Si_visible", _si_green, _si_green_ref + " [n and k, 0.25-1.45 um, 300 K]",
-              aliases=("silicon visible", "si-nk")))
+              aliases=("silicon visible", "si-nk"), datum_temperature=300.0))
 
 _add(Material(
     "Si3N4", _f(1, [0, 3.0249, 0.1353406, 40314, 1239.842], 0.310, 5.504, "Si3N4:Luke"),
@@ -121,51 +116,51 @@ _add(Material(
         "poisson_ratio": Property(0.23, "-", "handbook value"),
         "thermal_expansion": Property(3.3e-6, "1/K", "handbook value"),
     },
-    aliases=("silicon nitride", "sin", "nitride")))
+    aliases=("silicon nitride", "sin", "nitride"), datum_assumed=True))   # RII states no temperature
 
 _add(Material(
     "GaAs", _f(1, [4.372514, 5.466742, 0.4431307, 0.02429960, 0.8746453, 1.957522, 36.9166], 0.97, 17, "GaAs:Skauli"),
     "T. Skauli et al., J. Appl. Phys. 94, 6447 (2003); " + RII_CITE,
     properties={"density": Property(5317.0, "kg/m^3", "handbook value"),
                 "thermal_conductivity": Property(55.0, "W/(m K)", "handbook value, 300 K")},
-    aliases=("gallium arsenide",)))
+    aliases=("gallium arsenide",), datum_temperature=295.15))   # RII: 22 C
 
 _add(Material(
     "InP", _f(1, [6.255, 2.316, 0.6263, 2.765, 32.935], 0.95, 10, "InP:Pettit"),
     "G. D. Pettit and W. J. Turner, J. Appl. Phys. 36, 2081 (1965); " + RII_CITE,
-    aliases=("indium phosphide",)))
+    aliases=("indium phosphide",), datum_assumed=True))   # RII: room temperature
 
 _add(Material(
     "Ge", _f(2, [0, 0.4886331, 1.393959, 14.5142535, 0.1626427, 0.0091224, 752.190], 2, 14.0, "Ge:Burnett"),
     "J. H. Burnett et al., Proc. SPIE 9974, 99740X (2016); " + RII_CITE,
-    aliases=("germanium",)))
+    aliases=("germanium",), datum_temperature=295.0))   # RII conditions: 295 K
 
 _add(Material(
     "Al2O3", _f(1, [0, 1.4313493, 0.0726631, 0.65054713, 0.1193242, 5.3414021, 18.028251], 0.20, 5.0, "Al2O3:Malitson-o"),
     "I. H. Malitson and M. J. Dodge, J. Opt. Soc. Am. 62, 1405 (1972) [sapphire, ordinary ray]; " + RII_CITE,
     properties={"density": Property(3980.0, "kg/m^3", "handbook value"),
                 "thermal_conductivity": Property(35.0, "W/(m K)", "handbook value, 300 K")},
-    aliases=("sapphire", "alumina")))
+    aliases=("sapphire", "alumina"), datum_temperature=293.15))   # RII: 20 C
 
 _add(Material(
     "MgF2", _f(1, [0, 0.48755108, 0.04338408, 0.39875031, 0.09461442, 2.3120353, 23.793604], 0.2, 7.0, "MgF2:Dodge-o"),
     "M. J. Dodge, Appl. Opt. 23, 1980 (1984) [ordinary ray]; " + RII_CITE,
-    aliases=("magnesium fluoride",)))
+    aliases=("magnesium fluoride",), datum_temperature=292.15))   # RII: 19 C
 
 _add(Material(
     "CaF2", _f(1, [0, 0.5675888, 0.050263605, 0.4710914, 0.1003909, 3.8484723, 34.649040], 0.23, 9.7, "CaF2:Malitson"),
     "I. H. Malitson, Appl. Opt. 2, 1103 (1963); " + RII_CITE,
-    aliases=("calcium fluoride",)))
+    aliases=("calcium fluoride",), datum_temperature=297.15))   # RII: 24 C
 
 _add(Material(
     "LiNbO3", _f(2, [0, 2.6734, 0.01764, 1.2290, 0.05914, 12.614, 474.60], 0.4, 5.0, "LiNbO3:Zelmon-o"),
     "D. E. Zelmon et al., J. Opt. Soc. Am. B 14, 3319 (1997) [ordinary ray, congruent]; " + RII_CITE,
-    aliases=("lithium niobate", "LN")))
+    aliases=("lithium niobate", "LN"), datum_temperature=294.15))   # RII: 21 C
 
 _add(Material(
     "TiO2", _f(4, [5.913, 0.2441, 0, 0.0803, 1, 0, 0, 0, 1], 0.43, 1.53, "TiO2:Devore-o"),
     "J. R. DeVore, J. Opt. Soc. Am. 41, 416 (1951) [rutile, ordinary ray]; " + RII_CITE,
-    aliases=("titanium dioxide", "rutile")))
+    aliases=("titanium dioxide", "rutile"), datum_assumed=True))   # RII: room temperature
 
 # ---- metals and water: measured tables -------------------------------------
 for _key, _name, _aliases in (("Au_Johnson", "Au", ("gold",)), ("Ag_Johnson", "Ag", ("silver",)),
@@ -189,33 +184,16 @@ for _key, _name, _aliases in (("Au_Johnson", "Au", ("gold",)), ("Ag_Johnson", "A
         _props = {"density": Property(10490.0, "kg/m^3", "handbook value"),
                   "thermal_conductivity": Property(429.0, "W/(m K)", "handbook value, 300 K"),
                   "electrical_conductivity": Property(6.3e7, "S/m", "handbook value, 300 K")}
-    _add(Material(_name, _disp, _ref, properties=_props, aliases=_aliases))
+    # Johnson and Christy, Rakic: room temperature or none stated; Hale and Querry water: 25 C.
+    _datum = dict(datum_temperature=298.15) if _name == "H2O" else dict(datum_assumed=True)
+    _add(Material(_name, _disp, _ref, properties=_props, aliases=_aliases, **_datum))
 
 
 # ---------------------------------------------------------------------------
 
-def _key(s: str) -> str:
-    return "".join(ch for ch in s.lower() if ch.isalnum())
-
-
-_INDEX: dict[str, Material] = {}
-for _m in _MATERIALS:
-    for _n in (_m.name, *_m.aliases):
-        _INDEX[_key(_n)] = _m
-
-
-def get(name: str) -> Material:
-    """Built-in material by name or alias (case/space-insensitive)."""
-    try:
-        return _INDEX[_key(name)]
-    except KeyError:
-        raise KeyError(f"unknown material {name!r}; available: {names()}") from None
+BY_NAME: dict[str, Material] = {m.name: m for m in _MATERIALS}
 
 
 def names() -> list[str]:
+    """The names of the built-in materials, in library order."""
     return [m.name for m in _MATERIALS]
-
-
-def constant(n: float, k: float = 0.0, name: str | None = None) -> Material:
-    """A user-defined non-dispersive material."""
-    return Material(name or f"n={n}", Constant(n, k), "user-defined")

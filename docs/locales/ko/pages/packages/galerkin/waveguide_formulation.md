@@ -12,13 +12,18 @@
 규범 계약, 한계, 측정된 검증은 링크된 문서에 남아 있습니다. 이 문서는 새로운
 정확도 주장이나 검증 결과를 추가하지 않습니다.
 
+여기 나오는 함수는 커널입니다. 일관 단위와 아래의 phasor exp(+iωt)로 계산하며 내부 `galerkin.kernels`로
+씁니다. 공개 표면은 `galerkin.solve_waveguide_modes`와 그 후처리 함수이며 SI 단위와 exp(−iωt)를
+따릅니다. 각 함수는 이 커널을 감싸고 복소 입출력의 켤레를 한 번만 취하며 k0 = 2π/λ로 둡니다
+([공개 SI 함수](mode_overlap.md#공개-si-함수)).
+
 ## 1. 문제 설정과 표기
 
 z 방향으로 변하지 않는 도파관은 다음 형태의 장을 전파합니다.
 
     E(x, y, z, t) = [E_t(x, y) + zhat E_z(x, y)] exp(+i omega t - i beta z)
 
-(`packages/galerkin/src/galerkin/waveguide.py` 모듈 docstring; 같은 phasor를
+(`packages/galerkin/src/galerkin/_waveguide_kernels.py` 모듈 docstring; 같은 phasor를
 [흡수 모드](../simcase/lossy_modes.md)와 [모드 복소 좌표](modal_coordinates.md)가
 명시합니다). 단면 Omega는 P1 삼각형으로 메시된 2D 영역(`galerkin.mesh.Mesh`)이고,
 길이는 메시 길이 단위, `k0`는 그 역단위입니다. 원천 없는 Maxwell 방정식은
@@ -29,15 +34,15 @@ z 방향으로 변하지 않는 도파관은 다음 형태의 장을 전파합�
 
 | 기호 | 의미 | 코드에서 |
 |---|---|---|
-| `E_t`, `E_z` | 한 모드의 횡·종방향 전기장 | `et`(`E_t`의 edge 선적분), `ez`와 `E_z = 1j * ez` (`waveguide.py::solve_modes`) |
+| `E_t`, `E_z` | 한 모드의 횡·종방향 전기장 | `et`(`E_t`의 edge 선적분), `ez`와 `E_z = 1j * ez` (`_waveguide_kernels.py::solve_modes`) |
 | `eps_r` | 상대 유전율, 스칼라 또는 삼각형당 하나, 실수 또는 복소수 | `solve_modes`, `assemble_mode_system`의 `eps_r`; simcase의 `eps_tri` |
-| `mu_r` | 상대 투자율, 스칼라 또는 삼각형당, 실수 또는 복소수; `1/mu_r`로만 들어감 | `mu_r`(기본 1.0); `waveguide.py::_mode_blocks`의 `inv_mu` |
+| `mu_r` | 상대 투자율, 스칼라 또는 삼각형당, 실수 또는 복소수; `1/mu_r`로만 들어감 | `mu_r`(기본 1.0); `_waveguide_kernels.py::_mode_blocks`의 `inv_mu` |
 | `k0 = 2 pi / lambda0` | 진공 파수, 메시 길이의 역단위 | `k0`; simcase는 메시를 파장으로 나누고 `k0 = 2 pi`를 넘김 (`simcase/physics_em_modes2d.py::_solve_vector`) |
 | `beta` | z 방향 전파상수 | `beta = k0 * n_eff` |
 | `n_eff = beta / k0` | 유효굴절률, 실수 또는 복소수 | `solve_modes`의 첫 반환값 `n_eff` |
 | `e_t = beta E_t`, `e_z = -i E_z` | 혼합 정식화의 스케일된 미지수 | pencil 벡터 `x = [beta * et; ez]` |
-| `lambda = -beta^2` | pencil `A x = lambda B x`의 고유값 | `waveguide.py::_live_modes`의 `lam0 = -(k0 n_eff)^2` |
-| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert 목표와 ARPACK이 실제로 반환하는 고유값 | `waveguide.py::_solve_modes_numpy`의 `sigma`, `nu` |
+| `lambda = -beta^2` | pencil `A x = lambda B x`의 고유값 | `_waveguide_kernels.py::_live_modes`의 `lam0 = -(k0 n_eff)^2` |
+| `sigma = -(k0 n_target)^2`, `nu = 1 / (lambda - sigma)` | shift-invert 목표와 ARPACK이 실제로 반환하는 고유값 | `_waveguide_kernels.py::_solve_modes_numpy`의 `sigma`, `nu` |
 | `(s_x, s_y, h)` | 두 횡축의 복소 좌표 늘림과 굽힘 metric, 삼각형당 한 쌍 | `coordinate_factors` (T, 3), `mode_coordinates.py::mode_coordinates`가 생성 |
 | `phi` | scalar 근사의 절점(nodal) 모드 함수 | `physics_em_modes2d.solve(formulation="scalar")`의 `fields` |
 
@@ -141,7 +146,7 @@ Jin 2014 도파관 장).
     A = [ S - k0^2 Mt_eps   0 ]        B = [ Mt_mu   G            ]
         [ 0                 0 ]            [ G^T     K - k0^2 M   ]
 
-입니다. `waveguide.py::assemble_mode_system`이 `waveguide.py::_mode_blocks`로부터
+입니다. `_waveguide_kernels.py::assemble_mode_system`이 `_waveguide_kernels.py::_mode_blocks`로부터
 정확히 이 블록을 (`sp.bmat`) 만듭니다.
 
 | 블록 | 적분 | 커널 (`galerkin/core/kernels.py`) | 공개 조립 함수 |
@@ -156,18 +161,30 @@ Jin 2014 도파관 장).
 두 번째 행에는 `beta^2`가 없는 항이 없으므로 `A`의 `e_z` 블록은 0입니다.
 curl-curl 방정식의 약한 종방향 성분은 제약식이고, `beta^2 = 0`은 자유 절점 수
 정도의 중복도를 가진 고유값(이산 gradient)입니다. 도파 모드는 그로부터 멀리
-`n_clad < Re n_eff < n_core`에 있고, `n_target` 근처의 shift-invert 탐색은 이
-무리를 만나지 않습니다. 혼합 쌍이 가짜 모드를 억제하는 방식이 바로 이것입니다.
+`n_clad < Re n_eff < n_core`에 있고, `n_target` 근처의 shift-invert 탐색은
+`beta^2 = 0`보다 목표에 가까운 근보다 많이 찾을 때만 이 무리에 닿습니다.
+혼합 쌍이 가짜 모드를 억제하는 방식이 바로 이것입니다.
 curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 있고, 절점 벡터
 요소처럼 스펙트럼 전체에 번지지 않습니다
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
 
+탐색이 이 무리에 닿으면 계산된 근은 보통 `|beta^2|`가 반올림 수준이고
+(`tests/galerkin/test_waveguide_static_roots.py`의 slab에서 최대 `1.2e-14 |sigma|`,
+가끔 정확히 0) `E_t = e_t / beta`가 정의되지 않습니다. `solve_modes`는 어느 경로에서도
+`|beta^2| <= STATIC_ROOT_TOL |sigma|`(`1e-10`, 곧 `|n_eff| <= 1e-5 |n_target|`)인 근을
+반환하지 않으므로, 이런 탐색은 `num_modes`보다 적은 근을 반환합니다. 한계: `B`의 절점
+블록 `K - k0^2 M`이 거의 특이할 때, 곧 `k0^2`가 자유 절점에서 `K e_z = lambda M e_z`의
+고유값(PEC 상자의 TM 차단)에 가까울 때는 무리의 조건이 나빠 계산된 근이 문턱을 넘을 수
+있습니다. 정사각 도파관에서 그런 차단으로부터 상대 거리 `1e-6`, `1e-8`일 때
+`2.2e-10 |sigma|`, `6.8e-9 |sigma|`가 측정되었습니다. 이런 근은 가로 성분이 거의 없는
+채로 반환됩니다.
+
 `A`와 `B`는 전치대칭입니다. 실수 `eps_r`, `mu_r`에서는 실대칭이고 `B`는
 부정부호(indefinite)이며, 복소 재료나 좌표 인자에서는 복소대칭이고 Hermitian이
-아닙니다(`waveguide.py` docstring).
+아닙니다(`_waveguide_kernels.py` docstring).
 
 **경계조건.** PEC 벽 `n x E = 0`은 두 종류의 자유도를 0으로 고정합니다
-(`waveguide.py::_free_dofs`). `pec_nodes`(기본: 모든 이름 있는 경계의 모든 절점)의
+(`_waveguide_kernels.py::_free_dofs`). `pec_nodes`(기본: 모든 이름 있는 경계의 모든 절점)의
 `e_z` 값과 `pec_edges`의 `e_t` 선적분입니다. 기본 `pec_edges`는 삼각형 하나만이
 소유하고 두 끝점이 모두 `pec_nodes`에 있는 edge입니다
 (`core/spaces.py::EdgeSpace.boundary_edge_ids`; 소속은 위상으로 결정하므로 두 경계
@@ -180,7 +197,7 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 
 **고유값 풀이.** `B`가 부정부호이므로 양의 준정부호 질량행렬을 요구하는 SciPy
 일반화 ARPACK 드라이버는 쓰지 않습니다. 대신 shift-invert 연산자를 만들어 표준
-고유값 문제로 넘깁니다(`waveguide.py::_solve_modes_numpy`).
+고유값 문제로 넘깁니다(`_waveguide_kernels.py::_solve_modes_numpy`).
 
     sigma = -(k0 n_target)^2,    (A - sigma B)의 LU   (scipy.sparse.linalg.splu),
     op(v) = (A - sigma B)^-1 B v,     eigs(op, k=num_modes, which="LM", v0=ones),
@@ -244,9 +261,9 @@ simcase는 `Im eps > 0`을 거부합니다("passive modes use Im eps <= 0"). 이
 `eps_core = 2.25 - 0.01i`를 주면 `Im n_eff = -3.35e-3`이 나오며, 이는 5절의 1차
 값 `(d n_eff / d eps_core) Im eps_core`와도 같습니다. 진폭은 `a = -Im beta`로
 `exp(-a z)`, 전력은 `exp(-2 a z)`로 감쇠합니다. dB/cm 변환은
-[흡수 모드](../simcase/lossy_modes.md)에 있습니다. 좌표 인자가 있으면 모든 후보를
-남기고 비유한 또는 0인 근은 오류이므로, 호출자가 모든 후보와 제외 사유를 기록할
-수 있습니다.
+[흡수 모드](../simcase/lossy_modes.md)에 있습니다. 좌표 인자가 있으면 정적
+`beta^2 = 0` 근(3절)을 뺀 모든 후보를 남기고 비유한 근은 오류이므로, 호출자가 모든
+후보와 제외 사유를 기록할 수 있습니다.
 
 **복소 좌표 늘림으로서의 PML.** 열린 단면은 횡좌표를 복소 평면으로 늘려
 절단합니다(분리장 층은 Bérenger 1994; 여기서 쓰는 늘린 좌표 형식은 Chew,
@@ -303,7 +320,7 @@ PML 밖의 물리 종방향 장은 `1j * ez / h`이고, simcase 후보 솔버는
 `solve_modes`는 `eps_r`, `mu_r`, `k0`에 JAX 또는 PyTorch 값을 받습니다
 ([미분](differentiation.md)). 3절의 NumPy 고유값 풀이가 먼저 숫자로 실행됩니다.
 그 뒤 자유 자유도에서 반환된 각 단순 고유쌍 `(lambda0, x0)`,
-`lambda0 = -(k0 n_eff)^2`, `x0 = [beta et; ez]`에 대해 `waveguide.py::_live_modes`가
+`lambda0 = -(k0 n_eff)^2`, `x0 = [beta et; ez]`에 대해 `_waveguide_kernels.py::_live_modes`가
 같은 커널로 live 라이브러리에서 `A`, `B`를 다시 만들고(`_live_blocks`,
 `_restricted`) `galerkin.core.eigen.refine`을 호출합니다. 정규화 `x^T B x = 1`
 (전치, 공액 없음)로 테두리를 친 고유값 문제의 Newton 한 단계입니다.
@@ -336,7 +353,7 @@ PML 밖의 물리 종방향 장은 `1j * ez / h`이고, simcase 후보 솔버는
 `-n_eff/k0`를 더합니다.
 
 단계 후 반환 gauge를 다시 적용합니다. NumPy 풀이가 실수 양수로 남긴 성분을 pivot
-`p`로 택해(`waveguide.py::_pivot`, 여러 성분이 같은 크기면 위상이 0인 것)
+`p`로 택해(`_waveguide_kernels.py::_pivot`, 여러 성분이 같은 크기면 위상이 0인 것)
 
     x <- x conj(x_p) / ( |x_p| ||x||_2 ),    beta = sqrt(-lambda),    et = x_t / beta,    ez = x_z,
 
@@ -386,7 +403,7 @@ live 값을 거부합니다. 검사 목록은 [미분](differentiation.md#검증
 | sipi 모듈 | galerkin 구성요소 |
 |---|---|
 | `sipi/crosssection.py` (`CrossSection.mesh`) | meshine 삼각분할에 대한 `galerkin.Mesh`, `galerkin.from_mesher` |
-| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.assemble_stiffness`(실수 또는 복소 `eps_r`의 P1 `K`), `galerkin.solve_dirichlet` |
+| `sipi/quasistatic.py::capacitance_matrix` | `galerkin.kernels.assemble_stiffness`(실수 또는 복소 `eps_r`의 P1 `K`), `galerkin.kernels.solve_dirichlet` |
 | `sipi/conductor.py` (표면 임피던스 손실) | 완전도체 외부장에 대한 `assemble_stiffness`, `solve_dirichlet` |
 | `sipi/conductor_diffusion.py` (DC/AC 전류 확산) | P1 `A_z` 확산 시스템의 `assemble_stiffness`, `assemble_mass`, `assemble_load` |
 | `sipi/plane.py` (전원면 IR drop) | `galerkin.electric.solve_steady_electric` |
@@ -460,8 +477,9 @@ edge 요소도, `solve_modes`도, `k0`도 없습니다. 선로를 준-TEM(단면
   흡수와 방사로 나뉘지 않습니다.
 - 장은 상대 진폭입니다. 전력 정규화, 직교성·완전성 보장, 축퇴 쌍 안의 정체성
   배정이 없습니다.
-- 미분은 `eps_r`, `mu_r`, `k0`에 대해서만 있습니다. 좌표, PML 파라미터, `n_target`,
-  절점 위치, PEC 집합에 대해서는 없고 `Field`를 통과하지도 않습니다.
+- 미분은 `eps_r`, `mu_r`, `k0`에 대해, 그리고 설계 이동(`motion=`,
+  [형상 미분](shape_derivative.md#도파관-모드))을 따라 절점 위치에 대해 있습니다. 좌표 인자, PML 파라미터,
+  `n_target`, PEC 집합에 대해서는 없고 `Field`를 통과하지도 않습니다.
 - Scalar 경로는 불변 축 TE slab 편광에서만 정확합니다.
 - `sipi`는 준정적이고 비자성(`L`에서 `mu = mu0`)이며 full-wave 분산이 없고, 단위
   길이당 손실 모델은 모드 솔버의 복소 `n_eff`와 별개입니다.

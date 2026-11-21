@@ -35,6 +35,8 @@ import numpy as np
 from .mesh import Mesh
 from .mesh3d import Mesh3D
 
+__all__ = ["from_mesher"]
+
 _CELLS_2D = ("triangles", "cells", "elements")
 _CELLS_3D = ("tetrahedra", "tets", "cells", "elements")
 

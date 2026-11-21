@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Natural boundary conditions on exterior edges of P1 triangle meshes."""
+"""Natural boundary conditions on exterior edges of P1 triangle meshes.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from typing import Mapping
 
 import numpy as np
@@ -37,7 +41,8 @@ class _EdgeOwners:
         return int(self.counts[index]), int(self.first[index])
 
 
-def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection):
+def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection, *,
+                             flux_name="inward_heat_flux", prescribed_name="prescribed_temperature"):
     """Validated geometry of the natural edges selected by ``outward_flux`` and ``convection``.
 
     Returns a list of (kind, tag, edges, points, normals, shape, weights) tuples,
@@ -46,7 +51,10 @@ def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection):
     normals of the 4-point Gauss rule, the (4,2) P1 edge shape functions and the
     (E,4) length-weighted rule weights. Every selected edge identity is validated
     here, before any condition value is evaluated; the condition values are
-    not inspected.
+    not inspected. ``flux_name`` and ``prescribed_name`` are the public names the
+    refusals give the flux and the prescribed values (the caller's solver; the flux
+    is the public inward quantity, negated by the public layer, and no message prints
+    its values).
     """
     owners = _EdgeOwners(t, len(p))
     x, w = np.polynomial.legendre.leggauss(4)
@@ -56,12 +64,13 @@ def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection):
     for kind, data in (("outward_flux", outward_flux), ("convection", convection)):
         if data is None:
             continue
+        label = flux_name if kind == "outward_flux" else kind
         if not isinstance(data, Mapping):
-            raise ValueError(f"{kind} must map boundary edge tags to conditions")
+            raise ValueError(f"{label} must map boundary edge tags to conditions")
         seen = set()
         for tag in data:
             if tag not in mesh.boundary_edges:
-                raise ValueError(f"unknown boundary edge tag {tag!r}")
+                raise ValueError(f"{label}: unknown boundary edge tag {tag!r}")
             edges = np.asarray(mesh.boundary_edges[tag])
             if (edges.ndim != 2 or edges.shape[1] != 2 or not len(edges)
                     or edges.dtype.kind not in "iu"):
@@ -72,13 +81,14 @@ def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection):
                     raise ValueError("invalid boundary edge node indices")
                 key = tuple(sorted((int(a), int(b))))
                 if key in seen:
-                    raise ValueError(f"duplicate {kind} edge, including reversed/tag duplicates")
+                    raise ValueError(f"duplicate {label} edge, including reversed/tag duplicates")
                 seen.add(key)
                 count, slot = owners.lookup(*key)
                 if count != 1:
                     raise ValueError("selected edge must have exactly one incident triangle")
                 if int(a) in prescribed and int(b) in prescribed:
-                    raise ValueError("natural condition overlaps a fully Dirichlet edge")
+                    raise ValueError(f"{label} on tag {tag!r} overlaps an edge whose two nodes are both in "
+                                     f"{prescribed_name}")
                 v = p[b]-p[a]
                 length = np.linalg.norm(v)
                 if not np.isfinite(length) or length <= 0:
@@ -94,14 +104,15 @@ def scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection):
     return geometry
 
 
-def evaluate_scalar_boundary(geometry, outward_flux, convection, *, live=False):
+def evaluate_scalar_boundary(geometry, outward_flux, convection, *, live=False, flux_name="inward_heat_flux"):
     """Sample condition values on validated ``scalar_boundary_geometry`` edges.
 
     ``outward_flux[tag]`` is a constant or callable(points, normals) and
     ``convection[tag]`` a pair (h, ambient) of the same kinds, looked up by the
     geometry's tags. Returns the (kind, edges, shape, weights, values) tuples of
     ``scalar_boundary_samples``; with live=True a JAX or PyTorch constant or
-    callback result stays in its library (otherwise it is refused).
+    callback result stays in its library (otherwise it is refused). ``flux_name``
+    is the public name refusals give the flux (see ``scalar_boundary_geometry``).
     """
     samples = []
     for kind, tag, edges, points, normal, shape, weights in geometry:
@@ -122,20 +133,21 @@ def evaluate_scalar_boundary(geometry, outward_flux, convection, *, live=False):
                 return namespace(out).broadcast_to(out, count)
             return np.full(count, float(out))
         if kind == "outward_flux":
-            values = (evaluate(condition, "outward flux"),)
+            values = (evaluate(condition, f"{flux_name}[{tag!r}]"),)
         else:
             if not isinstance(condition, (tuple, list)) or len(condition) != 2:
-                raise ValueError("convection condition must be a pair (h, ambient_temperature)")
-            h = evaluate(condition[0], "convection h")
-            ambient = evaluate(condition[1], "ambient temperature")
+                raise ValueError(f"convection[{tag!r}] must be a pair (heat_transfer_coefficient, ambient_temperature)")
+            h = evaluate(condition[0], f"convection[{tag!r}] heat_transfer_coefficient")
+            ambient = evaluate(condition[1], f"convection[{tag!r}] ambient_temperature")
             if np.any(to_numpy(h) < 0):
-                raise ValueError("convection h must be nonnegative")
+                raise ValueError(f"convection[{tag!r}] heat_transfer_coefficient must be nonnegative")
             values = (h, ambient)
         samples.append((kind, edges, shape, weights, values))
     return samples
 
 
-def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *, live=False):
+def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *, live=False,
+                            flux_name="inward_heat_flux", prescribed_name="prescribed_temperature"):
     """Sample scalar natural conditions on selected exterior edges (4-point Gauss rules).
 
     ``outward_flux`` maps boundary_edges tags to a constant or callable(points,
@@ -145,10 +157,12 @@ def scalar_boundary_samples(mesh, p, t, prescribed, outward_flux, convection, *,
     or PyTorch constant or callback result stays in its library (otherwise it
     is refused); sampled values are then arrays of that library.
     ``scalar_boundary_geometry`` and ``evaluate_scalar_boundary`` are the two
-    halves, for callers that sample changing values on fixed edges.
+    halves, for callers that sample changing values on fixed edges. ``flux_name`` and
+    ``prescribed_name`` are the public names refusals use.
     """
-    geometry = scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection)
-    return evaluate_scalar_boundary(geometry, outward_flux, convection, live=live)
+    geometry = scalar_boundary_geometry(mesh, p, t, prescribed, outward_flux, convection,
+                                        flux_name=flux_name, prescribed_name=prescribed_name)
+    return evaluate_scalar_boundary(geometry, outward_flux, convection, live=live, flux_name=flux_name)
 
 
 def traction_load(mesh, p, triangles, traction, *, live=False):

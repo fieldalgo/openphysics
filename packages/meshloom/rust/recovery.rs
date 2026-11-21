@@ -188,7 +188,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                     let w = tr * 2f64.powi(-30);
                     let t = if s[0] as usize == v { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
                     let _ = pv;
-                    let id = insert_s(&mut mesh, SPoint { a: s[0], b: s[1], t }, &mut stats)?;
+                    let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
                     stats.protection_points += 1;
                     let ps = &mut pieces[k as usize];
                     let i = ps.iter().position(|p| p.t0 < t && t < p.t1).ok_or_else(|| {
@@ -214,7 +214,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                     "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
             }
             let s = segments[k];
-            let id = insert_s(&mut mesh, SPoint { a: s[0], b: s[1], t: tm }, &mut stats)?;
+            let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], tm), &mut stats)?;
             stats.bisection_points += 1;
             stats.max_depth = stats.max_depth.max(p.depth + 1);
             pieces[k][i] = Piece { t1: tm, v: id, depth: p.depth + 1, ..p };
@@ -314,7 +314,7 @@ fn is_acute(points: &[P3], segments: &[[u32; 2]], inc: &[u32], v: usize) -> bool
 
 fn exact_point(a: &P3, b: &P3, t: f64) -> bool {
     let input = [*a, *b];
-    let s = [SPoint { a: 0, b: 1, t }];
+    let s = [SPoint::seg(0, 1, t)];
     crate::mixed::Mixed { input: &input, s: &s }.is_exact(Pt::S(0))
 }
 

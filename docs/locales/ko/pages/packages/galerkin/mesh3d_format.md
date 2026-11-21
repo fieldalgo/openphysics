@@ -27,7 +27,7 @@
 `Mesh3D`는 면 없이 절점 집합(`boundary`)만 가질 수도 있습니다. 면이 추가되기 전의
 `box_mesh`가 그랬고, 표면 physical group이 없는 파일을 읽는 `galerkin.read_msh`가
 그렇습니다. 태그로 벽을 고르는 모든 기능(`solve_cavity`, `solve_material_cavity`,
-`thermal3d.dirichlet_from_faces`)은 면이 필요합니다.
+`galerkin.kernels.dirichlet_from_faces`)은 면이 필요합니다.
 
 ## 규칙
 

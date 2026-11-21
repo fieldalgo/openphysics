@@ -42,6 +42,12 @@ server. The server refuses them before any route runs:
   server keeps the newest 16 finished optical jobs and frees older ones (an
   older job then answers 404, also to the workspace's Resume button). A
   failed job reports its error message; the traceback goes to the server log only.
+- **Error replies.** A refusal written for users (a document, geometry,
+  mesh-limit or mode-search refusal, meshine's `MeshingError` or
+  `MeshInputError`, and the thermal routes' coded refusals) keeps its message. Any other failure of an optical or thermal request, job or
+  view keeps its status and code and replies with the fixed message "Studio
+  failed unexpectedly; the details are in the server log": its exception type,
+  text and traceback go to the server log only (logger `simcase.studio`).
 - **Pages.** Every response from the server's routes and refusals carries a
   Content-Security-Policy: scripts only from
   the server itself plus the one hashed inline script of the classic editor,

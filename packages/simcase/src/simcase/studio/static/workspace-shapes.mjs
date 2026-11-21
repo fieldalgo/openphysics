@@ -6,8 +6,8 @@
 export const WINDOW_NM=Object.freeze({xmin:-1500,xmax:1500,ymin:-1200,ymax:1200});
 export const MAX_SHAPES=8,MAX_POINTS=12,MIN_SIZE_NM=10;
 // Lossless physmat data covering 1400–1700 nm. Uniaxial crystals use their ordinary index (isotropic model).
-export const SHAPE_MATERIALS=Object.freeze({Silicon:'Si','Silicon nitride':'Si3N4',Silica:'SiO2',Air:'vacuum','Sapphire (ordinary)':'Al2O3','Lithium niobate (ordinary)':'LiNbO3','Indium phosphide':'InP','Gallium arsenide':'GaAs','Calcium fluoride':'CaF2','Magnesium fluoride (ordinary)':'MgF2'});
-export const V4_MATERIALS=Object.freeze(['Silicon','Silicon nitride','Silica','Air']);
+// Display names and the exact library names a format 0.3 document writes.
+export const SHAPE_MATERIALS=Object.freeze({Silicon:'physmat:Si','Silicon nitride':'physmat:Si3N4',Silica:'physmat:SiO2',Air:'physmat:vacuum','Sapphire (ordinary)':'physmat:Al2O3','Lithium niobate (ordinary)':'physmat:LiNbO3','Indium phosphide':'physmat:InP','Gallium arsenide':'physmat:GaAs','Calcium fluoride':'physmat:CaF2','Magnesium fluoride (ordinary)':'physmat:MgF2'});
 // Above the silica index across the band, so they can guide light and get the core mesh size.
 export const GUIDING_MATERIALS=Object.freeze(['Silicon','Silicon nitride','Sapphire (ordinary)','Lithium niobate (ordinary)','Indium phosphide','Gallium arsenide']);
 const NAME=/^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
@@ -88,17 +88,20 @@ export function overlappingPairs(shapes){
  for(let i=0;i<shapes.length;i++)for(let j=i+1;j<shapes.length;j++){const a=boxes[i],b=boxes[j];if(a.xmin<b.xmax&&b.xmin<a.xmax&&a.ymin<b.ymax&&b.ymin<a.ymax)pairs.push([i,j]);}
  return pairs;
 }
-export function solverShapes(shapes,coreMeshUm){
+// Format 0.3 shapes in the design's nanometres (geometry.length_unit "nm"); a guiding shape carries
+// the core element size as a quantity string.
+export function solverShapes(shapes,coreMeshNm){
  return shapes.map((s,i)=>{
   const base={name:'s'+(i+1),material:SHAPE_MATERIALS[s.material]};
-  if(GUIDING_MATERIALS.includes(s.material))base.mesh_size=coreMeshUm;
-  if(s.type==='circle')return {...base,type:'circle',cx:s.cx/1000,cy:s.cy/1000,r:s.r/1000};
-  return {...base,type:'polygon',points:shapeCorners(s).map(([x,y])=>[x/1000,y/1000])};
+  if(GUIDING_MATERIALS.includes(s.material))base.element_size=coreMeshNm+' nm';
+  if(s.type==='circle')return {...base,type:'circle',cx:s.cx,cy:s.cy,r:s.r};
+  return {...base,type:'polygon',points:shapeCorners(s).map(([x,y])=>[x,y])};
  });
 }
+/** The grading centre in nm: the middle of the guiding shapes (else of all shapes). */
 export function gradingCentre(shapes){
  const guiding=shapes.filter(s=>GUIDING_MATERIALS.includes(s.material)),b=designBounds(guiding.length?guiding:shapes);
- return [(b.xmin+b.xmax)/2000,(b.ymin+b.ymax)/2000];
+ return [(b.xmin+b.xmax)/2,(b.ymin+b.ymax)/2];
 }
 const nm=value=>Number.isInteger(value)?String(value):String(Math.round(value*1000)/1000);
 export function shapeText(s){

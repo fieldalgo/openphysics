@@ -11,13 +11,16 @@ absorbing boundary.
 import numpy as np
 import pytest
 
-from galerkin import (rectangle_mesh, annulus_mesh, assemble_stiffness,
-                      assemble_mass, assemble_boundary_mass, solve_dirichlet,
-                      l2_error, radial_pml_coeffs)
+from galerkin import rectangle_mesh, annulus_mesh, l2_error
+from galerkin.kernels import (radial_pml_coeffs, assemble_stiffness, assemble_mass, assemble_boundary_mass,
+                              solve_dirichlet)
 from conftest import assert_second_order, rate
 
 L, H, K_WAVE = 1.0, 0.5, 4.0 * np.pi
 A_CYL, R_OUT, K_SCAT = 1.0, 4.0, np.pi
+#: refsol's cylinder in SI registry names; read in m and rad/m (only k a and k r enter), so the series is the
+#: former one bit for bit, and it already follows exp(-i omega t), the convention of this solve
+CYLINDER = dict(vacuum_angular_wavenumber=K_SCAT, radius=A_CYL, kind="pec_tm")
 
 
 def test_guided_plane_wave_converges_at_second_order():
@@ -44,13 +47,13 @@ def test_cylinder_scattering_matches_the_partial_wave_series(refsol):
          - gamma * B).tocsr()
     inner = mesh.boundary["inner"]
     x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
-    g = -refsol.scattering.incident(x[inner], y[inner], K_SCAT)
+    g = -refsol.scattering.incident(np.column_stack([x[inner], y[inner]]), vacuum_angular_wavenumber=K_SCAT)
     u_s = solve_dirichlet(A, np.zeros(mesh.num_nodes, dtype=complex),
                           {tuple(inner): g})
 
     r = np.hypot(x, y)
     sel = r < 0.6 * R_OUT
-    ex = refsol.scattering.scattered(x[sel], y[sel], K_SCAT, A_CYL, kind="pec_tm")
+    ex = refsol.scattering.scattered(np.column_stack([x[sel], y[sel]]), **CYLINDER)
     rel = np.linalg.norm(u_s[sel] - ex) / np.linalg.norm(ex)
     # The first-order absorbing boundary, not the mesh, sets this floor; M2.5
     # replaces it with a PML and the error drops by two orders of magnitude.
@@ -66,7 +69,7 @@ R_END = R0 + D_PML
 def _error(mesh, u_s, refsol, r_max=2.4):
     x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
     sel = np.hypot(x, y) < r_max
-    ex = refsol.scattering.scattered(x[sel], y[sel], K_SCAT, A_CYL, kind="pec_tm")
+    ex = refsol.scattering.scattered(np.column_stack([x[sel], y[sel]]), **CYLINDER)
     return np.linalg.norm(u_s[sel] - ex) / np.linalg.norm(ex)
 
 
@@ -86,7 +89,7 @@ def _solve(n_r, n_theta, pml, refsol):
         outer = {}
     inner = mesh.boundary["inner"]
     x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
-    g = -refsol.scattering.incident(x[inner], y[inner], K_SCAT)
+    g = -refsol.scattering.incident(np.column_stack([x[inner], y[inner]]), vacuum_angular_wavenumber=K_SCAT)
     u = solve_dirichlet(A, np.zeros(mesh.num_nodes, dtype=complex),
                         {tuple(inner): g, **outer})
     return mesh, u

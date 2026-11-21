@@ -9,7 +9,7 @@ conduction (`galerkin.electric.solve_steady_electric`), transient heat conductio
 (`galerkin.transient_heat.solve_transient_heat`), elasticity
 (`galerkin.elasticity.solve_elasticity`), thermoelasticity
 (`galerkin.thermoelasticity.solve_thermoelasticity`), waveguide modes
-(`galerkin.waveguide.solve_modes`) and the PEC box cavity
+(`galerkin.kernels.solve_modes`) and the PEC box cavity
 (`galerkin.cavity.solve_cavity_box`) accept JAX or PyTorch values
 in place of NumPy numbers. The result arrays are then arrays of that library, and
 derivatives with respect to those inputs flow through the solve. NumPy remains the
@@ -23,22 +23,24 @@ Install an array library with the matching extra, `pip install "galerkin[jax]"` 
 
 | Solver | Inputs that may be JAX or PyTorch values |
 |---|---|
-| `solve_steady_heat` | `conductivity` (scalar or `{region name: value}`); `heat_source` (scalar, region table or a callback returning live values); `dirichlet` temperatures; `outward_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
-| `solve_steady_electric` | `conductivity` (scalar or region table); `dirichlet` and `reference_potential` volts; `outward_current` (scalar or callback returning live values) |
-| `solve_electrostatics`, `capacitance_matrix` | `permittivity` (real scalar or region table; complex permittivity is NumPy only); conductor and `reference_potential` volts; `charge_density` (scalar, region table or a callback returning live values). The capacitance matrix is returned in that library ([contract](electrostatics.md)) |
-| `solve_transient_heat` | `conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source` (scalar, region table or a callback `(points, time)` returning live values); `dirichlet` temperatures (scalars or callbacks `(time)` returning live values); `initial_temperature_k` |
-| `solve_elasticity` | `young_modulus` and `poisson_ratio` (scalars or region tables); `dirichlet` displacements; `body_force` and `traction` (constant vectors or callbacks returning live values) |
-| `solve_thermoelasticity` | as `solve_elasticity`, plus `reference_temperature_k` and `thermal_expansion_per_k` (scalar or region table); the temperature snapshot stays a NumPy record |
+| `solve_steady_heat` | `thermal_conductivity` (scalar or `{region name: value}`); `heat_source_density` (scalar, region table or a callback returning live values); `prescribed_temperature` values; `inward_heat_flux` and both members of each `convection` pair (scalars or callbacks returning live values) |
+| `solve_steady_electric` | `electrical_conductivity` (scalar or region table); `prescribed_electric_potential` and `reference_electric_potential` volts; `inward_current_density` (scalar or callback returning live values) |
+| `solve_electrostatics`, `capacitance_matrix` | `relative_permittivity` (real scalar or region table; complex permittivity is NumPy only); conductor and `reference_electric_potential` volts; `free_charge_density` (scalar, region table or a callback returning live values). The capacitance matrix is returned in that library ([contract](electrostatics.md)) |
+| `solve_transient_heat` | `thermal_conductivity` and `volumetric_heat_capacity` (scalars or region tables); `heat_source_density` (scalar, region table or a callback `(position, time)` returning live values); `prescribed_temperature` values (scalars or callbacks `(time)` returning live values); `initial_temperature` |
+| `solve_elasticity` | `youngs_modulus` and `poisson_ratio` (scalars or region tables); `prescribed_displacement` values; `body_force_density` and `traction` (constant vectors or callbacks returning live values) |
+| `solve_thermoelasticity` | as `solve_elasticity`, plus `stress_free_temperature` and `linear_expansion_coefficient` (scalar or region table); the temperature snapshot stays a NumPy record |
 | `solve_modes` | `eps_r` and `mu_r` (scalars or per-element arrays, real or complex) and `k0`; `n_eff`, `et` and `ez` are returned in that library. `n_target` only selects the modes and has no derivative; `coordinate_factors` must be NumPy |
-| `solve_cavity_box` | `lengths_m` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency_hz` only selects the modes |
+| `solve_cavity_box` | `box_size` (an array of three, or a sequence mixing numbers and live values); frequencies, eigenvalues, edge coefficients and centroid fields are returned in that library with derivatives, the residuals (a diagnostic of the NumPy solve) without. `target_frequency` only selects the modes |
 | `eval_edge_field` | `dofs` (real or complex), such as `et[i]` of `solve_modes`; the centroid field is returned in that library as float64 or complex128. The `EdgeSpace` is NumPy structure: its geometry and edge signs carry no derivative |
 
-The time grid `time_s` is structure, like the mesh. A transient callback must
+The time grid `time` is structure, like the mesh. A transient callback must
 return values of one library for the whole run: a callback that returns NumPy
 numbers at the first time and live values later is refused.
 
 Mesh coordinates, connectivity, boundary tags and region ids are fixed structure;
-derivatives with respect to node positions are not provided. `ElementHeatSource`
+derivatives with respect to node positions are not provided, except along a
+design motion of steady heat, steady electric conduction, linear elasticity, thermoelasticity, transient heat or waveguide modes (`motion=`,
+[shape derivatives](shape_derivative.md)). `ElementHeatSource`
 and `ElementConductivity` hold NumPy values. A callback receives NumPy coordinates
 and normals and may return live values; lift the coordinates into the same library
 when they enter the expression (PyTorch does not combine tensors with NumPy arrays).
@@ -60,7 +62,7 @@ right = jnp.asarray(mesh.boundary["right"])
 
 
 def right_temperature(k, h):
-    result = solve_steady_heat(mesh, conductivity=k, dirichlet={i: 350.0 for i in left},
+    result = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature={i: 350.0 for i in left},
                                convection={"right": (h, 300.0)})
     return result.temperature[right].mean()
 
@@ -127,6 +129,12 @@ linearly with the number of steps in both modes; checkpointing lowers the slope.
 
 ## Waveguide modes: eigenvalues, fields and degenerate modes
 
+The public `galerkin.solve_waveguide_modes` (SI, exp(−iωt)) takes JAX or PyTorch values for
+`relative_permittivity`, `relative_permeability` and the wavelength or k0; it conjugates the complex
+ones with the library's `conj` (`to_kernel`) and returns `to_public` of the kernel's live outputs, so
+the derivatives pass through both conversions (`tests/galerkin/test_conventions.py` checks a JAX and a
+PyTorch gradient of Im(`effective_index`)). Its kernel, `galerkin.kernels.solve_modes`, works as follows.
+
 `solve_modes` runs the NumPy eigensolve on the numbers of the inputs. Each
 returned pair (λ0, x0), with λ0 = −(k0 n_eff)² and x0 = [et β, ez] on the free
 degrees of freedom, then takes one Newton step on the eigenproblem A x = λ B x
@@ -153,7 +161,7 @@ geometry carries no derivative.
 A degenerate eigenvalue has no derivative: its eigenvectors are any combination
 of the pair. When a returned eigenvalue lies within 1e-8 relative
 (`galerkin.waveguide.DEGENERATE_GAP`) of another eigenvalue of the discrete
-problem, whether or not that one was returned (`num_modes` may cut a pair), the
+problem, whether or not that one was returned (the requested count may cut a pair), the
 mode keeps its exact values and gets a `DegenerateModeWarning` and NaN
 derivatives, so a backward pass that uses it gives NaN instead of a wrong
 number. The nearest other eigenvalue is found densely for small problems and by
@@ -186,7 +194,7 @@ evaluated on the solved mesh and divided by d_a, component by component.
 
 Boxes have many degenerate modes (any two equal side lengths give pairs); they
 follow the same rule as the waveguide: NaN derivatives and a
-`DegenerateModeWarning`, also when `num_modes` cuts the pair. `result.mesh` and
+`DegenerateModeWarning`, also when `mode_count` cuts the pair. `result.mesh` and
 `result.space` hold the numbers of the solved geometry; node coordinates carry
 no derivative.
 
@@ -282,7 +290,7 @@ structure; only coefficients may be live.
   live box lengths the cavity field also depends on the lengths through the
   geometry, which `result.space` holds as numbers, so evaluating it from live
   coefficients alone would miss that part of the derivative. `solve_cavity_box`
-  returns the field with its full derivative in `result.electric_field`.
+  returns the field with its full derivative in `result.mass_normalized_electric_field`.
 - Forward-mode differentiation (`jax.jvp`, `jax.jacfwd`) and second derivatives.
 - JAX without `jax_enable_x64`, and JAX and PyTorch values in one call.
 - Solvers that do not differentiate yet refuse JAX and PyTorch values with a
@@ -307,7 +315,7 @@ structure; only coefficients may be live.
   iteration, so a live value that one returns surfaces as a
   `JouleConvergenceError` whose cause is that `TypeError`: the conductivity
   callbacks `ConductivityModel.evaluate` and `derivative`, and boundary callbacks
-  given for `outward_flux`, `convection` or `outward_current`. See [iterative solvers](#iterative-solvers) for the derivative
+  given for `inward_heat_flux`, `convection` or `inward_current_density`. See [iterative solvers](#iterative-solvers) for the derivative
   such a solver would need.
 
 ## Limits
@@ -320,7 +328,7 @@ structure; only coefficients may be live.
 - On JAX, a singular sparse system fails inside the host callback of the solve:
   JAX logs the callback's traceback (`jax.pure_callback failed`) before the
   solver raises its `ValueError`. PyTorch prints nothing.
-- With live inputs, `joule_power_per_length` and `supplied_power_per_length` are
+- With live inputs, `joule_power_per_depth` and `inward_electric_power_per_depth` are
   0-d arrays of that library instead of Python floats, and result arrays are not
   made read-only.
 - Tested on CPU only. Static data is lifted to CPU tensors; tensors on another
@@ -391,7 +399,7 @@ PyTorch 2.14.1 CPU):
   paths, and for one live length beside two numbers.
 - A box with a square cross-section: the degenerate pair warns and gives NaN, the
   simple fundamental matches central differences, and a pair cut by
-  `num_modes=1` still warns and gives NaN.
+  `mode_count=1` still warns and gives NaN.
 
 `tests/galerkin/test_edge_field_gradients.py` (2026-10-29, Linux, NumPy 2.5, JAX
 0.12.0.1, PyTorch 2.14.1 CPU):

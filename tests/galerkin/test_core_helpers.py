@@ -58,19 +58,19 @@ def test_elasticity_now_uses_the_strict_check():
     # Before the shared check, elasticity accepted a bool inside a list and
     # converted overflowing long doubles to infinity.
     mesh = rectangle_mesh(1., 1., 2, 2)
-    kw = dict(young_modulus=1., poisson_ratio=.3, plane="stress", dirichlet=_held(mesh))
+    kw = dict(youngs_modulus=1., poisson_ratio=.3, plane="stress", prescribed_displacement=_held(mesh))
     with pytest.raises(ValueError, match="must not contain booleans"):
-        solve_elasticity(mesh, body_force=[0., True], **kw)
+        solve_elasticity(mesh, body_force_density=[0., True], **kw)
     if WIDE:
         with pytest.raises(ValueError, match="exceeds floating-point range"):
-            solve_elasticity(mesh, body_force=np.array([0., HUGE], dtype=np.longdouble), **kw)
+            solve_elasticity(mesh, body_force_density=np.array([0., HUGE], dtype=np.longdouble), **kw)
 
 
 def test_thermal_now_rejects_bools_inside_callback_values():
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError, match="must not contain booleans"):
-        solve_steady_heat(mesh, conductivity=1., dirichlet={0: 300.},
-                          heat_source=lambda x: [True]*len(x))
+        solve_steady_heat(mesh, thermal_conductivity=1., prescribed_temperature={0: 300.},
+                          heat_source_density=lambda x: [True]*len(x))
 
 
 def test_orientation_is_the_only_difference_between_the_two_mesh_checks():

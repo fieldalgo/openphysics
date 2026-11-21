@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Sparse matrices whose values may be live while their pattern is static.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 A ``CooMatrix`` keeps row and column indices as NumPy integer arrays (the
 sparsity pattern, fixed by the mesh) and its entries in the caller's array
 library, so an entry can carry a derivative. Repeated (row, column) pairs add,

@@ -29,19 +29,19 @@ T1 = T2 = .5e-3
 LENGTH = 20e-3
 E, NU, ALPHA = [200e9, 70e9], [.3, .33], [12e-6, 23e-6]
 DT, TREF, KELVIN = 100., 293.15, 273.15
-STRIP = dict(thicknesses=[T1, T2], young_moduli=E, poisson_ratios=NU, expansions=ALPHA,
+STRIP = dict(thickness=[T1, T2], youngs_modulus=E, poisson_ratio=NU, linear_expansion_coefficient=ALPHA,
              temperature_change=DT, length=LENGTH)
-P, TARGET = tc.NAFEMS_T4, tc.NAFEMS_T4_TARGET
+P, TARGET = tc.nafems_t4(), tc.nafems_t4_target()        # SI (K); this figure shows degC
 
 
 def solve_strip(n):
     mesh = layered_rectangle_mesh([T1, T1+T2], LENGTH, [n, n], 40*n, ['layer1', 'layer2'])
-    snapshot = freeze_temperature(mesh, np.full(len(mesh.nodes), TREF+DT))
+    snapshot = freeze_temperature(mesh, temperature=np.full(len(mesh.nodes), TREF+DT))
     supports = {(0, 0): 0., (0, 1): 0., (40*n*(2*n+1), 0): 0.}
     r = solve_thermoelasticity(
-        mesh, snapshot, reference_temperature_k=TREF, plane='stress', dirichlet=supports,
-        thermal_expansion_per_k={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
-        young_modulus={'layer1': E[0], 'layer2': E[1]},
+        mesh, snapshot, stress_free_temperature=TREF, plane='stress', prescribed_displacement=supports,
+        linear_expansion_coefficient={'layer1': ALPHA[0], 'layer2': ALPHA[1]},
+        youngs_modulus={'layer1': E[0], 'layer2': E[1]},
         poisson_ratio={'layer1': NU[0], 'layer2': NU[1]})
     ids = mesh.boundary['left']
     y = mesh.nodes[ids, 1]
@@ -51,13 +51,14 @@ def solve_strip(n):
 
 
 def solve_t4(n):
-    mesh = rectangle_mesh(P.width, P.height, 6*n, 10*n)
-    hot = {int(i): P.bottom_temperature+KELVIN for i in mesh.boundary['bottom']}
-    r = solve_steady_heat(mesh, conductivity=P.conductivity, dirichlet=hot,
-                          convection={'right': (P.convection, P.ambient+KELVIN),
-                                      'top': (P.convection, P.ambient+KELVIN)})
+    mesh = rectangle_mesh(*P.length, 6*n, 10*n)
+    hot = {int(i): P.prescribed_temperature for i in mesh.boundary['bottom']}
+    r = solve_steady_heat(mesh, thermal_conductivity=P.thermal_conductivity, prescribed_temperature=hot,
+                          convection={'right': (P.heat_transfer_coefficient, P.ambient_temperature),
+                                      'top': (P.heat_transfer_coefficient, P.ambient_temperature)})
     celsius = r.temperature-KELVIN
-    node = np.flatnonzero(np.isclose(mesh.nodes[:, 0], TARGET.point[0]) & np.isclose(mesh.nodes[:, 1], TARGET.point[1]))[0]
+    node = np.flatnonzero(np.isclose(mesh.nodes[:, 0], TARGET.position[0])
+                          & np.isclose(mesh.nodes[:, 1], TARGET.position[1]))[0]
     return mesh, celsius, float(celsius[node])
 
 
@@ -69,20 +70,22 @@ def main(argv):
     out = Path(args[0])
     out.mkdir(parents=True, exist_ok=True)
     levels = (1, 2, 4) if quick else (1, 2, 4, 8, 16)
-    kappa = bimetal.curvature([T1, T2], E, ALPHA, DT).curvature
-    exact_t4 = tc.series(np.array([TARGET.point]), P, terms=300).temperature[0]
+    kappa = bimetal.curvature(thickness=[T1, T2], youngs_modulus=E, linear_expansion_coefficient=ALPHA,
+                              temperature_change=DT).curvature
+    exact_t4 = tc.series(np.array([TARGET.position]), P, terms=300).temperature[0]-KELVIN
     strip_rows, t4_rows = [], []
     for n in levels:
         mesh, r, k = solve_strip(n)
         strip_rows.append(dict(n=n, triangles=mesh.num_triangles, element_m=(T1+T2)/(2*n),
                                curvature_per_m=k, relative_error=k/kappa-1))
         mesh_t, celsius, value = solve_t4(n)
-        t4_rows.append(dict(n=n, triangles=mesh_t.num_triangles, element_m=P.height/(10*n),
+        t4_rows.append(dict(n=n, triangles=mesh_t.num_triangles, element_m=P.length[1]/(10*n),
                             temperature_c=value, error_c=value-exact_t4))
     values = dict(bimetal=dict(closed_form_curvature_per_m=kappa, radius_m=1/kappa, rows=strip_rows,
                                source='S. Timoshenko, J. Opt. Soc. Am. 11, 233-255 (1925), doi:10.1364/JOSA.11.000233'),
-                  nafems_t4=dict(exact_c=exact_t4, published_c=TARGET.value, published_precision_c=TARGET.quoted_precision,
-                                 rows=t4_rows, source=TARGET.source))
+                  nafems_t4=dict(exact_c=exact_t4, published_k=TARGET.temperature,
+                                 published_precision_k=TARGET.temperature_tolerance, rows=t4_rows,
+                                 source=TARGET.source))
     (out/'public_benchmarks.json').write_text(json.dumps(values, indent=1), encoding='utf-8')
     draw(out/'public_benchmarks.png', mesh, r, mesh_t, celsius, values)
     return values
@@ -117,10 +120,10 @@ def draw(path, mesh, r, mesh_t, celsius, values):
     ax = axes[1]
     tri_t = mtri.Triangulation(mesh_t.nodes[:, 0], mesh_t.nodes[:, 1], mesh_t.triangles)
     im = ax.tricontourf(tri_t, celsius, levels=20, cmap='inferno')
-    ax.plot(*TARGET.point, 'wo', mec='k', ms=7)
+    ax.plot(*TARGET.position, 'wo', mec='k', ms=7)
     ax.annotate('(0.6, 0.2) m\nNAFEMS target %.1f °C\nexact series %.3f °C\nFEM %.3f °C' % (
-        TARGET.value, values['nafems_t4']['exact_c'], values['nafems_t4']['rows'][-1]['temperature_c']),
-        TARGET.point, xytext=(.04, .5), fontsize=8, color='w',
+        TARGET.temperature-KELVIN, values['nafems_t4']['exact_c'], values['nafems_t4']['rows'][-1]['temperature_c']),
+        TARGET.position, xytext=(.04, .5), fontsize=8, color='w',
         arrowprops=dict(arrowstyle='-', color='w', lw=.8))
     ax.set_aspect('equal')
     ax.set_xlabel('x, m'); ax.set_ylabel('y, m')

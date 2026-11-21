@@ -2,11 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """Analytic Cartesian-traction fields, independent of FEM code and its solver.
 
-Coordinates/displacement: m; stress/traction/E: Pa; body force: N/m^3.
-Strain uses (exx, eyy, gamma_xy), gamma_xy=2*exy.
+Coordinates/displacement: m; stress/traction/youngs_modulus: Pa; body force density: N/m^3.
+Strain uses (exx, eyy, gamma_xy), gamma_xy=2*exy. SI throughout, keyword-only
+registry names after the leading positional ``points`` ((Q,2) metre coordinates)
+and, for the traction functions, ``normals``; a str for a quantity raises TypeError.
 """
 from dataclasses import dataclass
 import numpy as np
+
+from ._checks import refuse_text
+
+__all__ = ["TractionFields", "traction_from_stress", "uniaxial", "shear", "polynomial_manufactured",
+           "polynomial_traction", "polynomial_resultants"]
 
 
 def _real(value, shape, name):
@@ -16,11 +23,12 @@ def _real(value, shape, name):
     return a.astype(float)
 
 
-def _material(young_modulus, poisson_ratio, plane):
-    e = float(_real(young_modulus, (), "E"))
-    nu = float(_real(poisson_ratio, (), "nu"))
+def _material(youngs_modulus, poisson_ratio, plane):
+    refuse_text(youngs_modulus=youngs_modulus, poisson_ratio=poisson_ratio)
+    e = float(_real(youngs_modulus, (), "youngs_modulus"))
+    nu = float(_real(poisson_ratio, (), "poisson_ratio"))
     if e <= 0 or not -1 < nu < .5 or plane not in ("stress", "strain"):
-        raise ValueError("require E>0, -1<nu<0.5, and plane='stress' or 'strain'")
+        raise ValueError("require youngs_modulus>0, -1<poisson_ratio<0.5, and plane='stress' or 'strain'")
     mu = e/(2*(1+nu))
     lam = e*nu/(1-nu*nu) if plane == "stress" else e*nu/((1+nu)*(1-2*nu))
     return e, nu, mu, lam
@@ -38,11 +46,12 @@ class TractionFields:
     displacement: np.ndarray
     strain: np.ndarray
     stress: np.ndarray
-    body_force: np.ndarray
+    body_force_density: np.ndarray
 
 
-def traction_from_stress(stress, normals):
+def traction_from_stress(normals, *, stress):
     """Evaluate t=sigma*n for (Q,3) stresses and outward unit (Q,2) normals."""
+    refuse_text(stress=stress)
     n = _points(normals)
     sigma = _real(stress, (len(n), 3), "stress")
     if not np.allclose(np.linalg.norm(n, axis=1), 1., rtol=0, atol=1e-10):
@@ -51,29 +60,31 @@ def traction_from_stress(stress, normals):
                             sigma[:, 2]*n[:, 0]+sigma[:, 1]*n[:, 1]])
 
 
-def uniaxial(points, axial_stress, *, young_modulus, poisson_ratio, plane):
-    """Uniform sigma_xx=P, sigma_yy=sigma_xy=0; left-x/bottom-y supports."""
+def uniaxial(points, *, stress_xx, youngs_modulus, poisson_ratio, plane):
+    """Uniform sigma_xx=stress_xx, sigma_yy=sigma_xy=0; left-x/bottom-y supports."""
+    refuse_text(stress_xx=stress_xx)
     p = _points(points)
-    e, nu, _, _ = _material(young_modulus, poisson_ratio, plane)
-    applied = float(_real(axial_stress, (), "axial_stress"))
+    e, nu, _, _ = _material(youngs_modulus, poisson_ratio, plane)
+    applied = float(_real(stress_xx, (), "stress_xx"))
     ex, ey = ((applied/e, -nu*applied/e) if plane == "stress" else
               ((1-nu*nu)*applied/e, -nu*(1+nu)*applied/e))
     return TractionFields(p*[ex, ey], np.tile([ex, ey, 0.], (len(p), 1)),
                            np.tile([applied, 0., 0.], (len(p), 1)), np.zeros_like(p))
 
 
-def shear(points, shear_stress, *, young_modulus, poisson_ratio, plane):
-    """Uniform sigma_xy=tau, u=(tau/mu*y,0), fixed bottom displacement."""
+def shear(points, *, stress_xy, youngs_modulus, poisson_ratio, plane):
+    """Uniform sigma_xy=tau=stress_xy, u=(tau/mu*y,0), fixed bottom displacement."""
+    refuse_text(stress_xy=stress_xy)
     p = _points(points)
-    _, _, mu, _ = _material(young_modulus, poisson_ratio, plane)
-    tau = float(_real(shear_stress, (), "shear_stress"))
+    _, _, mu, _ = _material(youngs_modulus, poisson_ratio, plane)
+    tau = float(_real(stress_xy, (), "stress_xy"))
     gamma = tau/mu
     return TractionFields(np.column_stack([gamma*p[:, 1], np.zeros(len(p))]),
                            np.tile([0., 0., gamma], (len(p), 1)),
                            np.tile([0., 0., tau], (len(p), 1)), np.zeros_like(p))
 
 
-def polynomial_manufactured(points, *, young_modulus, poisson_ratio, plane):
+def polynomial_manufactured(points, *, youngs_modulus, poisson_ratio, plane):
     """Cubic mixed-boundary MMS on the unit square, A=1e-3 m.
 
     u=A*(x^2+x*y+x*y^2, .6*x^2*y+.2*x*y^2+.3*x^3).
@@ -81,7 +92,7 @@ def polynomial_manufactured(points, *, young_modulus, poisson_ratio, plane):
     Force is differentiated explicitly from the Navier equation, not FEM.
     """
     p = _points(points)
-    _, _, mu, lam = _material(young_modulus, poisson_ratio, plane)
+    _, _, mu, lam = _material(youngs_modulus, poisson_ratio, plane)
     length, amplitude = 1., 1e-3  # fixed reference length (m), displacement (m)
     x, y, a = p[:, 0]/length, p[:, 1]/length, amplitude/length
     u = amplitude*np.column_stack([x*x+x*y+x*y*y, .6*x*x*y+.2*x*y*y+.3*x*x*x])
@@ -95,20 +106,20 @@ def polynomial_manufactured(points, *, young_modulus, poisson_ratio, plane):
     return TractionFields(u, strain, sigma, force)
 
 
-def polynomial_traction(points, normals, *, young_modulus, poisson_ratio, plane):
+def polynomial_traction(points, normals, *, youngs_modulus, poisson_ratio, plane):
     """Analytic nonuniform boundary traction in global Cartesian coordinates."""
-    fields = polynomial_manufactured(points, young_modulus=young_modulus,
+    fields = polynomial_manufactured(points, youngs_modulus=youngs_modulus,
                                       poisson_ratio=poisson_ratio, plane=plane)
-    return traction_from_stress(fields.stress, normals)
+    return traction_from_stress(normals, stress=fields.stress)
 
 
-def polynomial_resultants(*, young_modulus, poisson_ratio, plane):
+def polynomial_resultants(*, youngs_modulus, poisson_ratio, plane):
     """Applied force and origin moment per thickness, excluding the left wall.
 
     For the unit-square MMS, the resultant of body plus other three walls
     is minus the left-wall analytic traction integral. Units N/m and N.
     """
-    _, _, mu, lam = _material(young_modulus, poisson_ratio, plane)
+    _, _, mu, lam = _material(youngs_modulus, poisson_ratio, plane)
     length, amplitude = 1., 1e-3  # metres
     return (np.array([5*amplitude*(lam+2*mu)/6, amplitude*mu/15]),
             -7*amplitude*length*(lam+2*mu)/12)

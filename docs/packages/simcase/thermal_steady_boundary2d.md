@@ -7,8 +7,8 @@
 This checkout implements the boundary extension for `thermal.steady2d` through
 `Document.from_dict`, JSON loading, validation, document summaries,
 `run(Document)`, `ThermalRunResult`, the CLI and JSON/NPZ saving with the existing
-thermal engine. The [legacy guide](thermal_steady2d.md) retains the original v1
-contract. Use matching packages from the same checkout.
+thermal engine. The [rectangle guide](thermal_steady2d.md) describes the plain layout
+without boundary keys. Use matching packages from the same checkout.
 
 The [independent validation report](steady_boundary_independent_validation.md)
 separates fixed acceptance gates, source review and bounded direct-path
@@ -19,21 +19,23 @@ expectations; they do not expand the measured validation scope.
 
 ## Inputs and supported scope
 
-Use format `"openphysics": "0.2"`, one `thermal.steady2d` physics,
-a homogeneous rectangle, P1 triangles, constant isotropic
-`conductivity_w_mk > 0` in W/(m K), and signed constant
-`heat_source_w_m3` in W/m³ (default zero). Declare length units and
-`temperature: "K"`; geometry is converted to metres, while SI suffixes
-are independent of the declared length unit. Mesh subdivisions are positive,
-nonboolean JSON integers. Study is single and plots are false.
+Use format `"openphysics": "0.3"`, one `thermal.steady2d` physics,
+a homogeneous rectangle, P1 triangles, constant isotropic positive
+`thermal_conductivity` (such as `"2 W/(m K)"`), and signed constant
+`heat_source_density` (such as `"0 W/m^3"`; absent means no source). The geometry declares
+its `length_unit`; every value carries its own unit and is read in SI. `subdivision_count` is
+two positive JSON integers. Study is single and plots are false.
 
 | Physics field | Contract |
 | --- | --- |
-| `dirichlet_temperature_k` | Required side-to-temperature mapping; finite input K >= 0 |
-| `outward_flux_w_m2` | Optional side-to-signed-constant g mapping, W/m² |
-| `convection` | Optional side-to-object mapping with exactly `h_w_m2k` and `ambient_temperature_k` |
-| `h_w_m2k` | Finite h >= 0, W/(m² K) |
-| `ambient_temperature_k` | Finite ambient K >= 0, including when h=0 |
+| `prescribed_temperature` | Required side-to-temperature mapping; each above 0 K |
+| `inward_heat_flux` | Optional side-to-signed-constant mapping, W/m^2, positive into the body |
+| `convection` | Optional side-to-object mapping with exactly `heat_transfer_coefficient` and `ambient_temperature` |
+| `heat_transfer_coefficient` | h >= 0, such as `"4 W/(m^2 K)"` |
+| `ambient_temperature` | Above 0 K, including when h=0 |
+
+The engine takes the outward flux g; simcase hands it `0.0 - inward_heat_flux`, an exact sign
+flip. A format 0.2 `outward_flux_w_m2` key is refused with this rule in its message.
 
 Side names are exactly left/right/bottom/top. Missing natural conditions mean
 insulation. Null, booleans in numeric fields, nonfinite numbers, unknown keys,
@@ -75,7 +77,7 @@ sum(fQ) = total_outward
 
 K and H have units W/(m K). All nodal loads, rhs, residual, reaction and
 integrated heat rates are W/m of out-of-plane depth; q is W/m².
-`load_w_per_m` remains the volumetric source fQ, not the combined rhs.
+`generated_heat_rate_per_depth` remains the volumetric source fQ, not the combined rhs.
 The thermostat contribution alone is -sum(reaction); it is not total outward
 heat when flux or convection is present. No transient storage or heat-content
 quantity is introduced.
@@ -100,20 +102,21 @@ On the right, T=293 K, g=2 and h*(T-Ta)=12; the left thermostat contributes
 
 ```json
 {
-  "openphysics": "0.2",
+  "openphysics": "0.3",
   "name": "Steady additive outward flux and convection",
-  "units": {"length": "m", "temperature": "K"},
-  "geometry": {"domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
+  "geometry": {"length_unit": "m", "depth": null,
+               "domain": {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1}},
   "materials": {},
   "physics": {"heat1": {
     "type": "thermal.steady2d",
-    "conductivity_w_mk": 2,
-    "heat_source_w_m3": 0,
-    "dirichlet_temperature_k": {"left": 300},
-    "outward_flux_w_m2": {"right": 2},
-    "convection": {"right": {"h_w_m2k": 4, "ambient_temperature_k": 290}}
+    "thermal_conductivity": "2 W/(m K)",
+    "heat_source_density": "0 W/m^3",
+    "prescribed_temperature": {"left": "300 K"},
+    "inward_heat_flux": {"right": "-2 W/m^2"},
+    "convection": {"right": {"heat_transfer_coefficient": "4 W/(m^2 K)",
+                             "ambient_temperature": "290 K"}}
   }},
-  "mesh": {"subdivisions": [8, 8]},
+  "mesh": {"subdivision_count": [8, 8]},
   "study": {"type": "single"},
   "results": {"save_fields": true, "plots": false}
 }
@@ -161,7 +164,7 @@ with tempfile.TemporaryDirectory(prefix="steady-boundary-") as directory:
     assert isinstance(result, ThermalRunResult)
     summary = result.summary()
     result.save(root / "api_results")
-    assert summary["result_format"] == "thermal.steady2d-result-v2"
+    assert summary["result_format"] == "thermal.steady2d-result-v4"
     json.dumps(summary, allow_nan=False)
 ```
 
@@ -173,59 +176,58 @@ through its own heat routes; see [Steady heat in Studio](thermal_studio.md).
 
 `summary()` returns a JSON-safe dictionary. `result_format`, `field_layout`
 and `boundary_enabled` identify the captured layout. Public array properties
-use the names below, except `nodes_m` is `mesh_nodes_m` and `triangles` is
-`mesh_triangles`. `dirichlet_node_ids` and `dirichlet_temperature_k` are
-public result attributes. No optical effective index or modal normalization is
+use the names below. No optical effective index or modal normalization is
 attached to temperature.
 
 ## Version and raw-field contract
 
-Presence of either new mapping key, even an empty object, selects
-`thermal.steady2d-result-v2` and `thermal2d-p1-node-cell-boundary-v2`.
-Absence of both retains legacy v1 identifiers and nine arrays. Do not insert
-empty defaults or infer versions from nonempty values. Null is invalid.
-Input format remains 0.2.
+Presence of either mapping key, even an empty object, selects
+`thermal.steady2d-result-v4` and `thermal2d-p1-node-cell-boundary-v3`.
+Absence of both gives `thermal.steady2d-result-v3`, `thermal2d-p1-node-cell-v2` and nine
+arrays. Do not insert empty defaults or infer versions from nonempty values. Null is invalid.
+The format 0.2 identifiers (`-result-v1`, `-result-v2`, `-cell-v1`, `-boundary-v2`) are retired.
 
 | NPZ array | Shape | Location / meaning | Unit |
 | --- | --- | --- | --- |
-| `nodes_m` | (N,2) | nodes, SI coordinates | m |
-| `triangles` | (M,3) | integer CCW connectivity | 1 |
-| `temperature_k` | (N,) | nodes | K |
-| `heat_flux_w_m2` | (M,2) | triangle centroids, -k grad(T) | W/m² |
-| `load_w_per_m` | (N,) | nodes, source fQ only | W/m |
-| `reaction_w_per_m` | (N,) | nodes, inward thermostat reaction | W/m |
-| `residual_w_per_m` | (N,) | nodes, A*T-rhs | W/m |
-| `dirichlet_node_ids` | (D,) | sorted unique prescribed integer IDs | 1 |
-| `dirichlet_temperature_k` | (D,) | matching prescribed values | K |
-| `prescribed_outward_load_w_per_m` | (N,) | nodes, G; v2 only | W/m |
-| `ambient_load_w_per_m` | (N,) | nodes, B; v2 only | W/m |
-| `convective_outward_w_per_m` | (N,) | nodes, C; v2 only | W/m |
-| `system_rhs_w_per_m` | (N,) | nodes, fQ+B-G; v2 only | W/m |
+| `node_coordinates` | (N,2) | nodes, SI coordinates | m |
+| `triangles` | (M,3) | integer CCW connectivity | (structural) |
+| `temperature` | (N,) | nodes | K |
+| `heat_flux` | (M,2) | triangle centroids, -k grad(T) | W/m^2 |
+| `generated_heat_rate_per_depth` | (N,) | nodes, source fQ only | W/m |
+| `reaction_heat_rate_per_depth` | (N,) | nodes, heat the constraint injects | W/m |
+| `residual_heat_rate_per_depth` | (N,) | nodes, A*T-rhs | W/m |
+| `prescribed_node_ids` | (D,) | sorted unique prescribed integer IDs | (structural) |
+| `prescribed_temperature` | (D,) | matching prescribed values | K |
+| `outward_prescribed_heat_rate_per_depth` | (N,) | nodes, G; boundary layout only | W/m |
+| `ambient_convective_heat_rate_per_depth` | (N,) | nodes, B; boundary layout only | W/m |
+| `outward_convective_heat_rate_per_depth` | (N,) | nodes, C; boundary layout only | W/m |
+| `applied_heat_rate_per_depth` | (N,) | nodes, fQ+B-G; boundary layout only | W/m |
 
-For Robin-only anchoring, both Dirichlet arrays have shape (0,); node IDs
+For Robin-only anchoring, both prescribed arrays have shape (0,); node IDs
 remain integer. Full residual uses A and rhs above. Consumers must check
 format/layout, units, shapes, finite numeric types and metadata, using
-`allow_pickle=False`. Missing v2 fields must not be replaced with invented
-zeros. Summary metadata includes `field_units`, `field_locations`,
-`field_shapes`, `mesh_length_unit="m"`, original document units,
-boundary mappings, fixed-node count, temperature extrema and mesh/solve timings.
-NPZ additionally stores Unicode scalars `result_format`, `field_layout`,
-`mesh_length_unit` and `metadata_json`; metadata JSON matches the summary.
+`allow_pickle=False`. Missing boundary fields must not be replaced with invented
+zeros. The summary carries `field_units` (structural arrays have none), `field_locations`,
+`field_shapes`, `field_components`, the `diagnostics`, `defaults_applied` and
+`resolved_inputs`, the boundary mappings as `{"value", "unit"}` objects, fixed-node count,
+temperature extrema and `timing.wall_time`. NPZ additionally stores the scalars
+`result_format`, `field_layout` and `metadata_json`; metadata JSON matches the summary.
 It does not contain Python object arrays.
 
-V2 diagnostics are `source_heat_w_per_m`,
-`prescribed_outward_heat_w_per_m`, `convective_outward_heat_w_per_m`,
-`thermostat_outward_heat_w_per_m`, `outward_heat_w_per_m`,
-`heat_balance_defect_w_per_m`, `normalized_heat_balance_defect` and
-`free_residual_max_w_per_m`. The signed defect is total outward minus source.
+Boundary-layout balance values (each `{"value", "unit"}`) are
+`generated_heat_rate_per_depth`, `outward_prescribed_heat_rate_per_depth`,
+`outward_convective_heat_rate_per_depth`, `outward_reaction_heat_rate_per_depth`,
+`outward_heat_rate_per_depth`, `heat_rate_imbalance_per_depth`,
+`relative_conservation_residual` and `maximum_residual_heat_rate_per_depth`. The signed
+imbalance is total outward minus source.
 The normalized defect divides its absolute value by the sum of absolute nodal
 source, reaction, G and C contributions, with a positive floating-point floor.
-The free residual maximum is dimensional W/m (zero when no free nodes exist).
-V2 does not publish the v1 `normalized_free_residual` diagnostic: a K-only
+The residual maximum is dimensional W/m (zero when no free nodes exist).
+The boundary layout does not publish the plain layout's `relative_residual`: a K-only
 normalization is not the Robin engine's guard. These summary checks do not
 replace the engine's unchanged physical residual/balance guards or independent
-acceptance. The reviewed implementation keeps the v2 dimensional free residual
-separate from the legacy normalization.
+acceptance. The reviewed implementation keeps the dimensional residual maximum of the
+boundary layout separate from the plain layout's normalization.
 
 ## Geometry, lifetime and validation limits
 

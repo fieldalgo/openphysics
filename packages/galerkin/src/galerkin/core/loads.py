@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Volumetric load vectors on P1 triangles."""
+"""Volumetric load vectors on P1 triangles.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 
 import numpy as np
@@ -42,20 +46,20 @@ def source_load(mesh, p, t, area, source, *, live=False, measure=None):
     if isinstance(source, ElementSource):
         return _centroid_load(mesh, t, len(p), source.values)
     if is_per_region(source):
-        values = region_property(mesh, source, "heat_source", live=live)
+        values = region_property(mesh, source, "heat_source_density", live=live)
         return _centroid_load(mesh, t, len(p), values)
     check = real_value if live else real_array
     if not callable(source):
-        value = check(source, "heat_source")
+        value = check(source, "heat_source_density")
         if tuple(value.shape) != ():
-            raise ValueError("constant heat_source must be scalar")
+            raise ValueError("constant heat_source_density must be scalar")
         return _centroid_load(mesh, t, len(p), value if is_live(value) else float(value))
     # Original Duffy-product rule: integrate Q*N_i, not centroid Q times A/3.
     bary, weights = triangle_product_rule()
     points = np.einsum("qa,tad->tqd", bary, p[t])
-    values = check(source(points.reshape(-1, 2)), "heat_source callback")
+    values = check(source(points.reshape(-1, 2)), "heat_source_density callback")
     if tuple(values.shape) != (points.shape[0]*points.shape[1],):
-        raise ValueError("heat_source callback must return exactly shape (Q,)")
+        raise ValueError("heat_source_density callback must return exactly shape (Q,)")
     if is_live(values):
         xp = namespace(values)
         local = xp.einsum("qi,q,tq,t->ti", *(xp.asarray(a) for a in (bary, weights)),
@@ -76,16 +80,16 @@ def _weighted_source_load(mesh, p, t, area, source, live, measure):
     if isinstance(source, ElementSource):
         values = source.values[:, None]
     elif is_per_region(source):
-        values = region_property(mesh, source, "heat_source", live=live)[:, None]
+        values = region_property(mesh, source, "heat_source_density", live=live)[:, None]
     elif callable(source):
-        values = check(source(points.reshape(-1, 2)), "heat_source callback")
+        values = check(source(points.reshape(-1, 2)), "heat_source_density callback")
         if tuple(values.shape) != (points.shape[0]*points.shape[1],):
-            raise ValueError("heat_source callback must return exactly shape (Q,)")
+            raise ValueError("heat_source_density callback must return exactly shape (Q,)")
         values = values.reshape(points.shape[:2])
     else:
-        values = check(source, "heat_source")
+        values = check(source, "heat_source_density")
         if tuple(values.shape) != ():
-            raise ValueError("constant heat_source must be scalar")
+            raise ValueError("constant heat_source_density must be scalar")
     xp = namespace(values)
     basis = xp.broadcast_to(xp.asarray(bary)[None, :, :], (len(t), *bary.shape))
     local = forms.integrate_linear(basis, weights, area,

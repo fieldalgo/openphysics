@@ -23,7 +23,8 @@ For side lengths a, b, d in metres,
     k² = π²[(m/a)² + (n/b)² + (p/d)²]
     f_Hz = 299792458 sqrt(k²) / (2π).
 
-`refsol.metallic.rect_cavity_resonances` returns k², not Hz.
+`refsol.metallic.rect_cavity_resonances(*, box_size, n_max=3)` (the box (a, b, d) in m) returns
+k² in 1/m², not Hz.
 Its TE index rules are p >= 1 and (m,n) != (0,0); TM requires m,n >= 1,
 p >= 0. Independently, the standing-wave amplitudes give one polarization
 when exactly two indices are positive and two when all three are positive.
@@ -152,7 +153,7 @@ root = Path.cwd()
 for package in (root / "packages").iterdir():
     if (package / "pyproject.toml").exists():
         sys.path.insert(0, str(package))
-sys.path.insert(0, str(root / "packages/galerkin/examples"))
+sys.path.insert(0, str(root / "examples/galerkin"))
 import cavity_modes as example
 from refsol.metallic import rect_cavity_resonances
 
@@ -166,7 +167,7 @@ for sides in ((1, 1, 1), (1, .8, .6)):
         multiplicity = {0: 0, 1: 0, 2: 1, 3: 2}[positive]
         k2 = sum((np.pi * i / a)**2 for i, a in zip(indices, sides))
         independent.extend([k2] * multiplicity)
-    expected = [k2 for k2, _ in rect_cavity_resonances(*sides, n_max=4)]
+    expected = [k2 for k2, _ in rect_cavity_resonances(box_size=sides, n_max=4)]
     assert len(independent) == len(expected) == 176
     assert np.allclose(sorted(independent), sorted(expected), rtol=1e-13, atol=0)
     if sides == (1, 1, 1):
@@ -203,7 +204,9 @@ a full suite pass is not claimed.
 ## Approved technical contract and executable tests
 
 The callable is
-`galerkin.solve_cavity_box(lengths_m, subdivisions, *, num_modes=6, target_frequency_hz)`.
+`galerkin.solve_cavity_box(*, box_size, subdivision_count, mode_count=6, target_frequency)`
+(its SI registry names since the galerkin step; `lengths_m`, `subdivisions`, `num_modes` and
+`target_frequency_hz` before).
 Lengths and mesh coordinates are SI metres; frequencies are Hz. Selection is
 `near_target` in squared frequency and returns exactly the requested count on
 success. It can split a degenerate cluster. Results and saved metadata declare
@@ -230,7 +233,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m pytest -c pyproject.toml -q \
 ```
 
 The convergence fixture uses the original fixed shift sigma = 1.3 times the
-analytic fundamental k², expressed as target_frequency_hz. This stays away from
+analytic fundamental k², expressed as target_frequency. This stays away from
 the gradient kernel while retaining the complete reference clusters under test.
 It does not change the numerical gates or guarantee completeness for other targets.
 The raw restoration test reconstructs Mesh3D/EdgeSpace3D from saved primitive

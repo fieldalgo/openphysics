@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import copy
 import json
 import math
 import re
@@ -15,33 +14,41 @@ from simcase import Document, DocumentError, TransientThermalRunResult
 from . import thermal_api as common
 
 KIND = "thermal.transient2d"
-PAIR = ("thermal.transient2d-result-v1", "thermal2d-transient-p1-node-cell-v1")
-MANIFEST = "studio-thermal-transient-v1"
-FRAME = "studio-thermal-transient-frame-v1"
-HISTORY = "studio-thermal-transient-history-v1"
+# Rectangle documents are format 0.3: arrays under registry names, SI values.
+PAIR = ("thermal.transient2d-result-v3", "thermal2d-transient-p1-node-cell-v2")
+MANIFEST = "studio-thermal-transient-v2"
+FRAME = "studio-thermal-transient-frame-v2"
+HISTORY = "studio-thermal-transient-history-v2"
 MAX_TIMES = 128
 RAW_BYTES = 16*1024**2
 ENCODED_BYTES = 4*1024**2
 PAGE_ROWS = 16
 # Independent transport metadata: do not import private producer implementation.
+# (unit, location, time axis); a structural array has no unit, a static one no time axis.
 SPEC = {
-    "nodes_m": ("m", "nodes", "static"),
-    "triangles": ("1", "triangle_connectivity", "static"),
-    "time_s": ("s", "requested_times", "time_s"),
-    "temperature_k": ("K", "nodes", "time_s"),
-    "heat_flux_w_m2": ("W/m^2", "triangle_centroids", "time_s"),
-    "source_load_w_per_m": ("W/m", "nodes", "time_s"),
-    "reaction_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "residual_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "storage_rate_w_per_m": ("W/m", "nodes", "time_s[1:]"),
-    "heat_content_j_per_m": ("J/m", "domain", "time_s"),
-    "quadratic_functional_jk_per_m": ("J K/m", "domain", "time_s"),
-    "dirichlet_node_ids": ("1", "dirichlet_nodes", "static"),
-    "dirichlet_temperatures_k": ("K", "dirichlet_nodes", "time_s"),
+    "node_coordinates": ("m", "nodes", "static"),
+    "triangles": (None, "triangle_connectivity", "static"),
+    "time": ("s", "requested_times", "time"),
+    "temperature": ("K", "nodes", "time"),
+    "heat_flux": ("W/m^2", "triangle_centroids", "time"),
+    "generated_heat_rate_per_depth": ("W/m", "nodes", "time"),
+    "reaction_heat_rate_per_depth": ("W/m", "nodes", "time[1:]"),
+    "residual_heat_rate_per_depth": ("W/m", "nodes", "time[1:]"),
+    "heat_storage_rate_per_depth": ("W/m", "nodes", "time[1:]"),
+    "stored_heat_per_depth": ("J/m", "domain", "time"),
+    "thermal_energy_functional_per_depth": ("J K/m", "domain", "time"),
+    "prescribed_node_ids": (None, "prescribed_nodes", "static"),
+    "prescribed_temperature": ("K", "prescribed_nodes", "time"),
 }
-UI_FIELDS = {"temperature_k", "heat_flux_w_m2", "heat_content_j_per_m",
-             "quadratic_functional_jk_per_m"}
-DYNAMIC = set(SPEC)-{"nodes_m", "triangles", "time_s", "dirichlet_node_ids"}
+UI_FIELDS = {"temperature", "heat_flux", "stored_heat_per_depth", "thermal_energy_functional_per_depth"}
+DYNAMIC = set(SPEC)-{"node_coordinates", "triangles", "time", "prescribed_node_ids"}
+STATIC = ("node_coordinates", "triangles", "time", "prescribed_node_ids")
+FORMAT_03 = ('transient Studio reads format 0.3 rectangle documents ("openphysics": "0.3", values with their '
+             'units); format 0.2 rectangle documents are not read')
+def _family(record_pair):
+    """``(spec, time key, frame id, history id, rate axis)`` of a record: rectangle and region
+    records alike carry the registry names (format 0.3)."""
+    return SPEC, "time", FRAME, HISTORY, "time[1:]"
 
 
 def require(condition, message, status=400, code="invalid_result"):
@@ -56,33 +63,28 @@ def preflight(data, limits):
             and isinstance(next(iter(physics.values())), dict)
             and next(iter(physics.values())).get("type") == KIND,
             "transient route accepts one thermal.transient2d entry", code="unsupported_physics")
+    require(data.get("openphysics") == "0.3", FORMAT_03, code="invalid_document")
     # The transient view shows the V1 pair only: documents that select the boundary
     # layout (key presence, as in the headless contract) are refused before any
     # validation or run, with no job; run them headless instead.
     entry = next(iter(physics.values()))
-    require(not ("outward_flux_w_m2" in entry or "convection" in entry),
-            "transient Studio shows Dirichlet and insulated sides only; a document with "
-            "outward_flux_w_m2 or convection saves the boundary layout and runs headless "
+    require(not ("inward_heat_flux" in entry or "convection" in entry),
+            "transient Studio shows prescribed-temperature and insulated sides only; a document with "
+            "inward_heat_flux or convection saves the boundary layout and runs headless "
             "(python -m simcase run)", code="unsupported_physics")
-    mesh, study = data.get("mesh"), data.get("study")
-    subdivisions = mesh.get("subdivisions") if isinstance(mesh, dict) else None
-    require(isinstance(subdivisions, list) and len(subdivisions) == 2
-            and all(type(n) is int and n > 0 for n in subdivisions),
-            "mesh.subdivisions must be two positive integers", code="invalid_document")
-    nx, ny = subdivisions
-    n, m = (nx+1)*(ny+1), 2*nx*ny
-    require(n <= limits.max_nodes and m <= limits.max_triangles,
-            "transient mesh exceeds resource cap", 413, "mesh_limit_exceeded")
-    times = study.get("time_s") if isinstance(study, dict) else None
+    n, m = common.subdivisions(data, limits)
+    study = data.get("study")
+    time = study.get("time") if isinstance(study, dict) else None
+    times = time.get("values") if isinstance(time, dict) else None
     require(isinstance(times, list) and len(times) >= 2,
-            "study.time_s must contain at least two requested times", code="invalid_document")
+            "study.time must be a tagged array of at least two requested times", code="invalid_document")
     require(len(times) <= MAX_TIMES, "too many requested times", 413, "history_limit_exceeded")
     try:
         valid = (all(type(x) in (int, float) and math.isfinite(x) and x >= 0 for x in times)
                  and all(b > a and math.isfinite(b-a) for a, b in zip(times, times[1:])))
     except OverflowError:
         valid = False
-    require(valid, "requested times must be finite strictly increasing seconds", code="invalid_document")
+    require(valid, "requested times must be finite strictly increasing values", code="invalid_document")
     nt = len(times)
     # Sound D=N upper bound before public boundary validation/deduplication.
     scalar_count = (5*nt-1)*n+(2*nt+3)*m+(nt+1)*n+3*nt
@@ -113,14 +115,17 @@ async def read_request(request, limits, *, for_run, region=None):
 
 
 def validation_payload(spec, limits):
-    return common.encode_json({"ok": True, "kind": KIND, **spec.tags(),
-                               "doc": spec.doc.data, "summary": spec.doc.summary(),
-                               "notes": list(spec.doc.notes)}, limits.metadata_bytes)
+    """The validation reply: within ``metadata_bytes`` without the document's diagnostics, which
+    grow with the document and count, as in the result summary, against ``manifest_bytes``."""
+    body = {"ok": True, "kind": KIND, **spec.tags(), **common.document_body(spec.doc),
+            "summary": spec.doc.summary()}
+    common.encode_json({key: value for key, value in body.items() if key != "diagnostics"},
+                       limits.metadata_bytes, exact=True, name="metadata_bytes")
+    return common.encode_json(body, ENCODED_BYTES, exact=True, name="manifest_bytes")
 
 
 def runtime_available(limits):
     return (callable(getattr(TransientThermalRunResult, "summary", None))
-            and hasattr(TransientThermalRunResult, "mesh_nodes_m")
             and hasattr(TransientThermalRunResult, "mesh_triangles")
             and RAW_BYTES+ENCODED_BYTES+limits.status_bytes <= limits.terminal_bytes)
 
@@ -148,39 +153,40 @@ def reservation(limits):
 
 def capture_result(result, identity, limits, document):
     require(isinstance(result, TransientThermalRunResult), "public transient result required")
-    original = json.dumps(document.data, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    summary = copy.deepcopy(result.summary())
-    common.encode_json(summary, limits.metadata_bytes)
+    require(document.si is not None, "a format 0.3 rectangle document required")
+    original = document.canonical_json(separators=(",", ":"))
+    summary = common.json_value(result.summary())
+    common.check_summary(summary, limits)
     require(isinstance(summary, dict) and summary.get("physics_type") == KIND
             and (summary.get("result_format"), summary.get("field_layout")) == PAIR,
             "unsupported transient summary/result pair")
     # Producer summary validates its own bound snapshot; compare against this job too.
-    require(json.dumps(result.doc.data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    require(result.doc.canonical_json(separators=(",", ":"))
             == original, "public result document does not match accepted snapshot")
-    require(summary.get("units") == document["units"] and summary.get("mesh_length_unit") == "m",
-            "transient document/SI units mismatch")
-    n, m, nt = preflight(document.data, limits)
+    unit, scale = common.length_unit(document)
+    require(common.domain_input(summary, document).get("length_unit") == unit,
+            "transient document/summary length_unit mismatch")
+    n, m, nt = preflight(common.json_value(document.data), limits)
     captured = {}
     total = 0
     fixed_count = None
     # Capture each public property exactly once; never use producer _raw_arrays.
-    order = ("nodes_m", "triangles", "time_s", "dirichlet_node_ids")+tuple(
-        k for k in SPEC if k not in {"nodes_m", "triangles", "time_s", "dirichlet_node_ids"})
+    order = STATIC+tuple(k for k in SPEC if k not in STATIC)
     for key in order:
         value = getattr(result, key)
         require(isinstance(value, np.ndarray) and value.dtype.kind in "iuf",
                 "transient "+key+" requires real nonboolean ndarray")
-        if key == "dirichlet_node_ids":
+        if key == "prescribed_node_ids":
             require(value.ndim == 1 and len(value) <= n and value.dtype.kind in "iu",
-                    "invalid transient Dirichlet IDs")
+                    "invalid transient prescribed node IDs")
             fixed_count = len(value)
-        shapes = {"nodes_m": (n, 2), "triangles": (m, 3), "time_s": (nt,),
-                  "dirichlet_node_ids": (fixed_count,), "temperature_k": (nt, n),
-                  "heat_flux_w_m2": (nt, m, 2), "source_load_w_per_m": (nt, n),
-                  "reaction_w_per_m": (nt-1, n), "residual_w_per_m": (nt-1, n),
-                  "storage_rate_w_per_m": (nt-1, n), "heat_content_j_per_m": (nt,),
-                  "quadratic_functional_jk_per_m": (nt,),
-                  "dirichlet_temperatures_k": (nt, fixed_count)}
+        shapes = {"node_coordinates": (n, 2), "triangles": (m, 3), "time": (nt,),
+                  "prescribed_node_ids": (fixed_count,), "temperature": (nt, n),
+                  "heat_flux": (nt, m, 2), "generated_heat_rate_per_depth": (nt, n),
+                  "reaction_heat_rate_per_depth": (nt-1, n), "residual_heat_rate_per_depth": (nt-1, n),
+                  "heat_storage_rate_per_depth": (nt-1, n), "stored_heat_per_depth": (nt,),
+                  "thermal_energy_functional_per_depth": (nt,),
+                  "prescribed_temperature": (nt, fixed_count)}
         require(value.shape == shapes[key], "transient "+key+" shape mismatch")
         require(np.isfinite(value).all(), "nonfinite transient "+key)
         require(value.dtype.itemsize <= 8, "unsupported transient numeric width")
@@ -190,69 +196,67 @@ def capture_result(result, identity, limits, document):
         require(np.isfinite(owned).all(), "nonfinite captured transient "+key)
         owned.flags.writeable = False
         captured[key] = owned
-    x, tri, fixed = (captured[k] for k in ("nodes_m", "triangles", "dirichlet_node_ids"))
+    x, tri, fixed = (captured[k] for k in ("node_coordinates", "triangles", "prescribed_node_ids"))
     require(tri.dtype.kind in "iu" and np.all(tri >= 0) and np.all(tri < n),
             "transient triangle indices invalid")
     require(np.all(fixed >= 0) and np.all(fixed < n)
-            and np.all(fixed[1:] > fixed[:-1]), "transient Dirichlet IDs invalid")
+            and np.all(fixed[1:] > fixed[:-1]), "transient prescribed node IDs invalid")
     a, b, c = x[tri[:, 0]], x[tri[:, 1]], x[tri[:, 2]]
     with np.errstate(over="ignore", invalid="ignore"):
         area = (b[:, 0]-a[:, 0])*(c[:, 1]-a[:, 1])-(b[:, 1]-a[:, 1])*(c[:, 0]-a[:, 0])
     require(np.isfinite(area).all() and np.all(area > 0), "transient mesh must be CCW")
-    require(np.array_equal(captured["time_s"], np.asarray(document["study"]["time_s"])),
+    require(np.array_equal(captured["time"], np.asarray(document.si["study"]["time"])),
             "transient requested time axis mismatch")
-    for meta in ("field_units", "field_locations", "field_time_axes", "field_shapes"):
-        require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(SPEC),
+    expected = {"field_units": [k for k, v in SPEC.items() if v[0] is not None],
+                "field_locations": list(SPEC), "field_shapes": list(SPEC),
+                "field_time_axes": [k for k, v in SPEC.items() if v[2] != "static"]}
+    for meta, keys in expected.items():
+        require(isinstance(summary.get(meta), dict) and set(summary[meta]) == set(keys),
                 "transient metadata field set mismatch")
     mesh_meta, study_meta = summary.get("mesh"), summary.get("study")
+    counts = summary.get("resolved_inputs", {}).get("mesh.subdivision_count", {}).get("value")
     require(isinstance(mesh_meta, dict) and type(mesh_meta.get("nodes")) is int
             and type(mesh_meta.get("triangles")) is int
             and mesh_meta["nodes"] == n and mesh_meta["triangles"] == m
-            and isinstance(mesh_meta.get("subdivisions"), list)
-            and all(type(v) is int for v in mesh_meta["subdivisions"])
-            and mesh_meta["subdivisions"] == document["mesh"]["subdivisions"],
+            and isinstance(counts, list) and all(type(v) is int for v in counts)
+            and counts == document.si["mesh"]["subdivision_count"],
             "transient summary mesh disagrees with captured geometry")
-    declared_times = study_meta.get("time_s") if isinstance(study_meta, dict) else None
+    declared = study_meta.get("time") if isinstance(study_meta, dict) else None
+    declared_times = declared.get("values") if isinstance(declared, dict) else None
     require(isinstance(study_meta, dict) and study_meta.get("type") == "transient"
-            and isinstance(declared_times, list)
+            and declared.get("unit") == "s" and isinstance(declared_times, list)
             and all(type(v) in (int, float) and math.isfinite(v) for v in declared_times)
-            and np.array_equal(np.asarray(declared_times), captured["time_s"]),
+            and np.array_equal(np.asarray(declared_times), captured["time"]),
             "transient summary study disagrees with captured times")
-    rate_times = summary.get("rate_time_s")
-    require(isinstance(rate_times, list)
-            and all(type(v) in (int, float) and math.isfinite(v) for v in rate_times)
-            and np.array_equal(np.asarray(rate_times), captured["time_s"][1:]),
-            "transient summary rate times disagree")
-    require(type(summary.get("dirichlet_nodes")) is int
-            and summary["dirichlet_nodes"] == fixed_count,
-            "transient summary Dirichlet count disagrees")
+    require(type(summary.get("prescribed_nodes")) is int
+            and summary["prescribed_nodes"] == fixed_count,
+            "transient summary prescribed node count disagrees")
     descriptors = {}
-    for key, (unit, location, axis) in SPEC.items():
+    for key, (field_unit, location, axis) in SPEC.items():
         declared_shape = summary["field_shapes"][key]
-        require(isinstance(declared_shape, list) and all(type(n) is int for n in declared_shape)
-                and summary["field_units"][key] == unit and summary["field_locations"][key] == location
-                and summary["field_time_axes"][key] == axis
+        require(isinstance(declared_shape, list) and all(type(v) is int for v in declared_shape)
+                and summary["field_units"].get(key) == field_unit and summary["field_locations"][key] == location
+                and summary["field_time_axes"].get(key, "static") == axis
                 and declared_shape == list(captured[key].shape),
                 "transient metadata mismatch: "+key)
-        descriptors[key] = {"shape": list(captured[key].shape), "unit": unit,
+        descriptors[key] = {"shape": list(captured[key].shape), "unit": field_unit,
                             "location": location, "axis": axis,
                             "available_views": ["frame", "history"] if key in DYNAMIC else [],
-                            "initial_available": axis != "time_s[1:]",
+                            "initial_available": axis != "time[1:]",
                             "ui_supported": key in UI_FIELDS}
-    scale = document.scale.to_si(1., {"length": 1})
     require(type(scale) in (int, float) and math.isfinite(scale) and scale > 0,
             "transient display scale invalid")
     pair = {"result_format": PAIR[0], "field_layout": PAIR[1]}
-    base = {**identity, **pair, "display_length_in_m": scale}
+    base = {**identity, **pair, "length_unit": unit, "display_length_in_m": scale}
     job, rid = identity["job"], identity["result_id"]
     payload = {**base, "payload_format": MANIFEST, "summary": summary, "fields": descriptors,
-               "time_s": captured["time_s"].tolist(), "default_frame_index": nt-1,
-               "arrays": {k: captured[k].tolist() for k in ("nodes_m", "triangles", "dirichlet_node_ids")},
+               "time": captured["time"].tolist(), "default_frame_index": nt-1,
+               "arrays": {k: captured[k].tolist() for k in ("node_coordinates", "triangles", "prescribed_node_ids")},
                "frame_url": "/api/jobs/"+job+"/frame?result_id="+rid
                             +"&field={field}&time_index={time_index}&frame_seq={frame_seq}",
                "history_url": "/api/jobs/"+job+"/history?result_id="+rid
                               +"&field={field}&start={start}&stop={stop}&frame_seq={frame_seq}"}
-    encoded = common.encode_json(payload, ENCODED_BYTES)
+    encoded = common.encode_json(payload, ENCODED_BYTES, name="manifest_bytes")
     return encoded, MappingProxyType(captured), scale
 
 
@@ -284,37 +288,39 @@ def encode_view(record, query, *, history):
     arrays = record.get("raw")
     require(arrays is not None and record["identity"]["kind"] == KIND,
             "job has no transient history", code="unsupported_result_format")
-    key = query["field"]
-    unit, location, axis = SPEC[key]
-    times = arrays["time_s"]
-    nt = len(times)
     pair = record.get("pair", PAIR)  # region records store their own pair
+    spec, time_key, frame_id, history_id, rate_axis = _family(pair)
+    key = query["field"]
+    require(key in spec and key in arrays, "unsupported transient field for this result", code="invalid_query")
+    unit, location, axis = spec[key]
+    times = arrays[time_key]
+    nt = len(times)
     base = {**record["identity"], "result_format": pair[0], "field_layout": pair[1],
             # Display scale is captured in immutable manifest, bounded <=4MiB.
             "display_length_in_m": record["display_length_in_m"],
             "frame_seq": query["frame_seq"], "field": key, "unit": unit, "location": location}
+    start_key, end_key = "interval_start", "interval_end"
     if history:
         start, stop = query["start"], query["stop"]
         require(0 <= start < stop <= nt and stop-start <= PAGE_ROWS,
                 "history page range invalid", 422, "invalid_range")
-        require(axis != "time_s[1:]" or start >= 1,
+        require(axis != rate_axis or start >= 1,
                 "initial rate is unavailable", 422, "unavailable_initial_rate")
-        rows = arrays[key][start-1:stop-1] if axis == "time_s[1:]" else arrays[key][start:stop]
-        payload = {**base, "payload_format": HISTORY, "start": start, "stop": stop,
-                   "time_indices": list(range(start, stop)), "time_s": times[start:stop].tolist(),
+        rows = arrays[key][start-1:stop-1] if axis == rate_axis else arrays[key][start:stop]
+        payload = {**base, "payload_format": history_id, "start": start, "stop": stop,
+                   "time_indices": list(range(start, stop)), time_key: times[start:stop].tolist(),
                    "shape": list(rows.shape), "arrays": {key: rows.tolist()}}
-        if axis == "time_s[1:]":
-            payload.update(interval_start_s=times[start-1:stop-1].tolist(),
-                           interval_end_s=times[start:stop].tolist())
+        if axis == rate_axis:
+            payload.update({start_key: times[start-1:stop-1].tolist(), end_key: times[start:stop].tolist()})
     else:
         index = query["time_index"]
         require(0 <= index < nt, "time index outside requested times", 422, "invalid_range")
-        require(axis != "time_s[1:]" or index >= 1,
+        require(axis != rate_axis or index >= 1,
                 "initial rate is unavailable", 422, "unavailable_initial_rate")
-        row = arrays[key][index-1 if axis == "time_s[1:]" else index]
-        payload = {**base, "payload_format": FRAME, "time_index": index,
-                   "time_s": float(times[index]), "shape": list(np.shape(row)),
+        row = arrays[key][index-1 if axis == rate_axis else index]
+        payload = {**base, "payload_format": frame_id, "time_index": index,
+                   time_key: float(times[index]), "shape": list(np.shape(row)),
                    "arrays": {key: row.tolist()}}
-        if axis == "time_s[1:]":
-            payload.update(interval_start_s=float(times[index-1]), interval_end_s=float(times[index]))
+        if axis == rate_axis:
+            payload.update({start_key: float(times[index-1]), end_key: float(times[index])})
     return common.encode_json(payload, ENCODED_BYTES)

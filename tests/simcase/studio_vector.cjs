@@ -33,21 +33,28 @@ function page() {
   return { element, colors, run: code => vm.runInContext(code, ctx) };
 }
 
-const vector = { location: 'triangle_centroids', components: ['Ex', 'Ey', 'Ez'],
+// The optical payload of a format 0.3 result (section 5.3.4 names): node coordinates in metres,
+// drawn in the document's length unit (display), series as tagged arrays or {re, im}.
+const vector = { name: 'unnormalized_electric_field', location: 'triangle_centroids', components: ['x', 'y', 'z'],
+  unit: '1', normalization: 'max_centroid_magnitude', time_convention: 'exp(-i omega t)',
   real: [[[0.6, 0, 0], [0.3, 0, 0]]], imag: [[[0, 0, 0.8], [0, 0, 0.4]]] };
-const result = { nodes:[[0,0],[1,0],[1,1],[0,1]], triangles:[[0,1,2],[0,2,3]],
-  fields:[], vector_fields:[vector], parameter:null, values:[1550], neff:[[2.05]],
-  summary:{units:{length:'nm'}}, timings:{mesh:0,solve:0}, group_index:null };
+const TC = 'exp(-i omega t)';
+const result = { node_coordinates:[[0,0],[1e-9,0],[1e-9,1e-9],[0,1e-9]], field_units:{node_coordinates:'m'},
+  display:{length_unit:'nm', metres_per_length_unit:1e-9}, triangles:[[0,1,2],[0,2,3]],
+  unnormalized_mode_field:[], vector_fields:[vector], parameter:null, study_values:null,
+  vacuum_wavelength:{unit:'m', values:[1.55e-6]}, effective_index:{unit:'1', values:[[2.05]]},
+  summary:{}, timings:{mesh:0,solve:0}, group_index:null, propagation_loss:null };
 
-test('absorbing modes display the imaginary index and positive loss with units', () => {
+test('absorbing modes display the imaginary index and positive loss with units and the convention', () => {
   const p = page(), data = structuredClone(result);
-  data.neff_imag = [[-0.01]];
-  data.propagation_loss_db_cm = [[3521.]];
+  data.effective_index = {unit:'1', re:[[2.05]], im:[[0.01]], time_convention:TC};
+  data.propagation_loss = {unit:'dB/m', values:[[352100.]]};
   p.run(`resultData = ${JSON.stringify(data)}; fillResultTable();`);
   const table = p.element('resTable').innerHTML;
-  assert(table.includes('Im n_eff: -1.0000e-2'));
-  assert(table.includes('3521.0000 dB/cm'));
+  assert(table.includes('Im n_eff: 1.0000e-2'));
+  assert(table.includes('3.5210e+5 dB/m'));
   assert(table.includes('Material absorption only'));
+  assert(table.includes('exp(−iωt)') && table.includes('Im n_eff &gt; 0 means attenuation'));
 });
 
 test('complex vector components retain their common magnitude scale', () => {
@@ -74,7 +81,7 @@ test('vector triangle samples are not averaged through shared nodes', () => {
 test('scalar responses still use nodal fields and hide the component selector', () => {
   const p = page(), data = structuredClone(result);
   delete data.vector_fields;
-  data.fields = [[[1, 1, 1, 1]]];
+  data.unnormalized_mode_field = [{real: [[1, -1, 1, 1]], imag: null}];
   p.run(`resultData = ${JSON.stringify(data)}; populateResultSelectors(); drawField();`);
   assert.equal(p.element('componentLabel').hidden, true);
   assert.deepEqual(p.colors, [1, 1]);
@@ -82,11 +89,11 @@ test('scalar responses still use nodal fields and hide the component selector', 
 
 function trackedSweep() {
   const data = structuredClone(result);
-  data.parameter = 'physics.em1.wavelength';
-  data.values = [1500, 1550, 1600];
+  data.parameter = 'physics.em1.vacuum_wavelength';
+  data.vacuum_wavelength = {unit:'m', values:[1.5e-6, 1.55e-6, 1.6e-6]};
   // Response columns are already in branch order, even when candidate ranks swap.
-  data.neff = [[2.1, 2.0], [1.95, 2.05], [1.9, 2.0]];
-  data.group_index = [[4.1, 4.4], [4.2, 4.5], [4.3, 4.6]];
+  data.effective_index = {unit:'1', values:[[2.1, 2.0], [1.95, 2.05], [1.9, 2.0]]};
+  data.group_index = {unit:'1', values:[[4.1, 4.4], [4.2, 4.5], [4.3, 4.6]]};
   data.vector_fields = [
     { ...vector, real: [[[0.6, 0, 0], [0.3, 0, 0]], [[0.8, 0, 0], [0.4, 0, 0]]],
       imag: [[[0, 0, 0.8], [0, 0, 0.4]], [[0, 0, 0.6], [0, 0, 0.3]]] },
@@ -97,7 +104,8 @@ function trackedSweep() {
   ];
   data.summary.mode_tracking = {
     method: 'electric-l2-assignment-v1',
-    settings: { search_modes: 4, min_overlap: 0.8, min_margin: 0.1, degeneracy_tolerance: 1e-5 },
+    settings: { search_mode_count: 4, mode_tracking_threshold: 0.8, mode_tracking_margin_threshold: 0.1,
+                degeneracy_tolerance: 1e-5 },
     points: [
       { candidate_count: 4, candidate_ranks: [1, 2], overlaps: null, margins: null },
       { candidate_count: 4, candidate_ranks: [2, 1], overlaps: [0.98, 0.97], margins: [0.7, 0.6] },
@@ -173,19 +181,19 @@ for (const failure of ['validation', 'tracking']) {
 function subspaceSweep() {
   const data = structuredClone(result);
   delete data.vector_fields;
-  data.parameter = 'physics.em1.wavelength';
-  data.values = [1500, 1550, 1600];
-  data.neff = null; data.group_index = null; data.fields = [];
-  data.summary.field_representation = 'vector-subspace-edge-nodal-v1';
+  data.parameter = 'physics.em1.vacuum_wavelength';
+  data.vacuum_wavelength = {unit:'m', values:[1.5e-6, 1.55e-6, 1.6e-6]};
+  data.effective_index = null; data.group_index = null; data.unnormalized_mode_field = [];
+  data.summary.field_representation = 'vector-subspace-edge-nodal-v2';
   data.summary.mode_tracking = { method: 'electric-l2-subspace-v1', points: [
     { clusters: [{ rank: 2 }] },
-    { clusters: [{ rank: 2, min_principal_squared: 0.9991 }] },
-    { clusters: [{ rank: 2, min_principal_squared: 0.9987 }] }] };
-  data.subspace = { field_representation: 'vector-subspace-edge-nodal-v1',
+    { clusters: [{ rank: 2, minimum_principal_squared: 0.9991 }] },
+    { clusters: [{ rank: 2, minimum_principal_squared: 0.9987 }] }] };
+  data.subspace = { field_representation: 'vector-subspace-edge-nodal-v2',
     clusters: [{ id: 1, rank: 2, columns: [0, 2] }],
-    raw_neff: [[2.1, 2.09], [2.05, 2.04], [2.0, 1.99]],
-    cluster_mean_neff: [[2.095], [2.045], [1.995]],
-    cluster_mean_group_index: [[4.1], [4.2], [4.3]],
+    effective_index: [[2.1, 2.09], [2.05, 2.04], [2.0, 1.99]],
+    mean_effective_index: [[2.095], [2.045], [1.995]],
+    mean_group_index: [[4.1], [4.2], [4.3]],
     density: [[[1, 0.25]], [[0.5, 1]], [[1, 0.75]]],
     density_label: 'normalized subspace field density' };
   return data;
@@ -222,7 +230,7 @@ test('cluster table reports mean index, band width and mean-index group index on
 
 test('an unknown cluster layout version is refused instead of displayed', () => {
   const p = page(), data = subspaceSweep();
-  data.subspace.field_representation = 'vector-subspace-edge-nodal-v2';
+  data.subspace.field_representation = 'vector-subspace-edge-nodal-v1';          // retired by the batch
   assert.throws(() => p.run(`resultData = ${JSON.stringify(data)}; populateResultSelectors();`), /unsupported cluster result layout/);
 });
 
@@ -251,18 +259,19 @@ test('circles on a hidden zero-size canvas do not throw', () => {
 
 test('PML candidates expose reasons and total bend loss and mask artificial fields', () => {
   const p = page(), data = structuredClone(result);
-  data.neff_imag = [[-.001]]; data.propagation_loss_db_cm = [[352.1]];
-  data.summary.open_boundary = [{physical_bounds:[[0,0],[.5,1]], candidates:[
-    {candidate:1, neff_real:2.05, neff_imag:-.001, physical_l2_fraction:.9,
-     pencil_residual:1e-12, reasons:['selected_near_target'], attenuation_status:'resolved_sign'},
-    {candidate:2, neff_real:1.4, neff_imag:-.2, physical_l2_fraction:.01,
-     pencil_residual:2e-12, reasons:['low_physical_l2_fraction'], attenuation_status:'resolved_sign'}]}];
-  data.summary.bend_loss_db_90deg = [[.55]];
+  data.effective_index = {unit:'1', re:[[2.05]], im:[[.001]], time_convention:TC};
+  data.propagation_loss = {unit:'dB/m', values:[[35210.]]};
+  data.summary.open_boundary = [{physical_bounds:{unit:'m', values:[[0,0],[.5e-9,1e-9]]}, candidates:[
+    {candidate:1, effective_index:{re:2.05, im:.001, unit:'1', time_convention:TC}, physical_l2_fraction:.9,
+     relative_residual:1e-12, reasons:['selected_near_target'], attenuation_status:'resolved_sign'},
+    {candidate:2, effective_index:{re:1.4, im:.2, unit:'1', time_convention:TC}, physical_l2_fraction:.01,
+     relative_residual:2e-12, reasons:['low_physical_l2_fraction'], attenuation_status:'resolved_sign'}]}];
+  data.summary.bend_loss = {unit:'dB/(90 deg)', values:[[.55]]};
   p.run(`resultData = ${JSON.stringify(data)}; fillResultTable(); populateResultSelectors(); drawField();`);
   const table = p.element('resTable').innerHTML;
   assert(table.includes('stability not checked'));
   assert(table.includes('low_physical_l2_fraction'));
-  assert(table.includes('dB/90°'));
+  assert(table.includes('dB/(90 deg)') && table.includes('1.400000 / 2.000e-1'));
   assert(!table.includes('Material absorption only'));
   assert.deepEqual(p.colors, ['#d0d5dd', .5]);
   assert(p.element('resInfo').textContent.includes('PML candidate'));

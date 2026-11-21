@@ -15,7 +15,8 @@ import numpy as np
 import pytest
 
 from galerkin import Mesh3D, box_mesh, from_mesher
-from galerkin.thermal3d import dirichlet_from_faces, solve_steady_heat_3d, source_load_3d
+from galerkin.kernels import dirichlet_from_faces, source_load_3d
+from galerkin.thermal3d import solve_steady_heat_3d
 
 meshine = pytest.importorskip("meshine")
 refsol = pytest.importorskip("refsol")
@@ -49,7 +50,7 @@ def _errors(mesh, result, k):
     p = mesh.nodes[mesh.tets]
     vol6 = 6.0 * mesh.volumes()
     xq = np.einsum("qk,tkd->tqd", lam, p)
-    fields = exact.sine_product(xq.reshape(-1, 3), lengths=LENGTHS, conductivity=k)
+    fields = exact.sine_product(xq.reshape(-1, 3), length=LENGTHS, thermal_conductivity=k, reference_temperature=300.0, temperature_difference=1.0)
     u = fields.temperature.reshape(xq.shape[:2])
     gu = -fields.heat_flux.reshape(xq.shape) / k
     uh = np.einsum("qk,tk->tq", lam, result.temperature[mesh.tets])
@@ -61,10 +62,10 @@ def _errors(mesh, result, k):
 
 def _manufactured(h, k=2.5):
     mesh = extruded(h)
-    source = lambda c: exact.sine_product(c, lengths=LENGTHS, conductivity=k).heat_source
+    source = lambda c: exact.sine_product(c, length=LENGTHS, thermal_conductivity=k, reference_temperature=300.0, temperature_difference=1.0).heat_source_density
     bc = dirichlet_from_faces(mesh, dict.fromkeys(mesh.tagged_faces, 300.0))
-    result = solve_steady_heat_3d(mesh, conductivity=k, dirichlet=bc, heat_source=source)
-    assert result.balance_error <= 1e-10
+    result = solve_steady_heat_3d(mesh, thermal_conductivity=k, prescribed_temperature=bc, heat_source_density=source)
+    assert result.relative_conservation_residual <= 1e-10
     return mesh, result
 
 
@@ -81,13 +82,13 @@ def test_m4_manufactured_sine_product_converges_at_second_order():
 
 def test_manufactured_solution_on_a_coarse_mesh_is_close_and_balanced():
     mesh, result = _manufactured(0.2)
-    nodal = exact.sine_product(mesh.nodes, lengths=LENGTHS, conductivity=2.5).temperature
+    nodal = exact.sine_product(mesh.nodes, length=LENGTHS, thermal_conductivity=2.5, reference_temperature=300.0, temperature_difference=1.0).temperature
     assert np.abs(result.temperature - nodal).max() < 0.2       # amplitude 1 K, h = 0.2 m
-    assert np.array_equal(result.dirichlet_nodes, mesh.boundary_nodes())
-    assert abs(result.load.sum() + result.reaction.sum()) <= 1e-10 * np.abs(result.load).sum()
+    assert np.array_equal(result.prescribed_node_ids, mesh.boundary_nodes())
+    assert abs(result.generated_heat_rate.sum() + result.reaction_heat_rate.sum()) <= 1e-10 * np.abs(result.generated_heat_rate).sum()
     # the source load integrates Q exactly for a constant per tetrahedron
-    assert abs(result.load.sum() - (result.heat_source * mesh.volumes()).sum()) <= 1e-12 * abs(result.load).sum()
-    assert np.all(result.reaction[np.setdiff1d(np.arange(mesh.num_nodes), result.dirichlet_nodes)] == 0)
+    assert abs(result.generated_heat_rate.sum() - (result.heat_source_density * mesh.volumes()).sum()) <= 1e-12 * abs(result.generated_heat_rate).sum()
+    assert np.all(result.reaction_heat_rate[np.setdiff1d(np.arange(mesh.num_nodes), result.prescribed_node_ids)] == 0)
 
 
 def test_m4_layered_slab_is_reproduced_exactly():
@@ -95,25 +96,24 @@ def test_m4_layered_slab_is_reproduced_exactly():
     k = {"substrate": 1.0, "die": 0.01, "mold": 0.5}
     mesh = extruded(0.15, z, {"box": ["substrate", "die", "mold"]})
     bc = dirichlet_from_faces(mesh, {"z0": 320.0, "z1": 300.0})
-    result = solve_steady_heat_3d(mesh, conductivity=k, dirichlet=bc)
-    fields = exact.layered_slab(mesh.nodes, interfaces=z[1:], conductivities=[k[n] for n in
-                                ("substrate", "die", "mold")], bottom_temperature=320.0,
-                                top_temperature=300.0)
+    result = solve_steady_heat_3d(mesh, thermal_conductivity=k, prescribed_temperature=bc)
+    fields = exact.layered_slab(mesh.nodes, position=z, thermal_conductivity=[k[n] for n in
+                                ("substrate", "die", "mold")], prescribed_temperature=(320.0, 300.0))
     error = np.abs(result.temperature - fields.temperature).max() / 20.0
     centroids = mesh.nodes[mesh.tets].mean(axis=1)
     flux_error = np.abs(result.heat_flux - exact.layered_slab(
-        centroids, interfaces=z[1:], conductivities=[1.0, 0.01, 0.5], bottom_temperature=320.0,
-        top_temperature=300.0).heat_flux).max() / abs(fields.heat_flux[0, 2])
+        centroids, position=z, thermal_conductivity=[1.0, 0.01, 0.5],
+        prescribed_temperature=(320.0, 300.0)).heat_flux).max() / abs(fields.heat_flux[0, 2])
     print(f"M4 layered slab temperature error {error:.3e}, flux error {flux_error:.3e}, "
-          f"balance {result.balance_error:.3e}")
+          f"balance {result.relative_conservation_residual:.3e}")
     assert error <= 1e-10
     assert flux_error <= 1e-9
-    assert result.balance_error <= 1e-10
+    assert result.relative_conservation_residual <= 1e-10
     # reactions: heat enters at the hot face and leaves at the cold one, flux x area
     area = LENGTHS[0] * LENGTHS[1]
-    hot = result.reaction[np.unique(mesh.tagged_faces["z0"])].sum()
+    hot = result.reaction_heat_rate[np.unique(mesh.tagged_faces["z0"])].sum()
     assert abs(hot - fields.heat_flux[0, 2] * area) <= 1e-9 * abs(hot)
-    assert np.array_equal(result.conductivity, mesh.by_region(k))
+    assert np.array_equal(result.thermal_conductivity, mesh.by_region(k))
 
 
 def test_region_sources_on_the_box_mesh_balance_and_use_every_region():
@@ -122,42 +122,42 @@ def test_region_sources_on_the_box_mesh_balance_and_use_every_region():
     mesh = Mesh3D(base.nodes, base.tets, base.boundary, regions, ["left", "right"],
                   tagged_faces=base.tagged_faces)
     bc = dirichlet_from_faces(mesh, {"x0": 300.0})
-    result = solve_steady_heat_3d(mesh, conductivity={"left": 1.0, "right": 10.0}, dirichlet=bc,
-                                  heat_source={"left": 0.0, "right": 1e4})
-    assert result.balance_error <= 1e-10
-    assert abs(result.load.sum() - 1e4 * 0.5 * LENGTHS[1] * LENGTHS[2]) <= 1e-9 * result.load.sum()
+    result = solve_steady_heat_3d(mesh, thermal_conductivity={"left": 1.0, "right": 10.0}, prescribed_temperature=bc,
+                                  heat_source_density={"left": 0.0, "right": 1e4})
+    assert result.relative_conservation_residual <= 1e-10
+    assert abs(result.generated_heat_rate.sum() - 1e4 * 0.5 * LENGTHS[1] * LENGTHS[2]) <= 1e-9 * result.generated_heat_rate.sum()
     assert np.all(result.temperature >= 300.0 - 1e-9)
-    assert np.array_equal(result.heat_source, np.where(regions == 1, 1e4, 0.0))
-    assert np.allclose(source_load_3d(mesh, result.heat_source), result.load)
+    assert np.array_equal(result.heat_source_density, np.where(regions == 1, 1e4, 0.0))
+    assert np.allclose(source_load_3d(mesh, result.heat_source_density), result.generated_heat_rate)
 
 
 def test_m5_refusals(monkeypatch):
     mesh = extruded(0.3)
     bc = dirichlet_from_faces(mesh, {"z0": 300.0})
     with pytest.raises(ValueError, match="match mesh.region_names"):
-        solve_steady_heat_3d(mesh, conductivity={"air": 1.0}, dirichlet=bc)
+        solve_steady_heat_3d(mesh, thermal_conductivity={"air": 1.0}, prescribed_temperature=bc)
     with pytest.raises(ValueError, match="> 0"):
-        solve_steady_heat_3d(mesh, conductivity=-1.0, dirichlet=bc)
+        solve_steady_heat_3d(mesh, thermal_conductivity=-1.0, prescribed_temperature=bc)
     with pytest.raises(ValueError, match="exterior mesh boundary"):
         interior = int(np.setdiff1d(np.arange(mesh.num_nodes), mesh.boundary_nodes())[0])
-        solve_steady_heat_3d(mesh, conductivity=1.0, dirichlet={interior: 300.0})
+        solve_steady_heat_3d(mesh, thermal_conductivity=1.0, prescribed_temperature={interior: 300.0})
     with pytest.raises(ValueError, match="different temperatures"):
         dirichlet_from_faces(mesh, {"z0": 300.0, "left": 310.0})
     with pytest.raises(ValueError, match="unknown face tag"):
         dirichlet_from_faces(mesh, {"lid": 300.0})
     with pytest.raises(ValueError, match="needs a Dirichlet node"):
-        solve_steady_heat_3d(mesh, conductivity=1.0, dirichlet={})
+        solve_steady_heat_3d(mesh, thermal_conductivity=1.0, prescribed_temperature={})
     with pytest.raises(ValueError, match="centroids"):
-        solve_steady_heat_3d(mesh, conductivity=1.0, dirichlet=bc, heat_source=lambda c: c)
+        solve_steady_heat_3d(mesh, thermal_conductivity=1.0, prescribed_temperature=bc, heat_source_density=lambda c: c)
     with pytest.raises(TypeError, match="Mesh3D"):
-        solve_steady_heat_3d({"nodes": mesh.nodes}, conductivity=1.0, dirichlet=bc)
+        solve_steady_heat_3d({"nodes": mesh.nodes}, thermal_conductivity=1.0, prescribed_temperature=bc)
 
     class Array:
         pass
     monkeypatch.setitem(sys.modules, "jax", types.SimpleNamespace(Array=Array))
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_steady_heat_3d(mesh, conductivity=Array(), dirichlet=bc)
+        solve_steady_heat_3d(mesh, thermal_conductivity=Array(), prescribed_temperature=bc)
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_steady_heat_3d(mesh, conductivity=1.0, dirichlet={**bc, 0: Array()})
+        solve_steady_heat_3d(mesh, thermal_conductivity=1.0, prescribed_temperature={**bc, 0: Array()})
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_steady_heat_3d(mesh, conductivity=1.0, dirichlet=bc, heat_source={"box": Array()})
+        solve_steady_heat_3d(mesh, thermal_conductivity=1.0, prescribed_temperature=bc, heat_source_density={"box": Array()})

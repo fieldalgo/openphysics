@@ -14,13 +14,13 @@ from galerkin.thermal import solve_steady_heat
 R, L, k, Q, Tb = .003, .001, 1.114, 1e5, 293.15
 mesh = rectangle_mesh(R, L, 64, 32)
 result = solve_steady_heat(
-    mesh, conductivity=k, heat_source=Q,
-    dirichlet={int(i): Tb for i in mesh.boundary["right"]},
+    mesh, thermal_conductivity=k, heat_source_density=Q,
+    prescribed_temperature={int(i): Tb for i in mesh.boundary["right"]},
     coordinate_system="axisymmetric",
 )
-assert result.nodal_heat_rate_unit == "W"
-absorbed_W = result.load.sum()
-outward_W = -result.reaction.sum()
+assert result.units["generated_heat_rate"] == "W"     # an AxisymmetricSteadyHeatResult
+absorbed_W = result.generated_heat_rate.sum()
+outward_W = -result.reaction_heat_rate.sum()
 exact_rise = Q*(R**2-mesh.nodes[:, 0]**2)/(4*k)
 ```
 
@@ -51,11 +51,16 @@ Dirichlet or positive Robin support. Pure-Neumann solves are not supported.
 
 ## Units and coupling
 
-`temperature` is K, and `heat_flux` is `(q_r,q_z)` in W/m². All integrated nodal
-rates (`load`, `reaction`, `residual`, boundary loads and `system_rhs`) are W.
-The result records `coordinate_system` and `nodal_heat_rate_unit`. Cartesian
-results record `"cartesian"` and `"W/m"`. The outward heat balance is
-`sum(load + reaction - prescribed_outward_load - convective_outward) = 0`.
+`temperature` is K, and `heat_flux` is `(q_r,q_z)` in W/m². The result is an
+`AxisymmetricSteadyHeatResult`: its integrated nodal rates are totals over the
+full revolution in W and carry the plain registry names (`generated_heat_rate`,
+`reaction_heat_rate`, `residual_heat_rate`, `outward_prescribed_heat_rate`,
+`ambient_convective_heat_rate`, `outward_convective_heat_rate`,
+`applied_heat_rate`); `.units` gives W. A Cartesian solve returns a
+`PlanarSteadyHeatResult` whose rates are W/m of depth, named `..._per_depth`;
+asking either kind for the other's name raises an `AttributeError` that says why.
+Both record `coordinate_system`. The outward heat balance is
+`sum(generated + reaction - outward_prescribed - outward_convective) = 0`.
 
 An element [Field](coupling.md) in W/m³ still means volume density, never
 power per meridional area. Its cell volume is `2*pi*mean(r_vertices)*area`.

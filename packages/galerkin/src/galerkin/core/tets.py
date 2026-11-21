@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""P1 tetrahedron element data shared by the 3D assembly modules and core kernels."""
+"""P1 tetrahedron element data shared by the 3D assembly modules and core kernels.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 import numpy as np
 
 from ..mesh3d import Mesh3D

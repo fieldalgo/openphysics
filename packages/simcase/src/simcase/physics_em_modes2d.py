@@ -19,7 +19,8 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse.linalg as spla
 
-from galerkin import Mesh, EdgeSpace, assemble_mass, assemble_stiffness, solve_modes, eval_edge_field
+from galerkin import Mesh, EdgeSpace
+from galerkin.kernels import assemble_mass, assemble_stiffness, eval_edge_field, solve_modes
 
 from .fields import VectorField
 
@@ -138,7 +139,7 @@ def vector_pencil_residuals(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, 
     A diagnostic: a rotated mixture of eigenvectors with different eigenvalues
     is not an eigenvector of either value and has a large residual.
     """
-    from galerkin import assemble_mode_system
+    from galerkin.kernels import assemble_mode_system
 
     scaled = Mesh(mesh.nodes / wavelength, mesh.triangles.copy(), mesh.boundary, mesh.boundary_edges)
     coords = None

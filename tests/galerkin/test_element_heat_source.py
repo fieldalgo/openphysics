@@ -12,8 +12,8 @@ from galerkin.thermal import ElementHeatSource, solve_steady_heat
 
 def solve(mesh, source):
     fixed = np.unique(np.concatenate(list(mesh.boundary.values())))
-    return solve_steady_heat(mesh, conductivity=3., dirichlet={int(i): 300. for i in fixed},
-                             heat_source=source)
+    return solve_steady_heat(mesh, thermal_conductivity=3., prescribed_temperature={int(i): 300. for i in fixed},
+                             heat_source_density=source)
 
 
 def test_element_source_exact_local_load_and_power_not_region_average():
@@ -23,10 +23,10 @@ def test_element_source_exact_local_load_and_power_not_region_average():
     expected = np.zeros(mesh.num_nodes)
     for tri, value in zip(mesh.triangles, [3., 9.]):
         expected[tri] += value/3  # both triangle areas independently equal 1 m²
-    np.testing.assert_allclose(result.load, expected, atol=1e-14, rtol=0)
-    assert np.sum(result.load) == pytest.approx(12.)
-    assert -np.sum(result.reaction) == pytest.approx(12.)
-    assert not np.allclose(result.load, solve(mesh, 6.).load)
+    np.testing.assert_allclose(result.generated_heat_rate_per_depth, expected, atol=1e-14, rtol=0)
+    assert np.sum(result.generated_heat_rate_per_depth) == pytest.approx(12.)
+    assert -np.sum(result.reaction_heat_rate_per_depth) == pytest.approx(12.)
+    assert not np.allclose(result.generated_heat_rate_per_depth, solve(mesh, 6.).generated_heat_rate_per_depth)
 
 
 @pytest.mark.parametrize("change", ["coordinates", "cell_order", "node_order", "regions", "names"])
@@ -56,7 +56,7 @@ def test_owned_snapshot_and_equivalent_copy():
     source = ElementHeatSource(mesh, values)
     values[:] = 999
     np.testing.assert_array_equal(source.values, np.arange(mesh.num_triangles))
-    np.testing.assert_array_equal(solve(mesh, source).load, solve(copy.deepcopy(mesh), source).load)
+    np.testing.assert_array_equal(solve(mesh, source).generated_heat_rate_per_depth, solve(copy.deepcopy(mesh), source).generated_heat_rate_per_depth)
     with pytest.raises(ValueError):
         source.values[0] = 123
     mesh.nodes *= 2
@@ -76,7 +76,7 @@ def test_signed_cooling_and_zero_are_valid_thermal_sources():
     for value in [-2., 0., 3.]:
         element = solve(mesh, ElementHeatSource(mesh, np.full(mesh.num_triangles, value)))
         scalar = solve(mesh, value)
-        np.testing.assert_array_equal(element.load, scalar.load)
+        np.testing.assert_array_equal(element.generated_heat_rate_per_depth, scalar.generated_heat_rate_per_depth)
         np.testing.assert_array_equal(element.temperature, scalar.temperature)
 
 

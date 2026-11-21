@@ -15,8 +15,8 @@ implementation bug.
 
 import numpy as np
 
-from galerkin import (annulus_mesh, assemble_stiffness, assemble_load,
-                      solve_dirichlet, l2_error)
+from galerkin import annulus_mesh, l2_error
+from galerkin.kernels import assemble_stiffness, assemble_load, solve_dirichlet
 
 A, B = 1.0, 3.0  # inner, outer radius
 

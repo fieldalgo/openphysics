@@ -300,25 +300,29 @@ class PowerPlane:
         for s in self.sources:
             for node in np.unique(edges[s.name]):
                 dirichlet[int(node)] = float(s.voltage)
-        # Galerkin works per metre of depth; with depth t, J.n = I / (P t) carries I.
+        # Galerkin works per metre of depth; with depth t, J.n = I / (P t) carries I. A sink's
+        # current leaves the copper, so galerkin's inward current density is 0.0 - I / (P t); its
+        # own negation 0.0 - (0.0 - g) hands the solve today's g bit for bit (g > 0: a sink's current
+        # is positive).
         outward = {s.name: s.current / (edge_length(s.name) * t) for s in self.sinks}
-        r = solve_steady_electric(mesh, conductivity=self.conductivity,
-                                  dirichlet=dirichlet, outward_current=outward)
+        inward = {name: 0.0 - g for name, g in outward.items()}
+        r = solve_steady_electric(mesh, electrical_conductivity=self.conductivity,
+                                  prescribed_electric_potential=dirichlet, inward_current_density=inward)
 
         terminals = {}
         for kind, group in (("source", self.sources), ("sink", self.sinks)):
             for s in group:
                 e = edges[s.name]
                 lengths = np.hypot(*(p[e[:, 1]] - p[e[:, 0]]).T)
-                v = r.potential[e]
+                v = r.electric_potential[e]
                 mean = float(np.sum(lengths * v.mean(axis=1)) / np.sum(lengths))
                 if kind == "source":
-                    current = float(np.sum(r.reaction[np.unique(e)]) * t)
+                    current = float(np.sum(r.reaction_current_per_depth[np.unique(e)]) * t)
                 else:
                     current = -float(s.current)
                 terminals[s.name] = {"kind": kind, "mean": mean, "min": float(v.min()),
                                      "max": float(v.max()), "current": current}
-        return IRDropResult(mesh=r.mesh, potential=r.potential, current_density=r.current_density,
+        return IRDropResult(mesh=r.mesh, potential=r.electric_potential, current_density=r.current_density,
                             sheet_current=r.current_density * t,
-                            power_loss=float(r.joule_power_per_length * t),
+                            power_loss=float(r.joule_power_per_depth * t),
                             terminals=terminals, thickness=t)

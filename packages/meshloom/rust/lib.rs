@@ -17,6 +17,7 @@ mod mixed;
 mod plc;
 mod predicates;
 mod recovery;
+mod refine;
 
 use predicates::{two_product, P3};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -164,7 +165,7 @@ fn mixed_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes>, s
         return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
     }
     let s: Vec<mixed::SPoint> = ts.iter().enumerate()
-        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+        .map(|(j, &t)| mixed::SPoint::seg(ends[2 * j], ends[2 * j + 1], t)).collect();
     mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
     let q = u32s(query.as_bytes(), "query index")?;
     if q.len() % k != 0 {
@@ -213,7 +214,7 @@ fn spoint_coords<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, seg: &Bound
         return Err(PyValueError::new_err("seg must hold 2 indices per S point and t one value"));
     }
     let s: Vec<mixed::SPoint> = ts.iter().enumerate()
-        .map(|(j, &t)| mixed::SPoint { a: ends[2 * j], b: ends[2 * j + 1], t }).collect();
+        .map(|(j, &t)| mixed::SPoint::seg(ends[2 * j], ends[2 * j + 1], t)).collect();
     mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
     let m = mixed::Mixed { input: &input, s: &s };
     let out: Vec<f64> = (0..s.len() as u32).flat_map(|j| m.rounded(mixed::Pt::S(j))).collect();
@@ -391,11 +392,16 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// "regions" (every bounded component a region) or "parity" (the even-odd domain of
 /// closed surfaces). Returns (nodes N x 3 doubles, tetrahedra, regions, boundary
 /// facet per face, boundary faces, interface region pairs, interface faces, node
-/// sources, region count) as bytes, and counters.
+/// sources, region count) as bytes, and counters. `seed_coords` (k x 3 doubles) and
+/// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
-#[pyo3(signature = (coords, segments, facets, domain, max_depth))]
+#[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None, h=0.0, ratio=0.0,
+                    alpha=1.0, max_points=0, label_h=None))]
+#[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
-                 facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32)
+                 facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
+                 seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>, h: f64,
+                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
@@ -412,18 +418,43 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     let facets: Vec<Vec<Vec<u32>>> = facets.iter()
         .map(|f| f.iter().map(|b| u32s(b.as_bytes(), "loop index")).collect::<PyResult<_>>())
         .collect::<PyResult<_>>()?;
+    let sp = match seed_coords { Some(b) => self::points(b.as_bytes())?, None => Vec::new() };
+    let sl: Vec<i64> = match seed_labels {
+        Some(b) => {
+            let b = b.as_bytes();
+            if b.len() % 8 != 0 {
+                return Err(PyValueError::new_err("seed labels must be int64"));
+            }
+            b.chunks_exact(8).map(|c| i64::from_le_bytes(c.try_into().unwrap())).collect()
+        }
+        None => Vec::new(),
+    };
+    if sp.len() != sl.len() {
+        return Err(PyValueError::new_err("one label per region seed"));
+    }
+    let seeds: Vec<mesh::Seed> = sp.into_iter().zip(sl).map(|(p, label)| mesh::Seed { p, label }).collect();
     let plc = plc::Plc { points, segments, facets };
-    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "Internal", message, ids)
-    let (m, b) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
-        let b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
-        let m = mesh::build(&plc.points, &b, domain).map_err(|e| match &e {
+    // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
+    let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
+        let mut b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+        let mut rs = refine::RefineStats::default();
+        if h > 0.0 || ratio > 0.0 {
+            let opt = refine::RefineOptions { h, alpha, ratio, max_points };  // 0: refine() derives the cap from the size field
+            let lh = label_h.unwrap_or_default();
+            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh).map_err(|e| match e.strip_prefix("seed: ") {
+                Some(m) => ("RegionSeed", m.to_string(), vec![]),
+                None => ("RefineFail", e, vec![]),
+            })?;
+        }
+        let m = mesh::build(&plc.points, &b, domain, &seeds).map_err(|e| match &e {
             mesh::MeshError::NotClosed { segment, facets } => {
                 ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
             }
             mesh::MeshError::Rounding(_) => ("RoundingFail", e.to_string(), vec![]),
+            mesh::MeshError::Seed(_) => ("RegionSeed", e.to_string(), vec![]),
             mesh::MeshError::Internal(_) => ("Internal", e.to_string(), vec![]),
         })?;
-        Ok((m, b.stats))
+        Ok((m, b.stats, rs))
     }).map_err(|(kind, msg, ids)| PyValueError::new_err((kind, msg, ids)))?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
@@ -441,13 +472,26 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
         i64_bytes(m.boundary.iter().flat_map(|b| b.1).collect())?,
         i64_bytes(m.interfaces.iter().flat_map(|i| [i.0, i.1]).collect())?,
         i64_bytes(m.interfaces.iter().flat_map(|i| i.2).collect())?,
-        i64_bytes(m.source.clone())?,
+        // a point the repair added has no global index: -1
+        PyBytes::new(py, &m.source.iter()
+            .flat_map(|&s| (if s == u32::MAX { -1i64 } else { s as i64 }).to_le_bytes()).collect::<Vec<u8>>()),
     ];
     let d = PyDict::new(py);
     d.set_item("region_count", m.region_count)?;
+    d.set_item("segment_points", rs.segment_points)?;
+    d.set_item("facet_points", rs.facet_points)?;
+    d.set_item("volume_points", rs.volume_points)?;
+    d.set_item("rejected_points", rs.rejected)?;
+    d.set_item("minimal_cavities", rs.minimal)?;
+    d.set_item("exempt_subsegments", rs.exempt)?;
+    d.set_item("exempt_subfacets", rs.exempt_faces)?;
     d.set_item("inverted_after_rounding", m.repair.inverted)?;
     d.set_item("flips23", m.repair.flips23)?;
     d.set_item("flips32", m.repair.flips32)?;
+    d.set_item("edge_removals", m.repair.removals)?;
+    d.set_item("facet_flips", m.repair.facet_flips)?;
+    d.set_item("cavity_fills", m.repair.cavity_fills)?;
+    d.set_item("points_added", m.repair.points_added)?;
     d.set_item("regions_filled", b.regions)?;
     d.set_item("cavity_tetrahedra", b.removed)?;
     Ok((out, d))

@@ -92,7 +92,9 @@ NumPy·JAX).
 `docs/locales/ko/pages/packages/<name>/`에 있습니다. `tools/`에는 저장소 검사, 고정한 검증
 환경, 검토한 라이선스 목록, 관리용 스크립트가 있습니다. 예를 들어 `tools/build_physmat_tables.py`는
 physmat의 내장 표를 다시 만듭니다. 그중 필수 CI가 무엇을 돌리는지는 [tools/README.md](../../../../tools/README.md)에
-있습니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
+있습니다. `physmat/unit_tables.json`은 `python -m physmat.units --write`로
+`physmat/quantities.json`에서 생성합니다(`--check`는 비교). 생성기가 패키지 안에 들어 있어
+`tests/physmat/test_units.py`(R3)가 설치한 휠에서도 이 파일을 검사합니다. [benchmarks/](../../../../benchmarks/README.md)에는 시간 측정 벤치마크가,
 [studies/](../../../../studies/README.md)에는 진단 스크립트가 있습니다. 사람이 돌리며 필수 CI는 돌리지
 않습니다. `openphysics` 메타 배포판에는 코드·시험·예제가 없고, 일곱 패키지(`studio`·`export` extra를 포함한 `simcase`, `rii`를 포함한 `physmat`)를 요구하며 Studio를 여는 `openphysics` 명령을 제공합니다. 루트에서 `python -m pytest`를
 실행하면 루트 `pyproject.toml`의 `testpaths`에 따라 `tests/`와 도구의 시험인 `tools/tests/`를 모읍니다. `slow`
@@ -107,6 +109,30 @@ python -m pytest -q tests/galerkin -m "not slow"   # 수렴 연구 제외
 python -m pytest -q tests/gmshio/test_msh.py       # 파일 하나
 node --test tests/simcase/*.cjs                    # Studio JavaScript 검사
 ```
+
+**API 단위 검사.** `tests/galerkin`, `tests/refsol`, `tests/physmat`은 각각
+`test_api_units_scan_<package>.py`를 돌려, 공개 API(공개 모듈의 `__all__`)의 모든 매개변수를
+단위 규칙에 비추어 봅니다. 매개변수는 `api` 자리가 있는 `physmat.units` 등록부 이름이면서
+키워드 전용이고 차원 있는 기본값이 없거나, 구조 이름이어야 하며, 어떤 이름도 단위 토큰으로 끝나지
+않아야 합니다. 공개 메서드에는 `__call__`도 들어가며, solver가 돌려주는 결과 클래스의 생성자는
+검사하지 않습니다. 공통 논리와 데이터는 `tests/_support/`에 있습니다. `api_scan.py`, 공개·내부
+모듈 목록, 닫힌 구조 이름 목록과 결과 클래스 목록, 제거된 이름 목록입니다. 그 밖의 모듈은 모두 내부 모듈이며
+docstring에 "Internal module, consistent units"라고 적습니다. 패키지마다의
+`api_units_allowlist.json`은 비어 있고 늘어날 수 없습니다. 새 위반은 실패합니다. 그래서 모든 공개 모듈이
+깨끗합니다. 제거된 이름 목록의 모든 이름이 없는지 확인하고, 공개 물리량 매개변수에 `str`을 주면
+반드시 `TypeError`가 나야 합니다. 범위(scope)와 그 까닭을 적은 메모가 붙은 제거된 이름은 그 모듈에서만 없는지
+확인합니다. `refsol.bent_slab`은 더는 `radius`를 받지 않고(이제 `bend_radius`), `refsol.fiber`는 등록부 이름
+`radius`를 받습니다. `galerkin.kernels`와 `physmat.kernels`는 simcase와 sipi를 위해 일관 단위의
+커널을 다시 내보내는 내부 이름공간입니다. 어떤 공개 이름도 그 이름과 같지 않고, 그 객체도 아닙니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the
+materials step" 범주(`datum_temperature` 같은 physmat 레코드 인수)는 그 항목을 끝낼 조건도 적습니다.
+
+**복소 규약.** galerkin과 refsol의 공개 복소 값은 exp(−iωt)를 따릅니다. exp(+iωt)로 계산하는 커널은
+패키지의 비공개 모듈 `_conventions`의 `to_kernel`과 `to_public`으로만 변환합니다.
+`tests/galerkin/test_conventions.py`는 galerkin, refsol, simcase의 패키지 코드를 읽고(sipi와 시험은
+읽지 않음) 켤레(`conj`, `conjugate`, 또는 `0.0 - x.imag`와 `-x.imag`)를 거기와 simcase의 경계 함수,
+수학적 켤레의 닫힌 목록 `tests/galerkin/conventions_allowlist.json`에서만 허용합니다. 목록 항목마다
+함수, 원본 줄, 이유를 적으며, 더는 맞지 않는 항목도 실패합니다. 이 시험은 변환된 출력마다(지금은
+정전기) 수동 매질의 부호를 확인하고, JAX와 PyTorch 기울기가 변환을 지나는지도 확인합니다.
 
 ## 검사 실행
 
@@ -145,26 +171,52 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 ## CI가 돌리는 것
 
 `Validate packages` 워크플로(`.github/workflows/validate.yml`)는 main push, Ready PR,
-수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 네 부분이 병렬로
+수동 실행에서 돕니다. 브랜치 push와 draft PR에서는 돌지 않습니다. 다섯 부분이 병렬로
 실행됩니다.
 
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
-| `linux-py312` | Ubuntu 24.04 | Markdown 링크 검사와 빠른 사전 검사 묶음 뒤 고정 RII 데이터베이스로 전체 소스 시험; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
-| `installed-tests` | Ubuntu 24.04 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 실행 |
+| `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
+| `linux-py312-tests` | Ubuntu 24.04, job 여덟 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 여덟 부분으로 동시에 실행 |
+| `installed-tests` | Ubuntu 24.04, job 여덟 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 여덟 부분으로 동시에 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
-필수 검사는 **`tests`** 하나입니다. 네 부분이 모두 성공해야 통과하며, 하나라도
+필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 여덟 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
 하나인지 확인하고([배포](#배포pypi) 참고), 이어 Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대
 링크와 `#앵커`가 풀려야 합니다(외부 URL은 가져오지 않습니다). 사전 검사 묶음(정상 경계, 과도 문서, 정상·과도 Studio, 과도 열-역학)을
-이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그다음 전체 시험이 모든 것을 다시
-돌립니다. 소스 시험이 실패해도 배포 검사와 Node 검사는 근거를 남기려고 계속 돌지만,
-job은 실패로 남습니다. 보통 23~45분 걸립니다. 90분 제한은 멈춘 실행을 끊기 위한
-것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
+이어서 돌려서 계약이 깨지면 몇 분 안에 실패합니다. 그 뒤 배포 검사, Studio Node 검사,
+자원 관측이 돕니다. 소스 시험을 뺀 이 job은 2026-11-20에 8~11분 걸렸습니다. 45분 제한은
+멈춘 실행을 끊기 위한 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
+
+**소스 시험** (`linux-py312-tests`). 루트 설정의 `python -m pytest` 전체(`tests/`와
+`tools/tests/`의 모든 시험)를 job 여덟 개에서 동시에 돌립니다. 각 job은 전체를 수집한 뒤
+`tools/shards/openphysics_shard.py`가 자기 부분에 배정한 시험 파일만 남깁니다. 파일은 통째로,
+큰 것부터, 그때까지 시간이 가장 적은 부분에 배정하며, 시간은
+`tools/shards/durations.json`의 파일별 초를 씁니다(표에 없는 파일은 중앙값으로 셉니다).
+모든 부분이 같은 수집 결과에서 같은 배정을 계산하므로, 여덟 부분을 합치면 수집한 시험을
+빠짐없이 정확히 한 번씩 돌립니다. 이름으로 고르는 시험은 없습니다. 각 로그 끝에 그 부분의
+파일 수, 시험 수, 예상 시간이 나옵니다. job 하나로 돌리던 때 전체 시험은 2026-11-20에 러너
+CPU에 따라 44~70분, 네 부분으로는 2026-11-21에 10~21분 걸렸습니다. 여덟 부분의 한 부분은 표
+기준 시험 약 5.5분과 준비 약 3분이며, 45분 제한은 멈춘 실행을 끊기 위한 것입니다. 파일을
+통째로 배정하므로 가장 큰 파일이 한 부분의 바닥입니다(`tools/tests/test_examples_smoke.py`
+5.7분, 예제를 파일 안에서 정한 순서로 돌림). 같은 이유로 5.5분짜리 M3 판 세밀화 연구는 자기
+파일(`tests/galerkin/test_cavity_mesh_slab_refinement.py`)에 둡니다. 로컬에서 한 부분만
+돌리려면:
+
+```bash
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/8
+```
+
+시험 시간의 균형이 어긋나면, 한 번의 완전한 실행에서 나온 JUnit 파일(artifact
+`source-tests-<k>-of-8` 여덟 개를 한 폴더에 푼 것)로 저장소 루트에서 표를 다시 만듭니다.
+
+```bash
+python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
+```
 
 **배포 검사** (`tools/check_distributions.py`). 패키지 아홉 개(`openphysics` 메타
 배포판 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
@@ -196,17 +248,27 @@ Studio 브라우저 검사는 Chrome에서 작은 실제 모델을 돌립니다.
 **설치 시험** (`tools/run_installed_tests.py`). 모든 패키지를 빌드하고(각 wheel은 자기
 sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다. wheel 아홉 개를 각 metadata가
 선언한 모든 extra와 함께 checkout 밖 임시 디렉터리의 새 환경에 설치합니다. 그 옆에는
-`tests/`, `examples/`, `docs/` 아래의 추적 파일과 루트 `pyproject.toml`만 복사하고
-`packages/` 아래는 복사하지 않습니다. 복사한 파일의 해시는
+`tests/`, `examples/`, `docs/` 아래의 추적 파일, 단위 배치의 고정 문서(`tools/units_batch/fixtures/`,
+시험이 읽는 JSON 데이터)와 루트 `pyproject.toml`만 복사하고 `packages/` 아래와 `tools/`의 다른
+파일은 복사하지 않습니다. 복사한 파일의 해시는
 `suite-file-hashes.json`에 기록합니다. 이어서 `tests/`의 Python 시험 전체를 `python -I -m pytest`로
 실행하며, 이름으로 고르는 시험은 없습니다. 시험이 실패하는 경우 말고도, 이 저장소 패키지의
 모듈이 설치된 환경에서 로드되지 않거나, 건너뛰거나 xfail된 시험이 하나라도 있거나, 결과가
 없는 시험 파일(`test_*.py`, `*_test.py`)이 있으면 실패합니다. 설치된 환경은 `tools/check_licenses.py`도
 통과해야 합니다. 이 job은 고정 requirements, Gmsh, 고정 RII 데이터베이스, 필수 레퍼런스
-교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬 Linux 실행에서 25분쯤
-걸렸고, 50분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬에서 돌리려면 Gmsh와
+교차 검사(`OPENPHYSICS_REQUIRE_CROSSCHECK=1`)를 사용합니다. 로컬에서 돌리려면 Gmsh와
 `PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
-실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 계속 `linux-py312`에서 돕니다.
+실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 `linux-py312-tests`에서 돕니다.
+
+CI에서는 이 job을 `--shard K/8`로 여덟 부분, `installed-tests (1/8)`~`(8/8)`로 돌립니다.
+각 부분은 자기 wheel을 빌드·설치하고(약 2분), 복사한 시험 파일 전체에서
+`tools/shards/openphysics_shard.py`가 소스 시험과 같은 표로 자기에게 배정한 시험 파일을 pytest에
+넘깁니다. 결과 검사는 그 파일마다 결과가 있는지 확인합니다. 여덟 부분을 합치면 모든 시험 파일을
+한 번씩 돌리며, 각 부분은 자기 파일과 예상 시간을 `shard.json`에 남깁니다. job 하나로 돌리던 때는
+2026-11-20에 러너 CPU에 따라 39~71분 걸렸고, 63분 실행을 여덟으로 나누면 부분마다 7.1~10.9분이며
+가장 긴 부분은 M3 판 세밀화 연구 하나입니다.
+45분 제한은 멈춘 실행을 끊기 위한 것입니다. 로컬처럼 `--shard` 없이 실행하면 모든 시험 파일을
+돌립니다.
 
 **라이선스** (`tools/check_licenses.py`). 시험 전에 고정 검증 환경을, 이후 새로 설치한
 환경마다 `tools/third_party_licenses.json`의 검토 목록과 대조합니다. 선언된 라이선스와, 제3자 휠이
@@ -229,7 +291,11 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 설치 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
 Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스와 같은 버전)도 설치하고,
 러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
-설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구.
+설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구, 그다음 Joule 가열
+애플리케이션: 기본 띠를 Picard와 Newton으로(반복 횟수, 수지, 온도·전위 범위, 두 방법의 1e-6 K 이내 일치. 영역
+메시가 macOS arm64와 다른 플랫폼에서 달라서 메시에 따라 달라지는 값은 이산화 오차 안에서 확인),
+수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).
+잡히지 않은 페이지 예외와 `console.error` 호출이 있으면 검사가 실패합니다(그 밖의 브라우저 로그 항목은 모으지 않습니다).
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
@@ -239,6 +305,18 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 [벡터](benchmark_vector.md)·[공동](benchmark_cavity.md)·[열전도](benchmark_thermal.md)·
 [탄성](benchmark_elasticity.md)·[전기](benchmark_electric.md)·[미분](benchmark_derivatives.md)
 벤치마크 안내에 있습니다.
+
+**단위 배치 동등성(수동 실행 전용).** `units-batch-equivalence` job은
+`OPENPHYSICS_BATCH_BASELINE`을 `main`과의 merge base로, `OPENPHYSICS_BATCH_PHASE`를 `3`으로 두고
+`tests/simcase/test_units_batch_equivalence.py`를 Ubuntu 24.04, macOS 15, Windows 2022에서
+한 플랫폼씩 실행합니다. `examples/simcase`의 모든 문서와 고정 fixture를 같은 문서 그대로 기준
+커밋과 실행한 커밋에서 각각 기록해, 저장 바이트가 같은지, 그리고 solver·mesher 입력이
+[단위 배치 비교 도구](../../../../tools/units_batch/README.md#phase-3-the-galerkin-step)의 규칙
+항목 아래에서 매개변수 이름별로 같은지 봅니다(galerkin 단계의 점검 P3-1). 비교 도구의 phase 2,
+즉 단위 배치 자체의 점검은 그 배치의 기준 커밋이 필요하므로 로컬에서 실행합니다. 수동
+실행(`gh workflow run validate.yml --ref <branch>`)에서만 돌고 push와 pull request에서는
+건너뜁니다. `tests`에 들어 있지 않으므로 플랫폼마다 결과를 따로, 주장하는 커밋의 실행에서
+읽습니다.
 
 **대기열.** main 실행은 워크플로마다 하나의 동시성 그룹을 `queue: max`로 공유하며,
 새 push가 와도 취소되지 않습니다. 다른 ref는 `queue: single`이라 새 push가 이전
@@ -275,13 +353,18 @@ notices, slow 연구.
 
 각 job은 실패해도 artifact를 올립니다.
 
-- Linux: `distributions-and-test-results`. 단계별 JUnit XML, 배포물 체크섬과 보고서,
+- Linux: `distributions-and-test-results`. 사전 검사 묶음별 JUnit XML, 배포물 체크섬과 보고서,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
-- 설치 시험: `installed-test-results`. 빌드한 배포물, `installed-tests.xml`,
-  `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사 기록이 든
-  `.validation/` 디렉터리입니다.
+- 소스 시험: 부분마다 `source-tests-<k>-of-8`. `source-tests-<k>.xml`, 교차 검사 기록,
+  `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
+- 설치 시험: 부분마다 `installed-test-results-<k>-of-8`. 빌드한 배포물, `installed-tests.xml`,
+  `shard.json`, `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사
+  기록이 든 `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
   환경 정보, 체크섬, 설치 위치, JUnit XML, `numeric-runtime.json`이 들어 있습니다.
+- 단위 배치 동등성(수동 실행 전용): `units-batch-equivalence-<os>-<run_id>`. 비교
+  보고서(문서와 배열마다의 SHA-256 표와 적용한 규칙 항목), 문서 목록, 양쪽 기록의 manifest가
+  들어 있습니다.
 
 일부 단계는 통과한 시험의 stdout도 JUnit `system-out`에 남깁니다
 (`-o junit_logging=all -o junit_log_passing_tests=true`). 통과한 시험이 출력한 수치
@@ -360,7 +443,9 @@ python -m twine check --strict .validation/simcase/*
 
 배포판 아홉 개는 하나의 버전으로 함께 릴리스합니다. 버전을 바꿀 때는 모든
 `packages/<name>/pyproject.toml`과 각 import 패키지의 `__version__`, meshloom의 `Cargo.toml`을 바꾸고, 우리 배포판
-사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두고,
+사이의 의존성은 그 마이너 계열 안(0.0.2라면 `>=0.0.2,<0.1`, 0.1.x라면 `>=0.1.0,<0.2`)으로 두되 `simcase`는 내부
+`physmat.kernels`와 `galerkin.kernels`를 부르므로 `physmat`과 `galerkin`을, `sipi`는 내부 `galerkin.kernels`를
+부르므로 `galerkin`을 정확한 버전(`physmat==0.0.2`, `galerkin==0.0.2`)으로 고정하고,
 [변경 기록](changelog.md)의 `[Unreleased]` 절을 `[X.Y.Z] - YYYY-MM-DD`로 바꿉니다.
 릴리스에서는 `python tools/check_release_version.py --tag vX.Y.Z`가 이것을 모두 확인합니다.
 또 패키지 README와 문서 페이지(변경 기록 제외)에 "아직 PyPI에 없다"는 문구가 남아 있으면

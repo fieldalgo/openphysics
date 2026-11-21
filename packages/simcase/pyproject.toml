@@ -24,8 +24,8 @@ classifiers = [
 dependencies = [
   "numpy>=1.26", "scipy>=1.11.2", "shapely>=2.0.2", "matplotlib>=3.8",
   "meshine>=0.0.2,<0.1",
-  "physmat>=0.0.2,<0.1",
-  "galerkin>=0.0.2,<0.1",
+  "physmat==0.0.2",      # exact: simcase calls the internal physmat.kernels (phase-3 decision F2)
+  "galerkin==0.0.2",     # exact: simcase calls the internal galerkin.kernels (phase-3 decision F2)
 ]
 
 [project.urls]
@@ -36,7 +36,7 @@ Issues = "https://github.com/fieldalgo/openphysics/issues"
 [project.optional-dependencies]
 # The base install is headless on purpose: a batch or an HPC user must not pull
 # a web stack to run a document.
-studio = ["fastapi>=0.100", "uvicorn>=0.20"]
+studio = ["fastapi>=0.109.1", "uvicorn>=0.20"]
 # VTU export for ParaView (simcase.export); meshio is MIT and pure Python.
 export = ["meshio>=5.3,<6"]
 test = ["pytest", "httpx", "galerkin-refsol>=0.0.2,<0.1"]
@@ -46,9 +46,15 @@ simcase = "simcase.cli:main"
 simcase-studio = "simcase.studio.server:main"
 simcase-run = "simcase.cli:main"
 
+# The built-in physics provider (simcase.providers): simcase's own kinds, loaded first.
+[project.entry-points."openphysics.providers"]
+openphysics-fem = "simcase.providers:builtin_provider"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["simcase*"]
 
 [tool.setuptools.package-data]
+# simcase.slots: the generated slot table of format 0.3 documents
+simcase = ["slot_table.json"]
 "simcase.studio" = ["static/*"]

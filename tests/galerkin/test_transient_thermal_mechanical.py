@@ -15,38 +15,37 @@ import galerkin.transient_thermal_mechanical as workflow
 
 def case():
     mesh = rectangle_mesh(1., 1., 2, 2)
-    heat = solve_transient_heat(mesh, conductivity=2., volumetric_heat_capacity=4.,
-        time_s=[2., 2.1, 2.7, 3.], initial_temperature_k=np.full(mesh.num_nodes, 300.),
-        dirichlet={}, heat_source=8.)
+    heat = solve_transient_heat(mesh, thermal_conductivity=2., volumetric_heat_capacity=4.,
+        time=[2., 2.1, 2.7, 3.], initial_temperature=np.full(mesh.num_nodes, 300.),
+        prescribed_temperature={}, heat_source_density=8.)
     right = int(mesh.boundary['bottom'][-1])
-    kwargs = dict(units={'length': 'm', 'time': 's', 'temperature': 'K'},
-        young_modulus=2e9, poisson_ratio=.25, plane='stress',
-        thermal_expansion_per_k=1e-5, reference_temperature_k=300.,
-        mechanical_dirichlet={(0, 0): 0., (0, 1): 0., (right, 1): 0.})
+    kwargs = dict(youngs_modulus=2e9, poisson_ratio=.25, plane='stress',
+        linear_expansion_coefficient=1e-5, stress_free_temperature=300.,
+        prescribed_displacement={(0, 0): 0., (0, 1): 0., (right, 1): 0.})
     return mesh, heat, kwargs
 
 
 def test_default_and_subset_exact_times_and_snapshot_ownership():
     mesh, heat, kwargs = case()
     before_nodes = mesh.nodes.copy()
-    before_temperature = heat.temperature_k.copy()
+    before_temperature = heat.temperature.copy()
     result = workflow.solve_transient_thermoelasticity(mesh, heat, **kwargs)
     assert result.time_indices == (0, 1, 2, 3)
-    assert result.time_s == tuple(heat.time_s)
+    assert result.time == tuple(heat.time)
     subset = workflow.solve_transient_thermoelasticity(mesh, heat, time_indices=[0, 2], **kwargs)
     assert subset.time_indices == (0, 2)
-    assert subset.time_s == (2., 2.7)
+    assert subset.time == (2., 2.7)
     for step in result.steps:
         snapshot = step.temperature_snapshot
         assert snapshot is step.mechanics.temperature_snapshot
-        np.testing.assert_array_equal(snapshot.temperature_k, heat.temperature_k[step.time_index])
-        for array in (snapshot.nodes, snapshot.triangles, snapshot.temperature_k):
+        np.testing.assert_array_equal(snapshot.temperature, heat.temperature[step.time_index])
+        for array in (snapshot.nodes, snapshot.triangles, snapshot.temperature):
             with pytest.raises(ValueError):
                 array.setflags(write=True)
     np.testing.assert_array_equal(mesh.nodes, before_nodes)
-    np.testing.assert_array_equal(heat.temperature_k, before_temperature)
+    np.testing.assert_array_equal(heat.temperature, before_temperature)
     mesh.nodes[:] += 100
-    kwargs['mechanical_dirichlet'].clear()
+    kwargs['prescribed_displacement'].clear()
     np.testing.assert_array_equal(result.reference_mesh.nodes, before_nodes)
     np.testing.assert_array_equal(result.steps[0].temperature_snapshot.nodes, before_nodes)
     reference = weakref.ref(heat)
@@ -67,21 +66,21 @@ def test_bad_selection(indices):
 
 
 @pytest.mark.parametrize('field,value', [
-    ('time_s', np.array([0., 1., 1., 2.])),
-    ('time_s', np.array([0., 1., np.nan, 2.])),
-    ('time_s', np.array([-1., 0., 1., 2.])),
-    ('time_s', np.array([0., 1e308, 1.5e308, 1.6e308])),
-    ('time_s', np.array([0.])),
-    ('temperature_k', np.zeros((4, 2))),
-    ('temperature_k', np.full((4, 9), np.inf)),
+    ('time', np.array([0., 1., 1., 2.])),
+    ('time', np.array([0., 1., np.nan, 2.])),
+    ('time', np.array([-1., 0., 1., 2.])),
+    ('time', np.array([0., 1e308, 1.5e308, 1.6e308])),
+    ('time', np.array([0.])),
+    ('temperature', np.zeros((4, 2))),
+    ('temperature', np.full((4, 9), np.inf)),
 ])
 def test_bad_consumed_history(field, value):
     mesh, heat, kwargs = case()
-    if field == 'time_s' and len(value) == 4 and value[1] == 1e308:
+    if field == 'time' and len(value) == 4 and value[1] == 1e308:
         # Nonnegative finite times cannot overflow their positive differences;
         # these extreme but valid times are metadata only and must be preserved.
         result = workflow.solve_transient_thermoelasticity(mesh, replace(heat, **{field: value}), **kwargs)
-        assert result.time_s == tuple(value)
+        assert result.time == tuple(value)
         return
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(mesh, replace(heat, **{field: value}), **kwargs)
@@ -106,16 +105,16 @@ def test_exact_mesh_order_required(change):
 
 def test_later_negative_transfer_is_atomic_and_unselected_negative_allowed(monkeypatch):
     mesh, heat, kwargs = case()
-    temperatures = heat.temperature_k.copy()
+    temperatures = heat.temperature.copy()
     temperatures[2, 0] = -1.
-    changed = replace(heat, temperature_k=temperatures)
+    changed = replace(heat, temperature=temperatures)
     workflow.solve_transient_thermoelasticity(mesh, changed, time_indices=[0, 1], **kwargs)
     calls = []
     monkeypatch.setattr(workflow, 'solve_thermoelasticity', lambda *a, **k: calls.append(1))
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(mesh, changed, **kwargs)
     assert calls == []
-    assert (caught.value.stage, caught.value.time_index, caught.value.time_s) == ('transfer', 2, 2.7)
+    assert (caught.value.stage, caught.value.time_index, caught.value.time) == ('transfer', 2, 2.7)
     assert isinstance(caught.value.__cause__, ValueError)
 
 
@@ -124,9 +123,9 @@ def test_all_snapshots_frozen_before_mechanics_and_failure_location(monkeypatch)
     original = workflow.solve_thermoelasticity
     events = []
     freeze = workflow.freeze_temperature
-    def record_freeze(*args):
+    def record_freeze(*args, **kw):
         events.append('freeze')
-        return freeze(*args)
+        return freeze(*args, **kw)
     def fail_second(*args, **kw):
         events.append('mechanics')
         if events.count('mechanics') == 2:
@@ -137,17 +136,16 @@ def test_all_snapshots_frozen_before_mechanics_and_failure_location(monkeypatch)
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(mesh, heat, time_indices=[1, 3], **kwargs)
     assert events == ['freeze', 'freeze', 'mechanics', 'mechanics']
-    assert (caught.value.stage, caught.value.time_index, caught.value.time_s) == ('mechanics', 3, 3.)
+    assert (caught.value.stage, caught.value.time_index, caught.value.time) == ('mechanics', 3, 3.)
     assert isinstance(caught.value.__cause__, RuntimeError)
     assert not hasattr(caught.value, 'partial_result')
 
 
 @pytest.mark.parametrize('key,value', [
-    ('units', {'length': 'mm', 'time': 's', 'temperature': 'K'}),
-    ('plane', '3d'), ('young_modulus', 0), ('poisson_ratio', .5),
-    ('reference_temperature_k', -1), ('thermal_expansion_per_k', True),
-    ('body_force', lambda p: p), ('body_force', [0, True]),
-    ('mechanical_dirichlet', {(0, 0): True}),
+    ('plane', '3d'), ('youngs_modulus', 0), ('poisson_ratio', .5),
+    ('stress_free_temperature', -1), ('linear_expansion_coefficient', True),
+    ('body_force_density', lambda p: p), ('body_force_density', [0, True]),
+    ('prescribed_displacement', {(0, 0): True}),
 ])
 def test_invalid_configuration(key, value):
     mesh, heat, kwargs = case()
@@ -159,8 +157,8 @@ def test_invalid_configuration(key, value):
 
 def test_insufficient_supports_have_initial_selected_index():
     mesh, heat, kwargs = case()
-    kwargs['mechanical_dirichlet'] = {}
+    kwargs['prescribed_displacement'] = {}
     with pytest.raises(workflow.TransientThermoelasticError) as caught:
         workflow.solve_transient_thermoelasticity(mesh, heat, time_indices=[2], **kwargs)
-    assert (caught.value.stage, caught.value.time_index, caught.value.time_s) == ('mechanics', 2, 2.7)
+    assert (caught.value.stage, caught.value.time_index, caught.value.time) == ('mechanics', 2, 2.7)
     assert 'rigid modes' in str(caught.value.__cause__)

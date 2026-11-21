@@ -1,0 +1,538 @@
+{
+ "format": "openphysics-units-batch-map-v1",
+ "description": "cavity3d-edge-complex-v1 (format 0.2 em.cavity3d with materials or conducting walls, SI, exp(+j omega t)) -> cavity3d-edge-complex-v2 (format 0.3, SI, exp(-i omega t)); spec section 5.3.5. Every complex array is conjugated (conj); the quality factors are the same doubles (Re f / (2 Im f_old) = Re f / (-2 Im f_new)); a summary value of a complex array is that array's entry (f array); the material echo's imaginary parts negate (neg, 0.0 - x, as the converter writes them); the subdivision echo is compared with resolved_inputs.",
+ "old_layout": "cavity3d-edge-complex-v1",
+ "new_layout": "cavity3d-edge-complex-v2",
+ "arrays": [
+  {
+   "old": "nodes",
+   "new": "node_coordinates",
+   "f": "="
+  },
+  {
+   "old": "tetrahedra",
+   "new": "tetrahedra",
+   "f": "="
+  },
+  {
+   "old": "edges",
+   "new": "edges",
+   "f": "="
+  },
+  {
+   "old": "tet_edges",
+   "new": "tet_edges",
+   "f": "="
+  },
+  {
+   "old": "edge_signs",
+   "new": "edge_signs",
+   "f": "="
+  },
+  {
+   "old": "pec_edge_ids",
+   "new": "pec_edge_ids",
+   "f": "="
+  },
+  {
+   "old": "frequencies_hz",
+   "new": "resonant_frequency",
+   "f": "conj"
+  },
+  {
+   "old": "eigenvalues_m2",
+   "new": "wavenumber_squared",
+   "f": "conj"
+  },
+  {
+   "old": "edge_coefficients",
+   "new": "mass_normalized_electric_field_line_integral",
+   "f": "conj"
+  },
+  {
+   "old": "electric_field",
+   "new": "mass_normalized_electric_field",
+   "f": "conj"
+  },
+  {
+   "old": "relative_residuals",
+   "new": "relative_residual",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "search",
+   "new": "search",
+   "f": "="
+  },
+  {
+   "old": "edge_orientation",
+   "new": "edge_orientation",
+   "f": "="
+  },
+  {
+   "old": "electric_field_location",
+   "new": "electric_field_location",
+   "f": "="
+  },
+  {
+   "old": "cluster_completeness",
+   "new": "cluster_completeness",
+   "f": "="
+  },
+  {
+   "old": "mode_count_policy",
+   "new": "mode_count_policy",
+   "f": "="
+  },
+  {
+   "old": "quality_factors",
+   "new": "quality_factor",
+   "f": "="
+  },
+  {
+   "old": "tet_relative_permittivity",
+   "new": "relative_permittivity",
+   "f": "conj"
+  },
+  {
+   "old": "tet_relative_permeability",
+   "new": "relative_permeability",
+   "f": "conj"
+  },
+  {
+   "old": "wall_names",
+   "new": "wall_names",
+   "f": "="
+  },
+  {
+   "old": "wall_conductivity_s_per_m",
+   "new": "electrical_conductivity",
+   "f": "="
+  },
+  {
+   "old": "fixed_point_iterations",
+   "new": "iteration_count",
+   "f": "="
+  }
+ ],
+ "arrays_removed": [
+  {
+   "old": "mesh_length_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "frequency_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "eigenvalue_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "edge_coefficient_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "electric_field_unit",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "target_frequency_hz",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "requested_modes",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "returned_modes",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "time_convention",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "conductivity_unit",
+   "check": "unit-metadata"
+  }
+ ],
+ "arrays_added": [],
+ "summary": [
+  {
+   "old": "name",
+   "new": "name",
+   "f": "="
+  },
+  {
+   "old": "physics_type",
+   "new": "physics_type",
+   "f": "="
+  },
+  {
+   "old": "units.length",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "mesh_length_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "frequency_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "eigenvalue_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "edge_coefficient_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "electric_field_unit",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "amplitude",
+   "new": "amplitude",
+   "f": "="
+  },
+  {
+   "old": "normalization",
+   "new": "normalization",
+   "f": "="
+  },
+  {
+   "old": "edge_orientation",
+   "new": "edge_orientation",
+   "f": "="
+  },
+  {
+   "old": "electric_field_location",
+   "new": "electric_field_location",
+   "f": "="
+  },
+  {
+   "old": "cluster_completeness",
+   "new": "cluster_completeness",
+   "f": "="
+  },
+  {
+   "old": "mode_count_policy",
+   "new": "mode_count_policy",
+   "f": "="
+  },
+  {
+   "old": "mesh.nodes",
+   "new": "mesh.nodes",
+   "f": "="
+  },
+  {
+   "old": "mesh.tetrahedra",
+   "new": "mesh.tetrahedra",
+   "f": "="
+  },
+  {
+   "old": "mesh.edges",
+   "new": "mesh.edges",
+   "f": "="
+  },
+  {
+   "old": "mesh.subdivisions.[]",
+   "new": "resolved_inputs.[\"mesh.subdivision_count\"].value.[]",
+   "f": "="
+  },
+  {
+   "old": "study.type",
+   "new": "study.type",
+   "f": "="
+  },
+  {
+   "old": "boundary",
+   "new": "boundary",
+   "f": "="
+  },
+  {
+   "old": "search",
+   "new": "search",
+   "f": "="
+  },
+  {
+   "old": "target_frequency_hz",
+   "new": "target_frequency.value",
+   "f": "="
+  },
+  {
+   "old": "requested_modes",
+   "new": "mode_count",
+   "f": "="
+  },
+  {
+   "old": "returned_modes",
+   "new": "returned_mode_count",
+   "f": "="
+  },
+  {
+   "old": "relative_residuals.[]",
+   "new": "relative_residual.values.[]",
+   "f": "="
+  },
+  {
+   "old": "time_convention",
+   "f": "removed",
+   "check": "unit-metadata"
+  },
+  {
+   "old": "boundary.conductivity_s_per_m",
+   "new": "boundary.electrical_conductivity.value",
+   "f": "="
+  },
+  {
+   "old": "boundary.conductivity_s_per_m.*",
+   "new": "boundary.electrical_conductivity.*.value",
+   "f": "="
+  },
+  {
+   "old": "wall_conductivity_s_per_m.*",
+   "new": [
+    "electrical_conductivity.*.value",
+    "electrical_conductivity.*"
+   ],
+   "f": "="
+  },
+  {
+   "old": "materials.*.relative_permittivity",
+   "new": "materials.*.relative_permittivity.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.relative_permittivity.[0]",
+   "new": "materials.*.relative_permittivity.re",
+   "f": "="
+  },
+  {
+   "old": "materials.*.relative_permittivity.[1]",
+   "new": "materials.*.relative_permittivity.im",
+   "f": "neg"
+  },
+  {
+   "old": "materials.*.relative_permeability",
+   "new": "materials.*.relative_permeability.value",
+   "f": "="
+  },
+  {
+   "old": "materials.*.relative_permeability.[0]",
+   "new": "materials.*.relative_permeability.re",
+   "f": "="
+  },
+  {
+   "old": "materials.*.relative_permeability.[1]",
+   "new": "materials.*.relative_permeability.im",
+   "f": "neg"
+  },
+  {
+   "old": "lossless",
+   "new": "lossless",
+   "f": "="
+  },
+  {
+   "old": "resonant_frequencies_hz.[]",
+   "f": "array",
+   "part": "real",
+   "old_array": "frequencies_hz",
+   "new": "resonant_frequency.re.[]",
+   "new_array": "resonant_frequency"
+  },
+  {
+   "old": "frequencies_hz_imag.[]",
+   "f": "array",
+   "part": "imag",
+   "old_array": "frequencies_hz",
+   "new": "resonant_frequency.im.[]",
+   "new_array": "resonant_frequency"
+  },
+  {
+   "old": "quality_factors.[]",
+   "new": "quality_factor.values.[]",
+   "f": "="
+  },
+  {
+   "old": "eigenvalues_m2_real.[]",
+   "f": "array",
+   "part": "real",
+   "old_array": "eigenvalues_m2",
+   "new": "wavenumber_squared.re.[]",
+   "new_array": "wavenumber_squared"
+  },
+  {
+   "old": "eigenvalues_m2_imag.[]",
+   "f": "array",
+   "part": "imag",
+   "old_array": "eigenvalues_m2",
+   "new": "wavenumber_squared.im.[]",
+   "new_array": "wavenumber_squared"
+  },
+  {
+   "old": "fixed_point_iterations.[]",
+   "new": "iteration_count.[]",
+   "f": "="
+  }
+ ],
+ "summary_added": [
+  "field_units.**",
+  "field_locations.**",
+  "field_shapes.**",
+  "target_frequency.unit",
+  "resonant_frequency.unit",
+  "wavenumber_squared.unit",
+  "relative_residual.unit",
+  "resonant_frequency.time_convention",
+  "wavenumber_squared.time_convention",
+  "quality_factor.unit",
+  "boundary.electrical_conductivity.unit",
+  "boundary.electrical_conductivity.*.unit",
+  "electrical_conductivity.*.unit",
+  "materials.*.relative_permeability.**",
+  "materials.*.*.unit",
+  "materials.*.*.time_convention"
+ ],
+ "identifiers": [
+  "field_layout",
+  "background.material"
+ ],
+ "vtu": [
+  {
+   "old": "electric_field_mode_0_real",
+   "new": "mass_normalized_electric_field_mode_0_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_0_imag",
+   "new": "mass_normalized_electric_field_mode_0_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_1_real",
+   "new": "mass_normalized_electric_field_mode_1_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_1_imag",
+   "new": "mass_normalized_electric_field_mode_1_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_2_real",
+   "new": "mass_normalized_electric_field_mode_2_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_2_imag",
+   "new": "mass_normalized_electric_field_mode_2_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_3_real",
+   "new": "mass_normalized_electric_field_mode_3_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_3_imag",
+   "new": "mass_normalized_electric_field_mode_3_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_4_real",
+   "new": "mass_normalized_electric_field_mode_4_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_4_imag",
+   "new": "mass_normalized_electric_field_mode_4_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_5_real",
+   "new": "mass_normalized_electric_field_mode_5_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_5_imag",
+   "new": "mass_normalized_electric_field_mode_5_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_6_real",
+   "new": "mass_normalized_electric_field_mode_6_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_6_imag",
+   "new": "mass_normalized_electric_field_mode_6_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_7_real",
+   "new": "mass_normalized_electric_field_mode_7_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_7_imag",
+   "new": "mass_normalized_electric_field_mode_7_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_8_real",
+   "new": "mass_normalized_electric_field_mode_8_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_8_imag",
+   "new": "mass_normalized_electric_field_mode_8_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "electric_field_mode_9_real",
+   "new": "mass_normalized_electric_field_mode_9_real",
+   "f": "="
+  },
+  {
+   "old": "electric_field_mode_9_imag",
+   "new": "mass_normalized_electric_field_mode_9_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "tet_relative_permittivity_real",
+   "new": "relative_permittivity_real",
+   "f": "="
+  },
+  {
+   "old": "tet_relative_permittivity_imag",
+   "new": "relative_permittivity_imag",
+   "f": "imag-conj"
+  },
+  {
+   "old": "tet_relative_permeability_real",
+   "new": "relative_permeability_real",
+   "f": "="
+  },
+  {
+   "old": "tet_relative_permeability_imag",
+   "new": "relative_permeability_imag",
+   "f": "imag-conj"
+  }
+ ],
+ "vtu_added": []
+}

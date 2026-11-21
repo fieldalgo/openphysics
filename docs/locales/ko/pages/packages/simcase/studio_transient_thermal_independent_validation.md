@@ -53,7 +53,7 @@ rate는 Nt-1 interval에 있고 초기 zero row가 아니다.
 
 ## transport와 독립 음성 대조
 13개 public field 전부 검증한다. manifest static 배열은
-nodes_m/triangles/dirichlet_node_ids이며 time_s는 정확 top-level 축이다.
+node_coordinates/triangles/prescribed_node_ids이며 time은 정확 top-level 축이다(형식 0.3).
 descriptor의 shape/unit/location/time axis/initial availability를 확인한다.
 기본 frame은 Nt-1이다. 모든 동적 field를 전 저장 frame에서 재구성하여 history와
 대조한 뒤 독립 기대 배열과 검사한다. T는 nodal, 공급 q는 cell-centered이며 절점
@@ -86,11 +86,12 @@ shared admission/pinned-response accounting·실브라우저 Canvas/current-fram
 
 `tests/simcase/test_studio_region_acceptance.py`는 과도 route로 과도 영역 문서도
 검사하며 디코딩한 manifest·frame·history page만 씁니다. 기준값은 구현 전에 정했고,
-측정값은 Linux 한 번 실행(Python 3.12, numpy 2.5)에서 얻었습니다.
+측정값은 단위·이름 일괄 변경 전 Linux 한 번 실행(Python 3.12, numpy 2.5)에서 얻었습니다. 그 일괄
+변경부터 문서와 이름은 형식 0.3입니다(기준은 그대로).
 
 | 사례 | 기준 | 측정 |
 | --- | --- | --- |
-| A3 변을 단열한(`dirichlet_temperature_k: {}`) 배포 과도 예제, Q = 0.01 K/s x 영역별 체적 열용량, T0 = 300 K | 모든 온도 frame이 300 + 0.01 t에서 1e-10 x 300 K 이내; 모든 열유속 frame이 1e-9 W/m² 미만; H page가 Σ c_r A_r (300 + 0.01 t)와 rtol 1e-10으로 같음(A_r은 manifest의 nodes·triangles·`triangle_regions`로 계산); Σ A_r = 영역 면적(rtol 1e-12) | 0; 7.1e-15 W/m²; 3.3e-16; 0 |
+| A3 변을 단열한(`prescribed_temperature: {}`) 배포 과도 예제, Q = 0.01 K/s x 영역별 체적 열용량, T0 = 300 K | 모든 온도 frame이 300 + 0.01 t에서 1e-10 x 300 K 이내; 모든 열유속 frame이 1e-9 W/m² 미만; H page가 Σ c_r A_r (300 + 0.01 t)와 rtol 1e-10으로 같음(A_r은 manifest의 nodes·triangles·`triangle_regions`로 계산); Σ A_r = 영역 면적(rtol 1e-12) | 0; 7.1e-15 W/m²; 3.3e-16; 0 |
 | A4 전송 동일성, 과도 예제 | `triangle_regions`를 포함한 manifest 정적 배열, 모든 온도·열유속 frame, H·V page가 직접 `simcase.run`과 같음(JSON 왕복 뒤 `np.array_equal`) | 같음 |
 
 영역 job의 frame과 page에는 영역 result/layout 쌍이 붙습니다. 과도 영역 문서의 수렴은

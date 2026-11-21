@@ -3,6 +3,9 @@
 
 """Dirichlet boundary conditions and linear solve.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 When boundary potentials are prescribed (V = g on Gamma_D), only interior
 nodes are unknowns. Splitting K into free (F) / Dirichlet (D) blocks:
 

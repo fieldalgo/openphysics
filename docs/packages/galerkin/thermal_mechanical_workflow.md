@@ -25,36 +25,39 @@ mesh = rectangle_mesh(1., 1., n, n)
 thermal = {int(i): 303.15 for i in mesh.boundary['left']}
 thermal.update({int(i): 323.15 for i in mesh.boundary['right']})
 result = solve_steady_thermoelasticity(
-    mesh, units={'length': 'm', 'temperature': 'K'},
-    conductivity=10., thermal_dirichlet=thermal, heat_source=0.,
-    young_modulus=70e9, poisson_ratio=.3, plane='strain',
-    thermal_expansion_per_k=12e-6, reference_temperature_k=293.15,
-    mechanical_dirichlet={(0, 0): 0., (0, 1): 0., (n, 1): 0.},
-    body_force=(0., 0.))
+    mesh, thermal_conductivity=10., prescribed_temperature=thermal,
+    heat_source_density=0., youngs_modulus=70e9, poisson_ratio=.3, plane='strain',
+    linear_expansion_coefficient=12e-6, stress_free_temperature=293.15,
+    prescribed_displacement={(0, 0): 0., (0, 1): 0., (n, 1): 0.},
+    body_force_density=(0., 0.))
 ```
 
 Full signature:
 
 ```python
 solve_steady_thermoelasticity(
-    mesh, *, units, conductivity, thermal_dirichlet, heat_source=0.0,
-    young_modulus, poisson_ratio, plane, thermal_expansion_per_k,
-    reference_temperature_k, mechanical_dirichlet, body_force=(0., 0.))
+    mesh, *, thermal_conductivity, prescribed_temperature,
+    heat_source_density=None, youngs_modulus, poisson_ratio, plane,
+    linear_expansion_coefficient, stress_free_temperature,
+    prescribed_displacement, body_force_density=None, motion=None)
 ```
 
 | Input | Meaning and validation |
 | --- | --- |
 | mesh | galerkin Mesh, nodes (N,2) m, integer triangles (M,3); reference geometry |
-| units | exactly `{'length':'m','temperature':'K'}`; no extra keys or inferred conversion |
-| conductivity | finite constant k>0, W/(m K), or `{region name: k}` over `mesh.region_names` |
-| thermal_dirichlet | exterior integer node → finite absolute K; remainder insulated |
-| heat_source | finite signed scalar, `{region name: Q}`, or callback (Q,2) metre points → (Q,) W/m³ |
-| young_modulus / poisson_ratio | finite E>0 Pa / -1<nu<0.5; each a scalar or `{region name: value}` |
+| thermal_conductivity | finite constant k>0, W/(m K), or `{region name: k}` over `mesh.region_names` |
+| prescribed_temperature | exterior integer node → finite absolute K; remainder insulated |
+| heat_source_density | `None` (no source), finite signed scalar, `{region name: Q}`, or callback (Q,2) metre points → (Q,) W/m³ |
+| youngs_modulus / poisson_ratio | finite E>0 Pa / -1<nu<0.5; each a scalar or `{region name: value}` |
 | plane | explicitly `stress` or `strain` |
-| thermal_expansion_per_k | finite signed **linear** alpha, 1/K; zero/negative allowed; scalar or `{region name: alpha}` |
-| reference_temperature_k | required finite nonnegative absolute K, no implicit reference |
-| mechanical_dirichlet | exterior (node,component) → displacement m; component0=x,1=y |
-| body_force | finite (2,) or callback (Q,2) metre points → (Q,2) N/m³ |
+| linear_expansion_coefficient | finite signed **linear** alpha, 1/K; zero/negative allowed; scalar or `{region name: alpha}` |
+| stress_free_temperature | required finite nonnegative absolute K, no implicit reference |
+| prescribed_displacement | exterior (node,component) → displacement m; component0=x,1=y |
+| body_force_density | `None` (none), finite (2,) or callback (Q,2) metre points → (Q,2) N/m³ |
+| motion | `None`, or a `galerkin.shape.MeshMotion` ([shape derivatives](shape_derivative.md)) |
+
+Every quantity is a number in SI units: there is no `units=` argument and no
+conversion, and a `str` value (such as `"10 W/(m K)"`) raises `TypeError`.
 
 Each heat component needs a Dirichlet anchor; each mechanical component needs
 three independent rigid-mode constraints. Remaining mechanical components have
@@ -113,7 +116,7 @@ change or recertify the completed run.
 | Member | Contract |
 | --- | --- |
 | reference_mesh | isolated owned Mesh; SI reference nodes, mutable after return |
-| heat | existing SteadyHeatResult; temperature/flux/load/reaction/residual |
+| heat | the steady heat result, a `PlanarSteadyHeatResult`: temperature, heat_flux and the generated, reaction and residual heat rates per depth (`*_heat_rate_per_depth`) |
 | temperature_snapshot | immutable TemperatureSnapshot actually passed to mechanics |
 | mechanics | existing ThermoelasticResult; fields, separate loads, reactions, physical energy |
 | manifest_json | immutable canonical JSON string |
@@ -121,18 +124,28 @@ change or recertify the completed run.
 
 ```python
 metadata = result.manifest
-metadata['units']['length'] = 'mm'
-assert result.manifest['units']['length'] == 'm'
+metadata['units']['node_coordinates'] = 'mm'
+assert result.manifest['units']['node_coordinates'] == 'm'
 assert result.mechanics.temperature_snapshot is result.temperature_snapshot
 ```
 
 JSON uses sorted keys, compact separators and finite numbers. Schema is
-`galerkin-steady-thermoelasticity-v1`. It records declared SI units,
-materials (a float, or a `{region name: float}` dictionary with sorted keys),
-reference/plane, sorted supports, sources/body force (`{'kind': 'constant',
-'value': ...}`, `{'kind': 'per_region', 'value': {...}}` for a region source, or
-callable labels), mesh counts/boundary/region metadata, mesh/temperature/snapshot
-hashes, exact-copy transfer policy, completed stage statuses and quantity units.
+`galerkin-steady-thermoelasticity-v2`; every key is a registry name. `units`
+maps each input quantity (`node_coordinates`, `thermal_conductivity`,
+`youngs_modulus`, `poisson_ratio`, `linear_expansion_coefficient`,
+`stress_free_temperature`, `prescribed_temperature`, `prescribed_displacement`,
+`heat_source_density`, `body_force_density`) and each field of `heat` and
+`mechanics` (their `.units`) to its SI unit. `inputs` records the materials
+(`thermal_conductivity`, `youngs_modulus`, `poisson_ratio`,
+`linear_expansion_coefficient`, each a float or a `{region name: float}`
+dictionary with sorted keys, `stress_free_temperature` and `plane`), the sorted
+`prescribed_temperature` and `prescribed_displacement`, and
+`heat_source_density`/`body_force_density` (`{'kind': 'constant', 'value': ...}`,
+`{'kind': 'per_region', 'value': {...}}` for a region source, or callable
+labels). The manifest also records mesh counts/boundary/region metadata,
+mesh/temperature/snapshot hashes, the exact-copy transfer policy and the
+completed stage statuses. Schema v1 (unit-suffixed keys, a `units` argument and
+`quantity_units`) is no longer written.
 No moving Git revision is asserted as the whole runtime version; exact source
 manifests belong in external validation evidence.
 
@@ -189,16 +202,18 @@ external body force. A body-force-only replacement loses boundary terms and
 uniform free expansion. Physical thermal strain remains aI in3D, including z;
 PE effective (1+nu)a is only a reduced load representation.
 
-Total strain is cell-constant; thermal/elastic strain, stress, sigma_zz and
-epsilon_zz are centroid samples. Stress generally varies linearly in a cell
+Total strain (`strain`) is cell-constant; thermal/elastic strain, stress,
+`stress_zz` and `strain_zz` are centroid samples. Stress generally varies linearly in a cell
 because T is P1. Use the snapshot's P1 T and cell displacement strain to recover
 pointwise stress; do not interpret centroid samples as the complete constant
 field. Plane stress is a local reduction, not reconstructed3D warping.
 
-Mechanical external load, thermal-equivalent load, reaction and residual are
-separate N/m of depth. `load_total` is external+thermal. Reaction equals
+Mechanical external load (`applied_force_per_depth`), thermal-equivalent load
+(`thermal_equivalent_force_per_depth`), reaction (`reaction_force_per_depth`) and
+residual (`residual_force_per_depth`) are separate N/m of depth; the total load
+is external+thermal (there is no field for it). Reaction equals
 Ku-f-g on fixed components, zero on free; full residual retains all components.
-Physical elastic energy U is J/m, from original3D elastic energy:
+Physical elastic energy U (`strain_energy_per_depth`) is J/m, from original3D elastic energy:
 
 ```text
 PS: psi=.5(e-a m)^T Dps(e-a m)

@@ -42,7 +42,7 @@ actually observed.
 ## Independent derivation and scales
 
 The scalar SI problem is c*Tdot-div(k*gradT)=Q with prescribed fixed exterior
-nodes, all other edges insulated. The `outward_flux`/`convection` keywords added
+nodes, all other edges insulated. The `inward_heat_flux`/`convection` keywords added
 later are outside this frozen oracle; their producer gates are in the
 [validation contract](transient_heat_validation.md#outward-flux-and-convection-gates). Coordinates are metres, k W/(m K),
 c J/(m^3 K), Q W/m^3 and T Kelvin. Original barycentric geometry gives
@@ -147,9 +147,9 @@ R6 defines the entire discrete source lookup first. Wrong left/average/frozen
 lookup actors are applied to that same function/history; averaging continuous
 derivatives of a quadratic would be an invalid negative discriminator.
 
-R1 actual captured accessors are nodes_m/triangles. R3 tests each requested
+R1 actual captured accessors are node_coordinates/triangles. R3 tests each requested
 time and equal sampled-point totals, not one invented Python-call count or
-batch order. R4 expects TransientHeatStepError with time_index/time_s and
+batch order. R4 expects TransientHeatStepError with time_index/time and
 nonempty chained cause. R7 normalization/5% error-ratio interpretation matches
 the original frozen plan. No producer numerical conformance is inferred.
 

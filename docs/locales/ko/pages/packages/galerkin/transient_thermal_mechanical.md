@@ -14,8 +14,11 @@ feedback, 변형 geometry 또는 시간 보간은 없다. E, nu, alpha는 각각
 
 `mesh`는 열 결과와 m 단위 좌표 및 삼각형 연결이 정확히 같아야 하며 노드와
 요소 순서도 같아야 한다. 내용이 같은 별도 mesh 객체는 허용한다. 재mesh,
-매핑, 단위 변환/추론은 하지 않는다. 필수 `units`는 정확히
-`{'length': 'm', 'time': 's', 'temperature': 'K'}`여야 한다.
+매핑, 단위 변환/추론은 하지 않는다. signature는 `solve_transient_thermoelasticity(mesh, heat, *,
+time_indices=None, youngs_modulus, poisson_ratio, plane,
+linear_expansion_coefficient, stress_free_temperature, prescribed_displacement,
+body_force_density=None)`이다. registry 이름의 SI 숫자를 받으며 `units=` 인자는 없고
+`str` 값은 `TypeError`를 낸다.
 
 `heat`는 `TransientHeatResult`여야 한다. 소비하는 시간/geometry/온도 필드를
 검사한다. 시간은 유한한 비음수 초 2개 이상, 엄격 증가하고 차이도 유한한 양수이며
@@ -26,20 +29,20 @@ solver 출처는 인증하지 않는다. 공개 결과 클래스를 수동 생�
 `time_indices=None`은 초기 index0을 포함한 모든 저장 index를 선택한다.
 그 외에는 비어 있지 않은 1D list/tuple/array에 엄격 증가 정수를 전달한다.
 bool/float/중복/역순/범위 밖 값은 거절한다. 최근접 시간 검색은 없다.
-비균일 시간 grid 및 0이 아닌 시작 시각을 지원하며 `time_s[0]`을 그대로
+비균일 시간 grid 및 0이 아닌 시작 시각을 지원하며 열 결과의 `time[0]`을 그대로
 보존한다. 초기 온도는 시간 전진 없이 그 시점의 역학에 사용된다.
 
 선택 온도는 절대 Kelvin>=0이어야 한다. 선택 음수는 clipping 없이 거절한다.
 선택하지 않은 유한 음수는 열 API의 수학적 계약과 같이 허용한다.
-`reference_temperature_k`는 전체 이력에 고정된 유한 비음수 K scalar,
-`thermal_expansion_per_k`는 유한 부호 있는 1/K 값이다. 영/음의 팽창을
-지원한다. `young_modulus`는 유한 양수 Pa, `-1<poisson_ratio<0.5`이며, 세 값은 각각
+`stress_free_temperature`는 전체 이력에 고정된 유한 비음수 K scalar,
+`linear_expansion_coefficient`는 유한 부호 있는 1/K 값이다. 영/음의 팽창을
+지원한다. `youngs_modulus`는 유한 양수 Pa, `-1<poisson_ratio<0.5`이며, 세 값은 각각
 scalar 또는 `{영역 이름: 값}` 매핑이다. `plane`은 명시적으로 `'stress'` 또는 `'strain'`이다.
 
-`mechanical_dirichlet`는 외곽 `(node,component)`에서 고정 scalar 변위 m로의
+`prescribed_displacement`는 외곽 `(node,component)`에서 고정 scalar 변위 m로의
 mapping이다. 성분0은 x, 1은 y다. 각 분리 연결 성분의 세 rigid mode를
-제거할 충분한 독립 조건이 필요하다. `body_force`는 일정한 유한 Cartesian
-2-vector N/m³이며 기본 `(0.,0.)`이다. 나머지 역학 경계는 **총 물리 traction=0**이다.
+제거할 충분한 독립 조건이 필요하다. `body_force_density`는 일정한 유한 Cartesian
+2-vector N/m³이며 기본값 `None`은 체적력이 없다는 뜻이다. 나머지 역학 경계는 **총 물리 traction=0**이다.
 열 traction을 따로 빼지 않는다. 시간 변화 지지조건, 체적력 callback 및 외부
 traction은 이 최소 adapter 범위 밖이다. 더 넓은 하중 계약은 별도 처방온도
 역학 API를 사용한다. 고정 지지/일정 체적력은 두 번째 시간 sampling 규약을
@@ -48,16 +51,16 @@ traction은 이 최소 adapter 범위 밖이다. 더 넓은 하중 계약은 별
 ## 출력, 소유권 및 실패
 
 frozen aggregate는 `reference_mesh`와 `steps` tuple을 가진다. `time_indices`와
-`time_s`는 선택 순서의 tuple이다. 각 step은 원 `time_index`, 정확한 저장
-`time_s`, 불변 `temperature_snapshot`, `mechanics` (`ThermoelasticResult`)를
-보유한다. 변위는 m, 면내 응력/`sigma_zz`는 Pa, engineering strain 순서는
+`time`은 선택 순서의 tuple이다. 각 frozen step은 원 `time_index`, 정확한 저장
+`time`(s; `step.units`는 `{"time": "s"}`), 불변 `temperature_snapshot`, `mechanics`
+(자체 `.units`를 가진 `ThermoelasticResult`)를 보유한다. 변위는 m, 면내 응력/`stress_zz`는 Pa, engineering strain 순서는
 `(exx,eyy,gamma_xy)`다. 응력과 열변형률 배열은 삼각형 중심에서 평가하며
-물리 응력은 일반적으로 P1 요소 내부에서 변한다. 하중/반력/잔차는 두께당
-N/m, 물리 탄성 에너지는 J/m이다.
+물리 응력은 일반적으로 P1 요소 내부에서 변한다. 하중/반력/잔차(`*_force_per_depth`)는 두께당
+N/m, 물리 탄성 에너지(`strain_energy_per_depth`)는 J/m이다.
 
 균일 가열의 자유 면내 팽창에서 평면 응력은 `u=alpha*DeltaT*x`, 응력0이다.
 평면 변형률은 `u=(1+nu)*alpha*DeltaT*x`, 면내 응력0,
-`sigma_zz=-E*alpha*DeltaT`다. z 자유 팽창을 의미하지 않는다.
+`stress_zz=-E*alpha*DeltaT`다. z 자유 팽창을 의미하지 않는다.
 비압축성에 가까운 P1 locking은 여전히 가능하며 adapter가 해결하지 않는다.
 
 mesh/지지조건/매개변수/소비 온도 이력을 복사한다. 첫 역학 호출 전에 모든
@@ -67,7 +70,7 @@ mesh/지지조건/매개변수/소비 온도 이력을 복사한다. 첫 역학 
 이를 수정해도 불변 snapshot은 바뀌지 않는다.
 
 `TransientThermoelasticError`에는 `stage` (`input`, `transfer`, `mechanics`),
-`time_index`, `time_s`가 있다. 전역 입력 실패는 index/time이 없고 선택 transfer/
+`time_index`, `time`(s)이 있다. 전역 입력 실패는 index/time이 없고 선택 transfer/
 mechanics 실패는 원 저장 index/time 및 `__cause__`를 보존한다. 부분 성공
 aggregate는 반환하지 않는다. 뒤 시점 역학 실패 전에 앞 해석이 끝났을 수 있고,
 예외 traceback은 해제될 때까지 임시 메모리를 보유할 수 있다. 단계는 [연성 층](coupling.md)의

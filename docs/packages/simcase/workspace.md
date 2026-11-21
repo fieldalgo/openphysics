@@ -13,6 +13,54 @@ remain at `/`. No separate proxy, JavaScript build, CDN or new dependency is nee
 
 New to the workspace? Start with the [quick start](workspace_quickstart.md). For build reviews and first-user checks, use the [acceptance checklist](workspace_acceptance.md).
 
+## Workspace layout and visual foundations
+
+The workbench has a command ribbon, a model builder and adjacent Settings panel
+on the left, a large Graphics workspace on the right, and a Study/Messages dock
+below. The ribbon groups Project, Edit, Model setup, Physics and Compute. **Geometry**,
+**Materials**, **Mesh** and **Study** open the same settings as the model tree.
+**Physics → Installed** opens [Installed physics](#installed-physics). Compute holds
+the run command of the chosen application: **Run optical study**, **Run heat study**
+or **Run Joule heating study**. The optical workflow strip shows the current step
+without hiding the model. The dock shows the study sequence and Messages; after a
+Joule heating run, Results adds its **Solver log** there.
+
+**Save** and **Open** keep their session semantics, including completed optical
+runs and comparisons. **More** contains input-only files, browser drafts and
+Reset design. **Workspace tools** in the bottom status bar contains connection,
+recovery and Reset layout; **Installed physics** sits next to it. Both open above the
+status bar, one at a time, on every page including Applications; Escape closes the open
+one. Below 1000 px the ribbon leaves out the Physics group, so its Compute commands stay in
+view; Installed physics remains in the status bar. Heat and Joule heating
+results remain in the current tab only.
+
+Settings and Graphics scroll independently on wide screens. The default
+Model builder/Settings widths are 240/320 px; saved widths are retained. Drag
+either divider right to widen its panel, or focus it and use Left/Right;
+Shift uses larger steps and Home/End reach the limits. At narrower widths,
+the settings and tree appear above Graphics; on phones the panels stack.
+Position and size inputs are paired to keep the core dimensions visible.
+
+The local CSS uses light neutral surfaces, blue selection, system fonts and
+compact square controls: 13 px base text, 13 px input labels, 18–20 px view
+headings and 32 px numeric inputs. Small ribbon/status labels have separate
+roles. Tokens live at the top of `workspace.css`. Focus outlines, a skip link,
+textual statuses and native form controls are retained. The shell and line
+icons are authored locally, with no new runtime dependency, font download or CDN.
+
+**Connections** retains the one-way setup diagram with labeled ports and curved
+wires. Selecting a node, port or physics tree item opens its settings. Heat-source
+wires are rose, temperature wires amber and geometry updates use dashed purple
+wires. Excluded interfaces lose their dependent wires, and wires follow the
+ports when panels resize. Small screens scroll the graph horizontally.
+Ports inspect settings; arbitrary wiring, field transfer and coupled execution
+remain unavailable. Single-physics optical and heat studies retain their existing
+solver contracts. For the Joule heating application the diagram shows its two
+interfaces, Electric currents and Heat transfer, solved together by one study (the badge
+names `joule.steady2d` or `joule.temperature2d`): a rose Joule heat → heat source wire,
+and, when a used material has σ(T), an amber temperature → conductivity wire that
+returns below the nodes. It has no interface checkboxes; the wires cannot be rewired.
+
 ## First optical study
 
 1. Choose **Applications → Optical waveguide**. The heated-waveguide card is
@@ -126,9 +174,9 @@ Choose **Applications → Steady heat conduction** to edit a steady heat problem
 without JSON. The plate is one homogeneous rectangle with its lower-left corner at
 (0, 0), sized in mm, with constant isotropic conductivity k [W/(m·K)] and a uniform
 heat source Q [W/m³]. Select a side in the drawing or open **Heat transfer** to give
-each side one condition: insulated (zero flux), a fixed temperature [K], an outward
-heat flux [W/m²] (positive leaves the plate) or convection with h [W/(m²·K)] and an
-ambient temperature [K]. **Mesh** sets the structured divisions along x and y and
+each side one condition: insulated (zero flux), a fixed temperature [K], an inward
+heat flux [W/m²] (positive enters the plate, as the document's `inward_heat_flux`) or
+convection with h [W/(m²·K)] and an ambient temperature [K]. **Mesh** sets the structured divisions along x and y and
 shows the node and triangle counts against this server's limits.
 
 Run is enabled when the inputs determine the temperature level (a fixed temperature
@@ -144,11 +192,65 @@ clicked point. A result keeps the inputs it was computed with; after an edit it 
 labelled as an earlier snapshot and **Restore run inputs** brings them back.
 
 Heat inputs are saved in input files, drafts, browser input recovery and undo
-history (project version 5, plate lengths in mm). Heat results stay in the tab:
+history (project version 7, plate lengths in mm, a flux side as its inward heat flux). Heat results stay in the tab:
 sessions, run history, comparison and browser notebook recovery remain optical-only.
 Transient heat, region-wise or temperature-dependent materials and arbitrary
-geometry are not part of this application; the classic page keeps the JSON
+geometry are not part of this application (region-wise materials with Joule heating are
+the [Joule heating application](#joule-heating-on-named-regions)); the classic page keeps the JSON
 interfaces for them.
+
+## Joule heating on named regions
+
+Choose **Applications → Joule heating** to set up steady Joule heating on named
+material regions without JSON. The domain is a rectangle in mm with its lower-left
+corner at (0, 0) and a background material; **Geometry** adds up to eight
+rectangles, circles or polygons (later shapes win where they overlap), each a named
+region of one material. **Materials** holds up to six named materials, each with a
+thermal conductivity k [W/(m·K)] and an electrical conductivity that is either a
+constant σ [S/m] or the linear resistivity model σ(T) = σ₀ / (1 + α (T − T₀)) with
+its reference conductivity, reference temperature, coefficient α [1/K] and valid
+temperature range. **Electric currents** gives each side an insulating boundary, a
+fixed potential [V] or an inward current density [A/m²]; **Heat transfer** an
+insulated boundary, a fixed temperature [K], an inward heat flux [W/m²] or
+convection. **Mesh** sets the element size in mm. When a used material has the
+model, the study is `joule.temperature2d` and **Study** sets the iteration: the
+method, Picard (default) or Newton, the initial temperature and the documented
+defaults (relaxation 0.5, relative tolerance 1e-10, 100 iterations, at most Studio's
+500) with a temperature tolerance the form starts at 1e-9 K. Newton takes no
+relaxation (the field is hidden and its value kept) and at most 17 steps, Studio's
+cap: choosing it lowers the limit to 17 at most, and choosing Picard again sets the
+limit back to 100. With constant materials it is `joule.steady2d`. The default model is
+the two-material strip of the [region Joule checks](electric_joule.md#material-regions-temperature-dependent-joule-heating).
+
+Run is enabled when a side fixes the potential, a side fixes the temperature or has
+convection with h > 0, adjacent fixed sides agree at their corner (potential and
+temperature), every given temperature lies in the valid range of every model material,
+and no heat job holds Studio's one job slot (heat waits for a Joule job the same way); the
+reason is shown otherwise. **Run Joule heating study** builds the
+document (shown under **Study**), validates it and runs it on Studio's
+[Joule routes](electric_joule.md#studio-region-documents), with their region and mesh
+limits; a refusal (for example two potentials at one corner, a mesh over the node
+cap, an iteration that does not converge) is shown with its text. Results show
+temperature and electric potential (P1) or current density |J|, Joule power density
+and heat flux |q| (per triangle, with optional arrows) on the actual mesh with
+region boundaries in Graphics, the balances (supplied electric power, Joule power,
+outward heat, temperature range and the current through each fixed side, per metre of
+depth) in Settings, the value at a clicked point, and the **Solver log** in the study
+dock: its line gives the method and count ("Picard 31 iterations", "Newton 3 steps"),
+the last temperature and conductivity changes and the three power balances, and
+opening it lists every Picard iteration or accepted Newton step (|ΔT|, Δσ/σ, maximum T). With constant materials it says the problem was solved once. A result keeps its inputs;
+**Restore run inputs** brings them back. Joule inputs are saved in input files,
+sessions, drafts, recovery and undo history (version 7; the iteration method is an
+optional key, absent meaning Picard, so earlier version 7 files load unchanged, while a
+Studio from before the method was added opens a Newton file as Picard without a warning);
+Joule results stay in the
+tab, as heat results do. A run that ends after you switch to another application waits in
+the Joule application; undo keeps following a running job, and opening a file discards its
+result. In the multiphysics preview the interface boxes cannot leave electric currents and
+heat alone: that combination is the Joule heating application. CI runs this application in a
+real browser on Linux, macOS and Windows against installed wheels
+([development guide](../../development.md)): Picard and Newton runs of the default model, a
+refused Newton run shown with its text, and constant materials.
 
 ## Results and files
 
@@ -169,38 +271,52 @@ and session indicators compare against the last save/open snapshot or download
 request; an unchanged indicator does not certify download completion. Browser
 recovery reports its own committed storage state separately.
 
-Version-1 inputs and sessions remain readable: their fixed core height becomes
-220 nm. New files record height and its nm unit explicitly; older editors reject
-version 2 instead of silently ignoring height. Each result retains its captured
-height, including field outlines, comparisons and CSV/PNG exports.
+Input files are version 7: version 6 (the units and naming batch) plus the Joule heating
+inputs (`model.joule`, lengths in mm, `units.joule_length`). A version 6 file is still read,
+with the default Joule inputs; a project whose only interfaces are electric currents and
+heat opens in the Joule heating application. They record the
+core height, wavelength, core mesh size and shape list in nm and the heat plate in mm,
+each with its unit, and a flux side of the heat plate as its inward heat flux (version 5
+stored the outward flux). Input files of versions 1 to 5 are refused by version with a
+message instead of being read under another meaning; enter their inputs again and save a
+new file. Browser drafts and input recovery use new storage keys
+(`openphysics.studio.workspace.v2`, `openphysics.studio.recovery.v2`), so a draft an earlier
+Studio saved is not offered. Each result retains its captured inputs, including field
+outlines, comparisons and CSV/PNG exports.
 
-Version-3 inputs and sessions add the wavelength and core mesh size with nm units.
-Version-1 and version-2 files open at 1550 nm and 30 nm, the settings their results
-were computed with; older editors reject version 3 instead of ignoring the new
-values. Results keep their captured wavelength and core mesh in history labels,
-comparisons and CSV/PNG exports.
+The run table CSV (`studio-runs.csv`) writes every quantity column as `name [unit]` with
+its SI value: `core_width [m]` and `core_height [m]` (single-rectangle designs),
+`vacuum_wavelength [m]`, `core_element_size [m]` and `effective_index [1]`; job, name, pin,
+completion time, `core_material`, a `shapes` column describing every shape (in nm, as the
+page shows it) and the candidate number carry no unit.
 
-Version-4 inputs and sessions store the shape list with nm units. Version-1 to
-version-3 files open as one centred rectangular core resting on y = 0 with their
-width, height and core material, which is the geometry their results were computed
-with. Results from the earlier adapters stay valid only with that single core;
-older editors reject version 4 instead of ignoring the shapes. The run table CSV
-keeps the core width, height and material columns for single-rectangle designs and
-adds a `shapes` column describing every shape. Results computed with the
-`optical-shapes-v4` adapter (silicon, silicon nitride, silica and air only) keep that
-adapter name; new results record `optical-shapes-v5`.
+Session files are version 7, whose input is an input file of version 7 (a version 6
+session is still read, its input as a version 6 input file); version 6 was written since the units and naming batch: the workspace
+builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
+under their exact `physmat:` names) and each run record keeps the result's
+`effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in
+metres, and its input as an input file of version 6. Sessions of versions 1 to 5 hold
+results under the earlier names and the document length unit; the workspace refuses them
+by version with a message instead of reading them under another meaning. Enter the design
+again, run it and save a new session.
 
-The workspace checks `/api/workspace/capabilities/v5` before enabling Run. Contract
-version 5 and adapter `optical-shapes-v5` declare the window in nm, at most eight
-shapes and twelve polygon vertices, the shape types and the ten materials, the
-1400–1700 nm wavelength and 20–60 nm core mesh ranges, the fixed window, boundary
-and candidate settings,
+The workspace checks `/api/workspace/capabilities/v7` before enabling Run. Contract
+version 7 (the content of version 6, for a workspace that saves input and session files of
+version 7; version 6 is the content of version 5 for files of version 6 and the coded
+`diagnostics` of a document check) and adapter
+`optical-shapes-v7` declare the window in nm, at most eight
+shapes and twelve polygon vertices, the shape types and the ten materials with their
+`physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
+strings), the fixed window, boundary and candidate settings (`mode_count`),
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
-The earlier capability endpoints remain available for older clients.
-This is not a complete engine dependency or Git provenance record. Older
-version-1 sessions without this field remain readable with unknown provenance.
+The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v6`) remain
+available at the same paths and schema versions;
+because every adapter now writes format 0.3 documents and reads the new result names, each
+names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,
+`optical-shapes-v6` and `-v7`), with its values as quantity strings.
+This is not a complete engine dependency or Git provenance record.
 
 ## Scope and validation
 
@@ -326,16 +442,21 @@ status labels update. The workflow is shown for the optical application only.
 Study → Check inputs calls the public document validation endpoint without meshing
 or starting a job. The report retains its input snapshot and server identity;
 editing inputs or reconnecting to another server makes the report earlier evidence.
+It lists every coded diagnostic the server returns (severity, code, path and message:
+errors, warnings and notes) in place of the earlier free-text notes.
 A transport failure retains the previous report alongside the new error. Validation
 acceptance is not material-accuracy, mesh-convergence or solver acceptance. Run
 always validates its own captured document again.
 
-Export solver JSON downloads the actual simcase `openphysics: "0.2"` input with
-lengths in micrometres. It can be read by the simcase Python/CLI APIs; it is not a
+Export solver JSON downloads the actual simcase `openphysics: "0.3"` input: its
+geometry in nm (`length_unit`) and its other lengths as quantity strings. It can be read by the simcase Python/CLI APIs; it is not a
 workspace project/session and does not contain computed results. The expandable
 solver document shows the same payload; with an invalid editor draft it shows the
 last valid inputs and export is disabled.
 
+The server reads these requests from their raw bytes: a number keeps its written digits,
+and a duplicate key, `NaN`, `Infinity`, text that is not UTF-8 or a string with an escaped
+unpaired surrogate is refused with its code.
 Workspace validate, mesh and run requests carry the connected server instance.
 A restarted/different server rejects stale requests before parsing the model or
 starting a job; old jobs do not migrate between server processes. When Run meets a
@@ -357,8 +478,11 @@ Changing candidate/component updates the profile. Line choices are view state sa
 Each plotted step is the stored centroid value of the triangle intersected by
 that interval. There is no field interpolation, smoothing, absolute-power estimate
 or mode tracking. Shared/coincident edges follow the last painted triangle; mesh
-gaps remain gaps. CSV exports interval endpoints, triangle number, centroid,
-normalized value, job, origin and candidate/component. Values at an interval's
+gaps remain gaps. The CSV (`studio-profile.csv`) exports job, origin, candidate,
+component, axis, the fixed coordinate, interval endpoints, triangle number, centroid and
+normalized value; every quantity column is `name [unit]` with its SI value
+(`fixed_coordinate [m]`, `start [m]`, `end [m]`, `centroid_x [m]`, `centroid_y [m]`,
+`relative_amplitude [1]`), while the panel takes and shows micrometres. Values at an interval's
 isolated endpoints are not a separate point-probe claim.
 
 Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
@@ -456,10 +580,11 @@ normalization, candidate, line location, job IDs, geometry, materials and origin
 Field PNG exports also annotate an active profile line. Comparison plot rows stay
 aligned when run labels wrap to multiple lines.
 
-Session view metadata now also preserves the probe coordinates/visibility and
-profile direction, fixed coordinate and expanded state. These settings do not
-change model revisions or run a solver. Legacy sessions without these optional
-fields restore a hidden probe at (0, 0.15) µm and a closed horizontal profile at
+Session view metadata also preserves the probe coordinates/visibility and
+profile direction, fixed coordinate and expanded state; the coordinates are quantity
+strings such as `"0.15 um"`, and a bare number is refused. These settings do not
+change model revisions or run a solver. A session without these optional
+fields restores a hidden probe at (0, 0.15) µm and a closed horizontal profile at
 y = 0.15 µm. Invalid/out-of-domain saved view metadata rejects the whole import
 before changing current inputs or results.
 
@@ -471,3 +596,31 @@ again. The replacement dialog lists the source, old/new dimensions, core materia
 result counts and Undo behavior. It checks the workspace again when confirmed;
 a completed job arriving during review cannot be silently discarded by an old
 replacement prompt. Import runs continues to preserve current model inputs.
+
+## Installed physics
+
+**Installed physics**, in the status bar next to Workspace tools and opened from the
+ribbon with **Physics → Installed** (Escape closes it), lists the physics
+providers installed with Studio ([physics providers](providers.md)): each provider's
+name, version, distribution, status and physics kinds, built-in provider
+(`openphysics-fem`, distribution `simcase`) first. A provider that could not be loaded
+is listed as *Unavailable* with its error as `simcase.providers.providers()` reports
+it, for example `ImportError: No module named 'my_physics'`; the other providers and
+the built-in physics keep working. The list is read when the panel opens, from
+`GET /api/providers`.
+
+The list is data only. Every string a provider supplies is shown as text (a
+string longer than 2000 characters is cut for display), and the page never loads
+code (JavaScript or HTML) from a provider. The route sends the fields above and
+kind names, no other manifest content and no entry-point target. The error text is
+sent as `providers()` reports it, so it can name a file, such as the module an
+import failed in; Studio serves only this computer by default (see the
+[package overview](overview.md)). If the list itself cannot be read, the panel
+says so and the server log holds the details. The panel does not change the workspace
+capability contract (now `/api/workspace/capabilities/v7`, for the Joule heating inputs). Installed providers are not yet offered as
+workspace physics; the list only shows what is installed.
+
+Checks: `tests/simcase/test_studio_providers.py` (the built-in provider alone, an
+injected provider, unavailable providers, a failing listing, and route output with
+empty, long and hostile strings read by the shipped page module) and
+`tests/simcase/studio_workspace_providers.cjs` (escaping and the reply contract).

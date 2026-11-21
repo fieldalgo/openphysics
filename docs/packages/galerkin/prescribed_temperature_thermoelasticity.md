@@ -11,12 +11,12 @@ heat-to-mechanics workflow. Import from `galerkin.thermoelasticity` and
 ## API and SI contract
 
 ```python
-snapshot = freeze_temperature(mesh, temperature_k)
+snapshot = freeze_temperature(mesh, temperature=nodal_temperature)
 result = solve_thermoelasticity(
-    mesh, snapshot, reference_temperature_k=293.15,
-    thermal_expansion_per_k=12e-6, young_modulus=70e9,
+    mesh, snapshot, stress_free_temperature=293.15,
+    linear_expansion_coefficient=12e-6, youngs_modulus=70e9,
     poisson_ratio=0.3, plane="strain",
-    dirichlet={(0, 0): 0., (0, 1): 0., (nx, 1): 0.})
+    prescribed_displacement={(0, 0): 0., (0, 1): 0., (nx, 1): 0.})
 ```
 
 The supports in this example assume `rectangle_mesh(1., 1., nx, ny)` with its
@@ -27,12 +27,16 @@ T is a real finite nonnegative `(N,)` array in K, and Tref a real finite
 nonnegative scalar K. Cooling, zero alpha and negative alpha are permitted.
 Require finite E>0, -1<nu<0.5 and explicit plane=`"stress"` or `"strain"`.
 There is no Celsius conversion, scalar-temperature broadcast, or unit inference.
+Every quantity is a keyword-only number in SI units under its registry name
+(`temperature`, `stress_free_temperature`, `linear_expansion_coefficient`,
+`youngs_modulus`, `poisson_ratio`, `prescribed_displacement`,
+`body_force_density`); a `str` value raises `TypeError`.
 
-Body force is a finite two-vector or callable accepting `(Q,2)` coordinates and
+`body_force_density` (default `None`, no body force) is a finite two-vector or callable accepting `(Q,2)` coordinates and
 returning `(Q,2)` force densities in N/m^3. It is integrated with the same
 six-point-per-axis Duffy rule as the elasticity body load. Meshes use triangles
 with vector nodal displacement; DOF order is `[ux0, uy0, ux1, uy1, ...]`.
-Dirichlet maps exterior `(node, component)` to displacement m; components are
+`prescribed_displacement` maps exterior `(node, component)` to displacement m; components are
 0=x, 1=y. Without an applied traction mapping, remaining components have **zero total
 thermoelastic natural traction**. The optional global Cartesian total-traction
 mapping is described in the [traction contract](thermoelastic_traction.md).
@@ -49,8 +53,9 @@ external force. Report body load and support reactions separately.
 
 `TemperatureSnapshot` copies coordinates, connectivity, node/element order and
 T into canonical little-endian float64/int64, immutable bytes-backed arrays.
-It stores schema1, `length_unit="m"`, `temperature_unit="K"`, mesh, temperature
-and combined reproducible fingerprints. Fingerprints use version-tagged,
+It stores schema1, the read-only `units` map `{"nodes": "m", "temperature": "K"}`,
+mesh, temperature and combined reproducible fingerprints; the nodal values are
+`snapshot.temperature`. Fingerprints use version-tagged,
 length-framed FNV-1a64 checksums; they are not cryptographic signatures or source
 authentication. Exact mesh arrays are also compared, so a checksum collision
 cannot authorize different geometry. Matching copied meshes work; changing
@@ -94,11 +99,13 @@ rejects remaining rigid modes on every disconnected component.
 
 ## Result locations, reconstruction and energy
 
-`displacement` has shape `(N,2)`. `total_strain` is constant `(M,3)`.
+`displacement` has shape `(N,2)`. `strain` is constant `(M,3)`.
 `thermal_strain`, `elastic_strain`, `stress` are centroid `(M,3)`;
-`sigma_zz` and `epsilon_zz` are centroid `(M,)`. `load_external`,
-`load_thermal`, `reaction`, `residual` are distinct `(N,2)` arrays.
-`load_total` is the sum of the first two. Reaction equals `Ku-f_body-g` only on
+`stress_zz` and `strain_zz` are centroid `(M,)`. `applied_force_per_depth`,
+`thermal_equivalent_force_per_depth`, `reaction_force_per_depth`,
+`residual_force_per_depth` are distinct `(N,2)` arrays (N/m of depth); the
+total load is the sum of the first two (there is no field for it). `result.units`
+maps each quantity field to its SI unit. Reaction equals `Ku-f_body-g` only on
 prescribed DOFs and is zero elsewhere; residual retains all DOFs.
 
 For barycentric coordinates l in an element, reconstruct T(l)=sum l_i T_i,
@@ -107,7 +114,7 @@ sigma(l)=D e-q(l)m; use the table for sigma_zz/epsilon_zz. Thus stress is
 usually linear inside an element. Centroid stresses are not the complete
 piecewise-constant stress field. No stress smoothing or nodal recovery is used.
 
-`physical_elastic_energy` integrates the original 3D elastic energy after the
+`strain_energy_per_depth` integrates the original 3D elastic energy after the
 chosen reduction. The element energy density is
 
 - PS: `.5 (e-a m)^T D (e-a m)`;

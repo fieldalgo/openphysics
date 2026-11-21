@@ -8,7 +8,10 @@ whose film absorbs (n = 3.48 - 0.01i, cladding 1.444, 0.22 um) solved in a
 closed PEC strip, and the substrate-leaky slab of tests/galerkin/test_pml_modes.py
 (film 0.22 um, 0.25 um low-index gap, silicon substrate) solved with the
 complex-coordinate PML. The references are the transfer-matrix roots on the
-decaying sheet (bound) and on the outgoing sheet (leaky).
+decaying sheet (bound) and on the outgoing sheet (leaky). refsol's values follow
+exp(-i omega t) since the galerkin step (L3 commit 11c) and the kernels here compute in
+exp(+i omega t), so each reference is conjugated once at the comparison (D8): its input is
+the conjugate absorbing film 3.48 + 0.01i, and its root the conjugate of the kernel's.
 
 Measured on the three strips below (h = 0.04, 0.02, 0.01; nodes 332/972/3553
 bound and 456/1350/4928 leaky), the complex error |n - n_ref| was
@@ -29,7 +32,8 @@ import math
 import numpy as np
 import pytest
 
-from galerkin import rectangle_mesh, solve_modes
+from galerkin import rectangle_mesh
+from galerkin.kernels import solve_modes
 from galerkin.mode_coordinates import mode_coordinates, solve_scalar_coordinates
 from conftest import rate
 
@@ -92,7 +96,8 @@ def check_convergence(errors, imag_relative, label):
 
 @pytest.mark.parametrize("pol,vector", CASES)
 def test_absorbing_slab_converges_to_the_decaying_sheet_root(refsol, pol, vector):
-    expected = refsol.lossy_slab.three_layer_modes(3.48 - 0.01j, 1.444, 1.444, 0.22, WL, pol)[0]
+    expected = refsol.lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48 + 0.01j, 1.444), thickness=0.22,
+                                                   vacuum_wavelength=WL, pol=pol)[0].conjugate()   # D8: to the kernel's
     assert expected.imag < 0
     values = [solve_bound(h, pol, vector, expected) for h in STEPS]
     assert all(v.imag < 0 for v in values)
@@ -102,7 +107,9 @@ def test_absorbing_slab_converges_to_the_decaying_sheet_root(refsol, pol, vector
 
 @pytest.mark.parametrize("pol,vector", CASES)
 def test_pml_leaky_slab_converges_to_the_outgoing_sheet_root(refsol, pol, vector):
-    expected = refsol.lossy_slab.substrate_leaky_mode(3.48, 1.444, 3.48, 0.22, 0.25, WL, pol=pol)
+    expected = refsol.lossy_slab.substrate_leaky_mode(refractive_index=(1.444, 3.48, 1.444, 3.48),
+                                                      thickness=(0.22, 0.25), vacuum_wavelength=WL,
+                                                      pol=pol).conjugate()                          # D8: to the kernel's
     assert expected.imag < 0
     values = [solve_leaky(h, pol, vector, expected) for h in STEPS]
     assert all(v.imag < 0 for v in values)
@@ -113,8 +120,10 @@ def test_pml_leaky_slab_converges_to_the_outgoing_sheet_root(refsol, pol, vector
 def test_lossless_film_recovers_the_real_slab_reference(refsol):
     # the complex reference with zero loss is the existing real one, and the
     # closed strip then returns a real spectrum
-    reference = refsol.slab.modes(3.48, 1.444, 1.444, 0.22, WL, "TE")[0]
-    expected = refsol.lossy_slab.three_layer_modes(3.48, 1.444, 1.444, 0.22, WL, "TE")[0]
+    reference = refsol.slab.modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22, vacuum_wavelength=WL,
+                                  pol="TE")[0]
+    expected = refsol.lossy_slab.three_layer_modes(refractive_index=(1.444, 3.48, 1.444), thickness=0.22,
+                                                   vacuum_wavelength=WL, pol="TE")[0]
     assert expected == reference
     mesh, centers = strip([-1.5, 0.0, 0.22, 1.72], 0.02)
     eps = np.where((centers > 0) & (centers < 0.22), 3.48**2, 1.444**2)

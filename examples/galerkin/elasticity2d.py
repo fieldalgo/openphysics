@@ -8,12 +8,12 @@ from galerkin.elasticity import solve_elasticity
 def main():
     mesh = rectangle_mesh(.1, .02, 20, 4)  # metres
     fixed = {(int(i), component): 0. for i in mesh.boundary["left"] for component in (0, 1)}
-    result = solve_elasticity(mesh, young_modulus=70e9, poisson_ratio=.3,
-                              plane="stress", dirichlet=fixed, body_force=(0., -2700*9.81))
+    result = solve_elasticity(mesh, youngs_modulus=70e9, poisson_ratio=.3,
+                              plane="stress", prescribed_displacement=fixed, body_force_density=(0., -2700*9.81))
     print("Minimum vertical displacement (m):", result.displacement[:, 1].min())
-    print("Body load per thickness (N/m):", result.load.sum(axis=0))
-    print("Support reaction per thickness (N/m):", result.reaction.sum(axis=0))
-    print("Force imbalance per thickness (N/m):", (result.load+result.reaction).sum(axis=0))
+    print("Body load per thickness (N/m):", result.applied_force_per_depth.sum(axis=0))
+    print("Support reaction per thickness (N/m):", result.reaction_force_per_depth.sum(axis=0))
+    print("Force imbalance per thickness (N/m):", (result.applied_force_per_depth+result.reaction_force_per_depth).sum(axis=0))
 
 
 if __name__ == "__main__":

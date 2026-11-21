@@ -14,9 +14,9 @@ import pytest
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from galerkin import (box_mesh, EdgeSpace3D, assemble_curlcurl_3d,
-                      assemble_edge_mass_3d, assemble_edge_grad_3d,
-                      assemble_stiffness_3d)
+from galerkin import box_mesh, EdgeSpace3D
+from galerkin.kernels import (assemble_curlcurl_3d, assemble_edge_mass_3d, assemble_edge_grad_3d,
+                              assemble_stiffness_3d)
 from conftest import rate
 
 
@@ -55,7 +55,7 @@ def _clusters(pairs, take=3):
 def test_unit_cube_lowest_resonance_is_a_triple(refsol):
     """The claim worth checking before any solver runs: on a unit cube the lowest
     k^2 is 2 pi^2 with THREE modes, and the next is 3 pi^2."""
-    cl = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    cl = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     assert abs(cl[0][0] - 2 * np.pi ** 2) < 1e-9 and cl[0][1] == 3
     assert sorted(cl[0][2]) == ["TE011", "TE101", "TM110"]
     assert abs(cl[1][0] - 3 * np.pi ** 2) < 1e-9 and cl[1][1] == 2
@@ -92,7 +92,7 @@ def test_whitney_identities_hold_in_3d():
 
 
 def test_no_spurious_mode_between_the_physical_ones(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     flat = [k for k, mult, _ in exact for _ in range(mult)]
     got = _resonances(8, 8, 8, sigma=1.3 * exact[0][0])[:len(flat)]
     for value in got:
@@ -111,7 +111,7 @@ def test_unit_cube_resonances_converge_at_second_order(refsol):
     them. Each cluster is therefore compared through its mean, which is the
     mesh-independent quantity.
     """
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0, n_max=3))
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0), n_max=3))
     errors = []
     for n in (6, 12):
         got = _resonances(n, n, n, sigma=1.3 * exact[0][0])
@@ -136,7 +136,7 @@ def test_the_example_agrees_with_the_answer_key(refsol):
 
     mine = cavity_modes.exact_spectrum()
     theirs = _clusters(refsol.metallic.rect_cavity_resonances(
-        cavity_modes.A_BOX, cavity_modes.B_BOX, cavity_modes.C_BOX, n_max=3),
+        box_size=(cavity_modes.A_BOX, cavity_modes.B_BOX, cavity_modes.C_BOX), n_max=3),
         take=8)
     for (k_mine, mult_mine, labels_mine), (k_ref, mult_ref, labels_ref) in zip(
             mine[:8], theirs):
@@ -185,7 +185,7 @@ def _unstructured_cavity(lc, nev=16, sigma=None):
 
 @needs_gmsh
 def test_unstructured_cavity_matches_the_analytic_spectrum(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     mesh, vals = _unstructured_cavity(0.11, sigma=1.3 * exact[0][0])
     assert abs(mesh.volumes().sum() - 1.0) < 1e-9
@@ -209,7 +209,7 @@ def test_unstructured_cavity_improves_under_refinement(refsol):
     sequence are not nested and a fitted order would be measuring the mesher as
     much as the solver. The strict second-order ladder is the structured test
     above; what is asserted here is that refinement monotonically helps."""
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     first = []
     for lc in (0.25, 0.16, 0.11):
@@ -247,7 +247,7 @@ def _extruded_cavity(size, nev=16, sigma=None):
 
 
 def test_extruded_cavity_matches_the_analytic_spectrum(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     mesh, vals = _extruded_cavity(0.11, sigma=1.3 * exact[0][0])
     assert abs(mesh.volumes().sum() - 1.0) < 1e-9
@@ -266,7 +266,7 @@ def test_extruded_cavity_matches_the_analytic_spectrum(refsol):
 
 @pytest.mark.slow
 def test_extruded_cavity_improves_under_refinement(refsol):
-    exact = _clusters(refsol.metallic.rect_cavity_resonances(1.0, 1.0, 1.0,
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
                                                              n_max=3))
     first = []
     for size in (0.25, 0.16, 0.11):
@@ -274,3 +274,54 @@ def test_extruded_cavity_improves_under_refinement(refsol):
         first.append(abs(vals[:exact[0][1]].mean() - exact[0][0]) / exact[0][0])
     assert first[0] > first[1] > first[2], f"not converging: {first}"
     assert first[-1] < 1e-2, f"finest extruded mesh still {first[-1]:.2e} off"
+
+
+# --------------------------------------------------------------------------
+# The same assertions on a mesh from OpenPhysics's own general mesher (V23, V32):
+# meshloom.generate3d meshes the cube from its six faces. This runs without Gmsh.
+# The refinement ladder above (0.25, 0.16, 0.11) does not hold on meshloom yet: the
+# first-cluster errors are 0.0009, 0.0102 and 0.0067 (the coarsest mesh happens to be
+# the most accurate), so V32 fails there; see the meshloom page's limits.
+# --------------------------------------------------------------------------
+meshloom = pytest.importorskip("meshloom")
+needs_meshloom = pytest.mark.skipif(not meshloom.kernel_available(),
+                                    reason="meshloom's compiled kernel is not built here")
+
+_CUBE = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], float)
+_FACES = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]], [[2, 3, 7, 6]], [[1, 2, 6, 5]], [[0, 4, 7, 3]]]
+
+
+def _meshloom_cavity(h, nev=16, sigma=None):
+    from galerkin import from_mesher
+
+    mesh = from_mesher(meshloom.generate3d(_CUBE, _FACES, h=h))
+    space = EdgeSpace3D(mesh)
+    S = assemble_curlcurl_3d(space)
+    M = assemble_edge_mass_3d(space)
+    free = np.setdiff1d(np.arange(space.num_edges), space.boundary_edge_ids())
+    vals = np.sort(spla.eigsh(S[free][:, free].tocsc(), k=nev,
+                              M=M[free][:, free].tocsc(), sigma=sigma,
+                              which="LM", v0=np.ones(len(free)),
+                              ncv=min(len(free), max(6 * nev, 100)),
+                              maxiter=50000, return_eigenvectors=False))
+    scale = np.abs(vals).max()
+    return mesh, np.sort(vals[np.abs(vals) > 1e-6 * scale])
+
+
+@needs_meshloom
+def test_meshloom_cavity_matches_the_analytic_spectrum(refsol):
+    exact = _clusters(refsol.metallic.rect_cavity_resonances(box_size=(1.0, 1.0, 1.0),
+                                                             n_max=3))
+    mesh, vals = _meshloom_cavity(0.11, sigma=1.3 * exact[0][0])
+    assert abs(mesh.volumes().sum() - 1.0) < 1e-9
+
+    at, errors = 0, []
+    for k2, mult, _ in exact:
+        errors.append(abs(vals[at:at + mult].mean() - k2) / k2)
+        at += mult
+    assert max(errors) < 2e-2, f"cluster-mean errors {errors}"
+
+    flat = [k for k, mult, _ in exact for _ in range(mult)]
+    for value in vals[:len(flat)]:
+        assert min(abs(value - k) / k for k in flat) < 0.06, (
+            f"{value:.4f} falls between the analytic resonances — spurious")

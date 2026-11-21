@@ -1,0 +1,58 @@
+{
+  "openphysics": "0.3",
+  "name": "Uniaxial plate under 1 MPa",
+  "geometry": {
+    "length_unit": "mm",
+    "depth": null,
+    "domain": {
+      "xmin": -500.0,
+      "xmax": 500.0,
+      "ymin": 100.0,
+      "ymax": 500.0
+    }
+  },
+  "materials": {},
+  "mesh": {
+    "subdivision_count": [
+      10,
+      4
+    ]
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  },
+  "physics": {
+    "plate": {
+      "type": "mechanics.elasticity2d",
+      "plane": "stress",
+      "youngs_modulus": "200000000000 Pa",
+      "poisson_ratio": 0.3,
+      "prescribed_displacement": {
+        "left": {
+          "x": "0 m"
+        },
+        "bottom": {
+          "y": "0 m"
+        }
+      },
+      "traction": {
+        "right": [
+          "3000000 Pa",
+          "0 Pa"
+        ],
+        "top": [
+          "0 Pa",
+          "-100000 Pa"
+        ]
+      },
+      "body_force_density": [
+        "0 N/m^3",
+        "-77000 N/m^3"
+      ]
+    }
+  }
+}

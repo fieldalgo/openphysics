@@ -8,7 +8,7 @@
 (`galerkin.electric.solve_steady_electric`), 과도 열전도
 (`galerkin.transient_heat.solve_transient_heat`), 탄성(`galerkin.elasticity.solve_elasticity`),
 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`), 도파관 모드
-(`galerkin.waveguide.solve_modes`), PEC 상자 공진기(`galerkin.cavity.solve_cavity_box`)는
+(`galerkin.kernels.solve_modes`), PEC 상자 공진기(`galerkin.cavity.solve_cavity_box`)는
 NumPy 숫자 대신 JAX나
 PyTorch 값을 받습니다. 그러면 결과 배열도 그 라이브러리의 배열이 되고, 그 입력에 대한 미분이
 풀이를 거쳐 흐릅니다. 기본값은 여전히 NumPy이며 계산은 이전과 똑같습니다.
@@ -22,22 +22,22 @@ NumPy는 미분하지 않습니다.
 
 | Solver | JAX·PyTorch 값으로 줄 수 있는 입력 |
 |---|---|
-| `solve_steady_heat` | `conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `dirichlet` 온도; `outward_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
-| `solve_steady_electric` | `conductivity`(스칼라 또는 영역표); `dirichlet`와 `reference_potential` 전위(V); `outward_current`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
-| `solve_electrostatics`, `capacitance_matrix` | `permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_potential` 전위(V); `charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
-| `solve_transient_heat` | `conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(points, time)`); `dirichlet` 온도(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature_k` |
-| `solve_elasticity` | `young_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `dirichlet` 변위; `body_force`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
-| `solve_thermoelasticity` | `solve_elasticity`와 같고, `reference_temperature_k`와 `thermal_expansion_per_k`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
+| `solve_steady_heat` | `thermal_conductivity`(스칼라 또는 `{영역 이름: 값}`); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백); `prescribed_temperature` 값; `inward_heat_flux`와 각 `convection` 쌍의 두 값(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_steady_electric` | `electrical_conductivity`(스칼라 또는 영역표); `prescribed_electric_potential`과 `reference_electric_potential` 전위(V); `inward_current_density`(스칼라 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_electrostatics`, `capacitance_matrix` | `relative_permittivity`(실수 스칼라 또는 영역표; 복소 유전율은 NumPy 전용); 도체·`reference_electric_potential` 전위(V); `free_charge_density`(스칼라, 영역표 또는 살아 있는 값을 돌려주는 콜백). 정전용량 행렬도 그 라이브러리로 돌아옵니다([계약](electrostatics.md)) |
+| `solve_transient_heat` | `thermal_conductivity`와 `volumetric_heat_capacity`(스칼라 또는 영역표); `heat_source_density`(스칼라, 영역표, 또는 살아 있는 값을 돌려주는 콜백 `(position, time)`); `prescribed_temperature` 값(스칼라 또는 살아 있는 값을 돌려주는 콜백 `(time)`); `initial_temperature` |
+| `solve_elasticity` | `youngs_modulus`와 `poisson_ratio`(스칼라 또는 영역표); `prescribed_displacement` 값; `body_force_density`와 `traction`(상수 벡터 또는 살아 있는 값을 돌려주는 콜백) |
+| `solve_thermoelasticity` | `solve_elasticity`와 같고, `stress_free_temperature`와 `linear_expansion_coefficient`(스칼라 또는 영역표)를 더함; 온도 스냅숏은 NumPy 기록으로 남음 |
 | `solve_modes` | `eps_r`와 `mu_r`(스칼라 또는 요소별 배열, 실수·복소수)와 `k0`; `n_eff`, `et`, `ez`를 그 라이브러리로 돌려줌. `n_target`은 모드를 고르기만 하므로 미분이 없음; `coordinate_factors`는 NumPy여야 함 |
-| `solve_cavity_box` | `lengths_m`(세 값의 배열, 또는 숫자와 살아 있는 값을 섞은 시퀀스); 주파수, 고유값, 모서리 계수, 중심 필드는 미분과 함께, 잔차(NumPy 풀이의 진단값)는 미분 없이 그 라이브러리로 돌려줌. `target_frequency_hz`는 모드를 고르기만 함 |
+| `solve_cavity_box` | `box_size`(세 값의 배열, 또는 숫자와 살아 있는 값을 섞은 시퀀스); 주파수, 고유값, 모서리 계수, 중심 필드는 미분과 함께, 잔차(NumPy 풀이의 진단값)는 미분 없이 그 라이브러리로 돌려줌. `target_frequency`는 모드를 고르기만 함 |
 | `eval_edge_field` | `dofs`(실수 또는 복소수, 예: `solve_modes`의 `et[i]`); 중심 필드를 그 라이브러리의 float64 또는 complex128로 돌려줌. `EdgeSpace`는 NumPy 구조이므로 그 기하와 모서리 부호에는 미분이 없음 |
 
-시간 격자 `time_s`는 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
+시간 격자 `time`은 메시처럼 고정된 구조입니다. 과도 해석의 콜백은 실행 내내 한
 라이브러리의 값을 돌려줘야 합니다. 첫 시각에 NumPy 숫자를 돌려주고 나중에 살아 있는
 값을 돌려주는 콜백은 거부합니다.
 
 메시 좌표, 연결, 경계 태그, 영역 번호는 고정된 구조입니다. 노드 위치에 대한
-미분은 제공하지 않습니다. `ElementHeatSource`와 `ElementConductivity`는 NumPy
+미분은 제공하지 않습니다. 예외는 정상 열·정상 전기 전도·선형 탄성·열탄성·과도 열·도파관 모드의 설계 이동(`motion=`, [형상 미분](shape_derivative.md))입니다. `ElementHeatSource`와 `ElementConductivity`는 NumPy
 값을 담습니다. 콜백은 NumPy 좌표와 법선을 받고, 살아 있는 값을 돌려줄 수
 있습니다. 좌표를 식에 쓸 때는 같은 라이브러리로 올리십시오(PyTorch는 텐서와
 NumPy 배열을 섞어 계산하지 않습니다).
@@ -59,7 +59,7 @@ right = jnp.asarray(mesh.boundary["right"])
 
 
 def right_temperature(k, h):
-    result = solve_steady_heat(mesh, conductivity=k, dirichlet={i: 350.0 for i in left},
+    result = solve_steady_heat(mesh, thermal_conductivity=k, prescribed_temperature={i: 350.0 for i in left},
                                convection={"right": (h, 300.0)})
     return result.temperature[right].mean()
 
@@ -121,6 +121,12 @@ JAX 0.12.0.1, PyTorch 2.14.1 CPU). 결과 이력 자체는 O(Nt (N + M))이며 �
 
 ## 도파관 모드: 고유값, 필드, 축퇴 모드
 
+공개 함수 `galerkin.solve_waveguide_modes`(SI, exp(−iωt))는 `relative_permittivity`,
+`relative_permeability`, 파장 또는 k0에 JAX·PyTorch 값을 받습니다. 복소 값은 그 라이브러리의 `conj`로
+켤레를 취하고(`to_kernel`) 커널의 live 출력에 `to_public`을 적용해 돌려주므로, 미분은 두 변환을 모두
+지나갑니다(`tests/galerkin/test_conventions.py`가 Im(`effective_index`)의 JAX·PyTorch 기울기를 점검).
+그 커널 `galerkin.kernels.solve_modes`는 다음과 같이 동작합니다.
+
 `solve_modes`는 입력의 숫자로 NumPy 고유값 풀이를 돌립니다. 돌려받은 각 쌍 (λ0, x0)
 (λ0 = −(k0 n_eff)², x0 = 자유 자유도 위의 [et β, ez])은 정규화 xᵀ B x = 1을 덧붙인
 고유값 문제 A x = λ B x에서 Newton 한 걸음을 밟습니다. 이 연립방정식은 살아 있는 A와
@@ -144,7 +150,7 @@ B로 풉니다:
 축퇴 고유값에는 미분이 없습니다. 고유벡터가 그 쌍의 어떤 결합이든 될 수 있기 때문입니다.
 돌려준 고유값이 이산 문제의 다른 고유값과 상대 1e-8 이내이면
 (`galerkin.waveguide.DEGENERATE_GAP`) 그 모드는 정확한 값과 `DegenerateModeWarning`, NaN
-미분을 받습니다. 다른 고유값을 돌려줬는지와 상관없습니다(`num_modes`가 쌍을 자를 수
+미분을 받습니다. 다른 고유값을 돌려줬는지와 상관없습니다(요청한 개수가 쌍을 자를 수
 있습니다). 가장 가까운 다른 고유값은 작은 문제에서는 밀집 행렬로, 그 밖에는 모드마다
 shift-invert Arnoldi로 찾으며, 모드마다 분해를 한 번 더 합니다. 그래서 그 모드를 쓰는
 역방향 계산은 틀린 숫자 대신 NaN을 냅니다. 목적함수가 쓰지 않는 출력은 아무것도 더하지
@@ -170,7 +176,7 @@ curl-curl 행렬과 질량 행렬은 정확히
 따릅니다. 중심 필드는 푼 메시에서 계산하고 성분마다 d_a로 나눕니다.
 
 상자에는 축퇴 모드가 많습니다(두 변의 길이가 같으면 쌍이 생깁니다). 도파관과 같은 규칙을
-따릅니다. NaN 미분과 `DegenerateModeWarning`이며, `num_modes`가 쌍을 잘라도 마찬가지입니다.
+따릅니다. NaN 미분과 `DegenerateModeWarning`이며, `mode_count`가 쌍을 잘라도 마찬가지입니다.
 `result.mesh`와 `result.space`는 푼 기하의 숫자를 담고, 노드 좌표에는 미분이 없습니다.
 
 ## 반복 solver
@@ -252,7 +258,7 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
 - JAX·PyTorch 계수를 준 `eval_edge_field_3d`(`TypeError`). 상자 길이가 살아 있으면 공진기
   필드는 기하를 통해서도 길이에 의존하는데, `result.space`는 그 기하를 숫자로 담습니다. 그래서
   살아 있는 계수만으로 계산하면 미분의 그 부분을 놓칩니다. `solve_cavity_box`는 미분 전체를
-  담은 필드를 `result.electric_field`로 돌려줍니다.
+  담은 필드를 `result.mass_normalized_electric_field`로 돌려줍니다.
 - forward 모드 미분(`jax.jvp`, `jax.jacfwd`)과 2차 미분.
 - `jax_enable_x64`가 꺼진 JAX, 그리고 한 호출에 섞인 JAX와 PyTorch 값.
 - 아직 미분하지 않는 solver는 미분을 조용히 끊지 않고 JAX·PyTorch 값을
@@ -271,8 +277,8 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
   복사하거나 풀기 전에 `TypeError`를 냅니다. 영역 표와 `{node: volts}`, `{tag: (h, ambient)}`
   같은 경계 표 안의 값도 마찬가지입니다. 콜백은 반복 안에서만 돌므로, 콜백이 돌려준 살아 있는
   값은 그 `TypeError`를 원인으로 가진 `JouleConvergenceError`로 나옵니다. 전도도 콜백
-  `ConductivityModel.evaluate`와 `derivative`, 그리고 `outward_flux`, `convection`,
-  `outward_current`에 준 경계 콜백이 그렇습니다. 이런 solver에 필요한 미분은
+  `ConductivityModel.evaluate`와 `derivative`, 그리고 `inward_heat_flux`, `convection`,
+  `inward_current_density`에 준 경계 콜백이 그렇습니다. 이런 solver에 필요한 미분은
   [반복 solver](#반복-solver)를 보십시오.
 
 ## 한계
@@ -284,7 +290,7 @@ T는 셀 수, N은 노드 수, E는 모서리 수, E_b는 넘긴 경계 모서�
 - JAX에서 특이한 희소 연립방정식은 풀이의 host callback 안에서 실패합니다. solver가
   `ValueError`를 내기 전에 JAX가 callback의 traceback(`jax.pure_callback failed`)을
   기록합니다. PyTorch는 아무것도 출력하지 않습니다.
-- 살아 있는 입력에서는 `joule_power_per_length`와 `supplied_power_per_length`가
+- 살아 있는 입력에서는 `joule_power_per_depth`와 `inward_electric_power_per_depth`가
   Python float 대신 그 라이브러리의 0차원 배열이며, 결과 배열을 읽기 전용으로
   만들지 않습니다.
 - CPU에서만 시험했습니다. 정적 데이터는 CPU 텐서로 올리며, 다른 PyTorch 장치의
@@ -346,7 +352,7 @@ PyTorch 2.14.1 CPU):
 - 고유값, 주파수, 모서리 계수, 필드 양의 세 길이에 대한 미분이 두 경로 모두에서 NumPy
   풀이의 중심차분과 맞습니다. 숫자 둘 옆에 살아 있는 길이 하나를 준 경우도 맞습니다.
 - 단면이 정사각형인 상자: 축퇴 쌍은 경고와 NaN을 내고, 단순한 기본 모드는 중심차분과
-  맞으며, `num_modes=1`로 잘린 쌍도 경고와 NaN을 냅니다.
+  맞으며, `mode_count=1`로 잘린 쌍도 경고와 NaN을 냅니다.
 
 `tests/galerkin/test_edge_field_gradients.py`(2026-10-29, Linux, NumPy 2.5, JAX 0.12.0.1,
 PyTorch 2.14.1 CPU):

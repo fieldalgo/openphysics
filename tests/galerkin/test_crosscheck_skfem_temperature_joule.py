@@ -23,11 +23,11 @@ def test_temperature_coupling_against_skfem(case, method):
     clock = Stopwatch()
     with clock('openphysics'):
         result = solve_temperature_joule_heat(mesh, electrical_conductivity=models,
-            thermal_conductivity={'a': 1., 'b': 3.}, electric_dirichlet=voltage,
-            thermal_dirichlet={int(i): 300. for i in left}, initial_temperature=300.,
-            outward_current={'right': 1.} if case == 'current' else None,
-            convection={'right': (2., 300.)}, relaxation=.7,
-            relative_tolerance=1e-12, temperature_atol=1e-11, max_iterations=300, method=method)
+            thermal_conductivity={'a': 1., 'b': 3.}, prescribed_electric_potential=voltage,
+            prescribed_temperature={int(i): 300. for i in left}, initial_temperature=300.,
+            inward_current_density={'right': -1.} if case == 'current' else None,
+            convection={'right': (2., 300.)}, relaxation_factor=.7,
+            relative_tolerance=1e-12, temperature_tolerance=1e-11, iteration_limit=300, method=method)
     with clock('reference'):
         m = sk.MeshTri(mesh.nodes.T.copy(), mesh.triangles.T.copy())
         basis = sk.Basis(m, sk.ElementTriP1())
@@ -80,7 +80,7 @@ def test_temperature_coupling_against_skfem(case, method):
                  'cell-mean rho(T), fixed k, Joule heat'], not_matched=[], stopwatch=clock,
         analytical_acceptance='tests/galerkin/test_temperature_joule_heating.py',
         observables=[observable(name, unit, 'max relative difference', relative_difference(a,b), 1e-9)
-            for name, unit, a, b in [('potential','V',e.potential,potential),
-                ('current','A/m^2',e.current_density,current), ('source','W/m^3',e.joule_heating,q),
+            for name, unit, a, b in [('potential','V',e.electric_potential,potential),
+                ('current','A/m^2',e.current_density,current), ('source','W/m^3',e.joule_power_density,q),
                 ('temperature rise','K',h.temperature-300,next_rise),
-                ('power','W/m',result.coupled.source_power_per_length,power)]]))
+                ('power','W/m',result.coupled.generated_heat_rate_per_depth,power)]]))

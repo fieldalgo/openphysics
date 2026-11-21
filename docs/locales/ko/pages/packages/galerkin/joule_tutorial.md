@@ -25,8 +25,8 @@ python -m pip install -e packages/galerkin -e packages/galerkin-refsol
 
 [예제](../../../../../../examples/galerkin/joule_heating.py)는 `solve_steady_electric`을
 먼저 호출한 뒤 같은 메시에서 그 결과를 `solve_steady_joule_heat`로 전달합니다.
-전기 해석의 `conductivity` 단위는 S/m, 열 해석은 W/(m K)입니다. 키워드 이름은 같아도
-다른 물성입니다. 열 호출에는 K 단위의 새 경계 맵을 전달합니다. 전압은 온도가 아닙니다.
+`electrical_conductivity`의 단위는 S/m, `thermal_conductivity`는 W/(m K)입니다. 두 물성은
+서로 다른 것이며 각자 자기 레지스트리 이름을 씁니다. 열 호출에는 K 단위의 새 경계 맵을 전달합니다. 전압은 온도가 아닙니다.
 
 ## 2. 실행과 결과 해석
 

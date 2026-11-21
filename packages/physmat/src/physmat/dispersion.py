@@ -3,6 +3,9 @@
 
 """Dispersion models: complex refractive index and permittivity as functions of wavelength.
 
+Internal module, consistent units: not part of physmat's public API (the ``__all__``
+of its public modules).
+
 Conventions (fixed for the whole package)
 -----------------------------------------
 * Wavelength is the vacuum wavelength in micrometres.

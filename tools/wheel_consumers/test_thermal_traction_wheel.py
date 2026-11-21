@@ -36,24 +36,24 @@ def test_heat_kelvin_slab_flux_and_outward_sign(offset):
     mesh = rectangle_mesh(2., .7, 8, 5)
     bc = {int(i): 350. + offset for i in mesh.boundary['left']}
     bc.update({int(i): 300. + offset for i in mesh.boundary['right']})
-    result = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc)
+    result = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc)
     expected = 350. + offset - 25. * mesh.nodes[:, 0]
-    reference = heat_reference.slab(mesh.nodes, length=2., conductivity=12.,
-                                    left_temperature=350. + offset, right_temperature=300. + offset)
+    reference = heat_reference.slab(mesh.nodes, length=2., thermal_conductivity=12.,
+                                    prescribed_temperature=(350. + offset, 300. + offset))
     scaled_close(result.temperature - (300. + offset), expected - (300. + offset), 50.)
     scaled_close(reference.temperature - (300. + offset), expected - (300. + offset), 50.)
     scaled_close(result.heat_flux, np.tile([300., 0.], (mesh.num_triangles, 1)), 300.)
     scaled_close(reference.heat_flux, np.tile([300., 0.], (mesh.num_nodes, 1)), 300.)
-    np.testing.assert_array_equal(result.load, 0.)
-    left = result.reaction[mesh.boundary['left']].sum()
-    right = result.reaction[mesh.boundary['right']].sum()
+    np.testing.assert_array_equal(result.generated_heat_rate_per_depth, 0.)
+    left = result.reaction_heat_rate_per_depth[mesh.boundary['left']].sum()
+    right = result.reaction_heat_rate_per_depth[mesh.boundary['right']].sum()
     scaled_close([left, right], [210., -210.], 210.)
     assert -left < 0 < -right  # outward heat is minus the fixed-node reaction
     fixed = np.array(sorted(bc))
     free = np.setdiff1d(np.arange(mesh.num_nodes), fixed)
-    np.testing.assert_array_equal(result.reaction[free], 0.)
-    scale = np.abs(result.load).sum() + np.abs(result.reaction).sum()
-    assert abs(np.sum(result.load + result.reaction)) / scale <= 1e-10
+    np.testing.assert_array_equal(result.reaction_heat_rate_per_depth[free], 0.)
+    scale = np.abs(result.generated_heat_rate_per_depth).sum() + np.abs(result.reaction_heat_rate_per_depth).sum()
+    assert abs(np.sum(result.generated_heat_rate_per_depth + result.reaction_heat_rate_per_depth)) / scale <= 1e-10
 
 
 def heat_closed_form_errors(mesh, result):
@@ -83,18 +83,18 @@ def test_heat_constant_source_mixed_insulation_closed_form():
     for nx in (8, 16):
         mesh = rectangle_mesh(2., .7, nx, nx // 2)
         bc = {int(i): 300. for i in mesh.boundary['left']}
-        constant = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc, heat_source=48.)
-        callback = heat.solve_steady_heat(mesh, conductivity=12., dirichlet=bc,
-                                          heat_source=lambda points: np.full(len(points), 48.))
+        constant = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc, heat_source_density=48.)
+        callback = heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature=bc,
+                                          heat_source_density=lambda points: np.full(len(points), 48.))
         scaled_close(callback.temperature - 300., constant.temperature - 300., 8.)
         scaled_close(callback.heat_flux, constant.heat_flux, 96.)
-        scaled_close(callback.load, constant.load, 67.2)
-        scaled_close(callback.reaction, constant.reaction, 67.2)
-        scaled_close(constant.load.sum(), 48.*2.*.7, 67.2)
-        scaled_close(constant.reaction.sum(), -48.*2.*.7, 67.2)
-        assert -constant.reaction.sum() > 0  # positive generation leaves through x=0
-        scale = np.abs(constant.load).sum() + np.abs(constant.reaction).sum()
-        assert abs(np.sum(constant.load + constant.reaction)) / scale <= 1e-10
+        scaled_close(callback.generated_heat_rate_per_depth, constant.generated_heat_rate_per_depth, 67.2)
+        scaled_close(callback.reaction_heat_rate_per_depth, constant.reaction_heat_rate_per_depth, 67.2)
+        scaled_close(constant.generated_heat_rate_per_depth.sum(), 48.*2.*.7, 67.2)
+        scaled_close(constant.reaction_heat_rate_per_depth.sum(), -48.*2.*.7, 67.2)
+        assert -constant.reaction_heat_rate_per_depth.sum() > 0  # positive generation leaves through x=0
+        scale = np.abs(constant.generated_heat_rate_per_depth).sum() + np.abs(constant.reaction_heat_rate_per_depth).sum()
+        assert abs(np.sum(constant.generated_heat_rate_per_depth + constant.reaction_heat_rate_per_depth)) / scale <= 1e-10
         assert constant.temperature.max() > 300.
         errors.append(heat_closed_form_errors(mesh, constant))
     coarse, fine = np.asarray(errors)
@@ -106,21 +106,21 @@ def test_heat_constant_source_mixed_insulation_closed_form():
 def test_heat_rejects_unconstrained_constant_mode():
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=12., dirichlet={})
+        heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature={})
 
 
 @pytest.mark.parametrize('conductivity', [0., -1., np.nan])
 def test_heat_rejects_invalid_conductivity(conductivity):
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=conductivity, dirichlet={0: 300.})
+        heat.solve_steady_heat(mesh, thermal_conductivity=conductivity, prescribed_temperature={0: 300.})
 
 
 @pytest.mark.parametrize('source', [lambda p: 1., lambda p: np.full(len(p), np.nan)])
 def test_heat_rejects_invalid_source_callback(source):
     mesh = rectangle_mesh(1., 1., 2, 2)
     with pytest.raises(ValueError):
-        heat.solve_steady_heat(mesh, conductivity=12., dirichlet={0: 300.}, heat_source=source)
+        heat.solve_steady_heat(mesh, thermal_conductivity=12., prescribed_temperature={0: 300.}, heat_source_density=source)
 
 
 def checkout_example(name):
@@ -157,18 +157,18 @@ def test_traction_uniaxial_closed_form(plane):
     mesh = rectangle_mesh(1.2, .7, 4, 3)
     e, nu, p = 70000., .3, 123.
     ex, ey = (p/e, -nu*p/e) if plane == 'stress' else ((1-nu**2)*p/e, -nu*(1+nu)*p/e)
-    result = elastic.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu,
-                                      plane=plane, dirichlet=rollers(mesh), traction={'right': (p, 0.)})
-    exact = traction_reference.uniaxial(mesh.nodes, p, young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elastic.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu,
+                                      plane=plane, prescribed_displacement=rollers(mesh), traction={'right': (p, 0.)})
+    exact = traction_reference.uniaxial(mesh.nodes, stress_xx=p, youngs_modulus=e, poisson_ratio=nu, plane=plane)
     expected_u = mesh.nodes * [ex, ey]
     scaled_close(result.displacement, expected_u, p/e*1.2)
     scaled_close(exact.displacement, expected_u, p/e*1.2)
     scaled_close(result.strain, np.tile([ex, ey, 0.], (mesh.num_triangles, 1)), p/e)
     scaled_close(result.stress, np.tile([p, 0., 0.], (mesh.num_triangles, 1)), p)
-    scaled_close(result.load.sum(axis=0), [p*.7, 0.], p*.7)
-    scaled_close(result.reaction.sum(axis=0), [-p*.7, 0.], p*.7)
-    scale = np.linalg.norm(result.load.sum(axis=0))
-    assert np.linalg.norm((result.load + result.reaction).sum(axis=0)) / scale <= 1e-9
+    scaled_close(result.applied_force_per_depth.sum(axis=0), [p*.7, 0.], p*.7)
+    scaled_close(result.reaction_force_per_depth.sum(axis=0), [-p*.7, 0.], p*.7)
+    scale = np.linalg.norm(result.applied_force_per_depth.sum(axis=0))
+    assert np.linalg.norm((result.applied_force_per_depth + result.reaction_force_per_depth).sum(axis=0)) / scale <= 1e-9
 
 
 @pytest.mark.parametrize('plane', ['stress', 'strain'])
@@ -181,9 +181,9 @@ def test_traction_shear_closed_form(plane):
     def field(points, normals):
         return tau * normals[:, ::-1]  # sigma=[[0,tau],[tau,0]]
 
-    result = elastic.solve_elasticity(mesh, young_modulus=e, poisson_ratio=nu, plane=plane,
-                                      dirichlet=bc, traction={s: field for s in ('left', 'right', 'top')})
-    exact = traction_reference.shear(mesh.nodes, tau, young_modulus=e, poisson_ratio=nu, plane=plane)
+    result = elastic.solve_elasticity(mesh, youngs_modulus=e, poisson_ratio=nu, plane=plane,
+                                      prescribed_displacement=bc, traction={s: field for s in ('left', 'right', 'top')})
+    exact = traction_reference.shear(mesh.nodes, stress_xy=tau, youngs_modulus=e, poisson_ratio=nu, plane=plane)
     expected = np.column_stack([tau/mu * mesh.nodes[:, 1], np.zeros(mesh.num_nodes)])
     scaled_close(result.displacement, expected, tau/mu*.7)
     scaled_close(exact.displacement, expected, tau/mu*.7)
@@ -207,11 +207,11 @@ def test_traction_consistent_linear_load_and_outward_normal():
     for reverse in (False, True):
         if reverse:
             mesh.boundary_edges['right'] = mesh.boundary_edges['right'][:, ::-1].copy()
-        r = elastic.solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3, plane='stress',
-                                     dirichlet=bc, traction={'right': linear})
-        scaled_close(r.load, expected, np.linalg.norm([4., -3.5]))
-        scaled_close(r.reaction, -expected, np.linalg.norm([4., -3.5]))
-        outputs.append(r.load)
+        r = elastic.solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3, plane='stress',
+                                     prescribed_displacement=bc, traction={'right': linear})
+        scaled_close(r.applied_force_per_depth, expected, np.linalg.norm([4., -3.5]))
+        scaled_close(r.reaction_force_per_depth, -expected, np.linalg.norm([4., -3.5]))
+        outputs.append(r.applied_force_per_depth)
     scaled_close(outputs[0], outputs[1], np.linalg.norm([4., -3.5]))
 
 
@@ -219,12 +219,12 @@ def test_traction_preserves_load_on_prescribed_dofs():
     mesh = rectangle_mesh(1., 1., 1, 1)
     u = mesh.nodes @ np.array([[.002, .0003], [.0001, -.0006]]).T + [.01, -.02]
     bc = {(i, c): u[i, c] for i in range(mesh.num_nodes) for c in (0, 1)}
-    args = dict(young_modulus=70000., poisson_ratio=.3, plane='stress', dirichlet=bc)
+    args = dict(youngs_modulus=70000., poisson_ratio=.3, plane='stress', prescribed_displacement=bc)
     base = elastic.solve_elasticity(mesh, **args)
     loaded = elastic.solve_elasticity(mesh, **args, traction={'right': (123., -17.)})
     np.testing.assert_array_equal(loaded.displacement, base.displacement)
-    scaled_close(loaded.reaction - base.reaction, -loaded.load, np.linalg.norm([123., -17.]))
-    scaled_close(loaded.load.sum(axis=0), [123., -17.], np.linalg.norm([123., -17.]))
+    scaled_close(loaded.reaction_force_per_depth - base.reaction_force_per_depth, -loaded.applied_force_per_depth, np.linalg.norm([123., -17.]))
+    scaled_close(loaded.applied_force_per_depth.sum(axis=0), [123., -17.], np.linalg.norm([123., -17.]))
 
 
 @pytest.mark.parametrize('kind', ['duplicate', 'interior'])
@@ -243,18 +243,18 @@ def test_traction_rejects_invalid_selected_edges(kind):
         mesh.boundary_edges['interior'] = np.array([edge], dtype=int)
         traction = {'interior': (1., 0.)}
     with pytest.raises(ValueError):
-        elastic.solve_elasticity(mesh, young_modulus=70000., poisson_ratio=.3, plane='stress',
-                                 dirichlet=rollers(mesh), traction=traction)
+        elastic.solve_elasticity(mesh, youngs_modulus=70000., poisson_ratio=.3, plane='stress',
+                                 prescribed_displacement=rollers(mesh), traction=traction)
 
 
 def test_traction_none_and_empty_mapping_keep_existing_results():
     mesh = rectangle_mesh(1., 1., 2, 2)
     bc = {(int(i), c): 0. for i in mesh.boundary['left'] for c in (0, 1)}
-    args = dict(young_modulus=70000., poisson_ratio=.3, plane='strain', dirichlet=bc, body_force=(0., -1.))
+    args = dict(youngs_modulus=70000., poisson_ratio=.3, plane='strain', prescribed_displacement=bc, body_force_density=(0., -1.))
     default = elastic.solve_elasticity(mesh, **args)
     for traction in (None, {}):
         result = elastic.solve_elasticity(mesh, **args, traction=traction)
-        for name in ('displacement', 'strain', 'stress', 'load', 'reaction', 'residual'):
+        for name in ('displacement', 'strain', 'stress', 'applied_force_per_depth', 'reaction_force_per_depth', 'residual_force_per_depth'):
             np.testing.assert_array_equal(getattr(result, name), getattr(default, name))
 
 

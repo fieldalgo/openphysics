@@ -96,7 +96,7 @@ galerkin은 배포판 하나이고, 안이 여러 층으로 나뉩니다. import
 물리 모듈은 coupling, core, 공개 조립 모듈을 쓰고, coupling은 core를 씁니다. 공개 조립 모듈(`assembly`,
 `assembly3d`, `edge`, `edge3d`, `solver`)은 호출자를 위해 이름을 유지하며 core 위에 있습니다. core는 메시
 형식(`mesh`, `mesh3d`)만 쓰고, 메시 형식은 galerkin의 다른 모듈을 import하지 않습니다. 어떤 모듈도 다른 모듈의 비공개(밑줄) 이름을 import하거나 속성으로 읽지 않으며, 클래스의 밑줄 멤버는 그 클래스의 메서드만 읽습니다.
-여러 모듈이 함께 쓰는 것은 core, 패키지 비공개 모듈 `_thermal_mechanical_common`(열→역학 workflow)과 `_cavity_common`(두 상자 공진기), 또는 그것을 가진 모듈의 공개 이름(thermoelasticity는 elasticity의 것을 씁니다)에 둡니다.
+여러 모듈이 함께 쓰는 것은 core, 패키지 비공개 모듈 `_thermal_mechanical_common`(열→역학 workflow), `_cavity_common`(두 상자 공진기), `_heat_kernels`(열 솔버의 경계 계, 3D 열원 하중과 면 맵), `_mechanics_kernels`(탄성·열탄성 helper와 온도 스냅숏 hash), `_moving`(`motion=` 뒤의 이동 메시 풀이), `_public`(공개 API의 문자열 거부, 내향 자료, 결과 표면), `_conventions`(`to_kernel`과 `to_public`, 복소 값이 공개 exp(−iωt)와 커널의 exp(+iωt) 사이를 오가는 유일한 곳), `_waveguide_kernels`(모드 풀이 `solve_modes`와 그 pencil `assemble_mode_system`; `galerkin.kernels`가 다시 내보냄), 또는 그것을 가진 모듈의 공개 이름(thermoelasticity는 elasticity의 것을 쓰고, Joule 가열과 workflow는 `galerkin.thermal.solve_steady_heat_outward`를, 온도 의존 Joule 반복은 `galerkin.electric.solve_steady_electric_outward`와 `galerkin.joule_heating.solve_steady_joule_heat_outward`를 부릅니다. 모두 `__all__` 밖 내부의 바깥 방향 형식 본체입니다)에 둡니다. 공진기 함수는 같은 모듈의 private 본체(`galerkin.cavity._solve_cavity_box`, `_solve_cavity`, `galerkin.material_cavity._solve_material_cavity_box`, `_solve_material_cavity`) 위의 얇은 공개 층이며, `galerkin.kernels`는 그 본체를 내보내지 않습니다.
 재료 조회는 core에 있고(`galerkin.materials`는 공개 이름을 그대로 둡니다), 물리 모듈은 메시에 묶인
 자기 컨테이너를 검사를 마친 값으로 바꿔 core에 넘깁니다(`core.loads.ElementSource`).
 메시 형식, core, 공개 조립 모듈, coupling 중 하나가 위쪽 모듈을 import하거나, 어떤 모듈이 다른 모듈의 비공개 이름을 쓰면 `tests/galerkin/test_layers.py`가 실패합니다.
@@ -126,9 +126,11 @@ flowchart TB
 | physics | `galerkin.thermal`, `electric`, `transient_heat`, `elasticity`, `thermoelasticity`, `waveguide`, `cavity` 등 | 정식화 하나씩: 입력과 단위, 계약의 검사, 조립(core 커널을 직접 또는 공개 함수를 거쳐), 풀이, 결과 dataclass. |
 | coupling | [`galerkin.coupling`](../../../../packages/galerkin/src/galerkin/coupling/__init__.py) | 한 메시 위의 절점·요소 `Field`(SI 단위), 같은 메시 `transfer`, `OneWayChain` 드라이버. 드라이버는 넘겨받은 단계를 실행할 뿐 물리 모듈을 import하지 않습니다. Joule와 열→역학 workflow가 이 층 위에서 돕니다. [커널 인터페이스](packages/galerkin/coupling.md)는 다른 solver가 결과를 받아 쓰려면 한 solver가 무엇을 내놓아야 하는지 정합니다. |
 
-요소 공식은 `core.kernels`의 닫힌 식 커널로 한 벌만 있습니다. 공개 조립 함수(`assemble_stiffness`,
+요소 공식은 `core.kernels`의 닫힌 식 커널로 한 벌만 있습니다. 조립 함수(`assemble_stiffness`,
 `assemble_curlcurl_3d` 등)는 이 커널을 `core.forms`로 조립해 SciPy 행렬을 돌려줍니다. NumPy 값을 받고
-JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널을 입력이 속한 배열 라이브러리에서 조립하며,
+JAX·PyTorch 값은 거부합니다. 이 조립 함수, Dirichlet 풀이, 물리 모듈의 도우미, 전자기 커널(모드 풀이와
+좌표, 모드 중첩, 반경 PML)은 `galerkin.kernels`로 씁니다. 이것은 모든 층 위에 있는 내부 이름공간(일관 단위,
+공개 API 아님)으로, galerkin 모듈, simcase, sipi를 위해 다시 내보내기만 합니다. 미분하는 물리 모듈은 같은 커널을 입력이 속한 배열 라이브러리에서 조립하며,
 이 경로로 solver 일곱 개가 JAX와 PyTorch에서 미분됩니다([미분](packages/galerkin/differentiation.md)).
 커널은 모든 계수 형태에서 정확한 적분과 비교합니다([요소 정의](reference-comparisons.md#요소-정의)).
 
@@ -161,6 +163,9 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
    의존 Joule workflow의 실패 증거, 두 경우를 이름으로 다룹니다
    ([`simcase/cli.py`](../../../../packages/simcase/src/simcase/cli.py)). 실패에 구조화된 증거가
    있는 종류는 그곳에 더합니다. 등록하기 전까지 Python 전용 물리는 문서 기능이 되지 않습니다.
+   다른 배포판의 종류는 공급자로 들어옵니다. entry point 그룹 `openphysics.providers`에 등록한
+   공급자가 종류와 데이터만 담은 manifest를 돌려줍니다([물리 공급자](packages/simcase/providers.md),
+   0.x 동안 불안정).
 
 영어와 한국어 문서는 함께 고치고, 수치 기준은 검증한 대로 유지합니다([기여 안내](contributing.md)).
 
@@ -174,4 +179,6 @@ JAX·PyTorch 값은 거부합니다. 미분하는 물리 모듈은 같은 커널
 `simcase`는 [물리 등록표](../../../../packages/simcase/src/simcase/registry.py)로 문서를 물리
 타입별로 나눠 보냅니다. 물리마다 계약 검증·실행기·요약·결과 형식을 그곳에 등록하므로, 새 물리를
 더할 때 실행기나 스키마를 고치지 않습니다([새 물리 추가하기](#새-물리-추가하기)).
+등록표의 종류는 [공급자](packages/simcase/providers.md)에서 옵니다. simcase 자신의 종류는 먼저
+불러오는 내장 공급자 `openphysics-fem`입니다.
 이 문서 추가가 새 구현이나 수치 검증 결과를 의미하지는 않습니다.

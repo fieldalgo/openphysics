@@ -13,7 +13,9 @@ M2  the same box through ``solve_cavity_box``: on the box solver's own Kuhn mesh
     extruded mesh the difference between routes decreases with refinement
     (orders reported, extrusion cannot reproduce the alternating Kuhn box).
 M3  dielectric slab as an extruded layer region through ``solve_material_cavity``
-    against ``solve_material_cavity_box``: finest difference <= 5e-3.
+    against ``solve_material_cavity_box``: finest difference <= 5e-3 (the refinement
+    study is in test_cavity_mesh_slab_refinement.py: it is about nine tenths of this
+    file's time, and CI assigns whole files to its parallel parts).
 M5  refusals: unknown wall tag, live inputs, missing faces.
 Plus the gradient-kernel count of ``_cavity_common.gradient_potentials`` for
 partial PEC (one, two and no components), verified by the dense eigenvalue path.
@@ -58,10 +60,10 @@ def test_m1_pec_box_on_extruded_meshes_converges_to_the_analytic_resonances():
     sizes = (0.2, 0.1, 0.05)
     errors = []
     for h in sizes:
-        result = solve_cavity(extruded_box(h), num_modes=3, target_frequency_hz=TARGET)
-        assert result.pec_face_tags == ("z0", "z1", "left", "right", "bottom", "top") or \
-            set(result.pec_face_tags) == {"z0", "z1", "left", "right", "bottom", "top"}
-        errors.append(np.abs(result.frequencies_hz - LOWEST) / LOWEST)
+        result = solve_cavity(extruded_box(h), mode_count=3, target_frequency=TARGET)
+        assert result.pec_faces == ("z0", "z1", "left", "right", "bottom", "top") or \
+            set(result.pec_faces) == {"z0", "z1", "left", "right", "bottom", "top"}
+        errors.append(np.abs(result.resonant_frequency - LOWEST) / LOWEST)
     errors = np.array(errors)                                   # (3 meshes, 3 modes)
     worst = errors.max(axis=1)
     order = np.polyfit(np.log(sizes), np.log(worst), 1)[0]
@@ -71,8 +73,8 @@ def test_m1_pec_box_on_extruded_meshes_converges_to_the_analytic_resonances():
 
 
 def test_m1_pec_box_on_a_coarse_extruded_mesh_is_within_a_few_percent():
-    result = solve_cavity(extruded_box(0.2), num_modes=3, target_frequency_hz=TARGET)
-    assert np.all(np.abs(result.frequencies_hz - LOWEST) / LOWEST < 0.05)
+    result = solve_cavity(extruded_box(0.2), mode_count=3, target_frequency=TARGET)
+    assert np.all(np.abs(result.resonant_frequency - LOWEST) / LOWEST < 0.05)
     assert result.mesh.num_tets == extruded_box(0.2).num_tets
     assert result.gradient_kernel_dimension == result.mesh.num_nodes - len(result.mesh.boundary_nodes())
 
@@ -82,17 +84,18 @@ def test_m1_pec_box_on_a_coarse_extruded_mesh_is_within_a_few_percent():
 @pytest.mark.parametrize("cells", [(2, 2, 2), (4, 3, 3)])
 def test_m2_the_box_solver_mesh_gives_the_same_result_through_both_routes(cells):
     """Same Kuhn mesh, same assembly and search: dense (2,2,2) and sparse (4,3,3) paths."""
-    box = solve_cavity_box((A, B, D), cells, num_modes=3, target_frequency_hz=TARGET)
+    box = solve_cavity_box(box_size=(A, B, D), subdivision_count=cells, mode_count=3, target_frequency=TARGET)
     mesh = cavity_mesh((A, B, D), cells)
     mesh = Mesh3D(mesh.nodes, mesh.tets, mesh.boundary, mesh.regions, mesh.region_names,
                   tagged_faces=mesh.tagged_faces)
-    through = solve_cavity(mesh, num_modes=3, target_frequency_hz=TARGET)
-    difference = np.abs(through.frequencies_hz - box.frequencies_hz) / box.frequencies_hz
+    through = solve_cavity(mesh, mode_count=3, target_frequency=TARGET)
+    difference = np.abs(through.resonant_frequency - box.resonant_frequency) / box.resonant_frequency
     print(f"M2 same-mesh route difference {difference.max():.3e} on {cells}")
     assert difference.max() <= 1e-10
-    assert np.array_equal(through.pec_edge_ids, box.pec_edge_ids)
+    assert np.array_equal(through.pec_edges, box.pec_edges)
     assert through.gradient_kernel_dimension == box.gradient_kernel_dimension == int(np.prod(np.array(cells) - 1))
-    assert np.allclose(np.abs(through.edge_coefficients), np.abs(box.edge_coefficients), atol=1e-9)
+    assert np.allclose(np.abs(through.mass_normalized_electric_field_line_integral),
+                       np.abs(box.mass_normalized_electric_field_line_integral), atol=1e-9)
 
 
 @pytest.mark.slow
@@ -101,9 +104,9 @@ def test_m2_extruded_mesh_and_box_route_approach_each_other_under_refinement():
     differences = []
     for h in sizes:
         cells = tuple(int(round(L / h)) for L in (A, B, D))
-        box = solve_cavity_box((A, B, D), cells, num_modes=3, target_frequency_hz=TARGET)
-        through = solve_cavity(extruded_box(h), num_modes=3, target_frequency_hz=TARGET)
-        differences.append(np.max(np.abs(through.frequencies_hz - box.frequencies_hz) / box.frequencies_hz))
+        box = solve_cavity_box(box_size=(A, B, D), subdivision_count=cells, mode_count=3, target_frequency=TARGET)
+        through = solve_cavity(extruded_box(h), mode_count=3, target_frequency=TARGET)
+        differences.append(np.max(np.abs(through.resonant_frequency - box.resonant_frequency) / box.resonant_frequency))
     orders = rate(differences)
     print(f"M2 extruded-vs-box differences {differences} orders {orders.tolist()}")
     assert differences[0] > differences[1] > differences[2]
@@ -112,59 +115,51 @@ def test_m2_extruded_mesh_and_box_route_approach_each_other_under_refinement():
 # -- M3 ----------------------------------------------------------------------
 
 def _slab_pair(h, walls=None):
-    eps_slab = 2.2 - 0.02j
+    eps_slab = 2.2 + 0.02j                  # exp(-i omega t): a loss is Im > 0
     mesh = extruded_box(h, layers=((0.0, 0.3), (0.3, D)), materials={"cavity": ["slab", "air"]})
     cells = tuple(int(round(L / h)) for L in (A, B, D))
     target = TARGET / np.sqrt(1.4)
     box = solve_material_cavity_box(
-        (A, B, D), cells, num_modes=3, target_frequency_hz=target,
-        regions=[CavityMaterialRegion(((0, A), (0, B), (0, 0.3)), eps_slab, 1.0)],
-        wall_conductivity_s_per_m=None if walls is None else {"z0": walls})
-    through = solve_material_cavity(mesh, regions={"slab": (eps_slab, 1.0), "air": 1.0},
-                                    walls=None if walls is None else {"z0": walls},
-                                    num_modes=3, target_frequency_hz=target)
+        box_size=(A, B, D), subdivision_count=cells, mode_count=3, target_frequency=target,
+        regions=[CavityMaterialRegion(lower_corner_position=(0, 0, 0), upper_corner_position=(A, B, 0.3),
+                                      relative_permittivity=eps_slab, relative_permeability=1.0)],
+        electrical_conductivity=None if walls is None else {"z0": walls})
+    through = solve_material_cavity(mesh, relative_permittivity={"slab": eps_slab, "air": 1.0},
+                                    electrical_conductivity=None if walls is None else {"z0": walls},
+                                    mode_count=3, target_frequency=target)
     return box, through
-
-
-@pytest.mark.slow
-def test_m3_dielectric_slab_layer_matches_the_box_solver_on_refinement():
-    differences = []
-    for h in (0.15, 0.1, 0.05):          # 0.3 m must be a grid plane of the box route
-        box, through = _slab_pair(h)
-        differences.append(np.max(np.abs(through.frequencies_hz - box.frequencies_hz)
-                                  / np.abs(box.frequencies_hz)))
-    print(f"M3 slab differences {differences}")
-    assert differences[-1] <= 5e-3
-    assert differences[0] > differences[-1]
 
 
 def test_m3_dielectric_slab_layer_on_a_coarse_mesh_with_a_lossy_floor():
     box, through = _slab_pair(0.15, walls=5.8e7)
     assert through.lossless is False and box.lossless is False
-    assert through.wall_conductivity_s_per_m["z0"] == 5.8e7
-    assert all(v is None for k, v in through.wall_conductivity_s_per_m.items() if k != "z0")
-    relative = np.abs(through.frequencies_hz - box.frequencies_hz) / np.abs(box.frequencies_hz)
-    print(f"M3 coarse lossy-floor difference {relative.max():.3e}, Q {through.quality_factors}")
+    assert through.electrical_conductivity["z0"] == 5.8e7
+    assert all(v is None for k, v in through.electrical_conductivity.items() if k != "z0")
+    relative = np.abs(through.resonant_frequency - box.resonant_frequency) / np.abs(box.resonant_frequency)
+    print(f"M3 coarse lossy-floor difference {relative.max():.3e}, Q {through.quality_factor}")
     assert relative.max() < 0.05
-    assert np.all(np.isfinite(through.quality_factors)) and np.all(through.quality_factors > 10)
-    assert through.fixed_point_iterations.max() >= 1
+    assert np.all(np.isfinite(through.quality_factor)) and np.all(through.quality_factor > 10)
+    assert through.iteration_count.max() >= 1
 
 
 def test_material_cavity_on_the_box_solver_mesh_gives_the_same_result():
     cells = (2, 2, 2)
-    region = CavityMaterialRegion(((0, A), (0, B), (0, 0.3)), 2.2 - 0.02j, 1.0)
-    box = solve_material_cavity_box((A, B, D), cells, num_modes=3, target_frequency_hz=TARGET / 1.2,
-                                    regions=[region], wall_conductivity_s_per_m={"x1": 1e7})
+    region = CavityMaterialRegion(lower_corner_position=(0, 0, 0), upper_corner_position=(A, B, 0.3),
+                                  relative_permittivity=2.2 + 0.02j, relative_permeability=1.0)
+    box = solve_material_cavity_box(box_size=(A, B, D), subdivision_count=cells, mode_count=3,
+                                    target_frequency=TARGET / 1.2, regions=[region],
+                                    electrical_conductivity={"x1": 1e7})
     mesh = cavity_mesh((A, B, D), cells)
     centroid_z = mesh.nodes[mesh.tets].mean(axis=1)[:, 2]
     mesh = Mesh3D(mesh.nodes, mesh.tets, mesh.boundary, regions=(centroid_z > 0.3).astype(int),
                   region_names=["slab", "air"], tagged_faces=mesh.tagged_faces)
-    through = solve_material_cavity(mesh, regions={"slab": (2.2 - 0.02j, 1.0), "air": (1.0, 1.0)},
-                                    walls={"x1": 1e7}, num_modes=3, target_frequency_hz=TARGET / 1.2)
-    difference = np.abs(through.frequencies_hz - box.frequencies_hz) / np.abs(box.frequencies_hz)
+    through = solve_material_cavity(mesh, relative_permittivity={"slab": 2.2 + 0.02j, "air": 1.0},
+                                    relative_permeability={"slab": 1.0, "air": 1.0},
+                                    electrical_conductivity={"x1": 1e7}, mode_count=3, target_frequency=TARGET / 1.2)
+    difference = np.abs(through.resonant_frequency - box.resonant_frequency) / np.abs(box.resonant_frequency)
     print(f"material same-mesh route difference {difference.max():.3e}")
     assert difference.max() <= 1e-10
-    assert np.allclose(through.quality_factors, box.quality_factors, rtol=1e-8)
+    assert np.allclose(through.quality_factor, box.quality_factor, rtol=1e-8)
 
 
 # -- gradient kernel on partial PEC ----------------------------------------
@@ -182,10 +177,10 @@ def test_gradient_kernel_count_follows_the_pec_components(tags, expected):
     assert count == expected(mesh.num_nodes, len(mesh.boundary_nodes()))
     assert len(components) == (1 if tags == ("z0", "z1") else 0)
     assert count == len(unit) + len(components)
-    result = solve_cavity(mesh, pec_faces=tags, num_modes=2, target_frequency_hz=TARGET)
+    result = solve_cavity(mesh, pec_faces=tags, mode_count=2, target_frequency=TARGET)
     assert result.gradient_kernel_dimension == count
-    assert result.pec_face_tags == tuple(tags)
-    assert np.all(result.frequencies_hz > 0) and np.all(result.relative_residuals <= 1e-8)
+    assert result.pec_faces == tuple(tags)
+    assert np.all(result.resonant_frequency > 0) and np.all(result.relative_residual <= 1e-8)
 
 
 def test_pec_on_top_and_bottom_only_is_a_parallel_plate_resonator():
@@ -196,9 +191,9 @@ def test_pec_on_top_and_bottom_only_is_a_parallel_plate_resonator():
     mesh = Mesh3D(mesh.nodes, mesh.tets, mesh.boundary, mesh.regions, mesh.region_names,
                   tagged_faces=mesh.tagged_faces)
     lowest = 0.5 * C0 / A
-    result = solve_cavity(mesh, pec_faces=("z0", "z1"), num_modes=2, target_frequency_hz=lowest)
+    result = solve_cavity(mesh, pec_faces=("z0", "z1"), mode_count=2, target_frequency=lowest)
     expected = np.sort([lowest, 0.5 * C0 / B])
-    assert np.all(np.abs(result.frequencies_hz - expected) / expected < 2e-2)
+    assert np.all(np.abs(result.resonant_frequency - expected) / expected < 2e-2)
 
 
 # -- M5 ----------------------------------------------------------------------
@@ -206,21 +201,21 @@ def test_pec_on_top_and_bottom_only_is_a_parallel_plate_resonator():
 def test_m5_unknown_wall_tags_and_missing_faces_are_refused():
     mesh = extruded_box(0.3)
     with pytest.raises(ValueError, match="unknown face tag"):
-        solve_cavity(mesh, pec_faces=("z0", "lid"), num_modes=2, target_frequency_hz=TARGET)
+        solve_cavity(mesh, pec_faces=("z0", "lid"), mode_count=2, target_frequency=TARGET)
     with pytest.raises(ValueError, match="unknown face tag"):
-        solve_material_cavity(mesh, regions={"cavity": 1.0}, walls={"x0": 1e7}, num_modes=2,
-                              target_frequency_hz=TARGET)
-    with pytest.raises(ValueError, match="match mesh.region_names"):
-        solve_material_cavity(mesh, regions={"air": 1.0}, num_modes=2, target_frequency_hz=TARGET)
+        solve_material_cavity(mesh, relative_permittivity={"cavity": 1.0}, electrical_conductivity={"x0": 1e7},
+                              mode_count=2, target_frequency=TARGET)
+    with pytest.raises(ValueError, match="name the regions of mesh.region_names"):
+        solve_material_cavity(mesh, relative_permittivity={"air": 1.0}, mode_count=2, target_frequency=TARGET)
     bare = Mesh3D(mesh.nodes, mesh.tets, mesh.boundary, mesh.regions, mesh.region_names)
     with pytest.raises(ValueError, match="tagged boundary faces"):
-        solve_cavity(bare, num_modes=2, target_frequency_hz=TARGET)
+        solve_cavity(bare, mode_count=2, target_frequency=TARGET)
     with pytest.raises(TypeError, match="Mesh3D"):
-        solve_cavity({"nodes": mesh.nodes}, num_modes=2, target_frequency_hz=TARGET)
+        solve_cavity({"nodes": mesh.nodes}, mode_count=2, target_frequency=TARGET)
     broken = Mesh3D(mesh.nodes, mesh.tets, regions=mesh.regions, region_names=mesh.region_names,
                     tagged_faces={k: v for k, v in mesh.tagged_faces.items() if k != "z1"})
     with pytest.raises(ValueError, match="carry no tag"):
-        solve_cavity(broken, num_modes=2, target_frequency_hz=TARGET)
+        solve_cavity(broken, mode_count=2, target_frequency=TARGET)
 
 
 def test_m5_live_inputs_are_refused_on_the_mesh_variants(monkeypatch):
@@ -230,9 +225,9 @@ def test_m5_live_inputs_are_refused_on_the_mesh_variants(monkeypatch):
     monkeypatch.setitem(sys.modules, "jax", types.SimpleNamespace(Array=Array))
     mesh = extruded_box(0.3)
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_cavity(mesh, num_modes=2, target_frequency_hz=Array())
+        solve_cavity(mesh, mode_count=2, target_frequency=Array())
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_material_cavity(mesh, regions={"cavity": 1.0}, num_modes=2, target_frequency_hz=Array())
+        solve_material_cavity(mesh, relative_permittivity={"cavity": 1.0}, mode_count=2, target_frequency=Array())
     with pytest.raises(TypeError, match="carries no derivative"):
-        solve_material_cavity(mesh, regions={"cavity": (Array(), 1.0)}, num_modes=2,
-                              target_frequency_hz=TARGET)
+        solve_material_cavity(mesh, relative_permittivity={"cavity": Array()}, mode_count=2,
+                              target_frequency=TARGET)

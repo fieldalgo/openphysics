@@ -1,0 +1,8 @@
+{
+  "schema": "openphysics.api-units-allowlist/1",
+  "package": "refsol",
+  "rule": "Violations of the public-API units scan (tests/_support/api_scan.py) that exist today. Entries may only be removed; a new violation and an entry that no longer matches one both fail.",
+  "fields": ["module", "callable", "parameter", "reason"],
+  "entries": [
+  ]
+}

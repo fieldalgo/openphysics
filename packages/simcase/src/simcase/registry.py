@@ -13,6 +13,11 @@ A document belongs to the first kind, in ``precedence`` order, that claims the
 type of any of its physics entries. A document no kind claims -- an unknown or
 missing type, or a malformed ``physics`` section -- goes to the fallback kind,
 whose validator reports what is wrong with it.
+
+The kinds come from providers (``simcase.providers``): simcase's own kinds are the built-in
+provider ``openphysics-fem``, and an installed distribution can add kinds through an entry
+point in the group ``openphysics.providers``. The first lookup loads the providers, the
+built-in one first; a provider that fails is listed as unavailable and leaves the others.
 """
 
 from __future__ import annotations
@@ -22,7 +27,8 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 #: Modules that register the built-in kinds when imported. Imported on first
-#: lookup, not here: they import ``schema``, which uses this module.
+#: lookup, not here: they import ``schema``, which uses this module. The built-in
+#: provider ``openphysics-fem`` (``simcase.providers``) is these modules' kinds.
 BUILTIN_MODULES = ("electric_joule", "mechanics", "transient_thermal", "thermal", "cavity", "runner")
 
 
@@ -42,9 +48,6 @@ class PhysicsKind:
     summary: Callable[[Any], str]
     #: what ``run`` returns
     result_types: tuple[type, ...]
-    #: document defaults that ``Document.from_dict`` merges the input into;
-    #: None keeps ``schema.DEFAULTS``
-    defaults: Callable[[], dict] | None = None
     #: the command line refuses an output folder that already exists
     fresh_output: bool = False
     #: refusal for ``build_mesh`` and ``solve_point``, with ``{stage}`` for the
@@ -56,9 +59,24 @@ class PhysicsKind:
     #: (``simcase.mesh_limits``); the runner then gets them as ``mesh_limits``.
     #: None for a kind that takes them for no document
     accepts_mesh_limits: Callable[[Any], bool] | None = None
+    #: the slots this kind's format 0.3 documents add to the shared ones (``simcase.slots``):
+    #: data only, one dict per entry. None for a kind that does not read format 0.3 yet,
+    #: whose 0.3 documents are refused with ``E-CONTRACT``
+    slots: tuple[dict, ...] | None = None
+    #: the geometry forms (``simcase.slots.GEOMETRY_FORMS``) whose format 0.3 documents this
+    #: kind reads; None for every form. A 0.3 document of another form is refused with
+    #: ``E-CONTRACT`` while the kind still reads that form in format 0.2 only
+    forms_03: frozenset[str] | None = None
+    #: a refusal by name, checked on the raw format 0.3 tree before its slots are walked: a
+    #: ``(path, message)`` pair (``E-CONTRACT``), or ``(path, message, code)``, for a document
+    #: one of this kind's types never takes (for example a geometry form), so the reader names
+    #: it before asking for that type's keys; None (or a None result) for none
+    refuse_03: Callable[[dict], tuple | None] | None = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}
+#: kind name -> the name of the provider that added it (``simcase.providers``)
+_OWNERS: dict[str, str] = {}
 _loaded = False
 
 
@@ -77,11 +95,11 @@ def register(kind: PhysicsKind) -> PhysicsKind:
 
 
 def _load_builtin() -> None:
+    """Load the providers once: the built-in kinds, then every installed provider's."""
     global _loaded
     if not _loaded:
         _loaded = True
-        for module in BUILTIN_MODULES:
-            importlib.import_module(f"{__package__}.{module}")
+        importlib.import_module(f"{__package__}.providers")._load()
 
 
 def kinds() -> tuple[PhysicsKind, ...]:

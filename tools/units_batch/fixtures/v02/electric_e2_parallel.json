@@ -1,0 +1,62 @@
+{
+  "openphysics": "0.2",
+  "name": "strip",
+  "units": {
+    "length": "mm"
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "domain": {
+          "xmin": 0,
+          "xmax": 2,
+          "ymin": 0,
+          "ymax": 1
+        },
+        "background": {
+          "material": "A"
+        },
+        "features": [
+          {
+            "name": "b",
+            "type": "rect",
+            "x": 0,
+            "y": 0.5,
+            "w": 2,
+            "h": 0.5,
+            "material": "B"
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "A": {
+      "electrical_conductivity_s_m": 2.0
+    },
+    "B": {
+      "electrical_conductivity_s_m": 0.5
+    }
+  },
+  "physics": {
+    "e": {
+      "type": "electric.steady2d",
+      "dirichlet_potential_v": {
+        "left": 2.0,
+        "right": 0.0
+      }
+    }
+  },
+  "mesh": {
+    "size": 0.25
+  },
+  "study": {
+    "type": "single"
+  },
+  "results": {
+    "save_fields": true,
+    "plots": false
+  }
+}
