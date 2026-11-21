@@ -7,9 +7,11 @@ with an exact-arithmetic compiled kernel (Rust, through PyO3). Apache-2.0.
 meshes a piecewise-linear complex (closed polyhedral surfaces, several regions,
 tagged facets) with constrained Delaunay refinement to a size and a radius-edge bound
 (`quality="practical"` or `"guaranteed"`), and returns the tetrahedral mesh fields that
-`galerkin.from_mesher` reads. It has no sliver removal, graded sizes or curved surfaces
-yet and is not yet graded by the plan's acceptance gates; for layered geometry
-`meshine.extrude` and for other shapes Gmsh through `gmshio` stay the tested routes.
+`galerkin.from_mesher` reads, after removing slivers and improving the mesh by
+smoothing and flips. It meets the plan's quality gates measured so far on polyhedral
+inputs, but has no graded sizes or curved surfaces yet and is slower than the baseline;
+for layered geometry `meshine.extrude` and for other shapes Gmsh through `gmshio` stay
+the tested routes.
 
 ```python
 import meshloom

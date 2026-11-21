@@ -46,10 +46,15 @@ GUARANTEED_RATIO = 2.0
 #: no termination proof; the point cap ends it with RefineError instead of a hang
 PRACTICAL_RATIO = 1.4
 #: default size factor: a tetrahedron is split when its circumradius exceeds ALPHA * h.
-#: Calibrated once (2026-11-20) so that the median edge over h on the unit cube at
-#: h = 0.06 matches the plan's baseline (1.245; 1.356 with factor 1), so that "size h"
-#: means the same as the baseline's MeshSizeMax (validation3d.md, size convention)
-ALPHA = 0.9181
+#: Chosen (2026-11-21, with M6's boundary size field, FAC_C 0.68 in the kernel) with the
+#: subfacet size so that the median and 95th percentile of edge length over h meet V8's
+#: windows around the plan's baseline on the cube (C2) and the chip package (C3) at all
+#: their sizes, so that "size h" means the same as the baseline's MeshSizeMax
+#: (validation3d.md, size convention). 0.99 and 1.0 meet them; V8 is therefore no
+#: independent check of this value. Matching one median alone (C2 at h = 0.06) is not
+#: stable: at 1/0.96 the cube's and the package's dyadic lengths reach alpha h together
+#: and the medians jump.
+ALPHA = 1.0
 
 
 def generate3d(points, facets, segments=None, *, h, domain="regions", region_points=None, facet_tags=None,
