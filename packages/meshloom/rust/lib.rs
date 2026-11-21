@@ -396,12 +396,12 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
 #[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None, h=0.0, ratio=0.0,
-                    alpha=1.0, max_points=0, label_h=None))]
+                    alpha=1.0, max_points=0, label_h=None, locked=None))]
 #[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
                  facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
                  seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>, h: f64,
-                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>)
+                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>, locked: Option<Vec<u32>>)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
@@ -437,11 +437,25 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
     let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
         let mut b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+        let locked = locked.unwrap_or_default();
+        // a locked (curved) facet is sampled on its surface by the caller: recovery must find
+        // it among the Delaunay faces, with no point added on it or on its edges
+        let n_in = plc.points.len() as u32;
+        for &fi in &locked {
+            let Some(subs) = b.plc.subfacets.get(fi as usize) else {
+                return Err(("Internal", format!("locked facet {fi} does not exist"), vec![]));
+            };
+            if let Some(v) = subs.iter().flatten().find(|&&v| v >= n_in) {
+                return Err(("RecoveryFail", format!(
+                    "locked facet {fi} needs a point that is not an input point ({v}); a curved surface \
+                     must be sampled so that its triangles are Delaunay faces"), vec![fi]));
+            }
+        }
         let mut rs = refine::RefineStats::default();
         if h > 0.0 || ratio > 0.0 {
             let opt = refine::RefineOptions { h, alpha, ratio, max_points };  // 0: refine() derives the cap from the size field
             let lh = label_h.unwrap_or_default();
-            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh).map_err(|e| match e.strip_prefix("seed: ") {
+            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh, &locked).map_err(|e| match e.strip_prefix("seed: ") {
                 Some(m) => ("RegionSeed", m.to_string(), vec![]),
                 None => ("RefineFail", e, vec![]),
             })?;

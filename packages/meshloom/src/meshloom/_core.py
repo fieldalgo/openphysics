@@ -182,7 +182,7 @@ def recover_boundary(points, segments, facets, max_depth: int = 60) -> dict:
 
 def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: int = 60,
              region_points=None, h=None, ratio: float | None = None, alpha: float = 1.0,
-             max_points: int = 0) -> dict:
+             max_points: int = 0, locked_facets=None) -> dict:
     """A tetrahedral mesh of a PLC: ``recover_boundary``, then (with ``h`` or ``ratio``)
     refinement, then regions, rounding and certification. ``domain="regions"`` makes every bounded
     component (tetrahedra joined across faces that are not facets) a region;
@@ -221,6 +221,11 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     (0: derived from the size field, at least 1000); reaching it raises ``RefineError``.
     ``stats`` then also counts segment, facet and volume points, rejected circumcentres and
     insertions that fell back to the smallest cavity (``minimal_cavities``).
+
+    ``locked_facets`` lists facets (by index) on which no point may be added, nor on their
+    edges: curved surfaces sampled on the surface by a builder. Recovery must find them
+    among the Delaunay faces (``RecoveryError`` otherwise), and refinement never splits
+    them or inserts a point that encroaches them.
 
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
     witness type 6), ``RecoveryError``, ``RefineError``, ``RoundingError``, ``RegionError``
@@ -280,12 +285,20 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
             raise ValueError(f"h names regions {names!r}; unknown {unknown!r}, missing {missing!r}")
         label_h = [float(region_h[n]) for n in names]
     check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
+    locked = None
+    if locked_facets is not None:
+        locked = []
+        for fi in locked_facets:
+            if isinstance(fi, bool) or not isinstance(fi, (int, np.integer)) or not 0 <= fi < len(facets):
+                raise ValueError(f"locked_facets holds facet indices in [0, {len(facets)}), got {fi!r}")
+            locked.append(int(fi))
+        locked = sorted(set(locked))
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
     seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
               np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
         out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
-                                     float(ratio or 0.0), float(alpha), int(max_points), label_h)
+                                     float(ratio or 0.0), float(alpha), int(max_points), label_h, locked)
     except ValueError as e:
         if len(e.args) != 3:
             raise

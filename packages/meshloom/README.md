@@ -8,8 +8,9 @@ meshes a piecewise-linear complex (closed polyhedral surfaces, several regions,
 tagged facets) with constrained Delaunay refinement to a size and a radius-edge bound
 (`quality="practical"` or `"guaranteed"`), and returns the tetrahedral mesh fields that
 `galerkin.from_mesher` reads, after removing slivers and improving the mesh by
-smoothing and flips. It meets the plan's quality gates measured so far on polyhedral
-inputs, but has no graded sizes or curved surfaces yet and is slower than the baseline;
+smoothing and flips. `meshloom.builder` adds spheres and cylinder vias, sampled on their
+surfaces. It meets the plan's quality gates measured so far, but has no graded sizes or
+refinement on curved surfaces yet and is slower than the baseline;
 for layered geometry `meshine.extrude` and for other shapes Gmsh through `gmshio` stay
 the tested routes.
 

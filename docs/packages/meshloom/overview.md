@@ -11,10 +11,11 @@ tetrahedralization with exact predicates, boundary recovery, quality refinement 
 piecewise-linear complex to a size `h` (one number, or one per named region) with a
 radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
 `quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades), then improves
-the mesh (sliver removal, smoothing and flips). It meets the quality gates measured so
-far on polyhedral inputs (V10 on C2, C3 and C6; V7, V8, V21, V23, V32), but has no
-graded or curved-surface sizing yet, so V10 is not graded on all of its cases, and it
-is slower than the baseline (see Limits).
+the mesh (sliver removal, smoothing and flips). `meshloom.builder` adds curved
+primitives (spheres, cylinder vias), sampled on their surfaces. The quality gates
+measured so far pass, V10 on all 15 of its pairs included, but meshloom has no graded
+sizes and no refinement on curved surfaces yet, and it is slower than the baseline (see
+Limits).
 
 ```python
 import numpy as np
@@ -27,6 +28,30 @@ facets = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]],
 mesh = meshloom.generate3d(points, facets, h=0.1)
 mesh["nodes"], mesh["tetrahedra"], mesh["boundary_faces"]   # the output contract
 ```
+
+Curved inputs come from `meshloom.builder`. Each builder returns the keyword arguments
+of `generate3d`: `sphere(h)` (C1), `nested_spheres(h, radii=..., names=...)` (C11; a None
+name leaves a hole), `sphere_in_box(h)` (C5) and `via_in_slab(h)` (C4, a z-axis cylinder
+through a slab).
+
+```python
+from meshloom import builder
+
+mesh = meshloom.generate3d(h=0.1, **builder.via_in_slab(0.1, radius=0.3))
+mesh["region_names"]           # ['via', 'slab']
+```
+
+- **Sampling.** A sphere is a geodesic subdivision of the icosahedron, a cylinder a
+  stack of rings rotated by half a step. Both use surface edges of about h
+  (`builder.SURFACE_EDGE` = 1).
+- **Points.** Each point is `c + R·q/‖q‖`, computed with +, −, ×, ÷ and √ only, so the
+  points are the same on every platform and lie on the surface to rounding (V5: at most
+  1e-15, measured 1.8e-16).
+- **Locked facets.** The curved triangles are passed as `locked_facets`: the mesher adds
+  no point on them or on their edges. Recovery needs none there, because the triangles
+  are strictly Delaunay on their surface. If one were missing, meshing raises
+  `RecoveryError` and never returns a node off the surface.
+- **Planar facets.** The box faces and the via's end disks are refined as usual.
 
 Errors are typed `ValueError` subclasses exported by the package (`InvalidPLC` with a
 witness, `NotClosed`, `RecoveryError`, `RefineError`, `RoundingError`, `RegionError`,
@@ -254,15 +279,26 @@ See [third-party software](../../third-party.md).
 ## Limits
 
 - Not yet accepted. Measured with the defaults (2026-11-21), every row run so far
-  passes: V10 on C2, C3 and C6 at the plan's three sizes (smallest dihedral angle
-  15.4–23.1°, mean q 0.767–0.855, T within its window); V8 on C2 at three sizes and on C3
-  with the die at h/2 (every region); V21 at the plan's CI sizes (L2 slope 2.08, H1 1.05);
-  V23 and the V32 refinement ladder of the unstructured cavity (first-cluster errors
-  0.0130, 0.0027, 0.0005); V7 on C2, C3 and C9. V10 is graded on C2–C6 and C4 and C5
-  have curved surfaces, which meshloom does not mesh yet, so V10 is not complete.
-  `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's
-  C2 and C3 rows, so V8 does not check them independently.
-- No graded or callable sizes (one size per region only) and no curved surfaces.
+  passes:
+  - V10 on all 15 pairs (C2–C6 at the plan's three sizes): smallest dihedral angle
+    15.4–23.1°, mean q 0.767–0.857, T within its window.
+  - V9 on C1: smallest angle 25.2 / 21.1 / 19.0°, smallest q ≥ 0.43, mean q above the
+    floor.
+  - V8 on C1, C2 and C3 with the die at h/2 (every region).
+  - V6: sphere volume slope 1.87, e(0.05) = 1.15e-3.
+  - V5 on C1, C4 and C5.
+  - V21 at the plan's CI sizes on C2 (L2 slope 2.08, H1 1.05) and on C1 (L2 2.06).
+  - V23, and the V32 refinement ladder of the unstructured cavity (first-cluster errors
+    0.0130, 0.0027, 0.0005).
+  - V7 on C2, C3 and C9.
+
+  C11 has no sizes in the plan yet, so V24 and its V5 row wait for an amendment.
+  `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's C2
+  and C3 rows, so V8 does not check them independently. The curved surface edge
+  (`SURFACE_EDGE` = 1) was set before V8 on C1 was measured.
+- No graded or callable sizes (one size per region only). Curved surfaces are limited
+  to the builder's primitives, sampled once, uniformly, at h, with no refinement on
+  them: a small curved feature needs a small h everywhere.
   Meshing is slow: the unit cube at h = 0.03 (190,000 tetrahedra) takes about 2 minutes
   on one core. Without `h` or `ratio`, `mesh_plc` returns the boundary-conforming mesh of the
   input and recovery points (and the few points repair adds) only. A
