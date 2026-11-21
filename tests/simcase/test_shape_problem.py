@@ -169,12 +169,7 @@ def test_c5_refusals_name_the_reason():
     axi["geometry"]["components"]["xs"].pop("depth")
     with pytest.raises(DocumentError, match="axisymmetric"):
         shape_problem(axi, "L1")
-    electric = strip()
-    electric["materials"] = {"A": {"electrical_conductivity": "2 S/m"}, "B": {"electrical_conductivity": "0.5 S/m"}}
-    electric["physics"] = {"e": {"type": "electric.steady2d",
-                                 "prescribed_electric_potential": {"left": "1 V", "right": "0 V"}}}
-    with pytest.raises(DocumentError, match="physics.e is 'electric.steady2d'; .* covers thermal.steady2d"):
-        shape_problem(electric, "L1")
+    # another physics: test_shape_problem_physics.py (P6), now that electric and mechanics are covered
     with pytest.raises(DocumentError, match="unknown parameter 'nope'"):
         shape_problem(strip(), "nope")
     ratio = strip()

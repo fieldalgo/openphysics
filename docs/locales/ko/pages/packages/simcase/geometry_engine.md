@@ -253,17 +253,28 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 - `run`과 같이 문서를 메시합니다. 미터 단위의 같은 galerkin 메시, 같은 순서의 같은 노드, 같은 풀이 입력입니다.
 - 메시한 복합체에서 읽은 `node_velocity`로 곡선 위 노드에 설계 속도를 줍니다.
 - galerkin의 조화 `extend_velocity`로 내부 노드를 움직입니다.
-- `solve(t)`는 문서의 정상 열 풀이를 `motion=MeshMotion(design_velocity=W, t=t)`로 돌립니다.
+- `solve(t)`는 문서의 galerkin 풀이를 `motion=MeshMotion(design_velocity=W, t=t)`로 돌립니다.
 
 `problem.design_velocity`(W), `on_curve`, `arguments`(풀이기 키워드 인수), `admissible_interval`은 공개입니다. t는 파라미터의
 변화를 미터로 나타낸 값이므로, 문서가 파라미터를 어떤 단위로 쓰든 모든 미분은 파라미터 1 m당입니다. t가 `admissible_interval`
 안이면 어떤 요소도 뒤집히지 않습니다. galerkin은 재메시하지 않습니다. 더 큰 스텝은 문서의 파라미터를 바꾸고 `shape_problem`을
 다시 부르십시오.
 
-다루는 범위는 버전 1 `2d` 성분의 재료 영역 위 정상 열(`thermal.steady2d`)입니다. 다음은 이름을 밝혀 거부합니다(`DocumentError`).
+다루는 범위는 버전 1 `2d` 성분의 재료 영역 위 다음 물리입니다(`problem.physics`가 종류를 밝히고, `solve(t)`는 그 풀이기의 결과를 돌려줍니다).
+
+| 물리 | galerkin 풀이 |
+|---|---|
+| `thermal.steady2d` | `thermal.solve_steady_heat` |
+| `thermal.transient2d` | `transient_heat.solve_transient_heat` |
+| `electric.steady2d` | `electric.solve_steady_electric` |
+| `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
+| `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: 움직이는 메시에서 열 단계를 다시 풀므로 온도가 형상과 함께 움직입니다 |
+
+다음은 이름을 밝혀 거부합니다(`DocumentError`).
 - flat 형상 블록;
 - `axisymmetric` 성분;
-- 다른 물리;
+- 다른 물리(메시를 다르게 만드는 도파관 모드, Joule 가열 포함);
+- 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도와 단열, 처방 변위, 체적력만 받습니다;
 - 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).
 
 검사(`tests/simcase/test_shape_problem.py`, C1–C6을 2026-11-21에 사전 등록, 같은 날 Linux, JAX 0.12.0.1, PyTorch 2.14.1에서 측정):
@@ -276,6 +287,22 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 | C4 같은 메시 중앙 차분 | 1e-6 이내 | 9.7e-9 |
 | C5 거부 | 위 목록대로(sweep도 사전 등록했으나 정상 열 검증이 먼저 거부) | 통과 |
 | C6 `run` 불변 | 영역 열·Joule·역학·전기 시험 | 통과 |
+
+다른 물리는 `tests/simcase/test_shape_problem_physics.py`에서 검사합니다(P1–P6을 2026-11-21에 사전 등록, 같은 날 위와 같이 측정).
+x = L1(파라미터)에서 두 재료로 나뉜 2 × 1 mm 띠를 씁니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| P1 전기, 직렬 띠 | I와 dI/dL1 1e-9 이내(P1에서 정확) | ≤ 4.4e-16, ≤ 1.2e-14 |
+| P2 탄성, 직렬 막대, ν = 0, 오른쪽 traction | 끝 변위와 그 L1 미분 1e-9 이내(정확) | ≤ 1.2e-15, ≤ 1.1e-15 |
+| P3 열탄성, 양 끝 400 K / 300 K | 열 단계 미분이 정상 열 문제의 것과 1e-12 이내; 끝 변위 미분이 같은 메시 중앙 차분과 1e-6 이내; flux·convection·traction 거부 | 통과; 2.2e-9 |
+| P4 열원이 있는 과도 열, 0–1000 s | 1000 s의 왼쪽 방출 열: 미분이 정상 문제의 것과 1e-6 이내; 같은 메시 중앙 차분과 1e-6 이내 | 2.9e-9; 7.6e-10 |
+| P5 `run`과 같음 | 노드·삼각형 비트 단위로 같음; t = 0 필드 1e-12 이내 | 넷 모두 통과 |
+| P6 거부 | 도파관 모드와 Joule 가열을 이름을 밝혀 거부 | 통과 |
+
+P3과 P4는 계획의 해석 기준을 바꾼 것입니다. 그 기준은 P1이 재현하지 못합니다. P3에서는 x에 선형인 온도가 이차 변위를 만들고,
+계면에서 α나 T′가 뛰면 열변형률이 양립하지 않습니다. P4에서는 영역 과도 문서가 내향 열유속을 받지 않고, 열원이 있는 띠는 2D
+P1에서 정확하지 않습니다.
 
 C3은 t = 0 반력을 가장 큰 값 대비 `run`의 것과 1e-12 이내로 사전 등록했습니다. 처음 측정값은 2.0e-12였습니다. galerkin의
 움직이는 메시 열 풀이가 절대 온도(약 300 K, 범위 1 K)로 계산했기 때문이며, 한동안 시험은 64 ε · max |T| / 범위를 검사했습니다.

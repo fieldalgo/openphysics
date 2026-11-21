@@ -343,7 +343,7 @@ The helper does four things:
 - It gives the curve nodes their design velocity with `node_velocity`, read from
   the complex that was meshed.
 - It moves the interior nodes with galerkin's harmonic `extend_velocity`.
-- Its `solve(t)` runs the document's steady heat solve with
+- Its `solve(t)` runs the document's galerkin solve with
   `motion=MeshMotion(design_velocity=W, t=t)`.
 
 `problem.design_velocity` (W), `on_curve`, `arguments` (the solver's keyword
@@ -353,11 +353,24 @@ unit the document writes it in. No element inverts for t inside
 `admissible_interval`. galerkin never remeshes: for a larger step, change the
 parameter in the document and call `shape_problem` again.
 
-Covered: steady heat (`thermal.steady2d`) on the material regions of a version 1
-`2d` component. Refused by name (`DocumentError`):
+Covered, on the material regions of a version 1 `2d` component (`problem.physics`
+names the kind, and `solve(t)` returns that solver's result):
+
+| Physics | galerkin solve |
+|---|---|
+| `thermal.steady2d` | `thermal.solve_steady_heat` |
+| `thermal.transient2d` | `transient_heat.solve_transient_heat` |
+| `electric.steady2d` | `electric.solve_steady_electric` |
+| `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
+| `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: the heat stage is solved again on the moving mesh, so the temperature moves with the geometry |
+
+Refused by name (`DocumentError`):
 - a flat geometry block;
 - an `axisymmetric` component;
-- another physics;
+- another physics, including waveguide modes (their runner meshes differently) and Joule heating;
+- a `mechanics.thermoelastic2d` document with an inward heat flux, a convection or
+  a traction: the workflow takes Dirichlet temperatures and insulation, prescribed
+  displacements and a body force only;
 - the parameters the design velocity refuses, including a topology change at p.
 
 Checked (`tests/simcase/test_shape_problem.py`, pre-registered C1–C6 on
@@ -371,6 +384,25 @@ Checked (`tests/simcase/test_shape_problem.py`, pre-registered C1–C6 on
 | C4 same-mesh central difference | within 1e-6 | 9.7e-9 |
 | C5 refusals | as listed above (a sweep was pre-registered too: steady heat validation refuses it first) | pass |
 | C6 `run` unchanged | the region heat, Joule, mechanics and electric tests | pass |
+
+The other physics are checked in `tests/simcase/test_shape_problem_physics.py`
+(pre-registered P1–P6 on 2026-11-21, measured that day as above), on a 2 × 1 mm
+strip of two materials split at x = L1, the parameter:
+
+| Check | Criterion | Result |
+|---|---|---|
+| P1 electric, series strip | I and dI/dL1 within 1e-9 (exact for P1) | ≤ 4.4e-16 and ≤ 1.2e-14 |
+| P2 elasticity, series bar, ν = 0, traction on the right | end displacement and its L1 derivative within 1e-9 (exact) | ≤ 1.2e-15 and ≤ 1.1e-15 |
+| P3 thermoelastic, 400 K / 300 K ends | heat stage derivative equals the steady heat problem's within 1e-12; end displacement derivative vs a same-mesh central difference within 1e-6; flux, convection and traction refused | pass; 2.2e-9 |
+| P4 transient heat with a source, 0–1000 s | heat out at 1000 s: derivative equals the steady problem's within 1e-6; same-mesh central difference within 1e-6 | 2.9e-9; 7.6e-10 |
+| P5 equal to `run` | nodes and triangles bit for bit; t = 0 fields within 1e-12 | pass, all four |
+| P6 refusals | waveguide modes and Joule heating by name | pass |
+
+P3 and P4 replace the plan's analytic references, which P1 does not reproduce. For
+P3, a temperature linear in x gives a quadratic displacement, and a jump of α or
+of T′ at the interface makes the thermal strain incompatible. For P4, region
+transient documents take no inward flux, and the strip with a source is not exact
+for P1 in 2D.
 
 C3 pre-registered the reactions at t = 0 within 1e-12 of `run`'s, relative to
 their largest value. They first measured 2.0e-12: galerkin's moving-mesh heat solve
