@@ -68,7 +68,7 @@ physics 항목:
 import는 없다. 미터 단위 메시를 한 번 만들고, 각 삼각형 세 절점을 범위와 비교한 뒤 산술평균
 온도에서 σ를 평가한다. 열전도도는 온도에 무관하다.
 
-`iteration`(`temperature_tolerance`에 차원 있는 기본값이 없어서 필수): `relaxation_factor`(기본
+`iteration`(`temperature_tolerance`에 차원 있는 기본값이 없어서 필수): `relaxation_factor`(Picard용; 기본
 0.5, `defaults_applied`에 기록; 레지스트리는 2까지 허용하지만 이 종류는 0 초과 1 이하),
 `temperature_tolerance`(필수, 예: `"1e-8 K"`, `"1e-5 mK"`; `"1e-8 degC"`는 제안만 붙여 거부),
 `relative_tolerance`(기본 1e-10, 1 이하), `iteration_limit`(기본 100, 양의 정수). 기존 완화
@@ -82,11 +82,13 @@ Picard 반복이 **완화 전** 온도·전도도 변화와 전기 재평가를 
 `method="newton"`을 넘긴다. 전위와 온도를 함께 푸는 Newton 걸음(걸음 반감 포함)이며 같은 수렴 검사로
 판정한다([Newton 방법](../galerkin/temperature_joule_heating.md#newton-방법)). Newton은 완화를 쓰지
 않으므로 `"method": "newton"` 옆에 쓴 `relaxation_factor`는 이름을 밝혀 거부한다(`iteration.relaxation_factor`에서
-`E-CONTRACT`). 해석된 문서에는 여전히 기본값 0.5가 있고 `defaults_applied`에 남지만 Newton은 쓰지 않는다.
+`E-CONTRACT`). 해석된 문서에는 여전히 기본값 0.5가 있지만 Newton은 쓰지 않으므로, Newton 문서는 이를
+`defaults_applied`에 남기지 않는다(요약, `simcase validate --json`, `simcase explain` 모두). Newton 문서의 요약 문구와 실행
+로그는 "Newton iteration"이라고 밝힌다(Picard 직사각형의 문구는 그대로이고, 영역 문서는 어느 방법이든 이름을 적는다).
 `iteration_limit`는 받아들인 Newton 걸음 수를 제한하며, 걸음 하나는 후보를 최대 31번 평가한다. 그 밖의
 값(`"Newton"` 포함)은 `iteration.method`에서 `E-VALUE-FORM`이다. 강한 온도 피드백에서 Picard가 느리거나
 `iteration_limit`에 걸리면 `"newton"`을 쓴다([galerkin 계약](../galerkin/temperature_joule_heating.md)이 언제인지
-적는다). 기본값과 설치 검사 경로는 Picard 그대로다.
+적는다). 기본값은 Picard 그대로이고, 설치 검사는 두 방법을 모두 돌린다.
 
 형식 0.2 키는 새 이름을 알려 주며 거부한다(`E-KEY-UNKNOWN`). 두 outward 입력은 부호를 뒤집은
 값을 쓰라고 안내하며, 뜻이 바뀌므로 자동 수정은 없다.
@@ -237,6 +239,8 @@ mm 단위 2 × 1 mm 띠로, 왼쪽 절반의 `linear_resistivity` 금속(300 K�
 | Picard 문서 | 이 변경 전 결과(커밋과 함께 측정, 시험 아님) | 예제와 영역 띠 셋: 저장 배열·요약(시간 제외) 해시가 직전 커밋과 같음 |
 | `"method": "picard"`를 씀 | 그 키가 없는 같은 문서 | 배열·요약(시간 제외)이 바이트 단위로 같음, 직사각형과 영역 |
 | 거부 | | `"secant"`, `"Newton"`, `1`, `null`, `"newton"` 옆의 `relaxation_factor`, `iteration` 밖의 `method`; 직사각형과 영역 모두 |
+| Linux·macOS·Windows 설치 CLI(`tools/wheel_consumers/test_electric_joule_wheel.py`, 설치 검사가 실행) | 같은 메시의 Picard, 출하 예제 둘 | 온도·전위 2e-8(K, V) 이내, 반복 수가 더 적음, `iteration_method` 기록 |
+| Newton 자체의 보고(2026-11-21) | 같은 문서의 Picard | `defaults_applied`에 `relaxation_factor` 항목 없음; 문구와 CLI 실패 증거가 Newton을 밝힘; Picard 결과·문구·로그·실패 증거는 바이트 단위로 그대로(직전 커밋과 비교해 측정) |
 
 ## Studio (영역 문서)
 
@@ -363,7 +367,7 @@ Picard 걸음을 가려야 하는 독자는 이 키를 확인한다. 요약의 `
 CLI 종료값: 입력 오류 2, 풀이·비수렴·I/O 오류 1, 성공 0.
 비수렴·범위 이탈은 Python에서 `JouleConvergenceError`로 이유·완료 이력·마지막
 절점 온도를 보존한다. CLI는 이 근거를 stderr에 JSON 한 개로 출력한다: `status:"failed"`,
-`reason`, `iterations`(위 기록), 비유한 값을 `null`로 쓴
+`reason`, Newton 풀이면 `iteration_method: "newton"`, `iterations`(위 기록), 비유한 값을 `null`로 쓴
 `last_iterate: {"temperature": {"unit": "K", "values": [...]}}`, `nonfinite_temperature_count`.
 **성공 출력 폴더를 만들지 않으며** 부분 성공으로 반환하지 않는다. 실패 근거는 stderr를 파일로
 redirect해 보존한다.

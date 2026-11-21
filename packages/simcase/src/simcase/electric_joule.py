@@ -374,6 +374,12 @@ def iteration_checks_03(doc, name, p, path):
         _refuse(f'{path}.iteration.relaxation_factor: relaxation_factor relaxes Picard steps only; '
                 'method "newton" takes no relaxation_factor (remove it, or use method "picard")',
                 f'{path}.iteration.relaxation_factor')
+    if iteration_method_03(p) == 'newton':
+        # the resolved tree still holds relaxation_factor 0.5 (galerkin's Newton ignores it); a
+        # Newton document does not report a default it does not use. In place: the list is the
+        # reader's, so ``simcase validate --json``, ``simcase explain`` and the summary agree.
+        unused = f'{path}.iteration.relaxation_factor'
+        doc.defaults_applied[:] = [d for d in doc.defaults_applied if d['path'] != unused]
     if not iteration['relaxation_factor'] <= 1:
         _refuse('relaxation_factor: this kind takes 0 < relaxation_factor <= 1', f'{path}.iteration.relaxation_factor',
                 'E-DOMAIN')
@@ -424,6 +430,12 @@ def rectangle_summary_03(doc):
         out.append(f'  thermal_conductivity {_authored(doc, where + ".thermal_conductivity")}; prescribed_temperature '
                    f'{temperatures}' + (f'; inward_heat_flux {flux}' if flux else '')
                    + (f'; convection {convection}' if convection else '') + '; other sides insulated')
+    if kind == 'joule.temperature2d' and iteration_method_03(p) == 'newton':
+        # a Picard document's text is unchanged; the region form names the method either way
+        it = f'{where}.iteration'
+        out.append('  Newton iteration: ' + ', '.join(f'{k} {_authored(doc, f"{it}.{k}")}'
+                                                      for k in doc.data['physics'][name]['iteration'] if k != 'method')
+                   + ' (other options at their defaults)')
     out.append(f'  result: {kind}-result-v2; layout: {FIELD_LAYOUT}')
     out.append('  output: SI (electric_potential V, current_density A/m^2, joule_power_density W/m^3, '
                'nodal currents A/m and powers W/m of depth)')
@@ -460,10 +472,19 @@ def iteration_record(record):
             for field, column, quantity in ITERATION_COLUMNS}
 
 
-def failure_evidence(exc):
-    """JSON-safe failed-state evidence; never a successful result."""
+def document_iteration_method(doc):
+    """``iteration.method`` of a validated ``joule.temperature2d`` document (``"picard"`` for any
+    other kind or when absent)."""
+    _, p = next(iter(doc.si['physics'].items()))
+    return iteration_method_03(p) if p.get('type') == 'joule.temperature2d' else 'picard'
+
+
+def failure_evidence(exc, *, method):
+    """JSON-safe failed-state evidence; never a successful result. A Newton solve adds
+    ``iteration_method: "newton"`` before the records; Picard evidence has no such key."""
     values = np.asarray(exc.last_temperature)
-    return dict(status='failed', reason=exc.reason, iterations=[iteration_record(i) for i in exc.history],
+    return dict(status='failed', reason=exc.reason, **({'iteration_method': method} if method != 'picard' else {}),
+                iterations=[iteration_record(i) for i in exc.history],
                 last_iterate={'temperature': results_common.tagged_array(values, 'temperature')},
                 nonfinite_temperature_count=int(np.count_nonzero(~np.isfinite(values))))
 
@@ -697,6 +718,8 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
                           method=iteration_method_03(p) if nonlinear is not None else 'picard')
     printed = [doc.summary(), f'Solved {mesh.num_nodes} nodes, {mesh.num_triangles} triangles; '
                f'joule_power_per_depth {electric.joule_power_per_depth:.12g} W/m']
+    if nonlinear is not None and iteration_method_03(p) == 'newton':
+        printed.append(f'converged in {len(nonlinear.history)} Newton iterations')   # Picard log unchanged
     if verbose:
         print('\n'.join(printed))
     return ElectricJouleRunResult(doc, arrays, metadata, log_lines_03(doc, printed))
