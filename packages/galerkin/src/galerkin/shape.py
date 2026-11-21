@@ -151,7 +151,8 @@ def extend_velocity(mesh: Mesh, values, known, *, method: str = "harmonic"):
 @dataclass(frozen=True, kw_only=True)
 class MotionStep:
     """A checked motion: the live namespace ``xp`` and float64 ``t``, the NumPy design velocity
-    (``design_velocity``, (N, 2) metres per unit of t) and the moved mesh. Keyword-only."""
+    (``design_velocity``, (N, 2) metres per unit of t, (N, 3) on a ``Mesh3D``) and the moved mesh
+    (a ``Mesh`` or ``Mesh3D``, as given). Keyword-only."""
 
     xp: object
     t: object
@@ -165,7 +166,8 @@ class MotionStep:
 def motion_step(mesh: Mesh, motion: MeshMotion) -> MotionStep:
     """Check ``motion`` against ``mesh`` (live float64 t, finite velocity, no inverted element) and move it.
 
-    For solver modules that assemble their own live system on X0 + t W."""
+    For solver modules that assemble their own live system on X0 + t W; ``mesh`` is a ``Mesh`` or a
+    ``Mesh3D`` (velocity (N, 2) or (N, 3)). ``live_triangle_geometry`` takes the 2D steps only."""
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
     return MotionStep(xp=xp, t=t, design_velocity=W, moved=_checked_step(mesh, W, t))
@@ -188,7 +190,13 @@ def _edges(nodes, W, tris):
 
 
 def _tet_interval(nodes, W, tets):
-    """The admissible interval of a tetrahedral motion: 6 V(t) = det(E + t F) is a cubic in t."""
+    """The admissible interval of a tetrahedral motion: 6 V(t) = det(E + t F) is a cubic in t.
+
+    Vectorized over the tetrahedra. Simple real roots are polished by Newton steps; a cluster of
+    roots (a double or triple root, e.g. a uniform scaling) splits under rounding into a real root
+    and a nearly real complex pair, so the real parts of roots within 1e-5 of the real axis are
+    candidates too. The interval is then exact for simple roots and conservative (inside the true
+    one) near clustered roots; _checked_step also tests the moved volumes directly."""
     p, w = nodes[tets], W[tets]
     e = [p[:, i] - p[:, 0] for i in (1, 2, 3)]
     f = [w[:, i] - w[:, 0] for i in (1, 2, 3)]
@@ -199,38 +207,40 @@ def _tet_interval(nodes, W, tets):
     c1 = det(f[0], e[1], e[2]) + det(e[0], f[1], e[2]) + det(e[0], e[1], f[2])
     c2 = det(e[0], f[1], f[2]) + det(f[0], e[1], f[2]) + det(f[0], f[1], e[2])
     c3 = det(*f)
-    lo, hi = -math.inf, math.inf
-    for k in np.flatnonzero((c1 != 0) | (c2 != 0) | (c3 != 0)):     # a tetrahedron that changes volume
-        for r in _cubic_real_roots(c3[k], c2[k], c1[k], c0[k]):
-            if r > 0:
-                hi = min(hi, r)
-            elif r < 0:
-                lo = max(lo, r)
-    return lo, hi
-
-
-def _cubic_real_roots(a, b, c, d):
-    """Real roots of a t^3 + b t^2 + c t + d (d, six times the volume at t = 0, is nonzero).
-
-    The companion-matrix roots are polished by Newton steps on the cubic; a root counts as
-    real when its imaginary part is below 1e-9 of its size, then its real part is polished."""
-    if a == 0:
-        return _real_roots(b, c, d)
-    out = []
-    for root in np.roots([a, b, c, d]):
-        if abs(root.imag) > 1e-9 * max(abs(root), 1e-300):
-            continue
-        x = float(root.real)
-        for _ in range(4):
-            value, slope = ((a * x + b) * x + c) * x + d, (3 * a * x + 2 * b) * x + c
-            if slope == 0:
-                break
-            step = value / slope
-            x -= step
-            if abs(step) <= 4 * np.finfo(float).eps * max(abs(x), 1e-300):
-                break
-        out.append(x)
-    return out
+    candidates = [np.empty(0)]
+    cubic = c3 != 0
+    if np.any(cubic):
+        a, b, c, d = c3[cubic], c2[cubic], c1[cubic], c0[cubic]
+        companion = np.zeros((len(a), 3, 3))
+        companion[:, 0, :] = -np.stack([b / a, c / a, d / a], axis=1)
+        companion[:, 1, 0] = companion[:, 2, 1] = 1.0
+        roots = np.linalg.eigvals(companion)                                       # (K, 3)
+        size = np.maximum(np.abs(roots), 1e-300)
+        real = np.abs(roots.imag) <= 1e-9 * size
+        x = roots.real.copy()
+        coefficients = [np.broadcast_to(v[:, None], x.shape) for v in (a, b, c, d)]
+        for _ in range(4):                                                         # polish the real roots
+            value = ((coefficients[0] * x + coefficients[1]) * x + coefficients[2]) * x + coefficients[3]
+            slope = (3 * coefficients[0] * x + 2 * coefficients[1]) * x + coefficients[2]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                step = np.where(real & (slope != 0), value / slope, 0.0)
+            x = x - step
+        candidates.append(x[np.abs(roots.imag) <= 1e-5 * size])
+    quadratic = ~cubic & (c2 != 0)
+    if np.any(quadratic):
+        a, b, c = c2[quadratic], c1[quadratic], c0[quadratic]
+        disc = b * b - 4 * a * c
+        ok = disc >= 0
+        q = -0.5 * (b[ok] + np.copysign(np.sqrt(disc[ok]), b[ok]))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            candidates += [q / a[ok], np.where(q != 0, c[ok] / q, 0.0)]
+    linear = ~cubic & (c2 == 0) & (c1 != 0)
+    candidates.append(-c0[linear] / c1[linear])
+    roots = np.concatenate(candidates)
+    roots = roots[np.isfinite(roots)]
+    positive, negative = roots[roots > 0], roots[roots < 0]
+    return (float(negative.max()) if len(negative) else -math.inf,
+            float(positive.min()) if len(positive) else math.inf)
 
 
 def _real_roots(a, b, c):

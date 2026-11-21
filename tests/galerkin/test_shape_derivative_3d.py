@@ -218,15 +218,53 @@ def test_t7_admissible_interval_brackets_the_first_inversion():
                              motion=MeshMotion(design_velocity=W, t=_t("jax", hi * 1.01)))
 
 
-@pytest.mark.parametrize("method", ["harmonic", "stiffened"])
-def test_t8_extension_reproduces_linear_data(method):
+def test_review_a_clustered_root_never_admits_an_inverted_step():
+    """Independent review 2026-11-21: a uniform contraction has a triple root; the interval stays inside
+    it, a step past it is refused by the moved volumes, and the caller's tetrahedra are not reordered."""
+    torch = pytest.importorskip("torch")
+    m = box_mesh(1.0, 1.0, 1.0, 2, 2, 2)
+    W = -(m.nodes - 0.3) * 1e3                       # every volume vanishes at t = 1e-3 (a triple root)
+    lo, hi = admissible_interval(m, design_velocity=W)
+    assert lo == -math.inf and 1e-3 * (1 - 1e-4) < hi <= 1e-3
+    tets = m.tets.copy()
+    with pytest.raises(ElementInversion):
+        solve_steady_heat_3d(m, thermal_conductivity=1.0, prescribed_temperature={0: 300.0},
+                             motion=MeshMotion(design_velocity=W, t=torch.tensor(1.000003e-3, dtype=torch.float64)))
+    assert np.array_equal(m.tets, tets)
+
+
+def _perturbed_box():
     m = box_mesh(1.0, 0.7, 0.4, 5, 4, 3)
+    nodes = m.nodes.copy()
+    interior = np.ones(m.num_nodes, dtype=bool)
+    interior[m.boundary_nodes()] = False
+    nodes[interior] += 0.02 * np.random.default_rng(3).standard_normal((int(interior.sum()), 3))
+    return Mesh3D(nodes, m.tets, m.boundary)
+
+
+def test_t8_extension_reproduces_linear_data():
+    """Harmonic P1 extension reproduces linear data exactly, on a perturbed (nonuniform) mesh."""
+    m = _perturbed_box()
     A = np.array([[0.2, -0.1, 0.3], [0.05, 0.4, -0.2], [0.1, 0.0, 0.25]])
     linear = m.nodes @ A.T + np.array([0.1, -0.2, 0.3])
     known = np.zeros(m.num_nodes, dtype=bool)
     known[m.boundary_nodes()] = True
-    out = extend_velocity(m, np.where(known[:, None], linear, np.nan), known, method=method)
+    out = extend_velocity(m, np.where(known[:, None], linear, np.nan), known)
     assert np.max(np.abs(out - linear)) <= 1e-12 * np.max(np.abs(linear))
+
+
+def test_t8_stiffened_weights_by_the_volume():
+    """'stiffened' reproduces constants and, on a nonuniform mesh, differs from 'harmonic' (its
+    diffusivity is mean volume / volume, so linear data are not reproduced; review 2026-11-21)."""
+    m = _perturbed_box()
+    known = np.zeros(m.num_nodes, dtype=bool)
+    known[m.boundary_nodes()] = True
+    constant = np.broadcast_to(np.array([0.1, -0.2, 0.3]), m.nodes.shape)
+    assert np.max(np.abs(extend_velocity(m, constant, known, method="stiffened") - constant)) <= 1e-14
+    values = m.nodes ** 2
+    harmonic = extend_velocity(m, values, known)
+    stiffened = extend_velocity(m, values, known, method="stiffened")
+    assert np.max(np.abs(stiffened - harmonic)) > 1e-6
 
 
 # ---------------------------------------------------------------- T9 refusals, T10 unchanged
