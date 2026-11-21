@@ -6,8 +6,7 @@
 Checks C1-C6, pre-registered in the HQ work record (2026-11-21) before the tests ran:
 C1 the annulus inner radius against 2 pi k dT / (a ln^2(b/a)), order >= 1.5 and <= 1e-3 at
 the finest mesh; C2 a two-material series strip, exact for P1, within 1e-9; C3 the
-problem's mesh and solver inputs are run()'s, and its solve at t = 0 agrees (see the test for
-the reaction bound); C4 a same-mesh central difference within
+problem's mesh and solver inputs are run()'s, and its solve at t = 0 agrees within 1e-12; C4 a same-mesh central difference within
 1e-6; C5 refusals by name (the pre-registered sweep refusal is the validation's own: steady heat
 takes only a single study); C6 run() is unchanged (the region heat tests).
 """
@@ -125,13 +124,11 @@ def test_c3_mesh_and_solve_at_zero_equal_run():
     r = problem.solve(jnp.asarray(0.0, dtype=jnp.float64))
     T, T0 = to_numpy(r.temperature), ran.solution.temperature
     assert np.max(np.abs(T - T0)) <= 1e-12 * np.max(np.abs(T0))
-    # The reaction is K T - f, which cancels: T is about 300 K and its range 1 K, so rounding of
-    # the order of eps max|T| enters a value of the order of the range. Pre-registered was 1e-12
-    # relative to max|q|: FAILED, measured 2.0e-12 (2026-11-21). The bound below is 64 roundings
-    # of max|T| relative to the range, 4.3e-12 here.
+    # The pre-registered 1e-12 failed at first (2.0e-12, 2026-11-21): the motion path computed
+    # with absolute temperatures near 300 K. Since it subtracts each component's offset, as the
+    # plain solve does (follow-up 3), the reactions agree to 5.5e-15 and the bound is 1e-12 again.
     q, q0 = to_numpy(r.reaction_heat_rate_per_depth), ran.solution.reaction_heat_rate_per_depth
-    offset = np.max(np.abs(T0)) / (np.max(T0) - np.min(T0))
-    assert np.max(np.abs(q - q0)) <= 64 * np.finfo(float).eps * offset * np.max(np.abs(q0))
+    assert np.max(np.abs(q - q0)) <= 1e-12 * np.max(np.abs(q0))
     assert problem.on_curve.any() and not problem.on_curve.all()
 
 

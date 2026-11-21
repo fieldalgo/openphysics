@@ -97,7 +97,26 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
                   xp.reshape(element, (-1,)), (n, n))
     load = scatter_add(xp, n, tris.ravel(), xp.reshape((lift(xp, Q) * area / 3.0)[:, None] * xp.ones((1, 3),
                                                        dtype=xp.float64), (-1,)))
-    H_terms, B, G = [], None, None
+    # Work with the increment over each component's offset, as thermal.py does: K annihilates
+    # constants, so a large common temperature times a rounding-level sum must not reach the
+    # residual, reactions, convection or flux. The offset of a component is its first Dirichlet
+    # value, else the ambient of its first convection edge with h > 0 (thermal.py's anchors),
+    # else its temperature at its first node.
+    from .core.triangles import triangle_geometry
+    _p, _t, _a, _b, count, labels = triangle_geometry(moved)
+    offsets = np.zeros(count)
+    anchored = np.zeros(count, dtype=bool)
+    for node, value in dirichlet.items():
+        if not anchored[labels[node]]:
+            offsets[labels[node]], anchored[labels[node]] = float(value), True
+    for tag, (h, ambient) in (convection or {}).items():
+        if float(h) > 0:
+            for node in np.asarray(mesh.boundary_edges[tag], dtype=int).ravel():
+                if not anchored[labels[node]]:
+                    offsets[labels[node]], anchored[labels[node]] = float(ambient), True
+    for component in np.flatnonzero(~anchored):
+        offsets[component] = float(base.temperature[np.flatnonzero(labels == component)[0]])
+    H_terms, B, shifted_B, G = [], None, None, None
     for tag, g in (outward_flux or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
         G = scatter_add(xp, n, edges.ravel(), xp.reshape((float(g) * length / 2.0)[:, None]
@@ -109,23 +128,32 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
                                  xp.reshape(local, (-1,)), (n, n)))
         B = scatter_add(xp, n, edges.ravel(), xp.reshape((float(h) * float(ambient) * length / 2.0)[:, None]
                                                          * xp.ones((1, 2), dtype=xp.float64), (-1,)), base=B)
+        # h (ambient - offset): an edge lies in one component, so both its nodes share the offset
+        shift = float(h) * (float(ambient) - offsets[labels[edges[:, 0]]])
+        shifted_B = scatter_add(xp, n, edges.ravel(), xp.reshape((lift(xp, shift) * length / 2.0)[:, None]
+                                                                 * xp.ones((1, 2), dtype=xp.float64), (-1,)),
+                                base=shifted_B)
     zero = xp.zeros(n, dtype=xp.float64)
     G = zero if G is None else G
     B = zero if B is None else B
+    shifted_B = zero if shifted_B is None else shifted_B
     rhs = load + B - G
+    shifted_rhs = load + shifted_B - G
     terms = [K, *H_terms]
-    T0 = lift(xp, base.temperature)
-    A_T0 = sum((term.matvec(T0) for term in terms[1:]), terms[0].matvec(T0))
+
+    def apply(u):
+        return sum((term.matvec(u) for term in terms[1:]), terms[0].matvec(u))
+    u0 = lift(xp, np.asarray(base.temperature, dtype=float) - offsets[labels])
     fixed = {(int(node),): 0.0 for node in dirichlet}
-    delta = core_solve.solve_dirichlet(terms, rhs - A_T0, fixed)
-    temperature = T0 + delta
-    A_T = sum((term.matvec(temperature) for term in terms[1:]), terms[0].matvec(temperature))
-    residual = A_T - rhs
-    convective = (sum((term.matvec(temperature) for term in terms[1:]), zero) - B) if H_terms else zero
+    delta = core_solve.solve_dirichlet(terms, shifted_rhs - apply(u0), fixed)
+    increment = u0 + delta
+    temperature = increment + lift(xp, offsets[labels])
+    residual = apply(increment) - shifted_rhs
+    convective = (sum((term.matvec(increment) for term in terms[1:]), zero) - shifted_B) if H_terms else zero
     fixed_nodes = np.array(sorted(int(i) for i in dirichlet), dtype=int)
     reaction = scatter_add(xp, n, fixed_nodes, residual[fixed_nodes])
-    grad_x = xp.sum(b * temperature[tris], axis=1) / (2.0 * area)
-    grad_y = xp.sum(c * temperature[tris], axis=1) / (2.0 * area)
+    grad_x = xp.sum(b * increment[tris], axis=1) / (2.0 * area)
+    grad_y = xp.sum(c * increment[tris], axis=1) / (2.0 * area)
     flux = -lift(xp, k)[:, None] * xp.stack([grad_x, grad_y], axis=1)
     return thermal.PlanarSteadyHeatResult(temperature, flux, load, reaction, residual, G, B, convective, rhs)
 

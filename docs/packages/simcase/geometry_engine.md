@@ -367,16 +367,18 @@ Checked (`tests/simcase/test_shape_problem.py`, pre-registered C1–C6 on
 |---|---|---|
 | C1 annulus a < r < b, inner radius | dQ/da → 2πkΔT/(a ln²(b/a)): order ≥ 1.5, ≤ 1e-3 at the finest mesh (JAX, PyTorch) | 7.9e-3, 2.1e-3, 5.8e-4 at 0.8, 0.4, 0.2 µm (order 1.9) |
 | C2 two-material series strip, interface position | Q and dQ/dL1 within 1e-9 (exact for P1) | ≤ 1.7e-14 and ≤ 7.8e-14 |
-| C3 equal to `run` | mesh, inputs and plain solve bit for bit; at t = 0 temperature and reactions within 1e-12 | mesh, inputs, solve, temperature pass; reactions **fail**, 2.0e-12 (below) |
+| C3 equal to `run` | mesh, inputs and plain solve bit for bit; at t = 0 temperature and reactions within 1e-12 | pass (reactions 5.5e-15; they failed at 2.0e-12 before 2026-11-21, below) |
 | C4 same-mesh central difference | within 1e-6 | 9.7e-9 |
 | C5 refusals | as listed above (a sweep was pre-registered too: steady heat validation refuses it first) | pass |
 | C6 `run` unchanged | the region heat, Joule, mechanics and electric tests | pass |
 
 C3 pre-registered the reactions at t = 0 within 1e-12 of `run`'s, relative to
-their largest value. Measured: 2.0e-12. The reaction K T − f cancels, and T is
-about 300 K over a 1 K range, so the live correction step's rounding, of the order
-of max |T|, enters a value of the order of the range. The test keeps the failure on
-record and asserts 64 ε · max |T| / range instead (4.3e-12 here).
+their largest value. They first measured 2.0e-12: galerkin's moving-mesh heat solve
+computed with absolute temperatures (about 300 K over a 1 K range), and the test
+asserted 64 ε · max |T| / range for a while. Since galerkin takes temperatures
+relative to each component's offset there as well
+([S9](../galerkin/shape_derivative.md#validation)), they agree to 5.5e-15 and the
+test asserts the pre-registered 1e-12.
 
 ## Validation
 

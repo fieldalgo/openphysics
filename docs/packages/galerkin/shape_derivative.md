@@ -36,6 +36,10 @@ and b(t) are assembled from X₀ + t·W in the live library (P1 stiffness, regio
 sources, and the flux and Robin terms on the moving edges), and T equals T₀ up to
 rounding. `temperature`, `heat_flux`, `generated_heat_rate_per_depth`,
 `reaction_heat_rate_per_depth` and `residual_heat_rate_per_depth` carry the derivative.
+As in the solver, temperatures are taken relative to each component's offset (its
+first Dirichlet value, else the ambient of its first convection side with h > 0), so
+a large common temperature does not reach the reactions, convection, flux or their
+derivatives (S9).
 
 ```python
 import jax
@@ -261,6 +265,7 @@ before the implementation. They were measured on 2026-11-09 on Linux with JAX
 | S6 inversion bound | the interval equals the exact roots; a step beyond it is refused | pass |
 | S7 unchanged | without `motion` the result equals the previous code | sha256 of the result arrays equal to main `627eb28` (measured); `motion=None` equals no keyword (test) |
 | S8 refusals | as listed above | pass |
+| S9 large temperature offset (2026-11-21) | offsets 300 K, 1e6 K, 1e9 K with Dirichlet sides, a Dirichlet and a convection side, convection only: t = 0 reactions, convection and flux equal the plain solve's within 1e-12 of their largest value; dQ/dt equals the offset-free value within 1e-9; JAX and PyTorch | pass (about 1e-15). Before the fix the error grew as ε·c: at 1e9 K, 2e-8 in flux and 7e-8 in dQ/dt |
 
 `tests/galerkin/test_shape_derivative_electric.py` holds checks E1–E8 for
 steady electric conduction, pre-registered on 2026-11-10 and measured that day
