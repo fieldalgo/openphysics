@@ -22,6 +22,7 @@ Python과 JSON/CLI는 직사각형·영역 모델을 지원하고, Studio는 직
 - [정상 외향 열유속·대류 문서](../packages/simcase/thermal_steady_boundary2d.md)
 - [직사각형의 headless 과도 열전도](../packages/simcase/thermal_transient2d.md)
 - [재료 영역이 있는 열전도 문서](../packages/simcase/thermal_regions2d.md)
+- [다중물리 문서: 광 모드와 결합한 정상 상태 열](../packages/simcase/multiphysics_document.md)
 - [Studio 정상 열전도](../packages/simcase/thermal_studio.md)
 - [Studio 과도 열전도](../packages/simcase/thermal_transient_studio.md)
 

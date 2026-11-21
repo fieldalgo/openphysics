@@ -395,6 +395,7 @@ script / CLI  ->  runs the document      simcase.run
 |---|---|---|
 | 패키지 개요 | [Overview](../../../../../packages/simcase/overview.md) | [한국어](overview.md) |
 | 물리 공급자 | [Contract](../../../../../packages/simcase/providers.md) | [한국어](providers.md) |
+| 다중물리 문서 | [Contract](../../../../../packages/simcase/multiphysics_document.md) | [한국어](multiphysics_document.md) |
 | 도파관 튜토리얼 | [Analyse your own waveguide](../../../../../packages/simcase/waveguide_tutorial.md) | [한국어](waveguide_tutorial.md) |
 | 벡터 부분공간 추적 | [Guide](../../../../../packages/simcase/vector_subspace_tracking.md) | [한국어](vector_subspace_tracking.md) |
 | 공진기 문서 | [Contract](../../../../../packages/simcase/cavity3d.md) | [한국어](cavity3d.md) |

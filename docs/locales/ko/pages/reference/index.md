@@ -50,6 +50,7 @@
 
 - [문서 형식 0.3: 정확한 읽기, 슬롯 표, 진단](../packages/simcase/document_format.md)
 - [물리 공급자: 공급자 프로토콜과 manifest(0.x 동안 불안정)](../packages/simcase/providers.md)
+- [다중물리 문서: 한 형상 위의 여러 물리, 결합과 그 결과](../packages/simcase/multiphysics_document.md)
 - [형상 문서: 0단계 계약](../packages/simcase/geometry_document.md)
 - [버전 1 형상 읽기(1단계)](../packages/simcase/geometry_reader.md)
 - [정확 2D 형상 엔진(2단계)](../packages/simcase/geometry_engine.md)

@@ -88,9 +88,11 @@ separately installed packages, without Studio or the runner testing type strings
    [changelog](../../../CHANGELOG.md#stability-in-0x)). A provider declares the protocol
    version it implements (`protocol = 1`); simcase refuses a different version by name.
 
-Not in D1: worker processes (D3), saving (D4), adapter distributions (D5) and
-multiphysics documents (D2). No built-in kind reads a field another kind computes,
-so input ports and `combine` are not used by the built-in kinds yet.
+Not in D1: worker processes (D3), saving (D4) and adapter distributions (D5).
+Input ports and `combine` are read by [multiphysics documents](multiphysics_document.md)
+(D2): a coupling carries an output port of one physics to an input port of another. A kind
+takes part in a coupling through simcase's internal coupling hook, which is not part of this
+protocol yet, so a provider's kinds may declare input ports but cannot be coupled yet.
 
 ## Listing the providers
 
@@ -130,8 +132,17 @@ declares. Every shipped example document was checked against it.
 | `em.cavity3d` | `em.cavity3d` | `electromagnetics` | `resonant_frequency` (Hz, scalar per mode) |
 | `em.modes2d` | `em.modes2d` | `electromagnetics` | `effective_index` (1, scalar per mode) |
 
-No built-in kind has input ports. The Joule temperature workflow and the
-thermoelastic workflow couple inside one kind; they do not read another kind's output.
+One built-in kind has an input port, read only in a
+[multiphysics document](multiphysics_document.md):
+
+| Kind | Input port (quantity, unit, location, `combine`) | What the kind does with it |
+|---|---|---|
+| `em.modes2d` | `temperature` (temperature, K, element, `single`) | takes the mean of a node temperature over each triangle and sets n = n₀(λ) + (dn/dT)(T − T_ref) |
+
+An input port is not saved under its name as an output is; a coupled `em.modes2d` result
+saves the temperature it used and the index it gave as `temperature` and
+`refractive_index` in its `fields.npz`. The Joule temperature workflow and the thermoelastic
+workflow still couple inside one kind; they do not read another kind's output.
 
 ## Writing a provider
 
