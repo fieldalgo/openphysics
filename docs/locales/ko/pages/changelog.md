@@ -68,6 +68,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- CI: Linux 소스 시험 전체를 시간이 고르게 나뉜 네 부분으로 동시에 돌립니다(`linux-py312-tests (1/4)` … `(4/4)`). `linux-py312`에는 라이선스·release 버전·meshloom·링크·사전 검사·배포물·Studio Node·자원 검사가 남고, 필수 검사 `tests`는 이 job들이 모두 성공해야 통과합니다. 각 부분은 수집한 전체 시험에서 `tools/shards/openphysics_shard.py`가 `tools/shards/durations.json`의 파일별 시간으로 배정한 시험 파일을 통째로 남기므로, 네 부분을 합치면 수집한 시험을 정확히 한 번씩 돌립니다. 러너 하나에서는 2026-11-20에 44~70분 걸렸고, 한 부분은 시험 약 11분입니다. 시험과 결과는 바뀌지 않습니다. [개발 안내](development.md#ci가-돌리는-것).
+
 - `simcase`: Studio 작업대에 Joule 가열 애플리케이션과 Installed physics를 배치했습니다. **Run Joule heating study**는 리본 Compute 묶음에 있고, 리본의 **Physics → Installed**가 **Installed physics**를 엽니다. 이 패널은 이제 Workspace tools 옆 상태줄 패널입니다(한 번에 하나만, 모든 페이지에서). Joule 실행 뒤 하단 해석 영역의 **Solver log**가 Picard 반복 횟수, 마지막 |ΔT|와 Δσ/σ, 세 전력 수지를 보여 주고 반복마다 나열하며, Settings에는 수지가 남습니다. Connections는 Joule의 두 인터페이스를 노드로 그리고 Joule heat 선과, σ(T) 재료가 있으면 온도 → 전도율 선을 더합니다(설정 전용 배지와 인터페이스 체크 상자 없음). 영역 그림은 밝은 색을 씁니다. 광학 단면은 선택한 형상과 경계를 다시 주황색으로 표시합니다(밝은 색 체계에서 파랑 위 파랑이 되었음). 1000 px보다 좁으면 Run이 보이도록 리본에서 Physics를 빼며, Escape로 두 상태줄 패널 중 열린 것을 닫습니다. 파일 의미, 단위, route, Joule·공급자 계약은 바뀌지 않습니다.
 
 - Studio 결과: 광학 그래프 높이를 데스크톱 작업 영역에 맞추고 완료 후 비활성 작업 버튼을 숨깁니다.
