@@ -15,7 +15,7 @@ import numpy as np
 
 SCHEMA = "openphysics.reference-values/1"
 RECORD_LIMIT = 1024 * 1024
-PAYLOAD_LIMIT = 512 * 1024
+PAYLOAD_LIMIT = 1024 * 1024
 REQUIRED = {
     "schema", "case", "physics", "comparison", "role", "references", "generator",
     "generated_utc", "environment", "cost", "inputs", "matched", "not_matched",

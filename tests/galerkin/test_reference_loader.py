@@ -86,3 +86,25 @@ def test_runtime_hash_validation(good, field):
     good[1][field] = "0" * 64
     with pytest.raises(ValueError, match="hash mismatch"):
         load_reference(write_good(good))
+
+
+def write_npz_payload(good, count):
+    """Replace the inline values with an uncompressed NPZ payload of `count` float64 values."""
+    path, record, _, _ = good
+    x = np.zeros(count, dtype="<f8")
+    payload = path.parent / "case.npz"
+    np.savez(payload, x=x)
+    record.pop("values", None)
+    record["payload"] = {"file": payload.name, "format": "npz",
+                         "file_sha256": file_digest(payload), "arrays": ["x"]}
+    record["values_sha256"] = values_digest({"x": x})
+    record["content_sha256"] = content_digest(record["inputs"], record["values_sha256"])
+    return write_good(good)
+
+
+def test_payload_limit_is_one_mebibyte(good):
+    """The payload limit is 1 MiB (raised from 512 KiB): 768 KiB of values loads, 1 MiB plus one value does not."""
+    ref = load_reference(write_npz_payload(good, 768 * 1024 // 8))
+    assert ref.arrays["x"].nbytes == 768 * 1024
+    with pytest.raises(ValueError, match="size limit"):
+        load_reference(write_npz_payload(good, 1024 * 1024 // 8 + 1))
