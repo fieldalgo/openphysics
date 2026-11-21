@@ -6,8 +6,9 @@
 Checks Q1-Q5, pre-registered in the HQ work record (2026-11-21) before the tests ran: Q1 the
 derivative of the effective index with respect to the core width against a same-mesh
 Richardson difference within 1e-6; Q2 the effective index at t = 0 equals run()'s within
-1e-12; Q3 the same document in micrometres and in nanometres gives the same mesh and the same
+1e-12 (a lossy case added after the review); Q3 the same document in micrometres and in nanometres gives the same mesh and the same
 derivative per metre; Q4 refusals by name; Q5 the other shape_problem tests are unchanged.
+Q6 (added after the review, see its docstring) compares with run() meshed anew.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ def _backend(name):
         pytest.importorskip("torch")
 
 
-def strip(scale=1.0, unit="um", w=0.5, **physics):
+def strip(scale=1.0, unit="um", w=0.5, size=0.1, core=None, **physics):
     """A 0.22 um silicon strip of width w in oxide, PEC box, 1.55 um, one vector mode."""
     s = scale
     comp = {"dimension": "2d", "length_unit": unit, "depth": None,
@@ -44,8 +45,8 @@ def strip(scale=1.0, unit="um", w=0.5, **physics):
          "effective_index_threshold": 1.444, **physics}
     return {"openphysics": "0.3", "name": "strip",
             "geometry": {"version": 1, "parameters": {"w": {"value": f"{w * s!r} {unit}"}}, "components": {"xs": comp}},
-            "materials": {"si": {"refractive_index": 3.48}, "oxide": {"refractive_index": 1.444}},
-            "physics": {"em1": p}, "mesh": {"element_size": f"{0.1 * s!r} {unit}"}, "study": {"type": "single"},
+            "materials": {"si": core or {"refractive_index": 3.48}, "oxide": {"refractive_index": 1.444}},
+            "physics": {"em1": p}, "mesh": {"element_size": f"{size * s!r} {unit}"}, "study": {"type": "single"},
             "results": {"save_fields": False, "plots": False}}
 
 
@@ -78,15 +79,20 @@ def test_q1_width_derivative_matches_a_richardson_difference(name):
     assert slope > 0                                      # a wider core confines more
 
 
-def test_q2_effective_index_at_zero_equals_run():
+@pytest.mark.parametrize("lossy", [False, True])
+def test_q2_effective_index_at_zero_equals_run(lossy):
+    """The lossy core (k = 0.01) has Im n_eff > 0 under exp(-i omega t): a missing or doubled
+    conjugation would flip its sign against run()'s."""
     _backend("jax")
     import jax.numpy as jnp
-    doc = strip()
+    doc = strip(core={"refractive_index": {"n": 3.48, "k": 0.01}} if lossy else None)
     ran = run(Document.from_dict(doc), verbose=False)
     r = shape_problem(doc, "w").solve(jnp.asarray(0.0, dtype=jnp.float64))
     got, want = np.asarray(r["effective_index"]), np.asarray(ran.effective_index).ravel()
     assert got.shape == want.shape
     assert np.max(np.abs(got - want)) <= 1e-12 * np.max(np.abs(want)), (got, want)
+    if lossy:
+        assert np.all(got.imag > 0) and np.all(want.imag > 0)
 
 
 def test_q3_the_document_unit_does_not_change_mesh_or_derivative():
@@ -116,3 +122,20 @@ def test_q4_refusals_name_the_reason():
                                     "material": "si"}]}
     with pytest.raises(DocumentError, match="not a version 1 block"):
         shape_problem(flat, "w")
+
+
+def test_q6_the_derivative_and_a_remeshed_difference_converge_together():
+    """Added after the independent review (2026-11-21), not pre-registered: Q1 moves the mesh by the
+    same W it checks, so Q6 checks W against the document. run() at w +- 0.01 um, each meshed anew,
+    gives a difference whose gap to the derivative shrinks with the mesh: measured 4.9 % at 0.1 um
+    and 0.65 % at 0.05 um. Criterion: at least halves, and at most 2 % at 0.05 um."""
+    _backend("jax")
+    gaps = []
+    for size in (0.1, 0.05):
+        def index(w):
+            return float(np.asarray(run(Document.from_dict(strip(w=w, size=size)), verbose=False)
+                                    .effective_index).ravel()[0].real)
+        remeshed = (index(0.51) - index(0.49)) / 0.02e-6
+        slope = shape_problem(strip(size=size), "w").derivative(_index)[1]
+        gaps.append(abs(slope / remeshed - 1))
+    assert gaps[1] <= gaps[0] / 2 and gaps[1] <= 2e-2, gaps
