@@ -102,6 +102,9 @@ test('a rectangle Width edit keeps its horizontal centre and a Height edit its b
  // an off-centre shape keeps its own centre, rounded once in nm
  assert.deepEqual(S.editShapeProperty(rect('R',100,50,400,200),'w',333),rect('R',133.5,50,333,200));
  assert.equal(S.validateShape(S.editShapeProperty(core,'w',3000)).x,-1500);
+ // an odd width keeps the centre exactly: Left x becomes a half nanometre, not snapped
+ const odd=S.editShapeProperty(core,'w',601);assert.equal(odd.x,-300.5);assert.equal(odd.x+odd.w/2,0);
+ const back=S.editShapeProperty(odd,'w',500);assert.deepEqual(back,core);
  assert.throws(()=>S.validateShape(S.editShapeProperty(rect('R',1000,0,400,200),'w',1000)),/inside the window/);
  // other properties and shapes are set as given
  assert.deepEqual(S.editShapeProperty(core,'x',-100),{...core,x:-100});
