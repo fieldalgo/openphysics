@@ -72,6 +72,9 @@ class PhysicsKind:
     #: one of this kind's types never takes (for example a geometry form), so the reader names
     #: it before asking for that type's keys; None (or a None result) for none
     refuse_03: Callable[[dict], tuple | None] | None = None
+    #: how the kind takes part in a multiphysics document (``simcase.multiphysics.CouplingHook``);
+    #: internal to simcase in this release. None for a kind a multiphysics document refuses
+    coupling: Any = None
 
 
 _KINDS: dict[str, PhysicsKind] = {}
@@ -118,8 +121,15 @@ def kind_of_type(physics_type) -> PhysicsKind | None:
     return next((k for k in kinds() if physics_type in k.types), None)
 
 
+def _envelope() -> str:
+    return importlib.import_module(f"{__package__}.multiphysics").ENVELOPE
+
+
 def kind_of(data) -> PhysicsKind:
-    """The kind a raw or validated document's data belongs to."""
+    """The kind a raw or validated document's data belongs to; a multiphysics document's is
+    ``simcase.multiphysics.KIND`` (each of its physics entries is its own kind's)."""
+    if isinstance(data, dict) and data.get("openphysics") == _envelope():
+        return importlib.import_module(f"{__package__}.multiphysics").KIND
     physics = data.get("physics") if isinstance(data, dict) else None
     entries = [p for p in physics.values() if isinstance(p, dict)] if isinstance(physics, dict) else []
     ordered = kinds()

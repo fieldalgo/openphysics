@@ -795,10 +795,39 @@ def _forms():
     return FORMS_03
 
 
+class _CoupledHeat:
+    """A coupled thermal.steady2d entry before its solve: it has no input ports, so no mesh is
+    needed before the solve (``simcase.multiphysics``)."""
+    mesh = None
+    triangle_regions = None
+
+    def __init__(self, view):
+        self.view = view
+
+
+def _coupling_prepare(doc, name):
+    return _CoupledHeat(doc.views[name])
+
+
+def _coupling_solve(state, inputs, verbose):
+    """The view's steady heat solve, as a single run solves it; the ``temperature`` output is the
+    node temperature on the region mesh (K)."""
+    from galerkin.coupling import Field
+    result = run_thermal(state.view, verbose=verbose)
+    return result, {'temperature': Field(result.mesh, np.asarray(result.temperature, dtype=float),
+                                         location='node', unit='K', name='temperature')}
+
+
+def _coupling():
+    from .multiphysics import CouplingHook
+    # mesh.grading (the em.modes2d radial grading) is not read: a heat region mesh is built without it
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, ignored_mesh_keys=frozenset({'grading'}))
+
+
 #: the kind this module registers; the built-in provider openphysics-fem reads it here
 KIND = register(PhysicsKind(
     name=PHYSICS, types=frozenset({PHYSICS}), precedence=30,
     validate=_validate, run=run_thermal, summary=_summary,
     result_types=(ThermalRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM 2D stage; use run(document) for thermal.steady2d',
-    accepts_mesh_limits=_accepts_mesh_limits, slots=_slots(), forms_03=_forms()))
+    accepts_mesh_limits=_accepts_mesh_limits, slots=_slots(), forms_03=_forms(), coupling=_coupling()))

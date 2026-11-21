@@ -102,6 +102,8 @@ class Document:
     _resolution: object = field(default=None, init=False, repr=False, compare=False)
     #: format 0.3: the canonical JSON of ``data`` when it was read; a changed tree is read again
     _read_json: str | None = field(default=None, init=False, repr=False, compare=False)
+    #: a multiphysics document: each physics entry's single-physics view (``simcase.multiphysics``)
+    views: dict | None = field(default=None, init=False, repr=False, compare=False)
 
     # -- construction --------------------------------------------------------
 
@@ -167,6 +169,7 @@ class Document:
         self.diagnostics.extend(d for d in fresh.diagnostics if (d.code, d.path, d.message) not in seen)
         self.si, self.defaults_applied, self._resolution = fresh.si, fresh.defaults_applied, fresh._resolution
         self.geometry_model, self.geometry_flat, self.source_bytes = fresh.geometry_model, fresh.geometry_flat, None
+        self.views = fresh.views
         self._read_json = self.canonical_json()
 
     # -- format 0.3 ----------------------------------------------------------
@@ -186,8 +189,11 @@ class Document:
 
     @property
     def format(self) -> str:
-        """``"0.3"`` for a document read by the format 0.3 reader, else None (not read)."""
-        return None if self.si is None else "0.3"
+        """``"0.3"`` for a document read by the format 0.3 reader (a multiphysics document: its
+        envelope), else None (not read)."""
+        if self.si is None:
+            return None
+        return self.si.get("openphysics") if self.views is not None else "0.3"
 
     def canonical_json(self, separators=(",", ":")) -> str:
         """The authored tree as sorted, decimal-preserving JSON (``reader.dumps``); for a tree of
@@ -287,6 +293,7 @@ class Document:
             other.geometry_flat = copy.deepcopy(self.geometry_flat)
             other._resolution = self._resolution
             other._read_json = self._read_json
+            other.views = None if self.views is None else {n: v.copy() for n, v in self.views.items()}
         return other
 
     # -- access --------------------------------------------------------------
@@ -455,10 +462,14 @@ class Document:
 
 
 def _is_v03(value) -> bool:
-    return isinstance(value, str) and value == "0.3"
+    """The format 0.3 string, or the multiphysics envelope on top of it (``simcase.multiphysics``)."""
+    from .multiphysics import ENVELOPE
+    return isinstance(value, str) and value in ("0.3", ENVELOPE)
 
 
-_V03_TEXT = re.compile(r'"openphysics"\s*:\s*"0\.3"')
+def _v03_text():
+    from .multiphysics import ENVELOPE
+    return re.compile(r'"openphysics"\s*:\s*"(?:0\.3|' + re.escape(ENVELOPE) + ')"')
 
 
 def declares_v03(raw) -> bool:
@@ -473,4 +484,4 @@ def declares_v03(raw) -> bool:
         return False
     if isinstance(raw, (bytes, bytearray, memoryview)):
         raw = bytes(raw).decode("utf-8", "replace")
-    return isinstance(raw, str) and _V03_TEXT.search(raw) is not None
+    return isinstance(raw, str) and _v03_text().search(raw) is not None

@@ -105,6 +105,9 @@ class MeshedModel:
     kernel_tri: TriMesh | None = None
     #: the micrometre kernel hand-off of the document (``modes_document.kernel_document``; internal)
     kernel_doc: Document | None = None
+    #: a coupled temperature's real index change per triangle, (dn/dT)(T - T_ref)
+    #: (``simcase.multiphysics``); None for an uncoupled model
+    index_shift: np.ndarray | None = None
 
     def relative_permittivity(self, vacuum_wavelength: float) -> np.ndarray:
         """Relative permittivity of each triangle at one vacuum wavelength in metres, as physmat
@@ -120,7 +123,20 @@ class MeshedModel:
         tri = self.kernel_tri if self.kernel_tri is not None else self.tri
         lut = np.array([modes_document.kernel_permittivity(self.materials[n], wavelength_um)
                         for n in tri.region_names])
-        return lut[tri.regions]
+        eps = lut[tri.regions]
+        if self.index_shift is None:
+            return eps
+        # a triangle without an index change keeps its material's permittivity bit for bit
+        return np.where(self.index_shift == 0, eps, self.refractive_index(wavelength_um) ** 2)
+
+    def refractive_index(self, wavelength_um: float) -> np.ndarray:
+        """n + i k of each triangle at a kernel wavelength in micrometres, with the coupled index
+        change (``index_shift``) added to n."""
+        tri = self.kernel_tri if self.kernel_tri is not None else self.tri
+        lut = np.array([complex(modes_document.kernel_index(self.materials[n], wavelength_um))
+                        for n in tri.region_names])
+        n = lut[tri.regions]
+        return n if self.index_shift is None else n + self.index_shift
 
 
 def build_mesh(doc: Document) -> MeshedModel:
@@ -264,6 +280,10 @@ FIELDS = {
     "cluster_offsets": (None, "clusters", None),
     "mean_effective_index": ("mean_effective_index", "study_points_clusters", None),
     "mean_group_index": ("mean_group_index", "study_points_clusters", None),
+    # a coupled temperature input (multiphysics documents): the P1 mean per triangle and the
+    # index it gave at each study point
+    "temperature": ("temperature", "triangles", None),
+    "refractive_index": ("refractive_index", "study_points_triangles", None),
 }
 
 
@@ -328,6 +348,9 @@ class RunResult:
     study_values: np.ndarray | None = None
     #: n_g = n_eff - lambda dn/dlambda (computed in the kernel frame), None when not defined
     group_index_values: np.ndarray | None = None
+    #: the coupled inputs of a multiphysics run, saved in fields.npz (``temperature`` per triangle,
+    #: ``refractive_index`` per study point and triangle); None for a single-physics run
+    coupled_inputs: dict | None = None
 
     # -- derived -----------------------------------------------------------
 
@@ -379,6 +402,8 @@ class RunResult:
             arrays.update(self.postprocessing)
         if self.open_boundary is not None:
             arrays["open_boundary_json"] = json.dumps(self.open_boundary)
+        if self.coupled_inputs is not None:
+            arrays.update(self.coupled_inputs)
         return arrays
 
     def _field_maps(self, arrays: dict) -> dict:
@@ -590,12 +615,14 @@ def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, ma
     return kind.run(doc, verbose=verbose, mesh_limits=limits)
 
 
-def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | SubspaceSweepResult:
+def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel | None = None
+                    ) -> RunResult | SubspaceSweepResult:
     """The 2D mode pipeline: ``build_mesh``, then the kernel over the study, then ``_to_public``.
 
     The study runs on the micrometre kernel hand-off (``MeshedModel.kernel_doc``) in the
     kernel's frame, exactly as format 0.2 micrometre documents ran; nothing is converted until
-    the result is complete."""
+    the result is complete. ``model`` is a model ``build_mesh(doc)`` built already (a coupled
+    run's, with its ``index_shift``)."""
     log: list[str] = []
 
     def say(msg):
@@ -605,7 +632,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True) -> RunResult | Subspace
 
     say(results_common.log_header(doc).rstrip("\n"))
     t0 = time.time()
-    model = build_mesh(doc)
+    model = build_mesh(doc) if model is None else model
     t_mesh = time.time() - t0
     k, tm = model.kernel_doc, model.kernel_tri
     say(f"mesh: {tm.num_nodes} nodes, {tm.num_triangles} triangles, min angle {tm.min_angle():.1f} deg, {t_mesh:.2f} s")
@@ -905,9 +932,90 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
                                mean_effective_index=mean, mean_group_index=mean_group)
 
 
+# -- multiphysics (simcase.multiphysics) ---------------------------------------------------------
+
+@dataclass
+class _CoupledModes:
+    doc: Document
+    name: str
+    model: MeshedModel
+    mesh: Mesh
+    triangle_regions: np.ndarray
+    materials: dict
+
+
+def _coupling_prepare(doc, name) -> _CoupledModes:
+    """The mesh of a coupled em.modes2d entry: ``build_mesh`` of its view, as a single run builds it."""
+    view = doc.views[name]
+    model = build_mesh(view)
+    names = np.asarray(model.tri.region_names, dtype=object)
+    return _CoupledModes(view, name, model, model.mesh, names[np.asarray(model.tri.regions)], doc.si["materials"])
+
+
+def _coupling_solve(state: _CoupledModes, inputs: dict, verbose: bool):
+    """The modes of the view with a coupled ``temperature`` (K at the nodes): its P1 mean T per
+    triangle gives n = n0(lambda) + (dn/dT)(T - T_ref), with each material's thermo-optic model."""
+    from .multiphysics import thermo_optic
+    model = state.model
+    temperature = inputs.get("temperature")
+    if temperature is not None:
+        values = np.asarray(temperature.values)
+        triangles = np.asarray(model.mesh.triangles)
+        mean = values[triangles].mean(axis=1)
+        names = list(model.tri.region_names)
+        coefficient, reference = np.zeros(len(names)), np.zeros(len(names))
+        for i, region in enumerate(names):
+            coefficient[i], reference[i] = thermo_optic(state.materials, model.region_materials[region])
+        regions = np.asarray(model.tri.regions)
+        model.index_shift = coefficient[regions] * (mean - reference[regions])
+    result = _run_em_modes2d(state.doc, verbose, model=model)
+    if temperature is not None:
+        kp = model.kernel_doc.sole_physics()[1]
+        parameter, values_ = _kernel_points(model.kernel_doc)
+        index = []
+        for v in values_:
+            wavelength = v if parameter is not None and parameter.endswith(".wavelength") else kp["wavelength"]
+            index.append(model.refractive_index(wavelength))        # n + i k under exp(-i omega t)
+        index = np.asarray(index)
+        result.coupled_inputs = {"temperature": mean,
+                                 "refractive_index": index if np.any(index.imag) else index.real}
+    return result, {}
+
+
+def _coupling_check(view, name, coupled, materials):
+    """A coupled ``temperature`` input needs the thermo-optic model of every optical material."""
+    from physmat.units import Diagnostic
+    from .multiphysics import LIBRARY_THERMO_OPTIC, region_material_refs, thermo_optic
+    if "temperature" not in coupled:
+        return []
+    found = []
+    for ref in region_material_refs(view):
+        if thermo_optic(materials, ref) is not None:
+            continue
+        keys = ('"thermo_optic_coefficient" (for example "1.8e-4 1/K") and "reference_temperature" '
+                '(for example "300 K")')
+        if ref.startswith("physmat:"):
+            library = " or ".join(f'"physmat:{n}"' for n in LIBRARY_THERMO_OPTIC)
+            found.append(Diagnostic("E-PROPERTY-MISSING", f"physics.{name}",
+                                    f"physics.{name} takes a coupled temperature, so each optical material needs a "
+                                    f'thermo-optic model; "{ref}" has none in the library (which gives it for '
+                                    f"{library}). Describe the material as a local record with refractive_index, "
+                                    f"{keys}"))
+        else:
+            found.append(Diagnostic("E-PROPERTY-MISSING", f"materials.{ref}",
+                                    f"physics.{name} takes a coupled temperature, so each optical material needs a "
+                                    f"thermo-optic model; materials.{ref} has none: add {keys}"))
+    return found
+
+
+def _coupling():
+    from .multiphysics import CouplingHook
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check)
+
+
 #: the kind this module registers; the built-in provider openphysics-fem reads it here
 KIND = register(PhysicsKind(
     name="em.modes2d", types=frozenset({"em.modes2d"}), precedence=100,
     validate=modes_document.validate, run=_run_em_modes2d, summary=modes_document.summary,
     result_types=(RunResult,), fallback=True, slots=modes_document.modes_slots(),
-    refuse_03=modes_document.refuse_03))
+    refuse_03=modes_document.refuse_03, coupling=_coupling()))
