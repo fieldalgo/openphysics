@@ -58,7 +58,7 @@ ALPHA = 1.0
 
 
 def generate3d(points, facets, segments=None, *, h, domain="regions", region_points=None, facet_tags=None,
-               quality="practical", alpha=ALPHA, max_points=0):
+               quality="practical", alpha=ALPHA, max_points=0, locked_facets=None):
     """Tetrahedral mesh of a piecewise-linear complex.
 
     ``points`` (n x 3) and ``facets`` (each a list of loops of point indices, the first
@@ -73,6 +73,9 @@ def generate3d(points, facets, segments=None, *, h, domain="regions", region_poi
     ``region_points`` choose the regions as in ``meshloom._core.mesh_plc``.
     ``facet_tags`` names the facets, one string per facet (facets may share a name); the
     default names facet i ``str(i)``.
+    ``locked_facets`` (facet indices) are facets no point is added to, nor to their edges:
+    the triangles of a curved surface sampled on the surface (``meshloom.builder`` makes
+    them), so that every node of a curved surface lies on it.
 
     Returns the output contract: ``nodes``, ``tetrahedra``, ``regions``,
     ``region_names``, ``boundary_faces`` and ``boundary_nodes`` by facet index (wound
@@ -99,7 +102,7 @@ def generate3d(points, facets, segments=None, *, h, domain="regions", region_poi
     from ._core import mesh_plc
     import numpy as np
     m = mesh_plc(points, facets, segments=segments, domain=domain, region_points=region_points, h=h,
-                 ratio=ratios[quality], alpha=alpha, max_points=max_points)
+                 ratio=ratios[quality], alpha=alpha, max_points=max_points, locked_facets=locked_facets)
     faces = {}
     for i in sorted(m["boundary_faces"]):
         faces.setdefault(tags[i], []).append(m["boundary_faces"][i])
