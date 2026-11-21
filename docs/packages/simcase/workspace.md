@@ -67,7 +67,12 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    setup only; it does not run coupled physics.
 2. In **Geometry**, edit the core numerically or drag it and its edges. Add
    rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
-   each shape's material; the silica background stays.
+   each shape's material; the silica background stays. A rectangle's **Width** edit
+   keeps its horizontal centre (Left x moves by half the change) and a **Height** edit
+   keeps its bottom edge, so a core resting on y = 0 stays centred there; the window
+   rule still refuses a size that would leave the window. Projects saved earlier keep
+   their stored coordinates. The step bar's **4. Study** shows the wavelength, for
+   example *λ 1550 nm · Ready to run*.
    Optionally set the wavelength in **Optical modes** and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
@@ -75,13 +80,25 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    even if you edit the model while waiting. Stop waiting pauses observation only.
 5. Name and **Pin selected run** as a reference. Change the model and run again,
    then use **Compare** to choose A/B, candidate, component, probe and line profile.
+   A table lists, for each candidate rank, n_eff of A and B, Δ (B − A) and Δ % of A;
+   its column headers name each run (name, size, λ).
 6. **Save session**, the first save button, creates a portable file with the model,
-   retained results and view settings. **Save inputs only** keeps the model without
-   results; while completed runs are not in a session file, the header says
-   *Results not saved*. Wait for **Browser recovery saved** before relying on local
+   retained results and view settings, named from the application and the local
+   date-time (for example `optical-waveguide-session-2026-11-21-1305.json`) in the
+   browser's download folder. Messages reports *Session saved as …*, and the header
+   shows *Saved as … · time* until the next edit or run. **Save inputs only** keeps the
+   model without results; while completed runs are not in a session file, the header says
+   *Results not saved* (or *Changed since …* after a saved file). Browser recovery keeps
+   the last saved file name and time, so a recovered session that matched it shows
+   *Saved as …* again. Wait for **Browser recovery saved** before relying on local
    recovery. After a reload or a Studio restart, the start page shows **Continue
    where you left off** with the last browser session and any earlier ones; choose
-   one to recover it, open a session file, or start new.
+   one to recover it, open a session file, or start new. Over a workspace with default
+   inputs and no results, an open or recovery asks nothing. Otherwise **Open saved
+   session?** (or **Recover saved session?**) lists the runs with their names and pins
+   and the comparison that come back, what is replaced, and only the physics present.
+   Before an application is chosen, the status bar reads *Choose an application to
+   start* and the Study sequence lists no steps.
 
 Use **Import runs from file** to add results to the current notebook while keeping
 the model. Use **Open session** to replace both model and notebook. Current/earlier

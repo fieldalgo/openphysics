@@ -1,11 +1,13 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {MAX_SESSION_BYTES,parseSession} from './workspace-notebook.mjs';
+import {validateSavedFile} from './workspace-persistence.mjs';
 
 export function readNotebookRecovery(record){
  if(record==null)return null;
  if(record.version!==1||typeof record.savedAt!=='string'||!Number.isFinite(Date.parse(record.savedAt))||typeof record.session!=='string')throw new Error('Invalid notebook recovery record.');
- return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true})};
+ // savedFile (optional): the last session file this notebook was saved to; a malformed one is ignored.
+ return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile)};
 }
 
 // A legacy record has no revision; include its payload to detect same-time writes.
@@ -62,9 +64,10 @@ export class NotebookAutosave {
  constructor(store,{onState=()=>{},delay=700,setTimer=(fn,ms)=>setTimeout(fn,ms),clearTimer=id=>clearTimeout(id)}={}){
   this.store=store;this.onState=onState;this.delay=delay;this.setTimer=setTimer;this.clearTimer=clearTimer;this.timer=null;this.desired=null;this.writing=false;this.savedStamp=null;this.failedStamp=null;
  }
- schedule(stamp,makeText){
+ // extra: optional {savedFile} written beside the session in the record.
+ schedule(stamp,makeText,extra={}){
   if(this.desired?.stamp===stamp)return;
-  this.desired={stamp,makeText};this.failedStamp=null;
+  this.desired={stamp,makeText,extra};this.failedStamp=null;
   if(this.timer!==null)this.clearTimer(this.timer);
   this.timer=null;
   if(this.writing)return;
@@ -77,14 +80,14 @@ export class NotebookAutosave {
   const capture=this.desired;this.writing=true;this.onState({phase:'saving'});
   try{
    const session=capture.makeText();if(typeof session!=='string'||new TextEncoder().encode(session).length>MAX_SESSION_BYTES)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');
-   const record={version:1,savedAt:new Date().toISOString(),session};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
+   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
   }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error.code,message:error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
  }
- async replaceReviewed(record,stamp,makeText){
+ async replaceReviewed(record,stamp,makeText,extra={}){
   if(this.writing)throw new Error('Recovery storage is busy. Wait for it to finish, then review again.');
   this.store.adopt(record);this.savedStamp=null;this.desired=null;
-  this.schedule(stamp,makeText);await this.flush();
+  this.schedule(stamp,makeText,extra);await this.flush();
  }
  retry(){this.failedStamp=null;return this.flush();}
  get pending(){return this.writing||!!this.desired&&this.desired.stamp!==this.savedStamp;}
