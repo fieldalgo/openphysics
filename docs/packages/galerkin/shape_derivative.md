@@ -13,7 +13,8 @@ elasticity (`galerkin.elasticity.solve_elasticity`, 2026-11-10),
 thermoelasticity (`galerkin.thermoelasticity.solve_thermoelasticity` and
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10),
 transient heat (`galerkin.transient_heat.solve_transient_heat`, Cartesian
-2026-11-10, axisymmetric 2026-11-21) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11). The
+2026-11-10, axisymmetric 2026-11-21) and waveguide modes (`galerkin.kernels.solve_modes`, 2026-11-11; with a modal PML
+2026-11-21). The
 other
 solvers follow the same frame later.
 
@@ -244,8 +245,37 @@ without a motion, and numbers for k0 and n_target.
   are 2.300 (upper) and 5.676 (lower), with the same sum (independent review,
   2026-11-21). Finite differences pass from one regime to the other near a step
   of 1e-5 µm.
-- `coordinate_factors` (PML, bends) are refused with a motion: they depend on node
-  positions.
+- A modal PML takes a motion (2026-11-21) that leaves the layer in place:
+  `solve_waveguide_modes(..., pml=ModalPML(...), motion=)`, or `coordinate_factors`
+  with `solve_modes`.
+  - The design velocity must be 0 on every node of an element whose factors are
+    not 1. Otherwise it is refused by name.
+  - Each PML element then keeps its centroid and so its factors. The factors of the
+    physical window are 1, and the profile (order ≥ 2) is flat where the window
+    ends. The factors therefore carry no derivative.
+  - The public function places the layer on the mesh at the step t. The moving
+    pencil weighs its blocks with the factors as numbers, using the same
+    coefficients as the static assembly.
+  - A bend is refused with a motion: h depends on every node position.
+
+  `tests/galerkin/test_shape_derivative_pml.py` holds P1–P7, pre-registered on
+  2026-11-21 before the implementation ran, and measured that day:
+
+  | Check | Criterion | Result |
+  |---|---|---|
+  | P1 numbers | n_eff equal the ordinary PML solve on the moved mesh, relative 1e-12 | 3.9e-15 |
+  | P2 strip in a PML window | 0.6 × 0.2 µm Si strip, PML 0.5 µm on every side, core-width motion: complex dn_eff/dt against a Richardson central difference of moved meshes within 1e-7 | 8.5e-10 (1.9426 + 2.5e-6i) |
+  | P3 libraries | JAX and PyTorch within 1e-12 | 6.9e-16 |
+  | P4 refusals | a velocity on a PML node; a motion with a bend | pass |
+  | P5 unchanged | without a motion, `motion=None` equals no keyword bit for bit | pass |
+  | P6 leaky slab | the outgoing TE pole of the PML tests, first core thickness d₁ = 0.22 µm (the substrate stays at 0.47 µm): dn/dd₁ against the derivative of the analytic root; the error falls on meshes 0.04, 0.02 and 0.01 µm, finest within 2e-2, imaginary part within 5e-2 | 6.2e-3, 1.8e-3, 4.7e-4 (3.3319 − 0.01428i against 3.3303 − 0.01427i); imaginary part 1.1e-3 |
+  | P7 layer independence | the slope on mesh 0.02 for PML thickness 0.75 and 1.5 µm and strength 2 and 6 within 1e-2 of the default | ≤ 3.2e-6 |
+
+  The analytic slope is in the kernel's exp(+iωt) convention; the public index is
+  its conjugate. P6 first failed (2026-11-21): the reference root kept the gap
+  at 0.25 µm, while the motion keeps the substrate at 0.47 µm. Once the root
+  used the moved geometry (gap 0.47 − d₁), the criteria were met as
+  pre-registered.
 
 ## The mesh velocity
 
@@ -310,7 +340,8 @@ Each refusal names the reason:
 - a temperature snapshot of another mesh, including the moved one: the snapshot
   belongs to the mesh as given;
 - a radial design velocity on the symmetry axis with `coordinate_system="axisymmetric"`;
-  `checkpoint_every` in transient heat; `coordinate_factors` in waveguide modes;
+  `checkpoint_every` in transient heat; in waveguide modes a design velocity on a PML
+  element and a bend;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
   ([refused](differentiation.md#refused-not-approximated)).

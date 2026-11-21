@@ -19,7 +19,7 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
 ``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian and axisymmetric),
 ``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
 ``transient_heat.solve_transient_heat`` (Cartesian and axisymmetric), ``waveguide.solve_modes``
-(without coordinate factors),
+(with coordinate factors when the motion leaves every stretched element in place),
 ``thermoelasticity.solve_thermoelasticity`` and
 ``thermal_mechanical.solve_steady_thermoelasticity`` with scalar or region data and
 constant loads; the refusals are listed in docs/packages/galerkin/shape_derivative.md.

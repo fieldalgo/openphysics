@@ -8,7 +8,7 @@
 (`galerkin.thermal.solve_steady_heat`, Cartesian 2026-11-09, 축대칭 2026-11-21), 정상 전기 전도(`galerkin.electric.solve_steady_electric`, 2026-11-10),
 선형 탄성(`galerkin.elasticity.solve_elasticity`, 2026-11-10), 열탄성(`galerkin.thermoelasticity.solve_thermoelasticity`와
 `galerkin.thermal_mechanical.solve_steady_thermoelasticity`, 2026-11-10), 과도 열(`galerkin.transient_heat.solve_transient_heat`, Cartesian
-2026-11-10, 축대칭 2026-11-21), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
+2026-11-10, 축대칭 2026-11-21), 도파관 모드(`galerkin.kernels.solve_modes`, 2026-11-11; modal PML과 함께 2026-11-21)를 다룹니다. 다른 솔버는 같은 틀로 뒤에 잇습니다.
 
 ## 무엇을 미분하나
 
@@ -175,7 +175,28 @@ motion이 없을 때와 같은 PEC 노드·변, 숫자인 k0·n_target을 받습
   `DEGENERATE_GAP`보다 크면 motion을 준 `solve_waveguide_modes`가 NaN 없이 줍니다. D6 메시(간격 3.1e-5)에서 분기는 5.696, 2.280 µm⁻¹이고,
   정렬 모드의 t = 0 미분은 2.300(위), 5.676(아래)이며 합은 같습니다(2026-11-21 독립 검토). 유한 차분은 걸음 1e-5 µm 근처에서 한 체제에서
   다른 체제로 넘어갑니다.
-- `coordinate_factors`(PML, 굽힘)는 노드 위치에 따라 달라지므로 motion과 함께 거부합니다.
+- modal PML은 층을 제자리에 두는 motion을 받습니다(2026-11-21): `solve_waveguide_modes(..., pml=ModalPML(...), motion=)`, 또는
+  `solve_modes`의 `coordinate_factors`.
+  - 인자가 1이 아닌 요소의 모든 노드에서 설계 속도는 0이어야 합니다. 아니면 이름을 밝혀 거부합니다.
+  - 그러면 PML 요소는 중심이 움직이지 않으므로 인자도 그대로입니다. 물리 창의 인자는 1이고, profile(차수 ≥ 2)은 창이 끝나는 곳에서
+    평평합니다. 따라서 인자는 미분을 갖지 않습니다.
+  - 공개 함수는 걸음 t의 메시에 층을 놓습니다. 움직이는 pencil은 인자를 수로 두고, 정적 조립과 같은 계수로 블록에 가중을 줍니다.
+  - 굽힘은 h가 모든 노드 위치에 달려 있으므로 motion과 함께 거부합니다.
+
+  `tests/galerkin/test_shape_derivative_pml.py`에 P1–P7이 있습니다(2026-11-21 구현 실행 전 사전 등록, 같은 날 측정):
+
+  | 검사 | 기준 | 결과 |
+  |---|---|---|
+  | P1 수치 | n_eff가 이동 메시의 보통 PML 풀이와 상대 1e-12 이내 | 3.9e-15 |
+  | P2 PML 창 안의 strip | 0.6 × 0.2 µm Si strip, 사방 PML 0.5 µm, 코어 폭 motion: 복소 dn_eff/dt가 이동 메시 중앙 차분 Richardson과 1e-7 이내 | 8.5e-10 (1.9426 + 2.5e-6i) |
+  | P3 라이브러리 | JAX와 PyTorch가 1e-12 이내 | 6.9e-16 |
+  | P4 거부 | PML 노드의 속도; 굽힘과 motion | 통과 |
+  | P5 불변 | motion 없이 `motion=None`이 키워드 없는 호출과 비트까지 같음 | 통과 |
+  | P6 누설 slab | PML 시험의 외향 TE 극점, 첫 코어 두께 d₁ = 0.22 µm(기판은 0.47 µm에 그대로): dn/dd₁을 해석 근의 미분과 비교; 메시 0.04, 0.02, 0.01 µm에서 오차가 줄고, 가장 고운 메시 2e-2 이내, 허수부 5e-2 이내 | 6.2e-3, 1.8e-3, 4.7e-4(3.3319 − 0.01428i 대 3.3303 − 0.01427i); 허수부 1.1e-3 |
+  | P7 층 독립성 | 메시 0.02에서 PML 두께 0.75, 1.5 µm와 강도 2, 6의 기울기가 기본값과 1e-2 이내 | ≤ 3.2e-6 |
+
+  해석 기울기는 커널의 exp(+iωt) 규약이고 공개 지수는 그 켤레입니다. P6은 처음에 실패했습니다(2026-11-21). 기준 근은 간격을 0.25 µm로
+  두었지만, motion은 기판을 0.47 µm에 둡니다. 근이 움직인 기하(간격 0.47 − d₁)를 쓰자 사전 등록한 기준을 충족했습니다.
 
 ## 메시 속도
 
@@ -217,7 +238,7 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
   그런 호출에서 live 입력은 t 하나입니다.
 - 다른 메시(옮겨진 메시 포함)의 온도 스냅샷: 스냅샷은 주어진 메시의 것입니다.
-- `coordinate_system="axisymmetric"`에서 대칭축 위의 반지름 방향 설계 속도; 과도 열의 `checkpoint_every`; 도파관 모드의 `coordinate_factors`.
+- `coordinate_system="axisymmetric"`에서 대칭축 위의 반지름 방향 설계 속도; 과도 열의 `checkpoint_every`; 도파관 모드에서 PML 요소 위의 설계 속도와 굽힘.
 - 다른 솔버의 `motion=`: 그 솔버에는 이 키워드가 없습니다.
 - 2차 미분: 모든 galerkin 풀이처럼 JAX 전진 모드와 PyTorch `create_graph=True`는 오류를 냅니다
   ([거부 목록](differentiation.md#근사하지-않고-거부하는-것)).

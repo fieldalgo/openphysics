@@ -297,9 +297,12 @@ def test_w8_refusals(strip):
         solve_modes(mesh, eps, xp.asarray(K0), N_CORE, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="eps_r must be a number or a per-element array"):
         solve_modes(mesh, lambda p: 1.0, K0, N_CORE, motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(ValueError, match="coordinate_factors .* refused with a motion"):
-        solve_modes(mesh, eps, K0, N_CORE, coordinate_factors=np.ones((mesh.num_triangles, 3)),
-                    motion=MeshMotion(design_velocity=W, t=t))
+    # coordinate factors take a motion since 2026-11-21 when it leaves every stretched element in place
+    stretched = np.ones((mesh.num_triangles, 3), dtype=complex)
+    moving = int(np.flatnonzero(np.any(W[mesh.triangles] != 0, axis=(1, 2)))[0])
+    stretched[moving, 0] = 1 - 1j
+    with pytest.raises(ValueError, match="moves .* node\\(s\\) of PML or bend elements"):
+        solve_modes(mesh, eps, K0, N_CORE, coordinate_factors=stretched, motion=MeshMotion(design_velocity=W, t=t))
     _lo, hi = admissible_interval(mesh, design_velocity=W)
     with pytest.raises(ElementInversion):
         solve_modes(mesh, eps, K0, N_CORE, motion=MeshMotion(design_velocity=W, t=xp.asarray(hi * 1.01)))
