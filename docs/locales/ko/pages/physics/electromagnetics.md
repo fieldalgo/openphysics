@@ -13,6 +13,7 @@
 ## 모델 문서와 사용 흐름
 
 - [튜토리얼: 내 도파관 해석하기](../packages/simcase/waveguide_tutorial.md)
+- [다중물리 문서: 정상 상태 온도를 광 모드로, n(T)](../packages/simcase/multiphysics_document.md)
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
 - [PML·누설·일정 반경 모드](../packages/simcase/pml_modes.md)
 - [벡터 파장 sweep의 선택형 부분공간 추적](../packages/simcase/vector_subspace_tracking.md)

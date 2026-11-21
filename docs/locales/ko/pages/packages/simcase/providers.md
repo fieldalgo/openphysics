@@ -80,9 +80,11 @@ Studio와 `simcase.run`이 돌릴 수 있는 물리를 모두 찾게 한다. 따
    - 공급자는 자신이 구현한 프로토콜 버전(`protocol = 1`)을 밝힌다. simcase는 다른 버전을 이름을
      밝혀 거부한다.
 
-D1에 넣지 않는 것: worker 프로세스(D3), 저장(D4), 어댑터 배포판(D5), 다중물리 문서(D2).
-다른 종류가 계산한 필드를 읽는 내장 종류는 아직 없다. 그래서 내장 종류는 입력 포트와
-`combine`을 아직 쓰지 않는다.
+D1에 넣지 않는 것: worker 프로세스(D3), 저장(D4), 어댑터 배포판(D5).
+입력 포트와 `combine`은 [다중물리 문서](multiphysics_document.md)(D2)가 읽는다. 결합은 한 물리의
+출력 포트를 다른 물리의 입력 포트로 나른다. 종류는 simcase 내부의 결합 훅으로 결합에 참여하는데,
+이 훅은 아직 이 프로토콜의 일부가 아니다. 그래서 공급자의 종류는 입력 포트를 밝힐 수 있지만 아직
+결합할 수는 없다.
 
 ## 공급자 목록
 
@@ -119,8 +121,15 @@ listing = [p.as_dict() for p in providers.providers()]   # JSON 데이터
 | `em.cavity3d` | `em.cavity3d` | `electromagnetics` | `resonant_frequency` (Hz, 모드마다 scalar) |
 | `em.modes2d` | `em.modes2d` | `electromagnetics` | `effective_index` (1, 모드마다 scalar) |
 
-입력 포트를 가진 내장 종류는 없다. Joule 온도 흐름과 열탄성 흐름은 한 종류 안에서 결합한다.
-다른 종류의 출력을 읽지 않는다.
+내장 종류 가운데 하나에 입력 포트가 있다. [다중물리 문서](multiphysics_document.md)에서만 읽는다.
+
+| 종류 | 입력 포트 (양, 단위, 위치, `combine`) | 종류가 하는 일 |
+|---|---|---|
+| `em.modes2d` | `temperature` (temperature, K, element, `single`) | 절점 온도를 삼각형마다 평균하고 n = n₀(λ) + (dn/dT)(T − T_ref)로 둔다 |
+
+입력 포트는 출력처럼 그 이름으로 저장하지 않는다. 결합된 `em.modes2d` 결과는 쓴 온도와 그 온도가
+준 굴절률을 `fields.npz`에 `temperature`와 `refractive_index`로 저장한다. Joule 온도 흐름과
+열탄성 흐름은 여전히 한 종류 안에서 결합하며 다른 종류의 출력을 읽지 않는다.
 
 ## 공급자 만들기
 
