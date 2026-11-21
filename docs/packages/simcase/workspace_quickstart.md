@@ -71,22 +71,34 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 
 ## 4. Two designs and a comparison
 
-1. On **Choose a starting model**, select **Optical waveguide**.
-2. In **Geometry**, set the core width to 600 nm and the height to 300 nm. The
-   material is silicon and the wavelength 1550 nm (change it in **Optical modes**).
+1. On **Choose a starting model**, select **Optical waveguide**. Until you choose one,
+   the status bar reads *Choose an application to start* and the Study sequence is empty.
+2. In **Geometry**, set the core width to 600 nm and the height to 300 nm. A Width edit
+   keeps the core centred (Left x becomes −300 nm) and a Height edit keeps its bottom
+   on y = 0, so no **Centre on x = 0** is needed. The material is silicon and the
+   wavelength 1550 nm; the step bar shows it as *4. Study · λ 1550 nm · Ready to run*
+   (change it in **Optical modes**).
 3. Select **Run optical study**. The result shows the field and the effective index
    of two candidates. Name the run and select **Pin selected run**.
 4. Back in **Geometry**, set the width to 700 nm and run again.
-5. Open **Compare**. Runs A and B are chosen for you; the comparison shows the
-   difference in effective index. Candidate ranks are not matched modes.
+5. Open **Compare**. Runs A and B are chosen for you; a table lists n_eff of A and B,
+   Δ (B − A) and Δ % of A for each candidate rank, with each run's name, size and
+   wavelength in its column header. Candidate ranks are not matched modes.
 
 ## 5. Keep your work
 
 - **Save** in the ribbon's Project group (Save session) writes one file with the inputs,
   all completed runs, their names and pins, and the comparison. Use it before you stop.
+  The file is named after the application and the local time, for example
+  `optical-waveguide-session-2026-11-21-1305.json`, and goes to your browser's download
+  folder (the browser may add a number if that name exists). Messages reports
+  *Session saved as …* and the title shows *Saved as …* until your next edit or run.
   **More → Save inputs only** keeps the model without results.
 - After a reload or a restart, the start page shows **Continue where you left off**.
-  Recover the last session, an earlier one, or open a session file.
+  Recover the last session, an earlier one, or open a session file. On a fresh page
+  (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
+  runs and the comparison that come back and what is replaced. A recovered session that
+  matched its saved file shows *Saved as …* in the title again.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
 - Input and session files are version 7 (the Joule heating inputs added); version 6 files are

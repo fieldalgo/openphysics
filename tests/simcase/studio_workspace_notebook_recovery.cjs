@@ -149,3 +149,15 @@ test('continuing the recovered latest session replaces it and keeps no duplicate
  }
  assert.equal((await page.load()).session,'E');assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['A']);
 });
+
+test('browser recovery keeps the last saved session file beside the session and ignores a malformed one',async()=>{
+ let record;const saver=new NotebookAutosave({save:async r=>record=r},timing);
+ const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''});
+ const session=JSON.stringify(createSession(input,[],null,[null,null]));
+ const savedFile={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
+ saver.schedule('one',()=>session,{savedFile});await saver.flush();
+ assert.deepEqual(record.savedFile,savedFile);assert.deepEqual(readNotebookRecovery(record).savedFile,savedFile);
+ saver.schedule('two',()=>session);await saver.flush();
+ assert.equal('savedFile' in record,false);assert.equal(readNotebookRecovery(record).savedFile,null);
+ assert.equal(readNotebookRecovery({...record,savedFile:{name:'x.exe',savedAt:'2026-11-21T04:05:00Z',current:true}}).savedFile,null);
+});

@@ -17,3 +17,9 @@ test('invalid drafts, detached jobs and offline service block readiness without 
  const steps=opticalWorkflow({input:doc,block:'offline',runs});assert.equal(steps[3].detail,'Unavailable');assert.equal(steps[4].detail,'Current input result');
  assert.equal(opticalWorkflow({input:doc})[1].detail,'Silicon in silica');doc.model.shapes=[{...doc.model.shapes[0],material:'Air'}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');doc.model.shapes=[{...doc.model.shapes[0],material:''}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');
 });
+test('the Study step leads with the wavelength of the optical inputs',()=>{
+ const doc=input();doc.model.wavelength=1550;
+ assert.equal(opticalWorkflow({input:doc})[3].detail,'λ 1550 nm · Ready to run');
+ assert.equal(opticalWorkflow({input:doc,busy:true})[3].detail,'λ 1550 nm · Computing');
+ doc.model.wavelength=1310.5;assert.equal(opticalWorkflow({input:doc,block:'offline'})[3].detail,'λ 1310.5 nm · Unavailable');
+});
