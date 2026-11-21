@@ -73,8 +73,17 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   필수), `volumetric_heat_capacity` > 0(과도 열전도에 필수), 선택 `source` 메모. 표는 영역 기계·영역 전기
   전도와 공유하므로 `youngs_modulus`, `poisson_ratio`, `linear_expansion_coefficient`,
   `electrical_conductivity`도 있으면 받아 검사합니다. 열이 읽지 않는 물성은 `I-UNUSED-PROPERTY`(검사만 하고
-  쓰지 않음)로 알립니다. 열 물성은 내장 광학 재료에서 가져오지 않으므로 사용하는 재료는 모두 여기 정의해야
-  합니다(`E-MATERIAL-UNKNOWN`, `E-PROPERTY-MISSING`). 쓰지 않는 재료는 허용합니다.
+  쓰지 않음)로 알립니다. 사용하는 로컬 재료는 모두 여기 정의해야 합니다(`E-MATERIAL-UNKNOWN`,
+  `E-PROPERTY-MISSING`). 쓰지 않는 재료는 허용합니다.
+- **라이브러리 재료(정상 열전도).** 정상 열전도 문서의 영역은 physmat이 `thermal_conductivity`를 상수 하나로
+  주는 라이브러리 재료 `"physmat:<Name>"`을 쓸 수 있습니다. Si 148, SiO2 1.38, GaAs 55, Al2O3 35,
+  Si3N4 20, Au 317, Ag 429 W/(m K)입니다. 이 값은 **300 K 핸드북 상숫값**이며 온도를 따라 바뀌지 않습니다.
+  온도 상승이 크면 자기 값으로 로컬 기록을 쓰십시오(온도에 따라 바뀌는 전도도는 `joule.temperature2d`의
+  모델에만 있습니다). summary는 참조 이름 아래에 값을 적습니다(`material physmat:Si: thermal_conductivity
+  148 W/(m K) (physmat, constant 300 K handbook value)`). physmat이 전도도를 온도 모델로 주거나(Cu, Al)
+  주지 않는(vacuum, standard_air, …) 라이브러리 재료는 이름을 밝혀 `E-PROPERTY-MISSING`입니다. 출처가
+  온도를 밝히지 않은 기록(Si3N4, Au, Ag)은 `I-DATUM-ASSUMED`도 받습니다. 과도 열전도는 라이브러리 재료를
+  읽지 않습니다(라이브러리가 주지 않는 `volumetric_heat_capacity`도 필요하기 때문입니다).
 - `physics.<name>`: `type`, `heat_source_density`(`"5e6 W/m^3"` 같은 값 하나, 또는 `{영역 이름: 값}`이며
   적지 않은 영역은 0; 모르는 영역은 `E-SELECTION-UNKNOWN`), 사각형 문서와 같은 변 규칙의
   `prescribed_temperature`, `inward_heat_flux`, `convection`(`heat_transfer_coefficient`,

@@ -82,9 +82,20 @@ simcase run examples/simcase/thermal_regions.json -o heated_plate
   region mechanics and region electric conduction, so `youngs_modulus`, `poisson_ratio`,
   `linear_expansion_coefficient` and `electrical_conductivity` are accepted and checked
   when present. A property heat does not read is reported as `I-UNUSED-PROPERTY` (checked,
-  not used). Thermal properties are never taken from built-in optical materials; every used
-  material must be defined here (`E-MATERIAL-UNKNOWN`, `E-PROPERTY-MISSING`). Unused
-  materials are allowed.
+  not used). Every used local material must be defined here (`E-MATERIAL-UNKNOWN`,
+  `E-PROPERTY-MISSING`). Unused materials are allowed.
+- **Library materials (steady heat).** A region of a steady heat document may name a
+  library material, `"physmat:<Name>"`, whose `thermal_conductivity` physmat gives as one
+  constant: Si 148, SiO2 1.38, GaAs 55, Al2O3 35, Si3N4 20, Au 317 and Ag 429 W/(m K).
+  These are **constant 300 K handbook values**: the conductivity does not follow the
+  temperature. Where the temperature rise is large, write a local record with your own value
+  (a temperature-dependent conductivity exists only in the models of `joule.temperature2d`).
+  The summary lists the value under the reference (`material physmat:Si: thermal_conductivity
+  148 W/(m K) (physmat, constant 300 K handbook value)`). A library material whose
+  conductivity physmat gives as a temperature model (Cu, Al) or not at all (vacuum,
+  standard_air, …) is `E-PROPERTY-MISSING`, naming it; a record whose source states no
+  temperature (Si3N4, Au, Ag) is also `I-DATUM-ASSUMED`. Transient heat reads no library
+  material (it also needs `volumetric_heat_capacity`, which the library does not give).
 - `physics.<name>`: `type`, `heat_source_density` (one quantity such as
   `"5e6 W/m^3"`, or `{region name: quantity}` with regions not listed at zero; an
   unknown region is `E-SELECTION-UNKNOWN`), `prescribed_temperature`,

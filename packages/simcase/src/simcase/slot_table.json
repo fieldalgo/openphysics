@@ -169,7 +169,7 @@
 {"kind": "override", "library": "vacuum", "pattern": "materials.*", "physics_kind": "em.cavity3d", "reads": {"em.cavity3d": ["relative_permittivity", "relative_permeability"]}},
 {"kind": "override", "library": "any", "pattern": "materials.*", "physics_kind": "em.modes2d", "reads": {"em.modes2d": ["refractive_index"]}},
 {"kind": "override", "library": "none", "pattern": "materials.*", "physics_kind": "mechanics", "reads": {"mechanics.elasticity2d": ["youngs_modulus", "poisson_ratio"], "mechanics.thermoelastic2d": ["youngs_modulus", "poisson_ratio", "linear_expansion_coefficient", "thermal_conductivity"]}},
-{"kind": "override", "library": "none", "pattern": "materials.*", "physics_kind": "thermal.steady2d", "reads": {"thermal.steady2d": ["thermal_conductivity"]}},
+{"kind": "override", "library": "any", "library_properties": ["thermal_conductivity"], "pattern": "materials.*", "physics_kind": "thermal.steady2d", "reads": {"thermal.steady2d": ["thermal_conductivity"]}},
 {"kind": "override", "library": "none", "pattern": "materials.*", "physics_kind": "thermal.transient2d", "reads": {"thermal.transient2d": ["thermal_conductivity", "volumetric_heat_capacity"]}},
 {"code": "E-KEY-UNKNOWN", "kind": "refused", "message": "material overrides (base) are not supported in this release; write the whole record", "pattern": "materials.*.base"},
 {"code": "E-CONTRACT", "kind": "refused", "message": "bulk_modulus is a registry property that this release does not read; give the property the physics reads", "pattern": "materials.*.bulk_modulus"},

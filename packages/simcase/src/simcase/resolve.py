@@ -825,6 +825,7 @@ class _Walker:
                 datum = datum_diagnostic(target[1], where)
                 if datum is not None:
                     self.add(datum, path)
+                self.library_properties(target[1], policy.get("library_properties") or ())
         reads = policy.get("reads")
         if reads is None:
             return
@@ -839,6 +840,22 @@ class _Walker:
                     path = ["materials", mname, key]
                     self.add(Diagnostic("I-UNUSED-PROPERTY", display_path(path),
                                         f"no physics of this run reads {key}; it is checked and not used"), path)
+
+    def library_properties(self, name: str, keys) -> None:
+        """The resolved record of a library material under its reference (``materials["physmat:Si"]``),
+        for a kind that reads ``keys`` from the library: each property physmat gives as one constant
+        number. A property physmat gives as a model, or not at all, is left out; the kind refuses
+        the material by name (``E-PROPERTY-MISSING``)."""
+        from .materials import library_constant
+        if not keys or not isinstance(self.r.si, dict):
+            return
+        record = {}
+        for key in keys:
+            value = library_constant(name, key)
+            if value is not None:
+                record[key] = value
+        materials = self.r.si.setdefault("materials", {})
+        materials.setdefault(f"physmat:{name}", {}).update(record)
 
     def study_values(self) -> None:
         study = self.tree.get("study")
