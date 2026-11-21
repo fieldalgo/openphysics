@@ -205,6 +205,11 @@ input[aria-invalid=true],textarea[aria-invalid=true]{border-color:#bd5b41;outlin
 .run-item{display:block;width:100%;text-align:left;overflow-wrap:anywhere;margin:8px 0;font-size:12px}
 .tree:has(.run-item){padding:12px}
 .run-name label{margin-bottom:8px}
+.run-name .input-hint{margin-top:6px}
+/* Provenance (job id, versions) and longer help stay one click away, out of primary labels. */
+.run-details{margin:8px 0 12px;font-size:11px}
+.run-details summary,.shape-size-more summary{cursor:pointer;color:var(--accent)}
+.shape-size-more p{margin:4px 0 0}
 .canvas>.toolbar label{display:flex;align-items:center;gap:8px;margin:4px 0}
 .canvas>.toolbar label select{margin:0;width:auto}
 .field-result .toolbar{padding:8px 0;background:transparent}

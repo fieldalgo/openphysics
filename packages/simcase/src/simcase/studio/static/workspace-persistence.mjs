@@ -16,14 +16,19 @@ export function validateSavedFile(value){
  if(typeof value!=='object'||typeof value.name!=='string'||!/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(value.name)||typeof value.savedAt!=='string'||!Number.isFinite(Date.parse(value.savedAt))||typeof value.current!=='boolean')return null;
  return {name:value.name,savedAt:value.savedAt,current:value.current};
 }
-// The title bar's persistence state. saved: {name, savedAt, current, recovered} or null.
+// The title bar's persistence state. saved: {name, savedAt, current} (the last session file
+// this notebook was saved to) or null; loaded: {kind: 'opened' | 'recovered', name, current}
+// (the session file opened, or browser recovery) or null; current means nothing changed since.
 // Studio hands the file to the browser's downloads and cannot know it was kept, so the
-// title names the session file and never claims it was saved.
-export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// title names the session file and never claims it was saved. No revision counter: it
+// counts input changes in this tab only and would differ after a restore.
+export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null,loaded=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
- if(saved?.current)return saved.recovered?`Last session file ${saved.name} (${when(saved.savedAt)})`:`Session file ${saved.name} · ${when(saved.savedAt)}`;
- if(runsUnsaved)return saved?`Changed since session file ${saved.name} (${when(saved.savedAt)}) · use Save session`:'Results not saved · use Save session';
- return clean?'Input snapshot unchanged':'Unsaved inputs';
+ if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`;
+ if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:'');
+ if(saved?.current)return `Session file ${saved.name} · ${when(saved.savedAt)}`;
+ if(runsUnsaved)return saved?`Changed since session file ${saved.name} (${when(saved.savedAt)}) · Save session to keep the changes`:'Results not saved · Save session to keep them';
+ return clean?'No unsaved input changes':'Unsaved inputs';
 }
 const PHYSICS=[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']];
 // The physics a model holds; chosen=false is the start state, before any application.

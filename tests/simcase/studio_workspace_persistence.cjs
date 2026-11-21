@@ -22,14 +22,28 @@ test('a session file name holds the application and the local date-time to the m
 test('the title shows the saved file until the next edit, and after recovery what the record kept',()=>{
  const when=()=>'13:05',saved={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
  assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Session file optical-waveguide-session-2026-11-21-1305.json · 13:05');
- assert.equal(P.persistenceTitle({saved:{...saved,recovered:true}},when),'Last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
- for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved:{...saved,recovered:true}},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
+ const recovered={kind:'recovered',name:null,current:true};
+ assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser');
+ for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,loaded:recovered},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false},when),'Unsaved inputs');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · use Save session');
- assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Results not saved · use Save session');
- assert.equal(P.persistenceTitle({}),'Input snapshot unchanged');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · Save session to keep the changes');
+ assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Results not saved · Save session to keep them');
+ assert.equal(P.persistenceTitle({}),'No unsaved input changes');
  // an invalid draft outranks a saved state
  assert.equal(P.persistenceTitle({invalid:true,clean:true,saved},when),'Invalid input draft · last valid inputs unchanged');
+});
+
+test('after an open the title names the file opened; after the next change it says what changed',()=>{
+ const opened={kind:'opened',name:'design-a.json',current:true};
+ assert.equal(P.persistenceTitle({loaded:opened}),'Opened design-a.json');
+ assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true}),'Results not saved · Save session to keep them');
+ assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false}),'Unsaved inputs');
+ // a save after the open names the new file, not the one opened
+ assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),'Session file b.json · 13:05');
+ // the title carries no revision counter: it would differ after a restore
+ for(const title of [P.persistenceTitle({loaded:opened}),P.persistenceTitle({}),P.persistenceTitle({clean:false})])assert.doesNotMatch(title,/revision/i);
 });
 
 test('a malformed saved-file entry in a recovery record is ignored, not trusted',()=>{

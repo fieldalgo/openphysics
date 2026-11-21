@@ -32,7 +32,7 @@ export class OpticalJobMonitor {
      this.onState({phase:'loading',message:'Loading completed result '+pending.job,pending});
      const result=await this.api('/api/jobs/'+pending.job+'/result?workspace_instance='+pending.serverInstance);if(!active())return;
      await this.onResult(result,pending);if(!active())return;
-     this.onState({phase:'done',message:'Optical computation complete. Result retains its input snapshot.',pending});return;
+     this.onState({phase:'done',message:'Optical run complete. The result keeps the inputs it was run with.',pending});return;
     }
     if(job.status!=='running')throw new Error('Unsupported job status.');
     if(this.now()>=deadline){this.onState({phase:'detached',message:'Stopped waiting after three minutes. Resume to check this job again.',pending});return;}

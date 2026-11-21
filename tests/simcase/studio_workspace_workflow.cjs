@@ -5,8 +5,8 @@ before(async()=>({opticalWorkflow}=await import('../../packages/simcase/src/simc
 const input=()=>({model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},setup:{materials:{Core:'Silicon',Oxide:'Silica'}}});
 test('mesh preview is optional and an earlier result is never labeled current after an input edit',()=>{
  const doc=input(),run={signature:JSON.stringify(doc)};
- let steps=opticalWorkflow({input:doc,runs:[run]});assert.equal(steps[2].detail,'Optional preview');assert.equal(steps[3].detail,'Ready to run');assert.equal(steps[4].detail,'Current input result');
- doc.model.shapes=[{...doc.model.shapes[0],h:300}];assert.equal(opticalWorkflow({input:doc})[0].detail,'500 × 300 nm · Silicon');steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Preview earlier inputs');assert.equal(steps[4].detail,'Earlier inputs only');assert.equal(steps[3].detail,'Ready to run');
+ let steps=opticalWorkflow({input:doc,runs:[run]});assert.equal(steps[2].detail,'Optional preview');assert.equal(steps[3].detail,'Run complete');assert.equal(steps[4].detail,'Result for these inputs');
+ doc.model.shapes=[{...doc.model.shapes[0],h:300}];assert.equal(opticalWorkflow({input:doc})[0].detail,'500 × 300 nm · Silicon');steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Inputs changed since preview');assert.equal(steps[4].detail,'Inputs changed since this result');assert.equal(steps[3].detail,'Ready to run');
 });
 test('invalid drafts, detached jobs and offline service block readiness without hiding completed results',()=>{
  const doc=input(),runs=[{signature:JSON.stringify(doc)}];
@@ -14,7 +14,7 @@ test('invalid drafts, detached jobs and offline service block readiness without 
  assert.equal(opticalWorkflow({input:doc,pending:true})[3].detail,'Resume or detach job');
  assert.equal(opticalWorkflow({input:doc,pending:true,resumeBlocked:true})[3].detail,'Detach unavailable job');
  assert.equal(opticalWorkflow({input:doc,pending:true,busy:true})[3].state,'busy');
- const steps=opticalWorkflow({input:doc,block:'offline',runs});assert.equal(steps[3].detail,'Unavailable');assert.equal(steps[4].detail,'Current input result');
+ const steps=opticalWorkflow({input:doc,block:'offline',runs});assert.equal(steps[3].detail,'Unavailable');assert.equal(steps[4].detail,'Result for these inputs');
  assert.equal(opticalWorkflow({input:doc})[1].detail,'Silicon in silica');doc.model.shapes=[{...doc.model.shapes[0],material:'Air'}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');doc.model.shapes=[{...doc.model.shapes[0],material:''}];assert.equal(opticalWorkflow({input:doc})[1].state,'attention');
 });
 test('the Study step leads with the wavelength of the optical inputs',()=>{
@@ -24,4 +24,13 @@ test('the Study step leads with the wavelength of the optical inputs',()=>{
  // the state alone, for panels that show the wavelength in a row of its own
  assert.equal(opticalWorkflow({input:doc})[3].summary,'Ready to run');
  doc.model.wavelength=1310.5;assert.equal(opticalWorkflow({input:doc,block:'offline'})[3].detail,'λ 1310.5 nm · Unavailable');
+});
+test('after a run of the current inputs the Study step says the run is complete, until an edit',()=>{
+ const doc=input();doc.model.wavelength=1550;const run={signature:JSON.stringify(doc)};
+ assert.equal(opticalWorkflow({input:doc,runs:[run]})[3].detail,'λ 1550 nm · Run complete');
+ assert.equal(opticalWorkflow({input:doc,runs:[]})[4].detail,'No run yet');
+ // a busy or invalid editor outranks a completed run
+ assert.equal(opticalWorkflow({input:doc,runs:[run],busy:true})[3].summary,'Computing');
+ assert.equal(opticalWorkflow({input:doc,runs:[run],invalid:true})[3].summary,'Correct input draft');
+ doc.model.wavelength=1551;assert.equal(opticalWorkflow({input:doc,runs:[run]})[3].detail,'λ 1551 nm · Ready to run');
 });

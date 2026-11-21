@@ -25,9 +25,10 @@ or **Run Joule heating study**. The optical workflow strip shows the current ste
 without hiding the model. The dock shows the study sequence and Messages; after a
 Joule heating run, Results adds its **Solver log** there.
 
-**Save** and **Open** keep their session semantics, including completed optical
-runs and comparisons. **More** contains input-only files, browser drafts and
-Reset design. **Workspace tools** in the bottom status bar contains connection,
+**Save session** and **Open session** keep the whole session, including completed
+optical runs and comparisons; "Save session" is the one name for that save in the
+ribbon, the header and Messages. **More** contains input-only files (**More › Save
+inputs only**, **Open inputs file**), browser drafts and Reset design. **Workspace tools** in the bottom status bar contains connection,
 recovery and Reset layout; **Installed physics** sits next to it. Both open above the
 status bar, one at a time, on every page including Applications; Escape closes the open
 one. Below 1000 px the ribbon leaves out the Physics group, so its Compute commands stay in
@@ -72,13 +73,16 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    keeps its bottom edge, so a core resting on y = 0 stays centred there; the window
    rule still refuses a size that would leave the window. Projects saved earlier keep
    their stored coordinates. The step bar's **4. Study** shows the wavelength, for
-   example *λ 1550 nm · Ready to run*.
-   Optionally set the wavelength in **Optical modes** and the core mesh size in **Mesh**.
+   example *λ 1550 nm · Ready to run*, and *Run complete* once these inputs have a result.
+   Optionally set the wavelength in **Optical modes** (**Study → Edit wavelength** opens
+   it with the field focused) and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
-4. Select **Run optical study**. Results keep the input snapshot used by that run,
+4. Select **Run optical study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
-5. Name and **Pin selected run** as a reference. Change the model and run again,
+   An input edit replaces the completion message, so it never describes edited inputs.
+5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
+   replace it (**Unpin this run** releases it). Change the model and run again,
    then use **Compare** to choose A/B, candidate, component, probe and line profile.
    A table lists, for each candidate rank, n_eff of A and B, Δ (B − A) and Δ % of A;
    its column headers name each run (name, size, λ).
@@ -88,25 +92,28 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    browser's downloads. Studio hands the file to the browser and cannot know that it was
    kept (a download can be cancelled), so Messages reports *Session file … sent to the
    browser's downloads (check your Downloads folder)* and the header shows *Session file
-   … · time* until the next edit or run. **Save inputs only** keeps the model without
+   … · time* until the next edit or run. **More › Save inputs only** keeps the model without
    results; while completed runs are not in a session file, the header says *Results not
-   saved* (or *Changed since session file …* after one). Browser recovery keeps the last
-   session file name and time, so a recovered session that matched it shows *Last
-   session file … (time)*. A Width edit by an odd number of nanometres gives a
-   half-nanometre Left x: the centre is kept exactly, and typed values are not snapped
-   to the drag step. Wait for **Browser recovery saved** before relying on local
-   recovery. After a reload or a Studio restart, the start page shows **Continue
+   saved · Save session to keep them* (or *Changed since session file …* after one).
+   After **Open session** the header says *Opened …* with the file name, and after a
+   recovery *Recovered from this browser*; browser recovery keeps the last session file
+   name and time, so a recovered session adds *last session file … (time)*. Both last
+   until the next change. The header has no revision counter. A Width edit by an odd
+   number of nanometres gives a half-nanometre Left x: the centre is kept exactly, and
+   typed values are not snapped to the drag step (**More about width and height** under
+   the size fields). The footer shows *Updating browser recovery…* while it writes; wait
+   for **Browser recovery saved** before relying on local recovery. After a reload or a Studio restart, the start page shows **Continue
    where you left off** with the last browser session and any earlier ones; choose
    one to recover it, open a session file, or start new. Over a workspace with default
    inputs and no results, an open or recovery asks nothing. Otherwise **Open saved
    session?** (or **Recover saved session?**) lists the runs with their names and pins
    and the comparison that come back, what is replaced, and only the physics present.
-   Before an application is chosen, the status bar reads *Choose an application to
-   start* and the Study sequence lists no steps.
+   Before an application is chosen, the header reads *No model chosen*, the status bar
+   *Choose an application to start* and the Study sequence lists no steps.
 
 Use **Import runs from file** to add results to the current notebook while keeping
-the model. Use **Open session** to replace both model and notebook. Current/earlier
-input labels identify which design a result belongs to; candidate ranks do not
+the model. Use **Open session** to replace both model and notebook. *Result for these
+inputs* and *Inputs changed since this result* say which design a result belongs to; candidate ranks do not
 establish mode correspondence between designs.
 
 ## Working with a model
@@ -145,13 +152,14 @@ window and PEC edges matter more at longer wavelengths and for small cores; thes
 settings do not certify mesh or window convergence. Large silicon or silicon nitride
 areas at a fine core mesh take longer and produce large results: a silicon block
 filling the window at 20 nm took about 22 s and returned 14 MB in a Linux check, so
-a session with several such runs can exceed 16 MiB. Save selected runs instead. Use the existing editor for
+a session with several such runs can exceed 16 MiB. Export single runs instead (**Export this run**). Use the existing editor for
 other supported optical studies; this workspace does not expose all engine APIs.
 
 Invalid numeric drafts stay visible across navigation. Resolve or discard them
 before saving, opening or running. Undo/redo keeps up to 60 edits; result input
 restore creates a new edit. Panel widths can be adjusted on wide screens and
-are stored in this browser. Revisions identify local editing order, not Git commits.
+are stored in this browser. Input revisions count edits in this tab only; they are
+not shown in the header and are not Git commits.
 
 The model drawing has Zoom in/out, Pan and Fit view controls. Focus the drawing
 and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view retains
@@ -414,14 +422,18 @@ not establish convergence or physical field amplitudes.
 
 ## Naming and preserving runs
 
-Use **Selected run name** and **Rename run** to label a completed calculation
-(up to 80 characters). Names appear in history and comparisons, persist in
-session JSON and CSV, and never change captured inputs or fields. **Save selected
-run** exports a standalone session containing that result and its original
-inputs; this is useful before the six-run retention limit removes an older unpinned run.
+Type a **Run name** (up to 80 characters) and press Enter, or leave the field, to
+name the selected run. Naming a run also pins it, as the hint under the field says.
+Names appear in the **Runs** list and comparisons, persist in session JSON and CSV,
+and never change captured inputs or fields. The Runs list labels each run by name,
+size, wavelength and completion time; **Run details** in Results holds the job id,
+source, simcase version and input change number. **Export this run** writes a
+standalone session file containing that result and its original inputs; this is useful
+before the six-run retention limit removes an older unpinned run.
 The footer distinguishes a changed session from saved input-only files. Saving
-inputs or a browser draft does not claim to save the result notebook. A selected
-run export does not mark the full notebook saved.
+inputs or a browser draft does not claim to save the result notebook. A single-run
+export does not mark the full notebook saved. **Export field PNG** draws the Results
+plot; on Compare it is unavailable, and the text under it says to open a run in Results.
 
 Undo/redo applies to design inputs. Outside text fields, Ctrl/Cmd+Z undoes and
 Ctrl/Cmd+Shift+Z or Ctrl+Y redoes. In text fields, native text editing is retained.
@@ -450,8 +462,11 @@ The Geometry, Materials, Mesh, Study and Results bar follows the current inputs.
 It identifies invalid drafts, unavailable execution, a pending job, and mesh or
 results captured from earlier inputs. A mesh preview is optional: Run creates its
 own mesh. Ready to run is an input/connection state, not numerical validation or
-convergence certification. Results opens the newest retained matching input when
+convergence certification; Run complete means a retained result has exactly the current
+inputs. Results opens the newest retained matching input when
 one exists; navigation itself never runs a solver. Earlier results remain available.
+The Results step is highlighted on Results only, not on Compare. The Study sequence
+line in the dock is plain text; the step bar and the model tree select nodes.
 
 Connection details, input recovery and layout help are grouped in an expandable
 panel. A connection failure opens it automatically. Numeric error descriptions
@@ -553,7 +568,7 @@ This is not a backup archive. A quota or
 transaction failure retains the previous committed record; Retry recovery storage
 retries the latest requested state. Closing the tab while pending/saving can lose
 recent changes. Browser cleanup/private mode or a different port can make recovery
-unavailable. Use Save session / Save selected run for portable files. The 16 MiB
+unavailable. Use Save session / Export this run for portable files. The 16 MiB
 session and six-result limits still apply; invalid drafts, undo history, mesh,
 and preflight reports are not included. Probe and profile positions are included.
 
@@ -565,7 +580,7 @@ coalescing delay; changing inputs does not copy field arrays on every keystroke.
 
 ## Pin reference runs
 
-Pin selected run protects that result from automatic notebook eviction. A new
+**Pin this run** (or naming the run) keeps that result: new runs do not replace it. A new
 result replaces the oldest unpinned run, with at most six retained in total. If
 all six are pinned, Run is disabled until one is unpinned; document checks and
 mesh previews remain available. Pins are saved in sessions, browser recovery and

@@ -163,6 +163,7 @@ try {
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical run', 120000);
   };
   const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Geometry"]'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
+  const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
   const delta = () => page.eval("(document.getElementById('canvas').innerText.match(/Δn_eff \\(B − A\\), candidate rank 1: (-?[0-9]+\\.[0-9]+)/)||[])[1]||null");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
@@ -177,13 +178,19 @@ try {
   const sized = await page.eval("({x:document.getElementById('shape-x').value,y:document.getElementById('shape-y').value,study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' ')})");
   stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /λ 1550 nm · Ready to run/);
   await runAndWait();
+  // after a run of these inputs the Study step says so, and the title carries no revision counter
+  const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('project').textContent})");
+  stage('first run complete', afterRun); assert.match(afterRun.study, /λ 1550 nm · Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
+  // naming a run with Enter pins it
+  await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.value="design A";e.form.requestSubmit();return true}', '#run-name-input'); await sleep(150);
+  const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
   await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350'); await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
   const neffTable = await page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent))}})()");
   stage('two designs compared', {deltaNeff: before, table: neffTable});
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
-  assert.match(neffTable.head[1], /^n_eff A 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[2], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
+  assert.match(neffTable.head[1], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[2], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
   assert.equal(neffTable.rows[0][3], before, 'the table and the sentence give the same Δn_eff');
   await page.screenshot('compare');
   await page.click('#save-session');
@@ -197,6 +204,8 @@ try {
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to the browser's downloads (check your Downloads folder)`), savedMessage);
   assert.ok(savedHeader.includes(`Session file ${sessionFile} · `), savedHeader);
+  // right after Save session the footer says recovery is updating, never "pending"
+  assert.doesNotMatch(await page.eval("document.getElementById('autosave-status').textContent"), /pending/i);
   await page.until("/Browser recovery saved/.test(document.getElementById('autosave-status').textContent)", 'browser recovery saved', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
@@ -220,7 +229,7 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
-  assert.ok(recoveredHeader.includes(`Last session file ${sessionFile} (`), 'the recovered title names the session file: ' + recoveredHeader);
+  assert.ok(recoveredHeader.includes(`Recovered from this browser · last session file ${sessionFile} (`), 'the recovered title says it was recovered and names the session file: ' + recoveredHeader);
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
@@ -232,7 +241,6 @@ try {
   // not depend on it stay tight: the power balance on each mesh, Newton against Picard on the same
   // mesh, the potential's fixed values and the uniform strip's exact power. Bit-for-bit equality
   // with simcase.run on one mesh is tests/simcase/test_studio_joule_regions.py.
-  const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
   const canvasRange = async () => {
     const label = await page.eval("document.getElementById('joule-field-canvas')?.getAttribute('aria-label')||''");
     const m = label.match(/^(.*) (\S+) to (\S+) (\S+)$/); assert.ok(m, 'result canvas label: ' + label);
