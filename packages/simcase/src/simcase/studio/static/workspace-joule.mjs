@@ -109,6 +109,19 @@ export function validateIteration(raw){
 }
 // The iteration method of a joule.temperature2d summary (simcase writes iteration_method for Newton only).
 export function iterationMethod(summary){return summary?.iteration_method==='newton'?'newton':'picard';}
+// The iteration settings after choosing a method: Newton's step limit is at most MAX_NEWTON_ITERATIONS
+// (the relaxation factor is kept, unused); Picard returns to the documented default limit.
+export function withMethod(iteration,method){
+ if(!Object.hasOwn(METHODS,method))throw new Error('Choose the Picard or the Newton iteration.');
+ return {...iteration,method,iteration_limit:method==='newton'?Math.min(iteration.iteration_limit,MAX_NEWTON_ITERATIONS):ITERATION_DEFAULTS.iteration_limit};
+}
+// Why the server's capability cannot run the iteration settings, or ''. limits: capability limits.
+export function iterationBlock(iteration,limits){
+ const newton=iteration.method==='newton',max=newton?limits?.max_newton_iterations:limits?.max_iterations;
+ if(newton&&!max)return 'This Studio server does not run the Newton iteration; choose Picard.';
+ if(max&&iteration.iteration_limit>max)return `The iteration limit exceeds this server's ${max}${newton?' Newton steps':''}.`;
+ return '';
+}
 // "Picard 31 iterations" or "Newton 3 steps": the method and count of a summary's iteration records.
 export function iterationText(summary){const n=summary.iterations.length;return iterationMethod(summary)==='newton'?`Newton ${n} step${n===1?'':'s'}`:`Picard ${n} iteration${n===1?'':'s'}`;}
 // Structural checks: every value finite and in range, names unique, shapes inside the domain.

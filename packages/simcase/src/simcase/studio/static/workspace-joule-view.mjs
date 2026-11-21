@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,MAX_NEWTON_ITERATIONS,METHODS,ITERATION_DEFAULTS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
- usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,iterationMethod,iterationText,JouleRunner} from './workspace-joule.mjs';
+import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,MAX_NEWTON_ITERATIONS,METHODS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
+ usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,iterationMethod,iterationText,withMethod,iterationBlock,JouleRunner} from './workspace-joule.mjs';
 import {shapeCorners} from './workspace-shapes.mjs';
 import {renderJouleGraph} from './workspace-graph.mjs';
 
@@ -24,9 +24,7 @@ export function createJouleView(ctx){
   if(capError)return capError;if(!cap)return 'Checking whether this server runs Joule heating…';if(!cap.run_enabled)return 'This server does not enable Joule heating runs.';
   if(drafts.size)return 'Correct or restore the highlighted Joule inputs before running.';
   if(ctx.otherBusy?.())return 'A heat job holds the server job slot; wait for it to finish.';
-  if(jouleKind(j())===TEMPERATURE){const it=j().iteration,newton=it.method==='newton',max=newton?cap.limits?.max_newton_iterations:cap.limits?.max_iterations;
-   if(newton&&!max)return 'This Studio server does not run the Newton iteration; choose Picard.';
-   if(max&&it.iteration_limit>max)return `The iteration limit exceeds this server's ${max}${newton?' Newton steps':''}.`;}
+  if(jouleKind(j())===TEMPERATURE){const b=iterationBlock(j().iteration,cap.limits);if(b)return b;}
   return jouleBlock(j(),cap.limits);
  }
  // A path into the inputs: "width", "materials.0.k", "sides.left.thermal.h", "shapes.1.points".
@@ -89,8 +87,7 @@ export function createJouleView(ctx){
   document.querySelectorAll('[data-joule-select]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleSelect;
    if(path.endsWith('.sigma.model')){for(const key of [...drafts.keys()])if(key.startsWith(path.slice(0,-6)+'.'))drafts.delete(key);const next=el.value==='constant'?{model:'constant',value:1000}:{model:'linear_resistivity',reference_conductivity:1000,reference_temperature:300,coefficient:0.004,tmin:250,tmax:600};set(path.slice(0,-6),next,'Conductivity model changed.');}
    else if(path==='iteration.method'){
-    // Newton's step limit is at most MAX_NEWTON_ITERATIONS; Picard returns to the documented default limit
-    const it={...j().iteration,method:el.value};it.iteration_limit=el.value==='newton'?Math.min(it.iteration_limit,MAX_NEWTON_ITERATIONS):ITERATION_DEFAULTS.iteration_limit;
+    const it=withMethod(j().iteration,el.value);
     drafts.delete('iteration.iteration_limit');drafts.delete('iteration.relaxation_factor');set('iteration',it,`Iteration method: ${METHODS[el.value]}, limit ${it.iteration_limit}.`);}
    else set(path,el.value,'Material assignment updated.');});
   document.querySelectorAll('[data-joule-type]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleType,type=el.value,defaults={insulating:{type},potential:{type,potential:0},current:{type,current:0},insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:300}};

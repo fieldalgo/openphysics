@@ -254,7 +254,8 @@ Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서
 허용한다. `iteration.iteration_limit`이 `max_iterations`(500)를 넘는 Picard 문서와, `iteration_limit`이
 `max_newton_iterations`(17: 첫 평가와 이후 걸음마다 후보 최대 31개, 1 + 31 × 16 = 497)를 넘는 Newton
 문서는 작업 전에 거부한다(`iteration_limit_exceeded`, 413, `iteration.iteration_limit`에서). 그래서 Newton
-문서는 `iteration_limit`을 적어야 한다. 문서 기본값(100)이 Studio 상한을 넘기 때문이다. Newton 걸음은
+문서는 `iteration_limit`을 적어야 한다. 문서 기본값(100)이 Studio 상한을 넘기 때문이며, 한도를 적지 않았으면
+거부 문장이 그렇게 알린다. Newton 걸음은
 전위와 온도를 함께 푸는 희소 연립계도 한 번 푼다. 반복 기록(하나에 약 1 kB)은 64 KiB `metadata_bytes`가
 아니라 결과의 `payload_bytes`에 센다. `/api/capabilities`에는 종류마다
 블록(`run`, `validate`, `geometry: "regions"`, 결과·payload 형식, 영역 한도, `joule.temperature2d`에는
@@ -272,7 +273,7 @@ Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서
 작업 오류 `not_converged`이다: "the Picard iteration did not converge after N iterations: …" 또는 "the
 Newton iteration did not converge after N steps: …". 보이는 이유는 반복 한도, 반복 값이 재료 모델의 유효
 범위를 벗어남, 그리고 Newton에서는 온도 결함을 줄이지 못하는 걸음(마지막 후보가 범위를 벗어나 실패했으면
-그 문장도)과 특이하거나 유한하지 않은 걸음을 내는 Newton 연립계다. 반복 안의 다른 오류는 고정 문장을
+그 문장도. 마지막 후보의 다른 실패는 그 문장 뒤에 고정 문장으로 바꾼다)과 특이하거나 유한하지 않은 걸음을 내는 Newton 연립계다. 반복 안의 다른 오류는 고정 문장을
 받는다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
 남긴다([보안](../../security.md#브라우저-studio)).
 
@@ -283,7 +284,8 @@ Newton iteration did not converge after N steps: …". 보이는 이유는 반�
 작업 공간 기본 문서에 `"method": "newton"`과 `iteration_limit` 17을 준 것이 `simcase.run`과 비트 단위로
 같다(Newton 3걸음 대 Picard 31번, 온도는 Picard와 2e-8 K 이내). 17은 받고 18과 기본값 100은 validate와
 run 모두 거부한다. `"Newton"`, `"secant"`, `"newton"` 옆의 `relaxation_factor`에 대한 읽기 도구의 거부는
-그 문장을 유지한다. 수렴 실패 문장과 보이는 솔버 이유, 공유 작업 자리도 검사한다. 작업 공간의
+그 문장을 유지한다. 수렴 실패 문장과 보이는 솔버 이유(실제로 실패하는 걸음이 만든 galerkin 자신의 문장 포함), 공유 작업
+자리도 검사한다. 작업 공간의
 [Joule 가열 애플리케이션](workspace.md#이름-붙은-영역의-joule-가열)이 이 문서를 만들어 실행한다.
 
 ## 실행·저장

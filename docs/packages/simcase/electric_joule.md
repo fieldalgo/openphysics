@@ -320,7 +320,8 @@ solve, one Picard step). Studio allows at most 500 evaluations: a Picard documen
 `iteration_limit` exceeds `max_newton_iterations` (17: the first evaluation and up to 31
 candidates for each further step, 1 + 31 × 16 = 497), is refused before a job
 (`iteration_limit_exceeded`, 413, at `iteration.iteration_limit`). A Newton document must
-therefore write its `iteration_limit`: the document default (100) is over Studio's cap. A
+therefore write its `iteration_limit`: the document default (100) is over Studio's cap, and
+the refusal says so when the limit was not written. A
 Newton step also solves one sparse system of the potential and temperature together. The
 iteration records (about 1 kB each) count against the
 result's `payload_bytes`, not the 64 KiB `metadata_bytes`. `/api/capabilities`
@@ -345,7 +346,8 @@ touches no potential). An iteration that does not converge is the job error
 iteration did not converge after N iterations: …" or "the Newton iteration did not converge
 after N steps: …". The reasons shown are the iteration limit, a material model's valid range
 left by an iterate, and for Newton a step that does not reduce the temperature defect (with
-the last candidate's range refusal, when that was the cause) and a Newton system that is
+the last candidate's range refusal when that was the cause; another failure of the last
+candidate is replaced by the fixed message after that text) and a Newton system that is
 singular or gives a nonfinite step; another error inside the iteration gets the fixed message.
 Any other failure replies with
 Studio's fixed message and logs its traceback ([Security](../../security.md#browser-studio)).
@@ -359,7 +361,8 @@ default document with `"method": "newton"` and `iteration_limit` 17 equal `simca
 for bit (3 Newton steps against 31 Picard iterations; temperatures within 2e-8 K of Picard);
 17 is accepted and 18 or the default 100 refused, for validate and run; the reader's
 refusals of `"Newton"`, `"secant"` and a `relaxation_factor` beside `"newton"` keep its text;
-the non-convergence texts and which solver reasons are shown; the shared job slot.
+the non-convergence texts and which solver reasons are shown, including galerkin's own
+texts produced by a real failing step; the shared job slot.
 A strip at about 8,400 nodes gave a 4.9 MB payload in 8 s on one Linux machine (the payload
 limit is 16 MiB). The workspace's [Joule heating application](workspace.md#joule-heating-on-named-regions)
 builds and runs these documents.
