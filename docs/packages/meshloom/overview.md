@@ -291,8 +291,11 @@ See [third-party software](../../third-party.md).
   - V23, and the V32 refinement ladder of the unstructured cavity (first-cluster errors
     0.0130, 0.0027, 0.0005).
   - V7 on C2, C3 and C9.
+  - V24 on C11 at the sizes of the amendment of 2026-11-21, {0.1, 0.05, 0.025}:
+    capacitance errors 1.05e-2, 2.07e-3 and 4.95e-4, slope 2.20. V5 holds on its three
+    spheres. At h = 0.025 the mesh has 1,078,489 tetrahedra and took 17 minutes and
+    0.8 GiB to make; conjugate gradients to a relative residual of 1e-12 took 18 s.
 
-  C11 has no sizes in the plan yet, so V24 and its V5 row wait for an amendment.
   `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's C2
   and C3 rows, so V8 does not check them independently. The curved surface edge
   (`SURFACE_EDGE` = 1) was set before V8 on C1 was measured.
