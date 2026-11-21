@@ -591,7 +591,7 @@ Pinning is not a portable backup; export files before discarding browser data.
 
 ## Import runs without replacing the model
 
-Results/Compare → Import runs from file accepts a session or selected-run file.
+Results/Compare → Import runs from file accepts a session file or a single-run file from **Export this run**.
 Review the number of new, matching and replaced unpinned runs before applying.
 Current model inputs and input Undo are preserved; the imported selection opens
 beside a retained result for comparison. Imported runs remain labeled `imported`.
@@ -601,7 +601,7 @@ Matching job IDs retain their current names, pins and provenance only when their
 input, settings, effective indices, field arrays and server version agree. A
 conflicting payload rejects the whole import. Incoming runs and pinned references
 are never silently dropped to fit the six-run limit; if they exceed capacity,
-unpin a reference or export/import a selected-run file. Older unpinned current
+unpin a reference or export/import a single-run file (**Export this run**). Older unpinned current
 runs may be replaced after the review. Pending jobs block run imports.
 
 Keyboard focus stays on the corresponding tree, geometry, material and run control

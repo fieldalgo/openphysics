@@ -184,7 +184,10 @@ try {
   // naming a run with Enter pins it
   await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.value="design A";e.form.requestSubmit();return true}', '#run-name-input'); await sleep(150);
   const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
-  await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350'); await runAndWait();
+  await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350');
+  // an input edit takes the Study step back from Run complete to Ready to run
+  const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /λ 1550 nm · Ready to run/);
+  await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
   const neffTable = await page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent))}})()");
