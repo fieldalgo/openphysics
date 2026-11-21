@@ -207,8 +207,14 @@ try {
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
-  // constant materials. The ranges allow for other OSes and BLAS builds; the values agree with
-  // tests/simcase/test_studio_joule_regions.py, which compares them with simcase.run bit for bit.
+  // constant materials. The region mesh of the same document is not the same on every platform
+  // (Linux x86-64: 288 nodes, 526 triangles; macOS arm64: 289, 528), so values that depend on the
+  // mesh are checked within the discretization error at this element size (about 2e-3 of the
+  // temperature rise in the strip convergence study of test_joule_temperature_regions.py, so about
+  // 0.04 K of this 22 K rise; 0.01 K is allowed), and the checks that do
+  // not depend on it stay tight: the power balance on each mesh, Newton against Picard on the same
+  // mesh, the potential's fixed values and the uniform strip's exact power. Bit-for-bit equality
+  // with simcase.run on one mesh is tests/simcase/test_studio_joule_regions.py.
   const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
   const canvasRange = async () => {
     const label = await page.eval("document.getElementById('joule-field-canvas')?.getAttribute('aria-label')||''");
@@ -236,16 +242,19 @@ try {
   await jouleRun(logIs('/Picard \\d+ iterations/'), 'Joule Picard run');
   const picardLog = await text('#solver-log summary'), picardSettings = await text('#inspector');
   const picardN = Number(picardLog.match(/Picard (\d+) iterations/)[1]), picardT = await canvasRange();
-  stage('JB2 Picard result', {log: picardLog, temperature: picardT});
+  stage('JB2 Picard result', {log: picardLog, temperature: picardT, settings: picardSettings.slice(0, 260)});
   assert.ok(picardN >= 28 && picardN <= 34, 'Picard iterations ' + picardN);
-  assert.match(picardSettings, /Nodes 288 Triangles 526/);
-  // the displayed values (7 significant digits), compared within a tolerance rather than as text
+  // the displayed values (7 significant digits), parsed and compared within a tolerance
   const shown = (settings, label, unit) => Number(settings.match(new RegExp(label + ' (\\S+) ' + unit))?.[1]);
-  for (const label of ['Supplied electric power', 'Joule power', 'Outward heat'])
-    assert.ok(Math.abs(shown(picardSettings, label, 'W/m') - 16.67289) <= 2e-5, label + ' ' + shown(picardSettings, label, 'W/m'));
-  assert.ok(Math.abs(shown(picardSettings, 'Maximum temperature', 'K') - 321.8271) <= 2e-4, 'maximum temperature');
+  const nodes = shown(picardSettings, 'Nodes', 'Triangles'), triangles = Number(picardSettings.match(/Triangles (\d+)/)?.[1]);
+  assert.ok(nodes >= 270 && nodes <= 310 && triangles >= 500 && triangles <= 560, `mesh ${nodes} nodes, ${triangles} triangles`);
+  const balances = ['Supplied electric power', 'Joule power', 'Outward heat'].map(label => shown(picardSettings, label, 'W/m'));
+  // the balance on each mesh to the display's resolution; the value within 1e-4 of Linux's 16.67289 W/m
+  assert.ok(Math.max(...balances) - Math.min(...balances) <= 2e-5 && Math.abs(balances[0] - 16.67289) <= 16.67289e-4, 'balances ' + balances);
+  const tmax = shown(picardSettings, 'Maximum temperature', 'K');
+  assert.ok(Math.abs(tmax - 321.827) <= 0.01, 'maximum temperature ' + tmax);
   assert.equal(picardT.field, 'Temperature T'); assert.equal(picardT.unit, 'K');
-  assert.ok(Math.abs(picardT.min - 300) <= 1e-3 && Math.abs(picardT.max - 321.827) <= 1e-3, 'temperature range ' + JSON.stringify(picardT));
+  assert.ok(Math.abs(picardT.min - 300) <= 1e-9 && Math.abs(picardT.max - tmax) <= 1e-4, 'temperature range ' + JSON.stringify(picardT));
   await page.screenshot('joule-picard');
   await page.choose('#joule-field', 'electric_potential'); await sleep(300);
   const potential = await canvasRange();
