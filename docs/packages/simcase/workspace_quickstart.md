@@ -97,14 +97,16 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   downloads (the browser may ask where to save it, or add a number if that name exists).
   Messages reports *Session file … sent to the browser's downloads (check your Downloads
   folder)* and the title shows *Session file … · time* until your next edit or run.
-  **More → Save inputs only** keeps the model without results; **Export this run** in
+  **More › Save inputs only** keeps the model without results; **Export this run** in
   the Runs list writes one run to its own file.
 - After a reload or a restart, the start page shows **Continue where you left off**.
   Recover the last session, an earlier one, or open a session file. On a fresh page
   (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
   runs and the comparison that come back and what is replaced. Messages names what was
   opened. The title then reads *Opened …* with the file name, or *Recovered from this
-  browser* (with *last session file …* when one was saved), until your next change.
+  browser* (with *last session file …* when one was saved, *changed since session file …*
+  when the recovered work had changed after that save, or *results not in a session file
+  yet* when none was saved), until your next change.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
 - Input and session files are version 7 (the Joule heating inputs added); version 6 files are

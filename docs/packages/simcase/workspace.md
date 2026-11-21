@@ -97,8 +97,9 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    saved · Save session to keep them* (or *Changed since session file …* after one).
    After **Open session** the header says *Opened …* with the file name, and after a
    recovery *Recovered from this browser*; browser recovery keeps the last session file
-   name and time, so a recovered session adds *last session file … (time)*. Both last
-   until the next change. The header has no revision counter. A Width edit by an odd
+   name and time, so a recovered session adds *last session file … (time)* (*changed
+   since session file …* if it had changed after that save, *results not in a session file
+   yet* if none was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, and
    typed values are not snapped to the drag step (**More about width and height** under
    the size fields). The footer shows *Updating browser recovery…* while it writes; wait

@@ -153,7 +153,7 @@ function setJoule(next,message){
  let checked;try{checked=validateJoule(next);}catch(error){notice(error.message);return false;}
  state.joule=checked;edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
 }
-const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),notice:text=>notice(text),getJoule:()=>state.joule,commit:setJoule,render:()=>render(),
+const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),notice:text=>notice(text),announceResult:text=>announceResult(text),getJoule:()=>state.joule,commit:setJoule,render:()=>render(),
  request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(current())});
 function refreshHeatControls(){
  const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat()||isJoule();if(!isHeat())return;
@@ -220,7 +220,9 @@ function renderConnectionOverview(){return renderConnectionGraph(state,ui.select
 // The inspector is rebuilt in stages with layout reads in between, which can clamp its scroll;
 // a redraw of the same panel keeps its scroll position and the focused field in view.
 let panelKey=null;
-function render(){const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;const focused=document.activeElement;if(focused&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
+function render(){const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
+ // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
+ const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
 function renderPanels(){document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose an application':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
@@ -436,7 +438,7 @@ function completeLoad(pending){
   loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp()};
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
- }else{applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{loadedSession=null;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
@@ -612,14 +614,14 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; 3 × 2.4 µm window; PEC outer edges; two candidates. Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
   const msg=document.createElement('p');msg.textContent=block||'Optical input supported. Solver validation runs before submission.';info.append(msg);
-  if(ui.selection==='Study'&&!block)$('canvas').innerHTML='<h2>Optical study</h2><p>Input snapshot is captured when Run is pressed.</p>'+pair('Geometry',escapeHtml(designSummary(current().model)))+pair('Wavelength',state.wavelength+' nm')+pair('Core mesh',state.coreMesh+' nm')+pair('Background',setup.materials.Oxide)+'<button id=review-geometry>Edit geometry</button> <button id=review-materials>Edit materials</button>';
+  if(ui.selection==='Study'&&!block)$('canvas').innerHTML='<h2>Optical study</h2><p>Run uses the inputs as they are when you press it.</p>'+pair('Geometry',escapeHtml(designSummary(current().model)))+pair('Wavelength',state.wavelength+' nm')+pair('Core mesh',state.coreMesh+' nm')+pair('Background',setup.materials.Oxide)+'<button id=review-geometry>Edit geometry</button> <button id=review-materials>Edit materials</button>';
    if($('review-geometry'))$('review-geometry').onclick=()=>select('Geometry');if($('review-materials'))$('review-materials').onclick=()=>select('Materials');
   $('canvas').append(info);if(ui.selection==='Study'&&!block)$('inspector').innerHTML='<h2>Optical execution</h2>'+pair('State',solverBusy?'Computing':solverRun?'Completed run available':'Ready for validation')+'<p>Run captures current inputs. Other physics remain unavailable.</p>';
  }
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Connections','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
-  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';
+  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
   renderField();solverRun.effective_index.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Browser recovery result — not recomputed or authenticated. ':'Imported file result — not recomputed or authenticated. ')+' Candidates are ranked by effective index and are not matched between designs. Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
@@ -778,7 +780,7 @@ function runLabel(run){return `${run.label?run.label+' · ':''}${designSummary(r
 // Where a run came from, kept out of the primary labels and available on request.
 function runDetails(run){
  const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[])];
- return '<details class="run-details" id="run-details"><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
+ return '<details class="run-details" id="run-details"'+(ui.runDetailsOpen?' open':'')+'><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
 }
 const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save session to keep it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one.';
 // Naming applies on Enter or when the field is left, and pins the run. Leaving the field
@@ -786,13 +788,19 @@ const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save 
 function nameRun(run,value,redraw){
  let label;try{label=validateRunLabel(value);}catch(error){notice(error.message);return;}
  if(label===(run.label||'')&&(!label||run.pinned))return;
- run.label=label;if(label)run.pinned=true;
+ // a name pins the run, except while a calculation runs: pinning the last free slot then
+ // would leave the finishing result nowhere to go (the Pin button is disabled then too)
+ const pinBlocked=(solverBusy||!!pendingJob)&&!run.pinned;
+ run.label=label;if(label&&!pinBlocked)run.pinned=true;
  if(redraw)render();else{
   document.querySelectorAll('[data-run]').forEach(b=>{const r=runs.find(x=>x.job===b.dataset.run);if(r)b.textContent=runItemText(r);});
+  document.querySelectorAll('#compare-a option,#compare-b option').forEach(o=>{const r=runs.find(x=>x.job===o.value);if(r)o.textContent=runLabel(r);});
+  document.querySelectorAll('.compare-grid article h3').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=`${i?'B':'A'} · ${runLabel(r)}`;});
+  profileRedraw();if($('pin-run'))$('pin-run').disabled=(solverBusy||!!pendingJob)&&!run.pinned;
   if($('pin-run'))$('pin-run').textContent=run.pinned?'Unpin this run':'Pin this run';if($('run-list-heading'))$('run-list-heading').textContent=runListHeading();
   if($('run-name-value'))$('run-name-value').textContent=run.label||'Not named';refreshPersistence();
  }
- notice(label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
+ notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; pin it when the calculation ends.`:label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
 }
 const runItemText=run=>(run.pinned?'Pinned · ':'')+runLabel(run);
 const runListHeading=()=>`Runs · ${runs.length} of ${RUN_LIMIT} · ${runs.filter(r=>r.pinned).length} pinned`;
@@ -812,6 +820,8 @@ function renderRunList(){
   nameForm.append(nameLabel,rename,hint);panel.append(nameForm);
   const target=solverRun;
   nameForm.onsubmit=event=>{event.preventDefault();nameRun(target,nameInput.value,true);};
+  // Enter applies here, before the change event the browser fires ahead of an implicit submit
+  nameInput.onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing){event.preventDefault();nameRun(target,nameInput.value,true);}};
   nameInput.onchange=()=>{if(nameInput.isConnected)nameRun(target,nameInput.value,false);};
   const exportRun=document.createElement('button');exportRun.id='export-run';exportRun.textContent='Export this run';exportRun.style.marginTop='10px';exportRun.onclick=()=>{try{
    const text=JSON.stringify(createSession(solverRun.input,[solverRun],solverRun.job,[solverRun.job,solverRun.job],currentView()));

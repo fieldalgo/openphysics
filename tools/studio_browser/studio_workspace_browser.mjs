@@ -182,7 +182,10 @@ try {
   const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('project').textContent})");
   stage('first run complete', afterRun); assert.match(afterRun.study, /λ 1550 nm · Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
   // naming a run with Enter pins it
-  await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.value="design A";e.form.requestSubmit();return true}', '#run-name-input'); await sleep(150);
+  await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', '#run-name-input');
+  await page.call('Input.insertText', {text: 'design A'});
+  for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
+  await sleep(150);
   const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
   await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350');
   // an input edit takes the Study step back from Run complete to Ready to run

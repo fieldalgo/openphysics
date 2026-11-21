@@ -175,7 +175,7 @@ export function createJouleView(ctx){
    // a file opened meanwhile replaced the design: its run is not this design's result
    if(started!==epoch){notice('A Joule heating run of the inputs before the file was opened finished; its result was discarded.');return;}
    result={input,signature:JSON.stringify(input),payload,completedAt:new Date().toISOString()};probe=null;
-   if(ctx.active()){ui.page='Results';ctx.render();notice('Joule heating calculation complete. The result keeps the inputs it was run with; it is kept in this tab only.');}
+   if(ctx.active()){ui.page='Results';ctx.render();(ctx.announceResult||notice)('Joule heating calculation complete. The result keeps the inputs it was run with; it is kept in this tab only.');}
    else notice('A Joule heating result is ready; choose Applications → Joule heating to see it.');
   }catch(e){if(started!==epoch)return;error=e.message;notice('Joule heating run failed: '+e.message+(/[.!?]$/.test(e.message)?'':'.')+' Inputs unchanged.');}
   finally{refreshControls();ctx.onIdle?.();}

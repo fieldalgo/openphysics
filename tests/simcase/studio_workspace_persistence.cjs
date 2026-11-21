@@ -25,7 +25,9 @@ test('the title shows the saved file until the next edit, and after recovery wha
  const recovered={kind:'recovered',name:null,current:true};
  assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
- assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser');
+ assert.equal(P.persistenceTitle({loaded:recovered},when),'Recovered from this browser');
+ // a recovered notebook never saved to a file still says its results are not in one
+ assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · results not in a session file yet');
  for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,loaded:recovered},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false},when),'Unsaved inputs');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · Save session to keep the changes');
