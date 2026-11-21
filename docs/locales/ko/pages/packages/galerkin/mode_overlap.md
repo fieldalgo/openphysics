@@ -153,6 +153,7 @@ eta = coupling_efficiency(space, et[:2], ez[:2], et_in)                 # 퇴화
 |---|---|
 | `solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None, target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None, pec_edges=None, pml=None, bend=None, motion=None)` | 고정된 `WaveguideModes`: `effective_index`(수동 손실 도파로의 전방 모드는 Im ≥ 0), `unnormalized_electric_field_line_integral`(m, `space`의 변을 따른 `E_t`의 선적분), `unnormalized_electric_field_z`(`E_z` 그대로), `space`, `vacuum_angular_wavenumber`, 재료와 `.units`. 메시는 미터, 파장(m)과 k0(rad/m) 중 정확히 하나를 주며 k0 = 2π/λ |
 | `ModalPML(*, pml_thickness={side: m}, pml_strength=3.0, pml_order=2)`, `Bend(*, bend_radius, bend_origin, bend_axis="x")` | 흡수층과 굽힘([모드 좌표](modal_coordinates.md)); 좌표 인자는 솔버가 직접 만듭니다 |
+| `degenerate_branch_derivatives(mesh, *, ..., motion, relative_tolerance=DEGENERATE_GAP)`(motion을 준 `solve_waveguide_modes`의 인수; 최상위로 다시 내보내지 않음) | frozen `DegenerateModeBranches(mode_index, effective_index, effective_index_derivative, mode_combination)`의 목록: motion에서 축퇴 모드의 분기 기울기, t 한 단위당([형상 미분](shape_derivative.md#도파관-모드)) |
 | `mode_power(modes, mode)` | 복소 `P`(V/m 장이면 W); `Re P`가 +z 전력 |
 | `cross_power(modes_a, mode_a, modes_b, mode_b)` | `P_ab`, 모드 `b`의 `H`(같은 메시와 k0) |
 | `field_overlap(modes_a, mode_a, modes_b, mode_b)` | m^2의 `<E_a, E_b>`(두 성분) |

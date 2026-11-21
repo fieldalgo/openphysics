@@ -1,7 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""galerkin.kernels.degenerate_branch_derivatives: the branch slopes of degenerate modes.
+"""galerkin.waveguide.degenerate_branch_derivatives: the branch slopes of degenerate modes.
+
+The meshes are in micrometres and k0 in rad per micrometre (consistent units, as the 2026-11-11
+comparison used), so the slopes are per micrometre of the motion's t.
 
 Checks D1-D6, pre-registered in the HQ work record (2026-11-21) before the tests ran:
 D1 on a symmetric square core the sorted branch slopes equal one-sided differences of the
@@ -21,7 +24,8 @@ import warnings
 import numpy as np
 import pytest
 
-from galerkin.kernels import degenerate_branch_derivatives, solve_modes
+from galerkin.kernels import solve_modes
+from galerkin.waveguide import degenerate_branch_derivatives
 from galerkin.mesh import Mesh
 from galerkin.shape import MeshMotion, extend_velocity
 
@@ -71,7 +75,8 @@ def _square():
 def _branches(mesh, eps, W, name, num_modes=3, **kw):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return degenerate_branch_derivatives(mesh, eps, K0, N_CORE, num_modes=num_modes,
+        return degenerate_branch_derivatives(mesh, relative_permittivity=eps, vacuum_angular_wavenumber=K0,
+                                             target_effective_index=N_CORE, search_mode_count=num_modes,
                                              motion=MeshMotion(design_velocity=W, t=_t(name)), **kw)
 
 
@@ -90,9 +95,9 @@ def square():
 def test_d1_d2_d5_branch_slopes_on_the_symmetric_square(square):
     mesh, eps, W = square
     jax_groups, torch_groups = _branches(mesh, eps, W, "jax"), _branches(mesh, eps, W, "torch")
-    assert len(jax_groups) == 1 and jax_groups[0].modes == (0, 1)
-    slopes = jax_groups[0].slopes
-    assert np.max(np.abs(torch_groups[0].slopes - slopes)) <= 1e-12 * np.max(np.abs(slopes))      # D5
+    assert len(jax_groups) == 1 and jax_groups[0].mode_index == (0, 1)
+    slopes = jax_groups[0].effective_index_derivative
+    assert np.max(np.abs(torch_groups[0].effective_index_derivative - slopes)) <= 1e-12 * np.max(np.abs(slopes))      # D5
     n0 = _sorted_pair(mesh, eps, W, 0.0)
 
     def one_sided(h):                       # two Richardson levels of (n(h) - n0) / h
@@ -110,7 +115,7 @@ def test_d1_d2_d5_branch_slopes_on_the_symmetric_square(square):
         return (np.sum(_sorted_pair(mesh, eps, W, s)) - np.sum(_sorted_pair(mesh, eps, W, -s))) / (2 * s)
     total = (4 * central(h / 2) - central(h)) / 3
     assert abs(np.sum(slopes) / total - 1) <= 1e-6, (np.sum(slopes), total)                        # D2
-    combos = jax_groups[0].combinations
+    combos = jax_groups[0].mode_combination
     assert combos.shape == (2, 2) and abs(np.linalg.det(combos)) > 1e-6
 
 
@@ -131,8 +136,8 @@ def test_d4_a_partner_that_was_not_returned_is_refused(square):
     mesh, eps, W = square
     with pytest.raises(ValueError, match="degenerate with a mode that was not returned; ask for more modes"):
         _branches(mesh, eps, W, "jax", num_modes=1)
-    with pytest.raises(ValueError, match="tolerance must lie in"):
-        _branches(mesh, eps, W, "jax", tolerance=0.0)
+    with pytest.raises(ValueError, match="relative_tolerance must lie in"):
+        _branches(mesh, eps, W, "jax", relative_tolerance=0.0)
 
 
 # ---------------------------------------------------------------- D6 the 2026-11-11 comparison
@@ -159,7 +164,7 @@ def test_d6_the_measured_branch_slopes_of_2026_11_11():
     mesh = from_mesher(tm)
     W = extend_velocity(mesh, nv.values, nv.on_curve)
     eps = np.array([N_CORE ** 2 if mesh.region_names[r] == "core" else N_CLAD ** 2 for r in mesh.regions])
-    (group,) = _branches(mesh, eps, W, "jax", num_modes=2, tolerance=1e-4)
-    steep, gentle = group.slopes
+    (group,) = _branches(mesh, eps, W, "jax", num_modes=2, relative_tolerance=1e-4)
+    steep, gentle = group.effective_index_derivative
     assert 5.70 * 0.97 <= steep <= 5.82 * 1.03 and 2.276 * 0.97 <= gentle <= 2.283 * 1.03, (steep, gentle)
     assert 5.53 * 0.95 <= steep <= 5.63 * 1.05 and 2.251 * 0.95 <= gentle <= 2.254 * 1.05, (steep, gentle)

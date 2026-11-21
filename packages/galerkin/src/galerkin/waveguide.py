@@ -54,7 +54,7 @@ from .mode_overlap import (confinement_factor as _confinement_factor, coupling_e
                            vector_field_overlap as _vector_field_overlap, vector_power as _vector_power)
 
 __all__ = ["STATIC_ROOT_TOL", "DegenerateModeWarning", "ModalPML", "Bend", "WaveguideModes",
-           "solve_waveguide_modes", "mode_power", "cross_power", "field_overlap", "mode_coupling_efficiency",
+           "solve_waveguide_modes", "DegenerateModeBranches", "degenerate_branch_derivatives", "mode_power", "cross_power", "field_overlap", "mode_coupling_efficiency",
            "mode_confinement_factor", "mode_effective_area"]
 
 _SIDES = ("left", "right", "bottom", "top")
@@ -280,6 +280,66 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
                                         to_kernel(mu), pec_nodes, pec_edges=pec_edges, coordinate_factors=factors,
                                         motion=motion)
     return WaveguideModes(to_public(n_eff), to_public(et), to_public(1j * ez), space, k0, eps, mu)
+
+
+@dataclass(frozen=True)
+class DegenerateModeBranches:
+    """One group of degenerate modes and the branches a shape motion splits it into.
+
+    ``mode_index``: the indices of the group among the modes ``solve_waveguide_modes`` returns
+    for the same inputs; ``effective_index``: their values; ``effective_index_derivative``: the
+    slope d n_eff / dt of each branch, largest real part first, per unit of the motion's t (per
+    metre when the design velocity is metres per metre); ``mode_combination``
+    (len(mode_index), len(mode_index)): column k holds the coefficients of branch k in the
+    returned modes of ``mode_index``. Values follow exp(-i omega t), as the modes do.
+    """
+    mode_index: tuple
+    effective_index: np.ndarray
+    effective_index_derivative: np.ndarray
+    mode_combination: np.ndarray
+
+
+def degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelength=None,
+                                  vacuum_angular_wavenumber=None, target_effective_index, search_mode_count,
+                                  relative_permeability=1.0, pec_nodes=None, pec_edges=None, motion,
+                                  relative_tolerance=DEGENERATE_GAP) -> list:
+    """The branch slopes of degenerate modes under a shape motion (decision 2026-11-21).
+
+    ``solve_waveguide_modes(..., motion=motion)`` gives a degenerate mode NaN derivatives: sorted
+    effective indices have a kink where two branches cross. Each branch is smooth, and its slope is
+    an eigenvalue of the motion's derivative projected onto the degenerate subspace. This takes the
+    inputs of ``solve_waveguide_modes`` with a motion (no PML or bend; NumPy material data) and returns
+    one ``DegenerateModeBranches`` per group of returned modes whose eigenvalues lie within
+    ``relative_tolerance`` of each other (a value above DEGENERATE_GAP also groups nearly degenerate
+    modes), or an empty list. The numbers are NumPy values; the slopes are taken in the library of
+    the motion's t. A degenerate mode whose partner was not returned is refused (raise
+    ``search_mode_count``).
+    """
+    from ._waveguide_kernels import degenerate_branch_derivatives as _branches
+    count = mesh.num_triangles
+    eps = _material(relative_permittivity, "relative_permittivity", count)
+    mu = _material(relative_permeability, "relative_permeability", count)
+    k0 = _wavenumber(vacuum_wavelength, vacuum_angular_wavenumber)
+    target = _target(target_effective_index)
+    refuse_text("search_mode_count", search_mode_count)
+    if isinstance(search_mode_count, (bool, np.bool_)) or not isinstance(search_mode_count, (int, np.integer)) \
+            or search_mode_count < 1:
+        raise ValueError("search_mode_count must be a positive integer")
+    refuse_text("relative_tolerance", relative_tolerance)
+    for name, value in (("relative_permittivity", eps), ("relative_permeability", mu),
+                        ("vacuum_wavelength or vacuum_angular_wavenumber", k0)):
+        if contains_live(value):
+            raise TypeError(f"motion: {name} is a JAX or PyTorch value; with a motion only its t carries a "
+                            "derivative")
+    try:
+        groups = _branches(mesh, to_kernel(eps), k0, to_kernel(target), int(search_mode_count), motion=motion,
+                           mu_r=to_kernel(mu), pec_nodes=pec_nodes, pec_edges=pec_edges,
+                           tolerance=float(relative_tolerance))
+    except ValueError as exc:
+        raise ValueError(str(exc).replace("degenerate_branch_derivatives: ", "")
+                         .replace("tolerance", "relative_tolerance").replace("num_modes", "search_mode_count")) from exc
+    return [DegenerateModeBranches(g.modes, to_public(g.effective_index), to_public(g.slopes),
+                                   to_public(g.combinations)) for g in groups]
 
 
 # -- post-processing ---------------------------------------------------------------------------------------------
