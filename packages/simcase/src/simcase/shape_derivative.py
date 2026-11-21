@@ -42,8 +42,10 @@ callback of the normals, and a motion takes constant tractions only.
   runner's vector solve (``galerkin.kernels.solve_modes`` on the mesh over the wavelength), with
   the runner's choice of modes. ``solve(t)`` returns ``{"effective_index": ...}``, the kept
   modes' effective indices under exp(-i omega t); a degenerate mode's derivative is NaN with a
-  ``DegenerateModeWarning``, as in galerkin. The scalar formulation (simcase's own eigensolver),
-  a PML or bend (coordinate factors move with the mesh), a sweep and mode tracking are refused.
+  ``DegenerateModeWarning``, as in galerkin (not tested separately here). The kernel mesh is in
+  micrometres, so its nodes move with 1e6 W. The mode choice reads numbers, so ``solve`` cannot run
+  under ``jax.jit``. The scalar formulation (simcase's own eigensolver), a PML or bend (coordinate
+  factors move with the mesh), a sweep and mode tracking are refused.
 
 Refused by name, as ``DocumentError``: a flat geometry block, an ``axisymmetric`` component,
 another physics, and every parameter the design velocity refuses (unknown, ratio or derived
@@ -70,11 +72,13 @@ _COVERED = (STEADY_HEAT, TRANSIENT_HEAT, ELECTRIC, ELASTICITY, THERMOELASTIC, MO
 class ShapeProblem:
     """One document, one length parameter: the mesh, its motion and the solve that differentiates.
 
-    ``mesh`` is the galerkin mesh ``run`` solves on (metres, the same nodes in the same order);
+    ``mesh`` is the galerkin mesh ``run`` solves on (metres, the same nodes in the same order; for
+    modes, ``run`` solves on the same nodes in micrometres, which ``arguments["mesh"]`` holds);
     ``design_velocity`` is W, (N, 2), dimensionless: the nodes move as X0 + t W, t in metres of
     the parameter; ``on_curve`` marks the nodes whose W the geometry gives (the rest are
     extended); ``admissible_interval`` is (lo, hi) in metres: no element inverts for lo < t < hi;
-    ``arguments`` are the keyword arguments of the galerkin solve, as ``run`` passes them;
+    ``arguments`` are the keyword arguments of the galerkin solve, as ``run`` passes them (for modes,
+    the runner's kernel inputs: the micrometre mesh, the kernel permittivity and the solve point);
     ``physics`` is the document's physics type, which picks the solver.
     """
 
@@ -187,7 +191,8 @@ def _modes_problem(given, doc, name, parameter):
         dv = design_velocity(doc.data, parameter)
     except GeometryError as exc:
         raise DocumentError(f"shape_problem: {exc}") from None
-    model = build_mesh(doc)          # the mesher's findings reach the copy's diagnostics, as in build_mesh
+    # build_mesh writes the mesher's findings to the document it meshes: the caller's, as run() does
+    model = build_mesh(given)
     k = model.kernel_doc
     point = views.modes_inputs(k.sole_physics()[1])
     where = f"physics.{name}"
@@ -216,11 +221,15 @@ def _modes_problem(given, doc, name, parameter):
 def _solve_modes(arguments, motion):
     from galerkin.shape import MeshMotion
 
-    from .physics_em_modes2d import _solve_vector
+    from . import modes_document
+    from .physics_em_modes2d import solve
     p = arguments["inputs"]
     kernel_motion = MeshMotion(design_velocity=1e6 * np.asarray(motion.design_velocity, dtype=float), t=motion.t)
-    result = _solve_vector(arguments["mesh"], np.asarray(arguments["eps"]), p.wavelength, p.boundary, p.num_modes,
-                           p.n_cladding, p.n_target, motion=kernel_motion)
+    try:                              # the runner's checks and its messages under the document's names
+        result = solve(arguments["mesh"], arguments["eps"], p.wavelength, p.boundary, p.num_modes, p.formulation,
+                       p.n_cladding, n_target=p.n_target, motion=kernel_motion)
+    except ValueError as exc:
+        raise ValueError(modes_document.public_kernel_message(str(exc))) from exc
     return {"effective_index": _to_public(result["neff"])}
 
 

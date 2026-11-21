@@ -27,7 +27,7 @@ from .fields import VectorField
 
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
           num_modes: int = 1, formulation: str = "scalar", n_cladding: float | None = None,
-          *, n_target: float | None = None, pml: dict | None = None, bend: dict | None = None):
+          *, n_target: float | None = None, pml: dict | None = None, bend: dict | None = None, motion=None):
     """Relative fields and n_eff; wavelength and mesh use the same length unit.
 
     eps_tri uses the modal time convention (negative imaginary part for loss).
@@ -51,8 +51,10 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     if pml is not None:
         from .physics_pml_modes import solve as solve_open
         return solve_open(mesh, eps_tri, wavelength, boundary, num_modes, formulation, n_target, pml, bend)
+    if motion is not None and (formulation != "vector" or pml is not None):
+        raise ValueError("a mesh motion takes the vector formulation with closed boundaries")
     if formulation == "vector":
-        return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target)
+        return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target, motion=motion)
     k0 = 2 * np.pi / wavelength
     K = assemble_stiffness(mesh, 1.0)
     M = assemble_mass(mesh, 1.0)
