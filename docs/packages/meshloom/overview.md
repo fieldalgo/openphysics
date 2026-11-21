@@ -46,7 +46,7 @@ mesh["region_names"]           # ['via', 'slab']
   (`builder.SURFACE_EDGE` = 1).
 - **Points.** Each point is `c + R·q/‖q‖`, computed with +, −, ×, ÷ and √ only, so the
   points are the same on every platform and lie on the surface to rounding (V5: at most
-  1e-15, measured 1.8e-16).
+  1e-15, at most 2.5e-16 measured on C1, C4, C5 and C11).
 - **Locked facets.** The curved triangles are passed as `locked_facets`: the mesher adds
   no point on them or on their edges. Recovery needs none there, because the triangles
   are strictly Delaunay on their surface. If one were missing, meshing raises
@@ -286,7 +286,7 @@ See [third-party software](../../third-party.md).
     floor.
   - V8 on C1, C2 and C3 with the die at h/2 (every region).
   - V6: sphere volume slope 1.87, e(0.05) = 1.15e-3.
-  - V5 on C1, C4 and C5.
+  - V5 on C1, C4, C5 and C11 (at most 2.5e-16).
   - V21 at the plan's CI sizes on C2 (L2 slope 2.08, H1 1.05) and on C1 (L2 2.06).
   - V23, and the V32 refinement ladder of the unstructured cavity (first-cluster errors
     0.0130, 0.0027, 0.0005).
@@ -295,6 +295,10 @@ See [third-party software](../../third-party.md).
     capacitance errors 1.05e-2, 2.07e-3 and 4.95e-4, slope 2.20. V5 holds on its three
     spheres. At h = 0.025 the mesh has 1,078,489 tetrahedra and took 17 minutes and
     0.8 GiB to make; conjugate gradients to a relative residual of 1e-12 took 18 s.
+  - V25 (report): the PEC sphere cavity on C1 has k² errors of 9.27e-3, 2.64e-3 and
+    6.73e-4 for TM11 (order 1.89) and 3.32e-3, 1.03e-3 and 2.82e-4 for TE11 (order 1.78)
+    at h = 0.2, 0.1 and 0.05: monotone, order ≥ 1.5 and finest < 2e-2, as the plan
+    expects.
 
   `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's C2
   and C3 rows, so V8 does not check them independently. The curved surface edge
