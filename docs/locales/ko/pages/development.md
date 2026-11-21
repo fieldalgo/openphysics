@@ -291,7 +291,10 @@ CI에서는 이 job을 `--shard K/8`로 여덟 부분, `installed-tests (1/8)`~`
 설치 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
 Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스와 같은 버전)도 설치하고,
 러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
-설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구.
+설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구, 그다음 Joule 가열
+애플리케이션: 기본 띠를 Picard와 Newton으로(반복 횟수, 수지, 온도·전위 범위, 두 방법의 1e-6 K 이내 일치),
+수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).
+페이지 예외와 콘솔 오류가 있으면 검사가 실패합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

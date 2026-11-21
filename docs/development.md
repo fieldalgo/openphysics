@@ -339,7 +339,12 @@ This is installed acceptance, not a full macOS or Windows regression.
 It also installs the Studio extra's pins (`tools/requirements-py312-studio.txt`, the
 Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
-session, a server restart with the page open and recovery from the start page.
+session, a server restart with the page open and recovery from the start page, then the
+Joule heating application: the default strip by Picard and by Newton (iteration counts,
+balances, temperature and potential ranges, the two methods agreeing within 1e-6 K), a
+non-converging Newton run whose refusal is shown with its text, and constant materials
+(`joule.steady2d`, 20 W/m, the uniform strip's exact power). Page exceptions and console
+errors fail the check.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

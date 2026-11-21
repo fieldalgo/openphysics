@@ -14,7 +14,9 @@ Studio check is deselected here; check_distributions.py runs it on Linux.
 Since 2026-11-08 it installs the Studio extra's pins (requirements-py312-studio.txt)
 and runs the installed workspace in the runner's Chrome on every platform
 (tools/studio_browser/studio_workspace_browser.mjs): two designs, Compare, Save
-session, a restart with the page open and recovery from the start page.
+session, a restart with the page open and recovery from the start page. Since
+2026-11-21 the same check also runs the Joule heating application (Picard, Newton, a refusal
+shown, constant materials).
 """
 import argparse
 from email.parser import BytesParser
