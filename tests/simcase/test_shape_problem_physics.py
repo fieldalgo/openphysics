@@ -163,6 +163,33 @@ def test_p3_thermoelastic_refuses_flux_convection_and_traction_by_name():
     held = {"top": {"heat_transfer_coefficient": "10 W/(m^2 K)", "ambient_temperature": "300 K"}}
     with pytest.raises(DocumentError, match="has convection; "):
         shape_problem(thermoelastic_doc(convection=held), "L1")
+    with pytest.raises(DocumentError, match="has inward_heat_flux; "):
+        shape_problem(thermoelastic_doc(inward_heat_flux={"top": "40 W/m^2"}), "L1")
+    with pytest.raises(DocumentError, match="has gauge_pressure; a shape motion takes constant tractions"):
+        shape_problem(thermoelastic_doc(gauge_pressure={"right": "1e5 Pa"}), "L1")
+
+
+def test_p3_a_heat_source_is_taken():
+    """The workflow takes a heat source (scalar or per region); t = 0 equals run()."""
+    doc = thermoelastic_doc(heat_source_density={"first": "1e8 W/m^3"})
+    ran = run(Document.from_dict(doc), verbose=False)
+    r = shape_problem(doc, "L1").solve(_zero("jax"))
+    T0 = ran.fields["temperature"]
+    assert _close(r.heat.temperature, T0, np.ptp(T0))
+    assert _close(r.mechanics.displacement, ran.fields["displacement"])
+
+
+def test_p6_a_gauge_pressure_is_refused_by_name():
+    """The shipped pipe example loads its bore with a gauge pressure (a traction of the normals)."""
+    import copy
+    from simcase.examples import EXAMPLES
+    doc = copy.deepcopy(EXAMPLES["elastic_regions"])
+    doc["geometry"]["parameters"] = {"a": {"value": "3.0 mm"}}
+    component = next(iter(doc["geometry"]["components"].values()))
+    bore = next(f for f in component["features"] if f["name"] == "bore")
+    bore["r"] = "a"
+    with pytest.raises(DocumentError, match="has gauge_pressure; a shape motion takes constant tractions"):
+        shape_problem(doc, "a")
 
 
 # ---------------------------------------------------------------- P4 transient heat

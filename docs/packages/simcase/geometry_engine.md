@@ -369,8 +369,10 @@ Refused by name (`DocumentError`):
 - an `axisymmetric` component;
 - another physics, including waveguide modes (their runner meshes differently) and Joule heating;
 - a `mechanics.thermoelastic2d` document with an inward heat flux, a convection or
-  a traction: the workflow takes Dirichlet temperatures and insulation, prescribed
-  displacements and a body force only;
+  a traction: the workflow takes Dirichlet temperatures, a heat source and
+  insulation, prescribed displacements and a body force only;
+- a `gauge_pressure` of either mechanics kind: simcase applies it as a traction
+  that follows the normals, and a motion takes constant tractions only;
 - the parameters the design velocity refuses, including a topology change at p.
 
 Checked (`tests/simcase/test_shape_problem.py`, pre-registered C1–C6 on
@@ -396,7 +398,7 @@ strip of two materials split at x = L1, the parameter:
 | P3 thermoelastic, 400 K / 300 K ends | heat stage derivative equals the steady heat problem's within 1e-12; end displacement derivative vs a same-mesh central difference within 1e-6; flux, convection and traction refused | pass; 2.2e-9 |
 | P4 transient heat with a source, 0–1000 s | heat out at 1000 s: derivative equals the steady problem's within 1e-6; same-mesh central difference within 1e-6 | 2.9e-9; 7.6e-10 |
 | P5 equal to `run` | nodes and triangles bit for bit; t = 0 fields within 1e-12 | pass, all four |
-| P6 refusals | waveguide modes and Joule heating by name | pass |
+| P6 refusals | waveguide modes, Joule heating and a gauge pressure by name | pass |
 
 P3 and P4 replace the plan's analytic references, which P1 does not reproduce. For
 P3, a temperature linear in x gives a quadratic displacement, and a jump of α or

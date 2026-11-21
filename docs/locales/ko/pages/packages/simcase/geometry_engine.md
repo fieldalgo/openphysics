@@ -274,7 +274,8 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 - flat 형상 블록;
 - `axisymmetric` 성분;
 - 다른 물리(메시를 다르게 만드는 도파관 모드, Joule 가열 포함);
-- 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도와 단열, 처방 변위, 체적력만 받습니다;
+- 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도, 열원, 단열, 처방 변위, 체적력만 받습니다;
+- 두 역학 종류의 `gauge_pressure`. simcase는 이를 법선을 따르는 traction으로 적용하는데, motion은 일정한 traction만 받습니다;
 - 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).
 
 검사(`tests/simcase/test_shape_problem.py`, C1–C6을 2026-11-21에 사전 등록, 같은 날 Linux, JAX 0.12.0.1, PyTorch 2.14.1에서 측정):
@@ -298,7 +299,7 @@ x = L1(파라미터)에서 두 재료로 나뉜 2 × 1 mm 띠를 씁니다.
 | P3 열탄성, 양 끝 400 K / 300 K | 열 단계 미분이 정상 열 문제의 것과 1e-12 이내; 끝 변위 미분이 같은 메시 중앙 차분과 1e-6 이내; flux·convection·traction 거부 | 통과; 2.2e-9 |
 | P4 열원이 있는 과도 열, 0–1000 s | 1000 s의 왼쪽 방출 열: 미분이 정상 문제의 것과 1e-6 이내; 같은 메시 중앙 차분과 1e-6 이내 | 2.9e-9; 7.6e-10 |
 | P5 `run`과 같음 | 노드·삼각형 비트 단위로 같음; t = 0 필드 1e-12 이내 | 넷 모두 통과 |
-| P6 거부 | 도파관 모드와 Joule 가열을 이름을 밝혀 거부 | 통과 |
+| P6 거부 | 도파관 모드, Joule 가열, gauge pressure를 이름을 밝혀 거부 | 통과 |
 
 P3과 P4는 계획의 해석 기준을 바꾼 것입니다. 그 기준은 P1이 재현하지 못합니다. P3에서는 x에 선형인 온도가 이차 변위를 만들고,
 계면에서 α나 T′가 뛰면 열변형률이 양립하지 않습니다. P4에서는 영역 과도 문서가 내향 열유속을 받지 않고, 열원이 있는 띠는 2D
