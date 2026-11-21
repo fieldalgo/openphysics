@@ -108,7 +108,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 ## 축대칭 열
 
 `coordinate_system="axisymmetric"`인 `solve_steady_heat`와 `solve_transient_heat`도 Cartesian 풀이와 같은 입력으로 motion을
-받습니다(2026-11-21 결정, 후속 5 조각 1). 좌표는 (r, z)이고 2πr 측도가 노드와 함께 움직입니다. r이 각 삼각형과 변에서 선형이므로 live
+받습니다(2026-11-21). 좌표는 (r, z)이고 2πr 측도가 노드와 함께 움직입니다. r이 각 삼각형과 변에서 선형이므로 live
 조립은 구적 없이 정확한 식을 씁니다:
 - 강성 k(bbᵀ + ccᵀ)/(4A) · 2πr̄, r̄는 세 꼭짓점 반지름의 평균;
 - 영역 열원 2πQA(2rᵢ + rⱼ + rₖ)/12;
@@ -116,7 +116,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 - Robin 변 행렬 2πhL/12 · [[3rₐ + r_b, rₐ + r_b], [rₐ + r_b, rₐ + 3r_b]];
 - 일관 질량 2πcA Σₘ rₘ ∫φᵢφⱼφₘ/A, NumPy 질량과 같은 3차 moment.
 
-대칭축(r = 0) 위 노드는 축에 머물러야 합니다. 그곳에 반지름 방향 성분이 있는 설계 속도는 이름을 밝혀 거부합니다. 음의 반지름과 축
+대칭축(걸음 t에서 r = 0) 위 노드는 축에 머물러야 합니다. 그곳에 반지름 방향 성분이 있는 설계 속도는 이름을 밝혀 거부합니다. 음의 반지름과 축
 위에만 있는 Dirichlet 값은 이동 메시의 보통 풀이가 그대로 거부합니다. 결과는 한 바퀴 전체에 대한 W 단위 비율을 가진 축대칭 클래스이며,
 Cartesian 풀이처럼 미분을 실어 나릅니다.
 

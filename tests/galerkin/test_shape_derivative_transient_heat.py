@@ -296,7 +296,7 @@ def test_h8_refusals():
         call(convection={"right": (xp.asarray(12.0), 290.0)})
     with pytest.raises(TypeError, match="callbacks of time must return NumPy numbers"):
         call(prescribed_temperature={int(m.boundary["left"][0]): (lambda time: xp.asarray(300.0))})
-    # axisymmetric heat takes a motion since 2026-11-21 (follow-up 5); a node leaving the axis is refused
+    # axisymmetric heat takes a motion since 2026-11-21; a node leaving the axis is refused
     with pytest.raises(ValueError, match="symmetry axis off it"):
         solve_transient_heat(m, motion=MeshMotion(design_velocity=W + np.array([1.0, 0.0]), t=t),
                              coordinate_system="axisymmetric", **base)

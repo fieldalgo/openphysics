@@ -155,8 +155,7 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
 ## Axisymmetric heat
 
 `solve_steady_heat` and `solve_transient_heat` with `coordinate_system="axisymmetric"`
-take a motion with the same inputs as the Cartesian solves (decision 2026-11-21,
-follow-up 5, slice 1). The coordinates are (r, z), and the 2πr measure moves with the
+take a motion with the same inputs as the Cartesian solves (2026-11-21). The coordinates are (r, z), and the 2πr measure moves with the
 nodes. The live assembly uses exact closed forms, since r is linear on each triangle and
 edge (no quadrature):
 - stiffness k(bbᵀ + ccᵀ)/(4A) · 2πr̄, with r̄ the mean of the three vertex radii;
@@ -165,8 +164,8 @@ edge (no quadrature):
 - Robin edge matrix 2πhL/12 · [[3rₐ + r_b, rₐ + r_b], [rₐ + r_b, rₐ + 3r_b]];
 - consistent mass 2πcA Σₘ rₘ ∫φᵢφⱼφₘ/A, the cubic moments of the NumPy mass.
 
-Nodes on the symmetry axis (r = 0) must stay on it: a design velocity with a radial
-component there is refused by name. Negative radii and Dirichlet values only on the
+Nodes on the symmetry axis (r = 0 at the step t) must stay on it: a design velocity
+with a radial component there is refused by name. Negative radii and Dirichlet values only on the
 axis keep the ordinary solve's refusals on the moved mesh. Results are the
 axisymmetric classes, with rates in W over the full revolution; they carry the
 derivative as in the Cartesian solves.

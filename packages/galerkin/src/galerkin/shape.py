@@ -16,9 +16,9 @@ derivative is the exact derivative of the discrete solution on the moving mesh.
 - ``MeshMotion(design_velocity=W, t=t)`` passed as ``motion=`` to a supported solver
   returns its result fields with their derivative with respect to t.
 
-``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian),
+``motion=`` is taken by ``thermal.solve_steady_heat`` (Cartesian and axisymmetric),
 ``electric.solve_steady_electric``, ``elasticity.solve_elasticity``,
-``transient_heat.solve_transient_heat`` (Cartesian), ``waveguide.solve_modes``
+``transient_heat.solve_transient_heat`` (Cartesian and axisymmetric), ``waveguide.solve_modes``
 (without coordinate factors),
 ``thermoelasticity.solve_thermoelasticity`` and
 ``thermal_mechanical.solve_steady_thermoelasticity`` with scalar or region data and
