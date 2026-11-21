@@ -11,8 +11,11 @@ import {shapeBounds,shapeCorners,polygonArea} from './workspace-shapes.mjs';
 // these inputs; results stay in the tab.
 export const SIDES=Object.freeze(['left','right','bottom','top']);
 export const MAX_JOULE_SHAPES=8,MAX_JOULE_MATERIALS=6,MAX_JOULE_POINTS=12;
-// Studio's cap on the Picard iteration count (joule_regions_api.MAX_ITERATIONS, capability limits.max_iterations).
-export const MAX_ITERATIONS=500;
+// Studio's caps on the iteration count (joule_regions_api.MAX_ITERATIONS and MAX_NEWTON_ITERATIONS,
+// capability limits.max_iterations and max_newton_iterations): 500 Picard steps, or 17 Newton steps,
+// whose first evaluation and up to 31 candidates per step fit the same budget.
+export const MAX_ITERATIONS=500,MAX_NEWTON_ITERATIONS=17;
+export const METHODS=Object.freeze({picard:'Picard (relaxed)',newton:'Newton'});
 export const STEADY='joule.steady2d',TEMPERATURE='joule.temperature2d';
 export const PAIRS=Object.freeze({[STEADY]:Object.freeze(['joule.steady2d-regions-result-v2','electric-joule2d-p1-node-cell-regions-v2']),
  [TEMPERATURE]:Object.freeze(['joule.temperature2d-regions-result-v2','electric-joule2d-temperature-p1-node-cell-regions-v2'])});
@@ -20,8 +23,9 @@ export const PAYLOAD='studio-joule-regions-v1';
 export const ELECTRIC_TYPES=Object.freeze({insulating:'Insulating',potential:'Fixed potential',current:'Inward current density'});
 export const THERMAL_TYPES=Object.freeze({insulated:'Insulated (zero flux)',temperature:'Fixed temperature',flux:'Inward heat flux',convection:'Convection'});
 // The documented iteration defaults of joule.temperature2d; temperature_tolerance has no default
-// in the document format, so the form starts it at the value of the two-material check.
-export const ITERATION_DEFAULTS=Object.freeze({initial_temperature:300,relaxation_factor:0.5,temperature_tolerance:1e-9,relative_tolerance:1e-10,iteration_limit:100});
+// in the document format, so the form starts it at the value of the two-material check. method is
+// optional in projects: absent means Picard, as in the document format.
+export const ITERATION_DEFAULTS=Object.freeze({method:'picard',initial_temperature:300,relaxation_factor:0.5,temperature_tolerance:1e-9,relative_tolerance:1e-10,iteration_limit:100});
 const linear=(sigma,alpha)=>Object.freeze({model:'linear_resistivity',reference_conductivity:sigma,reference_temperature:300,coefficient:alpha,tmin:250,tmax:600});
 // The two-material strip of the region Joule checks: A on the left half, B on the right.
 export const DEFAULT_JOULE=Object.freeze({width:2,height:1,background:'A',elementSize:0.125,
@@ -91,14 +95,22 @@ function validateThermalSide(raw,side){
  if(raw?.type==='convection')return {type:'convection',h:number(raw.h,`${side} heat transfer coefficient [W/(m²·K)]`,{min:0,max:1e7}),ambient:number(raw.ambient,`${side} ambient temperature [K]`,{positive:true,max:1e5})};
  throw new Error(`Choose a thermal condition for the ${side} side.`);
 }
+// The relaxation factor is kept with Newton (unused, so switching back restores it).
 export function validateIteration(raw){
  if(!raw||typeof raw!=='object')throw new Error('Iteration settings are missing.');
- return {initial_temperature:number(raw.initial_temperature,'initial temperature [K]',{positive:true,max:1e5}),
+ const method=raw.method===undefined?'picard':raw.method;
+ if(!Object.hasOwn(METHODS,method))throw new Error('Choose the Picard or the Newton iteration.');
+ const newton=method==='newton';
+ return {method,initial_temperature:number(raw.initial_temperature,'initial temperature [K]',{positive:true,max:1e5}),
   relaxation_factor:number(raw.relaxation_factor,'relaxation factor',{positive:true,max:1}),
   temperature_tolerance:number(raw.temperature_tolerance,'temperature tolerance [K]',{positive:true,max:1e3}),
   relative_tolerance:number(raw.relative_tolerance,'relative tolerance',{positive:true,max:1}),
-  iteration_limit:number(raw.iteration_limit,'iteration limit',{min:1,max:MAX_ITERATIONS,integer:true})};
+  iteration_limit:number(raw.iteration_limit,newton?`iteration limit (1–${MAX_NEWTON_ITERATIONS} Newton steps)`:`iteration limit (1–${MAX_ITERATIONS})`,{min:1,max:newton?MAX_NEWTON_ITERATIONS:MAX_ITERATIONS,integer:true})};
 }
+// The iteration method of a joule.temperature2d summary (simcase writes iteration_method for Newton only).
+export function iterationMethod(summary){return summary?.iteration_method==='newton'?'newton':'picard';}
+// "Picard 31 iterations" or "Newton 3 steps": the method and count of a summary's iteration records.
+export function iterationText(summary){const n=summary.iterations.length;return iterationMethod(summary)==='newton'?`Newton ${n} step${n===1?'':'s'}`:`Picard ${n} iteration${n===1?'':'s'}`;}
 // Structural checks: every value finite and in range, names unique, shapes inside the domain.
 export function validateJoule(raw){
  if(!raw||typeof raw!=='object')throw new Error('Joule heating inputs are missing.');
@@ -170,7 +182,9 @@ export function jouleDocument(raw){
  if(Object.keys(flux).length)p.inward_heat_flux=flux;
  if(Object.keys(convection).length)p.convection=convection;
  if(kind===TEMPERATURE){const it=j.iteration;p.initial_temperature=q(it.initial_temperature,'K');
-  p.iteration={relaxation_factor:it.relaxation_factor,temperature_tolerance:q(it.temperature_tolerance,'K'),relative_tolerance:it.relative_tolerance,iteration_limit:it.iteration_limit};}
+  // a Picard document is written as before (no method key); Newton takes no relaxation_factor
+  p.iteration=it.method==='newton'?{method:'newton',temperature_tolerance:q(it.temperature_tolerance,'K'),relative_tolerance:it.relative_tolerance,iteration_limit:it.iteration_limit}
+   :{relaxation_factor:it.relaxation_factor,temperature_tolerance:q(it.temperature_tolerance,'K'),relative_tolerance:it.relative_tolerance,iteration_limit:it.iteration_limit};}
  const materials={};for(const m of usedMaterials(j))materials[m.name]={electrical_conductivity:sigmaDocument(m.sigma),thermal_conductivity:q(m.k,'W/(m K)')};
  return {openphysics:'0.3',name:'Workspace Joule heating',
   geometry:{version:1,components:{xs:{dimension:'2d',length_unit:'mm',depth:null,domain:{xmin:0,xmax:j.width,ymin:0,ymax:j.height},

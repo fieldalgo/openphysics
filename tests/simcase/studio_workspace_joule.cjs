@@ -148,3 +148,42 @@ test('the capability check needs both kinds on the Joule routes',async()=>{
  assert.equal((await runner({'joule.temperature2d':block({run_enabled:false}),'joule.steady2d':block()}).capability()).run_enabled,false);
  await assert.rejects(runner({'joule.temperature2d':block()}).capability(),/does not run Joule heating/);
 });
+
+// SN7 (HQ work record openphysics-studio-joule-newton, 2026-11-21, pre-registered): the Newton
+// iteration. test_studio_joule_regions.py runs WORKSPACE_NEWTON, the document asserted here.
+const newtonInputs=(limit=17)=>inputs(j=>{j.iteration.method='newton';j.iteration.iteration_limit=limit;});
+test('a Newton document writes method "newton" and no relaxation factor; Picard is written as before',()=>{
+ assert.equal(J.DEFAULT_JOULE.iteration.method,'picard');
+ assert.equal('method' in J.jouleDocument(J.DEFAULT_JOULE).physics.j.iteration,false);
+ const d=J.jouleDocument(newtonInputs()),picard=J.jouleDocument(J.DEFAULT_JOULE);
+ assert.deepEqual(d.physics.j.iteration,{method:'newton',temperature_tolerance:'1e-9 K',relative_tolerance:1e-10,iteration_limit:17});
+ delete d.physics.j.iteration;delete picard.physics.j.iteration;assert.deepEqual(d,picard);
+ assert.equal(J.jouleBlock(J.validateJoule(newtonInputs())),'');
+});
+test('the method is optional (absent is Picard), and Newton steps are capped at 17',()=>{
+ assert.equal(J.MAX_NEWTON_ITERATIONS,17);assert.equal(J.MAX_ITERATIONS,500);
+ const absent=inputs(j=>delete j.iteration.method);assert.equal(J.validateJoule(absent).iteration.method,'picard');
+ assert.deepEqual(J.jouleDocument(absent),J.jouleDocument(J.DEFAULT_JOULE));
+ for(const method of ['Newton','secant',1,null])assert.throws(()=>J.validateJoule(inputs(j=>j.iteration.method=method)),/Picard or the Newton iteration/);
+ assert.throws(()=>J.validateJoule(newtonInputs(18)),/iteration limit \(1–17 Newton steps\)/);
+ assert.throws(()=>J.validateJoule(newtonInputs(100)),/1–17 Newton steps/);
+ assert.equal(J.validateJoule(newtonInputs(1)).iteration.iteration_limit,1);
+ assert.equal(J.validateJoule(inputs(j=>j.iteration.iteration_limit=500)).iteration.iteration_limit,500);
+ // the relaxation factor is kept, unused, while Newton is chosen
+ assert.equal(J.validateJoule(newtonInputs()).iteration.relaxation_factor,0.5);
+});
+test('projects keep the method; a version 7 project without it loads as Picard',()=>{
+ const doc=P.snapshot({...state,joule:newtonInputs(12)},setup);
+ const loaded=P.parseProject(JSON.stringify(doc));assert.equal(loaded.model.joule.iteration.method,'newton');assert.equal(loaded.model.joule.iteration.iteration_limit,12);
+ const old=clone(doc);delete old.model.joule.iteration.method;old.model.joule.iteration.iteration_limit=100;
+ assert.equal(P.parseProject(JSON.stringify(old)).model.joule.iteration.method,'picard');
+ const session=N.createSession(doc,[],null,[null,null]);assert.equal(N.parseSession(JSON.stringify(session)).input.model.joule.iteration.method,'newton');
+});
+test('result texts name the method from the summary',()=>{
+ const records=n=>Array.from({length:n},(_,i)=>({iteration_count:i+1}));
+ assert.equal(J.iterationMethod({iterations:[]}),'picard');assert.equal(J.iterationMethod({iteration_method:'newton'}),'newton');
+ assert.equal(J.iterationText({iterations:records(31)}),'Picard 31 iterations');
+ assert.equal(J.iterationText({iteration_method:'newton',iterations:records(3)}),'Newton 3 steps');
+ assert.equal(J.iterationText({iteration_method:'newton',iterations:records(1)}),'Newton 1 step');
+ assert.equal(J.checkJoulePayload(payload(p=>{p.summary.iteration_method='newton';}),owner,'joule.temperature2d').summary.iteration_method,'newton');
+});

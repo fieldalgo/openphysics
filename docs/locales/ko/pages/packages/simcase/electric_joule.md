@@ -243,36 +243,47 @@ mm 단위 2 × 1 mm 띠로, 왼쪽 절반의 `linear_resistivity` 금속(300 K�
 Studio는 재료 영역이 있는 `joule.steady2d`·`joule.temperature2d` 문서를 `POST /api/joule/validate`와
 `POST /api/joule/run`에서 열전도 route와 같은 요청 봉투(`{"doc", "client_revision", "request_seq"}`)로
 검증·실행한다. 직사각형 전기 문서, `electric.steady2d` 문서, 다른 물리는 이름을 밝혀 거부한다
-(`unsupported_geometry`, `unsupported_physics`). `iteration.method: "newton"`인 `joule.temperature2d` 문서도
-거부한다(`unsupported_iteration_method`, 400). Studio의 반복 상한과 오류 문장이 Picard 걸음을 센다. 이 route는
+(`unsupported_geometry`, `unsupported_physics`). `joule.temperature2d` 문서는 `simcase.run`과 같이 Picard로,
+`iteration.method: "newton"`이면 Newton으로 푼다. 이 route는
 [Studio 영역 경로](thermal_studio.md#영역-문서)를 단계마다 그대로 따른다. 같은 영역 한도
 (`max_shapes`, `max_circles`, `max_polygon_points`, `max_boundary_crossings`, `max_input_vertices`)를
 문서를 읽기 전에 검사하고, 작업은 절점·삼각형 상한(`max_nodes`, `max_triangles`)으로 실행하므로 너무
 조밀한 메시는 메시 생성 뒤, 풀이 전에 실패한다. 열전도와 Joule 작업은 열전도 route의 활성 작업 한
-자리, 바이트 예산, 결과 보존을 함께 쓴다. 작업 실행 시간 한도는 없다. 작업 비용은 메시 비용 × Picard 반복 수이므로 `iteration.iteration_limit`이
-Studio의 `max_iterations`(500)를 넘는 `joule.temperature2d` 문서는 작업 전에 거부한다
-(`iteration_limit_exceeded`, 413). 반복 기록(하나에 약 1 kB)은 64 KiB `metadata_bytes`가 아니라 결과의
-`payload_bytes`에 센다. `/api/capabilities`에는 종류마다
+자리, 바이트 예산, 결과 보존을 함께 쓴다. 작업 실행 시간 한도는 없다. 작업 비용은 메시 비용 × 반복
+평가 수다(평가 하나는 전기 풀이 두 번과 열 풀이 한 번, 곧 Picard 한 걸음). Studio는 평가를 최대 500번
+허용한다. `iteration.iteration_limit`이 `max_iterations`(500)를 넘는 Picard 문서와, `iteration_limit`이
+`max_newton_iterations`(17: 첫 평가와 이후 걸음마다 후보 최대 31개, 1 + 31 × 16 = 497)를 넘는 Newton
+문서는 작업 전에 거부한다(`iteration_limit_exceeded`, 413, `iteration.iteration_limit`에서). 그래서 Newton
+문서는 `iteration_limit`을 적어야 한다. 문서 기본값(100)이 Studio 상한을 넘기 때문이다. Newton 걸음은
+전위와 온도를 함께 푸는 희소 연립계도 한 번 푼다. 반복 기록(하나에 약 1 kB)은 64 KiB `metadata_bytes`가
+아니라 결과의 `payload_bytes`에 센다. `/api/capabilities`에는 종류마다
 블록(`run`, `validate`, `geometry: "regions"`, 결과·payload 형식, 영역 한도, `joule.temperature2d`에는
-`max_iterations`)이 있다.
+`max_iterations`와 `max_newton_iterations`)이 있다.
 
 끝난 작업의 결과(`GET /api/jobs/<job>/result`)는 payload `studio-joule-regions-v1`이다. 공개 결과의
 모든 배열을 등록부 이름으로(SI, `triangle_regions` 포함, `joule.temperature2d`에는
-`evaluation_temperature`), 생산자 요약(수지, 단자 전류, 영역, `joule.temperature2d`의 Picard 반복
-기록), `length_unit`, `display_length_in_m`을 담는다. 게시 전에 결과/배치 쌍, 각 배열의 형상과 단위를
+`evaluation_temperature`), 생산자 요약(수지, 단자 전류, 영역, `joule.temperature2d`의 반복 기록 — Picard
+걸음 또는 받아들인 Newton 걸음마다 하나 — 와 Newton이면 `iteration_method`), `length_unit`, `display_length_in_m`을 담는다. 게시 전에 결과/배치 쌍, 각 배열의 형상과 단위를
 요약과, 연결과 방향, 고정 절점 ID, 메시 개수, 각 영역의 재료와 열전도율을 문서와 대조한다(어긋나면
 `invalid_result`).
 
 오류: 문서·형상·한도 거부는 자기 문장을 유지한다(모델의 `valid.temperature` 밖 온도, 전위 누락, 어떤
-전위에도 닿지 않는 도체 부분을 영역 이름으로). 수렴하지 않은 Picard 반복은 반복 횟수와 솔버의 이유를
-담은 작업 오류 `not_converged`이다(반복 한도, 또는 반복 값이 재료 모델의 유효 범위를 벗어남). 반복 안의
-다른 오류는 고정 문장을 받는다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
+전위에도 닿지 않는 도체 부분을 영역 이름으로). 수렴하지 않은 반복은 방법, 반복 횟수, 솔버의 이유를 담은
+작업 오류 `not_converged`이다: "the Picard iteration did not converge after N iterations: …" 또는 "the
+Newton iteration did not converge after N steps: …". 보이는 이유는 반복 한도, 반복 값이 재료 모델의 유효
+범위를 벗어남, 그리고 Newton에서는 온도 결함을 줄이지 못하는 걸음(마지막 후보가 범위를 벗어나 실패했으면
+그 문장도)과 특이하거나 유한하지 않은 걸음을 내는 Newton 연립계다. 반복 안의 다른 오류는 고정 문장을
+받는다. 그 밖의 실패는 Studio의 고정 문장으로 답하고 traceback을 로그에
 남긴다([보안](../../security.md#브라우저-studio)).
 
 검사(`tests/simcase/test_studio_joule_regions.py`, 사전 등록 J-S1–J-S4): 위의 두 재료 띠의 payload가
 같은 문서의 `simcase.run`과 배열마다 비트 단위로 같고 요약도 실행 시간 밖에서 같다(두 종류 모두). 위의
 거부, 형상·절점 상한과 공유 작업 자리, 요약과 어긋나는 결과. 약 8,400 절점의 띠는 Linux 한 대에서
-8초에 4.9 MB payload를 냈다(payload 한도 16 MiB). 작업 공간의
+8초에 4.9 MB payload를 냈다(payload 한도 16 MiB). Newton 문서(사전 등록 SN1–SN6, 같은 파일): 띠와
+작업 공간 기본 문서에 `"method": "newton"`과 `iteration_limit` 17을 준 것이 `simcase.run`과 비트 단위로
+같다(Newton 3걸음 대 Picard 31번, 온도는 Picard와 2e-8 K 이내). 17은 받고 18과 기본값 100은 validate와
+run 모두 거부한다. `"Newton"`, `"secant"`, `"newton"` 옆의 `relaxation_factor`에 대한 읽기 도구의 거부는
+그 문장을 유지한다. 수렴 실패 문장과 보이는 솔버 이유, 공유 작업 자리도 검사한다. 작업 공간의
 [Joule 가열 애플리케이션](workspace.md#이름-붙은-영역의-joule-가열)이 이 문서를 만들어 실행한다.
 
 ## 실행·저장
@@ -363,8 +374,7 @@ redirect해 보존한다.
 `tests/simcase/test_units_electric_joule.py`가 검사한다. 기존 솔버의 독립 도구 비교는 유지하며
 새로운 이산화는 추가하지 않는다.
 
-이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. Newton 문서의 Studio 실행,
-경계면 전위, 축대칭 전도, 임의 σ 함수, 기준 전위만 주는 전류 조건, 단자 총량, 과도, 3D,
+이 계약은 위의 직사각형과 영역 형식, 단일 study에 한정된다. 경계면 전위, 축대칭 전도, 임의 σ 함수, 기준 전위만 주는 전류 조건, 단자 총량, 과도, 3D,
 직사각형 문서의 Studio 실행, 릴리스는 제외한다. 저장한 필드는 `simcase.export`로 ParaView에서 볼 수 있다
 ([ParaView로 보기](overview.md#paraview로-보기)). 그 내보내기는 저장된 배열을 복사하고 FieldData
 `units`와 `conventions` 블록을 더할 뿐 이 계약에 다른 것을 더하지 않는다. 입력 검증 통과는

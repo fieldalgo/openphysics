@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
- usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,JouleRunner} from './workspace-joule.mjs';
+import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,MAX_ITERATIONS,MAX_NEWTON_ITERATIONS,METHODS,ITERATION_DEFAULTS,TEMPERATURE,RESULT_FIELDS,validateJoule,jouleBlock,jouleDocument,jouleKind,
+ usedMaterials,sigmaText,electricText,thermalText,jouleSummary,newJouleShape,newJouleMaterial,jouleViewModel,balanceRows,iterationRows,iterationMethod,iterationText,JouleRunner} from './workspace-joule.mjs';
 import {shapeCorners} from './workspace-shapes.mjs';
 import {renderJouleGraph} from './workspace-graph.mjs';
 
@@ -24,7 +24,9 @@ export function createJouleView(ctx){
   if(capError)return capError;if(!cap)return 'Checking whether this server runs Joule heating…';if(!cap.run_enabled)return 'This server does not enable Joule heating runs.';
   if(drafts.size)return 'Correct or restore the highlighted Joule inputs before running.';
   if(ctx.otherBusy?.())return 'A heat job holds the server job slot; wait for it to finish.';
-  if(cap.limits?.max_iterations&&jouleKind(j())===TEMPERATURE&&j().iteration.iteration_limit>cap.limits.max_iterations)return `The iteration limit exceeds this server's ${cap.limits.max_iterations}.`;
+  if(jouleKind(j())===TEMPERATURE){const it=j().iteration,newton=it.method==='newton',max=newton?cap.limits?.max_newton_iterations:cap.limits?.max_iterations;
+   if(newton&&!max)return 'This Studio server does not run the Newton iteration; choose Picard.';
+   if(max&&it.iteration_limit>max)return `The iteration limit exceeds this server's ${max}${newton?' Newton steps':''}.`;}
   return jouleBlock(j(),cap.limits);
  }
  // A path into the inputs: "width", "materials.0.k", "sides.left.thermal.h", "shapes.1.points".
@@ -60,7 +62,7 @@ export function createJouleView(ctx){
     (lin?input(`${b}.sigma.reference_conductivity`,'Reference conductivity σ₀ [S/m]','min="0"')+input(`${b}.sigma.reference_temperature`,'Reference temperature T₀ [K]','min="0"')+input(`${b}.sigma.coefficient`,'Resistivity temperature coefficient α [1/K]')+input(`${b}.sigma.tmin`,'Valid from [K]','min="0"')+input(`${b}.sigma.tmax`,'Valid to [K]','min="0"')
      :input(`${b}.sigma.value`,'Electrical conductivity σ [S/m]','min="0"'))+
     `<button type="button" data-joule-delete-material="${i}" ${used.has(m.name)||s.materials.length<=1?'disabled':''}>Delete material</button></fieldset>`;}).join('');
-  return html+`<button type="button" id="joule-add-material" ${s.materials.length>=MAX_JOULE_MATERIALS?'disabled':''}>Add material</button><p>σ(T) = σ₀ / (1 + α (T − T₀)) inside its valid range. When a used material has this model the study is joule.temperature2d (Picard iteration); with constant materials it is joule.steady2d.</p>`;
+  return html+`<button type="button" id="joule-add-material" ${s.materials.length>=MAX_JOULE_MATERIALS?'disabled':''}>Add material</button><p>σ(T) = σ₀ / (1 + α (T − T₀)) inside its valid range. When a used material has this model the study is joule.temperature2d (Picard or Newton iteration, chosen under Study); with constant materials it is joule.steady2d.</p>`;
  }
  function sidesPanel(kind){
   return SIDES.map(side=>{const c=j().sides[side][kind],b=`sides.${side}.${kind}`;let fields='';
@@ -76,7 +78,8 @@ export function createJouleView(ctx){
   else if(ui.selection==='Electric currents')html+=sidesPanel('electric');
   else if(ui.selection==='Heat transfer')html+=sidesPanel('thermal');
   else if(ui.selection==='Mesh')html+=input('elementSize','Element size [mm]','min="0"')+'<p>Unstructured P1 triangles that follow the region boundaries. The node and triangle limits of this server apply when the job meshes; the actual mesh is shown with the result.</p>';
-  else{html+=pair('Physics',jouleKind(s))+(jouleKind(s)===TEMPERATURE?input('iteration.initial_temperature','Initial temperature [K]','min="0"')+input('iteration.relaxation_factor','Relaxation factor (0, 1]','min="0" max="1"')+input('iteration.temperature_tolerance','Temperature tolerance [K]','min="0"')+input('iteration.relative_tolerance','Relative tolerance','min="0" max="1"')+input('iteration.iteration_limit',`Iteration limit (at most ${MAX_ITERATIONS})`,'min="1" step="1"')+'<p>Picard iteration; the defaults are the documented ones (relaxation 0.5, relative tolerance 1e-10, 100 iterations).</p>':'<p>All used materials have constant conductivity: one coupled solve, no iteration.</p>');}
+  else{const newton=s.iteration.method==='newton';html+=pair('Physics',jouleKind(s))+(jouleKind(s)===TEMPERATURE?select('iteration.method',METHODS,s.iteration.method,'Iteration method')+input('iteration.initial_temperature','Initial temperature [K]','min="0"')+(newton?'':input('iteration.relaxation_factor','Relaxation factor (0, 1]','min="0" max="1"'))+input('iteration.temperature_tolerance','Temperature tolerance [K]','min="0"')+input('iteration.relative_tolerance','Relative tolerance','min="0" max="1"')+input('iteration.iteration_limit',newton?`Newton step limit (at most ${MAX_NEWTON_ITERATIONS})`:`Iteration limit (at most ${MAX_ITERATIONS})`,'min="1" step="1"')+
+   (newton?`<p>Newton steps of the potential and temperature together, each halved until it reduces the temperature defect; the same convergence tests as Picard, and no relaxation. Studio allows ${MAX_NEWTON_ITERATIONS} steps (each evaluates up to 31 candidates). Use it when Picard is slow or stops at its limit.</p>`:'<p>Picard iteration; the defaults are the documented ones (relaxation 0.5, relative tolerance 1e-10, 100 iterations).</p>'):'<p>All used materials have constant conductivity: one coupled solve, no iteration.</p>');}
   if(drafts.size)html+='<button id="joule-discard-drafts">Restore last valid values</button>';
   return html;
  }
@@ -85,6 +88,10 @@ export function createJouleView(ctx){
   document.querySelectorAll('[data-joule-text]').forEach(el=>el.onchange=()=>set(el.dataset.jouleText,el.value.trim(),'Shape renamed.'));
   document.querySelectorAll('[data-joule-select]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleSelect;
    if(path.endsWith('.sigma.model')){for(const key of [...drafts.keys()])if(key.startsWith(path.slice(0,-6)+'.'))drafts.delete(key);const next=el.value==='constant'?{model:'constant',value:1000}:{model:'linear_resistivity',reference_conductivity:1000,reference_temperature:300,coefficient:0.004,tmin:250,tmax:600};set(path.slice(0,-6),next,'Conductivity model changed.');}
+   else if(path==='iteration.method'){
+    // Newton's step limit is at most MAX_NEWTON_ITERATIONS; Picard returns to the documented default limit
+    const it={...j().iteration,method:el.value};it.iteration_limit=el.value==='newton'?Math.min(it.iteration_limit,MAX_NEWTON_ITERATIONS):ITERATION_DEFAULTS.iteration_limit;
+    drafts.delete('iteration.iteration_limit');drafts.delete('iteration.relaxation_factor');set('iteration',it,`Iteration method: ${METHODS[el.value]}, limit ${it.iteration_limit}.`);}
    else set(path,el.value,'Material assignment updated.');});
   document.querySelectorAll('[data-joule-type]').forEach(el=>el.onchange=()=>{const path=el.dataset.jouleType,type=el.value,defaults={insulating:{type},potential:{type,potential:0},current:{type,current:0},insulated:{type},temperature:{type,temperature:300},flux:{type,flux:0},convection:{type,h:10,ambient:300}};
    for(const key of [...drafts.keys()])if(key.startsWith(path+'.'))drafts.delete(key);set(path,defaults[type],`${path.split('.')[1]} side: ${type}.`);});
@@ -146,16 +153,16 @@ export function createJouleView(ctx){
   const rows=balanceRows(summary),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—';
   $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
    '<h3>Balances per metre of depth</h3>'+rows.map(([l,v])=>pair(esc(l),esc(v))).join('')+
-   '<h3>Solution</h3>'+(history.length?pair('Picard iterations',history.length)+'<p>The iteration history is in the Solver log of the study dock.</p>':'<p>One coupled solve (constant conductivities).</p>')+
+   '<h3>Solution</h3>'+(history.length?pair(iterationMethod(summary)==='newton'?'Newton steps':'Picard iterations',history.length)+'<p>The iteration history is in the Solver log of the study dock.</p>':'<p>One coupled solve (constant conductivities).</p>')+
    pair('Completed',new Date(run.completedAt).toLocaleTimeString());
   const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>ctx.commit(clone(run.input),'Joule inputs restored from the run.');$('inspector').append(restore);
  }
- // The study dock's solver log: Picard history and the power balance of the shown result.
+ // The study dock's solver log: the Picard or Newton history and the power balance of the shown result.
  function solverLog(){
   const log=$('solver-log');if(!log)return;const show=ui.page==='Results'&&!!result;log.hidden=!show;if(!show)return;
   const summary=result.payload.summary,rows=balanceRows(summary).slice(0,3),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—',last=history.at(-1);
-  log.querySelector('summary').innerHTML='<b>Solver log</b>'+(history.length?`Picard ${history.length} iterations · last |ΔT| ${num(last[1])} K · Δσ/σ ${num(last[2])}`:'One coupled solve · constant conductivities')+' · '+rows.map(([l,v])=>esc(l)+' '+esc(v)).join(' · ');
-  log.querySelector('.dock-log-body').innerHTML=history.length?`<table aria-label="Picard iterations"><thead><tr><th scope="col">#</th><th scope="col">|ΔT| [K]</th><th scope="col">Δσ/σ</th><th scope="col">T max [K]</th></tr></thead><tbody>${history.map(r=>`<tr><td>${r[0]}</td><td>${num(r[1])}</td><td>${num(r[2])}</td><td>${num(r[3])}</td></tr>`).join('')}</tbody></table>`:'<p>The conductivities are constant, so the electric and heat problems were solved once without iteration.</p>';
+  log.querySelector('summary').innerHTML='<b>Solver log</b>'+(history.length?`${esc(iterationText(summary))} · last |ΔT| ${num(last[1])} K · Δσ/σ ${num(last[2])}`:'One coupled solve · constant conductivities')+' · '+rows.map(([l,v])=>esc(l)+' '+esc(v)).join(' · ');
+  log.querySelector('.dock-log-body').innerHTML=history.length?`<table aria-label="${iterationMethod(summary)==='newton'?'Newton steps':'Picard iterations'}"><thead><tr><th scope="col">#</th><th scope="col">|ΔT| [K]</th><th scope="col">Δσ/σ</th><th scope="col">T max [K]</th></tr></thead><tbody>${history.map(r=>`<tr><td>${r[0]}</td><td>${num(r[1])}</td><td>${num(r[2])}</td><td>${num(r[3])}</td></tr>`).join('')}</tbody></table>`:'<p>The conductivities are constant, so the electric and heat problems were solved once without iteration.</p>';
  }
  function refreshControls(){
   const button=$('run-joule');if(!button)return;const on=ctx.active();button.hidden=!on;if(!on)return;$('run-optical').hidden=true;$('run-heat').hidden=true;

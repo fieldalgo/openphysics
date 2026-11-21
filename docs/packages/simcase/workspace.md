@@ -213,10 +213,13 @@ temperature range. **Electric currents** gives each side an insulating boundary,
 fixed potential [V] or an inward current density [A/m²]; **Heat transfer** an
 insulated boundary, a fixed temperature [K], an inward heat flux [W/m²] or
 convection. **Mesh** sets the element size in mm. When a used material has the
-model, the study is `joule.temperature2d` and **Study** sets the Picard iteration:
-initial temperature and the documented defaults (relaxation 0.5, relative tolerance
-1e-10, 100 iterations, at most Studio's 500) with a temperature tolerance the form
-starts at 1e-9 K; with constant materials it is `joule.steady2d`. The default model is
+model, the study is `joule.temperature2d` and **Study** sets the iteration: the
+method, Picard (default) or Newton, the initial temperature and the documented
+defaults (relaxation 0.5, relative tolerance 1e-10, 100 iterations, at most Studio's
+500) with a temperature tolerance the form starts at 1e-9 K. Newton takes no
+relaxation (the field is hidden and its value kept) and at most 17 steps, Studio's
+cap: choosing it lowers the limit to 17 at most, and choosing Picard again sets the
+limit back to 100. With constant materials it is `joule.steady2d`. The default model is
 the two-material strip of the [region Joule checks](electric_joule.md#material-regions-temperature-dependent-joule-heating).
 
 Run is enabled when a side fixes the potential, a side fixes the temperature or has
@@ -233,11 +236,14 @@ and heat flux |q| (per triangle, with optional arrows) on the actual mesh with
 region boundaries in Graphics, the balances (supplied electric power, Joule power,
 outward heat, temperature range and the current through each fixed side, per metre of
 depth) in Settings, the value at a clicked point, and the **Solver log** in the study
-dock: its line gives the Picard iteration count, the last temperature and conductivity
-changes and the three power balances, and opening it lists every Picard iteration
-(|ΔT|, Δσ/σ, maximum T). With constant materials it says the problem was solved once. A result keeps its inputs;
+dock: its line gives the method and count ("Picard 31 iterations", "Newton 3 steps"),
+the last temperature and conductivity changes and the three power balances, and
+opening it lists every Picard iteration or accepted Newton step (|ΔT|, Δσ/σ, maximum T). With constant materials it says the problem was solved once. A result keeps its inputs;
 **Restore run inputs** brings them back. Joule inputs are saved in input files,
-sessions, drafts, recovery and undo history (version 7); Joule results stay in the
+sessions, drafts, recovery and undo history (version 7; the iteration method is an
+optional key, absent meaning Picard, so earlier version 7 files load unchanged, while a
+Studio from before the method was added opens a Newton file as Picard without a warning);
+Joule results stay in the
 tab, as heat results do. A run that ends after you switch to another application waits in
 the Joule application; undo keeps following a running job, and opening a file discards its
 result. In the multiphysics preview the interface boxes cannot leave electric currents and

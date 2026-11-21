@@ -612,7 +612,7 @@ def _run_joule_job(jobs, lease, spec, rlimits):
             result = run(spec.run_doc, verbose=False, max_nodes=spec.plan.n_cap,
                          max_triangles=spec.plan.m_cap, max_input_vertices=rlimits.max_input_vertices)
         except Exception as exc:
-            mapped = joule.job_error(exc, spec.plan)
+            mapped = joule.job_error(exc, spec)
             if mapped is None:
                 raise
             raise mapped from exc
