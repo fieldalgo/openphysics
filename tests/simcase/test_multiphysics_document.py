@@ -485,3 +485,21 @@ def test_a_malformed_loop_method_or_norm_is_named_not_raised(relays):
     for change in ({"method": 1.5}, {"tolerance": {"port": "a.y", "norm": 2.5, "value": "1e-6 K"}}):
         found = resolve.resolve_text(json.dumps(_cycle([_loop(**change)]))).diagnostics.errors
         assert found
+
+
+def test_progress_events_follow_the_solve_order(relays):
+    events = []
+    doc = Document.from_dict(relay_document({"b": ("test.relay", 2, 1), "a": ("test.relay", 1, 3)},
+                                            {"ab": ("a.y", "b.x")}))
+    multiphysics.run(doc, verbose=False, on_event=events.append)
+    assert [(e["event"], e["physics"]) for e in events] == [
+        ("physics_started", "a"), ("physics_finished", "a"), ("physics_started", "b"), ("physics_finished", "b")]
+    assert json.loads(json.dumps(events)) == events                      # JSON data
+    events = []
+    tree = _cycle([_loop(max_iterations=300, tolerance={"port": "a.y", "norm": "max_abs", "value": "1e-10 K"})])
+    result = multiphysics.run(Document.from_dict(tree), verbose=False, on_event=events.append)
+    kinds = [e["event"] for e in events]
+    assert kinds[0] == "loop_started" and kinds[-1] == "loop_finished" and set(kinds[1:-1]) == {"loop_iteration"}
+    residuals = [e["residual"] for e in events if e["event"] == "loop_iteration"]
+    assert residuals == [r["value"] for r in result.loops[0]["residuals"]]
+    assert events[-1]["iterations"] == result.loops[0]["iterations"]
