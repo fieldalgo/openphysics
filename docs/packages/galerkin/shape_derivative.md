@@ -182,7 +182,7 @@ on 2026-11-21 before the implementation ran, and measured that day:
 | A5 hollow cylinder | a = 1, b = 2, T(a) = 400, T(b) = 300: the inner-wall heat rate differentiated in b against −2πkH(T₁ − T₂)/(b ln²(b/a)); order ≥ 1.5, finest within 1 % | 8.6e-4, 2.2e-4, 5.4e-5 at 8, 16, 32 radial cells; order 1.99 and 2.00 |
 | A6 transient | the same section, five backward-Euler steps: the last temperatures as A2 | 2.4e-10 |
 | A7 refusals | a radial velocity on the axis (steady and transient), a live conductivity, an unknown coordinate system | pass |
-| A8 unchanged | without a motion the results equal main `54485b12` | sha256 equal (steady and transient) |
+| A8 unchanged | without a motion the results equal main `54485b12` | sha256 equal for steady and transient (measured on one machine); `motion=None` equals no keyword (test) |
 
 ## Waveguide modes
 
