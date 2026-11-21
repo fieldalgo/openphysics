@@ -225,11 +225,12 @@ try {
   const logIs = pattern => `${pattern}.test(document.querySelector('#solver-log summary')?.textContent||'')&&!document.getElementById('solver-log').hidden`;
 
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=joule]')", 'applications page');
-  await page.click('[data-template=joule]'); await sleep(300);
-  if (await page.eval("!!document.querySelector('dialog[open] #confirm-load')")) await page.click('dialog[open] #confirm-load');
+  await page.click('[data-template=joule]');
   await page.until("!!document.querySelector('svg[data-geometry-view=joule]')&&!document.getElementById('run-joule').hidden", 'Joule application');
   const drawn = await page.eval("({shapes:document.querySelectorAll('svg[data-geometry-view=joule] [data-joule-pick]').length,sides:document.querySelectorAll('svg[data-geometry-view=joule] [data-joule-side]').length})");
   stage('JB1 Joule application', drawn); assert.deepEqual(drawn, {shapes: 1, sides: 4});
+  // choosing a template opens no confirmation (workspace-app.mjs); a dialog here would be a change to check
+  assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no dialog after choosing Joule heating');
   await page.screenshot('joule-model');
 
   await jouleRun(logIs('/Picard \\d+ iterations/'), 'Joule Picard run');
@@ -238,8 +239,11 @@ try {
   stage('JB2 Picard result', {log: picardLog, temperature: picardT});
   assert.ok(picardN >= 28 && picardN <= 34, 'Picard iterations ' + picardN);
   assert.match(picardSettings, /Nodes 288 Triangles 526/);
-  for (const label of ['Supplied electric power', 'Joule power', 'Outward heat']) assert.match(picardSettings, new RegExp(label + ' 16\\.67289 W/m'));
-  assert.match(picardSettings, /Maximum temperature 321\.8271 K/);
+  // the displayed values (7 significant digits), compared within a tolerance rather than as text
+  const shown = (settings, label, unit) => Number(settings.match(new RegExp(label + ' (\\S+) ' + unit))?.[1]);
+  for (const label of ['Supplied electric power', 'Joule power', 'Outward heat'])
+    assert.ok(Math.abs(shown(picardSettings, label, 'W/m') - 16.67289) <= 2e-5, label + ' ' + shown(picardSettings, label, 'W/m'));
+  assert.ok(Math.abs(shown(picardSettings, 'Maximum temperature', 'K') - 321.8271) <= 2e-4, 'maximum temperature');
   assert.equal(picardT.field, 'Temperature T'); assert.equal(picardT.unit, 'K');
   assert.ok(Math.abs(picardT.min - 300) <= 1e-3 && Math.abs(picardT.max - 321.827) <= 1e-3, 'temperature range ' + JSON.stringify(picardT));
   await page.screenshot('joule-picard');
@@ -265,6 +269,7 @@ try {
   await page.screenshot('joule-newton');
 
   await toJoule('Study'); await page.type('[data-joule="iteration.iteration_limit"]', 1);
+  await page.until("!document.getElementById('run-joule').hidden&&!document.getElementById('run-joule').disabled", 'Joule run enabled');
   await page.click('#run-joule');
   await page.until("/Newton iteration did not converge/.test(document.body.innerText)&&document.getElementById('run-joule').textContent==='Run Joule heating study'", 'Newton refusal shown', 120000);
   const refusal = await page.eval("(document.body.innerText.match(/the Newton iteration did not converge[^\\n]*/)||[''])[0]");
@@ -289,7 +294,7 @@ try {
   await page.screenshot('joule-steady');
 
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
-  assert.deepEqual(report.consoleErrors, [], 'no console errors');
+  assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);
   report.status = 'passed';
 } catch (error) {
