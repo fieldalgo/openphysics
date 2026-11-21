@@ -136,7 +136,7 @@ export function createJouleView(ctx){
   if(!result){host.innerHTML='<h2>No Joule heating result in this tab</h2><p>Edit the model and run the study. Joule heating results are kept in this tab only; saved projects and sessions keep the inputs.</p>';$('inspector').innerHTML='<h2>Joule heating results</h2><p>No completed run.</p>';return;}
   const run=result,p=run.payload,summary=p.summary,same=run.signature===signature();
   host.innerHTML='<h2>Joule heating result</h2>';
-  const desc=document.createElement('p');desc.textContent=`${same?'Current input snapshot':'Earlier input snapshot — current edits retained'} · ${jouleSummary(run.input)} · ${p.result_format}`;host.append(desc);
+  const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${jouleSummary(run.input)} · ${p.result_format}`;host.append(desc);
   const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="joule-field">${Object.entries(RESULT_FIELDS).map(([k,[l,u]])=>`<option value="${k}" ${k===field?'selected':''}>${l} [${u}]</option>`).join('')}</select></label><label><input id="joule-arrows" type="checkbox" ${arrows?'checked':''}> Arrows on cell fields</label>`;host.append(bar);
   const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='joule-field-canvas';canvas.style.cssText='display:block;width:100%;height:var(--plot-height,360px);cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
   const out=document.createElement('p');out.id='joule-probe';out.setAttribute('role','status');host.append(out);
@@ -149,7 +149,7 @@ export function createJouleView(ctx){
   $('joule-field').onchange=()=>{field=$('joule-field').value;draw();};$('joule-arrows').onchange=()=>{arrows=$('joule-arrows').checked;draw();};
   resize=new ResizeObserver(draw);resize.observe(canvas);draw();
   const rows=balanceRows(summary),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—';
-  $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Input',same?'Current snapshot':'Earlier snapshot')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
+  $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
    '<h3>Balances per metre of depth</h3>'+rows.map(([l,v])=>pair(esc(l),esc(v))).join('')+
    '<h3>Solution</h3>'+(history.length?pair(iterationMethod(summary)==='newton'?'Newton steps':'Picard iterations',history.length)+'<p>The iteration history is in the Solver log of the study dock.</p>':'<p>One coupled solve (constant conductivities).</p>')+
    pair('Completed',new Date(run.completedAt).toLocaleTimeString());
@@ -175,7 +175,7 @@ export function createJouleView(ctx){
    // a file opened meanwhile replaced the design: its run is not this design's result
    if(started!==epoch){notice('A Joule heating run of the inputs before the file was opened finished; its result was discarded.');return;}
    result={input,signature:JSON.stringify(input),payload,completedAt:new Date().toISOString()};probe=null;
-   if(ctx.active()){ui.page='Results';ctx.render();notice('Joule heating calculation complete. The result keeps its input snapshot; it is kept in this tab only.');}
+   if(ctx.active()){ui.page='Results';ctx.render();notice('Joule heating calculation complete. The result keeps the inputs it was run with; it is kept in this tab only.');}
    else notice('A Joule heating result is ready; choose Applications → Joule heating to see it.');
   }catch(e){if(started!==epoch)return;error=e.message;notice('Joule heating run failed: '+e.message+(/[.!?]$/.test(e.message)?'':'.')+' Inputs unchanged.');}
   finally{refreshControls();ctx.onIdle?.();}
