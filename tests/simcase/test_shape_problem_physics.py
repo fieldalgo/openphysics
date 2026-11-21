@@ -257,10 +257,9 @@ def test_p5_mesh_inputs_and_solve_at_zero_equal_run(which):
         assert _close(r.mechanics.reaction_force_per_depth, fields["reaction_force_per_depth"])
 
 
-# ---------------------------------------------------------------- P6 refusals
+# ---------------------------------------------------------------- P6 refusals (modes: test_shape_problem_modes.py)
 
-@pytest.mark.parametrize("example, kind", [("soi_strip", "em.modes2d"),
-                                           ("joule_temperature_regions", "joule.temperature2d")])
+@pytest.mark.parametrize("example, kind", [("joule_temperature_regions", "joule.temperature2d")])
 def test_p6_other_physics_are_refused_by_name(example, kind):
     import copy
     from simcase.examples import EXAMPLES
