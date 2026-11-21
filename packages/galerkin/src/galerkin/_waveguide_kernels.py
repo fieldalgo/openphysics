@@ -494,10 +494,11 @@ def _groups(lam0, tolerance):
 
 def _jacobian(xp, function, t0):
     """d function / dt at t0 as NumPy numbers, in the library of ``xp`` (JAX or PyTorch)."""
+    import sys      # the engine imports no array library: t is live, so its library is loaded already
     if backend_of(xp) is Backend.JAX:
-        import jax
+        jax = sys.modules["jax"]
         return np.asarray(jax.jacrev(function)(xp.asarray(t0, dtype=xp.float64)))
-    import torch
+    torch = sys.modules["torch"]
     return torch.autograd.functional.jacobian(function, torch.tensor(t0, dtype=torch.float64)).detach().numpy()
 
 
