@@ -548,11 +548,13 @@ def _keys(obj: dict, required: set, optional: set, path: str, reserved: set = fr
 
 
 def parse(doc: dict) -> GeometryModel:
-    """Read the version 1 ``geometry`` block of a format 0.3 document. A document of another
-    format is refused by name (``E-FORMAT`` at ``openphysics``, as ``Document.from_dict`` refuses
-    it; units batch C11a)."""
+    """Read the version 1 ``geometry`` block of a format 0.3 document, or of a multiphysics
+    document (whose physics share that block). A document of another format is refused by name
+    (``E-FORMAT`` at ``openphysics``, as ``Document.from_dict`` refuses it; units batch C11a)."""
+    from .multiphysics import ENVELOPE
     from .resolve import format_refusal
-    refusal = format_refusal(doc) if isinstance(doc, dict) else None
+    multi = isinstance(doc, dict) and doc.get("openphysics") == ENVELOPE
+    refusal = format_refusal(doc) if isinstance(doc, dict) and not multi else None
     if refusal is not None:
         raise GeometryError(refusal.message, path=refusal.path, code=refusal.code)
     return _parse(_Reader(doc), doc)

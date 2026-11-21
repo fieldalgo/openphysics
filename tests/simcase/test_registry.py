@@ -73,7 +73,13 @@ def test_kind_of_type():
 
 @pytest.mark.parametrize("path", sorted(EXAMPLE_DOCUMENTS.glob("*.json")), ids=lambda p: p.stem)
 def test_every_example_document_is_claimed_by_the_kind_of_its_type(path):
+    from simcase import multiphysics
     data = json.loads(path.read_text(encoding="utf-8"))
+    if data["openphysics"] == multiphysics.ENVELOPE:
+        # a multiphysics document is the multiphysics kind's; each entry is its own kind's
+        assert registry.kind_of(data) is multiphysics.KIND
+        assert all(registry.kind_of_type(p["type"]).coupling is not None for p in data["physics"].values())
+        return
     (physics,) = data["physics"].values()
     assert physics["type"] in registry.kind_of(data).types
 

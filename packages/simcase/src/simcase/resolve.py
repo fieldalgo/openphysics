@@ -127,7 +127,14 @@ def _resolve(tree, result: Resolution) -> Resolution:
     if not isinstance(tree, dict):
         diags.append(Diagnostic("E-VALUE-FORM", "", "a document is a JSON object"))
         return result
+    from . import multiphysics
+    if tree.get("openphysics") == multiphysics.ENVELOPE:
+        return multiphysics.resolve_envelope(tree, result)
     refusal = format_refusal(tree)
+    if refusal is not None:
+        diags.append(refusal)
+        return result
+    refusal = multiphysics.envelope_refusal(tree)
     if refusal is not None:
         diags.append(refusal)
         return result
@@ -164,6 +171,11 @@ def format_refusal(tree: dict) -> Diagnostic | None:
     if "openphysics" not in tree:
         return Diagnostic("E-FORMAT", "openphysics", f"the document has no format key; {_FORMAT_HELP}")
     fmt = tree["openphysics"]
+    from .multiphysics import ENVELOPE
+    if fmt == ENVELOPE:
+        return Diagnostic("E-FORMAT", "openphysics", f'openphysics is "{ENVELOPE}", a multiphysics document; this '
+                                                     'reads single-physics "0.3" documents only. Read it with '
+                                                     "simcase validate or simcase run, or Document.load")
     if fmt != FORMAT or not isinstance(fmt, str):
         shown = f'the number {fmt}' if _number(fmt) else json.dumps(fmt, default=str)
         hint = (' The format is the JSON string "0.3", not a number.' if _number(fmt) and str(fmt) == "0.3"
