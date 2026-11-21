@@ -53,7 +53,7 @@
 `file`, `format` (`npz`/`json`), `file_sha256`, `arrays` 이름 목록입니다. JSON은 인라인 목록 형식이며
 NPZ는 숫자 배열만 담고 pickle 없이 읽습니다.
 
-기록 1 MiB, payload(압축 해제 포함)·전체 배열 바이트 512 KiB, 저장소 합계 10 MiB가 한도입니다.
+기록 1 MiB, payload(압축 해제 포함)·전체 배열 바이트 1 MiB, 저장소 합계 10 MiB가 한도입니다.
 경로가 디렉터리를 벗어나면 실패합니다. 절대·홈·드라이브 경로, 비공개 조정 경로, 세션 URL,
 비공개 연구 저장소 이름은 문자열에 넣지 않습니다. 대신 `private research repository`라고 씁니다.
 어느 깊이든 `gate`, `tolerance` 키는 금지합니다. AGPL 도구는 수정하지 않은 것만 허용합니다.

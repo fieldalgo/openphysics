@@ -63,7 +63,7 @@ A payload has `file` (relative to the record), `format` (`npz` or `json`),
 `file_sha256` and `arrays` (names). JSON payloads use the inline list format;
 NPZ files contain only numeric arrays and are loaded without pickle.
 
-Limits: record 1 MiB, payload (also expanded NPZ) and total array bytes 512 KiB,
+Limits: record 1 MiB, payload (also expanded NPZ) and total array bytes 1 MiB,
 repository total 10 MiB. Paths cannot escape their directory. Strings must not
 contain absolute/home/drive paths, private coordination paths, session URLs or
 private research repository names. Use `private research repository` instead.
