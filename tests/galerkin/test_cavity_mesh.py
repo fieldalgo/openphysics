@@ -13,7 +13,9 @@ M2  the same box through ``solve_cavity_box``: on the box solver's own Kuhn mesh
     extruded mesh the difference between routes decreases with refinement
     (orders reported, extrusion cannot reproduce the alternating Kuhn box).
 M3  dielectric slab as an extruded layer region through ``solve_material_cavity``
-    against ``solve_material_cavity_box``: finest difference <= 5e-3.
+    against ``solve_material_cavity_box``: finest difference <= 5e-3 (the refinement
+    study is in test_cavity_mesh_slab_refinement.py: it is about nine tenths of this
+    file's time, and CI assigns whole files to its parallel parts).
 M5  refusals: unknown wall tag, live inputs, missing faces.
 Plus the gradient-kernel count of ``_cavity_common.gradient_potentials`` for
 partial PEC (one, two and no components), verified by the dense eigenvalue path.
@@ -126,18 +128,6 @@ def _slab_pair(h, walls=None):
                                     electrical_conductivity=None if walls is None else {"z0": walls},
                                     mode_count=3, target_frequency=target)
     return box, through
-
-
-@pytest.mark.slow
-def test_m3_dielectric_slab_layer_matches_the_box_solver_on_refinement():
-    differences = []
-    for h in (0.15, 0.1, 0.05):          # 0.3 m must be a grid plane of the box route
-        box, through = _slab_pair(h)
-        differences.append(np.max(np.abs(through.resonant_frequency - box.resonant_frequency)
-                                  / np.abs(box.resonant_frequency)))
-    print(f"M3 slab differences {differences}")
-    assert differences[-1] <= 5e-3
-    assert differences[0] > differences[-1]
 
 
 def test_m3_dielectric_slab_layer_on_a_coarse_mesh_with_a_lossy_floor():
