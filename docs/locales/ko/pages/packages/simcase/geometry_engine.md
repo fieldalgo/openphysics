@@ -269,11 +269,13 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 | `electric.steady2d` | `electric.solve_steady_electric` |
 | `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
 | `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: 움직이는 메시에서 열 단계를 다시 풀므로 온도가 형상과 함께 움직입니다 |
+| `em.modes2d`, vector formulation | runner의 vector 풀이(파장으로 나눈 메시에서 `galerkin.kernels.solve_modes`)와 그 모드 선택. `solve(t)`는 exp(−iωt) 기준의 `{"effective_index": ...}`를 돌려줍니다. 축퇴 모드의 미분은 galerkin처럼 NaN이고 `DegenerateModeWarning`이 납니다 |
 
 다음은 이름을 밝혀 거부합니다(`DocumentError`).
 - flat 형상 블록;
 - `axisymmetric` 성분;
-- 다른 물리(메시를 다르게 만드는 도파관 모드, Joule 가열 포함);
+- 다른 물리(예: Joule 가열);
+- 모드에서: scalar formulation(simcase 자체 고유값 풀이기라 움직이는 메시 경로가 없음), PML·bend(좌표 인자가 노드에 따름), sweep, 모드 추적;
 - 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도, 열원, 단열, 처방 변위, 체적력만 받습니다;
 - 두 역학 종류의 `gauge_pressure`. simcase는 이를 법선을 따르는 traction으로 적용하는데, motion은 일정한 traction만 받습니다;
 - 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).
@@ -300,6 +302,17 @@ x = L1(파라미터)에서 두 재료로 나뉜 2 × 1 mm 띠를 씁니다.
 | P4 열원이 있는 과도 열, 0–1000 s | 1000 s의 왼쪽 방출 열: 미분이 정상 문제의 것과 1e-6 이내; 같은 메시 중앙 차분과 1e-6 이내 | 2.9e-9; 7.6e-10 |
 | P5 `run`과 같음 | 노드·삼각형 비트 단위로 같음; t = 0 필드 1e-12 이내 | 넷 모두 통과 |
 | P6 거부 | 도파관 모드, Joule 가열, gauge pressure를 이름을 밝혀 거부 | 통과 |
+
+모드는 `tests/simcase/test_shape_problem_modes.py`에서 검사합니다(Q1–Q5를 2026-11-21에 사전 등록, 같은 날 위와 같이 측정).
+1.55 µm에서 산화막 속 0.22 µm 실리콘 strip을 쓰고, 파라미터는 폭 w = 0.5 µm입니다.
+
+| 검사 | 기준 | 결과 |
+|---|---|---|
+| Q1 dn_eff/dw | 같은 메시 Richardson 차분과 1e-6 이내(JAX, PyTorch) | µm당 1.58; 6.5e-11(단순 중앙 차분은 2.7e-5 차이) |
+| Q2 `run`과 같음 | t = 0 n_eff 1e-12 이내 | 1.8e-15 |
+| Q3 문서 단위 | µm와 nm로 쓴 strip: 메시가 비트 단위로 같고, 1 m당 미분이 1e-12 이내로 같음 | 같음 |
+| Q4 거부 | scalar formulation, PML, sweep, flat 형상 | 통과 |
+| Q5 다른 종류 불변 | C·P 검사 | 통과 |
 
 P3과 P4는 계획의 해석 기준을 바꾼 것입니다. 그 기준은 P1이 재현하지 못합니다. P3에서는 x에 선형인 온도가 이차 변위를 만들고,
 계면에서 α나 T′가 뛰면 열변형률이 양립하지 않습니다. P4에서는 영역 과도 문서가 내향 열유속을 받지 않고, 열원이 있는 띠는 2D
