@@ -94,14 +94,15 @@ py -3.12 -m venv "$HOME\op-studio"
   저장 위치를 묻거나, 같은 이름이 있으면 번호를 붙일 수 있습니다). Messages에 *Session file …
   sent to the browser's downloads (check your Downloads folder)*가 나오고, 다음 편집이나 실행
   전까지 제목에 *Session file … · 시각*이 표시됩니다.
-  **More → Save inputs only**는 결과 없이 모델만 저장하고, Runs 목록의 **Export this run**은
+  **More › Save inputs only**는 결과 없이 모델만 저장하고, Runs 목록의 **Export this run**은
   실행 하나를 자체 파일로 씁니다.
 - 새로고침하거나 다시 켜면 시작 화면에 **Continue where you left off**가 나옵니다. 마지막
   세션이나 이전 세션을 복구하거나, 세션 파일을 엽니다. 새 페이지(기본 입력, 실행 없음)에서는
   바로 열립니다. 그렇지 않으면 **Open saved session?** 창이 돌아올 실행과 비교, 바뀌는 것을
   보여 줍니다. Messages에 무엇을 열었는지 나옵니다. 그다음 변경 전까지 제목에 파일 이름과 함께
-  *Opened …*, 또는 *Recovered from this browser*(세션 파일을 저장한 적이 있으면 *last session
-  file …* 포함)가 나옵니다.
+  *Opened …*, 또는 *Recovered from this browser*가 나옵니다. 세션 파일을 저장한 적이 있으면
+  *last session file …*(저장 뒤 바뀐 작업이면 *changed since session file …*), 저장한 적이 없으면
+  *results not in a session file yet*이 덧붙습니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
   안내가 나오면 Run을 다시 누르세요.
 - 입력·세션 파일은 버전 7입니다(Joule 가열 입력 추가). 버전 6 파일도 계속 읽습니다. 단위·이름 일괄 변경 이전 Studio가 저장한 파일(버전 1–5)은

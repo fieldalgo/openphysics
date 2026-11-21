@@ -86,8 +86,9 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    *Results not saved · Save session to keep them*(세션 파일이 있었다면 *Changed since session
    file …*)가 표시됩니다. **Open session** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
    뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 마지막 세션 파일 이름과
-   시각을 함께 보관하므로 복구한 세션에는 *last session file … (시각)*이 덧붙습니다. 둘 다 다음
-   변경까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   시각을 함께 보관하므로 복구한 세션에는 *last session file … (시각)*이 덧붙습니다(저장 뒤 바뀐
+   작업이면 *changed since session file …*, 저장한 적이 없으면 *results not in a session file yet*).
+   둘 다 다음 변경이나 다른 파일 열기까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되며 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 하단에는 기록 중 *Updating browser recovery…*가
    나오며, 로컬 복구를 사용하려면 **Browser recovery saved**를 확인합니다. 새로고침하거나 Studio를 다시

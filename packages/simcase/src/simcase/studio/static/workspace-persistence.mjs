@@ -25,7 +25,7 @@ export function validateSavedFile(value){
 export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null,loaded=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`;
- if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:'');
+ if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:runsUnsaved?' · results not in a session file yet':'');
  if(saved?.current)return `Session file ${saved.name} · ${when(saved.savedAt)}`;
  if(runsUnsaved)return saved?`Changed since session file ${saved.name} (${when(saved.savedAt)}) · Save session to keep the changes`:'Results not saved · Save session to keep them';
  return clean?'No unsaved input changes':'Unsaved inputs';
