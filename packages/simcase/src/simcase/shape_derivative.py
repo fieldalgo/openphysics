@@ -38,9 +38,16 @@ Covered, on the material regions of a version 1 ``2d`` component (``run``'s regi
 A ``gauge_pressure`` of either mechanics kind is refused: simcase applies it as a traction
 callback of the normals, and a motion takes constant tractions only.
 
+- ``em.modes2d`` with ``formulation: vector``, closed boundaries and a single study: the
+  runner's vector solve (``galerkin.kernels.solve_modes`` on the mesh over the wavelength), with
+  the runner's choice of modes. ``solve(t)`` returns ``{"effective_index": ...}``, the kept
+  modes' effective indices under exp(-i omega t); a degenerate mode's derivative is NaN with a
+  ``DegenerateModeWarning``, as in galerkin. The scalar formulation (simcase's own eigensolver),
+  a PML or bend (coordinate factors move with the mesh), a sweep and mode tracking are refused.
+
 Refused by name, as ``DocumentError``: a flat geometry block, an ``axisymmetric`` component,
-another physics (waveguide modes have their own runner), and every parameter the design
-velocity refuses (unknown, ratio or derived parameters, a topology change at p).
+another physics, and every parameter the design velocity refuses (unknown, ratio or derived
+parameters, a topology change at p).
 """
 
 from __future__ import annotations
@@ -55,7 +62,8 @@ __all__ = ["ShapeProblem", "shape_problem"]
 
 STEADY_HEAT, TRANSIENT_HEAT, ELECTRIC = "thermal.steady2d", "thermal.transient2d", "electric.steady2d"
 ELASTICITY, THERMOELASTIC = "mechanics.elasticity2d", "mechanics.thermoelastic2d"
-_COVERED = (STEADY_HEAT, TRANSIENT_HEAT, ELECTRIC, ELASTICITY, THERMOELASTIC)
+MODES = "em.modes2d"
+_COVERED = (STEADY_HEAT, TRANSIENT_HEAT, ELECTRIC, ELASTICITY, THERMOELASTIC, MODES)
 
 
 @dataclass(frozen=True)
@@ -87,8 +95,10 @@ class ShapeProblem:
         or transient heat, steady electric conduction, elasticity, or the steady
         heat-to-mechanics workflow (see the module docstring)."""
         from galerkin.shape import MeshMotion
-        return _solver(self.physics)(self.mesh, **self.arguments,
-                                     motion=MeshMotion(design_velocity=self.design_velocity, t=t))
+        motion = MeshMotion(design_velocity=self.design_velocity, t=t)
+        if self.physics == MODES:
+            return _solve_modes(self.arguments, motion)
+        return _solver(self.physics)(self.mesh, **self.arguments, motion=motion)
 
     def derivative(self, objective, *, backend="jax", t=0.0):
         """(objective, d objective / d t) at ``t``, on the mesh moved to X0 + t W.
@@ -119,7 +129,7 @@ def shape_problem(document, parameter: str) -> ShapeProblem:
     from galerkin.shape import admissible_interval, extend_velocity
 
     from .geometry_document import GeometryError
-    from .geometry_velocity import design_velocity, signature
+    from .geometry_velocity import design_velocity
     from .thermal_regions import component_03, handoff_03, is_axisymmetric, is_region_thermal, mesh_diagnostics_03, \
         region_mesh_um
     from .electric_regions import is_region_electric
@@ -135,6 +145,8 @@ def shape_problem(document, parameter: str) -> ShapeProblem:
                             f"{', '.join(_COVERED)} on material regions so far")
     regions = {STEADY_HEAT: is_region_thermal, TRANSIENT_HEAT: is_transient_region_thermal,
                ELECTRIC: is_region_electric, ELASTICITY: is_region_mechanics, THERMOELASTIC: is_region_mechanics}
+    if kind == MODES:
+        return _modes_problem(given, doc, name, parameter)
     if not (regions[kind](doc.data) and doc.is_version_1):
         raise DocumentError("shape_problem: the geometry is not a version 1 block of material regions; a design "
                             "parameter is a geometry.parameters entry of a version 1 component")
@@ -151,19 +163,78 @@ def shape_problem(document, parameter: str) -> ShapeProblem:
     for target in (given, doc):
         mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     meshed = canonical.geometry_complex
-
-    def curves(rc):
-        return [(k.index, k.kind, k.a, k.b, k.params) for k in rc.curves]
-    if (signature(meshed) != signature(dv.complex) or meshed.vertices != dv.complex.vertices
-            or curves(meshed) != curves(dv.complex)):
-        raise DocumentError("shape_problem: the meshed geometry and the geometry of the design velocity differ "
-                            "(a defect of simcase, please report it)")
+    _check_same_complex(meshed, dv.complex)
     # node_velocity reads the curves of the complex that was handed to the mesher
     nv = replace(dv, complex=meshed).node_velocity(tri)
     W = extend_velocity(mesh, nv.values, nv.on_curve)
     lo, hi = admissible_interval(mesh, design_velocity=W)
     arguments = _arguments(kind, name, doc, mesh, region_materials)
     return ShapeProblem(doc, parameter, kind, mesh, W, np.asarray(nv.on_curve), (float(lo), float(hi)), arguments)
+
+
+def _modes_problem(given, doc, name, parameter):
+    """The shape problem of a vector mode document, meshed by the runner's ``build_mesh``."""
+    from galerkin.shape import admissible_interval, extend_velocity
+
+    from . import modes_document, views
+    from .geometry_document import GeometryError
+    from .geometry_velocity import design_velocity
+    from .runner import _to_kernel, build_mesh
+    if not doc.is_version_1:
+        raise DocumentError("shape_problem: the geometry is not a version 1 block; a design parameter is a "
+                            "geometry.parameters entry of a version 1 component")
+    try:
+        dv = design_velocity(doc.data, parameter)
+    except GeometryError as exc:
+        raise DocumentError(f"shape_problem: {exc}") from None
+    model = build_mesh(doc)          # the mesher's findings reach the copy's diagnostics, as in build_mesh
+    k = model.kernel_doc
+    point = views.modes_inputs(k.sole_physics()[1])
+    where = f"physics.{name}"
+    if point.formulation != "vector":
+        raise DocumentError(f"shape_problem: {where}.formulation is {point.formulation!r}; the shape derivative "
+                            "of modes covers the vector formulation (galerkin's solve_modes); the scalar one is "
+                            "simcase's own eigensolver, which has no moving-mesh path")
+    if point.pml is not None or point.bend is not None:
+        raise DocumentError(f"shape_problem: {where} has a PML or a bend; their coordinate factors depend on the "
+                            "node positions, and galerkin refuses them with a motion")
+    if k["study"]["type"] != "single" or modes_document.kernel_tracking(k):
+        raise DocumentError("shape_problem: the shape derivative of modes is taken at one point (study single, "
+                            "no mode tracking); set the wavelength and call shape_problem for each point")
+    meshed = getattr(k, "geometry_complex", None)
+    _check_same_complex(meshed, dv.complex)
+    nv = replace(dv, complex=meshed).node_velocity(model.kernel_tri)
+    mesh_um = model.solver_mesh
+    W = extend_velocity(mesh_um, nv.values, nv.on_curve)
+    lo, hi = admissible_interval(mesh_um, design_velocity=W)
+    arguments = dict(mesh=mesh_um, eps=_to_kernel(model._permittivity(point.wavelength)), inputs=point)
+    # t is metres of the parameter: the kernel mesh is in micrometres, so its nodes move with 1e6 W
+    return ShapeProblem(doc, parameter, MODES, model.mesh, W, np.asarray(nv.on_curve),
+                        (float(lo) * 1e-6, float(hi) * 1e-6), arguments)
+
+
+def _solve_modes(arguments, motion):
+    from galerkin.shape import MeshMotion
+
+    from .physics_em_modes2d import _solve_vector
+    p = arguments["inputs"]
+    kernel_motion = MeshMotion(design_velocity=1e6 * np.asarray(motion.design_velocity, dtype=float), t=motion.t)
+    result = _solve_vector(arguments["mesh"], np.asarray(arguments["eps"]), p.wavelength, p.boundary, p.num_modes,
+                           p.n_cladding, p.n_target, motion=kernel_motion)
+    neff = result["neff"]
+    # the kernel is under exp(+i omega t); the public value is its conjugate (real for a lossless guide)
+    return {"effective_index": neff.conj() if hasattr(neff, "conj") else neff}
+
+
+def _check_same_complex(meshed, moving):
+    from .geometry_velocity import signature
+
+    def curves(rc):
+        return [(k.index, k.kind, k.a, k.b, k.params) for k in rc.curves]
+    if (meshed is None or signature(meshed) != signature(moving) or meshed.vertices != moving.vertices
+            or curves(meshed) != curves(moving)):
+        raise DocumentError("shape_problem: the meshed geometry and the geometry of the design velocity differ "
+                            "(a defect of simcase, please report it)")
 
 
 def _solver(kind):

@@ -82,7 +82,10 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     return {"neff": neff, "guided": guided, "fields": fields}
 
 
-def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target=None):
+def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target=None, motion=None):
+    """The vector modes of ``solve``. With ``motion`` (a galerkin MeshMotion of the nodes in the
+    mesh's unit, internal: simcase.shape_derivative), the modes are chosen from the numbers as
+    without it, and only the kept modes' ``neff`` is returned, live in the library of ``motion.t``."""
     if not np.isfinite(eps_tri).all() or (n_target is None and np.any(eps_tri.real <= 0)):
         raise ValueError("vector modes require finite positive dielectric permittivity")
     n_core = float(np.sqrt(max(0., eps_tri.real.max())))
@@ -101,8 +104,17 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_
     candidates = min(max(2 * num_modes, 6), free_count - 2)
     if candidates < 1:
         raise ValueError("mesh has too few unconstrained degrees of freedom for vector modes")
+    scaled_motion = None
+    if motion is not None:
+        from galerkin.shape import MeshMotion
+        # the solver mesh is the mesh over the wavelength, so its nodes move with W / wavelength
+        scaled_motion = MeshMotion(design_velocity=np.asarray(motion.design_velocity, dtype=float) / wavelength,
+                                   t=motion.t)
     neff, space, et, ez = solve_modes(scaled, eps_tri, 2 * np.pi, n_target=n_core if n_target is None else n_target,
-                                     num_modes=candidates, pec_nodes=pec, pec_edges=pec_edges)
+                                     num_modes=candidates, pec_nodes=pec, pec_edges=pec_edges, motion=scaled_motion)
+    if motion is not None:
+        from galerkin.core.backend import to_numpy
+        live, neff = neff, to_numpy(neff)
     if n_target is None:
         keep = np.flatnonzero(np.isfinite(neff) & (neff.real > n_cladding) & (neff.real < n_core))[:num_modes]
     else:
@@ -112,6 +124,8 @@ def _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_
     if not len(keep):
         raise ValueError("no guided vector modes found between n_cladding and the maximum material index; "
                          "check the cladding index, mesh and computational domain")
+    if motion is not None:
+        return {"neff": live[keep], "guided": np.ones(len(keep), dtype=bool)}
     neff, et, ez = neff[keep], et[keep], ez[keep]
     electric = np.empty((mesh.num_triangles, len(keep), 3), dtype=complex)
     for j in range(len(keep)):
