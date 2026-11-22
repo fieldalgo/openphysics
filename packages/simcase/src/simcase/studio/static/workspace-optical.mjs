@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {validateShapes,legacyCoreShape,shapesBlock,solverShapes,gradingCentre} from './workspace-shapes.mjs';
 import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
+import {checkOpenBoundary,hasOpenEdge,applyOpenBoundary} from './workspace-open-boundary.mjs';
 
 /** The study's quantity strings: the vacuum wavelength and the core element size in nm. */
 export function opticalStudy(wavelengthNm=1550,coreMeshNm=30){
@@ -27,10 +28,19 @@ export {groupIndexStep} from './workspace-modes.mjs';
  * document is the one optical-shapes-v7 wrote. With state.groupIndex (Also compute group index)
  * it also has results.group_index; without it, it is the optical-shapes-v8 document as before. A
  * run's document is its settings' document, with withGroupIndex(doc, groupIndexStep(method)) when
- * the run has a group_index_method. */
+ * the run has a group_index_method.
+ * optical-shapes-v9: with state.openBoundary (workspace-open-boundary.mjs) and an open edge, the
+ * window gets a PML outside it on each open edge; with every edge closed, or without it, the
+ * document is the optical-shapes-v8 one byte for byte. The group index is not offered with an
+ * open boundary. */
 export function opticalDocument(state,setup){
  const block=opticalBlock(state,setup);if(block)throw new Error(block);
  const coreMesh=state.coreMesh??30,modeCount=checkModeCount(state.modeCount??DEFAULT_MODE_COUNT),shapes=designShapes(state,setup),study=opticalStudy(state.wavelength??1550,coreMesh),[cx,cy]=gradingCentre(shapes);
  const doc={openphysics:'0.3',name:'Workspace optical study',geometry:{length_unit:'nm',depth:null,domain:{xmin:-1500,xmax:1500,ymin:-1200,ymax:1200},background:{material:'physmat:SiO2'},shapes:solverShapes(shapes,coreMesh)},physics:{em1:{type:'em.modes2d',formulation:'vector',vacuum_wavelength:study.vacuumWavelength,mode_count:modeCount,effective_index_threshold:1.45,boundary:{left:'pec',right:'pec',top:'pec',bottom:'pec'}}},mesh:{element_size:'250 nm',grading:{position:[cx+' nm',cy+' nm'],near:study.coreElementSize,far:'160 nm',refinement_distance:'1000 nm'}},study:{type:'single'},results:{save_fields:true,plots:false}};
+ const open=state.openBoundary==null?null:checkOpenBoundary(state.openBoundary,shapes);
+ if(open&&hasOpenEdge(open)){
+  if(state.groupIndex===true)throw new Error('Group index is not computed with an open boundary; close every edge to compute it.');
+  return applyOpenBoundary(doc,open);
+ }
  return state.groupIndex===true?withGroupIndex(doc):doc;
 }

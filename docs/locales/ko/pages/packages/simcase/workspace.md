@@ -690,6 +690,30 @@ from 1 to 8 (got 9).*로 거부합니다. 0, 9, 2.5, 2.0, `"2"`, `true`는 거�
 `-v5`, `optical-shapes-v6`와 `-v7`)을 알리고 값은 양 문자열입니다. 전체 엔진 의존성이나 Git
 이력을 나타내는 정보는 아닙니다.
 
+### 열린 경계 문서(optical-shapes-v9)
+
+`/api/workspace/capabilities/v9`는 버전 8에 어댑터 `optical-shapes-v9`와 `open_boundary` 블록을
+더한 것입니다. 페이지는 아직 버전 8을 확인하며 이를 위한 조작은 없습니다. 어댑터의 문서 작성기
+(`openBoundary: {edges, thickness, target}`를 받은 `opticalDocument`)는 계산창의 어느 변이든 열 수 있습니다.
+
+- 열린 변마다 두께 *t*(1000–2000 nm의 정수 nm, 기본 1000)의 완전 정합층(PML)이 3 × 2.4 µm
+  계산창 **바깥**에 놓입니다. 그 변에서 영역이 *t*만큼 커지고 바깥 벽은 PEC입니다. 닫힌 변은 PEC 벽입니다.
+- 열린 변에 놓인 다각형 변은 층을 지나 곧게 이어지고, 형상의 모서리에서 열린 두 변이 만나면 모서리
+  정사각형도 채웁니다(계산창 바닥을 채운 기판은 바깥 벽까지 닿음). 원은 변과 한 점에서만 만나므로
+  이전처럼 씁니다.
+- PML 설정은 고정입니다: `pml_strength` 3, `pml_order` 2, `pml_minimum_physical_fraction` 0.5,
+  `pml_search_mode_count` 16.
+- **Search near n_eff**(`target_effective_index`)는 1.45보다 크고 설계의 최대 굴절률보다 작습니다.
+  기본값은 재료의 1550 nm 굴절률로 구한 (n_max + n_SiO2) / 2를 소수 둘째 자리로 반올림한 값입니다
+  (실리콘 코어는 2.46).
+- 열린 경계에서는 군굴절률을 계산하지 않습니다.
+
+모든 변이 닫혔거나 `openBoundary`가 없으면 문서는 `optical-shapes-v8` 문서와 바이트 단위로 같고 결과도
+그 문서의 결과입니다. 작업공간 요청의 `em.modes2d` 물리에 다른 `pml`(다른 두께, 서로 다른 두께, 다른 고정값)이
+있으면 *The open boundary of a workspace run has a PML of 1–2 µm on each open edge with strength 3,
+order 2, physical fraction 0.5 and a search of 16 candidates.*로 거부합니다. PML 결과는
+[PML 모드 규칙](pml_modes.md)을 따르는 후보입니다.
+
 ### 광학 세션 파일(버전 9)
 
 모든 실행이 실수 모드 두 개와 장을 가진 세션은 이전과 바이트 단위로 같은 버전 7로 씁니다. 버전 7이 담을 수

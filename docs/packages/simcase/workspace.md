@@ -829,6 +829,34 @@ names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-
 `optical-shapes-v6` and `-v7`), with its values as quantity strings.
 This is not a complete engine dependency or Git provenance record.
 
+### Open boundary document (optical-shapes-v9)
+
+`/api/workspace/capabilities/v9` is version 8 with adapter `optical-shapes-v9` and an
+`open_boundary` block. The page still checks version 8 and has no control for it yet. The
+adapter's document builder (`opticalDocument` with `openBoundary: {edges, thickness, target}`)
+can open any edge of the window:
+
+- a perfectly matched layer (PML) of thickness *t* (a whole number of nm from 1000 to 2000,
+  1000 by default) lies **outside** the 3 × 2.4 µm window on each open edge: the domain grows
+  by *t* there and the outer wall stays PEC. Closed edges stay PEC walls;
+- a polygon edge along an open edge continues straight through the layer, and where two open
+  edges meet at a shape's corner the corner square is filled too (a substrate that fills the
+  bottom of the window reaches the outer wall). A circle meets an edge only at a point and is
+  written as before;
+- the PML settings are fixed: `pml_strength` 3, `pml_order` 2,
+  `pml_minimum_physical_fraction` 0.5 and `pml_search_mode_count` 16;
+- **Search near n_eff** (`target_effective_index`) is above 1.45 and below the largest
+  index of the design. By default it is (n_max + n_SiO2) / 2 to two decimals, from the
+  materials' indices at 1550 nm (2.46 for a silicon core);
+- the group index is not computed with an open boundary.
+
+With every edge closed, or without `openBoundary`, the document is the `optical-shapes-v8`
+document byte for byte, and its results are those of that document. A workspace request whose
+`em.modes2d` physics has any other `pml` (another thickness, unequal thicknesses or another fixed
+value) is refused with *The open boundary of a workspace run has a PML of 1–2 µm on each open edge
+with strength 3, order 2, physical fraction 0.5 and a search of 16 candidates.* The PML results
+are candidates under the [PML mode rules](pml_modes.md).
+
 ### Optical session files (version 9)
 
 A session in which every run has two real modes and its fields is written as version 7, byte
