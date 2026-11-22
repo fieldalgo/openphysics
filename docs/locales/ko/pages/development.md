@@ -297,6 +297,10 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 메시가 macOS arm64와 다른 플랫폼에서 달라서 메시에 따라 달라지는 값은 이산화 오차 안에서 확인),
 수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).
 잡히지 않은 페이지 예외와 `console.error` 호출이 있으면 검사가 실패합니다(그 밖의 브라우저 로그 항목은 모으지 않습니다).
+이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
+조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
+한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 광 모델
+단독 실행, 1440 × 900과 390 px 폭에서 가로 넘침이 없음을 확인합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

@@ -64,8 +64,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 
 ## First optical study
 
-1. Choose **Models → Optical waveguide** (the start page; its tab is **Models**). The heated-waveguide card is
-   setup only; it does not run coupled physics.
+1. Choose **Models → Optical waveguide** (the start page; its tab is **Models**). (The Heated
+   silicon waveguide card opens a coupled heat and optical model instead; see [Multiphysics models](#multiphysics-models-heat--optical-modes).)
 2. In **Geometry**, edit the core numerically or drag it and its edges. Add
    rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
    each shape's material; the silica background stays. A rectangle's **Width** edit
@@ -133,8 +133,10 @@ establish mode correspondence between designs.
 
 Choose a model, select a body or boundary in the model tree or drawing,
 and edit its properties in the inspector. The optical application runs a real
-2D mode calculation. The heated-waveguide application is a setup preview: its
-coupling diagram, voltage and mechanical selections do not run coupled physics.
+2D mode calculation. The Heated silicon waveguide application runs steady heat and
+optical modes as one coupled model ([Multiphysics models](#multiphysics-models-heat--optical-modes)). An older input
+file with all four interfaces on opens the earlier conceptual preview, whose diagram,
+voltage and mechanical selections run nothing.
 
 The optical adapter accepts up to eight shapes inside the window x = ±1500 nm,
 y = ±1200 nm: rectangles, circles and polygons with 3–12 vertices in a silica
@@ -176,7 +178,7 @@ not shown in the header and are not Git commits.
 
 The model drawing has Zoom in/out, Pan and Fit view controls. Focus the drawing
 and use +/−, arrow keys or Home. Zoom is limited to 100–400%; each view retains
-its camera while navigating this tab. Heated-waveguide views remain schematic. The optical-only view shows a
+its camera while navigating this tab. The conceptual preview remains schematic. The optical-only view shows a
 2D cross section with equal x/y scale and dimensions in nm, drawn from the same
 shapes as the submitted document: every shape in draw order over the silica
 window x = ±1500 nm, y = ±1200 nm. The view opens fitted to the window; **Fit view**
@@ -294,6 +296,84 @@ real browser on Linux, macOS and Windows against installed wheels
 ([development guide](../../development.md)): Picard and Newton runs of the default model, a
 refused Newton run shown with its text, and constant materials.
 
+## Multiphysics models: heat → optical modes
+
+Choose **Models → Heated silicon waveguide** (“Heat → optical modes · coupled”) to open a
+[multiphysics document](multiphysics_document.md): two physics on one geometry and one mesh,
+joined by a coupling, solved by one **Run**. The template is a 500 × 220 nm `physmat:Si` core on
+`physmat:SiO2` in a 6 × 4.5 µm window, with a 2 µm × 100 nm heater 1.1 µm above the core. **Heat 1**
+holds the bottom edge at 300 K and heats the heater region; **Modes 1** finds the optical mode at
+1550 nm; the coupling **Heat 1 temperature → Modes 1 temperature** gives every triangle the mean
+of its three node temperatures, and the optical solve uses n = n₀ + (dn/dT)(T − T_ref) there. The
+heater is a local record with a lossless placeholder index; metal loss is later work.
+
+The workspace edits the document itself, so it keeps every key it has no form for, and
+**More › Open model file** opens any multiphysics document, such as the shipped
+[heated slab example](../../../examples/simcase/multiphysics_heated_slab.json).
+
+- **Model builder.** One Component (Geometry 1, Materials with one item per material in use,
+  Mesh 1 shared by every physics), the physics with a badge giving their place in the solve
+  order (a cycle shares one amber number), **Couplings** with one item per coupling named in
+  words, and **Study 1** with the derived solve order and any iteration step. Settings shows each
+  file name as “Name in file”. A red count on a node is the number of problems to fix there.
+- **Add physics** lists the installed providers and their kinds from their manifests, each with
+  its ports (unit, where the values live, and for inputs whether they take one source or add
+  their sources). Studio adds heat transfer and optical modes here; the other kinds are listed
+  and greyed with the reason (the Joule heating and thermoelastic kinds solve their own coupling
+  and stay start-page applications). Adding a second physics turns a one-physics model into a
+  multiphysics model; **Remove physics** leaves the couplings that named it on screen as
+  problems to fix, never dropping them silently.
+- **Add coupling** picks an output, then one of the inputs that can take it; the others are
+  greyed with the reason (the same physics, another quantity, another unit, an input that
+  already has its one source). The transfer is Same mesh, the only one in this release. When an
+  input could obviously be fed (Modes 1 temperature from Heat 1), Messages suggests the
+  coupling; nothing is coupled until you add it.
+- **Connections** is drawn from the couplings: nodes in solve-order columns, input pins on the
+  left and output pins on the right with their units, one wire per coupling. A coupling that
+  fails the check is drawn red and dashed with its short cause, or listed under the diagram when
+  its physics is missing. A cycle is boxed: amber until it has an iteration step, then blue. Its
+  message proposes the engine's defaults, and **Accept iteration step** writes them to
+  `study.loops` (Undo reverts it); its values are edited under Study 1 › Iteration step.
+- **The check runs on every edit** with the rules of `simcase validate`. Each problem appears in
+  Messages (with Show and a one-click fix when there is one: Remove coupling, Use same mesh,
+  remove the mesh key one physics does not read, Accept iteration step, Fill from physmat), on
+  its tree node, in its Settings, and on the diagram for couplings. The engine's code and text
+  stay under Details. While a problem is open, Run is disabled and says why (“Fix 1 problem in
+  Messages to run”). A coupled temperature needs a thermo-optic coefficient and a reference
+  temperature for every optical material: `physmat:Si` and `physmat:SiO2` carry them, and for a
+  local record **Fill from physmat** copies physmat's values in (noting the source) or **Use
+  physmat:… instead** switches its regions to the library material.
+- **Run** solves every physics in solve order. The Study dock lists each physics or iteration
+  step with its state (Waiting, Solving…, Done in 0.3 s, Iteration 7 of up to 30 with the last
+  change, Did not settle, Not run), Connections shows the same states while it is open, and **Stop run**
+  ends the run at the engine's next step: after the physics being solved, or inside an
+  iteration step after the current iteration. A run that fails or is stopped keeps no partial
+  result; Messages names the physics that failed, and the previous complete run stays. A sweep
+  is checked but not run (the run reason says so).
+- **Results** has a page per physics and a **Coupling check**: the solve order used and, per
+  coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
+  (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
+  0 K”). Heat 1 shows the temperature map; Modes 1 shows the coupled temperature and the
+  refractive index (or its change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the
+  document's values) on the core, and the
+  n_eff table. **Run Modes 1 alone** runs the optical model without its coupling, on request,
+  and adds an “n_eff without heater” column. A result names its run and does not change when
+  the model is edited.
+- **Files.** **Save model file** and **Open model file** (under More) write and read the
+  document; Save session is not used for multiphysics models, and runs stay in the tab. An
+  opened file is read by the server first, so a duplicate key or text that is not JSON is
+  refused by name; a saved file writes each number in its shortest form. A sweep is checked,
+  and this view runs one point only.
+
+Studio runs these documents through `/api/multiphysics/*` (validate, run, progress events,
+stop, result), as an ordinary consumer of `simcase.multiphysics`; the n_eff it shows is the
+engine's for the same document, exactly. CI drives this model in a real browser
+(`tools/studio_browser/studio_multiphysics_browser.mjs`), and
+`tests/simcase/test_studio_multiphysics.py` and `studio_workspace_multiphysics.cjs` check the
+routes and the words. Limitations: only heat transfer (`thermal.steady2d`) and optical modes
+(`em.modes2d`) are edited here; the Same mesh transfer only; no multiphysics sweep runs; the
+geometry form edits rectangles and the window, other shapes stay as written in the file.
+
 ## Results and files
 
 The notebook retains up to six successful runs, preserving pinned references. Select a candidate to inspect
@@ -392,7 +472,7 @@ save alternative; keep session files for durable results and comparisons.
 The optical Materials inspector offers silicon/silicon nitride for the core and
 silica for the background. Unsupported imported assignments remain visible and
 block execution until corrected. These choices reach the optical solver;
-heated-waveguide assignments remain setup labels. Study summarizes the current
+assignments in the conceptual preview remain setup labels. Study summarizes the current
 core dimensions and materials with links back to their editors.
 
 ## Running, stopping the wait and resuming
@@ -468,8 +548,8 @@ is not mesh reuse or a convergence certification.
 
 An optical-only model tree shows Geometry, Materials, Optical modes, Mesh and
 Study. Connections explains that no coupled interfaces are present and links
-back to application choice. The heated-waveguide template retains the broader
-setup tree and still cannot execute coupled physics.
+back to application choice. The conceptual preview of older input files keeps the broader
+setup tree and runs nothing; the Heated silicon waveguide is a separate, runnable model.
 
 ## Guided optical workflow
 

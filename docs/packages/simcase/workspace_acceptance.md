@@ -34,8 +34,8 @@ not establish an independent installation of the whole stack.
 
 Start `simcase-studio --workspace` on an unused local port. Use a separate browser
 profile or test origin for a fresh-user check; preserve existing sessions first.
-The initial Models page (one word, model, throughout) must make live optical calculation and setup-only
-coupled physics distinguishable.
+The initial Models page (one word, model, throughout) must name what each card runs,
+including the coupled Heated silicon waveguide.
 
 | Task | Expected observation |
 |---|---|
@@ -68,7 +68,7 @@ coupled physics distinguishable.
 | Temporarily lose the connection while retrieving a job | Existing results remain visible; Resume retries retrieval of the same captured job after reconnecting. A missing job or a solver-reported failure instead requires Detach. |
 | Import a saved run into an existing notebook | Review states additions/replacements; current inputs and input Undo remain. A conflicting payload leaves the whole notebook intact. |
 | Pin all six retained runs | New Run is blocked; input checks and mesh preview remain available. Unpinning one restores capacity. |
-| Select the heated-waveguide template | Setup and connection editing are available; coupled execution remains unavailable and no fabricated thermal/mechanical results appear. |
+| Select the Heated silicon waveguide template | The multiphysics model opens checked; Connections draws the coupling; Run solves heat, then optical modes, and Results show the coupling check and the T and n maps. |
 
 Check that the width slider exposes its purpose and unit, and each load/import/
 recovery dialog exposes its title and description. Escape cancels a dialog and
