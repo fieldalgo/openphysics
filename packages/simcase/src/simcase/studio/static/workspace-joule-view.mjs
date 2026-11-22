@@ -165,7 +165,7 @@ export function createJouleView(ctx){
  }
  function refreshControls(){
   const button=$('run-joule');if(!button)return;const on=ctx.active();button.hidden=!on;if(!on)return;$('run-optical').hidden=true;$('run-heat').hidden=true;
-  const b=block();button.disabled=!!b||runner.busy;button.textContent=runner.busy?'Computing…':'Run Joule heating study';
+  const b=block();button.disabled=!!b||runner.busy;button.textContent=runner.busy?'Computing…':'Run study';
   $('status').textContent=drafts.size?'Input errors · correct or restore the last valid values':runner.busy?'Joule heating calculation running':b?'Joule input not ready · '+b:'Joule heating solver ready · explicit Run required';
   const message=$('joule-message');if(message)message.textContent=error?requestFailedText('Joule',error):runner.busy?phase:'';
  }

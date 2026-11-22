@@ -80,7 +80,7 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
    wavelength 1550 nm; the step bar shows *4. Study · Ready to run* with **λ 1550 nm**
    beside it, which opens the wavelength field under **Physics › Optical modes** (as
    **Study → Edit wavelength** does).
-3. Select **Run optical study**. The result shows the field and the effective index
+3. Select **Run study**. The result shows the field and the effective index
    of two modes in the modes table (Mode, n_eff, Polarization, Loss), and the Study step reads *Run complete*. Type a **Run name**, for
    example *design A*, and press Enter: a named run is pinned, so new runs do not
    replace it (**Unpin this run** releases it; there is no separate Pin button).

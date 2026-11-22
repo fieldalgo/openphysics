@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-const {test,before}=require('node:test');const assert=require('node:assert/strict');let opticalWorkflow,inputsDifferText,opticalInputParts;
-before(async()=>({opticalWorkflow,inputsDifferText,opticalInputParts}=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs')));
+const {test,before}=require('node:test');const assert=require('node:assert/strict');let opticalWorkflow,inputsDifferText,opticalInputParts,nextRunText;
+before(async()=>({opticalWorkflow,inputsDifferText,opticalInputParts,nextRunText}=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs')));
 const input=()=>({model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},setup:{materials:{Core:'Silicon',Oxide:'Silica'}}});
 test('mesh preview is optional and an earlier result is never labeled current after an input edit',()=>{
  const doc=input(),run={signature:JSON.stringify(doc)};
@@ -128,4 +128,11 @@ test('round 9 (J5): the dock heading and the footer describe the run being viewe
  // an unnamed run reads as before; without a viewed run the newest run of these inputs is described
  assert.equal(W.opticalSequenceHeading(W.opticalFreshness(older,[{signature:JSON.stringify(older)}],null)),'Run 1 · solved from the current inputs');
  assert.equal(W.runTitle(1,'Design A'),'Run 1 · Design A');assert.equal(W.runTitle(2,''),'Run 2');
+});
+test('round 11: the Study panel names the inputs the next run uses, whatever run is viewed',()=>{
+ const doc=input();doc.model.wavelength=1550;doc.model.coreMesh=30;doc.model.shapes=[{...doc.model.shapes[0],w:700,h:300}];
+ assert.equal(nextRunText(doc,2),'Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2');
+ assert.equal(nextRunText(doc),'Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ // the same parts the inputs words compare
+ assert.ok(nextRunText(doc,2).startsWith('Next run uses '+opticalInputParts(doc).join(' · ')));
 });

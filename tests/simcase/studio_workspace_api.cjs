@@ -3,11 +3,11 @@
 
 const {before}=require('node:test');
 let solverApi;
-let APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime;
+let APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime,cardResumeChoice,cardRecords;
 let opticalBlock,opticalDocument;
 before(async()=>{
 ({solverApi}=await import('../../packages/simcase/src/simcase/studio/static/workspace-api.mjs'));
-({APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
+({APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime,cardResumeChoice,cardRecords}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
 ({opticalBlock,opticalDocument}=await import('../../packages/simcase/src/simcase/studio/static/workspace-optical.mjs'));
 });
 const test=require('node:test');
@@ -97,10 +97,31 @@ test('the Optical waveguide card offers the optical session in browser recovery 
  assert.deepEqual(opticalResumeChoice({runs:2,names:['Run 1 · design A','Run 2'],file:'optical-waveguide-session-2026-11-22-1425.json',savedAt:'T'},t=>'2:25 PM'),{label:'Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · 2:25 PM · file optical-waveguide-session-2026-11-22-1425.json'});
  // round 10: whether the record still matched its file, in words; never "(this browser)" beside a file name
  const file='optical-waveguide-session-2026-11-22-1425.json';
- assert.equal(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:true,savedAt:'T'},t=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · 2:25 PM · same as file '+file);
+ assert.equal(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:true,savedAt:'T'},t=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · browser copy 2:25 PM · same as file '+file);
  assert.equal(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:false,savedAt:'T'},t=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · 2:25 PM · file '+file+', changed since');
  assert.equal(sessionLine({model:'Optical waveguide',runs:1,names:['Run 1'],file,fileCurrent:true}),'Optical waveguide · 1 run · Run 1 · same as file '+file);
  for(const fileCurrent of [true,false,null])assert.doesNotMatch(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent,savedAt:'T'},t=>'2:25 PM').label,/\(this browser|Resume|Recover/);
  const now=new Date(2026,10,22,15,0),today=new Date(2026,10,22,14,25).toISOString(),before=new Date(2026,10,20,14,25).toISOString();
  assert.doesNotMatch(offerTime(today,now),/2026|20/);assert.match(offerTime(before,now),/20/);
+});
+test('round 11: a record the same as its session file names the file save time, not the record time',()=>{
+ const file='optical-waveguide-session-2026-11-22-2124.json',when=t=>({R:'9:25 PM',F:'9:24 PM'})[t];
+ assert.equal(cardResumeChoice({runs:2,names:['Run 1','Run 2'],file,fileCurrent:true,fileSavedAt:'F',savedAt:'R'},'Optical waveguide',when).label,
+  'Restore from this browser · Optical waveguide · Run 1, Run 2 · same as file '+file+', saved 9:24 PM');
+ // no save time of the file (an opened file): the record time, said to be the browser copy's
+ assert.equal(cardResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:true,savedAt:'R'},'Optical waveguide',when).label,
+  'Restore from this browser · Optical waveguide · Run 1 · browser copy 9:25 PM · same as file '+file);
+ // changed since the file, or no file: the record time, as before
+ assert.equal(cardResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:false,fileSavedAt:'F',savedAt:'R'},'Optical waveguide',when).label,
+  'Restore from this browser · Optical waveguide · Run 1 · 9:25 PM · file '+file+', changed since');
+ assert.equal(cardResumeChoice({runs:2,names:['Run 1','Run 2 · Heater 2e14'],savedAt:'R'},'Heated silicon waveguide',when).label,
+  'Restore from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 9:25 PM');
+ assert.deepEqual(opticalResumeChoice({runs:1,names:['Run 1'],savedAt:'R'},when),cardResumeChoice({runs:1,names:['Run 1'],savedAt:'R'},'Optical waveguide',when));
+});
+test('round 11: each model card offers the newest session of its model; the top box keeps the rest',()=>{
+ const entries=[{index:-1,application:'multiphysics'},{index:0,application:'optical'},{index:1,application:'multiphysics'},{index:2,application:'optical'}];
+ assert.deepEqual(Object.fromEntries(Object.entries(cardRecords(entries)).map(([k,v])=>[k,v.index])),{'heated-waveguide':-1,optical:0});
+ // a card whose model this tab holds runs of offers nothing; its sessions stay in the top box
+ assert.deepEqual(Object.keys(cardRecords(entries,new Set(['optical']))),['heated-waveguide']);
+ assert.deepEqual(cardRecords([]),{});
 });

@@ -20,8 +20,8 @@ on the left, a large Graphics workspace on the right, and a Study/Messages dock
 below. The ribbon groups Project, Edit, Model setup, Physics and Compute. **Geometry**,
 **Materials**, **Mesh** and **Study** open the same settings as the model tree.
 **Physics → Installed** opens [Installed physics](#installed-physics). Compute holds
-the run command of the chosen application: **Run optical study**, **Run heat study**
-or **Run Joule heating study**. The optical workflow strip shows the current step
+the run command of the chosen application, **Run study** in every model (optical, steady heat,
+Joule heating and multiphysics; the header names the model). The optical workflow strip shows the current step
 without hiding the model. The dock shows the study sequence and Messages; after a
 Joule heating run, Results adds its **Solver log** there.
 
@@ -76,13 +76,15 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    their stored coordinates. The step bar's **4. Study** shows *Ready to run*, and *Run
    complete* once these inputs have a result; next to it the wavelength (for example
    **λ 1550 nm**) is a button that opens the wavelength field. Optionally set the
-   wavelength in **Physics › Optical modes** (its settings are headed *Optical modes*;
-   **Study → Edit wavelength**, **Edit in Optical modes** under the Study's execution
-   settings, which show the wavelength too, and the step bar's wavelength open that one field
-   focused) and the core mesh size in **Mesh**.
+   wavelength in **Physics › Optical modes** (its settings are headed *Optical modes*) or in
+   the Study's execution settings: both hold the same field, as both hold **Modes to find**
+   (**Study → Edit wavelength** and the step bar's wavelength open it under Optical modes,
+   focused). The Study settings also say which inputs the next run uses, *Next run uses 700 ×
+   300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, whatever run Results shows.
+   Set the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
-4. Select **Run optical study**. Results keep the inputs used by that run,
+4. Select **Run study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
    An input edit replaces the completion message, so it never describes edited inputs.
    The dock heading, the status bar, the title and the step bar describe the run being viewed
@@ -91,14 +93,21 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    other inputs, after an edit or with an older run selected, *Run 1 · design A · current inputs
    differ from this run* (the status bar adds *Run 2 has them* when another run has the current
    inputs, else *press Run to compute them*), and when no input was edited the title adds
-   *viewing Run 1 · design A, which used other inputs*, so the difference does not read as
-   unsaved edits; before any run *Nothing is computed until you press Run* and *Optical adapter
+   *viewing Run 1 · design A (other inputs)* on Results and Compare, so the difference does not
+   read as unsaved edits (on the Model tab the title describes the current inputs only). Under
+   the Inputs row of the selected run, **Use this run's inputs** loads that run's inputs (and its
+   Modes to find and group index option) as the current inputs at once, without a question,
+   since the runs stay as they are; it is one input edit, so **Undo** takes it back (Undo does not
+   change Modes to find or the group index option, which are page state); before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
    bar adds *press Run to compute it here*). Run list entries name a run by its number with its
    name, *Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*, and give the time
-   with seconds; the Compare pickers and headings name runs the same way. Exactly one run card
+   with seconds; the Compare pickers and headings name runs the same way. Compare opens with
+   the two newest runs, the older as A and the newer as B (a run just computed is B); the run
+   list shows the newest first, so on Compare the two cards end with *· Compare A* and *· Compare
+   B*. A pick whose run is gone sets both back to that pair. Exactly one run card
    reads as selected (the pointer over another card changes only its border). On Compare a click on
    a run in the run list selects it (Run name and the run commands act on it) and Compare stays
    as it is: A and B are chosen with the pickers above the plots, and **Open Run 1 · design A in
@@ -176,8 +185,13 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    session** with the session file that holds them, or that nothing does. While the tab holds no optical
    runs and browser recovery holds an optical session, for example after a restart, the Optical
    waveguide card offers it first, *Restore from this browser · Optical waveguide · Run 1 ·
-   design A, Run 2 · 2:25 PM · same as file …json*, next to **Start new**; the box above the cards then lists only
-   the other sessions, and when there are none **Open session file (portable)…** and its note
+   design A, Run 2 · 2:25 PM*, next to **Start new**. The Heated silicon waveguide card does the
+   same for the newest multiphysics session while the tab holds no multiphysics runs, *Restore
+   from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. An
+   offer whose record is the same as the session file it was saved to names the file's save
+   time instead of the record's, *· same as file …json, saved 2:24 PM*; one the same as a file
+   it was opened from says which time it shows, *· browser copy 2:25 PM · same as file …json*.
+   The box above the cards then lists only the sessions no card offers, and when there are none **Open session file (portable)…** and its note
    are beside the card's offer instead. Every recovery entry names its
    model, its run count and its runs (*Run N*, with the run's name if it has one), for example
    *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
@@ -251,11 +265,11 @@ three times as long ([group index of a single study](group_index.md)). With the 
 document is the `optical-shapes-v8` document as before, byte for byte. With it on, the only
 difference is `results.group_index`, and n_eff and the fields at λ0 are the same values. The
 box is page state, like Modes to find. A new model starts with it off, and an input file does
-not store it. Opening a session, or **Restore this run's inputs**, sets it from the run: on for
+not store it. Opening a session, or **Use this run's inputs**, sets it from the run: on for
 a run with n_g. It is part of the study a run is compared with: with the box on, a run without
 n_g is not of the current inputs, and a document check made with the box off is of earlier
 inputs. The adapter stays `optical-shapes-v8` and the run's `settings` are unchanged. The run
-table CSV has no n_g column.
+table CSV has n_g in its `group_index [1]` column.
 
 A run with n_g keeps it in the version 9 slots `group_index` and `group_index_method`. Its
 document is rebuilt from its settings, as for any run, with `results.group_index` added, whose
@@ -330,7 +344,7 @@ Run is enabled when the inputs determine the temperature level (a fixed temperat
 or convection with h > 0 on some side), adjacent fixed sides agree at their corner,
 and the mesh fits the server limits; the reason is shown otherwise. Invalid values
 stay as highlighted drafts that block running and saving until corrected or
-restored. **Run heat study** builds a `thermal.steady2d` document (see **Study** for
+restored. **Run study** builds a `thermal.steady2d` document (see **Study** for
 the exact JSON), validates it through the same public thermal routes as the classic
 Studio page and solves it. Results show temperature (P1, interpolated in each
 triangle) or heat flux |q|, qx or qy (constant per triangle) on the actual result
@@ -373,7 +387,7 @@ Run is enabled when a side fixes the potential, a side fixes the temperature or 
 convection with h > 0, adjacent fixed sides agree at their corner (potential and
 temperature), every given temperature lies in the valid range of every model material,
 and no heat job holds Studio's one job slot (heat waits for a Joule job the same way); the
-reason is shown otherwise. **Run Joule heating study** builds the
+reason is shown otherwise. **Run study** builds the
 document (shown under **Study**), validates it and runs it on Studio's
 [Joule routes](electric_joule.md#studio-region-documents), with their region and mesh
 limits; a refusal (for example two potentials at one corner, a mesh over the node
@@ -431,7 +445,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
 - **Add coupling** picks an output, then one of the inputs that can take it; the others are
   greyed with the reason (the same physics, another quantity, another unit, an input that
   already has its one source). An output of single numbers is listed greyed as, for example,
-  *Modes 1 effective index (single numbers, not a map)*. The transfer is Same mesh, the only one in this release. When an
+  *Modes 1 effective index (single numbers, not a map)*. Opened for one input (**Add coupling**
+  from a suggestion in Messages), From lists only the outputs that input can take: a
+  temperature input is offered temperature fields only. The transfer is Same mesh, the only one in this release. When an
   input could obviously be fed (Modes 1 temperature from Heat 1), Messages suggests the
   coupling; nothing is coupled until you add it. Until then Modes 1 carries a warning in the
   tree, on its Connections node, in its Settings and in Messages: “Temperature input has no
@@ -459,9 +475,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   temperature for every optical material: `physmat:Si` and `physmat:SiO2` carry them, and for a
   local record **Fill from physmat** copies physmat's values in (noting the source) or **Use
   physmat:… instead** switches its regions to the library material.
-- **Run** solves every physics in solve order, with the same ▶ as **Run optical study**. The ▶
-  is decoration with an empty alternative text, so screen readers read the label alone (“Run”,
-  “Run optical study”). The Study dock lists each physics or iteration
+- **Run study** solves every physics in solve order, with the same ▶ and label as the
+  single-physics models. The ▶ is decoration with an empty alternative text, so screen readers
+  read the label alone (“Run study”). The Study dock lists each physics or iteration
   step with its state (Waiting, Solving…, Done in 0.3 s, Iteration 7 of up to 30 with the last
   change, Did not settle, Not run), Connections shows the same states while it is open, and **Stop run**
   ends the run at the engine's next step: after the physics being solved, or inside an
@@ -475,8 +491,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   the model changed since; press Run to update” and the footer “Model edited since run 1 · press
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
   coupling removed and added back, or Undo) makes it current again, and Messages, the dock
-  heading and the footer then say the same sentence, “Model matches run 1 again: its results are
-  current. Run makes a new run with the same inputs”, which says what Run would do. A run read
+  heading and the footer then say the same sentence, “No need to run: Run 1 already has these
+  results. Run again to make a copy”, which says first that nothing needs running (Messages adds
+  “Also solve without heater” is ticked again when an Undo ticked it again). A run read
   from a session file or recovered from this browser has no solve times: its rows read **From
   file** or **From this browser** (an iteration step keeps its count, *Settled in 7 iterations · from
   file*), the dock heading “Run 1 · read from file, not recomputed” (or
@@ -664,8 +681,12 @@ was opened, as the version 8 text Save session would write. Over 16 MiB it keeps
 the selected and pinned runs only, without a dialog, and the indicator says “kept for recovery in
 this browser without the maps of 2 runs · Save session to keep them”; when even that is over the
 limit it writes nothing new (“browser recovery unavailable: session over 16 MiB”) and the earlier
-record stays. **Recover last session** and **Recover earlier session · Heated silicon waveguide ·
-3 runs · Run 1, Run 2, Run 3 · time** run the same checks as Open session.
+record stays. **Restore last session from this browser**, **Restore earlier session from this
+browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · time** (Workspace tools) and
+the Heated silicon waveguide card's **Restore from this browser** run the same checks as Open
+session. A restored record that was the same as the session file it was saved to, or opened
+from, reads *Recovered from this browser · same as file …json*, as an optical one does. A
+template just opened reads *New model · not saved* until its first edit, run or save.
 
 The module checks are in `tests/simcase/studio_workspace_multiphysics_session.cjs` (the optical
 files of versions 6 and 7 written by the Studio before version 8, in
@@ -765,7 +786,7 @@ An optical session of [version 9](#optical-session-files-version-9) keeps the en
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
 sessions to 16 MiB. CSV and PNG exports are available. These workspace
-formats are separate from headless simcase JSON documents. After reload, explicitly choose Recover last session for the committed browser
+formats are separate from headless simcase JSON documents. After reload, explicitly choose Restore last session from this browser for the committed browser
 snapshot, or Open session for a portable file. Pending writes are not a backup.
 
 A download request does not confirm that the browser wrote a file to disk.
@@ -791,7 +812,10 @@ The run table CSV (`studio-runs.csv`) writes every quantity column as `name [uni
 its SI value: `core_width [m]` and `core_height [m]` (single-rectangle designs),
 `vacuum_wavelength [m]`, `core_element_size [m]` and `effective_index [1]`; job, name, pin,
 completion time, `core_material`, a `shapes` column describing every shape (in nm, as the
-page shows it) and the candidate number carry no unit.
+page shows it) and the candidate number carry no unit. `effective_index [1]` is Re n_eff. Two
+columns follow `origin`, so every earlier column keeps its place: `effective_index_imag [1]`,
+Im n_eff under exp(−iωt) (0 for a lossless run, whose n_eff is real), and `group_index [1]`, n_g
+of a run with the group index (empty when the run has none or the mode has no value).
 
 Optical session files are version 7, whose input is an input file of version 7 (a version 6
 session is still read, its input as a version 6 input file; a multiphysics model is saved as
@@ -951,7 +975,7 @@ These checks do not replace the required full CI or independent physics validati
 ## Input recovery and material review
 
 Valid input edits are saved automatically to a separate browser recovery record.
-After reloading, **Recover recent inputs** offers a confirmed replacement; it
+After reloading, **Restore recent inputs from this browser** offers a confirmed replacement; it
 never runs a calculation. This is one latest record per browser origin, shared
 by its tabs. Invalid drafts, completed fields and undo history are not recovered.
 Recovery does not mark a file as saved. Storage failures are shown with a file
@@ -1131,8 +1155,10 @@ the save indicator reports the browser copy (*updating browser recovery*, *kept 
 recovery in this browser*, *browser recovery unavailable*) while no session file holds
 the runs, and the session file once one does. An empty new tab does not erase the prior notebook.
 
-After reload, choose the last session on the start page's **Continue where you left off**
-card, or expand Connection, recovery and layout help → Recover last session.
+After reload, choose the last session on its model's card (**Restore from this browser** under
+Optical waveguide or Heated silicon waveguide), on the start page's **Continue where you left
+off** card for the sessions no card offers, or under Workspace tools → **Restore last session
+from this browser**.
 The complete record is validated before the existing replacement dialog; recovered
 fields are labeled `recovered`, not newly computed. Recovery starts a new input
 undo history and keeps the document unsaved until you save a file/session. No
@@ -1147,7 +1173,7 @@ runs as a second earlier session):
 when the session written equals the stored one (the same file opened again) the stored record is
 replaced, not moved, and an earlier copy of either (the unchanged model saved again after the tab
 moved to another model and back) is dropped. The lists hide any copy left. Browser recovery also keeps the name of the session file the notebook was
-opened from, for the lists; **Recover earlier session** lists each with its
+opened from, for the lists; **Restore earlier session from this browser** lists each with its
 model, run count, run names and time and recovers it through the same replacement dialog. Recovering
 an earlier session keeps the current one as an earlier session at the next save.
 
@@ -1155,7 +1181,7 @@ The latest snapshot is a single record for the browser origin, shared across tab
 Each write checks the previously observed revision in the same database transaction.
 If another tab has saved since this tab loaded or recovered the notebook, automatic
 storage stops without overwriting that record. Save session to preserve this tab,
-then Recover last session to review and adopt the newer notebook. Cancelling the
+then Restore last session from this browser to review and adopt the newer notebook. Cancelling the
 review or Retry recovery storage does not bypass this protection.
 
 To keep this tab's notebook instead, choose **Use current notebook for recovery**.

@@ -40,13 +40,32 @@ export function offerTime(savedAt,now=new Date()){
  const t=new Date(savedAt),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
  return t.toDateString()===now.toDateString()?time:t.toLocaleDateString()+' '+time;
 }
-// The Optical waveguide card's offer when the tab holds no optical runs and browser recovery
-// holds an optical session: "Restore from this browser · Optical waveguide · design A, design B ·
-// 2:25 PM", then the file it names, shown before Start new. item: a recovery entry {runs, names,
-// savedAt, file, fileCurrent}.
-export function opticalResumeChoice(item,when=offerTime){
+// The time a card offer names. The record is written a moment after a save, so a record that is
+// the same as its session file names the file's save time ("same as file x, saved 9:24 PM"), the
+// time people remember; else the browser copy's time, said as such when a file is named beside it.
+function offerTimeWords(item,when){
+ if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return ` · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
+ if(item.file&&item.fileCurrent===true)return ` · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
+ return ` · ${when(item.savedAt)}${fileWords(item)}`;
+}
+// A model card's offer when the tab holds none of that model's runs and browser recovery holds a
+// session of it: "Restore from this browser · Optical waveguide · design A, design B · 2:25 PM",
+// then the file it names, shown before Start new. item: a recovery entry {runs, names, savedAt,
+// file, fileCurrent, fileSavedAt}; model: the model the entry names.
+export function cardResumeChoice(item,model,when=offerTime){
  const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`${RESTORE_TEXT} · Optical waveguide · ${names} · ${when(item.savedAt)}${fileWords(item)}`};
+ return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when)}`};
+}
+export const opticalResumeChoice=(item,when=offerTime)=>cardResumeChoice(item,'Optical waveguide',when);
+// Which stored session each model card offers: the newest of its model (entries newest first, each
+// {kind, index, application}), on the cards whose model this tab does not hold runs of (busy: the
+// set of card ids to leave out). {optical: entry, 'heated-waveguide': entry}; the top box lists the
+// others only, so every session has one route.
+export function cardRecords(entries,busy=new Set()){
+ const out={};
+ for(const entry of entries){const card=entry.application==='multiphysics'?'heated-waveguide':'optical';
+  if(!busy.has(card)&&!out[card])out[card]=entry;}
+ return out;
 }
 // What the landing page offers to resume: the latest browser session and the
 // earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
@@ -60,8 +79,8 @@ export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleStri
  return choices;
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
-// onOpenFile(), onStartNew()}; shown above the templates when there is something. The record the
-// Optical waveguide card resumes is not among them (one route to each session).
+// onOpenFile(), onStartNew()}; shown above the templates when there is something. The records the
+// model cards resume are not among them (one route to each session).
 function resumeCard(resume){
  const choices=resumeChoices(resume.latest,resume.earlier);if(!choices.length)return null;
  const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
@@ -91,23 +110,27 @@ export const CHOOSER_NOTES=Object.freeze([
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
 const PORTABLE_NOTE='A session file is the copy that moves between computers; browser recovery stays in this browser.';
 const openFileButton=onOpenFile=>{const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file (portable)…';open.onclick=()=>onOpenFile();return open;};
-// The Optical waveguide card with its resume offer under it: Resume first, then Start new.
+// A model card with its resume offer under it: Resume first, then Start new. key: the id the
+// buttons carry (resume-optical, optical-start-new; resume-heated-waveguide, ...).
 // offer.onOpenFile: no box above lists other sessions, so the session file route and its note
 // are here, beside the only other way back.
-function opticalSlot(button,offer){
+function cardSlot(button,offer,key){
  const slot=document.createElement('div');slot.className='card-slot';
  const actions=document.createElement('div');actions.className='card-resume';
- const go=document.createElement('button');go.type='button';go.id='resume-optical';go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
- const fresh=document.createElement('button');fresh.type='button';fresh.id='optical-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
+ const go=document.createElement('button');go.type='button';go.id='resume-'+key;go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
+ const fresh=document.createElement('button');fresh.type='button';fresh.id=key+'-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
  actions.append(go,fresh);slot.append(button,actions);
  if(offer.onOpenFile){actions.append(openFileButton(offer.onOpenFile));const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;slot.append(portable);}
  return slot;
 }
-// optical: the Optical waveguide card's resume offer {label, onResume(button), onStartNew()}, or null.
-export function renderApplications(host,resume=null,optical=null){
- host.replaceChildren();
+// offers: each model card's resume offer by card id ({optical, 'heated-waveguide'}), each
+// {label, record, onResume(button), onStartNew()}; a card without one has none.
+export function renderApplications(host,resume=null,offers={}){
+ host.replaceChildren();offers={...(offers||{})};
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
- if(!card&&resume&&optical)optical={...optical,onOpenFile:resume.onOpenFile};
+ // no box above: the first card with an offer carries the session file route
+ const first=Object.keys(offers).find(id=>offers[id]);
+ if(!card&&resume&&first)offers[first]={...offers[first],onOpenFile:resume.onOpenFile};
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';
  const cards=document.createElement('div');cards.className='cards';
@@ -117,7 +140,7 @@ export function renderApplications(host,resume=null,optical=null){
   const status=document.createElement('span');status.className='application-status'+(app.available?' available':'');status.textContent=app.status;
   const description=document.createElement('p');description.textContent=app.description;
   const scope=document.createElement('span');scope.textContent=app.scope;
-  button.append(title,status,description,scope);cards.append(app.id==='optical'&&optical?opticalSlot(button,optical):button);
+  button.append(title,status,description,scope);cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
  const contractTitle=document.createElement('h3');contractTitle.textContent='What this workspace supports';

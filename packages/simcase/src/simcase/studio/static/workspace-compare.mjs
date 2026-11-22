@@ -14,6 +14,16 @@ export function fieldHeading(side,run,number=null){
  const named=run.label&&run.label.trim().toLowerCase()!==side.toLowerCase();
  return `${side} · ${runHeading(named?run:{...run,label:''},number)}`;
 }
+// The pair Compare opens with, as [A job, B job]: A the older and B the newer of the two newest
+// runs (a run just computed is B, the run before it A). The run list shows the newest first, so B is
+// above A there, and on Compare each of the two cards says which side it is (compareSide). [job, job]
+// with one run, [null, null] with none.
+export function defaultComparison(runs){
+ if(!runs.length)return [null,null];
+ return [(runs.at(-2)||runs.at(-1)).job,runs.at(-1).job];
+}
+// The side a run card names on Compare: "A", "B", "A and B" (one run on both sides) or ''.
+export function compareSide(job,[a,b]){return job===a&&job===b?'A and B':job===a?'A':job===b?'B':'';}
 // n_eff everywhere (results, mode select, Compare): 8 decimals.
 export const formatIndex=value=>value.toFixed(8);
 export const formatPercent=value=>value===null?'—':value.toFixed(4)+' %';
