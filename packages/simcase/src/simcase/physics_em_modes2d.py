@@ -50,7 +50,8 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
         raise ValueError("bend modes require PML")
     if pml is not None:
         from .physics_pml_modes import solve as solve_open
-        return solve_open(mesh, eps_tri, wavelength, boundary, num_modes, formulation, n_target, pml, bend)
+        return solve_open(mesh, eps_tri, wavelength, boundary, num_modes, formulation, n_target, pml, bend,
+                          motion=motion)
     if motion is not None and (formulation != "vector" or pml is not None):
         raise ValueError("a mesh motion takes the vector formulation with closed boundaries")
     if formulation == "vector":

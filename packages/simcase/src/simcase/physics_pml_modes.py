@@ -22,7 +22,14 @@ def coordinates(mesh, pml, bend=None):
                             bend_axis=bend.get('axis','x'), bend_origin=bend.get('origin',0.))
 
 
-def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend):
+def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion=None):
+    """With ``motion`` (a galerkin MeshMotion of the nodes in the mesh's unit; internal:
+    simcase.shape_derivative), the modes are chosen from the numbers on the moved mesh exactly as
+    without it, and the kept modes' ``neff`` is returned live in the library of ``motion.t``: the
+    same eigensolve with the layer's factors of the moved mesh held fixed (galerkin requires the
+    motion to leave every stretched element in place)."""
+    if motion is not None:
+        return _solve_moving(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion)
     if n_target is None:
         raise ValueError('PML modes require explicit positive n_target')
     from .pml_contract import validate
@@ -127,3 +134,37 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         chosen /= peak
         result['fields']=chosen
     return result
+
+
+def _solve_moving(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion):
+    from galerkin.shape import MeshMotion, motion_step
+
+    from .physics_em_modes2d import _numbers
+    if bend is not None:
+        raise ValueError("a mesh motion is refused with a bend: its coordinate factor depends on every node position")
+    if formulation != "vector":
+        raise ValueError("a mesh motion takes the vector formulation")
+    moved = motion_step(mesh, motion).moved
+    numbers = solve(moved, eps, wavelength, boundary, num_modes, formulation, n_target, pml, None)
+    c = coordinates(moved, pml)
+    scaled = Mesh(mesh.nodes / wavelength, mesh.triangles.copy(), mesh.boundary, mesh.boundary_edges)
+    sides = [s for s, v in boundary.items() if v == 'pec']
+    fixed = np.unique(np.concatenate([mesh.boundary[s] for s in sides])) if sides else np.zeros(0, int)
+    space = EdgeSpace(scaled)
+    ids = {tuple(e): i for i, e in enumerate(space.edges)}
+    edges = np.unique([ids[tuple(sorted(e))] for s in sides for e in mesh.boundary_edges[s]]).astype(int)
+    free = np.setdiff1d(np.arange(space.num_edges + mesh.num_nodes), np.r_[edges, space.num_edges + fixed])
+    search = min(max(2 * num_modes, 6), len(free) - 2)
+    scaled_motion = MeshMotion(design_velocity=np.asarray(motion.design_velocity, dtype=float) / wavelength,
+                               t=motion.t)
+    live, *_ = solve_modes(scaled, eps, 2 * np.pi, n_target, search, pec_nodes=fixed, pec_edges=edges,
+                           coordinate_factors=c.factors, motion=scaled_motion)
+    values = _numbers(live)
+    picks = []
+    for value in numbers['neff']:
+        j = int(np.argmin(np.abs(values - value)))
+        if abs(values[j] - value) > 1e-12 * max(1.0, abs(value)):
+            raise ValueError("the moving-mesh PML solve did not reproduce a selected mode (a defect of simcase, "
+                             "please report it)")
+        picks.append(j)
+    return {"neff": live[np.asarray(picks)], "guided": numbers['guided'], "open_boundary": numbers['open_boundary']}

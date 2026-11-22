@@ -270,13 +270,13 @@ value, slope = problem.derivative(lambda r: r.reaction_heat_rate_per_depth[inner
 | `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
 | `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: 움직이는 메시에서 열 단계를 다시 풀므로 온도가 형상과 함께 움직입니다 |
 | `axisymmetric` 성분의 `thermal.steady2d`, `thermal.transient2d` | `run`처럼 `coordinate_system="axisymmetric"`을 준 같은 풀이기(2026-11-22). 대칭축 위 노드는 반지름 속도 0을 유지합니다. 반지름 성분을 그 노드들을 0으로 둔 채 다시 확장합니다. 축 위의 점을 축 밖으로 움직이는 설계는 거부합니다 |
-| `em.modes2d`, vector formulation | runner의 vector 풀이(파장으로 나눈 메시에서 `galerkin.kernels.solve_modes`)와 그 모드 선택. `solve(t)`는 exp(−iωt) 기준의 `{"effective_index": ...}`를 돌려줍니다. 축퇴 모드의 미분은 galerkin처럼 NaN이고 `DegenerateModeWarning`이 납니다 |
+| `em.modes2d`, vector formulation | runner의 vector 풀이(파장으로 나눈 메시에서 `galerkin.kernels.solve_modes`)와 그 모드 선택. `solve(t)`는 exp(−iωt) 기준의 `{"effective_index": ...}`를 돌려줍니다. 축퇴 모드의 미분은 galerkin처럼 NaN이고 `DegenerateModeWarning`이 납니다. `pml`이 있으면(2026-11-22) `run`처럼 움직인 메시의 수치로 모드를 고릅니다. 설계 속도는 층을 제자리에 둡니다. 인자가 1이 아닌 요소의 모든 노드에서 0이고, 바깥 면에서는 법선 성분이 0입니다 |
 
 다음은 이름을 밝혀 거부합니다(`DocumentError`).
 - flat 형상 블록;
 - 다른 물리의 `axisymmetric` 성분;
 - 다른 물리(예: Joule 가열);
-- 모드에서: scalar formulation(simcase 자체 고유값 풀이기라 움직이는 메시 경로가 없음), PML·bend(simcase 모드 문서 경로에 아직 연결하지 않음), sweep, 모드 추적;
+- 모드에서: scalar formulation(simcase 자체 고유값 풀이기라 움직이는 메시 경로가 없음), bend(인자가 모든 노드에 달려 있음), PML 안이나 바깥 면을 가로질러 점을 움직이는 설계, sweep, 모드 추적;
 - 내향 열유속·convection·traction이 있는 `mechanics.thermoelastic2d` 문서. 이 워크플로는 Dirichlet 온도, 열원, 단열, 처방 변위, 체적력만 받습니다;
 - 두 역학 종류의 `gauge_pressure`. simcase는 이를 법선을 따르는 traction으로 적용하는데, motion은 일정한 traction만 받습니다;
 - 설계 속도가 거부하는 파라미터(p에서의 위상 변화 포함).
