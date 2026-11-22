@@ -276,6 +276,7 @@ FIELDS = {
     "unnormalized_field_overlap": ("unnormalized_field_overlap", "study_points_modes_modes", None),
     "coupling_efficiency": ("coupling_efficiency", "study_points_modes", None),
     "te_polarization_fraction": ("te_polarization_fraction", "study_points_modes", None),
+    "effective_area": ("effective_area", "study_points_modes", None),
     "frame_transform": (None, "study_points_columns_columns", None),
     "cluster_ids": (None, "clusters", None),
     "cluster_offsets": (None, "clusters", None),
@@ -343,7 +344,8 @@ class RunResult:
     #: ``unnormalized_mode_power`` (vector, W) or ``unnormalized_mode_field_square_integral``
     #: (scalar, m^2) (P, M), ``confinement_factor`` (P, M, R), ``unnormalized_field_overlap``
     #: (P, M, M, m^2), with ``results.mode_overlap.gaussian`` ``coupling_efficiency`` (P, M) and,
-    #: for vector results, ``te_polarization_fraction`` (P, M) of the saved centroid field;
+    #: for vector results, ``te_polarization_fraction`` (P, M) of the saved centroid field, and
+    #: ``effective_area`` (P, M, m^2);
     #: None for PML results (``simcase.mode_postprocessing``)
     postprocessing: dict | None = None
     #: the swept values of a sweep over another slot than the wavelength, in SI
@@ -887,10 +889,15 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
         out["unnormalized_field_overlap"] = np.conj(arrays["field_overlap"]) * KERNEL_AREA
         if "coupling_efficiency" in arrays:
             out["coupling_efficiency"] = arrays["coupling_efficiency"]
+        if not vector:
+            out["effective_area"] = arrays["effective_area"] * KERNEL_AREA
         if vector:
             # defined on the public samples themselves (metres; |E| is the same in either frame)
             out["te_polarization_fraction"] = np.stack([
                 mode_postprocessing.te_polarization_fraction(model.tri.nodes, model.tri.triangles, f.electric)
+                for f in fields])
+            out["effective_area"] = np.stack([
+                mode_postprocessing.effective_area(model.tri.nodes, model.tri.triangles, f.electric)
                 for f in fields])
         return out
 

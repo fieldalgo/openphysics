@@ -302,6 +302,10 @@ values (skipped where the libraries are absent; the backend CI job runs them).
 - simcase saves `vector_power`/`scalar_power`, `confinement_factor`,
   `overlap_matrix` and an optional Gaussian `coupling_efficiency` with every
   closed-window `em.modes2d` result
-  ([mode post-processing](../simcase/overview.md#mode-post-processing)); not
-  exposed in Studio. The simcase normalisations (`"peak"`) are reproduced here
+  ([mode post-processing](../simcase/overview.md#mode-post-processing)), and
+  an effective area: `scalar_effective_area` for scalar results, and for vector
+  results the same `|E|^2`/`|E|^4` definition with all three components summed
+  by the centroid rule on the saved triangle-centroid field, which converges to
+  `effective_area(..., include_longitudinal=True)`. Studio shows that effective
+  area, not these kernels. The simcase normalisations (`"peak"`) are reproduced here
   for comparison only.

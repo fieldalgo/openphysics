@@ -2910,7 +2910,7 @@
    "domain": {"min_exclusive": "0"},
    "band": null,
    "places": ["result"],
-   "description": {"en": "Effective mode area (output).", "ko": "유효 모드 면적(출력)."}
+   "description": {"en": "Effective mode area (int |E|^2 dA)^2 / int |E|^4 dA of a mode (output); for saved vector modes the area-weighted sums over the triangle-centroid field with all three components, the common mode-solver form, not the vectorial nonlinear area.", "ko": "모드의 유효 모드 면적 (int |E|^2 dA)^2 / int |E|^4 dA(출력). 저장된 벡터 모드에서는 세 성분 모두를 쓴 삼각형 중심 필드의 면적 가중 합이며, 흔한 모드 솔버 형식이고 벡터 비선형 면적이 아니다."}
   },
   "beam_waist_radius": {
    "dimension": {"L": 1},
