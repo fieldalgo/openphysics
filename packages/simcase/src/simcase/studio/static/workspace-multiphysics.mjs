@@ -465,26 +465,30 @@ export function staleRows(rows,runDoc,doc){
 export function freshnessAgain(freshness,diverged){return freshness==='current'&&diverged?'again':freshness;}
 // The one sentence every place shows when the model equals the last run again.
 // says what Run would do, so the sentence does not read as a request to run
-export const matchesAgainText=runId=>`Model matches run ${runId} again: its results are current. Run makes a new run with the same inputs`;
-// The Messages line after an edit: no request to Run when the model equals the last run again.
-export function editNotice(message,freshness,runId){return message+(freshness==='again'?` ${matchesAgainText(runId)}.`:' Press Run to compute the new model.');}
+// A run in the dock and the footer: "Run 2 · design A" when it is named, as the optical app says
+// it; an unnamed run keeps the words it had ("run 2" inside a sentence).
+const runWords=(runId,label,inSentence=false)=>label?`Run ${runId} · ${label}`:`${inSentence?'run':'Run'} ${runId}`;
+export const matchesAgainText=(runId,label='')=>`Model matches ${runWords(runId,label,true)} again: its results are current. Run makes a new run with the same inputs`;
+export function editNotice(message,freshness,runId,label=''){return message+(freshness==='again'?` ${matchesAgainText(runId,label)}.`:' Press Run to compute the new model.');}
 // Where a result shown as current came from, when this tab did not compute it (optical and
 // multiphysics alike); null for a run computed here.
 export const originText=origin=>origin==='imported'?'read from file, not recomputed':origin==='recovered'?'recovered from this browser, not recomputed':null;
 // The dock heading and the footer for the state of the model and its last run. origin: where
 // that run came from ('local', 'imported' or 'recovered'); a run not computed in this tab says so.
-export function sequenceHeading(freshness,runId,origin='local'){
- if(freshness==='again')return matchesAgainText(runId);
- if(freshness==='current'&&originText(origin))return `Run ${runId} · ${originText(origin)}`;
- if(freshness==='current')return `Run ${runId} · solved from the current model`;
- if(freshness==='stale')return `Run ${runId} · the model changed since; press Run to update`;
+export function sequenceHeading(freshness,runId,origin='local',label=''){
+ const run=runWords(runId,label);
+ if(freshness==='again')return matchesAgainText(runId,label);
+ if(freshness==='current'&&originText(origin))return `${run} · ${originText(origin)}`;
+ if(freshness==='current')return `${run} · solved from the current model`;
+ if(freshness==='stale')return `${run} · the model changed since; press Run to update`;
  return 'Nothing is computed until you press Run';
 }
-export function readyStatus(freshness,runId,origin='local'){
- if(freshness==='again')return matchesAgainText(runId);
- if(freshness==='current'&&originText(origin))return `Run ${runId} · ${originText(origin)} · press Run to compute it here`;
- if(freshness==='current')return `Run ${runId} matches the model · press Run to solve again`;
- if(freshness==='stale')return `Model edited since run ${runId} · press Run to update`;
+export function readyStatus(freshness,runId,origin='local',label=''){
+ const run=runWords(runId,label);
+ if(freshness==='again')return matchesAgainText(runId,label);
+ if(freshness==='current'&&originText(origin))return `${run} · ${originText(origin)} · press Run to compute it here`;
+ if(freshness==='current')return `${run} matches the model · press Run to solve again`;
+ if(freshness==='stale')return `Model edited since ${runWords(runId,label,true)} · press Run to update`;
  return 'Model checked · press Run';
 }
 // The content key of one physics solved alone: an uncoupled column is valid for a run whose

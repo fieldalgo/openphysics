@@ -25,7 +25,7 @@ test('the save indicator shows the file the session was sent to until the next e
  // the browser copy does not change what the indicator says about the file
  assert.equal(P.persistenceTitle({saved,recovery:'kept'},when),P.persistenceTitle({saved},when));
  const recovered={kind:'recovered',name:null,current:true};
- assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser (last sent to a file: optical-waveguide-session-2026-11-21-1305.json at 13:05)');
+ assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · same as file optical-waveguide-session-2026-11-21-1305.json');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser (last sent to a file: optical-waveguide-session-2026-11-21-1305.json at 13:05; changed since)');
  assert.equal(P.persistenceTitle({loaded:recovered},when),'Recovered from this browser');
  // a recovered notebook never saved to a file still says its results are not in one
@@ -51,6 +51,7 @@ test('the save indicator shows the file the session was sent to until the next e
 test('after an open the title names the file opened; after the next change it says what changed',()=>{
  const opened={kind:'opened',name:'design-a.json',current:true};
  assert.equal(P.persistenceTitle({loaded:opened}),'Opened design-a.json');
+ assert.equal(P.persistenceTitle({loaded:{...opened,current:false,file:'design-a.json',fileCurrent:true},runsUnsaved:true,recovery:'kept'}),'Changed since session file design-a.json · kept for recovery in this browser');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false}),'Unsaved inputs');
  // a save after the open names the new file, not the one opened
@@ -149,9 +150,9 @@ test('switching models says where the optical runs stay: one short line, the res
  // the tab holds them until it is closed or reloaded; after that, only what still holds them is named
  assert.deepEqual(P.opticalRunsStayText({runs:1}),{text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, no file or browser recovery holds it.'});
  assert.deepEqual(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
-  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.'});
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.'});
  assert.deepEqual(P.opticalRunsStayText({runs:2,recovery:true}),
-  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) brings them back.'});
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions) brings them back.'});
  assert.deepEqual(P.opticalRunsStayText({runs:1,file:'a.json'}),
   {text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, Open session with a.json brings it back.'});
 });
@@ -169,4 +170,21 @@ test('round 9 (J5): Compare headings name a run by its number with its name',()=
  assert.equal(C.runHeading(run('aaaaaaaa',700),2),'Run 2 · 700 × 300 nm · Silicon · λ 1550 nm');
  assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A'),1),'A · Run 1 · 600 × 300 nm · Silicon · λ 1550 nm');
  assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,'design B'),2),'B · Run 2 · design B · 700 × 300 nm · Silicon · λ 1550 nm');
+});
+
+test('round 10: a recovered notebook whose record still matched its file says "same as file", not "not saved to a file"',()=>{
+ const when=()=>'13:05',name='optical-waveguide-session-2026-11-22-2010.json';
+ // the record names the file it was opened from and says the inputs and runs were still that file's
+ const recovered={kind:'recovered',name:null,current:true,file:name,fileCurrent:true};
+ assert.equal(P.persistenceTitle({loaded:recovered,recovery:'kept'},when),'Recovered from this browser · same as file '+name);
+ // the record's file link no longer matched when it was written
+ assert.equal(P.persistenceTitle({loaded:{...recovered,fileCurrent:false},runsUnsaved:true,recovery:'kept'},when),`Recovered from this browser (opened from ${name}; changed since)`);
+ // after a change of the model or a run: what changed, and the file it changed from
+ assert.equal(P.persistenceTitle({loaded:{...recovered,current:false},runsUnsaved:true,recovery:'kept'},when),`Changed since session file ${name} · kept for recovery in this browser`);
+ // a record with no file link reads as before
+ assert.equal(P.persistenceTitle({loaded:{kind:'recovered',name:null,current:true},runsUnsaved:true,recovery:'kept'},when),'Recovered from this browser · not saved to a file');
+ // a file sent to Downloads that still matches outranks an opened one
+ const saved={name:'later.json',savedAt:'2026-11-22T20:15:00Z',current:true};
+ assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · same as file later.json');
+ for(const t of [P.persistenceTitle({loaded:recovered},when),P.persistenceTitle({saved,loaded:recovered},when)])assert.doesNotMatch(t,/not saved to a file/i);
 });

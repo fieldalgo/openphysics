@@ -355,13 +355,22 @@ checked within the discretization error), a
 non-converging Newton run whose refusal is shown with its text, and constant materials
 (`joule.steady2d`, 20 W/m, the uniform strip's exact power). Uncaught page exceptions and
 `console.error` calls fail the check (other browser log entries are not collected).
+It also checks the model builder as an ARIA tree with the keyboard alone (Tab to its one tab
+stop, Up, Down, Home, End, Enter, Space, Left and Right) and finds every node of the optical and
+Joule heating trees by role and accessible name in the browser's accessibility tree, and it checks
+Compare's absorption loss columns, plots framed on the core with the probe line under them at
+1440 × 900 and 1280 × 800, a run clicked on Compare staying on Compare with **Open in Results**,
+one selected run card, the session file still named after a page, run or mode is chosen and after
+a restore, and a restore opening the page that was shown.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff
 must equal the engine's run of the same document exactly, the coupling check, the heater-off
 column solved with the run and its Δn_eff equal to the difference of the engine's two runs, the
 run marked out of date by an edit and current again for the same content (the column staying
-valid on a second run), only the optical step out of date when the coupling alone is removed, the template's two modes (TE-like, then a TM-like cell that names its TM share), the warning and Undo of a removed coupling, and no horizontal overflow at 1440 × 900 and 390 px wide.
+valid on a second run), only the optical step out of date when the coupling alone is removed, the template's two modes (TE-like, then a TM-like cell that names its TM share), the warning and Undo of a removed coupling, no horizontal overflow at 1440 × 900 and 390 px wide,
+the multiphysics model tree with the keyboard alone and by role and name, and the results page
+marked in the tree on Results.
 A third script (`tools/studio_browser/studio_multiphysics_session_browser.mjs`) checks
 multiphysics session files (version 8): one Save session and one Open session in every model,
 the template, a 0.12 µm mesh and a two-run session saved, opened and saved again (the second
@@ -371,7 +380,9 @@ refusal), the refusals of damaged and newer files, browser recovery after a relo
 earlier sessions, the conflict of two tabs, and a restart: two optical runs, the heated session
 file opened over them, a reload and the same file opened again. After it, the title keeps
 *Opened …* through tab clicks, the recovery lists show each session once, and the Optical
-waveguide card offers the optical runs, which come back with the same n_eff.
+waveguide card offers the optical runs, which come back with the same n_eff. It also checks a
+named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the heated session's save
+message naming the optical runs that are not in its file.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

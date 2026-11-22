@@ -5,7 +5,8 @@
 // drawn from the document's couplings, Messages from the live check, the run with progress per
 // physics and loop, and Results per physics with the coupling check. The model is its document
 // (workspace-multiphysics.mjs); the server checks and runs it (/api/multiphysics/*).
-import {POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
+import {POLARIZATION_HELP,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
+import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
@@ -32,6 +33,7 @@ export function createMultiphysicsView(ctx){
  const {$,notice}=ctx;
  let active=false,doc=null,caps=null,catalog={types:new Map(),providers:[]},capsError=null;
  let check={pending:false,diagnostics:[],solve_order:[],run_refusal:null,error:null},messages=[],checkSeq=0,checkTimer=null;
+ const treeView=treeState();
  let selection='model',undoStack=[],redoStack=[],announcedMultiphysics=false;
  // runs: up to six completed runs (names, pins); lastRun: the one shown under Results
  let job=null,runs=[],lastRun=null,runFailure=null,uncoupled={},resultPage=null,indexView='n',resize=null;
@@ -88,12 +90,12 @@ export function createMultiphysicsView(ctx){
   undoStack.push(doc);if(undoStack.length>100)undoStack.shift();redoStack=[];
   const before=isMultiphysics(doc),prior=doc;doc=normalizeEnvelope(next);if(select)selection=select;lastRemoval=null;
   validate();ctx.onHistory();ctx.render();
-  let text=editNotice(message,freshness(),lastRun?.number);
+  let text=editNotice(message,freshness(),lastRun?.number,lastRun?.label||'');
   if(!before&&isMultiphysics(doc)&&!announcedMultiphysics){announcedMultiphysics=true;text+=' This model is now saved as a multiphysics model (format 0.3/multiphysics.1).';}
   notice(text+baselineReturnText(prior,doc,baselineOption));
  }
  // Undo and Redo compute nothing; back at the last run's model they say its results are current.
- const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.number).trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption));};
+ const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.number,lastRun.label||'').trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption));};
  function undo(){if(!undoStack.length)return;lastRemoval=null;const prior=doc;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Undo · model edit undone',prior);}
  function redo(){if(!redoStack.length)return;lastRemoval=null;const prior=doc;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Redo · model edit redone',prior);}
  // A removed coupling is named in Messages with Undo until the next edit.
@@ -126,8 +128,8 @@ export function createMultiphysicsView(ctx){
   const button=$('run-multiphysics'),reason=$('run-multiphysics-reason');if(!button)return;
   button.hidden=!active;reason.hidden=!active;if(!active)return;
   const block=runBlock(),fresh=freshness();button.disabled=!!block;button.textContent=job?'Running… (stop it under Study)':'Run';reason.textContent=job?'':block;
-  $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin);
-  const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number,lastRun?.origin);
+  $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
+  const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
   const option=$('run-baseline-option'),box=$('run-baseline');
   if(option){const o=baselineOptionState(doc,{on:baselineOption,busy:!!job});option.hidden=false;option.classList.toggle('unavailable',!o.available);box.checked=o.checked;box.disabled=o.disabled;option.title=o.title;}
  }
@@ -196,10 +198,16 @@ export function createMultiphysicsView(ctx){
   host.querySelectorAll('[data-mp-show]').forEach(b=>b.onclick=()=>{selection=messages[+b.dataset.mpShow].node;if(ctx.ui.page!=='Connections')ctx.ui.page='Model';ctx.render();$('inspector').querySelector('.mp-message')?.scrollIntoView({block:'nearest'});});
  }
  // ---- the tree ----
+ // drawn again with the focus kept on its item (a group opened or closed, a node chosen)
+ function drawTree(){const host=$('tree'),had=treeFocus(host,treeView);host.innerHTML=tree();host.querySelectorAll('[data-mp-node]').forEach(b=>b.onclick=()=>choose(b.dataset.mpNode));bindTree(host,treeView,drawTree);restoreTreeFocus(host,treeView,had);}
  function tree(){
   const counts=problemCounts(messages),order=check.solve_order||[],badge=name=>{const i=order.findIndex(g=>g.includes(name));return i<0?'':`<span class="order-badge${order[i].length>1?' cycle':''}" aria-label="solve order ${i+1}">${i+1}</span>`;};
   const count=id=>counts[id]?`<span class="problem-badge" aria-label="${counts[id]} problem${counts[id]===1?'':'s'}">${counts[id]}</span>`:'';
-  const item=(id,label,mark,extra='',indent=false)=>`<button data-mp-node="${esc(id)}" aria-pressed="${selection===id}" class="${indent?'tree-child':''}"><span class="tree-node-mark" aria-hidden="true">${mark}</span>${extra}${esc(label)}${count(id)}</button>`;
+  // an ARIA tree (workspace-tree.mjs): a node is selected while its page or settings are shown; on
+  // Results the results page shown, on Compare none
+  const page=ctx.ui.page,shown=id=>page==='Compare'||page==='Applications'?false:page==='Results'?id.startsWith('results:')&&id===resultPage:!id.startsWith('results:')&&selection===id;
+  const item=(id,label,mark,extra='',indent=false,level=indent?3:2)=>`<button type="button" data-mp-node="${esc(id)}" ${itemAttributes(level,shown(id))} class="${indent?'tree-child':''}"><span class="tree-node-mark" aria-hidden="true">${mark}</span>${extra}${esc(label)}${count(id)}</button>`;
+  const group=name=>groupHeading(name,!treeView.collapsed.has(name));
   const multi=isMultiphysics(doc)||couplingNames(doc).length>0;
   const warned=new Map(unsourcedInputs(doc,catalog).map(w=>[w.physics,w.text]));
   const warn=n=>warned.has(n)?`<span class="warn-badge" title="${esc(warned.get(n))}" aria-label="warning: ${esc(warned.get(n))}">!</span>`:'';
@@ -208,12 +216,12 @@ export function createMultiphysicsView(ctx){
   const loops=(Array.isArray(doc.study?.loops)?doc.study.loops:[]).map((l,i)=>item('loop:'+i,`Iteration step ${i+1} · ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`,MARK.loop,'',true)).join('');
   const materials=materialUses(doc).map(u=>item('material:'+u.ref,u.label,'·','',true)).join('');
   const results=lastRun?[{id:'results:runs',label:`Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT}`},...resultPages(lastRun.result)].map(p=>item(p.id,p.label,MARK.results,'',true)).join(''):'';
-  return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">${multi?'Multiphysics model':'Model 1'}</span></div><div class="model-root"><button data-mp-node="model" aria-pressed="${selection==='model'}"><span aria-hidden="true">▾ ◇</span><strong>${esc(doc.name||'Untitled model')}</strong></button></div>`+
-   `<section class="tree-group"><h3><span aria-hidden="true">▾</span>Component 1</h3>${item('geometry','Geometry 1',MARK.geometry,'',false)}${item('materials','Materials',MARK.materials)}${materials}${item('mesh',multi?'Mesh 1 · shared':'Mesh 1',MARK.mesh)}</section>`+
-   `<section class="tree-group"><h3><span aria-hidden="true">▾</span>Physics</h3>${physics}</section>`+
-   (multi?`<section class="tree-group"><h3><span aria-hidden="true">▾</span>Couplings</h3>${couplings}</section>`:'')+
-   `<section class="tree-group"><h3><span aria-hidden="true">▾</span>Study 1</h3>${item('study','Study 1',MARK.study)}${multi?item('order','Solve order (from couplings)',MARK.order,'',true):''}${loops}</section>`+
-   (results?`<section class="tree-group"><h3><span aria-hidden="true">▾</span>Results · run ${lastRun.number}</h3>${results}</section>`:'')+
+  return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">${multi?'Multiphysics model':'Model 1'}</span></div>${treeOpen()}<div class="model-root" role="none"><button type="button" data-mp-node="model" ${itemAttributes(1,shown('model'))}><span aria-hidden="true">▾ ◇</span><strong>${esc(doc.name||'Untitled model')}</strong></button></div>`+
+   `<section class="tree-group" role="none">${group('Component 1')}${item('geometry','Geometry 1',MARK.geometry,'',false)}${item('materials','Materials',MARK.materials)}${materials}${item('mesh',multi?'Mesh 1 · shared':'Mesh 1',MARK.mesh)}</section>`+
+   `<section class="tree-group" role="none">${group('Physics')}${physics}</section>`+
+   (multi?`<section class="tree-group" role="none">${group('Couplings')}${couplings}</section>`:'')+
+   `<section class="tree-group" role="none">${group('Study')}${item('study','Study 1',MARK.study)}${multi?item('order','Solve order (from couplings)',MARK.order,'',true):''}${loops}</section>`+
+   (results?`<section class="tree-group" role="none">${group(`Results · run ${lastRun.number}`)}${results}</section>`:'')+`</div>`+
    `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>Solver available</strong><p>${multi?'Multiphysics model · one Run solves every physics in order':physicsNames(doc).length>1?`${physicsNames(doc).length} physics · no couplings · format 0.3`:'One physics · format 0.3'}</p></div>`;
  }
  // ---- fields ----
@@ -439,14 +447,14 @@ export function createMultiphysicsView(ctx){
    const head=alone?`<th>n_eff without heater${valid?'':' (other model)'}</th><th>Δn_eff (coupled − without heater)</th>`:'';
    const cells=(row,k)=>{if(!alone)return '';const a=alone.rows[k];return `<td data-neff-alone="${row.mode}" data-neff-value="${a?.value??''}">${a?a.value.toFixed(8):'—'}</td><td data-neff-shift="${row.mode}">${a&&valid?shiftText(row.value,a.value):'—'}</td>`;};
    const note=!coupled?'':solving?`Solving ${esc(physicsLabel(id))} without heater…`:valid?esc(baselineText(lastRun.doc,id)):alone?`The without-heater column was solved from a different optical model. Run ${esc(physicsLabel(id))} alone to refresh.`:failed?`The run without heater ${failed==='stopped'?'was stopped':'failed: '+esc(failed)}. Run ${esc(physicsLabel(id))} alone to try again.`:`An n_eff without heater appears here when “Also solve without heater” beside Run is on, or run ${esc(physicsLabel(id))} alone.`;
-   const identity=physicsModes(p),table=modeTableRows(identity.modes,{missing:identity.missing,areaMissing:identity.areaMissing,areaHelp:identity.areaHelp});
+   const identity=physicsModes(p),table=modeTableRows(identity.modes,{missing:identity.missing,areaMissing:identity.areaMissing,areaHelp:identity.areaHelp,open:identity.open});
    // the table holds the first study point's modes; rows of a later point keep their columns
    const cellOf=row=>row.point===0?table.rows[row.mode-1]:undefined;
    const polarization=row=>{const r=cellOf(row);if(!r)return '<td>—</td>';const c=r.polarization;return c?`<td data-polarization="${row.mode}" title="${esc(c.title)}"${c.rowspan>1?` rowspan="${c.rowspan}"`:''}>${esc(c.text)}</td>`:'';};
    const area=row=>{const c=cellOf(row)?.area;return c?`<td data-area="${row.mode}" title="${esc(c.title)}"${c.value===null?'':` data-area-value="${c.value}"`}>${esc(c.text)}</td>`:'<td>—</td>';};
-   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th><th title="${esc(POLARIZATION_HELP)}">Polarization</th><th>Loss</th><th title="${esc(identity.areaHelp)}">A_eff (µm²)</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Mode ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${polarization(row)}<td data-loss="${row.mode}"${cellOf(row)?.lossless?` title="${esc(LOSSLESS_NOTE)}"`:''}>${esc(cellOf(row)?.loss??'—')}</td>${area(row)}${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(RANKING_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
+   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th><th title="${esc(POLARIZATION_HELP)}">Polarization</th><th title="${esc(table.loss.help)}">${esc(table.loss.header)}</th><th title="${esc(identity.areaHelp)}">A_eff (µm²)</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Mode ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${polarization(row)}<td data-loss="${row.mode}"${cellOf(row)?` title="${esc(cellOf(row).lossTitle)}"`:''}>${esc(cellOf(row)?.loss??'—')}</td>${area(row)}${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(RANKING_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
     `<p class="muted" data-mp-polarization-note>Polarization: ${esc(POLARIZATION_HELP)}${identity.source?'; '+esc(SOURCE_TEXT[identity.source]):identity.missing?' · '+esc(identity.missing):''}.</p>`+
-    `<p class="muted" data-mp-area-note>A_eff: ${esc(identity.areaHelp)}${identity.areaSource?'; '+esc(SOURCE_TEXT[identity.areaSource]):identity.areaMissing?' · '+esc(identity.areaMissing):''}.</p>`+(table.lossless?`<p class="muted" data-mp-lossless>${esc(LOSSLESS_NOTE)}</p>`:'')+
+    `<p class="muted" data-mp-area-note>A_eff: ${esc(identity.areaHelp)}${identity.areaSource?'; '+esc(SOURCE_TEXT[identity.areaSource]):identity.areaMissing?' · '+esc(identity.areaMissing):''}.</p>`+(table.rows.length&&table.rows.every(r=>r.lossless)?`<p class="muted" data-mp-lossless>${esc(table.loss.note)}</p>`:`<p class="muted" data-mp-loss-note>${esc(table.loss.note)}</p>`)+
     (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    // the answer first, then the coupled input it was solved from
    if(coupled&&!kept)host.insertAdjacentHTML('beforeend',`<p class="mp-no-maps" data-mp-no-maps>${esc(MAPS_NOT_KEPT)}</p>`);
@@ -462,7 +470,7 @@ export function createMultiphysicsView(ctx){
  }
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
- const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed; the file passed its damage check (this does not show who made it).';
+ const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed; integrity check passed (it does not show who made the file).';
  const runItem=run=>`${run.pinned?'Pinned · ':''}${runTitle(run)} · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}${run.maps==='not kept'?' · values only':''}`;
  // Results › Runs: the run list, in the optical words; selecting a run shows it, the model stays
  function runList(host){
@@ -511,7 +519,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   if(!out.ok){if(out.reduced)return {ok:false,question:overflowQuestion(out.bytes)};notice('Session not saved: '+out.refusal);return {ok:false,refused:out.refusal};}
   const name=sessionFileName(modelSlug(doc.name));ctx.download(new Blob([out.text],{type:'application/json'}),name);
   sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:filed()};cleanSignature=signature();loaded=null;ctx.onHistory();
-  notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:out.baselines>0}));
+  notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0}));
   return {ok:true,name};
  }
  // browser recovery (§4): written while the model has a run or was edited since it was opened
@@ -564,7 +572,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   $('breadcrumb').textContent=page+' / '+(selection.startsWith('physics:')?physicsLabel(selection.slice(8)):selection.startsWith('coupling:')?couplingTitle(doc,selection.slice(9)):selection.startsWith('material:')?materialLabel(selection.slice(9)):selection.startsWith('results:')?'Results':selection[0].toUpperCase()+selection.slice(1));
   document.querySelector('.workspace > .note').textContent=page==='Results'?'A result belongs to its run; editing the model does not change it.':lengthsNote(doc);
   $('solver-log').hidden=true;$('workflow').hidden=true;
-  $('tree').innerHTML=tree();$('tree').querySelectorAll('[data-mp-node]').forEach(b=>b.onclick=()=>choose(b.dataset.mpNode));
+  drawTree();
   const inspector=$('inspector');inspector.innerHTML=settings();bindSettings(inspector);
   const canvas=$('canvas');let maps=[];
   if(page==='Applications')ctx.applications(canvas);

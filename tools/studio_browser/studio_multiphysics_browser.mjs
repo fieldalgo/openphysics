@@ -108,6 +108,28 @@ class Page {
     if (result.exceptionDetails) throw new Error('page: ' + (result.exceptionDetails.exception?.description || result.exceptionDetails.text));
     return result.result.value;
   }
+  // A model tree node by role and accessible name, as assistive technology finds it (the
+  // accessibility tree): exactly one tree item must have the name.
+  async treeItem(name) {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const {nodes} = await this.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role: 'treeitem'});
+    const found = nodes.filter(n => !n.ignored);
+    if (found.length !== 1) throw new Error(`${found.length} tree items named ${JSON.stringify(name)}`);
+    const {object} = await this.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+    return object.objectId;
+  }
+  async clickTreeItem(name) {
+    const result = await this.call('Runtime.callFunctionOn', {objectId: await this.treeItem(name), functionDeclaration: 'function(){this.click();return true}', returnByValue: true});
+    if (result.exceptionDetails) throw new Error('page: ' + result.exceptionDetails.text);
+  }
+  // Every tree item and the tree itself in the accessibility tree: [{role, name, level, selected, expanded}]
+  async axTree() {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const prop = (n, key) => n.properties?.find(p => p.name === key)?.value?.value;
+    const read = async role => (await this.call('Accessibility.queryAXTree', {objectId: document.objectId, role})).nodes.filter(n => !n.ignored)
+      .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
+    return [...await read('tree'), ...await read('treeitem')];
+  }
   click(selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); }
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector); }
   attr(selector, name) { return this.on('function(s,n){const e=this.querySelector(s);return e?e.getAttribute(n):null}', selector, name); }
@@ -181,6 +203,50 @@ try {
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
   assert.equal(await page.text('#status'), 'Model checked · press Run');
   assert.equal(await page.text('#tree [data-mp-node="coupling:heat1_to_modes1"]'), '⇄ Heat 1 temperature → Modes 1 temperature');
+  // round 10 (K9): the multiphysics model builder is an ARIA tree, used with the keyboard alone
+  const KEYS = {ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, Enter: 13, ' ': 32, Tab: 9};
+  const press = async key => {
+    for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key, code: key === ' ' ? 'Space' : key, windowsVirtualKeyCode: KEYS[key], ...(type === 'keyDown' && (key === 'Enter' || key === ' ') ? {text: key === 'Enter' ? '\r' : ' '} : {})});
+    await sleep(150);
+  };
+  // the focused element's name without its hidden icon, and its tree attributes
+  const focused = () => page.eval("(()=>{const e=document.activeElement,c=e?.cloneNode(true);c?.querySelectorAll('[aria-hidden=true]').forEach(x=>x.remove());return {role:e?.getAttribute('role')||null,name:c?.textContent.replace(/\\s+/g,' ').trim()||null,tabindex:e?.getAttribute('tabindex'),selected:e?.getAttribute('aria-selected'),expanded:e?.getAttribute('aria-expanded')}})()");
+  const checkTree = async (tag, names) => {
+    const ax = await page.axTree(), trees = ax.filter(n => n.role === 'tree'), items = ax.filter(n => n.role === 'treeitem');
+    const stops = await page.eval("document.querySelectorAll('#tree [role=treeitem][tabindex=\"0\"]').length");
+    stage('tree ' + tag, {trees, items, stops});
+    assert.deepEqual(trees.map(t => t.name), ['Model tree'], tag + ': one tree named Model tree');
+    assert.equal(new Set(items.map(i => i.name)).size, items.length, tag + ': tree item names are unique');
+    assert.ok(items.every(i => Number.isInteger(i.level) && i.level >= 1), tag + ': every tree item has a level');
+    assert.ok(items.filter(i => i.selected === true).length <= 1, tag + ': at most one selected item');
+    assert.equal(stops, 1, tag + ': one tab stop');
+    for (const name of names) await page.treeItem(name);
+    return items;
+  };
+  const mpNodes = ['Heated silicon waveguide', 'Component 1', 'Geometry 1', 'Materials', 'Silicon (core)', 'Heater', 'Silica (background)', 'Mesh 1 · shared', 'Physics',
+    'solve order 1 Heat 1 · Heat transfer', 'solve order 2 Modes 1 · Optical modes', 'Couplings', 'Heat 1 temperature → Modes 1 temperature', 'Study', 'Study 1', 'Solve order (from couplings)'];
+  const mpItems = await checkTree('multiphysics', mpNodes);
+  assert.deepEqual(mpItems.map(i => [i.name, i.level]), mpNodes.map(n => [n, ['Heated silicon waveguide', 'Component 1', 'Physics', 'Couplings', 'Study'].includes(n) ? 1 : ['Silicon (core)', 'Heater', 'Silica (background)', 'Solve order (from couplings)'].includes(n) ? 3 : 2]));
+  assert.deepEqual(mpItems.filter(i => i.selected === true).map(i => i.name), ['Heated silicon waveguide']);
+  await page.on('function(s){const t=this.querySelector(s);const all=[...this.querySelectorAll("button,select,input,[tabindex]")].filter(e=>e.tabIndex>=0&&!e.disabled&&e.offsetParent&&(t.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_PRECEDING));all.at(-1).focus();return true}', '#tree');
+  await press('Tab'); let at = await focused(); stage('K9 multiphysics tab into the tree', at);
+  assert.deepEqual([at.role, at.name, at.tabindex, at.selected], ['treeitem', 'Heated silicon waveguide', '0', 'true']);
+  await press('ArrowDown'); assert.equal((await focused()).name, 'Component 1');
+  await press('End'); assert.equal((await focused()).name, 'Solve order (from couplings)');
+  await press('Home'); assert.equal((await focused()).name, 'Heated silicon waveguide');
+  await press('ArrowDown'); await press('ArrowDown'); await press('Enter'); at = await focused();
+  assert.deepEqual([at.name, at.selected], ['Geometry 1', 'true']);
+  await press('ArrowDown'); await press(' '); at = await focused(); assert.deepEqual([at.name, at.selected], ['Materials', 'true']);
+  assert.equal(await page.eval("document.querySelectorAll('#tree [aria-selected=true]').length"), 1);
+  // Left from a node to its group, Left closes it, Down skips its hidden nodes, Right opens it and enters it
+  await press('ArrowLeft'); at = await focused(); assert.deepEqual([at.name, at.expanded], ['Component 1', 'true']);
+  await press('ArrowLeft'); assert.equal((await focused()).expanded, 'false');
+  await press('ArrowDown'); assert.equal((await focused()).name, 'Physics', 'Down skips the nodes of a closed group');
+  await press('ArrowUp'); await press('ArrowRight'); assert.equal((await focused()).expanded, 'true'); await press('ArrowRight'); assert.equal((await focused()).name, 'Geometry 1');
+  // a node under another (level 3): Left goes to the node above it at level 2
+  await press('ArrowDown'); await press('ArrowDown'); assert.equal((await focused()).name, 'Silicon (core)'); await press('ArrowLeft'); assert.equal((await focused()).name, 'Materials');
+  await press('Home'); await press('Enter'); at = await focused(); assert.deepEqual([at.name, at.selected], ['Heated silicon waveguide', 'true']);
+  await checkTree('multiphysics after keys', mpNodes);
   assert.equal(await page.text('#project'), 'Multiphysics model / No unsaved input changes');
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
   stage('MB1 template', {tree: await page.text('#tree')});
@@ -204,20 +270,20 @@ try {
   stage('MB2 connections', wire);
 
   // MB3: remove the coupling, get the suggestion, add it back through the dialog; Undo/Redo
-  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.clickTreeItem('Heat 1 temperature → Modes 1 temperature');
   await page.until("/Remove coupling/.test(document.getElementById('inspector').innerText)", 'coupling settings');
   assert.match(await page.text('#inspector'), /Transfer Same mesh \(both use Mesh 1\).*each triangle gets the mean of its 3 nodes/);
   // the names the file uses are under a closed File details: the same rows, collapsed
   const fileDetails = () => page.eval("[...document.querySelectorAll('#inspector details.mp-file-details')].map(d=>({open:d.open,summary:d.querySelector('summary').textContent,rows:[...d.querySelectorAll('.pair')].map(p=>p.textContent)}))");
   assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['Input takesone source', 'Name in fileheat1_to_modes1']}]);
   assert.doesNotMatch(await page.text('#inspector'), /heat1_to_modes1|Input takes/);
-  await page.click('#tree [data-mp-node="physics:heat1"]'); await page.until("/Heat source per region/.test(document.getElementById('inspector').innerText)", 'physics settings');
+  await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer'); await page.until("/Heat source per region/.test(document.getElementById('inspector').innerText)", 'physics settings');
   assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['Typethermal.steady2d', 'Name in fileheat1']}]);
   assert.doesNotMatch(await page.text('#inspector'), /thermal\.steady2d|Name in file/);
-  await page.click('#tree [data-mp-node="model"]'); await page.until("!!document.querySelector('[data-mp-text]')", 'model settings');
+  await page.clickTreeItem('Heated silicon waveguide'); await page.until("!!document.querySelector('[data-mp-text]')", 'model settings');
   assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['FormatMultiphysics model · 0.3/multiphysics.1']}]);
   assert.doesNotMatch(await page.text('#inspector'), /0\.3\/multiphysics\.1/);
-  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]'); await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings back');
+  await page.clickTreeItem('Heat 1 temperature → Modes 1 temperature'); await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings back');
   await page.click('[data-mp-remove-coupling]');
   await page.until("/Modes 1 can take its temperature from Heat 1/.test(document.getElementById('mp-messages').innerText)", 'suggestion');
   await runReady();          // two physics without a coupling still run; nothing is coupled silently
@@ -238,7 +304,7 @@ try {
   // the heater-off option comes back ticked, and Messages says so
   assert.match(await page.text('#file-status'), /“Also solve without heater” is ticked again\.$/);
   assert.equal(await page.eval("document.getElementById('run-baseline').checked"), true);
-  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.clickTreeItem('Heat 1 temperature → Modes 1 temperature');
   await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings again');
   await page.click('[data-mp-remove-coupling]');
   await page.until("!!document.querySelector('#mp-messages [data-mp-add-coupling]')", 'suggestion again');
@@ -287,7 +353,7 @@ try {
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
-  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Loss A_eff (µm²) n_eff without heater Δn_eff (coupled − without heater)');
+  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Absorption loss (dB/cm) A_eff (µm²) n_eff without heater Δn_eff (coupled − without heater)');
   // A_eff of each mode in µm², the engine's value from this run
   const areas = await page.eval("[...document.querySelectorAll('.mp-neff [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue)}))");
   stage('multiphysics A_eff', {areas}); assert.equal(areas.length, 2);
@@ -300,8 +366,11 @@ try {
   assert.match(await page.text('[data-polarization="2"]'), /^TM-like · (\d+\.\d) % TM \((\d+\.\d) % TE\)$/);
   // round 9 (J8): the template is lossless, its n_eff real: each mode reads 0 dB/cm, absorption only
   assert.equal(await page.text('[data-loss="1"]'), '0 dB/cm'); assert.equal(await page.text('[data-loss="2"]'), '0 dB/cm');
-  assert.equal(await page.text('[data-mp-lossless]'), 'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
-  assert.equal(await page.attr('[data-loss="1"]', 'title'), 'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+  assert.equal(await page.text('[data-mp-lossless]'), 'Absorption loss counts material absorption (k) only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a closed window.');
+  // round 10 (K2): every loss cell and the header give the absorption-only help
+  const absorptionHelp = 'Absorption (material k) only; leakage and radiation are not computed in a closed window';
+  assert.equal(await page.attr('[data-loss="1"]', 'title'), absorptionHelp); assert.equal(await page.attr('[data-loss="2"]', 'title'), absorptionHelp);
+  assert.equal(await page.eval("[...document.querySelectorAll('.mp-neff thead th')].find(t=>/^Absorption loss/.test(t.textContent)).title"), absorptionHelp);
   assert.doesNotMatch(await page.eval('document.body.innerText'), /not matched between runs|(?:matched|compared) by rank/i);
   assert.equal(await page.text('#mp-candidate-note'), 'Modes are ranked by effective index. This model asks for 2 modes: Modes 1 › Modes to find');
   assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
@@ -315,18 +384,23 @@ try {
   const d = Number(engine) - Number(engineAlone), shiftShown = await page.text('[data-neff-shift="1"]');
   assert.equal(shiftShown, (d < 0 ? '−' : '+') + Math.abs(d).toFixed(8), 'Δn_eff is the difference of the two engine runs');
   assert.equal(await page.text('.dock-title>span'), 'Run 1 · solved from the current model');
+  // round 10 (K6): on Results the tree marks the results page shown, not Study
+  const onResults = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),selected:[...document.querySelectorAll('#tree [aria-selected=true]')].map(e=>e.dataset.mpNode)})");
+  stage('K6 tree on Results', onResults); assert.deepEqual(onResults.page, ['Results']);
+  assert.equal(onResults.selected.length, 1); assert.match(onResults.selected[0], /^results:/);
+  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.name === 'Study 1').map(n => n.selected), [false]);
   // the answer first: the n_eff table above the maps, whole on a 1440 × 900 screen
   const answer = await page.eval("({first:!!(document.querySelector('.mp-neff').compareDocumentPosition(document.querySelector('.mp-maps'))&Node.DOCUMENT_POSITION_FOLLOWING),bottom:document.querySelector('.mp-neff').getBoundingClientRect().bottom})");
   assert.ok(answer.first && answer.bottom <= 900, JSON.stringify(answer));
   stage('MB5 run', {coupled_neff: shown, engine_neff: engine, without_heater_neff: engineAlone, shift: shiftShown});
-  await page.click('[data-mp-node="results:check"]');
+  await page.clickTreeItem('Coupling check');
   await page.until("/Coupling check/.test(document.getElementById('canvas').innerText)", 'coupling check');
   assert.match(await page.text('.mp-check tbody'), /node temperatures, 300\.0–[0-9.]+ K .*triangle means \(mean of 3 nodes\) Passed · max \|received − sent\| = 0 K/);
 
   // MB6: an edit marks the run out of date; the same model again is current, and a second Run
   // keeps the heater-off column valid (same content) without solving it again
   await page.click('nav [data-page=Connections]');
-  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.clickTreeItem('Heat 1 temperature → Modes 1 temperature');
   await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings after the run');
   await page.click('[data-mp-remove-coupling]');
   await page.until("/Out of date/.test(document.getElementById('sequence').innerText)", 'out of date');

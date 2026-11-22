@@ -1,6 +1,7 @@
 import {renderConnectionGraph,installConnectionGraph} from './workspace-graph.mjs';
 import {LatestWorkspaceLoad} from './workspace-load.mjs';
-import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords} from './workspace-notebook-recovery.mjs';
+import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
+import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
 import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS} from './workspace-workflow.mjs';
@@ -23,8 +24,8 @@ import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,AREA_HELP,modeTableRows,modeOptionLabel,opticalModes} from './workspace-modes.mjs';
-import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes} from './workspace-modes.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
 import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -170,6 +171,8 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more)=>notice(text,mor
  // physics selections no application claims, so no single-physics view acts while it is open
  onOpen:()=>Object.assign(state,{electric:true,heat:true,structure:true,optics:true}),
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),serverVersion:()=>connection.version,validateRunLabel,
+ // the optical runs this tab holds beside the multiphysics model (the save message names them)
+ opticalRunCount:()=>runs.length,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
  recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),opticalResumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
@@ -290,11 +293,17 @@ function renderHeat(){
  bindHeatSides();refreshHeatControls();
 }
 // These views describe the existing model; they do not add solver capabilities.
+const modelTree=treeState();
+// the tree drawn again with the focus kept on its item (a group opened or closed, a node chosen)
+function drawModelTree(){const had=treeFocus($('tree'),modelTree);$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));bindTree($('tree'),modelTree,drawModelTree);restoreTreeFocus($('tree'),modelTree,had);}
 function renderModelTree(){
  const model=isHeat()?'Heat conduction':isJoule()?'Joule heating':isOptical()?'Optical waveguide':'Heated waveguide';
  const groups=[['Component 1',['Geometry','Materials']],['Physics',isHeat()?['Heat transfer']:isJoule()?['Electric currents','Heat transfer']:isOptical()?['Optical modes']:names.slice(2,6)],['Analysis',['Couplings','Mesh','Study'].filter(n=>n!=='Couplings'||(!isHeat()&&!isJoule()&&!isOptical()))]];
  const marks={'Geometry':'◇','Materials':'▱','Electric currents':'ϟ','Heat transfer':'∿','Solid mechanics':'↔','Optical modes':'λ','Couplings':'⇄','Mesh':'▦','Study':'▷'};
- return '<div class="pane-title"><span>Model builder</span><span class="pane-detail">Model 1</span></div><div class="model-root"><span aria-hidden="true">▾ ◇</span><strong>'+model+'</strong></div>'+groups.map(([title,nodes])=>'<section class="tree-group"><h3><span aria-hidden="true">▾</span>'+title+'</h3>'+nodes.map(n=>`<button data-node="${n}" aria-pressed="${ui.selection===n}"><span class="tree-node-mark" aria-hidden="true">${marks[n]}</span>${n}</button>`).join('')+'</section>').join('')+'<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>'+(isHeat()||isOptical()||isJoule()?'Solver available':'Setup only')+'</strong><p>'+(isHeat()?'Steady heat conduction':isJoule()?'Joule heating on named regions':isOptical()?'Optical mode analysis':'Coupled calculation unavailable')+'</p></div>';
+ // an ARIA tree (workspace-tree.mjs): a node is selected only while its settings are shown; on
+ // Results and Compare no node is (the optical tree has no Results node)
+ const shown=n=>(ui.page==='Model'||ui.page==='Connections')&&ui.selection===n;
+ return '<div class="pane-title"><span>Model builder</span><span class="pane-detail">Model 1</span></div><div class="model-root"><span aria-hidden="true">▾ ◇</span><strong>'+model+'</strong></div>'+treeOpen()+groups.map(([title,nodes])=>'<section class="tree-group" role="none">'+groupHeading(title,!modelTree.collapsed.has(title))+nodes.map(n=>`<button type="button" data-node="${n}" ${itemAttributes(2,shown(n))}><span class="tree-node-mark" aria-hidden="true">${marks[n]}</span>${n}</button>`).join('')+'</section>').join('')+'</div><div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>'+(isHeat()||isOptical()||isJoule()?'Solver available':'Setup only')+'</strong><p>'+(isHeat()?'Steady heat conduction':isJoule()?'Joule heating on named regions':isOptical()?'Optical mode analysis':'Coupled calculation unavailable')+'</p></div>';
 }
 let disposeConnectionGraph=()=>{};
 function renderConnectionOverview(){return renderConnectionGraph(state,ui.selection,active(),ui.graphOptionsOpen);}
@@ -302,10 +311,10 @@ function renderConnectionOverview(){return renderConnectionGraph(state,ui.select
 // The inspector is rebuilt in stages with layout reads in between, which can clamp its scroll;
 // a redraw of the same panel keeps its scroll position and the focused field in view.
 let panelKey=null;
-function render(){const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
+function render(){if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
-function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose a model':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose a model':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -499,7 +508,7 @@ function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
  const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
  steps.forEach((step,index)=>{
-  let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
+  let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;if(step.tone)button.dataset.tone=step.tone;else delete button.dataset.tone;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
   if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
   button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.wavelength?step.summary:step.detail;
@@ -529,9 +538,9 @@ function requestLoad(doc,options={}){
   loadInputs(doc,options);
 }
 // modeCount: Modes to find to set with the inputs (a run's inputs restored), else unchanged
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,opener=document.activeElement,leaveChecked=false,modeCount=null}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,modeCount=null}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,opener,context:loadContext(),modeCount};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext(),modeCount};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
   if((leaveChecked&&!session)||untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
@@ -564,17 +573,26 @@ function completeLoad(pending){
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   // Modes to find follows the selected run (a session keeps it with each run, not with the inputs)
   if(solverRun)state.modeCount=runModeCount(solverRun);
-  // A recovered notebook that still matched its saved file reads as saved, as the file would.
-  const file=pending.source==='file'?null:pending.savedFile,matched=file?.current===true;
+  // A recovered notebook that still matched its saved file, or the file it was opened from, reads
+  // as saved, as the file would.
+  const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
   // before the render that schedules the first recovery save, so that record names the file (the
   // record's file is not part of the save stamp: set later, it would wait for the next change)
   openedFile=pending.source==='file'?pending.label:pending.openedFile||null;
-  applyProject(session.input,{saved:pending.saved||matched,resetHistory:true});ui.page=runs.length>1?'Compare':runs.length?'Results':'Model';render();
+  applyProject(session.input,{saved:pending.saved||matched,resetHistory:true});
+  // the page a recovery record names (Results, Compare or Model), when its runs allow it; else
+  // Compare for two runs or more, Results for one (a session file names no page)
+  ui.page=restorePage(pending.page,runs.length);
+  if(ui.page!=='Model'&&ui.selection==='Study')ui.selection='Geometry';
+  render();
   savedNotebookState=pending.source==='file'||matched?notebookStamp():null;savedRunsState=pending.source==='file'||matched?runsStamp():null;
   // a record without a session file belongs to a notebook never saved: no file name carries over
   lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:null;
   // the title says what is open until the next change: the file opened, or browser recovery
-  newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp()};
+  // file: the session file the notebook came from (opened, or named by the recovered record), and
+  // whether the record said it still matched it
+  newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
+  openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
  }else{loadedSession=null;newModelInputs=null;if(pending.modeCount!=null)state.modeCount=pending.modeCount;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
@@ -646,13 +664,23 @@ let loadedSession=null;
 // The session file these optical runs were opened from (or that a recovered record names), by
 // name: browser recovery keeps it so its lists can name the file.
 let openedFile=null;
-const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.name,current:loadedSession.stamp===saveStamp()}:null;
-// The whole notebook a session file holds: inputs, runs, selection, comparison and view.
-const saveStamp=()=>notebookStamp();
+const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.name,current:loadedSession.stamp===saveStamp(),file:loadedSession.file,fileCurrent:loadedSession.fileCurrent}:null;
+// What a session file is "the same as" for the title: the model inputs and the runs (their names
+// and pins). The selected run, the Compare choice and the field view are left out: a click on a
+// run, a page or a mode does not make the notebook differ from its file.
+const saveStamp=()=>JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true])});
+// The content stamp when the notebook was opened from openedFile (or recovered while it still
+// matched it); null when no file was opened. Browser recovery keeps whether it still matches.
+let openedStamp=null;
+const openedCurrent=()=>openedFile?openedStamp!==null&&openedStamp===saveStamp():null;
+// The page a recovery record names: the last of Model, Results and Compare shown (Connections
+// counts as Model), so a restore opens the same view.
+let recordedPage=null;
+const pageForRecord=()=>{if(['Model','Results','Compare'].includes(ui.page))recordedPage=ui.page;else if(ui.page==='Connections')recordedPage='Model';return recordedPage;};
 const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp(),recovered:lastSavedFile.recovered===true}:null;
 const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduction':isJoule()?'joule-heating':state.electric===undefined?'workspace':'multiphysics';
 // Browser recovery also keeps the last saved file, so its stamp includes it.
-const autosaveStamp=()=>notebookStamp()+JSON.stringify(savedFile());
+const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurrent(),pageForRecord()]);
 const notebookStore=indexedNotebookStore();
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
@@ -676,7 +704,11 @@ async function loadNotebookRecovery(){
 const recoveredModel=recovered=>recovered.session.application==='multiphysics'?String(recovered.session.document.name||'Multiphysics model'):null;
 // A recovered session as the recovery lists name it: every entry names its model and its runs.
 // file: the session file the list names for the entry (distinctRecords), else the record's own.
-const recoveredEntry=(recovered,file)=>({runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session),file:file||recovered.savedFile?.name||recovered.openedFile||null});
+// file: the session file the entry names; fileCurrent whether this record still matched it (null
+// when the record does not say, or the file comes from an older merged record)
+const recoveredEntry=(recovered,file)=>{const own=recovered.savedFile?.name||recovered.openedFile||null,name=file||own,
+ fileCurrent=name&&name===own?(recovered.savedFile?recovered.savedFile.current:recovered.openedCurrent):null;
+ return {runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session),file:name,fileCurrent};};
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 // earlierRecords: the stored records as read, for the list's de-duplication (distinctRecords).
 let earlierSessions=[],earlierRecords=[];
@@ -736,7 +768,7 @@ async function recoverEarlier(index,opener){
   if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
   if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile});return;}
   // Adopt the latest record: the next save keeps it as an earlier session in turn.
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
  }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
 $('retry-notebook').onclick=()=>(multiView.active()?multiView.recovery():runs.length)?notebookAutosave.retry():loadNotebookRecovery();
@@ -746,7 +778,7 @@ async function recoverLatest(opener){
  $('recover-notebook').disabled=true;
  try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
   if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile});return;}
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
@@ -769,7 +801,7 @@ $('replace-notebook').onclick=async()=>{
   const record=loaded.value;let prior='No stored notebook';
   try{const recovered=readNotebookRecovery(record);if(recovered)prior=recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();}
   catch{prior='Unreadable stored notebook';}
-  pendingRecoveryReplacement=multi?{record,context:loadContext(),stamp:multi.stamp,makeText:multi.makeText,extra:{savedFile:multi.savedFile}}:{record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile()}};
+  pendingRecoveryReplacement=multi?{record,context:loadContext(),stamp:multi.stamp,makeText:multi.makeText,extra:{savedFile:multi.savedFile}}:{record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()}};
   const summary=$('recovery-replace-summary');summary.replaceChildren();
   for(const [name,value] of [['Stored recovery',prior],['Replace with',multi?multiView.runCount()+' runs · '+multiView.modelName():runs.length+' runs · '+designSummary(current().model)],['Current inputs and Undo','Kept'],['Other tabs','Their next automatic save will detect this replacement']]){
    const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);
@@ -797,7 +829,7 @@ function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKi
 function refreshNotebook(){
  if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile});
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
- const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -923,6 +955,8 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
  const margin={left:54,right:20,top:20,bottom:45};const scale=Math.min((w-margin.left-margin.right)/(xmax-xmin),(h-margin.top-margin.bottom)/(ymax-ymin));
  const pw=(xmax-xmin)*scale,ph=(ymax-ymin)*scale,left=margin.left+(w-margin.left-margin.right-pw)/2,top=margin.top;
  const X=x=>left+(x-xmin)*scale,Y=y=>top+(ymax-y)*scale;
+ // the drawn window in µm, so a check can compare plots of the same run
+ canvas.dataset.viewBounds=[xmin,xmax,ymin,ymax].join(',');
  ctx.save();ctx.beginPath();ctx.rect(left,top,pw,ph);ctx.clip();
  run.field.triangles.forEach((triangle,i)=>{ctx.beginPath();triangle.forEach((n,j)=>{const p=run.field.nodes[n];if(j)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.closePath();ctx.fillStyle=fieldColor(values[i]);ctx.fill();});
  ctx.strokeStyle='#f5f1da';ctx.setLineDash([4,3]);ctx.lineWidth=1;for(const shape of run.input.model.shapes){ctx.beginPath();if(shape.type==='circle')ctx.arc(X(shape.cx/1000),Y(shape.cy/1000),shape.r/1000*scale,0,2*Math.PI);else shapeCorners(shape).forEach(([x,y],i)=>i?ctx.lineTo(X(x/1000),Y(y/1000)):ctx.moveTo(X(x/1000),Y(y/1000)));ctx.closePath();ctx.stroke();}
@@ -995,23 +1029,24 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
 function runNumber(run){return runs.includes(run)?runs.indexOf(run)+1:null;}
 function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+' · ':run.label?run.label+' · ':''}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
 // Where a run came from, kept out of the primary labels and available on request.
-// The modes table of a run: | Mode | n_eff | Polarization | Loss | A_eff (µm²) |, one merged polarization
-// cell per degenerate pair, and the lossless note once below the table.
+// The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |, one merged polarization
+// cell per degenerate pair, and the absorption-loss note once below the table.
 function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
- const {rows,lossless}=modeTableRows(opticalModes(run));
+ const {rows,loss}=modeTableRows(opticalModes(run));
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent='Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th','Loss',{scope:'col'}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  const body=document.createElement('tbody');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
-  tr.append(cell('td',r.loss,{'data-loss':String(r.mode),...(r.lossless?{title:LOSSLESS_NOTE}:{})}),cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));body.append(tr);}
+  tr.append(cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle}),cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));body.append(tr);}
  table.append(body);box.append(table);
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${AREA_HELP}.`;box.append(help);
- if(lossless){const note=document.createElement('p');note.className='table-note';note.id='lossless-note';note.textContent=LOSSLESS_NOTE;box.append(note);}
+ // the loss note: absorption only, with the lossless words when every mode has k = 0
+ {const note=document.createElement('p');note.className='table-note';note.id=rows.every(r=>r.lossless)?'lossless-note':'loss-note';note.textContent=loss.note;box.append(note);}
  return box;
 }
 function runDetails(run){
@@ -1036,7 +1071,7 @@ function nameRun(run,value,redraw){
   profileRedraw();syncUnpinButton();if($('run-list-heading'))$('run-list-heading').textContent=runListHeading();
   document.querySelectorAll('#compare-neff thead .run-heading').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=runHeading(r,runNumber(r));});
   // the dock heading, the footer and the title name the run too (refreshInputIssues rewrites all three)
-  if($('run-name-value'))$('run-name-value').textContent=run.label||'Not named';refreshInputIssues();
+  if($('open-in-results')&&run===solverRun)$('open-in-results').textContent=`Open ${runTitle(runNumber(run),run.label)} in Results`;if($('run-name-value'))$('run-name-value').textContent=run.label||'Not named';refreshInputIssues();
  }
  notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; press Enter in Run name when the calculation ends to pin it.`:label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
 }
@@ -1054,8 +1089,12 @@ function renderRunList(){
  const importRuns=document.createElement('button');importRuns.id='import-runs';importRuns.textContent='Add runs from file (inputs unchanged)';importRuns.title='Adds the runs in a session or run file to this list; the current inputs are not replaced';importRuns.disabled=solverBusy||!!pendingJob;importRuns.onclick=()=>$('run-import-file').click();panel.append(importRuns);
  const title=document.createElement('h3');title.id='run-list-heading';title.textContent=runListHeading();panel.append(title);
  for(const run of [...runs].reverse()){
-  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=runItemText(run);b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
+  const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=runItemText(run);
+  // on Compare a run click selects the run and stays on Compare (the A and B pickers choose what
+  // is compared); Open in Results below shows it there. Elsewhere it opens Results on that run.
+  b.onclick=()=>{solverRun=run;if(ui.page!=='Compare')ui.page='Results';render();if(ui.page==='Compare')document.querySelector(`.run-item[data-run="${CSS.escape(run.job)}"]`)?.focus();};panel.append(b);
  }
+ if(ui.page==='Compare'&&solverRun){const open=document.createElement('button');open.type='button';open.id='open-in-results';open.textContent=`Open ${runTitle(runNumber(solverRun),solverRun.label)} in Results`;open.title='Shows the selected run in Results; the comparison stays as it is';open.onclick=()=>{ui.page='Results';render();};panel.append(open);}
  if(solverRun){
   const unpinSlot=document.createElement('span');unpinSlot.id='unpin-slot';panel.append(unpinSlot);syncUnpinButton();
   const nameForm=document.createElement('form');nameForm.className='run-name';
@@ -1078,7 +1117,7 @@ function renderRunList(){
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
   // The image is drawn from the Results plot; Compare shows two runs and has no single plot.
-  if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent='Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
+  if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent=ui.page==='Compare'?'Field images export from Results: Open in Results shows the selected run there.':'Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
  const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. Save session keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
@@ -1094,22 +1133,24 @@ function compareTable(a,b,match){
  const head=document.createElement('thead'),row=document.createElement('tr');
  row.append(cell('th','Modes',{scope:'col'}),cell('th','Polarization A',{scope:'col',title:POLARIZATION_HELP}),cell('th','Polarization B',{scope:'col',title:POLARIZATION_HELP}),cell('th','Overlap',{scope:'col'}));
  for(const [side,run] of [['A',a],['B',b]]){const th=cell('th','n_eff '+side,{scope:'col'});const name=document.createElement('span');name.className='run-heading';name.textContent=runHeading(run,runNumber(run));th.append(name);row.append(th);}
- row.append(cell('th','Δn_eff (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}),cell('th','A_eff A (µm²)',{scope:'col',title:AREA_HELP}),cell('th','A_eff B (µm²)',{scope:'col',title:AREA_HELP}));head.append(row);table.append(head);
+ row.append(cell('th','Δn_eff (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}),cell('th','A_eff A (µm²)',{scope:'col',title:AREA_HELP}),cell('th','A_eff B (µm²)',{scope:'col',title:AREA_HELP}),cell('th','Absorption loss A (dB/cm)',{scope:'col',title:ABSORPTION_HELP}),cell('th','Absorption loss B (dB/cm)',{scope:'col',title:ABSORPTION_HELP}));head.append(row);table.append(head);
  // n_eff of a unit: the mode's, or the mean of a pair
  const index=(run,unit)=>unit.reduce((t,i)=>t+run.effective_index[i],0)/unit.length;
  const indexText=(run,unit)=>unit?(unit.length>1?'mean ':'')+formatIndex(index(run,unit)):'—';
  // A_eff of a unit: the mode's, or the mean of a pair with its note
  const areaCell=(run,unit,side)=>{if(!unit)return cell('td','—');const v=unitArea(run,unit);return cell('td',v.text,{title:v.title,['data-area-'+side]:v.value===null?'':String(v.value)});};
+ // absorption loss of a unit, from the saved indices (the mode's, or the mean of a pair)
+ const lossCell=(run,unit,side)=>{const v=unitLoss(run,unit);return cell('td',v.text,{class:'num',title:v.title,['data-loss-'+side]:v.value===null?'':String(v.value)});};
  const body=document.createElement('tbody');
  for(const r of compareMatchRows(match)){
   const tr=document.createElement('tr');
   if(r.kind==='match'){
    const mean=index(a,r.unitA);tr.dataset.match=`${r.unitA.join('-')}:${r.unitB.join('-')}`;
    tr.append(cell('th',`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`,{scope:'row',title:r.text}),cell('td',unitPolarization(a,r.unitA)),cell('td',unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta),class:'num'}),
-    cell('td',indexText(a,r.unitA),{class:'num'}),cell('td',indexText(b,r.unitB),{class:'num'}),cell('td',formatDelta(r.pair.delta),{class:'num','data-delta':''}),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100),{class:'num','data-delta-percent':''}),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'));
+    cell('td',indexText(a,r.unitA),{class:'num'}),cell('td',indexText(b,r.unitB),{class:'num'}),cell('td',formatDelta(r.pair.delta),{class:'num','data-delta':''}),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100),{class:'num','data-delta-percent':''}),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'));
   }else{
    tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
-   tr.append(cell('th',r.text,{scope:'row'}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'));
+   tr.append(cell('th',r.text,{scope:'row'}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'));
   }
   body.append(tr);
  }
@@ -1119,7 +1160,17 @@ function compareTable(a,b,match){
 }
 // The matched modes shown in the Compare plots (in memory only: session files keep the Results mode)
 let compareChoice=null;
+// Compare just opened (not redrawn while open): its pane then scrolls so the plots' middle, where
+// the window is centred on the core, is in view, as Results shows its plot; a redraw keeps the scroll
+var compareOpen=false;
+function frameComparePlots(grid){
+ const pane=$('canvas'),box=pane.getBoundingClientRect(),plot=grid.querySelector('canvas')?.getBoundingClientRect();if(!plot)return;
+ // the middle of the plot 24 px above the pane's bottom edge, never scrolling the plots' headings out of view
+ const need=plot.top+plot.height/2-(box.bottom-24),room=grid.getBoundingClientRect().top-box.top;
+ if(need>0)pane.scrollTop+=Math.min(need,Math.max(0,room));
+}
 function renderComparison(){
+ const opening=!compareOpen;compareOpen=true;
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
  if(runs.length<2){host.insertAdjacentHTML('beforeend','<p>Compute two designs to compare their fields and inputs. Existing results stay attached to their original inputs.</p>');return;}
  if(!runs.some(r=>r.job===compareIds[0]))compareIds[0]=runs.at(-2).job;
@@ -1136,13 +1187,16 @@ function renderComparison(){
  const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label class="compare-mode-label">Matched modes <select id="compare-mode" ${choices.length?'':'disabled'}>${choices.length?choices.map((c,i)=>`<option value="${i}" ${c===chosen?'selected':''}>${escapeHtml(c.label)}</option>`).join(''):'<option>No matched modes</option>'}</select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const pairOf=chosen&&match.pairs.find(p=>p.accepted&&p.unitA.includes(chosen.a));
  const shownText=chosen?`Shown: A mode ${chosen.a+1} ↔ B mode ${chosen.b+1}, overlap ${formatOverlap(pairOf.eta)}, Δn_eff (B − A) ${formatDelta(pairOf.delta)}${pairOf.unitA.length>1?' (difference of the pair means)':''}.`:match.error?`Modes not matched (${match.error}); the plots show mode 1 of each run.`:'No mode of A matches a mode of B; the plots show mode 1 of each run, not matched.';
- const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. ${shownText} ${a.job===b.job?'Same run on both sides. ':''}`;host.append(description);
- const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run,runNumber(run));const which=document.createElement('p');which.className='compare-field-mode';which.id=i?'compare-shown-b':'compare-shown-a';which.textContent=`Mode ${shown[i]+1} · ${unitPolarization(run,[shown[i]])}${chosen?'':' · not matched'}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,which,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
+ const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. ${shownText} ${a.job===b.job?'Same run on both sides. ':''}`;
+ const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run,runNumber(run));const which=document.createElement('p');which.className='compare-field-mode';which.id=i?'compare-shown-b':'compare-shown-a';which.textContent=`Mode ${shown[i]+1} · ${unitPolarization(run,[shown[i]])}${chosen?'':' · not matched'}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:var(--optical-plot-height,340px);display:block';canvas.setAttribute('role','img');article.append(h,which,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});
+ // the plots first, right under the pickers (as Results shows its plot), then what they show
+ host.append(grid,description);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each mode is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their mode vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b,match));
  const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw,shown[0]);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw,shown[1]);};addProbeControls(host,redraw);
  $('compare-mode').onchange=()=>{const c=choices[+$('compare-mode').value];if(c){compareChoice={a:c.a,b:c.b};render();}};
  for(const [id,key] of [['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw,()=>shown);
+ if(opening)frameComparePlots(grid);
 }
 let pendingRunImport=null;
 const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.setAttribute('aria-labelledby','run-import-title');runImportDialog.setAttribute('aria-describedby','run-import-summary run-import-description');runImportDialog.innerHTML='<h2 id="run-import-title">Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p id="run-import-description">Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);

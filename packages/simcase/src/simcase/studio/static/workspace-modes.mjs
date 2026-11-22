@@ -2,15 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 import {formatIndex} from './workspace-compare.mjs';
 
-// The modes table of one run: | Mode | n_eff | Polarization | Loss | A_eff (µm²) |. Every number is
+// The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
 // (te_polarization_fraction, effective_area, simcase.mode_postprocessing) give the same value from
 // the same samples.
 
 export const RANKING_TEXT='Modes are ranked by effective index.';
 export const POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal';
-// A loss of 0 dB/cm (Im n_eff exactly 0) is absorption only: the cell's help and the note under the table.
-export const LOSSLESS_NOTE='Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.';
+// The loss column of a closed window counts material absorption (k) only: its header, the help of
+// every cell and the note under the table say so; "0 dB/cm" is a lossless run, not a computed leak.
+// A result with an open boundary (PML) has an Im n_eff that includes leakage into the PML: its
+// column is "Loss (dB/cm)", with its own help.
+export const LOSS_HEADER='Absorption loss (dB/cm)';
+export const PML_LOSS_HEADER='Loss (dB/cm)';
+export const ABSORPTION_HELP='Absorption (material k) only; leakage and radiation are not computed in a closed window';
+export const PML_LOSS_HELP='Material absorption (k) and leakage into the PML of the open boundary';
+export const ABSORPTION_NOTE='Absorption loss counts material absorption (k) only. Leakage and radiation are not computed in a closed window.';
+export const LOSSLESS_NOTE='Absorption loss counts material absorption (k) only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a closed window.';
+export const PML_LOSS_NOTE='Loss includes material absorption (k) and leakage into the PML of the open boundary.';
+/** The loss column of a table: {header, help, note}; open: the result has an open boundary (PML);
+ * lossless: every mode has Im n_eff exactly 0. */
+export function lossColumn({open=false,lossless=false}={}){
+ if(open)return {header:PML_LOSS_HEADER,help:PML_LOSS_HELP,note:PML_LOSS_NOTE};
+ return {header:LOSS_HEADER,help:ABSORPTION_HELP,note:lossless?LOSSLESS_NOTE:ABSORPTION_NOTE};
+}
 // 1e-3, not smaller: the mesh splits a symmetric pair by 1e-4 to 6e-4 at 40-10 nm, below the solver's n_eff
 // error at the same meshes, so two modes closer than 1e-3 cannot be told apart by this solver.
 export const PAIR_TOLERANCE=1e-3;
@@ -94,12 +109,13 @@ export const propagationLoss=(im,lambda0)=>40*Math.PI/Math.LN10*im/lambda0;
  * missing: the reason the fractions are absent ('' when they are present); areaMissing: the same
  * for the effective areas. One merged polarization cell per degenerate group, on its first row
  * with rowspan; each member keeps its own effective area, with a note. */
-export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP}={}){
+export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP,open=false}={}){
+ const allLossless=modes.length>0&&modes.every(m=>m.im===0),column=lossColumn({open,lossless:allLossless});
  const close=new Set(degenerateGroups(modes.map(m=>m.re)).flat());
  // a group is merged only when each member has its fraction (a result without them keeps its reason)
  const groups=degenerateGroups(modes.map(m=>m.re)).filter(g=>g.every(i=>Number.isFinite(modes[i].fte))),groupOf=new Map();groups.forEach(g=>g.forEach(i=>groupOf.set(i,g)));
  const rows=modes.map((m,i)=>{
-  const row={mode:i+1,label:`Mode ${i+1}`,neff:formatIndex(m.re),loss:lossText(m.im,m.loss),lossless:m.im===0};
+  const row={mode:i+1,label:`Mode ${i+1}`,neff:formatIndex(m.re),loss:lossText(m.im,m.loss),lossless:m.im===0,lossTitle:column.help};
   row.area=Number.isFinite(m.area)?{text:areaText(m.area),value:m.area,title:close.has(i)?areaHelp+'. '+AREA_PAIR_NOTE:areaHelp}:{text:'—',value:null,title:areaMissing||'No field: no effective area'};
   const g=groupOf.get(i);
   if(g&&g.length>1){
@@ -112,7 +128,7 @@ export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HEL
   row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${polarizationShare(m.fte)}`,title:POLARIZATION_HELP,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};
   return row;
  });
- return {rows,lossless:modes.some(m=>m.im===0),groups};
+ return {rows,lossless:modes.some(m=>m.im===0),groups,loss:column};
 }
 /** The field view's mode picker: "Mode 1 · TE-like · n_eff 2.44406001" (a pair member reads "pair"). */
 export function modeOptionLabel(i,modes){
@@ -161,5 +177,5 @@ export function physicsModes(p){
  const fits=fte&&fte.length===re.length;
  const area=engineEffectiveArea(p.summary),areaFits=area&&area.length===re.length;
  const areaMissing=areaFits?'':area?'The saved effective areas do not match the modes':p.summary?.open_boundary?'PML result: its fields are in stretched coordinates, so no effective area is computed':RUN_AGAIN+': this run was saved before Studio kept the effective area';
- return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null,areaHelp:vector?AREA_HELP:SCALAR_AREA_HELP};
+ return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null,areaHelp:vector?AREA_HELP:SCALAR_AREA_HELP,open:!!p.summary?.open_boundary};
 }

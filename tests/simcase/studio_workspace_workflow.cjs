@@ -84,7 +84,11 @@ test('the Results step describes the run being viewed, in neutral words that nam
  let steps=opticalWorkflow({input:newer,runs,viewed:runs[0]});
  assert.deepEqual([steps[4].state,steps[4].detail],['attention','Current inputs differ from this run']);
  assert.equal(steps[3].summary,'Run complete');
+ // round 10: that is information, not a problem: the step carries the neutral tone
+ assert.equal(steps[4].tone,'info');
+ assert.equal(opticalWorkflow({input:input(),runs}).at(4).tone,'info');
  steps=opticalWorkflow({input:newer,runs,viewed:runs[1]});assert.deepEqual([steps[4].state,steps[4].detail],['ready','Result for these inputs']);
+ assert.equal(steps[4].tone,undefined);
  // the words name only the parts that differ, this run first
  assert.equal(inputsDifferText(opticalInputParts(older),opticalInputParts(newer)),'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon');
  const other=structuredClone(newer);other.model.wavelength=1310;other.model.coreMesh=40;

@@ -92,9 +92,15 @@ test('a recovery entry names the session file its record came from',()=>{
  assert.equal(sessionLine({model:'Optical waveguide',runs:1,names:['Run 1'],file:null}),'Optical waveguide · 1 run · Run 1');
 });
 test('the Optical waveguide card offers the optical session in browser recovery before Start new',()=>{
- assert.deepEqual(opticalResumeChoice({runs:2,names:['design A','design B'],savedAt:'T'},t=>'2:25 PM'),{label:'Resume Optical waveguide · design A, design B · 2:25 PM (this browser)'});
+ assert.deepEqual(opticalResumeChoice({runs:2,names:['design A','design B'],savedAt:'T'},t=>'2:25 PM'),{label:'Restore from this browser · Optical waveguide · design A, design B · 2:25 PM'});
  // the record's session file, when it names one
- assert.deepEqual(opticalResumeChoice({runs:2,names:['Run 1 · design A','Run 2'],file:'optical-waveguide-session-2026-11-22-1425.json',savedAt:'T'},t=>'2:25 PM'),{label:'Resume Optical waveguide · Run 1 · design A, Run 2 · file optical-waveguide-session-2026-11-22-1425.json · 2:25 PM (this browser)'});
+ assert.deepEqual(opticalResumeChoice({runs:2,names:['Run 1 · design A','Run 2'],file:'optical-waveguide-session-2026-11-22-1425.json',savedAt:'T'},t=>'2:25 PM'),{label:'Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · 2:25 PM · file optical-waveguide-session-2026-11-22-1425.json'});
+ // round 10: whether the record still matched its file, in words; never "(this browser)" beside a file name
+ const file='optical-waveguide-session-2026-11-22-1425.json';
+ assert.equal(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:true,savedAt:'T'},t=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · 2:25 PM · same as file '+file);
+ assert.equal(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent:false,savedAt:'T'},t=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · 2:25 PM · file '+file+', changed since');
+ assert.equal(sessionLine({model:'Optical waveguide',runs:1,names:['Run 1'],file,fileCurrent:true}),'Optical waveguide · 1 run · Run 1 · same as file '+file);
+ for(const fileCurrent of [true,false,null])assert.doesNotMatch(opticalResumeChoice({runs:1,names:['Run 1'],file,fileCurrent,savedAt:'T'},t=>'2:25 PM').label,/\(this browser|Resume|Recover/);
  const now=new Date(2026,10,22,15,0),today=new Date(2026,10,22,14,25).toISOString(),before=new Date(2026,10,20,14,25).toISOString();
  assert.doesNotMatch(offerTime(today,now),/2026|20/);assert.match(offerTime(before,now),/20/);
 });
