@@ -145,10 +145,12 @@ def test_p4_refusals(strip):
     with pytest.raises(ValueError, match=r"moves 1 node\(s\) of PML or bend elements"):
         _fundamental(mesh, eps, MeshMotion(design_velocity=into_layer, t=t))
     shifted = Mesh(mesh.nodes + np.array([4.0, 0.0]), mesh.triangles, mesh.boundary, mesh.boundary_edges)
-    with pytest.raises(ValueError, match="a motion is refused with a bend"):
+    # a bend takes a motion since 2026-11-22 (test_shape_derivative_bend.py); the layer must still stay put
+    with pytest.raises(ValueError, match=r"moves 1 node\(s\) of PML or bend elements"):
         _quiet(lambda: solve_waveguide_modes(shifted, relative_permittivity=eps, vacuum_angular_wavenumber=K0,
                                              target_effective_index=2.6, search_mode_count=4, pml=PML,
-                                             bend=Bend(bend_radius=20.0, bend_origin=0.0), motion=MeshMotion(design_velocity=W, t=t)))
+                                             bend=Bend(bend_radius=20.0, bend_origin=0.0),
+                                             motion=MeshMotion(design_velocity=into_layer, t=t)))
 
 
 def test_review_an_outer_face_without_a_layer_stays_in_place(strip):
