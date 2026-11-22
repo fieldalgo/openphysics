@@ -53,6 +53,17 @@ The Gaussian input is E(x, y) = exp(-((x - x0)^2 + (y - y0)^2) / w^2) with the d
 in micrometres as ``waist`` and ``center``; it is x-polarised for vector results (compared with
 E_t of each mode alone) and a scalar amplitude for scalar results.
 
+TE fraction. ``te_polarization_fraction[p, m]`` (vector results only) is defined on the saved
+SI centroid field ``unnormalized_electric_field`` (E_x, E_y, E_z per triangle T) and the triangle
+areas A_T of ``node_coordinates``, summed over every triangle of the window, all regions:
+
+    f_TE = sum_T A_T |E_x,T|^2 / sum_T A_T (|E_x,T|^2 + |E_y,T|^2)
+
+with x the document's horizontal axis and E_z left out; f_TM = 1 - f_TE. It needs no kernel
+call, so any reader of the saved samples gets the same number (``te_polarization_fraction``).
+Two modes whose Re n_eff differ by at most 1e-4 are a degenerate pair: each member's fraction is
+then an arbitrary rotation within the pair and only their sum is defined; both are still saved.
+
 Not computed: PML results (the saved transverse coefficients are covariant integrals in
 complex-stretched coordinates, so the lossless Poynting formula on the whole window is not the
 physical power and the window is not the physical one) and subspace sweeps (cluster frames, not
@@ -71,7 +82,7 @@ from galerkin.kernels import (confinement_factor, coupling_efficiency, interpola
                               vector_power)
 
 __all__ = ["validate_mode_overlap", "gaussian_settings", "vector_postprocessing", "scalar_postprocessing",
-           "stack_points", "summary_block"]
+           "te_polarization_fraction", "stack_points", "summary_block"]
 
 #: The one accepted post-processing input, ``results.mode_overlap``.
 _OVERLAP_KEYS = frozenset({"gaussian"})
@@ -214,6 +225,27 @@ def scalar_postprocessing(nodes, triangles, fields, regions, num_regions, gaussi
     return out
 
 
+def te_polarization_fraction(node_coordinates, triangles, electric) -> np.ndarray:
+    """f_TE (M,) of one study point from the saved centroid field (module docstring).
+
+    ``node_coordinates`` (N, 2), ``triangles`` (T, 3) and ``electric`` (T, M, 3), the complex
+    E_x, E_y, E_z of each mode at each triangle centroid; the coordinates' length unit cancels.
+    A mode with no transverse field gives NaN. Each term is written out (|E|^2 = re^2 + im^2,
+    A_T = |cross| / 2) so that a reader in another language reproduces it to rounding.
+    """
+    x = np.asarray(node_coordinates, dtype=float)
+    t = np.asarray(triangles)
+    e = np.asarray(electric)
+    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
+    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    ex = e[:, :, 0].real ** 2 + e[:, :, 0].imag ** 2
+    ey = e[:, :, 1].real ** 2 + e[:, :, 1].imag ** 2
+    num = area @ ex
+    den = num + area @ ey
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
+
+
 def stack_points(points: list[dict]) -> dict:
     """Per-point dictionaries -> arrays with a leading study-point axis."""
     return {key: np.stack([p[key] for p in points]) for key in points[0]}
@@ -258,6 +290,14 @@ def summary_block(arrays: dict, *, vector: bool, region_names: list[str], gaussi
         "description": "<E_a, E_b> = int conj(E_a) . E_b dA of the saved fields (Hermitian); the diagonal is the "
                        "mass norm int |E|^2 dA" + ("" if vector else ", equal to "
                                                    "unnormalized_mode_field_square_integral")}
+    if "te_polarization_fraction" in arrays:
+        out["te_polarization_fraction"] = {
+            "unit": "1", "values": _part(arrays["te_polarization_fraction"]),
+            "description": "f_TE = sum_T A_T |E_x|^2 / sum_T A_T (|E_x|^2 + |E_y|^2) on the saved centroid field "
+                           "unnormalized_electric_field over every triangle of the window, x horizontal, E_z left "
+                           "out; f_TM = 1 - f_TE. For two modes whose Re n_eff differ by at most 1e-4 (a degenerate "
+                           "pair) each member's value is an arbitrary rotation within the pair and is still saved; "
+                           "only the pair's sum is defined"}
     if gaussian is not None:
         out["coupling_efficiency"] = {
             "unit": "1", "values": _part(arrays["coupling_efficiency"]),

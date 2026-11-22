@@ -1167,7 +1167,7 @@ DESIGN_MENUS = {
     "vacuum_wavenumber": ("1/cm", "1/m"), "vacuum_angular_wavenumber": ("rad/m", "rad/um"),
     "propagation_loss": ("dB/m", "dB/cm", "dB/mm"), "bend_loss": ("dB/(90 deg)", "dB/(180 deg)"),
     "phase_shift": ("rad", "deg", "mrad"),
-    **_menus("confinement_factor overlap coupling_efficiency relative_humidity", ("1", "%")),
+    **_menus("confinement_factor overlap coupling_efficiency te_polarization_fraction relative_humidity", ("1", "%")),
     "co2_mole_fraction": ("1", "ppm", "%"),
     "absolute_pressure": ("Pa", "kPa", "hPa", "bar", "mbar", "atm", "bara", "psia"),
     "vapor_pressure": ("Pa", "kPa", "hPa"),
@@ -1499,8 +1499,9 @@ def test_p2_names_are_legal_with_their_unit_and_places():
         assert name not in names, name                      # spec section 6, "not added"
     # registry pin follows the addition: 242 entries and 367 names until L2 commit 5 of the galerkin step
     # added the 7 bases and 2 role names of P3_L2_NAMES, 249 and 376 until L3 commit 9 added the 9 bases of
-    # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS)
-    assert len(units._ENTRIES) == 259 and len(names) == 386
+    # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS), 259 and 386 until the mode
+    # TE fraction added te_polarization_fraction (a result fraction)
+    assert len(units._ENTRIES) == 260 and len(names) == 387
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal

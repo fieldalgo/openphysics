@@ -46,7 +46,8 @@ N_FILM, N_CLAD, THICKNESS, WAVELENGTH = 3.48, 1.444, 0.22, 1.55
 PAD, HALF_WIDTH = 1.1, 0.05
 SIZES = (0.04, 0.02, 0.01)
 WAIST, CENTER = THICKNESS, (0.0, THICKNESS / 2)
-POST_KEYS = {"vector": {"unnormalized_mode_power", "confinement_factor", "unnormalized_field_overlap"},
+POST_KEYS = {"vector": {"unnormalized_mode_power", "confinement_factor", "unnormalized_field_overlap",
+                        "te_polarization_fraction"},
              "scalar": {"unnormalized_mode_field_square_integral", "confinement_factor", "unnormalized_field_overlap"}}
 COMMON_KEYS = {"node_coordinates", "triangles", "regions", "region_names", "vacuum_wavelength", "effective_index",
                "field_layout", "study_parameter", "metadata_json"}

@@ -232,13 +232,20 @@ converted once):
 | `confinement_factor` | `(points, modes, regions)` | energy fraction per region in `region_names` order: `int_R Re(eps_r) |E|^2 / int Re(eps_r) |E|^2` (`confinement_factor`); scalar: `int_R |phi|^2 / int |phi|^2`. Rows sum to 1 |
 | `unnormalized_field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA` in m^2 (`overlap_matrix(..., "field")`, Hermitian; scalar: `scalar_overlap`); the diagonal is `int |E|^2 dA`, which for scalar results equals the square integral |
 | `coupling_efficiency` | `(points, modes)` | only with `results.mode_overlap.gaussian`: `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)` of a Gaussian input (`coupling_efficiency` after `interpolate_vector_field`; scalar: `scalar_coupling_efficiency` at the nodes) |
+| `te_polarization_fraction` | `(points, modes)` | vector results only: `f_TE = Σ_T A_T |E_x,T|² / Σ_T A_T (|E_x,T|² + |E_y,T|²)` on the saved centroid field `unnormalized_electric_field`, summed over every triangle of the window (all regions), `A_T` the triangle area from `node_coordinates`, `x` the document's horizontal axis and `E_z` left out; `f_TM = 1 − f_TE`. Unit 1 (registry quantity `te_polarization_fraction`, a fraction). It needs no kernel call: any reader of the saved samples reproduces it |
 
 The saved amplitudes are relative, hence "unnormalized": read the vector amplitudes as V/m;
 `unnormalized_mode_power` is then the power of that field in watts, `Re` the time-averaged
 power carried in +z. Dividing a saved mode by `sqrt(Re unnormalized_mode_power)` gives a field
 that carries 1 W. For a lossless mode the imaginary part is roundoff; for a lossy mode
 (complex `effective_index`) it is the reactive part and the modes are not power-orthogonal.
-`confinement_factor` and `coupling_efficiency` are dimensionless. `summary.json` repeats the
+Two modes of one run whose `Re n_eff` differ by at most 1e-4 are a degenerate pair (for example
+the two lowest modes of a square core): any rotation within the pair is a solution, so each
+member's `te_polarization_fraction` is arbitrary and only the pair's sum is defined. Both values
+are still saved, and the summary's description says so. The words TE-like, TM-like and hybrid
+are Studio's, not the engine's. The key is additive: `field_layout` stays
+`em-modes2d-p1-node-centroid-v2` and no other array or key changes.
+`confinement_factor`, `coupling_efficiency` and `te_polarization_fraction` are dimensionless. `summary.json` repeats the
 values under `mode_postprocessing` as value objects with a `unit` and `description` per key
 (complex values as `re`/`im` with `time_convention`, `confinement_factor` with its region names).
 
@@ -254,7 +261,8 @@ and `position = [x0, y0]`, each a length with its unit. For vector results the i
 x-polarised and compared with the transverse mode field alone; for scalar
 results it is a scalar amplitude. The waist must be positive, the centre must
 lie inside the geometry window and no other key is accepted under
-`mode_overlap` or `gaussian`. PML results and subspace sweeps gain none of
+`mode_overlap` or `gaussian`. Scalar results have no `te_polarization_fraction`. PML results
+(bends included) and subspace sweeps gain none of
 these keys: PML coefficients are covariant integrals in stretched coordinates,
 so the lossless Poynting formula over the window is not the physical power, and
 subspace frames are not modes ([PML modes](pml_modes.md),
