@@ -392,7 +392,7 @@ export function createMultiphysicsView(ctx){
   resize?.disconnect();resize=null;const page=ctx.ui.page,main=document.querySelector('main');
   main.dataset.page=page;main.classList.toggle('connecting',page==='Connections');main.classList.toggle('choosing',page==='Applications');main.classList.remove('comparing');
   $('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[page];
-  $('view-detail').textContent=page==='Connections'?(couplingNames(doc).length?'Drawn from the couplings':'One physics'):page==='Model'?'Interactive model view':page==='Applications'?'Choose an application':'';
+  $('view-detail').textContent=page==='Connections'?(couplingNames(doc).length?'Drawn from the couplings':'One physics'):page==='Model'?'Interactive model view':page==='Applications'?'Choose a model':'';
   document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===page));
   document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode]);});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
@@ -420,6 +420,8 @@ export function createMultiphysicsView(ctx){
   for(const id of ['save-session','open-session','save-draft']){$(id).disabled=false;if(id==='save-draft')$(id).removeAttribute('title');else $(id).title=id==='save-session'?'Save inputs, completed runs and comparison to one file':'Open a saved session with its runs and comparison';}
   $('save-project').textContent='Save inputs only';$('open-project').textContent='Open inputs file';
  }
+ // The save indicator, in the words of the single-physics one: the model file, never a session
+ function saveState(){return !savedFile?'Not saved to a file · runs stay in this tab':savedSignature===signature()?`${savedFile.kind} ${savedFile.name}${savedFile.at?' · '+savedFile.at.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''}`:`Changed since ${savedFile.kind.toLowerCase()} ${savedFile.name}`;}
  function saveFile(){
   const text=JSON.stringify(doc,null,2)+'\n',name=(String(doc.name||'model').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'model')+'.json';
   const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -427,7 +429,7 @@ export function createMultiphysicsView(ctx){
  }
  return {active:()=>active,open,openText,openTemplate,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveFile,busy:()=>!!job,
-  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${!savedFile?'Not saved to a file · runs stay in this tab':savedSignature===signature()?`${savedFile.kind} ${savedFile.name}${savedFile.at?' · '+savedFile.at.toLocaleTimeString():''}`:`Changed since ${savedFile.kind.toLowerCase()} ${savedFile.name}`}`,
+  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,
   // for checks: the current document and the last result
   document:()=>clone(doc),lastResult:()=>lastRun?.result||null};
 }

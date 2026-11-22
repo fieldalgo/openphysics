@@ -1,7 +1,8 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 // /api/mesh gives node coordinates in metres (field_units); the page draws in micrometres
-// (display only): the metre coordinates times 1e6.
+// (display only): the metre coordinates times 1e6. Axis labels are in nanometres.
+import {nmTicks,formatNm} from './workspace-field.mjs';
 export function readMesh(data){
  if(data?.field_units?.node_coordinates!=='m'||'units' in (data??{}))throw new Error('Mesh coordinates must be in metres.');
  const {node_coordinates:coordinates,triangles,regions,region_names:names,stats}=data;
@@ -34,7 +35,7 @@ export function drawMesh(canvas,mesh,view='Full window',region=[-.65,.65,-.25,.7
  ctx.save();ctx.beginPath();ctx.rect(left,top,pw,ph);ctx.clip();
  mesh.triangles.forEach((triangle,i)=>{ctx.beginPath();triangle.forEach((n,j)=>{const p=mesh.nodes[n];if(j)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.closePath();ctx.fillStyle=mesh.regions[i]===mesh.names.background?'#203744':'#3c887d';ctx.fill();ctx.strokeStyle='#8aa6b5';ctx.lineWidth=.4;ctx.stroke();});ctx.restore();
  ctx.strokeStyle='#91a8b7';ctx.strokeRect(left,top,pw,ph);ctx.fillStyle='#cfdae0';ctx.font='12px Segoe UI';ctx.textAlign='center';
- for(let i=0;i<3;i++){const x=xmin+(xmax-xmin)*i/2;ctx.fillText(x.toFixed(2),X(x),top+ph+18);}ctx.fillText('x [µm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(let i=0;i<3;i++){const y=ymin+(ymax-ymin)*i/2;ctx.fillText(y.toFixed(2),left-8,Y(y)+4);}
- ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [µm]',0,0);ctx.restore();
- canvas.setAttribute('aria-label',`Generated mesh: ${mesh.stats.nodes} nodes, ${mesh.stats.triangles} triangles; ${view}, coordinates in micrometres.`);
+ for(const x of nmTicks(xmin,xmax,Math.max(3,Math.min(7,Math.floor(pw/64)))))ctx.fillText(formatNm(x),X(x),top+ph+18);ctx.fillText('x [nm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(const y of nmTicks(ymin,ymax,Math.max(3,Math.min(7,Math.floor(ph/40)))))ctx.fillText(formatNm(y),left-8,Y(y)+4);
+ ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [nm]',0,0);ctx.restore();
+ canvas.setAttribute('aria-label',`Generated mesh: ${mesh.stats.nodes} nodes, ${mesh.stats.triangles} triangles; ${view}, coordinates in nanometres.`);
 }

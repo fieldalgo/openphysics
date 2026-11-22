@@ -30,7 +30,7 @@ optical runs and comparisons; "Save session" is the one name for that save in th
 ribbon, the header and Messages. **More** contains input-only files (**More › Save
 inputs only**, **Open inputs file**), browser drafts and Reset design. **Workspace tools** in the bottom status bar contains connection,
 recovery and Reset layout; **Installed physics** sits next to it. Both open above the
-status bar, one at a time, on every page including Applications; Escape closes the open
+status bar, one at a time, on every page including Models; Escape closes the open
 one. Below 1000 px the ribbon leaves out the Physics group, so its Compute commands stay in
 view; Installed physics remains in the status bar. Heat and Joule heating
 results remain in the current tab only.
@@ -64,62 +64,74 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 
 ## First optical study
 
-1. Choose **Applications → Optical waveguide**. (The Heated silicon waveguide card
-   opens a coupled heat and optical model instead; see [Multiphysics models](#multiphysics-models-heat--optical-modes).)
+1. Choose **Models → Optical waveguide** (the start page; its tab is **Models**). (The Heated
+   silicon waveguide card opens a coupled heat and optical model instead; see [Multiphysics models](#multiphysics-models-heat--optical-modes).)
 2. In **Geometry**, edit the core numerically or drag it and its edges. Add
    rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
    each shape's material; the silica background stays. A rectangle's **Width** edit
    keeps its horizontal centre (Left x moves by half the change) and a **Height** edit
    keeps its bottom edge, so a core resting on y = 0 stays centred there; the window
    rule still refuses a size that would leave the window. Projects saved earlier keep
-   their stored coordinates. The step bar's **4. Study** shows the wavelength, for
-   example *λ 1550 nm · Ready to run*, and *Run complete* once these inputs have a result.
-   Optionally set the wavelength in **Optical modes** (**Study → Edit wavelength** opens
-   it with the field focused) and the core mesh size in **Mesh**.
+   their stored coordinates. The step bar's **4. Study** shows *Ready to run*, and *Run
+   complete* once these inputs have a result; next to it the wavelength (for example
+   **λ 1550 nm**) is a button that opens the wavelength field. Optionally set the
+   wavelength in **Physics › Optical modes** (its settings are headed *Optical modes*;
+   **Study → Edit wavelength** and the step bar's wavelength open it with the field
+   focused) and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
 4. Select **Run optical study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
    An input edit replaces the completion message, so it never describes edited inputs.
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
-   replace it (**Unpin this run** releases it). Change the model and run again,
+   replace it. There is no separate Pin button: **Unpin this run** releases a pinned run,
+   and Enter in Run name pins a named run again. Change the model and run again,
    then use **Compare** to choose A/B, candidate, component, probe and line profile.
-   A table lists, for each candidate rank, n_eff of A and B, Δ (B − A) and Δ % of A;
-   its column headers name each run (name, size, λ).
+   The two field plots come first, headed by the side and the run (a run named *A* on side
+   A is not named twice); below them a table lists, for each candidate rank, n_eff of A
+   and B, Δ (B − A) and Δ % of A; its column headers name each run (name, size, λ).
+   n_eff has 8 decimals everywhere (results, candidate list, Compare).
 6. **Save session**, the first save button, creates a portable file with the model,
    retained results and view settings, named from the application and the local
    date-time (for example `optical-waveguide-session-2026-11-21-1305.json`) in the
    browser's downloads. Studio hands the file to the browser and cannot know that it was
    kept (a download can be cancelled), so Messages reports *Session file … sent to the
-   browser's downloads (check your Downloads folder)* and the header shows *Session file
-   … · time* until the next edit or run. **More › Save inputs only** keeps the model without
-   results; while completed runs are not in a session file, the header says *Results not
-   saved · Save session to keep them* (or *Changed since session file …* after one).
+   browser's downloads (check your Downloads folder)*. The header holds the one save
+   indicator, and the footer repeats it word for word: *Sent to session file … · time*
+   until the next edit or run. **More › Save inputs only** keeps the model without
+   results; while completed runs are not in a session file, the indicator says *Not saved
+   to a file · kept for recovery in this browser* (*· updating browser recovery* while it
+   writes, *· browser recovery unavailable* if it cannot), or *Changed since session
+   file … (time) · kept for recovery in this browser* after a file save.
    After **Open session** the header says *Opened …* with the file name, and after a
    recovery *Recovered from this browser*; browser recovery keeps the last session file
    name and time, so a recovered session adds *last session file … (time)* (*changed
-   since session file …* if it had changed after that save, *results not in a session file
-   yet* if none was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
+   since session file …* if it had changed after that save, *not saved to a file* if none
+   was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, and
    typed values are not snapped to the drag step (**More about width and height** under
-   the size fields). The footer shows *Updating browser recovery…* while it writes; wait
-   for **Browser recovery saved** before relying on local recovery. After a reload or a Studio restart, the start page shows **Continue
-   where you left off** with the last browser session and any earlier ones; choose
-   one to recover it, open a session file, or start new. Over a workspace with default
+   the size fields). Wait for *kept for recovery in this browser* before relying on local
+   recovery (**Workspace tools** shows when it was last updated). After a reload or a
+   Studio restart, the start page shows **Continue where you left off** with
+   **Recover (this browser only): Last session in this browser …** and any earlier ones,
+   **Open session file (portable)…** and **Start new**, and says that a session file is the
+   copy that moves between computers; browser recovery stays in this browser. Over a workspace with default
    inputs and no results, an open or recovery asks nothing. Otherwise **Open saved
    session?** (or **Recover saved session?**) lists the runs with their names and pins
    and the comparison that come back, what is replaced, and only the physics present.
-   Before an application is chosen, the header reads *No model chosen*, the status bar
-   *Choose an application to start* and the Study sequence lists no steps.
+   Before a model is chosen, the header reads *No model chosen*, the status bar
+   *Choose a model to start* and the Study sequence lists no steps. The start page uses
+   one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
+   Choose a model*.
 
-Use **Import runs from file** to add results to the current notebook while keeping
+Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
 the model. Use **Open session** to replace both model and notebook. *Result for these
 inputs* and *Inputs changed since this result* say which design a result belongs to; candidate ranks do not
 establish mode correspondence between designs.
 
 ## Working with a model
 
-Choose an application, select a body or boundary in the model tree or drawing,
+Choose a model, select a body or boundary in the model tree or drawing,
 and edit its properties in the inspector. The optical application runs a real
 2D mode calculation. The Heated silicon waveguide application runs steady heat and
 optical modes as one coupled model ([Multiphysics models](#multiphysics-models-heat--optical-modes)). An older input
@@ -202,7 +214,7 @@ gesture start, so zoom and pan do not change the unit conversion.
 
 ## Steady heat plate
 
-Choose **Applications → Steady heat conduction** to edit a steady heat problem
+Choose **Models → Steady heat conduction** to edit a steady heat problem
 without JSON. The plate is one homogeneous rectangle with its lower-left corner at
 (0, 0), sized in mm, with constant isotropic conductivity k [W/(m·K)] and a uniform
 heat source Q [W/m³]. Select a side in the drawing or open **Heat transfer** to give
@@ -233,7 +245,7 @@ interfaces for them.
 
 ## Joule heating on named regions
 
-Choose **Applications → Joule heating** to set up steady Joule heating on named
+Choose **Models → Joule heating** to set up steady Joule heating on named
 material regions without JSON. The domain is a rectangle in mm with its lower-left
 corner at (0, 0) and a background material; **Geometry** adds up to eight
 rectangles, circles or polygons (later shapes win where they overlap), each a named
@@ -286,7 +298,7 @@ refused Newton run shown with its text, and constant materials.
 
 ## Multiphysics models: heat → optical modes
 
-Choose **Applications → Heated silicon waveguide** (“Heat → optical modes · coupled”) to open a
+Choose **Models → Heated silicon waveguide** (“Heat → optical modes · coupled”) to open a
 [multiphysics document](multiphysics_document.md): two physics on one geometry and one mesh,
 joined by a coupling, solved by one **Run**. The template is a 500 × 220 nm `physmat:Si` core on
 `physmat:SiO2` in a 6 × 4.5 µm window, with a 2 µm × 100 nm heater 1.1 µm above the core. **Heat 1**
@@ -487,8 +499,10 @@ sessions before restarting the server or closing the tab.
 
 ## Inspecting field samples
 
-In Results or Compare, click inside a field plot or enter x/y coordinates in µm
-and select **Inspect point**. The crosshair and readout use physical coordinates.
+In Results or Compare, click inside a field plot or enter x/y coordinates in nm
+and select **Inspect point**. The crosshair and readout use physical coordinates in nm,
+like the model inputs; field, mesh and profile plot axes are in nm with ticks on round
+values. The session file keeps these positions as quantity strings in µm, unchanged.
 Compare samples both meshes at the same location. The value is the normalized
 stored centroid sample of the containing triangle, not an interpolated point
 field. The readout identifies that triangle and its centroid; a point outside
@@ -511,7 +525,7 @@ size, wavelength and completion time; **Run details** in Results holds the job i
 source, simcase version and input change number. **Export this run** writes a
 standalone session file containing that result and its original inputs; this is useful
 before the six-run retention limit removes an older unpinned run.
-The footer distinguishes a changed session from saved input-only files. Saving
+The save indicator (header and footer) distinguishes a changed session from saved input-only files. Saving
 inputs or a browser draft does not claim to save the result notebook. A single-run
 export does not mark the full notebook saved. **Export field PNG** draws the Results
 plot; on Compare it is unavailable, and the text under it says to open a run in Results.
@@ -525,7 +539,7 @@ Run names and comparison choices are session metadata, outside input undo.
 For an optical model, choose **Mesh → Generate mesh** to call the existing
 server mesh builder without solving modes. The preview shows actual triangles,
 region colouring, node/triangle counts, minimum angle and mean quality. Select
-Full window or Core region; coordinates are in µm with equal x/y scale.
+Full window or Core region; axes are in nm with equal x/y scale.
 Changing the design leaves the prior preview visible with an earlier-input
 label until explicitly regenerated. Failed generation preserves the last good
 preview. Mesh previews live only in the tab and are not saved in session JSON.
@@ -588,7 +602,7 @@ keep their existing API.
 
 Results and Compare include an expandable Line profile and CSV panel. Choose a
 horizontal line (constant y) or vertical line (constant x), enter its fixed
-coordinate in micrometres, and select Show profile. Both comparison runs use the
+coordinate in nanometres, and select Show profile. Both comparison runs use the
 same line and 0–1 relative scale; each candidate retains its own max|E| denominator.
 Changing candidate/component updates the profile. Line choices are view state saved with the session and browser notebook recovery.
 
@@ -599,7 +613,7 @@ gaps remain gaps. The CSV (`studio-profile.csv`) exports job, origin, candidate,
 component, axis, the fixed coordinate, interval endpoints, triangle number, centroid and
 normalized value; every quantity column is `name [unit]` with its SI value
 (`fixed_coordinate [m]`, `start [m]`, `end [m]`, `centroid_x [m]`, `centroid_y [m]`,
-`relative_amplitude [1]`), while the panel takes and shows micrometres. Values at an interval's
+`relative_amplitude [1]`), while the panel takes and shows nanometres. Values at an interval's
 isolated endpoints are not a separate point-probe claim.
 
 Analytical unit-square tests cover exact horizontal/vertical intervals, reversed
@@ -611,8 +625,9 @@ independently checked against complex vector norms and triangle containment.
 Once the tab has completed or imported results, valid input/selection/name changes
 queue a browser IndexedDB snapshot containing the current inputs, up to six
 completed runs, names, comparison and field view. Writes are debounced and serialized;
-the footer reports pending, saving, committed or failed storage separately from
-portable file save status. An empty new tab does not erase the prior notebook.
+the save indicator reports the browser copy (*updating browser recovery*, *kept for
+recovery in this browser*, *browser recovery unavailable*) while no session file holds
+the runs, and the session file once one does. An empty new tab does not erase the prior notebook.
 
 After reload, choose the last session on the start page's **Continue where you left off**
 card, or expand Connection, recovery and layout help → Recover last session.
@@ -661,7 +676,8 @@ coalescing delay; changing inputs does not copy field arrays on every keystroke.
 
 ## Pin reference runs
 
-**Pin this run** (or naming the run) keeps that result: new runs do not replace it. A new
+Naming a run pins it: new runs do not replace it. There is no separate Pin button;
+**Unpin this run** releases a pinned run, and Enter in Run name pins a named run again. A new
 result replaces the oldest unpinned run, with at most six retained in total. If
 all six are pinned, Run is disabled until one is unpinned; document checks and
 mesh previews remain available. Pins are saved in sessions, browser recovery and
@@ -672,7 +688,7 @@ Pinning is not a portable backup; export files before discarding browser data.
 
 ## Import runs without replacing the model
 
-Results/Compare → Import runs from file accepts a session file or a single-run file from **Export this run**.
+Results/Compare → **Add runs from file (inputs unchanged)** accepts a session file or a single-run file from **Export this run**.
 Review the number of new, matching and replaced unpinned runs before applying.
 Current model inputs and input Undo are preserved; the imported selection opens
 beside a retained result for comparison. Imported runs remain labeled `imported`.
@@ -712,7 +728,7 @@ If inputs, view, run history or job state change while reading, choose the sourc
 again. The replacement dialog lists the source, old/new dimensions, core material,
 result counts and Undo behavior. It checks the workspace again when confirmed;
 a completed job arriving during review cannot be silently discarded by an old
-replacement prompt. Import runs continues to preserve current model inputs.
+replacement prompt. Add runs from file continues to preserve current model inputs.
 
 ## Installed physics
 

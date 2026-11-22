@@ -72,21 +72,25 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 ## 4. Two designs and a comparison
 
 1. On **Choose a starting model**, select **Optical waveguide**. Until you choose one,
-   the title reads *No model chosen*, the status bar *Choose an application to start*
-   and the Study sequence is empty.
+   the title reads *No model chosen*, the status bar *Choose a model to start*
+   and the Study sequence is empty. The page's tab is **Models**.
 2. In **Geometry**, set the core width to 600 nm and the height to 300 nm. A Width edit
    keeps the core centred (Left x becomes −300 nm) and a Height edit keeps its bottom
    on y = 0, so no **Centre on x = 0** is needed. The material is silicon and the
-   wavelength 1550 nm; the step bar shows it as *4. Study · λ 1550 nm · Ready to run*
-   (**Study → Edit wavelength** opens **Optical modes** with the field focused).
+   wavelength 1550 nm; the step bar shows *4. Study · Ready to run* with **λ 1550 nm**
+   beside it, which opens the wavelength field under **Physics › Optical modes** (as
+   **Study → Edit wavelength** does).
 3. Select **Run optical study**. The result shows the field and the effective index
    of two candidates, and the Study step reads *Run complete*. Type a **Run name**, for
    example *design A*, and press Enter: a named run is pinned, so new runs do not
-   replace it.
+   replace it (**Unpin this run** releases it; there is no separate Pin button).
+   n_eff has 8 decimals everywhere; field plots and the point inspector use nm, like the
+   inputs.
 4. Back in **Geometry**, set the width to 700 nm and run again.
 5. Open **Compare**. Runs A and B are chosen for you; a table lists n_eff of A and B,
    Δ (B − A) and Δ % of A for each candidate rank, with each run's name, size and
-   wavelength in its column header. Candidate ranks are not matched modes.
+   wavelength in its column header, below the two field plots. Candidate ranks are not
+   matched modes.
 
 ## 5. Keep your work
 
@@ -96,11 +100,15 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   `optical-waveguide-session-2026-11-21-1305.json`, and is handed to your browser's
   downloads (the browser may ask where to save it, or add a number if that name exists).
   Messages reports *Session file … sent to the browser's downloads (check your Downloads
-  folder)* and the title shows *Session file … · time* until your next edit or run.
+  folder)* and the title shows *Sent to session file … · time* until your next edit or
+  run. The footer repeats the title's save indicator; before a file save it reads *Not
+  saved to a file · kept for recovery in this browser*.
   **More › Save inputs only** keeps the model without results; **Export this run** in
   the Runs list writes one run to its own file.
 - After a reload or a restart, the start page shows **Continue where you left off**.
-  Recover the last session, an earlier one, or open a session file. On a fresh page
+  **Recover (this browser only)** brings back the last session or an earlier one from this
+  browser; **Open session file (portable)…** opens a file, the copy that moves between
+  computers. On a fresh page
   (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
   runs and the comparison that come back and what is replaced. Messages names what was
   opened. The title then reads *Opened …* with the file name, or *Recovered from this

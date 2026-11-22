@@ -175,7 +175,7 @@ main.choosing .workspace>.note{display:none}
 #file-status{color:#7b8798}
 footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;padding:3px 12px;background:#e2e8f1;border-top:1px solid #c2cddb;font-size:10px;color:#586c87;z-index:10}
 #status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-#autosave-status{margin-left:auto;white-space:nowrap}
+#autosave-status{margin-left:auto;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #workspace-tools{position:relative;flex:none}
 #workspace-tools>summary{cursor:pointer;font-size:10px;list-style:none;color:#355d92;padding:0 5px;white-space:nowrap}
 .workspace-tools-content{position:absolute;bottom:24px;right:0;width:560px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;background:#fff;border:1px solid #bbc8db;box-shadow:0 -8px 30px #1e345e22;padding:18px;font-size:12px}
@@ -306,6 +306,9 @@ dialog::backdrop{background:#162a4b66}
 /* Joule heating connections: two interfaces solved by one study. */
 .joule-stage{height:320px;min-width:600px}.joule-stage .graph-key{left:auto;right:20px}.joule-stage .node-electric{left:56px}.joule-stage .node-heat{top:120px;left:auto;right:calc(50% - 250px)}
 .setup-badge.solved{background:#e8f1fb;border-color:#bcd2ee;color:#255da9}
+/* The Study step's wavelength opens the wavelength field (Physics › Optical modes). */
+.workflow-wavelength{flex:none;align-self:center;margin:0 8px 0 -6px;padding:3px 8px;border:1px solid #c9d3df;border-radius:999px;background:#fff;color:var(--accent);font-size:11px;white-space:nowrap}
+.workflow-wavelength:hover{background:#e8f0fc}
 /* Multiphysics models (D2): a graph drawn from the couplings, solve-order badges, cycles, Messages. */
 .mp-stage{display:flex;align-items:flex-start;gap:96px;height:auto;min-height:280px;min-width:min-content;padding:36px 32px 72px}
 .mp-stage .graph-node{position:relative;width:230px}

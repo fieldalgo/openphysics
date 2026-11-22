@@ -1,5 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
+import {nmTicks,formatNm} from './workspace-field.mjs';
 
 // Intersect a line with the piecewise-constant painted field, without interpolation.
 export function lineProfile(field,values,axis,coordinate){
@@ -50,10 +51,10 @@ export function drawProfile(canvas,series,axis,coordinate){
  const X=x=>left+(x+extent)/(2*extent)*pw,Y=y=>top+(1-y)*ph;
  ctx.strokeStyle='#34414b';ctx.fillStyle='#cfdae0';ctx.font='12px Segoe UI';ctx.textAlign='right';
  for(const value of [0,.5,1]){ctx.beginPath();ctx.moveTo(left,Y(value));ctx.lineTo(left+pw,Y(value));ctx.stroke();ctx.fillText(String(value),left-8,Y(value)+4);}
- ctx.textAlign='center';for(const value of [-extent,0,extent])ctx.fillText(value.toFixed(2),X(value),top+ph+19);ctx.fillText(axis+' [µm]',left+pw/2,h-7);
+ ctx.textAlign='center';for(const value of nmTicks(-extent,extent,Math.max(3,Math.min(7,Math.floor(pw/64)))))ctx.fillText(formatNm(value),X(value),top+ph+19);ctx.fillText(axis+' [nm]',left+pw/2,h-7);
  ctx.save();ctx.beginPath();ctx.rect(left,top,pw,ph);ctx.clip();
  series.forEach((item,i)=>{ctx.strokeStyle=i?'#e7bc73':'#80d7c0';ctx.lineWidth=2;ctx.beginPath();let previous=null;
   for(const s of item.segments){if(previous&&Math.abs(previous.end-s.start)<1e-11){ctx.lineTo(X(s.start),Y(s.value));}else ctx.moveTo(X(s.start),Y(s.value));ctx.lineTo(X(s.end),Y(s.value));previous=s;}ctx.stroke();
  });ctx.restore();
- canvas.setAttribute('aria-label',`Piecewise-constant line profile along ${axis}, ${axis==='x'?'y':'x'} = ${coordinate} µm. Relative amplitude 0 to 1, no interpolation.`);
+ canvas.setAttribute('aria-label',`Piecewise-constant line profile along ${axis}, ${axis==='x'?'y':'x'} = ${formatNm(coordinate,1)} nm. Relative amplitude 0 to 1, no interpolation.`);
 }
