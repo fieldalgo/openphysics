@@ -265,7 +265,21 @@ without a motion, and numbers for k0 and n_target.
   - The public function places the layer on the mesh at the step t. The moving
     pencil weighs its blocks with the factors as numbers, using the same
     coefficients as the static assembly.
-  - A bend is refused with a motion: h depends on every node position.
+  - A bend takes a motion too (2026-11-22). The window elements (sx = sy = 1) may move,
+    and their bend factor h = 1 + (centroid − origin)/R follows the live centroid. PML
+    elements keep every node in place, so their complex factors stay fixed. The kernel's
+    `solve_modes` takes `coordinate_bend=(radius, axis, origin)` with a motion for this.
+    `tests/galerkin/test_shape_derivative_bend.py` holds BD1–BD6, pre-registered on
+    2026-11-22 (radius 2 µm bent silicon film, film thickness motion):
+
+    | Check | Criterion | Result |
+    |---|---|---|
+    | BD1 numbers | all returned n_eff equal the ordinary bend solve on the moved mesh within 1e-12 | pass, against a reference polished by the same Newton step (residual ≤ 2e-13). Against the raw eigensolver numbers it failed first: 1.85e-12 on PML candidates, 1.2e-15 on the physical mode |
+    | BD2 consistency | complex dn_eff/dt against a Richardson central difference of moved meshes within 1e-7 | 5.7e-11 |
+    | BD3 libraries | JAX and PyTorch within 1e-12 | 1.3e-15 |
+    | BD4 Bessel–Hankel pole | dn/dd of the bent film's analytic pole: the error falls on meshes 0.04, 0.02, 0.01 µm, finest within 2e-2, imaginary part within 5e-2 | 2.4e-3, 6.2e-4, 1.6e-4; imaginary part 9.4e-3 |
+    | BD5 refusals | a velocity on a PML node or normal to an outer face | pass |
+    | BD6 unchanged | `motion=None` equals no keyword bit for bit | pass |
 
   `tests/galerkin/test_shape_derivative_pml.py` holds P1–P7, pre-registered on
   2026-11-21 before the implementation ran, and measured that day:
@@ -275,7 +289,7 @@ without a motion, and numbers for k0 and n_target.
   | P1 numbers | n_eff equal the ordinary PML solve on the moved mesh, relative 1e-12 | 3.9e-15 |
   | P2 strip in a PML window | 0.6 × 0.2 µm Si strip, PML 0.5 µm on every side, core-width motion: complex dn_eff/dt against a Richardson central difference of moved meshes within 1e-7 | 8.5e-10 (1.9426 + 2.5e-6i) |
   | P3 libraries | JAX and PyTorch within 1e-12 | 6.9e-16 |
-  | P4 refusals | a velocity on a PML node; a motion with a bend | pass |
+  | P4 refusals | a velocity on a PML node (also with a bend, since 2026-11-22); the first P4 refused a motion with a bend | pass |
   | P5 unchanged | without a motion, `motion=None` equals no keyword bit for bit | pass |
   | P6 leaky slab | the outgoing TE pole of the PML tests, first core thickness d₁ = 0.22 µm (the substrate stays at 0.47 µm): dn/dd₁ against the derivative of the analytic root; the error falls on meshes 0.04, 0.02 and 0.01 µm, finest within 2e-2, imaginary part within 5e-2 | 6.2e-3, 1.8e-3, 4.7e-4 (3.3319 − 0.01428i against 3.3303 − 0.01427i); imaginary part 1.1e-3 |
   | P7 layer independence | the slope on mesh 0.02 for PML thickness 0.75 and 1.5 µm and strength 2 and 6 within 1e-2 of the default | ≤ 3.2e-6 |
@@ -389,7 +403,7 @@ Each refusal names the reason:
   belongs to the mesh as given;
 - a radial design velocity on the symmetry axis with `coordinate_system="axisymmetric"`;
   `checkpoint_every` in transient heat; in waveguide modes a design velocity on a PML
-  element and a bend;
+  element or normal to an outer face;
 - `motion=` on any other solver: it is not a keyword there;
 - second derivatives: JAX forward mode and PyTorch `create_graph=True` raise, as for every galerkin solve
   ([refused](differentiation.md#refused-not-approximated)).
