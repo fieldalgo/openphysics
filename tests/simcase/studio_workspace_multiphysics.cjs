@@ -286,9 +286,9 @@ test('the graphics footer names the geometry unit',async()=>{
  assert.equal(m.lengthsNote(heated()),'Lengths in µm; other values carry their units. Run solves every physics in solve order.');
  assert.match(m.lengthsNote({physics:{}}),/^Lengths in the geometry’s unit \(not set\);/);
 });
-test('a modes table names candidates with the optical caveat and the mode count it asks for',async()=>{
+test('a modes table names modes with the optical ranking sentence and the mode count it asks for',async()=>{
  const m=await mp;
- assert.equal(m.CANDIDATE_CAVEAT,'Candidates are ranked by effective index and are not matched between designs.');
+ assert.equal(m.RANKING_CAVEAT,'Modes are ranked by effective index.');
  assert.equal(m.modeCountText(heated(),'modes1'),'This model asks for 1 mode: Modes 1 › Modes to find');
  const three=heated();three.physics.modes1={...three.physics.modes1,mode_count:3};
  assert.equal(m.modeCountText(three,'modes1'),'This model asks for 3 modes: Modes 1 › Modes to find');

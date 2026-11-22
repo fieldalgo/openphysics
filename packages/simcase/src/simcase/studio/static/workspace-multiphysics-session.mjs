@@ -210,10 +210,18 @@ function checkArrays(r,result,run){
   }
  }
 }
+// An effective-index series of unit 1: real {values} (points × modes), or complex {re, im} of the
+// same shape under exp(-i omega t), as the engine writes a lossy result.
+const indexRows=v=>Array.isArray(v)&&v.length>0&&v.every(row=>Array.isArray(row)&&row.length&&row.every(finite));
+function indexSeries(s){
+ if(!isObject(s)||s.unit!=='1')return false;
+ if('values' in s)return !('re' in s)&&!('im' in s)&&indexRows(s.values);
+ return indexRows(s.re)&&indexRows(s.im)&&s.re.length===s.im.length&&s.re.every((row,i)=>row.length===s.im[i].length)&&s.time_convention==='exp(-i omega t)';
+}
 function checkValues(r,result,run){
  for(const [name,p] of Object.entries(result.physics)){
   if(p.type==='thermal.steady2d'&&!(finite(p.range?.min)&&finite(p.range?.max)&&p.range.min<=p.range.max&&p.range.unit==='K'))fail(`${r}'s heat range is not well formed.`);
-  if(p.type==='em.modes2d'){const v=p.effective_index?.values;if(p.effective_index?.unit!=='1'||!Array.isArray(v)||!v.length||!v.every(row=>Array.isArray(row)&&row.length&&row.every(finite)))fail(`${r}'s ${physicsLabel(name)} effective index is not well formed.`);}
+  if(p.type==='em.modes2d'&&!indexSeries(p.effective_index))fail(`${r}'s ${physicsLabel(name)} effective index is not well formed.`);
  }
  if(run.maps==='not kept'){const c=run.counts;if(!isObject(c)||!Number.isInteger(c.nodes)||c.nodes<1||!Number.isInteger(c.triangles)||c.triangles<1)fail(`${r} keeps no maps and no node and triangle counts.`);
   if('mesh' in result)fail(`${r} says its maps are not kept but holds a mesh.`);}
@@ -285,8 +293,7 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
   const what=`The without-heater result of ${physicsLabel(name)}`;
   if(!isObject(raw)||typeof raw.job!=='string'||!/^mp-[0-9a-f]{12}$/.test(raw.job)||typeof raw.completedAt!=='string'||!Number.isFinite(Date.parse(raw.completedAt)))fail(`${what} is not well formed.`);
   documentSize(raw.document,what);
-  const v=raw.result?.effective_index?.values;
-  if(raw.result?.type!=='em.modes2d'||raw.result?.effective_index?.unit!=='1'||!Array.isArray(v)||!v.length||!v.every(row=>Array.isArray(row)&&row.length&&row.every(finite)))fail(`${what} is not well formed.`);
+  if(raw.result?.type!=='em.modes2d'||!indexSeries(raw.result?.effective_index))fail(`${what} is not well formed.`);
   if(typeof raw.digest!=='string'||raw.digest!==recordDigest(raw))fail(`${what} changed after it was saved (its check value does not match).`);
   if(!baselineTied(name,raw,tied))fail(`${what} belongs to no run in this file and not to its model.`);
   baselines[name]={job:raw.job,completedAt:new Date(raw.completedAt).toISOString(),document:raw.document,result:raw.result};

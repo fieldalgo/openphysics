@@ -78,15 +78,15 @@ py -3.12 -m venv "$HOME\op-studio"
    **Centre on x = 0**을 누를 필요가 없습니다. 재료는 실리콘, 파장은 1550 nm이며 단계
    표시줄에 *4. Study · Ready to run*과 그 옆의 **λ 1550 nm**가 나옵니다. **λ 1550 nm**는
    **Study → Edit wavelength**처럼 **Physics › Optical modes**의 파장 입력란을 엽니다.
-3. **Run optical study**를 누릅니다. 결과에 장 분포와 두 후보의 유효굴절률이 나오고 Study
+3. **Run optical study**를 누릅니다. 결과에 장 분포와 모드 표(Mode, n_eff, Polarization, Loss)가 나오고 Study
    단계는 *Run complete*가 됩니다. **Run name**에 이름(예: *design A*)을 입력하고 Enter를
    누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지 않습니다(**Unpin this run**으로 해제하며
    별도의 Pin 버튼은 없습니다). n_eff는 어디서나 소수 8자리이고, 장 그림과 점 조회는 입력과 같은
    nm를 씁니다.
 4. 다시 **Geometry**에서 폭을 700 nm로 바꾸고 실행합니다.
-5. **Compare**를 엽니다. A와 B가 자동으로 골라지고, 표에 후보 순위마다 A와 B의 n_eff,
+5. **Compare**를 엽니다. A와 B가 자동으로 골라지고, 표에 모드 순위마다 A와 B의 n_eff,
    Δ (B − A), A 대비 Δ %가 두 장 그림 아래에 나오며 열 머리글에 각 실행의 이름, 크기, 파장이 붙습니다.
-   후보 순위는 같은 모드끼리 짝지은 것이 아닙니다.
+   모드 순위는 같은 모드끼리 짝지은 것이 아닙니다.
 
 ## 5. 작업 남기기
 

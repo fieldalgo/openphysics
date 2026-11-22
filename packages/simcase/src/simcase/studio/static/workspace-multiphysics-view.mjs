@@ -5,11 +5,12 @@
 // drawn from the document's couplings, Messages from the live check, the run with progress per
 // physics and loop, and Results per physics with the coupling check. The model is its document
 // (workspace-multiphysics.mjs); the server checks and runs it (/api/multiphysics/*).
+import {POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
  mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
- runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,CANDIDATE_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
+ runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,RANKING_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {persistenceTitle,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
@@ -435,7 +436,12 @@ export function createMultiphysicsView(ctx){
    const head=alone?`<th>n_eff without heater${valid?'':' (other model)'}</th><th>Δn_eff (coupled − without heater)</th>`:'';
    const cells=(row,k)=>{if(!alone)return '';const a=alone.rows[k];return `<td data-neff-alone="${row.mode}" data-neff-value="${a?.value??''}">${a?a.value.toFixed(8):'—'}</td><td data-neff-shift="${row.mode}">${a&&valid?shiftText(row.value,a.value):'—'}</td>`;};
    const note=!coupled?'':solving?`Solving ${esc(physicsLabel(id))} without heater…`:valid?esc(baselineText(lastRun.doc,id)):alone?`The without-heater column was solved from a different optical model. Run ${esc(physicsLabel(id))} alone to refresh.`:failed?`The run without heater ${failed==='stopped'?'was stopped':'failed: '+esc(failed)}. Run ${esc(physicsLabel(id))} alone to try again.`:`An n_eff without heater appears here when “Also solve without heater” beside Run is on, or run ${esc(physicsLabel(id))} alone.`;
-   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Candidate</th><th>n_eff${coupled?' (coupled)':''}</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Candidate ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(CANDIDATE_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
+   const identity=physicsModes(p),table=modeTableRows(identity.modes,{missing:identity.missing});
+   // the table holds the first study point's modes; rows of a later point keep their columns
+   const cellOf=row=>row.point===0?table.rows[row.mode-1]:undefined;
+   const polarization=row=>{const r=cellOf(row);if(!r)return '<td>—</td>';const c=r.polarization;return c?`<td data-polarization="${row.mode}" title="${esc(c.title)}"${c.rowspan>1?` rowspan="${c.rowspan}"`:''}>${esc(c.text)}</td>`:'';};
+   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th><th title="${esc(POLARIZATION_HELP)}">Polarization</th><th>Loss</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Mode ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${polarization(row)}<td data-loss="${row.mode}">${esc(cellOf(row)?.loss??'—')}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(RANKING_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
+    `<p class="muted" data-mp-polarization-note>Polarization: ${esc(POLARIZATION_HELP)}${identity.source?'; '+esc(SOURCE_TEXT[identity.source]):identity.missing?' · '+esc(identity.missing):''}.</p>`+(table.lossless?`<p class="muted" data-mp-lossless>${esc(LOSSLESS_NOTE)}</p>`:'')+
     (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    // the answer first, then the coupled input it was solved from
    if(coupled&&!kept)host.insertAdjacentHTML('beforeend',`<p class="mp-no-maps" data-mp-no-maps>${esc(MAPS_NOT_KEPT)}</p>`);

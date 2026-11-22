@@ -287,10 +287,13 @@ try {
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
-  assert.equal(await page.text('.mp-neff thead'), 'Candidate n_eff (coupled) n_eff without heater Δn_eff (coupled − without heater)');
-  // the rows are candidates, with the optical caveat and the mode count the model asks for
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-neff tbody tr')].map(r=>r.cells[0].textContent)"), ['Candidate 1']);
-  assert.equal(await page.text('#mp-candidate-note'), 'Candidates are ranked by effective index and are not matched between designs. This model asks for 1 mode: Modes 1 › Modes to find');
+  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Loss n_eff without heater Δn_eff (coupled − without heater)');
+  // the rows are modes, with the engine's polarization, lossless, the ranking sentence and the mode count the model asks for
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-neff tbody tr')].map(r=>r.cells[0].textContent)"), ['Mode 1']);
+  assert.match(await page.text('[data-polarization="1"]'), /^TE-like · \d+\.\d % TE$/);
+  assert.equal(await page.text('[data-loss="1"]'), 'lossless');
+  assert.equal(await page.text('[data-mp-lossless]'), 'Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+  assert.equal(await page.text('#mp-candidate-note'), 'Modes are ranked by effective index. This model asks for 1 mode: Modes 1 › Modes to find');
   assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
   const shown = await page.attr('[data-neff="1"]', 'data-neff-value');
   const documentSent = JSON.parse(await page.eval("fetch('/api/multiphysics/template').then(r=>r.text())"));

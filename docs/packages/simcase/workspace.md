@@ -98,11 +98,11 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
    replace it. There is no separate Pin button: **Unpin this run** releases a pinned run,
    and Enter in Run name pins a named run again. Change the model and run again,
-   then use **Compare** to choose A/B, candidate, component, probe and line profile.
+   then use **Compare** to choose A/B, mode, component, probe and line profile.
    The two field plots come first, headed by the side and the run (a run named *A* on side
-   A is not named twice); below them a table lists, for each candidate rank, n_eff of A
+   A is not named twice); below them a table lists, for each mode rank, n_eff of A
    and B, Δ (B − A) and Δ % of A; its column headers name each run (name, size, λ).
-   n_eff has 8 decimals everywhere (results, candidate list, Compare).
+   n_eff has 8 decimals everywhere (results, mode list, Compare).
 6. **Save session**, the first save button, creates a portable file with the model,
    retained results and view settings, named from the application and the local
    date-time (for example `optical-waveguide-session-2026-11-21-1305.json`) in the
@@ -150,7 +150,7 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 
 Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
 the model. Use **Open session** to replace both model and notebook. *Result for these
-inputs* and *Inputs changed since this result* say which design a result belongs to; candidate ranks do not
+inputs* and *Inputs changed since this result* say which design a result belongs to; mode ranks do not
 establish mode correspondence between designs.
 
 ## Working with a model
@@ -179,7 +179,7 @@ exactly in the solver document. Set the wavelength (1400–1700 nm) in
 with one 500 × 220 nm silicon core at 1550 nm and 30 nm. The core mesh size applies
 to those guiding materials; silica, air, CaF2 and MgF2 shapes use the graded
 background mesh. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
-boundaries and two candidates. Each result shows the shapes, wavelength and core
+boundaries and two modes. Each result shows the shapes, wavelength and core
 mesh it used.
 
 Material indices are evaluated at the chosen wavelength; the lower limit stays
@@ -412,9 +412,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   0 K”). Heat 1 shows the temperature map. Modes 1 shows the answer first, the n_eff table, and
   below it the maps of its coupled input: the temperature and the refractive index (or its
   change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
-  core. The n_eff table names its rows *Candidate 1*, …, and the note under it gives the optical
-  application's caveat, “Candidates are ranked by effective index and are not matched between
-  designs.”, and the number of modes the model asks for, “This model asks for 1 mode: Modes 1 ›
+  core. The modes table has the optical application's columns, | Mode | n_eff | Polarization |
+  Loss | ([Modes table](#modes-table)), names its rows *Mode 1*, …, and the note under it gives the
+  ranking sentence, “Modes are ranked by effective index.”, and the number of modes the model asks for, “This model asks for 1 mode: Modes 1 ›
   Modes to find”, a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
   what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
@@ -587,10 +587,41 @@ mesh shared between runs, adding runs from a file, and mode fields of coupled ru
 
 ## Results and files
 
-The notebook retains up to six successful runs, preserving pinned references. Select a candidate to inspect
-its field or compare two runs. Candidate indices are not a mode-tracking result.
-Field colours use the vector magnitude normalized separately per candidate;
+The notebook retains up to six successful runs, preserving pinned references. Select a mode to inspect
+its field or compare two runs. Mode numbers are ranks, not a mode-tracking result.
+Field colours use the vector magnitude normalized separately per mode;
 they do not represent optical power or a common physical colour scale.
+
+### Modes table
+
+Results show one table per run, | Mode | n_eff | Polarization | Loss |, in the optical
+application and in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.”
+Every value is defined on the saved centroid field `unnormalized_electric_field`, so Studio, the
+engine and older session files give the same number from the same samples:
+
+- **Polarization** is the TE fraction `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)` over every
+  triangle of the window (the column help: “TE = share of |E_x|² in |E_x|² + |E_y|², x
+  horizontal”), shown as a word and the TE percentage, e.g. *TE-like · 98.2 % TE*. Studio's words
+  are **TE-like** at f_TE ≥ 0.9, **TM-like** at f_TE ≤ 0.1, otherwise **hybrid**; the engine saves
+  only the number (`te_polarization_fraction`, [result format](overview.md#mode-post-processing)).
+- **Degenerate pairs**: two adjacent modes of one run whose Re n_eff differ by at most 1e-4 share one
+  merged cell (shown only when both have a fraction), *pair (n_eff within 0.0001) · 50 % TE together*, the mean of their two fractions;
+  its tooltip says each member's polarization is not defined (any rotation within the pair is a
+  solution). The field view's mode picker names a member *pair*.
+- **Loss** is `propagation_loss` / 100 in dB/cm to 4 significant digits, where `propagation_loss
+  = (40π / ln 10) · Im n_eff / λ0` in dB/m (exp(−iωt), Im n_eff > 0 is loss). Where Im n_eff is
+  exactly 0 the row reads *lossless*, and once below the table: “Lossless: all materials have k =
+  0 at this wavelength. Leakage and radiation are not computed in a closed window.” The optical
+  application's materials are lossless.
+- The field view's mode picker reads *Mode 1 · TE-like · n_eff 2.44406001*.
+
+Run details say where the fraction came from: *computed by the engine from the saved field* for
+a run computed in this tab, *computed by Studio from the saved field* for a run opened from a
+session file (optical versions 6 and 7 store the samples, not the fraction; the files are
+written exactly as before). Multiphysics runs take the engine's value; a version 8 run saved
+before Studio kept it, or a scalar-formulation run, shows “—” (its tooltip says *Run again to
+compute*, or that the scalar formulation has no polarization). Version 8 files now also read a
+complex effective index `{re, im}`. The run-table CSV keeps its `candidate` column name.
 
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
@@ -641,7 +672,7 @@ version 7; version 6 is the content of version 5 for files of version 6 and the 
 `optical-shapes-v7` declare the window in nm, at most eight
 shapes and twelve polygon vertices, the shape types and the ten materials with their
 `physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
-strings), the fixed window, boundary and candidate settings (`mode_count`),
+strings), the fixed window, boundary and mode settings (`mode_count`),
 `optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
@@ -721,7 +752,7 @@ field. The readout identifies that triangle and its centroid; a point outside
 the captured mesh reports no sample. At shared edges, the last drawn triangle
 is chosen consistently. Degenerate cells are ignored.
 
-Candidate/component changes update the readout with the same vector-normalized
+Mode/component changes update the readout with the same vector-normalized
 scale used by the plot. **Clear point** removes the marker. Probe selection is
 view state stored in session JSON and browser notebook recovery. Field PNG
 exports include the marker and its coordinates when selected. These samples do
@@ -815,8 +846,8 @@ keep their existing API.
 Results and Compare include an expandable Line profile and CSV panel. Choose a
 horizontal line (constant y) or vertical line (constant x), enter its fixed
 coordinate in nanometres, and select Show profile. Both comparison runs use the
-same line and 0–1 relative scale; each candidate retains its own max|E| denominator.
-Changing candidate/component updates the profile. Line choices are view state saved with the session and browser notebook recovery.
+same line and 0–1 relative scale; each mode retains its own max|E| denominator.
+Changing mode/component updates the profile. Line choices are view state saved with the session and browser notebook recovery.
 
 Each plotted step is the stored centroid value of the triangle intersected by
 that interval. There is no field interpolation, smoothing, absolute-power estimate
@@ -921,7 +952,7 @@ identity visible above the optical interface properties.
 An open line-profile panel draws an amber dashed slice on each field plot when
 that line intersects the visible window. The graph uses the full domain even
 when the field view is zoomed to the core. Export profile PNG includes axes,
-normalization, candidate, line location, job IDs, geometry, materials and origins.
+normalization, mode, line location, job IDs, geometry, materials and origins.
 Field PNG exports also annotate an active profile line. Comparison plot rows stay
 aligned when run labels wrap to multiple lines.
 

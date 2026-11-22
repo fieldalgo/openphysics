@@ -86,10 +86,10 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
    않습니다. 별도의 Pin 버튼은 없으며, **Unpin this run**으로 해제하고 Run name에서 Enter를 누르면 이름 붙은
    실행을 다시 고정합니다. 모델을 변경해
-   다시 실행한 뒤 **Compare**에서 A/B, 후보, 성분, probe와 단면을 선택합니다.
+   다시 실행한 뒤 **Compare**에서 A/B, 모드, 성분, probe와 단면을 선택합니다.
    두 장(field) 그림이 먼저 나오고, 제목은 쪽과 실행으로 이루어집니다(A 쪽의 *A*라는 이름의 실행은
-   이름을 두 번 쓰지 않음). 그 아래 표에는 후보 순위마다 A와 B의 n_eff, Δ (B − A), A 대비 Δ %가
-   나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 후보 목록,
+   이름을 두 번 쓰지 않음). 그 아래 표에는 모드 순위마다 A와 B의 n_eff, Δ (B − A), A 대비 Δ %가
+   나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
    Compare) 소수 8자리입니다.
 6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
    파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
@@ -134,7 +134,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
 모두 교체하려면 **Open session**을 사용합니다. *Result for these inputs*와 *Inputs changed
 since this result* 표시는 결과의
-설계 출처를 나타내며, 서로 다른 설계의 후보 번호는 동일 모드를 보장하지 않습니다.
+설계 출처를 나타내며, 서로 다른 설계의 모드 순위는 동일 모드를 보장하지 않습니다.
 
 ## 모델 편집
 
@@ -158,7 +158,7 @@ Heated silicon waveguide 애플리케이션은 정상 열전도와 광 모드를
 **Optical modes**, 코어 메시 크기(20–60 nm)는 **Mesh**에서 정하며 새 모델은 500 × 220 nm
 실리콘 코어 하나와 1550 nm, 30 nm로 시작합니다. 코어 메시는 이 고굴절 재료
 형상에 적용하고 실리카·공기·CaF2·MgF2 형상은 점진적 배경 메시를 사용합니다. 계산창
-[-1.5, 1.5, -1.2, 1.2] µm, PEC 경계, 후보 두 개는 고정됩니다. 결과마다 사용한
+[-1.5, 1.5, -1.2, 1.2] µm, PEC 경계, 모드 두 개는 고정됩니다. 결과마다 사용한
 형상·파장·코어 메시를 표시합니다.
 
 재료 굴절률은 선택한 파장에서 계산하며, 하한은 실리콘 데이터 범위 안에 있습니다.
@@ -354,9 +354,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
-  서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. n_eff 표의 행은
-  *Candidate 1*, …이고, 표 아래 문장은 광 애플리케이션과 같은 주의 “Candidates are ranked by
-  effective index and are not matched between designs.”와 모델이 요청한 모드 수 “This model asks
+  서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. 모드 표는 광 애플리케이션과
+  같은 열 | Mode | n_eff | Polarization | Loss |([모드 표](#모드-표))를 쓰고 행은 *Mode 1*, …이며, 표 아래
+  문장은 순위 문장 “Modes are ranked by effective index.”와 모델이 요청한 모드 수 “This model asks
   for 1 mode: Modes 1 › Modes to find”(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
   소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
@@ -505,9 +505,35 @@ waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은
 
 ## 결과와 파일
 
-고정한 기준 실행을 유지하면서 성공한 실행 최대 여섯 개를 보관합니다. 후보의 장 분포를 보거나 두 실행을
-비교할 수 있습니다. 후보 번호는 모드 추적 결과가 아닙니다. 장 색상은 후보마다
+고정한 기준 실행을 유지하면서 성공한 실행 최대 여섯 개를 보관합니다. 모드의 장 분포를 보거나 두 실행을
+비교할 수 있습니다. 모드 번호는 순위이며 모드 추적 결과가 아닙니다. 장 색상은 모드마다
 벡터 크기를 따로 정규화한 값이며, 광학 전력이나 공통 물리 색상 척도가 아닙니다.
+
+### 모드 표
+
+결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Loss |가 광 애플리케이션과 다중물리 모델의
+Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.” 모든 값은 저장된 중심 장
+`unnormalized_electric_field`에서 정의되므로 Studio, 엔진, 이전 세션 파일이 같은 샘플에서 같은 값을 얻습니다.
+
+- **Polarization**은 창의 모든 삼각형에 대한 TE 비율 `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)`입니다(열
+  도움말: “TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal”). 낱말과 TE 백분율로 보여 줍니다(예:
+  *TE-like · 98.2 % TE*). Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
+  **hybrid**이며, 엔진은 수만 저장합니다(`te_polarization_fraction`, [결과 형식](overview.md)).
+- **축퇴 쌍**: 한 실행에서 Re n_eff 차이가 1e-4 이하인 이웃한 두 모드는(둘 다 비율이 있을 때) 합친 칸 하나 *pair (n_eff within 0.0001) ·
+  50 % TE together*(두 비율의 평균)를 씁니다. 도움말은 각 모드의 편광이 정의되지 않는다고 밝힙니다(쌍 안의
+  어떤 회전도 해입니다). 장 보기의 모드 선택은 그 모드를 *pair*로 부릅니다.
+- **Loss**는 `propagation_loss` / 100을 dB/cm로 유효숫자 4자리까지 보인 값이며, `propagation_loss = (40π / ln 10)
+  · Im n_eff / λ0`(dB/m, exp(−iωt), Im n_eff > 0이 손실)입니다. Im n_eff가 정확히 0이면 행에 *lossless*를
+  쓰고, 표 아래에 한 번 “Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not
+  computed in a closed window.”를 씁니다. 광 애플리케이션의 재료는 무손실입니다.
+- 장 보기의 모드 선택은 *Mode 1 · TE-like · n_eff 2.44406001*처럼 읽힙니다.
+
+Run details는 비율의 출처를 밝힙니다. 이 탭에서 계산한 실행은 *computed by the engine from the saved
+field*, 세션 파일에서 연 실행은 *computed by Studio from the saved field*입니다(광 버전 6과 7은 비율이 아니라
+샘플을 저장하며, 파일은 이전과 똑같이 써집니다). 다중물리 실행은 엔진 값을 씁니다. Studio가 그 값을 보관하기
+전에 저장한 버전 8 실행이나 스칼라 정식화 실행은 “—”를 보여 줍니다(도움말: *Run again to compute*, 또는 스칼라
+정식화에는 편광이 없음). 버전 8 파일은 이제 복소 유효 굴절률 `{re, im}`도 읽습니다. 실행 표 CSV의 `candidate`
+열 이름은 그대로입니다.
 
 입력 JSON은 설계를, 세션 JSON은 검증된 결과까지 저장합니다. 열기로 복원하며
 입력 파일은 64 KiB, 세션은 16 MiB로 제한합니다. CSV·PNG 내보내기도 제공합니다.
@@ -543,7 +569,7 @@ CSV/PNG 내보내기에도 반영합니다.
 있는 `diagnostics`용)과
 `optical-shapes-v7` 어댑터는 nm 단위 계산창, 최대 형상 여덟 개·다각형 꼭짓점 열두 개,
 형상 종류와 `physmat:` 이름을 가진 재료 열 가지, 파장 1400–1700 nm와 코어 메시 20–60 nm
-범위(양 문자열), 고정된 계산창·경계·후보 조건(`mode_count`), `optical: true`, `coupled: false`,
+범위(양 문자열), 고정된 계산창·경계·모드 조건(`mode_count`), `optical: true`, `coupled: false`,
 `simcase_version`을 알립니다. 계약이 없거나 다르면 실행을 차단하며
 **Check connection**으로 재시도합니다. 실행 시 보고된 simcase 패키지 버전을
 실행 당시 형상·파장·코어 메시와 함께 기록하고 세션 JSON에도 보존합니다. 이전 capability
@@ -619,7 +645,7 @@ Results 또는 Compare에서 그림 내부를 클릭하거나 x/y 좌표(nm)를 
 표시하고, 메시 밖이면 샘플이 없음을 알립니다. 공유 경계에서는 마지막으로 그린
 삼각형을 일관되게 선택하고 퇴화한 셀은 제외합니다.
 
-후보·성분 변경 시 그림과 같은 벡터 정규화 기준으로 값을 갱신합니다.
+모드·성분 변경 시 그림과 같은 벡터 정규화 기준으로 값을 갱신합니다.
 **Clear point**는 표시를 지웁니다. 조회 위치는 뷰 상태이며 세션 JSON과 브라우저 노트북 복구에
 저장합니다. 장 PNG에는 선택한 표시와 좌표를 포함합니다. 이 조회는
 수렴 검증이나 물리적인 절대 장 크기를 의미하지 않습니다.
@@ -700,8 +726,8 @@ Studio를 다시 켜면 저절로 다시 연결합니다. **Check connection**�
 
 Results와 Compare의 Line profile and CSV를 펼쳐 가로(y 고정) 또는 세로(x 고정)
 단면을 선택하고 고정 좌표를 nm로 입력한 뒤 Show profile을 누릅니다. 비교하는 두
-실행은 같은 선과 0–1 상대 척도를 사용하되 각 후보의 max|E| 정규화 분모는 유지합니다.
-후보/성분을 바꾸면 그래프도 갱신합니다. 단면 설정은 뷰 상태이며 세션과 브라우저 노트북 복구에
+실행은 같은 선과 0–1 상대 척도를 사용하되 각 모드의 max|E| 정규화 분모는 유지합니다.
+모드/성분을 바꾸면 그래프도 갱신합니다. 단면 설정은 뷰 상태이며 세션과 브라우저 노트북 복구에
 저장합니다.
 
 각 계단 구간은 해당 삼각형에 저장된 중심 값을 표시합니다. 장 보간·평활화·절대
@@ -795,7 +821,7 @@ Results/Compare → **Add runs from file (inputs unchanged)**에서 세션 파�
 
 단면 패널을 열면 해당 선이 현재 보기 범위 안에 있을 때 각 장 그림에 주황 점선으로
 표시합니다. 장 그림이 코어 주변 보기여도 단면 그래프는 전체 계산 영역을 사용합니다.
-Export profile PNG에는 축·정규화·후보·단면 위치·작업 ID·형상·재료·출처를 포함하며,
+Export profile PNG에는 축·정규화·모드·단면 위치·작업 ID·형상·재료·출처를 포함하며,
 장 PNG에도 활성 단면 위치를 표기합니다. 비교 실행 제목이 여러 줄로 바뀌어도 두
 그림의 좌표 행을 나란히 유지합니다.
 
