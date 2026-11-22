@@ -349,7 +349,7 @@ Korean page, and record its package NOTICE if it is bundled or copied.
 ## Stored-tool inventory
 
 `external_tools` in `tools/third_party_licenses.json` records provenance separately from installed dependencies.
-NGSolve is stored-only and has no value records yet. modesolver is stored-only with one record, `soi_strip_modes`. EMpy is stored-only; its generator is tracked beside its record directory and its record `strip_square_modes` is added once generated. The loader and audit follow
+NGSolve is stored-only and has no value records yet. modesolver is stored-only with one record, `soi_strip_modes`. EMpy is stored-only with one record, `strip_square_modes`, written by its tracked generator in a separate environment. The loader and audit follow
 [stored reference values](stored-reference-values.md); dependency admission rules are unchanged.
 
 ## Reference import boundaries
@@ -361,7 +361,7 @@ NGSolve is stored-only and has no value records yet. modesolver is stored-only w
 | `symfem` | live | Existing permissive element comparisons; required CI |
 | `ngsolve` | stored | Separate generation environment; no value records committed yet |
 | `modesolver` | stored | Separate generation environment; one value record (`tests/simcase/reference_values/modesolver/soi_strip_modes.json`) |
-| `empy` | stored | Separate generation environment; the tracked generator `tests/simcase/reference_values/empy/generate_strip_square_modes.py` is its only importer |
+| `empy` | stored | Separate generation environment; one value record (`tests/simcase/reference_values/empy/strip_square_modes.json`); the tracked generator beside it is its only importer |
 
 The static zone check reads git-tracked Python source without importing it.
 Non-permissive references may be loaded only lazily inside listed test functions,

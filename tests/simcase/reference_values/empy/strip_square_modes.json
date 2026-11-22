@@ -1,0 +1,309 @@
+{
+ "schema": "openphysics.reference-values/1",
+ "case": "strip_square_modes",
+ "physics": "em.modes2d vector, lossless SOI strip and 400 x 400 nm square core: n_eff and TE fraction",
+ "comparison": "different-discretization",
+ "role": "code-to-code comparison of n_eff and the TE fraction; not analytical acceptance or convergence evidence",
+ "references": [
+  {
+   "tool": "empy",
+   "version": "2.2.3",
+   "build": "PyPI wheel electromagneticpython-2.2.3-py3-none-any.whl; EMpy.__version__ 2.2.3",
+   "modified": {
+    "value": false,
+    "description": "unmodified PyPI wheel"
+   },
+   "license": "MIT",
+   "source": "https://github.com/lbolla/EMpy",
+   "install": {
+    "kind": "pip",
+    "command": "python -m pip install --require-hashes --only-binary :all: -r tests/simcase/reference_values/empy/requirements.txt",
+    "lock": "tests/simcase/reference_values/empy/requirements.txt (hash-pinned)"
+   },
+   "settings": {
+    "function": "scipy.sparse.linalg.eigs on EMpy.modesolvers.FD.VFDModeSolver.build_matrix(), fields by VFDModeSolver.compute_other_fields and FDMode.normalize, in place of VFDModeSolver.solve()",
+    "why": "solve() fixes which=LR with shift-invert, which asks for the eigenvalues just above the shift and did not converge at 20 nm; LM with the shift at the core index gives the highest modes",
+    "which": "LM",
+    "sigma": "(core index k0)^2",
+    "boundary": "SSAA",
+    "k": 4,
+    "tol": 1e-12,
+    "kept": "the two largest guided n_eff of 4, confirmed at the coarsest grid by a second solve with 6 eigenvalues",
+    "grid": "nodes on the window and core edges, each segment in equal cells of at most h"
+   },
+   "discretization": {
+    "kind": "vector finite differences (Fallahkhair, Li, Murphy 2008)",
+    "permittivity": "cell-centred staircase",
+    "grids_um": [
+     0.02,
+     0.01,
+     0.005
+    ]
+   },
+   "arrays": [
+    "*"
+   ],
+   "execution": "in-process",
+   "independence": {
+    "product_loaded": false,
+    "inputs_from_product": true
+   }
+  }
+ ],
+ "generator": {
+  "path": "tests/simcase/reference_values/empy/generate_strip_square_modes.py",
+  "sha256": "5ee714e291daf5e2b21af4292ac79eb5b31c76c6a8859154e8b17b21a23b40d8",
+  "command": "python generate_strip_square_modes.py OUTPUT.json",
+  "product_commit": "16be4aa63cf8665e45241477e68ee077fb5846f0",
+  "clean": true
+ },
+ "generated_utc": "2026-11-22T12:38:36Z",
+ "environment": {
+  "python": "3.12.3",
+  "numpy": "2.5.5",
+  "os": "Linux",
+  "cpu": "x86_64",
+  "dtype": "float64 and complex128",
+  "backend/device": "cpu, SciPy 1.18.1 ARPACK shift-invert"
+ },
+ "cost": {
+  "compile_s": null,
+  "compute_s": 108.3,
+  "wall_time_s": 110.9,
+  "peak_rss_mb": 1639.7,
+  "threads": null,
+  "not_measured": [
+   "BLAS thread count"
+  ],
+  "per_solve_s": {
+   "strip 0.02 um": 4.31,
+   "strip 0.01 um": 11.9,
+   "strip 0.005 um": 54.54,
+   "square 0.02 um": 2.86,
+   "square 0.01 um": 5.64,
+   "square 0.005 um": 29.03
+  }
+ },
+ "inputs": {
+  "vacuum_wavelength_um": 1.55,
+  "core_index": 3.477724,
+  "background_index": 1.444024,
+  "window_um": {
+   "xmin": -1.5,
+   "xmax": 1.5,
+   "ymin": -1.2,
+   "ymax": 1.2
+  },
+  "boundary": "pec on all four walls",
+  "cases": {
+   "strip": {
+    "x": -0.25,
+    "y": 0.0,
+    "w": 0.5,
+    "h": 0.22
+   },
+   "square": {
+    "x": -0.2,
+    "y": 0.0,
+    "w": 0.4,
+    "h": 0.4
+   }
+  },
+  "kept_modes": 2,
+  "te_fraction": "sum A |E_x|^2 divided by sum A (|E_x|^2 + |E_y|^2) over every cell of the window, A the cell area, E at cell centres",
+  "grid": "nodes on every window and core edge; each segment in equal cells of at most the step h",
+  "te_fraction_band": "te_fraction_<case>_d20 and _d40: the same fraction over the cells whose centre lies at a distance of at least 20 or 40 nm from the core rectangle's boundary, inside or outside (inside: the smallest distance to its four edges; outside: the Euclidean distance to the rectangle)",
+  "band_distances_um": [
+   0.02,
+   0.04
+  ]
+ },
+ "matched": [
+  "window and both cores",
+  "PEC on all walls (VFDModeSolver boundary SSAA)",
+  "material indices: physmat Si and SiO2 at 1550 nm, as plain numbers",
+  "the TE fraction definition, weighted by cell area"
+ ],
+ "not_matched": [
+  "discretization: finite differences on a near-uniform rectilinear grid against edge finite elements on a graded mesh",
+  "interfaces: staircase cell-centred permittivity against mesh-conforming interfaces",
+  "samples: cell centres against triangle centroids",
+  "eigen solver"
+ ],
+ "reference_self_check": [
+  "strip: the top two at h = 0.02 um are the same with 4 and with 6 eigenvalues (guided among the 4: [2.45207, 1.78687, 1.50585])",
+  "strip: n_eff with walls 0000 instead of SSAA at h = 0.02 um differs by 9.12e-05",
+  "square: the top two at h = 0.02 um are the same with 4 and with 6 eigenvalues (guided among the 4: [2.63904, 2.63904, 1.78746, 1.57508])",
+  "square: n_eff with walls 0000 instead of SSAA at h = 0.02 um differs by 5.08e-08",
+  "strip: mode 1 n_eff is monotone over h = [0.02, 0.01, 0.005]",
+  "square: mode 1 n_eff is monotone over h = [0.02, 0.01, 0.005]",
+  "largest |Im n_eff| returned: 0.0e+00 (lossless problem)"
+ ],
+ "failed_or_discarded": [],
+ "not_run": [
+  "macOS and Windows",
+  "a repeated run for determinism"
+ ],
+ "values": [
+  {
+   "name": "grid_h_um",
+   "unit": "um",
+   "dtype": "<f8",
+   "shape": [
+    3
+   ],
+   "data": [
+    0.02,
+    0.01,
+    0.005
+   ]
+  },
+  {
+   "name": "neff_strip",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    2.4520740566700923,
+    1.7868661121007041,
+    2.450759826782804,
+    1.7805130422613475,
+    2.449449638935503,
+    1.776711759363142
+   ]
+  },
+  {
+   "name": "te_fraction_strip",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.9398224807315549,
+    0.10034860078159218,
+    0.9492499918108075,
+    0.08572239036810174,
+    0.9529001975752683,
+    0.07976742628373895
+   ]
+  },
+  {
+   "name": "te_fraction_strip_d20",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.9710391027033736,
+    0.05963750418618696,
+    0.98225628801929,
+    0.04480952761107728,
+    0.9849328912474393,
+    0.04111355356452749
+   ]
+  },
+  {
+   "name": "te_fraction_strip_d40",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.9811395621760934,
+    0.04464168089373659,
+    0.985797361373435,
+    0.03831572083786698,
+    0.9873867132426456,
+    0.03613097031440125
+   ]
+  },
+  {
+   "name": "neff_square",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    2.6390391454845243,
+    2.6390390663661814,
+    2.637543027934819,
+    2.637542949226448,
+    2.636569439592219,
+    2.6365693607936005
+   ]
+  },
+  {
+   "name": "te_fraction_square",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.04688528445308292,
+    0.9531146293909003,
+    0.039346410556128135,
+    0.960653517706385,
+    0.036472401009215456,
+    0.9635275326483654
+   ]
+  },
+  {
+   "name": "te_fraction_square_d20",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.023129790063810895,
+    0.9768701475790391,
+    0.01557861528671754,
+    0.984421338593777,
+    0.013763826321185852,
+    0.9862361322386407
+   ]
+  },
+  {
+   "name": "te_fraction_square_d40",
+   "unit": "1",
+   "dtype": "<f8",
+   "shape": [
+    3,
+    2
+   ],
+   "data": [
+    0.014014553251982167,
+    0.9859853910442973,
+    0.011031583474976943,
+    0.9889683712153585,
+    0.010064719292589662,
+    0.9899352392886406
+   ]
+  }
+ ],
+ "values_sha256": "4754243bb85299e8235a539789ad89ca7eb7d11affc2c6e0fda7dc36912f2b17",
+ "content_sha256": "da92b57384ddd95fbf135121bbdd60684b35690b1afe3511cee290a6675bb271",
+ "consumers": [
+  "tests/simcase/test_reference_empy_modes.py"
+ ],
+ "provenance_status": "complete",
+ "not_recorded": {
+  "cost.compile_s": "no compile step; source: generator",
+  "cost.threads": "BLAS threads were left at the default and not logged; source: generator"
+ },
+ "regeneration": []
+}

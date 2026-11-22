@@ -307,7 +307,7 @@ URL을 목록에 항목으로 추가하고, CI 플랫폼마다 그 휠에 묶인
 ## 저장값 도구 목록
 
 `tools/third_party_licenses.json`의 `external_tools`는 설치 의존성과 별개인 출처 목록입니다.
-NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. modesolver 항목은 stored 방식이며 값 기록 `soi_strip_modes` 하나가 있습니다. EMpy 항목은 stored 방식이며, 생성기는 기록 디렉터리 옆에 추적되고 값 기록 `strip_square_modes`는 생성 뒤에 추가됩니다. 로더와 감사 형식은
+NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. modesolver 항목은 stored 방식이며 값 기록 `soi_strip_modes` 하나가 있습니다. EMpy 항목은 stored 방식이며, 추적되는 생성기가 별도 환경에서 쓴 값 기록 `strip_square_modes` 하나가 있습니다. 로더와 감사 형식은
 [저장 레퍼런스 값](stored-reference-values.md)을 따릅니다. 기존 의존성 허용 규칙은 그대로입니다.
 
 ## 레퍼런스 import 경계
@@ -319,7 +319,7 @@ NGSolve 항목은 stored 방식이며 아직 값 기록은 없습니다. modesol
 | `symfem` | live | 기존 허용형 요소 비교; 필수 CI |
 | `ngsolve` | stored | 별도 생성 환경; 아직 값 기록은 커밋되지 않음 |
 | `modesolver` | stored | 별도 생성 환경; 값 기록 하나(`tests/simcase/reference_values/modesolver/soi_strip_modes.json`) |
-| `empy` | stored | 별도 생성 환경; 추적되는 생성기 `tests/simcase/reference_values/empy/generate_strip_square_modes.py`만 import함 |
+| `empy` | stored | 별도 생성 환경; 값 기록 하나(`tests/simcase/reference_values/empy/strip_square_modes.json`); 옆의 추적되는 생성기만 import함 |
 
 정적 구역 검사는 git 추적 Python 소스를 읽으며 실행하거나 import하지 않습니다.
 비허용형 레퍼런스는 목록에 등록된 시험 함수 안에서 늦게, 또는 등록된 생성기·연구에서만

@@ -93,14 +93,14 @@
         "execution": "in-process",
         "modules": ["EMpy"],
         "imported_by": ["tests/simcase/reference_values/empy/generate_strip_square_modes.py"],
-        "values": [],
+        "values": ["tests/simcase/reference_values/empy/strip_square_modes.json"],
         "generators": "tests/simcase/reference_values/empy/generate_strip_square_modes.py",
         "light": {
           "verdict": false,
           "reason": "The stored record is generated once in a separate reference environment from the hash-pinned requirements beside its generator; CI and development sessions never install or run EMpy.",
           "date": "2026-11-22", "runner": "separate reference environment",
-          "python": null, "os": "linux", "install_s": null,
-          "cases_s": null, "peak_rss_mb": null, "pins_unchanged": null, "pip_check": null
+          "python": "3.12.3", "os": "linux", "install_s": null,
+          "cases_s": 111, "peak_rss_mb": 1640, "pins_unchanged": null, "pip_check": null
         }
       }
     }
