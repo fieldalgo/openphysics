@@ -293,7 +293,11 @@ CI에서는 이 job을 `--shard K/8`로 여덟 부분, `installed-tests (1/8)`~`
 Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스와 같은 버전)도 설치하고,
 러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
 설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구, 설계 두 개를 더 만든
-Compare의 모드 짝짓기(500 → 450 nm: 두 모드가 겹침 0.95 이상으로 짝지어지고 선택 목록이 짝지어진 쌍을 나열), 그다음 Joule 가열
+Compare의 모드 짝짓기(500 → 450 nm: 두 모드가 겹침 0.95 이상으로 짝지어지고 선택 목록이 짝지어진 쌍을 나열), 모드 수(Optical
+modes와 Study의 Modes to find가 0, 9, 2.5를 거부하며 Run을 막고 1과 8을 받음, 8을 요청한 템플릿이 *Found 3 of 8 modes above
+n = 1.45*와 세 행을 보임, 모드 8개인 2000 × 400 nm 코어 두 개가 쌍마다 짝지어지고 템플릿과 비교하면 *no match*, 선택 목록이
+모든 쌍을 나열하며 1440 × 900과 390 × 844에 들어맞음, 엔진 값을 가진 버전 9 세션 저장과 열기, 16 MiB를 넘는 모드 8개 실행
+여섯 개에서 먼저 묻고 Cancel은 아무것도 쓰지 않으며 보존한 파일은 장 없는 실행을 엶), 그다음 Joule 가열
 애플리케이션: 기본 띠를 Picard와 Newton으로(반복 횟수, 수지, 온도·전위 범위, 두 방법의 1e-6 K 이내 일치. 영역
 메시가 macOS arm64와 다른 플랫폼에서 달라서 메시에 따라 달라지는 값은 이산화 오차 안에서 확인),
 수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).

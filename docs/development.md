@@ -343,7 +343,12 @@ Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
 session, a server restart with the page open and recovery from the start page, Compare's
 mode matching on two more designs (500 → 450 nm: both modes matched with overlap ≥ 0.95, the
-picker listing matched pairs), then the Joule heating application: the default strip by Picard and by Newton (iteration counts,
+picker listing matched pairs), the number of modes (Modes to find refusing 0, 9 and 2.5 and holding
+Run, accepting 1 and 8, in Optical modes and Study; the template asking for 8 reads *Found 3 of 8
+modes above n = 1.45* with three rows; two 2000 × 400 nm cores of 8 modes matched pair by pair, the
+template against one reading *no match*, the picker listing every pair and fitting at 1440 × 900 and
+390 × 844; a version 9 session saved and opened with the engine's values; six 8-mode runs over
+16 MiB asking first, Cancel writing nothing and the kept file opening a run without fields), then the Joule heating application: the default strip by Picard and by Newton (iteration counts,
 balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the region
 mesh differs between macOS arm64 and the other platforms, so mesh-dependent values are
 checked within the discretization error), a
