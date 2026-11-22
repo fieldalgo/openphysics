@@ -287,7 +287,12 @@ try {
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
-  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Loss n_eff without heater Δn_eff (coupled − without heater)');
+  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Loss A_eff (µm²) n_eff without heater Δn_eff (coupled − without heater)');
+  // A_eff of each mode in µm², the engine's value from this run
+  const areas = await page.eval("[...document.querySelectorAll('.mp-neff [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue)}))");
+  stage('multiphysics A_eff', {areas}); assert.equal(areas.length, 2);
+  for (const a of areas) { assert.match(a.text, /^\d\.\d{4}$/); assert.equal(a.text, (a.value * 1e12).toPrecision(4)); }
+  assert.match(await page.text('[data-mp-area-note]'), /^A_eff: Effective area \(∫\|E\|²\)²\/∫\|E\|⁴ over the window, all three field components; computed by the engine from the saved field\.$/);
   // the rows are modes, with the engine's polarization, lossless, the ranking sentence and the mode count the model asks for
   // the template asks for two modes: TE-like first, then TM-like, whose cell names its TM share first
   assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-neff tbody tr')].map(r=>r.cells[0].textContent)"), ['Mode 1', 'Mode 2']);
