@@ -85,14 +85,20 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 4. Select **Run optical study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
    An input edit replaces the completion message, so it never describes edited inputs.
-   The dock heading and the status bar name the same run: after a run *Run 1 · solved from
-   the current inputs* (the status bar adds *press Run to solve again*), after an edit
-   *Inputs changed since run 1 · press Run to update*, and before any run *Nothing is
-   computed until you press Run* and *Optical adapter ready · explicit Run required*. A run's
-   number is its place in the run list, the oldest first. A current run that this tab did not
+   The dock heading, the status bar, the title and the step bar describe the run being viewed
+   (the selected run), named by its number with its name: after a run *Run 1 · solved from
+   the current inputs* (the status bar adds *press Run to solve again*); when the viewed run has
+   other inputs, after an edit or with an older run selected, *Run 1 · design A · current inputs
+   differ from this run* (the status bar adds *Run 2 has them* when another run has the current
+   inputs, else *press Run to compute them*), and when no input was edited the title adds
+   *viewing Run 1 · design A, which used other inputs*, so the difference does not read as
+   unsaved edits; before any run *Nothing is computed until you press Run* and *Optical adapter
+   ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
-   bar adds *press Run to compute it here*). Run list entries give the time with seconds. While something holds Run (input
+   bar adds *press Run to compute it here*). Run list entries name a run by its number with its
+   name, *Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*, and give the time
+   with seconds; the Compare pickers and headings name runs the same way. While something holds Run (input
    errors, a computation or job in progress, an unsupported input), the heading repeats the
    status bar's words instead.
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
@@ -144,18 +150,23 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    for its edits, and you leave it by choosing another model. Each model's note says what Save
    session keeps of it: the inputs and runs of the optical model, the inputs of steady heat and
    Joule heating (their results stay in the tab), and the heated silicon waveguide with its runs.
-   Opening the heated model over optical runs says in Messages that this tab holds them until it
-   is closed or reloaded and that **Models › Optical waveguide** brings them back, then what holds
-   them after that: **Models › Optical waveguide › Resume** (browser recovery, which keeps the four
-   newest sessions) or **Open session**
-   with the session file that holds them, or that nothing does. While the tab holds no optical
+   Opening the heated model over optical runs says in one line of Messages *Optical waveguide runs
+   stay in this tab · Models › Optical waveguide returns to them*; **More** after it says that the
+   tab holds them until it is closed or reloaded, then what holds them after that: **Models ›
+   Optical waveguide › Resume** (browser recovery, which keeps the four newest sessions) or **Open
+   session** with the session file that holds them, or that nothing does. While the tab holds no optical
    runs and browser recovery holds an optical session, for example after a restart, the Optical
-   waveguide card offers it first, *Resume Optical waveguide · design A, design B · 2:25 PM (this
-   browser)*, next to **Start new**. Every recovery entry names its model, its run count and its
-   runs (a run's name, else *Run N*), for example *Optical waveguide · 2 runs · design A, Run 2*,
-   and the session file its record was opened from or last sent to (*· file …json*). Each stored
-   session is listed once, newest first: an entry whose session equals a newer one's but for its
-   view (page, selection, field view) is not shown, and the session open in this tab is not offered. The start page uses
+   waveguide card offers it first, *Resume Optical waveguide · Run 1 · design A, Run 2 · file
+   …json · 2:25 PM (this browser)*, next to **Start new**; the box above the cards then lists only
+   the other sessions, and when there are none **Open session file (portable)…** and its note
+   are beside the card's Resume instead. Every recovery entry names its
+   model, its run count and its runs (*Run N*, with the run's name if it has one), for example
+   *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
+   opened from or last sent to (*· file …json*). Each stored session is listed once, newest first:
+   records with the same inputs (or model) and runs are one session even when their view (page,
+   field view), selected run, Compare choice, the runs' origin (computed here, opened from a file
+   or recovered), file link or save time differ. The newest is shown, naming the file if any of
+   the merged records named one, and the session open in this tab is not offered. The start page uses
    one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
@@ -163,11 +174,15 @@ Use **Add runs from file (inputs unchanged)** to add results to the current note
 the model. Use **Open session** to replace both model and notebook. *Result for the current
 inputs* and *Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 ×
 300 nm · Silicon* (only the parts that differ: geometry, wavelength, core mesh) say which design a
-result belongs to, in Results and in the selected run's settings; the step bar's Results step
+result belongs to, in Results and in the selected run's settings. The line under the Results
+heading names each part once: the parts that differ with both values, then the others,
+*…, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm*; the step bar's Results step
 describes the run shown (*Result for these inputs* or *Current inputs differ from this run*), and
 clicking it shows that run. Steady heat and Joule heating results use the same words. In optical
 Results the modes table comes first, then the field plot with its sample and line profile. Between
-designs, Compare pairs modes by field overlap, not by rank.
+designs, Compare pairs modes by field overlap, not by rank; the dock note on Results and Compare
+reads *Each result keeps the inputs it was run with · Compare matches modes by field overlap ·
+convergence not certified*.
 
 ## Working with a model
 
@@ -537,7 +552,8 @@ opening there. This section is the public statement of the format.
   the record without its `digest`, written as JSON with the keys of every object sorted and
   the same number rules. It detects a truncated, damaged or hand-edited file. It is not an
   authentication: whoever edits a file can recompute it, so opened results still read
-  “Loaded from file, not recomputed. Studio checks the file for damage, not who made it.”
+  “Loaded from file, not recomputed; the file passed its damage check (this does not show who
+  made it).”
   Recovered results read “Recovered from this browser, not recomputed.” An optical session
   file carries no digest; its opened results read “Loaded from file, not recomputed. Studio
   checks that the file is well formed, not who made it.”
@@ -633,11 +649,17 @@ engine and older session files give the same number from the same samples:
   mesh splits a symmetric pair (a square core) by 1e-4 to 6e-4 at 40 to 10 nm, below the solver's
   n_eff error at those meshes. A mesh split above 1e-3, possible on very coarse meshes, is not
   flagged, and a member's polarization is then a rotation chosen by the mesh.
-- **Loss** is `propagation_loss` / 100 in dB/cm to 4 significant digits, where `propagation_loss
-  = (40π / ln 10) · Im n_eff / λ0` in dB/m (exp(−iωt), Im n_eff > 0 is loss). Where Im n_eff is
-  exactly 0 the row reads *lossless*, and once below the table: “Lossless: all materials have k =
-  0 at this wavelength. Leakage and radiation are not computed in a closed window.” The optical
-  application's materials are lossless.
+- **Loss** comes from Im n_eff: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100 with k0 = 2π / λ0 in
+  1/m (exp(−iωt), Im n_eff > 0 is loss), the engine's `propagation_loss = (40π / ln 10) · Im n_eff
+  / λ0` in dB/m divided by 100, shown to 4 significant digits (*37.49 dB/cm*). Where Im n_eff is
+  exactly 0 the row reads *0 dB/cm*; the cell's help and the note below the table say this zero is
+  absorption only: “Absorption only: all materials have k = 0 at this wavelength. Leakage and
+  radiation are not computed in a closed window.” There is no threshold: a nonzero Im n_eff,
+  however small, is shown as it is. The engine returns a complex n_eff only for a material with
+  k > 0 or a PML; a lossless problem gives a real n_eff, whose Im is exactly 0. The optical
+  application's materials and the heated template are lossless, so they read 0 dB/cm; a
+  multiphysics session or model file can hold a complex n_eff (a lossy material or a PML), whose
+  loss is shown as a number. Loss is display only: the result and session formats are unchanged.
 - The field view's mode picker reads *Mode 1 · TE-like · n_eff 2.44406001*.
 
 Run details say where the fraction came from: *computed by the engine from the saved field* for
@@ -736,7 +758,8 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
   0.8 on a common grid. A low overlap means the mode changed shape between designs.”
 - **Field picker.** *Matched modes* lists the matched pairs (*A mode 1 ↔ B mode 1 · overlap
-  0.99*; the members of a matched degenerate pair read *pair, any rotation*), and the two plots
+  0.99 · TE-like*, the polarization word once when A and B agree, else *A TE-like, B
+  hybrid*; the closed picker spans the pane, so the whole pair shows; the members of a matched degenerate pair read *pair, any rotation*), and the two plots
   and the line profile show the chosen pair. With no match the picker is disabled and the plots
   show mode 1 of each run, marked *not matched*. The choice is not saved: session files are
   written exactly as before.
@@ -951,7 +974,10 @@ solver is started. Input-only recovery and pending-job recovery remain separate.
 
 Starting new work without recovering does not discard the stored session. The first
 automatic save after a page opens moves the stored session to the earlier sessions,
-newest first, keeping at most three. That save keeps a session once, compared without its view:
+newest first, keeping at most three. That save keeps a session once, compared without its view,
+its selected run, its Compare choice and its runs' origin (before this, opening a session file or
+recovering re-marked every run's origin, so a new page's first save kept the stored copy of the same
+runs as a second earlier session):
 when the session written equals the stored one (the same file opened again) the stored record is
 replaced, not moved, and an earlier copy of either (the unchanged model saved again after the tab
 moved to another model and back) is dropped. The lists hide any copy left. Browser recovery also keeps the name of the session file the notebook was

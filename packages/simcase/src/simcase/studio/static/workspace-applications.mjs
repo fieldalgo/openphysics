@@ -20,7 +20,8 @@ export function templatePhysics(id){
 // The runs of a stored session by name, oldest first: a run's name, else "Run <number>" (an
 // optical run is numbered by its place in the list, a multiphysics run by its own number).
 export function sessionRunNames(session){
- return (session?.runs||[]).map((run,i)=>run.label||`Run ${Number.isInteger(run.number)?run.number:i+1}`);
+ // the run number with the name, as the run list names a run: "Run 1 · design A", or "Run 2"
+ return (session?.runs||[]).map((run,i)=>`Run ${Number.isInteger(run.number)?run.number:i+1}`+(run.label?' · '+run.label:''));
 }
 // One stored session as a recovery list names it: the model, the run count, the run names and,
 // when the record came from a session file, that file ("Optical waveguide · 2 runs · design A,
@@ -39,7 +40,7 @@ export function offerTime(savedAt,now=new Date()){
 // browser)", shown before Start new. item: a recovery entry {runs, names, savedAt}.
 export function opticalResumeChoice(item,when=offerTime){
  const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`Resume Optical waveguide · ${names} · ${when(item.savedAt)} (this browser)`};
+ return {label:`Resume Optical waveguide · ${names}${item.file?' · file '+item.file:''} · ${when(item.savedAt)} (this browser)`};
 }
 // What the landing page offers to resume: the latest browser session and the
 // earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
@@ -53,21 +54,22 @@ export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleStri
  return choices;
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
-// onOpenFile(), onStartNew()}; shown above the templates when there is something.
+// onOpenFile(), onStartNew()}; shown above the templates when there is something. The record the
+// Optical waveguide card resumes is not among them (one route to each session).
 function resumeCard(resume){
  const choices=resumeChoices(resume.latest,resume.earlier);if(!choices.length)return null;
  const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
  const heading=document.createElement('h3');heading.id='resume-heading';heading.textContent='Continue where you left off';
  const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
- const portable=document.createElement('p');portable.className='resume-portable';portable.textContent='A session file is the copy that moves between computers; browser recovery stays in this browser.';
+ const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;
  const actions=document.createElement('div');actions.className='resume-actions';
  for(const choice of choices){
   const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?'Recover (this browser only): ':'Recover earlier (this browser only): ')+choice.label;
-  if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.onclick=()=>resume.onLatest(button);}
-  else{button.dataset.resumeEarlier=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
+  if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
+  else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);
  }
- const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file (portable)…';open.onclick=()=>resume.onOpenFile();
+ const open=openFileButton(resume.onOpenFile);
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
  actions.append(open,fresh);card.append(heading,note,actions,portable);return card;
 }
@@ -81,18 +83,25 @@ export const CHOOSER_NOTES=Object.freeze([
  'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. Save session keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
+const PORTABLE_NOTE='A session file is the copy that moves between computers; browser recovery stays in this browser.';
+const openFileButton=onOpenFile=>{const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file (portable)…';open.onclick=()=>onOpenFile();return open;};
 // The Optical waveguide card with its resume offer under it: Resume first, then Start new.
+// offer.onOpenFile: no box above lists other sessions, so the session file route and its note
+// are here, beside the only other way back.
 function opticalSlot(button,offer){
  const slot=document.createElement('div');slot.className='card-slot';
  const actions=document.createElement('div');actions.className='card-resume';
- const go=document.createElement('button');go.type='button';go.id='resume-optical';go.className='primary';go.textContent=offer.label;go.onclick=()=>offer.onResume(go);
+ const go=document.createElement('button');go.type='button';go.id='resume-optical';go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
  const fresh=document.createElement('button');fresh.type='button';fresh.id='optical-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
- actions.append(go,fresh);slot.append(button,actions);return slot;
+ actions.append(go,fresh);slot.append(button,actions);
+ if(offer.onOpenFile){actions.append(openFileButton(offer.onOpenFile));const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;slot.append(portable);}
+ return slot;
 }
 // optical: the Optical waveguide card's resume offer {label, onResume(button), onStartNew()}, or null.
 export function renderApplications(host,resume=null,optical=null){
  host.replaceChildren();
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
+ if(!card&&resume&&optical)optical={...optical,onOpenFile:resume.onOpenFile};
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';
  const cards=document.createElement('div');cards.className='cards';

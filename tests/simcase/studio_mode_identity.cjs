@@ -29,7 +29,7 @@ test('words: TE-like at f_TE >= 0.9, TM-like at <= 0.1, otherwise hybrid; percen
  assert.equal(M.polarizationWord(.1),'TM-like');assert.equal(M.polarizationWord(.1001),'hybrid');
  assert.equal(M.tePercent(.98213),'98.2 % TE');
  const {rows}=M.modeTableRows([{re:2.44406001,im:0,fte:.98213,loss:null},{re:1.7,im:0,fte:.0123,loss:null}]);
- assert.deepEqual(rows.map(r=>[r.label,r.neff,r.polarization.text,r.loss]),[['Mode 1','2.44406001','TE-like · 98.2 % TE','lossless'],['Mode 2','1.70000000','TM-like · 98.8 % TM (1.2 % TE)','lossless']]);
+ assert.deepEqual(rows.map(r=>[r.label,r.neff,r.polarization.text,r.loss]),[['Mode 1','2.44406001','TE-like · 98.2 % TE','0 dB/cm'],['Mode 2','1.70000000','TM-like · 98.8 % TM (1.2 % TE)','0 dB/cm']]);
  // a TM-like cell names its dominant TM share first; the two shares add to 100.0 as shown
  assert.equal(M.polarizationShare(.0315),'96.9 % TM (3.1 % TE)');assert.equal(M.polarizationShare(.1),'90.0 % TM (10.0 % TE)');assert.equal(M.polarizationShare(0),'100.0 % TM (0.0 % TE)');
  for(let k=0;k<=1000;k++){const f=k/10000,m=/^(\d+\.\d) % TM \((\d+\.\d) % TE\)$/.exec(M.polarizationShare(f));assert.ok(m);assert.equal((Number(m[1])*10+Number(m[2])*10).toFixed(0),'1000');}
@@ -60,13 +60,24 @@ test('degenerate pairs: Re n_eff within 1e-3 (inclusive) make one merged cell wi
  assert.equal(M.modeOptionLabel(0,modes),'Mode 1 · pair · n_eff 2.50000000');
  assert.equal(M.modeOptionLabel(0,[{re:2.44406001,fte:.982},{re:1.7,fte:.01}]),'Mode 1 · TE-like · n_eff 2.44406001');
 });
-test('loss: dB/cm = propagation_loss / 100 to 4 significant digits; "lossless" and its note when Im n_eff = 0',()=>{
+test('loss: dB/cm = propagation_loss / 100 to 4 significant digits; "0 dB/cm" and its absorption-only note when Im n_eff = 0',()=>{
  const im=1.0647158815313716e-4,db=M.propagationLoss(im,1.55e-6);
  assert.equal(M.lossText(im,db),'37.49 dB/cm');
  assert.ok(Math.abs(db-40*Math.PI/Math.log(10)*im/1.55e-6)<=1e-12*db);
- assert.equal(M.lossText(0,null),'lossless');
- const table=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null}]);assert.equal(table.lossless,true);
- assert.equal(M.LOSSLESS_NOTE,'Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+ // the documented formula: dB/cm = 20 log10(e) k0 Im(n_eff) / 100, k0 = 2 pi / lambda0 in 1/m
+ const k0=2*Math.PI/1.55e-6;assert.ok(Math.abs(db/100-20*Math.log10(Math.E)*k0*im/100)<=1e-12*db/100);
+ // an independent literal: Im n_eff = 1e-4 at lambda0 = 1550 nm,
+ // 20 log10(e) x (2 pi / 1.55e-6 m) x 1e-4 / 100 = 8.685889638 x 4.053667940e6 x 1e-4 / 100 = 35.21 dB/cm
+ assert.equal(M.lossText(1e-4,M.propagationLoss(1e-4,1.55e-6)),'35.21 dB/cm');
+ assert.equal(M.lossText(0,null),'0 dB/cm');
+ // pre-registered: no threshold; a tiny nonzero Im n_eff is shown as it is, to 4 significant digits
+ const tiny=1e-15;assert.equal(M.lossText(tiny,M.propagationLoss(tiny,1.55e-6)),(M.propagationLoss(tiny,1.55e-6)/100).toPrecision(4)+' dB/cm');
+ assert.equal(M.lossText(tiny,M.propagationLoss(tiny,1.55e-6)),'3.521e-10 dB/cm');
+ const table=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null}]);assert.equal(table.lossless,true);assert.equal(table.rows[0].lossless,true);
+ assert.equal(M.LOSSLESS_NOTE,'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+ assert.equal(M.modeTableRows([{re:2.4,im:tiny,fte:1,loss:M.propagationLoss(tiny,1.55e-6)}]).rows[0].lossless,false);
+ // an optical run's n_eff is real: every mode reads 0 dB/cm
+ assert.deepEqual(M.opticalModes({effective_index:[2.4,1.7],te:{values:[.98,.01],source:'studio'}}).map(m=>M.lossText(m.im,m.loss)),['0 dB/cm','0 dB/cm']);
  assert.equal(M.modeTableRows([{re:2.4,im:1e-4,fte:1,loss:3749}]).lossless,false);
  assert.equal(M.RANKING_TEXT,'Modes are ranked by effective index.');assert.equal(MP.RANKING_CAVEAT,M.RANKING_TEXT);
 });

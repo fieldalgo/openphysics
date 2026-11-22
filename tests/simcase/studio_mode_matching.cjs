@@ -198,3 +198,22 @@ test('V17: matching leaves the runs as stored: version 7 is written byte for byt
   assert.equal(write(),before,state);
  }
 });
+test('round 9: the closed matched-modes picker names the whole pair, its overlap and its polarization',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ for(const name of ['optical-v7-one.json','optical-v7-three.json']){
+  const session=N.parseSession(fs.readFileSync(path.join(FIXTURES,name),'utf8'));
+  const [a,b]=[session.runs[0],session.runs.at(-1)],m=X.opticalMatch(a,b);
+  const plain=X.fieldChoices(m),named=X.fieldChoices(m,{a,b});
+  assert.equal(named.length,plain.length,name);
+  named.forEach((c,k)=>{
+   const wa=M.polarizationWord(M.opticalModes(a)[c.a].fte),wb=M.polarizationWord(M.opticalModes(b)[c.b].fte);
+   assert.equal(c.label,plain[k].label+(wa===wb?' · '+wa:` · A ${wa}, B ${wb}`),name);
+   assert.match(c.label,/^A mode \d ↔ B mode \d · overlap \d\.\d\d · /,name);
+  });
+ }
+});
+test('round 9: no Studio page says that modes are compared by rank or not matched between runs',()=>{
+ const dir=path.join(__dirname,'../../packages/simcase/src/simcase/studio/static');
+ for(const name of fs.readdirSync(dir).filter(n=>/\.(mjs|html|js|css)$/.test(n)))
+  assert.doesNotMatch(fs.readFileSync(path.join(dir,name),'utf8'),/not matched between runs|(?:matched|compared|paired) by rank/i,name);
+});

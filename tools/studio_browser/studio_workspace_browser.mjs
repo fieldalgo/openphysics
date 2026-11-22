@@ -247,7 +247,10 @@ try {
   // the modes table first, then the field plot with its sample and line profile
   const order = await page.eval("({table:!!(document.getElementById('modes-table').compareDocumentPosition(document.querySelector('.field-result'))&Node.DOCUMENT_POSITION_FOLLOWING)})");
   stage('modes table first', order); assert.ok(order.table, 'the modes table comes before the field plot');
-  assert.deepEqual(resultsView.loss, ['lossless', 'lossless']); assert.match(resultsView.lossless, /^Lossless: all materials have k = 0/);
+  // round 9 (J8): a lossless result reads 0 dB/cm; the cell's help and the note say it is absorption only
+  assert.deepEqual(resultsView.loss, ['0 dB/cm', '0 dB/cm']); assert.match(resultsView.lossless, /^Absorption only: all materials have k = 0/);
+  const lossTitles = await page.eval("[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.title)");
+  assert.deepEqual(lossTitles, [resultsView.lossless, resultsView.lossless]);
   assert.equal(resultsView.options[0].split('n_eff ')[1], resultsView.values[0]);
   assert.deepEqual(resultsView.probe, ['x [nm]', 'y [nm]']);
   // an unnamed run offers no separate Pin button: naming it pins it
@@ -260,26 +263,26 @@ try {
   await page.call('Input.insertText', {text: 'design A'});
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
   await sleep(150);
-  const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
+  const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · Run 1 · design A · 600 × 300 nm/);
   // the run list gives the time with seconds, so runs of the same minute read apart
   assert.match(named, / · \d{1,2}:\d\d:\d\d(?: [AP]M)?$/);
   // a pinned run offers Unpin; after it, Enter in Run name pins it again
   assert.equal(await text('#pin-run'), 'Unpin this run'); await page.click('#pin-run'); await sleep(150);
-  assert.equal(await page.eval("document.getElementById('pin-run')"), null); assert.match(await text('.run-item'), /^design A · /);
+  assert.equal(await page.eval("document.getElementById('pin-run')"), null); assert.match(await text('.run-item'), /^Run 1 · design A · /);
   await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();return true}', '#run-name-input');
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
-  await sleep(150); assert.match(await text('.run-item'), /^Pinned · design A · /); assert.equal(await text('#pin-run'), 'Unpin this run');
+  await sleep(150); assert.match(await text('.run-item'), /^Pinned · Run 1 · design A · /); assert.equal(await text('#pin-run'), 'Unpin this run');
   await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350');
   assert.match(await text('#file-status'), /^Width set to 700 nm\. Left x moved to −350 nm to keep the centre\. /);
   // an input edit takes the Study step back from Run complete to Ready to run
   const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
-  assert.deepEqual(await opticalSequence(), {heading: 'Inputs changed since run 1 · press Run to update', status: 'Inputs changed since run 1 · press Run to update'});
+  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · press Run to compute them'});
   // while an input error holds Run, the heading repeats the footer instead of asking for a Run
   await page.type('#shape-w', 99999);
   const held = await opticalSequence(); stage('input error holds Run', held);
   assert.deepEqual(held, {heading: 'Input errors · correct or restore the last valid values', status: 'Input errors · correct or restore the last valid values'});
   await page.type('#shape-w', 700);
-  assert.deepEqual(await opticalSequence(), {heading: 'Inputs changed since run 1 · press Run to update', status: 'Inputs changed since run 1 · press Run to update'});
+  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · press Run to compute them'});
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
@@ -288,13 +291,13 @@ try {
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
-  assert.match(neffTable.head[4], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
+  assert.match(neffTable.head[4], /^n_eff A Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B Run 2 · 700 × 300 nm · Silicon · λ 1550 nm$/);
   assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
   assert.equal(neffTable.rows[0][6], before, 'the table and the sentence give the same Δn_eff');
   // the field panels do not repeat the name, and come before the n_eff table
   const panels = await page.eval("({headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>h.textContent),plotsFirst:!!(document.querySelector('.compare-grid').compareDocumentPosition(document.getElementById('compare-neff'))&Node.DOCUMENT_POSITION_FOLLOWING),plotTop:Math.round(document.getElementById('compare-field-a').getBoundingClientRect().top+scrollY),viewport:innerHeight})");
   stage('compare panels', panels);
-  assert.deepEqual(panels.headings, ['A · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · 700 × 300 nm · Silicon · λ 1550 nm']);
+  assert.deepEqual(panels.headings, ['A · Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · 700 × 300 nm · Silicon · λ 1550 nm']);
   assert.ok(panels.plotsFirst, 'field plots before the n_eff table');
   await page.screenshot('compare');
   await page.click('#save-session');
@@ -326,19 +329,23 @@ try {
 
   // Reload: the start page offers the last session; recovering it restores the comparison.
   await page.call('Page.reload');
-  await page.until("!!document.querySelector('#resume-latest')", 'resume card');
-  const card = await page.eval("(()=>{const r=document.querySelector('.resume-card').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
-  stage('resume card', card); assert.ok(card.inView, 'resume card inside the first viewport');
+  // round 9 (J3): the one stored session is the optical one, so the Optical waveguide card resumes
+  // it and no box above lists it again; the session file route and its note are beside the card's offer
+  await page.until("!!document.querySelector('#resume-optical')", 'resume offer');
+  const card = await page.eval("(()=>{const r=document.getElementById('resume-optical').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
+  stage('resume card', card); assert.ok(card.inView, 'the Optical waveguide resume offer inside the first viewport');
   // the routes back say which copy is durable
-  const routes = await page.eval("({latest:document.getElementById('resume-latest').textContent,open:document.getElementById('resume-open-file').textContent,note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
+  const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('resume-open-file').textContent,beside:!!document.getElementById('resume-optical').closest('.card-slot').querySelector('#resume-open-file'),note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
-  // the entry names the session file the record was last sent to
-  assert.ok(routes.latest.startsWith(`Recover (this browser only): Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · file ${sessionFile} · saved `), routes.latest); assert.equal(routes.open, 'Open session file (portable)…');
+  // the offer names the session file the record was last sent to
+  assert.ok(routes.latest.startsWith(`Resume Optical waveguide · Run 1 · design A, Run 2 · file ${sessionFile} · `), routes.latest); assert.equal(routes.open, 'Open session file (portable)…');
+  assert.deepEqual(routes.listed, [], 'the record the card resumes is not listed again above it'); assert.equal(routes.box, false);
+  assert.ok(routes.beside, 'Open session file is beside the card\'s Resume');
   assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
   // a fresh page holds nothing an open would lose, so recovery asks nothing
-  await page.click('#resume-latest'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
+  await page.click('#resume-optical'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
@@ -349,17 +356,40 @@ try {
   // the older run viewed: the step bar, the result and its settings all say the current inputs
   // differ from this run, naming both, and none speaks of edits (there were none)
   await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list');
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Pinned · design A/.test(b.textContent)).click();return true}', '.run-item');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Pinned · Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/600 × 300 nm/.test(document.querySelector('#canvas p')?.textContent||'')", 'older run shown');
   const viewed = await page.eval("({step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),result:document.querySelector('#canvas p').textContent,inputs:[...document.querySelectorAll('#inspector .pair')].find(p=>p.firstElementChild?.textContent==='Inputs')?.lastElementChild.textContent,header:document.getElementById('project').textContent})");
   stage('older run viewed', viewed);
   assert.equal(viewed.step, '5. Results Current inputs differ from this run');
-  assert.match(viewed.result, /^Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon · 600 × 300 nm · Silicon · λ 1550 nm · core mesh \d+ nm$/);
+  // round 9 (J4): the line under the heading names each difference once
+  assert.match(viewed.result, /^Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh \d+ nm$/);
+  for (const part of ['600 × 300 nm', '700 × 300 nm', 'λ 1550 nm']) assert.equal(viewed.result.split(part).length, 2, part);
   assert.equal(viewed.inputs, 'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon');
   for (const t of Object.values(viewed)) assert.doesNotMatch(t, /edits are kept/);
+  // round 9 (J5): the dock, the footer, the title and the step bar describe the viewed run, run 1
+  const viewedNames = await opticalSequence(); stage('older run named', {...viewedNames, header: viewed.header});
+  assert.deepEqual(viewedNames, {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · Run 2 has them'});
+  assert.match(viewed.header, / · viewing Run 1 · design A, which used other inputs$/); assert.doesNotMatch(viewed.header, /Unsaved inputs/);
+  assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), viewed.header.replace(/^Optical waveguide \/ /, ''));
+  assert.match(await text('.run-item[aria-pressed=true]'), /^Pinned · Run 1 · design A · /);
+  // a name applied on leaving the field (change, no redraw) reaches the dock, the footer and the title too
+  const renameOnBlur = name => page.eval(`(()=>{const e=document.getElementById('run-name-input');e.value=${JSON.stringify(name)};e.dispatchEvent(new Event('change'));return true})()`);
+  await renameOnBlur('design A2'); await sleep(200);
+  const blurNamed = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,header:document.getElementById('project').textContent})");
+  stage('renamed on blur', blurNamed);
+  for (const t of Object.values(blurNamed)) assert.match(t, /Run 1 · design A2\b/);
+  await renameOnBlur('design A'); await sleep(200); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A · /);
+  // round 9 (J1): the dock note on Results says Compare matches modes by field overlap
+  assert.match(await text('#sequence'), /Compare matches modes by field overlap/); assert.doesNotMatch(await text('#sequence'), /not matched between runs/);
+  // round 9 (J4): the Inputs label of Selected run is one line at 1440 × 900 and 390 × 844
+  const labelLines = () => page.eval("(()=>{const s=[...document.querySelectorAll('#inspector .pair>span')].find(e=>e.textContent==='Inputs');const r=document.createRange();r.selectNodeContents(s);return new Set([...r.getClientRects()].map(x=>Math.round(x.top))).size})()");
+  for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+    const lines = await labelLines(); stage('Inputs label lines', {width, lines}); assert.equal(lines, 1, `the Inputs label wraps at ${width} px`);
+  }
   await noOverflow('older run viewed');
   // the newer run viewed: every place says it is the result of the current inputs
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/^Result for the current inputs/.test(document.querySelector('#canvas p')?.textContent||'')", 'newer run shown');
   assert.equal(await page.eval("[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' ')"), '5. Results Result for these inputs');
   // switching to the heated model says where the optical runs stay, and they come back
@@ -367,7 +397,12 @@ try {
   await page.click('[data-template=heated-waveguide]');
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'heated model', 30000);
   const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('project').textContent")});
-  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
+  // round 9 (J7): one short line, the rest behind More
+  const switchedParts = await page.eval("({line:[...document.getElementById('file-status').childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim(),summary:document.querySelector('#file-status details.message-more>summary')?.textContent,more:document.querySelector('#file-status .message-more-text')?.textContent})");
+  stage('switch message parts', switchedParts);
+  assert.equal(switchedParts.line, 'Heated silicon waveguide ready. Edit settings and couplings, then press Run. Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them');
+  assert.equal(switchedParts.summary, 'More');
+  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
@@ -379,7 +414,7 @@ try {
   const resultsNote = await text('#canvas'); assert.match(resultsNote, /Modes are ranked by effective index\. Compare matches them between runs by field overlap\./);
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare 500 → 450 nm');
   const matched = await compareTableRows(); stage('V17-M2 Compare 500 → 450 nm', matched);
-  assert.match(matched.head[4], /^n_eff A 500 × 300 nm/); assert.match(matched.head[5], /^n_eff B 450 × 300 nm/);
+  assert.match(matched.head[4], /^n_eff A Run 3 · 500 × 300 nm/); assert.match(matched.head[5], /^n_eff B Run 4 · 450 × 300 nm/);
   assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
   assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
   // the polarization cells use the modes table's words: a TM-like cell names its TM share first
@@ -391,6 +426,21 @@ try {
   await page.eval("(()=>{const s=document.getElementById('compare-mode');s.value='1';s.dispatchEvent(new Event('change'));})()"); await sleep(300);
   assert.match(await text('#compare-shown-a'), /^Mode 2 · /, 'the plots show the chosen matched pair');
   assert.match(await text('#compare-shown-b'), /^Mode 2 · /); assert.match(await text('#compare-description'), /Shown: A mode 2 ↔ B mode 2, overlap /);
+  // round 9 (J1): the dock note on Compare agrees with the table caption
+  assert.match(await text('#sequence'), /Compare matches modes by field overlap/); assert.doesNotMatch(await text('#sequence'), /not matched between runs/);
+  // round 9 (J6, J4): the closed picker shows the whole pair with its overlap and polarization, and
+  // every number cell keeps its value and unit on one line, at 1440 × 900 and 390 × 844
+  const closedPicker = () => page.eval(`(()=>{const s=document.getElementById('compare-mode'),o=s.options[s.selectedIndex],c=document.createElement('canvas').getContext('2d'),st=getComputedStyle(s);c.font=st.font;
+    const lines=e=>{const r=document.createRange();r.selectNodeContents(e);return new Set([...r.getClientRects()].map(x=>Math.round(x.top))).size};
+    return {text:o.textContent,need:Math.ceil(c.measureText(o.textContent).width)+32,width:s.clientWidth,cells:[...document.querySelectorAll('#compare-neff td.num')].map(e=>[e.textContent,lines(e)]).filter(x=>x[1]!==1),percent:[...document.querySelectorAll('#compare-neff [data-delta-percent]')].map(e=>e.textContent)}})()`);
+  for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+    const picker = await closedPicker(); stage('closed matched-modes picker', {width, ...picker});
+    assert.match(picker.text, /^A mode 2 ↔ B mode 2 · overlap \d\.\d\d · (?:TE-like|TM-like|hybrid|A \S+, B \S+)$/);
+    assert.ok(picker.need <= picker.width, `the closed picker needs ${picker.need} px, has ${picker.width} px at ${width}`);
+    assert.deepEqual(picker.cells, [], `number cells wrap at ${width} px`); assert.ok(picker.percent.length === 2 && picker.percent.every(t => / %$/.test(t)), JSON.stringify(picker.percent));
+  }
+  await noOverflow('compare matched');
   await page.screenshot('compare-matched');
   // Results: the line profile follows the Mode picker (it read the mode once before this check)
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('field-mode')", 'Results field');
@@ -495,6 +545,51 @@ try {
   stage('JB6 steady result', {log: await text('#solver-log summary'), jouleW_per_m: power});
   assert.ok(Math.abs(power - 20) <= 20e-6, 'uniform strip Joule power ' + power);
   await page.screenshot('joule-steady');
+
+  // Round 9 (J2, J3): the same two runs opened from their session file, recovered, and opened again
+  // on new pages are one session: the Models page offers them once, on the Optical waveguide card
+  // (which names the file), and the box above lists only other sessions. Before round 9 each open
+  // or recovery re-marked the runs' origin, so the store kept the earlier copy as another session.
+  const setFile = async (selector, path) => {
+    const {root} = await page.call('DOM.getDocument');
+    const {nodeId} = await page.call('DOM.querySelector', {nodeId: root.nodeId, selector});
+    await page.call('DOM.setFileInputFiles', {nodeId, files: [path]});
+  };
+  const answerDialogs = async (done, label) => {
+    const end = Date.now() + 60000;
+    while (Date.now() < end) {
+      if (await page.eval(done)) return;
+      if (await page.eval("!!document.getElementById('leave-confirm')?.open")) await page.click('#leave-go');
+      else if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.click('#confirm-load');
+      await sleep(150);
+    }
+    throw new Error('timed out: ' + label);
+  };
+  const recoveryUpdated = "/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)";
+  const freshPage = async label => { await page.call('Page.reload'); await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')&&!document.getElementById('recover-notebook').disabled", label, 30000); };
+  const openFile = async label => {
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await setFile('#session-file', join(downloads, sessionFile));
+    await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)&&${recoveryUpdated}`, label);
+  };
+  await freshPage('J2 page 1'); await openFile('J2 open 1');
+  await freshPage('J2 page 2'); await page.until("!!document.getElementById('resume-optical')", 'J2 resume offer');
+  await page.eval("document.getElementById('notebook-recovery-detail').textContent=''"); await page.click('#resume-optical');
+  await answerDialogs(`/^Recovered from this browser/.test(document.getElementById('autosave-status').textContent)&&${recoveryUpdated}`, 'J2 resumed');
+  await freshPage('J2 page 3'); await openFile('J2 open 2');
+  await freshPage('J2 page 4'); await page.until("!!document.getElementById('resume-optical')", 'J2 Models page');
+  await sleep(500);
+  const offers = await page.eval(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const s=m.indexedNotebookStore();const latest=await s.load(),earlier=await s.loadEarlier();
+    const record=i=>Number(i)<0?latest:earlier[Number(i)],card=document.getElementById('resume-optical');
+    const top=[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({record:b.dataset.resumeRecord,text:b.textContent}));
+    return {card:{record:card.dataset.resumeRecord,text:card.textContent},top,keys:[card.dataset.resumeRecord,...top.map(t=>t.record)].map(i=>{const d=JSON.parse(record(i).session);return JSON.stringify({model:d.input??d.document,runs:(d.runs||[]).map(r=>[r.job,r.label||'',r.pinned===true])});}),stored:earlier.length};})`);
+  stage('J2 one entry per session', offers);
+  assert.ok(offers.card.text.startsWith('Resume Optical waveguide · Run 1 · design A, Run 2 · file ' + sessionFile + ' · '), offers.card.text);
+  assert.ok(!offers.top.some(t => t.record === offers.card.record), 'the box above does not list the record the card resumes');
+  // compared by the stored inputs and runs themselves, not by the sessionKey under test
+  assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');
+  assert.ok(!offers.top.some(t => t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')), JSON.stringify(offers.top));
+  await noOverflow('J2 Models page');
 
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');

@@ -293,8 +293,11 @@ try {
   assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-neff tbody tr')].map(r=>r.cells[0].textContent)"), ['Mode 1', 'Mode 2']);
   assert.match(await page.text('[data-polarization="1"]'), /^TE-like · \d+\.\d % TE$/);
   assert.match(await page.text('[data-polarization="2"]'), /^TM-like · (\d+\.\d) % TM \((\d+\.\d) % TE\)$/);
-  assert.equal(await page.text('[data-loss="1"]'), 'lossless');
-  assert.equal(await page.text('[data-mp-lossless]'), 'Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+  // round 9 (J8): the template is lossless, its n_eff real: each mode reads 0 dB/cm, absorption only
+  assert.equal(await page.text('[data-loss="1"]'), '0 dB/cm'); assert.equal(await page.text('[data-loss="2"]'), '0 dB/cm');
+  assert.equal(await page.text('[data-mp-lossless]'), 'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+  assert.equal(await page.attr('[data-loss="1"]', 'title'), 'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+  assert.doesNotMatch(await page.eval('document.body.innerText'), /not matched between runs|(?:matched|compared) by rank/i);
   assert.equal(await page.text('#mp-candidate-note'), 'Modes are ranked by effective index. This model asks for 2 modes: Modes 1 › Modes to find');
   assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
   const shown = await page.attr('[data-neff="1"]', 'data-neff-value');

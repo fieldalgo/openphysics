@@ -190,10 +190,13 @@ export function compareMatchRows(match){
 }
 /** The field picker of Compare: one entry per matched mode, {a, b, label}; a matched pair gives
  * one entry per member, in rank order (any rotation within a pair is a solution). */
-export function fieldChoices(match){
- const out=[];
+// runs: optional {a, b}, the two runs: a single-mode pair then names its polarization word, once
+// when A and B agree ("… · overlap 0.98 · TM-like"), else both ("… · A TE-like, B hybrid").
+export function fieldChoices(match,runs={}){
+ const out=[],word=(run,i)=>{const f=run?opticalModes(run)[i]?.fte:null;return Number.isFinite(f)?polarizationWord(f):null;};
+ const words=(a,b)=>{const wa=word(runs.a,a),wb=word(runs.b,b);return !wa||!wb?'':wa===wb?' · '+wa:` · A ${wa}, B ${wb}`;};
  for(const p of match.pairs?.filter(x=>x.accepted)??[]){
-  if(p.unitA.length===1&&p.unitB.length===1){out.push({a:p.unitA[0],b:p.unitB[0],label:`A mode ${p.unitA[0]+1} ↔ B mode ${p.unitB[0]+1} · overlap ${formatOverlap(p.eta)}`});continue;}
+  if(p.unitA.length===1&&p.unitB.length===1){out.push({a:p.unitA[0],b:p.unitB[0],label:`A mode ${p.unitA[0]+1} ↔ B mode ${p.unitB[0]+1} · overlap ${formatOverlap(p.eta)}${words(p.unitA[0],p.unitB[0])}`});continue;}
   p.unitA.forEach((a,k)=>{const b=p.unitB[Math.min(k,p.unitB.length-1)];out.push({a,b,label:`A mode ${a+1} ↔ B mode ${b+1} (pair, any rotation) · overlap ${formatOverlap(p.eta)}`});});
  }
  return out.sort((x,y)=>x.a-y.a);

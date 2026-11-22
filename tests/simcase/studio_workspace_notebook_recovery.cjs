@@ -216,3 +216,38 @@ test('an opened file name may be in any script, never a path',()=>{
  assert.equal(openedFileName('가열-도파로 세션.json'),'가열-도파로 세션.json');
  for(const bad of ['../x.json','a/b.json','a\\b.json','x.exe','a\u0001.json',42,null])assert.equal(openedFileName(bad),null,String(bad));
 });
+// round 9 (J2): the same runs and inputs are one session, whatever their origin, selection or view
+const optical=(extra={},run={})=>JSON.stringify({format:'openphysics-studio-session',version:7,input:{w:700},
+ runs:[{job:'aaaaaaaa',label:'Design A',pinned:true,origin:'local',...run},{job:'bbbbbbbb',label:'Design B',pinned:true,origin:'local',...run}],
+ selected:'bbbbbbbb',comparison:['aaaaaaaa','bbbbbbbb'],view:{mode:0},...extra});
+test('round 9: a session key leaves out the runs\' origin, the selected run, the comparison and the view',()=>{
+ const key=sessionKey(optical());
+ for(const other of [optical({},{origin:'imported'}),optical({},{origin:'recovered'}),optical({selected:'aaaaaaaa'}),optical({comparison:['bbbbbbbb','aaaaaaaa']}),optical({view:{mode:1}})])
+  assert.equal(sessionKey(other),key);
+ // the runs or the inputs make another session
+ for(const other of [optical({input:{w:600}}),optical({},{label:'Design C'}),optical({},{pinned:false}),optical({runs:[]})])
+  assert.notEqual(sessionKey(other),key);
+});
+test('round 9: a page that opens or recovers the runs already stored keeps no second copy of them',async()=>{
+ const r=(session,savedAt,extra={})=>({version:1,savedAt,session,...extra});
+ const db=database(null);
+ // page 1 computes the runs; page 2 opens the session file of the same runs (origin imported)
+ let page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(r(optical(),'2026-11-22T15:50:14Z'));
+ page=indexedNotebookStore(db);page.adopt(await page.load());
+ await page.save(r(optical({selected:'aaaaaaaa'},{origin:'imported'}),'2026-11-22T15:50:50Z',{openedFile:'optical-waveguide-session-2026-11-22-1549.json'}));
+ assert.deepEqual(await page.loadEarlier(),[]);assert.equal(page.movedEarlier(),false);
+ // page 3 recovers them (origin recovered) from an earlier copy: still one session
+ page.keepPrevious();await page.save(r('H','2026-11-22T15:51:00Z'));
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(r(optical({},{origin:'recovered'}),'2026-11-22T15:52:00Z'));
+ assert.deepEqual((await page.loadEarlier()).map(x=>x.session),['H']);
+});
+test('round 9: a list entry is the newest record of its session and names the file any merged record names',()=>{
+ const r=(session,savedAt,extra={})=>({version:1,savedAt,session,...extra});
+ const withFile=r(optical({},{origin:'imported'}),'2026-11-22T15:50:14Z',{openedFile:'optical-waveguide-session-2026-11-22-1549.json'});
+ const newer=r(optical({selected:'aaaaaaaa'},{origin:'recovered'}),'2026-11-22T15:50:50Z');
+ const entries=distinctRecords(null,[newer,withFile,r('H','2026-11-22T15:49:00Z')]);
+ assert.deepEqual(entries.map(e=>[e.index,e.file]),[[0,'optical-waveguide-session-2026-11-22-1549.json'],[2,null]]);
+ // the newest record's own file is kept; a saved file is named before an opened one
+ const saved=r(optical(),'2026-11-22T15:51:00Z',{savedFile:{name:'optical-waveguide-session-2026-11-22-1551.json',savedAt:'2026-11-22T15:51:00Z',current:true}});
+ assert.deepEqual(distinctRecords(saved,[withFile]).map(e=>[e.index,e.file]),[[-1,'optical-waveguide-session-2026-11-22-1551.json']]);
+});

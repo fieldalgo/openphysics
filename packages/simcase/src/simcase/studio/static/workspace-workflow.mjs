@@ -13,6 +13,14 @@ export function inputsDifferText(runParts,currentParts){
  if(!differ.length)return 'Current inputs differ from this run in other settings';
  return `Current inputs differ from this run: this run ${differ.map(i=>runParts[i]).join(' · ')}, current ${differ.map(i=>currentParts[i]).join(' · ')}`;
 }
+// The line under a result's heading: whether the current inputs are the run's, then the run's
+// inputs, each part named once: a part that differs is named with both values, the others after
+// "unchanged" ("…, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm").
+export function runInputsLine(runParts,currentParts){
+ const same=runParts.filter((part,i)=>part===currentParts[i]);
+ if(same.length===runParts.length)return [SAME_INPUTS,...runParts].join(' · ');
+ return inputsDifferText(runParts,currentParts)+(same.length?'; unchanged: '+same.join(' · '):'');
+}
 // The parts of an optical input the words above compare.
 export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.model.wavelength} nm`,`core mesh ${input.model.coreMesh} nm`];
 // Readiness describes the current editor and retained artifacts, not accuracy.
@@ -36,26 +44,37 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
   :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Current inputs differ from this run':'No run yet'}
  ];
 }
-// The last-run state of the optical inputs, in the words of the multiphysics model. A run is
-// numbered by its place in the run list (oldest = 1). 'current': a run solved these exact
-// inputs; 'stale': runs exist but none of these inputs; 'none' before any run. origin: where the
-// current run came from when it was not computed in this tab ('imported' or 'recovered').
-export function opticalFreshness(input,runs=[]){
- const signature=JSON.stringify(input),index=runs.findLastIndex(run=>run.signature===signature);
- const origin=runs[index]?.origin;
- if(index>=0)return origin==='imported'||origin==='recovered'?{state:'current',run:index+1,origin}:{state:'current',run:index+1};
+// A run as the dock, the footer and the title name it: its number (its place in the run list,
+// oldest = 1) with its name, "Run 1 · design A", or "Run 2" when it has none.
+export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
+// The run state the dock heading and the footer describe, in the words of the multiphysics model.
+// viewed: the run Results shows (the selected run), which both then describe, so they agree with
+// the step bar and the title. 'current': that run (without one, the newest run) solved these exact
+// inputs; 'other': the viewed run has other inputs, and has: the number of a run of these inputs,
+// if any; 'stale': runs exist but none is viewed and none has these inputs; 'none' before any
+// run. origin: where the run came from when it was not computed in this tab ('imported' or
+// 'recovered'). name: the run's name (absent when it has none).
+export function opticalFreshness(input,runs=[],viewed=null){
+ const signature=JSON.stringify(input),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
+ const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
+ if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{})};
+ if(index>=0)return {state:'current',run:index+1,...name,...from};
  return runs.length?{state:'stale',run:runs.length}:{state:'none',run:null};
 }
 // The dock heading and the ready footer for that state: both name the same run.
-export function opticalSequenceHeading({state,run,origin}){
- if(state==='current'&&originText(origin))return `Run ${run} · ${originText(origin)}`;
- if(state==='current')return `Run ${run} · solved from the current inputs`;
+export function opticalSequenceHeading({state,run,name='',origin}){
+ const title=runTitle(run,name);
+ if(state==='current'&&originText(origin))return `${title} · ${originText(origin)}`;
+ if(state==='current')return `${title} · solved from the current inputs`;
+ if(state==='other')return `${title} · current inputs differ from this run`;
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Nothing is computed until you press Run';
 }
-export function opticalReadyStatus({state,run,origin}){
- if(state==='current'&&originText(origin))return `Run ${run} · ${originText(origin)} · press Run to compute it here`;
- if(state==='current')return `Run ${run} · solved from the current inputs · press Run to solve again`;
+export function opticalReadyStatus({state,run,name='',origin,has}){
+ const title=runTitle(run,name);
+ if(state==='current'&&originText(origin))return `${title} · ${originText(origin)} · press Run to compute it here`;
+ if(state==='current')return `${title} · solved from the current inputs · press Run to solve again`;
+ if(state==='other')return `${title} · current inputs differ from this run · `+(has?`Run ${has} has them`:'press Run to compute them');
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Optical adapter ready · explicit Run required';
 }

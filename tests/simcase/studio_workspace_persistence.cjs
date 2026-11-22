@@ -143,14 +143,30 @@ test('a model just chosen reads as new until its first edit, save or open',async
  assert.equal(P.persistenceTitle({fresh:true,clean:false,runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.match(P.persistenceTitle({fresh:true,invalid:true,clean:false}),/^Invalid input draft/);
 });
-test('switching models says where the optical runs stay',()=>{
- assert.equal(P.opticalRunsStayText({runs:0}),'');
+test('switching models says where the optical runs stay: one short line, the rest behind More',()=>{
+ assert.deepEqual(P.opticalRunsStayText({runs:0}),{text:'',more:''});
+ const one='Optical waveguide run stays in this tab · Models › Optical waveguide returns to it',two='Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them';
  // the tab holds them until it is closed or reloaded; after that, only what still holds them is named
- assert.equal(P.opticalRunsStayText({runs:1}),'Optical waveguide and its 1 run stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to it. After that, no file or browser recovery holds it.');
- assert.equal(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
-  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.');
- assert.equal(P.opticalRunsStayText({runs:2,recovery:true}),
-  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) brings them back.');
- assert.equal(P.opticalRunsStayText({runs:1,file:'a.json'}),
-  'Optical waveguide and its 1 run stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to it. After that, Open session with a.json brings it back.');
+ assert.deepEqual(P.opticalRunsStayText({runs:1}),{text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, no file or browser recovery holds it.'});
+ assert.deepEqual(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.'});
+ assert.deepEqual(P.opticalRunsStayText({runs:2,recovery:true}),
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) brings them back.'});
+ assert.deepEqual(P.opticalRunsStayText({runs:1,file:'a.json'}),
+  {text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, Open session with a.json brings it back.'});
+});
+test('round 9 (J5): the title says the viewed run used other inputs, and that they are not unsaved edits',()=>{
+ const when=()=>'15:50',viewed={run:1,name:'Design A'};
+ assert.equal(P.persistenceTitle({viewed},when),'No unsaved input changes · viewing Run 1 · Design A, which used other inputs');
+ assert.equal(P.persistenceTitle({viewed:{run:2,name:''}},when),'No unsaved input changes · viewing Run 2, which used other inputs');
+ assert.equal(P.persistenceTitle({loaded:{kind:'recovered',current:true},viewed},when),'Recovered from this browser · viewing Run 1 · Design A, which used other inputs');
+ // without a viewed run of other inputs, or with an invalid draft, the title is as before
+ assert.equal(P.persistenceTitle({},when),'No unsaved input changes');
+ assert.equal(P.persistenceTitle({invalid:true,viewed},when),'Invalid input draft · last valid inputs unchanged');
+});
+test('round 9 (J5): Compare headings name a run by its number with its name',()=>{
+ assert.equal(C.runHeading(run('aaaaaaaa',600,'design A'),1),'Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.runHeading(run('aaaaaaaa',700),2),'Run 2 · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A'),1),'A · Run 1 · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,'design B'),2),'B · Run 2 · design B · 700 × 300 nm · Silicon · λ 1550 nm');
 });

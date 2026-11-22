@@ -376,7 +376,7 @@ print(n)`;
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened results');
   const after = await shown();
   assert.deepEqual(after, before, 'S2: the same strings after the open');
-  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed\. Studio checks the file for damage, not who made it\.$/);
+  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed; the file passed its damage check \(this does not show who made it\)\.$/);
   // the dock, the footer and the step rows say the result was read from the file, with no solve times
   const openedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,sequence:document.getElementById('sequence').textContent})");
   stage('opened run status', openedDock);
@@ -574,7 +574,9 @@ print(n)`;
   assert.equal(await page.exists('#resume-optical'), false);
   // the switch note says the tab holds the runs until it is closed or reloaded, then how to get them back
   await openTemplate();
-  assert.match(await notice(), / Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
+  // round 9 (J7): one short line, the rest behind More
+  assert.match(await page.eval("document.getElementById('file-status').textContent"), / Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them More\s*This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
+  assert.equal(await page.eval("document.querySelector('#file-status details.message-more')?.open"), false, 'the rest is behind More, closed');
   await openSession(c1.path);
   await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)||/^Opened /.test(document.getElementById('autosave-status').textContent)", 'heated session kept');
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'heated session in browser recovery', 20000);
@@ -607,9 +609,12 @@ print(n)`;
     const keys=listed.map(i=>m.sessionKey(earlier[i].session));return {listed,stored:earlier.length,distinct:new Set(keys).size,latestListed:keys.includes(m.sessionKey(latest.session))};})`);
   stage('R2 stored sessions', stored);
   assert.equal(stored.distinct, stored.listed.length, JSON.stringify(stored)); assert.equal(stored.latestListed, false);
-  assert.equal(lists.resume.length, stored.listed.length, 'the resume card lists the same entries');
+  // the resume card lists the same entries, but for the one the Optical waveguide card resumes (round 9, J3)
+  const onCard = await page.eval("document.getElementById('resume-optical').dataset.resumeRecord");
+  assert.equal(lists.resume.length, stored.listed.length - (stored.listed.includes(Number(onCard)) ? 1 : 0), 'the resume card lists the same entries');
+  assert.ok(!lists.resume.some(t => /Optical waveguide · 2 runs · Run 1, Run 2/.test(t)), 'the optical session is offered once, on its card: ' + JSON.stringify(lists.resume));
   // the heated session open in this tab is not offered again, and its earlier copy is gone
-  assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Heater 2e14')), JSON.stringify(lists.earlier));
+  assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Run 1 · Heater 2e14')), JSON.stringify(lists.earlier));
   assert.ok(lists.earlier.some(t => /^Recover earlier session · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
     await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R1 ' + tag); await page.screenshot('r1-' + tag);
