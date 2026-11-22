@@ -32,7 +32,7 @@ export function createMultiphysicsView(ctx){
  let job=null,lastRun=null,runFailure=null,uncoupled={},resultPage=null,indexView='n',resize=null;
  // the heater-off comparison solved after each coupled run (on for a model with a coupled
  // temperature when it opens), the physics still to solve alone, and the last coupling removed
- let baselineOption=false,baselineQueue=[],baselineErrors={},lastRemoval=null;
+ let baselineOption=false,baselineQueue=[],baselineErrors={},lastRemoval=null,starting=false,stopAsked=false;
  const signature=()=>JSON.stringify(doc);
  // ---- model lifecycle ----
  async function loadCapabilities(){try{caps=await ctx.request('GET','/api/multiphysics/capabilities');catalog=kindCatalog(caps);capsError=null;}catch(e){capsError=e.message;}}
@@ -80,7 +80,7 @@ export function createMultiphysicsView(ctx){
  const errors=()=>messages.filter(m=>m.severity==='error');
  function runBlock(){
   if(capsError)return 'Studio cannot list the installed physics: '+capsError;
-  if(job)return 'Running… (stop it under Study)';
+  if(job||starting)return 'Running… (stop it under Study)';
   if(check.error)return 'The model could not be checked: '+check.error;
   if(check.pending)return 'Checking the model…';
   return runBlockText(errors().length,check.run_refusal);
@@ -98,12 +98,14 @@ export function createMultiphysicsView(ctx){
  // ---- running ----
  let pollTimer=null;function stopPolling(){clearTimeout(pollTimer);pollTimer=null;}
  async function run(source=doc,{alone=null,key=null}={}){
-  if(job||(!alone&&runBlock()))return;
+  if(job||starting||(!alone&&runBlock()))return;
   const sent=clone(source),order=alone?[[alone]]:check.solve_order;
-  try{const reply=await ctx.request('POST','/api/multiphysics/run',{doc:sent});
+  // busy from the request on, so nothing else starts or opens until the job is followed
+  starting=true;if(!alone)stopAsked=false;
+  try{const reply=await ctx.request('POST','/api/multiphysics/run',{doc:sent});starting=false;
    job={id:reply.job,doc:sent,order:reply.solve_order||order,events:[],status:'running',error:null,alone,key};if(!alone)runFailure=null;
    refreshRun();ctx.render();notice(alone?`Solving ${physicsLabel(alone)} without heater: alone, with no temperature input…`:'Running every physics in solve order…');poll();
-  }catch(e){if(alone){baselineErrors[alone]=e.message;ctx.render();}notice('Run refused: '+e.message);}
+  }catch(e){starting=false;if(alone){baselineErrors[alone]=e.message;baselineQueue=[];}refreshRun();ctx.render();notice('Run refused: '+e.message);}
  }
  async function poll(){
   if(!job)return;
@@ -130,14 +132,14 @@ export function createMultiphysicsView(ctx){
   resultPage=resultPages(result).find(p=>p.id.startsWith('results:')&&result.physics[p.id.slice(8)]?.coupled)?.id||resultPages(result)[0].id;
   selection=resultPage;ctx.ui.page='Results';
   // the heater-off comparison: solved only when no column of the same content is kept
-  baselineQueue=baselineOption?baselinePhysics(lastRun.doc).filter(n=>uncoupled[n]?.key!==baselineKey(lastRun.doc,n)):[];
+  baselineQueue=baselineOption&&!stopAsked?baselinePhysics(lastRun.doc).filter(n=>uncoupled[n]?.key!==baselineKey(lastRun.doc,n)):[];
   refreshRun();ctx.render();ctx.announceResult(`Run ${lastRun.id} complete. Its results belong to that run; editing the model does not change them.`+(baselineQueue.length?' Solving without heater…':''));
   nextBaseline();
  }
  // Starts the next heater-off solve of the last run; false when none is left.
  function nextBaseline(){const name=baselineQueue.shift();if(!name||!lastRun)return false;runAlone(name);return true;}
  function runAlone(name){return run(uncoupledDocument(lastRun.doc,name),{alone:name,key:baselineKey(lastRun.doc,name)});}
- async function stop(){if(!job)return;baselineQueue=[];try{await ctx.request('POST',`/api/multiphysics/jobs/${job.id}/stop`);notice('Stopping after the physics being solved finishes; no result will be kept.');}catch(e){notice('Stop failed: '+e.message);}}
+ async function stop(){if(!job)return;baselineQueue=[];stopAsked=true;const alone=job.alone;try{await ctx.request('POST',`/api/multiphysics/jobs/${job.id}/stop`);notice(alone?`Stopping ${physicsLabel(alone)} without heater; the coupled run stays under Results.`:'Stopping after the physics being solved finishes; no result will be kept.');}catch(e){notice('Stop failed: '+e.message);}}
  // ---- fixes ----
  function applyFix(fix){
   if(!fix)return;if(check.pending){notice('The model is being checked; try again when the check finishes.');return;}
@@ -398,7 +400,7 @@ export function createMultiphysicsView(ctx){
    const cells=(row,k)=>{if(!alone)return '';const a=alone.rows[k];return `<td data-neff-alone="${row.mode}" data-neff-value="${a?.value??''}">${a?a.value.toFixed(8):'—'}</td><td data-neff-shift="${row.mode}">${a&&valid?shiftText(row.value,a.value):'—'}</td>`;};
    const note=!coupled?'':solving?`Solving ${esc(physicsLabel(id))} without heater…`:valid?esc(baselineText(lastRun.doc,id)):alone?`The without-heater column was solved from a different optical model. Run ${esc(physicsLabel(id))} alone to refresh.`:failed?`The run without heater ${failed==='stopped'?'was stopped':'failed: '+esc(failed)}. Run ${esc(physicsLabel(id))} alone to try again.`:`An n_eff without heater appears here when “Also solve without heater” beside Run is on, or run ${esc(physicsLabel(id))} alone.`;
    host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div>`+
-    (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
+    (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    const alone_=host.querySelector('#mp-run-alone');if(alone_)alone_.onclick=()=>runAlone(id);
    const sel=host.querySelector('#mp-index-view');if(sel)sel.onchange=()=>{indexView=sel.value;maps.find(m=>m[0]==='n')?.[1]();};
   }
@@ -468,10 +470,11 @@ export function createMultiphysicsView(ctx){
   for(const id of ['open-session','save-session'])$(id).hidden=on;
   $('save-draft').hidden=on;
   if(on){
-   if(!menuPlace)menuPlace={parent:$('save-project').parentElement,next:$('save-draft')};
-   for(const id of ['open-project','save-project']){const b=$(id);b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon">${FILE_ICONS[id]}</svg><span>${FILE_WORDS[id][0]}</span>`;b.title=FILE_WORDS[id][1];b.classList.add('model-file-command');commands.insertBefore(b,$('open-session'));}
+   if(menuPlace)return;
+   menuPlace={parent:$('save-project').parentElement,next:$('save-draft'),describe:{}};
+   for(const id of ['open-project','save-project']){const b=$(id);menuPlace.describe[id]=b.getAttribute('aria-description');b.setAttribute('aria-description',FILE_WORDS[id][1]);b.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true" class="ui-icon">${FILE_ICONS[id]}</svg><span>${FILE_WORDS[id][0]}</span>`;b.title=FILE_WORDS[id][1];b.classList.add('model-file-command');commands.insertBefore(b,$('open-session'));}
   }else{
-   if(menuPlace){for(const id of ['save-project','open-project'].reverse())menuPlace.parent.insertBefore($(id),menuPlace.parent.firstChild);menuPlace=null;}
+   if(menuPlace){for(const id of ['save-project','open-project']){menuPlace.parent.insertBefore($(id),menuPlace.next);if(menuPlace.describe[id]!==null)$(id).setAttribute('aria-description',menuPlace.describe[id]);}menuPlace=null;}
    $('save-project').textContent='Save inputs only';$('open-project').textContent='Open inputs file';
    for(const id of ['save-project','open-project']){$(id).removeAttribute('title');$(id).classList.remove('model-file-command');}
   }
@@ -490,8 +493,8 @@ export function createMultiphysicsView(ctx){
   savedSignature=signature();savedFile={name,kind:'Sent to model file',at:new Date()};ctx.onHistory();notice(`Model file ${name} sent to the browser's downloads. It holds the model; runs stay in this tab.`);
  }
  return {active:()=>active,open,openText,openTemplate,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
-  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveFile,busy:()=>!!job,
-  setBaseline:on=>{baselineOption=!!on;refreshRun();notice(on?'The next Run also solves the optical model without heater (about 1 s).':'The next Run solves the coupled model only; Run Modes 1 alone under Results still adds the comparison.');},
+  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveFile,busy:()=>!!job||starting,
+  setBaseline:on=>{baselineOption=!!on;refreshRun();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,
   // for checks: the current document and the last result
   document:()=>clone(doc),lastResult:()=>lastRun?.result||null};

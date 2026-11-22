@@ -346,6 +346,19 @@ try {
   assert.deepEqual(Object.values(screens).filter(v => v > 0), [], JSON.stringify(screens));
   stage('MB7 screens', screens);
 
+  // MB8: leaving for a single-physics model puts the session commands and the menu back
+  await size(1440, 900);
+  await page.click('nav [data-page=Applications]');
+  await page.until("!!document.querySelector('[data-template=optical]')", 'start page before leaving');
+  await page.click('[data-template=optical]');
+  await page.until("!document.getElementById('open-session').hidden&&!document.getElementById('save-session').hidden", 'session commands back');
+  assert.deepEqual(await page.eval("[...document.querySelector('.file-menu-items').children].slice(0,3).map(b=>b.id+':'+b.textContent+':'+!b.hidden)"),
+    ['save-project:Save inputs only:true', 'open-project:Open inputs file:true', 'save-draft:Save browser draft:true']);
+  assert.match(await page.attr('#save-project', 'aria-description'), /^Saves the model inputs only/);
+  assert.equal(await page.eval("document.getElementById('run-baseline-option').hidden&&document.getElementById('run-multiphysics').hidden"), true);
+  assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
+  stage('MB8 back to a single-physics model');
+
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';
 } catch (error) {
