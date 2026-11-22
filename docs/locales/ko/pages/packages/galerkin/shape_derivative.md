@@ -76,6 +76,11 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 응력과 깊이당 부하·반력·잔차가 d/dt를 나릅니다.
 - Dirichlet 값은 노드에 붙어 노드와 함께 움직입니다.
 - 큰 강체 변위 오프셋(탄성 변형보다 훨씬 큰 Dirichlet 값)은 솔버 자체에서처럼 결과와 그 미분의 정밀도를 떨어뜨립니다.
+- 체적력은 `callback(points) -> (Q, 2)`, traction은 `callback(points, outward_normals) -> (Q, 2)`이어도 됩니다(2026-11-22).
+  일반 규칙(6 × 6 Duffy, 변 4점 Gauss, 단위 바깥 법선)의 live 점으로 한 번 더 부르므로, 받은 JAX·PyTorch 점으로 계산해야
+  합니다. 아래 열탄성 풀이는 여전히 상수만 받습니다. `tests/galerkin/test_shape_derivative_elastic_callbacks.py`에 EL1–EL7이
+  있습니다. 모든 필드가 이동 메시 일반 풀이와 1e-12 이내, 미분이 Richardson 차분과 1e-8 이내(기울어지는 변의 압력도), JAX와
+  PyTorch가 1e-12 이내, 고정 체적력과 자라는 변의 traction이 닫힌 식 작용력과 그 미분에 1e-10 이내로 맞습니다.
 
 ## 열탄성
 
@@ -125,7 +130,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
   일반 풀이처럼 가중치에 live 점의 2πr이 곱해집니다.
 - 그래서 콜백은 받은 점으로 배열 연산을 해야 하고 순수해야 합니다. live 점에 NumPy 숫자를 돌려주거나(`np.asarray`,
   `np.ones(len(p))`) live 점에서 예외가 나는 콜백은 이름을 밝힌 `TypeError`로 거부합니다.
-- 아직 다루지 않는 것: 탄성, 3D 열의 좌표 콜백과 콜백인 계수(전도도 등)나 Dirichlet 값.
+- 아직 다루지 않는 것: 열탄성, 3D 열의 좌표 콜백과 콜백인 계수(전도도 등)나 Dirichlet 값.
 
 `tests/galerkin/test_shape_derivative_callbacks.py`에 2026-11-22에 사전 등록한 E1–E7이 있습니다. 수치가 이동 메시 일반
 풀이와 1e-12 이내(E1); 세 종류 콜백을 모두 쓴 반력·온도 목적함수의 미분이 Richardson 중앙 차분과 1e-8 이내(E2), 법선
@@ -310,7 +315,7 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·경계 열유속·convection·전류밀도·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
   `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받고,
-  정상·과도 열과 전류 밀도에서는 live 점으로 계산하는 좌표 콜백을 받습니다(위).
+  정상·과도 열, 전류 밀도, 탄성에서는 live 점으로 계산하는 좌표 콜백을 받습니다(위).
 - 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
   그런 호출에서 live 입력은 t 하나입니다.
