@@ -34,7 +34,7 @@ import numpy as np
 import scipy
 
 import EMpy
-from EMpy.modesolvers.FD import VFDModeSolver
+from EMpy.modesolvers.FD import FDMode, VFDModeSolver
 
 SCHEMA = "openphysics.reference-values/1"
 CONSUMER = "tests/simcase/test_reference_empy_modes.py"
@@ -59,13 +59,14 @@ INPUTS = {
 #: wall normal to y (north, south) H_y is odd and H_x even ("S"); at a wall normal to x (east,
 #: west) H_x is odd and H_y even ("A")
 BOUNDARY = "SSAA"
-#: VFDModeSolver.solve shifts by sigma = (guess k0)^2 and asks ARPACK for the eigenvalues just
-#: above it ("LR" in shift-invert): guess must lie below every mode wanted. 1.5 is above the
-#: background index (no box mode is returned) and below both kept modes of each core. SEARCHED
-#: modes are asked for; the top two are then confirmed by a second solve whose guess sits just
-#: below the second kept mode (any higher mode the first solve missed would appear there).
-GUESS = 1.5
-SEARCHED = 8
+#: The eigenvalue call. VFDModeSolver.solve (EMpy 2.2.3) fixes which="LR" with sigma = (guess k0)^2,
+#: which in shift-invert asks for the eigenvalues just above sigma and also chases far-away
+#: negative ones (n_eff ~ 8j): at 20 nm it does not converge in practical time, and with guess at
+#: the core index it returns none. This script therefore calls scipy.sparse.linalg.eigs itself on
+#: EMpy's own matrix (VFDModeSolver.build_matrix) with which="LM" and sigma at the core index: no
+#: mode lies above the core index, so the eigenvalues nearest sigma are the highest modes. The
+#: fields come from EMpy's own compute_other_fields and FDMode(...).normalize(), as in its solve().
+SEARCHED = 4
 TOL = 1e-12
 
 
@@ -91,20 +92,29 @@ def permittivity(core):
     return eps
 
 
-def eigen(core, x, y, boundary, guess, count):
-    solver = VFDModeSolver(INPUTS["vacuum_wavelength_um"], x, y, permittivity(core), boundary)
-    solver.solve(count, TOL, guess)
-    # ARPACK also returns eigenvalues far below sigma when fewer than count lie above it (n_eff with
-    # real part 0 or below the guess): those are not modes of interest and are left out
-    found = [complex(m.neff) for m in solver.modes]
-    modes = sorted([m for m, n in zip(solver.modes, found) if np.isfinite(n) and n.real > guess],
-                   key=lambda m: -np.real(m.neff))
+def eigen(core, x, y, boundary, count):
+    """The count eigenpairs nearest (n_core k0)^2 of EMpy's matrix, as EMpy's solve() builds its modes."""
+    from scipy.sparse import linalg
+    wl = INPUTS["vacuum_wavelength_um"]
+    k = 2 * np.pi / wl
+    solver = VFDModeSolver(wl, x, y, permittivity(core), boundary)
+    matrix = solver.build_matrix()
+    values, vectors = linalg.eigs(matrix, k=count, which="LM", sigma=(INPUTS["core_index"] * k) ** 2, tol=TOL)
+    nx, ny = solver.nx, solver.ny
+    neffs = wl * np.sqrt(values) / (2 * np.pi)
+    order = np.argsort(-neffs.real)
+    neffs = neffs[order]
+    hxs = [vectors[:nx * ny, i].reshape(nx, ny) for i in order]
+    hys = [vectors[nx * ny:, i].reshape(nx, ny) for i in order]
+    hzs, exs, eys, ezs = solver.compute_other_fields(neffs, hxs, hys)
+    found = [complex(n) for n in neffs]
+    modes = [FDMode(wl, x, y, n, ex, ey, ez, hx, hy, hz).normalize()
+             for n, hx, hy, hz, ex, ey, ez in zip(neffs, hxs, hys, hzs, exs, eys, ezs)
+             if np.isfinite(n) and INPUTS["background_index"] < n.real < INPUTS["core_index"]]
     neff = np.array([complex(m.neff) for m in modes])
-    if len(modes) < INPUTS["kept_modes"] or np.any(neff.real >= INPUTS["core_index"]) or \
-            np.any(np.abs(neff.imag) > 1e-8 * neff.real):
-        raise SystemExit(f"rejected solve (guess {guess}, {count} eigenvalues): returned n_eff {found} give "
-                         f"{len(modes)} modes above the guess, need {INPUTS['kept_modes']} real ones below the core "
-                         "index; nothing written")
+    if len(modes) < INPUTS["kept_modes"] or np.any(np.abs(neff.imag) > 1e-8 * neff.real):
+        raise SystemExit(f"rejected solve ({count} eigenvalues): n_eff {found} give {len(modes)} real guided modes "
+                         f"between the background and core indices, need {INPUTS['kept_modes']}; nothing written")
     return modes, neff
 
 
@@ -114,14 +124,14 @@ def solve(core, h, boundary=BOUNDARY, confirm=False):
     y = grid([w["ymin"], core["y"], core["y"] + core["h"], w["ymax"]], h)
     area = np.outer(np.diff(x), np.diff(y))           # (cells in x, cells in y), the shape of E
     start = time.perf_counter()
-    modes, every = eigen(core, x, y, boundary, GUESS, SEARCHED)
+    modes, every = eigen(core, x, y, boundary, SEARCHED)
     kept = INPUTS["kept_modes"]
     modes, neff = modes[:kept], every[:kept]
     if confirm:
-        _, top = eigen(core, x, y, boundary, float(neff[-1].real) - 0.02, kept + 2)
+        _, top = eigen(core, x, y, boundary, SEARCHED + 2)
         if not np.allclose(top[:kept].real, neff.real, rtol=0, atol=1e-7):
-            raise SystemExit(f"the top {kept} modes differ between guesses {GUESS} ({neff.real.tolist()}) and "
-                             f"{neff[-1].real - 0.02:.4f} ({top[:kept].real.tolist()}); nothing written")
+            raise SystemExit(f"the top {kept} modes differ between {SEARCHED} ({neff.real.tolist()}) and "
+                             f"{SEARCHED + 2} eigenvalues ({top[:kept].real.tolist()}); nothing written")
     seconds = time.perf_counter() - start
     fraction = []
     for m in modes:
@@ -175,10 +185,10 @@ def main(argv=None):
             fractions.append(fraction)
             timings[f"{case} {h} um"] = round(seconds, 2)
             print(f"{case} h={h} um: n_eff {neff.real.tolist()}, f_TE {fraction.tolist()}, {seconds:.1f} s "
-                  f"(all {len(every)} above {GUESS}: {np.round(every, 5).tolist()})", flush=True)
+                  f"(guided among the {SEARCHED} nearest the core index: {np.round(every, 5).tolist()})", flush=True)
             if h == grids[0]:
-                self_check.append(f"{case}: the top two at h = {h} um are the same with guess {GUESS} and with a "
-                                  f"guess 0.02 below the second (all returned above {GUESS}: "
+                self_check.append(f"{case}: the top two at h = {h} um are the same with {SEARCHED} and with "
+                                  f"{SEARCHED + 2} eigenvalues (guided among the {SEARCHED}: "
                                   f"{np.round(every, 5).tolist()})")
         arrays[f"neff_{case}"] = np.array(neffs)
         arrays[f"te_fraction_{case}"] = np.array(fractions)
@@ -216,10 +226,16 @@ def main(argv=None):
             "install": {"kind": "pip", "command": "python -m pip install --require-hashes --only-binary :all: -r "
                         "tests/simcase/reference_values/empy/requirements.txt",
                         "lock": "tests/simcase/reference_values/empy/requirements.txt (hash-pinned)"},
-            "settings": {"function": "EMpy.modesolvers.FD.VFDModeSolver(...).solve(neigs, tol, guess)",
-                         "boundary": BOUNDARY, "neigs": SEARCHED, "tol": TOL, "guess": GUESS,
-                         "kept": f"the two largest n_eff of {SEARCHED}, confirmed at the coarsest grid by a second "
-                                 "solve with the guess 0.02 below the second",
+            "settings": {"function": "scipy.sparse.linalg.eigs on EMpy.modesolvers.FD.VFDModeSolver.build_matrix(), "
+                                     "fields by VFDModeSolver.compute_other_fields and FDMode.normalize, in place "
+                                     "of VFDModeSolver.solve()",
+                         "why": "solve() fixes which=LR with shift-invert, which asks for the eigenvalues just above "
+                                "the shift and did not converge at 20 nm; LM with the shift at the core index gives "
+                                "the highest modes",
+                         "which": "LM", "sigma": "(core index k0)^2", "boundary": BOUNDARY, "k": SEARCHED,
+                         "tol": TOL,
+                         "kept": f"the two largest guided n_eff of {SEARCHED}, confirmed at the coarsest grid by a "
+                                 f"second solve with {SEARCHED + 2} eigenvalues",
                          "grid": "nodes on the window and core edges, each segment in equal cells of at most h"},
             "discretization": {"kind": "vector finite differences (Fallahkhair, Li, Murphy 2008)",
                                "permittivity": "cell-centred staircase", "grids_um": grids},
