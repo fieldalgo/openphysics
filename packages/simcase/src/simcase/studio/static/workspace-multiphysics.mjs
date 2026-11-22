@@ -399,9 +399,10 @@ export function effectiveIndexRows(payload){
 // The caveat under a modes table, in the words of the optical application, and the number of
 // modes the model asks for, named by its setting: the rows are candidates, not matched modes.
 export const CANDIDATE_CAVEAT='Candidates are ranked by effective index and are not matched between designs.';
-export function modeCountText(doc,name){
+// past: the model changed since the run, so the count is the run's, not the model's.
+export function modeCountText(doc,name,{past=false}={}){
  const n=doc?.physics?.[name]?.mode_count,where=`${physicsLabel(name)} › Modes to find`;
- return Number.isInteger(n)?`This model asks for ${n} ${n===1?'mode':'modes'}: ${where}`:`The number of modes is set in ${where}`;
+ return Number.isInteger(n)?`${past?'This run asked for':'This model asks for'} ${n} ${n===1?'mode':'modes'}: ${where}`:`The number of modes is set in ${where}`;
 }
 // The Results pages of a run: one per physics, then the coupling check.
 export function resultPages(result){return [...Object.keys(result.physics).map(n=>({id:'results:'+n,label:physicsLabel(n)})),...(Object.keys(result.couplings||{}).length?[{id:'results:check',label:'Coupling check'}]:[])];}

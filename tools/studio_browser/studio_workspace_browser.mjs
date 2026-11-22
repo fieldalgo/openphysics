@@ -257,6 +257,12 @@ try {
   // an input edit takes the Study step back from Run complete to Ready to run
   const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
   assert.deepEqual(await opticalSequence(), {heading: 'Inputs changed since run 1 · press Run to update', status: 'Inputs changed since run 1 · press Run to update'});
+  // while an input error holds Run, the heading repeats the footer instead of asking for a Run
+  await page.type('#shape-w', 99999);
+  const held = await opticalSequence(); stage('input error holds Run', held);
+  assert.deepEqual(held, {heading: 'Input errors · correct or restore the last valid values', status: 'Input errors · correct or restore the last valid values'});
+  await page.type('#shape-w', 700);
+  assert.deepEqual(await opticalSequence(), {heading: 'Inputs changed since run 1 · press Run to update', status: 'Inputs changed since run 1 · press Run to update'});
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
