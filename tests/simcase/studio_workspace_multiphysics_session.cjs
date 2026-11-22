@@ -145,6 +145,12 @@ const MUTATIONS=[
  ['seven runs',d=>{for(let i=2;i<=7;i++)d.runs.push({...JSON.parse(JSON.stringify(d.runs[0])),number:i,job:'mp-00000000000'+i});},/^Unsupported session format or run count\.$/],
  ['a job identifier of another form',d=>{d.runs[0].job='12345678';d.selected='12345678';},/^Run 1 has an invalid job identifier\.$/],
  ['a name with a control character',d=>{d.runs[0].label='a\u0007b';},/^Run 1: Run name must be at most 80 characters/],
+ ['a coupling record of null',d=>{d.runs[0].result.couplings.heat1_to_modes1=null;},/^Run 1's coupling record heat1_to_modes1 does not match its model\.$/],
+ ['a physics result of null',d=>{d.runs[0].result.physics.heat1=null;},/^Run 1's result does not hold the physics of its model\.$/],
+ ['a selection of an inherited name',d=>{d.view.selection='physics:__proto__';},/^The saved view is not one this Studio offers\.$/],
+ ['a loop tolerance that the result raised',d=>{d.runs[0].document.study={type:'single',loops:[{physics:['heat1','modes1'],tolerance:{port:'heat1.temperature',value:'1e-6 K'},max_iterations:5}]};
+  d.runs[0].result.loops=[{physics:['heat1','modes1'],method:'fixed_point',tolerance:{port:'heat1.temperature',value:'1 K'},relaxation:1,iterations:3,converged:true,residuals:[{value:1e-3,unit:'K'},{value:2e-6,unit:'K'}]}];},
+  /did not converge: its last change 0\.000002 K is above the tolerance\.$/],
  ['a document over 1 MiB',d=>{d.runs[0].document.description='x'.repeat(1<<20);},/^Run 1 is over 1 MiB, the size Studio reads a model file up to\.$/],
 ];
 const redigest=d=>{for(const r of d.runs)r.digest=M.recordDigest(r);for(const b of Object.values(d.baselines))b.digest=M.recordDigest(b);return d;};
@@ -213,4 +219,14 @@ test('the version 8 fixture is what the writer writes, with the numbers JSON can
  if(process.env.OPENPHYSICS_WRITE_FIXTURES==='1')require('node:fs').writeFileSync(path,text);
  assert.equal(text,fixture('multiphysics-v8.json'));
  const read=N.parseSession(text);assert.deepEqual(read.runs.map(r=>r.maps),['kept','not kept']);
+});
+
+test('the file assembled from cached run texts is the session object written whole',()=>{
+ const state=stateOf([runOf(1,'mp-000000000001',{pinned:true}),runOf(2,'mp-000000000002')]);
+ const first=M.writeMultiphysicsSession(state).text;assert.equal(first,M.sessionJson(M.createMultiphysicsSession(state)));
+ state.runs[1].label='renamed';const second=M.writeMultiphysicsSession(state).text;
+ assert.equal(second,M.sessionJson(M.createMultiphysicsSession(state)));assert.notEqual(second,first);assert.equal(N.parseSession(second).runs[1].label,'renamed');
+ // a baseline the file does not hold is not counted in the notice
+ const lone={...state,runs:[],baselines:{modes1:{...baselineOf(documentOf()),document:{...MP.uncoupledDocument(documentOf('9e14 W/m^3'),'modes1'),name:'other'}}}};
+ assert.equal(M.writeMultiphysicsSession(lone).baselines,0);assert.equal(M.writeMultiphysicsSession(state).baselines,1);
 });

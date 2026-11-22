@@ -206,8 +206,8 @@ function endLeave(go){
  if(go===false){restoreDialogFocus(pending.opener);notice('Kept the current model and its runs.');return;}
  if(go==='save'){
   $('save-session').click();
-  // the file was not written (the 16 MiB question, or a refusal): stay
-  if(multiView.active()?multiView.unsavedRuns()>0:savedRunsState!==runsStamp())return;
+  // the file was not written (the 16 MiB question, or a refusal): stay, and say so
+  if(multiView.active()?multiView.unsavedRuns()>0:savedRunsState!==runsStamp()){if(overflowDialog.open)notice('Answer the 16 MiB question to save the session; nothing was opened. Choose again once the session is saved.');return;}
  }
  pending.proceed();
 }
@@ -473,7 +473,7 @@ function refreshSaveIndicator(){
  const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});
  $('project').textContent=!applicationChosen()||!text?'No model chosen':(isOptical()?'Optical waveguide':isHeat()?'Heat conduction':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+text;
  // Rewritten only on a change: the footer is a status region read out by screen readers.
- const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';
+ const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.model?latestOffer.model+' · ':''}${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';
  if($('autosave-status').textContent!==footer)$('autosave-status').textContent=footer;
 }
 function refreshWorkflow(){
@@ -635,20 +635,22 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
  try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
-  latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt}:null;
+  latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)}:null;
   if(recovered){$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
   refreshSaveIndicator();
   await renderEarlierSessions();
   if(ui.page==='Applications')render();
  }catch(error){if(version!==notebookLoadVersion)return;recoveryState='unavailable';refreshSaveIndicator();$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
 }
+// The model a recovered multiphysics session names in the recovery lists; null for optical ones.
+const recoveredModel=recovered=>recovered.session.application==='multiphysics'?String(recovered.session.document.name||'Multiphysics model'):null;
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 let earlierSessions=[];
 // The landing page offers to resume until the page has runs or the user starts new.
 let resumeDismissed=false;
 function resumeOffer(){
  if(resumeDismissed||runs.length)return null;
- return {latest:latestOffer,earlier:earlierSessions.map(e=>({runs:e.recovered.session.runs.length,savedAt:e.recovered.savedAt,index:e.index})),
+ return {latest:latestOffer,earlier:earlierSessions.map(e=>({runs:e.recovered.session.runs.length,savedAt:e.recovered.savedAt,index:e.index,model:recoveredModel(e.recovered)})),
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),
   onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
 }
@@ -663,7 +665,8 @@ async function renderEarlierSessions(){
   // keep the storage index: a record that does not parse is skipped, not renumbered
   earlierSessions.push({index,recovered});
   const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
-  button.textContent='Recover earlier session · '+(recovered.session.application==='multiphysics'?(recovered.session.document.name||'Multiphysics model')+' · ':'')+recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();
+  const count=recovered.session.runs.length,model=recoveredModel(recovered);
+  button.textContent='Recover earlier session · '+(model?model+' · ':'')+count+(count===1?' run':' runs')+' · '+new Date(recovered.savedAt).toLocaleString();
   button.onclick=()=>recoverEarlier(index,button);box.append(button);});
 }
 async function recoverEarlier(index,opener){
@@ -1077,7 +1080,16 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   if(session.application==='multiphysics')await checkSessionModels(session,validateModel);
   return {session};});
  if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');
- if(loaded.value.model!==undefined){const text=loaded.value.model;guardLeave(file.name,true,()=>{openingModel=true;multiView.openText(text,file.name,{asSession:true}).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}
+ if(loaded.value.model!==undefined){const text=loaded.value.model,asked=!!leaveText(file.name,true);
+  const open=()=>{openingModel=true;multiView.openText(text,file.name,{asSession:true}).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});};
+  // an edited model or one with runs is replaced only after the open question, as a session is
+  guardLeave(file.name,true,()=>{if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){open();return;}
+   const runsNow=multiView.runCount();
+   $('load-confirm').querySelector('h2').textContent='Open model file?';$('load-confirm').querySelector('p').textContent=`It holds the model but no runs. Replaces the current model${runsNow?` and ${runsNow} ${runsNow===1?'run':'runs'} in this tab`:''}; input undo starts at the opened model.`;$('confirm-load').textContent='Open model file';
+   const summary=$('load-summary');summary.replaceChildren();
+   for(const [name,value] of [['Source',file.name],['Runs that come back','None'],['Model',`${multiView.modelName()} → the model in the file`]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
+   pendingLoad={multiphysics:open,opener:$('open-session'),context:loadContext()};if(!$('load-confirm').open)$('load-confirm').showModal();});
+  return;}
  const session=loaded.value.session;
  if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
  requestLoad(session.input,{session,label:file.name,opener:$('open-session')});
