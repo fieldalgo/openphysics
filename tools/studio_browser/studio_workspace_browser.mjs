@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import {spawn, spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
-import {mkdir, mkdtemp, readdir, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
@@ -601,6 +601,114 @@ try {
   assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');
   assert.ok(!offers.top.some(t => t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')), JSON.stringify(offers.top));
   await noOverflow('J2 Models page');
+
+  // M4 (number of modes; pre-registered, blind except the template's count of guided modes, which
+  // the engine run before this check showed to be 3 of 8): Modes to find in Optical modes and in
+  // Study (M4-d), fewer found than asked (M4-c), Compare of 8-mode runs (M4-f), a version 9
+  // session saved and opened (V17), and a session over 16 MiB (M4-e).
+  await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+  await page.click('[data-template=optical]');
+  await answerDialogs("!!document.querySelector('#shape-w')", 'M4 optical model');
+  const toNode = async node => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click(`#tree [data-node="${node}"]`); await page.until("!!document.getElementById('mode-count-number')", node + ' Modes to find'); };
+  const modeField = () => page.eval("(()=>{const e=document.getElementById('mode-count-number'),p=document.getElementById('input-problems');return {label:e.closest('label').firstChild.textContent,value:e.value,min:e.min,max:e.max,step:e.step,invalid:e.getAttribute('aria-invalid'),problems:p.hidden?'':p.innerText.replace(/\\s+/g,' ').trim(),run:document.getElementById('run-optical').disabled}})()");
+  await toNode('Optical modes');
+  const m4field = await modeField(); stage('M4-d Modes to find', m4field);
+  assert.deepEqual([m4field.label, m4field.value, m4field.min, m4field.max, m4field.step, m4field.run], ['Modes to find', '2', '1', '8', '1', false]);
+  const m4refused = {};
+  for (const raw of ['0', '9', '2.5']) {
+    await page.type('#mode-count-number', raw); const seen = m4refused[raw] = await modeField();
+    assert.match(seen.problems, /Modes to find must be a whole number from 1 to 8\. Last valid value is retained\./, raw);
+    assert.equal(seen.run, true, raw + ': Run is held'); assert.equal(seen.invalid, 'true', raw);
+  }
+  for (const raw of ['1', '8']) { await page.type('#mode-count-number', raw); const seen = m4refused[raw] = await modeField(); assert.equal(seen.problems, '', raw); assert.equal(seen.run, false, raw); }
+  stage('M4-d refused and accepted', m4refused);
+  await toNode('Study');
+  const m4study = await page.eval("({value:document.getElementById('mode-count-number').value,text:document.getElementById('inspector').innerText})");
+  assert.equal(m4study.value, '8'); assert.match(m4study.text, /Window and boundaries are fixed\./); assert.doesNotMatch(m4study.text, /mode count are fixed|candidate count/i);
+  await noOverflow('M4 Study');
+  // M4-c: the template (500 x 220 nm) asking for 8
+  await runAndWait();
+  await page.until("!!document.getElementById('modes-table')", 'M4 results');
+  const m4found = await page.eval("({found:document.getElementById('modes-found')?.textContent??null,rows:document.querySelectorAll('#modes-table tbody tr').length,options:document.querySelectorAll('#field-mode option').length})");
+  stage('M4-c fewer found than asked', m4found);
+  const k = Number(m4found.found?.match(/^Found (\d) of 8 modes above n = 1\.45\.$/)?.[1]);
+  assert.ok(k >= 1 && k < 8, m4found.found); assert.equal(m4found.rows, k); assert.equal(m4found.options, k);
+  await noOverflow('M4 results 3 of 8');
+  // M4-f: two 2000 x 400 nm cores asking for 8 (λ 1550 and 1560 nm), and the template run against one
+  await toGeometry(); await page.type('#shape-w', 2000); await page.type('#shape-h', 400);
+  await runAndWait();
+  await toNode('Optical modes'); await page.type('#wavelength-number', 1560); await runAndWait();
+  const wide = await page.eval("({found:document.getElementById('modes-found')?.textContent??null,rows:document.querySelectorAll('#modes-table tbody tr').length})");
+  stage('M4-f wide core', wide); assert.equal(wide.found, null); assert.equal(wide.rows, 8);
+  const pickerFits = () => page.eval(`(()=>{const s=document.getElementById('compare-mode'),c=document.createElement('canvas').getContext('2d');c.font=getComputedStyle(s).font;
+    return {options:[...s.options].map(o=>o.textContent),width:s.clientWidth,need:Math.max(...[...s.options].map(o=>Math.ceil(c.measureText(o.textContent).width)+32))}})()`);
+  const m4compare = {};
+  for (const [name, a] of [['wide 1550 → 1560', null], ['template → wide 1560', 0]]) {
+    await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'M4 Compare ' + name);
+    if (a !== null) { const job = await page.eval(`document.getElementById('compare-a').options[${a}].value`); await page.choose('#compare-a', job); await page.until("!!document.getElementById('compare-neff')", 'M4 Compare A'); }
+    const rows = await compareTableRows(), accepted = rows.matched.filter(Boolean);
+    m4compare[name] = {rows: rows.rows.map(r => r[0]), picker: rows.picker};
+    stage('M4-f Compare rows ' + name, m4compare[name]);
+    // every matched pair is listed; with none, the picker says so (and is disabled)
+    assert.deepEqual(rows.picker.length ? rows.picker.map(o => o.replace(/ · overlap .*$/, '')) : [], accepted.length ? rows.rows.filter((r, i) => rows.matched[i]).map(r => r[0]) : ['No matched modes'], name + ': the picker lists every matched pair');
+    assert.ok(rows.rows.filter((r, i) => !rows.matched[i]).every(r => /: no match in [AB]/.test(r[0])), name);
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+      const fit = await pickerFits(); m4compare[name]['fit ' + width] = {width: fit.width, need: fit.need};
+      assert.ok(fit.need <= fit.width, `${name}: the widest matched pair needs ${fit.need} px, the picker has ${fit.width} px at ${width}`);
+    }
+    await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
+    await noOverflow('M4 Compare ' + name);
+  }
+  stage('M4-f Compare', m4compare);
+  assert.equal(m4compare['wide 1550 → 1560'].picker.length, 8, 'eight modes of the wide core matched');
+  assert.ok(m4compare['template → wide 1560'].rows.some(r => /^B mode \d: no match in A/.test(r)), 'a wide mode without a template partner reads no match');
+  await page.screenshot('m4-compare');
+  // V17: the session of these runs is version 9; opened again it reads the same runs
+  // the downloads as {name: modification time}: a save in the same minute may reuse a file name
+  const listDownloads = async () => Object.fromEntries(await Promise.all((await readdir(downloads)).filter(n => n.endsWith('.json')).map(async n => [n, (await stat(join(downloads, n))).mtimeMs])));
+  const newDownload = async before => { for (let i = 0; i < 300; i++) { const now = await listDownloads(), f = Object.keys(now).find(n => before[n] !== now[n]); if (f) { await sleep(500); return f; } await sleep(100); } throw new Error('no new download: ' + await text('#file-status')); };
+  let listed = await listDownloads(); await page.click('#save-session');
+  const v9File = await newDownload(listed), v9Text = await readFile(join(downloads, v9File), 'utf8'), v9 = JSON.parse(v9Text);
+  stage('V17 version 9 saved', {file: v9File, bytes: Buffer.byteLength(v9Text), version: v9.version, counts: v9.runs.map(r => [r.settings.mode_count, Array.isArray(r.effective_index) ? r.effective_index.length : r.effective_index.re.length])});
+  assert.equal(v9.version, 9); assert.equal(v9.application, 'optical');
+  assert.ok(v9.runs.every(r => /^sha256:[0-9a-f]{64}$/.test(r.digest) && r.settings.adapter === 'optical-shapes-v8' && Array.isArray(r.te_polarization_fraction) && Array.isArray(r.effective_area)));
+  await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+  await setFile('#session-file', join(downloads, v9File));
+  await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)`, 'V17 open version 9');
+  await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('modes-table')", 'V17 results');
+  const reopened = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,details:document.getElementById('run-details').textContent})");
+  stage('V17 version 9 opened', reopened); assert.equal(reopened.rows, 8); assert.match(reopened.details, /computed by the engine from the saved field/);
+  await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Modes to find follows the selected run');
+  // M4-e: five more wide runs (6 kept: the newest unpinned replace the oldest) are over 16 MiB
+  for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); }
+  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question');
+  const question = await page.eval("({text:document.getElementById('session-overflow-description').textContent,buttons:[...document.querySelectorAll('#session-overflow button')].map(b=>b.textContent)})");
+  stage('M4-e overflow question', question);
+  assert.match(question.text, /^Session is \d\d MB; the limit is 16 MiB\. Keep the fields of the selected and pinned runs only\? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields\.$/);
+  assert.deepEqual(question.buttons, ['Cancel', 'Keep fields for selected and pinned runs']);
+  listed = await listDownloads(); await page.click('#overflow-cancel'); await sleep(500);
+  assert.match(await text('#file-status'), /^Session not saved: nothing was written\./); assert.deepEqual(await listDownloads(), listed, 'Cancel writes nothing');
+  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question again');
+  await page.click('#overflow-keep');
+  const reducedFile = await newDownload(listed), reduced = JSON.parse(await readFile(join(downloads, reducedFile), 'utf8'));
+  const keptFields = reduced.runs.map(r => [r.job === reduced.selected, r.pinned, 'field' in r]);
+  stage('M4-e reduced session', {file: reducedFile, bytes: (await readFile(join(downloads, reducedFile))).length, keptFields, message: await text('#file-status')});
+  assert.equal(reduced.version, 9); assert.ok(keptFields.every(([selected, pinned, field]) => field === (selected || pinned)), JSON.stringify(keptFields));
+  assert.ok(keptFields.some(([, , field]) => !field), 'some runs were written without fields');
+  assert.match(await text('#file-status'), /Fields not kept for Run \d/);
+  // the reduced file opened: a run without fields shows its modes, no field view, and Compare says why
+  await setFile('#session-file', join(downloads, reducedFile));
+  await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)`, 'M4-e open reduced');
+  const bare = reduced.runs.findIndex(r => !('field' in r));
+  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===6", 'M4-e run list');
+  await page.click(`.run-item[data-run="${reduced.runs[bare].job}"]`); await page.until("!!document.getElementById('fields-not-kept')", 'M4-e field-less run');
+  const bareView = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,field:!!document.getElementById('optical-field'),details:document.getElementById('run-details').textContent})");
+  stage('M4-e field-less run', bareView); assert.equal(bareView.rows, 8); assert.equal(bareView.field, false); assert.match(bareView.details, /saved in the session file; its fields were not kept/);
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.querySelector('.compare-no-fields')||!!document.getElementById('compare-neff')", 'M4-e Compare');
+  await page.choose('#compare-b', reduced.runs[bare].job); await page.until("!!document.querySelector('.compare-no-fields')", 'M4-e Compare without fields');
+  assert.match(await text('.compare-no-fields'), /^Run \d has no saved fields, so its modes cannot be matched by overlap\.$/);
+  await noOverflow('M4-e Compare without fields');
 
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
