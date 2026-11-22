@@ -275,6 +275,7 @@ FIELDS = {
     "confinement_factor": ("confinement_factor", "study_points_modes_regions", None),
     "unnormalized_field_overlap": ("unnormalized_field_overlap", "study_points_modes_modes", None),
     "coupling_efficiency": ("coupling_efficiency", "study_points_modes", None),
+    "te_polarization_fraction": ("te_polarization_fraction", "study_points_modes", None),
     "frame_transform": (None, "study_points_columns_columns", None),
     "cluster_ids": (None, "clusters", None),
     "cluster_offsets": (None, "clusters", None),
@@ -341,7 +342,8 @@ class RunResult:
     open_boundary: list[dict] | None = None
     #: ``unnormalized_mode_power`` (vector, W) or ``unnormalized_mode_field_square_integral``
     #: (scalar, m^2) (P, M), ``confinement_factor`` (P, M, R), ``unnormalized_field_overlap``
-    #: (P, M, M, m^2) and, with ``results.mode_overlap.gaussian``, ``coupling_efficiency`` (P, M);
+    #: (P, M, M, m^2), with ``results.mode_overlap.gaussian`` ``coupling_efficiency`` (P, M) and,
+    #: for vector results, ``te_polarization_fraction`` (P, M) of the saved centroid field;
     #: None for PML results (``simcase.mode_postprocessing``)
     postprocessing: dict | None = None
     #: the swept values of a sweep over another slot than the wavelength, in SI
@@ -873,7 +875,7 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
         return VectorField(f.edges, np.conj(f.transverse) * KERNEL_LENGTH, np.conj(f.longitudinal),
                            np.conj(f.electric), f.normalization)
 
-    def postprocessing(arrays: dict | None, vector: bool) -> dict | None:
+    def postprocessing(arrays: dict | None, vector: bool, fields: list[VectorField] | None) -> dict | None:
         if arrays is None:
             return None
         out = {}
@@ -885,6 +887,11 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
         out["unnormalized_field_overlap"] = np.conj(arrays["field_overlap"]) * KERNEL_AREA
         if "coupling_efficiency" in arrays:
             out["coupling_efficiency"] = arrays["coupling_efficiency"]
+        if vector:
+            # defined on the public samples themselves (metres; |E| is the same in either frame)
+            out["te_polarization_fraction"] = np.stack([
+                mode_postprocessing.te_polarization_fraction(model.tri.nodes, model.tri.triangles, f.electric)
+                for f in fields])
         return out
 
     if point:
@@ -911,17 +918,18 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
     if parameter is not None and not wavelength_sweep:
         study_values = np.asarray(study["values"])
     group = None if "cluster_offsets" in kernel else _kernel_group_index(parameter, values, neff, vector, tracked)
+    public_fields = None if not vector else [field(f) for f in kernel["vector_fields"]]
     common = dict(doc=doc, node_coordinates=model.tri.nodes, triangles=model.tri.triangles,
                   regions=model.tri.regions, region_names=list(model.tri.region_names),
                   region_materials=dict(model.region_materials),
                   parameter=study["parameter"] if parameter is not None else None,
                   vacuum_wavelength=wavelength_um * KERNEL_LENGTH, effective_index=np.conj(neff),
                   mode_fields=[np.conj(f) for f in kernel["fields"]], timings=timings, log=log,
-                  vector_fields=None if not vector else [field(f) for f in kernel["vector_fields"]],
+                  vector_fields=public_fields,
                   mode_tracking=_public_tracking(kernel["tracking"]),
                   open_boundary=None if kernel["open_boundary"] is None
                   else [_public_open_boundary(d) for d in kernel["open_boundary"]],
-                  postprocessing=postprocessing(kernel["postprocessing"], vector),
+                  postprocessing=postprocessing(kernel["postprocessing"], vector, public_fields),
                   study_values=study_values, group_index_values=None if group is None else np.conj(group))
     if "cluster_offsets" not in kernel:
         return RunResult(**common)

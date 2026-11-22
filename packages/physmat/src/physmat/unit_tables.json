@@ -2676,6 +2676,7 @@
   "sweep_index": "sweep_index",
   "target_effective_index": "target_effective_index",
   "target_frequency": "target_frequency",
+  "te_polarization_fraction": "te_polarization_fraction",
   "temperature": "temperature",
   "temperature_change": "temperature_change",
   "temperature_difference": "temperature_difference",

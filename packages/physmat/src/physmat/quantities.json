@@ -2791,6 +2791,17 @@
    "places": ["document", "api", "result"],
    "description": {"en": "Coupling efficiency.", "ko": "결합 효율."}
   },
+  "te_polarization_fraction": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1", "%"],
+   "kind": "fraction",
+   "rank": ["scalar"],
+   "domain": {"min": "0", "max": "1"},
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "TE fraction of a vector mode: the area-weighted sum of |E_x|^2 over |E_x|^2 + |E_y|^2 on the saved triangle-centroid field, x the horizontal axis (output); not defined for each member of a degenerate pair.", "ko": "벡터 모드의 TE 비율: 저장된 삼각형 중심 필드에서 면적 가중한 |E_x|^2 합을 |E_x|^2 + |E_y|^2 합으로 나눈 값, x는 수평축(출력). 축퇴 쌍의 각 모드에는 정의되지 않는다."}
+  },
   "overlap_threshold": {
    "dimension": {},
    "unit": "1",
