@@ -382,7 +382,9 @@ try {
   assert.match(matched.head[4], /^n_eff A 500 × 300 nm/); assert.match(matched.head[5], /^n_eff B 450 × 300 nm/);
   assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
   assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
-  for (const r of matched.rows) { assert.match(r[1], /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/); assert.match(r[2], /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/); assert.match(r[6], /^[+−]\d\.\d{8}$/); }
+  // the polarization cells use the modes table's words: a TM-like cell names its TM share first
+  const polarizationCell = /^(?:(?:TE-like|hybrid) · \d+\.\d % TE|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/;
+  for (const r of matched.rows) { assert.match(r[1], polarizationCell); assert.match(r[2], polarizationCell); assert.match(r[6], /^[+−]\d\.\d{8}$/); }
   assert.equal(matched.note, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
   assert.deepEqual(matched.picker.map(o => o.replace(/ · overlap .*$/, '')), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
   assert.doesNotMatch(await text('#canvas'), /compared by rank|not matched modes|mode rank/i);
