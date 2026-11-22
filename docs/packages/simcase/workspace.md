@@ -255,9 +255,10 @@ Modes to find is saved with the model: the input (project) file, a browser draft
 recovery and a session's input keep it ([version 8](#study-settings-in-input-files-version-8)),
 and each run of a session keeps the count it asked for. A change to it is an input edit:
 **Undo** and **Redo** cover it, and the title reads *Unsaved inputs* until it is saved. Opening an
-input file sets it from the file (2 for a file of version 6 or 7). Opening a session sets it from
-the session's input when that is of version 8, else from the selected run, as before. A new
-model starts at 2. With 2 modes the
+input file sets it from the file, 2 for a file of version 6 or 7 (an earlier Studio left it
+unchanged). Opening a session sets it from the session's input when that is of version 8, else
+from the selected run, as before; so a session saved at 2 modes while a run of 4 was selected
+(its input is version 7) opens at 4, as such files did before. A new model starts at 2. With 2 modes the
 solver document is byte for byte the one earlier Studios sent, so its n_eff, TE fraction and
 effective area are unchanged.
 
