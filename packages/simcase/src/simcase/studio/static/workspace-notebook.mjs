@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {validateProject} from './workspace-project.mjs';
+import {validateProject,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
@@ -105,6 +105,8 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  if(record.input?.units?.width!=='nm'||record.input?.units?.temperature!=='K'||record.input?.units?.voltage!=='V')throw new Error('Invalid run units.');
  if(record.serverVersion!=null&&(typeof record.serverVersion!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(record.serverVersion)))throw new Error('Invalid server version.');
  if(record.pinned!==undefined&&typeof record.pinned!=='boolean')throw new Error('Invalid run pin state.');
+ // a run keeps its inputs without study settings (version 6 or 7): its settings hold Modes to find
+ if(record.input?.version===STUDY_PROJECT_VERSION)throw new Error('Unsupported run settings or input mismatch.');
  const input=validateProject(record.input);
  if(format===7&&record.settings?.adapter!==V7_ADAPTER)throw new Error('Unsupported run settings or input mismatch.');
  if(format===9&&record.settings?.adapter!==OPTICAL_ADAPTER)throw new Error(`${which}: unsupported run settings (a version 9 file writes ${OPTICAL_ADAPTER}).`);
@@ -229,20 +231,22 @@ function readView(view){
  return validateView(out);
 }
 /** The version a session of these runs is written as: 7 when every run fits version 7 (and
- * every field is kept), else 9. */
-export function sessionVersion(runs,view={mode:0},keep=null){
+ * every field is kept) and the input is of version 6 or 7, else 9 (an input of version 8, with
+ * study settings, is held by version 9 only). */
+export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ if(input?.version===STUDY_PROJECT_VERSION)return OPTICAL_SESSION_VERSION;
  return runs.every(run=>fitsVersion7(run)&&(!keep||keep.has(run.job)))&&validateView(view).mode<2?SESSION_VERSION:OPTICAL_SESSION_VERSION;
 }
 /** The session object: version 7 (unchanged) or 9 by sessionVersion. keep: the jobs whose fields
  * are written (null: every run's). */
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'},{keep=null}={}){
- const version=sessionVersion(runs,view,keep);
- if(version===SESSION_VERSION)return {format:'openphysics-studio-session',version,input:validateProject(input),runs:runs.map(run=>sessionRun(run)),selected,comparison:[...comparison],view:sessionView(view)};
+ const checked=validateProject(input),version=sessionVersion(runs,view,keep,checked);
+ if(version===SESSION_VERSION)return {format:'openphysics-studio-session',version,input:checked,runs:runs.map(run=>sessionRun(run)),selected,comparison:[...comparison],view:sessionView(view)};
  // what a version 9 reader refuses is not written: a run read from an earlier file whose indices
  // are not ranked above the threshold, or a view of a mode the selected run does not have
- runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it. Remove the run or save it in a session of its own.`);});
+ runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it${checked.version===STUDY_PROJECT_VERSION&&sessionVersion(runs,view,keep)===SESSION_VERSION?' (the current Modes to find or group index option is saved in version 9 only; set 2 modes and the option off to save as version 7)':''}. Remove the run or save it in a session of its own.`);});
  const shown=runs.find(run=>run.job===selected);if(shown&&validateView(view).mode>=shown.effective_index.length)throw new Error('Unsupported saved field view.');
- return {format:'openphysics-studio-session',version,application:'optical',input:validateProject(input),runs:runs.map(run=>sessionRun(run,version,!keep||keep.has(run.job))),selected,comparison:[...comparison],view:sessionView(view)};
+ return {format:'openphysics-studio-session',version,application:'optical',input:checked,runs:runs.map(run=>sessionRun(run,version,!keep||keep.has(run.job))),selected,comparison:[...comparison],view:sessionView(view)};
 }
 /** The file text of a session: version 7 as JSON.stringify writes it (as before), version 9 with
  * the number rules of version 8 (workspace-multiphysics-session.mjs: negative zero kept). */
@@ -305,6 +309,9 @@ export function parseSession(text,{recovered=false}={}){
   const missing=TOP_KEYS_9.find(k=>!Object.hasOwn(doc,k));if(missing!==undefined)throw new Error(`The session file has no ${JSON.stringify(missing)}.`);
  }
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
+ // the input of a version 6 or 7 session is an input file of version 6 or 7; version 9 also
+ // holds one of version 8 (with study settings)
+ if(!nine&&doc.input?.version===STUDY_PROJECT_VERSION)throw new Error(`A version ${doc.version} session holds an input file of version 6 or 7.`);
  const input=validateProject(doc.input),runs=doc.runs.map((r,i)=>{
   let record=r;
   if(nine){

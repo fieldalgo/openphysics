@@ -83,7 +83,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
    입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
    군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. 입력
-   편집 하나이므로 **Undo**가 되돌립니다(페이지 상태인 Modes to find와 군굴절률 선택은 Undo가 바꾸지 않음). 실행 전에는 *Nothing is
+   편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
@@ -214,9 +214,12 @@ Heated silicon waveguide 애플리케이션은 정상 열전도와 광 모드를
 *Found 3 of 8 modes above n = 1.45*라고 알리고, 표에는 그만큼의 행만 있습니다. 결과마다 사용한
 형상·파장·코어 메시를 표시하고 요청한 모드 수를 함께 보존합니다.
 
-Modes to find는 페이지 상태입니다. 세션 파일은 실행마다 이 값을 보존하고 세션을 열면 선택한
-실행의 값으로 설정되지만, 입력(프로젝트) 파일과 브라우저 초안은 이 값을 저장하지 않으며 실행하지
-않은 변경은 저장되지 않습니다. 새 모델은 2로 시작합니다. 모드 2개일 때 솔버 문서는 이전 Studio가
+Modes to find는 모델과 함께 저장됩니다. 입력(프로젝트) 파일, 브라우저 초안, 브라우저 복구, 세션의 입력이
+이 값을 보존하고([버전 8](#입력-파일의-study-설정버전-8)), 세션의 실행마다 요청한 모드 수도 보존합니다.
+이 값의 변경은 입력 편집이므로 **Undo**와 **Redo**가 다루며, 저장할 때까지 제목은 *Unsaved inputs*입니다.
+입력 파일을 열면 파일의 값으로 설정되며 버전 6·7 파일이면 2입니다(이전 Studio는 값을 바꾸지 않았음). 세션을
+열면 세션의 입력이 버전 8일 때는 그 입력의 값으로, 아니면 이전처럼 선택한 실행의 값으로 설정됩니다. 그래서
+모드 4개 실행을 고른 채 모드 2로 저장한 세션(입력은 버전 7)은 이전 파일처럼 4로 열립니다. 새 모델은 2로 시작합니다. 모드 2개일 때 솔버 문서는 이전 Studio가
 보낸 문서와 바이트 단위로 같으므로 n_eff, TE 비율, 유효 면적이 바뀌지 않습니다.
 
 **Study**의 **Also compute group index (3 solves)**(기본값 꺼짐)는 실행 문서에
@@ -224,9 +227,10 @@ Modes to find는 페이지 상태입니다. 세션 파일은 실행마다 이 �
 λ0 − 1 nm와 λ0 + 1 nm에서도 풀고(재료는 파장마다 값을 구함), 중앙 차분으로
 n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배입니다([단일 study의 군굴절률](group_index.md)).
 꺼져 있으면 문서는 이전과 같은 `optical-shapes-v8` 문서이며 바이트 단위로 같습니다. 켜면 달라지는 것은
-`results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 페이지
-상태입니다. 새 모델은 꺼진 상태로 시작하고 입력 파일은 이 값을 저장하지 않습니다. 세션을 열거나
-**Use this run's inputs**를 누르면 실행에 맞춰 설정됩니다(n_g가 있는 실행이면 켜짐). 이 상자는 실행과
+`results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 모델과 함께
+저장되며 **Undo**와 **Redo**가 다룹니다. 새 모델은 꺼진 상태로 시작합니다. 입력 파일을 열면 파일의 값으로
+설정됩니다(버전 6·7이면 꺼짐). 세션을 열면 세션의 입력이 버전 8일 때는 그 입력의 값으로, 아니면 선택한
+실행의 값으로 설정됩니다. **Use this run's inputs**를 누르면 실행에 맞춰 설정됩니다(n_g가 있는 실행이면 켜짐). 이 상자는 실행과
 비교하는 study의 일부입니다. 상자를 켜면 n_g가 없는 실행은 현재 입력의 실행이 아니고, 상자를 끈 채 한
 문서 검사는 이전 입력의 검사입니다. 어댑터는 `optical-shapes-v8` 그대로이고 실행의 `settings`도 바뀌지
 않습니다. 실행 표 CSV는 n_g를 `group_index [1]` 열에 씁니다.
@@ -665,7 +669,7 @@ kept*를 보입니다.
 Restore last session from this browser로 완료된 브라우저 스냅샷을, Open session으로 파일을 명시적으로
 복원합니다. 저장 대기 중인 변경은 백업이 아닙니다.
 
-입력 파일은 버전 7입니다: 버전 6(단위·이름 일괄 변경)에 Joule 가열 입력(`model.joule`, 길이 mm,
+입력 파일은 버전 7이며, study 설정을 담으면 [버전 8](#입력-파일의-study-설정버전-8)입니다. 버전 7은 버전 6(단위·이름 일괄 변경)에 Joule 가열 입력(`model.joule`, 길이 mm,
 `units.joule_length`)을 더했습니다. 버전 6 파일도 기본 Joule 입력으로 계속 읽으며, 인터페이스가
 전류와 열뿐인 프로젝트는 Joule 가열 애플리케이션으로 열립니다. 코어 높이·파장·코어 메시 크기·형상 목록은
 nm, 열 판은 mm로 각각 단위와 함께 기록하고, 열 판의 열유속 변은 안쪽 방향 열유속으로 기록합니다
@@ -710,10 +714,22 @@ from 1 to 8 (got 9).*로 거부합니다. 0, 9, 2.5, 2.0, `"2"`, `true`는 거�
 `-v5`, `optical-shapes-v6`와 `-v7`)을 알리고 값은 양 문자열입니다. 전체 엔진 의존성이나 Git
 이력을 나타내는 정보는 아닙니다.
 
+### 입력 파일의 study 설정(버전 8)
+
+버전 8은 버전 7의 `model`에 광학 study 설정을 `model.joule` 뒤에 더한 것입니다. `modeCount`(Modes to find,
+1–8의 정수)는 2가 아닐 때만, `groupIndex`(`true`)는 **Also compute group index**를 켰을 때만 씁니다.
+모드 2개에 상자가 꺼진 입력은 이전과 바이트 단위로 같은 버전 7로 쓰므로 이전 Studio에서도 열리며, 버전 6·7
+파일을 열어도 다시 쓰지 않습니다. 버전 8 파일은 두 키를 검사해 읽습니다(1–8 밖의 `modeCount`나 boolean이
+아닌 `groupIndex`는 거부). 값이 기본값이면 버전 7 입력으로 읽습니다. 입력 파일을 버전 7까지 읽는 Studio는
+버전 8 파일을 *Unsupported project format or version.*으로 거부합니다. 실행은 입력을 버전 7로 보존하며, 실행의
+study는 `settings.mode_count`와 군굴절률이 담습니다. 실행이 없는 세션은 입력만으로 설정을 정합니다(버전 7
+입력이면 2와 꺼짐).
+
 ### 광학 세션 파일(버전 9)
 
 모든 실행이 실수 모드 두 개와 장을 가진 세션은 이전과 바이트 단위로 같은 버전 7로 씁니다. 버전 7이 담을 수
-없는 실행(모드 1개 또는 3–8개, 복소 유효 굴절률, 장이 없는 실행, 모드 3 이상을 보이는 보기)이 생기면 버전 9로
+없는 실행(모드 1개 또는 3–8개, 복소 유효 굴절률, 장이 없는 실행, 모드 3 이상을 보이는 보기)이 생기거나 입력이
+[버전 8](#입력-파일의-study-설정버전-8)이면 버전 9로
 씁니다. 버전 6·7 파일을 열어도 다시 쓰지 않습니다. 그 실행은 모드 두 개로 읽고, TE 비율과 유효 면적은
 Studio가 저장 샘플에서 계산하며, 세션은 다시 버전 7로 써집니다. 버전 9 이전 Studio는 버전 9 파일을 *This
 session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.*로
@@ -722,7 +738,12 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 버전 9 파일은 정확히 다음 키를 가진 JSON 객체 하나입니다: `format`(`"openphysics-studio-session"`),
 `version`(9), `application`(`"optical"`), `input`(버전 7 입력 파일), `runs`(최대 여섯 개), `selected`(실행의
 `job` 또는 null), `comparison`(`job` 두 개 또는 null), `view`(모두 필수. 버전 7과 같되 `mode`는 0–7이며 선택한 실행의
-모드 수보다 작음). 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
+모드 수보다 작음). `input`은 버전 8 입력 파일(study 설정)일 수도 있습니다. 입력이 버전 8인 세션은 모든 실행이
+버전 7에 맞아도 버전 9로 쓰며, 그런 입력을 담은 버전 6·7 세션은 거부합니다(*A version 7 session holds an
+input file of version 6 or 7.*, 버전 6도 마찬가지). 그래서 버전 6·7 파일에서 읽은 실행의 굴절률이 n = 1.45 위에서
+순서대로가 아니면 Modes to find가 2가 아니거나 군굴절률 선택이 켜진 동안 저장할 수 없습니다. 거부는 그 실행을
+밝히고 설정이 버전 9를 요구한다고 말합니다(그동안 그 노트북의 브라우저 복구도 멈춤). 입력 파일을 버전 7까지 읽는 Studio는 그런 버전 9 파일을 *Unsupported project format or
+version.*으로 거부합니다. 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
 
 | 키 | 형식 | |
 | --- | --- | --- |
