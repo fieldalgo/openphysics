@@ -233,6 +233,7 @@ converted once):
 | `unnormalized_field_overlap` | `(points, modes, modes)` | `<E_a, E_b> = int conj(E_a) . E_b dA` in m^2 (`overlap_matrix(..., "field")`, Hermitian; scalar: `scalar_overlap`); the diagonal is `int |E|^2 dA`, which for scalar results equals the square integral |
 | `coupling_efficiency` | `(points, modes)` | only with `results.mode_overlap.gaussian`: `|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>)` of a Gaussian input (`coupling_efficiency` after `interpolate_vector_field`; scalar: `scalar_coupling_efficiency` at the nodes) |
 | `te_polarization_fraction` | `(points, modes)` | vector results only: `f_TE = Σ_T A_T |E_x,T|² / Σ_T A_T (|E_x,T|² + |E_y,T|²)` on the saved centroid field `unnormalized_electric_field`, summed over every triangle of the window (all regions), `A_T` the triangle area from `node_coordinates`, `x` the document's horizontal axis and `E_z` left out; `f_TM = 1 − f_TE`. Unit 1 (registry quantity `te_polarization_fraction`, a fraction). It needs no kernel call: any reader of the saved samples reproduces it |
+| `effective_area` (m^2) | `(points, modes)` | vector: `A_eff = (Σ_T A_T |E_T|²)² / Σ_T A_T |E_T|⁴` on the same saved centroid field and triangle areas, summed over every triangle of the window (all regions), with all three components, `|E|² = |E_x|² + |E_y|² + |E_z|²`; any reader of the saved samples reproduces it. Scalar: `scalar_effective_area` (`(int |phi|^2 dA)^2 / int |phi|^4 dA` with the P1 mass and the degree-4 triangle rule) in the kernel frame, times 1e-12. Registry quantity `effective_area` |
 
 The saved amplitudes are relative, hence "unnormalized": read the vector amplitudes as V/m;
 `unnormalized_mode_power` is then the power of that field in watts, `Re` the time-averaged
@@ -250,6 +251,18 @@ Limitation: a mesh split above 1e-3, possible on very coarse meshes, is not reco
 and a member's fraction is then a rotation chosen by the mesh. The words TE-like, TM-like and hybrid
 are Studio's, not the engine's. The key is additive: `field_layout` stays
 `em-modes2d-p1-node-centroid-v2` and no other array or key changes.
+`effective_area` is the common form behind commercial mode solvers' "effective area"; it is not
+the vectorial nonlinear effective area of Afshar and Monro (Opt. Express 17, 2298 (2009)), which
+weights by the Poynting vector and `E · E`. The centroid rule converges to the same limit as the
+Whitney/P1 kernel `galerkin.kernels.effective_area(..., include_longitudinal=True)`: on the
+500 × 220 nm SOI strip with every mesh length scaled with the core element size, the two differ
+by 7.7e-4, 2.5e-4 and 5.2e-5 (TE-like mode) and 1.5e-4, 6.7e-5 and 1.3e-5 (TM-like mode) relative
+at 40, 20 and 10 nm, and an x-polarised Gaussian sampled at the centroids of a disk mesh gives
+π w0² to 1.7e-6 at a ring spacing of w0/32 (`tests/simcase/test_mode_effective_area.py`). Each
+member of a degenerate pair has its own value, which depends on the rotation within the pair;
+both are saved. `E_z` is part of the sum: for the 500 × 220 nm strip's TE-like mode it raises A_eff
+by about 27 % over the transverse-only value. The key is additive, like
+`te_polarization_fraction`: `field_layout` and every other key are unchanged.
 `confinement_factor`, `coupling_efficiency` and `te_polarization_fraction` are dimensionless. `summary.json` repeats the
 values under `mode_postprocessing` as value objects with a `unit` and `description` per key
 (complex values as `re`/`im` with `time_convention`, `confinement_factor` with its region names).

@@ -268,5 +268,8 @@ TE에 적용되지 않습니다(`H_z != 0`): Faraday 경로와의 측정 차이 
   제공하지 않습니다.
 - simcase는 닫힌 창 `em.modes2d` 결과마다 `vector_power`/`scalar_power`,
   `confinement_factor`, `overlap_matrix`와 선택적 Gaussian `coupling_efficiency`를
-  저장합니다([모드 후처리](../simcase/overview.md#모드-후처리)). Studio에는 노출되지
-  않습니다. simcase 정규화(`"peak"`)는 비교를 위해 재현했을 뿐입니다.
+  저장하고([모드 후처리](../simcase/overview.md#모드-후처리)), 유효 면적도 저장합니다.
+  스칼라 결과는 `scalar_effective_area`, 벡터 결과는 같은 `|E|^2`/`|E|^4` 정의를 세 성분
+  모두로 저장된 삼각형 중심 장에서 중심 규칙으로 합한 값이며, 이는
+  `effective_area(..., include_longitudinal=True)`로 수렴합니다. Studio는 이 커널이 아니라
+  그 유효 면적을 보여 줍니다. simcase 정규화(`"peak"`)는 비교를 위해 재현했을 뿐입니다.
