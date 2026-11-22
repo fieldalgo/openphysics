@@ -702,11 +702,13 @@ const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduct
 // Browser recovery also keeps the last saved file, so its stamp includes it.
 const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurrent(),pageForRecord()]);
 const notebookStore=indexedNotebookStore();
+// the note of the last recovery snapshot kept without the study settings (shown once in the message line)
+let recoveryNote='';
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current')recoveryState='kept';
- if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
+ if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
  refreshSaveIndicator();
 }});
@@ -867,10 +869,10 @@ const opticalDocument=()=>buildOpticalDocument(state,setup);
 // The parts the inputs words compare, with Modes to find when the run or the page asks for other
 // than 2 (other: the run's count, so both sides name it together)
 const studyParts=(input,n,other=n,g=false,otherG=g)=>[...opticalInputParts(input),...(n===DEFAULT_MODE_COUNT&&other===DEFAULT_MODE_COUNT&&state.modeCount===DEFAULT_MODE_COUNT?[]:[`Modes to find ${n}`]),...(g||otherG?[g?'group index on':'group index off']:[])];
-// Modes to find (1 to 8): the number of modes a run asks for. Page state: a session keeps it
-// with each run, a project or model file does not.
-const MODE_COUNT_NOTE='Modes to find is kept with each run of a session; a project or model file does not store it.';
-// Also compute group index (page state, off by default): the run's document gains
+// Modes to find (1 to 8): the number of modes a run asks for, saved with the inputs (version 8
+// when not 2) and kept with each run.
+const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept with each run of a session.';
+// Also compute group index (off by default, saved with the inputs): the run's document gains
 // results.group_index and the engine solves λ0 − 1 nm and λ0 + 1 nm as well (workspace-optical.mjs)
 const GROUP_INDEX_LABEL='Also compute group index (3 solves)';
 const groupIndexField=()=>`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">n_g by a central difference over λ0 ± 1 nm on the same mesh; about three times the run time. Off: the document is the one this Studio wrote before.</p>`;

@@ -896,8 +896,10 @@ whose input is of version 8 is written as version 9 even when every run fits ver
 version 6 or 7 session holding one is refused (*A version 7 session holds an input file of version
 6 or 7.*, and likewise for version 6). A run read from a version 6 or 7 file whose indices are not
 ranked above n = 1.45 can therefore not be saved while Modes to find is not 2 or the group index
-option is on: the refusal names the run and says that the setting asks for version 9 (browser
-recovery of that notebook stops until then). A Studio that reads input files up to version 7 refuses such a version 9 file with *Unsupported project
+option is on: the refusal names the run and says that the setting asks for version 9. Browser
+recovery keeps working: it keeps that notebook as version 7 without the setting, and says so once
+in the message line and in the recovery details (*Browser recovery kept this notebook without
+Modes to find 3: …*). A Studio that reads input files up to version 7 refuses such a version 9 file with *Unsupported project
 format or version.* Each run has these keys, in this order; any other key is refused by name:
 
 | Key | Type | |
