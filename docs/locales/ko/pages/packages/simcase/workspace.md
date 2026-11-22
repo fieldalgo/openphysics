@@ -742,7 +742,9 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 버전 7에 맞아도 버전 9로 쓰며, 그런 입력을 담은 버전 6·7 세션은 거부합니다(*A version 7 session holds an
 input file of version 6 or 7.*, 버전 6도 마찬가지). 그래서 버전 6·7 파일에서 읽은 실행의 굴절률이 n = 1.45 위에서
 순서대로가 아니면 Modes to find가 2가 아니거나 군굴절률 선택이 켜진 동안 저장할 수 없습니다. 거부는 그 실행을
-밝히고 설정이 버전 9를 요구한다고 말합니다(그동안 그 노트북의 브라우저 복구도 멈춤). 입력 파일을 버전 7까지 읽는 Studio는 그런 버전 9 파일을 *Unsupported project format or
+밝히고 설정이 버전 9를 요구한다고 말합니다. 브라우저 복구는 계속됩니다. 그 노트북을 설정 없이 버전 7로
+보존하고, 메시지 줄과 복구 세부 정보에 한 번 그렇게 알립니다(*Browser recovery kept this notebook without
+Modes to find 3: …*). 입력 파일을 버전 7까지 읽는 Studio는 그런 버전 9 파일을 *Unsupported project format or
 version.*으로 거부합니다. 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
 
 | 키 | 형식 | |

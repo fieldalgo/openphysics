@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {validateProject,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
+import {validateProject,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
@@ -282,8 +282,22 @@ export function captureSession(input,runs,selected,comparison,view){
   for(const key of ['te','area'])if(run[key])Object.defineProperty(copy,key,{value:run[key],enumerable:false,configurable:true,writable:true});
   return copy;});
  const capturedComparison=[...comparison];
- return ()=>{const out=writeOpticalSession(capturedInput,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true});
+ // When the study settings of the input (version 8) need version 9 but a run cannot be held by it
+ // (read from a version 6 or 7 file), recovery keeps the notebook as version 7 without those
+ // settings, and the snapshot's note says what was not kept; Save session still refuses.
+ const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true});
+ const make=()=>{make.note='';let out;
+  try{out=write(capturedInput);}catch(error){
+   if(capturedInput.version!==STUDY_PROJECT_VERSION)throw error;
+   let plain;try{plain=write(withoutStudy(capturedInput));}catch{throw error;}
+   out=plain;make.note=recoveryStudyNote(capturedInput);}
   if(!out.ok)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');return out.text;};
+ make.note='';return make;
+}
+/** The note of a recovery kept without the study settings of these inputs (version 8). */
+export function recoveryStudyNote(input){
+ const {modeCount,groupIndex}=projectStudy(input),parts=[...(modeCount===2?[]:[`Modes to find ${modeCount}`]),...(groupIndex?['the group index option']:[])];
+ return `Browser recovery kept this notebook without ${parts.join(' and ')}: a run read from an earlier file cannot be saved with ${parts.length>1?'them':'it'}. Set 2 modes and the option off, or remove that run, to keep them.`;
 }
 /** The refusal of a session file newer than a Studio reads (versions 6 to highest). */
 export const newerVersionText=(version,highest)=>`This session file is version ${version}, newer than this Studio reads (versions 6–${highest}). Open it in a newer Studio.`;

@@ -103,6 +103,21 @@ test('a run version 9 cannot hold names the study setting that asked for version
  assert.throws(()=>N.sessionText(P.withStudy(st.input,{modeCount:3}),[r],r.job,[r.job,r.job],view),{message:/^Run 1: its effective indices are not ranked by Re n_eff above n = 1\.45, so a version 9 session cannot hold it \(the current Modes to find or group index option is saved in version 9 only; set 2 modes and the option off to save as version 7\)\. Remove the run or save it in a session of its own\.$/});
 });
 
+test('recovery of such a session keeps the version 7 form and says which settings were not kept',()=>{
+ const st=JSON.parse(fixture('state-one.json')),r={...st.runs[0],effective_index:[st.runs[0].effective_index[0],1.40]};
+ const v7=N.sessionText(st.input,[r],r.job,[r.job,r.job],view);
+ for(const [study,words] of [[{modeCount:3},'Modes to find 3'],[{groupIndex:true},'the group index option'],[{modeCount:5,groupIndex:true},'Modes to find 5 and the group index option']]){
+  const make=N.captureSession(P.withStudy(st.input,study),[r],r.job,[r.job,r.job],view);
+  assert.equal(make(),v7,JSON.stringify(study));
+  assert.equal(make.note,`Browser recovery kept this notebook without ${words}: a run read from an earlier file cannot be saved with ${words.includes(' and ')?'them':'it'}. Set 2 modes and the option off, or remove that run, to keep them.`);
+ }
+ // a session version 9 can hold keeps its settings, with no note; one of version 7 inputs as before
+ const ok=N.captureSession(P.withStudy(st.input,{modeCount:3}),st.runs,st.selected,st.comparison,st.view);
+ assert.equal(JSON.parse(ok()).input.model.modeCount,3);assert.equal(ok.note,'');
+ const plain=N.captureSession(st.input,st.runs,st.selected,st.comparison,st.view);
+ assert.equal(plain(),fixture('optical-v7-one.json'));assert.equal(plain.note,'');
+});
+
 test('S-c: a version 7 session does not hold a version 8 input, and a run keeps version 7 inputs',()=>{
  const doc=JSON.parse(fixture('optical-v7-empty.json'));doc.input=v8Input();
  assert.throws(()=>N.parseSession(JSON.stringify(doc)),{message:'A version 7 session holds an input file of version 6 or 7.'});
