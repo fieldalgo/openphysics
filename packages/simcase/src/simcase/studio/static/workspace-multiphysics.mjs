@@ -90,6 +90,13 @@ export function sourceChoices(doc,catalog){
  }
  return out;
 }
+// The From list of a coupling added for one input (`to`): only the outputs that input can take
+// (pairProblem null), so a temperature input is never offered one value per mode. Without `to`,
+// every output, the ones that are not fields greyed with their reason (sourceChoices).
+export function sourceChoicesFor(doc,catalog,to){
+ const all=sourceChoices(doc,catalog);
+ return to?all.filter(s=>s.ok&&pairProblem(doc,catalog,s.spec,to)===null):all;
+}
 // Why `to` cannot take `from` (null when it can): the rules the engine checks, in words.
 export function pairProblem(doc,catalog,from,to){
  const out=findPort(doc,catalog,from),inp=findPort(doc,catalog,to);
@@ -468,7 +475,8 @@ export function freshnessAgain(freshness,diverged){return freshness==='current'&
 // A run in the dock and the footer: "Run 2 · design A" when it is named, as the optical app says
 // it; an unnamed run keeps the words it had ("run 2" inside a sentence).
 const runWords=(runId,label,inSentence=false)=>label?`Run ${runId} · ${label}`:`${inSentence?'run':'Run'} ${runId}`;
-export const matchesAgainText=(runId,label='')=>`Model matches ${runWords(runId,label,true)} again: its results are current. Run makes a new run with the same inputs`;
+// It says first that nothing needs running, then what Run would still do (a copy).
+export const matchesAgainText=(runId,label='')=>`No need to run: ${runWords(runId,label)} already has these results. Run again to make a copy`;
 export function editNotice(message,freshness,runId,label=''){return message+(freshness==='again'?` ${matchesAgainText(runId,label)}.`:' Press Run to compute the new model.');}
 // Where a result shown as current came from, when this tab did not compute it (optical and
 // multiphysics alike); null for a run computed here.

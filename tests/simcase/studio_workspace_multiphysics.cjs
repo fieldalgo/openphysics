@@ -48,6 +48,17 @@ test('the envelope follows the couplings and kinds: one physics is format 0.3, a
  // a removed physics leaves its coupling for the check to show
  assert.deepEqual(Object.keys(m.removePhysics(heated(),'heat1').couplings),['heat1_to_modes1']);
 });
+test('round 11: Add coupling opened for one input lists only the outputs that input can take',async()=>{
+ const m=await mp,c=m.kindCatalog(CAPS);
+ const doc=m.removeCoupling(heated(),'heat1_to_modes1');
+ const listed=m.sourceChoicesFor(doc,c,'modes1.temperature').map(s=>s.spec);
+ // a temperature input: the temperature field only, never one value per mode or a heat flux
+ assert.deepEqual(listed,['heat1.temperature']);
+ for(const spec of listed)assert.equal(m.pairProblem(doc,c,spec,'modes1.temperature'),null);
+ // without an input, the list is the full one, the outputs that are not fields greyed with their reason
+ assert.deepEqual(m.sourceChoicesFor(doc,c,null),m.sourceChoices(doc,c));
+ assert.ok(m.sourceChoicesFor(doc,c,null).some(s=>s.spec==='modes1.effective_index'&&!s.ok));
+});
 test('the port pickers offer outputs, then only compatible inputs, and say why the others are greyed',async()=>{
  const m=await mp,c=m.kindCatalog(CAPS);
  const doc={...heated(),physics:{...heated().physics,heat2:{type:'thermal.steady2d'},mk1:{type:'test.relaymk'},power1:{type:'test.power'},relay1:{type:'test.relay'}}};
@@ -235,8 +246,8 @@ test('a model edit leaves the last run out of date; the same content again is cu
  assert.equal(m.sequenceHeading('current',2,'imported','design A'),'Run 2 · design A · read from file, not recomputed');
  assert.equal(m.readyStatus('current',2,'local','design A'),'Run 2 · design A matches the model · press Run to solve again');
  assert.equal(m.readyStatus('stale',2,'local','design A'),'Model edited since Run 2 · design A · press Run to update');
- assert.equal(m.readyStatus('again',2,'local','design A'),'Model matches Run 2 · design A again: its results are current. Run makes a new run with the same inputs');
- assert.equal(m.matchesAgainText(2),'Model matches run 2 again: its results are current. Run makes a new run with the same inputs');
+ assert.equal(m.readyStatus('again',2,'local','design A'),'No need to run: Run 2 · design A already has these results. Run again to make a copy');
+ assert.equal(m.matchesAgainText(2),'No need to run: Run 2 already has these results. Run again to make a copy');
  assert.equal(m.canonicalJson({b:[{d:1,c:2}],a:null}),'{"a":null,"b":[{"c":2,"d":1}]}');
 });
 test('the heater-off column is valid by the content of the optical model it solved, not by run order',async()=>{
@@ -287,7 +298,7 @@ test('each wire is anchored on the ports its coupling joins; every port has its 
 test('the model back at the last run says so in one sentence everywhere, without asking for a Run',async()=>{
  const m=await mp;
  assert.equal(m.freshnessAgain('current',false),'current');assert.equal(m.freshnessAgain('current',true),'again');assert.equal(m.freshnessAgain('stale',true),'stale');
- const again='Model matches run 1 again: its results are current. Run makes a new run with the same inputs';
+ const again='No need to run: Run 1 already has these results. Run again to make a copy';
  assert.equal(m.sequenceHeading('again',1),again);assert.equal(m.readyStatus('again',1),again);
  assert.equal(m.editNotice('Coupling Heat 1 temperature → Modes 1 temperature added.','again',1),'Coupling Heat 1 temperature → Modes 1 temperature added. '+again+'.');
  assert.equal(m.editNotice('Value updated.','stale',1),'Value updated. Press Run to compute the new model.');

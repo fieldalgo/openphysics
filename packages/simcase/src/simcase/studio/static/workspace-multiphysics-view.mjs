@@ -8,7 +8,7 @@
 import {POLARIZATION_HELP,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
- normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
+ normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoicesFor,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
  mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
  runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,RANKING_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
@@ -44,6 +44,10 @@ export function createMultiphysicsView(ctx){
  // last written to a file (Save inputs only or Save session).
  // sourceFile: the session file this model was opened from (or a recovered record names), by name
  let sessionFile=null,loaded=null,openedSignature=null,cleanSignature=null,sourceFile=null;
+ // freshSignature: the model a template card gave, until it is edited, saved or run ("New model ·
+ // not saved"); openedStamp: the content when it was opened from sourceFile, or recovered from a
+ // record that still matched it (whether the recovery record still matches that file)
+ let freshSignature=null,openedStamp=null;
  // the heater-off comparison solved after each coupled run (on for a model with a coupled
  // temperature when it opens), the physics still to solve alone, and the last coupling removed
  let baselineOption=false,baselineQueue=[],baselineErrors={},lastRemoval=null,starting=false,stopAsked=false;
@@ -56,23 +60,27 @@ export function createMultiphysicsView(ctx){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];selection='model';runs=[];lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   baselineOption=baselinePhysics(doc).length>0;baselineQueue=[];baselineErrors={};lastRemoval=null;indexView='n';
-  ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;sourceFile=fromFile?label:null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;
+  ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;sourceFile=fromFile?label:null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;freshSignature=fromFile?null:signature();openedStamp=null;
   ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?.text?' '+note.text:''),note?.more||'');
  }
  // A session file of version 8 (or browser recovery), already checked (§3): the model, its runs,
  // the without-heater results and the view. Nothing is run, a without-heater run included.
  // source: 'file' | 'browser'; savedFile: the session file a recovered record was saved to.
  // openedFile: the file a recovered record was opened from, which the recovery lists name.
- async function openSession(session,{label,source='file',savedFile=null,openedFile=null}){
+ // openedCurrent: whether the recovered record still matched openedFile (null when it does not say).
+ async function openSession(session,{label,source='file',savedFile=null,openedFile=null,openedCurrent=null}){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=structuredClone(session.document);undoStack=[];redoStack=[];runFailure=null;lastRemoval=null;baselineQueue=[];baselineErrors={};stopAsked=false;
   runs=session.runs.map(r=>({...r}));lastRun=runs.find(r=>r.job===session.selected)||null;announcedMultiphysics=isMultiphysics(doc);
   uncoupled={};for(const [name,b] of Object.entries(session.baselines))uncoupled[name]={rows:effectiveIndexRows(b.result),key:canonicalJson(b.document),completedAt:b.completedAt,job:b.job,document:b.document,result:b.result};
   const v=session.view;selection=v.selection;indexView=v.index_map==='change'?'dn':'n';baselineOption=v.baseline_option;resultPage=selection.startsWith('results:')?selection:null;
-  openedSignature=signature();const matched=source==='file'||savedFile?.current===true;cleanSignature=matched?signature():null;sourceFile=source==='file'?label:openedFile;
-  sessionFile=source==='file'?{name:label,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map()}:null;
+  // a record that still matched the file it was opened from reads as that file, as an optical one does
+  const openedMatch=source!=='file'&&!savedFile&&!!openedFile&&openedCurrent===true;
+  openedSignature=signature();const matched=source==='file'||savedFile?.current===true||openedMatch;cleanSignature=matched?signature():null;sourceFile=source==='file'?label:openedFile;freshSignature=null;
+  sessionFile=source==='file'||openedMatch?{name:source==='file'?label:openedFile,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map()}:null;
   ctx.ui.page=v.page==='Results'&&!lastRun?'Model':v.page;validate(true);ctx.onHistory();
-  loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp()};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
+  loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp(),file:sourceFile,fileCurrent:source==='file'||openedMatch};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
+  openedStamp=source==='file'||openedMatch?loaded.stamp:null;
   ctx.onHistory();ctx.render();
   notice(source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
  }
@@ -127,7 +135,7 @@ export function createMultiphysicsView(ctx){
  function refreshRun(){
   const button=$('run-multiphysics'),reason=$('run-multiphysics-reason');if(!button)return;
   button.hidden=!active;reason.hidden=!active;if(!active)return;
-  const block=runBlock(),fresh=freshness();button.disabled=!!block;button.textContent=job?'Running… (stop it under Study)':'Run';reason.textContent=job?'':block;
+  const block=runBlock(),fresh=freshness();button.disabled=!!block;button.textContent=job?'Running… (stop it under Study)':'Run study';reason.textContent=job?'':block;
   $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
   const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
   const option=$('run-baseline-option'),box=$('run-baseline');
@@ -363,7 +371,8 @@ export function createMultiphysicsView(ctx){
    const s=suggestedCouplings(doc,catalog)[0];if(s)notice(`${physicsLabel(name)} added. ${suggestionText(s)} Use Add coupling… to connect them.`);}catch(e){notice(e.message);}});
  }
  function couplingDialog(from=null,to=null){
-  const sources=sourceChoices(doc,catalog);from=from||sources.find(s=>s.ok)?.spec;
+  // opened for one input: its From list holds only the outputs that input can take
+  const sources=sourceChoicesFor(doc,catalog,to);if(from&&!sources.some(s=>s.spec===from))from=null;from=from||sources.find(s=>s.ok)?.spec;
   if(!from){notice('No physics of this model sends a field to couplings yet. Add physics first.');return;}
   const d=dialog('Add coupling','<div id="mp-coupling-body"></div>','<button type="button" id="mp-coupling-add" class="primary">Add coupling</button>');
   const draw=()=>{const targets=targetChoices(doc,catalog,from);if(!to||!targets.find(t=>t.spec===to&&t.ok))to=targets.find(t=>t.ok)?.spec||null;
@@ -371,7 +380,7 @@ export function createMultiphysicsView(ctx){
     <label>To (inputs)<select id="mp-to">${targets.map(t=>`<option value="${esc(t.spec)}" ${t.spec===to?'selected':''} ${t.ok?'':'disabled'}>${esc(t.label)} · ${esc(unitText(t.port.unit))}${t.ok?'':' — '+esc(t.reason)}</option>`).join('')}</select></label>
     <ul class="mp-choice-reasons">${targets.filter(t=>!t.ok).map(t=>`<li>${esc(t.label)}: ${esc(t.reason)}</li>`).join('')}</ul>
     ${pair('Transfer',transferNote(doc,catalog,from,to||from).split(' · ')[0])}${to?`<p>${esc(transferNote(doc,catalog,from,to).split(' · ').slice(1).join(' · '))}.</p>`:'<p class="muted">No input can take this output.</p>'}`;
-   d.querySelector('#mp-from').onchange=e=>{from=e.target.value;to=null;draw();};d.querySelector('#mp-to').onchange=e=>{to=e.target.value;draw();};d.querySelector('#mp-coupling-add').disabled=!to;};
+   d.querySelector('#mp-from').onchange=e=>{from=e.target.value;draw();};d.querySelector('#mp-to').onchange=e=>{to=e.target.value;draw();};d.querySelector('#mp-coupling-add').disabled=!to;};
   draw();
   d.querySelector('#mp-coupling-add').onclick=()=>{try{const {doc:next,name}=addCoupling(doc,catalog,from,to);d.close();commit(next,`Coupling ${portLabel(from)} → ${portLabel(to)} added.`,'coupling:'+name);}catch(e){notice(e.message);}};
  }
@@ -510,7 +519,9 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const editedSinceOpen=()=>signature()!==openedSignature;
  function indicator(){
   return {clean:signature()===cleanSignature||(!cleanSignature&&!editedSinceOpen()),runsUnsaved:(runs.length>0||editedSinceOpen())&&!sessionCurrent(),
-   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp()}:null};
+   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
+   // a template just opened, not yet edited, run, saved or opened
+   fresh:freshSignature!==null&&signature()===freshSignature&&!runs.length&&!sessionFile&&!loaded};
  }
  function saveState(){return persistenceTitle({...indicator(),recovery:ctx.recoveryState?.()||null});}
  // Save session: the file if it fits; else the §2 dialog, or the refusal that names the run
@@ -518,7 +529,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const out=writeMultiphysicsSession(sessionState(),{keepSelected});
   if(!out.ok){if(out.reduced)return {ok:false,question:overflowQuestion(out.bytes)};notice('Session not saved: '+out.refusal);return {ok:false,refused:out.refusal};}
   const name=sessionFileName(modelSlug(doc.name));ctx.download(new Blob([out.text],{type:'application/json'}),name);
-  sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:filed()};cleanSignature=signature();loaded=null;ctx.onHistory();
+  sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:filed()};cleanSignature=signature();loaded=null;freshSignature=null;ctx.onHistory();
   notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0}));
   return {ok:true,name};
  }
@@ -528,7 +539,9 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const savedFile=sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null;
   const state={...sessionState(),runs:[...runs],baselines:savedBaselines()};
   // the maps recovery leaves out of a record over 16 MiB: the runs that still have them here
-  return {stamp:stamp()+JSON.stringify(savedFile),savedFile,openedFile:sourceFile,makeText:()=>{const out=recoveryText(state);recoveryDropped=out.notKept.filter(n=>state.runs.find(r=>r.number===n)?.maps!=='not kept').length;return out.text;}};
+  // openedCurrent: the inputs and runs are still those of the file it was opened from
+  const openedCurrent=sourceFile?openedStamp!==null&&openedStamp===stamp():null;
+  return {stamp:stamp()+JSON.stringify([savedFile,openedCurrent]),savedFile,openedFile:sourceFile,openedCurrent,makeText:()=>{const out=recoveryText(state);recoveryDropped=out.notKept.filter(n=>state.runs.find(r=>r.number===n)?.maps!=='not kept').length;return out.text;}};
  }
  let recoveryDropped=0;
  // ---- the dock ----

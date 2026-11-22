@@ -24,6 +24,9 @@ export function runInputsLine(runParts,currentParts){
 }
 // The parts of an optical input the words above compare.
 export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.model.wavelength} nm`,`core mesh ${input.model.coreMesh} nm`];
+// What the next run computes, in the Study panel: the current inputs, whatever run Results shows.
+// "Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2".
+export const nextRunText=(input,modeCount)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[])].join(' · ')}`;
 // Readiness describes the current editor and retained artifacts, not accuracy.
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.

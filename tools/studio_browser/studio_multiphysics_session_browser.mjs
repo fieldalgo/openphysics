@@ -550,6 +550,27 @@ print(n)`;
   await fetchReplies(r1.text);
   const s8Identity = {...compareArrays(r1.text), python: comparePython(r1.path)};
   stage('S8 recovered', {runs: recoveredRuns, ...s8Identity});
+  // round 11 (L7): after a restart the Heated silicon waveguide card restores its own newest record,
+  // which the box above does not list again; the record is the same as the file just saved, so the
+  // card names that file with its save time, and the restored title says "same as file"
+  const r1Name = basename(r1.path);
+  await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(r1Name)}&&r.savedFile.current===true})`, 'record of the saved session', 20000);
+  await page.call('Page.reload');
+  await page.until("!!document.getElementById('resume-heated-waveguide')", 'heated card offer');
+  const heatedOffer = await page.eval("(()=>{const b=document.getElementById('resume-heated-waveguide');return {text:b.textContent,record:b.dataset.resumeRecord,next:b.nextElementSibling?.textContent,card:b.closest('.card-slot')?.querySelector('[data-template]')?.dataset.template,top:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(x=>x.dataset.resumeRecord)}})()");
+  stage('L7 heated card offer', heatedOffer);
+  assert.ok(heatedOffer.text.startsWith('Restore from this browser · Heated silicon waveguide · Run '), heatedOffer.text);
+  assert.ok(heatedOffer.text.includes(' · same as file ' + r1Name + ', saved '), heatedOffer.text); assert.match(heatedOffer.text, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
+  assert.equal(heatedOffer.next, 'Start new'); assert.equal(heatedOffer.card, 'heated-waveguide');
+  assert.ok(!heatedOffer.top.includes(heatedOffer.record), 'the box above does not list the record the card restores');
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
+    await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'L7 ' + tag);
+  }
+  await size(1440, 900); await sleep(300);
+  await clearNotice(); await page.click('#resume-heated-waveguide');
+  await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'heated card restored');
+  assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
+  assert.equal(await page.text('#project'), `Multiphysics model / Recovered from this browser · same as file ${r1Name}`);
 
   // S8: three earlier sessions, from four pages that each edited the model
   for (const power of ['3e14', '4e14', '5e14', '6e14']) {
@@ -564,10 +585,11 @@ print(n)`;
   await page.call('Page.reload');
   await page.until("document.querySelectorAll('#earlier-sessions button').length===3", 'three earlier sessions');
   const earlier = await page.eval("[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)");
-  assert.ok(earlier.every(t => /^Recover earlier session · Heated silicon waveguide · \d+ runs · /.test(t)), JSON.stringify(earlier));
+  // round 11: the Workspace tools say Restore … from this browser, as the Models page does
+  assert.ok(earlier.every(t => /^Restore earlier session from this browser · Heated silicon waveguide · \d+ runs · /.test(t)), JSON.stringify(earlier));
   // every entry names its runs: one name (or "Run N") per run
   for (const t of earlier) {
-    const m = /^Recover earlier session · Heated silicon waveguide · (\d+) runs?(?: · (.+?))? · ([^·]+)$/.exec(t);
+    const m = /^Restore earlier session from this browser · Heated silicon waveguide · (\d+) runs?(?: · (.+?))? · ([^·]+)$/.exec(t);
     assert.ok(m, t); assert.equal(m[2] ? m[2].split(', ').length : 0, Number(m[1]), t);
   }
   await page.click('#earlier-sessions button');
@@ -602,7 +624,7 @@ print(n)`;
   await page.until("!!document.getElementById('shape-w')&&!document.getElementById('run-optical').disabled", 'optical model for R1', 60000);
   const runOptical = async label => {
     await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical');
-    await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical ' + label, 120000);
+    await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical ' + label, 120000);
   };
   await runOptical('run 1');
   await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Geometry'); await page.until("!!document.getElementById('shape-w')", 'geometry inspector');
@@ -665,7 +687,7 @@ print(n)`;
   assert.ok(!lists.resume.some(t => /Optical waveguide · 2 runs · Run 1, Run 2/.test(t)), 'the optical session is offered once, on its card: ' + JSON.stringify(lists.resume));
   // the heated session open in this tab is not offered again, and its earlier copy is gone
   assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Run 1 · Heater 2e14')), JSON.stringify(lists.earlier));
-  assert.ok(lists.earlier.some(t => /^Recover earlier session · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));
+  assert.ok(lists.earlier.some(t => /^Restore earlier session from this browser · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
     await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R1 ' + tag); await page.screenshot('r1-' + tag);
   }

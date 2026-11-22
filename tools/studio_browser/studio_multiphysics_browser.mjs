@@ -182,16 +182,16 @@ try {
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page');
   assert.match(await page.text('[data-template=heated-waveguide]'), /Heated silicon waveguide.*Heat → optical modes · coupled/);
   assert.equal(await page.exists('[data-template=multi]'), false, 'the setup-only card is replaced');
-  assert.equal(await page.axName('#run-optical'), 'Run optical study');
+  assert.equal(await page.axName('#run-optical'), 'Run study');
   await page.click('[data-template=heated-waveguide]');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"physics:heat1\"]')", 'multiphysics tree');
   await runReady();
   assert.match(await page.text('#tree [data-mp-node="physics:heat1"]'), /^∿ 1 Heat 1 · Heat transfer$/);
   assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^λ 2 Modes 1 · Optical modes$/);
-  // the ribbon: Run as Run optical study draws it, the heater-off option on, Open session and Save session in Project
+  // the ribbon: Run as Run study draws it, the heater-off option on, Open session and Save session in Project
   // the ▶ is decoration with an empty alternative text: the accessible names are the labels
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics'),'::before').content"), '"▶" / ""');
-  assert.equal(await page.axName('#run-multiphysics'), 'Run');
+  assert.equal(await page.axName('#run-multiphysics'), 'Run study');
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics')).fontWeight"), await page.eval("getComputedStyle(document.getElementById('run-optical')).fontWeight"));
   assert.equal(await page.eval("!document.getElementById('run-baseline-option').hidden&&document.getElementById('run-baseline').checked"), true);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');
@@ -247,7 +247,8 @@ try {
   await press('ArrowDown'); await press('ArrowDown'); assert.equal((await focused()).name, 'Silicon (core)'); await press('ArrowLeft'); assert.equal((await focused()).name, 'Materials');
   await press('Home'); await press('Enter'); at = await focused(); assert.deepEqual([at.name, at.selected], ['Heated silicon waveguide', 'true']);
   await checkTree('multiphysics after keys', mpNodes);
-  assert.equal(await page.text('#project'), 'Multiphysics model / No unsaved input changes');
+  // round 11 (L9): a template just opened reads as new, not as saved
+  assert.equal(await page.text('#project'), 'Multiphysics model / New model · not saved');
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
   stage('MB1 template', {tree: await page.text('#tree')});
 
@@ -311,8 +312,8 @@ try {
   await page.click('#mp-messages [data-mp-add-coupling]');
   await page.until("!!document.querySelector('dialog.mp-dialog #mp-to')", 'coupling dialog');
   assert.equal(await page.eval("document.querySelector('#mp-from').value"), 'heat1.temperature');
-  assert.equal(await page.eval("[...document.querySelectorAll('#mp-from option')].find(o=>o.value==='modes1.effective_index').disabled"), true);
-  assert.equal(await page.eval("[...document.querySelectorAll('#mp-from option')].find(o=>o.value==='modes1.effective_index').textContent"), 'Modes 1 effective index (single numbers, not a map)');
+  // round 11 (L9): opened for the temperature input, From lists only the outputs that input takes
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#mp-from option')].map(o=>o.value)"), ['heat1.temperature']);
   assert.match(await page.text('dialog.mp-dialog'), /each triangle gets the mean of its 3 nodes/);
   await page.click('#mp-coupling-add');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')&&!document.querySelector('dialog[open]')", 'coupling added');
@@ -417,7 +418,8 @@ try {
   await page.until("!document.querySelector('dialog[open]')&&!/Out of date/.test(document.getElementById('sequence').innerText)", 'same model again');
   await runReady();
   // one sentence in Messages, the dock heading and the status bar; the notice asks for no Run
-  const again = 'Model matches run 1 again: its results are current. Run makes a new run with the same inputs';
+  // round 11 (L8): says that no run is needed, then what Run would still do
+  const again = 'No need to run: Run 1 already has these results. Run again to make a copy';
   assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again.');
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
@@ -525,7 +527,7 @@ try {
   // session; they stay in this tab and come back with the optical model
   await page.until("!document.getElementById('run-optical').disabled", 'optical Run', 60000);
   await page.click('#run-optical');
-  await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical run', 120000);
+  await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical run', 120000);
   await page.click('nav [data-page=Applications]');
   await page.click('[data-template=heated-waveguide]');
   await page.until("document.getElementById('leave-confirm').open", 'optical leave confirmation');

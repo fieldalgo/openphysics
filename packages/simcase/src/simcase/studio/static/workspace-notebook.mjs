@@ -78,10 +78,15 @@ const si=(value,exponent)=>{if(value==='')return '';const [digits,power='0']=Str
 export function csvCell(value){const text=String(value);const safe=typeof value==='string'&&/^\s*[=+@-]/.test(text)?"'"+text:text;return '"'+safe.replaceAll('"','""')+'"';}
 // The run table (units and naming batch): every quantity column is `name [unit]` with its SI value;
 // identifier and text columns carry no unit.
+// The columns up to origin are the earlier table's, in place: effective_index [1] is Re n_eff. Two
+// columns follow: effective_index_imag [1], Im n_eff (exp(-iωt); 0 for a lossless run, whose
+// n_eff is real), and group_index [1], n_g of a run with the group index ('' when the run has none
+// or the mode has no value).
 export function runTableCsv(runs){
- const rows=[['job','name','pinned','completed_at','core_width [m]','core_height [m]','vacuum_wavelength [m]','core_element_size [m]','core_material','shapes','candidate','effective_index [1]','origin']];
+ const rows=[['job','name','pinned','completed_at','core_width [m]','core_height [m]','vacuum_wavelength [m]','core_element_size [m]','core_material','shapes','candidate','effective_index [1]','origin','effective_index_imag [1]','group_index [1]']];
  for(const r of runs){const shapes=r.input.model.shapes,single=shapes.length===1&&shapes[0].type==='rect'?shapes[0]:null;
-  r.effective_index.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,si(single?single.w:'',-9),si(single?single.h:'',-9),si(r.input.model.wavelength,-9),si(r.input.model.coreMesh,-9),single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin]));}
+  const e=r.effective_index,re=Array.isArray(e)?e:e.re,im=Array.isArray(e)?null:e.im,ng=Array.isArray(r.group_index)?r.group_index:null;
+  re.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,si(single?single.w:'',-9),si(single?single.h:'',-9),si(r.input.model.wavelength,-9),si(r.input.model.coreMesh,-9),single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin,im?im[i]:0,ng&&Number.isFinite(ng[i])?ng[i]:'']));}
  return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
 }
 const finiteList=(v,k)=>Array.isArray(v)&&v.length===k&&v.every(Number.isFinite);
