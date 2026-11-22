@@ -20,8 +20,8 @@ export const GROUP_INDEX_STEP='1 nm';
 /** The document with results.group_index ({wavelength_step: step}) added after the other
  * results keys: the group index of the single study by a central difference over λ0 ± step. */
 export function withGroupIndex(doc,step=GROUP_INDEX_STEP){return {...doc,results:{...doc.results,group_index:{wavelength_step:step}}};}
-/** The step of a run's group_index_method ("central_difference 1 nm electric-l2-assignment-v1"), or null. */
-export function groupIndexStep(method){const m=/^central_difference (\S+ (?:pm|nm|um|m)) \S+$/.exec(method??'');return m?m[1]:null;}
+// the step of a run's group_index_method (one parser, the modes table's)
+export {groupIndexStep} from './workspace-modes.mjs';
 /** The format 0.3 solver document: the design's nanometres as written, every other length a quantity string.
  * optical-shapes-v8: mode_count is the page's Modes to find (1 to 8, 2 by default); with 2 the
  * document is the one optical-shapes-v7 wrote. With state.groupIndex (Also compute group index)

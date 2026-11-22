@@ -99,3 +99,14 @@ test('S-f: the multiphysics modes table has no n_g column',()=>{
  const src=fs.readFileSync(path.join(__dirname,STATIC,'workspace-multiphysics-view.mjs'),'utf8');
  assert.ok(!/n_g|group_?index/i.test(src));
 });
+test('review: the box is part of the study signature; a run with n_g is of the inputs only with the box on',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ const plain=N.validateRun(run('00000009',2)),withNg=N.validateRun(run('00000010',2,N.engineGroupIndex(summary([4.2,4.1]),2)));
+ assert.equal(N.studySignature(input(),2),JSON.stringify(input()),'off: the signature of earlier Studios');
+ assert.equal(N.studySignature(input(),2,true),JSON.stringify(input())+'\ngroup index');
+ assert.equal(plain.signature,N.studySignature(input(),2));assert.equal(withNg.signature,N.studySignature(input(),2,true));
+ const own=(runs,g)=>W.opticalFreshness(input(),runs,runs.at(-1),2,g);
+ assert.deepEqual([own([plain],false).state,own([plain],true).state].map(x=>x===own([plain],false).state),[true,false],'ticking the box makes a run without n_g another study');
+ assert.equal(own([withNg],true).state,own([plain],false).state);
+ assert.equal(O.groupIndexStep,M.groupIndexStep,'one parser');
+});

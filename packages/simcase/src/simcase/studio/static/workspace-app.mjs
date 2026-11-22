@@ -347,7 +347,7 @@ function opticalHold(){
 // model sets its own heading, and the other models keep the default words.
 function refreshSequenceHeading(){
  if(multiView.active())return;const heading=document.querySelector('.dock-title>span');if(!heading)return;
- const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount)):opticalSequenceHeading({state:'none'});
+ const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex)):opticalSequenceHeading({state:'none'});
  if(heading.textContent!==text)heading.textContent=text;
 }
 function refreshInputIssues(){
@@ -365,7 +365,7 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
- else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount));
+ else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
 }
 function bindNumericInputs(){
@@ -477,7 +477,7 @@ function announceResult(text){notice(text);resultNotice=true;}
 const current = () => snapshot(state, setup);
 // The study a run is compared with: the inputs and Modes to find (workspace-notebook.mjs
 // studySignature; Modes to find is page state, not part of the project file).
-const signature = () => studySignature(current(), state.modeCount);
+const signature = () => studySignature(current(), state.modeCount, state.groupIndex);
 const inputSignature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
@@ -506,7 +506,7 @@ function refreshSaveIndicator(){
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
+ const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
  steps.forEach((step,index)=>{
   let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;if(step.tone)button.dataset.tone=step.tone;else delete button.dataset.tone;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
@@ -538,9 +538,9 @@ function requestLoad(doc,options={}){
   loadInputs(doc,options);
 }
 // modeCount: Modes to find to set with the inputs (a run's inputs restored), else unchanged
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,modeCount=null}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,modeCount=null,groupIndex=null}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext(),modeCount};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext(),modeCount,groupIndex};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
   if((leaveChecked&&!session)||untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
@@ -572,7 +572,7 @@ function completeLoad(pending){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   // Modes to find follows the selected run (a session keeps it with each run, not with the inputs)
-  if(solverRun)state.modeCount=runModeCount(solverRun);
+  if(solverRun){state.modeCount=runModeCount(solverRun);state.groupIndex=solverRun.group_index_method!==undefined;}
   // A recovered notebook that still matched its saved file, or the file it was opened from, reads
   // as saved, as the file would.
   const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
@@ -595,7 +595,7 @@ function completeLoad(pending){
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
- }else{loadedSession=null;newModelInputs=null;if(pending.modeCount!=null)state.modeCount=pending.modeCount;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{loadedSession=null;newModelInputs=null;if(pending.modeCount!=null)state.modeCount=pending.modeCount;if(pending.groupIndex!=null)state.groupIndex=pending.groupIndex;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
@@ -835,7 +835,7 @@ const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'A
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 // The parts the inputs words compare, with Modes to find when the run or the page asks for other
 // than 2 (other: the run's count, so both sides name it together)
-const studyParts=(input,n,other=n)=>[...opticalInputParts(input),...(n===DEFAULT_MODE_COUNT&&other===DEFAULT_MODE_COUNT&&state.modeCount===DEFAULT_MODE_COUNT?[]:[`Modes to find ${n}`])];
+const studyParts=(input,n,other=n,g=false,otherG=g)=>[...opticalInputParts(input),...(n===DEFAULT_MODE_COUNT&&other===DEFAULT_MODE_COUNT&&state.modeCount===DEFAULT_MODE_COUNT?[]:[`Modes to find ${n}`]),...(g||otherG?[g?'group index on':'group index off']:[])];
 // Modes to find (1 to 8): the number of modes a run asks for. Page state: a session keeps it
 // with each run, a project or model file does not.
 const MODE_COUNT_NOTE='Modes to find is kept with each run of a session; a project or model file does not store it.';
@@ -846,7 +846,7 @@ const groupIndexField=()=>`<label class="check-field"><input id="group-index-che
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run optical study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; 3 × 2.4 µm window; PEC outer edges; 1 to 8 modes (Modes to find, 2 by default). Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -858,7 +858,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Connections','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
-  const runParts=studyParts(solverRun.input,runModeCount(solverRun)),nowParts=studyParts(current(),state.modeCount,runModeCount(solverRun));
+  const runG=solverRun.group_index_method!==undefined,runParts=studyParts(solverRun.input,runModeCount(solverRun),runModeCount(solverRun),runG,state.groupIndex),nowParts=studyParts(current(),state.modeCount,runModeCount(solverRun),state.groupIndex,runG);
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=runInputsLine(runParts,nowParts);$('canvas').append(desc);
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
@@ -897,7 +897,7 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+'<p class="study-wavelength">Set in Physics › Optical modes. <button type="button" id="study-edit-wavelength">Edit in Optical modes</button></p>'+modeCountField()+groupIndexField()+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+'<p class="study-wavelength">Set in Physics › Optical modes. <button type="button" id="study-edit-wavelength">Edit in Optical modes</button></p>'+modeCountField()+groupIndexField()+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
  // One wavelength: shown here, edited in its one field under Optical modes.
  $('study-edit-wavelength').onclick=()=>editWavelengthField();
  $('group-index-check').onchange=e=>{state.groupIndex=e.target.checked;render();};
@@ -1119,7 +1119,7 @@ function renderRunList(){
    if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('This run exceeds the session size limit.');
    const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields. Add runs from file adds it to a session. The current design is unchanged.`);
   }catch(error){notice(error.message);}};panel.append(exportRun);
-  const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore this run’s inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false,label:runLabel(solverRun),modeCount:runModeCount(solverRun)});panel.append(restore);
+  const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore this run’s inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false,label:runLabel(solverRun),modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
@@ -1313,6 +1313,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
   ...engineRunValues(result.summary,re.length),
   // the engine's group index with Also compute group index (a version 9 file keeps it)
   ...engineGroupIndex(result.summary,re.length)});
+ if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=reasons;}
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);

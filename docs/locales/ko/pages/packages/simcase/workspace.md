@@ -214,8 +214,11 @@ Modes to find는 페이지 상태입니다. 세션 파일은 실행마다 이 �
 n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배입니다([단일 study의 군굴절률](group_index.md)).
 꺼져 있으면 문서는 이전과 같은 `optical-shapes-v8` 문서이며 바이트 단위로 같습니다. 켜면 달라지는 것은
 `results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 페이지
-상태입니다. 새 모델은 꺼진 상태로 시작하고 입력 파일은 이 값을 저장하지 않습니다. 어댑터는
-`optical-shapes-v8` 그대로이고 실행의 `settings`도 바뀌지 않습니다.
+상태입니다. 새 모델은 꺼진 상태로 시작하고 입력 파일은 이 값을 저장하지 않습니다. 세션을 열거나
+**Restore this run's inputs**를 누르면 실행에 맞춰 설정됩니다(n_g가 있는 실행이면 켜짐). 이 상자는 실행과
+비교하는 study의 일부입니다. 상자를 켜면 n_g가 없는 실행은 현재 입력의 실행이 아니고, 상자를 끈 채 한
+문서 검사는 이전 입력의 검사입니다. 어댑터는 `optical-shapes-v8` 그대로이고 실행의 `settings`도 바뀌지
+않습니다. 실행 표 CSV에는 n_g 열이 없습니다.
 
 n_g가 있는 실행은 그 값을 버전 9 칸 `group_index`와 `group_index_method`에 보관합니다. 그 문서는 다른
 실행처럼 settings에서 다시 만들고, `results.group_index`를 더합니다. 그 `wavelength_step`은
