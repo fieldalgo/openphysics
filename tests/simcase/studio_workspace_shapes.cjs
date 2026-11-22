@@ -63,6 +63,21 @@ test('run tables keep the single-rectangle columns in SI under `name [unit]` hea
  assert.ok(rows[1].includes('"5e-7","2.2e-7","0.00000155","3e-8","Silicon","Core: rect Silicon x -250…250, y 0…220 nm"'));
  assert.ok(rows[3].includes('"","","0.00000155","3e-8","","Slab: rect Silicon x -1500…1500, y 0…90 nm | Rod: circle Silicon nitride centre (0, 500), r 150 nm"'));
 });
+test('round 11: the run table keeps its columns in place and adds Im n_eff and n_g after origin',()=>{
+ const field={node_coordinates:[[0,0],[1e-6,0],[0,1e-6]],triangles:[[0,1,2]],real:[[[1,0,0]],[[0,1,0]]],imag:[[[0,0,0]],[[0,0,0]]]};
+ const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},setup);
+ const base={completedAt:'2026-10-27T00:00:00Z',input,settings:opticalSettings(),field,origin:'local'};
+ // a run of this tab keeps Im n_eff beside the real parts (validateRun); a file record holds {re, im}
+ const rows=runTableCsv([{...base,job:'aaaaaaa1',effective_index:[2.5,1.8],group_index:[4.2,null]},{...base,job:'aaaaaaa2',effective_index:[2.5,1.8],effective_index_im:[1e-5,2e-5]},{...base,job:'aaaaaaa3',effective_index:{re:[2.5,1.8],im:[1e-5,2e-5]}}]).trim().split('\n').map(r=>r.split(','));
+ const head=rows[0];
+ assert.deepEqual(head.slice(-5),['"candidate"','"effective_index [1]"','"origin"','"effective_index_imag [1]"','"group_index [1]"']);
+ assert.equal(head.length,15);
+ // Re n_eff in its old place; a lossless run reads Im 0; a mode without n_g is empty
+ assert.deepEqual(rows[1].slice(-4),['"2.5"','"local"','"0"','"4.2"']);
+ assert.deepEqual(rows[2].slice(-4),['"1.8"','"local"','"0"','""']);
+ // a lossy run (complex n_eff): Re and Im n_eff, in either shape
+ for(const first of [3,5]){assert.deepEqual(rows[first].slice(-4),['"2.5"','"local"','"0.00001"','""']);assert.deepEqual(rows[first+1].slice(-4),['"1.8"','"local"','"0.00002"','""']);}
+});
 test('alignment meets reference edges exactly and refuses leaving the window',()=>{
  const slot=rect('Slot',-50,0,100,220,'Air'),left=rect('Left',300.3,40,250.1,180),right={name:'Right',type:'polygon',material:'Silicon',points:[[0,500],[250,500],[250,720],[0,720]]};
  const placedLeft=S.alignShape(left,'left-of',slot);assert.equal(S.shapeBounds(placedLeft).xmax,-50);assert.equal(placedLeft.y,40);

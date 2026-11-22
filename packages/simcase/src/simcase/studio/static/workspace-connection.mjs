@@ -23,7 +23,7 @@ export function connectionFailure(error){
  if(error instanceof TypeError||error?.name==='TypeError')return 'unreachable';
  return 'request';
 }
-export const RESTARTED_MESSAGE='Studio was restarted. This page reconnected to the new server; your inputs and retained results are unchanged. Select Run optical study again.';
+export const RESTARTED_MESSAGE='Studio was restarted. This page reconnected to the new server; your inputs and retained results are unchanged. Select Run study again.';
 export const UNREACHABLE_MESSAGE='Studio server is not reachable. Start Studio again with the same command and keep this address; this page reconnects by itself.';
 // A refused or failed request as one line: "<what> request failed: <reason>. Inputs and earlier
 // results are unchanged." The server's reason ends with no full stop of its own (for example

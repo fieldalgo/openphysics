@@ -156,11 +156,11 @@ test('switching models says where the optical runs stay: one short line, the res
  assert.deepEqual(P.opticalRunsStayText({runs:1,file:'a.json'}),
   {text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, Open session with a.json brings it back.'});
 });
-test('round 9 (J5): the title says the viewed run used other inputs, and that they are not unsaved edits',()=>{
+test('round 9 (J5), round 11: the title says in a few words that the viewed run used other inputs, and that they are not unsaved edits',()=>{
  const when=()=>'15:50',viewed={run:1,name:'Design A'};
- assert.equal(P.persistenceTitle({viewed},when),'No unsaved input changes · viewing Run 1 · Design A, which used other inputs');
- assert.equal(P.persistenceTitle({viewed:{run:2,name:''}},when),'No unsaved input changes · viewing Run 2, which used other inputs');
- assert.equal(P.persistenceTitle({loaded:{kind:'recovered',current:true},viewed},when),'Recovered from this browser · viewing Run 1 · Design A, which used other inputs');
+ assert.equal(P.persistenceTitle({viewed},when),'No unsaved input changes · viewing Run 1 · Design A (other inputs)');
+ assert.equal(P.persistenceTitle({viewed:{run:2,name:''}},when),'No unsaved input changes · viewing Run 2 (other inputs)');
+ assert.equal(P.persistenceTitle({loaded:{kind:'recovered',current:true},viewed},when),'Recovered from this browser · viewing Run 1 · Design A (other inputs)');
  // without a viewed run of other inputs, or with an invalid draft, the title is as before
  assert.equal(P.persistenceTitle({},when),'No unsaved input changes');
  assert.equal(P.persistenceTitle({invalid:true,viewed},when),'Invalid input draft · last valid inputs unchanged');
@@ -187,4 +187,22 @@ test('round 10: a recovered notebook whose record still matched its file says "s
  const saved={name:'later.json',savedAt:'2026-11-22T20:15:00Z',current:true};
  assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · same as file later.json');
  for(const t of [P.persistenceTitle({loaded:recovered},when),P.persistenceTitle({saved,loaded:recovered},when)])assert.doesNotMatch(t,/not saved to a file/i);
+});
+test('round 11: Compare opens with the two newest runs, A the older; the two run cards say their side',()=>{
+ const run=(job,label='')=>({job,label});
+ assert.deepEqual(C.defaultComparison([]),[null,null]);
+ assert.deepEqual(C.defaultComparison([run('a1')]),['a1','a1']);
+ assert.deepEqual(C.defaultComparison([run('a1','design A'),run('a2','design B')]),['a1','a2']);
+ // the run just computed is B, the run before it A, named or not
+ assert.deepEqual(C.defaultComparison([run('a1','design A'),run('a2','design B'),run('a3')]),['a2','a3']);
+ assert.equal(C.compareSide('a2',['a2','a3']),'A');assert.equal(C.compareSide('a3',['a2','a3']),'B');
+ assert.equal(C.compareSide('a1',['a2','a3']),'');assert.equal(C.compareSide('a1',['a1','a1']),'A and B');
+});
+test('round 11: a fresh multiphysics template reads as new; a recovered record that matched its opened file says "same as file"',()=>{
+ // the multiphysics indicator's inputs (workspace-multiphysics-view.mjs indicator)
+ assert.equal(P.persistenceTitle({clean:false,fresh:true}),'New model · not saved');
+ assert.equal(P.persistenceTitle({clean:true,runsUnsaved:false,saved:null,loaded:{kind:'recovered',current:true,file:'heated-silicon-waveguide-session-2026-11-22-2124.json',fileCurrent:true}}),
+  'Recovered from this browser · same as file heated-silicon-waveguide-session-2026-11-22-2124.json');
+ assert.equal(P.persistenceTitle({clean:true,saved:{name:'h.json',savedAt:'2026-11-22T21:24:00Z',current:true},loaded:{kind:'recovered',current:true}},()=>'21:24'),
+  'Recovered from this browser · same as file h.json');
 });

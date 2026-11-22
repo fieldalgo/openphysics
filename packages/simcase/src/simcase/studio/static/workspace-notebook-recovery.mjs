@@ -9,7 +9,7 @@ export function readNotebookRecovery(record){
  // savedFile (optional): the last session file this notebook was saved to; a malformed one is ignored.
  // openedFile (optional): the session file the notebook was opened from, by name, for the recovery
  // lists; a malformed one is ignored. Neither is part of the session.
- // openedCurrent (optional, optical): true when the inputs and runs were still those of openedFile.
+ // openedCurrent (optional; optical and multiphysics records): true when the inputs and runs were still those of openedFile.
  // page (optional, optical): the page the notebook showed, which a restore opens again.
  // Both are browser-only, beside the session; a record without them (or with another value) reads as before.
  return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile),

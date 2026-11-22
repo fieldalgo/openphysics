@@ -31,12 +31,13 @@ const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return 
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
-// viewed: {run, name} when the run Results shows has other inputs than the current ones and no
-// input was edited: the title says so, so it agrees with the step bar and the dock ("current inputs
-// differ from this run") without reading as unsaved edits.
+// viewed: {run, name} when the run Results or Compare shows has other inputs than the current ones
+// and no input was edited: the title says so in a few words, so it agrees with the step bar and the
+// dock ("current inputs differ from this run") without reading as unsaved edits. The caller passes
+// it on Results and Compare only: on the Model tab the title describes the current inputs alone.
 export function persistenceTitle(state,when){
  const base=titleOf(state,when),v=state.viewed;
- return v&&!state.invalid?`${base} · viewing Run ${v.run}${v.name?' · '+v.name:''}, which used other inputs`:base;
+ return v&&!state.invalid?`${base} · viewing Run ${v.run}${v.name?' · '+v.name:''} (other inputs)`:base;
 }
 // loaded.file: the session file a notebook was opened from (or that its recovery record names as
 // opened), and loaded.fileCurrent whether the inputs and runs were still that file's. "Current"
