@@ -86,7 +86,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    파일을 브라우저에 넘길 뿐 실제로 보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음)
    Messages에 *Session file … sent to the browser's downloads (check your Downloads folder)*가
    나옵니다. 저장 표시는 헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 다음 편집이나
-   실행 전까지 *Sent to session file … · 시각*이 표시됩니다. **More › Save inputs only**는 결과 없이
+   실행 전까지 *Session file … sent to your browser's Downloads · 시각*이 표시되며, 파일이 저장됐다고는
+   하지 않습니다. **More › Save inputs only**는 결과 없이
    모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 *Not saved to a file · kept for recovery in
    this browser*(기록 중에는 *· updating browser recovery*, 쓸 수 없으면 *· browser recovery
    unavailable*), 세션 파일 저장 뒤 바뀌었으면 *Changed since session file … (시각) · kept for
@@ -95,7 +96,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    시각을 함께 보관하므로 복구한 세션에는 *last session file … (시각)*이 덧붙습니다(저장 뒤 바뀐
    작업이면 *changed since session file …*, 저장한 적이 없으면 *not saved to a file*).
    둘 다 다음 변경이나 다른 파일 열기까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
-   0.5 nm 단위가 됩니다. 중심은 정확히 유지되며 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
+   0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
+   to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면의 **Continue where you left off** 카드에 **Recover (this browser only): Last
@@ -288,7 +290,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   **Add coupling**을 가리킵니다. 트리에서 열전달은 ∿, 광 모드는 λ로 표시해 단일 물리
   애플리케이션과 같습니다.
 - **Connections**는 결합으로 그립니다. 풀이 순서 열에 노드를 놓고, 왼쪽에 입력 핀, 오른쪽에 출력
-  핀을 단위와 함께 그리며, 결합마다 선 하나를 긋습니다. 검사에 실패한 결합은 빨간 점선과 짧은
+  핀을 단위와 함께 그리며, 결합마다 선 하나를 긋습니다. 포트마다 자기 줄이 있고 점은 노드
+  가장자리에 있으며, 선은 결합이 잇는 포트의 점에서 시작하고 끝납니다(Heat 1의 선은 그 아래
+  “heat flux”가 아니라 “temperature”에서 나갑니다). 검사에 실패한 결합은 빨간 점선과 짧은
   원인으로 그리고, 물리가 없으면 그림 아래에 나열합니다. 순환은 상자로 묶습니다. 반복 단계가
   없으면 주황, 있으면 파랑입니다. 메시지는 엔진의 기본값을 제안하고, **Accept iteration step**은
   그 값을 `study.loops`에 씁니다(Undo로 되돌림). 값은 Study 1 › Iteration step에서 고칩니다.
@@ -300,7 +304,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   열광학 계수와 기준 온도가 필요합니다. `physmat:Si`와 `physmat:SiO2`는 이를 갖고 있고, 로컬
   기록에서는 **Fill from physmat**이 physmat 값을 복사해 넣거나(출처를 적음) **Use physmat:…
   instead**가 그 영역을 라이브러리 재료로 바꿉니다.
-- **Run**은 **Run optical study**와 같은 ▶와 함께 모든 물리를 풀이 순서대로 풉니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
+- **Run**은 **Run optical study**와 같은 ▶와 함께 모든 물리를 풀이 순서대로 풉니다. ▶는 빈 대체
+  텍스트를 가진 장식이라 화면 낭독기는 이름(“Run”, “Run optical study”)만 읽습니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
   Solving…, Done in 0.3 s, 마지막 변화와 함께 Iteration 7 of up to 30, Did not settle, Not run)를
   보여 주고, Connections도 열려 있는 동안 같은 상태를 보여 줍니다. **Stop run**은 엔진의 다음
   단계에서 실행을 멈춥니다. 풀고 있는 물리가 끝난 뒤, 반복 단계 안에서는 지금 반복이 끝난
@@ -309,11 +314,15 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   적힙니다). 실행 뒤 편집하면 도크와 Connections의 행이 **Out of date (last run: Done in 0.3 s)**가
   되고, 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
-  되돌린 편집(결합을 지웠다가 다시 추가)은 다시 현재가 됩니다.
+  되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
+  제목, 하단은 같은 문장 “Model matches run 1 again: results are current”를 보여 주고 Run을
+  요청하지 않습니다.
 - **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
-  열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다.
-- **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
+  열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
+  이 옵션은 그 자리에 남아 꺼진 채 “needs a temperature coupling”이라고 이유를 밝힙니다.
+- **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 광 모드 쪽에서는 n_eff 표가 먼저
+  나오고 결합 입력의 지도는 그 아래에 있습니다. 쓰인 풀이 순서와, 결합마다 보낸
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 코어의 결합 온도와 굴절률(또는 서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref)), n_eff 표를 보여 줍니다.
@@ -326,7 +335,14 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 - **파일.** 다중물리 모델에서는 리본의 Project 묶음에 **Open model file**과 **Save model file**이
   나오며 문서를 읽고 씁니다. 다중물리 실행은 파일에 담기지 않으므로 세션 명령은 숨깁니다(다중물리
   세션 파일은 이후 작업). 제목도 그렇게 밝힙니다: “Not saved to a file · runs stay in this tab”,
-  저장 뒤에는 “… · runs stay in this tab, not in the file”. 연 파일은
+  저장 뒤에는 “… · runs stay in this tab, not in the file”. 이 탭에만 있는 실행을 가진 모델을
+  떠나기 전(다른 모델 카드, 템플릿 다시 열기, 파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave
+  Heated silicon waveguide? Run 1 and its results exist only in this tab: a model file holds the
+  model, not its runs. Opening … discards run 1.” 버튼은 **Keep this model**, **Save model
+  file, then continue**(파일이 지금 모델을 담고 있지 않을 때), **Discard run 1 and continue**입니다.
+  세션 파일에 없는 광 실행이 있을 때 다중물리 모델을 열면 같은 방식으로 그 실행을 밝히고 **Save
+  session, then continue**를 제안합니다. 그 실행은 탭에 남아 광 모델로 돌아오면 다시 보입니다.
+  그래픽 하단은 형상의 길이 단위를 밝힙니다(“Lengths in µm; …”). 연 파일은
   서버가 먼저 읽으므로 중복 키나 JSON이 아닌 글은 이름을 밝혀 거부합니다. 저장한 파일은
   숫자를 가장 짧은 꼴로 씁니다. 스윕은 검사하되 이 화면은 한 점만 실행합니다.
 

@@ -52,7 +52,7 @@ python tools/check_markdown_links.py
 | 후보·성분 변경, 지점·단면 조회 | 두 그림의 물리 좌표가 같고, 조회와 마찬가지로 nm이며 눈금은 둥근 값입니다. n_eff는 후보 목록을 포함해 어디서나 소수 8자리입니다. 상대 정규화된 저장 삼각형 표본이며 보간한 절대장이 아닙니다. |
 | Save session과 Export this run 후 각각 다시 열기 | 파일 범위에 맞는 입력·결과 수·이름·고정·비교·보기를 복원합니다. 제목에 파일 이름과 함께 *Opened …*가 나오며 재계산하지 않습니다. |
 | 실행 표와 단면 CSV 내보내기 | 모든 양의 열 머리글이 `name [unit]`이고 값은 SI입니다(파장 1550 nm는 `0.00000155`, 좌표 0.5 µm는 `5e-7`). |
-| 세션 파일 저장 전 제목과 하단이 모두 *Not saved to a file · kept for recovery in this browser*; Save session | 둘 다 *Sent to session file … · 시각*이 되고, 어느 쪽도 파일이 디스크에 있다고 주장하지 않습니다. |
+| 세션 파일 저장 전 제목과 하단이 모두 *Not saved to a file · kept for recovery in this browser*; Save session | 둘 다 *Session file … sent to your browser's Downloads · 시각*이 되고, 어느 쪽도 파일이 디스크에 있다고 주장하지 않습니다. |
 | *kept for recovery in this browser* 확인 후 새로고침·**Recover (this browser only)** | 결과·보기가 recovered로 돌아오고 제목은 *Recovered from this browser*이며 마지막 세션 파일을 그렇게 표시합니다. 솔버는 시작하지 않습니다. 입력 Undo는 복구 문서에서 새로 시작합니다. |
 | 완료 노트북 저장 대기 중 빈 세션 열기 | 예약한 복구본의 결과가 보존되며 빈 세션이 이를 지우지 않는다. |
 | 교체 확인창을 열고 실행 중 계산 완료 기다리기 | 오래된 검토를 확정해도 새 결과는 보존하고 재검토를 요구한다. |

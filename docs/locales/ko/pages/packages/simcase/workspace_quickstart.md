@@ -95,7 +95,7 @@ py -3.12 -m venv "$HOME\op-studio"
   `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어갑니다(브라우저가
   저장 위치를 묻거나, 같은 이름이 있으면 번호를 붙일 수 있습니다). Messages에 *Session file …
   sent to the browser's downloads (check your Downloads folder)*가 나오고, 다음 편집이나 실행
-  전까지 제목에 *Sent to session file … · 시각*이 표시됩니다. 하단은 제목의 저장 표시를 그대로
+  전까지 제목에 *Session file … sent to your browser's Downloads · 시각*이 표시됩니다. 하단은 제목의 저장 표시를 그대로
   보여 주며, 세션 파일 저장 전에는 *Not saved to a file · kept for recovery in this browser*입니다.
   **More › Save inputs only**는 결과 없이 모델만 저장하고, Runs 목록의 **Export this run**은
   실행 하나를 자체 파일로 씁니다.

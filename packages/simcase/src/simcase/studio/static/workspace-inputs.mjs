@@ -17,6 +17,14 @@ export const INPUT_FIELDS=Object.freeze({
  voltage:Object.freeze({label:'Applied voltage',unit:'V',min:0,max:10,id:'setup-voltage',node:'Electric currents'}),
  temperature:Object.freeze({label:'Boundary temperature',unit:'K',min:1,max:2000,id:'temperature',node:'Heat transfer'})
 });
+// The Messages line after a numeric edit: what changed, a Left x that a Width edit moved to keep
+// the centre, and that nothing is computed until Run. afterResult: a result was just announced.
+const signed=v=>String(v).replace(/^-/,'−');
+export function editNoticeText(key,value,{leftX=null,afterResult=false}={}){
+ const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
+ const moved=leftX===null?'':` Left x moved to ${signed(leftX)} ${INPUT_FIELDS.shapeX.unit} to keep the centre.`;
+ return `${field.label} set to ${signed(value)} ${field.unit}.${moved} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
+}
 export function parseNumeric(key,raw){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
  const text=String(raw).trim(),range=`${field.min}–${field.max} ${field.unit}`;

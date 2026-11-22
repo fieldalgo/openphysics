@@ -160,6 +160,8 @@ export function loopIndexOf(doc,members){
 // ---- materials ------------------------------------------------------------------------------
 function geometryBlock(doc){const g=doc?.geometry;if(!isObject(g))return null;return g.version===1&&isObject(g.components)?Object.values(g.components)[0]:g;}
 export function geometryOf(doc){return geometryBlock(doc);}
+// The graphics footer: the geometry's length unit by name (µm), or that it is not set.
+export function lengthsNote(doc){const u=geometryBlock(doc)?.length_unit;return (typeof u==='string'&&u.trim()?`Lengths in ${unitText(u.trim())}`:'Lengths in the geometry’s unit (not set)')+'; other values carry their units. Run solves every physics in solve order.';}
 // Each material the regions use, in drawing order: {ref, local, label, regions}.
 export function materialUses(doc){
  const block=geometryBlock(doc),uses=new Map();
@@ -321,13 +323,20 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 export function renderMultiphysicsGraph(layout,selection,states={}){
  const pin=(node,p)=>`<button class="graph-port ${p.direction==='input'?'input':'output'} ${QUANTITY_COLOR[p.quantity]||'temperature'}${p.missing?' missing':''}" data-port="${esc(p.id)}" data-mp-select="physics:${esc(node.name)}" title="${esc(quantityWords(p.name))}: ${p.direction==='input'?'an input':'an output'} of ${esc(node.label)}. To connect ports, use Add coupling…" aria-label="${esc(node.label)} ${p.direction} ${esc(quantityWords(p.name))}${p.missing?' (not a port of this physics)':', '+esc(unitText(p.unit))+', '+esc(locationWords(p.location))}"><i class="port-dot" aria-hidden="true"></i><span>${esc(quantityWords(p.name))}<small>${p.missing?'not a port':esc(unitText(p.unit))+' · '+esc(locationWords(p.location))+(p.direction==='input'?' · '+((p.combine||'single')==='single'?'one source':'sources add'):'')}</small></span></button>`;
  const column=c=>layout.nodes.filter(n=>n.column===c);
- const node=n=>{const state=states[n.name];return `<article class="graph-node mp-node ${selection==='physics:'+n.name?'selected':''}" data-mp-node="${esc(n.name)}"><button class="graph-node-title" data-mp-select="physics:${esc(n.name)}" aria-pressed="${selection==='physics:'+n.name}"><span class="order-badge${n.cycle?' cycle':''}" aria-label="solve order ${n.badge}">${n.badge}</span>${esc(n.label)}<small>${esc(n.typeLabel)} · ${esc(n.type)}</small>${state?`<small class="mp-state ${esc(state.state)}">${esc(state.text)}</small>`:''}${(n.warnings||[]).map(w=>`<small class="mp-warn" data-mp-warning="${esc(n.name)}"><b aria-hidden="true">!</b> ${esc(w)}</small>`).join('')}</button><div class="graph-ports">${n.pins.filter(p=>p.direction==='input').map(p=>pin(n,p)).join('')}${n.pins.filter(p=>p.direction==='output').map(p=>pin(n,p)).join('')}</div></article>`;};
+ const node=n=>{const state=states[n.name];return `<article class="graph-node mp-node ${selection==='physics:'+n.name?'selected':''}" data-mp-node="${esc(n.name)}"><button class="graph-node-title" data-mp-select="physics:${esc(n.name)}" aria-pressed="${selection==='physics:'+n.name}"><span class="order-badge${n.cycle?' cycle':''}" aria-label="solve order ${n.badge}">${n.badge}</span>${esc(n.label)}<small>${esc(n.typeLabel)} · ${esc(n.type)}</small>${state?`<small class="mp-state ${esc(state.state)}">${esc(state.text)}</small>`:''}${(n.warnings||[]).map(w=>`<small class="mp-warn" data-mp-warning="${esc(n.name)}"><b aria-hidden="true">!</b> ${esc(w)}</small>`).join('')}</button><div class="graph-ports mp-ports">${[...n.pins.filter(p=>p.direction==='input'),...n.pins.filter(p=>p.direction==='output')].map(p=>pin(n,p)).join('')}</div></article>`;};
  const cols=Array.from({length:layout.columns},(_,c)=>{const box=layout.boxes.find(b=>b.column===c);const inner=column(c).map(node).join('');
   return box?`<div class="mp-column"><div class="mp-cycle ${box.accepted?'accepted':'open'}" data-mp-cycle="${esc(box.members.join(','))}"><span class="mp-cycle-label">${esc(box.label)}</span>${inner}</div></div>`:`<div class="mp-column">${inner}</div>`;}).join('');
  const wires=layout.wires.map(w=>[w.from,w.to,w.color+(w.invalid?' invalid':''),w.title+(w.cause?' · '+w.cause:''),w.route,w.coupling,w.cause]);
  const marks=layout.wires.filter(w=>w.invalid).map(w=>`<button class="mp-wire-mark" data-mp-select="coupling:${esc(w.coupling)}" data-mark-for="${esc(w.coupling)}"><b aria-hidden="true">!</b> ${esc(w.cause||'problem')}</button>`).join('');
  const dangling=layout.dangling.map(d=>`<li><button data-mp-select="coupling:${esc(d.coupling)}"><b aria-hidden="true">!</b> ${esc(d.title)} · ${esc(d.cause)}</button></li>`).join('');
  return `<div class="graph-scroll" tabindex="0" role="region" aria-label="Physics connection diagram; scroll sideways on small screens"><div class="graph-stage mp-stage" data-edges='${esc(JSON.stringify(wires))}'><svg class="graph-wires" aria-hidden="true"></svg>${cols}<div class="mp-marks">${marks}</div></div></div>${dangling?`<ul class="mp-dangling" aria-label="Couplings that cannot be drawn">${dangling}</ul>`:''}`;
+}
+
+// The two ends of each drawn wire: the positions of the ports its coupling joins, by port id
+// (point(id) -> {x, y} of that port's dot, or null when it is not drawn). Every port has its
+// own row with its dot on the node edge, so a wire never starts beside another port.
+export function wireEnds(edges,point){
+ return edges.map(([from,to,,,route,coupling])=>{const a=point(from),c=point(to);return a&&c?{coupling,route,from:a,to:c}:null;});
 }
 
 // ---- running --------------------------------------------------------------------------------
@@ -409,13 +418,22 @@ export const sameContent=(a,b)=>canonicalJson(a)===canonicalJson(b);
 export function runFreshness(run,doc){return !run?'none':sameContent(run.doc,doc)?'current':'stale';}
 // The rows of the last run once the model changed: each keeps what it did, marked out of date.
 export function staleRows(rows){return rows.map(r=>({...r,state:'stale',text:`Out of date (last run: ${r.text})`}));}
+// 'again' once an edit made the model differ from the last run and a later edit (Undo, the
+// same coupling added back) made it equal again: the results are current once more.
+export function freshnessAgain(freshness,diverged){return freshness==='current'&&diverged?'again':freshness;}
+// The one sentence every place shows when the model equals the last run again.
+export const matchesAgainText=runId=>`Model matches run ${runId} again: results are current`;
+// The Messages line after an edit: no request to Run when the model equals the last run again.
+export function editNotice(message,freshness,runId){return message+(freshness==='again'?` ${matchesAgainText(runId)}.`:' Press Run to compute the new model.');}
 // The dock heading and the footer for the state of the model and its last run.
 export function sequenceHeading(freshness,runId){
+ if(freshness==='again')return matchesAgainText(runId);
  if(freshness==='current')return `Run ${runId} · solved from the current model`;
  if(freshness==='stale')return `Run ${runId} · the model changed since; press Run to update`;
  return 'Nothing is computed until you press Run';
 }
 export function readyStatus(freshness,runId){
+ if(freshness==='again')return matchesAgainText(runId);
  if(freshness==='current')return `Run ${runId} matches the model · press Run to solve again`;
  if(freshness==='stale')return `Model edited since run ${runId} · press Run to update`;
  return 'Model checked · press Run';
@@ -425,6 +443,16 @@ export function readyStatus(freshness,runId){
 export function baselineKey(doc,name){return canonicalJson(uncoupledDocument(doc,name));}
 // The optical physics whose temperature a coupling sets: they get a heater-off comparison.
 export function baselinePhysics(doc){return physicsNames(doc).filter(n=>doc.physics[n]?.type==='em.modes2d'&&modesTemperatureCoupled(doc,n));}
+// The "Also solve without heater" option beside Run: shown for every multiphysics model, and
+// disabled with its reason while no coupling sets an optical temperature (nothing to switch off).
+// on: the option as chosen, kept for when a temperature coupling comes back.
+export function baselineOptionState(doc,{on=false,busy=false}={}){
+ const names=baselinePhysics(doc);
+ if(!names.length)return {available:false,disabled:true,checked:false,reason:'needs a temperature coupling',
+  title:'Needs a temperature coupling: no coupling sets an optical temperature, so there is no heater to switch off. Add one from a heat physics with Add coupling….'};
+ return {available:true,disabled:busy,checked:on,reason:'',
+  title:`After the coupled run, also solve ${names.map(physicsLabel).join(' and ')} alone with no temperature input (about 1 s), for the n_eff without heater`};
+}
 // Δn_eff in the 8-decimal format of the n_eff columns, always signed: +0.00215086
 export function shiftText(coupled,alone){const d=Number(coupled)-Number(alone);if(!Number.isFinite(d))return '—';const t=Math.abs(d).toFixed(8);return (d<0&&Number(t)!==0?'−':'+')+t;}
 // The reference temperature every material of the model shares (K), or null when the materials

@@ -179,7 +179,11 @@ try {
   assert.doesNotMatch(await text('#canvas'), /template|application/i, 'the start page says model');
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
-  await page.type('#shape-w', 600); await page.type('#shape-h', 300);
+  await page.type('#shape-w', 600);
+  // Messages says the edit and the Left x it moved, instead of keeping "Model ready…"
+  assert.equal(await text('#file-status'), 'Width set to 600 nm. Left x moved to −300 nm to keep the centre. Run explicitly to compute new results.');
+  await page.type('#shape-h', 300);
+  assert.equal(await text('#file-status'), 'Height set to 300 nm. Run explicitly to compute new results.');
   // a Width edit keeps the core centred on x = 0; a Height edit keeps it on y = 0
   const sized = await page.eval("({x:document.getElementById('shape-x').value,y:document.getElementById('shape-y').value,study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' ')})");
   stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /Ready to run/);
@@ -220,6 +224,7 @@ try {
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
   await sleep(150); assert.match(await text('.run-item'), /^Pinned · design A · /); assert.equal(await text('#pin-run'), 'Unpin this run');
   await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350');
+  assert.match(await text('#file-status'), /^Width set to 700 nm\. Left x moved to −350 nm to keep the centre\. /);
   // an input edit takes the Study step back from Run complete to Ready to run
   const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
   await runAndWait();
@@ -246,7 +251,8 @@ try {
   assert.equal(session.runs?.length, 2);
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to the browser's downloads (check your Downloads folder)`), savedMessage);
-  assert.ok(savedHeader.startsWith(`Optical waveguide / Sent to session file ${sessionFile} · `), savedHeader);
+  assert.ok(savedHeader.startsWith(`Optical waveguide / Session file ${sessionFile} sent to your browser's Downloads · `), savedHeader);
+  assert.doesNotMatch(savedHeader, /saved|disk/i, 'the title never claims the file reached the disk');
   // the footer repeats the title's save indicator and never says "pending"
   const savedFooter = await page.eval("document.getElementById('autosave-status').textContent");
   assert.equal('Optical waveguide / ' + savedFooter, savedHeader); assert.doesNotMatch(savedFooter, /pending/i);

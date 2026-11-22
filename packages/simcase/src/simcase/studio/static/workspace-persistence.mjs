@@ -25,13 +25,16 @@ export function validateSavedFile(value){
 // indicator names the file the session was sent to and never claims it was saved. No revision
 // counter: it counts input changes in this tab only and would differ after a restore.
 const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab'});
+// A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
+// the disk is the browser's to say, so no title claims it was saved.
+export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
 export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
  const problem=runsUnsaved||saved||loaded?.current?(recovery==='unavailable'||recovery==='conflict'?' · '+RECOVERY[recovery]:''):'';
  if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`+problem;
  if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:runsUnsaved?' · not saved to a file':'')+problem;
- if(saved?.current)return `Sent to session file ${saved.name} · ${when(saved.savedAt)}`+problem;
+ if(saved?.current)return `${sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
  const browser=RECOVERY[recovery]||'not in browser recovery yet';
  if(runsUnsaved)return (saved?`Changed since session file ${saved.name} (${when(saved.savedAt)})`:'Not saved to a file')+' · '+browser;
  return clean?'No unsaved input changes':'Unsaved inputs';
@@ -66,4 +69,19 @@ export function sessionLoadText(session,{runs:currentRuns=0,unsaved=false}={},so
   runs:back.length?back.map(runName).join('; '):'None',
   comparison
  };
+}
+
+// The confirmation before leaving a model whose runs only this tab holds, or null when nothing
+// is at stake. from 'multiphysics': runId is its last run (coupled runs are in no file; leaving
+// discards them), saved whether a model file holds the model as it is. from 'optical': runs not
+// in a session file (they stay in this tab, hidden while target is open, but no file holds
+// them). save names the save that fits the model: its model file, or a session file.
+export function leaveConfirmText({from,runId=null,runs=0,saved=false,model='this model',target='the other model'}){
+ if(from==='multiphysics'&&runId)return {title:`Leave ${model}?`,
+  description:`Run ${runId} and its results exist only in this tab: a model file holds the model, not its runs. Opening ${target} discards run ${runId}.`,
+  save:saved?null:{kind:'model',label:'Save model file, then continue'},leave:`Discard run ${runId} and continue`,stay:'Keep this model'};
+ if(from==='optical'&&runs>0&&!saved){const one=runs===1;return {title:`Open ${target}?`,
+  description:`${plural(runs,'optical run')} ${one?'is':'are'} in no file. ${one?'It stays':'They stay'} in this tab while ${target} is open and ${one?'comes':'come'} back with the optical model, but closing the tab can lose ${one?'it':'them'}. Save session keeps ${one?'it':'them'} in a file.`,
+  save:{kind:'session',label:'Save session, then continue'},leave:'Continue without saving',stay:'Keep this model'};}
+ return null;
 }

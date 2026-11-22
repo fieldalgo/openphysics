@@ -21,7 +21,7 @@ test('a session file name holds the application and the local date-time to the m
 
 test('the save indicator shows the file the session was sent to until the next edit, and after recovery what the record kept',()=>{
  const when=()=>'13:05',saved={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
- assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Sent to session file optical-waveguide-session-2026-11-21-1305.json · 13:05');
+ assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),"Session file optical-waveguide-session-2026-11-21-1305.json sent to your browser's Downloads · 13:05");
  // the browser copy does not change what the indicator says about the file
  assert.equal(P.persistenceTitle({saved,recovery:'kept'},when),P.persistenceTitle({saved},when));
  const recovered={kind:'recovered',name:null,current:true};
@@ -40,7 +40,7 @@ test('the save indicator shows the file the session was sent to until the next e
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'conflict'},when),'Not saved to a file · browser recovery changed in another tab');
  assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Not saved to a file · not in browser recovery yet');
  // a failing or conflicting browser copy is said after a file save, an open or a recovery too
- assert.equal(P.persistenceTitle({saved,recovery:'conflict'},when),'Sent to session file optical-waveguide-session-2026-11-21-1305.json · 13:05 · browser recovery changed in another tab');
+ assert.equal(P.persistenceTitle({saved,recovery:'conflict'},when),"Session file optical-waveguide-session-2026-11-21-1305.json sent to your browser's Downloads · 13:05 · browser recovery changed in another tab");
  assert.equal(P.persistenceTitle({loaded:recovered,recovery:'unavailable'},when),'Recovered from this browser · browser recovery unavailable');
  assert.equal(P.persistenceTitle({recovery:'unavailable'},when),'No unsaved input changes');
  assert.equal(P.persistenceTitle({}),'No unsaved input changes');
@@ -54,7 +54,7 @@ test('after an open the title names the file opened; after the next change it sa
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false}),'Unsaved inputs');
  // a save after the open names the new file, not the one opened
- assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),'Sent to session file b.json · 13:05');
+ assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),"Session file b.json sent to your browser's Downloads · 13:05");
  // the title carries no revision counter: it would differ after a restore
  for(const title of [P.persistenceTitle({loaded:opened}),P.persistenceTitle({}),P.persistenceTitle({clean:false})])assert.doesNotMatch(title,/revision/i);
 });
@@ -111,4 +111,25 @@ test('the Compare table has one row per candidate rank with both indices, their 
  assert.equal(C.fieldHeading('B',run('aaaaaaaa',700)),'B · 700 × 300 nm · Silicon · λ 1550 nm');
  // one n_eff precision everywhere: 8 decimals
  assert.equal(C.formatIndex(2.785604861),'2.78560486');
+});
+test('the title says the session file went to the browser Downloads, never that it was saved',()=>{
+ const title=P.persistenceTitle({saved:{name:'s.json',savedAt:'2026-11-21T04:05:00Z',current:true}},()=>'13:05');
+ assert.match(title,/^Session file s\.json sent to your browser's Downloads · 13:05$/);assert.doesNotMatch(title,/saved|disk/i);
+ assert.equal(P.sentToDownloads('Model','m.json'),"Model file m.json sent to your browser's Downloads");
+});
+test('leaving a model whose runs only this tab holds asks first, names what is lost and offers the save that fits',()=>{
+ // a multiphysics run is in no file: leaving discards it; the model file is offered while it is not current
+ const mp=P.leaveConfirmText({from:'multiphysics',runId:2,saved:false,model:'Heated silicon waveguide',target:'Optical waveguide'});
+ assert.deepEqual(mp,{title:'Leave Heated silicon waveguide?',description:'Run 2 and its results exist only in this tab: a model file holds the model, not its runs. Opening Optical waveguide discards run 2.',
+  save:{kind:'model',label:'Save model file, then continue'},leave:'Discard run 2 and continue',stay:'Keep this model'});
+ assert.equal(P.leaveConfirmText({from:'multiphysics',runId:2,saved:true}).save,null,'a model file that holds the model as it is is not offered again');
+ assert.equal(P.leaveConfirmText({from:'multiphysics',runId:null}),null,'no run: nothing to lose, no question');
+ // optical runs not in a session file stay in the tab but no file holds them: Save session is offered
+ const optical=P.leaveConfirmText({from:'optical',runs:1,saved:false,target:'Heated silicon waveguide'});
+ assert.equal(optical.title,'Open Heated silicon waveguide?');
+ assert.equal(optical.description,'1 optical run is in no file. It stays in this tab while Heated silicon waveguide is open and comes back with the optical model, but closing the tab can lose it. Save session keeps it in a file.');
+ assert.deepEqual(optical.save,{kind:'session',label:'Save session, then continue'});
+ assert.match(P.leaveConfirmText({from:'optical',runs:2,target:'x.json'}).description,/^2 optical runs are in no file\. They stay/);
+ assert.equal(P.leaveConfirmText({from:'optical',runs:2,saved:true}),null,'runs in a session file: no question');
+ assert.equal(P.leaveConfirmText({from:'optical',runs:0}),null);
 });

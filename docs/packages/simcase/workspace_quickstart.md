@@ -100,7 +100,7 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   `optical-waveguide-session-2026-11-21-1305.json`, and is handed to your browser's
   downloads (the browser may ask where to save it, or add a number if that name exists).
   Messages reports *Session file … sent to the browser's downloads (check your Downloads
-  folder)* and the title shows *Sent to session file … · time* until your next edit or
+  folder)* and the title shows *Session file … sent to your browser's Downloads · time* until your next edit or
   run. The footer repeats the title's save indicator; before a file save it reads *Not
   saved to a file · kept for recovery in this browser*.
   **More › Save inputs only** keeps the model without results; **Export this run** in

@@ -97,8 +97,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    browser's downloads. Studio hands the file to the browser and cannot know that it was
    kept (a download can be cancelled), so Messages reports *Session file … sent to the
    browser's downloads (check your Downloads folder)*. The header holds the one save
-   indicator, and the footer repeats it word for word: *Sent to session file … · time*
-   until the next edit or run. **More › Save inputs only** keeps the model without
+   indicator, and the footer repeats it word for word: *Session file … sent to your
+   browser's Downloads · time* until the next edit or run; it never says the file was saved. **More › Save inputs only** keeps the model without
    results; while completed runs are not in a session file, the indicator says *Not saved
    to a file · kept for recovery in this browser* (*· updating browser recovery* while it
    writes, *· browser recovery unavailable* if it cannot), or *Changed since session
@@ -108,7 +108,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    name and time, so a recovered session adds *last session file … (time)* (*changed
    since session file …* if it had changed after that save, *not saved to a file* if none
    was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
-   number of nanometres gives a half-nanometre Left x: the centre is kept exactly, and
+   number of nanometres gives a half-nanometre Left x: the centre is kept exactly, Messages says
+   where Left x moved (*Width set to 600 nm. Left x moved to −300 nm to keep the centre.*), and
    typed values are not snapped to the drag step (**More about width and height** under
    the size fields). Wait for *kept for recovery in this browser* before relying on local
    recovery (**Workspace tools** shows when it was last updated). After a reload or a
@@ -337,7 +338,9 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   points to **Add coupling**, which checks the pair. In the tree, heat transfer is marked ∿ and
   optical modes λ, as in the single-physics applications.
 - **Connections** is drawn from the couplings: nodes in solve-order columns, input pins on the
-  left and output pins on the right with their units, one wire per coupling. A coupling that
+  left and output pins on the right with their units, one wire per coupling. Each port has its
+  own row with its dot on the node edge, and a wire starts and ends at the dots of the ports its
+  coupling joins (Heat 1's wire leaves from “temperature”, not from “heat flux” below it). A coupling that
   fails the check is drawn red and dashed with its short cause, or listed under the diagram when
   its physics is missing. A cycle is boxed: amber until it has an iteration step, then blue. Its
   message proposes the engine's defaults, and **Accept iteration step** writes them to
@@ -351,7 +354,9 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   temperature for every optical material: `physmat:Si` and `physmat:SiO2` carry them, and for a
   local record **Fill from physmat** copies physmat's values in (noting the source) or **Use
   physmat:… instead** switches its regions to the library material.
-- **Run** solves every physics in solve order, with the same ▶ as **Run optical study**. The Study dock lists each physics or iteration
+- **Run** solves every physics in solve order, with the same ▶ as **Run optical study**. The ▶
+  is decoration with an empty alternative text, so screen readers read the label alone (“Run”,
+  “Run optical study”). The Study dock lists each physics or iteration
   step with its state (Waiting, Solving…, Done in 0.3 s, Iteration 7 of up to 30 with the last
   change, Did not settle, Not run), Connections shows the same states while it is open, and **Stop run**
   ends the run at the engine's next step: after the physics being solved, or inside an
@@ -361,12 +366,16 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   date (last run: Done in 0.3 s)**, on the dock and in Connections; the dock heading reads “Run 1 ·
   the model changed since; press Run to update” and the footer “Model edited since run 1 · press
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
-  coupling removed and added back) makes it current again.
+  coupling removed and added back, or Undo) makes it current again, and Messages, the dock
+  heading and the footer then say the same sentence, “Model matches run 1 again: results are
+  current”, with no request to Run.
 - **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
   take a coupled temperature opens. After the coupled run, Studio solves the optical model alone
   with no temperature input, through the same run route, and fills the heater-off column. It is
-  skipped when the kept column has the same content.
-- **Results** has a page per physics and a **Coupling check**: the solve order used and, per
+  skipped when the kept column has the same content. While no coupling sets an optical
+  temperature the option stays in place, disabled, and says “needs a temperature coupling”.
+- **Results** has a page per physics and a **Coupling check**. On an optical page the n_eff table
+  comes first and the maps of its coupled input below it: the solve order used and, per
   coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
   (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
   0 K”). Heat 1 shows the temperature map; Modes 1 shows the coupled temperature and the
@@ -384,7 +393,15 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   **Save model file**, which read and write the document; the session commands are hidden
   because a multiphysics run is not kept in a file (a multiphysics session file is later work).
   The title says so: “Not saved to a file · runs stay in this tab”, and after a save “… · runs
-  stay in this tab, not in the file”. An
+  stay in this tab, not in the file”. Before leaving a model whose run only this tab holds
+  (another model card, the template again, an opened file or inputs), Studio asks first: “Leave
+  Heated silicon waveguide? Run 1 and its results exist only in this tab: a model file holds the
+  model, not its runs. Opening … discards run 1.”, with **Keep this model**, **Save model file,
+  then continue** (while the file does not hold the model as it is) and **Discard run 1 and
+  continue**. Opening a multiphysics model over optical runs that are in no session file names
+  them the same way and offers **Save session, then continue**; those runs stay in the tab and
+  come back with the optical model. The graphics footer names the geometry's length unit
+  (“Lengths in µm; …”). An
   opened file is read by the server first, so a duplicate key or text that is not JSON is
   refused by name; a saved file writes each number in its shortest form. A sweep is checked,
   and this view runs one point only.
