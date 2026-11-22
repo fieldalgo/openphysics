@@ -197,3 +197,53 @@ test('the catalog keeps unavailable providers and greys kinds Studio does not ad
  assert.deepEqual(c.providers.map(p=>[p.name,p.status]),[['openphysics-fem','available'],['broken','unavailable'],['test-relays','available']]);
  assert.equal(c.types.get('joule.steady2d').addable,false);assert.equal(c.types.get('em.modes2d').provider,'openphysics-fem');
 });
+test('a model edit leaves the last run out of date; the same content again is current',async()=>{
+ const m=await mp;
+ assert.equal(m.runFreshness(null,heated()),'none');
+ const run={doc:heated()};assert.equal(m.runFreshness(run,heated()),'current');
+ const removed=m.removeCoupling(heated(),'heat1_to_modes1');
+ assert.equal(m.runFreshness(run,removed),'stale');
+ // the coupling added back: other key order, same content
+ const back={...removed,couplings:{heat1_to_modes1:{transfer:'same_mesh',to:'modes1.temperature',from:'heat1.temperature'}}};
+ assert.notEqual(JSON.stringify(back),JSON.stringify(heated()));
+ assert.equal(m.runFreshness(run,back),'current');
+ assert.deepEqual(m.staleRows([{label:'Heat 1',state:'done',text:'Done in 0.5 s'}]),[{label:'Heat 1',state:'stale',text:'Out of date (last run: Done in 0.5 s)'}]);
+ assert.equal(m.sequenceHeading('none'),'Nothing is computed until you press Run');
+ assert.equal(m.sequenceHeading('stale',2),'Run 2 · the model changed since; press Run to update');
+ assert.equal(m.sequenceHeading('current',2),'Run 2 · solved from the current model');
+ assert.equal(m.readyStatus('none'),'Model checked · press Run');
+ assert.equal(m.readyStatus('stale',1),'Model edited since run 1 · press Run to update');
+ assert.equal(m.readyStatus('current',1),'Run 1 matches the model · press Run to solve again');
+ assert.equal(m.canonicalJson({b:[{d:1,c:2}],a:null}),'{"a":null,"b":[{"c":2,"d":1}]}');
+});
+test('the heater-off column is valid by the content of the optical model it solved, not by run order',async()=>{
+ const m=await mp,key=m.baselineKey(heated(),'modes1');
+ const removed=m.removeCoupling(heated(),'heat1_to_modes1'),back=m.addCoupling(removed,m.kindCatalog(CAPS),'heat1.temperature','modes1.temperature').doc;
+ assert.equal(m.baselineKey(back,'modes1'),key);
+ // the heat physics and the thermo-optic data are not part of the optical model solved alone
+ const hotter=heated();hotter.physics.heat1.prescribed_temperature.bottom='310 K';hotter.materials.heater.thermo_optic_coefficient='1e-5 1/K';
+ assert.equal(m.baselineKey(hotter,'modes1'),key);
+ const other=heated();other.physics.modes1.vacuum_wavelength='1310 nm';
+ assert.notEqual(m.baselineKey(other,'modes1'),key);
+ assert.deepEqual(m.baselinePhysics(heated()),['modes1']);assert.deepEqual(m.baselinePhysics(removed),[]);
+});
+test('Δn_eff is signed in the 8-decimal format of n_eff; the baseline says what the engine solves',async()=>{
+ const m=await mp;
+ assert.equal(m.shiftText(2.44565013,2.44349927),'+0.00215086');
+ assert.equal(m.shiftText(2.44349927,2.44565013),'−0.00215086');
+ assert.equal(m.shiftText(1.5,1.5),'+0.00000000');assert.equal(m.shiftText(1,undefined),'—');
+ assert.equal(m.sharedReferenceTemperature(heated()),300);
+ assert.equal(m.baselineText(heated(),'modes1'),'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
+ const mixed=heated();mixed.materials.heater.reference_temperature='293 K';
+ assert.equal(m.sharedReferenceTemperature(mixed),null);
+ assert.equal(m.baselineText(mixed,'modes1'),'without heater = Modes 1 alone with no temperature input: every material keeps its index n₀.');
+});
+test('an optical temperature input with no source while a heat physics could give one is a warning',async()=>{
+ const m=await mp,c=m.kindCatalog(CAPS);
+ assert.deepEqual(m.unsourcedInputs(heated(),c),[]);
+ const removed=m.removeCoupling(heated(),'heat1_to_modes1');
+ assert.deepEqual(m.unsourcedInputs(removed,c).map(w=>[w.physics,w.text]),[['modes1','Temperature input has no source: uses n₀ at T_ref (300 K)']]);
+ // the optical model alone has nothing that could give it: no warning
+ assert.deepEqual(m.unsourcedInputs(m.removePhysics(removed,'heat1'),c),[]);
+ assert.equal(m.unitText('um'),'µm');assert.equal(m.unitText('W/(m^2 K)'),'W/(m² K)');
+});

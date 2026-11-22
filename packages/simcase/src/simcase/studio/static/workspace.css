@@ -44,8 +44,8 @@ p{margin:8px 0 14px;color:var(--muted)}
 .ui-icon{width:23px;height:23px;fill:none;stroke:#557394;stroke-width:1.45;stroke-linejoin:round;stroke-linecap:round}
 .ribbon-commands>button:disabled .ui-icon{stroke:#758397}
 .solve-commands{border:0;padding-left:18px}
-#run-optical,#run-heat,#run-joule{font-size:12px;font-weight:600;background:#edf3fc;color:#255da9;border:1px solid #d6e3f6;padding-inline:16px;min-width:140px}
-#run-optical::before,#run-heat::before,#run-joule::before{content:'▶';font-size:21px;line-height:23px;font-weight:400;color:#28755e}
+#run-optical,#run-heat,#run-joule,#run-multiphysics{font-size:12px;font-weight:600;background:#edf3fc;color:#255da9;border:1px solid #d6e3f6;padding-inline:16px;min-width:140px}
+#run-optical::before,#run-heat::before,#run-joule::before,#run-multiphysics::before{content:'▶';font-size:21px;line-height:23px;font-weight:400;color:#28755e}
 #save-session.unsaved-session{box-shadow:inset 0 -2px #b77b28}
 .file-menu{position:relative}
 .file-menu>summary{cursor:pointer;list-style:none}
@@ -145,7 +145,7 @@ main.choosing .canvas>h2{font-size:27px;margin-top:12px}
 main.choosing .canvas>p{margin-top:8px;margin-bottom:28px}
 main.choosing .workspace>.note{display:none}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;max-width:1100px;margin:20px auto}
-.cards button{text-align:left;padding:0 22px 22px;background:#fff;border:1px solid #ccd6e2;border-radius:4px;overflow:hidden;box-shadow:0 2px 5px #35517408}
+.cards button{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;text-align:left;padding:0 22px 22px;background:#fff;border:1px solid #ccd6e2;border-radius:4px;overflow:hidden;box-shadow:0 2px 5px #35517408}
 .cards button::before{content:'◇';display:flex;align-items:center;justify-content:center;height:112px;margin:0 -22px 20px;background:#e8eef8;color:#4678ba;font:64px/1 Georgia,serif;border-bottom:1px solid #d6dfec}
 .cards button[data-template=heat]::before{content:'∿';background:#f6eee2;color:#ac7941}
 .cards button[data-template=multi]::before,.cards button[data-template=heated-waveguide]::before{content:'⇄';background:#ecedf6;color:#7973ac}
@@ -308,7 +308,10 @@ dialog::backdrop{background:#162a4b66}
 .setup-badge.solved{background:#e8f1fb;border-color:#bcd2ee;color:#255da9}
 /* The Study step's wavelength opens the wavelength field (Physics › Optical modes). */
 .workflow-wavelength{flex:none;align-self:center;margin:0 8px 0 -6px;padding:3px 8px;border:1px solid #c9d3df;border-radius:999px;background:#fff;color:var(--accent);font-size:11px;white-space:nowrap}
-.workflow-wavelength:hover{background:#e8f0fc}
+.workflow-wavelength{cursor:pointer;border-color:#9fb6d6;box-shadow:0 1px 0 #c9d3df;font-weight:600}
+.workflow-wavelength::after{content:'✎';margin-left:5px;font-weight:400;opacity:.8}
+.workflow-wavelength:hover{background:#e8f0fc;border-color:var(--accent)}
+.workflow-wavelength:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 /* Multiphysics models (D2): a graph drawn from the couplings, solve-order badges, cycles, Messages. */
 .mp-stage{display:flex;align-items:flex-start;gap:96px;height:auto;min-height:280px;min-width:min-content;padding:36px 32px 72px}
 .mp-stage .graph-node{position:relative;width:230px}
@@ -355,3 +358,14 @@ dialog::backdrop{background:#162a4b66}
 .tree [data-mp-node]{white-space:normal;text-align:left;height:auto}
 .mp-result-tabs [aria-selected=true]{color:#184e9b;border-color:#7c9fce;background:var(--selected)}
 .mp-maps figcaption label{display:inline;margin:0}.mp-maps figcaption select{display:inline-block;width:auto;margin:0 4px}
+
+/* round 4: the multiphysics run, its out-of-date rows, warnings and model file commands */
+.run-option{display:flex;align-items:center;gap:5px;font-size:11px;color:#34445b;white-space:nowrap;cursor:pointer;padding:0 4px}
+.run-option small{color:#718197}
+.mp-row.stale{color:#8a6414;background:#fbf4e2}
+.mp-row.stale b{background:#c99a2e}
+.warn-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;margin-left:6px;border-radius:8px;background:#f2c14e;color:#4a3300;font-size:10px;font-weight:700}
+.mp-node .mp-warn{display:block;color:#8a5a00;background:#fdf3d8;border-radius:2px;padding:2px 5px;margin-top:4px;font-size:11px;white-space:normal}
+.mp-stage .graph-port{cursor:default}
+.mp-neff th:last-child{white-space:normal}
+@media (min-width:1200px){.cards{grid-template-columns:repeat(4,minmax(0,1fr))}.cards button::before{height:88px}}

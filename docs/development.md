@@ -352,8 +352,10 @@ non-converging Newton run whose refusal is shown with its text, and constant mat
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff
-must equal the engine's run of the same document exactly, the coupling check, the optical
-model run alone, and no horizontal overflow at 1440 × 900 and 390 px wide.
+must equal the engine's run of the same document exactly, the coupling check, the heater-off
+column solved with the run and its Δn_eff equal to the difference of the engine's two runs, the
+run marked out of date by an edit and current again for the same content (the column staying
+valid on a second run), the warning and Undo of a removed coupling, and no horizontal overflow at 1440 × 900 and 390 px wide.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

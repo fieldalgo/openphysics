@@ -308,7 +308,7 @@ of its three node temperatures, and the optical solve uses n = n₀ + (dn/dT)(T 
 heater is a local record with a lossless placeholder index; metal loss is later work.
 
 The workspace edits the document itself, so it keeps every key it has no form for, and
-**More › Open model file** opens any multiphysics document, such as the shipped
+**Open model file** (Project) opens any multiphysics document, such as the shipped
 [heated slab example](../../../examples/simcase/multiphysics_heated_slab.json).
 
 - **Model builder.** One Component (Geometry 1, Materials with one item per material in use,
@@ -327,7 +327,15 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   greyed with the reason (the same physics, another quantity, another unit, an input that
   already has its one source). The transfer is Same mesh, the only one in this release. When an
   input could obviously be fed (Modes 1 temperature from Heat 1), Messages suggests the
-  coupling; nothing is coupled until you add it.
+  coupling; nothing is coupled until you add it. Until then Modes 1 carries a warning in the
+  tree, on its Connections node, in its Settings and in Messages: “Temperature input has no
+  source: uses n₀ at T_ref (300 K)”. Without a coupled temperature the optical solve applies no
+  index change, so every material keeps n₀, its index at its reference temperature (the shared
+  T_ref is named when every material has the same one). Removing a coupling leaves a message
+  with **Undo** until the next edit.
+- **Ports are not dragged.** The port dots show what each physics sends and takes; their tooltip
+  points to **Add coupling**, which checks the pair. In the tree, heat transfer is marked ∿ and
+  optical modes λ, as in the single-physics applications.
 - **Connections** is drawn from the couplings: nodes in solve-order columns, input pins on the
   left and output pins on the right with their units, one wire per coupling. A coupling that
   fails the check is drawn red and dashed with its short cause, or listed under the diagram when
@@ -343,24 +351,40 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   temperature for every optical material: `physmat:Si` and `physmat:SiO2` carry them, and for a
   local record **Fill from physmat** copies physmat's values in (noting the source) or **Use
   physmat:… instead** switches its regions to the library material.
-- **Run** solves every physics in solve order. The Study dock lists each physics or iteration
+- **Run** solves every physics in solve order, with the same ▶ as **Run optical study**. The Study dock lists each physics or iteration
   step with its state (Waiting, Solving…, Done in 0.3 s, Iteration 7 of up to 30 with the last
   change, Did not settle, Not run), Connections shows the same states while it is open, and **Stop run**
   ends the run at the engine's next step: after the physics being solved, or inside an
   iteration step after the current iteration. A run that fails or is stopped keeps no partial
   result; Messages names the physics that failed, and the previous complete run stays. A sweep
-  is checked but not run (the run reason says so).
+  is checked but not run (the run reason says so). Any edit after a run marks its rows **Out of
+  date (last run: Done in 0.3 s)**, on the dock and in Connections; the dock heading reads “Run 1 ·
+  the model changed since; press Run to update” and the footer “Model edited since run 1 · press
+  Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
+  coupling removed and added back) makes it current again.
+- **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
+  take a coupled temperature opens. After the coupled run, Studio solves the optical model alone
+  with no temperature input, through the same run route, and fills the heater-off column. It is
+  skipped when the kept column has the same content.
 - **Results** has a page per physics and a **Coupling check**: the solve order used and, per
   coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
   (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
   0 K”). Heat 1 shows the temperature map; Modes 1 shows the coupled temperature and the
   refractive index (or its change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the
   document's values) on the core, and the
-  n_eff table. **Run Modes 1 alone** runs the optical model without its coupling, on request,
-  and adds an “n_eff without heater” column. A result names its run and does not change when
-  the model is edited.
-- **Files.** **Save model file** and **Open model file** (under More) write and read the
-  document; Save session is not used for multiphysics models, and runs stay in the tab. An
+  n_eff table with “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
+  with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
+  what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
+  keeps n₀, its index at T_ref = 300 K”. The column is valid while the optical model solved alone
+  (the run's document without couplings, loops and thermo-optic keys, compared with sorted keys)
+  is the one of the shown run; otherwise it is marked “(other model)”, Δn_eff is left out, and
+  **Run Modes 1 alone** refreshes it. A result names its run and does not change when the model
+  is edited.
+- **Files.** In a multiphysics model the ribbon's Project group shows **Open model file** and
+  **Save model file**, which read and write the document; the session commands are hidden
+  because a multiphysics run is not kept in a file (a multiphysics session file is later work).
+  The title says so: “Not saved to a file · runs stay in this tab”, and after a save “… · runs
+  stay in this tab, not in the file”. An
   opened file is read by the server first, so a duplicate key or text that is not JSON is
   refused by name; a saved file writes each number in its shortest form. A sweep is checked,
   and this view runs one point only.

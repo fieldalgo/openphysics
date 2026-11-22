@@ -19,7 +19,7 @@ const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 
 // ---- names and words ------------------------------------------------------------------------
 export function quantityWords(quantity){return QUANTITY_WORDS[quantity]||String(quantity).replace(/_/g,' ');}
-export function unitText(unit){return String(unit).replace(/\^2/g,'²').replace(/\^3/g,'³').replace(/\^-1/g,'⁻¹');}
+export function unitText(unit){return String(unit).replace(/\^2/g,'²').replace(/\^3/g,'³').replace(/\^-1/g,'⁻¹').replace(/\bum\b/g,'µm');}
 export function locationWords(location){return LOCATION_WORDS[location]||location;}
 // "heat1" -> "Heat 1"; another name is shown as written
 export function physicsLabel(name){const m=/^([a-z]+)_?(\d+)$/.exec(String(name));return m?m[1][0].toUpperCase()+m[1].slice(1)+' '+m[2]:String(name);}
@@ -299,7 +299,8 @@ export function connectionLayout(doc,catalog,order,messages=[]){
   const cycle=group.length>1;
   group.forEach((name,row)=>{
    const pins=portsOf(doc,catalog,name).filter(p=>p.location!=='scalar'||p.direction==='output').map(p=>({...p,id:`${name}--${p.direction}--${p.name}`}));
-   nodes.push({name,label:physicsLabel(name),type:doc.physics[name].type,typeLabel:catalog.types.get(doc.physics[name].type)?.label||doc.physics[name].type,column,row,badge:column+1,cycle,pins});
+   const warnings=unsourcedInputs(doc,catalog).filter(w=>w.physics===name).map(w=>w.text);
+   nodes.push({name,label:physicsLabel(name),type:doc.physics[name].type,typeLabel:catalog.types.get(doc.physics[name].type)?.label||doc.physics[name].type,column,row,badge:column+1,cycle,pins,warnings});
   });
   if(cycle){const loop=loopIndexOf(doc,group);boxes.push({members:[...group],column,accepted:loop>=0,loop,
    label:loop>=0?`Iteration step ${loop+1} · ${loopText(doc.study.loops[loop])}`:`Cycle: ${list(group.map(physicsLabel))} need an iteration step`});}
@@ -318,9 +319,9 @@ export function connectionLayout(doc,catalog,order,messages=[]){
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function renderMultiphysicsGraph(layout,selection,states={}){
- const pin=(node,p)=>`<button class="graph-port ${p.direction==='input'?'input':'output'} ${QUANTITY_COLOR[p.quantity]||'temperature'}${p.missing?' missing':''}" data-port="${esc(p.id)}" data-mp-select="physics:${esc(node.name)}" aria-label="${esc(node.label)} ${p.direction} ${esc(quantityWords(p.name))}${p.missing?' (not a port of this physics)':', '+esc(unitText(p.unit))+', '+esc(locationWords(p.location))}"><i class="port-dot" aria-hidden="true"></i><span>${esc(quantityWords(p.name))}<small>${p.missing?'not a port':esc(unitText(p.unit))+' · '+esc(locationWords(p.location))+(p.direction==='input'?' · '+((p.combine||'single')==='single'?'one source':'sources add'):'')}</small></span></button>`;
+ const pin=(node,p)=>`<button class="graph-port ${p.direction==='input'?'input':'output'} ${QUANTITY_COLOR[p.quantity]||'temperature'}${p.missing?' missing':''}" data-port="${esc(p.id)}" data-mp-select="physics:${esc(node.name)}" title="${esc(quantityWords(p.name))}: ${p.direction==='input'?'an input':'an output'} of ${esc(node.label)}. To connect ports, use Add coupling…" aria-label="${esc(node.label)} ${p.direction} ${esc(quantityWords(p.name))}${p.missing?' (not a port of this physics)':', '+esc(unitText(p.unit))+', '+esc(locationWords(p.location))}"><i class="port-dot" aria-hidden="true"></i><span>${esc(quantityWords(p.name))}<small>${p.missing?'not a port':esc(unitText(p.unit))+' · '+esc(locationWords(p.location))+(p.direction==='input'?' · '+((p.combine||'single')==='single'?'one source':'sources add'):'')}</small></span></button>`;
  const column=c=>layout.nodes.filter(n=>n.column===c);
- const node=n=>{const state=states[n.name];return `<article class="graph-node mp-node ${selection==='physics:'+n.name?'selected':''}" data-mp-node="${esc(n.name)}"><button class="graph-node-title" data-mp-select="physics:${esc(n.name)}" aria-pressed="${selection==='physics:'+n.name}"><span class="order-badge${n.cycle?' cycle':''}" aria-label="solve order ${n.badge}">${n.badge}</span>${esc(n.label)}<small>${esc(n.typeLabel)} · ${esc(n.type)}</small>${state?`<small class="mp-state ${esc(state.state)}">${esc(state.text)}</small>`:''}</button><div class="graph-ports">${n.pins.filter(p=>p.direction==='input').map(p=>pin(n,p)).join('')}${n.pins.filter(p=>p.direction==='output').map(p=>pin(n,p)).join('')}</div></article>`;};
+ const node=n=>{const state=states[n.name];return `<article class="graph-node mp-node ${selection==='physics:'+n.name?'selected':''}" data-mp-node="${esc(n.name)}"><button class="graph-node-title" data-mp-select="physics:${esc(n.name)}" aria-pressed="${selection==='physics:'+n.name}"><span class="order-badge${n.cycle?' cycle':''}" aria-label="solve order ${n.badge}">${n.badge}</span>${esc(n.label)}<small>${esc(n.typeLabel)} · ${esc(n.type)}</small>${state?`<small class="mp-state ${esc(state.state)}">${esc(state.text)}</small>`:''}${(n.warnings||[]).map(w=>`<small class="mp-warn" data-mp-warning="${esc(n.name)}"><b aria-hidden="true">!</b> ${esc(w)}</small>`).join('')}</button><div class="graph-ports">${n.pins.filter(p=>p.direction==='input').map(p=>pin(n,p)).join('')}${n.pins.filter(p=>p.direction==='output').map(p=>pin(n,p)).join('')}</div></article>`;};
  const cols=Array.from({length:layout.columns},(_,c)=>{const box=layout.boxes.find(b=>b.column===c);const inner=column(c).map(node).join('');
   return box?`<div class="mp-column"><div class="mp-cycle ${box.accepted?'accepted':'open'}" data-mp-cycle="${esc(box.members.join(','))}"><span class="mp-cycle-label">${esc(box.label)}</span>${inner}</div></div>`:`<div class="mp-column">${inner}</div>`;}).join('');
  const wires=layout.wires.map(w=>[w.from,w.to,w.color+(w.invalid?' invalid':''),w.title+(w.cause?' · '+w.cause:''),w.route,w.coupling,w.cause]);
@@ -393,4 +394,58 @@ export function uncoupledDocument(doc,name){
  for(const record of Object.values(next.materials||{}))if(isObject(record)){delete record.thermo_optic_coefficient;delete record.reference_temperature;}
  next.name=`${doc.name||'Model'} · ${physicsLabel(name)} alone`;
  return normalizeEnvelope(next);
+}
+
+// ---- what a run still says about the model --------------------------------------------------
+// JSON with the keys of every object sorted: two documents of the same content have the same
+// text, whatever order their edits wrote the keys in (a coupling removed and added back).
+export function canonicalJson(x){
+ if(Array.isArray(x))return '['+x.map(canonicalJson).join(',')+']';
+ if(isObject(x))return '{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canonicalJson(x[k])).join(',')+'}';
+ return JSON.stringify(x);
+}
+export const sameContent=(a,b)=>canonicalJson(a)===canonicalJson(b);
+// 'none' before a first run, 'current' while the model is the one the last run solved, else 'stale'
+export function runFreshness(run,doc){return !run?'none':sameContent(run.doc,doc)?'current':'stale';}
+// The rows of the last run once the model changed: each keeps what it did, marked out of date.
+export function staleRows(rows){return rows.map(r=>({...r,state:'stale',text:`Out of date (last run: ${r.text})`}));}
+// The dock heading and the footer for the state of the model and its last run.
+export function sequenceHeading(freshness,runId){
+ if(freshness==='current')return `Run ${runId} · solved from the current model`;
+ if(freshness==='stale')return `Run ${runId} · the model changed since; press Run to update`;
+ return 'Nothing is computed until you press Run';
+}
+export function readyStatus(freshness,runId){
+ if(freshness==='current')return `Run ${runId} matches the model · press Run to solve again`;
+ if(freshness==='stale')return `Model edited since run ${runId} · press Run to update`;
+ return 'Model checked · press Run';
+}
+// The content key of one physics solved alone: an uncoupled column is valid for a run whose
+// document gives the same uncoupled document, decided by content, not by the order of runs.
+export function baselineKey(doc,name){return canonicalJson(uncoupledDocument(doc,name));}
+// The optical physics whose temperature a coupling sets: they get a heater-off comparison.
+export function baselinePhysics(doc){return physicsNames(doc).filter(n=>doc.physics[n]?.type==='em.modes2d'&&modesTemperatureCoupled(doc,n));}
+// Δn_eff in the 8-decimal format of the n_eff columns, always signed: +0.00215086
+export function shiftText(coupled,alone){const d=Number(coupled)-Number(alone);if(!Number.isFinite(d))return '—';const t=Math.abs(d).toFixed(8);return (d<0&&Number(t)!==0?'−':'+')+t;}
+// The reference temperature every material of the model shares (K), or null when the materials
+// have none or differ. Without a coupled temperature the modes solve applies no index change, so
+// each material keeps n₀, its index at its own T_ref.
+export function sharedReferenceTemperature(doc){
+ const values=new Set();
+ for(const u of materialUses(doc)){
+  if(u.ref.startsWith('physmat:')){const t=PHYSMAT_THERMO_OPTIC[u.ref];if(!t)return null;values.add(t.reference);continue;}
+  const raw=doc.materials?.[u.ref]?.reference_temperature,m=/^\s*([-+]?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?)\s*K\s*$/.exec(String(raw??''));
+  if(typeof raw==='number')values.add(raw);else if(m)values.add(Number(m[1]));else return null;
+ }
+ return values.size===1?[...values][0]:null;
+}
+const atReference=doc=>{const t=sharedReferenceTemperature(doc);return t===null?'every material keeps its index n₀':`every material keeps n₀, its index at T_ref = ${t} K`;};
+// What the heater-off column is, in the words of what the engine does for it.
+export function baselineText(doc,name){return `without heater = ${physicsLabel(name)} alone with no temperature input: ${atReference(doc)}.`;}
+// The inputs that take a temperature no coupling gives, while a physics of the model could:
+// [{physics, port, text}] (a warning; the model still runs).
+export function unsourcedInputs(doc,catalog){
+ return suggestedCouplings(doc,catalog).filter(s=>splitSpec(s.to)[1]==='temperature'&&doc.physics[splitSpec(s.to)[0]]?.type==='em.modes2d').map(s=>{
+  const t=sharedReferenceTemperature(doc);
+  return {physics:splitSpec(s.to)[0],port:'temperature',from:s.from,to:s.to,text:`Temperature input has no source: ${t===null?'each material uses its index n₀':`uses n₀ at T_ref (${t} K)`}`};});
 }
