@@ -264,7 +264,9 @@ def test_e8_refusals():
     t = xp.asarray(0.0)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         solve_steady_electric(m, electrical_conductivity=2.0e3, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match=r"the current density on 'right' is a callback"):
+    # current-density callbacks take a motion since e4 (test_shape_derivative_electric_callbacks.py);
+    # a NumPy-only one is refused by name
+    with pytest.raises(TypeError, match=r"the callback of the current density on 'right' returned NumPy numbers"):
         solve_steady_electric(m, electrical_conductivity=2.0e3, **common,
                               inward_current_density={"right": lambda p, n: -np.ones(len(p))},
                               motion=MeshMotion(design_velocity=W, t=t))
