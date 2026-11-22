@@ -39,6 +39,10 @@ test('the save indicator shows the file the session was sent to until the next e
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'unavailable'},when),'Not saved to a file · browser recovery unavailable');
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'conflict'},when),'Not saved to a file · browser recovery changed in another tab');
  assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Not saved to a file · not in browser recovery yet');
+ // a failing or conflicting browser copy is said after a file save, an open or a recovery too
+ assert.equal(P.persistenceTitle({saved,recovery:'conflict'},when),'Sent to session file optical-waveguide-session-2026-11-21-1305.json · 13:05 · browser recovery changed in another tab');
+ assert.equal(P.persistenceTitle({loaded:recovered,recovery:'unavailable'},when),'Recovered from this browser · browser recovery unavailable');
+ assert.equal(P.persistenceTitle({recovery:'unavailable'},when),'No unsaved input changes');
  assert.equal(P.persistenceTitle({}),'No unsaved input changes');
  // an invalid draft outranks a saved state
  assert.equal(P.persistenceTitle({invalid:true,clean:true,saved},when),'Invalid input draft · last valid inputs unchanged');

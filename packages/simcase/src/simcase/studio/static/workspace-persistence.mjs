@@ -27,9 +27,11 @@ export function validateSavedFile(value){
 const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab'});
 export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
- if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`;
- if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:runsUnsaved?' · not saved to a file':'');
- if(saved?.current)return `Sent to session file ${saved.name} · ${when(saved.savedAt)}`;
+ // A browser copy that fails or changed in another tab is said in every state with runs.
+ const problem=runsUnsaved||saved||loaded?.current?(recovery==='unavailable'||recovery==='conflict'?' · '+RECOVERY[recovery]:''):'';
+ if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`+problem;
+ if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:runsUnsaved?' · not saved to a file':'')+problem;
+ if(saved?.current)return `Sent to session file ${saved.name} · ${when(saved.savedAt)}`+problem;
  const browser=RECOVERY[recovery]||'not in browser recovery yet';
  if(runsUnsaved)return (saved?`Changed since session file ${saved.name} (${when(saved.savedAt)})`:'Not saved to a file')+' · '+browser;
  return clean?'No unsaved input changes':'Unsaved inputs';
