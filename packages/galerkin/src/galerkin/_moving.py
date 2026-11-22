@@ -762,8 +762,8 @@ def _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, diri
 
 def _check_thermal_constants(reference_temperature_k, thermal_expansion_per_k):
     if callable(reference_temperature_k):
-        raise ValueError("motion: stress_free_temperature is a callback; with a motion it must be a finite "
-                         "nonnegative real scalar")
+        raise _CoefficientCallbackRefused("motion: stress_free_temperature is a callback; with a motion it must "
+                                          "be a finite nonnegative real scalar")
     if is_live(reference_temperature_k):
         raise TypeError("motion: stress_free_temperature is live; in this slice only the motion's t carries a "
                         "derivative")
@@ -865,10 +865,16 @@ def _tags(table, name):
     return table
 
 
+class _CoefficientCallbackRefused(TypeError, ValueError):
+    """A coefficient callback refused with a motion. A TypeError, as every other callback refused with a
+    motion (sources, boundary and Dirichlet values); also a ValueError, the type these refusals had
+    before 2026-11-22, so existing ``except ValueError`` handlers keep catching it."""
+
+
 def _coefficient(value, name):
     if callable(value):
-        raise ValueError(f"motion: {name} is a callback; with a motion it must be a finite real scalar or a table "
-                         "of region names")
+        raise _CoefficientCallbackRefused(f"motion: {name} is a callback; with a motion it must be a finite real "
+                                          "scalar or a table of region names")
     _numpy_data(value, name, sampled=False)
 
 
