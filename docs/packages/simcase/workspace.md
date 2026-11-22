@@ -26,8 +26,9 @@ without hiding the model. The dock shows the study sequence and Messages; after 
 Joule heating run, Results adds its **Solver log** there.
 
 **Save session** and **Open session** keep the whole session, including completed
-optical runs and comparisons; "Save session" is the one name for that save in the
-ribbon, the header and Messages. **More** contains input-only files (**More › Save
+optical runs and comparisons, or a multiphysics model with its runs; "Save session" is the
+one name for that save in the ribbon, the header and Messages, in every model (optical, heat,
+Joule heating and multiphysics). **More** contains input-only files (**More › Save
 inputs only**, **Open inputs file**), browser drafts and Reset design. **Workspace tools** in the bottom status bar contains connection,
 recovery and Reset layout; **Installed physics** sits next to it. Both open above the
 status bar, one at a time, on every page including Models; Escape closes the open
@@ -113,9 +114,9 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    file … (time) · kept for recovery in this browser* after a file save.
    After **Open session** the header says *Opened …* with the file name, and after a
    recovery *Recovered from this browser*; browser recovery keeps the last session file
-   name and time, so a recovered session adds *last session file … (time)* (*changed
-   since session file …* if it had changed after that save, *not saved to a file* if none
-   was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
+   name and time, so a recovered session names it as history, *Recovered from this browser
+   (last sent to a file: … at 13:05)* (*…; changed since)* if it had changed after that save,
+   *· not saved to a file* if none was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, Messages says
    where Left x moved (*Width set to 600 nm. Left x moved to −300 nm to keep the centre.*), and
    typed values are not snapped to the drag step (**More about width and height** under
@@ -320,8 +321,8 @@ of its three node temperatures, and the optical solve uses n = n₀ + (dn/dT)(T 
 heater is a local record with a lossless placeholder index; metal loss is later work.
 
 The workspace edits the document itself, so it keeps every key it has no form for, and
-**Open model file** (Project) opens any multiphysics document, such as the shipped
-[heated slab example](../../../examples/simcase/multiphysics_heated_slab.json).
+**More › Open inputs file** (or **Open session**) opens any multiphysics document, such as the
+shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab.json).
 
 - **Model builder.** One Component (Geometry 1, Materials with one item per material in use,
   Mesh 1 shared by every physics), the physics with a badge giving their place in the solve
@@ -380,8 +381,8 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   the model changed since; press Run to update” and the footer “Model edited since run 1 · press
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
   coupling removed and added back, or Undo) makes it current again, and Messages, the dock
-  heading and the footer then say the same sentence, “Model matches run 1 again: results are
-  current”, with no request to Run.
+  heading and the footer then say the same sentence, “Model matches run 1 again: its results are
+  current. Run makes a new run with the same inputs”, which says what Run would do.
 - **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
   take a coupled temperature opens. After the coupled run, Studio solves the optical model alone
   with no temperature input, through the same run route, and fills the heater-off column. It is
@@ -406,16 +407,24 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   is the one of the shown run; otherwise it is marked “(other model)”, Δn_eff is left out, and
   **Run Modes 1 alone** refreshes it. A result names its run and does not change when the model
   is edited.
-- **Files.** In a multiphysics model the ribbon's Project group shows **Open model file** and
-  **Save model file**, which read and write the document; the session commands are hidden
-  because a multiphysics run is not kept in a file (a multiphysics session file is later work).
-  The title says so: “Not saved to a file · runs stay in this tab”, and after a save “… · runs
-  stay in this tab, not in the file”. Before leaving a model whose run only this tab holds
-  (another model card, the template again, an opened file or inputs), Studio asks first: “Leave
-  Heated silicon waveguide? Run 1 and its results exist only in this tab: a model file holds the
-  model, not its runs. Opening … discards run 1.”, with **Keep this model**, **Save model file,
-  then continue** (while the file does not hold the model as it is) and **Discard run 1 and
-  continue**. Opening a multiphysics model over optical runs that are in no session file names
+- **Runs.** Up to six runs are kept, with the optical rules and words: Results › Runs lists
+  “Run N · name · time”, **Run name** (Enter pins) and **Unpin this run**; pinned runs stay, and
+  when a new run arrives the oldest unpinned run is replaced. Selecting a run shows its result
+  and its freshness line; it does not change the model. With six pinned runs, Run says to unpin
+  one first.
+- **Files.** **Save session** writes the model with its runs, their names and pins and the
+  without-heater results to one file, `<model-name>-session-YYYY-MM-DD-HHMM.json` (the model
+  name lowercased, other characters as hyphens, at most 40 characters, else `multiphysics`),
+  described in [Session files of multiphysics models](#session-files-of-multiphysics-models-version-8).
+  **Open session** opens such a file, an optical session, or a model file alone (“Opened model
+  file …: it holds the model but no runs.”). **More › Save inputs only** writes the document
+  alone, as a model file, and **More › Open inputs file** opens one. The title uses the optical
+  words: “Not saved to a file · kept for recovery in this browser”, “Session file … sent to your
+  browser's Downloads · 10:15”, “Opened …”, “Recovered from this browser”. Before leaving a model
+  whose runs no session file holds (another model card, the template again, an opened file or
+  inputs), Studio asks first: “Leave this model? 3 runs are only in this tab and in browser
+  recovery. Save session first to keep them in a file.”, with **Cancel**, **Save session** and
+  **Leave**. Opening a multiphysics model over optical runs that are in no session file names
   them the same way and offers **Save session, then continue**; those runs stay in the tab and
   come back with the optical model. The graphics footer names the geometry's length unit
   (“Lengths in µm; …”). An
@@ -426,11 +435,136 @@ The workspace edits the document itself, so it keeps every key it has no form fo
 Studio runs these documents through `/api/multiphysics/*` (validate, run, progress events,
 stop, result), as an ordinary consumer of `simcase.multiphysics`; the n_eff it shows is the
 engine's for the same document, exactly. CI drives this model in a real browser
-(`tools/studio_browser/studio_multiphysics_browser.mjs`), and
+(`tools/studio_browser/studio_multiphysics_browser.mjs`, and
+`studio_multiphysics_session_browser.mjs` for its session files), and
 `tests/simcase/test_studio_multiphysics.py` and `studio_workspace_multiphysics.cjs` check the
 routes and the words. Limitations: only heat transfer (`thermal.steady2d`) and optical modes
 (`em.modes2d`) are edited here; the Same mesh transfer only; no multiphysics sweep runs; the
 geometry form edits rectangles and the window, other shapes stay as written in the file.
+
+### Session files of multiphysics models (version 8)
+
+A multiphysics model is saved as a session file of **version 8**; optical sessions are still
+written as version 7, byte for byte as before, so a file shared with an earlier Studio keeps
+opening there. This section is the public statement of the format.
+
+```json
+{"format": "openphysics-studio-session", "version": 8, "application": "multiphysics",
+ "document": {"openphysics": "0.3/multiphysics.1", "name": "Heated silicon waveguide", "...": "..."},
+ "runs": [{"job": "mp-3f2a9c1d7e4b", "number": 1, "label": "Heater 10 mW", "pinned": true,
+           "completedAt": "2026-11-22T10:15:03.120Z", "serverVersion": "0.0.2",
+           "document": {"...": "the document this run solved"}, "events": [{"event": "physics_started", "physics": "heat1"}],
+           "maps": "kept", "result": {"result": "multiphysics-run-v1", "...": "..."}, "digest": "sha256:9c1e…"}],
+ "baselines": {"modes1": {"job": "mp-77a01b2c3d4e", "completedAt": "…", "document": {"...": "Modes 1 alone"},
+                          "result": {"type": "em.modes2d", "effective_index": {"unit": "1", "values": [[2.443499265702046]]}, "...": "..."},
+                          "digest": "sha256:41d0…"}},
+ "selected": "mp-3f2a9c1d7e4b",
+ "view": {"page": "Results", "selection": "results:modes1", "index_map": "change", "baseline_option": true}}
+```
+
+- `application` is required and `"multiphysics"` is its only value in version 8. `document` is
+  the model as it is now (it may differ from every run), written as Save inputs only writes it.
+- `runs` holds up to six runs in completion order. `job` is the server's job identifier
+  (`mp-` and 12 hex digits), `number` the “Run N” shown (the next run is numbered after the
+  highest stored), `label` and `pinned` follow the optical rules (at most 80 characters, no
+  control characters). `document` is the document the run solved; whether the model changed
+  since is decided as on screen, by comparing it with the current model with sorted keys.
+  `events` are the run's progress events (the Study dock rows). `result` is the reply of
+  `/api/multiphysics/jobs/{job}/result` unchanged (`multiphysics-run-v1`; a one-physics `"0.3"`
+  model run in this view keeps the reply of its kind, for example
+  `em-modes2d-p1-node-centroid-v2`): the solve order, the per-physics results, the coupling
+  records, each iteration step with its residuals, the shared mesh (`node_coordinates` in m,
+  `triangles`, `regions`, `region_names`), the heat temperature per node (K), and for the
+  optical modes `effective_index` and the per-triangle coupled `temperature` (K),
+  `refractive_index.n`, `refractive_index.k` (null when lossless) and `index_change` (null
+  when a material has no thermo-optic model). Mode fields are not in the reply and not in the
+  file.
+- `maps` is `"kept"` or `"not kept"`. A run whose maps are not kept has `counts`
+  (`{"nodes": N, "triangles": M}`) and a `result` without `mesh` and without the per-node and
+  per-triangle values; it keeps the solve order, the coupling records, the iteration steps
+  with their residuals, `effective_index` and the heat range and summary. On screen it reads
+  “Maps not kept in this file: n_eff, the coupling check and the iteration history are.” and
+  the run list says “values only”.
+- `baselines` holds at most one without-heater result per optical physics: the uncoupled
+  document solved and the modes part of its reply. Its tie to a run is decided from content on
+  open (the run's document without couplings, loops and thermo-optic keys, compared with sorted
+  keys), not by a stored key, and a baseline that belongs to no run in the file and not to the
+  model refuses the file.
+- `selected` is the run shown under Results (or null); `view` is the page (`Model`,
+  `Connections` or `Results`), the selected tree item, the index map (`index` or `change`)
+  and the “Also solve without heater” option. Undo history, a comparison, failed or stopped
+  runs and the provider list are not stored.
+- **Numbers.** Every number is JSON in its shortest round-trip form, as JavaScript's
+  `JSON.stringify` writes it (ECMAScript Number::toString), except negative zero, written
+  `-0.0` so that it reads back as negative zero. NaN and the infinities are never written and
+  are refused when read. Integers stay integers. Every stored value comes back bit for bit.
+- **Digest.** Each run and each baseline carries `"digest": "sha256:<hex>"`, the SHA-256 of
+  the record without its `digest`, written as JSON with the keys of every object sorted and
+  the same number rules. It detects a truncated, damaged or hand-edited file. It is not an
+  authentication: whoever edits a file can recompute it, so opened results still read
+  “Imported file result — not recomputed or authenticated”.
+- **Size.** A file is at most 16 MiB, checked before it is read, and each document in it at
+  most 1 MiB. Save session writes every run with its maps when the file fits (six runs of the
+  template mesh are about 2.5 MB). When it does not, it writes nothing and asks, naming the
+  size: “Session is 22 MB; the limit is 16 MiB. Keep the maps of the selected and pinned runs
+  only? …”; **Keep maps for selected and pinned runs** writes the others as `"maps": "not
+  kept"`, **Cancel** writes nothing. When even the selected and pinned runs are over the limit,
+  Save session refuses and names them (“Run 3 alone is 18 MB, over the 16 MiB session limit.
+  Unpin it or keep it in a smaller-mesh model.”). Maps are never dropped without saying so.
+
+**Opening.** Results are read from the file, not recomputed: the notice reads “Opened … Its
+results were read from the file, not recomputed; input undo starts here.”, runs say “from file”
+(or “recovered”), and opening never starts a run. Every check runs before anything in the tab is
+replaced; a failure refuses the whole file with a message that names the check, and the model,
+its runs and Undo stay as they were:
+
+- the size and the JSON (a leading byte order mark is removed), at most six runs, unique job
+  identifiers and run numbers, valid names, pins, times and server versions, `selected` a stored
+  run, and the view one the workspace offers;
+- each run's result against its document: the physics names and types, the solve order the
+  server derives for the document, the couplings with the same `from`, `to` and `transfer` (and
+  for Same mesh a matching mesh and a difference of 0), and the iteration steps of `study.loops`,
+  each converged, with one residual fewer than its iterations and the last at most the tolerance;
+- for kept maps: `node_coordinates` N × 2 and finite, `triangles` M × 3 with integers in [0, N),
+  `regions` M integers naming a region, the node temperature N finite values, each per-triangle
+  map M finite values, a finite `effective_index`, the heat range exactly the minimum and maximum
+  of the stored temperatures, and the coupled temperature the mean of each triangle's three node
+  temperatures within a relative 1e-12;
+- the digest of every run and baseline (“Run 2 changed after it was saved (its check value does
+  not match).”);
+- the server's check of every run and baseline document with the rules of `simcase validate`
+  (“Run 2's model does not pass today's check: …”), a document Studio runs, and the current model
+  read as Open inputs file reads one (its problems open into Messages). Without the server the
+  file is not opened.
+
+A version above 8 is refused by name (“This session file is version 9, newer than this Studio
+reads (versions 6–8). Open it in a newer Studio.”), as are another `application` (“This session
+file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
+result “multiphysics-run-v2”, which this Studio does not read.”) and another document envelope
+(the server reader's refusal, named in the run). Session files of versions 6 and 7 open as
+before; versions 1 to 5 keep their refusal. A Studio from before version 8 refuses a version 8
+file or recovery record with “Unsupported session format or run count.” and keeps its workspace,
+so multiphysics sessions need this Studio or a newer one.
+
+**Browser recovery** keeps a multiphysics model in the same store as optical sessions, with the
+same limits (one latest and three earlier sessions, each at most 16 MiB, written 0.7 s after a
+change, the cross-tab conflict rule). It writes once the model has a run or was edited since it
+was opened, as the version 8 text Save session would write. Over 16 MiB it keeps the maps of
+the selected and pinned runs only, without a dialog, and the indicator says “kept for recovery in
+this browser without the maps of 2 runs · Save session to keep them”; when even that is over the
+limit it writes nothing new (“browser recovery unavailable: session over 16 MiB”) and the earlier
+record stays. **Recover last session** and **Recover earlier session · Heated silicon waveguide ·
+3 runs · time** run the same checks as Open session.
+
+The module checks are in `tests/simcase/studio_workspace_multiphysics_session.cjs` (the optical
+files of versions 6 and 7 written by the Studio before version 8, in
+`tests/simcase/studio_session_fixtures/`, open and are written byte for byte as before),
+`tests/simcase/test_studio_multiphysics_session.py` recomputes the digests with Python's
+hashlib and its own writer, and the browser check saves, opens and saves again the template, a
+0.12 µm mesh and a two-run session (the second file byte-identical, every array equal to the
+server's reply as Float64), six runs of a 0.08 µm mesh against the 16 MiB limit, the refusals
+and browser recovery. Not in version 8: a session mixing optical and multiphysics runs, one
+mesh shared between runs, adding runs from a file, and mode fields of coupled runs.
 
 ## Results and files
 
@@ -470,8 +604,9 @@ its SI value: `core_width [m]` and `core_height [m]` (single-rectangle designs),
 completion time, `core_material`, a `shapes` column describing every shape (in nm, as the
 page shows it) and the candidate number carry no unit.
 
-Session files are version 7, whose input is an input file of version 7 (a version 6
-session is still read, its input as a version 6 input file); version 6 was written since the units and naming batch: the workspace
+Optical session files are version 7, whose input is an input file of version 7 (a version 6
+session is still read, its input as a version 6 input file; a multiphysics model is saved as
+[version 8](#session-files-of-multiphysics-models-version-8)); version 6 was written since the units and naming batch: the workspace
 builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
 under their exact `physmat:` names) and each run record keeps the result's
 `effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in

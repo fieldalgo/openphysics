@@ -379,14 +379,18 @@ export function failureText(error,doc){
 const count=n=>Number(n).toLocaleString('en-US');
 function range(values){let lo=Infinity,hi=-Infinity;for(const v of values){if(v<lo)lo=v;if(v>hi)hi=v;}return [lo,hi];}
 // The coupling check of a run: what each coupling sent and received, and its check result.
-export function couplingCheckRows(result,doc){
- const nodes=result.mesh.node_coordinates.length,triangles=result.mesh.triangles.length;
+// counts: {nodes, triangles} of a run whose maps a session file did not keep; the sent range is
+// then its heat range, and the received values are one per triangle.
+export function couplingCheckRows(result,doc,counts=null){
+ const nodes=counts?counts.nodes:result.mesh.node_coordinates.length,triangles=counts?counts.triangles:result.mesh.triangles.length;
  return Object.entries(result.couplings||{}).map(([name,c])=>{
   const [src,port]=splitSpec(c.from),sent=result.physics[src]?.[port]?.values,[dst]=splitSpec(c.to),received=result.physics[dst]?.coupled?.[splitSpec(c.to)[1]]?.values;
-  const where=c.location==='node'?'node':'triangle',[lo,hi]=sent?range(sent):[NaN,NaN];
-  const sentText=`${count(sent?sent.length:c.location==='node'?nodes:triangles)} ${where} ${quantityWords(c.quantity)}s${sent?`, ${lo.toFixed(1)}–${hi.toFixed(1)} ${unitText(c.unit)}`:''}`;
-  const elementInput=received&&received.length===triangles&&c.location==='node';
-  const receivedText=received?`${count(received.length)} ${elementInput?'triangle means (mean of 3 nodes)':'values'}`:'—';
+  const stored=!sent&&counts&&port==='temperature'&&result.physics[src]?.range;
+  const where=c.location==='node'?'node':'triangle',[lo,hi]=sent?range(sent):stored?[stored.min,stored.max]:[NaN,NaN];
+  const sentText=`${count(sent?sent.length:c.location==='node'?nodes:triangles)} ${where} ${quantityWords(c.quantity)}s${sent||stored?`, ${lo.toFixed(1)}–${hi.toFixed(1)} ${unitText(c.unit)}`:''}`;
+  const receivedCount=received?received.length:counts&&result.physics[dst]?.coupled?triangles:null;
+  const elementInput=receivedCount===triangles&&c.location==='node';
+  const receivedText=receivedCount!==null?`${count(receivedCount)} ${elementInput?'triangle means (mean of 3 nodes)':'values'}`:'—';
   const diff=c.max_abs_difference||{value:null,unit:c.unit},passed=c.mesh_signature==='match'&&diff.value===0;
   const check=c.conservation_residual!==null&&c.conservation_residual!==undefined?`${passed?'Passed':'Failed'} · conservation |Σ sent − Σ received| / |Σ sent| = ${formatValue(c.conservation_residual)}`:`${passed?'Passed':'Failed'} · max |received − sent| = ${diff.value} ${unitText(diff.unit)} · same mesh: ${c.location} values arrived unchanged`;
   return {name,title:couplingTitle(doc,name)||name,from:c.from,to:c.to,sent:sentText,received:receivedText,check,passed};
@@ -432,7 +436,8 @@ export function staleRows(rows){return rows.map(r=>({...r,state:'stale',text:`Ou
 // same coupling added back) made it equal again: the results are current once more.
 export function freshnessAgain(freshness,diverged){return freshness==='current'&&diverged?'again':freshness;}
 // The one sentence every place shows when the model equals the last run again.
-export const matchesAgainText=runId=>`Model matches run ${runId} again: results are current`;
+// says what Run would do, so the sentence does not read as a request to run
+export const matchesAgainText=runId=>`Model matches run ${runId} again: its results are current. Run makes a new run with the same inputs`;
 // The Messages line after an edit: no request to Run when the model equals the last run again.
 export function editNotice(message,freshness,runId){return message+(freshness==='again'?` ${matchesAgainText(runId)}.`:' Press Run to compute the new model.');}
 // The dock heading and the footer for the state of the model and its last run.

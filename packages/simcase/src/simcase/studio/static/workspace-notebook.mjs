@@ -4,6 +4,7 @@
 import {validateProject} from './workspace-project.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
+import {MULTIPHYSICS_VERSION,readMultiphysicsSession} from './workspace-multiphysics-session.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
 // Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
@@ -115,10 +116,17 @@ export function captureSession(input,runs,selected,comparison,view){
  return ()=>JSON.stringify(createSession(capturedInput,capturedRuns,selected,capturedComparison,capturedView));
 }
 
+// Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
+// its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics'.
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
- let doc;try{doc=JSON.parse(text);}catch{throw new Error('Session is not valid JSON.');}
+ let doc;try{doc=JSON.parse(text);}catch{
+  // a leading byte order mark is removed for version 8 files only: optical files read as before
+  try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
+  if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>MULTIPHYSICS_VERSION)throw new Error(`This session file is version ${doc.version}, newer than this Studio reads (versions 6–${MULTIPHYSICS_VERSION}). Open it in a newer Studio.`);
+ if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
  if(doc?.format!=='openphysics-studio-session'||![6,SESSION_VERSION].includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
  const input=validateProject(doc.input),runs=doc.runs.map(r=>{const run=validateRun(r,true);if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);

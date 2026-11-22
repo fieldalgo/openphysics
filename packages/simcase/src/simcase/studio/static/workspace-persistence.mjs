@@ -24,18 +24,22 @@ export function validateSavedFile(value){
 // Studio hands the file to the browser's downloads and cannot know it was kept, so the
 // indicator names the file the session was sent to and never claims it was saved. No revision
 // counter: it counts input changes in this tab only and would differ after a restore.
-const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab'});
+// overLimit and kept:N are a multiphysics session's (version 8): over 16 MiB, recovery keeps the
+// maps of the selected and pinned runs only, and writes nothing when even that is over the limit.
+const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab',overLimit:'browser recovery unavailable: session over 16 MiB'});
+const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · Save session to keep them`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
 export function persistenceTitle({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
- const problem=runsUnsaved||saved||loaded?.current?(recovery==='unavailable'||recovery==='conflict'?' · '+RECOVERY[recovery]:''):'';
+ const problem=runsUnsaved||saved||loaded?.current?(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:''):'';
  if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`+problem;
- if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` · ${saved.current?'last session file':'changed since session file'} ${saved.name} (${when(saved.savedAt)})`:runsUnsaved?' · not saved to a file':'')+problem;
+ // the last session file is history: the session came from browser recovery, not from that file
+ if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` (last sent to a file: ${saved.name} at ${when(saved.savedAt)}${saved.current?'':'; changed since'})`:runsUnsaved?' · not saved to a file':'')+problem;
  if(saved?.current)return `${sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
- const browser=RECOVERY[recovery]||'not in browser recovery yet';
+ const browser=recoveryWords(recovery)||'not in browser recovery yet';
  if(runsUnsaved)return (saved?`Changed since session file ${saved.name} (${when(saved.savedAt)})`:'Not saved to a file')+' · '+browser;
  // fresh: a model just chosen and not yet edited, saved or opened.
  if(fresh)return 'New model · not saved';
@@ -74,14 +78,14 @@ export function sessionLoadText(session,{runs:currentRuns=0,unsaved=false}={},so
 }
 
 // The confirmation before leaving a model whose runs only this tab holds, or null when nothing
-// is at stake. from 'multiphysics': runId is its last run (coupled runs are in no file; leaving
-// discards them), saved whether a model file holds the model as it is. from 'optical': runs not
-// in a session file (they stay in this tab, hidden while target is open, but no file holds
-// them). save names the save that fits the model: its model file, or a session file.
-export function leaveConfirmText({from,runId=null,runs=0,saved=false,model='this model',target='the other model'}){
- if(from==='multiphysics'&&runId)return {title:`Leave ${model}?`,
-  description:`Run ${runId} and its results exist only in this tab: a model file holds the model, not its runs. Opening ${target} discards run ${runId}.`,
-  save:saved?null:{kind:'model',label:'Save model file, then continue'},leave:`Discard run ${runId} and continue`,stay:'Keep this model'};
+// is at stake. from 'multiphysics': runs is the number of its runs no session file holds (they are
+// in browser recovery too, but leaving discards them from the tab). from 'optical': runs not in a
+// session file (they stay in this tab, hidden while target is open, but no file holds them).
+// Both offer Save session.
+export function leaveConfirmText({from,runs=0,saved=false,target='the other model'}){
+ if(from==='multiphysics'&&runs>0)return {title:'Leave this model?',
+  description:`${plural(runs,'run')} ${runs===1?'is':'are'} only in this tab and in browser recovery. Save session first to keep ${runs===1?'it':'them'} in a file.`,
+  save:{kind:'session',label:'Save session'},leave:'Leave',stay:'Cancel'};
  if(from==='optical'&&runs>0&&!saved){const one=runs===1;return {title:`Open ${target}?`,
   description:`${plural(runs,'optical run')} ${one?'is':'are'} in no file. ${one?'It stays':'They stay'} in this tab while ${target} is open and ${one?'comes':'come'} back with the optical model, but closing the tab can lose ${one?'it':'them'}. Save session keeps ${one?'it':'them'} in a file.`,
   save:{kind:'session',label:'Save session, then continue'},leave:'Continue without saving',stay:'Keep this model'};}

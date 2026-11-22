@@ -22,8 +22,9 @@ Compute에는 고른 애플리케이션의 실행 명령(**Run optical study**, 
 하단 영역은 해석 순서와 Messages를 보여 주며, Joule 가열을 실행한 뒤 Results에서는
 **Solver log**가 함께 나옵니다.
 
-**Save session**과 **Open session**은 완료된 광학 실행과 비교를 포함한 세션 전체를 저장하고
-엽니다. 리본, 헤더, Messages 모두 이 저장을 "Save session" 한 이름으로 부릅니다. **More**에
+**Save session**과 **Open session**은 완료된 광학 실행과 비교를 포함한 세션 전체, 또는 실행을 포함한
+다중물리 모델을 저장하고 엽니다. 리본, 헤더, Messages 모두 이 저장을 모든 모델(광학, 열, Joule 가열,
+다중물리)에서 "Save session" 한 이름으로 부릅니다. **More**에
 입력 전용 파일(**More › Save inputs only**, **Open inputs file**), 브라우저 초안, Reset design이 있습니다. 하단 상태줄의
 **Workspace tools**에서 연결, 복구, Reset layout에 접근하고, 그 옆에 **Installed physics**가 있습니다.
 둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Models를
@@ -100,8 +101,9 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    unavailable*), 세션 파일 저장 뒤 바뀌었으면 *Changed since session file … (시각) · kept for
    recovery in this browser*가 표시됩니다. **Open session** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
    뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 마지막 세션 파일 이름과
-   시각을 함께 보관하므로 복구한 세션에는 *last session file … (시각)*이 덧붙습니다(저장 뒤 바뀐
-   작업이면 *changed since session file …*, 저장한 적이 없으면 *not saved to a file*).
+   시각을 함께 보관하므로 복구한 세션에는 그 파일을 지난 기록으로 *Recovered from this browser (last saved
+   to a file: … at 13:05)*처럼 덧붙입니다(저장 뒤 바뀐 작업이면 *…; changed since)*, 저장한 적이 없으면
+   *· not saved to a file*).
    둘 다 다음 변경이나 다른 파일 열기까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
@@ -272,8 +274,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 그곳에서 n = n₀ + (dn/dT)(T − T_ref)를 씁니다. 히터는 손실 없는 임시 굴절률을 가진 로컬
 기록이며, 금속 손실은 이후 작업입니다.
 
-작업 공간은 문서 자체를 편집하므로 양식이 없는 키도 그대로 둡니다. **Open model file**(Project)로
-배포된 [가열 슬랩 예제](../../../../../../examples/simcase/multiphysics_heated_slab.json) 같은
+작업 공간은 문서 자체를 편집하므로 양식이 없는 키도 그대로 둡니다. **More › Open inputs file**(또는
+**Open session**)로 배포된 [가열 슬랩 예제](../../../../../../examples/simcase/multiphysics_heated_slab.json) 같은
 다중물리 문서를 열 수 있습니다.
 
 - **모델 트리.** 컴포넌트 하나(Geometry 1, 쓰인 재료마다 항목 하나인 Materials, 모든 물리가
@@ -326,8 +328,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   되고, 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
-  제목, 하단은 같은 문장 “Model matches run 1 again: results are current”를 보여 주고 Run을
-  요청하지 않습니다.
+  제목, 하단은 같은 문장 “Model matches run 1 again: its results are current. Run makes a new run with the
+  same inputs”를 보여 주어 Run이 무엇을 하는지 밝힙니다.
 - **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
@@ -348,14 +350,22 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   이 열은 따로 푼 광 모델(실행 문서에서 결합, 반복, 열광학 키를 뺀 것을 키 정렬로 비교)이 보이는
   실행의 것과 같을 때 유효합니다. 아니면 “(other model)”로 표시하고 Δn_eff를 비우며,
   **Run Modes 1 alone**으로 새로 풉니다. 결과는 자기 실행을 밝히며 모델을 고쳐도 바뀌지 않습니다.
-- **파일.** 다중물리 모델에서는 리본의 Project 묶음에 **Open model file**과 **Save model file**이
-  나오며 문서를 읽고 씁니다. 다중물리 실행은 파일에 담기지 않으므로 세션 명령은 숨깁니다(다중물리
-  세션 파일은 이후 작업). 제목도 그렇게 밝힙니다: “Not saved to a file · runs stay in this tab”,
-  저장 뒤에는 “… · runs stay in this tab, not in the file”. 이 탭에만 있는 실행을 가진 모델을
-  떠나기 전(다른 모델 카드, 템플릿 다시 열기, 파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave
-  Heated silicon waveguide? Run 1 and its results exist only in this tab: a model file holds the
-  model, not its runs. Opening … discards run 1.” 버튼은 **Keep this model**, **Save model
-  file, then continue**(파일이 지금 모델을 담고 있지 않을 때), **Discard run 1 and continue**입니다.
+- **실행.** 실행은 광학과 같은 규칙과 문구로 최대 여섯 개를 보관합니다. Results › Runs에
+  “Run N · 이름 · 시각” 목록, **Run name**(Enter로 고정), **Unpin this run**이 있습니다. 고정한
+  실행은 남고, 새 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
+  최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 여섯 개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
+- **파일.** **Save session**은 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
+  `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,
+  최대 40자, 아니면 `multiphysics`). 형식은
+  [다중물리 모델의 세션 파일](#다중물리-모델의-세션-파일버전-8)에 있습니다. **Open session**은 이런
+  파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
+  runs.”). **More › Save inputs only**는 문서만 모델 파일로 쓰고, **More › Open inputs file**은 모델
+  파일을 엽니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
+  browser”, “Session file … sent to your browser's Downloads · 10:15”, “Opened …”, “Recovered from
+  this browser”. 세션 파일에 없는 실행을 가진 모델을 떠나기 전(다른 모델 카드, 템플릿 다시 열기,
+  파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave this model? 3 runs are only in this tab and in
+  browser recovery. Save session first to keep them in a file.” 버튼은 **Cancel**, **Save session**,
+  **Leave**입니다.
   세션 파일에 없는 광 실행이 있을 때 다중물리 모델을 열면 같은 방식으로 그 실행을 밝히고 **Save
   session, then continue**를 제안합니다. 그 실행은 탭에 남아 광 모델로 돌아오면 다시 보입니다.
   그래픽 하단은 형상의 길이 단위를 밝힙니다(“Lengths in µm; …”). 연 파일은
@@ -365,11 +375,116 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, stop, result)로 실행하며
 `simcase.multiphysics`의 평범한 사용자로 동작합니다. 화면의 n_eff는 같은 문서를 엔진으로 푼 값과
 정확히 같습니다. CI는 이 모델을 실제 브라우저에서 조작하고
-(`tools/studio_browser/studio_multiphysics_browser.mjs`),
+(`tools/studio_browser/studio_multiphysics_browser.mjs`, 세션 파일은
+`studio_multiphysics_session_browser.mjs`),
 `tests/simcase/test_studio_multiphysics.py`와 `studio_workspace_multiphysics.cjs`가 경로와 문구를
 검사합니다. 한계: 여기서 편집하는 물리는 열전달(`thermal.steady2d`)과 광 모드(`em.modes2d`)뿐이고,
 전달은 Same mesh뿐이며, 다중물리 스윕은 실행하지 않습니다. 형상 양식은 직사각형과 창만 고치고,
 다른 도형은 파일에 쓴 대로 둡니다.
+
+### 다중물리 모델의 세션 파일(버전 8)
+
+다중물리 모델은 **버전 8** 세션 파일로 저장합니다. 광학 세션은 여전히 버전 7로, 이전과 바이트 단위까지
+같게 쓰므로 이전 Studio와 나눈 파일도 그곳에서 계속 열립니다. 이 절이 형식의 공개 명세입니다.
+
+```json
+{"format": "openphysics-studio-session", "version": 8, "application": "multiphysics",
+ "document": {"openphysics": "0.3/multiphysics.1", "name": "Heated silicon waveguide", "...": "..."},
+ "runs": [{"job": "mp-3f2a9c1d7e4b", "number": 1, "label": "Heater 10 mW", "pinned": true,
+           "completedAt": "2026-11-22T10:15:03.120Z", "serverVersion": "0.0.2",
+           "document": {"...": "이 실행이 푼 문서"}, "events": [{"event": "physics_started", "physics": "heat1"}],
+           "maps": "kept", "result": {"result": "multiphysics-run-v1", "...": "..."}, "digest": "sha256:9c1e…"}],
+ "baselines": {"modes1": {"job": "mp-77a01b2c3d4e", "completedAt": "…", "document": {"...": "Modes 1 단독"},
+                          "result": {"type": "em.modes2d", "effective_index": {"unit": "1", "values": [[2.443499265702046]]}, "...": "..."},
+                          "digest": "sha256:41d0…"}},
+ "selected": "mp-3f2a9c1d7e4b",
+ "view": {"page": "Results", "selection": "results:modes1", "index_map": "change", "baseline_option": true}}
+```
+
+- `application`은 필수이며 버전 8에서 값은 `"multiphysics"` 하나뿐입니다. `document`는 지금의
+  모델이며(어느 실행과도 다를 수 있음) Save inputs only가 쓰는 그대로 씁니다.
+- `runs`는 완료 순서대로 최대 여섯 실행입니다. `job`은 서버의 작업 식별자(`mp-`와 16진수 12자리),
+  `number`는 화면의 “Run N”이며(다음 실행은 저장된 가장 큰 번호 다음), `label`과 `pinned`는 광학
+  규칙(최대 80자, 제어 문자 없음)을 따릅니다. `document`는 그 실행이 푼 문서이고, 그 뒤 모델이
+  바뀌었는지는 화면과 같이 키를 정렬해 지금 모델과 비교해 정합니다. `events`는 실행의 진행 이벤트
+  (Study 하단 줄)입니다. `result`는 `/api/multiphysics/jobs/{job}/result`의 응답 그대로입니다
+  (`multiphysics-run-v1`; 이 화면에서 실행한 물리 하나의 `"0.3"` 모델은 그 종류의 응답, 예를 들어
+  `em-modes2d-p1-node-centroid-v2`). 풀이 순서, 물리별 결과, 결합 기록, 잔차를 포함한 반복 단계,
+  공유 메시(m 단위 `node_coordinates`, `triangles`, `regions`, `region_names`), 절점별 열 온도(K),
+  광 모드의 `effective_index`와 삼각형별 결합 `temperature`(K), `refractive_index.n`,
+  `refractive_index.k`(손실이 없으면 null), `index_change`(열광학 모델이 없는 재료가 있으면 null)를
+  담습니다. 모드 장은 응답에도 파일에도 없습니다.
+- `maps`는 `"kept"` 또는 `"not kept"`입니다. 맵을 보관하지 않은 실행은 `counts`
+  (`{"nodes": N, "triangles": M}`)를 가지며 `result`에 `mesh`와 절점·삼각형별 값이 없습니다. 풀이
+  순서, 결합 기록, 잔차를 포함한 반복 단계, `effective_index`, 열 범위와 요약은 남습니다. 화면에는
+  “Maps not kept in this file: n_eff, the coupling check and the iteration history are.”로 나오고
+  실행 목록에는 “values only”가 붙습니다.
+- `baselines`는 광 물리마다 히터 없는 결과를 최대 하나 담습니다: 푼 비결합 문서와 그 응답의 모드
+  부분입니다. 실행과의 연결은 저장된 키가 아니라 열 때 내용으로 정합니다(실행 문서에서 결합, 반복,
+  열광학 키를 뺀 것을 키를 정렬해 비교). 파일의 어느 실행에도, 모델에도 속하지 않는 기준 결과가
+  있으면 파일을 거부합니다.
+- `selected`는 Results에 보이는 실행(또는 null)이고, `view`는 페이지(`Model`, `Connections`,
+  `Results`), 고른 트리 항목, 굴절률 맵(`index` 또는 `change`), “Also solve without heater” 선택입니다.
+  실행 취소 기록, 비교, 실패하거나 멈춘 실행, 제공자 목록은 저장하지 않습니다.
+- **숫자.** 모든 숫자는 JavaScript `JSON.stringify`가 쓰는 가장 짧은 왕복 꼴(ECMAScript
+  Number::toString)의 JSON입니다. 단 음의 0은 음의 0으로 다시 읽히도록 `-0.0`으로 씁니다. NaN과
+  무한대는 쓰지 않으며 읽을 때 거부합니다. 정수는 정수로 남습니다. 저장한 모든 값은 비트 단위로
+  그대로 돌아옵니다.
+- **다이제스트.** 실행과 기준 결과마다 `"digest": "sha256:<hex>"`가 있습니다. `digest`를 뺀 기록을
+  모든 객체의 키를 정렬하고 같은 숫자 규칙으로 쓴 JSON의 SHA-256입니다. 잘리거나 손상되거나 손으로
+  고친 파일을 알아냅니다. 인증은 아닙니다: 파일을 고치는 사람은 다시 계산할 수 있으므로, 연 결과는
+  계속 “Imported file result — not recomputed or authenticated”로 표시합니다.
+- **크기.** 파일은 최대 16 MiB이며 읽기 전에 검사하고, 그 안의 문서는 각각 최대 1 MiB입니다. Save
+  session은 파일이 맞으면 모든 실행을 맵과 함께 씁니다(템플릿 메시 실행 여섯 개는 약 2.5 MB). 맞지
+  않으면 아무것도 쓰지 않고 크기를 밝혀 묻습니다: “Session is 22 MB; the limit is 16 MiB. Keep the
+  maps of the selected and pinned runs only? …”. **Keep maps for selected and pinned runs**는 나머지를
+  `"maps": "not kept"`로 쓰고, **Cancel**은 아무것도 쓰지 않습니다. 고른 실행과 고정한 실행만으로도
+  한도를 넘으면 Save session은 거부하고 그 실행을 밝힙니다(“Run 3 alone is 18 MB, over the 16 MiB
+  session limit. Unpin it or keep it in a smaller-mesh model.”). 맵을 말없이 버리지 않습니다.
+
+**열기.** 결과는 다시 계산하지 않고 파일에서 읽습니다. 알림은 “Opened … Its results were read from the
+file, not recomputed; input undo starts here.”이고, 실행에는 “from file”(또는 “recovered”)이 붙으며,
+열기는 어떤 실행도 시작하지 않습니다. 모든 검사는 탭의 무엇이든 바꾸기 전에 돌고, 하나라도 실패하면
+검사를 밝힌 메시지로 파일 전체를 거부하며 모델, 실행, 실행 취소는 그대로입니다:
+
+- 크기와 JSON(맨 앞의 바이트 순서 표시는 지움), 실행 최대 여섯, 고유한 작업 식별자와 실행 번호, 올바른
+  이름·고정·시각·서버 버전, 저장된 실행인 `selected`, 작업공간이 제공하는 화면 상태;
+- 실행마다 결과와 문서: 물리 이름과 종류, 서버가 문서에서 끌어내는 풀이 순서, 같은 `from`, `to`,
+  `transfer`의 결합(Same mesh는 일치하는 메시와 차이 0), `study.loops`의 반복 단계(각각 수렴, 반복
+  횟수보다 하나 적은 잔차, 마지막 잔차는 허용오차 이하);
+- 맵을 보관한 실행: 유한한 N × 2 `node_coordinates`, [0, N)의 정수로 된 M × 3 `triangles`, 영역을
+  가리키는 정수 M개의 `regions`, 유한한 값 N개의 절점 온도, 유한한 값 M개의 삼각형별 맵, 유한한
+  `effective_index`, 저장된 온도의 최솟값·최댓값과 정확히 같은 열 범위, 각 삼각형 세 절점 온도의
+  평균과 상대 1e-12 안에서 같은 결합 온도;
+- 모든 실행과 기준 결과의 다이제스트(“Run 2 changed after it was saved (its check value does not
+  match).”);
+- 모든 실행과 기준 문서를 `simcase validate` 규칙으로 서버가 검사(“Run 2's model does not pass
+  today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 Open inputs file과 같이 읽음(그
+  문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
+
+8보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 9, newer than this Studio reads
+(versions 6–8). Open it in a newer Studio.”). 다른 `application`(“This session file holds a “…” model,
+which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
+this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
+버전 6과 7 세션 파일은 이전처럼 열리고, 버전 1–5는 이전의 거부를 유지합니다. 버전 8 이전의 Studio는
+버전 8 파일이나 복구 기록을 “Unsupported session format or run count.”로 거부하고 작업공간을
+유지하므로, 다중물리 세션에는 이 Studio 이상이 필요합니다.
+
+**브라우저 복구**는 다중물리 모델을 광학 세션과 같은 저장소에 같은 한도로 보관합니다(최신 하나와 이전
+세 개, 각각 최대 16 MiB, 변경 0.7초 뒤 기록, 탭 사이 충돌 규칙). 모델에 실행이 있거나 연 뒤 편집했을
+때부터 Save session이 쓸 버전 8 글로 기록합니다. 16 MiB를 넘으면 대화 상자 없이 고른 실행과 고정한
+실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · Save session to
+keep them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
+MiB”) 이전 기록이 남습니다. **Recover last session**과 **Recover earlier session · Heated silicon
+waveguide · 3 runs · 시각**은 Open session과 같은 검사를 합니다.
+
+모듈 검사는 `tests/simcase/studio_workspace_multiphysics_session.cjs`에 있습니다(버전 8 이전 Studio가
+쓴 버전 6, 7 광학 파일이 `tests/simcase/studio_session_fixtures/`에 있고, 이전처럼 열리며 바이트
+단위로 같게 쓰임). `tests/simcase/test_studio_multiphysics_session.py`는 Python hashlib과 자체 쓰기기로
+다이제스트를 다시 계산합니다. 브라우저 검사는 템플릿, 0.12 µm 메시, 실행 두 개 세션을 저장·열기·다시
+저장하고(두 번째 파일은 바이트 단위로 같고, 모든 배열은 서버 응답과 Float64로 같음), 0.08 µm 메시 실행
+여섯 개로 16 MiB 한도, 거부, 브라우저 복구를 검사합니다. 버전 8에 없는 것: 광학과 다중물리 실행을 섞은
+세션, 실행 사이의 메시 공유, 파일에서 실행 추가, 결합 실행의 모드 장.
 
 ## 결과와 파일
 
@@ -398,8 +513,8 @@ CSV/PNG 내보내기에도 반영합니다.
 `core_element_size [m]`, `effective_index [1]`이며, 작업·이름·고정·완료 시각·`core_material`·
 모든 형상을 설명하는 `shapes` 열(페이지처럼 nm)·후보 번호에는 단위가 없습니다.
 
-세션 파일은 버전 7이며 입력은 버전 7 입력 파일입니다(버전 6 세션도 계속 읽고, 그 입력은 버전 6 입력
-파일로 읽습니다). 버전 6은 단위·이름 일괄 변경 이후의 형식입니다. 작업공간은 형식 0.3 문서(`"1550 nm"` 같은
+광학 세션 파일은 버전 7이며 입력은 버전 7 입력 파일입니다(버전 6 세션도 계속 읽고, 그 입력은 버전 6 입력
+파일로 읽습니다. 다중물리 모델은 [버전 8](#다중물리-모델의-세션-파일버전-8)로 저장합니다). 버전 6은 단위·이름 일괄 변경 이후의 형식입니다. 작업공간은 형식 0.3 문서(`"1550 nm"` 같은
 양 문자열의 길이, 정확한 `physmat:` 이름의 재료)를 만들고, 실행 기록마다 결과의
 `effective_index`(exp(−iωt)의 Re와 Im)와 미터 단위 `node_coordinates`를 가진 장 표본을 보존합니다.
 버전 1–5 세션은 이전 이름과 문서 길이 단위의 결과를 담고 있어, 다른 뜻으로 읽지 않도록 버전을

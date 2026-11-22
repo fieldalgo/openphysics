@@ -104,9 +104,9 @@ py -3.12 -m venv "$HOME\op-studio"
   **Open session file (portable)…**로 엽니다. 컴퓨터 사이를 옮길 수 있는 사본은 세션 파일입니다. 새 페이지(기본 입력, 실행 없음)에서는
   바로 열립니다. 그렇지 않으면 **Open saved session?** 창이 돌아올 실행과 비교, 바뀌는 것을
   보여 줍니다. Messages에 무엇을 열었는지 나옵니다. 그다음 변경 전까지 제목에 파일 이름과 함께
-  *Opened …*, 또는 *Recovered from this browser*가 나옵니다. 세션 파일을 저장한 적이 있으면
-  *last session file …*(저장 뒤 바뀐 작업이면 *changed since session file …*), 저장한 적이 없으면
-  *not saved to a file*이 덧붙습니다.
+  *Opened …*, 또는 *Recovered from this browser*가 나옵니다. 세션 파일을 저장한 적이 있으면 지난
+  기록으로 *(last sent to a file: … at 시각)*(저장 뒤 바뀐 작업이면 *; changed since*), 저장한 적이
+  없으면 *not saved to a file*이 덧붙습니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
   안내가 나오면 Run을 다시 누르세요.
 - 입력·세션 파일은 버전 7입니다(Joule 가열 입력 추가). 버전 6 파일도 계속 읽습니다. 단위·이름 일괄 변경 이전 Studio가 저장한 파일(버전 1–5)은

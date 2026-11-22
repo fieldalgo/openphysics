@@ -112,9 +112,9 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
   runs and the comparison that come back and what is replaced. Messages names what was
   opened. The title then reads *Opened …* with the file name, or *Recovered from this
-  browser* (with *last session file …* when one was saved, *changed since session file …*
-  when the recovered work had changed after that save, or *results not in a session file
-  yet* when none was saved), until your next change.
+  browser* (with *(last sent to a file: … at time)* when one was saved, as history, and
+  *; changed since* when the recovered work had changed after that save, or *not saved to a
+  file* when none was saved), until your next change.
 - If you restart Studio while the page is open, the page reconnects by itself. Select
   Run again if it asks you to.
 - Input and session files are version 7 (the Joule heating inputs added); version 6 files are

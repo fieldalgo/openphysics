@@ -166,19 +166,22 @@ try {
   await runReady();
   assert.match(await page.text('#tree [data-mp-node="physics:heat1"]'), /^∿ 1 Heat 1 · Heat transfer$/);
   assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^λ 2 Modes 1 · Optical modes$/);
-  // the ribbon: Run as Run optical study draws it, the heater-off option on, the model file commands in Project
+  // the ribbon: Run as Run optical study draws it, the heater-off option on, Open session and Save session in Project
   // the ▶ is decoration with an empty alternative text: the accessible names are the labels
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics'),'::before').content"), '"▶" / ""');
   assert.equal(await page.axName('#run-multiphysics'), 'Run');
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics')).fontWeight"), await page.eval("getComputedStyle(document.getElementById('run-optical')).fontWeight"));
   assert.equal(await page.eval("!document.getElementById('run-baseline-option').hidden&&document.getElementById('run-baseline').checked"), true);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');
-  assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open model file', 'Save model file']);
-  assert.match(await page.attr('#save-project', 'title'), /Runs stay in this tab and are not in the file/);
+  assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open session', 'Save session']);
+  // the model file alone is More › Save inputs only and Open inputs file
+  assert.deepEqual(await page.eval("['save-project','open-project'].map(id=>document.getElementById(id).textContent+':'+!document.getElementById(id).hidden+':'+!!document.getElementById(id).closest('.file-menu'))"),
+    ['Save inputs only:true:true', 'Open inputs file:true:true']);
+  assert.doesNotMatch(await page.eval('document.body.innerText'), /runs stay in this tab/i);
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
   assert.equal(await page.text('#status'), 'Model checked · press Run');
   assert.equal(await page.text('#tree [data-mp-node="coupling:heat1_to_modes1"]'), '⇄ Heat 1 temperature → Modes 1 temperature');
-  assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
+  assert.equal(await page.text('#project'), 'Multiphysics model / No unsaved input changes');
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
   stage('MB1 template', {tree: await page.text('#tree')});
 
@@ -325,7 +328,7 @@ try {
   await page.until("!document.querySelector('dialog[open]')&&!/Out of date/.test(document.getElementById('sequence').innerText)", 'same model again');
   await runReady();
   // one sentence in Messages, the dock heading and the status bar; the notice asks for no Run
-  const again = 'Model matches run 1 again: results are current';
+  const again = 'Model matches run 1 again: its results are current. Run makes a new run with the same inputs';
   assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again.');
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
@@ -351,12 +354,12 @@ try {
   assert.equal(new Set(cards.map(c => c.title)).size, 1, JSON.stringify(cards));
   assert.ok(cards.every(c => c.top < 900), JSON.stringify(cards));
   await page.screenshot('mb6b-start-page');
-  // run 2 lives only in this tab: opening the template again asks first and names it
+  // runs 1 and 2 are in no session file: opening the template again asks first
   await page.click('[data-template=heated-waveguide]');
   await page.until("document.getElementById('leave-confirm').open", 'leave confirmation');
-  assert.equal(await page.text('#leave-confirm-title'), 'Leave Heated silicon waveguide?');
-  assert.equal(await page.text('#leave-confirm-description'), 'Run 2 and its results exist only in this tab: a model file holds the model, not its runs. Opening Heated silicon waveguide discards run 2.');
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Keep this model', 'Save model file, then continue', 'Discard run 2 and continue']);
+  assert.equal(await page.text('#leave-confirm-title'), 'Leave this model?');
+  assert.equal(await page.text('#leave-confirm-description'), '2 runs are only in this tab and in browser recovery. Save session first to keep them in a file.');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Cancel', 'Save session', 'Leave']);
   await page.screenshot('mb6b-leave-confirm');
   await page.click('#leave-stay');
   await page.until("!document.getElementById('leave-confirm').open&&document.getElementById('file-status').textContent==='Kept the current model and its runs.'", 'kept');
@@ -390,17 +393,17 @@ try {
   await setFile(duplicate);
   // the template's run lives only in this tab: the open asks first
   await page.until("document.getElementById('leave-confirm').open", 'leave confirmation before an open');
-  assert.match(await page.text('#leave-confirm-description'), /^Run 1 and its results exist only in this tab: .* Opening duplicate-key\.json discards run 1\.$/);
+  assert.equal(await page.text('#leave-confirm-description'), '1 run is only in this tab and in browser recovery. Save session first to keep it in a file.');
   await page.click('#leave-go');
   await page.until("/Open failed: .*appears more than once/.test(document.getElementById('file-status').textContent)", 'duplicate key refused');
-  assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
+  assert.match(await page.text('#project'), /^Multiphysics model \/ Not saved to a file · (kept for recovery in this browser|updating browser recovery)$/);
   // the checkout's example, found from this script: the check runs outside the checkout
   await setFile(fileURLToPath(new URL('../../examples/simcase/multiphysics_heated_slab.json', import.meta.url)));
   await page.until("document.getElementById('leave-confirm').open", 'leave confirmation: the refused open kept the run');
   await page.click('#leave-go');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'example opened');
   await runReady();
-  assert.match(await page.text('#project'), /^Multiphysics model \/ Opened from multiphysics_heated_slab\.json · runs stay in this tab, not in the file$/);
+  assert.equal(await page.text('#project'), 'Multiphysics model / Opened multiphysics_heated_slab.json');
   stage('MB7a open model file');
 
   // MB7: the screens at 1440 x 900 and 390 px: no document overflow
