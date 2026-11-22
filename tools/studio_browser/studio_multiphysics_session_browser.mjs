@@ -549,6 +549,73 @@ print(n)`;
   await fetch(`http://127.0.0.1:${debugPort}/json/close/${second.id}`).catch(() => {});
   stage('S8 two tabs', {conflict});
 
+  // R1-R3, a restart: two optical runs, then the two-run heated session file opened over them.
+  // After a reload and the same file opened again, the Optical waveguide card offers the optical
+  // runs before Start new (R1), every recovery entry is shown once (R2), and a tab click keeps
+  // the opened file in the title (R3).
+  await page.call('Page.reload');
+  await page.until("!!document.querySelector('[data-template=optical]')", 'start page for R1');
+  await page.click('[data-template=optical]');
+  if (await page.eval("document.getElementById('leave-confirm').open")) await page.click('#leave-go');
+  await page.until("!!document.getElementById('shape-w')&&!document.getElementById('run-optical').disabled", 'optical model for R1', 60000);
+  const runOptical = async label => {
+    await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical');
+    await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical ' + label, 120000);
+  };
+  await runOptical('run 1');
+  await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Geometry"]'); await page.until("!!document.getElementById('shape-w')", 'geometry inspector');
+  await page.type('#shape-w', 600);
+  await runOptical('run 2');
+  const opticalNeff = () => page.eval("[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)");
+  await page.until("!!document.getElementById('modes-table')", 'optical results'); const neffBefore = await opticalNeff();
+  await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)", 'optical runs kept');
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'models page R1');
+  // the tab holds the optical runs, so the card offers nothing yet
+  assert.equal(await page.exists('#resume-optical'), false);
+  // the switch note says the tab holds the runs until it is closed or reloaded, then how to get them back
+  await openTemplate();
+  assert.match(await notice(), / Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery\) brings them back\.$/);
+  await openSession(c1.path);
+  await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)||/^Opened /.test(document.getElementById('autosave-status').textContent)", 'heated session kept');
+  await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'heated session in browser recovery', 20000);
+  // the restart, and the same file opened again
+  await page.call('Page.reload');
+  await page.until("!!document.querySelector('[data-template=optical]')&&!document.getElementById('recover-notebook').disabled", 'reload R1');
+  await openSession(c1.path);
+  await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'reopened session in browser recovery', 20000);
+  const openedTitle = `Opened ${basename(c1.path)}`;
+  assert.equal(await page.text('#autosave-status'), openedTitle);
+  // R3: tab clicks are not edits: the opened file stays in the title and the footer
+  const titles = {};
+  for (const tab of ['Applications', 'Connections', 'Results', 'Model', 'Applications']) {
+    await page.click(`nav [data-page=${tab}]`); await sleep(300);
+    titles[tab] = {project: await page.text('#project'), footer: await page.text('#autosave-status')};
+    assert.equal(titles[tab].footer, openedTitle, tab); assert.ok(titles[tab].project.endsWith(' / ' + openedTitle), titles[tab].project);
+  }
+  // R1: the Optical waveguide card offers the runs from browser recovery first, then Start new
+  await page.until("!!document.getElementById('resume-optical')", 'optical resume offer');
+  const offer = await page.eval("({resume:document.getElementById('resume-optical').textContent,next:document.getElementById('resume-optical').nextElementSibling?.textContent,card:document.getElementById('resume-optical').closest('.card-slot')?.querySelector('[data-template]')?.dataset.template})");
+  assert.match(offer.resume, /^Resume Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)? \(this browser\)$/); assert.equal(offer.next, 'Start new'); assert.equal(offer.card, 'optical');
+  // R2: each stored session once, newest first, the file named where a record came from one
+  const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
+  stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});
+  for (const list of [lists.resume, lists.earlier]) assert.equal(new Set(list).size, list.length, JSON.stringify(list));
+  // the heated session open in this tab is not offered again, and its earlier copy is gone
+  assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Heater 2e14')), JSON.stringify(lists.earlier));
+  assert.ok(lists.earlier.some(t => /^Recover earlier session · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
+    await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R1 ' + tag); await page.screenshot('r1-' + tag);
+  }
+  await size(1440, 900); await sleep(300);
+  // Resume brings the two optical runs back, not recomputed, with the same n_eff
+  await clearNotice(); await page.click('#resume-optical');
+  const end = Date.now() + 60000;
+  while (Date.now() < end && !/^Recovered from this browser/.test(await notice())) { if (await page.eval("document.getElementById('load-confirm').open")) await page.click('#confirm-load'); if (await page.eval("document.getElementById('leave-confirm').open")) await page.click('#leave-go'); await sleep(150); }
+  assert.match(await notice(), /^Recovered from this browser \(Earlier browser session · /);
+  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===2&&!!document.getElementById('modes-table')", 'optical runs back');
+  assert.deepEqual(await opticalNeff(), neffBefore);
+  stage('R1 resumed', {neff: await opticalNeff()});
+
   // S5: six runs of the 0.08 µm mesh, about 22 MB with their maps
   await page.call('Page.reload');
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'reload for S5');

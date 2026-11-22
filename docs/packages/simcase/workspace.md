@@ -121,7 +121,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    recovery *Recovered from this browser*; browser recovery keeps the last session file
    name and time, so a recovered session names it as history, *Recovered from this browser
    (last sent to a file: … at 13:05)* (*…; changed since)* if it had changed after that save,
-   *· not saved to a file* if none was saved). Both last until the next change or another open. The header has no revision counter. A Width edit by an odd
+   *· not saved to a file* if none was saved). Both last until the next change or another open;
+   a tab click (**Models**, **Model**, **Connections**, **Results**) is not a change. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, Messages says
    where Left x moved (*Width set to 600 nm. Left x moved to −300 nm to keep the centre.*), and
    typed values are not snapped to the drag step (**More about width and height** under
@@ -143,17 +144,29 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    for its edits, and you leave it by choosing another model. Each model's note says what Save
    session keeps of it: the inputs and runs of the optical model, the inputs of steady heat and
    Joule heating (their results stay in the tab), and the heated silicon waveguide with its runs.
-   Opening the heated model over optical runs says in Messages where those runs stay (this tab,
-   and browser recovery or the session file that holds them) and that **Models › Optical
-   waveguide** brings them back. Every recovery entry names its model, its run count and its
-   runs (a run's name, else *Run N*), for example *Optical waveguide · 2 runs · design A, Run 2*. The start page uses
+   Opening the heated model over optical runs says in Messages that this tab holds them until it
+   is closed or reloaded and that **Models › Optical waveguide** brings them back, then what holds
+   them after that: **Models › Optical waveguide › Resume** (browser recovery) or **Open session**
+   with the session file that holds them, or that nothing does. While the tab holds no optical
+   runs and browser recovery holds an optical session, for example after a restart, the Optical
+   waveguide card offers it first, *Resume Optical waveguide · design A, design B · 2:25 PM (this
+   browser)*, next to **Start new**. Every recovery entry names its model, its run count and its
+   runs (a run's name, else *Run N*), for example *Optical waveguide · 2 runs · design A, Run 2*,
+   and the session file its record was opened from or last sent to (*· file …json*). Each stored
+   session is listed once, newest first: an entry whose session text equals a newer one's is not
+   shown, and the session open in this tab is not offered. The start page uses
    one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
 Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
-the model. Use **Open session** to replace both model and notebook. *Result for these
-inputs* and *Inputs changed since this result* say which design a result belongs to; between designs,
-Compare pairs modes by field overlap, not by rank.
+the model. Use **Open session** to replace both model and notebook. *Result for the current
+inputs* and *Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 ×
+300 nm · Silicon* (only the parts that differ: geometry, wavelength, core mesh) say which design a
+result belongs to, in Results and in the selected run's settings; the step bar's Results step
+describes the run shown (*Result for these inputs* or *Current inputs differ from this run*), and
+clicking it shows that run. Steady heat and Joule heating results use the same words. In optical
+Results the modes table comes first, then the field plot with its sample and line profile. Between
+designs, Compare pairs modes by field overlap, not by rank.
 
 ## Working with a model
 
@@ -389,8 +402,11 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   ends the run at the engine's next step: after the physics being solved, or inside an
   iteration step after the current iteration. A run that fails or is stopped keeps no partial
   result; Messages names the physics that failed, and the previous complete run stays. A sweep
-  is checked but not run (the run reason says so). Any edit after a run marks its rows **Out of
-  date (last run: Done in 0.3 s)**, on the dock and in Connections; the dock heading reads “Run 1 ·
+  is checked but not run (the run reason says so). An edit after a run marks **Out of
+  date (last run: Done in 0.3 s)** the rows of the steps whose inputs it changed, on the dock and
+  in Connections: a step's own physics, the couplings into it, the shared geometry, materials, mesh
+  and study, and every step upstream of it. Removing only the coupling into the optical modes
+  leaves *Heat 1 · Done in 0.3 s* and marks *Modes 1 · Out of date (last run: Done in 1.2 s)*; the dock heading reads “Run 1 ·
   the model changed since; press Run to update” and the footer “Model edited since run 1 · press
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
   coupling removed and added back, or Undo) makes it current again, and Messages, the dock
@@ -416,8 +432,8 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
   core. The modes table has the optical application's columns, | Mode | n_eff | Polarization |
   Loss | ([Modes table](#modes-table)), names its rows *Mode 1*, …, and the note under it gives the
-  ranking sentence, “Modes are ranked by effective index.”, and the number of modes the model asks for, “This model asks for 1 mode: Modes 1 ›
-  Modes to find”, a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
+  ranking sentence, “Modes are ranked by effective index.”, and the number of modes the model asks for, “This model asks for 2 modes: Modes 1 ›
+  Modes to find” (the template asks for two, so its table shows a TE-like and a TM-like mode), a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
   what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
   keeps n₀, its index at T_ref = 300 K”. The column is valid while the optical model solved alone
@@ -605,7 +621,8 @@ engine and older session files give the same number from the same samples:
 
 - **Polarization** is the TE fraction `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)` over every
   triangle of the window (the column help: “TE = share of |E_x|² in |E_x|² + |E_y|², x
-  horizontal”), shown as a word and the TE percentage, e.g. *TE-like · 98.2 % TE*. Studio's words
+  horizontal”), shown as a word and the TE percentage, e.g. *TE-like · 98.2 % TE*; a TM-like cell names its TM
+  share first, *TM-like · 96.9 % TM (3.1 % TE)* (the two add to 100.0 as shown). Studio's words
   are **TE-like** at f_TE ≥ 0.9, **TM-like** at f_TE ≤ 0.1, otherwise **hybrid**; the engine saves
   only the number (`te_polarization_fraction`, [result format](overview.md#mode-post-processing)).
 - **Degenerate pairs**: two adjacent modes of one run whose Re n_eff differ by at most 1e-3 share one
@@ -933,7 +950,11 @@ solver is started. Input-only recovery and pending-job recovery remain separate.
 
 Starting new work without recovering does not discard the stored session. The first
 automatic save after a page opens moves the stored session to the earlier sessions,
-newest first, keeping at most three; **Recover earlier session** lists each with its
+newest first, keeping at most three. A session text is stored once: when the text written equals
+the stored one (the same file opened again) the stored record is replaced, not moved, and an
+earlier copy of it (the unchanged model saved again after the tab moved to another model and
+back) is dropped. Browser recovery also keeps the name of the session file the notebook was
+opened from, for the lists; **Recover earlier session** lists each with its
 model, run count, run names and time and recovers it through the same replacement dialog. Recovering
 an earlier session keeps the current one as an earlier session at the next save.
 

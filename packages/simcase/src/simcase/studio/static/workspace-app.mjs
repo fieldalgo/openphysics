@@ -1,9 +1,9 @@
 import {renderConnectionGraph,installConnectionGraph} from './workspace-graph.mjs';
 import {LatestWorkspaceLoad} from './workspace-load.mjs';
-import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery} from './workspace-notebook-recovery.mjs';
+import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,opticalInputParts,SAME_INPUTS} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -29,7 +29,7 @@ import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionL
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
-import {renderApplications,templatePhysics,sessionRunNames,sessionLine} from './workspace-applications.mjs';
+import {renderApplications,templatePhysics,sessionRunNames,sessionLine,opticalResumeChoice} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
@@ -171,7 +171,7 @@ const multiView=createMultiphysicsView({$,ui,notice:text=>notice(text),announceR
  onOpen:()=>Object.assign(state,{electric:true,heat:true,structure:true,optics:true}),
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),serverVersion:()=>connection.version,validateRunLabel,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
- recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+ recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),opticalResumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
@@ -260,7 +260,8 @@ function heatResults(){
  const host=$('canvas');if(!heatRun){host.innerHTML='<h2>No heat result in this tab</h2><p>Edit the plate and run a heat study. Heat results are not stored in session files.</p>';$('inspector').innerHTML='<h2>Heat results</h2><p>No completed heat run.</p>';return;}
  const same=heatRun.signature===heatSignature(),run=heatRun,s=run.payload.summary||{};
  host.innerHTML='<h2>Steady temperature and heat flux</h2>';
- const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${thermalSummary(run.input)} · ${SIDES.map(side=>side+': '+sideText(run.input.sides[side])).join(' · ')} · ${run.input.nx} × ${run.input.ny} divisions`;host.append(desc);
+ const desc=document.createElement('p');const heatParts=t=>[thermalSummary(t),SIDES.map(side=>side+': '+sideText(t.sides[side])).join(' · '),`${t.nx} × ${t.ny} divisions`];
+ desc.textContent=`${same?SAME_INPUTS:inputsDifferText(heatParts(run.input),heatParts(state.thermal))} · ${thermalSummary(run.input)} · ${SIDES.map(side=>side+': '+sideText(run.input.sides[side])).join(' · ')} · ${run.input.nx} × ${run.input.ny} divisions`;host.append(desc);
  const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="heat-field">${[['temperature','Temperature T [K]'],['magnitude','Heat flux |q| [W/m²]'],['qx','Heat flux qx [W/m²]'],['qy','Heat flux qy [W/m²]']].map(([v,l])=>`<option value="${v}" ${v===heatField?'selected':''}>${l}</option>`).join('')}</select></label><label><input id="heat-arrows" type="checkbox" ${heatArrows?'checked':''}> Flux arrows</label>`;host.append(bar);
  const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='heat-field-canvas';canvas.style.cssText='display:block;width:100%;height:var(--plot-height,360px);cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
  const probe=document.createElement('p');probe.id='heat-probe';probe.setAttribute('role','status');host.append(probe);
@@ -273,7 +274,7 @@ function heatResults(){
  $('heat-field').onchange=()=>{heatField=$('heat-field').value;draw();};$('heat-arrows').onchange=()=>{heatArrows=$('heat-arrows').checked;draw();};
  heatResize=new ResizeObserver(draw);heatResize.observe(canvas);draw();
  const named=globalThis.ThermalStudio.named(run.payload.arrays),t=named.temperature;let lo=Infinity,hi=-Infinity;for(const v of t){lo=Math.min(lo,v);hi=Math.max(hi,v);}
- $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',named.nodes.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
+ $('inspector').innerHTML='<h2>Heat result</h2>'+pair('Inputs',same?'Same as the current inputs':'Current inputs differ from this run')+pair('Minimum T',lo.toPrecision(7)+' K')+pair('Maximum T',hi.toPrecision(7)+' K')+pair('Nodes',named.nodes.length)+pair('Triangles',run.payload.arrays.triangles.length)+pair('Result format',escapeHtml(run.payload.result_format))+pair('Completed',new Date(run.completedAt).toLocaleTimeString())+'<p>Public steady heat solver output. Not stored in sessions or browser recovery.</p>';
  const restore=document.createElement('button');restore.textContent='Restore run inputs';restore.disabled=same;restore.onclick=()=>setThermal(run.input,'Heat inputs restored from the run.');$('inspector').append(restore);
 }
 function renderHeat(){
@@ -317,7 +318,7 @@ else inspector+=pair('Status','Not executed')+'<p>Settings and validation will b
 if(isHeat())inspector=heatInspector();else if(isJoule())inspector=jouleView.inspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();if(isJoule())jouleView.bindInspector();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML=renderConnectionOverview();
-else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer());
+else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),opticalResumeOffer());
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=applicationChosen()?active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>':'<span class="sequence-empty">Study steps appear once you choose an application.</span>';
@@ -488,9 +489,9 @@ function refreshSaveIndicator(){
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs});
+ const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:runs.includes(solverRun)?solverRun:null});
  steps.forEach((step,index)=>{
-  let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
+  let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
   if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
   button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.wavelength?step.summary:step.detail;
@@ -519,9 +520,9 @@ function requestLoad(doc,options={}){
   if(!options.leaveChecked&&multiView.active()&&multiView.unsavedRuns()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
   loadInputs(doc,options);
 }
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement,leaveChecked=false}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,opener=document.activeElement,leaveChecked=false}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
   if((leaveChecked&&!session)||untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
@@ -559,6 +560,7 @@ function completeLoad(pending){
   // a record without a session file belongs to a notebook never saved: no file name carries over
   lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:null;
   // the title says what is open until the next change: the file opened, or browser recovery
+  openedFile=pending.source==='file'?pending.label:pending.openedFile||null;
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp()};
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
@@ -626,6 +628,9 @@ let notebookRecoveryRecord=null,notebookLoadVersion=0;
 let lastSavedFile=null;
 // What the title names until the next change: {kind: 'opened' | 'recovered', name, stamp}.
 let loadedSession=null;
+// The session file these optical runs were opened from (or that a recovered record names), by
+// name: browser recovery keeps it so its lists can name the file.
+let openedFile=null;
 const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.name,current:loadedSession.stamp===saveStamp()}:null;
 // The whole notebook a session file holds: inputs, runs, selection, comparison and view.
 const saveStamp=()=>notebookStamp();
@@ -638,14 +643,14 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current')recoveryState='kept';
- if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;if(notebookStore.movedEarlier())renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
+ if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
  refreshSaveIndicator();
 }});
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
- try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
-  latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered),entry:recoveredEntry(recovered)}:null;
+ try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;ownLatest=false;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
+  latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered),entry:recoveredEntry(recovered),recovered}:null;
   if(recovered){$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
   refreshSaveIndicator();
   await renderEarlierSessions();
@@ -655,14 +660,34 @@ async function loadNotebookRecovery(){
 // The model a recovered multiphysics session names in the footer; null for optical ones.
 const recoveredModel=recovered=>recovered.session.application==='multiphysics'?String(recovered.session.document.name||'Multiphysics model'):null;
 // A recovered session as the recovery lists name it: every entry names its model and its runs.
-const recoveredEntry=recovered=>({runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session)});
+const recoveredEntry=recovered=>({runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session),file:recovered.savedFile?.name||recovered.openedFile||null});
 // Earlier sessions: what browser recovery held when an earlier page started new work.
-let earlierSessions=[];
+// earlierRecords: the stored records as read, for the list's de-duplication (distinctRecords).
+let earlierSessions=[],earlierRecords=[];
+// ownLatest: this tab has written the latest record, so it is the tab's own session, not one to
+// recover; it still hides an earlier copy of the same text.
+let ownLatest=false;
+// The stored sessions the lists offer, each once and newest first: {kind, index, recovered}.
+function recoveryList(){
+ const parsed=new Map(earlierSessions.map(e=>[e.index,e.recovered]));
+ return distinctRecords(notebookRecoveryRecord,earlierRecords).flatMap(({index})=>{
+  if(index<0)return latestOffer&&!ownLatest?[{kind:'latest',index,recovered:latestOffer.recovered}]:[];
+  return parsed.has(index)?[{kind:'earlier',index,recovered:parsed.get(index)}]:[];
+ });
+}
+// The Optical waveguide card's offer while this tab holds no optical runs: the newest optical
+// session with runs in browser recovery, offered before Start new.
+function opticalResumeOffer(){
+ if(runs.length)return null;
+ const found=recoveryList().find(e=>e.recovered.session.application!=='multiphysics'&&e.recovered.session.runs.length);if(!found)return null;
+ return {...opticalResumeChoice(recoveredEntry(found.recovered)),onResume:button=>found.kind==='latest'?recoverLatest(button):recoverEarlier(found.index,button),onStartNew:()=>chooseTemplate('optical')};
+}
 // The landing page offers to resume until the page has runs or the user starts new.
 let resumeDismissed=false;
 function resumeOffer(){
  if(resumeDismissed||runs.length)return null;
- return {latest:latestOffer?.entry||null,earlier:earlierSessions.map(e=>({...recoveredEntry(e.recovered),index:e.index})),
+ const list=recoveryList(),latest=list.find(e=>e.kind==='latest');
+ return {latest:latest?recoveredEntry(latest.recovered):null,earlier:list.filter(e=>e.kind==='earlier').map(e=>({...recoveredEntry(e.recovered),index:e.index})),
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),
   onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
 }
@@ -672,13 +697,16 @@ async function renderEarlierSessions(){
  const generation=++earlierGeneration;
  let list=[];try{list=await notebookStore.loadEarlier();}catch{return;}
  if(generation!==earlierGeneration)return;
- const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];
+ const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];earlierRecords=list;
  list.forEach((record,index)=>{let recovered;try{recovered=readNotebookRecovery(record);}catch{return;}
   // keep the storage index: a record that does not parse is skipped, not renumbered
-  earlierSessions.push({index,recovered});
+  earlierSessions.push({index,recovered});});
+ // each session once, newest first: a copy of the latest record's text or of a newer one is not listed
+ for(const {index,recovered} of recoveryList().filter(e=>e.kind==='earlier')){
   const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
   button.textContent='Recover earlier session · '+sessionLine(recoveredEntry(recovered))+' · '+new Date(recovered.savedAt).toLocaleString();
-  button.onclick=()=>recoverEarlier(index,button);box.append(button);});
+  button.onclick=()=>recoverEarlier(index,button);box.append(button);}
+ if(ui.page==='Applications')render();
 }
 async function recoverEarlier(index,opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
@@ -688,9 +716,9 @@ async function recoverEarlier(index,opener){
    if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {latest,recovered};});
   if(!loaded)return;const {latest,recovered}=loaded.value;if(!recovered)throw new Error('That earlier session is no longer stored.');
   if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
-  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,savedFile:recovered.savedFile});return;}
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile});return;}
   // Adopt the latest record: the next save keeps it as an earlier session in turn.
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
  }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
 $('retry-notebook').onclick=()=>(multiView.active()?multiView.recovery():runs.length)?notebookAutosave.retry():loadNotebookRecovery();
@@ -699,8 +727,8 @@ async function recoverLatest(opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
  try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
-  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile});return;}
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile});return;}
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
@@ -748,9 +776,9 @@ function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=
 let recoveryKind=null;
 function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKind!==kind)notebookStore.keepPrevious();recoveryKind=kind;notebookAutosave.schedule(stamp,makeText,extra);}
 function refreshNotebook(){
- if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile});
+ if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile});
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
- const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -768,9 +796,9 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Connections','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window/PEC fixed.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
-  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
-  const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
-  renderField();$('canvas').append(modesTable(solverRun));
+  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(opticalInputParts(solverRun.input),opticalInputParts(current()))))+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
+  const desc=document.createElement('p');desc.textContent=`${same?SAME_INPUTS:inputsDifferText(opticalInputParts(solverRun.input),opticalInputParts(current()))} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
+  $('canvas').append(modesTable(solverRun));renderField();
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Models → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
@@ -1099,11 +1127,11 @@ $('confirm-run-import').onclick=()=>{
 const validateModel=doc=>studioRequest('POST','/api/multiphysics/validate',{doc});
 // Opening a multiphysics session (a file or browser recovery), checked already: the leave
 // question when runs would be lost, else the open question when a model would be replaced.
-function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null}){
+function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null}){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  const asked=!!leaveText(label,true);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});multiView.openSession(session,{label,source,savedFile}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});multiView.openSession(session,{label,source,savedFile,openedFile}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.runCount(),unsaved:multiView.unsavedRuns()>0,model:'the current model'},source);

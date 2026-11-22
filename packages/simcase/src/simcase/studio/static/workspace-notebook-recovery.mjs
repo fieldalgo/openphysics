@@ -7,7 +7,20 @@ export function readNotebookRecovery(record){
  if(record==null)return null;
  if(record.version!==1||typeof record.savedAt!=='string'||!Number.isFinite(Date.parse(record.savedAt))||typeof record.session!=='string')throw new Error('Invalid notebook recovery record.');
  // savedFile (optional): the last session file this notebook was saved to; a malformed one is ignored.
- return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile)};
+ // openedFile (optional): the session file the notebook was opened from, by name, for the recovery
+ // lists; a malformed one is ignored. Neither is part of the session.
+ return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile)};
+}
+export const openedFileName=name=>typeof name==='string'&&/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(name)?name:null;
+// One session in a recovery list: the newest record of each session text. records: the latest
+// record (null when none) and the earlier ones, as stored; returns {record, index} newest first,
+// index being the record's place among the earlier sessions (-1 for the latest), so two
+// entries never hold the same session.
+export function distinctRecords(latest,earlier=[]){
+ const all=[...(latest?[{record:latest,index:-1}]:[]),...earlier.map((record,index)=>({record,index}))].filter(e=>e.record&&typeof e.record.session==='string');
+ all.sort((a,b)=>(Date.parse(b.record.savedAt)||0)-(Date.parse(a.record.savedAt)||0)||a.index-b.index);
+ const seen=new Set();
+ return all.filter(e=>{if(seen.has(e.record.session))return false;seen.add(e.record.session);return true;});
 }
 
 // A legacy record has no revision; include its payload to detect same-time writes.
@@ -42,8 +55,12 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
      if(!keepPrevious||request.result==null){snapshots.put(saved,'latest');return;}
      const earlier=snapshots.get('earlier');
      earlier.onsuccess=()=>{
-      const list=Array.isArray(earlier.result)?earlier.result:[];
-      if(recoveryRevision(list[0])!==recoveryRevision(request.result)){snapshots.put([request.result,...list].slice(0,EARLIER_SESSIONS),'earlier');moved=true;}
+      // a session is stored once: an earlier copy of the text written now is dropped, and a latest
+      // record of the same text is replaced, not kept (an unchanged model saved again, for
+      // example after the tab moved between models and back, or a file opened twice)
+      const stored=Array.isArray(earlier.result)?earlier.result:[],list=stored.filter(r=>r?.session!==saved.session);
+      const keep=request.result.session!==saved.session&&recoveryRevision(list[0])!==recoveryRevision(request.result);
+      if(keep||list.length!==stored.length){snapshots.put((keep?[request.result,...list]:list).slice(0,EARLIER_SESSIONS),'earlier');moved=true;}
       snapshots.put(saved,'latest');
      };
     };
@@ -67,7 +84,7 @@ export class NotebookAutosave {
  constructor(store,{onState=()=>{},delay=700,setTimer=(fn,ms)=>setTimeout(fn,ms),clearTimer=id=>clearTimeout(id)}={}){
   this.store=store;this.onState=onState;this.delay=delay;this.setTimer=setTimer;this.clearTimer=clearTimer;this.timer=null;this.desired=null;this.writing=false;this.savedStamp=null;this.failedStamp=null;
  }
- // extra: optional {savedFile} written beside the session in the record.
+ // extra: optional {savedFile, openedFile} written beside the session in the record.
  schedule(stamp,makeText,extra={}){
   if(this.desired?.stamp===stamp)return;
   this.desired={stamp,makeText,extra};this.failedStamp=null;
@@ -83,7 +100,7 @@ export class NotebookAutosave {
   const capture=this.desired;this.writing=true;this.onState({phase:'saving'});
   try{
    const session=capture.makeText();if(typeof session!=='string'||new TextEncoder().encode(session).length>MAX_SESSION_BYTES)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');
-   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
+   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
   }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error.code,message:error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
  }

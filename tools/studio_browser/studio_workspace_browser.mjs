@@ -242,7 +242,11 @@ try {
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
   assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss']);
-  assert.equal(resultsView.polarization.length, 2); for (const p of resultsView.polarization) assert.match(p, /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/);
+  // a TM-like cell names its TM share first: "TM-like · 96.9 % TM (3.1 % TE)"
+  assert.equal(resultsView.polarization.length, 2); for (const p of resultsView.polarization) assert.match(p, /^(?:(?:TE-like|hybrid) · \d+\.\d % TE|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/);
+  // the modes table first, then the field plot with its sample and line profile
+  const order = await page.eval("({table:!!(document.getElementById('modes-table').compareDocumentPosition(document.querySelector('.field-result'))&Node.DOCUMENT_POSITION_FOLLOWING)})");
+  stage('modes table first', order); assert.ok(order.table, 'the modes table comes before the field plot');
   assert.deepEqual(resultsView.loss, ['lossless', 'lossless']); assert.match(resultsView.lossless, /^Lossless: all materials have k = 0/);
   assert.equal(resultsView.options[0].split('n_eff ')[1], resultsView.values[0]);
   assert.deepEqual(resultsView.probe, ['x [nm]', 'y [nm]']);
@@ -328,7 +332,8 @@ try {
   // the routes back say which copy is durable
   const routes = await page.eval("({latest:document.getElementById('resume-latest').textContent,open:document.getElementById('resume-open-file').textContent,note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
-  assert.match(routes.latest, /^Recover \(this browser only\): Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved /); assert.equal(routes.open, 'Open session file (portable)…');
+  // the entry names the session file the record was last sent to
+  assert.ok(routes.latest.startsWith(`Recover (this browser only): Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · file ${sessionFile} · saved `), routes.latest); assert.equal(routes.open, 'Open session file (portable)…');
   assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
@@ -341,12 +346,28 @@ try {
   // the recovered run is current, and the dock and footer say where it came from
   const recoveredSequence = await opticalSequence(); stage('recovered sequence', recoveredSequence);
   assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · press Run to compute it here'});
+  // the older run viewed: the step bar, the result and its settings all say the current inputs
+  // differ from this run, naming both, and none speaks of edits (there were none)
+  await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Pinned · design A/.test(b.textContent)).click();return true}', '.run-item');
+  await page.until("/600 × 300 nm/.test(document.querySelector('#canvas p')?.textContent||'')", 'older run shown');
+  const viewed = await page.eval("({step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),result:document.querySelector('#canvas p').textContent,inputs:[...document.querySelectorAll('#inspector .pair')].find(p=>p.firstElementChild?.textContent==='Inputs')?.lastElementChild.textContent,header:document.getElementById('project').textContent})");
+  stage('older run viewed', viewed);
+  assert.equal(viewed.step, '5. Results Current inputs differ from this run');
+  assert.match(viewed.result, /^Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon · 600 × 300 nm · Silicon · λ 1550 nm · core mesh \d+ nm$/);
+  assert.equal(viewed.inputs, 'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon');
+  for (const t of Object.values(viewed)) assert.doesNotMatch(t, /edits are kept/);
+  await noOverflow('older run viewed');
+  // the newer run viewed: every place says it is the result of the current inputs
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
+  await page.until("/^Result for the current inputs/.test(document.querySelector('#canvas p')?.textContent||'')", 'newer run shown');
+  assert.equal(await page.eval("[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' ')"), '5. Results Result for these inputs');
   // switching to the heated model says where the optical runs stay, and they come back
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'models page');
   await page.click('[data-template=heated-waveguide]');
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'heated model', 30000);
   const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('project').textContent")});
-  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab, browser recovery(?: and \S+\.json)?; choose Models › Optical waveguide to return to them\.$/);
+  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');

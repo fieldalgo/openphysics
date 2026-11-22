@@ -3,8 +3,22 @@
 import {designSummary,shapesBlock} from './workspace-shapes.mjs';
 import {originText} from './workspace-multiphysics.mjs';
 
+// The words for a result whose inputs are not the current ones (optical, heat, Joule heating):
+// neutral, since an opened file or another selected run differs without any edit, and naming
+// both sides of each part that differs. runParts and currentParts: the same parts, in order,
+// as text (for example the geometry, the wavelength and the core mesh).
+export const SAME_INPUTS='Result for the current inputs';
+export function inputsDifferText(runParts,currentParts){
+ const differ=runParts.map((part,i)=>part!==currentParts[i]?i:-1).filter(i=>i>=0);
+ if(!differ.length)return 'Current inputs differ from this run in other settings';
+ return `Current inputs differ from this run: this run ${differ.map(i=>runParts[i]).join(' · ')}, current ${differ.map(i=>currentParts[i]).join(' · ')}`;
+}
+// The parts of an optical input the words above compare.
+export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.model.wavelength} nm`,`core mesh ${input.model.coreMesh} nm`];
 // Readiness describes the current editor and retained artifacts, not accuracy.
-export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[]}){
+// viewed: the run Results shows (the selected run); the Results step describes that run, so the
+// step bar, the result and its settings agree. Without it, the newest run of these inputs.
+export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed}){
  const signature=JSON.stringify(input);
  const materialBlock=input.setup.materials.Oxide!=='Silica'?'Background must be silica':shapesBlock(input.model.shapes),materialOK=!materialBlock;
  const currentRun=runs.findLast(run=>run.signature===signature);
@@ -18,7 +32,8 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
   {id:'Materials',state:materialOK?'ready':'attention',detail:materialOK?[...new Set(input.model.shapes.map(s=>s.material))].join(', ')+' in silica':'Assign supported materials'},
   {id:'Mesh',state:mesh?.signature===signature?'ready':mesh?'attention':'optional',detail:mesh?.signature===signature?'Preview current':mesh?'Inputs changed since preview':'Optional preview'},
   {id:'Study',state:invalid?'attention':busy?'busy':pending||block?'attention':'ready',detail:study,summary:state,wavelength:Number.isFinite(wavelength)?`λ ${wavelength} nm`:null},
-  {id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Inputs changed since this result':'No run yet'}
+  viewed?{id:'Results',state:viewed.signature===signature?'ready':'attention',detail:viewed.signature===signature?'Result for these inputs':'Current inputs differ from this run'}
+  :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Inputs changed since this result':'No run yet'}
  ];
 }
 // The last-run state of the optical inputs, in the words of the multiphysics model. A run is

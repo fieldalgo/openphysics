@@ -3,11 +3,11 @@
 
 const {before}=require('node:test');
 let solverApi;
-let APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE;
+let APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime;
 let opticalBlock,opticalDocument;
 before(async()=>{
 ({solverApi}=await import('../../packages/simcase/src/simcase/studio/static/workspace-api.mjs'));
-({APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
+({APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE,sessionLine,opticalResumeChoice,offerTime}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
 ({opticalBlock,opticalDocument}=await import('../../packages/simcase/src/simcase/studio/static/workspace-optical.mjs'));
 });
 const test=require('node:test');
@@ -85,4 +85,14 @@ test('the Models page says what Save session keeps of each model, and how to lea
 test('no Studio page calls a loaded or recovered result unauthenticated',()=>{
  const fs=require('node:fs'),path=require('node:path'),dir=path.join(__dirname,'../../packages/simcase/src/simcase/studio/static');
  for(const name of fs.readdirSync(dir).filter(n=>/\.(mjs|html|js)$/.test(n)))assert.doesNotMatch(fs.readFileSync(path.join(dir,name),'utf8'),/authenticated/,name);
+});
+test('a recovery entry names the session file its record came from',()=>{
+ assert.equal(sessionLine({model:'Heated silicon waveguide',runs:2,names:['Run 1','Run 2'],file:'heated-silicon-waveguide-session-2026-11-22-1426.json'}),
+  'Heated silicon waveguide · 2 runs · Run 1, Run 2 · file heated-silicon-waveguide-session-2026-11-22-1426.json');
+ assert.equal(sessionLine({model:'Optical waveguide',runs:1,names:['Run 1'],file:null}),'Optical waveguide · 1 run · Run 1');
+});
+test('the Optical waveguide card offers the optical session in browser recovery before Start new',()=>{
+ assert.deepEqual(opticalResumeChoice({runs:2,names:['design A','design B'],savedAt:'T'},t=>'2:25 PM'),{label:'Resume Optical waveguide · design A, design B · 2:25 PM (this browser)'});
+ const now=new Date(2026,10,22,15,0),today=new Date(2026,10,22,14,25).toISOString(),before=new Date(2026,10,20,14,25).toISOString();
+ assert.doesNotMatch(offerTime(today,now),/2026|20/);assert.match(offerTime(before,now),/20/);
 });

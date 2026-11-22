@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-const {test,before}=require('node:test');const assert=require('node:assert/strict');let opticalWorkflow;
-before(async()=>({opticalWorkflow}=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs')));
+const {test,before}=require('node:test');const assert=require('node:assert/strict');let opticalWorkflow,inputsDifferText,opticalInputParts;
+before(async()=>({opticalWorkflow,inputsDifferText,opticalInputParts}=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs')));
 const input=()=>({model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},setup:{materials:{Core:'Silicon',Oxide:'Silica'}}});
 test('mesh preview is optional and an earlier result is never labeled current after an input edit',()=>{
  const doc=input(),run={signature:JSON.stringify(doc)};
@@ -75,4 +75,20 @@ test('a current optical run read from a file or recovered says so, not that it w
  assert.equal(W.opticalSequenceHeading(f),'Run 2 · solved from the current inputs');
  // freshness is unchanged: an edit names the latest run as before
  assert.deepEqual(W.opticalFreshness({x:1},[{signature:sig,origin:'imported'}]),{state:'stale',run:1});
+});
+test('the Results step describes the run being viewed, in neutral words that name both inputs',()=>{
+ const older=input();older.model.wavelength=1550;older.model.coreMesh=30;older.model.shapes=[{...older.model.shapes[0],w:600,h:300}];
+ const newer=structuredClone(older);newer.model.shapes=[{...newer.model.shapes[0],w:700}];
+ const runs=[{signature:JSON.stringify(older),input:older},{signature:JSON.stringify(newer),input:newer}];
+ // a file opened with two runs: the inputs are the newer run's, the older one is viewed
+ let steps=opticalWorkflow({input:newer,runs,viewed:runs[0]});
+ assert.deepEqual([steps[4].state,steps[4].detail],['attention','Current inputs differ from this run']);
+ assert.equal(steps[3].summary,'Run complete');
+ steps=opticalWorkflow({input:newer,runs,viewed:runs[1]});assert.deepEqual([steps[4].state,steps[4].detail],['ready','Result for these inputs']);
+ // the words name only the parts that differ, this run first
+ assert.equal(inputsDifferText(opticalInputParts(older),opticalInputParts(newer)),'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon');
+ const other=structuredClone(newer);other.model.wavelength=1310;other.model.coreMesh=40;
+ assert.equal(inputsDifferText(opticalInputParts(newer),opticalInputParts(other)),'Current inputs differ from this run: this run λ 1550 nm · core mesh 30 nm, current λ 1310 nm · core mesh 40 nm');
+ assert.equal(inputsDifferText(['a'],['a']),'Current inputs differ from this run in other settings');
+ for(const text of [steps[4].detail,inputsDifferText(['a'],['b'])])assert.doesNotMatch(text,/edit/i);
 });

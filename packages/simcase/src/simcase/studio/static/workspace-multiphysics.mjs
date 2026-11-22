@@ -436,8 +436,29 @@ export function originRows(rows,origin){
  const text=origin==='imported'?'From file':origin==='recovered'?'From this browser':null;
  return text?rows.map(r=>r.state!=='done'?r:{...r,text:r.group?.length>1?`${r.text} · ${text.toLowerCase()}`:text}):rows;
 }
+// What one solve step (a physics, or the physics of an iteration step) reads: its own physics
+// entries, the couplings into them, the shared parts of the model (geometry, materials, mesh,
+// study and any other part, not its name or envelope spelling) and, through those couplings,
+// every step upstream. Two models whose texts are equal give a step the same inputs.
+export function stepInputs(doc,group){
+ const shared=Object.fromEntries(Object.entries(isObject(doc)?doc:{}).filter(([k])=>!['openphysics','name','physics','couplings'].includes(k)));
+ const seen=new Set(),physics={},into={};
+ const visit=name=>{
+  if(seen.has(name))return;seen.add(name);physics[name]=doc?.physics?.[name]??null;
+  for(const c of couplingNames(doc)){const link=doc.couplings[c];if(splitSpec(link?.to)[0]!==name)continue;into[c]=link;visit(splitSpec(link?.from)[0]);}
+ };
+ for(const name of group)visit(name);
+ return canonicalJson({shared,physics,couplings:into});
+}
+// 'current' when an edit left the step's own inputs and everything that flows into it as the run
+// solved them: removing only the coupling into the optical modes leaves the heat step current.
+export function stepFreshness(runDoc,doc,group){return stepInputs(runDoc,group)===stepInputs(doc,group)?'current':'stale';}
 // The rows of the last run once the model changed: each keeps what it did, marked out of date.
-export function staleRows(rows){return rows.map(r=>({...r,state:'stale',text:`Out of date (last run: ${r.text})`}));}
+// With the run's model and the current one, only the steps whose inputs changed are marked.
+export function staleRows(rows,runDoc,doc){
+ const stale=r=>runDoc===undefined||!Array.isArray(r.group)||stepFreshness(runDoc,doc,r.group)==='stale';
+ return rows.map(r=>stale(r)?{...r,state:'stale',text:`Out of date (last run: ${r.text})`}:r);
+}
 // 'again' once an edit made the model differ from the last run and a later edit (Undo, the
 // same coupling added back) made it equal again: the results are current once more.
 export function freshnessAgain(freshness,diverged){return freshness==='current'&&diverged?'again':freshness;}

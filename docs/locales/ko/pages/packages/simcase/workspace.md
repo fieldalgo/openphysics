@@ -108,7 +108,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    시각을 함께 보관하므로 복구한 세션에는 그 파일을 지난 기록으로 *Recovered from this browser (last saved
    to a file: … at 13:05)*처럼 덧붙입니다(저장 뒤 바뀐 작업이면 *…; changed since)*, 저장한 적이 없으면
    *· not saved to a file*).
-   둘 다 다음 변경이나 다른 파일 열기까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   둘 다 다음 변경이나 다른 파일 열기까지 유지되며, 탭 클릭(**Models**, **Model**, **Connections**, **Results**)은
+   변경이 아닙니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
@@ -126,16 +127,26 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    Undo로 되돌릴 수 있습니다. 가열 실리콘 도파로는 자기 편집용 Undo를 따로 가지며, 다른 모델을
    고르면 빠져나옵니다. 모델마다 Save session이 무엇을 남기는지 적혀 있습니다: 광학 모델은 입력과
    실행, 정상 열과 줄 가열은 입력(결과는 탭에만 남음), 가열 실리콘 도파로는 모델과 그 실행입니다.
-   광학 실행이 있는 채로 가열 모델을 열면 Messages가 그 실행이 남는 곳(이 탭, 그리고 그것을 가진
-   브라우저 복구나 세션 파일)과 **Models › Optical waveguide**로 되돌아갈 수 있음을 알려 줍니다.
-   복구 항목은 모두 모델, 실행 수, 실행 이름(이름이 없으면 *Run N*)을 보여 줍니다. 예:
-   *Optical waveguide · 2 runs · design A, Run 2*. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
+   광학 실행이 있는 채로 가열 모델을 열면 Messages가 이 탭은 닫거나 새로고침할 때까지 그 실행을 가지며
+   **Models › Optical waveguide**로 되돌아갈 수 있다고 알리고, 그 뒤에 무엇이 그 실행을 가지는지도
+   밝힙니다: **Models › Optical waveguide › Resume**(브라우저 복구), 그 실행을 가진 세션 파일로
+   **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
+   다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Resume Optical waveguide · design A,
+   design B · 2:25 PM (this browser)*, 그 옆에 **Start new**. 복구 항목은 모두 모델, 실행 수, 실행
+   이름(이름이 없으면 *Run N*)을 보여 줍니다. 예: *Optical waveguide · 2 runs · design A, Run 2*. 기록이
+   연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다(*· file …json*). 저장된 세션은
+   최신순으로 한 번씩만 나옵니다. 세션 글이 더 새 항목과 같은 항목은 보이지 않고, 이 탭에 열려 있는
+   세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
    *Model library · Choose a model*.
 
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
-모두 교체하려면 **Open session**을 사용합니다. *Result for these inputs*와 *Inputs changed
-since this result* 표시는 결과의
-설계 출처를 나타내며, 설계 사이의 모드는 Compare가 순위가 아니라 장 겹침으로 짝짓습니다.
+모두 교체하려면 **Open session**을 사용합니다. *Result for the current inputs*와 *Current inputs
+differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon*(다른
+부분만: 형상, 파장, 코어 메시)은 Results와 고른 실행의 설정에서 결과의 설계 출처를 나타냅니다. 단계
+막대의 Results 단계는 보고 있는 실행을 설명하고(*Result for these inputs* 또는 *Current inputs differ
+from this run*), 누르면 그 실행을 보여 줍니다. 정상 열과 줄 가열 결과도 같은 말을 씁니다. 광 Results는
+모드 표를 먼저, 그 아래에 표본과 선 프로파일이 있는 장 그림을 보여 줍니다. 설계 사이의 모드는
+Compare가 순위가 아니라 장 겹침으로 짝짓습니다.
 
 ## 모델 편집
 
@@ -335,8 +346,10 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   단계에서 실행을 멈춥니다. 풀고 있는 물리가 끝난 뒤, 반복 단계 안에서는 지금 반복이 끝난
   뒤입니다. 실패하거나 멈춘 실행은 부분 결과를 남기지 않습니다. Messages가 실패한 물리를
   밝히고, 앞선 완전한 실행은 그대로 남습니다. 스윕은 검사만 하고 실행하지 않습니다(실행 이유에
-  적힙니다). 실행 뒤 편집하면 도크와 Connections의 행이 **Out of date (last run: Done in 0.3 s)**가
-  되고, 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
+  적힙니다). 실행 뒤 편집하면 도크와 Connections에서 입력이 바뀐 단계의 행만 **Out of date (last run: Done
+  in 0.3 s)**가 됩니다. 단계의 입력은 그 물리, 그 물리로 들어오는 결합, 공유하는 형상·재료·메시·
+  스터디, 그리고 그 앞의 모든 단계입니다. 광 모드로 들어오는 결합만 지우면 *Heat 1 · Done in 0.3 s*는
+  그대로이고 *Modes 1 · Out of date (last run: Done in 1.2 s)*가 됩니다. 이때 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
   제목, 하단은 같은 문장 “Model matches run 1 again: its results are current. Run makes a new run with the
@@ -358,7 +371,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. 모드 표는 광 애플리케이션과
   같은 열 | Mode | n_eff | Polarization | Loss |([모드 표](#모드-표))를 쓰고 행은 *Mode 1*, …이며, 표 아래
   문장은 순위 문장 “Modes are ranked by effective index.”와 모델이 요청한 모드 수 “This model asks
-  for 1 mode: Modes 1 › Modes to find”(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
+  for 2 modes: Modes 1 › Modes to find”(템플릿은 두 모드를 요청하므로 표에 TE-like와 TM-like 모드가 나옴)(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
   소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
   Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K”.
@@ -518,7 +531,8 @@ Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(�
 
 - **Polarization**은 창의 모든 삼각형에 대한 TE 비율 `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)`입니다(열
   도움말: “TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal”). 낱말과 TE 백분율로 보여 줍니다(예:
-  *TE-like · 98.2 % TE*). Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
+  *TE-like · 98.2 % TE*). TM-like 칸은 TM 비율을 먼저 씁니다: *TM-like · 96.9 % TM (3.1 % TE)*(보이는 두
+  값의 합은 100.0). Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
   **hybrid**이며, 엔진은 수만 저장합니다(`te_polarization_fraction`, [결과 형식](overview.md)).
 - **축퇴 쌍**: 한 실행에서 Re n_eff 차이가 1e-3 이하인 이웃한 두 모드는(둘 다 비율이 있을 때) 합친 칸 하나 *pair (n_eff within 1e-3) ·
   50 % TE together*(두 비율의 평균)를 씁니다. 도움말은 각 모드의 편광이 정의되지 않는다고 밝힙니다(쌍 안의
@@ -798,7 +812,10 @@ Connection, recovery and layout help → Recover last session으로 복원합니
 대기 작업 복구는 별도입니다.
 
 복구하지 않고 새 작업을 시작해도 저장된 세션은 버리지 않습니다. 페이지를 연 뒤 첫 자동
-저장이 저장돼 있던 세션을 이전 세션 목록으로 옮깁니다(최신순, 최대 세 개). **Recover earlier
+저장이 저장돼 있던 세션을 이전 세션 목록으로 옮깁니다(최신순, 최대 세 개). 세션 글은 한 번만
+저장됩니다. 쓰는 글이 저장된 글과 같으면(같은 파일을 다시 열었을 때) 저장된 기록을 옮기지 않고
+바꾸며, 그 글의 이전 사본(탭이 다른 모델로 갔다 돌아온 뒤 바뀌지 않은 모델을 다시 저장할 때)은
+지웁니다. 브라우저 복구는 목록을 위해 노트북을 연 세션 파일의 이름도 보관합니다. **Recover earlier
 session**이 각 세션의 모델, 실행 수, 실행 이름과 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
 세션을 복구하면 다음 저장 때 지금 세션이 이전 세션으로 남습니다.
 
