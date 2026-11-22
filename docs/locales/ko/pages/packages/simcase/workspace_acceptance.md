@@ -40,7 +40,7 @@ python tools/check_markdown_links.py
 | Mesh 생성 후 폭을 700 nm로 변경 | 명시적 재생성 전까지 이전 입력의 메시임을 표시하고 자동 계산하지 않습니다. |
 | Check inputs 후 모델 변경 | 보고서가 캡처 입력·서버의 코드 있는 진단·이전 상태를 표시하며 Run은 새 입력을 다시 검증합니다. |
 | 600 × 300 nm 실행, 실행 이름 입력 후 Enter | 실제 장과 모드 표(Mode, n_eff, Polarization, Loss)가 나오고 Study 단계는 *Run complete*입니다. 이름은 Enter로 적용되며 실행을 고정합니다. 작업·입력·버전 출처는 실행 표시가 아니라 **Run details**에 있습니다. |
-| 실행 후 폭 변경 | 완료 메시지가 바뀌고 Study 단계는 *Ready to run*, Results는 *Inputs changed since this result*가 됩니다. |
+| 실행 후 폭 변경 | 완료 메시지가 바뀌고 Study 단계는 *Ready to run*, Results는 *Current inputs differ from this run*이 됩니다(결과는 이 실행의 폭과 현재 폭을 함께 밝힘). |
 | Study → Edit wavelength, 단계 표시줄의 *λ 1550 nm* | 파장 입력란에 포커스가 놓인 채 **Optical modes**(설정 제목도 *Optical modes*)가 열립니다. |
 | 700 × 300 nm 실행 후 A/B 비교 | 캡처 치수·재료를 식별할 수 있고 Compare가 모드를 장 겹침으로 짝지으며 짝이 없는 모드를 밝힙니다. 장 그림 제목은 실행 이름을 반복하지 않고 그림이 n_eff 표보다 먼저 나옵니다. |
 | 3000 × 90 nm 실리콘 슬랩 추가, 코어보다 먼저 그리도록 순서 변경, 공기 원과 다각형 추가 | 목록·그림·그리는 순서가 일치하고 겹침 안내가 우선하는 형상을 표시합니다. 계산창 밖이거나 교차하는 값은 차단된 초안으로 남거나 거부되며 형상은 바뀌지 않습니다. |

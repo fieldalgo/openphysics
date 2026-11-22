@@ -36,6 +36,12 @@ export function teFraction(field,mode){
 // Studio's words, not the engine's: TE-like at f_TE >= 0.9, TM-like at f_TE <= 0.1, else hybrid.
 export function polarizationWord(f){return f>=0.9?'TE-like':f<=0.1?'TM-like':'hybrid';}
 export const tePercent=f=>(f*100).toFixed(1)+' % TE';
+/** The share a cell names: TE for TE-like and hybrid modes; for a TM-like mode the dominant TM share
+ * first and its TE share after it, "96.9 % TM (3.1 % TE)", the two adding to 100.0. */
+export function polarizationShare(f){
+ if(polarizationWord(f)!=='TM-like')return tePercent(f);
+ const te=(f*100).toFixed(1);return (100-Number(te)).toFixed(1)+' % TM ('+te+' % TE)';
+}
 /** Groups of consecutive modes (rows of the table, in the run's order) whose Re n_eff all lie
  * within 1e-3 of each other (the whole group, not a chain): a group of two is a degenerate pair.
  * Modes outside a group are not listed. */
@@ -75,7 +81,7 @@ export function modeTableRows(modes,{missing=''}={}){
    row.polarization={text:`${name} (n_eff within ${PAIR_TEXT}) · ${known?(mean*100).toFixed(0)+' % TE together':'—'}`,title:PAIR_TITLE,rowspan:g.length,pair:true,mean};
    return row;
   }
-  row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${tePercent(m.fte)}`,title:POLARIZATION_HELP,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};
+  row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${polarizationShare(m.fte)}`,title:POLARIZATION_HELP,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};
   return row;
  });
  return {rows,lossless:modes.some(m=>m.im===0),groups};

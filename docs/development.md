@@ -356,14 +356,17 @@ through the port pickers, a material problem and its one-click fix, a Run whose 
 must equal the engine's run of the same document exactly, the coupling check, the heater-off
 column solved with the run and its Δn_eff equal to the difference of the engine's two runs, the
 run marked out of date by an edit and current again for the same content (the column staying
-valid on a second run), the warning and Undo of a removed coupling, and no horizontal overflow at 1440 × 900 and 390 px wide.
+valid on a second run), only the optical step out of date when the coupling alone is removed, the template's two modes (TE-like, then a TM-like cell that names its TM share), the warning and Undo of a removed coupling, and no horizontal overflow at 1440 × 900 and 390 px wide.
 A third script (`tools/studio_browser/studio_multiphysics_session_browser.mjs`) checks
 multiphysics session files (version 8): one Save session and one Open session in every model,
 the template, a 0.12 µm mesh and a two-run session saved, opened and saved again (the second
 file byte-identical, every stored array equal to the server's separately fetched reply as
 Float64 bits), six runs of a 0.08 µm mesh against the 16 MiB limit (the question and the
 refusal), the refusals of damaged and newer files, browser recovery after a reload, three
-earlier sessions and the conflict of two tabs.
+earlier sessions, the conflict of two tabs, and a restart: two optical runs, the heated session
+file opened over them, a reload and the same file opened again. After it, the title keeps
+*Opened …* through tab clicks, the recovery lists show each session once, and the Optical
+waveguide card offers the optical runs, which come back with the same n_eff.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

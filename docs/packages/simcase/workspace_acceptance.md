@@ -44,7 +44,7 @@ including the coupled Heated silicon waveguide.
 | Generate Mesh; change width to 700 nm | Preview belongs to earlier inputs until explicitly regenerated; no silent solve. |
 | Check inputs, then change the model | Check report identifies its captured input, lists the server's coded diagnostics and becomes stale. Run validates a fresh snapshot. |
 | Run at 600 × 300 nm; type a run name and press Enter | Actual fields and the modes table (Mode, n_eff, Polarization, Loss) appears; the Study step reads *Run complete*. The name applies on Enter and pins the run. Job, input and version provenance are under **Run details**, not in run labels. |
-| Edit the width after the run | The completion message is replaced, the Study step reads *Ready to run* and Results reads *Inputs changed since this result*. |
+| Edit the width after the run | The completion message is replaced, the Study step reads *Ready to run* and Results reads *Current inputs differ from this run* (the result names this run's and the current width). |
 | Study → Edit wavelength, and the step bar's *λ 1550 nm* | **Optical modes** (its settings headed *Optical modes*) opens with the wavelength field focused. |
 | Run at 700 × 300 nm; Compare A/B | Captured dimensions and material are identifiable; the field panel headings do not repeat a run's name and the plots come before the n_eff table. Compare matches modes by field overlap and names a mode without a match. |
 | Add a 3000 × 90 nm silicon slab, draw it earlier than the core, add an air circle and a polygon | The list, drawing and draw order agree; an overlap note names the shape that wins. Out-of-window or crossing values stay as blocked drafts or are refused with the shape unchanged. |

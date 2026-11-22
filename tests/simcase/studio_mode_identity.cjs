@@ -29,7 +29,12 @@ test('words: TE-like at f_TE >= 0.9, TM-like at <= 0.1, otherwise hybrid; percen
  assert.equal(M.polarizationWord(.1),'TM-like');assert.equal(M.polarizationWord(.1001),'hybrid');
  assert.equal(M.tePercent(.98213),'98.2 % TE');
  const {rows}=M.modeTableRows([{re:2.44406001,im:0,fte:.98213,loss:null},{re:1.7,im:0,fte:.0123,loss:null}]);
- assert.deepEqual(rows.map(r=>[r.label,r.neff,r.polarization.text,r.loss]),[['Mode 1','2.44406001','TE-like · 98.2 % TE','lossless'],['Mode 2','1.70000000','TM-like · 1.2 % TE','lossless']]);
+ assert.deepEqual(rows.map(r=>[r.label,r.neff,r.polarization.text,r.loss]),[['Mode 1','2.44406001','TE-like · 98.2 % TE','lossless'],['Mode 2','1.70000000','TM-like · 98.8 % TM (1.2 % TE)','lossless']]);
+ // a TM-like cell names its dominant TM share first; the two shares add to 100.0 as shown
+ assert.equal(M.polarizationShare(.0315),'96.9 % TM (3.1 % TE)');assert.equal(M.polarizationShare(.1),'90.0 % TM (10.0 % TE)');assert.equal(M.polarizationShare(0),'100.0 % TM (0.0 % TE)');
+ for(let k=0;k<=1000;k++){const f=k/10000,m=/^(\d+\.\d) % TM \((\d+\.\d) % TE\)$/.exec(M.polarizationShare(f));assert.ok(m);assert.equal((Number(m[1])*10+Number(m[2])*10).toFixed(0),'1000');}
+ // TE-like and hybrid cells are unchanged
+ assert.equal(M.polarizationShare(.98213),'98.2 % TE');assert.equal(M.polarizationShare(.5),'50.0 % TE');
  assert.equal(rows[0].polarization.title,'TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal');
 });
 test('degenerate pairs: Re n_eff within 1e-3 (inclusive) make one merged cell with the mean',()=>{

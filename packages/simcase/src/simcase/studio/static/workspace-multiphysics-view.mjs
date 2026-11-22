@@ -40,7 +40,8 @@ export function createMultiphysicsView(ctx){
  // name, stamp}: the file or recovery opened, until the next change; openedSignature: the model
  // as opened (edited since then means browser recovery keeps it); cleanSignature: the model as
  // last written to a file (Save inputs only or Save session).
- let sessionFile=null,loaded=null,openedSignature=null,cleanSignature=null;
+ // sourceFile: the session file this model was opened from (or a recovered record names), by name
+ let sessionFile=null,loaded=null,openedSignature=null,cleanSignature=null,sourceFile=null;
  // the heater-off comparison solved after each coupled run (on for a model with a coupled
  // temperature when it opens), the physics still to solve alone, and the last coupling removed
  let baselineOption=false,baselineQueue=[],baselineErrors={},lastRemoval=null,starting=false,stopAsked=false;
@@ -52,19 +53,20 @@ export function createMultiphysicsView(ctx){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];selection='model';runs=[];lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   baselineOption=baselinePhysics(doc).length>0;baselineQueue=[];baselineErrors={};lastRemoval=null;indexView='n';
-  ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;
+  ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;sourceFile=fromFile?label:null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;
   ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?' '+note:''));
  }
  // A session file of version 8 (or browser recovery), already checked (§3): the model, its runs,
  // the without-heater results and the view. Nothing is run, a without-heater run included.
  // source: 'file' | 'browser'; savedFile: the session file a recovered record was saved to.
- async function openSession(session,{label,source='file',savedFile=null}){
+ // openedFile: the file a recovered record was opened from, which the recovery lists name.
+ async function openSession(session,{label,source='file',savedFile=null,openedFile=null}){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=structuredClone(session.document);undoStack=[];redoStack=[];runFailure=null;lastRemoval=null;baselineQueue=[];baselineErrors={};stopAsked=false;
   runs=session.runs.map(r=>({...r}));lastRun=runs.find(r=>r.job===session.selected)||null;announcedMultiphysics=isMultiphysics(doc);
   uncoupled={};for(const [name,b] of Object.entries(session.baselines))uncoupled[name]={rows:effectiveIndexRows(b.result),key:canonicalJson(b.document),completedAt:b.completedAt,job:b.job,document:b.document,result:b.result};
   const v=session.view;selection=v.selection;indexView=v.index_map==='change'?'dn':'n';baselineOption=v.baseline_option;resultPage=selection.startsWith('results:')?selection:null;
-  openedSignature=signature();const matched=source==='file'||savedFile?.current===true;cleanSignature=matched?signature():null;
+  openedSignature=signature();const matched=source==='file'||savedFile?.current===true;cleanSignature=matched?signature():null;sourceFile=source==='file'?label:openedFile;
   sessionFile=source==='file'?{name:label,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map()}:null;
   ctx.ui.page=v.page==='Results'&&!lastRun?'Model':v.page;validate(true);ctx.onHistory();
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp()};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
@@ -485,8 +487,10 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const viewState=()=>({page:VIEW_PAGES.includes(ctx.ui.page)?ctx.ui.page:'Model',selection:storedSelection(),index_map:indexView==='dn'?'change':'index',baseline_option:baselineOption});
  const savedBaselines=()=>Object.fromEntries(Object.entries(uncoupled).filter(([,b])=>b.document&&b.job).map(([n,b])=>[n,{job:b.job,completedAt:b.completedAt,document:b.document,result:b.result}]));
  const sessionState=()=>({document:doc,runs,baselines:savedBaselines(),selected:lastRun?.job||null,view:viewState()});
- // everything a session file holds, as a comparable text
- function stamp(){return JSON.stringify({doc,runs:runs.map(r=>[r.job,r.label,r.pinned,r.maps]),selected:lastRun?.job||null,baselines:Object.entries(uncoupled).map(([n,b])=>[n,b.job||null]),view:viewState()});}
+ // everything a session file holds, as a comparable text, but the page: a tab click (Models,
+ // Model, Connections, Results) is not an edit, so an opened or saved file stays current through
+ // it. Save session still writes the page shown when it is pressed.
+ function stamp(){const {page,...view}=viewState();return JSON.stringify({doc,runs:runs.map(r=>[r.job,r.label,r.pinned,r.maps]),selected:lastRun?.job||null,baselines:Object.entries(uncoupled).map(([n,b])=>[n,b.job||null]),view});}
  const sessionCurrent=()=>!!sessionFile&&sessionFile.stamp===stamp();
  // the runs that no session file holds
  // the runs a session file holds as they are: job -> name and pin
@@ -513,7 +517,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const savedFile=sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null;
   const state={...sessionState(),runs:[...runs],baselines:savedBaselines()};
   // the maps recovery leaves out of a record over 16 MiB: the runs that still have them here
-  return {stamp:stamp()+JSON.stringify(savedFile),savedFile,makeText:()=>{const out=recoveryText(state);recoveryDropped=out.notKept.filter(n=>state.runs.find(r=>r.number===n)?.maps!=='not kept').length;return out.text;}};
+  return {stamp:stamp()+JSON.stringify(savedFile),savedFile,openedFile:sourceFile,makeText:()=>{const out=recoveryText(state);recoveryDropped=out.notKept.filter(n=>state.runs.find(r=>r.number===n)?.maps!=='not kept').length;return out.text;}};
  }
  let recoveryDropped=0;
  // ---- the dock ----
@@ -524,7 +528,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   if(!src)return order.map(g=>({group:g,label:g.length>1?g.map(physicsLabel).join(' ⇄ '):physicsLabel(g[0]),state:'ready',text:'Ready'}));
   let rows=progressRows(order,src.doc,src.events||[],coupledJob?'running':runFailure?runFailure.status:'done',runFailure?.error);
   if(src===lastRun)rows=originRows(rows,lastRun.origin);
-  if(!coupledJob&&src===lastRun&&runFreshness(lastRun,doc)==='stale')rows=staleRows(rows);
+  if(!coupledJob&&src===lastRun&&runFreshness(lastRun,doc)==='stale')rows=staleRows(rows,lastRun.doc,doc);
   if(job?.alone)rows.push(...progressRows([[job.alone]],job.doc,job.events,'running').map(r=>({...r,label:r.label+' without heater'})));
   return rows;
  }

@@ -22,10 +22,24 @@ export function templatePhysics(id){
 export function sessionRunNames(session){
  return (session?.runs||[]).map((run,i)=>run.label||`Run ${Number.isInteger(run.number)?run.number:i+1}`);
 }
-// One stored session as a recovery list names it: the model, the run count and the run names
-// ("Optical waveguide · 2 runs · design A, Run 2"), so two entries never read alike.
+// One stored session as a recovery list names it: the model, the run count, the run names and,
+// when the record came from a session file, that file ("Optical waveguide · 2 runs · design A,
+// Run 2 · file optical-waveguide-session-2026-11-22-1425.json"). The lists show each session text
+// once (distinctRecords), so two entries never read alike.
 export function sessionLine(item){
- return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'');
+ return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'')+(item.file?' · file '+item.file:'');
+}
+// The time an offer names: the time of day for a session saved today, else the date and time.
+export function offerTime(savedAt,now=new Date()){
+ const t=new Date(savedAt),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ return t.toDateString()===now.toDateString()?time:t.toLocaleDateString()+' '+time;
+}
+// The Optical waveguide card's offer when the tab holds no optical runs and browser recovery
+// holds an optical session: "Resume Optical waveguide · design A, design B · 2:25 PM (this
+// browser)", shown before Start new. item: a recovery entry {runs, names, savedAt}.
+export function opticalResumeChoice(item,when=offerTime){
+ const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
+ return {label:`Resume Optical waveguide · ${names} · ${when(item.savedAt)} (this browser)`};
 }
 // What the landing page offers to resume: the latest browser session and the
 // earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
@@ -67,7 +81,16 @@ export const CHOOSER_NOTES=Object.freeze([
  'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. Save session keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
-export function renderApplications(host,resume=null){
+// The Optical waveguide card with its resume offer under it: Resume first, then Start new.
+function opticalSlot(button,offer){
+ const slot=document.createElement('div');slot.className='card-slot';
+ const actions=document.createElement('div');actions.className='card-resume';
+ const go=document.createElement('button');go.type='button';go.id='resume-optical';go.className='primary';go.textContent=offer.label;go.onclick=()=>offer.onResume(go);
+ const fresh=document.createElement('button');fresh.type='button';fresh.id='optical-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
+ actions.append(go,fresh);slot.append(button,actions);return slot;
+}
+// optical: the Optical waveguide card's resume offer {label, onResume(button), onStartNew()}, or null.
+export function renderApplications(host,resume=null,optical=null){
  host.replaceChildren();
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
@@ -79,7 +102,7 @@ export function renderApplications(host,resume=null){
   const status=document.createElement('span');status.className='application-status'+(app.available?' available':'');status.textContent=app.status;
   const description=document.createElement('p');description.textContent=app.description;
   const scope=document.createElement('span');scope.textContent=app.scope;
-  button.append(title,status,description,scope);cards.append(button);
+  button.append(title,status,description,scope);cards.append(app.id==='optical'&&optical?opticalSlot(button,optical):button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
  const contractTitle=document.createElement('h3');contractTitle.textContent='What this workspace supports';

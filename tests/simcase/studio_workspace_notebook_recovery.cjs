@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-const {test,before}=require('node:test');const assert=require('node:assert/strict');let NotebookAutosave,readNotebookRecovery,indexedNotebookStore,snapshot,createSession,captureSession,opticalSettings;
-before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
+const {test,before}=require('node:test');const assert=require('node:assert/strict');let NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,snapshot,createSession,captureSession,opticalSettings;
+before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
 const timing={setTimer:()=>1,clearTimer:()=>{}};
 test('autosave serializes writes and coalesces pending edits to the newest snapshot',async()=>{
  const calls=[],resolvers=[];const saver=new NotebookAutosave({save:r=>{calls.push(r);return new Promise(resolve=>resolvers.push(resolve));}},timing);
@@ -160,4 +160,39 @@ test('browser recovery keeps the last saved session file beside the session and 
  saver.schedule('two',()=>session);await saver.flush();
  assert.equal('savedFile' in record,false);assert.equal(readNotebookRecovery(record).savedFile,null);
  assert.equal(readNotebookRecovery({...record,savedFile:{name:'x.exe',savedAt:'2026-11-21T04:05:00Z',current:true}}).savedFile,null);
+});
+test('a session text is stored once: the same model saved again after a move or a second open is not kept twice',async()=>{
+ const record=(session,savedAt='2026-11-22T05:26:19Z')=>({version:1,savedAt,session});
+ const db=database(null);
+ // a page saves the optical session O, then moves to a multiphysics model H and back
+ let page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('O','2026-11-22T05:25:00Z'));
+ page.keepPrevious();await page.save(record('H','2026-11-22T05:25:10Z'));
+ assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['O']);
+ // the unchanged optical session written again: the earlier copy goes, H is kept
+ page.keepPrevious();await page.save(record('O','2026-11-22T05:25:40Z'));
+ assert.equal((await page.load()).session,'O');assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['H']);assert.equal(page.movedEarlier(),true);
+ // a new page opens the file of H (the same text) and saves: H is in the list once, as the latest
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('H','2026-11-22T05:26:19Z'));
+ assert.equal((await page.load()).session,'H');assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['O']);
+ // a new page whose first save repeats the latest text replaces it and keeps no copy
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(record('H','2026-11-22T05:27:00Z'));
+ assert.deepEqual((await page.loadEarlier()).map(r=>r.session),['O']);assert.equal(page.movedEarlier(),false);
+});
+test('the recovery lists show each session text once, newest first',()=>{
+ const r=(session,savedAt)=>({version:1,savedAt,session});
+ const latest=r('H','2026-11-22T05:26:19Z');
+ // the earlier copy of the latest text, and two optical records 30 s apart with the same text
+ const earlier=[r('H','2026-11-22T05:26:19Z'),r('O','2026-11-22T05:25:10Z'),r('O','2026-11-22T05:24:40Z'),r('P','2026-11-22T05:25:30Z')];
+ assert.deepEqual(distinctRecords(latest,earlier).map(e=>[e.record.session,e.index]),[['H',-1],['P',3],['O',1]]);
+ assert.deepEqual(distinctRecords(null,earlier).map(e=>e.index),[0,3,1]);
+ assert.deepEqual(distinctRecords(null,[]),[]);
+});
+test('the autosave writes the opened file name beside the session and the reader returns it',async()=>{
+ let record;const saver=new NotebookAutosave({save:async r=>record=r},timing);
+ const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''});
+ const session=JSON.stringify(createSession(input,[],null,[null,null]));
+ saver.schedule('one',()=>session,{openedFile:'optical-waveguide-session-2026-11-22-1425.json'});await saver.flush();
+ assert.equal(record.openedFile,'optical-waveguide-session-2026-11-22-1425.json');assert.equal(readNotebookRecovery(record).openedFile,'optical-waveguide-session-2026-11-22-1425.json');
+ saver.schedule('two',()=>session,{openedFile:'x.exe'});await saver.flush();
+ assert.equal('openedFile' in record,false);assert.equal(readNotebookRecovery({...record,openedFile:'../x.json/'}).openedFile,null);
 });

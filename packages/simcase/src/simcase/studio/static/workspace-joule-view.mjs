@@ -5,6 +5,7 @@ import {SIDES,ELECTRIC_TYPES,THERMAL_TYPES,MAX_JOULE_SHAPES,MAX_JOULE_MATERIALS,
 import {shapeCorners} from './workspace-shapes.mjs';
 import {requestFailedText} from './workspace-connection.mjs';
 import {renderJouleGraph} from './workspace-graph.mjs';
+import {inputsDifferText,SAME_INPUTS} from './workspace-workflow.mjs';
 
 export const JOULE_NODES=Object.freeze(['Geometry','Materials','Electric currents','Heat transfer','Mesh','Study']);
 const FILLS=['#5b7f95','#b5784f','#7c9a5a','#9a6a9e','#c9a64a','#4f8f8a'];
@@ -136,7 +137,7 @@ export function createJouleView(ctx){
   if(!result){host.innerHTML='<h2>No Joule heating result in this tab</h2><p>Edit the model and run the study. Joule heating results are kept in this tab only; saved projects and sessions keep the inputs.</p>';$('inspector').innerHTML='<h2>Joule heating results</h2><p>No completed run.</p>';return;}
   const run=result,p=run.payload,summary=p.summary,same=run.signature===signature();
   host.innerHTML='<h2>Joule heating result</h2>';
-  const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${jouleSummary(run.input)} · ${p.result_format}`;host.append(desc);
+  const desc=document.createElement('p');desc.textContent=`${same?SAME_INPUTS:inputsDifferText([jouleSummary(run.input)],[jouleSummary(j())])} · ${jouleSummary(run.input)} · ${p.result_format}`;host.append(desc);
   const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=`<label>Field <select id="joule-field">${Object.entries(RESULT_FIELDS).map(([k,[l,u]])=>`<option value="${k}" ${k===field?'selected':''}>${l} [${u}]</option>`).join('')}</select></label><label><input id="joule-arrows" type="checkbox" ${arrows?'checked':''}> Arrows on cell fields</label>`;host.append(bar);
   const card=document.createElement('div');card.className='heat-plot';const canvas=document.createElement('canvas');canvas.id='joule-field-canvas';canvas.style.cssText='display:block;width:100%;height:var(--plot-height,360px);cursor:crosshair';canvas.setAttribute('role','img');card.append(canvas);host.append(card);
   const out=document.createElement('p');out.id='joule-probe';out.setAttribute('role','status');host.append(out);
@@ -149,7 +150,7 @@ export function createJouleView(ctx){
   $('joule-field').onchange=()=>{field=$('joule-field').value;draw();};$('joule-arrows').onchange=()=>{arrows=$('joule-arrows').checked;draw();};
   resize=new ResizeObserver(draw);resize.observe(canvas);draw();
   const rows=balanceRows(summary),history=iterationRows(summary),num=v=>Number.isFinite(v)?esc(String(Number(v.toPrecision(4)))):'—';
-  $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
+  $('inspector').innerHTML='<h2>Joule heating result</h2>'+pair('Inputs',same?'Same as the current inputs':'Current inputs differ from this run')+pair('Physics',esc(summary.physics_type))+pair('Nodes',p.arrays.node_coordinates.length)+pair('Triangles',p.arrays.triangles.length)+
    '<h3>Balances per metre of depth</h3>'+rows.map(([l,v])=>pair(esc(l),esc(v))).join('')+
    '<h3>Solution</h3>'+(history.length?pair(iterationMethod(summary)==='newton'?'Newton steps':'Picard iterations',history.length)+'<p>The iteration history is in the Solver log of the study dock.</p>':'<p>One coupled solve (constant conductivities).</p>')+
    pair('Completed',new Date(run.completedAt).toLocaleTimeString());

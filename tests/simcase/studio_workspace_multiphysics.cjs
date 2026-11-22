@@ -208,6 +208,20 @@ test('a model edit leaves the last run out of date; the same content again is cu
  assert.notEqual(JSON.stringify(back),JSON.stringify(heated()));
  assert.equal(m.runFreshness(run,back),'current');
  assert.deepEqual(m.staleRows([{label:'Heat 1',state:'done',text:'Done in 0.5 s'}]),[{label:'Heat 1',state:'stale',text:'Out of date (last run: Done in 0.5 s)'}]);
+ // per step: removing only the coupling leaves the heat step current, the optical modes out of date
+ const done=[{group:['heat1'],label:'Heat 1',state:'done',text:'Done in 0.3 s'},{group:['modes1'],label:'Modes 1',state:'done',text:'Done in 1.2 s'}];
+ assert.equal(m.stepFreshness(run.doc,removed,['heat1']),'current');assert.equal(m.stepFreshness(run.doc,removed,['modes1']),'stale');
+ assert.deepEqual(m.staleRows(done,run.doc,removed).map(r=>r.text),['Done in 0.3 s','Out of date (last run: Done in 1.2 s)']);
+ // a heat edit flows through the coupling: both steps are out of date
+ const hotter=heated();hotter.physics.heat1={...hotter.physics.heat1,prescribed_temperature:{bottom:'310 K'}};
+ assert.deepEqual(m.staleRows(done,run.doc,hotter).map(r=>r.state),['stale','stale']);
+ // an optical edit leaves the heat step current; a mesh edit (shared) makes both out of date; the name changes neither
+ const longer=heated();longer.physics.modes1={...longer.physics.modes1,vacuum_wavelength:'1310 nm'};
+ assert.deepEqual(m.staleRows(done,run.doc,longer).map(r=>r.state),['done','stale']);
+ const finer=heated();finer.mesh={...finer.mesh,element_size:'0.2 um'};
+ assert.deepEqual(m.staleRows(done,run.doc,finer).map(r=>r.state),['stale','stale']);
+ const renamed={...heated(),name:'Other name'};assert.deepEqual(m.staleRows(done,run.doc,renamed).map(r=>r.state),['done','done']);
+ assert.deepEqual(m.staleRows(done,run.doc,back).map(r=>r.state),['done','done']);
  assert.equal(m.sequenceHeading('none'),'Nothing is computed until you press Run');
  assert.equal(m.sequenceHeading('stale',2),'Run 2 · the model changed since; press Run to update');
  assert.equal(m.sequenceHeading('current',2),'Run 2 · solved from the current model');
