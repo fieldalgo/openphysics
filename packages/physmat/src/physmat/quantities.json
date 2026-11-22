@@ -2342,6 +2342,17 @@
    "family": "spectral",
    "description": {"en": "Vacuum wavelength lambda_0.", "ko": "진공 파장 lambda_0."}
   },
+  "wavelength_step": {
+   "dimension": {"L": 1},
+   "unit": "m",
+   "menu": ["pm", "nm", "um", "m"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min_exclusive": "0"},
+   "band": null,
+   "places": ["document", "result"],
+   "description": {"en": "Vacuum-wavelength step of a central difference (the group index at a single point).", "ko": "중앙 차분의 진공 파장 간격(단일 점의 군 굴절률)."}
+  },
   "air_wavelength": {
    "dimension": {"L": 1},
    "unit": "m",

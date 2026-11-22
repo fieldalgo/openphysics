@@ -75,7 +75,7 @@ Studio는 2D 광학 모델을 편집·실행하고, 직사각형이거나 재료
 
 CLI 요약, 저장 그림, Studio 형상/메시/결과 라벨은 구성 요소의 길이 단위(또는 `display_units.length`)를 사용합니다. 바뀌는 것은 라벨이지 저장 숫자가 아닙니다. 내장 재료 미리보기는 미터 단위 진공 파장을 받고 돌려줍니다. `em.modes2d`의 형상·메시·모드 풀이는 문서가 선언한 단위와 관계없이 마이크로미터(커널 기준틀, exp(+iωt))에서 합니다. 모든 길이는 정확한 값에서 한 번 마이크로미터로 바꾸고(`float(exact × 10⁶)`), 결과는 마이크로미터 값에 1e-6을 곱해 SI로 돌려주며 모든 복소 값은 한 번 켤레를 취합니다. 그래서 같은 소자를 `nm`, `um`, `m`로 써도 숫자가 같은 십진수이면(예: 1550 nm, 1.55 um, 1.55e-6 m) 비트 단위로 같은 메시와 결과를 냅니다(P2-5). 되돌린 값은 커널의 마이크로미터 double에 1e-6을 곱한 값입니다(`"0.22 um"`으로 쓴 2.2e-07은 `resolved_inputs`에서는 2.2e-07이지만, 커널 값으로 계산한 결과에서는 2.1999999999999998e-07입니다). schema는 여러 항목을 표현할 수 있지만 현재 runner는 정확히 하나만 요구하고 연성·다중물리 실행을 거절합니다.
 
-형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료는 `materials`의 로컬 기록이거나 정확한 이름으로 쓴 physmat 내장 재료(`"physmat:Si"`, `"physmat:SiO2"`, `"physmat:Au"`, ...)이며, 내장 재료의 분산은 sweep의 각 파장에 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 파장은 `physics.<name>.vacuum_wavelength`이고 값은 태그 배열(`{"unit": "um", "values": [...]}`)입니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다.
+형상은 `rect`, `circle`, `polygon`입니다. 뒤의 형상이 앞의 형상을 잘라내며 남는 부분은 background가 채웁니다(Boolean 처리는 shapely). 다른 형상과 겹치지 않는 원은 정확한 원으로 메시를 만듭니다. 재료는 `materials`의 로컬 기록이거나 정확한 이름으로 쓴 physmat 내장 재료(`"physmat:Si"`, `"physmat:SiO2"`, `"physmat:Au"`, ...)이며, 내장 재료의 분산은 sweep의 각 파장에 자동 적용됩니다. `study.parameter`는 `physics.` 아래의 기존 점 경로여야 합니다. 파장은 `physics.<name>.vacuum_wavelength`이고 값은 태그 배열(`{"unit": "um", "values": [...]}`)입니다. 메시를 한 번만 만들기 때문에 형상·메시·재료 sweep은 거절합니다. 파장을 sweep하면 군굴절률도 얻습니다. 단일 study는 `results.group_index`로 같은 메시에서 세 번 풀어 이를 얻습니다([단일 study의 군굴절률](group_index.md)).
 
 광학 모드 물리는 `em.modes2d`의 `scalar`(TE 슬랩 모드에는 정확하고 2D 고대비 코어에는 근사) 또는 단일 지점·추적 파장 sweep의 전체 `vector`입니다. 제공 예제 `soi_strip`은 `vector`를 씁니다. 이런 코어에서 스칼라 근사는 크게 어긋납니다. 같은 문서를 `scalar`로 풀면 1.55 um에서 n_eff가 2.444가 아니라 2.611입니다. 저대비 Hadley 리브에서 `hadley_rib`(스칼라)은 자기 메시에서 출판값과 4e-5 차이지만 메시를 세분화하면 멀어지고(0.65배에서 1.4e-4), `hadley_rib_vector`는 출판값보다 2.0e-4 낮고 세분화하면 다가갑니다(0.65배에서 1.1e-4). 두 경로 모두 수동 흡수를 받습니다. 부호·복소 출력·단위·선택은 [흡수 모드](lossy_modes.md)를 참고하세요. 스칼라 경계는 `pec`(장 = 0) 또는 `pmc`(자연)입니다. 벡터 PEC는 접선 전기장과 Ez를 고정하고 PMC는 자연 경계입니다. 이들은 서로 다른 장 조건이므로 스칼라 슬랩의 정식화만 바꿔도 다른 편광을 선택할 수 있습니다.
 
@@ -197,7 +197,7 @@ doc = Document.load("model.json")
 res = run(doc)
 res.effective_index      # (study points, modes); Im >= 0 is loss under exp(-i omega t)
 res.vacuum_wavelength    # (study points,), metres
-res.group_index()        # when sweeping the wavelength
+res.group_index()        # when sweeping the wavelength, or with results.group_index
 res.propagation_loss()   # dB/m: (40 pi / ln 10) Im(n_eff) / lambda0
 res.save("out/")
 ```
@@ -400,6 +400,7 @@ script / CLI  ->  runs the document      simcase.run
 | 다중물리 문서 | [Contract](../../../../../packages/simcase/multiphysics_document.md) | [한국어](multiphysics_document.md) |
 | 도파관 튜토리얼 | [Analyse your own waveguide](../../../../../packages/simcase/waveguide_tutorial.md) | [한국어](waveguide_tutorial.md) |
 | 벡터 부분공간 추적 | [Guide](../../../../../packages/simcase/vector_subspace_tracking.md) | [한국어](vector_subspace_tracking.md) |
+| 단일 study의 군굴절률 | [Contract](../../../../../packages/simcase/group_index.md) | [한국어](group_index.md) |
 | 공진기 문서 | [Contract](../../../../../packages/simcase/cavity3d.md) | [한국어](cavity3d.md) |
 | 정상 열전도 문서 | [Contract](../../../../../packages/simcase/thermal_steady2d.md) | [한국어](thermal_steady2d.md) |
 | 정상 열전도 검증 | [Report](../../../../../packages/simcase/thermal_simcase_independent_validation.md) | [한국어](thermal_simcase_independent_validation.md) |

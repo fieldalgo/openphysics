@@ -54,6 +54,10 @@ TRACKING_KERNEL = {"method": "method", "search_mode_count": "search_modes", "mod
                    "cluster_span_tolerance": "cluster_span_max", "cluster_gap_threshold": "external_gap_min"}
 #: the kernel's tracking names -> format 0.3 names (results echo the settings under these)
 TRACKING_PUBLIC = {kernel: public for public, kernel in TRACKING_KERNEL.items()}
+#: ``results.group_index``: the default step and its bounds (exact metres; at most a fraction of lambda0)
+GROUP_INDEX_STEP = "1 nm"
+GROUP_INDEX_MIN_STEP = Fraction(1, 10 ** 12)
+GROUP_INDEX_MAX_FRACTION = Fraction(1, 20)
 SHAPE_KEYS = {"rect": {"x", "y", "w", "h"}, "circle": {"cx", "cy", "r"}, "polygon": {"points"}}
 
 _FORMAT_02 = ('format 0.2 em.modes2d documents are not read: units now travel with each value ("1.55 um"), keys '
@@ -133,7 +137,11 @@ def modes_slots() -> tuple[dict, ...]:
            {"pattern": "results.mode_overlap.gaussian.beam_waist_radius", "kind": "quantity",
             "quantity": "beam_waist_radius", "forms": ["QS", "AV"], "required": True},
            {"pattern": "results.mode_overlap.gaussian.position", "kind": "quantity", "quantity": "position",
-            "forms": ["SL", "TA"], "required": True}]
+            "forms": ["SL", "TA"], "required": True},
+           obj("results.group_index"),
+           {"pattern": "results.group_index.wavelength_step", "kind": "quantity", "quantity": "wavelength_step",
+            "forms": ["QS", "AV"], "default": GROUP_INDEX_STEP,
+            "default_reason": "length default: a 1 nm central-difference step"}]
     results = {"save_fields": True, "plots": True}
     out += [{"pattern": "materials.*", "kind": "override", "library": "any", "reads": {TYPE: ["refractive_index"]}},
             {"pattern": "name", "kind": "override", "default": "untitled",
@@ -248,6 +256,7 @@ def validate_03(doc):
     _physics(doc, name, p, a, path, dom)
     _study(doc, name, p, path)
     _gaussian(doc, dom)
+    _group_index(doc, p, path)
     _default_boundaries(doc, name, a)
     if "version" in doc.data["geometry"]:
         # a version 1 block's region view is made (and its segments checked) at load; it is kept
@@ -469,6 +478,39 @@ def _gaussian(doc, dom):
         _refuse(f"{where}: the Gaussian centre lies outside the geometry window", where)
 
 
+def _group_index(doc, p, path):
+    """``results.group_index``: a single study of a lossless entry without pml or bend, with
+    1 pm <= wavelength_step <= lambda0 / 20 (exact metres)."""
+    if (doc.si.get("results") or {}).get("group_index") is None:
+        return
+    where = "results.group_index"
+    if doc.si["study"]["type"] != "single":
+        wavelength = doc.si["study"].get("parameter") == f"{path}.vacuum_wavelength"
+        _refuse(f"{where}: read by a single study only; " + (
+            "a wavelength sweep already gives group_index" if wavelength else
+            "a sweep over another parameter does not compute the group index"), where)
+    for key in ("bend", "pml"):
+        if key in p:
+            _refuse(f"{where}: not read with {path}.{key} (the group index of open or lossy modes is not "
+                    "computed)", where)
+    step = Fraction(_exact(doc, f"{where}.wavelength_step"))
+    wavelength = Fraction(_exact(doc, f"{path}.vacuum_wavelength"))
+    if not GROUP_INDEX_MIN_STEP <= step <= GROUP_INDEX_MAX_FRACTION * wavelength:
+        _refuse(f"{where}.wavelength_step: expected 1 pm <= wavelength_step <= vacuum_wavelength / 20",
+                f"{where}.wavelength_step", "E-DOMAIN")
+
+
+def group_index_wavelengths(doc) -> list[float] | None:
+    """The kernel wavelengths (um) lambda0 - step, lambda0, lambda0 + step of
+    ``results.group_index``, each ``float(exact metres * 10**6)`` as a sweep's values (H2)."""
+    if (doc.si.get("results") or {}).get("group_index") is None:
+        return None
+    path = entry(doc)[3]
+    step = Fraction(_exact(doc, "results.group_index.wavelength_step"))
+    wavelength = Fraction(_exact(doc, f"{path}.vacuum_wavelength"))
+    return [float((wavelength + sign * step) * 10 ** 6) for sign in (-1, 0, 1)]
+
+
 def _default_boundaries(doc, name, a):
     """``I-DEFAULT-BOUNDARY`` for each side the entry does not name: it is pec."""
     given = a.get("boundary") or {}
@@ -640,6 +682,9 @@ def kernel_results(doc) -> dict:
         where = "results.mode_overlap.gaussian"
         out["mode_overlap"] = {"gaussian": {"waist": um(doc, f"{where}.beam_waist_radius"),
                                             "center": um(doc, f"{where}.position")}}
+    wavelengths = group_index_wavelengths(doc)
+    if wavelengths is not None:
+        out["group_index"] = {"wavelengths": wavelengths}
     return out
 
 

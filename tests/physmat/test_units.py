@@ -1500,8 +1500,9 @@ def test_p2_names_are_legal_with_their_unit_and_places():
     # registry pin follows the addition: 242 entries and 367 names until L2 commit 5 of the galerkin step
     # added the 7 bases and 2 role names of P3_L2_NAMES, 249 and 376 until L3 commit 9 added the 9 bases of
     # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS), 259 and 386 until the mode
-    # TE fraction added te_polarization_fraction (a result fraction)
-    assert len(units._ENTRIES) == 260 and len(names) == 387
+    # TE fraction added te_polarization_fraction (a result fraction), 260 and 387 until the single-point group
+    # index added wavelength_step (the step of results.group_index)
+    assert len(units._ENTRIES) == 261 and len(names) == 388
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
