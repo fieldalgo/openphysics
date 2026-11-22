@@ -396,7 +396,8 @@ try {
   const lossCells = await page.eval("[...document.querySelectorAll('#compare-neff tbody tr')].map(r=>[r.querySelector('[data-loss-a]')?.textContent,r.querySelector('[data-loss-b]')?.textContent,r.querySelector('[data-loss-a]')?.title,r.querySelector('[data-loss-b]')?.title])");
   stage('K1 Compare loss', lossCells); assert.equal(lossCells.length, neffTable.rows.length);
   for (const row of lossCells) assert.deepEqual(row, ['0 dB/cm', '0 dB/cm', absorptionHelp, absorptionHelp]);
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].slice(-2).map(t=>t.title)"), [absorptionHelp, absorptionHelp]);
+  // the two Absorption loss headers (n_g A and n_g B follow them since M5)
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].filter(t=>/^Absorption loss [AB] /.test(t.textContent)).map(t=>t.title)"), [absorptionHelp, absorptionHelp]);
   await noOverflow('Compare with loss columns');
   // round 10 (K5): the plots are framed on the core as Results frames it, and the probe line sits under each plot
   // Compare opened afresh (from Results) at 1440 × 900 and at 1280 × 800
