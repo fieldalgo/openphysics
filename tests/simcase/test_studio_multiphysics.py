@@ -252,7 +252,7 @@ def test_refusals_are_named(client, api, monkeypatch):
     # a sweep is checked, and running it is refused with its message
     sweep = template()
     sweep["study"] = {"type": "sweep", "parameter": "physics.modes1.vacuum_wavelength",
-                      "values": {"unit": "nm", "values": [1540, 1560]}}
+                      "values": {"unit": "nm", "values": [1540, 1550, 1560]}}
     checked = client.post("/api/multiphysics/validate", json={"doc": sweep}).json()
     assert checked["ok"] is True and checked["run_refusal"] == api.SWEEP_REFUSAL
     refused = client.post("/api/multiphysics/run", json={"doc": sweep})
