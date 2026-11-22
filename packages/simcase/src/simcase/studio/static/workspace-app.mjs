@@ -19,7 +19,7 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 
 import {INPUT_FIELDS,NumericDrafts,editNoticeText} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
-import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
+import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
@@ -162,7 +162,7 @@ function setJoule(next,message){
  state.joule=checked;edits.endGroup();trackEdit();edits.endGroup();render();notice(message+' Run explicitly to compute new results.');return true;
 }
 const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),notice:text=>notice(text),announceResult:text=>announceResult(text),getJoule:()=>state.joule,commit:setJoule,render:()=>render(),
- request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(current())});
+ request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(inputsFile())});
 // A multiphysics model (contract D2) keeps its document in its own view; the other applications
 // do not see it. Names used before their declaration are wrapped.
 const multiView=createMultiphysicsView({$,ui,notice:(text,more)=>notice(text,more),announceResult:text=>announceResult(text),request:studioRequest,render:()=>render(),
@@ -248,7 +248,7 @@ function refreshHeatControls(){
 }
 async function runHeat(){
  if(!heatController||heatState.busy||heatBlock())return;
- const doc=heatDocument(state.thermal);heatCapture=JSON.parse(JSON.stringify(state.thermal));edits.record(current());
+ const doc=heatDocument(state.thermal);heatCapture=JSON.parse(JSON.stringify(state.thermal));edits.record(inputsFile());
  notice('Validating heat input…');
  if(!await heatController.validate(doc)){notice('Heat input rejected: '+(heatController.state().error||'validation failed')+' Inputs unchanged.');refreshHeatControls();return;}
  if(heatSignature()!==JSON.stringify(heatCapture)){notice('Inputs changed during validation; run again.');return;}
@@ -476,12 +476,17 @@ let resultNotice=false;
 const notice = (text,more='') => {resultNotice=false;const host=$('file-status');host.textContent = text;
  if(more){const details=document.createElement('details');details.className='message-more';const summary=document.createElement('summary');summary.textContent='More';const body=document.createElement('span');body.className='message-more-text';body.textContent=more;details.append(summary,body);host.append(' ',details);}};
 function announceResult(text){notice(text);resultNotice=true;}
+// current(): the model inputs (version 7), as a run keeps them; inputsFile(): those inputs with
+// Modes to find and the group index option (version 8 when they are not the defaults), as the
+// inputs file, a session, a draft, recovery and the edit history keep them.
 const current = () => snapshot(state, setup);
-// The study a run is compared with: the inputs and Modes to find (workspace-notebook.mjs
-// studySignature; Modes to find is page state, not part of the project file).
+const inputsFile = () => withStudy(current(), {modeCount: state.modeCount, groupIndex: state.groupIndex});
+const setStudy = doc => Object.assign(state, projectStudy(doc));
+// The study a run is compared with: the inputs, Modes to find and the group index option
+// (workspace-notebook.mjs studySignature).
 const signature = () => studySignature(current(), state.modeCount, state.groupIndex);
 const inputSignature = () => JSON.stringify(current());
-const edits=new WorkspaceStore(current());
+const edits=new WorkspaceStore(inputsFile());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
 let saveIndicator=null,recoveryState=null,latestOffer=null;
 // The inputs a model card gave, until the first edit: the indicator says the model is new, not that edits are unsaved.
@@ -525,7 +530,7 @@ function rejectInvalidInput(){
 }
 function applyProject(doc,{saved=true,resetHistory=false}={}){
   doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.reset();
-  pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
+  pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);setStudy(doc);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
   notice('Project inputs restored. Results and CAD geometry are not included.');
@@ -540,13 +545,12 @@ function requestLoad(doc,options={}){
   if(!options.leaveChecked&&multiView.active()&&multiView.unsavedRuns()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
   loadInputs(doc,options);
 }
-// modeCount: Modes to find to set with the inputs (a run's inputs restored), else unchanged
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,modeCount=null,groupIndex=null}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext(),modeCount,groupIndex};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
-  if((leaveChecked&&!session)||untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
+  if((leaveChecked&&!session)||untouchedWorkspace(inputsFile(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
   const text=session?sessionLoadText(session,{runs:runs.length,unsaved:runs.length>0&&savedRunsState!==runsStamp()},source):null;
   $('load-confirm').querySelector('h2').textContent=text?text.title:'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=text?text.description:'Save your current design first if you want to keep it.';
@@ -574,15 +578,16 @@ function completeLoad(pending){
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
-  // Modes to find follows the selected run (a session keeps it with each run, not with the inputs)
-  if(solverRun){state.modeCount=runModeCount(solverRun);state.groupIndex=solverRun.group_index_method!==undefined;}
+  // Modes to find and the group index option: those of an input of version 8; for an input of
+  // version 6 or 7 (a file that did not store them), those of the selected run, as before
+  const input=session.input.version===STUDY_PROJECT_VERSION||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});
   // A recovered notebook that still matched its saved file, or the file it was opened from, reads
   // as saved, as the file would.
   const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
   // before the render that schedules the first recovery save, so that record names the file (the
   // record's file is not part of the save stamp: set later, it would wait for the next change)
   openedFile=pending.source==='file'?pending.label:pending.openedFile||null;
-  applyProject(session.input,{saved:pending.saved||matched,resetHistory:true});
+  applyProject(input,{saved:pending.saved||matched,resetHistory:true});
   // the page a recovery record names (Results, Compare or Model), when its runs allow it; else
   // Compare for two runs or more, Results for one (a session file names no page)
   ui.page=restorePage(pending.page,runs.length);
@@ -598,10 +603,10 @@ function completeLoad(pending){
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
- }else{loadedSession=null;newModelInputs=null;if(pending.modeCount!=null)state.modeCount=pending.modeCount;if(pending.groupIndex!=null)state.groupIndex=pending.groupIndex;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
-  rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
+  rejectInvalidInput();const doc=inputsFile();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Inputs file download requested. It has no computed results'+(runs.length?'; Save session keeps the runs too.':'.'));
 }catch(e){notice(e.message);}};
@@ -614,7 +619,7 @@ $('project-file').onchange=async event=>{const file=event.target.files[0];event.
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
-$('save-draft').onclick=()=>{try{rejectInvalidInput();const text=inputSignature();localStorage.setItem(DRAFT_KEY,text);edits.record(current());edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
+$('save-draft').onclick=()=>{try{rejectInvalidInput();const doc=inputsFile();localStorage.setItem(DRAFT_KEY,JSON.stringify(doc));edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
 
 
@@ -624,34 +629,33 @@ function showRecovery(){
  $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are kept automatically for recovery in this browser. Save session for a file with the results.';
 }
 function checkpointRecovery(){
- try{writeRecovery(localStorage,current());recoverable=readRecovery(localStorage);showRecovery();}
+ try{writeRecovery(localStorage,inputsFile());recoverable=readRecovery(localStorage);showRecovery();}
  catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save session, or More › Save inputs only.';}
 }
 try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
 
 function updateHistory(){ $('undo-edit').disabled=multiView.active()?!multiView.canUndo():!edits.canUndo;$('redo-edit').disabled=multiView.active()?!multiView.canRedo():!edits.canRedo; }
-function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(current(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();}updateHistory();refreshPersistence();}
+function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(inputsFile(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();}updateHistory();refreshPersistence();}
 function inputsChangedSinceResult(){
  if(resultNotice)notice('Inputs changed since the last result. Run again to compute the new inputs.');
  if(jobPhase==='done'){jobPhase='idle';$('job-message').textContent='';refreshJobControls();}
 }
-// A run's inputs as the current inputs (Use this run's inputs): one input edit, so Undo takes it
-// back; Modes to find and the group index option follow the run, as they do when a session opens
-// (they are page state, which input undo does not cover). The runs and the page stay as they are.
+// A run's inputs as the current inputs (Use this run's inputs), with its Modes to find and group
+// index option: one input edit, so Undo takes all three back and Redo applies them again. The
+// runs and the page stay as they are.
 function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
- const doc=edits.replace(validateProject(run.input));workspaceLoads.invalidate();newModelInputs=null;
- state.modeCount=runModeCount(run);state.groupIndex=run.group_index_method!==undefined;
+ const doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined}));workspaceLoads.invalidate();newModelInputs=null;
  restoreEdit(doc,null);inputsChangedSinceResult();
- notice(`Current inputs set from ${runNumberTitle(run)}: ${designSummary(doc.model)} · λ ${doc.model.wavelength} nm · Modes to find ${state.modeCount}. The next run uses them; Undo takes the geometry and the wavelength back.`);
+ notice(`Current inputs set from ${runNumberTitle(run)}: ${designSummary(doc.model)} · λ ${doc.model.wavelength} nm · Modes to find ${state.modeCount}. The next run uses them; Undo takes them back.`);
 }
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)
 function restoreEdit(doc,label){
  numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.clearDrafts();
- Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
+ Object.assign(state,doc.model);setStudy(doc);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();if(label!==null)notice(label+' · input changes only; no solver executed.');
 }
 $('undo-edit').onclick=()=>multiView.active()?multiView.undo():restoreEdit(edits.undo(),'Undo');
@@ -684,7 +688,7 @@ const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.n
 // What a session file is "the same as" for the title: the model inputs and the runs (their names
 // and pins). The selected run, the Compare choice and the field view are left out: a click on a
 // run, a page or a mode does not make the notebook differ from its file.
-const saveStamp=()=>JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true])});
+const saveStamp=()=>JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true])});
 // The content stamp when the notebook was opened from openedFile (or recovered while it still
 // matched it); null when no file was opened. Browser recovery keeps whether it still matches.
 let openedStamp=null;
@@ -828,7 +832,7 @@ $('replace-notebook').onclick=async()=>{
   const record=loaded.value;let prior='No stored notebook';
   try{const recovered=readNotebookRecovery(record);if(recovered)prior=recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();}
   catch{prior='Unreadable stored notebook';}
-  pendingRecoveryReplacement=multi?{record,context:loadContext(),stamp:multi.stamp,makeText:multi.makeText,extra:{savedFile:multi.savedFile,openedFile:multi.openedFile,openedCurrent:multi.openedCurrent}}:{record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()}};
+  pendingRecoveryReplacement=multi?{record,context:loadContext(),stamp:multi.stamp,makeText:multi.makeText,extra:{savedFile:multi.savedFile,openedFile:multi.openedFile,openedCurrent:multi.openedCurrent}}:{record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()}};
   const summary=$('recovery-replace-summary');summary.replaceChildren();
   for(const [name,value] of [['Stored recovery',prior],['Replace with',multi?multiView.runCount()+' runs · '+multiView.modelName():runs.length+' runs · '+designSummary(current().model)],['Current inputs and Undo','Kept'],['Other tabs','Their next automatic save will detect this replacement']]){
    const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);
@@ -848,7 +852,7 @@ function currentView(){return {...fieldView,mode:Math.max(0,Math.min(fieldView.m
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 // The completed runs as a session file keeps them; inputs and view settings are not results.
 function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]));}
-function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
+function notebookStamp(){return JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
 // The application the last recovery record was scheduled for: when the tab moves between an
 // optical and a multiphysics model, the stored record is kept as an earlier session.
 let recoveryKind=null;
@@ -856,7 +860,7 @@ function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKi
 function refreshNotebook(){
  if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile,openedCurrent:rec.openedCurrent});
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
- const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -1152,7 +1156,7 @@ function renderRunList(){
   // a viewed run with other inputs than the current ones: its inputs become the current inputs at
   // once (the runs stay as they are, so nothing is asked), and Undo takes them back
   if(solverRun.signature!==signature()){const restore=document.createElement('button');restore.id='restore-run-input';restore.className='primary';restore.textContent='Use this run’s inputs';const target=solverRun;restore.onclick=()=>useRunInputs(target);restore.disabled=numericDrafts.invalid;
-   const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes the geometry and the wavelength back.`;restore.setAttribute('aria-describedby',why.id);
+   const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes them back.`;restore.setAttribute('aria-describedby',why.id);
    const slot=$('use-run-slot');if(slot)slot.append(restore,why);else panel.append(restore,why);}
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
@@ -1299,9 +1303,9 @@ $('save-session').onclick=()=>{if(multiView.active()){try{saveMultiphysicsSessio
 // Save session: the file as it is, or, over 16 MiB, the dialog (fields of the selected and pinned
 // runs only); nothing is written on Cancel or when even that is over the limit.
 function saveOpticalSession({keepSelected=false}={}){
- newModelInputs=null;const out=writeOpticalSession(current(),runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
+ newModelInputs=null;const out=writeOpticalSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
  if(!out.ok){if(out.refusal)throw new Error(out.refusal);setOverflowKeepText(false);$('session-overflow-description').textContent=opticalOverflowQuestion(out.bytes);if(!overflowDialog.open)overflowDialog.showModal();return;}
- const text=out.text;const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:''));
+ const text=out.text;const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(inputsFile());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:''));
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
@@ -1375,12 +1379,12 @@ $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null
 $('run-optical').onclick=async()=>{
  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
- const operation=++jobOperation;edits.record(current());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
+ const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
   const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
   jobPhase='submitting';$('job-message').textContent='Submitting calculation…';
   const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance),{doc});
-  const record=validatePending({version:1,job:started.job,input:capture.input,revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count});
+  const record=validatePending({version:1,job:started.job,input:withoutStudy(capture.input),revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count});
   setPending(record);await jobMonitor.follow(record,serverInstance);
  }catch(error){
   const phase=jobPhase,kind=connectionFailure(error);jobPhase='error';

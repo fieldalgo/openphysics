@@ -23,7 +23,7 @@ test('projects of versions 1-5 are refused by name (units and naming batch); ver
  const unassigned=snapshot(model(),{...setup(),materials:{...setup().materials,Core:'Platinum'}});
  assert.deepEqual(parseProject(JSON.stringify(unassigned)).model.shapes,[{name:'Core',type:'rect',material:'',x:-250,y:0,w:500,h:300}]);
  for(const change of [d=>delete d.model.height,d=>d.model.height=99,d=>d.model.height=501,d=>d.model.height=null,d=>d.units.height='um',d=>delete d.units.shapes,
-  d=>delete d.model.shapes,d=>delete d.model.thermal,d=>delete d.model.wavelength,d=>delete d.model.coreMesh,d=>delete d.units.thermal_length,d=>delete d.model.joule,d=>delete d.units.joule_length,d=>d.model.joule.width=0,d=>d.version=8]){const d=snapshot(model(),setup());change(d);assert.throws(()=>parseProject(JSON.stringify(d)));}
+  d=>delete d.model.shapes,d=>delete d.model.thermal,d=>delete d.model.wavelength,d=>delete d.model.coreMesh,d=>delete d.units.thermal_length,d=>delete d.model.joule,d=>delete d.units.joule_length,d=>d.model.joule.width=0,d=>d.version=9]){const d=snapshot(model(),setup());change(d);assert.throws(()=>parseProject(JSON.stringify(d)));}
 });
 test('a migrated core is submitted as its four corners with the grading centre at mid-height',()=>{
  for(const height of [100,300.5,500]){
