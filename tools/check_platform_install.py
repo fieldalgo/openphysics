@@ -18,7 +18,10 @@ session, a restart with the page open and recovery from the start page. Since
 2026-11-21 the same check also runs the Joule heating application (Picard, Newton, a refusal
 shown, constant materials). Since 2026-11-22 a second script
 (tools/studio_browser/studio_multiphysics_browser.mjs) runs the multiphysics model (heat ->
-optical modes), whose coupled n_eff must equal the installed engine's exactly.
+optical modes), whose coupled n_eff must equal the installed engine's exactly. A third
+(tools/studio_browser/studio_multiphysics_session_browser.mjs) saves multiphysics models with
+their runs as session files of version 8 and opens them again: every stored array equal to the
+server's reply bit for bit, browser recovery, the 16 MiB limit and the refusals of damaged files.
 """
 import argparse
 from email.parser import BytesParser
@@ -289,6 +292,10 @@ def main():
         # must equal the installed engine's run of the same document exactly.
         run("node", ROOT / "tools" / "studio_browser" / "studio_multiphysics_browser.mjs",
             "--python", python, "--output", output / "studio-multiphysics-browser", cwd=work)
+        # Multiphysics session files (version 8): saved, opened and saved again byte for byte,
+        # every array equal to the server's reply, recovery, the 16 MiB limit and the refusals.
+        run("node", ROOT / "tools" / "studio_browser" / "studio_multiphysics_session_browser.mjs",
+            "--python", python, "--output", output / "studio-multiphysics-session-browser", cwd=work)
 
 
 if __name__ == "__main__":
