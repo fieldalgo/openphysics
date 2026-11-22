@@ -121,7 +121,7 @@ Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크�
 | `jax`, `jaxlib` | `galerkin[jax]`(`>=0.12.0.1`) | Apache-2.0 |
 | `ml-dtypes` | jax | Apache-2.0 |
 | `opt-einsum` | jax | MIT |
-| `torch` | `galerkin[torch]`(`>=2.14.1`) | Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT |
+| `torch` | `galerkin[torch]`(`>=2.14.1`) | Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib(2.15.0 기준. 고정한 2.14.1은 ISC와 Zlib 없이 선언) |
 | `filelock` | torch | MIT |
 | `networkx`, `jinja2`, `fsspec` | torch | BSD-3-Clause |
 | `markupsafe` | jinja2 | BSD-3-Clause |
@@ -215,7 +215,7 @@ numpy·scipy·shapely는 cp313부터 cp315까지의 휠도 올립니다.
 | `setuptools` | Windows 런처 실행 파일(`setuptools/cli*.exe`, `gui*.exe`) | MIT(setuptools `launcher.c`) | 모든 OS에 설치되고 Windows에서만 실행됨. Microsoft C 런타임(`VCRUNTIME140.dll`, Universal CRT)은 시스템 것을 로드함 |
 | `cryptography` | OpenSSL 4.0.3 | Apache-2.0 | Linux 작업에서만 설치: `_rust` 확장 모듈에 정적으로 링크(휠 SBOM에 `no-shared` 빌드로 기록) |
 | `jaxlib` | BoringSSL, gRPC, Abseil, Protocol Buffers, Eigen, LLVM, oneDNN 등 `LICENSE.txt`가 옮겨 적은 구성 요소 | jaxlib 자체 모듈은 Apache-2.0. 정적으로 들어 있는 구성 요소는 각자의 허용형 조건이고 Eigen은 MPL-2.0(파일 단위 약한 copyleft, jaxlib 배포자가 컴파일해 배포) | Linux 작업에서만(`galerkin[jax]`): jaxlib 자체 모듈(`jaxlib/*.so`, `cpu/`·`mlir/_mlir_libs/` 포함)에 정적으로 링크. 따로 빌드한 제3자 라이브러리 없음. jaxlib 0.12.0.1에서 확인 |
-| `torch` | `dist-info/licenses/third_party/`가 옮겨 적은 제3자 코드, GNU libgomp | torch가 선언한 식. libgomp는 GPL-3.0-or-later WITH GCC-exception-3.1 | Linux 작업에서만(`galerkin[torch]`, CPU 휠): torch 자체 `torch/lib/lib*.so`에 정적으로, libgomp는 별도 공유 라이브러리. torch 2.14.1+cpu에서 확인(`torch/lib/`: torch 자체 라이브러리, 그중 4개는 시험·예제용, 그리고 `libgomp.so.1`) |
+| `torch` | `dist-info/licenses/third_party/`가 옮겨 적은 제3자 코드, GNU libgomp, 2.15.0부터 GNU libgfortran | torch가 선언한 식. libgomp와 libgfortran은 GPL-3.0-or-later WITH GCC-exception-3.1 | Linux 작업에서만(`galerkin[torch]`, CPU 휠): torch 자체 `torch/lib/lib*.so`에 정적으로, libgomp와 libgfortran은 별도 공유 라이브러리. torch 2.14.1+cpu와 2.15.0+cpu에서 확인(`torch/lib/`: torch 자체 라이브러리, 그중 4개는 시험·예제용, `libgomp.so.1`, 2.15.0부터 `libgfortran.so.5`). `libgfortran.so.5`를 의존성으로 적은 torch 라이브러리는 없고, 휠에는 그 고지가 없으며, 그것이 필요로 하는 `libquadmath.so.0`은 들어 있지 않음 |
 | | Rust crate(pyo3, asn1, openssl 바인딩 등) | 대부분 MIT OR Apache-2.0. BSD-3-Clause, Unicode-3.0(unicode-ident), Apache-2.0 OR GPL-2.0-only(self_cell, Apache-2.0로 사용)도 있음 | 정적 링크. 휠의 CycloneDX SBOM에 목록이 있음 |
 | `cffi` | libffi | MIT | Linux 작업에서만 설치: `_cffi_backend`에 정적으로 링크. 휠에는 cffi 자신의 MIT-0 라이선스만 있음 |
 | `nh3` | Rust crate(ammonia, html5ever, ICU4X 등) | 대부분 MIT OR Apache-2.0 또는 MIT. Unicode-3.0(ICU4X), MPL-2.0(cssparser, dtoa-short) | Linux 작업에서만 설치(twine 의존성): 확장 모듈에 정적으로 링크하고 휠의 CycloneDX SBOM에 목록이 있음. MPL-2.0은 파일 단위 약한 copyleft이고, 휠을 올린 쪽이 컴파일한 그대로 씀 |
