@@ -416,19 +416,31 @@ try {
       assert.ok(f.picker[1] >= f.pane[0], `the matched-modes picker stays in view at ${width} × ${height}`);
     }
   }
-  // the plots of Compare are drawn on the window Results draws for the same run
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
-  await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Run 1 in Results');
-  assert.equal(await page.eval("document.getElementById('optical-field').dataset.viewBounds"), compareFrame[0].bounds, 'Compare A (Run 1) and Results of Run 1 draw the same window');
-  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again');
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
-  const [ax0, ax1, ay0, ay1] = compareFrame[0].bounds.split(',').map(Number);
-  // Run 1 is 600 × 300 nm on the centre: the drawn window holds the whole core
-  assert.ok(ax0 <= -0.3 && ax1 >= 0.3 && ay0 <= -0.15 && ay1 >= 0.15, 'the core is inside the drawn window: ' + compareFrame[0].bounds);
-  for (const [width, height, mobile] of [[390, 844, true]]) {
+  // the plots of Compare are drawn on the window Results draws for the same run, and that window
+  // holds the core, at 1440 × 900 and at 390 × 844 (the 1280 × 800 frame above is checked the same way)
+  const sameWindowAsResults = async tag => {
+    const compareBounds = await page.eval("document.getElementById('compare-field-a').dataset.viewBounds");
+    await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
+    await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Run 1 in Results ' + tag);
+    const resultsBounds = await page.eval("document.getElementById('optical-field').dataset.viewBounds");
+    // Run 1's core, from its shapes (nm → µm): the drawn window holds all of it
+    stage('K5 Compare and Results windows ' + tag, {compareBounds, resultsBounds});
+    assert.equal(compareBounds, resultsBounds, `Compare A (Run 1) and Results of Run 1 draw the same window at ${tag}`);
+    const [x0, x1, y0, y1] = compareBounds.split(',').map(Number);
+    // Run 1 is 600 × 300 nm centred on x = 0, with its bottom at y = 0 (y from 0 to 300 nm)
+    assert.ok(x0 <= -0.3 && x1 >= 0.3 && y0 <= 0 && y1 >= 0.3, `the core is inside the drawn window at ${tag}: ${compareBounds}`);
+    await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again ' + tag);
+    await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
+  };
+  assert.equal(compareFrame[0].bounds, (await page.eval("document.getElementById('compare-field-a').dataset.viewBounds")));
+  await sameWindowAsResults('1280 × 800');
+  for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
     await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+    await sameWindowAsResults(`${width} × ${height}`);
+    if (mobile) {
     const phone = await page.eval("['a','b'].map(s=>{const c=document.getElementById('compare-field-'+s).getBoundingClientRect(),p=document.getElementById('compare-probe-'+s).getBoundingClientRect();return {canvas:[c.left,c.top,c.right,c.bottom],probe:[p.left,p.top,p.right,p.bottom]}})");
     stage('K5 Compare plots at 390', phone); for (const f of phone) assert.ok(!overlaps(f.canvas, f.probe), 'the probe line is outside the plot at 390 px');
+    }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   }
   // round 10 (K4): a run clicked on Compare is selected and Compare stays; Open in Results shows it there
