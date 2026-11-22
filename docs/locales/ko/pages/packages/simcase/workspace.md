@@ -77,6 +77,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    *press Run to solve again*을 덧붙임), 편집 뒤에는 *Inputs changed since run 1 · press Run to
    update*, 실행 전에는 *Nothing is computed until you press Run*과 *Optical adapter ready ·
    explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
+   입력 오류, 진행 중인 계산이나 작업, 지원하지 않는 입력처럼 Run을 막는 것이 있으면 도크 제목은
+   상태 표시줄의 문구를 그대로 씁니다.
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
    않습니다. 별도의 Pin 버튼은 없으며, **Unpin this run**으로 해제하고 Run name에서 Enter를 누르면 이름 붙은
    실행을 다시 고정합니다. 모델을 변경해
@@ -339,7 +341,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. n_eff 표의 행은
   *Candidate 1*, …이고, 표 아래 문장은 광 애플리케이션과 같은 주의 “Candidates are ranked by
   effective index and are not matched between designs.”와 모델이 요청한 모드 수 “This model asks
-  for 1 mode: Modes 1 › Modes to find”(그 설정으로 가는 링크)를 보여 줍니다.
+  for 1 mode: Modes 1 › Modes to find”(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
   소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
   Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K”.

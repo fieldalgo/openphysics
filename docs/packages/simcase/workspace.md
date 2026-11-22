@@ -88,7 +88,9 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    the current inputs* (the status bar adds *press Run to solve again*), after an edit
    *Inputs changed since run 1 · press Run to update*, and before any run *Nothing is
    computed until you press Run* and *Optical adapter ready · explicit Run required*. A run's
-   number is its place in the run list, the oldest first.
+   number is its place in the run list, the oldest first. While something holds Run (input
+   errors, a computation or job in progress, an unsupported input), the heading repeats the
+   status bar's words instead.
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
    replace it. There is no separate Pin button: **Unpin this run** releases a pinned run,
    and Enter in Run name pins a named run again. Change the model and run again,
@@ -396,7 +398,7 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   core. The n_eff table names its rows *Candidate 1*, …, and the note under it gives the optical
   application's caveat, “Candidates are ranked by effective index and are not matched between
   designs.”, and the number of modes the model asks for, “This model asks for 1 mode: Modes 1 ›
-  Modes to find”, a link to that setting. The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
+  Modes to find”, a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
   what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
   keeps n₀, its index at T_ref = 300 K”. The column is valid while the optical model solved alone

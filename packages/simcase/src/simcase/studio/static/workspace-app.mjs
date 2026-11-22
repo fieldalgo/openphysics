@@ -311,11 +311,18 @@ const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;nume
 document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{const prior=state[b.dataset.toggle];state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;
  if(isJoule()){state[b.dataset.toggle]=prior;notice('The multiphysics preview keeps mechanics or optics. For electric currents with heat alone, choose Models → Joule heating.');}render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{if(ui.page==='Connections'){ui.selection=b.dataset.select;render();}else select(b.dataset.select);});document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(ui.page==='Connections'&&!isOptical()&&!isHeat())disposeConnectionGraph=installConnectionGraph($('canvas'),open=>{ui.graphOptionsOpen=open;});if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
+// What stops an optical Run now (input errors, a computation or job in progress, an unsupported
+// input, no free run slot), in the footer's words; null when Run is ready.
+function opticalHold(){
+ if(numericDrafts.invalid)return 'Input errors · correct or restore the last valid values';
+ return solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()||(opticalBlock()?'Optical input unsupported · review Study':null);
+}
 // The dock heading says what the last optical run computed, with the same run as the footer;
-// the multiphysics model sets its own heading, and the other models keep the default words.
+// while Run is held it repeats the footer's words, so the two never disagree. The multiphysics
+// model sets its own heading, and the other models keep the default words.
 function refreshSequenceHeading(){
  if(multiView.active())return;const heading=document.querySelector('.dock-title>span');if(!heading)return;
- const text=applicationChosen()&&isOptical()?opticalSequenceHeading(opticalFreshness(current(),runs)):opticalSequenceHeading({state:'none'});
+ const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs)):opticalSequenceHeading({state:'none'});
  if(heading.textContent!==text)heading.textContent=text;
 }
 function refreshInputIssues(){
@@ -332,9 +339,8 @@ function refreshInputIssues(){
  }
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&['save-session','open-session','save-draft'].includes(id));
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
- if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
- else if(!applicationChosen())$('status').textContent='Choose a model to start';
- else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':opticalReadyStatus(opticalFreshness(current(),runs)));
+ if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
+ else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
 }
 function bindNumericInputs(){
@@ -454,7 +460,7 @@ function refreshPersistence(){
   // must not read as saved while completed runs would be lost.
   const runsUnsaved=runs.length>0&&savedRunsState!==runsStamp();
   // Before an application is chosen there is nothing to save or name.
-  const fresh=newModelInputs!==null&&newModelInputs===signature()&&!loadedSession&&!lastSavedFile;
+  if(newModelInputs!==null&&newModelInputs!==signature())newModelInputs=null;const fresh=newModelInputs!==null;
   saveIndicator={invalid:numericDrafts.invalid,clean,fresh,runsUnsaved,saved:savedFile(),loaded:loadedFrom()};refreshSaveIndicator();
   refreshNotebook();refreshWorkflow();
 }
@@ -538,15 +544,15 @@ function completeLoad(pending){
   // a record without a session file belongs to a notebook never saved: no file name carries over
   lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:null;
   // the title says what is open until the next change: the file opened, or browser recovery
-  loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp()};
+  newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp()};
   refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
- }else{loadedSession=null;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveFile();return;}try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  edits.record(doc);edits.markSaved();refreshPersistence();notice('Inputs file download requested. It has no computed results'+(runs.length?'; Save session keeps the runs too.':'.'));
+  edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Inputs file download requested. It has no computed results'+(runs.length?'; Save session keeps the runs too.':'.'));
 }catch(e){notice(e.message);}};
 $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click();}catch(e){notice(e.message);}};
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
@@ -557,7 +563,7 @@ $('project-file').onchange=async event=>{const file=event.target.files[0];event.
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
-$('save-draft').onclick=()=>{try{rejectInvalidInput();const text=signature();localStorage.setItem(DRAFT_KEY,text);edits.record(current());edits.markSaved();refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
+$('save-draft').onclick=()=>{try{rejectInvalidInput();const text=signature();localStorage.setItem(DRAFT_KEY,text);edits.record(current());edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
 
 
@@ -1007,7 +1013,7 @@ $('confirm-run-import').onclick=()=>{
  compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
 };
 
-$('save-session').onclick=()=>{try{rejectInvalidInput();const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
+$('save-session').onclick=()=>{try{rejectInvalidInput();newModelInputs=null;const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});

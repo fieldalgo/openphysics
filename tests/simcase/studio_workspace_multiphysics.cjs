@@ -294,6 +294,8 @@ test('a modes table names candidates with the optical caveat and the mode count 
  assert.equal(m.modeCountText(three,'modes1'),'This model asks for 3 modes: Modes 1 › Modes to find');
  const unset=heated();delete unset.physics.modes1.mode_count;
  assert.equal(m.modeCountText(unset,'modes1'),'The number of modes is set in Modes 1 › Modes to find');
+ // after an edit the note gives the run's count, not the model's
+ assert.equal(m.modeCountText(heated(),'modes1',{past:true}),'This run asked for 1 mode: Modes 1 › Modes to find');
 });
 test('the Messages line says when the without-heater option returns ticked',async()=>{
  const m=await mp,doc=heated(),removed={...doc,couplings:{}};
