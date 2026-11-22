@@ -54,6 +54,11 @@ INPUTS = {
     "te_fraction": "sum A |E_x|^2 divided by sum A (|E_x|^2 + |E_y|^2) over every cell of the window, A the cell "
                    "area, E at cell centres",
     "grid": "nodes on every window and core edge; each segment in equal cells of at most the step h",
+    "te_fraction_band": "te_fraction_<case>_d20 and _d40: the same fraction over the cells whose centre lies at "
+                        "a distance of at least 20 or 40 nm from the core rectangle's boundary, inside or outside "
+                        "(inside: the smallest distance to its four edges; outside: the Euclidean distance to the "
+                        "rectangle)",
+    "band_distances_um": [0.02, 0.04],
 }
 #: PEC walls for the transverse H of VFDModeSolver, in its order North, South, East, West: at a
 #: wall normal to y (north, south) H_y is odd and H_x even ("S"); at a wall normal to x (east,
@@ -90,6 +95,15 @@ def permittivity(core):
         xs, ys = np.meshgrid(np.asarray(xc), np.asarray(yc), indexing="ij")
         return np.where((xs > x0) & (xs < x1) & (ys > y0) & (ys < y1), inside, outside)
     return eps
+
+
+def boundary_distance(px, py, core):
+    """Distance of points to the core rectangle's boundary, inside or outside."""
+    x0, x1, y0, y1 = core["x"], core["x"] + core["w"], core["y"], core["y"] + core["h"]
+    dx, dy = np.maximum(np.maximum(x0 - px, px - x1), 0.0), np.maximum(np.maximum(y0 - py, py - y1), 0.0)
+    outside = np.hypot(dx, dy)
+    inside = np.minimum(np.minimum(px - x0, x1 - px), np.minimum(py - y0, y1 - py))
+    return np.where((dx > 0) | (dy > 0), outside, np.maximum(inside, 0.0))
 
 
 def eigen(core, x, y, boundary, count):
@@ -133,11 +147,23 @@ def solve(core, h, boundary=BOUNDARY, confirm=False):
             raise SystemExit(f"the top {kept} modes differ between {SEARCHED} ({neff.real.tolist()}) and "
                              f"{SEARCHED + 2} eigenvalues ({top[:kept].real.tolist()}); nothing written")
     seconds = time.perf_counter() - start
-    fraction = []
-    for m in modes:
-        ex, ey = np.sum(area * np.abs(m.Ex) ** 2), np.sum(area * np.abs(m.Ey) ** 2)
-        fraction.append(float(ex / (ex + ey)))
-    return neff, np.array(fraction), seconds, every.real
+    xc, yc = np.meshgrid((x[1:] + x[:-1]) / 2, (y[1:] + y[:-1]) / 2, indexing="ij")
+    distance = boundary_distance(xc, yc, core)
+    masks = {"": np.ones_like(area, dtype=bool), **{band_name(d): distance >= d - 1e-12
+                                                    for d in INPUTS["band_distances_um"]}}
+    fraction = {}
+    for name, mask in masks.items():
+        values = []
+        for m in modes:
+            ex = np.sum((area * np.abs(m.Ex) ** 2)[mask])
+            ey = np.sum((area * np.abs(m.Ey) ** 2)[mask])
+            values.append(float(ex / (ex + ey)))
+        fraction[name] = np.array(values)
+    return neff, fraction, seconds, every.real
+
+
+def band_name(d):
+    return f"_d{int(round(d * 1000))}"
 
 
 def canonical_json(value):
@@ -177,21 +203,24 @@ def main(argv=None):
     wall = time.perf_counter()
     arrays, timings, self_check, imaginary = {"grid_h_um": np.array(grids)}, {}, [], 0.0
     for case, core in INPUTS["cases"].items():
-        neffs, fractions = [], []
+        neffs, fractions = [], {}
         for h in grids:
             neff, fraction, seconds, every = solve(core, h, confirm=h == grids[0])
             imaginary = max(imaginary, float(np.max(np.abs(neff.imag))))
             neffs.append(neff.real)
-            fractions.append(fraction)
+            for name, value in fraction.items():
+                fractions.setdefault(name, []).append(value)
             timings[f"{case} {h} um"] = round(seconds, 2)
-            print(f"{case} h={h} um: n_eff {neff.real.tolist()}, f_TE {fraction.tolist()}, {seconds:.1f} s "
+            print(f"{case} h={h} um: n_eff {neff.real.tolist()}, f_TE " + ", ".join(
+                  f"{name or 'full'} {value.tolist()}" for name, value in fraction.items()) + f", {seconds:.1f} s "
                   f"(guided among the {SEARCHED} nearest the core index: {np.round(every, 5).tolist()})", flush=True)
             if h == grids[0]:
                 self_check.append(f"{case}: the top two at h = {h} um are the same with {SEARCHED} and with "
                                   f"{SEARCHED + 2} eigenvalues (guided among the {SEARCHED}: "
                                   f"{np.round(every, 5).tolist()})")
         arrays[f"neff_{case}"] = np.array(neffs)
-        arrays[f"te_fraction_{case}"] = np.array(fractions)
+        for name, value in fractions.items():
+            arrays[f"te_fraction_{case}{name}"] = np.array(value)
         # the window walls: the same case with H set to zero outside the window, coarsest grid
         other, _, _, _ = solve(core, grids[0], "0000")
         self_check.append(f"{case}: n_eff with walls 0000 instead of {BOUNDARY} at h = {grids[0]} um differs by "
@@ -205,8 +234,9 @@ def main(argv=None):
 
     values = [spec("grid_h_um", "um", arrays["grid_h_um"])]
     for case in INPUTS["cases"]:
-        values += [spec(f"neff_{case}", "1", arrays[f"neff_{case}"]),
-                   spec(f"te_fraction_{case}", "1", arrays[f"te_fraction_{case}"])]
+        values += [spec(f"neff_{case}", "1", arrays[f"neff_{case}"])]
+        values += [spec(f"te_fraction_{case}{name}", "1", arrays[f"te_fraction_{case}{name}"])
+                   for name in ["", *map(band_name, INPUTS["band_distances_um"])]]
     stored = {v["name"]: np.asarray(v["data"], dtype="<f8").reshape(v["shape"]) for v in values}
     values_sha256 = values_digest(stored)
     content_sha256 = hashlib.sha256(canonical_json({"inputs": INPUTS, "values_sha256": values_sha256})).hexdigest()
