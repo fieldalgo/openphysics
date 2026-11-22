@@ -101,8 +101,13 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
 - 초기 온도와 Dirichlet 값은 열탄성처럼 노드에 붙어 함께 움직입니다.
 - 시간만의 콜백 `callback(time)`은 Dirichlet 값, 내향 열유속, convection의 h와 ambient에 쓸 수 있습니다. 노드 위치와
   무관하기 때문입니다. 시간 콜백은 NumPy 숫자를 돌려줘야 하고 순수해야 합니다. 일반 풀이에 한 번, 미분에 한 번 더
-  불리기 때문입니다. (live 값을 돌려주는 시간 의존 h는 솔버 자체의 live 시간 의존 h 거부를 받습니다.) 좌표 콜백은
-  어디서나처럼 거부합니다.
+  불리기 때문입니다. (live 값을 돌려주는 시간 의존 h는 솔버 자체의 live 시간 의존 h 거부를 받습니다.)
+- 좌표 콜백도 받습니다(2026-11-22). 열원 `callback(position, time)`, 경계 `callback(position, outward_normal)`(한 번
+  표본), `callback(position, outward_normal, time)`(일반 풀이처럼 스텝 끝마다 표본)입니다. 정상 열(다음 절)처럼 live 점과
+  법선으로 한 번 더 부르므로, 받은 JAX·PyTorch 점으로 계산해야 합니다. `tests/galerkin/test_shape_derivative_transient_callbacks.py`에
+  ET1–ET7이 있습니다. 모든 이력이 이동 메시 일반 풀이와 1e-12 이내, 미분이 Richardson 차분과 1e-8 이내, JAX와 PyTorch가
+  1e-12 이내, 시간에 따라 바뀌는 고정 열원과 자라는 변의 필드 열유속이 닫힌 식의 비율·미분과 1e-10 이내입니다.
+  Dirichlet 값의 좌표 콜백은 계속 거부합니다.
 - motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
 
 ## 정상 열의 좌표 콜백
@@ -115,7 +120,7 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
   일반 풀이처럼 가중치에 live 점의 2πr이 곱해집니다.
 - 그래서 콜백은 받은 점으로 배열 연산을 해야 하고 순수해야 합니다. live 점에 NumPy 숫자를 돌려주거나(`np.asarray`,
   `np.ones(len(p))`) live 점에서 예외가 나는 콜백은 이름을 밝힌 `TypeError`로 거부합니다.
-- 아직 다루지 않는 것: 과도 열, 정상 전기 전도, 탄성, 3D 열의 좌표 콜백과 콜백인 계수(전도도 등)나 Dirichlet 값.
+- 아직 다루지 않는 것: 정상 전기 전도, 탄성, 3D 열의 좌표 콜백과 콜백인 계수(전도도 등)나 Dirichlet 값.
 
 `tests/galerkin/test_shape_derivative_callbacks.py`에 2026-11-22에 사전 등록한 E1–E7이 있습니다. 수치가 이동 메시 일반
 풀이와 1e-12 이내(E1); 세 종류 콜백을 모두 쓴 반력·온도 목적함수의 미분이 Richardson 중앙 차분과 1e-8 이내(E2), 법선
@@ -300,7 +305,7 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·경계 열유속·convection·전류밀도·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
   `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받고,
-  정상 열에서는 live 점으로 계산하는 좌표 콜백을 받습니다(위).
+  정상·과도 열에서는 live 점으로 계산하는 좌표 콜백을 받습니다(위).
 - 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
   그런 호출에서 live 입력은 t 하나입니다.

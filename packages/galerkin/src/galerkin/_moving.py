@@ -405,7 +405,9 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
                          "kept")
     _coefficient(conductivity, "thermal_conductivity")
     _coefficient(volumetric_heat_capacity, "volumetric_heat_capacity")
-    _numpy_data(heat_source, "heat_source_density")
+    sampled_source = callable(heat_source) and not is_per_region(heat_source)
+    if not sampled_source:
+        _numpy_data(heat_source, "heat_source_density")
     if is_live(initial_temperature_k) or (isinstance(initial_temperature_k, (list, tuple))
                                           and any(is_live(v) for v in initial_temperature_k)):
         raise TypeError("motion: initial_temperature is live; in this slice only the motion's t carries a "
@@ -419,7 +421,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         for tag, condition in _tags(table, name).items():
             values = condition if isinstance(condition, (tuple, list)) else (condition,)
             for value in values:
-                _time_only(value, _boundary_label(name, tag))
+                _boundary_form(value, _boundary_label(name, tag))
         tables[name] = _tags(table, name)
     moved = _checked_step(mesh, W, t)
     base = transient_heat.solve_transient_heat_outward(
@@ -444,7 +446,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
     k = _per_triangle(mesh, conductivity, "thermal_conductivity", positive=True)
     capacity = _per_triangle(mesh, volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
-    Q = _per_triangle(mesh, heat_source, "heat_source_density")
+    Q = None if sampled_source else _per_triangle(mesh, heat_source, "heat_source_density")
     rows, cols = np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel()
     stiff_e = lift(xp, k)[:, None, None] * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) \
         / (4.0 * area)[:, None, None]
@@ -453,8 +455,15 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     mass_e = _cell_mass(xp, X, tris, area, lift(xp, capacity), axisymmetric)
     K = CooMatrix(rows, cols, xp.reshape(stiff_e, (-1,)), (n, n))
     M = CooMatrix(rows, cols, xp.reshape(mass_e, (-1,)), (n, n))
-    load = scatter_add(xp, n, tris.ravel(), xp.reshape(_cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric),
-                                                       (-1,)))
+    def load_at(now):
+        """The live source load at ``now``: constant data, or the callback(position, time) at the live points."""
+        if sampled_source:
+            local = _sampled_cell_load(xp, X, tris, area, lambda points: heat_source(points, now), axisymmetric)
+        else:
+            local = _cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric)
+        return scatter_add(xp, n, tris.ravel(), xp.reshape(local, (-1,)))
+
+    load = load_at(float(times[0]))
     edges_of = {}
     for name in ("outward_flux", "convection"):
         for tag in tables[name]:
@@ -464,6 +473,22 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     def at(value, now):
         return float(value(now)) if callable(value) else float(to_numpy(value))
 
+    rules, static = {}, {}
+
+    def sampled(value, tag, label, now):
+        """(E, 4) live values of a coordinate callback: static ones once, field ones at ``now``."""
+        if tag not in rules:
+            rules[tag] = _edge_rule(xp, mesh, moved, X, edges_of[tag][0], axisymmetric)
+        if _boundary_form(value, label) == "static":
+            key = (tag, id(value))
+            if key not in static:
+                static[key] = _sampled(rules[tag], value, label)
+            return static[key]
+        return _sampled(rules[tag], lambda points, normals: value(points, normals, now), label)
+
+    def coordinate(value, label):
+        return callable(value) and _boundary_form(value, label) != "time"
+
     def natural(now):
         """Live (H terms, G, shifted B) of the boundary data at ``now``."""
         G = xp.zeros(n, dtype=xp.float64)
@@ -471,10 +496,28 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         H_terms = []
         for tag, g in tables["outward_flux"].items():
             edges, length = edges_of[tag]
+            label = _boundary_label("outward_flux", tag)
+            if coordinate(g, label):
+                values = sampled(g, tag, label, now)
+                G = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rules[tag], values), (-1,)),
+                                base=G)
+                continue
             G = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length, at(g, now),
                                                                         axisymmetric), (-1,)), base=G)
         for tag, (h, ambient) in tables["convection"].items():
             edges, length = edges_of[tag]
+            label = _boundary_label("convection", tag)
+            if coordinate(h, label) or coordinate(ambient, label):
+                rule = rules.get(tag) or rules.setdefault(tag, _edge_rule(xp, mesh, moved, X, edges, axisymmetric))
+                hv = sampled(h, tag, label, now) if coordinate(h, label) else at(h, now) + 0 * rule.weights
+                av = sampled(ambient, tag, label, now) if coordinate(ambient, label) else \
+                    at(ambient, now) + 0 * rule.weights
+                H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
+                                         xp.reshape(_rule_mass(xp, rule, hv), (-1,)), (n, n)))
+                offset = lift(xp, offsets[edges[:, 0]])[:, None]
+                shifted = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, hv * (av - offset)),
+                                                                       (-1,)), base=shifted)
+                continue
             h_now, ambient_now = at(h, now), at(ambient, now)
             local = _edge_mass(xp, X, edges, length, h_now, axisymmetric)
             H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
@@ -507,12 +550,16 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
     for key, value in zip(("T", "flux", "content", "quadratic"), recorded(first_abs, first_abs - offsets_l)):
         history[key].append(value)
     previous = lift(xp, initial - offsets)
+    loads_history = [load]
     mask = np.zeros(n, dtype=bool)
     mask[fixed] = True
     mask_l = lift(xp, mask)
     zero = xp.zeros(n, dtype=xp.float64)
     for index in range(1, len(times)):
         step = float(times[index] - times[index - 1])
+        if sampled_source:
+            load = load_at(float(times[index]))
+            loads_history.append(load)
         terms = [CooMatrix(M.rows, M.cols, M.values / step + K.values, (n, n))]
         rhs = load + M.matvec(previous) / step
         if has_natural:
@@ -539,7 +586,7 @@ def solve_transient_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_condu
         history["reaction"].append(xp.where(mask_l, residual, zero))
         previous = current
     stack = xp.stack
-    loads = stack([load] * len(times))
+    loads = stack(loads_history if sampled_source else [load] * len(times))
     extra = (stack(history["G"]), stack(history["C"])) if has_natural else ()
     result = transient_heat.AxisymmetricTransientHeatResult if axisymmetric else \
         transient_heat.PlanarTransientHeatResult
@@ -554,6 +601,31 @@ def _boundary_label(name, tag):
     """The message label of boundary data: the heat flux by its edge tag, as the public solvers take it
     inward and hand it here outward (so neither keyword names it), convection by its keyword."""
     return f"the heat flux on {tag!r}" if name == "outward_flux" else f"{name}[{tag!r}]"
+
+
+def _boundary_form(value, name):
+    """The form of a transient boundary value with a motion: "constant", "time" (callback(time)), "static"
+    (callback(position, outward_normal)) or "field" (callback(position, outward_normal, time)), by the
+    number of required positional parameters, as transient_heat tells them apart; others are refused."""
+    import inspect
+
+    if not callable(value):
+        _numpy_data(value, name, sampled=False)
+        return "constant"
+    try:
+        parameters = list(inspect.signature(value).parameters.values())
+    except (TypeError, ValueError):
+        parameters = None
+    if parameters is None or any(p.kind is p.VAR_POSITIONAL for p in parameters):
+        raise TypeError(f"motion: {name} must be a constant, a callback(time), a callback(position, "
+                        "outward_normal) or a callback(position, outward_normal, time)")
+    required = [p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                and p.default is p.empty]
+    forms = {1: "time", 2: "static", 3: "field"}
+    if len(required) not in forms:
+        raise TypeError(f"motion: {name} must be a constant, a callback(time), a callback(position, "
+                        "outward_normal) or a callback(position, outward_normal, time)")
+    return forms[len(required)]
 
 
 def _time_only(value, name):

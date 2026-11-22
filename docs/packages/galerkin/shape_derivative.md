@@ -151,7 +151,17 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
   positions. A callback of time must return NumPy numbers and must be pure: it is
   called once for the ordinary solve and once more for the derivative. (A
   time-dependent h that returns a live value gets the solver's own refusal of a
-  live time-dependent h.) Callbacks of coordinates are refused, as everywhere.
+  live time-dependent h.)
+- Coordinate callbacks are taken too (2026-11-22): the source `callback(position, time)`
+  and the boundary `callback(position, outward_normal)` (sampled once) or
+  `callback(position, outward_normal, time)` (sampled at the end of every step, as the
+  ordinary solve does). They are called once more at the live points and normals, as in
+  steady heat (next section), so they must compute with the JAX or PyTorch points they get.
+  `tests/galerkin/test_shape_derivative_transient_callbacks.py` holds ET1–ET7: every history
+  equals the moved mesh's ordinary solve within 1e-12, the derivative equals Richardson
+  differences within 1e-8, JAX and PyTorch agree within 1e-12, and a fixed time-dependent
+  source and a field flux on a growing side give their closed-form rates and derivatives
+  within 1e-10. Coordinate callbacks of the Dirichlet values stay refused.
 - `checkpoint_every` is refused with a motion: every step is kept.
 
 ## Coordinate callbacks in steady heat
@@ -169,8 +179,7 @@ h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - It must therefore compute with array operations on the points it is given, and be pure.
   A callback that returns NumPy numbers for live points (`np.asarray`, `np.ones(len(p))`),
   or raises on them, is refused with a `TypeError` that names it.
-- Not covered yet: coordinate callbacks in transient heat,
-  steady electric conduction, elasticity and 3D heat, and callable coefficients
+- Not covered yet: coordinate callbacks in steady electric conduction, elasticity and 3D heat, and callable coefficients
   (conductivity and the rest) or Dirichlet values.
 
 `tests/galerkin/test_shape_derivative_callbacks.py` holds E1–E7, pre-registered on 2026-11-22:
@@ -424,7 +433,7 @@ Each refusal names the reason:
   density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat, and coordinate
-  callbacks that compute with the live points in steady heat (above);
+  callbacks that compute with the live points in steady and transient heat (above);
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
