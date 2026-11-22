@@ -83,6 +83,26 @@
           "cases_s": 334, "peak_rss_mb": 7789, "pins_unchanged": null, "pip_check": null
         }
       }
+    },
+    "empy": {
+      "spdx": "MIT",
+      "url": "https://github.com/lbolla/EMpy/blob/master/LICENSE",
+      "review": "PyPI ElectroMagneticPython 2.2.3 (released 2026-01-31), py3-none-any wheel sha256 309694b39bbea1840effa27b3b5ef286b2ad104fe0d9d17fba3239bd9e274b9a; dist-info License-Expression MIT and LICENSE 'Copyright (c) Lorenzo Bolla'. The PyPI project named EMpy is an unrelated tool.",
+      "reference": {
+        "mode": ["stored"],
+        "execution": "in-process",
+        "modules": ["EMpy"],
+        "imported_by": ["tests/simcase/reference_values/empy/generate_strip_square_modes.py"],
+        "values": [],
+        "generators": "tests/simcase/reference_values/empy/generate_strip_square_modes.py",
+        "light": {
+          "verdict": false,
+          "reason": "The stored record is generated once in a separate reference environment from the hash-pinned requirements beside its generator; CI and development sessions never install or run EMpy.",
+          "date": "2026-11-22", "runner": "separate reference environment",
+          "python": null, "os": "linux", "install_s": null,
+          "cases_s": null, "peak_rss_mb": null, "pins_unchanged": null, "pip_check": null
+        }
+      }
     }
   },
   "distributions": {
