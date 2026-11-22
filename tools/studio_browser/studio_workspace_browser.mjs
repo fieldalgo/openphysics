@@ -933,11 +933,13 @@ try {
   assert.equal(offView.head.at(-1), 'n_g');
   assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study'), JSON.stringify(offView.cells));
   await toNode('Study'); await page.click('#group-index-check'); await page.until("document.getElementById('group-index-check')?.checked===true", 'M5 checkbox on');
+  // the document the page submits, read from its /api/run request
+  await page.eval("(()=>{const f=window.fetch;window.__m5Runs=[];window.fetch=(u,o)=>{if(String(u).includes('/api/run'))window.__m5Runs.push(o.body);return f(u,o);};})()");
   const t0 = Date.now(); await runAndWait(); const onSeconds = (Date.now() - t0) / 1000;
   await page.until("!!document.querySelector('#modes-table [data-group-index-value]')", 'M5 results on');
   const onView = await ngCells(); stage('M5 results on', {...onView, seconds: onSeconds});
-  // the same document run directly by the engine (the template's state, as the node tests build it)
-  const doc = await page.eval(`import('/workspace-assets/workspace-optical.mjs').then(O=>JSON.stringify(O.opticalDocument({height:220,width:500,wavelength:1550,coreMesh:30,electric:false,heat:false,structure:false,optics:true,modeCount:2,groupIndex:true,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''})))`);
+  // the submitted document run directly by the engine
+  const doc = JSON.stringify(JSON.parse(await page.eval('window.__m5Runs.at(-1)')).doc);
   const engine = spawnSync(args.python, ['-c', 'import json,sys\nfrom simcase import Document, run\nr=run(Document.from_dict(json.loads(sys.stdin.read())),False)\ns=r.summary()\nprint(json.dumps({"ng":s["group_index"]["values"][0],"neff":s["effective_index"]["values"][0],"method":s["group_index_method"]}))'], {input: doc, encoding: 'utf8'});
   assert.equal(engine.status, 0, engine.stderr);
   const direct = JSON.parse(engine.stdout); stage('M5 direct engine run', direct);
@@ -948,6 +950,7 @@ try {
     assert.ok(direct.ng[i] === null || /central difference over λ0 ± 1 nm \(3 solves\)/.test(c.title), c.title);
   });
   assert.deepEqual(onView.neff, offView.neff, 'the option leaves n_eff as it was');
+  assert.deepEqual(onView.neff, direct.neff.map(n => n.toFixed(8)), 'the engine run is of the same document');
   await noOverflow('M5 results with n_g');
   // Compare: the off run as A, the on run as B
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'M5 Compare');
