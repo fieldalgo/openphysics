@@ -599,9 +599,15 @@ print(n)`;
   // R2: each stored session once, newest first, the file named where a record came from one
   const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});
-  // the same session saved at another time reads alike once the time is removed: compare without it
-  const untimed = t => t.replace(/ · (?:saved )?[^·]+$/, '');
-  for (const list of [lists.resume, lists.earlier]) assert.equal(new Set(list.map(untimed)).size, list.length, JSON.stringify(list));
+  // the sessions behind the listed entries, as stored: no two are the same session (compared
+  // without their view), and none is the session this tab wrote as the latest record. Their texts
+  // can read alike (two unedited 0-run models of different heat power), so the check reads storage.
+  const stored = await page.eval(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const s=m.indexedNotebookStore();const latest=await s.load(),earlier=await s.loadEarlier();
+    const listed=[...document.querySelectorAll('#earlier-sessions button')].map(b=>Number(b.dataset.earlier));
+    const keys=listed.map(i=>m.sessionKey(earlier[i].session));return {listed,stored:earlier.length,distinct:new Set(keys).size,latestListed:keys.includes(m.sessionKey(latest.session))};})`);
+  stage('R2 stored sessions', stored);
+  assert.equal(stored.distinct, stored.listed.length, JSON.stringify(stored)); assert.equal(stored.latestListed, false);
+  assert.equal(lists.resume.length, stored.listed.length, 'the resume card lists the same entries');
   // the heated session open in this tab is not offered again, and its earlier copy is gone
   assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Heater 2e14')), JSON.stringify(lists.earlier));
   assert.ok(lists.earlier.some(t => /^Recover earlier session · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));
