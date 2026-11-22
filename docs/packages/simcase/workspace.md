@@ -786,7 +786,7 @@ mode count). Each run has these keys, in this order; any other key is refused by
 | `job`, `completedAt`, `label`, `pinned`, `origin`, `serverVersion`, `input` | as in version 7 | required |
 | `settings` | version 7's, with `adapter: "optical-shapes-v8"` and `mode_count` 1 to 8 | required |
 | `effective_index` | k numbers, or `{"re": [k], "im": [k]}`; 1 ≤ k ≤ `mode_count`, ranked by Re n_eff, every Re above 1.45 | required |
-| `field` | `{node_coordinates, triangles, real, imag}` of k modes | optional |
+| `field` | `{node_coordinates, triangles, real, imag}` of k modes (as in version 7, only these four are read; another key inside `field` is not refused, is covered by the digest and is not written again) | optional |
 | `te_polarization_fraction` | k numbers in [0, 1] or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
 | `effective_area` | k numbers in m² above 0 or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
 | `group_index`, `group_index_method` | k numbers or null; a text of 1 to 64 characters (only with `group_index`) | optional, reserved for the group index |

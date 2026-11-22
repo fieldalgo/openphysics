@@ -658,7 +658,7 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 | `job`, `completedAt`, `label`, `pinned`, `origin`, `serverVersion`, `input` | 버전 7과 같음 | 필수 |
 | `settings` | 버전 7과 같되 `adapter: "optical-shapes-v8"`, `mode_count` 1–8 | 필수 |
 | `effective_index` | 수 k개 또는 `{"re": [k], "im": [k]}`. 1 ≤ k ≤ `mode_count`, Re n_eff 순서, 모든 Re가 1.45보다 큼 | 필수 |
-| `field` | 모드 k개의 `{node_coordinates, triangles, real, imag}` | 선택 |
+| `field` | 모드 k개의 `{node_coordinates, triangles, real, imag}`(버전 7처럼 이 네 키만 읽음. `field` 안의 다른 키는 거부하지 않으며 digest가 덮고 다시 쓰지 않음) | 선택 |
 | `te_polarization_fraction` | [0, 1]의 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
 | `effective_area` | 0보다 큰 m² 단위 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
 | `group_index`, `group_index_method` | 수 또는 null k개; 1–64자 텍스트(`group_index`와 함께만) | 선택, 군굴절률용으로 예약 |

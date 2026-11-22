@@ -221,3 +221,10 @@ test('review: importing a run that a file kept without its fields is the same ru
  const other=N.parseSession(write([run('00000001',8,8,{field:{...field(8),real:field(8).real.map(m=>m.map(v=>v.map(x=>x+1)))}})]));
  assert.throws(()=>N.mergeRuns(full.runs,other.runs),/Conflicting result for job 00000001/);
 });
+test('V17: a key inside field other than the four arrays is not refused, as in version 7; the digest covers it and it is not written again',()=>{
+ const v7=JSON.parse(fixture('optical-v7-one.json'));v7.runs[0].field.note='x';assert.equal(N.parseSession(JSON.stringify(v7)).runs.length,1);
+ const text=write([run('00000001')]),added=edit(text,d=>{d.runs[0].field.note='x';});
+ const read=N.parseSession(added);assert.equal('note' in read.runs[0].field,false);
+ assert.doesNotMatch(N.sessionText(read.input,read.runs,read.selected,read.comparison,read.view),/"note"/);
+ assert.throws(()=>N.parseSession(edit(text,d=>{d.runs[0].field.note='x';},false)),{message:/^Run 1 changed after it was saved/});
+});
