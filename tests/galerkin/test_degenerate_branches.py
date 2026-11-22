@@ -269,10 +269,16 @@ def _orthogonal_sine(direction, vector):
     return float(np.linalg.norm(v - np.vdot(d, v) * d))
 
 
+def _kernel_combinations(group):
+    """mode_combination in the kernel's exp(+i omega t) frame of solve_modes' fields: the public
+    combination is its conjugate (CI's eigensolver returned complex-phased vectors, 2026-11-22)."""
+    return np.conj(np.asarray(group.mode_combination))
+
+
 def test_d10_prime_coefficients_follow_the_branch(square):
     mesh, eps, W = square
     (group,) = _branches(mesh, eps, W, "jax")
-    combos = np.asarray(group.mode_combination)
+    combos = _kernel_combinations(group)
     base = np.stack(_sorted_fields(mesh, eps, W, 0.0), axis=1)
     for sign, branch in ((1.0, 0), (-1.0, 1)):
         for h in (1e-4, 1e-5):
@@ -284,7 +290,7 @@ def test_d10b_prime_fields_follow_the_branch_under_a_diagonal_stretch(square):
     mesh, eps, _W = square
     W = _diagonal_stretch(mesh)
     (group,) = _branches(mesh, eps, W, "jax")
-    combos = np.asarray(group.mode_combination)
+    combos = _kernel_combinations(group)
     base = np.stack(_sorted_fields(mesh, eps, W, 0.0), axis=1)
     for sign, branch in ((1.0, 0), (-1.0, 1)):
         predicted = base @ combos[:, branch]
