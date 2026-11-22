@@ -133,7 +133,9 @@ export function createMultiphysicsView(ctx){
   if(job||starting||(!alone&&runBlock()))return;
   const sent=clone(source),order=alone?[[alone]]:check.solve_order;
   // busy from the request on, so nothing else starts or opens until the job is followed
-  starting=true;if(!alone)stopAsked=false;
+  // the Run button shows it at once: a without-heater solve starts right after a coupled run, and
+  // a Run pressed while its request is out would be ignored
+  starting=true;if(!alone)stopAsked=false;refreshRun();
   try{const reply=await ctx.request('POST','/api/multiphysics/run',{doc:sent});starting=false;
    job={id:reply.job,doc:sent,order:reply.solve_order||order,events:[],status:'running',error:null,alone,key};if(!alone)runFailure=null;
    refreshRun();ctx.render();notice(alone?`Solving ${physicsLabel(alone)} without heater: alone, with no temperature input…`:'Running every physics in solve order…');poll();
