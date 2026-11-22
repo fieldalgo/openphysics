@@ -361,7 +361,12 @@ Joule heating trees by role and accessible name in the browser's accessibility t
 Compare's absorption loss columns, plots framed on the core with the probe line under them at
 1440 × 900 and 1280 × 800, a run clicked on Compare staying on Compare with **Open in Results**,
 one selected run card, the session file still named after a page, run or mode is chosen and after
-a restore, and a restore opening the page that was shown.
+a restore, and a restore opening the page that was shown. Since round 11 it also checks no
+tree node selected on Results or Compare and a node under the pointer keeping the plain fill,
+the title's short *(other inputs)* only on Results, **Use this run's inputs** without a question
+and Undo taking it back, the Study settings naming the next run's inputs and editing the
+wavelength (1300 nm refused there as in Optical modes), and a restore card naming the file's
+save time.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff
@@ -370,7 +375,9 @@ column solved with the run and its Δn_eff equal to the difference of the engine
 run marked out of date by an edit and current again for the same content (the column staying
 valid on a second run), only the optical step out of date when the coupling alone is removed, the template's two modes (TE-like, then a TM-like cell that names its TM share), the warning and Undo of a removed coupling, no horizontal overflow at 1440 × 900 and 390 px wide,
 the multiphysics model tree with the keyboard alone and by role and name, and the results page
-marked in the tree on Results.
+marked in the tree on Results. Since round 11 it also checks *New model · not saved* for a
+fresh template, the From list of a coupling added for the temperature input holding only
+the temperature, and *No need to run: Run 1 already has these results*.
 A third script (`tools/studio_browser/studio_multiphysics_session_browser.mjs`) checks
 multiphysics session files (version 8): one Save session and one Open session in every model,
 the template, a 0.12 µm mesh and a two-run session saved, opened and saved again (the second
@@ -382,7 +389,10 @@ file opened over them, a reload and the same file opened again. After it, the ti
 *Opened …* through tab clicks, the recovery lists show each session once, and the Optical
 waveguide card offers the optical runs, which come back with the same n_eff. It also checks a
 named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the heated session's save
-message naming the optical runs that are not in its file.
+message naming the optical runs that are not in its file. Since round 11 the Heated silicon
+waveguide card restores its own newest record after a reload (the box above not listing it),
+naming the session file's save time, the restored title reads *same as file …*, and the
+Workspace tools say *Restore earlier session from this browser*.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

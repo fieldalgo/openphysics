@@ -306,14 +306,19 @@ n = 1.45*와 세 행을 보임, 모드 8개인 2000 × 400 nm 코어 두 개가 
 Space, Left, Right), 광학과 Joule 가열 트리의 모든 노드를 브라우저 접근성 트리에서 역할과 접근 가능한 이름으로 찾으며,
 Compare의 흡수 손실 열, 1440 × 900과 1280 × 800에서 코어에 맞춰진 그림과 그 아래의 probe 줄, Compare에서 누른 실행이
 Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 실행 카드 하나, 페이지·실행·모드를 골라도 복구 뒤에도
-이름이 남는 세션 파일, 보이던 페이지를 여는 복구를 확인합니다.
+이름이 남는 세션 파일, 보이던 페이지를 여는 복구를 확인합니다. 11차부터는 Results나 Compare에서 고른 트리 노드가 없고
+포인터가 올라간 노드도 일반 배경을 유지함, 짧은 *(other inputs)*가 Results에서만 제목에 붙음, 묻지 않는
+**Use this run's inputs**와 그것을 되돌리는 Undo, 다음 실행의 입력을 밝히고 파장을 고치는 Study 설정(1300 nm는
+Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는
 열과 엔진 두 실행의 차이와 같은 Δn_eff, 편집으로 out of date가 되고 내용이 같으면 다시 현재가 되는
 실행(두 번째 실행에서도 열이 유효), 결합만 지웠을 때 광 단계만 out of date가 됨, 템플릿의 두 모드(TE-like, 이어서 TM 비율을
 밝히는 TM-like 칸), 지운 결합의 경고와 Undo, 1440 × 900과 390 px 폭에서 가로 넘침이 없음, 키보드만으로 쓰고 역할과 이름으로 찾는
-다중물리 모델 트리, Results에서 트리가 결과 페이지를 표시함을 확인합니다.
+다중물리 모델 트리, Results에서 트리가 결과 페이지를 표시함을 확인합니다. 11차부터는 새 템플릿의 *New model · not
+saved*, 온도 입력을 위해 추가하는 결합의 From 목록에 온도만 있음, *No need to run: Run 1 already has these
+results*도 확인합니다.
 세 번째 스크립트(`tools/studio_browser/studio_multiphysics_session_browser.mjs`)는 다중물리 세션 파일(버전 8)을
 확인합니다. 모든 모델의 Save session과 Open session 하나씩, 템플릿·0.12 µm 메시·실행 두 개 세션을 저장하고 열고 다시
 저장(두 번째 파일은 바이트 단위로 같고, 저장된 모든 배열은 따로 받은 서버 응답과 Float64 비트까지 같음), 0.08 µm 메시
@@ -321,7 +326,9 @@ Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 �
 두 탭의 충돌, 그리고 다시 켜기입니다: 광학 실행 두 개, 그 위로 가열 세션 파일 열기, 새로고침, 같은 파일 다시 열기. 그 뒤
 제목은 탭을 눌러도 *Opened …*를 유지하고, 복구 목록은 세션마다 한 번씩만 보여 주며, Optical waveguide 카드가 광학
 실행을 제안하고 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
-가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다.
+가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 Heated silicon
+waveguide 카드가 자기 가장 새 기록을 복원하고(위 상자는 그 기록을 나열하지 않음) 세션 파일의 저장 시각을 밝히는지,
+복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

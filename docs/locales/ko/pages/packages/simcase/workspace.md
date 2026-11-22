@@ -17,8 +17,8 @@
 Graphics, 하단 Study/Messages 영역으로 구성됩니다. 리본은 Project, Edit,
 Model setup, Physics, Compute로 묶습니다. **Geometry**, **Materials**, **Mesh**, **Study**는
 모델 트리와 같은 설정을 엽니다. **Physics → Installed**는 [설치된 물리](#설치된-물리)를 엽니다.
-Compute에는 고른 애플리케이션의 실행 명령(**Run optical study**, **Run heat study**,
-**Run Joule heating study**)이 있습니다. 광학 작업 순서는 모델을 가리지 않는 별도 줄에 표시합니다.
+Compute에는 고른 애플리케이션의 실행 명령이 있으며, 모든 모델(광학, 정상 열, 줄 가열, 다중물리)에서
+이름은 **Run study**입니다(모델 이름은 헤더에 나옴). 광학 작업 순서는 모델을 가리지 않는 별도 줄에 표시합니다.
 하단 영역은 해석 순서와 Messages를 보여 주며, Joule 가열을 실행한 뒤 Results에서는
 **Solver log**가 함께 나옵니다.
 
@@ -65,27 +65,34 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    그 자리에서 가운데를 지킵니다. 계산창을 벗어나는 크기는 기존 규칙대로 거부됩니다. 이전에
    저장한 프로젝트는 저장된 좌표를 그대로 씁니다. 단계 표시줄의 **4. Study**에는 *Ready to run*이,
    현재 입력의 결과가 생기면 *Run complete*가 나오고, 옆의 파장(예: **λ 1550 nm**)은 파장 입력란을
-   여는 버튼입니다. 필요하면 **Physics › Optical modes**에서 파장을(설정 제목도 *Optical modes*이며,
-   **Study → Edit wavelength**, 파장도 함께 보여 주는 Study 실행 설정의 **Edit in Optical modes**,
-   단계 표시줄의 파장이 그 입력란 하나에 포커스를 둔 채 엽니다), **Mesh**에서
-   코어 메시 크기를 바꿉니다.
+   여는 버튼입니다. 필요하면 **Physics › Optical modes**(설정 제목도 *Optical modes*) 또는 Study 실행
+   설정에서 파장을 바꿉니다. **Modes to find**처럼 두 곳은 같은 입력란이며, **Study → Edit wavelength**와
+   단계 표시줄의 파장은 Optical modes의 그 입력란에 포커스를 둔 채 엽니다. Study 설정은 Results가 어느
+   실행을 보여 주든 다음 실행이 쓸 입력도 밝힙니다: *Next run uses 700 × 300 nm · Silicon · λ 1550 nm ·
+   core mesh 30 nm · Modes to find 2*. 코어 메시 크기는 **Mesh**에서 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.
-4. **Run optical study**를 누릅니다. 기다리는 동안 모델을 바꿔도 결과는 실행 당시
+4. **Run study**를 누릅니다. 기다리는 동안 모델을 바꿔도 결과는 실행 당시
    입력을 유지합니다. Stop waiting은 상태 조회만 중단합니다. 입력을 바꾸면 완료 메시지가
    바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다. 도크 제목, 상태 표시줄, 제목 표시줄과
    단계 막대는 보고 있는 실행(고른 실행)을 번호와 이름으로 가리킵니다: 실행 뒤에는 *Run 1 · solved
    from the current inputs*(상태 표시줄은 *press Run to solve again*을 덧붙임), 보고 있는 실행의 입력이
    다르면(편집 뒤나 이전 실행을 골랐을 때) *Run 1 · design A · current inputs differ from this run*(상태
    표시줄은 다른 실행이 현재 입력을 가지면 *Run 2 has them*, 아니면 *press Run to compute them*을
-   덧붙임)이며, 입력을 편집하지 않았으면 제목 표시줄이 *viewing Run 1 · design A, which used other
-   inputs*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다. 실행 전에는 *Nothing is
+   덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
+   (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
+   입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
+   군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. 입력
+   편집 하나이므로 **Undo**가 되돌립니다(페이지 상태인 Modes to find와 군굴절률 선택은 Undo가 바꾸지 않음). 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
    가리키고(*Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
-   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. 고른 것으로 보이는 실행 카드는 정확히
+   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. Compare는 가장 새 실행 두 개로 열리며,
+   오래된 쪽이 A, 새 쪽이 B입니다(방금 계산한 실행이 B). 실행 목록은 새 실행이 위에 오므로 Compare에서는
+   두 카드 끝에 *· Compare A*, *· Compare B*가 붙습니다. 고른 실행이 사라지면 둘 다 그 쌍으로 돌아갑니다.
+   고른 것으로 보이는 실행 카드는 정확히
    하나입니다(포인터가 올라간 다른 카드는 테두리만 바뀜). Compare에서 실행 목록의 실행을 누르면 그 실행을
    고르고(Run name과 실행 명령이 그 실행에 적용됨) Compare는 그대로 남습니다. A와 B는 그림 위의 선택
    목록으로 고르고, 목록 아래 **Open Run 1 · design A in Results**가 고른 실행을 Results에서 보여 줍니다.
@@ -151,8 +158,12 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    **Models › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
    다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
-   waveguide · Run 1 · design A, Run 2 · 2:25 PM · same as file …json*, 그 옆에 **Start new**. 이때 카드 위 상자는
-   다른 세션만 나열하고, 다른 세션이 없으면 **Open session file (portable)…**과 그 안내가 카드의 제안 옆에
+   waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 **Start new**. 탭에 다중물리 실행이 없으면 Heated
+   silicon waveguide 카드도 가장 새 다중물리 세션을 같은 방식으로 제안합니다: *Restore from this browser ·
+   Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. 기록이 저장했던 세션 파일과 같으면
+   기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은
+   어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). 이때 카드 위 상자는
+   어느 카드도 제안하지 않는 세션만 나열하고, 다른 세션이 없으면 **Open session file (portable)…**과 그 안내가 카드의 제안 옆에
    놓입니다. 복구 항목은 모두 모델, 실행 수,
    실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
    design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
@@ -215,10 +226,10 @@ n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배
 꺼져 있으면 문서는 이전과 같은 `optical-shapes-v8` 문서이며 바이트 단위로 같습니다. 켜면 달라지는 것은
 `results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 페이지
 상태입니다. 새 모델은 꺼진 상태로 시작하고 입력 파일은 이 값을 저장하지 않습니다. 세션을 열거나
-**Restore this run's inputs**를 누르면 실행에 맞춰 설정됩니다(n_g가 있는 실행이면 켜짐). 이 상자는 실행과
+**Use this run's inputs**를 누르면 실행에 맞춰 설정됩니다(n_g가 있는 실행이면 켜짐). 이 상자는 실행과
 비교하는 study의 일부입니다. 상자를 켜면 n_g가 없는 실행은 현재 입력의 실행이 아니고, 상자를 끈 채 한
 문서 검사는 이전 입력의 검사입니다. 어댑터는 `optical-shapes-v8` 그대로이고 실행의 `settings`도 바뀌지
-않습니다. 실행 표 CSV에는 n_g 열이 없습니다.
+않습니다. 실행 표 CSV는 n_g를 `group_index [1]` 열에 씁니다.
 
 n_g가 있는 실행은 그 값을 버전 9 칸 `group_index`와 `group_index_method`에 보관합니다. 그 문서는 다른
 실행처럼 settings에서 다시 만들고, `results.group_index`를 더합니다. 그 `wavelength_step`은
@@ -282,7 +293,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 
 온도 수준이 정해지고(어느 변에 고정 온도나 h > 0인 대류), 이웃한 고정 온도 변이 모서리에서
 같고, 메시가 서버 한도 안이면 실행할 수 있으며 그렇지 않으면 이유를 표시합니다. 잘못된 값은
-강조된 초안으로 남아 고치거나 되돌리기 전까지 실행·저장을 막습니다. **Run heat study**는
+강조된 초안으로 남아 고치거나 되돌리기 전까지 실행·저장을 막습니다. **Run study**는
 `thermal.steady2d` 문서(정확한 JSON은 **Study**에서 확인)를 만들고 고전 Studio 페이지와 같은
 공개 열 경로로 검증한 뒤 계산합니다. 결과는 실제 결과 메시 위에 온도(P1, 삼각형 안에서 보간)
 또는 열유속 |q|·qx·qy(삼각형마다 상수)를 열유속 화살표와 함께 보여 주며, 최저·최고 온도와
@@ -317,7 +328,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 모든 모델 재료의 유효 범위 안에 있고, 이웃한 고정 변이 모서리에서 같은 값(전위와 온도)을 가지며, Studio의
 작업 자리 하나를 열 작업이 쓰고 있지 않으면(열 작업도 Joule 작업을 같은 방식으로 기다림) Run이 켜지고,
 아니면 이유를 보여 줍니다.
-**Run Joule heating study**는 문서(**Study**에 표시)를 만들어 Studio의
+**Run study**는 문서(**Study**에 표시)를 만들어 Studio의
 [Joule route](electric_joule.md#studio-영역-문서)에서 그 영역·메시 한도로 검증하고 실행합니다. 거부(예:
 한 모서리의 두 전위, 절점 상한을 넘는 메시, 수렴하지 않는 반복)는 그 문장으로 보여 줍니다.
 결과는 Graphics의 실제 메시와 영역 경계 위에 온도와 전위(P1) 또는 전류 밀도 |J|, Joule 전력 밀도,
@@ -365,7 +376,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   조용히 지우지 않고 고칠 문제로 화면에 남깁니다.
 - **Add coupling**은 출력을 고른 뒤 그것을 받을 수 있는 입력 하나를 고릅니다. 나머지는 이유와
   함께 회색입니다(같은 물리, 다른 양, 다른 단위, 이미 소스 하나를 받은 입력). 단일 숫자인 출력은
-  예를 들어 *Modes 1 effective index (single numbers, not a map)*처럼 회색으로 나옵니다. 전달은 이번 릴리스의
+  예를 들어 *Modes 1 effective index (single numbers, not a map)*처럼 회색으로 나옵니다. 입력 하나를 위해
+  열면(Messages의 제안에서 **Add coupling**) From에는 그 입력이 받을 수 있는 출력만 나옵니다: 온도 입력에는
+  온도 장만 제안합니다. 전달은 이번 릴리스의
   유일한 방식인 Same mesh입니다. 분명히 이을 수 있는 입력(Heat 1에서 받는 Modes 1 온도)이 있으면
   Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다. 그동안 Modes 1은
   트리, Connections 노드, Settings, Messages에 경고를 답니다: “Temperature input has no source:
@@ -390,8 +403,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   열광학 계수와 기준 온도가 필요합니다. `physmat:Si`와 `physmat:SiO2`는 이를 갖고 있고, 로컬
   기록에서는 **Fill from physmat**이 physmat 값을 복사해 넣거나(출처를 적음) **Use physmat:…
   instead**가 그 영역을 라이브러리 재료로 바꿉니다.
-- **Run**은 **Run optical study**와 같은 ▶와 함께 모든 물리를 풀이 순서대로 풉니다. ▶는 빈 대체
-  텍스트를 가진 장식이라 화면 낭독기는 이름(“Run”, “Run optical study”)만 읽습니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
+- **Run study**는 단일 물리 모델과 같은 ▶와 이름으로 모든 물리를 풀이 순서대로 풉니다. ▶는 빈 대체
+  텍스트를 가진 장식이라 화면 낭독기는 이름(“Run study”)만 읽습니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
   Solving…, Done in 0.3 s, 마지막 변화와 함께 Iteration 7 of up to 30, Did not settle, Not run)를
   보여 주고, Connections도 열려 있는 동안 같은 상태를 보여 줍니다. **Stop run**은 엔진의 다음
   단계에서 실행을 멈춥니다. 풀고 있는 물리가 끝난 뒤, 반복 단계 안에서는 지금 반복이 끝난
@@ -403,8 +416,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   그대로이고 *Modes 1 · Out of date (last run: Done in 1.2 s)*가 됩니다. 이때 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
-  제목, 하단은 같은 문장 “Model matches run 1 again: its results are current. Run makes a new run with the
-  same inputs”를 보여 주어 Run이 무엇을 하는지 밝힙니다. 세션 파일에서 읽었거나 이 브라우저에서
+  제목, 하단은 같은 문장 “No need to run: Run 1 already has these results. Run again to make a copy”를
+  보여 주어 실행할 필요가 없다는 것을 먼저 밝힙니다(Undo가 선택을 되살렸으면 Messages가 “Also solve
+  without heater” is ticked again을 덧붙임). 세션 파일에서 읽었거나 이 브라우저에서
   복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**(반복 단계는 *Settled in 7 iterations · from file*처럼
   반복 횟수를 유지), 도크 제목은
   “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고
@@ -564,8 +578,11 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 때부터 Save session이 쓸 버전 8 글로 기록합니다. 16 MiB를 넘으면 대화 상자 없이 고른 실행과 고정한
 실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · Save session to
 keep them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
-MiB”) 이전 기록이 남습니다. **Recover last session**과 **Recover earlier session · Heated silicon
-waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은 검사를 합니다.
+MiB”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
+browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
+waveguide 카드의 **Restore from this browser**는 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
+연 세션 파일과 같았던 기록을 복구하면 광학 기록처럼 *Recovered from this browser · same as file …json*으로
+읽힙니다. 방금 연 템플릿은 첫 편집, 실행, 저장 전까지 *New model · not saved*로 읽힙니다.
 
 모듈 검사는 `tests/simcase/studio_workspace_multiphysics_session.cjs`에 있습니다(버전 8 이전 Studio가
 쓴 버전 6, 7 광학 파일이 `tests/simcase/studio_session_fixtures/`에 있고, 이전처럼 열리며 바이트
@@ -645,7 +662,7 @@ kept*를 보입니다.
 입력 JSON은 설계를, 세션 JSON은 검증된 결과까지 저장합니다. 열기로 복원하며
 입력 파일은 64 KiB, 세션은 16 MiB로 제한합니다. CSV·PNG 내보내기도 제공합니다.
 작업공간 형식은 headless simcase JSON 문서와 다릅니다. 새로고침 후에는
-Recover last session으로 완료된 브라우저 스냅샷을, Open session으로 파일을 명시적으로
+Restore last session from this browser로 완료된 브라우저 스냅샷을, Open session으로 파일을 명시적으로
 복원합니다. 저장 대기 중인 변경은 백업이 아닙니다.
 
 입력 파일은 버전 7입니다: 버전 6(단위·이름 일괄 변경)에 Joule 가열 입력(`model.joule`, 길이 mm,
@@ -661,7 +678,11 @@ CSV/PNG 내보내기에도 반영합니다.
 실행 표 CSV(`studio-runs.csv`)는 모든 양의 열을 `name [unit]` 머리글과 SI 값으로 씁니다.
 `core_width [m]`·`core_height [m]`(사각형 하나인 설계), `vacuum_wavelength [m]`,
 `core_element_size [m]`, `effective_index [1]`이며, 작업·이름·고정·완료 시각·`core_material`·
-모든 형상을 설명하는 `shapes` 열(페이지처럼 nm)·후보 번호에는 단위가 없습니다.
+모든 형상을 설명하는 `shapes` 열(페이지처럼 nm)·후보 번호에는 단위가 없습니다. `effective_index [1]`은
+Re n_eff입니다. 이전 열이 모두 제자리에 있도록 `origin` 뒤에 두 열이 붙습니다: `effective_index_imag [1]`은
+exp(−iωt) 아래의 Im n_eff(n_eff가 실수인 무손실 실행은 0), `group_index [1]`은 군굴절률을 계산한 실행의
+n_g(실행에 없거나 그 모드에 값이 없으면 빈칸)입니다. 복소 n_eff를 가진 실행도 씁니다. 이 열들 전에는
+내보내기가 그런 실행을 거부했습니다.
 
 광학 세션 파일은 버전 7이며 입력은 버전 7 입력 파일입니다(버전 6 세션도 계속 읽고, 그 입력은 버전 6 입력
 파일로 읽습니다. 다중물리 모델은 [버전 8](#다중물리-모델의-세션-파일버전-8)로, 버전 7이 담을 수 없는 실행이 있는
@@ -795,7 +816,7 @@ HTTP 자산을 다룹니다. 배포 검사에서도 설치 자산을 복사해 �
 ## 입력 복구와 재료 검토
 
 유효한 입력 변경은 별도 브라우저 복구 기록에 자동 저장됩니다. 새로고침 후
-**Recover recent inputs**로 교체 확인을 거쳐 복원하며 계산은 실행하지 않습니다.
+**Restore recent inputs from this browser**로 교체 확인을 거쳐 복원하며 계산은 실행하지 않습니다.
 브라우저 origin별 최신 기록 하나를 탭끼리 공유합니다. 잘못된 중간 입력,
 완료된 장 데이터, Undo 이력은 복구하지 않습니다. 자동 복구 기록은 파일 저장
 완료로 취급하지 않습니다. 저장소 오류는 파일 저장 대안과 함께 표시합니다.
@@ -956,8 +977,9 @@ IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름
 *browser recovery unavailable*)를, 세션 파일이 생기면 그 파일을 보여 줍니다. 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
-새로고침 후 시작 화면의 **Continue where you left off** 카드에서 마지막 세션을 고르거나
-Connection, recovery and layout help → Recover last session으로 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
+새로고침 후 모델 카드(Optical waveguide 또는 Heated silicon waveguide 아래 **Restore from this browser**),
+어느 카드도 제안하지 않는 세션은 시작 화면의 **Continue where you left off** 카드, 또는 Workspace tools →
+**Restore last session from this browser**로 마지막 세션을 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
 아닌 `recovered`로 표기합니다. 입력 Undo 이력은 새로 시작하고 파일/세션을 저장할
 때까지 미저장 상태를 유지합니다. 솔버는 실행하지 않습니다. 입력만 복구하는 기능과
 대기 작업 복구는 별도입니다.
@@ -967,14 +989,14 @@ Connection, recovery and layout help → Recover last session으로 복원합니
 Compare 선택과 실행의 출처를 빼고 비교해 세션을 한 번만 둡니다(이전에는 세션 파일을 열거나 복구하면 모든
 실행의 출처가 바뀌어, 새 페이지의 첫 저장이 같은 실행의 저장된 사본을 또 하나의 이전 세션으로 남겼습니다). 쓰는 세션이 저장된 세션과 같으면(같은 파일을 다시 열었을 때) 저장된
 기록을 옮기지 않고 바꾸며, 둘 중 어느 것의 이전 사본(탭이 다른 모델로 갔다 돌아온 뒤 바뀌지 않은
-모델을 다시 저장할 때)도 지웁니다. 남은 사본은 목록이 숨깁니다. 브라우저 복구는 목록을 위해 노트북을 연 세션 파일의 이름도 보관합니다. **Recover earlier
-session**이 각 세션의 모델, 실행 수, 실행 이름과 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
+모델을 다시 저장할 때)도 지웁니다. 남은 사본은 목록이 숨깁니다. 브라우저 복구는 목록을 위해 노트북을 연 세션 파일의 이름도 보관합니다. **Restore earlier
+session from this browser**가 각 세션의 모델, 실행 수, 실행 이름과 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
 세션을 복구하면 다음 저장 때 지금 세션이 이전 세션으로 남습니다.
 
 최신 스냅샷은 같은 브라우저 origin의 한 건이며 탭 간 공유됩니다. 저장할 때 같은 데이터베이스
 트랜잭션 안에서 이전에 읽은 revision을 확인합니다. 이 탭을 열거나 복구한 뒤 다른
 탭이 저장했다면 해당 기록을 덮지 않고 자동 저장을 중단합니다. Save session으로
-현재 탭을 파일에 보관한 뒤 Recover last session으로 최신 노트북을 검토·복구하세요.
+현재 탭을 파일에 보관한 뒤 Restore last session from this browser로 최신 노트북을 검토·복구하세요.
 검토 취소나 Retry recovery storage로 이 보호를 우회하지 않습니다.
 
 현재 탭의 노트북을 유지하려면 **Use current notebook for recovery**를 선택하고
