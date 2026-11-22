@@ -18,9 +18,10 @@ export function templatePhysics(id){
  return {...application.physics};
 }
 // What the landing page offers to resume: the latest browser session and the
-// earlier ones (C1), each as {runs, savedAt}. Empty when there is nothing.
+// earlier ones (C1), each as {runs, savedAt, model}; model names a multiphysics session's model
+// ("Heated silicon waveguide · 3 runs"). Empty when there is nothing.
 export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleString()){
- const line=(label,item)=>label+' · '+item.runs+(item.runs===1?' run':' runs')+' · saved '+when(item.savedAt);
+ const line=(label,item)=>label+' · '+(item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+' · saved '+when(item.savedAt);
  const choices=[];
  if(latest)choices.push({kind:'latest',label:line('Last session in this browser',latest)});
  // index: the record's place in storage, which recovery reads (given by the caller, else the position)

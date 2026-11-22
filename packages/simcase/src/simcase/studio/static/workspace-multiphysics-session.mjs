@@ -27,6 +27,8 @@ export const VIEW_PAGES=Object.freeze(['Model','Connections','Results']);
 export const INDEX_MAPS=Object.freeze(['index','change']);
 export const MAPS_NOT_KEPT='Maps not kept in this file: n_eff, the coupling check and the iteration history are.';
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+// an own entry of a record: "__proto__" or "toString" name nothing in a document
+const own=(o,k)=>isObject(o)&&Object.hasOwn(o,k)&&isObject(o[k]);
 const plural=(n,word)=>`${n} ${word}${n===1?'':'s'}`;
 const utf8=text=>new TextEncoder().encode(text);
 
@@ -114,34 +116,61 @@ export function sessionRun(run,keepMaps=true){
 function sessionBaseline(b){const record={job:b.job,completedAt:b.completedAt,document:b.document,result:b.result};return {...record,digest:recordDigest(record)};}
 // a baseline is written only for a run in the file or the current document (§1)
 function baselineTied(name,b,documents){const key=canonicalJson(b.document);return documents.some(d=>isObject(d?.physics?.[name])&&canonicalJson(uncoupledDocument(d,name))===key);}
+// The text of each run record, kept while the run is unchanged: a run's document, events and
+// result never change once it is completed, so only its number, name, pin and maps make a new
+// text. Browser recovery writes the session after every change; this keeps that write from
+// serialising and hashing every map again.
+const runTexts=new WeakMap();
+function runPiece(run,keep){
+ const kept=keep&&run.maps!=='not kept',key=JSON.stringify([run.job,run.number,run.label||'',run.pinned===true,run.completedAt,run.serverVersion??null,kept,run.maps]);
+ let byKey=runTexts.get(run.result);if(!byKey){byKey=new Map();runTexts.set(run.result,byKey);}
+ let piece=byKey.get(key);
+ if(!piece||piece.doc!==run.doc||piece.events!==run.events){const record=sessionRun(run,kept),text=sessionJson(record);piece={record,text,bytes:byteLength(text),doc:run.doc,events:run.events};byKey.set(key,piece);if(byKey.size>8)byKey.delete(byKey.keys().next().value);}
+ return piece;
+}
+function sessionBaselines(state){
+ const documents=[state.document,...state.runs.map(r=>r.doc)],baselines={};
+ for(const [name,b] of Object.entries(state.baselines||{}))if(b&&b.document&&b.job&&baselineTied(name,b,documents))baselines[name]=sessionBaseline(b);
+ return baselines;
+}
 /** The session object. state: {document, runs, baselines: {name: {job, completedAt, document,
  * result}}, selected: job or null, view}; keep: the jobs whose maps are kept (default all). */
 export function createMultiphysicsSession(state,keep=null){
- const runs=state.runs.map(r=>sessionRun(r,keep?keep.has(r.job):true)),documents=[state.document,...state.runs.map(r=>r.doc)],baselines={};
- for(const [name,b] of Object.entries(state.baselines||{}))if(b&&b.document&&b.job&&baselineTied(name,b,documents))baselines[name]=sessionBaseline(b);
- return {format:SESSION_FORMAT,version:MULTIPHYSICS_VERSION,application:'multiphysics',document:state.document,runs,baselines,selected:state.selected??null,view:state.view};
+ return {format:SESSION_FORMAT,version:MULTIPHYSICS_VERSION,application:'multiphysics',document:state.document,runs:state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true).record),
+  baselines:sessionBaselines(state),selected:state.selected??null,view:state.view};
+}
+// The file as parts: sessionJson(createMultiphysicsSession(state, keep)) is head + the run texts
+// joined by commas + tail; its size is counted without building the text.
+function fileParts(state,keep,baselines=sessionBaselines(state)){
+ const head=`{"format":${sessionJson(SESSION_FORMAT)},"version":${MULTIPHYSICS_VERSION},"application":"multiphysics","document":${sessionJson(state.document)},"runs":[`;
+ const pieces=state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true));
+ const tail=`],"baselines":${sessionJson(baselines)},"selected":${sessionJson(state.selected??null)},"view":${sessionJson(state.view)}}`;
+ const bytes=byteLength(head)+byteLength(tail)+pieces.reduce((n,p)=>n+p.bytes,0)+Math.max(0,pieces.length-1);
+ return {bytes,baselines:Object.keys(baselines).length,text:()=>head+pieces.map(p=>p.text).join(',')+tail};
 }
 // the runs that keep their maps when the file would exceed the limit: the selected and pinned
 const priority=state=>new Set(state.runs.filter(r=>r.pinned||r.job===state.selected).map(r=>r.job));
-/** Save session (§2): {ok, text, bytes, notKept} when it fits; else {ok: false, bytes, reduced}
- * where reduced is the file with the maps of the selected and pinned runs only (null when even
- * that is over the limit, with refusal naming why). keepSelected writes the reduced file. */
-export function writeMultiphysicsSession(state,{keepSelected=false,limit=MAX_SESSION_BYTES}={}){
- const full=sessionJson(createMultiphysicsSession(state)),fullBytes=byteLength(full),valuesOnlyRuns=state.runs.filter(r=>r.maps==='not kept').map(r=>r.number);
- if(fullBytes<=limit)return {ok:true,text:full,bytes:fullBytes,notKept:valuesOnlyRuns};
- const keep=priority(state),text=sessionJson(createMultiphysicsSession(state,keep)),bytes=byteLength(text);
+/** Save session (§2): {ok, text, bytes, notKept, baselines} when it fits; else {ok: false,
+ * bytes, reduced} where reduced is the file with the maps of the selected and pinned runs only
+ * (null when even that is over the limit, with refusal naming why). keepSelected writes the
+ * reduced file. name: false leaves out the per-run refusal (browser recovery has no use for it). */
+export function writeMultiphysicsSession(state,{keepSelected=false,limit=MAX_SESSION_BYTES,name=true}={}){
+ const baselines=sessionBaselines(state),full=fileParts(state,null,baselines),valuesOnlyRuns=state.runs.filter(r=>r.maps==='not kept').map(r=>r.number);
+ if(full.bytes<=limit)return {ok:true,text:full.text(),bytes:full.bytes,notKept:valuesOnlyRuns,baselines:full.baselines};
+ const keep=priority(state),reduced=fileParts(state,keep,baselines);
  const notKept=state.runs.filter(r=>!keep.has(r.job)||r.maps==='not kept').map(r=>r.number);
- if(bytes<=limit)return keepSelected?{ok:true,text,bytes,notKept}:{ok:false,bytes:fullBytes,reduced:{bytes,notKept},refusal:null};
+ if(reduced.bytes<=limit)return keepSelected?{ok:true,text:reduced.text(),bytes:reduced.bytes,notKept,baselines:reduced.baselines}:{ok:false,bytes:full.bytes,reduced:{bytes:reduced.bytes,notKept},refusal:null};
+ if(!name)return {ok:false,bytes:full.bytes,reduced:null,refusal:null};
  // over the limit with only the selected and pinned maps: name the run that alone exceeds it
  const kept=state.runs.filter(r=>keep.has(r.job)&&r.maps!=='not kept');
- for(const run of kept){const alone=byteLength(sessionJson(createMultiphysicsSession({...state,runs:[run],selected:run.job,baselines:{}})));
-  if(alone>limit)return {ok:false,bytes:fullBytes,reduced:null,refusal:`Run ${run.number} alone is ${sizeText(alone)}, over the 16 MiB session limit. Unpin it or keep it in a smaller-mesh model.`};}
- return {ok:false,bytes:fullBytes,reduced:null,refusal:`The selected and pinned runs (${kept.map(r=>'Run '+r.number).join(', ')}) are ${sizeText(bytes)} with their maps, over the 16 MiB session limit. Unpin some of them.`};
+ for(const run of kept){const alone=fileParts({...state,runs:[run],selected:run.job,baselines:{}},null,{}).bytes;
+  if(alone>limit)return {ok:false,bytes:full.bytes,reduced:null,refusal:`Run ${run.number} alone is ${sizeText(alone)}, over the 16 MiB session limit. Unpin it or keep it in a smaller-mesh model.`};}
+ return {ok:false,bytes:full.bytes,reduced:null,refusal:`The selected and pinned runs (${kept.map(r=>'Run '+r.number).join(', ')}) are ${sizeText(reduced.bytes)} with their maps, over the 16 MiB session limit. Unpin some of them.`};
 }
 export function overflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the maps of the selected and pinned runs only? The other runs keep n_eff, the coupling check and the iteration history, but not their maps.`;}
 /** Browser recovery (§4): the file, or the selected and pinned maps only, without a dialog. */
 export function recoveryText(state,limit=MAX_SESSION_BYTES){
- const out=writeMultiphysicsSession(state,{keepSelected:true,limit});
+ const out=writeMultiphysicsSession(state,{keepSelected:true,limit,name:false});
  if(!out.ok)throw Object.assign(new Error('browser recovery unavailable: session over 16 MiB'),{code:'recovery-over-limit'});
  return out;
 }
@@ -195,19 +224,22 @@ const KELVIN={K:1,mK:1e-3,uK:1e-6,'µK':1e-6};
 function tolerance(value,unit){const m=/^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(\S*)\s*$/.exec(String(value??''));if(!m)return NaN;const u=m[2]||unit;return u===unit?Number(m[1]):unit==='K'&&KELVIN[u]?Number(m[1])*KELVIN[u]:NaN;}
 function checkStructure(r,result,doc){
  const physics=isObject(doc.physics)?doc.physics:{},names=Object.keys(physics);
- if(!isObject(result.physics)||Object.keys(result.physics).sort().join()!==[...names].sort().join()||names.some(n=>result.physics[n]?.type!==physics[n]?.type))fail(`${r}'s result does not hold the physics of its model.`);
+ if(!isObject(result.physics)||Object.keys(result.physics).sort().join()!==[...names].sort().join()||names.some(n=>!isObject(result.physics[n])||result.physics[n].type!==physics[n]?.type))fail(`${r}'s result does not hold the physics of its model.`);
  const couplings=isObject(doc.couplings)?doc.couplings:{},records=isObject(result.couplings)?result.couplings:null;
  if(!records||Object.keys(records).sort().join()!==Object.keys(couplings).sort().join())fail(`${r}'s coupling records do not match its model's couplings.`);
  for(const [name,c] of Object.entries(couplings)){const k=records[name];
+  if(!isObject(c)||!isObject(k))fail(`${r}'s coupling record ${name} does not match its model.`);
   if(k.from!==c.from||k.to!==c.to||k.transfer!==(c.transfer??'same_mesh'))fail(`${r}'s coupling record ${name} does not match its model.`);
   if(k.transfer==='same_mesh'&&(k.mesh_signature!=='match'||k.max_abs_difference?.value!==0))fail(`${r}'s coupling ${name} did not pass its same-mesh check.`);}
  const loops=Array.isArray(doc.study?.loops)?doc.study.loops:[],stored=result.loops;
  const set=l=>[...(l?.physics||[])].sort().join();
- if(!Array.isArray(stored)||stored.length!==loops.length||loops.some(l=>!stored.some(s=>set(s)===set(l))))fail(`${r}'s iteration steps do not match its model.`);
- for(const s of stored){const what=`${r}'s iteration step ${(s.physics||[]).map(physicsLabel).join(' ⇄ ')}`;
+ if(!Array.isArray(stored)||!loops.every(isObject)||!stored.every(isObject)||stored.length!==loops.length||loops.some(l=>!stored.some(s=>set(s)===set(l))))fail(`${r}'s iteration steps do not match its model.`);
+ for(const s of stored){
+  // the tolerance is the model's (study.loops), not a value the result repeats
+  const step=loops.find(l=>set(l)===set(s));const what=`${r}'s iteration step ${(s.physics||[]).map(physicsLabel).join(' ⇄ ')}`;
   if(s.converged!==true||!Number.isInteger(s.iterations)||s.iterations<1)fail(`${what} did not converge; a run that did not succeed cannot be in a session.`);
   if(!Array.isArray(s.residuals)||s.residuals.length!==s.iterations-1||!s.residuals.every(x=>finite(x?.value)))fail(`${what} has ${Array.isArray(s.residuals)?s.residuals.length:'no'} residuals for ${s.iterations} iterations.`);
-  const last=s.residuals.at(-1),limit=tolerance(s.tolerance?.value,last?.unit);
+  const last=s.residuals.at(-1),limit=tolerance(step.tolerance?.value,last?.unit);
   if(last&&!(last.value<=limit))fail(`${what} did not converge: its last change ${last.value} ${last.unit} is above the tolerance.`);}
  if(!Array.isArray(result.solve_order)||!result.solve_order.every(g=>Array.isArray(g)&&g.every(n=>names.includes(n))))fail(`${r}'s solve order is not well formed.`);
 }
@@ -239,7 +271,8 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
   // a document of another envelope is refused by the server's reader, named in the run (§3.3)
   const known=multi||raw.document.openphysics==='0.3',accepted=multi?[RESULT_FORMAT]:types.length===1?SINGLE_RESULT_FORMATS[types[0]]||[]:[];
   if(known&&!accepted.includes(raw.result.result))fail(`${r} was saved as result “${typeof raw.result.result==='string'?raw.result.result:'unnamed'}”, which this Studio does not read.`);
-  checkStructure(r,raw.result,raw.document);checkValues(r,raw.result,raw);
+  // a record of an unexpected shape is refused by name, not with the engine's TypeError
+  try{checkStructure(r,raw.result,raw.document);checkValues(r,raw.result,raw);}catch(e){if(e instanceof TypeError)fail(`${r} is not well formed.`);throw e;}
   if(typeof raw.digest!=='string'||raw.digest!==recordDigest(raw))fail(`${r} changed after it was saved (its check value does not match).`);
   documents.push({what:r,doc:raw.document,run:raw.job,order:raw.result.solve_order});
   runs.push({job:raw.job,number:raw.number,label,pinned:raw.pinned,completedAt:new Date(raw.completedAt).toISOString(),serverVersion:raw.serverVersion,doc:raw.document,events:raw.events,
@@ -270,9 +303,9 @@ export function readMultiphysicsView(view,document,run){
  if(!isObject(view)||!VIEW_PAGES.includes(view.page)||!INDEX_MAPS.includes(view.index_map)||typeof view.baseline_option!=='boolean'||typeof view.selection!=='string')bad();
  const [kind,...rest]=view.selection.split(':'),id=rest.join(':');
  const plain=['model','geometry','materials','mesh','study','order','results'];
- const ok=plain.includes(view.selection)||(kind==='physics'&&isObject(document.physics?.[id]))||(kind==='coupling'&&isObject(document.couplings?.[id]))
+ const ok=plain.includes(view.selection)||(kind==='physics'&&own(document.physics,id))||(kind==='coupling'&&own(document.couplings,id))
   ||(kind==='material'&&materialUses(document).some(u=>u.ref===id))||(kind==='loop'&&/^\d+$/.test(id)&&Array.isArray(document.study?.loops)&&+id<document.study.loops.length)
-  ||(kind==='results'&&!!run&&(id==='check'?Object.keys(run.result.couplings||{}).length>0:id==='runs'||isObject(run.result.physics?.[id])));
+  ||(kind==='results'&&!!run&&(id==='check'?Object.keys(run.result.couplings||{}).length>0:id==='runs'||own(run.result.physics,id)));
  if(!ok)bad();
  return {page:view.page,selection:view.selection,index_map:view.index_map,baseline_option:view.baseline_option};
 }

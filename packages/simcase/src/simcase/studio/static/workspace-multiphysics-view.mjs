@@ -13,7 +13,7 @@ import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsName
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {persistenceTitle,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
- MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES} from './workspace-multiphysics-session.mjs';
+ MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView} from './workspace-multiphysics-session.mjs';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -58,12 +58,12 @@ export function createMultiphysicsView(ctx){
  // source: 'file' | 'browser'; savedFile: the session file a recovered record was saved to.
  async function openSession(session,{label,source='file',savedFile=null}){
   if(!caps)await loadCapabilities();
-  active=true;ctx.onOpen?.();doc=clone(session.document);undoStack=[];redoStack=[];runFailure=null;lastRemoval=null;baselineQueue=[];baselineErrors={};stopAsked=false;
+  active=true;ctx.onOpen?.();doc=structuredClone(session.document);undoStack=[];redoStack=[];runFailure=null;lastRemoval=null;baselineQueue=[];baselineErrors={};stopAsked=false;
   runs=session.runs.map(r=>({...r}));lastRun=runs.find(r=>r.job===session.selected)||null;announcedMultiphysics=isMultiphysics(doc);
   uncoupled={};for(const [name,b] of Object.entries(session.baselines))uncoupled[name]={rows:effectiveIndexRows(b.result),key:canonicalJson(b.document),completedAt:b.completedAt,job:b.job,document:b.document,result:b.result};
   const v=session.view;selection=v.selection;indexView=v.index_map==='change'?'dn':'n';baselineOption=v.baseline_option;resultPage=selection.startsWith('results:')?selection:null;
   openedSignature=signature();const matched=source==='file'||savedFile?.current===true;cleanSignature=matched?signature():null;
-  sessionFile=source==='file'?{name:label,savedAt:null,stamp:null,jobs:new Set(runs.map(r=>r.job)),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:new Set(matched?runs.map(r=>r.job):[])}:null;
+  sessionFile=source==='file'?{name:label,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map()}:null;
   ctx.ui.page=v.page==='Results'&&!lastRun?'Model':v.page;validate(true);ctx.onHistory();
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp()};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
   ctx.onHistory();ctx.render();
@@ -89,8 +89,8 @@ export function createMultiphysicsView(ctx){
  }
  // Undo and Redo compute nothing; back at the last run's model they say its results are current.
  const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.number).trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption));};
- function undo(){if(!undoStack.length)return;lastRemoval=null;const prior=doc;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Undo · model edit undone',prior);}
- function redo(){if(!redoStack.length)return;lastRemoval=null;const prior=doc;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Redo · model edit redone',prior);}
+ function undo(){if(!undoStack.length)return;lastRemoval=null;const prior=doc;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Undo · model edit undone',prior);}
+ function redo(){if(!redoStack.length)return;lastRemoval=null;const prior=doc;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Redo · model edit redone',prior);}
  // A removed coupling is named in Messages with Undo until the next edit.
  function removeCouplingNamed(name){const title=couplingTitle(doc,name);commit(removeCoupling(doc,name),`Coupling ${title} removed. Undo restores it.`,'model');lastRemoval={title};ctx.render();}
  // ---- the live check ----
@@ -214,11 +214,11 @@ export function createMultiphysicsView(ctx){
  function setPath(path,value,message){const next=clone(doc);let o=next;for(const k of path.slice(0,-1)){if(o[k]===undefined||o[k]===null)o[k]={};o=o[k];}if(value===undefined)delete o[path.at(-1)];else o[path.at(-1)]=value;commit(next,message);}
  // a quantity field: a number in the expected unit, or the text as written when another unit
  function qfield(path,label,unit,{required=false,invalid=false,attrs=''}={}){
-  const value=getPath(path),q=value===undefined?null:parseQuantity(value),id='mp-f-'+path.join('-');
+  const value=getPath(path),q=value===undefined?null:parseQuantity(value),id=esc('mp-f-'+path.join('-'));
   if(value!==undefined&&(!q||q.unit!==unit))return `<label for="${id}">${esc(label)}<input id="${id}" type="text" data-mp-text="${esc(JSON.stringify(path))}" value="${esc(value)}" aria-invalid="${invalid}"></label>`;
   return `<label for="${id}">${esc(label)} [${esc(unitText(unit))}]<input id="${id}" type="number" step="any" ${attrs} data-mp-quantity="${esc(JSON.stringify(path))}" data-unit="${esc(unit)}" value="${q?q.number:''}" ${required&&value===undefined?'placeholder="needed"':''} aria-invalid="${invalid}"></label>`;
  }
- function nfield(path,label,attrs=''){const id='mp-f-'+path.join('-');return `<label for="${id}">${esc(label)}<input id="${id}" type="number" step="any" ${attrs} data-mp-number="${esc(JSON.stringify(path))}" value="${esc(getPath(path)??'')}"></label>`;}
+ function nfield(path,label,attrs=''){const id=esc('mp-f-'+path.join('-'));return `<label for="${id}">${esc(label)}<input id="${id}" type="number" step="any" ${attrs} data-mp-number="${esc(JSON.stringify(path))}" value="${esc(getPath(path)??'')}"></label>`;}
  function sfield(path,label,options,current){return `<label>${esc(label)}<select data-mp-select-field="${esc(JSON.stringify(path))}">${Object.entries(options).map(([k,v])=>`<option value="${esc(k)}" ${k===current?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;}
  const pair=(a,b)=>`<div class="pair"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`;
  // The names the model file uses (type, name in file, format, input arity): shown, but closed by default.
@@ -470,14 +470,19 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   notice(label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
  }
  // ---- the session file (§1-§2) and the save indicator ----
- const viewState=()=>({page:VIEW_PAGES.includes(ctx.ui.page)?ctx.ui.page:'Model',selection,index_map:indexView==='dn'?'change':'index',baseline_option:baselineOption});
+ // the selection as a file can hold it: an item an Undo removed (a coupling, an iteration step)
+ // is written as the model, so Studio never writes a view it would refuse
+ function storedSelection(){try{return readMultiphysicsView({page:'Model',selection,index_map:'index',baseline_option:false},doc,lastRun).selection;}catch{return 'model';}}
+ const viewState=()=>({page:VIEW_PAGES.includes(ctx.ui.page)?ctx.ui.page:'Model',selection:storedSelection(),index_map:indexView==='dn'?'change':'index',baseline_option:baselineOption});
  const savedBaselines=()=>Object.fromEntries(Object.entries(uncoupled).filter(([,b])=>b.document&&b.job).map(([n,b])=>[n,{job:b.job,completedAt:b.completedAt,document:b.document,result:b.result}]));
  const sessionState=()=>({document:doc,runs,baselines:savedBaselines(),selected:lastRun?.job||null,view:viewState()});
  // everything a session file holds, as a comparable text
  function stamp(){return JSON.stringify({doc,runs:runs.map(r=>[r.job,r.label,r.pinned,r.maps]),selected:lastRun?.job||null,baselines:Object.entries(uncoupled).map(([n,b])=>[n,b.job||null]),view:viewState()});}
  const sessionCurrent=()=>!!sessionFile&&sessionFile.stamp===stamp();
  // the runs that no session file holds
- const unsavedRuns=()=>sessionCurrent()?0:runs.filter(r=>!sessionFile?.jobs?.has(r.job)).length;
+ // the runs a session file holds as they are: job -> name and pin
+ const filed=()=>new Map(runs.map(r=>[r.job,JSON.stringify([r.label||'',r.pinned===true])]));
+ const unsavedRuns=()=>sessionCurrent()?0:runs.filter(r=>sessionFile?.jobs?.get(r.job)!==JSON.stringify([r.label||'',r.pinned===true])).length;
  const editedSinceOpen=()=>signature()!==openedSignature;
  function indicator(){
   return {clean:signature()===cleanSignature||(!cleanSignature&&!editedSinceOpen()),runsUnsaved:(runs.length>0||editedSinceOpen())&&!sessionCurrent(),
@@ -489,8 +494,8 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const out=writeMultiphysicsSession(sessionState(),{keepSelected});
   if(!out.ok){if(out.reduced)return {ok:false,question:overflowQuestion(out.bytes)};notice('Session not saved: '+out.refusal);return {ok:false,refused:out.refusal};}
   const name=sessionFileName(modelSlug(doc.name));ctx.download(new Blob([out.text],{type:'application/json'}),name);
-  sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:new Set(runs.map(r=>r.job))};cleanSignature=signature();loaded=null;ctx.onHistory();
-  notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:Object.keys(savedBaselines()).length>0}));
+  sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:filed()};cleanSignature=signature();loaded=null;ctx.onHistory();
+  notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:out.baselines>0}));
   return {ok:true,name};
  }
  // browser recovery (§4): written while the model has a run or was edited since it was opened

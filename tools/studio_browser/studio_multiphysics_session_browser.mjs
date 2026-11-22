@@ -325,6 +325,24 @@ print(n)`;
   await size(1440, 900); await sleep(300);
   stage('S10 words', words);
 
+  // a coupling added and undone leaves no selection the file could not hold: the file reopens
+  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings');
+  await page.click('[data-mp-remove-coupling]');
+  await page.until("!!document.querySelector('#mp-messages [data-mp-add-coupling]')", 'suggestion');
+  await page.click('#mp-messages [data-mp-add-coupling]');
+  await page.until("!!document.querySelector('dialog.mp-dialog #mp-to')", 'coupling dialog');
+  await page.click('#mp-coupling-add');
+  await page.until("!document.querySelector('dialog[open]')&&!!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')", 'coupling added');
+  await page.click('#undo-edit');
+  await page.until("!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')", 'undone');
+  const undone = await saveSession('after undo');
+  assert.equal(JSON.parse(undone.text).view.selection, 'model');
+  await openSession(undone.path);
+  await page.click('nav [data-page=Applications]');
+  await openTemplate();
+  stage('selection after Undo', {selection: JSON.parse(undone.text).view.selection});
+
   // S1 and S2, the template: run, save, open, save again
   await runAndWait(1);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 180000);
