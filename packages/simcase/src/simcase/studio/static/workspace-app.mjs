@@ -368,7 +368,7 @@ function refreshInputIssues(){
  else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
- const next=$('next-run-inputs');if(next&&isOptical()){const text=nextRunText(current(),state.modeCount);if(next.textContent!==text)next.textContent=text;}
+ const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount);if(next.textContent!==text)next.textContent=text;}
 }
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
@@ -644,14 +644,15 @@ function useRunInputs(run){
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
  const doc=edits.replace(validateProject(run.input));workspaceLoads.invalidate();newModelInputs=null;
  state.modeCount=runModeCount(run);state.groupIndex=run.group_index_method!==undefined;
- restoreEdit(doc,'');
- notice(`Current inputs set from ${runNumberTitle(run)}: ${designSummary(doc.model)} · λ ${doc.model.wavelength} nm. The next run uses them; Undo takes them back.`);
+ restoreEdit(doc,null);inputsChangedSinceResult();
+ notice(`Current inputs set from ${runNumberTitle(run)}: ${designSummary(doc.model)} · λ ${doc.model.wavelength} nm · Modes to find ${state.modeCount}. The next run uses them; Undo takes the geometry and the wavelength back.`);
 }
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
+// label null: no notice (the caller says what happened)
 function restoreEdit(doc,label){
  numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.clearDrafts();
  Object.assign(state,doc.model);Object.assign(setup,doc.setup);pick.boundary=null;
- checkpointRecovery();render();updateHistory();refreshPersistence();notice(label+' · input changes only; no solver executed.');
+ checkpointRecovery();render();updateHistory();refreshPersistence();if(label!==null)notice(label+' · input changes only; no solver executed.');
 }
 $('undo-edit').onclick=()=>multiView.active()?multiView.undo():restoreEdit(edits.undo(),'Undo');
 $('redo-edit').onclick=()=>multiView.active()?multiView.redo():restoreEdit(edits.redo(),'Redo');
@@ -926,7 +927,7 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(nextRunText(current(),state.modeCount))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
  $('group-index-check').onchange=e=>{state.groupIndex=e.target.checked;render();};
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
@@ -1151,7 +1152,7 @@ function renderRunList(){
   // a viewed run with other inputs than the current ones: its inputs become the current inputs at
   // once (the runs stay as they are, so nothing is asked), and Undo takes them back
   if(solverRun.signature!==signature()){const restore=document.createElement('button');restore.id='restore-run-input';restore.className='primary';restore.textContent='Use this run’s inputs';const target=solverRun;restore.onclick=()=>useRunInputs(target);restore.disabled=numericDrafts.invalid;
-   const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes them back.`;restore.setAttribute('aria-describedby',why.id);
+   const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes the geometry and the wavelength back.`;restore.setAttribute('aria-describedby',why.id);
    const slot=$('use-run-slot');if(slot)slot.append(restore,why);else panel.append(restore,why);}
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');

@@ -590,12 +590,12 @@ try {
   // Use this run's inputs: run 1's inputs become the current ones at once (no question: the runs
   // stay), the title and the step bar agree, and Undo takes them back
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 Use this run\'s inputs');
-  assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes them back\.$/);
+  assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes the geometry and the wavelength back\.$/);
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')&&/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'L3 inputs used');
   const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
-  assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm\. The next run uses them; Undo takes them back\.$/);
+  assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm · Modes to find 2\. The next run uses them; Undo takes the geometry and the wavelength back\.$/);
   await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'L3 study after use');
   assert.match(await text('#next-run-inputs'), /^Next run uses 600 × 300 nm · Silicon · /);
   await page.click('#undo-edit'); await sleep(200);
@@ -842,7 +842,8 @@ try {
     const top=[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({record:b.dataset.resumeRecord,text:b.textContent}));
     return {card:{record:card.dataset.resumeRecord,text:card.textContent},top,keys:[card.dataset.resumeRecord,...top.map(t=>t.record)].map(i=>{const d=JSON.parse(record(i).session);return JSON.stringify({model:d.input??d.document,runs:(d.runs||[]).map(r=>[r.job,r.label||'',r.pinned===true])});}),stored:earlier.length};})`);
   stage('J2 one entry per session', offers);
-  assert.ok(offers.card.text.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · same as file ' + sessionFile + ', saved '), offers.card.text);
+  // the record matched the file it was opened from, which has no save time here: the time is the browser copy's
+  assert.ok(offers.card.text.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · browser copy ') && offers.card.text.endsWith(' · same as file ' + sessionFile), offers.card.text);
   assert.ok(!offers.top.some(t => t.record === offers.card.record), 'the box above does not list the record the card resumes');
   // compared by the stored inputs and runs themselves, not by the sessionKey under test
   assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');

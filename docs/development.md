@@ -363,7 +363,7 @@ Compare's absorption loss columns, plots framed on the core with the probe line 
 one selected run card, the session file still named after a page, run or mode is chosen and after
 a restore, and a restore opening the page that was shown. Since round 11 it also checks no
 tree node selected on Results or Compare and a node under the pointer keeping the plain fill,
-the title's short *(other inputs)* only on Results, **Use this run's inputs** without a question
+the title's short *(other inputs)* only on Results and Compare, **Use this run's inputs** without a question
 and Undo taking it back, the Study settings naming the next run's inputs and editing the
 wavelength (1300 nm refused there as in Optical modes), and a restore card naming the file's
 save time.

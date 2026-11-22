@@ -373,7 +373,7 @@ export function createMultiphysicsView(ctx){
  function couplingDialog(from=null,to=null){
   // opened for one input: its From list holds only the outputs that input can take
   const sources=sourceChoicesFor(doc,catalog,to);if(from&&!sources.some(s=>s.spec===from))from=null;from=from||sources.find(s=>s.ok)?.spec;
-  if(!from){notice('No physics of this model sends a field to couplings yet. Add physics first.');return;}
+  if(!from){notice(to?`No output of this model can feed ${physicsLabel(splitSpec(to)[0])} ${quantityWords(splitSpec(to)[1])}.`:'No physics of this model sends a field to couplings yet. Add physics first.');return;}
   const d=dialog('Add coupling','<div id="mp-coupling-body"></div>','<button type="button" id="mp-coupling-add" class="primary">Add coupling</button>');
   const draw=()=>{const targets=targetChoices(doc,catalog,from);if(!to||!targets.find(t=>t.spec===to&&t.ok))to=targets.find(t=>t.ok)?.spec||null;
    d.querySelector('#mp-coupling-body').innerHTML=`<label>From (outputs)<select id="mp-from">${sources.map(s=>`<option value="${esc(s.spec)}" ${s.spec===from?'selected':''} ${s.ok?'':`disabled title="${esc(s.detail)}"`}>${esc(s.label)}${s.ok?' · '+esc(unitText(s.port.unit)):` (${esc(s.reason)})`}</option>`).join('')}</select></label>

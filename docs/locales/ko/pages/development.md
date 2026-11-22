@@ -307,7 +307,7 @@ Space, Left, Right), 광학과 Joule 가열 트리의 모든 노드를 브라우
 Compare의 흡수 손실 열, 1440 × 900과 1280 × 800에서 코어에 맞춰진 그림과 그 아래의 probe 줄, Compare에서 누른 실행이
 Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 실행 카드 하나, 페이지·실행·모드를 골라도 복구 뒤에도
 이름이 남는 세션 파일, 보이던 페이지를 여는 복구를 확인합니다. 11차부터는 Results나 Compare에서 고른 트리 노드가 없고
-포인터가 올라간 노드도 일반 배경을 유지함, 짧은 *(other inputs)*가 Results에서만 제목에 붙음, 묻지 않는
+포인터가 올라간 노드도 일반 배경을 유지함, 짧은 *(other inputs)*가 Results와 Compare에서만 제목에 붙음, 묻지 않는
 **Use this run's inputs**와 그것을 되돌리는 Undo, 다음 실행의 입력을 밝히고 파장을 고치는 Study 설정(1300 nm는
 Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을

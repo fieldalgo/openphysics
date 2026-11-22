@@ -553,8 +553,10 @@ print(n)`;
   // round 11 (L7): after a restart the Heated silicon waveguide card restores its own newest record,
   // which the box above does not list again; the record is the same as the file just saved, so the
   // card names that file with its save time, and the restored title says "same as file"
-  const r1Name = basename(r1.path);
-  await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(r1Name)}&&r.savedFile.current===true})`, 'record of the saved session', 20000);
+  // the session's own file name (the browser may give the download another name)
+  const r1Name = (await page.text('#autosave-status')).match(/^Session file (\S+\.json) sent/)?.[1];
+  assert.ok(r1Name, await page.text('#autosave-status'));
+  await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(r1Name)}&&r.savedFile.current===true})`, 'record of the saved session', 30000);
   await page.call('Page.reload');
   await page.until("!!document.getElementById('resume-heated-waveguide')", 'heated card offer');
   const heatedOffer = await page.eval("(()=>{const b=document.getElementById('resume-heated-waveguide');return {text:b.textContent,record:b.dataset.resumeRecord,next:b.nextElementSibling?.textContent,card:b.closest('.card-slot')?.querySelector('[data-template]')?.dataset.template,top:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(x=>x.dataset.resumeRecord)}})()");

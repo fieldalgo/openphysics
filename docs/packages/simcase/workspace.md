@@ -815,8 +815,7 @@ completion time, `core_material`, a `shapes` column describing every shape (in n
 page shows it) and the candidate number carry no unit. `effective_index [1]` is Re n_eff. Two
 columns follow `origin`, so every earlier column keeps its place: `effective_index_imag [1]`,
 Im n_eff under exp(−iωt) (0 for a lossless run, whose n_eff is real), and `group_index [1]`, n_g
-of a run with the group index (empty when the run has none or the mode has no value). A run
-with complex n_eff is written too; before these columns the export refused it.
+of a run with the group index (empty when the run has none or the mode has no value).
 
 Optical session files are version 7, whose input is an input file of version 7 (a version 6
 session is still read, its input as a version 6 input file; a multiphysics model is saved as
