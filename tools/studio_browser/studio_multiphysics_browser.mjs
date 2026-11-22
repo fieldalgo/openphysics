@@ -237,7 +237,7 @@ try {
     assert.equal(done.status, 0, done.stderr);
     return done.stdout.trim();
   };
-  const uncoupledOf = tree => page.on('function(t){return import("/static/workspace-multiphysics.mjs").then(m=>m.uncoupledDocument(t,"modes1"))}', tree);
+  const uncoupledOf = tree => page.on('function(t){return import("/workspace-assets/workspace-multiphysics.mjs").then(m=>m.uncoupledDocument(t,"modes1"))}', tree);
   await page.click('#run-multiphysics');
   await page.until("!!document.querySelector('[data-neff=\"1\"]')", 'result', 120000);
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
