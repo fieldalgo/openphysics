@@ -241,6 +241,73 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 브라우저로 실행합니다([개발 안내](../../development.md)): 기본 모델의 Picard·Newton 실행, 거부된 Newton
 실행의 문장 표시, 상수 재료.
 
+## 다중물리 모델: 열 → 광 모드
+
+**Applications → Heated silicon waveguide**(“Heat → optical modes · coupled”)를 고르면
+[다중물리 문서](multiphysics_document.md)가 열립니다. 한 형상, 한 메시 위의 두 물리를 결합 하나로
+잇고 **Run** 한 번으로 풉니다. 템플릿은 6 × 4.5 µm 창 안의 `physmat:SiO2` 위에 놓인
+500 × 220 nm `physmat:Si` 코어와, 코어 1.1 µm 위의 2 µm × 100 nm 히터입니다. **Heat 1**은 아래
+변을 300 K로 두고 히터 영역을 가열하며, **Modes 1**은 1550 nm 광 모드를 찾습니다. 결합
+**Heat 1 temperature → Modes 1 temperature**는 삼각형마다 세 절점 온도의 평균을 넘기고, 광 계산은
+그곳에서 n = n₀ + (dn/dT)(T − T_ref)를 씁니다. 히터는 손실 없는 임시 굴절률을 가진 로컬
+기록이며, 금속 손실은 이후 작업입니다.
+
+작업 공간은 문서 자체를 편집하므로 양식이 없는 키도 그대로 둡니다. **More › Open model file**로
+배포된 [가열 슬랩 예제](../../../../../../examples/simcase/multiphysics_heated_slab.json) 같은
+다중물리 문서를 열 수 있습니다.
+
+- **모델 트리.** 컴포넌트 하나(Geometry 1, 쓰인 재료마다 항목 하나인 Materials, 모든 물리가
+  공유하는 Mesh 1), 풀이 순서의 자리를 표시한 배지를 단 물리(순환은 주황 번호 하나를 공유),
+  결합마다 말로 이름 붙은 항목이 있는 **Couplings**, 도출된 풀이 순서와 반복 단계가 있는
+  **Study 1**. Settings는 파일 속 이름을 “Name in file”로 보여 줍니다. 노드의 빨간 숫자는 그곳에서
+  고칠 문제의 수입니다.
+- **Add physics**는 설치된 제공자와 그 종류를 매니페스트에서 읽어 포트(단위, 값이 놓이는 곳,
+  입력이면 소스를 하나 받는지 더하는지)와 함께 보여 줍니다. 여기서 Studio가 추가하는 것은
+  열전달과 광 모드이며, 나머지 종류는 이유와 함께 회색으로 표시됩니다(Joule 가열과 열탄성
+  종류는 자기 결합을 스스로 풀므로 시작 화면 애플리케이션으로 남습니다). 두 번째 물리를 더하면
+  물리 하나인 모델이 다중물리 모델이 됩니다. **Remove physics**는 그 물리를 가리키던 결합을
+  조용히 지우지 않고 고칠 문제로 화면에 남깁니다.
+- **Add coupling**은 출력을 고른 뒤 그것을 받을 수 있는 입력 하나를 고릅니다. 나머지는 이유와
+  함께 회색입니다(같은 물리, 다른 양, 다른 단위, 이미 소스 하나를 받은 입력). 전달은 이번 릴리스의
+  유일한 방식인 Same mesh입니다. 분명히 이을 수 있는 입력(Heat 1에서 받는 Modes 1 온도)이 있으면
+  Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다.
+- **Connections**는 결합으로 그립니다. 풀이 순서 열에 노드를 놓고, 왼쪽에 입력 핀, 오른쪽에 출력
+  핀을 단위와 함께 그리며, 결합마다 선 하나를 긋습니다. 검사에 실패한 결합은 빨간 점선과 짧은
+  원인으로 그리고, 물리가 없으면 그림 아래에 나열합니다. 순환은 상자로 묶습니다. 반복 단계가
+  없으면 주황, 있으면 파랑입니다. 메시지는 엔진의 기본값을 제안하고, **Accept iteration step**은
+  그 값을 `study.loops`에 씁니다(Undo로 되돌림). 값은 Study 1 › Iteration step에서 고칩니다.
+- **검사는 편집마다 돌며** `simcase validate`와 같은 규칙을 씁니다. 문제마다 Messages(Show와,
+  있으면 한 번에 고치는 버튼: Remove coupling, Use same mesh, 한 물리가 읽지 않는 메시 키 제거,
+  Accept iteration step, Fill from physmat), 트리 노드, Settings, 결합이면 그림에 함께 나타납니다.
+  엔진의 코드와 문장은 Details 아래에 있습니다. 문제가 남아 있으면 Run이 꺼지고 이유를
+  보여 줍니다(“Fix 1 problem in Messages to run”). 결합된 온도를 받으면 모든 광학 재료에
+  열광학 계수와 기준 온도가 필요합니다. `physmat:Si`와 `physmat:SiO2`는 이를 갖고 있고, 로컬
+  기록에서는 **Fill from physmat**이 physmat 값을 복사해 넣거나(출처를 적음) **Use physmat:…
+  instead**가 그 영역을 라이브러리 재료로 바꿉니다.
+- **Run**은 모든 물리를 풀이 순서대로 풉니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
+  Solving…, Done in 0.3 s, 마지막 변화와 함께 Iteration 7 of up to 30, Did not settle, Not run)를
+  보여 주고, Connections도 같은 상태를 보여 줍니다. **Stop run**은 풀고 있는 물리가 끝난 뒤
+  실행을 멈춥니다. 실패하거나 멈춘 실행은 부분 결과를 남기지 않습니다. Messages가 실패한 물리를
+  밝히고, 앞선 완전한 실행은 그대로 남습니다. 스윕은 검사만 하고 실행하지 않습니다(실행 이유에
+  적힙니다).
+- **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
+  것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
+  nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
+  Modes 1은 코어의 결합 온도와 굴절률(또는 재료 자료로 계산한 변화 n − n₀), n_eff 표를 보여 줍니다.
+  **Run Modes 1 alone**은 요청할 때만 광 모델을 결합 없이 풀고 “n_eff without heater” 열을
+  더합니다. 결과는 자기 실행을 밝히며 모델을 고쳐도 바뀌지 않습니다.
+- **파일.** **Save model file**과 **Open model file**(More 아래)은 문서를 쓰고 읽습니다.
+  다중물리 모델에는 Save session을 쓰지 않으며, 실행 결과는 탭에 남습니다.
+
+Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, stop, result)로 실행하며
+`simcase.multiphysics`의 평범한 사용자로 동작합니다. 화면의 n_eff는 같은 문서를 엔진으로 푼 값과
+정확히 같습니다. CI는 이 모델을 실제 브라우저에서 조작하고
+(`tools/studio_browser/studio_multiphysics_browser.mjs`),
+`tests/simcase/test_studio_multiphysics.py`와 `studio_workspace_multiphysics.cjs`가 경로와 문구를
+검사합니다. 한계: 여기서 편집하는 물리는 열전달(`thermal.steady2d`)과 광 모드(`em.modes2d`)뿐이고,
+전달은 Same mesh뿐이며, 다중물리 스윕은 실행하지 않습니다. 형상 양식은 직사각형과 창만 고치고,
+다른 도형은 파일에 쓴 대로 둡니다.
+
 ## 결과와 파일
 
 고정한 기준 실행을 유지하면서 성공한 실행 최대 여섯 개를 보관합니다. 후보의 장 분포를 보거나 두 실행을

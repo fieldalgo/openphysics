@@ -16,7 +16,9 @@ and runs the installed workspace in the runner's Chrome on every platform
 (tools/studio_browser/studio_workspace_browser.mjs): two designs, Compare, Save
 session, a restart with the page open and recovery from the start page. Since
 2026-11-21 the same check also runs the Joule heating application (Picard, Newton, a refusal
-shown, constant materials).
+shown, constant materials). Since 2026-11-22 a second script
+(tools/studio_browser/studio_multiphysics_browser.mjs) runs the multiphysics model (heat ->
+optical modes), whose coupled n_eff must equal the installed engine's exactly.
 """
 import argparse
 from email.parser import BytesParser
@@ -283,6 +285,10 @@ def main():
         # It fails rather than skips when no preinstalled Chrome or Edge is found.
         run("node", ROOT / "tools" / "studio_browser" / "studio_workspace_browser.mjs",
             "--python", python, "--output", output / "studio-workspace-browser", cwd=work)
+        # The multiphysics model (heat -> optical modes) in the same browser: its coupled n_eff
+        # must equal the installed engine's run of the same document exactly.
+        run("node", ROOT / "tools" / "studio_browser" / "studio_multiphysics_browser.mjs",
+            "--python", python, "--output", output / "studio-multiphysics-browser", cwd=work)
 
 
 if __name__ == "__main__":

@@ -264,5 +264,4 @@ n₀ 1.444, dn/dT 1.0e-5 1/K인 클래딩으로 된 2.4 µm 창의 폭 1.0 µm �
   `physics.<이름>.…`)는 검증하고, `simcase run`은 sweep을 `study.type`에서 `E-CONTRACT`("a multiphysics
   sweep is validated but not run in this release")로 거부합니다.
 - `same_mesh`가 아닌 전달.
-- Studio: 아직 다중물리 문서를 편집하거나 보여 주지 않습니다.
 - 결합에 참여하는 다른 공급자의 종류(훅은 내부용입니다).
