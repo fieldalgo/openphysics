@@ -47,9 +47,14 @@ callback of the normals, and a motion takes constant tractions only.
   under ``jax.jit``. The scalar formulation (simcase's own eigensolver), a PML or bend (coordinate
   factors move with the mesh), a sweep and mode tracking are refused.
 
-Refused by name, as ``DocumentError``: a flat geometry block, an ``axisymmetric`` component,
-another physics, and every parameter the design velocity refuses (unknown, ratio or derived
-parameters, a topology change at p).
+An ``axisymmetric`` component of ``thermal.steady2d`` or ``thermal.transient2d`` is solved with
+``coordinate_system="axisymmetric"``, as run() solves it; nodes on the symmetry axis keep a zero
+radial velocity (the radial component is extended again with them known at 0), and a design
+that moves a point of the axis off it is refused.
+
+Refused by name, as ``DocumentError``: a flat geometry block, an ``axisymmetric`` component of
+another physics, another physics, and every parameter the design velocity refuses (unknown,
+ratio or derived parameters, a topology change at p).
 """
 
 from __future__ import annotations
@@ -155,9 +160,10 @@ def shape_problem(document, parameter: str) -> ShapeProblem:
         raise DocumentError("shape_problem: the geometry is not a version 1 block of material regions; a design "
                             "parameter is a geometry.parameters entry of a version 1 component")
     h = handoff_03(doc)
-    if is_axisymmetric(h):
-        raise DocumentError("shape_problem: the component is axisymmetric; galerkin refuses a motion in "
-                            "axisymmetric coordinates")
+    axisymmetric = is_axisymmetric(h)
+    if axisymmetric and kind not in (STEADY_HEAT, TRANSIENT_HEAT):
+        raise DocumentError(f"shape_problem: the component is axisymmetric; the shape derivative of an "
+                            f"axisymmetric document covers {STEADY_HEAT} and {TRANSIENT_HEAT}")
     try:
         dv = design_velocity(doc.data, parameter)
     except GeometryError as exc:
@@ -171,9 +177,31 @@ def shape_problem(document, parameter: str) -> ShapeProblem:
     # node_velocity reads the curves of the complex that was handed to the mesher
     nv = replace(dv, complex=meshed).node_velocity(tri)
     W = extend_velocity(mesh, nv.values, nv.on_curve)
+    if axisymmetric:
+        W = _axis_kept(mesh, W, nv.values, nv.on_curve, extend_velocity)
     lo, hi = admissible_interval(mesh, design_velocity=W)
     arguments = _arguments(kind, name, doc, mesh, region_materials)
+    if axisymmetric:
+        arguments["coordinate_system"] = "axisymmetric"           # as run() passes it
     return ShapeProblem(doc, parameter, kind, mesh, W, np.asarray(nv.on_curve), (float(lo), float(hi)), arguments)
+
+
+def _axis_kept(mesh, W, values, on_curve, extend_velocity):
+    """W with a zero radial velocity on the symmetry axis (r = 0), as galerkin requires.
+
+    The radial component is extended again with the axis nodes known at 0; the axial one is kept.
+    A curve node on the axis that the design moves radially is a geometry leaving the axis: refused."""
+    axis = mesh.nodes[:, 0] == 0
+    known = np.asarray(on_curve, dtype=bool)
+    leaving = axis & known & (np.asarray(values)[:, 0] != 0)
+    if np.any(leaving):
+        raise DocumentError(f"shape_problem: the parameter moves {int(np.count_nonzero(leaving))} point(s) of the "
+                            "geometry on the symmetry axis off it; an axisymmetric design keeps r = 0 on the axis")
+    radial = np.array(values, dtype=float)
+    radial[axis, 0] = 0.0
+    out = np.array(W, dtype=float)
+    out[:, 0] = extend_velocity(mesh, radial, known | axis)[:, 0]
+    return out
 
 
 def _modes_problem(given, doc, name, parameter):

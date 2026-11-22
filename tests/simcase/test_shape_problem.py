@@ -167,7 +167,9 @@ def test_c5_refusals_name_the_reason():
     axi = strip()
     axi["geometry"]["components"]["xs"]["dimension"] = "axisymmetric"
     axi["geometry"]["components"]["xs"].pop("depth")
-    with pytest.raises(DocumentError, match="axisymmetric"):
+    # axisymmetric heat takes a motion since 2026-11-22 (test_shape_problem_axisymmetric.py); this strip's
+    # left side becomes the axis, which carries no Dirichlet value: the document itself is refused
+    with pytest.raises(DocumentError, match="has no left side; its r = 0 side is the axis"):
         shape_problem(axi, "L1")
     # another physics: test_shape_problem_physics.py (P6), now that electric and mechanics are covered
     with pytest.raises(DocumentError, match="unknown parameter 'nope'"):
