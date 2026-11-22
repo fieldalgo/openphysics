@@ -321,7 +321,7 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
-  assert.ok(recoveredHeader.includes(`Recovered from this browser · last session file ${sessionFile} (`), 'the recovered title says it was recovered and names the session file: ' + recoveredHeader);
+  assert.ok(recoveredHeader.includes(`Recovered from this browser (last sent to a file: ${sessionFile} at `), 'the recovered title says it was recovered and names the last session file as history: ' + recoveredHeader);
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and

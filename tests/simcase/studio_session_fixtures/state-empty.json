@@ -1,0 +1,174 @@
+{
+ "input": {
+  "format": "openphysics-studio-workspace",
+  "version": 7,
+  "units": {
+   "height": "nm",
+   "width": "nm",
+   "wavelength": "nm",
+   "core_mesh": "nm",
+   "shapes": "nm",
+   "thermal_length": "mm",
+   "joule_length": "mm",
+   "voltage": "V",
+   "temperature": "K"
+  },
+  "model": {
+   "height": 220,
+   "wavelength": 1550,
+   "coreMesh": 30,
+   "width": 500,
+   "voltage": 1,
+   "electric": false,
+   "heat": false,
+   "structure": false,
+   "optics": true,
+   "shapes": [
+    {
+     "name": "Core",
+     "type": "rect",
+     "material": "Silicon",
+     "x": -250,
+     "y": 0,
+     "w": 500,
+     "h": 220
+    }
+   ],
+   "thermal": {
+    "width": 30,
+    "height": 20,
+    "conductivity": 12.5,
+    "source": 0,
+    "nx": 32,
+    "ny": 16,
+    "sides": {
+     "left": {
+      "type": "temperature",
+      "temperature": 280
+     },
+     "right": {
+      "type": "temperature",
+      "temperature": 315
+     },
+     "bottom": {
+      "type": "insulated"
+     },
+     "top": {
+      "type": "insulated"
+     }
+    }
+   },
+   "joule": {
+    "width": 2,
+    "height": 1,
+    "materials": [
+     {
+      "name": "A",
+      "k": 1.5,
+      "sigma": {
+       "model": "linear_resistivity",
+       "reference_conductivity": 2000,
+       "reference_temperature": 300,
+       "coefficient": 0.004,
+       "tmin": 250,
+       "tmax": 600
+      }
+     },
+     {
+      "name": "B",
+      "k": 0.25,
+      "sigma": {
+       "model": "linear_resistivity",
+       "reference_conductivity": 500,
+       "reference_temperature": 300,
+       "coefficient": -0.003,
+       "tmin": 250,
+       "tmax": 600
+      }
+     }
+    ],
+    "background": "A",
+    "shapes": [
+     {
+      "name": "b",
+      "type": "rect",
+      "material": "B",
+      "x": 1,
+      "y": 0,
+      "w": 1,
+      "h": 1
+     }
+    ],
+    "elementSize": 0.125,
+    "sides": {
+     "left": {
+      "electric": {
+       "type": "potential",
+       "potential": 0.2
+      },
+      "thermal": {
+       "type": "temperature",
+       "temperature": 300
+      }
+     },
+     "right": {
+      "electric": {
+       "type": "potential",
+       "potential": 0
+      },
+      "thermal": {
+       "type": "temperature",
+       "temperature": 320
+      }
+     },
+     "bottom": {
+      "electric": {
+       "type": "insulating"
+      },
+      "thermal": {
+       "type": "insulated"
+      }
+     },
+     "top": {
+      "electric": {
+       "type": "insulating"
+      },
+      "thermal": {
+       "type": "insulated"
+      }
+     }
+    },
+    "iteration": {
+     "method": "picard",
+     "initial_temperature": 300,
+     "relaxation_factor": 0.5,
+     "temperature_tolerance": 1e-9,
+     "relative_tolerance": 1e-10,
+     "iteration_limit": 100
+    }
+   }
+  },
+  "setup": {
+   "materials": {
+    "Core": "Silicon",
+    "Oxide": "Silica",
+    "Heater": ""
+   },
+   "temperature": 293.15,
+   "cooling": "",
+   "fixed": "",
+   "terminal": ""
+  }
+ },
+ "runs": [],
+ "selected": null,
+ "comparison": [
+  null,
+  null
+ ],
+ "view": {
+  "mode": 0,
+  "component": "magnitude",
+  "window": "Core region"
+ }
+}

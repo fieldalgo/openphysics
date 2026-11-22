@@ -25,8 +25,8 @@ test('the save indicator shows the file the session was sent to until the next e
  // the browser copy does not change what the indicator says about the file
  assert.equal(P.persistenceTitle({saved,recovery:'kept'},when),P.persistenceTitle({saved},when));
  const recovered={kind:'recovered',name:null,current:true};
- assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
+ assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser (last sent to a file: optical-waveguide-session-2026-11-21-1305.json at 13:05)');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser (last sent to a file: optical-waveguide-session-2026-11-21-1305.json at 13:05; changed since)');
  assert.equal(P.persistenceTitle({loaded:recovered},when),'Recovered from this browser');
  // a recovered notebook never saved to a file still says its results are not in one
  assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · not saved to a file');
@@ -112,18 +112,23 @@ test('the Compare table has one row per candidate rank with both indices, their 
  // one n_eff precision everywhere: 8 decimals
  assert.equal(C.formatIndex(2.785604861),'2.78560486');
 });
+test('browser recovery of a multiphysics session over 16 MiB says which maps it left out, or that it wrote nothing',()=>{
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept:2'}),'Not saved to a file · kept for recovery in this browser without the maps of 2 runs · Save session to keep them');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept:1'}),'Not saved to a file · kept for recovery in this browser without the maps of 1 run · Save session to keep them');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'overLimit'}),'Not saved to a file · browser recovery unavailable: session over 16 MiB');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
+});
 test('the title says the session file went to the browser Downloads, never that it was saved',()=>{
  const title=P.persistenceTitle({saved:{name:'s.json',savedAt:'2026-11-21T04:05:00Z',current:true}},()=>'13:05');
  assert.match(title,/^Session file s\.json sent to your browser's Downloads · 13:05$/);assert.doesNotMatch(title,/saved|disk/i);
  assert.equal(P.sentToDownloads('Model','m.json'),"Model file m.json sent to your browser's Downloads");
 });
 test('leaving a model whose runs only this tab holds asks first, names what is lost and offers the save that fits',()=>{
- // a multiphysics run is in no file: leaving discards it; the model file is offered while it is not current
- const mp=P.leaveConfirmText({from:'multiphysics',runId:2,saved:false,model:'Heated silicon waveguide',target:'Optical waveguide'});
- assert.deepEqual(mp,{title:'Leave Heated silicon waveguide?',description:'Run 2 and its results exist only in this tab: a model file holds the model, not its runs. Opening Optical waveguide discards run 2.',
-  save:{kind:'model',label:'Save model file, then continue'},leave:'Discard run 2 and continue',stay:'Keep this model'});
- assert.equal(P.leaveConfirmText({from:'multiphysics',runId:2,saved:true}).save,null,'a model file that holds the model as it is is not offered again');
- assert.equal(P.leaveConfirmText({from:'multiphysics',runId:null}),null,'no run: nothing to lose, no question');
+ // multiphysics runs no session file holds: leaving discards them from the tab; Save session is offered
+ assert.deepEqual(P.leaveConfirmText({from:'multiphysics',runs:3,target:'Optical waveguide'}),{title:'Leave this model?',description:'3 runs are only in this tab and in browser recovery. Save session first to keep them in a file.',
+  save:{kind:'session',label:'Save session'},leave:'Leave',stay:'Cancel'});
+ assert.equal(P.leaveConfirmText({from:'multiphysics',runs:1}).description,'1 run is only in this tab and in browser recovery. Save session first to keep it in a file.');
+ assert.equal(P.leaveConfirmText({from:'multiphysics',runs:0}),null,'every run in a session file, or none: nothing to lose, no question');
  // optical runs not in a session file stay in the tab but no file holds them: Save session is offered
  const optical=P.leaveConfirmText({from:'optical',runs:1,saved:false,target:'Heated silicon waveguide'});
  assert.equal(optical.title,'Open Heated silicon waveguide?');

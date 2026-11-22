@@ -33,6 +33,7 @@ import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
+import {checkSessionModels,isModelDocument,multiphysicsLoadText} from './workspace-multiphysics-session.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
 // A reload always opens the start page, so a restored scroll position would hide its top.
@@ -166,7 +167,9 @@ const multiView=createMultiphysicsView({$,ui,notice:text=>notice(text),announceR
  requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
  // physics selections no application claims, so no single-physics view acts while it is open
  onOpen:()=>Object.assign(state,{electric:true,heat:true,structure:true,optics:true}),
- onHistory:()=>{updateHistory();refreshPersistence();},applications:host=>{renderApplications(host,resumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+ onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),serverVersion:()=>connection.version,validateRunLabel,
+ // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
+ recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
@@ -182,7 +185,7 @@ leaveDialog.innerHTML='<h2 id="leave-confirm-title"></h2><p id="leave-confirm-de
 document.body.append(leaveDialog);
 let pendingLeave=null;
 function leaveText(target,toMultiphysics){
- if(multiView.active())return leaveConfirmText({from:'multiphysics',runId:multiView.runInTab(),saved:multiView.fileCurrent(),model:multiView.modelName(),target});
+ if(multiView.active())return leaveConfirmText({from:'multiphysics',runs:multiView.unsavedRuns(),target});
  if(toMultiphysics&&isOptical())return leaveConfirmText({from:'optical',runs:runs.length,saved:savedRunsState===runsStamp(),target});
  return null;
 }
@@ -202,8 +205,9 @@ function endLeave(go){
  const pending=pendingLeave;pendingLeave=null;leaveDialog.close();if(!pending)return;
  if(go===false){restoreDialogFocus(pending.opener);notice('Kept the current model and its runs.');return;}
  if(go==='save'){
-  if(pending.kind==='model')multiView.saveFile();
-  else{$('save-session').click();if(savedRunsState!==runsStamp())return;}
+  $('save-session').click();
+  // the file was not written (the 16 MiB question, or a refusal): stay
+  if(multiView.active()?multiView.unsavedRuns()>0:savedRunsState!==runsStamp())return;
  }
  pending.proceed();
 }
@@ -337,7 +341,7 @@ function refreshInputIssues(){
   const el=$(field.id);if(!el)continue;const issue=numericDrafts.get(key);el.setAttribute('aria-invalid',String(!!issue));
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max} ${field.unit}.`;
  }
- for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&['save-session','open-session','save-draft'].includes(id));
+ for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
  else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs));
@@ -502,7 +506,7 @@ function requestLoad(doc,options={}){
   if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
   // a multiphysics run in this tab is named before the inputs are replaced
   if(!options.opener)options={...options,opener:document.activeElement};
-  if(!options.leaveChecked&&multiView.active()&&multiView.runInTab()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
+  if(!options.leaveChecked&&multiView.active()&&multiView.unsavedRuns()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
   loadInputs(doc,options);
 }
 function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement,leaveChecked=false}={}){
@@ -533,6 +537,7 @@ $('confirm-load').onclick=()=>{
  completeLoad(pending);
 };
 function completeLoad(pending){
+ if(pending.multiphysics){pending.multiphysics();return;}
  if(!leaveMultiphysics())return;
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
@@ -549,7 +554,7 @@ function completeLoad(pending){
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});notice(`Project inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
-$('save-project').onclick=()=>{if(multiView.active()){multiView.saveFile();return;}try{
+$('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
   rejectInvalidInput();const doc=current();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='studio-workspace-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Inputs file download requested. It has no computed results'+(runs.length?'; Save session keeps the runs too.':'.'));
@@ -624,7 +629,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current')recoveryState='kept';
  if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;if(notebookStore.movedEarlier())renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
- if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
+ if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
  refreshSaveIndicator();
 }});
 async function loadNotebookRecovery(){
@@ -658,26 +663,30 @@ async function renderEarlierSessions(){
   // keep the storage index: a record that does not parse is skipped, not renumbered
   earlierSessions.push({index,recovered});
   const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
-  button.textContent='Recover earlier session · '+recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();
+  button.textContent='Recover earlier session · '+(recovered.session.application==='multiphysics'?(recovered.session.document.name||'Multiphysics model')+' · ':'')+recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();
   button.onclick=()=>recoverEarlier(index,button);box.append(button);});
 }
 async function recoverEarlier(index,opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  try{
   rejectInvalidInput();
-  const loaded=await workspaceLoads.read(async()=>{const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();return {latest,recovered:readNotebookRecovery(list[index]??null)};});
+  const loaded=await workspaceLoads.read(async()=>{const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();const recovered=readNotebookRecovery(list[index]??null);
+   if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {latest,recovered};});
   if(!loaded)return;const {latest,recovered}=loaded.value;if(!recovered)throw new Error('That earlier session is no longer stored.');
   if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,savedFile:recovered.savedFile});return;}
   // Adopt the latest record: the next save keeps it as an earlier session in turn.
   requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
  }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
-$('retry-notebook').onclick=()=>runs.length?notebookAutosave.retry():loadNotebookRecovery();
+$('retry-notebook').onclick=()=>(multiView.active()?multiView.recovery():runs.length)?notebookAutosave.retry():loadNotebookRecovery();
 $('recover-notebook').onclick=()=>recoverLatest($('recover-notebook'));
 async function recoverLatest(opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();return {record,recovered:readNotebookRecovery(record)};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile});return;}
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
@@ -691,15 +700,18 @@ $('cancel-recovery-replace').onclick=cancelRecoveryReplacement;
 recoveryDialog.oncancel=event=>{event.preventDefault();cancelRecoveryReplacement();};
 $('replace-notebook').onclick=async()=>{
  try{
-  rejectInvalidInput();if(!runs.length)throw new Error('Complete or import a run before replacing notebook recovery.');
+  // a multiphysics model: its own record (a run, or an edit since it was opened)
+  const multi=multiView.active()?multiView.recovery():null;
+  if(multiView.active()&&!multi)throw new Error('Complete a run or edit the model before replacing browser recovery.');
+  if(!multi){rejectInvalidInput();if(!runs.length)throw new Error('Complete or import a run before replacing notebook recovery.');}
   if(solverBusy||notebookAutosave.writing)throw new Error('Wait for calculation and recovery storage to finish, then review again.');
   const loaded=await workspaceLoads.read(()=>notebookStore.load());if(!loaded)return;
   const record=loaded.value;let prior='No stored notebook';
   try{const recovered=readNotebookRecovery(record);if(recovered)prior=recovered.session.runs.length+' runs · '+new Date(recovered.savedAt).toLocaleString();}
   catch{prior='Unreadable stored notebook';}
-  pendingRecoveryReplacement={record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile()}};
+  pendingRecoveryReplacement=multi?{record,context:loadContext(),stamp:multi.stamp,makeText:multi.makeText,extra:{savedFile:multi.savedFile}}:{record,context:loadContext(),stamp:autosaveStamp(),makeText:captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),extra:{savedFile:savedFile()}};
   const summary=$('recovery-replace-summary');summary.replaceChildren();
-  for(const [name,value] of [['Stored recovery',prior],['Replace with',runs.length+' runs · '+designSummary(current().model)],['Current inputs and Undo','Kept'],['Other tabs','Their next automatic save will detect this replacement']]){
+  for(const [name,value] of [['Stored recovery',prior],['Replace with',multi?multiView.runCount()+' runs · '+multiView.modelName():runs.length+' runs · '+designSummary(current().model)],['Current inputs and Undo','Kept'],['Other tabs','Their next automatic save will detect this replacement']]){
    const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);
   }
   recoveryDialog.showModal();
@@ -717,7 +729,14 @@ function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:vie
 // The completed runs as a session file keeps them; inputs and view settings are not results.
 function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]));}
 function notebookStamp(){return JSON.stringify({input:current(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
-function refreshNotebook(){const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)notebookAutosave.schedule(autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+// The application the last recovery record was scheduled for: when the tab moves between an
+// optical and a multiphysics model, the stored record is kept as an earlier session.
+let recoveryKind=null;
+function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKind!==kind)notebookStore.keepPrevious();recoveryKind=kind;notebookAutosave.schedule(stamp,makeText,extra);}
+function refreshNotebook(){
+ if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile});
+  $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(current(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -999,7 +1018,7 @@ const runImportDialog=document.createElement('dialog');runImportDialog.id='run-i
 const runListStamp=()=>JSON.stringify(runs.map(run=>[run.job,run.completedAt,run.label,run.pinned]));
 $('run-import-file').onchange=async event=>{
  const file=event.target.files[0];event.target.value='';if(!file)return;
- try{const loaded=await workspaceLoads.read(async()=>{if(solverBusy||pendingJob)throw new Error('Finish or detach the pending job before importing runs.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});if(!loaded)return;const session=loaded.value;if(solverBusy||pendingJob)throw new Error('A job started while reading the file.');const merged=mergeRuns(runs,session.runs);workspaceLoads.invalidate();pendingRunImport={session,merged,stamp:runListStamp()};
+ try{const loaded=await workspaceLoads.read(async()=>{if(solverBusy||pendingJob)throw new Error('Finish or detach the pending job before importing runs.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});if(!loaded)return;const session=loaded.value;if(solverBusy||pendingJob)throw new Error('A job started while reading the file.');if(session.application==='multiphysics')throw new Error('Add runs from file adds optical runs; open a multiphysics session with Open session.');const merged=mergeRuns(runs,session.runs);workspaceLoads.invalidate();pendingRunImport={session,merged,stamp:runListStamp()};
   $('run-import-summary').textContent=`${file.name}: ${merged.added.length} new, ${merged.reused.length} matching, ${merged.evicted.length} older unpinned runs replaced. ${merged.runs.length} runs will remain. Save a session first if you need all current results.`;runImportDialog.showModal();
  }catch(error){pendingRunImport=null;notice('Run import failed: '+error.message+' Current notebook kept.');}
 };
@@ -1013,11 +1032,55 @@ $('confirm-run-import').onclick=()=>{
  compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
 };
 
-$('save-session').onclick=()=>{try{rejectInvalidInput();newModelInputs=null;const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
+// The server's check of a document (/api/multiphysics/validate), as the reader reads it.
+const validateModel=doc=>studioRequest('POST','/api/multiphysics/validate',{doc});
+// Opening a multiphysics session (a file or browser recovery), checked already: the leave
+// question when runs would be lost, else the open question when a model would be replaced.
+function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null}){
+ if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
+ const asked=!!leaveText(label,true);
+ const go=()=>{
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});multiView.openSession(session,{label,source,savedFile}).catch(e=>notice('Session open failed: '+e.message));};
+  // nothing to lose: no multiphysics model open, or one with no runs that was not edited
+  if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){finish();return;}
+  const text=multiphysicsLoadText(session,{runs:multiView.runCount(),unsaved:multiView.unsavedRuns()>0,model:'the current model'},source);
+  $('load-confirm').querySelector('h2').textContent=text.title;$('load-confirm').querySelector('p').textContent=text.description;$('confirm-load').textContent=text.button;
+  const summary=$('load-summary');summary.replaceChildren();
+  for(const [name,value] of [['Source',label],['Runs that come back',text.runs],['Model',`${multiView.modelName()} → ${session.document.name||'Untitled model'}`],['Completed results',`${multiView.runCount()} now → ${session.runs.length} from the session`],['Input Undo','Starts at the opened session']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
+  pendingLoad={multiphysics:finish,opener,context:loadContext()};
+  if(!$('load-confirm').open)$('load-confirm').showModal();
+ };
+ guardLeave(label,true,go);
+}
+// A multiphysics session over 16 MiB asks first (§2): the maps of the selected and pinned runs
+// only, or nothing written. Studio never drops maps without asking.
+const overflowDialog=document.createElement('dialog');overflowDialog.id='session-overflow';overflowDialog.setAttribute('aria-labelledby','session-overflow-title');overflowDialog.setAttribute('aria-describedby','session-overflow-description');
+overflowDialog.innerHTML='<h2 id="session-overflow-title">Session over 16 MiB</h2><p id="session-overflow-description"></p><div class="leave-actions"><button id="overflow-cancel">Cancel</button> <button id="overflow-keep">Keep maps for selected and pinned runs</button></div>';
+document.body.append(overflowDialog);
+$('overflow-cancel').onclick=()=>{overflowDialog.close();notice('Session not saved: nothing was written.');};
+$('overflow-keep').onclick=()=>{overflowDialog.close();multiView.saveSession({keepSelected:true});};
+overflowDialog.oncancel=event=>{event.preventDefault();overflowDialog.close();notice('Session not saved: nothing was written.');};
+function saveMultiphysicsSession(){
+ const out=multiView.saveSession();
+ if(out.question){$('session-overflow-description').textContent=out.question;if(!overflowDialog.open)overflowDialog.showModal();}
+}
+$('save-session').onclick=()=>{if(multiView.active()){try{saveMultiphysicsSession();}catch(e){notice('Session not saved: '+e.message);}return;}try{rejectInvalidInput();newModelInputs=null;const text=JSON.stringify(createSession(current(),runs,solverRun?.job||null,compareIds,currentView()));if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB; export fewer runs.');const name=sessionFileName(applicationSlug());downloadFile(new Blob([text],{type:'application/json'}),name);edits.record(current());edits.markSaved();savedNotebookState=notebookStamp();savedRunsState=runsStamp();lastSavedFile={name,savedAt:new Date().toISOString(),stamp:saveStamp(),recovered:false};loadedSession=null;refreshPersistence();notice(`Session file ${name} sent to the browser's downloads (check your Downloads folder): current inputs, ${runs.length===1?'1 run':runs.length+' runs'} and the comparison.`);}catch(e){notice('Session not saved: '+e.message);}};
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
- const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');return parseSession(await file.text());});
- if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');requestLoad(loaded.value.input,{session:loaded.value,label:file.name,opener:$('open-session')});
+ if(multiView.busy())throw new Error('Wait for the multiphysics run to finish, or stop it under Study.');
+ const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
+  const text=await file.text();
+  // a bare model file opens as the model with no runs (§5), read by the server's reader as written
+  if(file.size<=(1<<20)){let tree=null;try{tree=JSON.parse(text.replace(/^\uFEFF/,''));}catch{}if(isModelDocument(tree))return {model:text.replace(/^\uFEFF/,'')};}
+  const session=parseSession(text);
+  // a multiphysics session: the server checks every model before anything in the tab is replaced
+  if(session.application==='multiphysics')await checkSessionModels(session,validateModel);
+  return {session};});
+ if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');
+ if(loaded.value.model!==undefined){const text=loaded.value.model;guardLeave(file.name,true,()=>{openingModel=true;multiView.openText(text,file.name,{asSession:true}).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}
+ const session=loaded.value.session;
+ if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
+ requestLoad(session.input,{session,label:file.name,opener:$('open-session')});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;

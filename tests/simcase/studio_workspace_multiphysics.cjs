@@ -264,7 +264,7 @@ test('each wire is anchored on the ports its coupling joins; every port has its 
 test('the model back at the last run says so in one sentence everywhere, without asking for a Run',async()=>{
  const m=await mp;
  assert.equal(m.freshnessAgain('current',false),'current');assert.equal(m.freshnessAgain('current',true),'again');assert.equal(m.freshnessAgain('stale',true),'stale');
- const again='Model matches run 1 again: results are current';
+ const again='Model matches run 1 again: its results are current. Run makes a new run with the same inputs';
  assert.equal(m.sequenceHeading('again',1),again);assert.equal(m.readyStatus('again',1),again);
  assert.equal(m.editNotice('Coupling Heat 1 temperature → Modes 1 temperature added.','again',1),'Coupling Heat 1 temperature → Modes 1 temperature added. '+again+'.');
  assert.equal(m.editNotice('Value updated.','stale',1),'Value updated. Press Run to compute the new model.');

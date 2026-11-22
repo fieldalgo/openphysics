@@ -56,7 +56,10 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
  const loadEarlier=async()=>{const list=await transact('readonly',null,'earlier');return Array.isArray(list)?list:[];};
  // whether the last committed save moved a record to the earlier sessions
  const movedEarlier=()=>movedOnLastSave;
- return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record),movedEarlier};
+ // keepPrevious: the next save keeps the stored record as an earlier session (the tab moved
+ // between an optical and a multiphysics model, so its next record is another session)
+ const keepPrevious=()=>{wroteSinceAdopt=false;};
+ return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record),movedEarlier,keepPrevious};
 }
 
 // Coalesce rapid edits and serialize writes so an older completion cannot win.
