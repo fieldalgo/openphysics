@@ -340,7 +340,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
   제목, 하단은 같은 문장 “Model matches run 1 again: its results are current. Run makes a new run with the
   same inputs”를 보여 주어 Run이 무엇을 하는지 밝힙니다. 세션 파일에서 읽었거나 이 브라우저에서
-  복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**, 도크 제목은
+  복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**(반복 단계는 *Settled in 7 iterations · from file*처럼
+  반복 횟수를 유지), 도크 제목은
   “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고
   하단은 “press Run to compute it here”를 덧붙입니다. 탭에서 만든 실행은 위 문구를 그대로 씁니다.
 - **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져

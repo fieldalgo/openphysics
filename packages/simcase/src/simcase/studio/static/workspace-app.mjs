@@ -226,9 +226,12 @@ function openTemplateCard(id){
  Object.assign(state,templatePhysics(id));newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
+// file: the session file that holds these runs (as the leave question decides it), by name;
+// recovery: browser recovery holds them, unless another tab has replaced the record.
 function opticalRunsNote(){
- const file=savedFile()?.current?savedFile().name:loadedFrom()?.kind==='opened'&&loadedFrom().current?loadedFrom().name:null;
- return opticalRunsStayText({runs:runs.length,file,recovery:recoveryState==='kept'||(loadedFrom()?.kind==='recovered'&&loadedFrom().current)});
+ const file=runs.length&&savedRunsState===runsStamp()?(lastSavedFile?.name||(loadedSession?.kind==='opened'?loadedSession.name:null)):null;
+ const recovery=recoveryState!=='conflict'&&(recoveryState==='kept'||(loadedFrom()?.kind==='recovered'&&loadedFrom().current));
+ return opticalRunsStayText({runs:runs.length,file,recovery});
 }
 function refreshHeatControls(){
  const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat()||isJoule()||multiView.active();if(!isHeat())return;

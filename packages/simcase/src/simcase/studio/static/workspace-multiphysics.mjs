@@ -431,9 +431,10 @@ export const sameContent=(a,b)=>canonicalJson(a)===canonicalJson(b);
 // 'none' before a first run, 'current' while the model is the one the last run solved, else 'stale'
 export function runFreshness(run,doc){return !run?'none':sameContent(run.doc,doc)?'current':'stale';}
 // The rows of a run this tab did not compute: where each result came from, with no solve times.
+// An iteration step keeps its count of iterations, a result of the run, not a time.
 export function originRows(rows,origin){
  const text=origin==='imported'?'From file':origin==='recovered'?'From this browser':null;
- return text?rows.map(r=>r.state==='done'?{...r,text}:r):rows;
+ return text?rows.map(r=>r.state!=='done'?r:{...r,text:r.group?.length>1?`${r.text} · ${text.toLowerCase()}`:text}):rows;
 }
 // The rows of the last run once the model changed: each keeps what it did, marked out of date.
 export function staleRows(rows){return rows.map(r=>({...r,state:'stale',text:`Out of date (last run: ${r.text})`}));}
