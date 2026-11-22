@@ -373,7 +373,8 @@ try {
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), viewed.header.replace(/^Optical waveguide \/ /, ''));
   assert.match(await text('.run-item[aria-pressed=true]'), /^Pinned · Run 1 · design A · /);
   // a name applied on leaving the field (change, no redraw) reaches the dock, the footer and the title too
-  const renameOnBlur = name => page.eval(`(()=>{const e=document.getElementById('run-name-input');e.value=${JSON.stringify(name)};e.dispatchEvent(new Event('change'));return true})()`);
+  // the name is passed as an argument to a fixed function, so no page code is built from it
+  const renameOnBlur = name => page.onElement("function(name){const e=this.getElementById('run-name-input');e.value=name;e.dispatchEvent(new Event('change'));return true}", name);
   await renameOnBlur('design A2'); await sleep(200);
   const blurNamed = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,header:document.getElementById('project').textContent})");
   stage('renamed on blur', blurNamed);
