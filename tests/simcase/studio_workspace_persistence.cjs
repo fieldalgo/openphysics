@@ -133,3 +133,11 @@ test('leaving a model whose runs only this tab holds asks first, names what is l
  assert.equal(P.leaveConfirmText({from:'optical',runs:2,saved:true}),null,'runs in a session file: no question');
  assert.equal(P.leaveConfirmText({from:'optical',runs:0}),null);
 });
+test('a model just chosen reads as new until its first edit, save or open',async()=>{
+ const P=await import('../../packages/simcase/src/simcase/studio/static/workspace-persistence.mjs');
+ assert.equal(P.persistenceTitle({fresh:true,clean:false}),'New model · not saved');
+ assert.equal(P.persistenceTitle({fresh:false,clean:false}),'Unsaved inputs');
+ // runs not in a file and invalid drafts outrank it
+ assert.equal(P.persistenceTitle({fresh:true,clean:false,runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
+ assert.match(P.persistenceTitle({fresh:true,invalid:true,clean:false}),/^Invalid input draft/);
+});

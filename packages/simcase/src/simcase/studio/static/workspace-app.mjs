@@ -3,7 +3,7 @@ import {LatestWorkspaceLoad} from './workspace-load.mjs';
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -219,7 +219,7 @@ function chooseTemplate(id){
 function openTemplateCard(id){
  if(id==='heated-waveguide'){multiView.openTemplate();return;}
  if(!leaveMultiphysics())return;
- Object.assign(state,templatePhysics(id));select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
+ Object.assign(state,templatePhysics(id));newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 function refreshHeatControls(){
  const button=$('run-heat');if(!button)return;button.hidden=!isHeat();$('run-optical').hidden=isHeat()||isJoule()||multiView.active();if(!isHeat())return;
@@ -311,6 +311,13 @@ const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;nume
 document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{const prior=state[b.dataset.toggle];state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;
  if(isJoule()){state[b.dataset.toggle]=prior;notice('The multiphysics preview keeps mechanics or optics. For electric currents with heat alone, choose Models → Joule heating.');}render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{if(ui.page==='Connections'){ui.selection=b.dataset.select;render();}else select(b.dataset.select);});document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(ui.page==='Connections'&&!isOptical()&&!isHeat())disposeConnectionGraph=installConnectionGraph($('canvas'),open=>{ui.graphOptionsOpen=open;});if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
+// The dock heading says what the last optical run computed, with the same run as the footer;
+// the multiphysics model sets its own heading, and the other models keep the default words.
+function refreshSequenceHeading(){
+ if(multiView.active())return;const heading=document.querySelector('.dock-title>span');if(!heading)return;
+ const text=applicationChosen()&&isOptical()?opticalSequenceHeading(opticalFreshness(current(),runs)):opticalSequenceHeading({state:'none'});
+ if(heading.textContent!==text)heading.textContent=text;
+}
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
  for(const issue of numericDrafts.issues){
@@ -327,8 +334,8 @@ function refreshInputIssues(){
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
  else if(!applicationChosen())$('status').textContent='Choose a model to start';
- else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
- refreshPersistence();jouleView.refreshControls();
+ else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':opticalReadyStatus(opticalFreshness(current(),runs)));
+ refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
 }
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
@@ -439,13 +446,16 @@ const signature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
 let saveIndicator=null,recoveryState=null,latestOffer=null;
+// The inputs a model card gave, until the first edit: the indicator says the model is new, not that edits are unsaved.
+let newModelInputs=null;
 function refreshPersistence(){
   const clean=!edits.dirty;
   // Results not in a session file outrank a clean input snapshot: saving inputs only
   // must not read as saved while completed runs would be lost.
   const runsUnsaved=runs.length>0&&savedRunsState!==runsStamp();
   // Before an application is chosen there is nothing to save or name.
-  saveIndicator={invalid:numericDrafts.invalid,clean,runsUnsaved,saved:savedFile(),loaded:loadedFrom()};refreshSaveIndicator();
+  const fresh=newModelInputs!==null&&newModelInputs===signature()&&!loadedSession&&!lastSavedFile;
+  saveIndicator={invalid:numericDrafts.invalid,clean,fresh,runsUnsaved,saved:savedFile(),loaded:loadedFrom()};refreshSaveIndicator();
   refreshNotebook();refreshWorkflow();
 }
 function refreshSaveIndicator(){
@@ -707,7 +717,7 @@ const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'A
 const opticalDocument=()=>buildOpticalDocument(state,setup);
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · modes are not matched between runs · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':'Optical adapter ready · explicit Run required';$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · modes are not matched between runs · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run optical study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; 3 × 2.4 µm window; PEC outer edges; two candidates. Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -755,7 +765,9 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+'<p class="study-wavelength">Set in Physics › Optical modes. <button type="button" id="study-edit-wavelength">Edit in Optical modes</button></p>'+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
+ // One wavelength: shown here, edited in its one field under Optical modes.
+ $('study-edit-wavelength').onclick=()=>editWavelengthField();
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
