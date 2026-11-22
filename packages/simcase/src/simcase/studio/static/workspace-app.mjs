@@ -20,9 +20,9 @@ import {INPUT_FIELDS,NumericDrafts} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
-import {readOpticalField,fieldScalars} from './workspace-field.mjs';
+import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession} from './workspace-notebook.mjs';
-import {compareRows,runHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
+import {compareRows,runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
 import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -48,6 +48,8 @@ const isHeat=()=>state.electric===false&&state.heat&&!state.structure&&!state.op
 // Electric currents and heat alone: the Joule heating application (workspace-joule-view.mjs).
 const isJoule=()=>state.electric!==false&&state.heat&&!state.structure&&!state.optics;
 function setShape(index,shape){state.shapes=state.shapes.map((s,i)=>i===index?shape:s);}
+// Physics › Optical modes on the Model page, with its wavelength field focused (Study and the step bar).
+function editWavelengthField(){ui.page='Model';select('Optical modes');const field=$('wavelength-number');if(field){field.focus({preventScroll:true});(field.closest('label')||field).scrollIntoView({block:'nearest'});field.select();}}
 function selectedShape(){ui.shape=Math.min(Math.max(0,ui.shape|0),state.shapes.length-1);return state.shapes[ui.shape];}
 function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.page==='Model'&&ui.selection==='Geometry'&&isOptical()&&pick.mode==='Bodies')disposeWidthEditor=installShapeEditor($('canvas'),{shape:selectedShape(),index:ui.shape,snap:ui.snap,blocked:()=>numericDrafts.invalid,commit:(shape,label)=>{edits.endGroup();setShape(ui.shape,shape);trackEdit();edits.endGroup();render();notice(label+'. Run explicitly to compute new results.');}});}
 function geom(){
@@ -223,7 +225,7 @@ let panelKey=null;
 function render(){const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
-function renderPanels(){document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose an application':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
+function renderPanels(){document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose a model':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===ui.page));document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -243,7 +245,7 @@ else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=applicationChosen()?active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>':'<span class="sequence-empty">Study steps appear once you choose an application.</span>';
 const width=$('width');if(width)width.oninput=()=>{state.width=+width.value;numericDrafts.clear('width');if($('width-number'))$('width-number').value=width.value;refreshInputIssues();width.previousElementSibling.textContent=state.width+' nm';if(ui.page==='Model'){const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}};const v=$('voltage');if(v)v.onchange=()=>{if(!v.checkValidity()||v.value===''){v.value=state.voltage;return;}state.voltage=+v.value;};
 document.querySelectorAll('[data-toggle]').forEach(b=>b.onchange=()=>{const prior=state[b.dataset.toggle];state[b.dataset.toggle]=b.checked;if(b.dataset.toggle==='heat'&&b.checked)state.electric=true;
- if(isJoule()){state[b.dataset.toggle]=prior;notice('The multiphysics preview keeps mechanics or optics. For electric currents with heat alone, choose Applications → Joule heating.');}render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{if(ui.page==='Connections'){ui.selection=b.dataset.select;render();}else select(b.dataset.select);});document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(ui.page==='Connections'&&!isOptical()&&!isHeat())disposeConnectionGraph=installConnectionGraph($('canvas'),open=>{ui.graphOptionsOpen=open;});if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
+ if(isJoule()){state[b.dataset.toggle]=prior;notice('The multiphysics preview keeps mechanics or optics. For electric currents with heat alone, choose Models → Joule heating.');}render();});document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{if(ui.page==='Connections'){ui.selection=b.dataset.select;render();}else select(b.dataset.select);});document.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{Object.assign(state,templatePhysics(b.dataset.template));select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');});if(isHeat()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;renderHeat();}else if(isJoule()){bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'&&$('canvas').querySelector('svg')?installViewport($('canvas'),cameras.Section):null;jouleView.page();}else{decorate();solverPanel();pickingPanel();bindNumericInputs();refreshInputIssues();refreshViewport=ui.page==='Model'?(isOptical()?installViewport($('canvas'),cameras.Optical,{fit:()=>cameras.Optical.fitTo(WINDOW_VIEW),fitShapes:()=>cameras.Optical.fitTo(shapesView(state.shapes)),onChange:()=>{if(refreshViewport)bindWidthEditor();}}):installViewport($('canvas'),cameras[ui.view])):null;bindWidthEditor();refreshHeatControls();}if(ui.page==='Connections'&&!isOptical()&&!isHeat())disposeConnectionGraph=installConnectionGraph($('canvas'),open=>{ui.graphOptionsOpen=open;});if(document.activeElement===document.body){const target=focusId?$(focusId):focusData?document.querySelector('[data-'+focusData[0]+'="'+CSS.escape(focusData[1])+'"]'):null;target?.focus({preventScroll:true});}}
 
 function refreshInputIssues(){
  const host=$('input-problems');host.replaceChildren();host.hidden=!numericDrafts.invalid;
@@ -260,7 +262,7 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid;
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
- else if(!applicationChosen())$('status').textContent='Choose an application to start';
+ else if(!applicationChosen())$('status').textContent='Choose a model to start';
  else $('status').textContent=solverBusy?'Optical computation running':pendingJob?(jobResumeBlocked?'Unavailable job · detach before starting another calculation':'Pending job · resume or detach'):retentionBlock()|| (opticalBlock()?'Optical input unsupported · review Study':'Optical adapter ready · explicit Run required');
  refreshPersistence();jouleView.refreshControls();
 }
@@ -365,23 +367,32 @@ function announceResult(text){notice(text);resultNotice=true;}
 const current = () => snapshot(state, setup);
 const signature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(current());
+// The title and the footer show one save indicator (persistenceTitle), so they never disagree.
+let saveIndicator=null,recoveryState=null,latestOffer=null;
 function refreshPersistence(){
   const clean=!edits.dirty;
   // Results not in a session file outrank a clean input snapshot: saving inputs only
   // must not read as saved while completed runs would be lost.
   const runsUnsaved=runs.length>0&&savedRunsState!==runsStamp();
   // Before an application is chosen there is nothing to save or name.
-  $('project').textContent=!applicationChosen()?'No model chosen':(isOptical()?'Optical waveguide':isHeat()?'Heat conduction':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+persistenceTitle({invalid:numericDrafts.invalid,clean,runsUnsaved,saved:savedFile(),loaded:loadedFrom()});
+  saveIndicator={invalid:numericDrafts.invalid,clean,runsUnsaved,saved:savedFile(),loaded:loadedFrom()};refreshSaveIndicator();
   refreshNotebook();refreshWorkflow();
+}
+function refreshSaveIndicator(){
+ const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});
+ $('project').textContent=!applicationChosen()||!text?'No model chosen':(isOptical()?'Optical waveguide':isHeat()?'Heat conduction':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+text;
+ $('autosave-status').textContent=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:'No model chosen · nothing to save yet';
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
  const steps=opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs});
  steps.forEach((step,index)=>{
-  let button=host.children[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
+  let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){solverRun=runs.findLast(run=>run.signature===signature())||solverRun;ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
   if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
-  button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.detail;
+  button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.wavelength?step.summary:step.detail;
+  // The wavelength of the Study step is its own control: it opens the wavelength field.
+  if(step.id==='Study'){let chip=$('workflow-wavelength');if(!chip){chip=document.createElement('button');chip.type='button';chip.id='workflow-wavelength';chip.className='workflow-wavelength';chip.title='Edit the wavelength (Physics › Optical modes)';chip.onclick=()=>editWavelengthField();button.after(chip);}chip.hidden=!step.wavelength;chip.textContent=step.wavelength||'';chip.setAttribute('aria-label',`Wavelength ${step.wavelength?step.wavelength.slice(2):''}: edit`);}
  });
 }
 function rejectInvalidInput(){
@@ -506,27 +517,27 @@ const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduct
 const autosaveStamp=()=>notebookStamp()+JSON.stringify(savedFile());
 const notebookStore=indexedNotebookStore();
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
- const message=$('autosave-status');
- // Updating, not "pending": right after Save session it would read as if the save were not done.
- if(state.phase==='pending'||state.phase==='saving')message.textContent='Updating browser recovery…';
- if(state.phase==='current')message.textContent='Current notebook already in browser recovery';
- if(state.phase==='saved'){notebookRecoveryRecord=state.record;notebookLoadVersion++;if(notebookStore.movedEarlier())renderEarlierSessions();message.textContent='Browser recovery saved · '+new Date(state.record.savedAt).toLocaleTimeString();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
- if(state.phase==='error'){message.textContent=state.code==='recovery-conflict'?'Browser recovery changed in another tab':'Browser recovery failed · save a session file';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
+ // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
+ if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
+ if(state.phase==='current')recoveryState='kept';
+ if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;if(notebookStore.movedEarlier())renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.';}
+ if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
+ refreshSaveIndicator();
 }});
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
  try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
   latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt}:null;
-  if(recovered){$('autosave-status').textContent='Previous browser session available · '+recovered.session.runs.length+' runs';$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
-  else $('autosave-status').textContent='Completed sessions will be saved for browser recovery';
+  if(recovered){$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Recover last session restores inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
+  refreshSaveIndicator();
   await renderEarlierSessions();
   if(ui.page==='Applications')render();
- }catch(error){if(version!==notebookLoadVersion)return;$('autosave-status').textContent='Browser recovery unavailable · save a session file';$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
+ }catch(error){if(version!==notebookLoadVersion)return;recoveryState='unavailable';refreshSaveIndicator();$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
 }
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 let earlierSessions=[];
 // The landing page offers to resume until the page has runs or the user starts new.
-let latestOffer=null,resumeDismissed=false;
+let resumeDismissed=false;
 function resumeOffer(){
  if(resumeDismissed||runs.length)return null;
  return {latest:latestOffer,earlier:earlierSessions.map(e=>({runs:e.recovered.session.runs.length,savedAt:e.recovered.savedAt,index:e.index})),
@@ -626,8 +637,8 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   renderField();solverRun.effective_index.forEach((v,i)=>{const row=document.createElement('div');row.className='pair';const label=document.createElement('span');label.textContent=`Candidate ${i+1} · effective index`;const value=document.createElement('strong');value.textContent=v.toFixed(8);row.append(label,value);$('canvas').append(row);});
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Browser recovery result — not recomputed or authenticated. ':'Imported file result — not recomputed or authenticated. ')+' Candidates are ranked by effective index and are not matched between designs. Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
- if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Applications → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
- if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical interface</h2>'+pair('Equation','Vector optical eigenproblem')+`<label>Wavelength [nm]<input id="wavelength-number" type="number" min="1400" max="1700" step="any" value="${state.wavelength}"></label>`+pair('Material data','Refractive indices at this wavelength')+pair('Candidates','2')+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
+ if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Models → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
+ if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+`<label>Wavelength [nm]<input id="wavelength-number" type="number" min="1400" max="1700" step="any" value="${state.wavelength}"></label>`+pair('Material data','Refractive indices at this wavelength')+pair('Candidates','2')+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
  if(ui.page==='Connections'&&isOptical()){$('inspector').innerHTML='<h2>Active interfaces</h2>'+pair('Optical modes','Enabled')+pair('Couplings','None')+'<p>This application computes optical modes only.</p>';document.querySelector('.workspace > .note').textContent='One optical interface; no thermal or mechanical field transfer is configured.';}
  if(ui.page==='Model'&&ui.selection==='Mesh'&&isOptical())renderMeshPreview();
  if(ui.page==='Model'&&ui.selection==='Study'&&isOptical())renderOpticalStudy();
@@ -642,11 +653,11 @@ function renderOpticalStudy(){
  const actions=document.createElement('div');actions.className='study-actions';
  for(const name of ['Geometry','Materials']){const edit=document.createElement('button');edit.textContent='Edit '+name.toLowerCase();edit.onclick=()=>select(name);actions.append(edit);}
  // The wavelength is shown here but set in Physics › Optical modes: open it with the field focused.
- const editWavelength=document.createElement('button');editWavelength.id='edit-wavelength';editWavelength.textContent='Edit wavelength';editWavelength.onclick=()=>{select('Optical modes');const field=$('wavelength-number');if(field){field.focus({preventScroll:true});(field.closest('label')||field).scrollIntoView({block:'nearest'});field.select();}};actions.append(editWavelength);
+ const editWavelength=document.createElement('button');editWavelength.id='edit-wavelength';editWavelength.textContent='Edit wavelength';editWavelength.onclick=()=>editWavelengthField();actions.append(editWavelength);
  const check=document.createElement('button');check.textContent=preflight.busy?'Checking inputs…':'Check inputs';check.disabled=preflight.busy||solverBusy||!!opticalBlock()||numericDrafts.invalid;
  check.onclick=()=>preflight.check(current(),opticalDocument(),connection.instance);actions.append(check);
  const exportDoc=document.createElement('button');exportDoc.textContent='Export solver JSON';exportDoc.disabled=!!opticalSupport(state,setup)||numericDrafts.invalid;
- exportDoc.onclick=()=>{try{rejectInvalidInput();downloadFile(new Blob([JSON.stringify(opticalDocument(),null,2)],{type:'application/json'}),'studio-optical-solver.json');notice('Solver document exported in micrometres. This is a simcase input, not a workspace session.');}catch(error){notice(error.message);}};actions.append(exportDoc);host.append(actions);
+ exportDoc.onclick=()=>{try{rejectInvalidInput();downloadFile(new Blob([JSON.stringify(opticalDocument(),null,2)],{type:'application/json'}),'studio-optical-solver.json');notice('Solver document exported: a simcase input with geometry in nm and other lengths as quantities, not a workspace session.');}catch(error){notice(error.message);}};actions.append(exportDoc);host.append(actions);
  const block=opticalBlock()||retentionBlock();if(block){const message=document.createElement('p');message.textContent=block;message.className='validation-warning';host.append(message);}
  if(preflight.error){const error=document.createElement('p');error.setAttribute('role','alert');error.textContent='Input check failed: '+preflight.error+' Previous check retained.';host.append(error);}
  const record=preflight.record;
@@ -659,13 +670,13 @@ function renderOpticalStudy(){
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
  panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+pair('Wavelength',state.wavelength+' nm')+pair('Candidates','2')+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window, boundaries and candidate count are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
- if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · lengths in µm';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
+ if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
 
 let meshView='Full window';
 const meshPreview=new MeshPreview((path,body)=>watchedApi(path+'?workspace_instance='+encodeURIComponent(connection.instance),body),()=>{if(ui.page==='Model'&&ui.selection==='Mesh')render();});
 function renderMeshPreview(){
- document.querySelector('.workspace > .note').textContent='Actual mesh in µm; preview is attached to captured inputs. Shaded triangles belong to shapes; dark triangles to the silica background.';
+ document.querySelector('.workspace > .note').textContent='Actual mesh, axes in nm; preview is attached to captured inputs. Shaded triangles belong to shapes; dark triangles to the silica background.';
  const host=$('canvas'),panel=$('inspector');host.innerHTML='<h2>Optical mesh</h2><p>Generate the actual triangular mesh without solving optical modes.</p>';
  const generate=document.createElement('button');generate.id='generate-mesh';generate.textContent=meshPreview.busy?'Generating mesh…':'Generate mesh';generate.disabled=meshPreview.busy||solverBusy||!!opticalBlock()||numericDrafts.invalid;
  generate.onclick=async()=>{try{rejectInvalidInput();await meshPreview.generate(current(),opticalDocument());}catch(error){notice(error.message);}};host.append(generate);
@@ -690,16 +701,18 @@ function fieldColor(t){const stops=[[18,38,59],[23,111,139],[69,187,159],[249,23
 let fieldResize=null,profileResize=null,profileRedraw=()=>{};const profileState={axis:'x',coordinate:.15,open:false};
 function addProbeControls(host,redraw){
  const form=document.createElement('form');form.className='probe-controls';
- form.innerHTML='<strong>Inspect displayed sample</strong><label>x [µm]<input id="probe-x" type="number" step="any" min="-1.5" max="1.5" required></label><label>y [µm]<input id="probe-y" type="number" step="any" min="-1.2" max="1.2" required></label><button type="submit">Inspect point</button><button type="button" id="clear-probe">Clear point</button><span>Click a plot or enter coordinates. Values belong to triangle centroids; no interpolation.</span>';
- host.append(form);$('probe-x').value=fieldProbe.x;$('probe-y').value=fieldProbe.y;
- form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;fieldProbe.x=Number($('probe-x').value);fieldProbe.y=Number($('probe-y').value);fieldProbe.active=true;redraw();refreshPersistence();};
+ form.innerHTML='<strong>Inspect displayed sample</strong><label>x [nm]<input id="probe-x" type="number" step="any" min="-1500" max="1500" required></label><label>y [nm]<input id="probe-y" type="number" step="any" min="-1200" max="1200" required></label><button type="submit">Inspect point</button><button type="button" id="clear-probe">Clear point</button><span>Click a plot or enter coordinates. Values belong to triangle centroids; no interpolation.</span>';
+ host.append(form);$('probe-x').value=nmValue(fieldProbe.x);$('probe-y').value=nmValue(fieldProbe.y);
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;fieldProbe.x=Number($('probe-x').value)/1000;fieldProbe.y=Number($('probe-y').value)/1000;fieldProbe.active=true;redraw();refreshPersistence();};
  $('clear-probe').onclick=()=>{fieldProbe.active=false;redraw();refreshPersistence();};
 }
+// A µm view coordinate as an nm input value (0.1 nm resolution, a plain number for the field).
+const nmValue=um=>String(Number((um*1000).toFixed(1)));
 function probeOutput(host,id){const output=document.createElement('p');output.id=id;output.className='probe-output';output.setAttribute('role','status');host.append(output);return output;}
 
 function renderField(){
  if(fieldResize)fieldResize.disconnect();
- const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${solverRun.effective_index[i].toFixed(6)}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:var(--optical-plot-height,340px)"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
+ const host=document.createElement('section');host.className='field-result';host.innerHTML=`<div class="toolbar"><label>Candidate <select id="field-mode">${[0,1].map(i=>`<option value="${i}" ${i===fieldView.mode?'selected':''}>${i+1} · n_eff ${formatIndex(solverRun.effective_index[i])}</option>`).join('')}</select></label><label>Quantity <select id="field-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option ${c===fieldView.component?'selected':''} value="${c}">${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="field-window">${['Core region','Full window'].map(c=>`<option ${c===fieldView.window?'selected':''}>${c}</option>`).join('')}</select></label></div><canvas id="optical-field" role="img" style="display:block;width:100%;height:var(--optical-plot-height,340px)"></canvas><div style="display:flex;align-items:center;gap:10px;padding:10px 0"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p id="field-description"></p>`;
  $('canvas').append(host);
  for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();profileRedraw();};
  probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();renderLineProfile(host,[solverRun]);
@@ -718,23 +731,23 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
  ctx.strokeStyle='#f5f1da';ctx.setLineDash([4,3]);ctx.lineWidth=1;for(const shape of run.input.model.shapes){ctx.beginPath();if(shape.type==='circle')ctx.arc(X(shape.cx/1000),Y(shape.cy/1000),shape.r/1000*scale,0,2*Math.PI);else shapeCorners(shape).forEach(([x,y],i)=>i?ctx.lineTo(X(x/1000),Y(y/1000)):ctx.moveTo(X(x/1000),Y(y/1000)));ctx.closePath();ctx.stroke();}
  if(profileState.open){ctx.strokeStyle='#e7bc73';ctx.setLineDash([8,4]);ctx.lineWidth=1.5;ctx.beginPath();if(profileState.axis==='x'&&profileState.coordinate>=ymin&&profileState.coordinate<=ymax){ctx.moveTo(X(xmin),Y(profileState.coordinate));ctx.lineTo(X(xmax),Y(profileState.coordinate));}else if(profileState.axis==='y'&&profileState.coordinate>=xmin&&profileState.coordinate<=xmax){ctx.moveTo(X(profileState.coordinate),Y(ymin));ctx.lineTo(X(profileState.coordinate),Y(ymax));}ctx.stroke();}ctx.restore();
  ctx.strokeStyle='#91a8b7';ctx.strokeRect(left,top,pw,ph);ctx.fillStyle='#cfdae0';ctx.font='12px Segoe UI';ctx.textAlign='center';
- for(let i=0;i<3;i++){const x=xmin+(xmax-xmin)*i/2;ctx.fillText(x.toFixed(2),X(x),top+ph+18);}
- ctx.fillText('x [µm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(let i=0;i<3;i++){const y=ymin+(ymax-ymin)*i/2;ctx.fillText(y.toFixed(2),left-8,Y(y)+4);}
- ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [µm]',0,0);ctx.restore();
+ for(const x of nmTicks(xmin,xmax,Math.max(3,Math.min(7,Math.floor(pw/64)))))ctx.fillText(formatNm(x),X(x),top+ph+18);
+ ctx.fillText('x [nm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(const y of nmTicks(ymin,ymax,Math.max(3,Math.min(7,Math.floor(ph/40)))))ctx.fillText(formatNm(y),left-8,Y(y)+4);
+ ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [nm]',0,0);ctx.restore();
  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';const description=`Candidate ${fieldView.mode+1}: ${q} / max|E|, relative amplitude (0–1). Each candidate uses its own vector maximum. Triangle-centroid samples, constant color per triangle; dashed outlines = shapes. Not absolute power.${maximum===0?' Zero field returned.':''}`;
  if(descriptionTarget)descriptionTarget.textContent=description;canvas.setAttribute('aria-label',description);
  if(sampleTarget){
   sampleTarget.textContent='No point selected.';
   if(fieldProbe.active){
    const sample=probeField(run.field,values,fieldProbe.x,fieldProbe.y);
-   sampleTarget.textContent=sample?`At (${fieldProbe.x.toFixed(4)}, ${fieldProbe.y.toFixed(4)}) µm: ${q} / max|E| = ${sample.value.toPrecision(6)} · triangle ${sample.index+1}, centroid (${sample.centroid[0].toFixed(4)}, ${sample.centroid[1].toFixed(4)}) µm. Stored centroid value, not interpolated.`:'No triangle contains this point in the captured result.';
+   sampleTarget.textContent=sample?`At (${formatNm(fieldProbe.x,1)}, ${formatNm(fieldProbe.y,1)}) nm: ${q} / max|E| = ${sample.value.toPrecision(6)} · triangle ${sample.index+1}, centroid (${formatNm(sample.centroid[0],1)}, ${formatNm(sample.centroid[1],1)}) nm. Stored centroid value, not interpolated.`:'No triangle contains this point in the captured result.';
    if(fieldProbe.x>=xmin&&fieldProbe.x<=xmax&&fieldProbe.y>=ymin&&fieldProbe.y<=ymax){const px=X(fieldProbe.x),py=Y(fieldProbe.y);ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px-6,py);ctx.lineTo(px+6,py);ctx.moveTo(px,py-6);ctx.lineTo(px,py+6);ctx.stroke();}
   }
   canvas.style.cursor='crosshair';canvas.onclick=event=>{
    const rect=canvas.getBoundingClientRect(),px=(event.clientX-rect.left)*w/rect.width,py=(event.clientY-rect.top)*h/rect.height;
    if(px<left||px>left+pw||py<top||py>top+ph)return;
    fieldProbe.x=Math.max(xmin,Math.min(xmax,xmin+(px-left)/scale));fieldProbe.y=Math.max(ymin,Math.min(ymax,ymax-(py-top)/scale));fieldProbe.active=true;
-   if($('probe-x'))$('probe-x').value=fieldProbe.x.toFixed(6);if($('probe-y'))$('probe-y').value=fieldProbe.y.toFixed(6);redraw();refreshPersistence();
+   if($('probe-x'))$('probe-x').value=nmValue(fieldProbe.x);if($('probe-y'))$('probe-y').value=nmValue(fieldProbe.y);redraw();refreshPersistence();
   };
  }
 
@@ -744,27 +757,27 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
 function renderLineProfile(host,profileRuns,updateFields=()=>drawField()){
  const details=document.createElement('details');details.className='line-profile';details.open=profileState.open;
  const summary=document.createElement('summary');summary.textContent='Line profile and CSV';details.append(summary);
- const form=document.createElement('form');form.className='profile-controls';form.innerHTML='<label>Profile direction<select id="profile-axis" aria-label="Profile direction"><option value="x">Horizontal · along x</option><option value="y">Vertical · along y</option></select></label><label>Fixed coordinate [µm]<input id="profile-coordinate" type="number" step="any" required></label><button type="submit">Show profile</button>';details.append(form);
+ const form=document.createElement('form');form.className='profile-controls';form.innerHTML='<label>Profile direction<select id="profile-axis" aria-label="Profile direction"><option value="x">Horizontal · along x</option><option value="y">Vertical · along y</option></select></label><label>Fixed coordinate [nm]<input id="profile-coordinate" type="number" step="any" required></label><button type="submit">Show profile</button>';details.append(form);
  const description=document.createElement('p');description.setAttribute('role','status');details.append(description);
  const canvas=document.createElement('canvas');canvas.style.cssText='display:block;width:100%;height:260px';canvas.setAttribute('role','img');details.append(canvas);
  const legend=document.createElement('div');legend.className='profile-legend';details.append(legend);
  const note=document.createElement('p');note.textContent='Step segments use the stored value of each intersected triangle. No interpolation, absolute power or mode matching. Each candidate uses its own max|E| normalization.';details.append(note);
  const csv=document.createElement('button');csv.type='button';csv.textContent='Export profile CSV';csv.disabled=true;details.append(csv);const png=document.createElement('button');png.type='button';png.textContent='Export profile PNG';png.style.marginLeft='8px';png.disabled=true;details.append(png);host.append(details);
- $('profile-axis').value=profileState.axis;$('profile-coordinate').value=profileState.coordinate;
- const range=()=>{const extent=$('profile-axis').value==='x'?1.2:1.5;$('profile-coordinate').min=-extent;$('profile-coordinate').max=extent;};range();$('profile-axis').onchange=range;
+ $('profile-axis').value=profileState.axis;$('profile-coordinate').value=nmValue(profileState.coordinate);
+ const range=()=>{const extent=$('profile-axis').value==='x'?1200:1500;$('profile-coordinate').min=-extent;$('profile-coordinate').max=extent;};range();$('profile-axis').onchange=range;
  let series=[],cacheKey='';
  profileRedraw=()=>{if(!details.isConnected||!details.open)return;try{
   const key=JSON.stringify([profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component]);if(key!==cacheKey){series=profileRuns.map(run=>({run,segments:lineProfile(run.field,fieldScalars(run.field,fieldView.mode,fieldView.component).values,profileState.axis,profileState.coordinate)}));cacheKey=key;}
-  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} µm · candidate ${fieldView.mode+1} · ${q} / max|E| (0–1). Full-domain profile; the amber dashed line marks its location in the field view when visible.`;
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1)} nm · candidate ${fieldView.mode+1} · ${q} / max|E| (0–1). Full-domain profile; the amber dashed line marks its location in the field view when visible.`;
   legend.replaceChildren();series.forEach((item,i)=>{const line=document.createElement('p');line.style.color=i?'#e7bc73':'#80d7c0';line.textContent=`${i?'B':'A'} · ${runLabel(item.run)} · ${item.segments.length} intervals`;legend.append(line);});
   drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);png.disabled=csv.disabled;
  }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;png.disabled=true;}};
- form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value);profileRedraw();updateFields();refreshPersistence();};
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value)/1000;profileRedraw();updateFields();refreshPersistence();};
  details.ontoggle=()=>{if(!details.isConnected)return;profileState.open=details.open;profileRedraw();updateFields();refreshPersistence();};
  csv.onclick=()=>downloadFile(new Blob([profileCsv(series,profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component)],{type:'text/csv'}),'studio-profile.csv');
  png.onclick=()=>{
   const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height+180;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,0,0);ctx.font='14px Segoe UI';ctx.fillStyle='#cfdae0';
-  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';ctx.fillText(`Line ${profileState.axis==='x'?'y':'x'} = ${profileState.coordinate} um | candidate ${fieldView.mode+1} | ${q} / max|E|`,12,canvas.height+24);
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';ctx.fillText(`Line ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1).replace('−','-')} nm | candidate ${fieldView.mode+1} | ${q} / max|E|`,12,canvas.height+24);
   ctx.fillText('Relative amplitude 0 to 1 per candidate. Stored triangle values; no interpolation.',12,canvas.height+48);
   series.forEach((item,i)=>{ctx.fillStyle=i?'#e7bc73':'#80d7c0';ctx.fillText(`${i?'B':'A'}: ${item.run.job} | ${designSummary(item.run.input.model)} | ${item.run.input.model.wavelength} nm | ${item.run.origin}`,12,canvas.height+76+i*24);});
   ctx.fillStyle='#cfdae0';ctx.fillText('Full domain. No absolute-power or cross-design mode matching claim.',12,canvas.height+142);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-profile.png');},'image/png');
@@ -782,41 +795,47 @@ function runDetails(run){
  const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[])];
  return '<details class="run-details" id="run-details"'+(ui.runDetailsOpen?' open':'')+'><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
 }
-const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save session to keep it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one.';
+const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save session to keep it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.';
 // Naming applies on Enter or when the field is left, and pins the run. Leaving the field
 // updates the panel in place, so a click on another control in it is not lost to a redraw.
 function nameRun(run,value,redraw){
  let label;try{label=validateRunLabel(value);}catch(error){notice(error.message);return;}
  if(label===(run.label||'')&&(!label||run.pinned))return;
  // a name pins the run, except while a calculation runs: pinning the last free slot then
- // would leave the finishing result nowhere to go (the Pin button is disabled then too)
+ // would leave the finishing result nowhere to go
  const pinBlocked=(solverBusy||!!pendingJob)&&!run.pinned;
  run.label=label;if(label&&!pinBlocked)run.pinned=true;
  if(redraw)render();else{
   document.querySelectorAll('[data-run]').forEach(b=>{const r=runs.find(x=>x.job===b.dataset.run);if(r)b.textContent=runItemText(r);});
   document.querySelectorAll('#compare-a option,#compare-b option').forEach(o=>{const r=runs.find(x=>x.job===o.value);if(r)o.textContent=runLabel(r);});
-  document.querySelectorAll('.compare-grid article h3').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=`${i?'B':'A'} · ${runLabel(r)}`;});
-  profileRedraw();if($('pin-run'))$('pin-run').disabled=(solverBusy||!!pendingJob)&&!run.pinned;
-  if($('pin-run'))$('pin-run').textContent=run.pinned?'Unpin this run':'Pin this run';if($('run-list-heading'))$('run-list-heading').textContent=runListHeading();
+  document.querySelectorAll('.compare-grid article h3').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=fieldHeading(i?'B':'A',r);});
+  profileRedraw();syncUnpinButton();if($('run-list-heading'))$('run-list-heading').textContent=runListHeading();
   if($('run-name-value'))$('run-name-value').textContent=run.label||'Not named';refreshPersistence();
  }
- notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; pin it when the calculation ends.`:label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
+ notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; press Enter in Run name when the calculation ends to pin it.`:label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
+}
+// Naming a run pins it, so the run list offers only Unpin, for a pinned run; an unpinned run is
+// kept again by naming it (Enter in Run name). Updated in place so the name field keeps focus.
+function syncUnpinButton(){
+ const slot=$('unpin-slot');if(!slot)return;const pinned=!!solverRun?.pinned;let button=$('pin-run');
+ if(!pinned){button?.remove();return;}
+ if(!button){button=document.createElement('button');button.id='pin-run';button.type='button';button.textContent='Unpin this run';button.onclick=()=>{solverRun.pinned=false;render();$('run-name-input')?.focus();notice(pinNotice(solverRun));};slot.append(button);}
 }
 const runItemText=run=>(run.pinned?'Pinned · ':'')+runLabel(run);
 const runListHeading=()=>`Runs · ${runs.length} of ${RUN_LIMIT} · ${runs.filter(r=>r.pinned).length} pinned`;
 function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Runs</h2>';
- const importRuns=document.createElement('button');importRuns.id='import-runs';importRuns.textContent='Import runs from file';importRuns.disabled=solverBusy||!!pendingJob;importRuns.onclick=()=>$('run-import-file').click();panel.append(importRuns);
+ const importRuns=document.createElement('button');importRuns.id='import-runs';importRuns.textContent='Add runs from file (inputs unchanged)';importRuns.title='Adds the runs in a session or run file to this list; the current inputs are not replaced';importRuns.disabled=solverBusy||!!pendingJob;importRuns.onclick=()=>$('run-import-file').click();panel.append(importRuns);
  const title=document.createElement('h3');title.id='run-list-heading';title.textContent=runListHeading();panel.append(title);
  for(const run of [...runs].reverse()){
   const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=runItemText(run);b.onclick=()=>{solverRun=run;ui.page='Results';render();};panel.append(b);
  }
  if(solverRun){
-  const pin=document.createElement('button');pin.id='pin-run';pin.textContent=solverRun.pinned?'Unpin this run':'Pin this run';pin.disabled=(solverBusy||!!pendingJob)&&!solverRun.pinned;pin.onclick=()=>{solverRun.pinned=!solverRun.pinned;render();$('pin-run')?.focus();notice(pinNotice(solverRun));};panel.append(pin);
+  const unpinSlot=document.createElement('span');unpinSlot.id='unpin-slot';panel.append(unpinSlot);syncUnpinButton();
   const nameForm=document.createElement('form');nameForm.className='run-name';
   const nameLabel=document.createElement('label');nameLabel.textContent='Run name';const nameInput=document.createElement('input');nameInput.id='run-name-input';nameInput.type='text';nameInput.maxLength=80;nameInput.value=solverRun.label||'';nameInput.placeholder='For example: design A';nameInput.setAttribute('aria-describedby','run-name-hint');nameLabel.append(nameInput);
   const rename=document.createElement('button');rename.id='rename-run';rename.type='submit';rename.textContent='Apply name';
-  const hint=document.createElement('p');hint.id='run-name-hint';hint.className='input-hint';hint.textContent='Press Enter to apply. A named run is pinned, so new runs do not replace it.';
+  const hint=document.createElement('p');hint.id='run-name-hint';hint.className='input-hint';hint.textContent='Press Enter to apply. Naming a run pins it, so new runs do not replace it; Enter on a named, unpinned run pins it again.';
   nameForm.append(nameLabel,rename,hint);panel.append(nameForm);
   const target=solverRun;
   nameForm.onsubmit=event=>{event.preventDefault();nameRun(target,nameInput.value,true);};
@@ -826,11 +845,11 @@ function renderRunList(){
   const exportRun=document.createElement('button');exportRun.id='export-run';exportRun.textContent='Export this run';exportRun.style.marginTop='10px';exportRun.onclick=()=>{try{
    const text=JSON.stringify(createSession(solverRun.input,[solverRun],solverRun.job,[solverRun.job,solverRun.job],currentView()));
    if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('This run exceeds the session size limit.');
-   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields. Import runs from file adds it to a session. The current design is unchanged.`);
+   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields. Add runs from file adds it to a session. The current design is unchanged.`);
   }catch(error){notice(error.message);}};panel.append(exportRun);
   const restore=document.createElement('button');restore.id='restore-run-input';restore.textContent='Restore this run’s inputs';restore.onclick=()=>requestLoad(validateProject(solverRun.input),{saved:false,label:'Run · '+runLabel(solverRun)});panel.append(restore);
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
-   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+fieldProbe.x.toFixed(4)+', '+fieldProbe.y.toFixed(4)+') um; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+profileState.coordinate+' um (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
+   const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | candidate ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per candidate; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
   // The image is drawn from the Results plot; Compare shows two runs and has no single plot.
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent='Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
@@ -863,9 +882,9 @@ function renderComparison(){
  for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
  const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label>Candidate rank <select id="compare-mode"><option value="0" ${fieldView.mode===0?'selected':''}>1</option><option value="1" ${fieldView.mode===1?'selected':''}>2</option></select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
- const description=document.createElement('p');const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.effective_index[fieldView.mode]-a.effective_index[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}`;host.append(description,compareTable(a,b));
- const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=`${i?'B':'A'} · ${runLabel(run)}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
- const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend);
+ const description=document.createElement('p');const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. Δn_eff (B − A), candidate rank ${fieldView.mode+1}: ${(b.effective_index[fieldView.mode]-a.effective_index[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}`;host.append(description);
+ const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run);const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
+ const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each candidate is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their candidate vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b));
  const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
  for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw);

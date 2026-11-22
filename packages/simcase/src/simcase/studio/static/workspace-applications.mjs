@@ -10,7 +10,7 @@ export const APPLICATIONS=Object.freeze([
 ]);
 export function templatePhysics(id){
  const application=APPLICATIONS.find(a=>a.id===id);
- if(!application)throw new Error('Unknown application template.');
+ if(!application)throw new Error('Unknown model template.');
  return {...application.physics};
 }
 // What the landing page offers to resume: the latest browser session and the
@@ -30,16 +30,17 @@ function resumeCard(resume){
  const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
  const heading=document.createElement('h3');heading.id='resume-heading';heading.textContent='Continue where you left off';
  const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
+ const portable=document.createElement('p');portable.className='resume-portable';portable.textContent='A session file is the copy that moves between computers; browser recovery stays in this browser.';
  const actions=document.createElement('div');actions.className='resume-actions';
  for(const choice of choices){
-  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?'Recover: ':'Recover earlier: ')+choice.label;
+  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?'Recover (this browser only): ':'Recover earlier (this browser only): ')+choice.label;
   if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.onclick=()=>resume.onLatest(button);}
   else{button.dataset.resumeEarlier=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);
  }
- const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file…';open.onclick=()=>resume.onOpenFile();
+ const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file (portable)…';open.onclick=()=>resume.onOpenFile();
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
- actions.append(open,fresh);card.append(heading,note,actions);return card;
+ actions.append(open,fresh);card.append(heading,note,actions,portable);return card;
 }
 export function renderApplications(host,resume=null){
  host.replaceChildren();
@@ -56,6 +57,6 @@ export function renderApplications(host,resume=null){
   button.append(title,status,description,scope);cards.append(button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
- contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, two candidates.</li><li>Steady heat: one homogeneous rectangle with constant conductivity and source; each side insulated, at fixed temperature, with inward heat flux or with convection. Results stay in the tab.</li><li>Joule heating: a rectangle in mm with up to 8 rectangles, circles or polygons over a background material, up to 6 materials with thermal conductivity and a constant or linear-resistivity electrical conductivity; each side insulating, at fixed potential or with inward current, and insulated, at fixed temperature, with inward heat flux or with convection. Temperature-dependent materials iterate (Picard, or Newton chosen under Study). Results stay in the tab.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a template changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
+ contract.innerHTML='<h3>What this workspace supports</h3><ul><li>Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, two candidates.</li><li>Steady heat: one homogeneous rectangle with constant conductivity and source; each side insulated, at fixed temperature, with inward heat flux or with convection. Results stay in the tab.</li><li>Joule heating: a rectangle in mm with up to 8 rectangles, circles or polygons over a background material, up to 6 materials with thermal conductivity and a constant or linear-resistivity electrical conductivity; each side insulating, at fixed potential or with inward current, and insulated, at fixed temperature, with inward heat flux or with convection. Temperature-dependent materials iterate (Picard, or Newton chosen under Study). Results stay in the tab.</li><li>Multiphysics: edit the setup and connections. Electrical heating and mechanical deformation do not run here yet.</li><li>Existing thermal Studio views remain separate from this workspace.</li></ul><p>Choosing a model changes physics selections, retains dimensions and run history, and can be undone. Save session to keep inputs and completed results.</p>';
  host.append(heading,intro,cards,contract);
 }

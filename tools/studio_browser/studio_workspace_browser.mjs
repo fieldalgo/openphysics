@@ -3,7 +3,9 @@
 // Real-browser check of the installed Studio workspace (/workspace) on this OS:
 // two optical designs (a Width edit keeps the core centred), Compare with its n_eff
 // table, Save session under a dated name, a server restart with the page open,
-// recovery from the start page without a confirmation; then the Joule heating application (Picard,
+// recovery from the start page without a confirmation (with the round-3 labels: one save indicator
+// in the title and footer, the routes back, nm plot axes, n_eff digits, the wavelength in the step bar,
+// Compare headings and Unpin only); then the Joule heating application (Picard,
 // Newton, a refusal shown, constant materials). Drives a preinstalled Chrome through the
 // DevTools protocol with Node's built-in fetch and WebSocket; no npm package and
 // no browser download. Fails, never skips, when no browser is found.
@@ -168,28 +170,58 @@ try {
 
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
-  const startPage = await page.eval("({heading:document.querySelector('#canvas h2').textContent,resumeCard:!!document.querySelector('.resume-card'),status:document.getElementById('status').textContent,steps:document.querySelectorAll('#sequence b').length})");
+  const startPage = await page.eval("({heading:document.querySelector('#canvas h2').textContent,resumeCard:!!document.querySelector('.resume-card'),status:document.getElementById('status').textContent,steps:document.querySelectorAll('#sequence b').length,tab:document.querySelector('nav [data-page=Applications]').textContent,view:document.getElementById('view-title').textContent+' · '+document.getElementById('view-detail').textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('start page', startPage);
   // before an application is chosen: a neutral status and no study steps
-  assert.equal(startPage.status, 'Choose an application to start'); assert.equal(startPage.steps, 0);
+  assert.equal(startPage.status, 'Choose a model to start'); assert.equal(startPage.steps, 0);
+  // one word for one thing on the start page: model
+  assert.equal(startPage.tab, 'Models'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Choose a model');
+  assert.doesNotMatch(await text('#canvas'), /template|application/i, 'the start page says model');
+  assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
   await page.type('#shape-w', 600); await page.type('#shape-h', 300);
   // a Width edit keeps the core centred on x = 0; a Height edit keeps it on y = 0
   const sized = await page.eval("({x:document.getElementById('shape-x').value,y:document.getElementById('shape-y').value,study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' ')})");
-  stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /λ 1550 nm · Ready to run/);
+  stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /Ready to run/);
+  // the step bar's wavelength opens the wavelength field under Physics › Optical modes
+  assert.equal(await text('#workflow-wavelength'), 'λ 1550 nm');
+  await page.click('#workflow-wavelength'); await sleep(200);
+  const wavelengthField = await page.eval("({heading:document.querySelector('#inspector h2')?.textContent,focused:document.activeElement?.id,tree:document.querySelector('#tree [aria-current],#tree .selected,#tree [aria-selected=true]')?.textContent?.trim()||null})");
+  stage('wavelength from the step bar', wavelengthField); assert.equal(wavelengthField.heading, 'Optical modes'); assert.equal(wavelengthField.focused, 'wavelength-number');
+  await toGeometry();
   await runAndWait();
   // after a run of these inputs the Study step says so, and the title carries no revision counter
   const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('project').textContent})");
-  stage('first run complete', afterRun); assert.match(afterRun.study, /λ 1550 nm · Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
+  stage('first run complete', afterRun); assert.match(afterRun.study, /Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
+  // one save indicator: before a file save it says which copy exists, and the footer repeats it
+  await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
+  assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
+  // n_eff with 8 decimals in the candidate list as in the results; plot axes and the inspector in nm
+  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#canvas .pair strong')].map(e=>e.textContent),probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
+  stage('results view', resultsView);
+  for (const option of resultsView.options) assert.match(option, /^\d · n_eff \d\.\d{8}$/);
+  assert.equal(resultsView.options[0].split('n_eff ')[1], resultsView.values[0]);
+  assert.deepEqual(resultsView.probe, ['x [nm]', 'y [nm]']);
+  // an unnamed run offers no separate Pin button: naming it pins it
+  assert.equal(resultsView.pin, null); assert.equal(resultsView.imports, 'Add runs from file (inputs unchanged)');
+  await page.onElement('function(selector){const c=this.querySelector(selector),r=c.getBoundingClientRect();c.dispatchEvent(new MouseEvent("click",{bubbles:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));return true}', '#optical-field'); await sleep(200);
+  const probed = await page.eval("({x:document.getElementById('probe-x').value,out:document.getElementById('field-probe').textContent})");
+  stage('probe in nm', probed); assert.match(probed.out, /^At \(−?\d+(\.\d)?, −?\d+(\.\d)?\) nm: /); assert.ok(Math.abs(Number(probed.x)) <= 1500, probed.x);
   // naming a run with Enter pins it
   await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', '#run-name-input');
   await page.call('Input.insertText', {text: 'design A'});
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
   await sleep(150);
   const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
+  // a pinned run offers Unpin; after it, Enter in Run name pins it again
+  assert.equal(await text('#pin-run'), 'Unpin this run'); await page.click('#pin-run'); await sleep(150);
+  assert.equal(await page.eval("document.getElementById('pin-run')"), null); assert.match(await text('.run-item'), /^design A · /);
+  await page.onElement('function(selector){const e=this.querySelector(selector);e.focus();return true}', '#run-name-input');
+  for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
+  await sleep(150); assert.match(await text('.run-item'), /^Pinned · design A · /); assert.equal(await text('#pin-run'), 'Unpin this run');
   await toGeometry(); await page.type('#shape-w', 700); assert.equal(await page.eval("document.getElementById('shape-x').value"), '-350');
   // an input edit takes the Study step back from Run complete to Ready to run
-  const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /λ 1550 nm · Ready to run/);
+  const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
@@ -198,6 +230,11 @@ try {
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
   assert.match(neffTable.head[1], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[2], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
   assert.equal(neffTable.rows[0][3], before, 'the table and the sentence give the same Δn_eff');
+  // the field panels do not repeat the name, and come before the n_eff table
+  const panels = await page.eval("({headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>h.textContent),plotsFirst:!!(document.querySelector('.compare-grid').compareDocumentPosition(document.getElementById('compare-neff'))&Node.DOCUMENT_POSITION_FOLLOWING),plotTop:Math.round(document.getElementById('compare-field-a').getBoundingClientRect().top+scrollY),viewport:innerHeight})");
+  stage('compare panels', panels);
+  assert.deepEqual(panels.headings, ['A · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · 700 × 300 nm · Silicon · λ 1550 nm']);
+  assert.ok(panels.plotsFirst, 'field plots before the n_eff table');
   await page.screenshot('compare');
   await page.click('#save-session');
   let sessionFile;
@@ -209,10 +246,11 @@ try {
   assert.equal(session.runs?.length, 2);
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to the browser's downloads (check your Downloads folder)`), savedMessage);
-  assert.ok(savedHeader.includes(`Session file ${sessionFile} · `), savedHeader);
-  // right after Save session the footer says recovery is updating, never "pending"
-  assert.doesNotMatch(await page.eval("document.getElementById('autosave-status').textContent"), /pending/i);
-  await page.until("/Browser recovery saved/.test(document.getElementById('autosave-status').textContent)", 'browser recovery saved', 20000);
+  assert.ok(savedHeader.startsWith(`Optical waveguide / Sent to session file ${sessionFile} · `), savedHeader);
+  // the footer repeats the title's save indicator and never says "pending"
+  const savedFooter = await page.eval("document.getElementById('autosave-status').textContent");
+  assert.equal('Optical waveguide / ' + savedFooter, savedHeader); assert.doesNotMatch(savedFooter, /pending/i);
+  await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'browser recovery updated', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
   const stopped = await stopServer(server);
@@ -229,6 +267,12 @@ try {
   await page.until("!!document.querySelector('#resume-latest')", 'resume card');
   const card = await page.eval("(()=>{const r=document.querySelector('.resume-card').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
   stage('resume card', card); assert.ok(card.inView, 'resume card inside the first viewport');
+  // the routes back say which copy is durable
+  const routes = await page.eval("({latest:document.getElementById('resume-latest').textContent,open:document.getElementById('resume-open-file').textContent,note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
+  stage('routes back', routes);
+  assert.match(routes.latest, /^Recover \(this browser only\): Last session in this browser · 2 runs · saved /); assert.equal(routes.open, 'Open session file (portable)…');
+  assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
+  assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
   // a fresh page holds nothing an open would lose, so recovery asks nothing
   await page.click('#resume-latest'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');

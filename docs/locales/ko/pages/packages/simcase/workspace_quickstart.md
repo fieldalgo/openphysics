@@ -71,19 +71,21 @@ py -3.12 -m venv "$HOME\op-studio"
 ## 4. 설계 두 개와 비교
 
 1. **Choose a starting model**에서 **Optical waveguide**를 고릅니다. 고르기 전에는 제목에
-   *No model chosen*, 상태 표시줄에 *Choose an application to start*가 나오고 Study sequence는
-   비어 있습니다.
+   *No model chosen*, 상태 표시줄에 *Choose a model to start*가 나오고 Study sequence는
+   비어 있습니다. 이 화면의 탭 이름은 **Models**입니다.
 2. **Geometry**에서 코어 폭을 600 nm, 높이를 300 nm로 정합니다. Width를 바꾸면 코어가
    가운데를 지키고(Left x가 −300 nm가 됨) Height를 바꾸면 바닥이 y = 0에 남으므로
    **Centre on x = 0**을 누를 필요가 없습니다. 재료는 실리콘, 파장은 1550 nm이며 단계
-   표시줄에 *4. Study · λ 1550 nm · Ready to run*으로 나옵니다(**Study → Edit wavelength**가
-   입력란에 포커스를 둔 채 **Optical modes**를 엽니다).
+   표시줄에 *4. Study · Ready to run*과 그 옆의 **λ 1550 nm**가 나옵니다. **λ 1550 nm**는
+   **Study → Edit wavelength**처럼 **Physics › Optical modes**의 파장 입력란을 엽니다.
 3. **Run optical study**를 누릅니다. 결과에 장 분포와 두 후보의 유효굴절률이 나오고 Study
    단계는 *Run complete*가 됩니다. **Run name**에 이름(예: *design A*)을 입력하고 Enter를
-   누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지 않습니다.
+   누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지 않습니다(**Unpin this run**으로 해제하며
+   별도의 Pin 버튼은 없습니다). n_eff는 어디서나 소수 8자리이고, 장 그림과 점 조회는 입력과 같은
+   nm를 씁니다.
 4. 다시 **Geometry**에서 폭을 700 nm로 바꾸고 실행합니다.
 5. **Compare**를 엽니다. A와 B가 자동으로 골라지고, 표에 후보 순위마다 A와 B의 n_eff,
-   Δ (B − A), A 대비 Δ %가 나오며 열 머리글에 각 실행의 이름, 크기, 파장이 붙습니다.
+   Δ (B − A), A 대비 Δ %가 두 장 그림 아래에 나오며 열 머리글에 각 실행의 이름, 크기, 파장이 붙습니다.
    후보 순위는 같은 모드끼리 짝지은 것이 아닙니다.
 
 ## 5. 작업 남기기
@@ -93,16 +95,18 @@ py -3.12 -m venv "$HOME\op-studio"
   `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어갑니다(브라우저가
   저장 위치를 묻거나, 같은 이름이 있으면 번호를 붙일 수 있습니다). Messages에 *Session file …
   sent to the browser's downloads (check your Downloads folder)*가 나오고, 다음 편집이나 실행
-  전까지 제목에 *Session file … · 시각*이 표시됩니다.
+  전까지 제목에 *Sent to session file … · 시각*이 표시됩니다. 하단은 제목의 저장 표시를 그대로
+  보여 주며, 세션 파일 저장 전에는 *Not saved to a file · kept for recovery in this browser*입니다.
   **More › Save inputs only**는 결과 없이 모델만 저장하고, Runs 목록의 **Export this run**은
   실행 하나를 자체 파일로 씁니다.
 - 새로고침하거나 다시 켜면 시작 화면에 **Continue where you left off**가 나옵니다. 마지막
-  세션이나 이전 세션을 복구하거나, 세션 파일을 엽니다. 새 페이지(기본 입력, 실행 없음)에서는
+  세션이나 이전 세션은 **Recover (this browser only)**로 이 브라우저에서 복구하고, 세션 파일은
+  **Open session file (portable)…**로 엽니다. 컴퓨터 사이를 옮길 수 있는 사본은 세션 파일입니다. 새 페이지(기본 입력, 실행 없음)에서는
   바로 열립니다. 그렇지 않으면 **Open saved session?** 창이 돌아올 실행과 비교, 바뀌는 것을
   보여 줍니다. Messages에 무엇을 열었는지 나옵니다. 그다음 변경 전까지 제목에 파일 이름과 함께
   *Opened …*, 또는 *Recovered from this browser*가 나옵니다. 세션 파일을 저장한 적이 있으면
   *last session file …*(저장 뒤 바뀐 작업이면 *changed since session file …*), 저장한 적이 없으면
-  *results not in a session file yet*이 덧붙습니다.
+  *not saved to a file*이 덧붙습니다.
 - 페이지를 열어 둔 채 Studio를 다시 켜면 페이지가 스스로 다시 연결합니다. 다시 실행하라는
   안내가 나오면 Run을 다시 누르세요.
 - 입력·세션 파일은 버전 7입니다(Joule 가열 입력 추가). 버전 6 파일도 계속 읽습니다. 단위·이름 일괄 변경 이전 Studio가 저장한 파일(버전 1–5)은

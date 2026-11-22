@@ -24,3 +24,17 @@ export function fieldScalars(field,mode,component='magnitude'){
  const values=index<0?magnitudes:field.real[mode].map((v,i)=>Math.hypot(v[index],field.imag[mode][i][index]));
  return {values:values.map(v=>maximum===0?0:v/maximum),maximum};
 }
+// Plot axes in nanometres (display only; the views and the stored state stay in µm).
+// Ticks fall on round nanometre values (1, 2 or 5 × 10^k nm) inside [min, max] µm: the
+// smallest such step that gives at most maxTicks ticks (at least 2 apart from tiny ranges).
+export function nmTicks(min,max,maxTicks=5){
+ if(!Number.isFinite(min)||!Number.isFinite(max)||!(max>min)||!(maxTicks>=2))throw new Error('Invalid axis range.');
+ const lo=min*1000,hi=max*1000,count=step=>Math.floor(hi/step+1e-9)-Math.ceil(lo/step-1e-9)+1;
+ let power=10**Math.floor(Math.log10((hi-lo)/maxTicks)),step;
+ for(;;power*=10){step=[1,2,5].map(f=>f*power).find(s=>count(s)<=maxTicks);if(step)break;}
+ const ticks=[];for(let k=Math.ceil(lo/step-1e-9);k<=Math.floor(hi/step+1e-9);k++)ticks.push(k===0?0:Math.round(k*step)/1000);
+ return ticks;
+}
+// A µm coordinate as nanometres for display, at most `digits` decimals without trailing
+// zeros, e.g. formatNm(-0.57) → "−570", formatNm(0.1234567, 1) → "123.5".
+export const formatNm=(um,digits=0)=>{const nm=um*1000,text=String(Number(Math.abs(nm).toFixed(digits)));return (nm<0&&text!=='0'?'−':'')+text;};
