@@ -9,8 +9,11 @@ import {formatIndex} from './workspace-compare.mjs';
 export const RANKING_TEXT='Modes are ranked by effective index.';
 export const POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal';
 export const LOSSLESS_NOTE='Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.';
-export const PAIR_TOLERANCE=1e-4;
-export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TOLERANCE}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
+// 1e-3, not smaller: the mesh splits a symmetric pair by 1e-4 to 6e-4 at 40-10 nm, below the solver's n_eff
+// error at the same meshes, so two modes closer than 1e-3 cannot be told apart by this solver.
+export const PAIR_TOLERANCE=1e-3;
+const PAIR_TEXT='1e-3';
+export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TEXT}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
 export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field'});
 export const RUN_AGAIN='Run again to compute';
 
@@ -34,10 +37,10 @@ export function teFraction(field,mode){
 export function polarizationWord(f){return f>=0.9?'TE-like':f<=0.1?'TM-like':'hybrid';}
 export const tePercent=f=>(f*100).toFixed(1)+' % TE';
 /** Groups of consecutive modes (rows of the table, in the run's order) whose Re n_eff all lie
- * within 1e-4 of each other (the whole group, not a chain): a group of two is a degenerate pair.
+ * within 1e-3 of each other (the whole group, not a chain): a group of two is a degenerate pair.
  * Modes outside a group are not listed. */
 export function degenerateGroups(re){
- // "at most 1e-4" with the rounding of the decimal values allowed
+ // "at most 1e-3" with the rounding of the decimal values allowed
  const close=(a,b)=>Math.abs(a-b)<=PAIR_TOLERANCE*(1+1e-9),groups=[];
  for(let i=0;i<re.length;){
   let j=i+1,lo=re[i],hi=re[i];
@@ -69,7 +72,7 @@ export function modeTableRows(modes,{missing=''}={}){
    if(g[0]!==i){row.polarization=null;return row;}
    const values=g.map(j=>modes[j].fte),known=values.every(Number.isFinite),mean=known?values.reduce((a,b)=>a+b,0)/values.length:null;
    const name=g.length===2?'pair':`group of ${g.length}`;
-   row.polarization={text:`${name} (n_eff within ${PAIR_TOLERANCE}) · ${known?(mean*100).toFixed(0)+' % TE together':'—'}`,title:PAIR_TITLE,rowspan:g.length,pair:true,mean};
+   row.polarization={text:`${name} (n_eff within ${PAIR_TEXT}) · ${known?(mean*100).toFixed(0)+' % TE together':'—'}`,title:PAIR_TITLE,rowspan:g.length,pair:true,mean};
    return row;
   }
   row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${tePercent(m.fte)}`,title:POLARIZATION_HELP,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};

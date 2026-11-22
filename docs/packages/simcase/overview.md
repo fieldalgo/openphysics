@@ -239,10 +239,15 @@ The saved amplitudes are relative, hence "unnormalized": read the vector amplitu
 power carried in +z. Dividing a saved mode by `sqrt(Re unnormalized_mode_power)` gives a field
 that carries 1 W. For a lossless mode the imaginary part is roundoff; for a lossy mode
 (complex `effective_index`) it is the reactive part and the modes are not power-orthogonal.
-Two modes of one run whose `Re n_eff` differ by at most 1e-4 are a degenerate pair (for example
+Two modes of one run whose `Re n_eff` differ by at most 1e-3 are a degenerate pair (for example
 the two lowest modes of a square core): any rotation within the pair is a solution, so each
 member's `te_polarization_fraction` is arbitrary and only the pair's sum is defined. Both values
-are still saved, and the summary's description says so. The words TE-like, TM-like and hybrid
+are still saved, and the summary's description says so. The threshold is 1e-3 because the mesh splits a symmetric pair: the two lowest modes of a
+400 × 400 nm silicon square differ by 1.2e-4 to 6.2e-4 at core element sizes of 40 to 10 nm, not
+converging monotonically, which is below the n_eff discretization error at the same meshes (the
+slab TE error is 5.5e-3 to 7.8e-4). Two modes closer than that cannot be told apart by the solver.
+Limitation: a mesh split above 1e-3, possible on very coarse meshes, is not recognised as a pair,
+and a member's fraction is then a rotation chosen by the mesh. The words TE-like, TM-like and hybrid
 are Studio's, not the engine's. The key is additive: `field_layout` stays
 `em-modes2d-p1-node-centroid-v2` and no other array or key changes.
 `confinement_factor`, `coupling_efficiency` and `te_polarization_fraction` are dimensionless. `summary.json` repeats the

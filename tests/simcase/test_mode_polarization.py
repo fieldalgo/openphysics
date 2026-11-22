@@ -164,19 +164,44 @@ def test_v4_wide_core_tends_to_the_slab_limit():
     assert tm[2] <= 0.01
 
 
-# -- V5: the degenerate pair of a square core --------------------------------------------------------------
+# -- V5, V5b: degenerate pairs and modes that are not ---------------------------------------------------
+
+PAIR_TOLERANCE = 1e-3       # Studio's pair rule (workspace-modes.mjs); 1e-4 failed V5 on these meshes
+
+
+def square(size, centre, w=0.4, h=0.4):
+    d = strip(size, w=w, h=h, mode_count=2)
+    d.data["mesh"]["grading"]["position"] = ["0 um", um(centre)]
+    return Document.from_dict(d.data)
+
 
 @pytest.mark.slow
-def test_v5_square_core_is_a_degenerate_pair():
+@pytest.mark.parametrize("centre", [THICKNESS / 2, 0.2], ids=["grading-y0.11", "grading-y0.2"])
+def test_v5_square_core_is_a_degenerate_pair(centre):
+    """The square's two lowest modes are a pair: their split is the mesh's (1.2e-4 to 6.2e-4 here,
+    above the 1e-4 first adopted and below 1e-3), and any rotation keeps the fractions' sum at 1."""
     sums, gaps = [], []
     for h in SIZES:
-        result = run(strip(h, w=0.4, h=0.4, mode_count=2), verbose=False)
+        result = run(square(h, centre), verbose=False)
         n, f = result.effective_index[0].real, fraction(result)
         gaps.append(abs(n[0] - n[1]))
         sums.append(f[0] + f[1])
-    print(f"\nV5 |dRe n_eff| {['%.2e' % g for g in gaps]}, f_TE sums {np.round(sums, 6).tolist()}")
-    assert max(gaps) <= 1e-4
+    print(f"\nV5 grading y={centre}: |dRe n_eff| {['%.2e' % g for g in gaps]}, f_TE sums {np.round(sums, 6).tolist()}")
+    assert max(gaps) <= PAIR_TOLERANCE
     assert np.all(np.abs(np.asarray(sums) - 1.0) <= 1e-3)
+
+
+@pytest.mark.slow
+def test_v5b_distinct_modes_are_not_pairs():
+    """Genuinely distinct modes split by more than 1e-3 at every size: the template strip's TE0 and
+    TM0, and a 400 x 380 nm core, the most square of 400 x 340, 360 and 380 nm (measured splits
+    1.17e-1, 7.09e-2 and 3.27e-2 at 40 nm)."""
+    template = [run(strip(h, mode_count=2), verbose=False).effective_index[0].real for h in SIZES]
+    near = [run(square(h, 0.19, h=0.38), verbose=False).effective_index[0].real for h in SIZES]
+    splits = {"template": [abs(n[0] - n[1]) for n in template], "400 x 380 nm": [abs(n[0] - n[1]) for n in near]}
+    print("\nV5b splits " + ", ".join(f"{k} {['%.3e' % v for v in vs]}" for k, vs in splits.items()))
+    for values in splits.values():
+        assert min(values) > PAIR_TOLERANCE
 
 
 # -- V6, V7: loss ---------------------------------------------------------------------------------------
