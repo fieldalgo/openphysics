@@ -21,6 +21,8 @@ test('V7: every edge closed, or no open boundary, is the optical-shapes-v8 docum
   assert.equal(JSON.stringify(O.opticalDocument(state({modeCount:n}),setup())),expected);
   assert.equal(JSON.stringify(O.opticalDocument(state({modeCount:n,openBoundary:{edges:edges()}}),setup())),expected);
   assert.equal(JSON.stringify(O.opticalDocument(state({modeCount:n,openBoundary:{edges:edges(),thickness:2000,target:2.1}}),setup())),expected);
+  // closed edges do not read the thickness or the target: values left over from an open design stay harmless
+  assert.equal(JSON.stringify(O.opticalDocument(state({modeCount:n,openBoundary:{edges:edges(),thickness:5,target:9}}),setup())),expected);
  }
 });
 
@@ -101,4 +103,16 @@ test('2 um on the right only',()=>{
  const doc=O.opticalDocument(state({openBoundary:{edges:edges('right'),thickness:2000}}),setup());
  assert.deepEqual(doc.geometry.domain,{xmin:-1500,xmax:3500,ymin:-1200,ymax:1200});
  assert.deepEqual(doc.physics.em1.pml.pml_thickness,{right:'2000 nm'});
+});
+
+test('a vertex within 1e-6 nm of an open edge is on it; the design\'s own collinear vertices stay',()=>{
+ const open=edges('bottom');
+ assert.deepEqual(B.extendPolygon([[-400,-1199.9999999],[400,-1200],[400,-900],[-400,-900]],open,1000),
+  [[-400,-2200],[400,-2200],[400,-900],[-400,-900]]);
+ // a vertex of the design in the middle of the top side (collinear, inside the window) is kept
+ assert.deepEqual(B.extendPolygon([[-400,-1200],[400,-1200],[400,-900],[0,-900],[-400,-900]],open,1000),
+  [[-400,-2200],[400,-2200],[400,-900],[0,-900],[-400,-900]]);
+ // a vertex of the design on the open edge itself is part of the pushed side and goes
+ assert.deepEqual(B.extendPolygon([[-400,-1200],[0,-1200],[400,-1200],[400,-900],[-400,-900]],open,1000),
+  [[-400,-2200],[400,-2200],[400,-900],[-400,-900]]);
 });

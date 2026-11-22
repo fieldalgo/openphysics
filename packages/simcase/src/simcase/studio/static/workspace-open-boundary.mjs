@@ -28,11 +28,13 @@ export function maxIndex(shapes){return Math.max(SILICA_INDEX,...shapes.map(s=>I
 /** The default "Search near n_eff": (n_max + n_SiO2) / 2 to two decimals (2.46 for a silicon core). */
 export function defaultTarget(shapes){return Math.round((maxIndex(shapes)+SILICA_INDEX)/2*100)/100;}
 
-/** The open boundary checked: {edges, thickness (nm), target}, defaults filled in. */
+/** The open boundary checked: {edges, thickness (nm), target}, defaults filled in. With every edge
+ * closed only the edge words are checked: thickness and target are not read then. */
 export function checkOpenBoundary(ob,shapes){
  if(ob==null||typeof ob!=='object')throw new Error('Invalid open boundary.');
  const edges={};
  for(const e of EDGES){const v=ob.edges?.[e]??'closed';if(v!=='open'&&v!=='closed')throw new Error(`The ${e} edge must be open or closed.`);edges[e]=v;}
+ if(!EDGES.some(e=>edges[e]==='open'))return {edges};
  const t=ob.thickness??PML_THICKNESS_DEFAULT_NM,[lo,hi]=PML_THICKNESS_RANGE_NM;
  if(!Number.isInteger(t)||t<lo||t>hi)throw new Error(`PML thickness must be a whole number of nm from ${lo} to ${hi} (${lo/1000}–${hi/1000} µm).`);
  const nmax=maxIndex(shapes),target=ob.target??defaultTarget(shapes);
@@ -43,12 +45,19 @@ export function checkOpenBoundary(ob,shapes){
 const tidy=value=>Math.round(value*1e6)/1e6;
 // The outward normal of each edge, and where the edge lies.
 const SIDE={left:{axis:0,at:WINDOW_NM.xmin,dir:-1},right:{axis:0,at:WINDOW_NM.xmax,dir:1},bottom:{axis:1,at:WINDOW_NM.ymin,dir:-1},top:{axis:1,at:WINDOW_NM.ymax,dir:1}};
+// A vertex within 1e-6 nm of an open window edge (the rounding of shape corners) lies on it.
+const NEAR=1e-6;
+const onEdge=(p,e)=>Math.abs(p[SIDE[e].axis]-SIDE[e].at)<=NEAR;
 function sideOf(p,q,edges){
- for(const e of EDGES){if(edges[e]!=='open')continue;const {axis,at}=SIDE[e];if(p[axis]===at&&q[axis]===at)return e;}
+ for(const e of EDGES)if(edges[e]==='open'&&onEdge(p,e)&&onEdge(q,e))return e;
  return null;
 }
-const push=(p,e,t)=>{const {axis,dir}=SIDE[e],q=[...p];q[axis]=tidy(q[axis]+dir*t);return q;};
+// a vertex on open edges moved onto them exactly, so the layer meets the shape with no gap
+function snap(p,edges){const q=[...p];for(const e of EDGES)if(edges[e]==='open'&&onEdge(p,e))q[SIDE[e].axis]=SIDE[e].at;return q;}
+const push=(p,e,t)=>{const {axis,at,dir}=SIDE[e],q=[...p];q[axis]=tidy(at+dir*t);return q;};
 const collinear=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])===0;
+// on a window edge or on the outer line of its layer: the vertices the extrusion makes redundant
+const onLine=(p,edges,t)=>EDGES.some(e=>edges[e]==='open'&&(p[SIDE[e].axis]===SIDE[e].at||p[SIDE[e].axis]===tidy(SIDE[e].at+SIDE[e].dir*t)));
 /** A polygon (solver points in nm) with each edge along an open window edge pushed out by t
  * through the layer, the corner square filled where two pushed edges meet, and collinear
  * vertices removed. Edges inside the window are untouched. */
@@ -57,18 +66,19 @@ export function extendPolygon(points,edges,t){
  if(!side.some(Boolean))return points;
  const out=[];
  for(let i=0;i<n;i++){
-  const p=points[i],before=side[(i+n-1)%n],after=side[i];
+  const p=snap(points[i],edges),before=side[(i+n-1)%n],after=side[i];
   if(before&&after&&before!==after)out.push(push(p,before,t),push(push(p,before,t),after,t),push(p,after,t));
   else if(before&&after)out.push(push(p,before,t));
   else if(before)out.push(push(p,before,t),p);
   else if(after)out.push(p,push(p,after,t));
   else out.push(p);
  }
- // drop repeated and collinear vertices until none is left
+ // drop repeated vertices, and collinear ones on a window edge or a layer's outer line (the
+ // extrusion's), until none is left; the design's own vertices inside the window stay
  let pts=out.filter((p,i)=>{const q=out[(i+1)%out.length];return p[0]!==q[0]||p[1]!==q[1];});
  for(let changed=true;changed&&pts.length>3;){
   changed=false;
-  for(let i=0;i<pts.length;i++){const a=pts[(i+pts.length-1)%pts.length],b=pts[i],c=pts[(i+1)%pts.length];if(collinear(a,b,c)){pts.splice(i,1);changed=true;break;}}
+  for(let i=0;i<pts.length;i++){const a=pts[(i+pts.length-1)%pts.length],b=pts[i],c=pts[(i+1)%pts.length];if(onLine(b,edges,t)&&collinear(a,b,c)){pts.splice(i,1);changed=true;break;}}
  }
  return pts;
 }

@@ -159,10 +159,21 @@ def _instance(client):
     {"pml_search_mode_count": 16.0}, {"pml_order": True}, {"pml_thickness": {"top": "999 nm"}},
     {"pml_thickness": {"top": "2001 nm"}}, {"pml_thickness": {"top": "1 um"}}, {"pml_thickness": {"top": "1000 nm", "bottom": "1500 nm"}},
     {"extra": 1},
+    {"target_effective_index": 1.45}, {"target_effective_index": True},
+    {"domain": {"xmin": -1500, "xmax": 2500, "ymin": -2200, "ymax": 2200}},
+    {"domain": {"xmin": -2500, "xmax": 2500, "ymin": -2200, "ymax": 2300}},
+    {"length_unit": "um"},
 ])
 def test_the_server_refuses_another_workspace_pml(client, change):
     doc = json.loads(build("template", 2, edges=ALL))
-    doc["physics"]["em1"]["pml"].update(change)
+    if "target_effective_index" in change:
+        doc["physics"]["em1"].update(change)
+    elif "domain" in change:
+        doc["geometry"]["domain"] = change["domain"]
+    elif "length_unit" in change:
+        doc["geometry"]["length_unit"] = change["length_unit"]
+    else:
+        doc["physics"]["em1"]["pml"].update(change)
     for route in ("/api/validate", "/api/run"):
         response = client.post(route, params=_instance(client), json={"doc": doc})
         assert response.status_code == 400 and "open boundary of a workspace run" in response.text, response.text

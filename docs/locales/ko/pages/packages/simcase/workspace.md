@@ -709,8 +709,7 @@ from 1 to 8 (got 9).*로 거부합니다. 0, 9, 2.5, 2.0, `"2"`, `true`는 거�
 - 열린 경계에서는 군굴절률을 계산하지 않습니다.
 
 모든 변이 닫혔거나 `openBoundary`가 없으면 문서는 `optical-shapes-v8` 문서와 바이트 단위로 같고 결과도
-그 문서의 결과입니다. 작업공간 요청의 `em.modes2d` 물리에 다른 `pml`(다른 두께, 서로 다른 두께, 다른 고정값)이
-있으면 *The open boundary of a workspace run has a PML of 1–2 µm on each open edge with strength 3,
+그 문서의 결과입니다. 작업공간 요청의 `em.modes2d` 물리에 다른 `pml`(다른 두께, 서로 다른 두께, 다른 고정값)이 있거나, 목표가 1.45 이하이거나, 영역이 열린 변에서만 그 두께만큼 커진 계산창(nm)이 아니면 *The open boundary of a workspace run has a PML of 1–2 µm on each open edge with strength 3,
 order 2, physical fraction 0.5 and a search of 16 candidates.*로 거부합니다. PML 결과는
 [PML 모드 규칙](pml_modes.md)을 따르는 후보입니다.
 

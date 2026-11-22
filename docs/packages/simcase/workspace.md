@@ -853,7 +853,8 @@ can open any edge of the window:
 With every edge closed, or without `openBoundary`, the document is the `optical-shapes-v8`
 document byte for byte, and its results are those of that document. A workspace request whose
 `em.modes2d` physics has any other `pml` (another thickness, unequal thicknesses or another fixed
-value) is refused with *The open boundary of a workspace run has a PML of 1–2 µm on each open edge
+value), a target of 1.45 or below, or a domain other than the window grown by the thickness on
+exactly the open edges (in nm) is refused with *The open boundary of a workspace run has a PML of 1–2 µm on each open edge
 with strength 3, order 2, physical fraction 0.5 and a search of 16 candidates.* The PML results
 are candidates under the [PML mode rules](pml_modes.md).
 

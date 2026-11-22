@@ -247,6 +247,7 @@ def workspace_capabilities_v8():
 # Versions 1 to 8 stay as they were.
 _PML_THICKNESS_RANGE = ["1 um", "2 um"]
 _PML_THICKNESS_NM = (1000, 2000)
+_WINDOW_NM = {"xmin": -1500, "xmax": 1500, "ymin": -1200, "ymax": 1200}
 _PML_FIXED = {"pml_strength": 3, "pml_order": 2, "pml_minimum_physical_fraction": 0.5,
               "pml_search_mode_count": 16}
 
@@ -265,9 +266,12 @@ def workspace_capabilities_v9():
 
 def workspace_open_boundary_refusal(tree) -> str | None:
     """The refusal of a workspace request whose em.modes2d physics has a pml other than the one
-    optical-shapes-v9 writes: thicknesses of 1000 to 2000 nm (one value on every open side) and the
-    fixed strength, order, physical fraction and search count of capabilities v9. Else None."""
-    physics = tree.get("doc", {}).get("physics") if isinstance(tree, dict) and isinstance(tree.get("doc"), dict) else None
+    optical-shapes-v9 writes, else None: thicknesses of 1000 to 2000 nm (one value on every open
+    side), the fixed strength, order, physical fraction and search count of capabilities v9, a
+    target above 1.45, and a domain in nm that is the window grown by that thickness on exactly
+    the open sides (the layer lies outside the window)."""
+    doc = tree.get("doc") if isinstance(tree, dict) else None
+    physics = doc.get("physics") if isinstance(doc, dict) else None
     if not isinstance(physics, dict):
         return None
     lo, hi = _PML_THICKNESS_NM
@@ -290,6 +294,22 @@ def workspace_open_boundary_refusal(tree) -> str | None:
             number = width[:-3] if isinstance(width, str) and width.endswith(" nm") else None
             if number is None or not number.isdigit() or not lo <= int(number) <= hi:
                 return text
+        target = entry.get("target_effective_index")
+        # compared as exact decimals: the reader gives 1.45 as Decimal("1.45"), above the binary float 1.45
+        if isinstance(target, bool) or not isinstance(target, (int, float, Decimal)) \
+                or not Decimal(str(target)) > Decimal("1.45"):
+            return text
+        geometry = doc.get("geometry")
+        t = int(next(iter(widths.values()))[:-3])
+        grown = {side: edge + (t if side in widths else 0) * sign for side, edge, sign in (
+            ("left", _WINDOW_NM["xmin"], -1), ("right", _WINDOW_NM["xmax"], 1),
+            ("bottom", _WINDOW_NM["ymin"], -1), ("top", _WINDOW_NM["ymax"], 1))}
+        domain = geometry.get("domain") if isinstance(geometry, dict) else None
+        if (not isinstance(domain, dict) or geometry.get("length_unit") != "nm"
+                or set(domain) != {"xmin", "xmax", "ymin", "ymax"}
+                or any(isinstance(domain[key], bool) or domain[key] != grown[side]
+                       for key, side in (("xmin", "left"), ("xmax", "right"), ("ymin", "bottom"), ("ymax", "top")))):
+            return text
     return None
 
 
