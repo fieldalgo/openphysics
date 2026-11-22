@@ -74,12 +74,38 @@ test('loss: dB/cm = propagation_loss / 100 to 4 significant digits; "0 dB/cm" an
  const tiny=1e-15;assert.equal(M.lossText(tiny,M.propagationLoss(tiny,1.55e-6)),(M.propagationLoss(tiny,1.55e-6)/100).toPrecision(4)+' dB/cm');
  assert.equal(M.lossText(tiny,M.propagationLoss(tiny,1.55e-6)),'3.521e-10 dB/cm');
  const table=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null}]);assert.equal(table.lossless,true);assert.equal(table.rows[0].lossless,true);
- assert.equal(M.LOSSLESS_NOTE,'Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.');
+ assert.equal(M.LOSSLESS_NOTE,'Absorption loss counts material absorption (k) only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a closed window.');
  assert.equal(M.modeTableRows([{re:2.4,im:tiny,fte:1,loss:M.propagationLoss(tiny,1.55e-6)}]).rows[0].lossless,false);
  // an optical run's n_eff is real: every mode reads 0 dB/cm
  assert.deepEqual(M.opticalModes({effective_index:[2.4,1.7],te:{values:[.98,.01],source:'studio'}}).map(m=>M.lossText(m.im,m.loss)),['0 dB/cm','0 dB/cm']);
  assert.equal(M.modeTableRows([{re:2.4,im:1e-4,fte:1,loss:3749}]).lossless,false);
  assert.equal(M.RANKING_TEXT,'Modes are ranked by effective index.');assert.equal(MP.RANKING_CAVEAT,M.RANKING_TEXT);
+});
+test('round 10: the loss column of a closed window is "Absorption loss (dB/cm)", every cell with the absorption-only help; an open boundary (PML) reads "Loss (dB/cm)"',()=>{
+ const tiny=1e-15,lossy=M.propagationLoss(1e-4,1.55e-6);
+ // closed, lossless: the header, the help on every cell and the note with the lossless words
+ const closed=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null},{re:1.7,im:0,fte:.01,loss:null}]);
+ assert.equal(closed.loss.header,'Absorption loss (dB/cm)');
+ assert.equal(closed.loss.help,'Absorption (material k) only; leakage and radiation are not computed in a closed window');
+ assert.ok(closed.rows.every(r=>r.lossTitle===closed.loss.help&&r.loss==='0 dB/cm'));
+ assert.equal(closed.loss.note,M.LOSSLESS_NOTE);
+ // closed, lossy: the same header and help, digits unchanged, the note without "k = 0"
+ const absorbing=M.modeTableRows([{re:2.4,im:1e-4,fte:1,loss:lossy},{re:1.7,im:tiny,fte:.01,loss:M.propagationLoss(tiny,1.55e-6)}]);
+ assert.deepEqual(absorbing.rows.map(r=>r.loss),['35.21 dB/cm','3.521e-10 dB/cm']);
+ assert.equal(absorbing.loss.header,'Absorption loss (dB/cm)');assert.ok(absorbing.rows.every(r=>r.lossTitle===M.ABSORPTION_HELP));
+ assert.equal(absorbing.loss.note,'Absorption loss counts material absorption (k) only. Leakage and radiation are not computed in a closed window.');
+ assert.doesNotMatch(absorbing.loss.note,/k = 0/);
+ // an open boundary: Im n_eff includes leakage into the PML, so the column does not say absorption only
+ const pml=M.physicsModes({effective_index:{unit:'1',re:[[2.4]],im:[[1e-4]]},vacuum_wavelength:{unit:'m',values:[1.55e-6]},summary:{formulation:'vector',open_boundary:true}});
+ assert.equal(pml.open,true);
+ const open=M.modeTableRows(pml.modes,{open:pml.open});
+ assert.equal(open.loss.header,'Loss (dB/cm)');
+ assert.equal(open.loss.help,'Material absorption (k) and leakage into the PML of the open boundary');
+ assert.equal(open.rows[0].lossTitle,open.loss.help);assert.equal(open.rows[0].loss,'35.21 dB/cm');
+ assert.equal(open.loss.note,'Loss includes material absorption (k) and leakage into the PML of the open boundary.');
+ assert.doesNotMatch(open.loss.header+open.loss.help+open.loss.note,/Absorption loss|only/);
+ // a closed multiphysics result keeps the absorption header
+ assert.equal(M.physicsModes({effective_index:{unit:'1',values:[[2.4]]},summary:{formulation:'vector'}}).open,false);
 });
 test('V17: optical v6 and v7 sessions open with two modes and the TE fraction computed by Studio',()=>{
  for(const name of ['optical-v6-one.json','optical-v7-one.json','optical-v6-three.json','optical-v7-three.json']){
@@ -183,6 +209,19 @@ test('Compare: a matched pair shows the mean A_eff of its members with a note, a
  const one=X.unitArea(run,[0]);assert.equal(one.value,own[0].area);assert.equal(one.text,M.areaText(own[0].area));
  const pair=X.unitArea(run,[0,1]);assert.equal(pair.value,(own[0].area+own[1].area)/2);
  assert.match(pair.text,/^mean \d\.\d{4}$/);assert.match(pair.title,/Mean of the pair members/);
+});
+test('round 10, Compare: the absorption loss of a unit from the saved indices, a pair the mean of its members',async()=>{
+ const X=await import(STATIC+'workspace-match.mjs');
+ const s=JSON.parse(fixture('state-one.json')),run=s.runs[0];
+ // an optical run of the template is lossless: every unit reads 0 dB/cm, with the absorption help
+ for(const unit of [[0],[1],[0,1]]){const v=X.unitLoss(run,unit);assert.deepEqual([v.text,v.value,v.title],['0 dB/cm',0,M.ABSORPTION_HELP]);}
+ assert.deepEqual(X.unitLoss(run,null),{text:'—',value:null,title:M.ABSORPTION_HELP});
+ // complex indices saved with a run (no field is needed): the mode's own text, a pair the mean in dB/cm
+ const lossy={effective_index:[2.4,2.3999],effective_index_im:[1e-4,0],input:{model:{wavelength:1550}},te_polarization_fraction:[.5,.5],effective_area:[1e-13,1e-13]};
+ const one=X.unitLoss(lossy,[0]);assert.equal(one.text,'35.21 dB/cm');assert.ok(Math.abs(one.value-M.propagationLoss(1e-4,1.55e-6)/100)<=1e-12*one.value);
+ assert.equal(X.unitLoss(lossy,[1]).text,'0 dB/cm');
+ const pair=X.unitLoss(lossy,[0,1]);assert.equal(pair.text,'mean '+(M.propagationLoss(1e-4,1.55e-6)/200).toPrecision(4)+' dB/cm');// 35.2097 dB/cm / 2 = 17.6049 dB/cm
+ assert.equal(pair.text,'mean 17.60 dB/cm');
 });
 test('V17-M3: optical v6 and v7 sessions open with A_eff computed by Studio; v7 is written byte for byte',()=>{
  for(const name of ['optical-v6-one.json','optical-v7-one.json','optical-v6-three.json','optical-v7-three.json']){

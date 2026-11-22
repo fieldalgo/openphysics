@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-const {test,before}=require('node:test');const assert=require('node:assert/strict');let NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName,snapshot,createSession,captureSession,opticalSettings;
-before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
+const {test,before}=require('node:test');const assert=require('node:assert/strict');let restorePage,recordPage,NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName,snapshot,createSession,captureSession,opticalSettings;
+before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName,restorePage,recordPage}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
 const timing={setTimer:()=>1,clearTimer:()=>{}};
 test('autosave serializes writes and coalesces pending edits to the newest snapshot',async()=>{
  const calls=[],resolvers=[];const saver=new NotebookAutosave({save:r=>{calls.push(r);return new Promise(resolve=>resolvers.push(resolve));}},timing);
@@ -250,4 +250,34 @@ test('round 9: a list entry is the newest record of its session and names the fi
  // the newest record's own file is kept; a saved file is named before an opened one
  const saved=r(optical(),'2026-11-22T15:51:00Z',{savedFile:{name:'optical-waveguide-session-2026-11-22-1551.json',savedAt:'2026-11-22T15:51:00Z',current:true}});
  assert.deepEqual(distinctRecords(saved,[withFile]).map(e=>[e.index,e.file]),[[-1,'optical-waveguide-session-2026-11-22-1551.json']]);
+});
+
+test('round 10: a record keeps the page shown and whether the notebook still matched its opened file; a record without them restores as before',async()=>{
+ let record;const saver=new NotebookAutosave({save:async r=>record=r},timing);
+ const input=snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''});
+ const session=JSON.stringify(createSession(input,[],null,[null,null])),file='optical-waveguide-session-2026-11-22-2010.json';
+ saver.schedule('one',()=>session,{openedFile:file,openedCurrent:true,page:'Results'});await saver.flush();
+ assert.deepEqual([record.openedFile,record.openedCurrent,record.page],[file,true,'Results']);
+ const read=readNotebookRecovery(record);assert.deepEqual([read.openedFile,read.openedCurrent,read.page],[file,true,'Results']);
+ // the session text is written as it was given: the extras sit beside it, never in it
+ assert.equal(record.session,session);
+ saver.schedule('two',()=>session,{openedFile:file,openedCurrent:false,page:'Compare'});await saver.flush();
+ assert.deepEqual([readNotebookRecovery(record).openedCurrent,readNotebookRecovery(record).page],[false,'Compare']);
+ // invalid values are not written and are ignored when read; openedCurrent needs an opened file
+ saver.schedule('three',()=>session,{openedCurrent:true,page:'Applications'});await saver.flush();
+ assert.equal('openedCurrent' in record,false);assert.equal('page' in record,false);
+ assert.deepEqual([readNotebookRecovery({...record,page:'Settings'}).page,readNotebookRecovery({...record,page:1}).page],[null,null]);
+ assert.equal(readNotebookRecovery({...record,openedFile:file,openedCurrent:'yes'}).openedCurrent,null);
+ assert.equal(readNotebookRecovery({...record,openedCurrent:true}).openedCurrent,null);
+ // a record as the code before this change wrote it (no page, no openedCurrent): the same fields
+ // as before, and the page rule of before (Compare for two runs or more, Results for one, else Model)
+ const today={version:1,savedAt:'2026-11-22T20:10:00Z',session,openedFile:file,savedFile:{name:file,savedAt:'2026-11-22T20:10:00Z',current:false}};
+ const old=readNotebookRecovery(today);
+ assert.deepEqual({savedAt:old.savedAt,savedFile:old.savedFile,openedFile:old.openedFile},{savedAt:today.savedAt,savedFile:today.savedFile,openedFile:file});
+ assert.deepEqual([old.page,old.openedCurrent],[null,null]);
+ assert.deepEqual([0,1,2,6].map(n=>restorePage(old.page,n)),['Model','Results','Compare','Compare']);
+ // a named page, when the runs allow it
+ assert.deepEqual([restorePage('Results',2),restorePage('Model',2),restorePage('Compare',2)],['Results','Model','Compare']);
+ assert.deepEqual([restorePage('Compare',1),restorePage('Results',0)],['Results','Model']);
+ assert.equal(recordPage('Results'),'Results');assert.equal(recordPage('Connections'),null);
 });

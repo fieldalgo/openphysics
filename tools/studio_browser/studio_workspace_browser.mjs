@@ -121,6 +121,28 @@ class Page {
     assert.equal(result.result.value, value, 'option ' + value + ' of ' + selector);
     await sleep(150);
   }
+  // A model tree node by role and accessible name, as assistive technology finds it (the
+  // accessibility tree): exactly one tree item must have the name.
+  async treeItem(name) {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const {nodes} = await this.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role: 'treeitem'});
+    const found = nodes.filter(n => !n.ignored);
+    if (found.length !== 1) throw new Error(`${found.length} tree items named ${JSON.stringify(name)}`);
+    const {object} = await this.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+    return object.objectId;
+  }
+  async clickTreeItem(name) {
+    const result = await this.call('Runtime.callFunctionOn', {objectId: await this.treeItem(name), functionDeclaration: 'function(){this.click();return true}', returnByValue: true});
+    if (result.exceptionDetails) throw new Error('page: ' + result.exceptionDetails.text);
+  }
+  // Every tree item and the tree itself in the accessibility tree: [{role, name, level, selected, expanded}]
+  async axTree() {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const prop = (n, key) => n.properties?.find(p => p.name === key)?.value?.value;
+    const read = async role => (await this.call('Accessibility.queryAXTree', {objectId: document.objectId, role})).nodes.filter(n => !n.ignored)
+      .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
+    return [...await read('tree'), ...await read('treeitem')];
+  }
   click(selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); }
   // Typing as a user does: focus, select, insert text, leave the field.
   async type(selector, text) {
@@ -154,7 +176,7 @@ try {
   for (let i = 0; i < 120 && !target; i++) { try { target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json()).find(t => t.type === 'page'); } catch {} if (!target) await sleep(250); }
   if (!target) throw new Error('Browser DevTools endpoint unavailable');
   const page = new Page(target.webSocketDebuggerUrl); await page.ready;
-  await page.call('Runtime.enable'); await page.call('Page.enable');
+  await page.call('Runtime.enable'); await page.call('Page.enable'); await page.call('DOM.enable'); await page.call('Accessibility.enable');
   await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false});
   await page.call('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: downloads});
   report.browserVersion = (await page.call('Browser.getVersion').catch(() => ({}))).product || null;
@@ -164,7 +186,7 @@ try {
     await page.click('#run-optical');
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical run', 120000);
   };
-  const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Geometry"]'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
+  const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Geometry'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
   const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
   // no horizontal document overflow at 1440 × 900 and on a 390 × 844 phone; back to 1280 × 800 after
   const noOverflow = async tag => {
@@ -176,6 +198,28 @@ try {
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
   const delta = () => page.eval("(document.getElementById('compare-description')?.textContent.match(/^.* Shown: A mode 1 ↔ B mode 1, overlap [0-9.]+, Δn_eff \\(B − A\\) ([+−][0-9]+\\.[0-9]+)\\./)||[])[1]||null");
+  // round 10: a key as a user presses it (keyDown and keyUp on the focused element)
+  const KEYS = {ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, Enter: 13, ' ': 32, Tab: 9};
+  const press = async key => {
+    for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key, code: key === ' ' ? 'Space' : key, windowsVirtualKeyCode: KEYS[key], ...(type === 'keyDown' && (key === 'Enter' || key === ' ') ? {text: key === 'Enter' ? '\r' : ' '} : {})});
+    await sleep(120);
+  };
+  // the focused element's name without its hidden icon (the tree items' marks are aria-hidden)
+  const focused = () => page.eval("(()=>{const e=document.activeElement,c=e?.cloneNode(true);c?.querySelectorAll('[aria-hidden=true]').forEach(x=>x.remove());return {role:e?.getAttribute('role')||null,name:c?.textContent.replace(/\\s+/g,' ').trim()||null,tabindex:e?.getAttribute('tabindex'),selected:e?.getAttribute('aria-selected'),expanded:e?.getAttribute('aria-expanded')}})()");
+  // round 10 (K9): the model builder in the accessibility tree: one tree named "Model tree", every
+  // item found by its role and name exactly once, at most one selected, one tab stop
+  const checkTree = async (tag, names) => {
+    const ax = await page.axTree(), trees = ax.filter(n => n.role === 'tree'), items = ax.filter(n => n.role === 'treeitem');
+    const stops = await page.eval("document.querySelectorAll('#tree [role=treeitem][tabindex=\"0\"]').length");
+    stage('tree ' + tag, {trees, items, stops});
+    assert.deepEqual(trees.map(t => t.name), ['Model tree'], tag + ': one tree named Model tree');
+    assert.equal(new Set(items.map(i => i.name)).size, items.length, tag + ': tree item names are unique');
+    assert.ok(items.every(i => Number.isInteger(i.level) && i.level >= 1), tag + ': every tree item has a level');
+    assert.ok(items.filter(i => i.selected === true).length <= 1, tag + ': at most one selected item');
+    assert.equal(stops, 1, tag + ': one tab stop');
+    for (const name of names) await page.treeItem(name);
+    return items;
+  };
   const compareTableRows = () => page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent)),matched:[...t.tBodies[0].rows].map(r=>r.dataset.match||null),overlap:[...t.querySelectorAll('[data-overlap]')].map(c=>Number(c.dataset.overlap)),note:document.getElementById('compare-match-note')?.textContent,picker:[...document.querySelectorAll('#compare-mode option')].map(o=>o.textContent)}})()");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
@@ -204,6 +248,34 @@ try {
   const opticalSequence = () => page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent})");
   assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / New model · not saved');
   assert.deepEqual(await opticalSequence(), {heading: 'Nothing is computed until you press Run', status: 'Optical adapter ready · explicit Run required'});
+  // round 10 (K9): the optical model builder is an ARIA tree, used with the keyboard alone
+  const opticalNodes = ['Component 1', 'Geometry', 'Materials', 'Physics', 'Optical modes', 'Analysis', 'Mesh', 'Study'];
+  const opticalItems = await checkTree('optical', opticalNodes);
+  assert.deepEqual(opticalItems.map(i => [i.name, i.level]), [['Component 1', 1], ['Geometry', 2], ['Materials', 2], ['Physics', 1], ['Optical modes', 2], ['Analysis', 1], ['Mesh', 2], ['Study', 2]]);
+  assert.deepEqual(opticalItems.filter(i => i.selected === true).map(i => i.name), ['Geometry']);
+  // Tab from the control before the tree lands on the selected node, the one tab stop
+  await page.onElement('function(s){const t=this.querySelector(s);const all=[...this.querySelectorAll("button,select,input,[tabindex]")].filter(e=>e.tabIndex>=0&&!e.disabled&&e.offsetParent&&(t.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_PRECEDING));all.at(-1).focus();return true}', '#tree');
+  await press('Tab'); let at = await focused(); stage('K9 tab into the tree', at);
+  assert.deepEqual([at.role, at.name, at.tabindex, at.selected], ['treeitem', 'Geometry', '0', 'true']);
+  await press('ArrowDown'); assert.equal((await focused()).name, 'Materials');
+  await press('ArrowUp'); await press('ArrowUp'); assert.equal((await focused()).name, 'Component 1');
+  await press('End'); assert.equal((await focused()).name, 'Study');
+  await press('Home'); assert.equal((await focused()).name, 'Component 1');
+  // Enter selects a node (the inspector shows it); Space too; focus stays on the node
+  await press('ArrowDown'); await press('ArrowDown'); await press('Enter'); at = await focused();
+  assert.deepEqual([at.name, at.selected], ['Materials', 'true']); assert.match(await page.eval("document.querySelector('#inspector h2').textContent"), /materials/i);
+  await press('End'); await press('ArrowUp'); await press(' '); at = await focused();
+  assert.deepEqual([at.name, at.selected], ['Mesh', 'true']); assert.match(await page.eval("document.querySelector('#inspector h2').textContent"), /mesh/i);
+  assert.equal(await page.eval("document.querySelectorAll('#tree [aria-selected=true]').length"), 1);
+  // Left from a node goes to its group; Left on an open group closes it, Right opens it, Right again enters it
+  await press('ArrowLeft'); at = await focused(); assert.deepEqual([at.name, at.expanded], ['Analysis', 'true']);
+  await press('ArrowLeft'); at = await focused(); assert.deepEqual([at.name, at.expanded], ['Analysis', 'false']);
+  assert.equal(await page.eval("[...document.querySelectorAll('#tree [data-node=Mesh],#tree [data-node=Study]')].every(e=>e.hidden)"), true);
+  await press('End'); assert.equal((await focused()).name, 'Analysis', 'End skips the nodes of a closed group');
+  await press('ArrowRight'); assert.equal((await focused()).expanded, 'true'); await press('ArrowRight'); assert.equal((await focused()).name, 'Mesh');
+  await press('Home'); await press('ArrowDown'); await press('Enter'); at = await focused();
+  assert.deepEqual([at.name, at.selected], ['Geometry', 'true']); await page.until("!!document.querySelector('#shape-w')", 'Geometry by keyboard');
+  await checkTree('optical after keys', opticalNodes);
   await page.type('#shape-w', 600);
   assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / Unsaved inputs');
   // Messages says the edit and the Left x it moved, instead of keeping "Model ready…"
@@ -219,7 +291,7 @@ try {
   const wavelengthField = await page.eval("({heading:document.querySelector('#inspector h2')?.textContent,focused:document.activeElement?.id,tree:document.querySelector('#tree [aria-current],#tree .selected,#tree [aria-selected=true]')?.textContent?.trim()||null})");
   stage('wavelength from the step bar', wavelengthField); assert.equal(wavelengthField.heading, 'Optical modes'); assert.equal(wavelengthField.focused, 'wavelength-number');
   // the Study settings show the wavelength and open its one field under Optical modes
-  await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Study"]'); await page.until("!!document.getElementById('study-edit-wavelength')", 'optical study settings');
+  await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('study-edit-wavelength')", 'optical study settings');
   assert.match(await text('#inspector'), /Wavelength 1550 nm Set in Physics › Optical modes\. Edit in Optical modes/);
   await noOverflow('optical study');
   await page.click('#study-edit-wavelength'); await sleep(200);
@@ -241,7 +313,7 @@ try {
   const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
-  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss', 'A_eff (µm²)']);
+  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)']);
   // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
   assert.equal(resultsView.area.length, 2);
   assert.equal(resultsView.areaSource, 'Effective areacomputed by the engine from the saved field');
@@ -255,9 +327,12 @@ try {
   const order = await page.eval("({table:!!(document.getElementById('modes-table').compareDocumentPosition(document.querySelector('.field-result'))&Node.DOCUMENT_POSITION_FOLLOWING)})");
   stage('modes table first', order); assert.ok(order.table, 'the modes table comes before the field plot');
   // round 9 (J8): a lossless result reads 0 dB/cm; the cell's help and the note say it is absorption only
-  assert.deepEqual(resultsView.loss, ['0 dB/cm', '0 dB/cm']); assert.match(resultsView.lossless, /^Absorption only: all materials have k = 0/);
+  // (round 10: the column is "Absorption loss (dB/cm)" and every cell's help says absorption only)
+  assert.deepEqual(resultsView.loss, ['0 dB/cm', '0 dB/cm']); assert.match(resultsView.lossless, /^Absorption loss counts material absorption \(k\) only: all materials have k = 0/);
   const lossTitles = await page.eval("[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.title)");
-  assert.deepEqual(lossTitles, [resultsView.lossless, resultsView.lossless]);
+  const absorptionHelp = 'Absorption (material k) only; leakage and radiation are not computed in a closed window';
+  assert.deepEqual(lossTitles, [absorptionHelp, absorptionHelp]);
+  assert.equal(await page.eval("document.querySelector('#modes-table thead th:nth-child(4)').title"), absorptionHelp);
   assert.equal(resultsView.options[0].split('n_eff ')[1], resultsView.values[0]);
   assert.deepEqual(resultsView.probe, ['x [nm]', 'y [nm]']);
   // an unnamed run offers no separate Pin button: naming it pins it
@@ -299,7 +374,7 @@ try {
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
   assert.match(neffTable.head[4], /^n_eff A Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B Run 2 · 700 × 300 nm · Silicon · λ 1550 nm$/);
-  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)']);
+  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)']);
   // both sides of a matched row give their A_eff in µm²
   for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
   assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
@@ -310,6 +385,71 @@ try {
   assert.deepEqual(panels.headings, ['A · Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · 700 × 300 nm · Silicon · λ 1550 nm']);
   assert.ok(panels.plotsFirst, 'field plots before the n_eff table');
   await page.screenshot('compare');
+  // round 10 (K1): absorption loss A and B on every row, from the saved indices, with the absorption-only help
+  const lossCells = await page.eval("[...document.querySelectorAll('#compare-neff tbody tr')].map(r=>[r.querySelector('[data-loss-a]')?.textContent,r.querySelector('[data-loss-b]')?.textContent,r.querySelector('[data-loss-a]')?.title,r.querySelector('[data-loss-b]')?.title])");
+  stage('K1 Compare loss', lossCells); assert.equal(lossCells.length, neffTable.rows.length);
+  for (const row of lossCells) assert.deepEqual(row, ['0 dB/cm', '0 dB/cm', absorptionHelp, absorptionHelp]);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].slice(-2).map(t=>t.title)"), [absorptionHelp, absorptionHelp]);
+  await noOverflow('Compare with loss columns');
+  // round 10 (K5): the plots are framed on the core as Results frames it, and the probe line sits under each plot
+  // Compare opened afresh (from Results) at 1440 × 900 and at 1280 × 800
+  const overlaps = (p, q) => p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3];
+  let compareFrame;
+  for (const [width, height] of [[1440, 900], [1280, 800]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile: false}); await sleep(300);
+    await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('optical-field')", 'Results before Compare');
+    await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare opened'); await sleep(300);
+    compareFrame = await page.eval("(()=>{const r=e=>{const b=e.getBoundingClientRect();return [b.left,b.top,b.right,b.bottom]};const pane=document.getElementById('canvas').getBoundingClientRect();return ['a','b'].map(s=>({bounds:document.getElementById('compare-field-'+s).dataset.viewBounds,canvas:r(document.getElementById('compare-field-'+s)),probe:r(document.getElementById('compare-probe-'+s)),pane:[pane.top,pane.bottom],picker:r(document.getElementById('compare-mode'))}))})()");
+    stage('K5 Compare plots', {width, height, compareFrame}); if (width === 1440) await page.screenshot('compare-framed-1440');
+    for (const f of compareFrame) {
+      assert.ok(!overlaps(f.canvas, f.probe), 'the probe line is outside the plot');
+      // the middle of the plot (the window is centred on the core) is in view when Compare opens, and so is the matched-modes picker
+      const middle = (f.canvas[1] + f.canvas[3]) / 2;
+      assert.ok(middle > f.pane[0] && middle < f.pane[1], `the plot's middle is in the first view of the pane at ${width} × ${height}: ${f.canvas} / ${f.pane}`);
+      assert.ok(f.picker[1] >= f.pane[0], `the matched-modes picker stays in view at ${width} × ${height}`);
+    }
+  }
+  // the plots of Compare are drawn on the window Results draws for the same run
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
+  await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Run 1 in Results');
+  assert.equal(await page.eval("document.getElementById('optical-field').dataset.viewBounds"), compareFrame[0].bounds, 'Compare A (Run 1) and Results of Run 1 draw the same window');
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
+  const [ax0, ax1, ay0, ay1] = compareFrame[0].bounds.split(',').map(Number);
+  // Run 1 is 600 × 300 nm on the centre: the drawn window holds the whole core
+  assert.ok(ax0 <= -0.3 && ax1 >= 0.3 && ay0 <= -0.15 && ay1 >= 0.15, 'the core is inside the drawn window: ' + compareFrame[0].bounds);
+  for (const [width, height, mobile] of [[390, 844, true]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+    const phone = await page.eval("['a','b'].map(s=>{const c=document.getElementById('compare-field-'+s).getBoundingClientRect(),p=document.getElementById('compare-probe-'+s).getBoundingClientRect();return {canvas:[c.left,c.top,c.right,c.bottom],probe:[p.left,p.top,p.right,p.bottom]}})");
+    stage('K5 Compare plots at 390', phone); for (const f of phone) assert.ok(!overlaps(f.canvas, f.probe), 'the probe line is outside the plot at 390 px');
+    await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
+  }
+  // round 10 (K4): a run clicked on Compare is selected and Compare stays; Open in Results shows it there
+  const pressedPage = () => page.eval("[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page)");
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
+  const k4 = await page.eval("({pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),table:!!document.getElementById('compare-neff'),open:document.getElementById('open-in-results')?.textContent})");
+  stage('K4 run clicked on Compare', {...k4, page: await pressedPage()});
+  assert.deepEqual(await pressedPage(), ['Compare']); assert.ok(k4.table); assert.equal(k4.pressed.length, 1); assert.match(k4.pressed[0], /^Pinned · Run 1 · design A/);
+  assert.equal(k4.open, 'Open Run 1 · design A in Results');
+  // round 10 (K6): with the pointer over the other card, exactly one card reads as selected
+  const cardLook = async () => {
+    const other = await page.eval("(()=>{const b=[...document.querySelectorAll('.run-item')].find(e=>e.getAttribute('aria-pressed')!=='true').getBoundingClientRect();return {x:b.left+b.width/2,y:b.top+b.height/2}})()");
+    await page.call('Input.dispatchMouseEvent', {type: 'mouseMoved', x: other.x, y: other.y}); await sleep(150);
+    return page.eval("(()=>{const sel=getComputedStyle(document.querySelector('.run-item[aria-pressed=true]'));return {pressed:document.querySelectorAll('.run-item[aria-pressed=true]').length,looks:[...document.querySelectorAll('.run-item')].filter(e=>{const c=getComputedStyle(e);return c.backgroundColor===sel.backgroundColor&&c.boxShadow===sel.boxShadow}).length,hovered:[...document.querySelectorAll('.run-item:hover')].length}})()");
+  };
+  const look = await cardLook(); stage('K6 one card selected', look); assert.deepEqual(look, {pressed: 1, looks: 1, hovered: 1});
+  await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Open in Results');
+  assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A · /);
+  // round 10 (K6): on Results the tree marks no optical node (the optical tree has no Results node), not Study
+  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), []);
+  assert.deepEqual(await cardLook(), {pressed: 1, looks: 1, hovered: 1});
+  // round 10 (K10): a run with other inputs than the current ones is information: the step bar is neutral
+  const tone = await page.eval("(()=>{const b=[...document.querySelectorAll('#workflow .workflow-step')][4];return {tone:b.dataset.tone,state:b.dataset.state,color:getComputedStyle(b.querySelector('span')).color,muted:getComputedStyle(document.querySelector('.muted')||document.body).color}})()");
+  stage('K10 neutral step', tone); assert.deepEqual([tone.state, tone.tone], ['attention', 'info']); assert.equal(tone.color, 'rgb(97, 112, 134)', 'the muted colour, not the warning colour');
+  // back to Compare with Run 2 selected, as before this stage
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
+  assert.deepEqual(await pressedPage(), ['Compare']); assert.match(await text('.run-item[aria-pressed=true]'), /^Run 2 · 700/);
   await page.click('#save-session');
   let sessionFile;
   for (let i = 0; i < 100 && !sessionFile; i++) { sessionFile = (await readdir(downloads)).find(f => f.endsWith('.json')); if (!sessionFile) await sleep(100); }
@@ -325,6 +465,13 @@ try {
   // the footer repeats the title's save indicator and never says "pending"
   const savedFooter = await page.eval("document.getElementById('autosave-status').textContent");
   assert.equal('Optical waveguide / ' + savedFooter, savedHeader); assert.doesNotMatch(savedFooter, /pending/i);
+  // round 10 (K3): a page, a run or a mode chosen is not a change: the title still names the file
+  await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('field-mode')", 'Results after save');
+  await page.choose('#field-mode', '1'); await sleep(300);
+  const keptName = await page.eval("document.getElementById('project').textContent"); stage('K3 title after a mode change', {keptName});
+  assert.ok(keptName.startsWith(`Optical waveguide / Session file ${sessionFile} sent to your browser's Downloads · `), keptName);
+  await page.choose('#field-mode', '0'); await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare after save');
+  assert.ok((await page.eval("document.getElementById('project').textContent")).startsWith(`Optical waveguide / Session file ${sessionFile} sent`));
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'browser recovery updated', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
@@ -337,6 +484,10 @@ try {
   await page.until("/Studio was restarted/.test(document.getElementById('job-message').textContent)&&/^Connected/.test(document.getElementById('connection-status').textContent)", 'reconnect after restart', 20000);
   stage('reconnected after restart', {message: await page.eval("document.getElementById('job-message').textContent")});
 
+  // round 10 (K6): browser recovery keeps the page shown; Compare again before the reload, so the
+  // restore below opens Compare because it was the page shown, not because there are two runs
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare before reload');
+  await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'browser recovery updated', 20000); await sleep(1500);
   // Reload: the start page offers the last session; recovering it restores the comparison.
   await page.call('Page.reload');
   // round 9 (J3): the one stored session is the optical one, so the Optical waveguide card resumes
@@ -348,7 +499,9 @@ try {
   const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('resume-open-file').textContent,beside:!!document.getElementById('resume-optical').closest('.card-slot').querySelector('#resume-open-file'),note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
   // the offer names the session file the record was last sent to
-  assert.ok(routes.latest.startsWith(`Resume Optical waveguide · Run 1 · design A, Run 2 · file ${sessionFile} · `), routes.latest); assert.equal(routes.open, 'Open session file (portable)…');
+  // round 10 (K3, K7): one phrase for browser recovery, and the file the record still matched
+  assert.match(routes.latest, /^Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · [^·]+ · same as file /); assert.ok(routes.latest.endsWith(' · same as file ' + sessionFile), routes.latest);
+  assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Models page says Restore from this browser'); assert.equal(routes.open, 'Open session file (portable)…');
   assert.deepEqual(routes.listed, [], 'the record the card resumes is not listed again above it'); assert.equal(routes.box, false);
   assert.ok(routes.beside, 'Open session file is beside the card\'s Resume');
   assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
@@ -359,7 +512,8 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
-  assert.ok(recoveredHeader.includes(`Recovered from this browser (last sent to a file: ${sessionFile} at `), 'the recovered title says it was recovered and names the last session file as history: ' + recoveredHeader);
+  // round 10 (K3): the record still matched the file it was sent to: the title says so
+  assert.equal(recoveredHeader, `Optical waveguide / Recovered from this browser · same as file ${sessionFile}`);
   // the recovered run is current, and the dock and footer say where it came from
   const recoveredSequence = await opticalSequence(); stage('recovered sequence', recoveredSequence);
   assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · press Run to compute it here'});
@@ -399,6 +553,29 @@ try {
     const lines = await labelLines(); stage('Inputs label lines', {width, lines}); assert.equal(lines, 1, `the Inputs label wraps at ${width} px`);
   }
   await noOverflow('older run viewed');
+  // round 10 (K3): a run chosen on Results is not a change: the recovered title still names the file
+  assert.ok(viewed.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), viewed.header);
+  // round 10 (K6): restoring opens the page shown when the record was written (Results, Run 1), not Compare or the newest run
+  // the stored record names the page shown and the run selected (read back from browser storage)
+  await page.until("import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();const d=JSON.parse(r.session);return r.page==='Results'&&d.selected===d.runs[0].job;})", 'recovery of the Results page', 20000);
+  await page.call('Page.reload'); await page.until("!!document.querySelector('#resume-optical')", 'resume offer after Results');
+  await page.click('#resume-optical'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
+  const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('project').textContent})");
+  stage('K6 restored on Results', restored);
+  assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A · /); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
+  assert.ok(restored.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), restored.header);
+  // round 10 (K3): a change of the model or a run ends "same as file". An input edit reads
+  // "Unsaved inputs" (the existing words for edited inputs); a run renamed reads "Changed since
+  // session file …"; the same content again names the file again
+  const header = () => page.eval("document.getElementById('project').textContent");
+  await toGeometry(); await page.type('#shape-w', 750);
+  const editedHeader = await header(); stage('K3 after an input edit', {editedHeader}); assert.equal(editedHeader, 'Optical waveguide / Unsaved inputs');
+  await page.type('#shape-w', 700); assert.ok((await header()).startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), await header());
+  await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list again');
+  await renameOnBlur('design A3'); await sleep(300);
+  const renamedHeader = await header(); stage('K3 after a run renamed', {renamedHeader});
+  assert.ok(renamedHeader.startsWith(`Optical waveguide / Changed since session file ${sessionFile} (`), renamedHeader);
+  await renameOnBlur('design A'); await sleep(300); assert.ok((await header()).startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), await header());
   // the newer run viewed: every place says it is the result of the current inputs
   await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/^Result for the current inputs/.test(document.querySelector('#canvas p')?.textContent||'')", 'newer run shown');
@@ -413,7 +590,7 @@ try {
   stage('switch message parts', switchedParts);
   assert.equal(switchedParts.line, 'Heated silicon waveguide ready. Edit settings and couplings, then press Run. Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them');
   assert.equal(switchedParts.summary, 'More');
-  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
+  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
@@ -482,7 +659,7 @@ try {
     await page.until(`document.getElementById('run-joule').textContent==='Run Joule heating study'&&(${expected})`, label, 120000);
     await sleep(300);
   };
-  const toJoule = async node => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click(`#tree [data-node="${node}"]`); await sleep(200); };
+  const toJoule = async node => { await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem(node); await sleep(200); };
   const logIs = pattern => `${pattern}.test(document.querySelector('#solver-log summary')?.textContent||'')&&!document.getElementById('solver-log').hidden`;
 
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=joule]')", 'applications page');
@@ -518,6 +695,9 @@ try {
   assert.ok(Math.abs(potential.min) <= 1e-12 && Math.abs(potential.max - 0.2) <= 1e-12, 'potential range ' + JSON.stringify(potential));
   await page.choose('#joule-field', 'temperature'); await sleep(300);
 
+  // round 10 (K9): the Joule heating model builder is the same ARIA tree, every node found by role and name
+  await page.click('nav [data-page=Model]'); await sleep(200);
+  await checkTree('Joule heating', ['Component 1', 'Geometry', 'Materials', 'Physics', 'Electric currents', 'Heat transfer', 'Analysis', 'Mesh', 'Study']);
   await toJoule('Study');
   await page.choose('[data-joule-select="iteration.method"]', 'newton');
   const newtonForm = await page.eval("({relaxation:!!document.querySelector('[data-joule=\"iteration.relaxation_factor\"]'),limit:document.querySelector('[data-joule=\"iteration.iteration_limit\"]').value})");
@@ -595,7 +775,7 @@ try {
     const top=[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({record:b.dataset.resumeRecord,text:b.textContent}));
     return {card:{record:card.dataset.resumeRecord,text:card.textContent},top,keys:[card.dataset.resumeRecord,...top.map(t=>t.record)].map(i=>{const d=JSON.parse(record(i).session);return JSON.stringify({model:d.input??d.document,runs:(d.runs||[]).map(r=>[r.job,r.label||'',r.pinned===true])});}),stored:earlier.length};})`);
   stage('J2 one entry per session', offers);
-  assert.ok(offers.card.text.startsWith('Resume Optical waveguide · Run 1 · design A, Run 2 · file ' + sessionFile + ' · '), offers.card.text);
+  assert.ok(offers.card.text.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · ') && offers.card.text.endsWith(' · same as file ' + sessionFile), offers.card.text);
   assert.ok(!offers.top.some(t => t.record === offers.card.record), 'the box above does not list the record the card resumes');
   // compared by the stored inputs and runs themselves, not by the sessionKey under test
   assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');
@@ -609,7 +789,7 @@ try {
   await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
   await page.click('[data-template=optical]');
   await answerDialogs("!!document.querySelector('#shape-w')", 'M4 optical model');
-  const toNode = async node => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click(`#tree [data-node="${node}"]`); await page.until("!!document.getElementById('mode-count-number')", node + ' Modes to find'); };
+  const toNode = async node => { await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem(node); await page.until("!!document.getElementById('mode-count-number')", node + ' Modes to find'); };
   const modeField = () => page.eval("(()=>{const e=document.getElementById('mode-count-number'),p=document.getElementById('input-problems');return {label:e.closest('label').firstChild.textContent,value:e.value,min:e.min,max:e.max,step:e.step,invalid:e.getAttribute('aria-invalid'),problems:p.hidden?'':p.innerText.replace(/\\s+/g,' ').trim(),run:document.getElementById('run-optical').disabled}})()");
   await toNode('Optical modes');
   const m4field = await modeField(); stage('M4-d Modes to find', m4field);

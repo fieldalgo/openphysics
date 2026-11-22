@@ -28,19 +28,25 @@ export function sessionRunNames(session){
 // Run 2 · file optical-waveguide-session-2026-11-22-1425.json"). The lists show each session text
 // once (distinctRecords), so two entries never read alike.
 export function sessionLine(item){
- return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'')+(item.file?' · file '+item.file:'');
+ return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'')+fileWords(item);
 }
+// The session file a recovery entry names: " · same as file x" when the record still matched it,
+// " · file x, changed since" when it did not, " · file x" when the record does not say.
+export const fileWords=item=>!item.file?'':item.fileCurrent===true?' · same as file '+item.file:item.fileCurrent===false?' · file '+item.file+', changed since':' · file '+item.file;
+// One phrase for browser recovery on the Models page; "Open session file…" is for files.
+export const RESTORE_TEXT='Restore from this browser';
 // The time an offer names: the time of day for a session saved today, else the date and time.
 export function offerTime(savedAt,now=new Date()){
  const t=new Date(savedAt),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
  return t.toDateString()===now.toDateString()?time:t.toLocaleDateString()+' '+time;
 }
 // The Optical waveguide card's offer when the tab holds no optical runs and browser recovery
-// holds an optical session: "Resume Optical waveguide · design A, design B · 2:25 PM (this
-// browser)", shown before Start new. item: a recovery entry {runs, names, savedAt}.
+// holds an optical session: "Restore from this browser · Optical waveguide · design A, design B ·
+// 2:25 PM", then the file it names, shown before Start new. item: a recovery entry {runs, names,
+// savedAt, file, fileCurrent}.
 export function opticalResumeChoice(item,when=offerTime){
  const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`Resume Optical waveguide · ${names}${item.file?' · file '+item.file:''} · ${when(item.savedAt)} (this browser)`};
+ return {label:`${RESTORE_TEXT} · Optical waveguide · ${names} · ${when(item.savedAt)}${fileWords(item)}`};
 }
 // What the landing page offers to resume: the latest browser session and the
 // earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
@@ -64,7 +70,7 @@ function resumeCard(resume){
  const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;
  const actions=document.createElement('div');actions.className='resume-actions';
  for(const choice of choices){
-  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?'Recover (this browser only): ':'Recover earlier (this browser only): ')+choice.label;
+  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?RESTORE_TEXT+': ':'Restore earlier from this browser: ')+choice.label;
   if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
   else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);

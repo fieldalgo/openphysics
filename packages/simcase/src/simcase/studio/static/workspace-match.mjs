@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
 // runs). Each run keeps its own centroid samples, so the overlap is taken on a common grid:
@@ -185,6 +185,21 @@ export function unitArea(run,unit){
  if(unit.length===1){const pair=degenerateGroups(modes.map(m=>m.re)).some(g=>g.includes(unit[0]));return {text:areaText(values[0]),value:values[0],title:pair?AREA_HELP+'. '+AREA_PAIR_NOTE:AREA_HELP};}
  const mean=values.reduce((t,v)=>t+v,0)/values.length;
  return {text:'mean '+areaText(mean),value:mean,title:AREA_HELP+'. '+AREA_MEAN_NOTE};
+}
+/** The absorption loss of one unit of a run, {text, value, title}, as its modes table shows it:
+ * the mode's ("0 dB/cm" for Im n_eff exactly 0), or for a degenerate pair "mean x dB/cm" of the
+ * members' dB/cm ("0 dB/cm" when every member is lossless); "—" without a unit or a value. The
+ * values come from the saved indices, so a run without fields has them too. */
+export function unitLoss(run,unit){
+ const help=lossColumn().help;
+ if(!unit)return {text:'—',value:null,title:help};
+ const modes=opticalModes(run),members=unit.map(i=>modes[i]);
+ if(members.every(m=>m.im===0))return {text:'0 dB/cm',value:0,title:help};
+ if(unit.length===1){const m=members[0],text=lossText(m.im,m.loss);return {text,value:text==='—'?null:m.loss/100,title:help};}
+ if(!members.every(m=>Number.isFinite(m.loss)||m.im===0))return {text:'—',value:null,title:help};
+ const mean=members.reduce((t,m)=>t+(m.im===0?0:m.loss),0)/members.length;
+ // lossText's digits for a nonzero Im n_eff: dB/m → dB/cm to 4 significant digits
+ return {text:'mean '+(mean/100).toPrecision(4)+' dB/cm',value:mean/100,title:help};
 }
 /** The Compare table rows of a match: accepted pairs and unmatched A units in A's rank order,
  * then the unmatched B units. kind: 'match' | 'a' | 'b'. */

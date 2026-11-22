@@ -85,7 +85,10 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
    가리키고(*Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
-   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다.
+   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. 고른 것으로 보이는 실행 카드는 정확히
+   하나입니다(포인터가 올라간 다른 카드는 테두리만 바뀜). Compare에서 실행 목록의 실행을 누르면 그 실행을
+   고르고(Run name과 실행 명령이 그 실행에 적용됨) Compare는 그대로 남습니다. A와 B는 그림 위의 선택
+   목록으로 고르고, 목록 아래 **Open Run 1 · design A in Results**가 고른 실행을 Results에서 보여 줍니다.
    입력 오류, 진행 중인 계산이나 작업, 지원하지 않는 입력처럼 Run을 막는 것이 있으면 도크 제목은
    상태 표시줄의 문구를 그대로 씁니다.
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
@@ -93,9 +96,12 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    실행을 다시 고정합니다. 모델을 변경해
    다시 실행한 뒤 **Compare**에서 A/B, 짝지어진 모드, 성분, probe와 단면을 선택합니다.
    두 장(field) 그림이 먼저 나오고, 제목은 쪽과 실행으로 이루어집니다(A 쪽의 *A*라는 이름의 실행은
-   이름을 두 번 쓰지 않음). 그 아래 표는 A와 B의 모드를 장 겹침으로 짝짓습니다([모드 짝짓기](#compare의-모드-짝짓기)).
+   이름을 두 번 쓰지 않음). 그림은 같은 실행에 Results가 그리는 창(코어를 가운데 둔 창)을 Results 그림과 같은
+   높이로 그리며, Compare를 열면 창(pane)이 스크롤되어 그림의 가운데가 보이고 짝지어진 모드 선택은 그 위에
+   남습니다. probe 줄(*No point selected.*)은 각 그림 아래에 있고, A와 B의 형상, 파장, 코어 메시를 밝히는
+   문장은 그림 뒤에 옵니다. 그 아래 표는 A와 B의 모드를 장 겹침으로 짝짓습니다([모드 짝짓기](#compare의-모드-짝짓기)).
    짝지어진 모드마다 행 하나 *A mode 1 ↔ B mode 1*에 양쪽 편광, 겹침, A와 B의 n_eff, Δn_eff (B − A),
-   A 대비 Δ %가 나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
+   A 대비 Δ %, A와 B의 A_eff와 흡수 손실이 나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
    Compare) 소수 8자리입니다.
 6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
    파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
@@ -109,19 +115,26 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    this browser*(기록 중에는 *· updating browser recovery*, 쓸 수 없으면 *· browser recovery
    unavailable*), 세션 파일 저장 뒤 바뀌었으면 *Changed since session file … (시각) · kept for
    recovery in this browser*가 표시됩니다. **Open session** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
-   뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 마지막 세션 파일 이름과
-   시각을 함께 보관하므로 복구한 세션에는 그 파일을 지난 기록으로 *Recovered from this browser (last saved
-   to a file: … at 13:05)*처럼 덧붙입니다(저장 뒤 바뀐 작업이면 *…; changed since)*, 저장한 적이 없으면
-   *· not saved to a file*).
-   둘 다 다음 변경이나 다른 파일 열기까지 유지되며, 탭 클릭(**Models**, **Model**, **Connections**, **Results**)은
-   변경이 아닙니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 노트북을 마지막으로 보낸 세션 파일이나
+   연 세션 파일과, 노트북이 그 파일과 아직 같았는지를 함께 보관하므로 복구한 세션은 그 파일을 밝힙니다:
+   같았으면 *Recovered from this browser · same as file …json*, 바뀌었으면 *Recovered from this browser
+   (last sent to a file: … at 13:05; changed since)* 또는 *(opened from …json; changed since)*, 저장하거나 연
+   파일이 없으면 *· not saved to a file*. 이 제목과 저장 뒤의 *Session file … sent to your browser's
+   Downloads*는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
+   때까지 유지됩니다. 탭 클릭(**Models**, **Model**, **Connections**, **Results**, **Compare**), 고른 실행,
+   Compare 선택, 장 보기는 변경이 아닙니다. 변경 뒤에는 제목이 무엇이 바뀌었는지 말합니다: 입력 편집이면
+   *Unsaved inputs*, 실행이면 *Changed since session file … · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
-   켜면 시작 화면의 **Continue where you left off** 카드에 **Recover (this browser only): Last
-   session in this browser …**와 이전 세션, **Open session file (portable)…**, **Start new**가 나오고,
-   세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다고 알려 줍니다.
+   켜면 시작 화면의 **Continue where you left off** 카드에 **Restore from this browser: Last
+   session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), **Open session file
+   (portable)…**, **Start new**가 나오고, 세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이
+   브라우저에만 남는다고 알려 줍니다. Models 페이지는 브라우저 복구를 한 문구 *Restore from this browser*로
+   부르고, **Open session file…**은 파일에 씁니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
+   그때 고른 실행과 함께 엽니다. Studio가 페이지를 보관하기 전에 쓴 기록과, 페이지를 담지 않는 세션 파일을 열
+   때는 실행이 둘 이상이면 Compare, 아니면 Results를 엽니다.
    기본 입력이고 결과가 없는 작업 공간에서는 열기와 복구가 확인 없이 진행됩니다. 그 밖에는
    **Open saved session?**(또는 **Recover saved session?**) 창이 돌아올 실행(이름과 고정
    포함)과 비교, 바뀌는 것, 실제로 있는 물리만 보여 줍니다. 모델을 고르기 전에는 헤더에
@@ -135,15 +148,16 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    광학 실행이 있는 채로 가열 모델을 열면 Messages가 한 줄로 *Optical waveguide runs stay in this tab ·
    Models › Optical waveguide returns to them*이라고 알립니다. 그 뒤의 **More**는 이 탭이 닫거나
    새로고침할 때까지 그 실행을 가진다는 것과, 그 뒤에 무엇이 그 실행을 가지는지를 밝힙니다:
-   **Models › Optical waveguide › Resume**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
+   **Models › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
-   다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Resume Optical waveguide · Run 1 ·
-   design A, Run 2 · file …json · 2:25 PM (this browser)*, 그 옆에 **Start new**. 이때 카드 위 상자는
-   다른 세션만 나열하고, 다른 세션이 없으면 **Open session file (portable)…**과 그 안내가 카드의 Resume 옆에
+   다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
+   waveguide · Run 1 · design A, Run 2 · 2:25 PM · same as file …json*, 그 옆에 **Start new**. 이때 카드 위 상자는
+   다른 세션만 나열하고, 다른 세션이 없으면 **Open session file (portable)…**과 그 안내가 카드의 제안 옆에
    놓입니다. 복구 항목은 모두 모델, 실행 수,
    실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
-   design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다(*·
-   file …json*). 저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
+   design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
+   그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가 그것을
+   보관하기 전에 쓴 기록이면 *· file …json*. 저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
    보기(페이지, 장 보기), 고른 실행, Compare 선택, 실행의 출처(여기서 계산, 파일에서 엶, 복구), 파일
    연결이나 저장 시각이 달라도 한 세션입니다. 가장 새 기록을 보여 주고, 합친 기록 중 하나라도 파일을
    가리키면 그 파일 이름을 붙이며, 이 탭에 열려 있는 세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
@@ -323,8 +337,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 
 - **모델 트리.** 컴포넌트 하나(Geometry 1, 쓰인 재료마다 항목 하나인 Materials, 모든 물리가
   공유하는 Mesh 1), 풀이 순서의 자리를 표시한 배지를 단 물리(순환은 주황 번호 하나를 공유),
-  결합마다 말로 이름 붙은 항목이 있는 **Couplings**, 도출된 풀이 순서와 반복 단계가 있는
-  **Study 1**. Settings는 쉬운 이름을 보여 주고, 파일이 쓰는 이름(물리 type, “Name in file”, 형식 줄,
+  결합마다 말로 이름 붙은 항목이 있는 **Couplings**, **Study 1** 노드와 도출된 풀이 순서, 반복 단계가
+  있는 **Study**(그룹 이름이 *Study*이므로 트리의 두 항목이 같은 이름을 갖지 않음). Settings는 쉬운 이름을 보여 주고, 파일이 쓰는 이름(물리 type, “Name in file”, 형식 줄,
   결합이면 입력이 소스를 하나 받는지)은 닫힌 **File details** 안에 둡니다. 노드의 빨간 숫자는 그곳에서
   고칠 문제의 수입니다.
 - **Add physics**는 설치된 제공자와 그 종류를 매니페스트에서 읽어 포트(단위, 값이 놓이는 곳,
@@ -378,7 +392,10 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**(반복 단계는 *Settled in 7 iterations · from file*처럼
   반복 횟수를 유지), 도크 제목은
   “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고
-  하단은 “press Run to compute it here”를 덧붙입니다. 탭에서 만든 실행은 위 문구를 그대로 씁니다.
+  하단은 “press Run to compute it here”를 덧붙입니다. 탭에서 만든 실행은 위 문구를 그대로 씁니다. 이름
+  붙은 실행은 광학 애플리케이션처럼 도크 제목과 하단에서 “Run N · 이름”으로 불립니다: “Run 1 · Heater 2e14 ·
+  solved from the current model”, “Run 1 · Heater 2e14 matches the model · press Run to solve again”,
+  “Model edited since Run 1 · Heater 2e14 · press Run to update”.
 - **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
@@ -390,7 +407,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
   서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. 모드 표는 광 애플리케이션과
-  같은 열 | Mode | n_eff | Polarization | Loss | A_eff (µm²) |([모드 표](#모드-표))를 쓰고 행은 *Mode 1*, …이며, 표 아래
+  같은 열 | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |([모드 표](#모드-표); 열린 경계 결과는 *Loss (dB/cm)*)를 쓰고 행은 *Mode 1*, …이며, 표 아래
   문장은 순위 문장 “Modes are ranked by effective index.”와 모델이 요청한 모드 수 “This model asks
   for 2 modes: Modes 1 › Modes to find”(템플릿은 두 모드를 요청하므로 표에 TE-like와 TM-like 모드가 나옴)(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
@@ -406,7 +423,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 - **파일.** **Save session**은 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
   `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,
   최대 40자, 아니면 `multiphysics`). 형식은
-  [다중물리 모델의 세션 파일](#다중물리-모델의-세션-파일버전-8)에 있습니다. **Open session**은 이런
+  [다중물리 모델의 세션 파일](#다중물리-모델의-세션-파일버전-8)에 있습니다. 탭에 Optical waveguide 실행도
+  있으면 저장 메시지가 그 실행은 이 파일에 없다고 밝힙니다: “The 2 Optical waveguide runs of this tab are
+  not in this file; Models › Optical waveguide › Save session keeps them in their own file.” **Open session**은 이런
   파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
   runs.”). **More › Save inputs only**는 문서만 모델 파일로 쓰고, **More › Open inputs file**은 모델
   파일을 엽니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
@@ -482,8 +501,8 @@ Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, s
 - **다이제스트.** 실행과 기준 결과마다 `"digest": "sha256:<hex>"`가 있습니다. `digest`를 뺀 기록을
   모든 객체의 키를 정렬하고 같은 숫자 규칙으로 쓴 JSON의 SHA-256입니다. 잘리거나 손상되거나 손으로
   고친 파일을 알아냅니다. 인증은 아닙니다: 파일을 고치는 사람은 다시 계산할 수 있으므로, 연 결과는
-  계속 “Loaded from file, not recomputed; the file passed its damage check (this does not show who
-  made it).”으로
+  계속 “Loaded from file, not recomputed; integrity check passed (it does not show who made the
+  file).”으로
   표시합니다. 복구한 결과는 “Recovered from this browser, not recomputed.”입니다. 광학 세션 파일에는
   다이제스트가 없으므로 연 결과는 “Loaded from file, not recomputed. Studio checks that the file is
   well formed, not who made it.”으로 표시합니다.
@@ -548,7 +567,7 @@ waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은
 
 ### 모드 표
 
-결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Loss | A_eff (µm²) |가 광 애플리케이션과 다중물리 모델의
+결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |가 광 애플리케이션과 다중물리 모델의
 Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(광 애플리케이션은 “Compare matches them between runs by field overlap.”을 덧붙임) 모든 값은 저장된 중심 장
 `unnormalized_electric_field`에서 정의되므로 Studio, 엔진, 이전 세션 파일이 같은 샘플에서 같은 값을 얻습니다.
 
@@ -562,11 +581,19 @@ Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(�
   어떤 회전도 해입니다). 장 보기의 모드 선택은 그 모드를 *pair*로 부릅니다. 임계값이 1e-3인 까닭은 메시가 대칭 쌍(정사각형
   코어)을 40~10 nm에서 1e-4~6e-4만큼 갈라 놓는데, 이는 같은 메시에서 솔버의 n_eff 오차보다 작기 때문입니다. 아주 성긴
   메시에서 생길 수 있는 1e-3 초과의 분리는 표시되지 않으며, 그때 각 모드의 편광은 메시가 고른 회전입니다.
-- **Loss**는 Im n_eff에서 구합니다: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100, k0 = 2π / λ0(1/m 단위,
+- **Absorption loss (dB/cm)**는 Im n_eff에서 구합니다: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100, k0 = 2π / λ0(1/m 단위,
   exp(−iωt), Im n_eff > 0이 손실). 이는 엔진의 `propagation_loss = (40π / ln 10) · Im n_eff / λ0`(dB/m)를
-  100으로 나눈 값이며 유효숫자 4자리까지 보입니다(*37.49 dB/cm*). Im n_eff가 정확히 0이면 행에 *0 dB/cm*를
-  쓰고, 칸의 도움말과 표 아래 안내가 이 0이 흡수만의 값이라고 밝힙니다: “Absorption only: all materials
-  have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.” 문턱값은 없습니다:
+  100으로 나눈 값이며 유효숫자 4자리까지 보입니다(*37.49 dB/cm*). 닫힌 창에서 이 열은 재료 흡수(k)만 세며,
+  열 머리글, 모든 칸의 도움말, 표 아래 안내가 그렇게 밝힙니다: 도움말은 “Absorption (material k) only; leakage
+  and radiation are not computed in a closed window”, 안내는 “Absorption loss counts material absorption (k)
+  only. Leakage and radiation are not computed in a closed window.”입니다. 모든 Im n_eff가 정확히 0이면 행마다
+  *0 dB/cm*(계산된 누설 0이 아니라 무손실 실행)를 쓰고, 안내는 “Absorption loss counts material absorption (k)
+  only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed
+  in a closed window.”입니다. 열린 경계(PML)가 있는 다중물리 결과는 Im n_eff가 PML로의 누설을 포함하므로 열이
+  **Loss (dB/cm)**이고, 도움말은 “Material absorption (k) and leakage into the PML of the open boundary”, 안내는
+  “Loss includes material absorption (k) and leakage into the PML of the open boundary.”입니다. 그 밖의 표는 모두
+  **Absorption loss (dB/cm)**입니다. Compare는 같은 값을 *Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*로
+  보입니다. 문턱값은 없습니다:
   0이 아닌 Im n_eff는 아무리 작아도 그대로 보입니다. 엔진은 k > 0인 재료나 PML이 있을 때만 복소 n_eff를
   돌려주며, 무손실 문제는 실수 n_eff를 주므로 그 Im은 정확히 0입니다. 광 애플리케이션의 재료와 가열 템플릿은
   무손실이라 0 dB/cm로 읽히고, 다중물리 세션이나 모델 파일은 복소 n_eff(손실 재료나 PML)를 가질 수 있으며 그
@@ -696,7 +723,11 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   때 짝을 받아들입니다. 추적기의 기본값 `mode_tracking_threshold`와 `mode_tracking_margin_threshold`입니다.
 - **표.** 짝지어진 모드마다 행 하나 *A mode 1 ↔ B mode 1*에 양쪽의 편광(낱말과 TE 백분율), 소수 2자리
   겹침, A와 B의 n_eff, Δn_eff (B − A), A 대비 Δ %, 그리고 A와 B의 A_eff(µm²)가 나옵니다(짝지어진 축퇴 쌍은
-  두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다). 짝이 없는 모드는 *A mode 2: no match in B
+  두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다), 그 뒤에 A와 B의
+  흡수 손실(*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*)이 짝지어진 행과 짝이 없는 행 모두에 나옵니다:
+  저장된 지수에서 얻은 모드 표의 값이며, 짝지어진 쌍은 두 모드 dB/cm의 *mean*이고, 광 어댑터의 재료는
+  무손실이라 광학 실행은 *0 dB/cm*입니다. 좁은 화면에서는 표가 자기 상자 안에서 옆으로 스크롤되고 페이지는
+  넘치지 않습니다. 짝이 없는 모드는 *A mode 2: no match in B
   (best overlap 0.43, with B mode 2)*로 읽히며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape
   between designs.”
@@ -819,6 +850,15 @@ Ctrl/Cmd+Shift+Z 또는 Ctrl+Y로 다시 실행합니다. 텍스트 필드는 �
 계약으로 메시를 다시 생성하므로 메시 재사용이나 수렴 인증으로 해석하지 않습니다.
 
 광학 전용 트리는 Geometry, Materials, Optical modes, Mesh, Study를 표시합니다.
+
+모든 모델의 모델 빌더는 *Model tree*라는 이름의 ARIA 트리입니다. 그룹 제목(*Component 1*, *Physics*,
+*Analysis*; 다중물리 모델은 *Couplings*, *Study*, 마지막 실행의 결과)은 그룹을 열고 닫는 수준 1의 트리 항목이고,
+그 노드는 수준 2, 다른 노드 아래의 노드(재료, 반복 단계, 결과 페이지)는 수준 3이며, 두 항목이 같은 이름을 갖지
+않습니다. 노드는 그 설정이나 페이지가 보일 때만 고른 것으로 표시됩니다(`aria-selected`): Results에서 광학 트리는
+어떤 노드도 표시하지 않고(Results 노드가 없음) 다중물리 트리는 보이는 결과 페이지를 표시하며, Compare에서는
+아무것도 표시하지 않습니다. 트리의 탭 정지는 고른 노드 하나입니다. **Up**과 **Down**은 보이는 항목 사이를,
+**Home**과 **End**는 처음과 끝으로 옮기고, **Enter**나 **Space**는 노드를 고르거나(클릭과 같음) 그룹을 열고
+닫으며, **Right**는 그룹을 열거나 그 안으로, **Left**는 그룹을 닫거나 노드에서 그 위 항목으로 옮깁니다.
 Connections에서는 결합 인터페이스가 없음을 알리고 애플리케이션 선택으로 연결합니다.
 예전 입력 파일이 여는 개념 미리보기는 더 넓은 설정 트리를 유지하며 아무것도 실행하지 않습니다. Heated silicon waveguide는 따로 실행할 수 있는 모델입니다.
 
@@ -831,7 +871,8 @@ Geometry, Materials, Mesh, Study, Results 단계 막대는 현재 입력을 기�
 현재 입력과 정확히 같다는 뜻입니다. Results는 현재 입력과
 일치하는 보관 결과가 있으면 가장 최근 것을 엽니다. 단계 이동은 솔버를 실행하지
 않고 이전 결과도 유지합니다. Results 단계는 Results 화면에서만 강조되고 Compare에서는
-강조되지 않습니다. 하단 Study sequence 줄은 일반 텍스트이며, 노드 선택은 단계 막대와 모델 트리로 합니다.
+강조되지 않습니다. 보고 있는 실행의 입력이 현재 입력과 다르면 Results 단계는 *Current inputs differ from this run*을
+일반 글자색으로 보여 줍니다: 문제가 아니라 정보입니다. 하단 Study sequence 줄은 일반 텍스트이며, 노드 선택은 단계 막대와 모델 트리로 합니다.
 
 접속 상세, 입력 복구, 레이아웃 도움말은 펼칠 수 있는 패널에 모았습니다.
 접속 실패 시 패널이 자동으로 열립니다. 숫자 오류 설명은 입력 필드 이름과 분리했고,

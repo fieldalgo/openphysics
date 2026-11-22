@@ -229,6 +229,14 @@ test('a model edit leaves the last run out of date; the same content again is cu
  assert.equal(m.readyStatus('none'),'Model checked · press Run');
  assert.equal(m.readyStatus('stale',1),'Model edited since run 1 · press Run to update');
  assert.equal(m.readyStatus('current',1),'Run 1 matches the model · press Run to solve again');
+ // round 10: a named run is "Run N · name" in the dock and the footer, as in the optical app
+ assert.equal(m.sequenceHeading('current',2,'local','design A'),'Run 2 · design A · solved from the current model');
+ assert.equal(m.sequenceHeading('stale',2,'local','design A'),'Run 2 · design A · the model changed since; press Run to update');
+ assert.equal(m.sequenceHeading('current',2,'imported','design A'),'Run 2 · design A · read from file, not recomputed');
+ assert.equal(m.readyStatus('current',2,'local','design A'),'Run 2 · design A matches the model · press Run to solve again');
+ assert.equal(m.readyStatus('stale',2,'local','design A'),'Model edited since Run 2 · design A · press Run to update');
+ assert.equal(m.readyStatus('again',2,'local','design A'),'Model matches Run 2 · design A again: its results are current. Run makes a new run with the same inputs');
+ assert.equal(m.matchesAgainText(2),'Model matches run 2 again: its results are current. Run makes a new run with the same inputs');
  assert.equal(m.canonicalJson({b:[{d:1,c:2}],a:null}),'{"a":null,"b":[{"c":2,"d":1}]}');
 });
 test('the heater-off column is valid by the content of the optical model it solved, not by run order',async()=>{

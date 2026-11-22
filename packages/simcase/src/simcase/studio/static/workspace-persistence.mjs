@@ -38,16 +38,25 @@ export function persistenceTitle(state,when){
  const base=titleOf(state,when),v=state.viewed;
  return v&&!state.invalid?`${base} · viewing Run ${v.run}${v.name?' · '+v.name:''}, which used other inputs`:base;
 }
+// loaded.file: the session file a notebook was opened from (or that its recovery record names as
+// opened), and loaded.fileCurrent whether the inputs and runs were still that file's. "Current"
+// counts the model inputs and the runs only: a selected run, a page or a field view is not a change.
 function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
  const problem=runsUnsaved||saved||loaded?.current?(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:''):'';
  if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`+problem;
- // the last session file is history: the session came from browser recovery, not from that file
- if(loaded?.current&&loaded.kind==='recovered')return 'Recovered from this browser'+(saved?` (last sent to a file: ${saved.name} at ${when(saved.savedAt)}${saved.current?'':'; changed since'})`:runsUnsaved?' · not saved to a file':'')+problem;
+ if(loaded?.current&&loaded.kind==='recovered'){
+  // a record whose file link still matched says so: the same as the file, not "not saved to a file"
+  const same=saved?.current?saved.name:!saved&&loaded.file&&loaded.fileCurrent?loaded.file:null;
+  if(same)return `Recovered from this browser · same as file ${same}`+problem;
+  // the last session file is history: the session came from browser recovery, not from that file
+  return 'Recovered from this browser'+(saved?` (last sent to a file: ${saved.name} at ${when(saved.savedAt)}; changed since)`:loaded.file?` (opened from ${loaded.file}; changed since)`:runsUnsaved?' · not saved to a file':'')+problem;
+ }
  if(saved?.current)return `${sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
- if(runsUnsaved)return (saved?`Changed since session file ${saved.name} (${when(saved.savedAt)})`:'Not saved to a file')+' · '+browser;
+ const file=saved?`${saved.name} (${when(saved.savedAt)})`:loaded?.file||null;
+ if(runsUnsaved)return (file?`Changed since session file ${file}`:'Not saved to a file')+' · '+browser;
  // fresh: a model just chosen and not yet edited, saved or opened.
  if(fresh)return 'New model · not saved';
  return clean?'No unsaved input changes':'Unsaved inputs';
@@ -107,7 +116,7 @@ export function opticalRunsStayText({runs=0,file=null,recovery=false}){
  if(!runs)return {text:'',more:''};
  const one=runs===1,them=one?'it':'them';
  const text=`Optical waveguide ${one?'run stays':'runs stay'} in this tab · Models › Optical waveguide returns to ${them}`;
- const back=[...(recovery?['Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions)']:[]),...(file?[`Open session with ${file}`]:[])];
+ const back=[...(recovery?['Models › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions)']:[]),...(file?[`Open session with ${file}`]:[])];
  const more=`This tab holds ${plural(runs,'run')} until it is closed or reloaded.`+(back.length?` After that, ${back.join(' or ')} brings ${them} back.`:` After that, no file or browser recovery holds ${them}.`);
  return {text,more};
 }

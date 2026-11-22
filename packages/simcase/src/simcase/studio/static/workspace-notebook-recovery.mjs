@@ -9,7 +9,22 @@ export function readNotebookRecovery(record){
  // savedFile (optional): the last session file this notebook was saved to; a malformed one is ignored.
  // openedFile (optional): the session file the notebook was opened from, by name, for the recovery
  // lists; a malformed one is ignored. Neither is part of the session.
- return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile)};
+ // openedCurrent (optional, optical): true when the inputs and runs were still those of openedFile.
+ // page (optional, optical): the page the notebook showed, which a restore opens again.
+ // Both are browser-only, beside the session; a record without them (or with another value) reads as before.
+ return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile),
+  openedCurrent:openedFileName(record.openedFile)&&typeof record.openedCurrent==='boolean'?record.openedCurrent:null,page:recordPage(record.page)};
+}
+// The pages a recovery record may name; any other value is ignored.
+export const RECORD_PAGES=Object.freeze(['Model','Results','Compare']);
+export const recordPage=page=>RECORD_PAGES.includes(page)?page:null;
+/** The page a restored notebook opens: the page its record names when its runs allow it (Compare
+ * needs two runs, Results one), else the rule for a record without one (and for a session file,
+ * which names no page): Compare for two runs or more, Results for one, else Model. */
+export function restorePage(page,runCount){
+ const named=recordPage(page);
+ if(named==='Compare'&&runCount>1||named==='Results'&&runCount>0||named==='Model')return named;
+ return runCount>1?'Compare':runCount?'Results':'Model';
 }
 // any letters (a Korean file name included), no path separators or control characters
 export const openedFileName=name=>typeof name==='string'&&/^[^\u0000-\u001f\u007f/\\]{1,200}\.json$/u.test(name)&&!/^\.\.?$/.test(name)?name:null;
@@ -106,7 +121,7 @@ export class NotebookAutosave {
  constructor(store,{onState=()=>{},delay=700,setTimer=(fn,ms)=>setTimeout(fn,ms),clearTimer=id=>clearTimeout(id)}={}){
   this.store=store;this.onState=onState;this.delay=delay;this.setTimer=setTimer;this.clearTimer=clearTimer;this.timer=null;this.desired=null;this.writing=false;this.savedStamp=null;this.failedStamp=null;
  }
- // extra: optional {savedFile, openedFile} written beside the session in the record.
+ // extra: optional {savedFile, openedFile, openedCurrent, page} written beside the session in the record.
  schedule(stamp,makeText,extra={}){
   if(this.desired?.stamp===stamp)return;
   this.desired={stamp,makeText,extra};this.failedStamp=null;
@@ -122,7 +137,7 @@ export class NotebookAutosave {
   const capture=this.desired;this.writing=true;this.onState({phase:'saving'});
   try{
    const session=capture.makeText();if(typeof session!=='string'||new TextEncoder().encode(session).length>MAX_SESSION_BYTES)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');
-   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
+   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile,...(typeof capture.extra.openedCurrent==='boolean'?{openedCurrent:capture.extra.openedCurrent}:{})}:{}),...(recordPage(capture.extra?.page)?{page:capture.extra.page}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record});
   }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error.code,message:error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
  }

@@ -104,6 +104,41 @@ class Page {
     if (result.exceptionDetails) throw new Error('page: ' + (result.exceptionDetails.exception?.description || result.exceptionDetails.text));
     return result.result.value;
   }
+  // A model tree node by role and accessible name, as assistive technology finds it (the
+  // accessibility tree): exactly one tree item must have the name.
+  async treeItem(name) {
+    // a background tab does not answer accessibility queries: the tab asked comes to the front
+    await this.call('Page.bringToFront');
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const {nodes} = await this.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role: 'treeitem'});
+    const found = nodes.filter(n => !n.ignored);
+    if (found.length !== 1) throw new Error(`${found.length} tree items named ${JSON.stringify(name)}`);
+    const {object} = await this.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+    return object.objectId;
+  }
+  // A tree item whose accessible name matches a pattern (a name with a count in it): exactly one
+  async clickTreeItemLike(pattern) {
+    await this.call('Page.bringToFront');
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const {nodes} = await this.call('Accessibility.queryAXTree', {objectId: document.objectId, role: 'treeitem'});
+    const found = nodes.filter(n => !n.ignored && pattern.test(n.name?.value ?? ''));
+    if (found.length !== 1) throw new Error(`${found.length} tree items match ${pattern}`);
+    const {object} = await this.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+    const result = await this.call('Runtime.callFunctionOn', {objectId: object.objectId, functionDeclaration: 'function(){this.click();return true}', returnByValue: true});
+    if (result.exceptionDetails) throw new Error('page: ' + result.exceptionDetails.text);
+  }
+  async clickTreeItem(name) {
+    const result = await this.call('Runtime.callFunctionOn', {objectId: await this.treeItem(name), functionDeclaration: 'function(){this.click();return true}', returnByValue: true});
+    if (result.exceptionDetails) throw new Error('page: ' + result.exceptionDetails.text);
+  }
+  // Every tree item and the tree itself in the accessibility tree: [{role, name, level, selected, expanded}]
+  async axTree() {
+    const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
+    const prop = (n, key) => n.properties?.find(p => p.name === key)?.value?.value;
+    const read = async role => (await this.call('Accessibility.queryAXTree', {objectId: document.objectId, role})).nodes.filter(n => !n.ignored)
+      .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
+    return [...await read('tree'), ...await read('treeitem')];
+  }
   click(selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); }
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector); }
   attr(selector, name) { return this.on('function(s,n){const e=this.querySelector(s);return e?e.getAttribute(n):null}', selector, name); }
@@ -327,7 +362,7 @@ print(n)`;
   stage('S10 words', words);
 
   // a coupling added and undone leaves no selection the file could not hold: the file reopens
-  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.clickTreeItem('Heat 1 temperature → Modes 1 temperature');
   await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings');
   await page.click('[data-mp-remove-coupling]');
   await page.until("!!document.querySelector('#mp-messages [data-mp-add-coupling]')", 'suggestion');
@@ -372,11 +407,11 @@ print(n)`;
   const openedA = await openSession(a1.path);
   assert.equal(openedA, `Opened ${basename(a1.path)}. Its results were read from the file, not recomputed; input undo starts here.`);
   assert.equal(await page.text('#autosave-status'), `Opened ${basename(a1.path)}`);
-  await page.click('#tree [data-mp-node="results:modes1"]');
+  await page.clickTreeItem('Modes 1');
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened results');
   const after = await shown();
   assert.deepEqual(after, before, 'S2: the same strings after the open');
-  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed; the file passed its damage check \(this does not show who made it\)\.$/);
+  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed; integrity check passed \(it does not show who made the file\)\.$/);
   // the dock, the footer and the step rows say the result was read from the file, with no solve times
   const openedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,sequence:document.getElementById('sequence').textContent})");
   stage('opened run status', openedDock);
@@ -396,7 +431,7 @@ print(n)`;
   const b0 = await shown(), b1 = await saveSession('0.12');
   await fetchReplies(b1.text);
   await openSession(b1.path);
-  await page.click('#tree [data-mp-node="results:modes1"]');
+  await page.clickTreeItem('Modes 1');
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened 0.12');
   assert.deepEqual(await shown(), b0);
   const b2 = await saveSession('0.12 again');
@@ -410,16 +445,20 @@ print(n)`;
   await runAndWait(1);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off two runs', 180000);
   await runReady();
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("!!document.getElementById('mp-run-name-input')", 'run list');
   await page.type('#mp-run-name-input', 'Heater 2e14');
   await page.click('#mp-rename-run');
   await page.until("/^Run named “Heater 2e14” and pinned/.test(document.getElementById('file-status').textContent)", 'named');
-  await page.click('#tree [data-mp-node="physics:heat1"]');
+  // round 10 (K11): the dock and the footer name the run as "Run N · name", as the optical app does
+  const namedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent})");
+  stage('K11 named run in the dock', namedDock);
+  assert.match(namedDock.heading, /^Run 1 · Heater 2e14 · /); assert.match(namedDock.status, /^Run 1 · Heater 2e14 /);
+  await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
   await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'heat settings');
   await page.type('#mp-f-physics-heat1-heat_source_density-heater', '1e14');
   await runAndWait(2);
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs listed');
   const listedRuns = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(listedRuns[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.match(listedRuns[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)?$/);
@@ -443,7 +482,7 @@ print(n)`;
   await page.click('#leave-stay');
   await page.until("document.getElementById('file-status').textContent==='Kept the current model and its runs.'", 'kept');
   await openSession(c1.path);
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs back');
   const back = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(back[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)? · from file$/); assert.match(back[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)? · from file$/);
@@ -477,7 +516,7 @@ print(n)`;
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
     ['S7 another document envelope', d => { d.runs[0].document.openphysics = '0.3/multiphysics.2'; }, /Run 1's model does not pass today's check: openphysics: openphysics is "0\.3\/multiphysics\.2"; this reader reads the format "0\.3"\./],
   ];
-  await page.click('#tree [data-mp-node="results:modes1"]');
+  await page.clickTreeItem('Modes 1');
   await page.until("/kept for recovery in this browser$/.test(document.getElementById('autosave-status').textContent)", 'recovery settled before the refusals');
   const kept = await workspace(), refusals = {};
   for (const [what, change, message, recompute = true, finish = t => t] of MUTATIONS) {
@@ -497,11 +536,11 @@ print(n)`;
   await clearNotice(); await page.click('#recover-notebook');
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'recovered');
   assert.match(await notice(), /^Recovered from this browser \(Browser recovery · .*\), not recomputed\. Last session file .*; changed since\. Input undo starts here\.$/);
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===3", 'three runs recovered');
   const recoveredRuns = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.ok(recoveredRuns.every(t => / · recovered$/.test(t)), JSON.stringify(recoveredRuns));
-  await page.click('#tree [data-mp-node="results:modes1"]');
+  await page.clickTreeItem('Modes 1');
   assert.match(await page.text('[data-mp-run-line]'), /Recovered from this browser, not recomputed\.$/);
   const recoveredDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,sequence:document.getElementById('sequence').textContent})");
   stage('recovered run status', recoveredDock);
@@ -517,7 +556,7 @@ print(n)`;
     await page.call('Page.reload');
     await page.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'reload ' + power);
     await openTemplate();
-    await page.click('#tree [data-mp-node="physics:heat1"]');
+    await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
     await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'heat settings ' + power);
     await page.type('#mp-f-physics-heat1-heat_source_density-heater', power);
     await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)", 'edited model kept ' + power);
@@ -537,14 +576,14 @@ print(n)`;
 
   // S8: two tabs: another tab writes browser recovery, then this one finds the conflict
   const second = await (await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(base + '/workspace')}`, {method: 'PUT'})).json();
-  const other = new Page(second.webSocketDebuggerUrl); await other.ready; await other.call('Runtime.enable');
+  const other = new Page(second.webSocketDebuggerUrl); await other.ready; await other.call('Runtime.enable'); await other.call('DOM.enable'); await other.call('Accessibility.enable');
   await other.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'second tab');
   await openTemplate(other);
-  await other.click('#tree [data-mp-node="physics:heat1"]');
+  await other.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
   await other.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'second tab settings');
   await other.type('#mp-f-physics-heat1-heat_source_density-heater', '7e14');
   await other.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)", 'second tab kept');
-  await page.click('#tree [data-mp-node="physics:heat1"]');
+  await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
   await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'first tab settings');
   await page.type('#mp-f-physics-heat1-heat_source_density-heater', '8e14');
   await page.until("/browser recovery changed in another tab/.test(document.getElementById('autosave-status').textContent)", 'conflict');
@@ -566,7 +605,7 @@ print(n)`;
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run optical study'", 'optical ' + label, 120000);
   };
   await runOptical('run 1');
-  await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Geometry"]'); await page.until("!!document.getElementById('shape-w')", 'geometry inspector');
+  await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Geometry'); await page.until("!!document.getElementById('shape-w')", 'geometry inspector');
   await page.type('#shape-w', 600);
   await runOptical('run 2');
   const opticalNeff = () => page.eval("[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)");
@@ -578,8 +617,16 @@ print(n)`;
   // the switch note says the tab holds the runs until it is closed or reloaded, then how to get them back
   await openTemplate();
   // round 9 (J7): one short line, the rest behind More
-  assert.match(await page.eval("document.getElementById('file-status').textContent"), / Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them More\s*This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
+  assert.match(await page.eval("document.getElementById('file-status').textContent"), / Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them More\s*This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
   assert.equal(await page.eval("document.querySelector('#file-status details.message-more')?.open"), false, 'the rest is behind More, closed');
+  // round 10 (K10): Save session of the heated model says the optical runs of the tab are not in its file
+  const heatedWithOptical = await saveSession('heated with optical runs'); const savedWords = await notice();
+  stage('K10 heated save with optical runs', {file: String(heatedWithOptical?.path ?? heatedWithOptical), savedWords});
+  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Models › Optical waveguide › Save session keeps them in their own file.'), savedWords);
+  // round 10 (K7): the Models page has one phrase for browser recovery
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page K7');
+  assert.doesNotMatch(await page.text('#canvas'), /Recover|\(this browser/);
+  await page.click('nav [data-page=Model]'); await page.until("!!document.querySelector('#tree [data-mp-node=\"physics:heat1\"]')", 'heated model again');
   await openSession(c1.path);
   await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)||/^Opened /.test(document.getElementById('autosave-status').textContent)", 'heated session kept');
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'heated session in browser recovery', 20000);
@@ -600,7 +647,7 @@ print(n)`;
   // R1: the Optical waveguide card offers the runs from browser recovery first, then Start new
   await page.until("!!document.getElementById('resume-optical')", 'optical resume offer');
   const offer = await page.eval("({resume:document.getElementById('resume-optical').textContent,next:document.getElementById('resume-optical').nextElementSibling?.textContent,card:document.getElementById('resume-optical').closest('.card-slot')?.querySelector('[data-template]')?.dataset.template})");
-  assert.match(offer.resume, /^Resume Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)? \(this browser\)$/); assert.equal(offer.next, 'Start new'); assert.equal(offer.card, 'optical');
+  assert.match(offer.resume, /^Restore from this browser · Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(offer.next, 'Start new'); assert.equal(offer.card, 'optical');
   // R2: each stored session once, newest first, the file named where a record came from one
   const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});
@@ -665,11 +712,11 @@ print(n)`;
   const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2, 3, 4, 5]}), python: comparePython(big.path)};
   // pinned runs: five pinned, with their maps, are over the limit together
   for (const n of [1, 2, 3, 4, 5]) {
-    await page.click('#tree [data-mp-node="results:runs"]');
+    await page.clickTreeItemLike(/^Runs · \d of 6$/);
     await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list for pins');
     await page.click(`[data-mp-run]:nth-last-of-type(${n})`);
     await page.until(`/^Run ${n} shown under Results/.test(document.getElementById('file-status').textContent)`, 'run ' + n + ' shown');
-    await page.click('#tree [data-mp-node="results:runs"]');
+    await page.clickTreeItemLike(/^Runs · \d of 6$/);
     await page.until("!!document.getElementById('mp-run-name-input')", 'run name ' + n);
     await page.type('#mp-run-name-input', 'kept ' + n); await page.click('#mp-rename-run');
     await page.until(`/^Run named “kept ${n}” and pinned/.test(document.getElementById('file-status').textContent)`, 'pinned ' + n);
@@ -688,26 +735,26 @@ print(n)`;
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'reload after the limit');
   await clearNotice(); await page.click('#recover-notebook');
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'the record before the limit');
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs recovered');
   const recoveredBig = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   // the last record written: four pinned with their maps; runs 5 and 6 values only
   assert.deepEqual(recoveredBig.map(t => [/^Pinned · /.test(t), / · values only$/.test(t)]), [[false, true], [false, true], [true, false], [true, false], [true, false], [true, false]], JSON.stringify(recoveredBig));
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
-  await page.click('#tree [data-mp-node="results:runs"]');
+  await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs opened');
   const bigList = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 5, JSON.stringify(bigList));
   await page.click('[data-mp-run]:last-of-type');
   await page.until("!!document.querySelector('[data-mp-values-only]')", 'values-only run shown');
-  await page.click('#tree [data-mp-node="results:heat1"]');
+  await page.clickTreeItem('Heat 1');
   await page.until("!!document.querySelector('[data-mp-no-maps]')", 'values-only heat page');
   assert.equal(await page.text('[data-mp-no-maps]'), 'Maps not kept in this file: n_eff, the coupling check and the iteration history are.');
   assert.equal(await page.exists('canvas[data-mp-map]'), false);
-  await page.click('#tree [data-mp-node="results:modes1"]');
+  await page.clickTreeItem('Modes 1');
   await page.until("!!document.querySelector('[data-mp-no-maps]')&&!!document.querySelector('[data-neff=\"1\"]')", 'values-only modes page');
-  await page.click('#tree [data-mp-node="results:check"]');
+  await page.clickTreeItem('Coupling check');
   await page.until("/Coupling check/.test(document.getElementById('canvas').innerText)", 'values-only coupling check');
   const counts = bigSession.runs[0].counts, us = n => n.toLocaleString('en-US');
   assert.match(await page.text('.mp-check tbody'), new RegExp(`${us(counts.nodes)} node temperatures, 300\\.0–[0-9.]+ K .*${us(counts.triangles)} triangle means \\(mean of 3 nodes\\) Passed · max \\|received − sent\\| = 0 K`));

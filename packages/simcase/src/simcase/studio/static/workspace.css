@@ -66,6 +66,8 @@ p{margin:8px 0 14px;color:var(--muted)}
 .workflow-step span{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .workflow-step[aria-current=step]{background:#e8f0fc;box-shadow:inset 0 -2px var(--accent)}
 .workflow-step[data-state=attention] span{color:var(--warning)}
+/* information, not a problem: a viewed run whose inputs differ from the current ones */
+.workflow-step[data-state=attention][data-tone=info] span{color:var(--muted)}
 main{position:relative;display:grid;grid-template-columns:var(--tree-width,240px) var(--inspector-width,320px) minmax(0,1fr);flex:1;min-height:0;gap:1px;background:#bdc8d7;overflow:hidden}
 .tree,.settings-pane,.workspace{min-width:0;min-height:0;background:var(--panel)}
 .tree{overflow:auto;position:relative;scrollbar-width:thin}
@@ -78,7 +80,11 @@ main{position:relative;display:grid;grid-template-columns:var(--tree-width,240px
 .tree-group h3{display:flex;gap:9px;align-items:center;font-size:11px;font-weight:600;color:#6b788d;margin:8px 0 2px;padding:5px 7px}
 .tree-group h3>span{color:#8292a7;font-size:10px}
 .tree-group button{display:flex;align-items:center;gap:9px;width:100%;min-height:32px;margin:0;padding:5px 8px 5px 25px;border:1px solid transparent;border-radius:2px;text-align:left;font-size:13px;white-space:nowrap}
-.tree-group button[aria-pressed=true]{border-color:#c5d7f0;font-weight:600;background:#e6eefb;color:#244f8b}
+.tree-group button[aria-selected=true],.model-root button[aria-selected=true]{border-color:#c5d7f0;font-weight:600;background:#e6eefb;color:#244f8b}
+/* round 10: group headings are tree items that open and close their group */
+.tree-group .tree-heading{gap:9px;font-size:11px;font-weight:600;color:#6b788d;margin:8px 0 2px;padding:5px 7px;min-height:0;background:none}
+.tree-group .tree-heading>span{color:#8292a7;font-size:10px}
+.tree-group .tree-heading:hover{background:#f0f5fd}
 .tree-node-mark{color:#577cae;display:inline-flex;align-items:center;justify-content:center;font-size:18px;width:20px;line-height:20px;flex:none}
 .capability-card{margin:24px 15px 12px;padding-top:12px;border-top:1px solid #e0e6ed;font-size:10px;color:#748195}
 .capability-card strong{font-size:11px;font-weight:500;color:#53667f}
@@ -214,6 +220,9 @@ input[aria-invalid=true],textarea[aria-invalid=true]{border-color:#bd5b41;outlin
 .probe-controls>span,.probe-output,.profile-legend{font-size:11px;color:var(--muted)}
 .profile-controls{padding:12px 0}
 .run-item{display:block;width:100%;text-align:left;overflow-wrap:anywhere;margin:8px 0;font-size:12px}
+/* one run card reads as selected: hover changes the border only, never the selected fill */
+.run-item:hover:not([aria-pressed=true]){background:var(--panel)}
+.run-item[aria-pressed=true]{box-shadow:inset 3px 0 var(--accent);font-weight:600}
 .tree:has(.run-item){padding:12px}
 .run-name label{margin-bottom:8px}
 .run-name .input-hint{margin-top:6px}
@@ -235,7 +244,8 @@ main.comparing{grid-template-columns:var(--inspector-width,320px) minmax(0,1fr)}
 main.comparing>.tree,main.comparing>.divider-tree{display:none}
 main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
-.compare-grid>article{min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 3;gap:0}
+/* four rows per run: heading, mode line, plot, the probe line under the plot */
+.compare-grid>article{min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 4;gap:0}
 .compare-grid h3{overflow-wrap:anywhere}
 .compare-table{max-width:100%;overflow-x:auto;margin:4px 0 10px}.compare-table table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;min-width:100%}.compare-table caption{text-align:left;font-weight:600;padding:0 0 6px;color:var(--text)}.compare-table th,.compare-table td{padding:5px 10px;border-bottom:1px solid #dfe5ee;text-align:right;vertical-align:bottom}.compare-table thead th{background:#f3f6fa;color:#33475f;font-weight:600}.compare-table th:first-child{text-align:left}.compare-table .run-heading{display:block;font-weight:400;color:#586c87;font-size:11px;overflow-wrap:anywhere;min-width:9em}.compare-table .table-note{margin:6px 0 0;font-size:11px;color:#586c87}
 .compare-selection{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:8px 0}
