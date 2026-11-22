@@ -141,8 +141,9 @@ export function modeOptionLabel(i,modes){
 export const groupIndexHelp=(step='1 nm')=>`n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± ${step} (3 solves), materials evaluated at each wavelength`;
 export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study';
 export const groupIndexKeptHelp=(step='1 nm')=>`Not matched at λ0 ± ${step}; the reason is not kept in session files`;
-// the step of a group_index_method ("central_difference 1 nm electric-l2-assignment-v1")
-const methodStep=method=>/^central_difference (\S+ \S+) \S+$/.exec(method??'')?.[1]??'1 nm';
+/** The step of a run's group_index_method ("central_difference 1 nm electric-l2-assignment-v1"), or null. */
+export function groupIndexStep(method){const m=/^central_difference (\S+ (?:pm|nm|um|m)) \S+$/.exec(method??'');return m?m[1]:null;}
+const methodStep=method=>groupIndexStep(method)??'1 nm';
 /** The n_g cell of mode i of a run: {text, value, title}. A run without group_index: "—", with the
  * help to turn the option on; a mode the engine could not match (null): "—" with the engine's
  * reason when this tab has it (groupIndexReasons, not written to files), else the kept-in-files note. */

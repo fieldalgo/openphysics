@@ -250,8 +250,12 @@ wavelength, and returns n_g = n_eff − λ0 dn_eff/dλ0 by a central difference.
 three times as long ([group index of a single study](group_index.md)). With the box off, the
 document is the `optical-shapes-v8` document as before, byte for byte. With it on, the only
 difference is `results.group_index`, and n_eff and the fields at λ0 are the same values. The
-box is page state, like Modes to find: a new model starts with it off, and an input file does
-not store it. The adapter stays `optical-shapes-v8` and the run's `settings` are unchanged.
+box is page state, like Modes to find. A new model starts with it off, and an input file does
+not store it. Opening a session, or **Restore this run's inputs**, sets it from the run: on for
+a run with n_g. It is part of the study a run is compared with: with the box on, a run without
+n_g is not of the current inputs, and a document check made with the box off is of earlier
+inputs. The adapter stays `optical-shapes-v8` and the run's `settings` are unchanged. The run
+table CSV has no n_g column.
 
 A run with n_g keeps it in the version 9 slots `group_index` and `group_index_method`. Its
 document is rebuilt from its settings, as for any run, with `results.group_index` added, whose

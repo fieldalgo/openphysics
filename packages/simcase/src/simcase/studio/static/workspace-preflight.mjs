@@ -18,7 +18,7 @@ export class OpticalPreflight {
    if(response.ok&&(!Array.isArray(response.diagnostics)||!response.diagnostics.every(diagnostic)))throw new Error('Invalid validation diagnostics.');
    const diagnostics=Array.isArray(response.diagnostics)&&response.diagnostics.every(diagnostic)?response.diagnostics.map(({code,severity,path,message})=>({code,severity,path,message})):[];
    // the study checked: the inputs and the mode count of the document
-   this.record={input:capture,signature:studySignature(capture,document.physics?.em1?.mode_count),serverInstance,checkedAt:new Date().toISOString(),ok:response.ok,error:response.ok?'':response.error,summary:response.ok?response.summary:'',diagnostics};
+   this.record={input:capture,signature:studySignature(capture,document.physics?.em1?.mode_count,document.results?.group_index!==undefined),serverInstance,checkedAt:new Date().toISOString(),ok:response.ok,error:response.ok?'':response.error,summary:response.ok?response.summary:'',diagnostics};
   }catch(error){this.error=error.message;}finally{this.busy=false;this.onChange();}
  }
 }

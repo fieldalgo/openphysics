@@ -56,7 +56,7 @@ function expectedSettings(settings,model,number){
 export const runModeCount=run=>run.settings.mode_count;
 /** The signature of a run's study: its input text, and its mode count when it is not 2 (a run of
  * two modes keeps the signature of the input alone, as before mode counts could change). */
-export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`);
+export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT,groupIndex=false)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`)+(groupIndex===true?'\ngroup index':'');
 /** A length written with its unit ("0.15 um", "150 nm", "1.5e-7 m") in micrometres, the page's display
  * unit, and its value in metres; a bare number is refused. */
 const LENGTH=/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?) (nm|um|m)$/i;
@@ -139,7 +139,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
   field=readOpticalField({node_coordinates:f.node_coordinates,field_units:{node_coordinates:'m'},triangles:f.triangles,vector_fields:[{...FIELD_METADATA,real:f.real,imag:f.imag}]},format===7?2:k);
   for(let mode=0;mode<k;mode++)fieldScalars(field,mode);
  }
- const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
+ const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
  if(im!==null)run.effective_index_im=[...im];
  return Object.assign(run,extra);
 }
