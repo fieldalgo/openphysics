@@ -369,7 +369,10 @@ After every point succeeds, `group_index()` computes
 `n_g = n_eff - wavelength * d(n_eff)/d(wavelength)` on each tracked column,
 using second-order finite differences including the endpoints (computed on the kernel's
 micrometre wavelengths, so the same in any length unit). The existing
-scalar derivative behavior is unchanged. **Check both mesh/domain and wavelength
+scalar derivative behavior is unchanged, except at a cut-off scalar mode: there β² ≤ 0 and the
+solve reports n_eff = 0 (a fill value, the clipped square root), so n_g is null (NaN) at every
+point whose difference uses it, and `log.txt` says *n_g undefined at …: n_eff^2 <= 0 (cut off)*;
+before, the sweep reported n_g = 0. **Check both mesh/domain and wavelength
 spacing convergence.** High endpoint overlap cannot rule out an avoided crossing
 or cutoff between sparse samples and does not certify a derivative's accuracy.
 

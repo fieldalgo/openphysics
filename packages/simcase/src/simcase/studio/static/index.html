@@ -699,7 +699,7 @@ function fillResultTable() {
   const tracked = !!resultData.summary.mode_tracking, ngMethod = resultData.summary.group_index_method;
   const ngCount = ng ? (tracked || ngMethod ? nm : 1) : 0;
   const ngText = (i, j) => Number.isFinite(ng[i][j]) ? ng[i][j].toFixed(4) + (ngImag ? `<br>Im n_g: ${ngImag[i][j].toExponential(4)}` : '')
-    : `<span title="${esc('Not matched: ' + (ngMethod?.reasons?.[j] || 'no group index'))}">—</span>`;
+    : `<span title="${esc(ngMethod ? 'Not matched: ' + (ngMethod.reasons?.[j] || 'no group index') : 'No group index: the difference uses a cut-off mode (n_eff^2 <= 0); see the run log')}">—</span>`;
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + esc(studyLabel(resultData)) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
   studyValues(resultData).forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + neff[i].map((x,j) => `<td>${x.toFixed(6)}${neffImag ? `<br>Im n_eff: ${neffImag[i][j].toExponential(4)}<br>${re(loss)[i][j].toExponential(4)} ${esc(loss.unit)}` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ngText(i, j)}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
