@@ -73,7 +73,7 @@ test('V17: a session of two-mode real runs with fields is version 7, byte for by
  for(const [what,r,v] of [['8 modes',run('0000000b'),view],['3 of 8',run('0000000c',3,8),view],['1 of 2',run('0000000d',1,2),view],
   ['complex',run('0000000e',2,2,{effective_index:{re:[2.4,1.7],im:[1e-4,0]}}),view],['group index',run('0000000f',2,2,{group_index:[4.2,null]}),view],
   ['view mode 3',run('00000010'),{...view,mode:3}]]){
-  const text=write([two,r],v),doc=JSON.parse(text);
+  const text=write([r,two],v),doc=JSON.parse(text);
   assert.equal(doc.version,9,what);assert.equal(doc.application,'optical',what);
   assert.deepEqual(Object.keys(doc),['format','version','application','input','runs','selected','comparison','view'],what);
  }
@@ -199,4 +199,25 @@ test('engine values of a new result: the first study point, k entries, within ra
  assert.deepEqual(N.engineRunValues(summary,3),{te_polarization_fraction:[0.98,0.05,null],effective_area:[1.9e-13,3.4e-13,5e-13]});
  assert.deepEqual(N.engineRunValues(summary,2),{});
  assert.deepEqual(N.engineRunValues({mode_postprocessing:{te_polarization_fraction:{unit:'1',values:[[1.2,0,0]]}}},3),{});
+});
+test('review: the writer refuses what a version 9 reader would refuse; a v9 file needs every top-level key',()=>{
+ // a version 7 run whose indices are not ranked above 1.45 opens as before, but cannot go into version 9
+ for(const bad of [[2.0,2.5],[2.0,1.44]]){
+  const d=JSON.parse(fixture('optical-v7-one.json'));d.runs[0].effective_index=bad;const s=N.parseSession(JSON.stringify(d));
+  assert.equal(JSON.parse(N.sessionText(s.input,s.runs,s.selected,s.comparison,s.view)).version,7,'still written as version 7');
+  assert.throws(()=>write([...s.runs,run('00000077')]),{message:'Run 1: its effective indices are not ranked by Re n_eff above n = 1.45, so a version 9 session cannot hold it. Remove the run or save it in a session of its own.'});
+ }
+ // a view of a mode the selected run does not have is not written
+ assert.throws(()=>N.sessionText(input(),[run('00000001',3,8),run('00000002')],'00000001',['00000001',null],{...view,mode:3}),{message:'Unsupported saved field view.'});
+ const text=write([run('00000001')]);
+ assert.throws(()=>N.parseSession(edit(text,d=>{delete d.view;})),{message:'The session file has no "view".'});
+});
+test('review: importing a run that a file kept without its fields is the same run, not a conflict',()=>{
+ const runs=[run('00000001'),run('00000002')],full=N.parseSession(write(runs));
+ const reduced=N.parseSession(N.writeOpticalSession(input(),runs,'00000002',['00000001','00000002'],view,{limit:1,keepSelected:true}).ok?'':N.sessionText(input(),runs,'00000002',['00000001','00000002'],view,{keep:new Set(['00000002'])}));
+ assert.equal(reduced.runs[0].field,null);
+ for(const [have,add] of [[full.runs,reduced.runs],[reduced.runs,full.runs]]){const out=N.mergeRuns(have,add);assert.deepEqual(out.reused,['00000001','00000002']);assert.deepEqual(out.added,[]);}
+ // a different field is still a conflict
+ const other=N.parseSession(write([run('00000001',8,8,{field:{...field(8),real:field(8).real.map(m=>m.map(v=>v.map(x=>x+1)))}})]));
+ assert.throws(()=>N.mergeRuns(full.runs,other.runs),/Conflicting result for job 00000001/);
 });

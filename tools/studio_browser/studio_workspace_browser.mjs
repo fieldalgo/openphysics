@@ -680,6 +680,12 @@ try {
   const reopened = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,details:document.getElementById('run-details').textContent})");
   stage('V17 version 9 opened', reopened); assert.equal(reopened.rows, 8); assert.match(reopened.details, /computed by the engine from the saved field/);
   await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Modes to find follows the selected run');
+  // review: Restore this run's inputs restores its Modes to find; the inputs words name the count
+  await page.type('#mode-count-number', 2); await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'Restore button');
+  assert.match(await text('#canvas'), /Modes to find 8/, 'the inputs line names the run\'s count');
+  await page.click('#restore-run-input'); await answerDialogs("document.getElementById('mode-count-number')?.value==='8'||/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'restore run inputs');
+  await page.click('nav [data-page=Results]'); await page.until("/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'restored run is current');
+  await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Restore sets Modes to find');
   // M4-e: five more wide runs (6 kept: the newest unpinned replace the oldest) are over 16 MiB
   for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); }
   await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question');

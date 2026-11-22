@@ -778,7 +778,7 @@ the same rules apply.
 A version 9 file is one JSON object with exactly the keys `format`
 (`"openphysics-studio-session"`), `version` (9), `application` (`"optical"`), `input` (an input
 file of version 7), `runs` (at most six), `selected` (a run's `job` or null), `comparison` (two
-`job`s or nulls) and `view` (as in version 7, with `mode` 0 to 7 and below the selected run's
+`job`s or nulls) and `view` (all required; as in version 7, with `mode` 0 to 7 and below the selected run's
 mode count). Each run has these keys, in this order; any other key is refused by name:
 
 | Key | Type | |
@@ -787,8 +787,8 @@ mode count). Each run has these keys, in this order; any other key is refused by
 | `settings` | version 7's, with `adapter: "optical-shapes-v8"` and `mode_count` 1 to 8 | required |
 | `effective_index` | k numbers, or `{"re": [k], "im": [k]}`; 1 ≤ k ≤ `mode_count`, ranked by Re n_eff, every Re above 1.45 | required |
 | `field` | `{node_coordinates, triangles, real, imag}` of k modes | optional |
-| `te_polarization_fraction` | k numbers in [0, 1] or null: the engine's | optional; required without `field` |
-| `effective_area` | k numbers in m² above 0 or null: the engine's | optional; required without `field` |
+| `te_polarization_fraction` | k numbers in [0, 1] or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
+| `effective_area` | k numbers in m² above 0 or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
 | `group_index`, `group_index_method` | k numbers or null; a text of 1 to 64 characters (only with `group_index`) | optional, reserved for the group index |
 | `digest` | `"sha256:<hex>"` | required |
 
@@ -796,7 +796,7 @@ The digest is the SHA-256 of the run without its digest, as sorted-key JSON with
 rules of version 8 (negative zero written `-0.0`), so it covers every other key the run has; a
 changed run is refused with *Run 1 changed after it was saved (its check value does not
 match).* A mode count over 8 is refused with *Run 1 asks for 9 modes; this Studio reads 1 to
-8.* Numbers are written as in version 8; a file Studio wrote from runs it read (whose origin is
+8.* Studio does not write what it would refuse: a run read from a version 6 or 7 file whose indices are not ranked above n = 1.45 can stay in a version 7 session, but a save that needs version 9 is refused naming it. Numbers are written as in version 8; a file Studio wrote from runs it read (whose origin is
 then `imported`) is written again byte for byte. The digest detects a damaged or hand-edited
 file; it is not an authentication.
 

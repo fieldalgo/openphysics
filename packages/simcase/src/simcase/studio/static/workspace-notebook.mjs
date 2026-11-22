@@ -216,6 +216,10 @@ export function sessionVersion(runs,view={mode:0},keep=null){
 export function createSession(input,runs,selected,comparison,view={mode:0,component:'magnitude',window:'Core region'},{keep=null}={}){
  const version=sessionVersion(runs,view,keep);
  if(version===SESSION_VERSION)return {format:'openphysics-studio-session',version,input:validateProject(input),runs:runs.map(run=>sessionRun(run)),selected,comparison:[...comparison],view:sessionView(view)};
+ // what a version 9 reader refuses is not written: a run read from an earlier file whose indices
+ // are not ranked above the threshold, or a view of a mode the selected run does not have
+ runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it. Remove the run or save it in a session of its own.`);});
+ const shown=runs.find(run=>run.job===selected);if(shown&&validateView(view).mode>=shown.effective_index.length)throw new Error('Unsupported saved field view.');
  return {format:'openphysics-studio-session',version,application:'optical',input:validateProject(input),runs:runs.map(run=>sessionRun(run,version,!keep||keep.has(run.job))),selected,comparison:[...comparison],view:sessionView(view)};
 }
 /** The file text of a session: version 7 as JSON.stringify writes it (as before), version 9 with
@@ -276,6 +280,7 @@ export function parseSession(text,{recovered=false}={}){
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
   if(doc.application!=='optical')throw new Error('A version 9 session file holds an optical model (application "optical").');
+  const missing=TOP_KEYS_9.find(k=>!Object.hasOwn(doc,k));if(missing!==undefined)throw new Error(`The session file has no ${JSON.stringify(missing)}.`);
  }
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
  const input=validateProject(doc.input),runs=doc.runs.map((r,i)=>{
@@ -305,11 +310,14 @@ export function parseSession(text,{recovered=false}={}){
 export function mergeRuns(existing,incoming){
  if(!incoming.length)throw new Error('The session contains no completed runs.');
  const result=[...existing],incomingIds=new Set(),added=[],reused=[];
- const identity=run=>JSON.stringify({input:run.input,settings:{...run.settings,adapter:OPTICAL_ADAPTER},effective_index:run.effective_index,effective_index_im:run.effective_index_im??null,field:run.field&&{node_coordinates:run.field.node_coordinates,triangles:run.field.triangles,real:run.field.real,imag:run.field.imag},serverVersion:run.serverVersion??null});
+ const identity=run=>JSON.stringify({input:run.input,settings:{...run.settings,adapter:OPTICAL_ADAPTER},effective_index:run.effective_index,effective_index_im:run.effective_index_im??null,serverVersion:run.serverVersion??null});
+ // the fields are compared when both runs have them: a file may have left them out (over 16 MiB)
+ const fields=run=>JSON.stringify({node_coordinates:run.field.node_coordinates,triangles:run.field.triangles,real:run.field.real,imag:run.field.imag});
+ const same=(a,b)=>identity(a)===identity(b)&&(!a.field||!b.field||fields(a)===fields(b));
  for(const raw of incoming){
   const run=validateRun(raw,true);if(incomingIds.has(run.job))throw new Error('Duplicate imported run identifier.');incomingIds.add(run.job);
   const prior=existing.find(r=>r.job===run.job);
-  if(prior){if(identity(prior)!==identity(run))throw new Error('Conflicting result for job '+run.job+'. Existing notebook kept.');reused.push(run.job);}
+  if(prior){if(!same(prior,run))throw new Error('Conflicting result for job '+run.job+'. Existing notebook kept.');reused.push(run.job);}
   else{result.push(run);added.push(run.job);}
  }
  const evicted=[];

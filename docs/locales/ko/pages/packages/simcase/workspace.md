@@ -650,7 +650,7 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 
 버전 9 파일은 정확히 다음 키를 가진 JSON 객체 하나입니다: `format`(`"openphysics-studio-session"`),
 `version`(9), `application`(`"optical"`), `input`(버전 7 입력 파일), `runs`(최대 여섯 개), `selected`(실행의
-`job` 또는 null), `comparison`(`job` 두 개 또는 null), `view`(버전 7과 같되 `mode`는 0–7이며 선택한 실행의
+`job` 또는 null), `comparison`(`job` 두 개 또는 null), `view`(모두 필수. 버전 7과 같되 `mode`는 0–7이며 선택한 실행의
 모드 수보다 작음). 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
 
 | 키 | 형식 | |
@@ -659,15 +659,15 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 | `settings` | 버전 7과 같되 `adapter: "optical-shapes-v8"`, `mode_count` 1–8 | 필수 |
 | `effective_index` | 수 k개 또는 `{"re": [k], "im": [k]}`. 1 ≤ k ≤ `mode_count`, Re n_eff 순서, 모든 Re가 1.45보다 큼 | 필수 |
 | `field` | 모드 k개의 `{node_coordinates, triangles, real, imag}` | 선택 |
-| `te_polarization_fraction` | [0, 1]의 수 또는 null k개: 엔진의 값 | 선택, `field`가 없으면 필수 |
-| `effective_area` | 0보다 큰 m² 단위 수 또는 null k개: 엔진의 값 | 선택, `field`가 없으면 필수 |
+| `te_polarization_fraction` | [0, 1]의 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
+| `effective_area` | 0보다 큰 m² 단위 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
 | `group_index`, `group_index_method` | 수 또는 null k개; 1–64자 텍스트(`group_index`와 함께만) | 선택, 군굴절률용으로 예약 |
 | `digest` | `"sha256:<hex>"` | 필수 |
 
 digest는 digest를 뺀 실행을 키 정렬 JSON(버전 8의 수 규칙, 음의 0은 `-0.0`)으로 쓴 텍스트의 SHA-256이므로
 실행의 다른 모든 키를 덮습니다. 바뀐 실행은 *Run 1 changed after it was saved (its check value does not
 match).*로 거부하며, 모드 수가 8을 넘으면 *Run 1 asks for 9 modes; this Studio reads 1 to 8.*로 거부합니다.
-수는 버전 8처럼 쓰며, Studio가 읽은 실행(그때 origin은 `imported`)으로 쓴 파일은 다시 써도 바이트 단위로
+Studio는 스스로 거부할 파일을 쓰지 않습니다. 버전 6·7 파일에서 읽은 실행의 굴절률이 n = 1.45 위에서 순서대로가 아니면 버전 7 세션에는 남을 수 있지만, 버전 9가 필요한 저장은 그 실행을 밝혀 거부합니다. 수는 버전 8처럼 쓰며, Studio가 읽은 실행(그때 origin은 `imported`)으로 쓴 파일은 다시 써도 바이트 단위로
 같습니다. digest는 손상되거나 손으로 고친 파일을 찾아낼 뿐 인증이 아닙니다.
 
 템플릿 메시(삼각형 2275개)에서 모드 8개인 실행 여섯 개는 약 9.4 MB, 모드당 약 0.2 MB로 16 MiB 한도 안입니다.
