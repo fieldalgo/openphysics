@@ -36,3 +36,27 @@ test('after a run of the current inputs the Study step says the run is complete,
  assert.equal(opticalWorkflow({input:doc,runs:[run],invalid:true})[3].summary,'Correct input draft');
  doc.model.wavelength=1551;assert.equal(opticalWorkflow({input:doc,runs:[run]})[3].detail,'λ 1551 nm · Ready to run');
 });
+test('the dock heading and the footer name the same optical run: none, current, then inputs changed',async()=>{
+ const W=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs');
+ const doc=input();doc.model.wavelength=1550;
+ let f=W.opticalFreshness(doc,[]);assert.deepEqual(f,{state:'none',run:null});
+ // before any run: today's words
+ assert.equal(W.opticalSequenceHeading(f),'Nothing is computed until you press Run');
+ assert.equal(W.opticalReadyStatus(f),'Optical adapter ready · explicit Run required');
+ const first={signature:JSON.stringify(doc)};f=W.opticalFreshness(doc,[first]);
+ assert.deepEqual(f,{state:'current',run:1});
+ assert.equal(W.opticalSequenceHeading(f),'Run 1 · solved from the current inputs');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · solved from the current inputs · press Run to solve again');
+ // an edit: both name the latest run as the one the inputs changed since
+ const edited=input();edited.model.wavelength=1551;const other={signature:JSON.stringify({x:1})};
+ f=W.opticalFreshness(edited,[first,other]);assert.deepEqual(f,{state:'stale',run:2});
+ assert.equal(W.opticalSequenceHeading(f),'Inputs changed since run 2 · press Run to update');
+ assert.equal(W.opticalReadyStatus(f),'Inputs changed since run 2 · press Run to update');
+ // back to the inputs of run 1: that run is named, as the Results step says it is current
+ f=W.opticalFreshness(doc,[first,other]);assert.deepEqual(f,{state:'current',run:1});
+ for(const state of [W.opticalFreshness(doc,[]),W.opticalFreshness(doc,[first]),W.opticalFreshness(edited,[first])]){
+  const steps=opticalWorkflow({input:state.state==='stale'?edited:doc,runs:state.state==='none'?[]:[first]});
+  // no mixed state: the Results step is current exactly when the heading names a current run
+  assert.equal(steps[4].state==='ready',state.state==='current');
+ }
+});

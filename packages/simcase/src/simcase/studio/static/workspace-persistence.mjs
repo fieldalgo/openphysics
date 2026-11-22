@@ -28,7 +28,7 @@ const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
-export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+export function persistenceTitle({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
  const problem=runsUnsaved||saved||loaded?.current?(recovery==='unavailable'||recovery==='conflict'?' · '+RECOVERY[recovery]:''):'';
@@ -37,6 +37,8 @@ export function persistenceTitle({invalid=false,clean=true,runsUnsaved=false,sav
  if(saved?.current)return `${sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
  const browser=RECOVERY[recovery]||'not in browser recovery yet';
  if(runsUnsaved)return (saved?`Changed since session file ${saved.name} (${when(saved.savedAt)})`:'Not saved to a file')+' · '+browser;
+ // fresh: a model just chosen and not yet edited, saved or opened.
+ if(fresh)return 'New model · not saved';
  return clean?'No unsaved input changes':'Unsaved inputs';
 }
 const PHYSICS=[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']];

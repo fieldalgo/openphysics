@@ -65,13 +65,18 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    저장한 프로젝트는 저장된 좌표를 그대로 씁니다. 단계 표시줄의 **4. Study**에는 *Ready to run*이,
    현재 입력의 결과가 생기면 *Run complete*가 나오고, 옆의 파장(예: **λ 1550 nm**)은 파장 입력란을
    여는 버튼입니다. 필요하면 **Physics › Optical modes**에서 파장을(설정 제목도 *Optical modes*이며,
-   **Study → Edit wavelength**와 단계 표시줄의 파장이 입력란에 포커스를 둔 채 엽니다), **Mesh**에서
+   **Study → Edit wavelength**, 파장도 함께 보여 주는 Study 실행 설정의 **Edit in Optical modes**,
+   단계 표시줄의 파장이 그 입력란 하나에 포커스를 둔 채 엽니다), **Mesh**에서
    코어 메시 크기를 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.
 4. **Run optical study**를 누릅니다. 기다리는 동안 모델을 바꿔도 결과는 실행 당시
    입력을 유지합니다. Stop waiting은 상태 조회만 중단합니다. 입력을 바꾸면 완료 메시지가
-   바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다.
+   바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다. 도크 제목과 상태 표시줄은 같은
+   실행을 가리킵니다: 실행 뒤에는 *Run 1 · solved from the current inputs*(상태 표시줄은
+   *press Run to solve again*을 덧붙임), 편집 뒤에는 *Inputs changed since run 1 · press Run to
+   update*, 실행 전에는 *Nothing is computed until you press Run*과 *Optical adapter ready ·
+   explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
    않습니다. 별도의 Pin 버튼은 없으며, **Unpin this run**으로 해제하고 Run name에서 Enter를 누르면 이름 붙은
    실행을 다시 고정합니다. 모델을 변경해
@@ -107,7 +112,9 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    **Open saved session?**(또는 **Recover saved session?**) 창이 돌아올 실행(이름과 고정
    포함)과 비교, 바뀌는 것, 실제로 있는 물리만 보여 줍니다. 모델을 고르기 전에는 헤더에
    *No model chosen*, 상태 표시줄에 *Choose a model to start*가 나오고 Study sequence에는
-   단계가 없습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
+   단계가 없습니다. 방금 고른 모델은 첫 편집 전까지 *New model · not saved*, 그 뒤에는
+   *Unsaved inputs*로 표시됩니다. 시작 화면은 모델을 고르면 무엇이 일어나는지 밝힙니다: 모델이
+   풀 물리를 정하고, 입력한 치수와 완료한 실행은 그대로 두며, Undo로 되돌릴 수 있습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
    *Model library · Choose a model*.
 
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
@@ -270,7 +277,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 - **모델 트리.** 컴포넌트 하나(Geometry 1, 쓰인 재료마다 항목 하나인 Materials, 모든 물리가
   공유하는 Mesh 1), 풀이 순서의 자리를 표시한 배지를 단 물리(순환은 주황 번호 하나를 공유),
   결합마다 말로 이름 붙은 항목이 있는 **Couplings**, 도출된 풀이 순서와 반복 단계가 있는
-  **Study 1**. Settings는 파일 속 이름을 “Name in file”로 보여 줍니다. 노드의 빨간 숫자는 그곳에서
+  **Study 1**. Settings는 쉬운 이름을 보여 주고, 파일이 쓰는 이름(물리 type, “Name in file”, 형식 줄,
+  결합이면 입력이 소스를 하나 받는지)은 닫힌 **File details** 안에 둡니다. 노드의 빨간 숫자는 그곳에서
   고칠 문제의 수입니다.
 - **Add physics**는 설치된 제공자와 그 종류를 매니페스트에서 읽어 포트(단위, 값이 놓이는 곳,
   입력이면 소스를 하나 받는지 더하는지)와 함께 보여 줍니다. 여기서 Studio가 추가하는 것은
@@ -279,7 +287,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   물리 하나인 모델이 다중물리 모델이 됩니다. **Remove physics**는 그 물리를 가리키던 결합을
   조용히 지우지 않고 고칠 문제로 화면에 남깁니다.
 - **Add coupling**은 출력을 고른 뒤 그것을 받을 수 있는 입력 하나를 고릅니다. 나머지는 이유와
-  함께 회색입니다(같은 물리, 다른 양, 다른 단위, 이미 소스 하나를 받은 입력). 전달은 이번 릴리스의
+  함께 회색입니다(같은 물리, 다른 양, 다른 단위, 이미 소스 하나를 받은 입력). 단일 숫자인 출력은
+  예를 들어 *Modes 1 effective index (single numbers, not a map)*처럼 회색으로 나옵니다. 전달은 이번 릴리스의
   유일한 방식인 Same mesh입니다. 분명히 이을 수 있는 입력(Heat 1에서 받는 Modes 1 온도)이 있으면
   Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다. 그동안 Modes 1은
   트리, Connections 노드, Settings, Messages에 경고를 답니다: “Temperature input has no source:
@@ -321,11 +330,16 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
   이 옵션은 그 자리에 남아 꺼진 채 “needs a temperature coupling”이라고 이유를 밝힙니다.
+  결합이 돌아오면(다시 추가, Undo 또는 Redo) 옵션은 고른 대로 돌아오고, Messages에
+  “Also solve without heater” is ticked again이 덧붙습니다.
 - **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
-  서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다.
+  서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. n_eff 표의 행은
+  *Candidate 1*, …이고, 표 아래 문장은 광 애플리케이션과 같은 주의 “Candidates are ranked by
+  effective index and are not matched between designs.”와 모델이 요청한 모드 수 “This model asks
+  for 1 mode: Modes 1 › Modes to find”(그 설정으로 가는 링크)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
   소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
   Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K”.

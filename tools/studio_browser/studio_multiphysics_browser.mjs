@@ -203,7 +203,18 @@ try {
   // MB3: remove the coupling, get the suggestion, add it back through the dialog; Undo/Redo
   await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
   await page.until("/Remove coupling/.test(document.getElementById('inspector').innerText)", 'coupling settings');
-  assert.match(await page.text('#inspector'), /Transfer Same mesh \(both use Mesh 1\).*each triangle gets the mean of its 3 nodes.*Name in file heat1_to_modes1/);
+  assert.match(await page.text('#inspector'), /Transfer Same mesh \(both use Mesh 1\).*each triangle gets the mean of its 3 nodes/);
+  // the names the file uses are under a closed File details: the same rows, collapsed
+  const fileDetails = () => page.eval("[...document.querySelectorAll('#inspector details.mp-file-details')].map(d=>({open:d.open,summary:d.querySelector('summary').textContent,rows:[...d.querySelectorAll('.pair')].map(p=>p.textContent)}))");
+  assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['Input takesone source', 'Name in fileheat1_to_modes1']}]);
+  assert.doesNotMatch(await page.text('#inspector'), /heat1_to_modes1|Input takes/);
+  await page.click('#tree [data-mp-node="physics:heat1"]'); await page.until("/Heat source per region/.test(document.getElementById('inspector').innerText)", 'physics settings');
+  assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['Typethermal.steady2d', 'Name in fileheat1']}]);
+  assert.doesNotMatch(await page.text('#inspector'), /thermal\.steady2d|Name in file/);
+  await page.click('#tree [data-mp-node="model"]'); await page.until("!!document.querySelector('[data-mp-text]')", 'model settings');
+  assert.deepEqual(await fileDetails(), [{open: false, summary: 'File details', rows: ['FormatMultiphysics model · 0.3/multiphysics.1']}]);
+  assert.doesNotMatch(await page.text('#inspector'), /0\.3\/multiphysics\.1/);
+  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]'); await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings back');
   await page.click('[data-mp-remove-coupling]');
   await page.until("/Modes 1 can take its temperature from Heat 1/.test(document.getElementById('mp-messages').innerText)", 'suggestion');
   await runReady();          // two physics without a coupling still run; nothing is coupled silently
@@ -221,6 +232,9 @@ try {
   assert.match(await page.text('#file-status'), /removed\. Undo restores it\./);
   await page.click('#mp-messages [data-mp-undo]');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')&&!document.querySelector('#tree .warn-badge')", 'removal undone');
+  // the heater-off option comes back ticked, and Messages says so
+  assert.match(await page.text('#file-status'), /“Also solve without heater” is ticked again\.$/);
+  assert.equal(await page.eval("document.getElementById('run-baseline').checked"), true);
   await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
   await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings again');
   await page.click('[data-mp-remove-coupling]');
@@ -229,9 +243,11 @@ try {
   await page.until("!!document.querySelector('dialog.mp-dialog #mp-to')", 'coupling dialog');
   assert.equal(await page.eval("document.querySelector('#mp-from').value"), 'heat1.temperature');
   assert.equal(await page.eval("[...document.querySelectorAll('#mp-from option')].find(o=>o.value==='modes1.effective_index').disabled"), true);
+  assert.equal(await page.eval("[...document.querySelectorAll('#mp-from option')].find(o=>o.value==='modes1.effective_index').textContent"), 'Modes 1 effective index (single numbers, not a map)');
   assert.match(await page.text('dialog.mp-dialog'), /each triangle gets the mean of its 3 nodes/);
   await page.click('#mp-coupling-add');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')&&!document.querySelector('dialog[open]')", 'coupling added');
+  assert.match(await page.text('#file-status'), /added\..*“Also solve without heater” is ticked again\.$/);
   await page.click('#undo-edit');
   await page.until("!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')", 'undo');
   await page.click('#redo-edit');
@@ -268,7 +284,10 @@ try {
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
-  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) n_eff without heater Δn_eff (coupled − without heater)');
+  assert.equal(await page.text('.mp-neff thead'), 'Candidate n_eff (coupled) n_eff without heater Δn_eff (coupled − without heater)');
+  // the rows are candidates, with the optical caveat and the mode count the model asks for
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-neff tbody tr')].map(r=>r.cells[0].textContent)"), ['Candidate 1']);
+  assert.equal(await page.text('#mp-candidate-note'), 'Candidates are ranked by effective index and are not matched between designs. This model asks for 1 mode: Modes 1 › Modes to find');
   assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
   const shown = await page.attr('[data-neff="1"]', 'data-neff-value');
   const documentSent = JSON.parse(await page.eval("fetch('/api/multiphysics/template').then(r=>r.text())"));
@@ -307,7 +326,7 @@ try {
   await runReady();
   // one sentence in Messages, the dock heading and the status bar; the notice asks for no Run
   const again = 'Model matches run 1 again: results are current';
-  assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '.');
+  assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again.');
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');

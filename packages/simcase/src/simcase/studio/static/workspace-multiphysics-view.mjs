@@ -9,7 +9,7 @@ import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsName
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
  mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
- runFreshness,freshnessAgain,editNotice,staleRows,sequenceHeading,readyStatus,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs} from './workspace-multiphysics.mjs';
+ runFreshness,freshnessAgain,editNotice,staleRows,sequenceHeading,readyStatus,CANDIDATE_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {sentToDownloads} from './workspace-persistence.mjs';
 
@@ -55,16 +55,16 @@ export function createMultiphysicsView(ctx){
  function close(){active=false;stopPolling();}
  function commit(next,message,select){
   undoStack.push(doc);if(undoStack.length>100)undoStack.shift();redoStack=[];
-  const before=isMultiphysics(doc);doc=normalizeEnvelope(next);if(select)selection=select;lastRemoval=null;
+  const before=isMultiphysics(doc),prior=doc;doc=normalizeEnvelope(next);if(select)selection=select;lastRemoval=null;
   validate();ctx.onHistory();ctx.render();
   let text=editNotice(message,freshness(),lastRun?.id);
   if(!before&&isMultiphysics(doc)&&!announcedMultiphysics){announcedMultiphysics=true;text+=' This model is now saved as a multiphysics model (format 0.3/multiphysics.1).';}
-  notice(text);
+  notice(text+baselineReturnText(prior,doc,baselineOption));
  }
  // Undo and Redo compute nothing; back at the last run's model they say its results are current.
- const historyNotice=done=>{const f=freshness();notice(f==='again'?`${done} · ${editNotice('',f,lastRun.id).trim()}`:`${done}; nothing was computed.`);};
- function undo(){if(!undoStack.length)return;lastRemoval=null;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Undo · model edit undone');}
- function redo(){if(!redoStack.length)return;lastRemoval=null;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Redo · model edit redone');}
+ const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.id).trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption));};
+ function undo(){if(!undoStack.length)return;lastRemoval=null;const prior=doc;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Undo · model edit undone',prior);}
+ function redo(){if(!redoStack.length)return;lastRemoval=null;const prior=doc;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();historyNotice('Redo · model edit redone',prior);}
  // A removed coupling is named in Messages with Undo until the next edit.
  function removeCouplingNamed(name){const title=couplingTitle(doc,name);commit(removeCoupling(doc,name),`Coupling ${title} removed. Undo restores it.`,'model');lastRemoval={title};ctx.render();}
  // ---- the live check ----
@@ -191,6 +191,8 @@ export function createMultiphysicsView(ctx){
  function nfield(path,label,attrs=''){const id='mp-f-'+path.join('-');return `<label for="${id}">${esc(label)}<input id="${id}" type="number" step="any" ${attrs} data-mp-number="${esc(JSON.stringify(path))}" value="${esc(getPath(path)??'')}"></label>`;}
  function sfield(path,label,options,current){return `<label>${esc(label)}<select data-mp-select-field="${esc(JSON.stringify(path))}">${Object.entries(options).map(([k,v])=>`<option value="${esc(k)}" ${k===current?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;}
  const pair=(a,b)=>`<div class="pair"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`;
+ // The names the model file uses (type, name in file, format, input arity): shown, but closed by default.
+ const fileDetails=rows=>`<details class="mp-file-details"><summary>File details</summary>${rows.map(([a,b])=>pair(a,b)).join('')}</details>`;
  const link=(id,text)=>`<button type="button" class="link-button" data-mp-node="${esc(id)}">${esc(text)}</button>`;
  function bindFields(host){
   host.querySelectorAll('[data-mp-quantity]').forEach(el=>el.onchange=()=>{const path=JSON.parse(el.dataset.mpQuantity),raw=el.value.trim();
@@ -214,7 +216,7 @@ export function createMultiphysicsView(ctx){
  function regions(){const block=geometryOf(doc);return [...(block?.features||[]).map(f=>f.name),'background'];}
  function physicsPanel(name){
   const p=doc.physics[name],info=catalog.types.get(p.type),order=check.solve_order||[],place=order.findIndex(g=>g.includes(name));
-  let html=pair('Physics',info?.label||p.type)+pair('Type',p.type)+pair('Name in file',name)+(place>=0&&couplingNames(doc).length?pair('Solve order',`${place+1} of ${order.length} (from the couplings)`):'');
+  let html=pair('Physics',info?.label||p.type)+(place>=0&&couplingNames(doc).length?pair('Solve order',`${place+1} of ${order.length} (from the couplings)`):'')+fileDetails([['Type',p.type],['Name in file',name]]);
   if(p.type==='thermal.steady2d'){
    html+='<h3>Sides</h3>'+SIDES.map(s=>heatSide(name,s)).join('')+'<h3>Heat source per region</h3>';
    const source=p.heat_source_density;
@@ -265,7 +267,7 @@ export function createMultiphysicsView(ctx){
  }
  function settings(){
   const [kind,...rest]=selection.split(':'),id=rest.join(':');let title,html='';
-  if(kind==='model'){title='Model';html=`<label>Name<input type="text" data-mp-text="${esc(JSON.stringify(['name']))}" value="${esc(doc.name||'')}"></label>`+pair('Format',isMultiphysics(doc)?`Multiphysics model · ${ENVELOPE}`:'One physics · 0.3')+pair('Physics',physicsNames(doc).map(physicsLabel).join(', ')||'none')+pair('Couplings',String(couplingNames(doc).length))+'<p><button type="button" data-mp-dialog="physics">Add physics…</button> <button type="button" data-mp-dialog="coupling">Add coupling…</button></p><p>Save model file (Project) keeps this document. Runs stay in this tab and are not in the file.</p>';}
+  if(kind==='model'){title='Model';html=`<label>Name<input type="text" data-mp-text="${esc(JSON.stringify(['name']))}" value="${esc(doc.name||'')}"></label>`+pair('Physics',physicsNames(doc).map(physicsLabel).join(', ')||'none')+pair('Couplings',String(couplingNames(doc).length))+fileDetails([['Format',isMultiphysics(doc)?`Multiphysics model · ${ENVELOPE}`:'One physics · 0.3']])+'<p><button type="button" data-mp-dialog="physics">Add physics…</button> <button type="button" data-mp-dialog="coupling">Add coupling…</button></p><p>Save model file (Project) keeps this document. Runs stay in this tab and are not in the file.</p>';}
   else if(kind==='geometry'){title='Geometry 1';const g=geometryOf(doc),u=unitText(g?.length_unit||'');const gpath=doc.geometry?.version===1?['geometry','components',Object.keys(doc.geometry.components)[0]]:['geometry'];
    html=pair('Length unit',u)+['xmin','xmax','ymin','ymax'].map(k=>nfield([...gpath,'domain',k],`Domain ${k} [${u}]`)).join('')+'<h3>Shapes (later shapes win where they overlap)</h3>'+(g?.features||[]).map((f,i)=>`<fieldset class="heat-side"><legend>${esc(f.name)} · ${esc(f.type)} · ${esc(materialLabel(f.material))}</legend>${f.type==='rect'?['x','y','w','h'].map(k=>nfield([...gpath,'features',i,k],`${k} [${u}]`)).join(''):'<p class="muted">Edited in the file.</p>'}</fieldset>`).join('')+'<p>Every physics uses this geometry and one shared mesh.</p>';}
   else if(kind==='materials'){title='Materials';html=materialUses(doc).map(u=>`<p>${link('material:'+u.ref,u.label)} · ${esc(u.local?'document record':u.ref)}</p>`).join('')+(anyTemperatureCoupled(doc)?'<p>A coupled temperature needs a thermo-optic coefficient and a reference temperature for every optical material.</p>':'');}
@@ -276,7 +278,7 @@ export function createMultiphysicsView(ctx){
    html+='<p>Every physics solves on this one mesh, so coupled values move without interpolation.</p>';}
   else if(kind==='physics'){title=doc.physics[id]?physicsLabel(id):id;html=doc.physics[id]?physicsPanel(id):'<p>This physics is not in the model.</p>';}
   else if(kind==='coupling'){const c=doc.couplings?.[id];title=c?couplingTitle(doc,id):id;if(c){const inp=catalog.types.get(doc.physics[splitSpec(c.to)[0]]?.type)?.ports.find(p=>p.name===splitSpec(c.to)[1]);
-   html=pair('From',portLabel(c.from))+pair('To',portLabel(c.to))+pair('Transfer',c.transfer==='same_mesh'?'Same mesh (both use Mesh 1)':String(c.transfer))+pair('Values',transferNote(doc,catalog,c.from,c.to).split(' · ').slice(1).join(' · ')||'—')+(inp?pair('Input takes',(inp.combine||'single')==='single'?'one source':'sources add'):'')+pair('Name in file',id)+`<p><button type="button" data-mp-remove-coupling="${esc(id)}">Remove coupling</button></p>`;}}
+   html=pair('From',portLabel(c.from))+pair('To',portLabel(c.to))+pair('Transfer',c.transfer==='same_mesh'?'Same mesh (both use Mesh 1)':String(c.transfer))+pair('Values',transferNote(doc,catalog,c.from,c.to).split(' · ').slice(1).join(' · ')||'—')+fileDetails([...(inp?[['Input takes',(inp.combine||'single')==='single'?'one source':'sources add']]:[]),['Name in file',id]])+`<p><button type="button" data-mp-remove-coupling="${esc(id)}">Remove coupling</button></p>`;}}
   else if(kind==='study'){title='Study 1';const sweep=doc.study?.type==='sweep';html=pair('Study',sweep?'Sweep':'Single run')+(sweep?`<p class="validation-warning">${esc(check.run_refusal||'')}</p><button type="button" data-mp-single>Use single run</button>`:'')+'<h3>Solve order (from the couplings)</h3>'+orderList()+((doc.study?.loops||[]).length?'<h3>Iteration steps</h3>'+doc.study.loops.map((l,i)=>`<p>${link('loop:'+i,`Iteration step ${i+1} · ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`)} · ${esc(loopText(l))}</p>`).join(''):'');}
   else if(kind==='order'){title='Solve order';html=orderList()+'<p>The order is derived from the couplings, not stored. To change it, change the couplings.</p>';}
   else if(kind==='loop'){title=`Iteration step ${+id+1}`;html=loopPanel(+id);}
@@ -320,7 +322,7 @@ export function createMultiphysicsView(ctx){
   if(!from){notice('No physics of this model sends a field to couplings yet. Add physics first.');return;}
   const d=dialog('Add coupling','<div id="mp-coupling-body"></div>','<button type="button" id="mp-coupling-add" class="primary">Add coupling</button>');
   const draw=()=>{const targets=targetChoices(doc,catalog,from);if(!to||!targets.find(t=>t.spec===to&&t.ok))to=targets.find(t=>t.ok)?.spec||null;
-   d.querySelector('#mp-coupling-body').innerHTML=`<label>From (outputs)<select id="mp-from">${sources.map(s=>`<option value="${esc(s.spec)}" ${s.spec===from?'selected':''} ${s.ok?'':'disabled'}>${esc(s.label)} · ${esc(unitText(s.port.unit))}${s.ok?'':' — '+esc(s.reason)}</option>`).join('')}</select></label>
+   d.querySelector('#mp-coupling-body').innerHTML=`<label>From (outputs)<select id="mp-from">${sources.map(s=>`<option value="${esc(s.spec)}" ${s.spec===from?'selected':''} ${s.ok?'':`disabled title="${esc(s.detail)}"`}>${esc(s.label)}${s.ok?' · '+esc(unitText(s.port.unit)):` (${esc(s.reason)})`}</option>`).join('')}</select></label>
     <label>To (inputs)<select id="mp-to">${targets.map(t=>`<option value="${esc(t.spec)}" ${t.spec===to?'selected':''} ${t.ok?'':'disabled'}>${esc(t.label)} · ${esc(unitText(t.port.unit))}${t.ok?'':' — '+esc(t.reason)}</option>`).join('')}</select></label>
     <ul class="mp-choice-reasons">${targets.filter(t=>!t.ok).map(t=>`<li>${esc(t.label)}: ${esc(t.reason)}</li>`).join('')}</ul>
     ${pair('Transfer',transferNote(doc,catalog,from,to||from).split(' · ')[0])}${to?`<p>${esc(transferNote(doc,catalog,from,to).split(' · ').slice(1).join(' · '))}.</p>`:'<p class="muted">No input can take this output.</p>'}`;
@@ -399,7 +401,7 @@ export function createMultiphysicsView(ctx){
    const head=alone?`<th>n_eff without heater${valid?'':' (other model)'}</th><th>Δn_eff (coupled − without heater)</th>`:'';
    const cells=(row,k)=>{if(!alone)return '';const a=alone.rows[k];return `<td data-neff-alone="${row.mode}" data-neff-value="${a?.value??''}">${a?a.value.toFixed(8):'—'}</td><td data-neff-shift="${row.mode}">${a&&valid?shiftText(row.value,a.value):'—'}</td>`;};
    const note=!coupled?'':solving?`Solving ${esc(physicsLabel(id))} without heater…`:valid?esc(baselineText(lastRun.doc,id)):alone?`The without-heater column was solved from a different optical model. Run ${esc(physicsLabel(id))} alone to refresh.`:failed?`The run without heater ${failed==='stopped'?'was stopped':'failed: '+esc(failed)}. Run ${esc(physicsLabel(id))} alone to try again.`:`An n_eff without heater appears here when “Also solve without heater” beside Run is on, or run ${esc(physicsLabel(id))} alone.`;
-   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div>`+
+   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Candidate</th><th>n_eff${coupled?' (coupled)':''}</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Candidate ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(CANDIDATE_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id))}</p>`+
     (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    // the answer first, then the coupled input it was solved from
    if(coupled){const region=r.mesh.region_names.includes('core')?'core':null,dn=coupled.index_change;

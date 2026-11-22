@@ -52,7 +52,7 @@ test('the port pickers offer outputs, then only compatible inputs, and say why t
  const m=await mp,c=m.kindCatalog(CAPS);
  const doc={...heated(),physics:{...heated().physics,heat2:{type:'thermal.steady2d'},mk1:{type:'test.relaymk'},power1:{type:'test.power'},relay1:{type:'test.relay'}}};
  const sources=m.sourceChoices(doc,c);
- assert.deepEqual(sources.filter(s=>!s.ok).map(s=>[s.spec,s.reason]),[['modes1.effective_index','Modes 1 effective index is one value per mode, not a field on the mesh']]);
+ assert.deepEqual(sources.filter(s=>!s.ok).map(s=>[s.spec,s.reason,s.detail]),[['modes1.effective_index','single numbers, not a map','Modes 1 effective index is one value per mode, not a field on the mesh']]);
  // heat flux is listed; no input of this model takes it, and each says why
  assert.ok(m.targetChoices(doc,c,'heat1.heat_flux').every(t=>!t.ok&&t.reason));
  assert.equal(m.pairProblem(doc,c,'heat1.heat_flux','modes1.temperature'),'temperature is not a heat flux');
@@ -285,4 +285,21 @@ test('the graphics footer names the geometry unit',async()=>{
  const m=await mp;
  assert.equal(m.lengthsNote(heated()),'Lengths in µm; other values carry their units. Run solves every physics in solve order.');
  assert.match(m.lengthsNote({physics:{}}),/^Lengths in the geometry’s unit \(not set\);/);
+});
+test('a modes table names candidates with the optical caveat and the mode count it asks for',async()=>{
+ const m=await mp;
+ assert.equal(m.CANDIDATE_CAVEAT,'Candidates are ranked by effective index and are not matched between designs.');
+ assert.equal(m.modeCountText(heated(),'modes1'),'This model asks for 1 mode: Modes 1 › Modes to find');
+ const three=heated();three.physics.modes1={...three.physics.modes1,mode_count:3};
+ assert.equal(m.modeCountText(three,'modes1'),'This model asks for 3 modes: Modes 1 › Modes to find');
+ const unset=heated();delete unset.physics.modes1.mode_count;
+ assert.equal(m.modeCountText(unset,'modes1'),'The number of modes is set in Modes 1 › Modes to find');
+});
+test('the Messages line says when the without-heater option returns ticked',async()=>{
+ const m=await mp,doc=heated(),removed={...doc,couplings:{}};
+ assert.equal(m.baselineReturnText(removed,doc,true),' “Also solve without heater” is ticked again.');
+ // not chosen, or not coming back from unavailable: nothing to say
+ assert.equal(m.baselineReturnText(removed,doc,false),'');
+ assert.equal(m.baselineReturnText(doc,doc,true),'');
+ assert.equal(m.baselineReturnText(doc,removed,true),'');
 });

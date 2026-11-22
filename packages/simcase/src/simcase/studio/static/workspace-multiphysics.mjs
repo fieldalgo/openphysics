@@ -84,7 +84,9 @@ export function sourceChoices(doc,catalog){
  for(const name of physicsNames(doc))for(const port of portsOf(doc,catalog,name))if(port.direction==='output'){
   const ok=port.location==='node'||port.location==='element';
   out.push({spec:`${name}.${port.name}`,label:`${physicsLabel(name)} ${quantityWords(port.name)}`,port,ok,
-   reason:ok?null:`${physicsLabel(name)} ${quantityWords(port.name)} is ${locationWords(port.location)}, not a field on the mesh`});
+   // reason: the short words the From list shows; detail: the longer sentence its tooltip gives
+   reason:ok?null:port.location==='scalar'?'single numbers, not a map':`${locationWords(port.location)}, not on the mesh`,
+   detail:ok?null:`${physicsLabel(name)} ${quantityWords(port.name)} is ${locationWords(port.location)}, not a field on the mesh`});
  }
  return out;
 }
@@ -394,6 +396,13 @@ export function effectiveIndexRows(payload){
  const series=payload.effective_index,values=Array.isArray(series?.values)?series.values:Array.isArray(series?.re)?series.re:[];
  const rows=[];values.forEach((point,i)=>(Array.isArray(point)?point:[point]).forEach((v,m)=>rows.push({point:i,mode:m+1,value:v})));return rows;
 }
+// The caveat under a modes table, in the words of the optical application, and the number of
+// modes the model asks for, named by its setting: the rows are candidates, not matched modes.
+export const CANDIDATE_CAVEAT='Candidates are ranked by effective index and are not matched between designs.';
+export function modeCountText(doc,name){
+ const n=doc?.physics?.[name]?.mode_count,where=`${physicsLabel(name)} › Modes to find`;
+ return Number.isInteger(n)?`This model asks for ${n} ${n===1?'mode':'modes'}: ${where}`:`The number of modes is set in ${where}`;
+}
 // The Results pages of a run: one per physics, then the coupling check.
 export function resultPages(result){return [...Object.keys(result.physics).map(n=>({id:'results:'+n,label:physicsLabel(n)})),...(Object.keys(result.couplings||{}).length?[{id:'results:check',label:'Coupling check'}]:[])];}
 // The document of one physics alone, uncoupled: format 0.3 with no couplings or thermo-optic keys.
@@ -452,6 +461,11 @@ export function baselineOptionState(doc,{on=false,busy=false}={}){
   title:'Needs a temperature coupling: no coupling sets an optical temperature, so there is no heater to switch off. Add one from a heat physics with Add coupling….'};
  return {available:true,disabled:busy,checked:on,reason:'',
   title:`After the coupled run, also solve ${names.map(physicsLabel).join(' and ')} alone with no temperature input (about 1 s), for the n_eff without heater`};
+}
+// The Messages words when an edit (a coupling added back, Undo, Redo) makes the option
+// available again and it returns ticked as it was chosen; '' when nothing returned.
+export function baselineReturnText(before,after,on){
+ return on&&!baselineOptionState(before,{on}).checked&&baselineOptionState(after,{on}).checked?' “Also solve without heater” is ticked again.':'';
 }
 // Δn_eff in the 8-decimal format of the n_eff columns, always signed: +0.00215086
 export function shiftText(coupled,alone){const d=Number(coupled)-Number(alone);if(!Number.isFinite(d))return '—';const t=Math.abs(d).toFixed(8);return (d<0&&Number(t)!==0?'−':'+')+t;}

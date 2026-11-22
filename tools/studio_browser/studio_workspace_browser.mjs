@@ -166,6 +166,15 @@ try {
   };
   const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Geometry"]'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
   const text = selector => page.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
+  // no horizontal document overflow at 1440 × 900 and on a 390 × 844 phone; back to 1280 × 800 after
+  const noOverflow = async tag => {
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+      const over = await page.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+      stage('overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+    }
+    await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
+  };
   const delta = () => page.eval("(document.getElementById('canvas').innerText.match(/Δn_eff \\(B − A\\), candidate rank 1: (-?[0-9]+\\.[0-9]+)/)||[])[1]||null");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
@@ -178,8 +187,17 @@ try {
   assert.equal(startPage.tab, 'Models'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Choose a model');
   assert.doesNotMatch(await text('#canvas'), /template|application/i, 'the start page says model');
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
+  // the chooser: a plain sentence about choosing, and Joule heating with its own card icon
+  assert.match(await text('.application-contract'), /Choosing a model sets which physics it solves\. Dimensions you entered and runs you completed are kept, and Undo takes the choice back/);
+  const icons = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,getComputedStyle(b,'::before').content]))");
+  stage('model card icons', icons); assert.notEqual(icons.joule, icons.optical); assert.equal(new Set(Object.values(icons)).size, Object.keys(icons).length);
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
+  // before any edit or run: a new model, and the dock and footer keep the words before a run
+  const opticalSequence = () => page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent})");
+  assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / New model · not saved');
+  assert.deepEqual(await opticalSequence(), {heading: 'Nothing is computed until you press Run', status: 'Optical adapter ready · explicit Run required'});
   await page.type('#shape-w', 600);
+  assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / Unsaved inputs');
   // Messages says the edit and the Left x it moved, instead of keeping "Model ready…"
   assert.equal(await text('#file-status'), 'Width set to 600 nm. Left x moved to −300 nm to keep the centre. Run explicitly to compute new results.');
   await page.type('#shape-h', 300);
@@ -192,8 +210,19 @@ try {
   await page.click('#workflow-wavelength'); await sleep(200);
   const wavelengthField = await page.eval("({heading:document.querySelector('#inspector h2')?.textContent,focused:document.activeElement?.id,tree:document.querySelector('#tree [aria-current],#tree .selected,#tree [aria-selected=true]')?.textContent?.trim()||null})");
   stage('wavelength from the step bar', wavelengthField); assert.equal(wavelengthField.heading, 'Optical modes'); assert.equal(wavelengthField.focused, 'wavelength-number');
+  // the Study settings show the wavelength and open its one field under Optical modes
+  await page.click('nav [data-page=Model]'); await sleep(200); await page.click('#tree [data-node="Study"]'); await page.until("!!document.getElementById('study-edit-wavelength')", 'optical study settings');
+  assert.match(await text('#inspector'), /Wavelength 1550 nm Set in Physics › Optical modes\. Edit in Optical modes/);
+  await noOverflow('optical study');
+  await page.click('#study-edit-wavelength'); await sleep(200);
+  const studyWavelength = await page.eval("({heading:document.querySelector('#inspector h2')?.textContent,focused:document.activeElement?.id,fields:document.querySelectorAll('input[id*=wavelength]').length})");
+  stage('wavelength from Study settings', studyWavelength); assert.deepEqual(studyWavelength, {heading: 'Optical modes', focused: 'wavelength-number', fields: 1});
   await toGeometry();
   await runAndWait();
+  // the dock heading and the footer say what was computed, naming the same run
+  stage('sequence after run 1', await opticalSequence());
+  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · solved from the current inputs', status: 'Run 1 · solved from the current inputs · press Run to solve again'});
+  await noOverflow('optical results');
   // after a run of these inputs the Study step says so, and the title carries no revision counter
   const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('project').textContent})");
   stage('first run complete', afterRun); assert.match(afterRun.study, /Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
@@ -227,6 +256,7 @@ try {
   assert.match(await text('#file-status'), /^Width set to 700 nm\. Left x moved to −350 nm to keep the centre\. /);
   // an input edit takes the Study step back from Run complete to Ready to run
   const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
+  assert.deepEqual(await opticalSequence(), {heading: 'Inputs changed since run 1 · press Run to update', status: 'Inputs changed since run 1 · press Run to update'});
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');

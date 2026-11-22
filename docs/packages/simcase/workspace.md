@@ -76,13 +76,19 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    complete* once these inputs have a result; next to it the wavelength (for example
    **λ 1550 nm**) is a button that opens the wavelength field. Optionally set the
    wavelength in **Physics › Optical modes** (its settings are headed *Optical modes*;
-   **Study → Edit wavelength** and the step bar's wavelength open it with the field
+   **Study → Edit wavelength**, **Edit in Optical modes** under the Study's execution
+   settings, which show the wavelength too, and the step bar's wavelength open that one field
    focused) and the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
 4. Select **Run optical study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
    An input edit replaces the completion message, so it never describes edited inputs.
+   The dock heading and the status bar name the same run: after a run *Run 1 · solved from
+   the current inputs* (the status bar adds *press Run to solve again*), after an edit
+   *Inputs changed since run 1 · press Run to update*, and before any run *Nothing is
+   computed until you press Run* and *Optical adapter ready · explicit Run required*. A run's
+   number is its place in the run list, the oldest first.
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
    replace it. There is no separate Pin button: **Unpin this run** releases a pinned run,
    and Enter in Run name pins a named run again. Change the model and run again,
@@ -121,7 +127,10 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    session?** (or **Recover saved session?**) lists the runs with their names and pins
    and the comparison that come back, what is replaced, and only the physics present.
    Before a model is chosen, the header reads *No model chosen*, the status bar
-   *Choose a model to start* and the Study sequence lists no steps. The start page uses
+   *Choose a model to start* and the Study sequence lists no steps. A model just chosen
+   reads *New model · not saved* until its first edit, then *Unsaved inputs*. The start
+   page says what choosing does: it sets which physics the model solves, keeps the
+   dimensions you entered and the runs you completed, and Undo takes it back. The start page uses
    one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
@@ -315,8 +324,9 @@ The workspace edits the document itself, so it keeps every key it has no form fo
 - **Model builder.** One Component (Geometry 1, Materials with one item per material in use,
   Mesh 1 shared by every physics), the physics with a badge giving their place in the solve
   order (a cycle shares one amber number), **Couplings** with one item per coupling named in
-  words, and **Study 1** with the derived solve order and any iteration step. Settings shows each
-  file name as “Name in file”. A red count on a node is the number of problems to fix there.
+  words, and **Study 1** with the derived solve order and any iteration step. Settings shows the
+  plain names; the names the file uses (the physics type, “Name in file”, the format line, and
+  for a coupling whether its input takes one source) are under a closed **File details**. A red count on a node is the number of problems to fix there.
 - **Add physics** lists the installed providers and their kinds from their manifests, each with
   its ports (unit, where the values live, and for inputs whether they take one source or add
   their sources). Studio adds heat transfer and optical modes here; the other kinds are listed
@@ -326,7 +336,8 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   problems to fix, never dropping them silently.
 - **Add coupling** picks an output, then one of the inputs that can take it; the others are
   greyed with the reason (the same physics, another quantity, another unit, an input that
-  already has its one source). The transfer is Same mesh, the only one in this release. When an
+  already has its one source). An output of single numbers is listed greyed as, for example,
+  *Modes 1 effective index (single numbers, not a map)*. The transfer is Same mesh, the only one in this release. When an
   input could obviously be fed (Modes 1 temperature from Heat 1), Messages suggests the
   coupling; nothing is coupled until you add it. Until then Modes 1 carries a warning in the
   tree, on its Connections node, in its Settings and in Messages: “Temperature input has no
@@ -374,13 +385,18 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   with no temperature input, through the same run route, and fills the heater-off column. It is
   skipped when the kept column has the same content. While no coupling sets an optical
   temperature the option stays in place, disabled, and says “needs a temperature coupling”.
+  When a coupling comes back (added again, Undo or Redo) the option returns as it was chosen,
+  and Messages adds “Also solve without heater” is ticked again.
 - **Results** has a page per physics and a **Coupling check**: the solve order used and, per
   coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
   (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
   0 K”). Heat 1 shows the temperature map. Modes 1 shows the answer first, the n_eff table, and
   below it the maps of its coupled input: the temperature and the refractive index (or its
   change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
-  core. The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
+  core. The n_eff table names its rows *Candidate 1*, …, and the note under it gives the optical
+  application's caveat, “Candidates are ranked by effective index and are not matched between
+  designs.”, and the number of modes the model asks for, “This model asks for 1 mode: Modes 1 ›
+  Modes to find”, a link to that setting. The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
   what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
   keeps n₀, its index at T_ref = 300 K”. The column is valid while the optical model solved alone
