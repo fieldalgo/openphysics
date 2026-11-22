@@ -348,7 +348,18 @@ print(n)`;
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 180000);
   await runReady();
   const before = await shown();
-  assert.deepEqual(before, ['2.44565013', '2.44349927', '+0.00215086'], 'the template values');
+  // the values shown are the installed engine's runs of the template and of its optical model
+  // alone (the mesh, and so n_eff, depends on the installed mesher: 2.44565013 / 2.44349927 /
+  // +0.00215086 with one, 2.44556247 / 2.44341167 / +0.00215081 with another)
+  const engineNeff = tree => {
+    const done = spawnSync(args.python, ['-I', '-c', 'import json,sys\nfrom simcase import Document, multiphysics, run\nd=Document.from_dict(json.loads(sys.stdin.read()))\nr=multiphysics.run(d,verbose=False).results["modes1"] if d["openphysics"]==multiphysics.ENVELOPE else run(d,verbose=False)\nprint(repr(float(r.effective_index[0][0])))'],
+      {input: JSON.stringify(tree), encoding: 'utf8'});
+    assert.equal(done.status, 0, done.stderr);
+    return Number(done.stdout.trim());
+  };
+  const alone = await page.on('function(t){return import("/workspace-assets/workspace-multiphysics.mjs").then(m=>m.uncoupledDocument(t,"modes1"))}', template);
+  const coupledEngine = engineNeff(template), aloneEngine = engineNeff(alone), shiftEngine = coupledEngine - aloneEngine;
+  assert.deepEqual(before, [coupledEngine.toFixed(8), aloneEngine.toFixed(8), (shiftEngine < 0 ? '−' : '+') + Math.abs(shiftEngine).toFixed(8)], 'the template values are the engine runs');
   await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)", 'recovery kept');
   assert.equal(await page.text('#autosave-status'), 'Not saved to a file · kept for recovery in this browser');
   const a1 = await saveSession('template');
@@ -438,10 +449,12 @@ print(n)`;
   // S6 and S7: each damaged or newer file is refused by name; the tab stays as it was
   const {recordDigest, sessionJson} = await import(new URL('../../packages/simcase/src/simcase/studio/static/workspace-multiphysics-session.mjs', import.meta.url));
   const redigest = d => { for (const r of d.runs) r.digest = recordDigest(r); for (const b of Object.values(d.baselines)) b.digest = recordDigest(b); return d; };
+  // the node count of the template's mesh, from the file (it depends on the installed mesher)
+  const N = JSON.parse(c1.text).runs[0].result.mesh.node_coordinates.length;
   const MUTATIONS = [
     ['S6 an array value changed', d => { d.runs[0].result.physics.modes1.coupled.refractive_index.n[5] += 1e-6; }, /Run 1 changed after it was saved \(its check value does not match\)\./, false],
-    ['S6 one array shortened', d => { d.runs[0].result.physics.heat1.temperature.values.pop(); }, /Run 1's stored maps are not well formed: Heat 1 node temperature has 1725 values for 1726 nodes\./],
-    ['S6 a triangle index out of range', d => { d.runs[0].result.mesh.triangles[7][2] = 1726; }, /Run 1's stored maps are not well formed: triangle 7 names node 1726, outside 0–1725\./],
+    ['S6 one array shortened', d => { d.runs[0].result.physics.heat1.temperature.values.pop(); }, new RegExp(`Run 1's stored maps are not well formed: Heat 1 node temperature has ${N - 1} values for ${N} nodes\\.`)],
+    ['S6 a triangle index out of range', d => { d.runs[0].result.mesh.triangles[7][2] = N; }, new RegExp(`Run 1's stored maps are not well formed: triangle 7 names node ${N}, outside 0–${N - 1}\\.`)],
     ['S6 a non-finite value', d => { d.runs[0].result.physics.modes1.coupled.refractive_index.n[3] = 7777.25; }, /Run 1's stored maps are not well formed: refractive_index\.n holds a value that is not a finite number\./, true, t => t.replace('7777.25', '1e999')],
     ['S6 a solve order swapped', d => { d.runs[0].result.solve_order.reverse(); }, /Run 1's solve order \[\["modes1"\],\["heat1"\]\] is not the order of its model \(\[\["heat1"\],\["modes1"\]\]\)\./],
     ['S6 a coupling renamed', d => { const c = d.runs[0].result.couplings; c.renamed = c.heat1_to_modes1; delete c.heat1_to_modes1; }, /Run 1's coupling records do not match its model's couplings\./],
@@ -596,7 +609,8 @@ print(n)`;
   await page.until("!!document.querySelector('[data-mp-no-maps]')&&!!document.querySelector('[data-neff=\"1\"]')", 'values-only modes page');
   await page.click('#tree [data-mp-node="results:check"]');
   await page.until("/Coupling check/.test(document.getElementById('canvas').innerText)", 'values-only coupling check');
-  assert.match(await page.text('.mp-check tbody'), /15,393 node temperatures, 300\.0–[0-9.]+ K .*30,410 triangle means \(mean of 3 nodes\) Passed · max \|received − sent\| = 0 K/);
+  const counts = bigSession.runs[0].counts, us = n => n.toLocaleString('en-US');
+  assert.match(await page.text('.mp-check tbody'), new RegExp(`${us(counts.nodes)} node temperatures, 300\\.0–[0-9.]+ K .*${us(counts.triangles)} triangle means \\(mean of 3 nodes\\) Passed · max \\|received − sent\\| = 0 K`));
   await page.screenshot('s5-values-only');
   stage('S5', {question, bigNotice, bytes: Buffer.byteLength(big.text), recoveryPartial, recoveryOver, refusal, recovered: recoveredBig, list: bigList, ...s5Arrays});
 
