@@ -148,9 +148,9 @@ test('switching models says where the optical runs stay',()=>{
  // the tab holds them until it is closed or reloaded; after that, only what still holds them is named
  assert.equal(P.opticalRunsStayText({runs:1}),'Optical waveguide and its 1 run stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to it. After that, no file or browser recovery holds it.');
  assert.equal(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
-  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.');
+  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.');
  assert.equal(P.opticalRunsStayText({runs:2,recovery:true}),
-  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery) brings them back.');
+  'Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them. After that, Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions) brings them back.');
  assert.equal(P.opticalRunsStayText({runs:1,file:'a.json'}),
   'Optical waveguide and its 1 run stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to it. After that, Open session with a.json brings it back.');
 });

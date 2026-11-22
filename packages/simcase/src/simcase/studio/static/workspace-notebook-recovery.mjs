@@ -11,8 +11,17 @@ export function readNotebookRecovery(record){
  // lists; a malformed one is ignored. Neither is part of the session.
  return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile)};
 }
-export const openedFileName=name=>typeof name==='string'&&/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(name)?name:null;
-// One session in a recovery list: the newest record of each session text. records: the latest
+// any letters (a Korean file name included), no path separators or control characters
+export const openedFileName=name=>typeof name==='string'&&/^[^\u0000-\u001f\u007f/\\]{1,200}\.json$/u.test(name)&&!/^\.\.?$/.test(name)?name:null;
+// What makes two stored sessions the same: the session text without its view (the page, the
+// selection, the field view), which a tab click or a selected run changes but the model and its
+// runs do not. A text that does not parse is compared as it is.
+export function sessionKey(text){
+ if(typeof text!=='string')return null;
+ try{const doc=JSON.parse(text.replace(/^\uFEFF/,''));if(doc&&typeof doc==='object'&&!Array.isArray(doc)){delete doc.view;return JSON.stringify(doc);}}catch{}
+ return text;
+}
+// One session in a recovery list: the newest record of each session (sessionKey). records: the latest
 // record (null when none) and the earlier ones, as stored; returns {record, index} newest first,
 // index being the record's place among the earlier sessions (-1 for the latest), so two
 // entries never hold the same session.
@@ -20,7 +29,7 @@ export function distinctRecords(latest,earlier=[]){
  const all=[...(latest?[{record:latest,index:-1}]:[]),...earlier.map((record,index)=>({record,index}))].filter(e=>e.record&&typeof e.record.session==='string');
  all.sort((a,b)=>(Date.parse(b.record.savedAt)||0)-(Date.parse(a.record.savedAt)||0)||a.index-b.index);
  const seen=new Set();
- return all.filter(e=>{if(seen.has(e.record.session))return false;seen.add(e.record.session);return true;});
+ return all.filter(e=>{const key=sessionKey(e.record.session);if(seen.has(key))return false;seen.add(key);return true;});
 }
 
 // A legacy record has no revision; include its payload to detect same-time writes.
@@ -55,11 +64,14 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
      if(!keepPrevious||request.result==null){snapshots.put(saved,'latest');return;}
      const earlier=snapshots.get('earlier');
      earlier.onsuccess=()=>{
-      // a session is stored once: an earlier copy of the text written now is dropped, and a latest
-      // record of the same text is replaced, not kept (an unchanged model saved again, for
+      // when the stored record is kept as an earlier session (the first save of a page, or after a
+      // move between models), a session is kept once (sessionKey): an earlier copy of the session
+      // written now is dropped, and a latest record of the same session is replaced, not kept (an unchanged model saved again, for
       // example after the tab moved between models and back, or a file opened twice)
-      const stored=Array.isArray(earlier.result)?earlier.result:[],list=stored.filter(r=>r?.session!==saved.session);
-      const keep=request.result.session!==saved.session&&recoveryRevision(list[0])!==recoveryRevision(request.result);
+      const savedKey=sessionKey(saved.session),latestKey=sessionKey(request.result.session),stored=Array.isArray(earlier.result)?earlier.result:[];
+      const keep=latestKey!==savedKey&&recoveryRevision(stored[0])!==recoveryRevision(request.result);
+      // the record moved in front stands for its session, so an older copy of it goes too
+      const list=stored.filter(r=>{const key=sessionKey(r?.session);return key!==savedKey&&!(keep&&key===latestKey);});
       if(keep||list.length!==stored.length){snapshots.put((keep?[request.result,...list]:list).slice(0,EARLIER_SESSIONS),'earlier');moved=true;}
       snapshots.put(saved,'latest');
      };

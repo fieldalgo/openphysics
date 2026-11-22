@@ -367,7 +367,7 @@ try {
   await page.click('[data-template=heated-waveguide]');
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'heated model', 30000);
   const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('project').textContent")});
-  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery\)(?: or Open session with \S+\.json)? brings them back\.$/);
+  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');

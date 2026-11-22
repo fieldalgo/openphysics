@@ -6,7 +6,7 @@ const input=()=>({model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-
 test('mesh preview is optional and an earlier result is never labeled current after an input edit',()=>{
  const doc=input(),run={signature:JSON.stringify(doc)};
  let steps=opticalWorkflow({input:doc,runs:[run]});assert.equal(steps[2].detail,'Optional preview');assert.equal(steps[3].detail,'Run complete');assert.equal(steps[4].detail,'Result for these inputs');
- doc.model.shapes=[{...doc.model.shapes[0],h:300}];assert.equal(opticalWorkflow({input:doc})[0].detail,'500 × 300 nm · Silicon');steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Inputs changed since preview');assert.equal(steps[4].detail,'Inputs changed since this result');assert.equal(steps[3].detail,'Ready to run');
+ doc.model.shapes=[{...doc.model.shapes[0],h:300}];assert.equal(opticalWorkflow({input:doc})[0].detail,'500 × 300 nm · Silicon');steps=opticalWorkflow({input:doc,runs:[run],mesh:run});assert.equal(steps[2].detail,'Inputs changed since preview');assert.equal(steps[4].detail,'Current inputs differ from this run');assert.equal(steps[3].detail,'Ready to run');
 });
 test('invalid drafts, detached jobs and offline service block readiness without hiding completed results',()=>{
  const doc=input(),runs=[{signature:JSON.stringify(doc)}];

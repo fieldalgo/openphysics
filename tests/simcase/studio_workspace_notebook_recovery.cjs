@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-const {test,before}=require('node:test');const assert=require('node:assert/strict');let NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,snapshot,createSession,captureSession,opticalSettings;
-before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
+const {test,before}=require('node:test');const assert=require('node:assert/strict');let NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName,snapshot,createSession,captureSession,opticalSettings;
+before(async()=>{({NotebookAutosave,readNotebookRecovery,indexedNotebookStore,distinctRecords,sessionKey,openedFileName}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook-recovery.mjs'));({snapshot}=await import('../../packages/simcase/src/simcase/studio/static/workspace-project.mjs'));({createSession,captureSession,opticalSettings}=await import('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs'));});
 const timing={setTimer:()=>1,clearTimer:()=>{}};
 test('autosave serializes writes and coalesces pending edits to the newest snapshot',async()=>{
  const calls=[],resolvers=[];const saver=new NotebookAutosave({save:r=>{calls.push(r);return new Promise(resolve=>resolvers.push(resolve));}},timing);
@@ -195,4 +195,24 @@ test('the autosave writes the opened file name beside the session and the reader
  assert.equal(record.openedFile,'optical-waveguide-session-2026-11-22-1425.json');assert.equal(readNotebookRecovery(record).openedFile,'optical-waveguide-session-2026-11-22-1425.json');
  saver.schedule('two',()=>session,{openedFile:'x.exe'});await saver.flush();
  assert.equal('openedFile' in record,false);assert.equal(readNotebookRecovery({...record,openedFile:'../x.json/'}).openedFile,null);
+});
+test('two stored sessions that differ only in their view are the same session',async()=>{
+ const text=(page,extra={})=>JSON.stringify({format:'openphysics-studio-session',version:8,document:{name:'H'},runs:[1,2],...extra,view:{page,selection:'model'}});
+ assert.equal(sessionKey(text('Results')),sessionKey(text('Model')));assert.notEqual(sessionKey(text('Model')),sessionKey(text('Model',{runs:[1]})));
+ assert.equal(sessionKey('not json'),'not json');
+ const r=(session,savedAt)=>({version:1,savedAt,session});
+ assert.deepEqual(distinctRecords(r(text('Model'),'2026-11-22T05:27:00Z'),[r(text('Results'),'2026-11-22T05:26:00Z')]).map(e=>e.index),[-1]);
+ // the store: a first save whose session equals the stored one but for the view replaces it
+ const db=database(null);let page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(r(text('Results'),'2026-11-22T05:26:00Z'));
+ page=indexedNotebookStore(db);page.adopt(await page.load());await page.save(r(text('Model'),'2026-11-22T05:27:00Z'));
+ assert.deepEqual(await page.loadEarlier(),[]);
+ // a record moved in front drops an older copy of its own session deeper in the list
+ page.keepPrevious();await page.save(r('O','2026-11-22T05:28:00Z'));
+ page.keepPrevious();await page.save(r(text('Connections'),'2026-11-22T05:29:00Z'));
+ page.keepPrevious();await page.save(r('P','2026-11-22T05:30:00Z'));
+ assert.deepEqual((await page.loadEarlier()).map(x=>x.session==='O'?'O':'H'),['H','O']);
+});
+test('an opened file name may be in any script, never a path',()=>{
+ assert.equal(openedFileName('가열-도파로 세션.json'),'가열-도파로 세션.json');
+ for(const bad of ['../x.json','a/b.json','a\\b.json','x.exe','a\u0001.json',42,null])assert.equal(openedFileName(bad),null,String(bad));
 });
