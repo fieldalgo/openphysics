@@ -382,7 +382,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
   서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. 모드 표는 광 애플리케이션과
-  같은 열 | Mode | n_eff | Polarization | Loss |([모드 표](#모드-표))를 쓰고 행은 *Mode 1*, …이며, 표 아래
+  같은 열 | Mode | n_eff | Polarization | Loss | A_eff (µm²) |([모드 표](#모드-표))를 쓰고 행은 *Mode 1*, …이며, 표 아래
   문장은 순위 문장 “Modes are ranked by effective index.”와 모델이 요청한 모드 수 “This model asks
   for 2 modes: Modes 1 › Modes to find”(템플릿은 두 모드를 요청하므로 표에 TE-like와 TM-like 모드가 나옴)(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
@@ -539,7 +539,7 @@ waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은
 
 ### 모드 표
 
-결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Loss |가 광 애플리케이션과 다중물리 모델의
+결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Loss | A_eff (µm²) |가 광 애플리케이션과 다중물리 모델의
 Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(광 애플리케이션은 “Compare matches them between runs by field overlap.”을 덧붙임) 모든 값은 저장된 중심 장
 `unnormalized_electric_field`에서 정의되므로 Studio, 엔진, 이전 세션 파일이 같은 샘플에서 같은 값을 얻습니다.
 
@@ -562,13 +562,21 @@ Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(�
   돌려주며, 무손실 문제는 실수 n_eff를 주므로 그 Im은 정확히 0입니다. 광 애플리케이션의 재료와 가열 템플릿은
   무손실이라 0 dB/cm로 읽히고, 다중물리 세션이나 모델 파일은 복소 n_eff(손실 재료나 PML)를 가질 수 있으며 그
   손실은 숫자로 보입니다. 손실은 표시만 바꾸며 결과와 세션 형식은 그대로입니다.
+- **A_eff (µm²)**는 창의 모든 삼각형에 대해 세 성분을 모두 쓴 유효 면적 `(Σ A_T |E|²)² / Σ A_T |E|⁴`,
+  `|E|² = |E_x|² + |E_y|² + |E_z|²`를 유효숫자 4자리로 보인 값입니다(열 도움말: “Effective area
+  (∫|E|²)²/∫|E|⁴ over the window, all three field components”, `effective_area`, [결과 형식](overview.md)).
+  흔한 모드 솔버 형식이며 벡터 비선형 면적이 아닙니다. 축퇴 쌍의 각 모드는 자기 값을 보이고, 도움말은 그 값이
+  쌍 안의 회전에 따라 달라진다고 밝힙니다. 스칼라 다중물리 결과는 엔진의 |φ|² 면적을 보입니다.
 - 장 보기의 모드 선택은 *Mode 1 · TE-like · n_eff 2.44406001*처럼 읽힙니다.
 
-Run details는 비율의 출처를 밝힙니다. 이 탭에서 계산한 실행은 *computed by the engine from the saved
+Run details는 비율과 유효 면적의 출처를 밝힙니다. 이 탭에서 계산한 실행은 *computed by the engine from the saved
 field*, 세션 파일에서 연 실행은 *computed by Studio from the saved field*입니다(광 버전 6과 7은 비율이 아니라
 샘플을 저장하며, 파일은 이전과 똑같이 써집니다). 다중물리 실행은 엔진 값을 씁니다. Studio가 그 값을 보관하기
 전에 저장한 버전 8 실행이나 스칼라 정식화 실행은 “—”를 보여 줍니다(도움말: *Run again to compute*, 또는 스칼라
-정식화에는 편광이 없음). 버전 8 파일은 이제 복소 유효 굴절률 `{re, im}`도 읽습니다. 실행 표 CSV의 `candidate`
+정식화에는 편광이 없음). 유효 면적도 같은 규칙을 따릅니다. 버전 6과 7 파일의 광 실행은 Studio가 저장 샘플에서
+계산한 값을 보이고(Run details: *Effective area · computed by Studio from the saved field*), Studio가 그 값을
+보관하기 전에 저장한 버전 8 실행은 *Run again to compute*와 함께 “—”를 보입니다. 세션 버전은 바뀌지 않으며 광
+버전 7 파일은 이전과 바이트 단위로 같게 써집니다. 버전 8 파일은 이제 복소 유효 굴절률 `{re, im}`도 읽습니다. 실행 표 CSV의 `candidate`
 열 이름은 그대로입니다.
 
 입력 JSON은 설계를, 세션 JSON은 검증된 결과까지 저장합니다. 열기로 복원하며
@@ -632,7 +640,8 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   시도하며, 실행마다 모드는 많아야 8개). η ≥ 0.8이고 η가 그 행과 그 열의 다음으로 큰 값보다 0.1 이상 클
   때 짝을 받아들입니다. 추적기의 기본값 `mode_tracking_threshold`와 `mode_tracking_margin_threshold`입니다.
 - **표.** 짝지어진 모드마다 행 하나 *A mode 1 ↔ B mode 1*에 양쪽의 편광(낱말과 TE 백분율), 소수 2자리
-  겹침, A와 B의 n_eff, Δn_eff (B − A), A 대비 Δ %가 나옵니다. 짝이 없는 모드는 *A mode 2: no match in B
+  겹침, A와 B의 n_eff, Δn_eff (B − A), A 대비 Δ %, 그리고 A와 B의 A_eff(µm²)가 나옵니다(짝지어진 축퇴 쌍은
+  두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다). 짝이 없는 모드는 *A mode 2: no match in B
   (best overlap 0.43, with B mode 2)*로 읽히며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape
   between designs.”

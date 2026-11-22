@@ -447,7 +447,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   below it the maps of its coupled input: the temperature and the refractive index (or its
   change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
   core. The modes table has the optical application's columns, | Mode | n_eff | Polarization |
-  Loss | ([Modes table](#modes-table)), names its rows *Mode 1*, …, and the note under it gives the
+  Loss | A_eff (µm²) | ([Modes table](#modes-table)), names its rows *Mode 1*, …, and the note under it gives the
   ranking sentence, “Modes are ranked by effective index.”, and the number of modes the model asks for, “This model asks for 2 modes: Modes 1 ›
   Modes to find” (the template asks for two, so its table shows a TE-like and a TM-like mode), a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
@@ -630,7 +630,7 @@ they do not represent optical power or a common physical colour scale.
 
 ### Modes table
 
-Results show one table per run, | Mode | n_eff | Polarization | Loss |, in the optical
+Results show one table per run, | Mode | n_eff | Polarization | Loss | A_eff (µm²) |, in the optical
 application and in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.” (the optical
 application adds “Compare matches them between runs by field overlap.”)
 Every value is defined on the saved centroid field `unnormalized_electric_field`, so Studio, the
@@ -660,14 +660,25 @@ engine and older session files give the same number from the same samples:
   application's materials and the heated template are lossless, so they read 0 dB/cm; a
   multiphysics session or model file can hold a complex n_eff (a lossy material or a PML), whose
   loss is shown as a number. Loss is display only: the result and session formats are unchanged.
+- **A_eff (µm²)** is the effective area `(Σ A_T |E|²)² / Σ A_T |E|⁴` over every triangle of the
+  window with all three components, `|E|² = |E_x|² + |E_y|² + |E_z|²`, to 4 significant digits
+  (column help: “Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components”;
+  `effective_area`, [result format](overview.md#mode-post-processing)). It is the common
+  mode-solver form, not the vectorial nonlinear area. A member of a degenerate pair shows its own
+  value, and its tooltip says that value depends on the rotation within the pair. A scalar
+  multiphysics result shows the engine's |φ|² area.
 - The field view's mode picker reads *Mode 1 · TE-like · n_eff 2.44406001*.
 
-Run details say where the fraction came from: *computed by the engine from the saved field* for
+Run details say where the fraction and the effective area came from: *computed by the engine from the saved field* for
 a run computed in this tab, *computed by Studio from the saved field* for a run opened from a
 session file (optical versions 6 and 7 store the samples, not the fraction; the files are
 written exactly as before). Multiphysics runs take the engine's value; a version 8 run saved
 before Studio kept it, or a scalar-formulation run, shows “—” (its tooltip says *Run again to
-compute*, or that the scalar formulation has no polarization). Version 8 files now also read a
+compute*, or that the scalar formulation has no polarization). The effective area follows the
+same rule: optical runs of version 6 and 7 files show the value Studio computes from the saved
+samples (Run details: *Effective area · computed by Studio from the saved field*), and a version
+8 run saved before Studio kept it shows “—” with *Run again to compute*; no session version
+changes and optical version 7 files are written byte for byte as before. Version 8 files now also read a
 complex effective index `{re, im}`. The run-table CSV keeps its `candidate` column name.
 
 Save input JSON to keep the design, or save session JSON to include validated
@@ -754,7 +765,8 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   `mode_tracking_margin_threshold`.
 - **Table.** One row per matched mode, *A mode 1 ↔ B mode 1*, with the polarization of both sides
   (word and TE percentage), the overlap to 2 decimals, n_eff of A and B, Δn_eff (B − A) and Δ % of
-  A. A mode without a match reads *A mode 2: no match in B (best overlap 0.43, with B mode 2)* and
+  A, then A_eff of A and of B in µm² (a matched degenerate pair shows *mean* of its members' values,
+  with a tooltip that each member's value is defined only up to a rotation within the pair). A mode without a match reads *A mode 2: no match in B (best overlap 0.43, with B mode 2)* and
   shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
   0.8 on a common grid. A low overlap means the mode changed shape between designs.”
 - **Field picker.** *Matched modes* lists the matched pairs (*A mode 1 ↔ B mode 1 · overlap

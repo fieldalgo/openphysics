@@ -146,3 +146,100 @@ test('V17: the version 8 fixture (scalar modes, saved before the TE fraction) op
  if(p.summary?.formulation==='vector')assert.match(rows[0].polarization.title,/^Run again to compute/);
  else assert.match(rows[0].polarization.title,/^Scalar formulation/);
 });
+
+// ---- Effective area (M3) -----------------------------------------------------------------------
+test('A_eff = (Σ A|E|²)² / Σ A|E|⁴ with all three components, complex parts and areas weighted',()=>{
+ // areas 1e-12 and 1e-12 m²; |E|² = 1 + 4 + 9 = 14 in the first triangle, 2 (complex E_z) in the second
+ const f=square([[[1,2,3],[0,1,[0,1]]],[[1,0,0],[1,0,0]],[[0,0,0],[0,0,0]]]);
+ const a=1e-12,expected=(a*14+a*2)**2/(a*14*14+a*2*2);
+ assert.ok(Math.abs(M.effectiveArea(f,0)-expected)<=1e-15*expected);
+ // a uniform field over the whole window: A_eff is the window's area
+ assert.ok(Math.abs(M.effectiveArea(f,1)-2e-12)<=1e-27);
+ assert.equal(M.effectiveArea(f,2),null,'no field');
+ // scale free: a mode times any complex number has the same area
+ const g=square([[[[3,-4],0,[0,2]],[0,[1,1],0]]]),h=square([[[[6,-8],0,[0,4]],[0,[2,2],0]]]);
+ assert.ok(Math.abs(M.effectiveArea(g,0)/M.effectiveArea(h,0)-1)<=1e-15);
+ assert.equal(M.areaText(1.9094544e-13),'0.1909');assert.equal(M.areaText(null),'—');
+ assert.equal(M.areaText(12345.6e-12),'12346','no exponent for large windows');assert.equal(M.areaText(999.94e-12),'999.9');
+ assert.equal(M.AREA_HELP,'Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components');
+});
+test('the modes table gives each mode its A_eff; a pair member keeps its own value with a note',()=>{
+ const {rows}=M.modeTableRows([{re:2.5,im:0,fte:.73,loss:null,area:3e-13},{re:2.499985,im:0,fte:.27,loss:null,area:5e-13},{re:2.1,im:0,fte:.95,loss:null,area:4e-13}]);
+ assert.deepEqual(rows.map(r=>r.area.text),['0.3000','0.5000','0.4000']);
+ assert.match(rows[0].area.title,/degenerate pair/);assert.match(rows[1].area.title,/degenerate pair/);
+ assert.equal(rows[2].area.title,M.AREA_HELP);
+ const none=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null,area:null}],{areaMissing:'Run again to compute: x'}).rows[0].area;
+ assert.deepEqual([none.text,none.title],['—','Run again to compute: x']);
+ assert.equal(M.modeTableRows([{re:2.4,im:0,fte:1,loss:null,area:null}]).rows[0].area.title,'No field: no effective area');
+ // a scalar result names |φ|², not three field components
+ const scalar=M.physicsModes({effective_index:{unit:'1',values:[[2.4]]},summary:{formulation:'scalar',mode_postprocessing:{effective_area:{unit:'m^2',values:[[2e-13]]}}}});
+ const cell=M.modeTableRows(scalar.modes,{areaHelp:scalar.areaHelp}).rows[0].area;
+ assert.equal(cell.text,'0.2000');assert.equal(cell.title,M.SCALAR_AREA_HELP);assert.match(cell.title,/φ/);
+});
+test('Compare: a matched pair shows the mean A_eff of its members with a note, a single mode its own',async()=>{
+ const X=await import(STATIC+'workspace-match.mjs');
+ const s=JSON.parse(fixture('state-one.json')),run=s.runs[0];
+ const own=M.opticalModes(run);
+ const one=X.unitArea(run,[0]);assert.equal(one.value,own[0].area);assert.equal(one.text,M.areaText(own[0].area));
+ const pair=X.unitArea(run,[0,1]);assert.equal(pair.value,(own[0].area+own[1].area)/2);
+ assert.match(pair.text,/^mean \d\.\d{4}$/);assert.match(pair.title,/Mean of the pair members/);
+});
+test('V17-M3: optical v6 and v7 sessions open with A_eff computed by Studio; v7 is written byte for byte',()=>{
+ for(const name of ['optical-v6-one.json','optical-v7-one.json','optical-v6-three.json','optical-v7-three.json']){
+  const session=N.parseSession(fixture(name));
+  for(const run of session.runs){
+   const modes=M.opticalModes(run);
+   // each mode against the formula written out here, independently of the module
+   const X=run.field.node_coordinates;
+   for(let i=0;i<2;i++){
+    let num=0,den=0;run.field.triangles.forEach((t,k)=>{const [a,b,c]=t.map(j=>X[j]),A=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))/2;
+     let d=0;for(let q=0;q<3;q++)d+=run.field.real[i][k][q]**2+run.field.imag[i][k][q]**2;num+=A*d;den+=A*d*d;});
+    assert.ok(Math.abs(modes[i].area/(num*num/den)-1)<=1e-12,name);
+   }
+   assert.equal(M.SOURCE_TEXT[run.area.source],'computed by Studio from the saved field');
+   assert.ok(M.modeTableRows(modes).rows.every(r=>r.area.text===M.areaText(r.area.value)&&/^\d+(\.\d+)?$/.test(r.area.text)),name);
+  }
+  const written=JSON.stringify(N.createSession(session.input,session.runs,session.selected,session.comparison,session.view));
+  assert.equal(written.includes('effective'+'_area'),false,name);
+ }
+ // v7 written byte for byte from the same state after Studio computed every A_eff
+ for(const state of ['one','three']){
+  const st=JSON.parse(fixture(`state-${state}.json`));for(const run of st.runs)M.opticalModes(run);
+  assert.equal(JSON.stringify(N.createSession(st.input,st.runs,st.selected,st.comparison,st.view)),fixture(`optical-v7-${state}.json`),state);
+ }
+ // the engine's value of a fresh run is shown with its source and not written
+ const s=JSON.parse(fixture('state-one.json')),run=s.runs[0];
+ const engine=M.engineEffectiveArea({mode_postprocessing:{effective_area:{unit:'m^2',values:[[1.9e-13,3.4e-13]]}}});
+ assert.deepEqual(engine,[1.9e-13,3.4e-13]);
+ Object.defineProperty(run,'area',{value:{values:engine,source:'engine'},enumerable:false});
+ assert.equal(M.opticalModes(run)[1].area,3.4e-13);
+ assert.equal(JSON.stringify(N.createSession(s.input,s.runs,s.selected,s.comparison,s.view)),fixture('optical-v7-one.json'));
+ // refused: another unit, a non-positive area
+ assert.equal(M.engineEffectiveArea({mode_postprocessing:{effective_area:{unit:'um^2',values:[[.19]]}}}),null);
+ assert.equal(M.engineEffectiveArea({mode_postprocessing:{effective_area:{unit:'m^2',values:[[0]]}}}),null);
+ assert.equal(M.engineEffectiveArea({}),null);
+});
+test('V17-M3: a version 8 run with and without effective_area round-trips with its digest; without it A_eff is "—"',()=>{
+ for(const withArea of [false,true]){
+  const doc=complexV8();
+  for(const run of doc.runs)for(const p of Object.values(run.result.physics))if(p.type==='em.modes2d'){
+   const re=p.effective_index.re;
+   if(withArea)p.summary.mode_postprocessing.effective_area={unit:'m^2',values:re.map(row=>row.map((_,i)=>(1.9+i)*1e-13))};
+   const {digest,...record}=run;run.digest=S.recordDigest(record);
+  }
+  const text=JSON.stringify(doc),read=N.parseSession(text);
+  const state={document:read.document,runs:read.runs,baselines:read.baselines,selected:read.selected,view:read.view};
+  const written=S.writeMultiphysicsSession(state).text,again=N.parseSession(written);
+  assert.deepEqual(again.runs.map(r=>r.result),read.runs.map(r=>r.result));
+  assert.deepEqual(JSON.parse(written).runs.map(r=>r.digest),doc.runs.map(r=>r.digest));
+  const p=Object.values(read.runs[0].result.physics).find(x=>x.type==='em.modes2d');
+  const identity=M.physicsModes(p),{rows}=M.modeTableRows(identity.modes,{missing:identity.missing,areaMissing:identity.areaMissing});
+  if(withArea){assert.equal(identity.areaSource,'engine');assert.deepEqual(rows.map(r=>r.area.text),rows.map((_,i)=>M.areaText((1.9+i)*1e-13)));assert.equal(rows[0].area.text,'0.1900');}
+  else{assert.equal(identity.areaSource,null);assert.equal(rows[0].area.text,'—');assert.match(rows[0].area.title,/^Run again to compute: this run was saved before Studio kept the effective area/);}
+ }
+ // the unmodified version 8 fixture shows "—" too
+ const read=N.parseSession(fixture('multiphysics-v8.json'));
+ const p=Object.values(read.runs[0].result.physics).find(x=>x.type==='em.modes2d');
+ const identity=M.physicsModes(p);
+ assert.equal(M.modeTableRows(identity.modes,{areaMissing:identity.areaMissing}).rows[0].area.text,'—');
+});

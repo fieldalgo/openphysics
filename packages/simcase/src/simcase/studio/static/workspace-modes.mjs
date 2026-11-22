@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import {formatIndex} from './workspace-compare.mjs';
 
-// The modes table of one run: | Mode | n_eff | Polarization | Loss |. Every number is defined on
-// the saved centroid field unnormalized_electric_field, so Studio and the engine
-// (te_polarization_fraction, simcase.mode_postprocessing) give the same value from the same samples.
+// The modes table of one run: | Mode | n_eff | Polarization | Loss | A_eff (µm²) |. Every number is
+// defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
+// (te_polarization_fraction, effective_area, simcase.mode_postprocessing) give the same value from
+// the same samples.
 
 export const RANKING_TEXT='Modes are ranked by effective index.';
 export const POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal';
@@ -17,6 +18,10 @@ const PAIR_TEXT='1e-3';
 export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TEXT}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
 export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field'});
 export const RUN_AGAIN='Run again to compute';
+export const AREA_HELP='Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components';
+export const AREA_PAIR_NOTE='A member of a degenerate pair: its effective area depends on the rotation within the pair, which any solution may choose.';
+export const SCALAR_AREA_HELP='Effective area (∫|φ|²)²/∫|φ|⁴ of the scalar mode field over the window';
+export const AREA_MEAN_NOTE='Mean of the pair members: each member’s effective area is defined only up to a rotation within the pair.';
 
 /** f_TE of one mode: Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²) over every triangle, with A_T from the
  * node coordinates (any length unit) and |E|² = re² + im², written as the engine writes it.
@@ -34,6 +39,23 @@ export function teFraction(field,mode){
  den+=num;
  return den>0?num/den:null;
 }
+/** A_eff of one mode: (Σ A_T |E_T|²)² / Σ A_T |E_T|⁴ over every triangle, |E|² = |E_x|² + |E_y|² +
+ * |E_z|², in the node coordinates' unit squared (metres for Studio runs), written as the engine
+ * writes it (simcase.mode_postprocessing.effective_area). null when the mode has no field. */
+export function effectiveArea(field,mode){
+ const X=field.node_coordinates,re=field.real[mode],im=field.imag[mode];
+ let num=0,den=0;
+ field.triangles.forEach((t,i)=>{
+  const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]];
+  const area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
+  const r=re[i],m=im[i],d=(r[0]*r[0]+m[0]*m[0])+(r[1]*r[1]+m[1]*m[1])+(r[2]*r[2]+m[2]*m[2]);
+  num+=area*d;den+=area*(d*d);
+ });
+ return den>0?num*num/den:null;
+}
+/** An area in m² as µm² to 4 significant digits (whole µm² from 1000 µm² up, never an exponent),
+ * "—" when unknown. */
+export const areaText=a=>{if(!Number.isFinite(a))return '—';const u=a*1e12;return Math.abs(u)>=1000?u.toFixed(0):u.toPrecision(4);};
 // Studio's words, not the engine's: TE-like at f_TE >= 0.9, TM-like at f_TE <= 0.1, else hybrid.
 export function polarizationWord(f){return f>=0.9?'TE-like':f<=0.1?'TM-like':'hybrid';}
 export const tePercent=f=>(f*100).toFixed(1)+' % TE';
@@ -68,14 +90,17 @@ export function lossText(im,dbPerM){
 }
 /** propagation_loss [dB/m] = (40 pi / ln 10) Im n_eff / lambda0, the engine's formula. */
 export const propagationLoss=(im,lambda0)=>40*Math.PI/Math.LN10*im/lambda0;
-/** The table rows. modes: [{re, im, fte (number or null), loss (dB/m or null)}]; missing: the
- * reason the fractions are absent ('' when they are present). One merged polarization cell per
- * degenerate group, on its first row with rowspan. */
-export function modeTableRows(modes,{missing=''}={}){
+/** The table rows. modes: [{re, im, fte (number or null), loss (dB/m or null), area (m² or null)}];
+ * missing: the reason the fractions are absent ('' when they are present); areaMissing: the same
+ * for the effective areas. One merged polarization cell per degenerate group, on its first row
+ * with rowspan; each member keeps its own effective area, with a note. */
+export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP}={}){
+ const close=new Set(degenerateGroups(modes.map(m=>m.re)).flat());
  // a group is merged only when each member has its fraction (a result without them keeps its reason)
  const groups=degenerateGroups(modes.map(m=>m.re)).filter(g=>g.every(i=>Number.isFinite(modes[i].fte))),groupOf=new Map();groups.forEach(g=>g.forEach(i=>groupOf.set(i,g)));
  const rows=modes.map((m,i)=>{
   const row={mode:i+1,label:`Mode ${i+1}`,neff:formatIndex(m.re),loss:lossText(m.im,m.loss),lossless:m.im===0};
+  row.area=Number.isFinite(m.area)?{text:areaText(m.area),value:m.area,title:close.has(i)?areaHelp+'. '+AREA_PAIR_NOTE:areaHelp}:{text:'—',value:null,title:areaMissing||'No field: no effective area'};
   const g=groupOf.get(i);
   if(g&&g.length>1){
    if(g[0]!==i){row.polarization=null;return row;}
@@ -96,10 +121,21 @@ export function modeOptionLabel(i,modes){
  return `Mode ${i+1}${word?' · '+word:''} · n_eff ${formatIndex(m.re)}`;
 }
 /** The modes of an optical run (two real indices and the vector samples). Studio computes f_TE
- * from the saved field unless the engine's values came with a fresh run. */
+ * and A_eff from the saved field unless the engine's values came with a fresh run. */
 export function opticalModes(run){
- if(!run.te){const values=run.effective_index.map((_,i)=>teFraction(run.field,i));Object.defineProperty(run,'te',{value:{values,source:'studio'},enumerable:false,configurable:true,writable:true});}
- return run.effective_index.map((re,i)=>({re,im:0,fte:run.te.values[i],loss:null}));
+ const keep=(key,values,source)=>Object.defineProperty(run,key,{value:{values,source},enumerable:false,configurable:true,writable:true});
+ if(!run.te)keep('te',run.effective_index.map((_,i)=>teFraction(run.field,i)),'studio');
+ // a run without samples (none is stored without them; a test may build one) has no A_eff
+ if(!run.area)keep('area',run.effective_index.map((_,i)=>run.field?effectiveArea(run.field,i):null),'studio');
+ return run.effective_index.map((re,i)=>({re,im:0,fte:run.te.values[i],loss:null,area:run.area.values[i]}));
+}
+/** The engine's effective_area (m²) of the first study point in a summary, or null. */
+export function engineEffectiveArea(summary){
+ const v=summary?.mode_postprocessing?.effective_area;
+ if(!v||v.unit!=='m^2'||!Array.isArray(v.values?.[0]))return null;
+ // an area that is not positive is not the engine's: the whole list is refused
+ if(!v.values[0].every(x=>x===null||(Number.isFinite(x)&&x>0)))return null;
+ return v.values[0].map(x=>Number.isFinite(x)?x:null);
 }
 /** The engine's te_polarization_fraction of the first study point in a summary, or null. */
 export function engineTeFraction(summary){
@@ -120,5 +156,7 @@ export function physicsModes(p){
  const lambda0=p.vacuum_wavelength?.unit==='m'?p.vacuum_wavelength.values?.[0]:null;
  const lossAt=i=>Array.isArray(loss)&&Number.isFinite(loss[i])?loss[i]:Number.isFinite(lambda0)&&Number.isFinite(im[i])?propagationLoss(im[i],lambda0):null;
  const fits=fte&&fte.length===re.length;
- return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i)})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null};
+ const area=engineEffectiveArea(p.summary),areaFits=area&&area.length===re.length;
+ const areaMissing=areaFits?'':area?'The saved effective areas do not match the modes':p.summary?.open_boundary?'PML result: its fields are in stretched coordinates, so no effective area is computed':RUN_AGAIN+': this run was saved before Studio kept the effective area';
+ return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null,areaHelp:vector?AREA_HELP:SCALAR_AREA_HELP};
 }
