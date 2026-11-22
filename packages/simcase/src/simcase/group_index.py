@@ -26,6 +26,16 @@ VECTOR_TRACKING = "electric-l2-assignment-v1"
 SCALAR_TRACKING = "scalar-l2-assignment-v1"
 
 
+def check_lossless(model, wavelengths: list[float]) -> None:
+    """Refuse ``results.group_index`` when a material is lossy at one of the three wavelengths
+    (called before any solve)."""
+    for wavelength in wavelengths:
+        if np.any(np.asarray(model._permittivity(wavelength)).imag != 0):
+            raise DocumentError(f"results.group_index: the materials are lossy at vacuum_wavelength "
+                                f"{wavelength:g} um; the group index of lossy modes is not computed",
+                                path="results.group_index")
+
+
 def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, say) -> dict:
     """``{"values": (1, M), "tracking": name, "reasons": [M]}`` in the kernel frame.
 
@@ -36,11 +46,7 @@ def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, 
 
     vector = physics["formulation"] == "vector"
     requested = len(neff0)
-    for wavelength in wavelengths:
-        if np.any(np.asarray(model._permittivity(wavelength)).imag != 0):
-            raise DocumentError(f"results.group_index: the materials are lossy at vacuum_wavelength "
-                                f"{wavelength:g} um; the group index of lossy modes is not computed",
-                                path="results.group_index")
+    check_lossless(model, wavelengths)
     settings = tracking_settings(int(physics["num_modes"]))     # the search a sweep of this entry makes
     tracker = ModeTracker(model.solver_mesh, requested, settings, scalar=not vector)
     key = "vector_field" if vector else "fields"
@@ -50,6 +56,13 @@ def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, 
     matched = np.full((3, requested), np.nan, dtype=np.asarray(neff0).dtype if np.iscomplexobj(neff0) else float)
     matched[1] = neff0
     reasons: list[str | None] = [None] * requested
+    # the lambda0 solve has mode_count candidates: two requested modes within the tolerance there
+    reference = np.asarray(neff0)
+    for mode in range(requested):
+        others = np.delete(reference, mode)
+        if len(others) and np.min(abs(others - reference[mode])) <= settings["degeneracy_tolerance"]:
+            reasons[mode] = (f"vacuum_wavelength {wavelengths[1]:g} um: near-degenerate with another requested "
+                             f"mode within n_eff tolerance {settings['degeneracy_tolerance']:g}")
     for row in (0, 2):
         wavelength = wavelengths[row]
         location = f"vacuum_wavelength {wavelength:g} um"
@@ -58,7 +71,7 @@ def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, 
         except (ValueError, RuntimeError) as exc:
             columns, side = np.full(requested, -1), [f"{location}: the solve failed ({exc})"] * requested
         else:
-            columns, side = match_modes(tracker, field0, res["neff"], res[key], np.asarray(neff0), location)
+            columns, side = match_modes(tracker, field0, res["neff"], res[key], location)
             for mode, column in enumerate(columns):
                 if column >= 0:
                     matched[row, mode] = res["neff"][column]

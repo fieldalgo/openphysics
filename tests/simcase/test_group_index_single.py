@@ -308,7 +308,7 @@ def test_an_unmatched_mode_is_null_with_a_reason_and_the_run_succeeds(tmp_path):
     summary = json.loads((output / "summary.json").read_text())
     assert summary["group_index"]["values"] == [[None]]
     [reason] = summary["group_index_method"]["reasons"]
-    assert "near-degenerate" in reason and "vacuum_wavelength 1.549 um" in reason
+    assert "near-degenerate" in reason and "vacuum_wavelength 1.549 um" in reason, reason
     assert summary["effective_index"]["values"][0][0] > 1.44
     with np.load(output / "fields.npz", allow_pickle=False) as arrays:
         assert np.isnan(arrays["group_index"]).all()
@@ -341,3 +341,85 @@ def test_three_solves_at_the_exact_side_wavelengths(monkeypatch):
     run(Document.from_dict(si_slab(mode_count=2, group_index={"wavelength_step": "10 nm"})), False)
     assert seen == [(1.55, 2), (1.54, 6), (1.56, 6)]
     assert group_index_module.VECTOR_TRACKING == "electric-l2-assignment-v1"
+
+
+# -- match_modes against ModeTracker.step on synthetic scalar fields (identity mass) --------------
+
+def _tracker(requested, reference, search_modes=6):
+    import scipy.sparse as sp
+    from simcase.tracking import ModeTracker, tracking_settings
+    tracker = object.__new__(ModeTracker)
+    tracker.num_modes, tracker.scalar, tracker.seed_target = requested, True, None
+    tracker.settings = tracking_settings(requested) | {"search_modes": search_modes}
+    tracker.node_mass = sp.identity(reference.shape[0], format="csr")
+    tracker.previous = reference
+    return tracker
+
+
+def _unit(*weights, size=8):
+    v = np.zeros(size)
+    v[:len(weights)] = weights
+    return v
+
+
+def _columns(*vectors):
+    return np.stack(vectors, axis=1)
+
+
+def _both(requested, reference, neff, field, search_modes=6):
+    from simcase.tracking import ModeTrackingError, match_modes
+    columns, reasons = match_modes(_tracker(requested, reference, search_modes), reference, neff, field, "here")
+    try:
+        _tracker(requested, reference, search_modes).step(neff, field, "here")
+        raised = None
+    except ModeTrackingError as exc:
+        raised = str(exc)
+    return list(columns), reasons, raised
+
+
+def test_match_modes_agrees_with_step_on_a_clean_swap():
+    reference = _columns(_unit(1), _unit(0, 1))
+    field = _columns(_unit(0, 1), _unit(1), _unit(0, 0, 1))
+    columns, reasons, raised = _both(2, reference, np.array([2.0, 1.9, 1.5]), field)
+    assert columns == [1, 0] and reasons == [None, None] and raised is None
+
+
+def test_match_modes_weak_overlap_is_per_mode():
+    reference = _columns(_unit(1), _unit(0, 1))
+    field = _columns(_unit(1), _unit(0, 0.6, 0.8), _unit(0, 0.8, -0.6, 0, 0, 0))
+    columns, reasons, raised = _both(2, reference, np.array([2.0, 1.9, 1.5]), field)
+    assert "weak overlap" in raised and "mode 2" in raised
+    assert columns == [0, -1] and reasons[0] is None and "weak overlap 0.64" in reasons[1]
+
+
+def test_match_modes_ambiguous_margin():
+    reference = _columns(_unit(1))
+    field = _columns(_unit(np.sqrt(0.85), np.sqrt(0.15)), _unit(np.sqrt(0.82), 0, np.sqrt(0.18)), _unit(0, 0, 0, 1))
+    columns, reasons, raised = _both(1, reference, np.array([2.0, 1.9, 1.5]), field)
+    assert "ambiguous assignment margin" in raised
+    assert columns == [-1] and "ambiguous assignment margin 0.03" in reasons[0]
+
+
+def test_match_modes_search_boundary():
+    reference = _columns(_unit(0, 0, 1))
+    field = _columns(_unit(1), _unit(0, 1), _unit(0, 0, 1))
+    columns, reasons, raised = _both(1, reference, np.array([2.0, 1.9, 1.5]), field, search_modes=3)
+    assert "search boundary" in raised
+    assert columns == [-1] and "last candidate of the search" in reasons[0]
+
+
+def test_match_modes_fewer_candidates_than_modes():
+    reference = _columns(_unit(1), _unit(0, 1), _unit(0, 0, 1))
+    field = _columns(_unit(1), _unit(0, 0, 1))
+    columns, reasons, raised = _both(3, reference, np.array([2.0, 1.5]), field)
+    assert "found only 2" in raised
+    assert columns == [0, -1, 1] and reasons[0] is None and reasons[2] is None
+    assert "found only 2 candidates for 3 modes" in reasons[1]
+
+
+def test_match_modes_degenerate_candidate():
+    reference = _columns(_unit(1))
+    field = _columns(_unit(1), _unit(0, 1), _unit(0, 0, 1))
+    columns, reasons, raised = _both(1, reference, np.array([2.0, 2.0 - 5e-6, 1.5]), field)
+    assert "near-degenerate" in raised
+    assert columns == [-1] and "near-degenerate within n_eff tolerance" in reasons[0]

@@ -163,13 +163,13 @@ class ModeTracker:
         return neff[selected], aligned, evidence
 
 
-def match_modes(tracker: ModeTracker, reference, neff, field, reference_neff, location):
+def match_modes(tracker: ModeTracker, reference, neff, field, location):
     """Match each reference mode to a candidate of one other solve on the same mesh, mode by mode.
 
     The tests are those of ``ModeTracker.step`` with the tracker's settings and product: the
     optimal assignment of the normalized squared L2 overlaps, overlap >= the overlap threshold,
     full-assignment margin >= the margin threshold, not the last candidate of a full search,
-    no other candidate (nor other reference mode) within the degeneracy tolerance. Where
+    no other candidate within the degeneracy tolerance. Where
     ``step`` raises on the first failure, this returns, for each reference mode, the matched
     candidate column (-1 when unmatched) and None or the reason it is unmatched.
     """
@@ -181,11 +181,6 @@ def match_modes(tracker: ModeTracker, reference, neff, field, reference_neff, lo
         if reasons[mode] is None:
             reasons[mode] = f"{location}: {reason}"
 
-    for mode in range(requested):
-        others = np.delete(reference_neff, mode)
-        if len(others) and np.min(abs(others - reference_neff[mode])) <= settings["degeneracy_tolerance"]:
-            fail(mode, f"near-degenerate with another requested mode within n_eff tolerance "
-                       f"{settings['degeneracy_tolerance']:g}")
     if count == 0:
         for mode in range(requested):
             fail(mode, "no guided candidate (cutoff or incomplete search)")

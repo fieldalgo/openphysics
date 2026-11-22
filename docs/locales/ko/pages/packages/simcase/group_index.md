@@ -3,7 +3,7 @@
 [English](../../../../../packages/simcase/group_index.md) | **한국어**
 
 파장 sweep은 이미 군굴절률 `n_g = n_eff − λ0 dn_eff/dλ0`를 돌려줍니다
-([개요](overview.md)). 단일 `em.modes2d` study는 문서가 요청할 때 이를 돌려줍니다.
+([개요](overview.md#추적-벡터-파장-sweep)). 단일 `em.modes2d` study는 문서가 요청할 때 이를 돌려줍니다.
 
 ```json
 "results": {"group_index": {"wavelength_step": "1 nm"}}
@@ -27,8 +27,13 @@
 
   옆 풀이는 sweep과 같은 후보 수 max(2 mode_count, mode_count + 4)를 탐색합니다. 이것이
   추적기의 기본 설정이며, 단일 study는 `study.tracking`을 읽지 않습니다.
+  λ0 풀이는 실행 자체의 풀이로 후보가 mode_count개뿐입니다. 그래서 λ0에서 축퇴 검사는
+  요청한 모드끼리만 보고, 탐색 경계 검사는 없습니다. 요청하지 않은 λ0 후보와 가까운 요청
+  모드는 옆 파장에서도 여전히 가까울 때만 걸립니다. 옆 풀이는 모든 후보에 대해 이를
+  검사합니다. 이는 sweep의 가운데 지점보다 약한 검사입니다.
 - **차분.** 대응된 세 값은 추적 sweep과 같은 2차 `np.gradient`를 거칩니다. 파장은 커널의
   마이크로미터 파장 λ0 ∓ Δλ이고, sweep 값처럼 쓴 값의 `float(정확한 미터 × 10⁶)`입니다.
+- 실행은 어떤 풀이보다 먼저 세 파장에서 재료가 무손실인지 확인합니다.
 - **대응되지 않은 모드**는 어느 쪽에서든 값이 없습니다. `summary.json`에서는 `null`,
   `fields.npz`에서는 NaN입니다. 이유에는 옆 파장과 실패한 검사가 나옵니다. 실행은
   실패하지 않습니다.
@@ -88,7 +93,7 @@ results.group_index: unknown key "group_index" in results. … (E-KEY-UNKNOWN)
 |---|---|---|
 | V8 | PEC 창 전체를 채운 220 nm physmat:Si 막(physmat:SiO2 안), λ0 1.55 µm, Δλ = 10 nm. 기준은 physmat 굴절률로 1.54, 1.55, 1.56 µm에서 구한 `refsol.slab` TE n_eff의 중앙 차분(n_g = 3.706704)입니다. 막 요소 h, 배경 5h, grading h~5h, h = 24, 12, 6 nm. 기준: 6 nm에서 ≤ 3e-3이고 엄격히 감소. **블라인드 아님**: 이 메시 계열에서 sweep의 오차를 등록 전에 측정했습니다 | 3.72e-3, 8.89e-4, 2.29e-4 |
 | V9 | 선택 결과와 λ0 ∓ Δλ에 대한 기존 sweep의 가운데 지점 비교: 추적 벡터 sweep(Δλ 1 nm와 10 nm), mode_count를 선택의 후보 수로 둔 비추적 스칼라 sweep. 기준: 상대 1e-12 | 통과. 스칼라 픽스처는 첫 결과를 본 뒤 바꿨습니다. 벡터 픽스처의 PEC 옆벽에서는 스칼라 창이 차단(n_eff = 0)되므로, 이제 옆벽이 PMC입니다 |
-| V10 | 원형 광섬유: a = 1.3 µm, 코어 n² = 1 + 1.1 λ²/(λ² − 0.01 µm²)(refsol 광섬유 테스트의 Sellmeier 코어), 클래딩 0.9 × 코어, PEC 상자 ±5a, mode_count 3, Δλ = 1 nm. 기준은 `refsol.fiber`의 음함수 미분 분산 군굴절률입니다. 코어 요소 h, 배경 4h, h = 0.16, 0.08, 0.04 µm. 기준: TE01이 0.04 µm에서 상대 ≤ 2e-3이고 엄격히 감소, HE11은 이유가 붙은 null이거나 같은 한계 이내. 블라인드 | TE01 6.18e-4, 2.88e-4, 1.17e-4. HE11: 0.16과 0.08 µm에서는 대응됨(상대 오차 ≤ 2e-5). 0.04 µm에서는 메시가 쌍을 2.9e-6만큼 갈라 허용값 1e-5보다 작아서 "near-degenerate with another requested mode"로 null |
+| V10 | 원형 광섬유: a = 1.3 µm, 코어 n² = 1 + 1.1 λ²/(λ² − 0.01 µm²)(refsol 광섬유 테스트의 Sellmeier 코어), 클래딩 0.9 × 코어, PEC 상자 ±5a, mode_count 3, Δλ = 1 nm. 기준은 `refsol.fiber`의 음함수 미분 분산 군굴절률입니다. 코어 요소 h, 배경 4h, h = 0.16, 0.08, 0.04 µm. 기준: TE01이 0.04 µm에서 상대 ≤ 2e-3이고 엄격히 감소, HE11은 이유가 붙은 null이거나 같은 한계 이내. 블라인드 | TE01 6.18e-4, 2.88e-4, 1.17e-4. HE11: 0.16과 0.08 µm에서는 대응됨(상대 오차 ≤ 2e-5). 0.04 µm에서는 메시가 쌍을 2.9e-6만큼 갈라 허용값 1e-5보다 작아서 "vacuum_wavelength 1.55 um: near-degenerate with another requested mode"로 null |
 | M5-f | sweep, PML, 굽힘, 결합, 손실 재료의 거절. 간격 범위의 경계. 알 수 없는 키를 이름으로 거절. 선택이 더하는 것은 `group_index`, `group_index_method`, 그 장 맵 항목, 간격 기본값뿐. λ0 배열은 비트 단위로 같음. HE11 하나만(축퇴 상대 있음) 요청하면 이유가 붙은 null이고 CLI는 0으로 끝남. 옆 풀이가 실패하면 이유가 붙은 null. 정확한 옆 파장에서 세 번 풀이 | 통과 |
 
 refsol 광섬유 테스트는 클래딩을 0.993 × 코어로 둡니다. 거기서는 TE01, TM01, HE21이 서로
