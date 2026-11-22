@@ -243,6 +243,20 @@ a change to it that has not been run is not saved. A new model starts at 2. With
 solver document is byte for byte the one earlier Studios sent, so its n_eff, TE fraction and
 effective area are unchanged.
 
+**Also compute group index (3 solves)** in **Study** (off by default) adds
+`results.group_index = {"wavelength_step": "1 nm"}` to the run's document. The engine then also
+solves the same mesh at λ0 − 1 nm and λ0 + 1 nm, with each material evaluated at each
+wavelength, and returns n_g = n_eff − λ0 dn_eff/dλ0 by a central difference. The run takes about
+three times as long ([group index of a single study](group_index.md)). With the box off, the
+document is the `optical-shapes-v8` document as before, byte for byte. With it on, the only
+difference is `results.group_index`, and n_eff and the fields at λ0 are the same values. The
+box is page state, like Modes to find: a new model starts with it off, and an input file does
+not store it. The adapter stays `optical-shapes-v8` and the run's `settings` are unchanged.
+
+A run with n_g keeps it in the version 9 slots `group_index` and `group_index_method`. Its
+document is rebuilt from its settings, as for any run, with `results.group_index` added, whose
+`wavelength_step` is the step named in `group_index_method`.
+
 Material indices are evaluated at the chosen wavelength; the lower limit stays
 inside the silicon data range. A coarser core mesh is faster and gives smaller
 session files, but changes n_eff: for a 500 × 220 nm silicon core at 1400 nm,
@@ -669,8 +683,8 @@ they do not represent optical power or a common physical colour scale.
 
 ### Modes table
 
-Results show one table per run, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |, in the optical
-application and in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.” (the optical
+Results show one table per run, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, in the optical
+application, and the same table without n_g in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.” (the optical
 application adds “Compare matches them between runs by field overlap.”)
 Every value is defined on the saved centroid field `unnormalized_electric_field`, so Studio, the
 engine and older session files give the same number from the same samples:
@@ -716,6 +730,16 @@ engine and older session files give the same number from the same samples:
   mode-solver form, not the vectorial nonlinear area. A member of a degenerate pair shows its own
   value, and its tooltip says that value depends on the rotation within the pair. A scalar
   multiphysics result shows the engine's |φ|² area.
+- **n_g** (optical application only) is the engine's group index to 4 decimals, from a run with
+  **Also compute group index** on. The column help reads “n_g = n_eff − λ0 dn_eff/dλ0: central
+  difference over λ0 ± 1 nm (3 solves), materials evaluated at each wavelength”. A cell reads
+  **—** in two cases:
+  - The run did not compute n_g. The help reads “Turn on Also compute group index in Study”.
+  - The engine could not match that mode at a side wavelength (`null`, for example one member
+    of a degenerate pair). In the tab that ran it, the help gives the engine's reason,
+    *Not matched: vacuum_wavelength 1.549 um: …*. A session file does not keep the reasons, so
+    after opening one the help reads “Not matched at λ0 ± 1 nm; the reason is not kept in
+    session files”.
 - The field view's mode picker reads *Mode 1 · TE-like · n_eff 2.44406001*.
 
 Run details say where the fraction and the effective area came from: *computed by the engine from the saved field* for
@@ -827,7 +851,7 @@ mode count). Each run has these keys, in this order; any other key is refused by
 | `field` | `{node_coordinates, triangles, real, imag}` of k modes (as in version 7, only these four are read; another key inside `field` is not refused, is covered by the digest and is not written again) | optional |
 | `te_polarization_fraction` | k numbers in [0, 1] or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
 | `effective_area` | k numbers in m² above 0 or null: the engine's (for a run written without `field`, the values it showed) | optional; required without `field` |
-| `group_index`, `group_index_method` | k numbers or null; a text of 1 to 64 characters (only with `group_index`) | optional, reserved for the group index |
+| `group_index`, `group_index_method` | k numbers or null (null: a mode the engine did not match); a text of 1 to 64 characters, only with `group_index`, written as `central_difference <step> <tracker>`, such as `central_difference 1 nm electric-l2-assignment-v1` | optional: present for a run with Also compute group index |
 | `digest` | `"sha256:<hex>"` | required |
 
 The digest is the SHA-256 of the run without its digest, as sorted-key JSON with the number
@@ -876,7 +900,8 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   the absorption loss of A and of B (*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*,
   on matched and unmatched rows: the modes table's value from the saved indices, *mean* of the
   members' dB/cm for a matched pair; optical runs read *0 dB/cm*, as the optical adapter's
-  materials are lossless). On a narrow screen the table scrolls sideways inside its box; the page
+  materials are lossless), then *n_g A* and *n_g B* (the modes table's value, *mean* of the
+  members' values for a matched pair, **—** with the modes table's help when a run has none). On a narrow screen the table scrolls sideways inside its box; the page
   does not. A mode without a match reads *A mode 2: no match in B (best overlap 0.43, with B mode 2)* and
   shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
   0.8 on a common grid. A low overlap means the mode changed shape between designs.”
