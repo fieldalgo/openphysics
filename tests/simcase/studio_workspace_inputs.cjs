@@ -25,3 +25,10 @@ test('multiple pending fields clear independently or explicitly together',()=>{
  const d=new NumericDrafts();d.update('width','');d.update('temperature','-1');d.clear('width');assert.equal(d.issues.length,1);
  d.clear();assert.equal(d.invalid,false);assert.throws(()=>parseNumeric('unsupported','1'));
 });
+test('an edit is said in Messages, with the Left x a Width edit moved to keep the centre',async()=>{
+ const {editNoticeText}=await import('../../packages/simcase/src/simcase/studio/static/workspace-inputs.mjs');
+ assert.equal(editNoticeText('shapeW',600,{leftX:-300}),'Width set to 600 nm. Left x moved to −300 nm to keep the centre. Run explicitly to compute new results.');
+ assert.equal(editNoticeText('shapeH',300),'Height set to 300 nm. Run explicitly to compute new results.');
+ assert.equal(editNoticeText('wavelength',1310,{afterResult:true}),'Wavelength set to 1310 nm. Inputs changed since the last result. Run again to compute the new inputs.');
+ assert.throws(()=>editNoticeText('nope',1));
+});

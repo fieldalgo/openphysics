@@ -247,3 +247,42 @@ test('an optical temperature input with no source while a heat physics could giv
  assert.deepEqual(m.unsourcedInputs(m.removePhysics(removed,'heat1'),c),[]);
  assert.equal(m.unitText('um'),'µm');assert.equal(m.unitText('W/(m^2 K)'),'W/(m² K)');
 });
+test('each wire is anchored on the ports its coupling joins; every port has its own row',async()=>{
+ const m=await mp,c=m.kindCatalog(CAPS);
+ const layout=m.connectionLayout(heated(),c,[['heat1'],['modes1']]),html=m.renderMultiphysicsGraph(layout,null);
+ // the two outputs of Heat 1 are separate rows of a one-column port list, temperature first
+ const heatNode=html.slice(html.indexOf('data-mp-node="heat1"'),html.indexOf('data-mp-node="modes1"'));
+ assert.match(heatNode,/<div class="graph-ports mp-ports">/);
+ assert.deepEqual([...heatNode.matchAll(/data-port="([^"]+)"/g)].map(x=>x[1]),['heat1--output--temperature','heat1--output--heat_flux']);
+ // the drawn ends come from the coupled ports' positions, never a neighbouring port's
+ const edges=JSON.parse(html.match(/data-edges='([^']+)'/)[1].replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&'));
+ const at={'heat1--output--temperature':{x:230,y:60},'heat1--output--heat_flux':{x:230,y:100},'modes1--input--temperature':{x:326,y:60}};
+ assert.deepEqual(m.wireEnds(edges,id=>at[id]||null),[{coupling:'heat1_to_modes1',route:'curve',from:{x:230,y:60},to:{x:326,y:60}}]);
+ // a port that is not drawn gives no wire rather than one from somewhere else
+ assert.deepEqual(m.wireEnds(edges,id=>id==='modes1--input--temperature'?null:at[id]),[null]);
+});
+test('the model back at the last run says so in one sentence everywhere, without asking for a Run',async()=>{
+ const m=await mp;
+ assert.equal(m.freshnessAgain('current',false),'current');assert.equal(m.freshnessAgain('current',true),'again');assert.equal(m.freshnessAgain('stale',true),'stale');
+ const again='Model matches run 1 again: results are current';
+ assert.equal(m.sequenceHeading('again',1),again);assert.equal(m.readyStatus('again',1),again);
+ assert.equal(m.editNotice('Coupling Heat 1 temperature → Modes 1 temperature added.','again',1),'Coupling Heat 1 temperature → Modes 1 temperature added. '+again+'.');
+ assert.equal(m.editNotice('Value updated.','stale',1),'Value updated. Press Run to compute the new model.');
+ assert.equal(m.editNotice('Value updated.','none'),'Value updated. Press Run to compute the new model.');
+});
+test('the heater-off option stays in the toolbar: disabled with its reason while no temperature coupling exists',async()=>{
+ const m=await mp;
+ const off=m.baselineOptionState(m.removeCoupling(heated(),'heat1_to_modes1'),{on:true});
+ assert.equal(off.available,false);assert.equal(off.disabled,true);assert.equal(off.checked,false);assert.equal(off.reason,'needs a temperature coupling');
+ assert.match(off.title,/^Needs a temperature coupling/);
+ const on=m.baselineOptionState(heated(),{on:true});
+ assert.deepEqual([on.available,on.disabled,on.checked,on.reason],[true,false,true,'']);
+ assert.equal(on.title,'After the coupled run, also solve Modes 1 alone with no temperature input (about 1 s), for the n_eff without heater');
+ assert.equal(m.baselineOptionState(heated(),{on:true,busy:true}).disabled,true);
+ assert.equal(m.baselineOptionState(heated(),{on:false}).checked,false);
+});
+test('the graphics footer names the geometry unit',async()=>{
+ const m=await mp;
+ assert.equal(m.lengthsNote(heated()),'Lengths in µm; other values carry their units. Run solves every physics in solve order.');
+ assert.match(m.lengthsNote({physics:{}}),/^Lengths in the geometry’s unit \(not set\);/);
+});

@@ -16,14 +16,14 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {INPUT_FIELDS,NumericDrafts} from './workspace-inputs.mjs';
+import {INPUT_FIELDS,NumericDrafts,editNoticeText} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession} from './workspace-notebook.mjs';
 import {compareRows,runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
-import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText} from './workspace-persistence.mjs';
+import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
@@ -174,10 +174,45 @@ function leaveMultiphysics(){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return false;}
  multiView.close();multiView.leave();return true;
 }
+// Before leaving a model whose runs only this tab holds (another model, an opened file, a
+// recovered session): a confirmation that names what is lost and offers the save that fits.
+// toMultiphysics: the target is a multiphysics model (optical runs then go out of sight).
+const leaveDialog=document.createElement('dialog');leaveDialog.id='leave-confirm';leaveDialog.setAttribute('aria-labelledby','leave-confirm-title');leaveDialog.setAttribute('aria-describedby','leave-confirm-description');
+leaveDialog.innerHTML='<h2 id="leave-confirm-title"></h2><p id="leave-confirm-description"></p><div class="leave-actions"><button id="leave-stay"></button> <button id="leave-save"></button> <button id="leave-go"></button></div>';
+document.body.append(leaveDialog);
+let pendingLeave=null;
+function leaveText(target,toMultiphysics){
+ if(multiView.active())return leaveConfirmText({from:'multiphysics',runId:multiView.runInTab(),saved:multiView.fileCurrent(),model:multiView.modelName(),target});
+ if(toMultiphysics&&isOptical())return leaveConfirmText({from:'optical',runs:runs.length,saved:savedRunsState===runsStamp(),target});
+ return null;
+}
+function guardLeave(target,toMultiphysics,proceed){
+ const text=leaveText(target,toMultiphysics);if(!text){proceed();return;}
+ pendingLeave={proceed,kind:text.save?.kind||null,opener:document.activeElement};
+ $('leave-confirm-title').textContent=text.title;$('leave-confirm-description').textContent=text.description;
+ $('leave-stay').textContent=text.stay;$('leave-go').textContent=text.leave;$('leave-save').hidden=!text.save;$('leave-save').textContent=text.save?.label||'';
+ if(!leaveDialog.open)leaveDialog.showModal();
+}
+function endLeave(go){
+ const pending=pendingLeave;pendingLeave=null;leaveDialog.close();if(!pending)return;
+ if(go===false){restoreDialogFocus(pending.opener);notice('Kept the current model and its runs.');return;}
+ if(go==='save'){
+  if(pending.kind==='model')multiView.saveFile();
+  else{$('save-session').click();if(savedRunsState!==runsStamp())return;}
+ }
+ pending.proceed();
+}
+$('leave-stay').onclick=()=>endLeave(false);$('leave-go').onclick=()=>endLeave(true);$('leave-save').onclick=()=>endLeave('save');
+leaveDialog.oncancel=event=>{event.preventDefault();endLeave(false);};
+const TEMPLATE_NAMES={'heated-waveguide':'Heated silicon waveguide',optical:'Optical waveguide',heat:'Heat conduction',joule:'Joule heating'};
 // The start page's cards: the coupled template opens the multiphysics model, the others the
 // application of their physics selection.
 function chooseTemplate(id){
- if(id==='heated-waveguide'){if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}multiView.openTemplate();return;}
+ if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
+ guardLeave(TEMPLATE_NAMES[id]||'the new model',id==='heated-waveguide',()=>openTemplateCard(id));
+}
+function openTemplateCard(id){
+ if(id==='heated-waveguide'){multiView.openTemplate();return;}
  if(!leaveMultiphysics())return;
  Object.assign(state,templatePhysics(id));select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
@@ -299,6 +334,11 @@ function bindNumericInputs(){
    else state[key]=parsed.value;
    if(key==='width'||key==='height'||field.prop){const slider=$('width');if(slider&&key==='width'){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
+  // a committed value is said in Messages, with the Left x a Width edit moved (the value at focus)
+  let leftBefore=null;el.onfocus=()=>{leftBefore=field.prop?selectedShape()?.x??null:null;};
+  el.onchange=()=>{if(numericDrafts.get(key))return;const shape=field.prop?selectedShape():null,value=key==='temperature'?setup.temperature:shape?shape[field.prop]:state[key];
+   const leftX=field.prop==='w'&&leftBefore!==null&&shape.x!==leftBefore?shape.x:null;if(shape)leftBefore=shape.x;
+   if(value!==undefined)notice(editNoticeText(key,value,{leftX,afterResult:resultNotice}));};
   el.onkeydown=e=>{if(e.key==='Escape'){numericDrafts.clear(key);el.value=key==='temperature'?setup.temperature:field.prop?selectedShape()[field.prop]:state[key];refreshInputIssues();}};
  }
 }
@@ -436,8 +476,13 @@ function applyProject(doc,{saved=true,resetHistory=false}={}){
 // The inputs a fresh workspace starts with; an open over them (and no results) asks nothing.
 const DEFAULT_INPUTS=current();
 const applicationChosen=()=>state.electric!==undefined;
-function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement}={}){
+function requestLoad(doc,options={}){
   if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
+  // a multiphysics run in this tab is named before the inputs are replaced
+  if(!options.leaveChecked&&multiView.active()&&multiView.runInTab()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
+  loadInputs(doc,options);
+}
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement}={}){
   workspaceLoads.invalidate();
   pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
@@ -489,7 +534,8 @@ $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click(
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  // a multiphysics document opens as a multiphysics model; any document opens in one that is open
  if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
-  if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');await multiView.openText(text,file.name);return;}}
+  if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');
+   guardLeave(file.name,true,()=>multiView.openText(text,file.name).catch(e=>notice('Open failed: '+e.message+' Current inputs kept.')));return;}}
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
