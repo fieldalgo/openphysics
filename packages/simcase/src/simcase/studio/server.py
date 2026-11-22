@@ -22,6 +22,7 @@ back byte for byte apart from whitespace and the spelling of string escapes.
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 import logging
 import sys
 import threading
@@ -220,6 +221,45 @@ def workspace_capabilities_v7():
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
 
 
+# Version 8 (number of modes): the contract of a workspace whose runs find 1 to 8 modes. Its window,
+# ranges and materials are those of version 7; the settings drop the fixed mode count, and the
+# range and default stand beside them. The adapter is optical-shapes-v8: the document of
+# optical-shapes-v7 with the mode count the page asks for. Versions 1 to 7 stay as they were.
+_MODE_COUNT_RANGE = [1, 8]
+_MODE_COUNT_DEFAULT = 2
+
+
+@app.get("/api/workspace/capabilities/v8")
+def workspace_capabilities_v8():
+    caps = json.loads(workspace_capabilities_v7().body)
+    settings = {key: value for key, value in caps["settings"].items() if key != "mode_count"}
+    caps.update(schema_version=8, adapter="optical-shapes-v8", settings=settings,
+                mode_count_range=list(_MODE_COUNT_RANGE), mode_count_default=_MODE_COUNT_DEFAULT)
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
+def workspace_mode_count_refusal(tree) -> str | None:
+    """The refusal of a workspace request (one that names its workspace_instance) whose em.modes2d
+    physics asks for a mode count outside 1 to 8 or not a whole number, else None. The JSON
+    integer 2 is whole; 2.5, "2", true and 2.0 are not (a page writes the integer). Requests
+    without a workspace instance (the single-page Studio) are not limited here."""
+    physics = tree.get("doc", {}).get("physics") if isinstance(tree, dict) and isinstance(tree.get("doc"), dict) else None
+    if not isinstance(physics, dict):
+        return None
+    lo, hi = _MODE_COUNT_RANGE
+    for entry in physics.values():
+        if not isinstance(entry, dict) or entry.get("type") != "em.modes2d" or "mode_count" not in entry:
+            continue
+        n = entry["mode_count"]
+        if type(n) is not int or not lo <= n <= hi:
+            # the value as the request wrote it (the reader keeps decimals exact)
+            shown = (("true" if n else "false") if isinstance(n, bool) else json.dumps(n) if isinstance(n, (str, int)) or n is None
+                     else f"{n}, written with a decimal point or an exponent" if isinstance(n, Decimal) and n == n.to_integral_value()
+                     else str(n))
+            return f"Modes to find must be a whole number from {lo} to {hi} (got {shown})."
+    return None
+
+
 @app.get("/api/examples")
 def list_examples():
     return {"examples": sorted(name for name, data in examples.EXAMPLES.items()
@@ -330,6 +370,8 @@ async def validate(request: Request):
         tree, found = await _document_body(request)
     except RequestRefused as exc:
         return exc.reply()
+    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)):
+        raise HTTPException(400, refusal)
     return exact_json(await run_in_threadpool(validation_payload, tree["doc"], found))
 
 
@@ -456,6 +498,8 @@ async def start_run(request: Request):
         tree, found = await _document_body(request)
     except RequestRefused as exc:
         return exc.reply()
+    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)):
+        raise HTTPException(400, refusal)
     return await run_in_threadpool(_start_job, tree, found)
 
 

@@ -469,7 +469,10 @@ print(n)`;
     ['S6 a duplicate job', d => { d.runs[1].job = d.runs[0].job; }, /Two runs have the same job identifier mp-[0-9a-f]{12}\./],
     ['S6 a model that fails the check', d => { d.runs[0].document.physics.modes1.vacuum_wavelength = 'warm'; }, /Run 1's model does not pass today's check: physics\.modes1\.vacuum_wavelength: /],
     ['S6 a baseline document changed', d => { d.baselines.modes1.document.physics.modes1.vacuum_wavelength = '1551 nm'; }, /The without-heater result of Modes 1 belongs to no run in this file and not to its model\./],
-    ['S7 version 9', d => { d.version = 9; }, /This session file is version 9, newer than this Studio reads \(versions 6–8\)\. Open it in a newer Studio\./],
+    // version 9 is an optical session since the number of modes: a newer file is version 10, and a
+    // multiphysics layout under version 9 is refused by its first key
+    ['S7 version 10', d => { d.version = 10; }, /This session file is version 10, newer than this Studio reads \(versions 6–9\)\. Open it in a newer Studio\./],
+    ['S7 a version 8 layout under version 9', d => { d.version = 9; }, /Unknown key "document" in the session file\./],
     ['S7 another application', d => { d.application = 'other'; }, /This session file holds a “other” model, which this Studio does not read\./],
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
     ['S7 another document envelope', d => { d.runs[0].document.openphysics = '0.3/multiphysics.2'; }, /Run 1's model does not pass today's check: openphysics: openphysics is "0\.3\/multiphysics\.2"; this reader reads the format "0\.3"\./],

@@ -16,7 +16,7 @@ export const LOSSLESS_NOTE='Absorption only: all materials have k = 0 at this wa
 export const PAIR_TOLERANCE=1e-3;
 const PAIR_TEXT='1e-3';
 export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TEXT}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
-export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field'});
+export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field',file:'saved in the session file; its fields were not kept'});
 export const RUN_AGAIN='Run again to compute';
 export const AREA_HELP='Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components';
 export const AREA_PAIR_NOTE='A member of a degenerate pair: its effective area depends on the rotation within the pair, which any solution may choose.';
@@ -120,14 +120,17 @@ export function modeOptionLabel(i,modes){
  const word=inPair?'pair':Number.isFinite(m.fte)?polarizationWord(m.fte):null;
  return `Mode ${i+1}${word?' · '+word:''} · n_eff ${formatIndex(m.re)}`;
 }
-/** The modes of an optical run (two real indices and the vector samples). Studio computes f_TE
- * and A_eff from the saved field unless the engine's values came with a fresh run. */
+/** The modes of an optical run (1 to 8 modes, real or complex indices, its vector samples or,
+ * for a run of a file without fields, the values saved with it). f_TE and A_eff: the engine's
+ * when they came with the run, else computed by Studio from the saved field. */
 export function opticalModes(run){
  const keep=(key,values,source)=>Object.defineProperty(run,key,{value:{values,source},enumerable:false,configurable:true,writable:true});
- if(!run.te)keep('te',run.effective_index.map((_,i)=>teFraction(run.field,i)),'studio');
- // a run without samples (none is stored without them; a test may build one) has no A_eff
- if(!run.area)keep('area',run.effective_index.map((_,i)=>run.field?effectiveArea(run.field,i):null),'studio');
- return run.effective_index.map((re,i)=>({re,im:0,fte:run.te.values[i],loss:null,area:run.area.values[i]}));
+ const source=run.field?'engine':'file';
+ if(!run.te)run.te_polarization_fraction?keep('te',run.te_polarization_fraction,source):keep('te',run.effective_index.map((_,i)=>teFraction(run.field,i)),'studio');
+ // a run without samples and without saved areas (a test may build one) has no A_eff
+ if(!run.area)run.effective_area?keep('area',run.effective_area,source):keep('area',run.effective_index.map((_,i)=>run.field?effectiveArea(run.field,i):null),'studio');
+ const im=run.effective_index_im;
+ return run.effective_index.map((re,i)=>({re,im:im?im[i]:0,fte:run.te.values[i],loss:im&&im[i]!==0?propagationLoss(im[i],run.input.model.wavelength*1e-9):null,area:run.area.values[i]}));
 }
 /** The engine's effective_area (m²) of the first study point in a summary, or null. */
 export function engineEffectiveArea(summary){

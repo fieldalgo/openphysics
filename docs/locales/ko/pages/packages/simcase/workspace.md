@@ -183,8 +183,16 @@ Heated silicon waveguide 애플리케이션은 정상 열전도와 광 모드를
 **Optical modes**, 코어 메시 크기(20–60 nm)는 **Mesh**에서 정하며 새 모델은 500 × 220 nm
 실리콘 코어 하나와 1550 nm, 30 nm로 시작합니다. 코어 메시는 이 고굴절 재료
 형상에 적용하고 실리카·공기·CaF2·MgF2 형상은 점진적 배경 메시를 사용합니다. 계산창
-[-1.5, 1.5, -1.2, 1.2] µm, PEC 경계, 모드 두 개는 고정됩니다. 결과마다 사용한
-형상·파장·코어 메시를 표시합니다.
+[-1.5, 1.5, -1.2, 1.2] µm와 PEC 경계는 고정됩니다. **Modes to find**(**Optical modes**와
+**Study**에 있음, 1–8의 정수, 기본값 2)는 실행이 요청하는 모드 수를 정합니다. 엔진은 n = 1.45보다
+위(Re n_eff)인 모드를 Re n_eff 순서로 남깁니다. 도파 모드가 그보다 적으면 Results가 모드 표 위에
+*Found 3 of 8 modes above n = 1.45*라고 알리고, 표에는 그만큼의 행만 있습니다. 결과마다 사용한
+형상·파장·코어 메시를 표시하고 요청한 모드 수를 함께 보존합니다.
+
+Modes to find는 페이지 상태입니다. 세션 파일은 실행마다 이 값을 보존하고 세션을 열면 선택한
+실행의 값으로 설정되지만, 입력(프로젝트) 파일과 브라우저 초안은 이 값을 저장하지 않으며 실행하지
+않은 변경은 저장되지 않습니다. 새 모델은 2로 시작합니다. 모드 2개일 때 솔버 문서는 이전 Studio가
+보낸 문서와 바이트 단위로 같으므로 n_eff, TE 비율, 유효 면적이 바뀌지 않습니다.
 
 재료 굴절률은 선택한 파장에서 계산하며, 하한은 실리콘 데이터 범위 안에 있습니다.
 코어 메시를 거칠게 하면 계산이 빠르고 세션 파일이 작아지지만 n_eff가 달라집니다.
@@ -507,8 +515,9 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 Open inputs file과 같이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-8보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 9, newer than this Studio reads
-(versions 6–8). Open it in a newer Studio.”). 다른 `application`(“This session file holds a “…” model,
+9보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 10, newer than this Studio reads
+(versions 6–9). Open it in a newer Studio.”. 버전 9는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
+버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
 버전 6과 7 세션 파일은 이전처럼 열리고, 버전 1–5는 이전의 거부를 유지합니다. 버전 8 이전의 Studio는
@@ -577,7 +586,10 @@ field*, 세션 파일에서 연 실행은 *computed by Studio from the saved fie
 계산한 값을 보이고(Run details: *Effective area · computed by Studio from the saved field*), Studio가 그 값을
 보관하기 전에 저장한 버전 8 실행은 *Run again to compute*와 함께 “—”를 보입니다. 세션 버전은 바뀌지 않으며 광
 버전 7 파일은 이전과 바이트 단위로 같게 써집니다. 버전 8 파일은 이제 복소 유효 굴절률 `{re, im}`도 읽습니다. 실행 표 CSV의 `candidate`
-열 이름은 그대로입니다.
+열 이름은 그대로입니다. [버전 9](#광학-세션-파일버전-9) 광학 세션은 실행마다 엔진의
+`te_polarization_fraction`과 `effective_area`를 보존하므로, 그 파일에서 연 실행은 *computed by the engine from
+the saved field*를 보이고, 그 파일이 장을 보존하지 않은 실행은 *saved in the session file; its fields were not
+kept*를 보입니다.
 
 입력 JSON은 설계를, 세션 JSON은 검증된 결과까지 저장합니다. 열기로 복원하며
 입력 파일은 64 KiB, 세션은 16 MiB로 제한합니다. CSV·PNG 내보내기도 제공합니다.
@@ -601,26 +613,69 @@ CSV/PNG 내보내기에도 반영합니다.
 모든 형상을 설명하는 `shapes` 열(페이지처럼 nm)·후보 번호에는 단위가 없습니다.
 
 광학 세션 파일은 버전 7이며 입력은 버전 7 입력 파일입니다(버전 6 세션도 계속 읽고, 그 입력은 버전 6 입력
-파일로 읽습니다. 다중물리 모델은 [버전 8](#다중물리-모델의-세션-파일버전-8)로 저장합니다). 버전 6은 단위·이름 일괄 변경 이후의 형식입니다. 작업공간은 형식 0.3 문서(`"1550 nm"` 같은
+파일로 읽습니다. 다중물리 모델은 [버전 8](#다중물리-모델의-세션-파일버전-8)로, 버전 7이 담을 수 없는 실행이 있는
+세션은 [버전 9](#광학-세션-파일버전-9)로 저장합니다). 버전 6은 단위·이름 일괄 변경 이후의 형식입니다. 작업공간은 형식 0.3 문서(`"1550 nm"` 같은
 양 문자열의 길이, 정확한 `physmat:` 이름의 재료)를 만들고, 실행 기록마다 결과의
 `effective_index`(exp(−iωt)의 Re와 Im)와 미터 단위 `node_coordinates`를 가진 장 표본을 보존합니다.
 버전 1–5 세션은 이전 이름과 문서 길이 단위의 결과를 담고 있어, 다른 뜻으로 읽지 않도록 버전을
 밝혀 메시지와 함께 거부합니다. 버전 6 세션의 입력은 버전 6 입력 파일과 같습니다. 설계를 다시 넣어
 실행하고 새 세션을 저장하세요.
 
-실행 전에 `/api/workspace/capabilities/v7`을 확인합니다. 계약 버전 7(버전 6과 내용이 같으며 버전 7
-입력·세션 파일을 저장하는 작업공간용. 버전 6은 버전 5와 내용이 같으며 버전 6 파일과 문서 검사의 코드
-있는 `diagnostics`용)과
-`optical-shapes-v7` 어댑터는 nm 단위 계산창, 최대 형상 여덟 개·다각형 꼭짓점 열두 개,
+실행 전에 `/api/workspace/capabilities/v8`을 확인합니다. 계약 버전 8(모드 1–8개 실행을 위해 버전 7에서
+고정 `mode_count: 2`를 settings에서 빼고 `mode_count_range: [1, 8]`, `mode_count_default: 2`를 그 옆에 둠.
+버전 7은 버전 6과 내용이 같으며 버전 7 입력·세션 파일을 저장하는 작업공간용. 버전 6은 버전 5와 내용이 같으며
+버전 6 파일과 문서 검사의 코드 있는 `diagnostics`용)과
+`optical-shapes-v8` 어댑터(요청한 모드 수를 넣은 `optical-shapes-v7` 문서)는 nm 단위 계산창, 최대 형상 여덟 개·다각형 꼭짓점 열두 개,
 형상 종류와 `physmat:` 이름을 가진 재료 열 가지, 파장 1400–1700 nm와 코어 메시 20–60 nm
-범위(양 문자열), 고정된 계산창·경계·모드 조건(`mode_count`), `optical: true`, `coupled: false`,
-`simcase_version`을 알립니다. 계약이 없거나 다르면 실행을 차단하며
+범위(양 문자열), 고정된 계산창·경계 조건, 모드 수 범위, `optical: true`, `coupled: false`,
+`simcase_version`을 알립니다. 작업공간 요청(`workspace_instance`를 밝힌 요청)이 `/api/validate`나
+`/api/run`에 보낸 `em.modes2d` 물리의 `mode_count`가 범위 밖이면 *Modes to find must be a whole number
+from 1 to 8 (got 9).*로 거부합니다. 0, 9, 2.5, 2.0, `"2"`, `true`는 거부되며, 단일 페이지 Studio의 요청은
+문서 자체의 규칙으로 읽습니다. 계약이 없거나 다르면 실행을 차단하며
 **Check connection**으로 재시도합니다. 실행 시 보고된 simcase 패키지 버전을
 실행 당시 형상·파장·코어 메시와 함께 기록하고 세션 JSON에도 보존합니다. 이전 capability
-엔드포인트(`/api/workspace/capabilities`와 `/v2`–`/v6`)는 같은 경로와 schema 버전으로 유지합니다. 모든 어댑터가 이제 형식 0.3 문서를 쓰고
+엔드포인트(`/api/workspace/capabilities`와 `/v2`–`/v7`)는 같은 경로와 schema 버전으로 유지하며, `/v7`은 고정된 모드 두 개를 그대로 알립니다. 모든 어댑터가 이제 형식 0.3 문서를 쓰고
 새 결과 이름을 읽으므로 각각 계열의 다음 어댑터 버전(`optical-fixed-v2`, `optical-rectangle-v4`와
 `-v5`, `optical-shapes-v6`와 `-v7`)을 알리고 값은 양 문자열입니다. 전체 엔진 의존성이나 Git
 이력을 나타내는 정보는 아닙니다.
+
+### 광학 세션 파일(버전 9)
+
+모든 실행이 실수 모드 두 개와 장을 가진 세션은 이전과 바이트 단위로 같은 버전 7로 씁니다. 버전 7이 담을 수
+없는 실행(모드 1개 또는 3–8개, 복소 유효 굴절률, 장이 없는 실행, 모드 3 이상을 보이는 보기)이 생기면 버전 9로
+씁니다. 버전 6·7 파일을 열어도 다시 쓰지 않습니다. 그 실행은 모드 두 개로 읽고, TE 비율과 유효 면적은
+Studio가 저장 샘플에서 계산하며, 세션은 다시 버전 7로 써집니다. 버전 9 이전 Studio는 버전 9 파일을 *This
+session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.*로
+거부합니다. 다중물리 세션은 버전 8 그대로입니다. 브라우저 복구도 같은 텍스트를 보존하므로 같은 규칙을 따릅니다.
+
+버전 9 파일은 정확히 다음 키를 가진 JSON 객체 하나입니다: `format`(`"openphysics-studio-session"`),
+`version`(9), `application`(`"optical"`), `input`(버전 7 입력 파일), `runs`(최대 여섯 개), `selected`(실행의
+`job` 또는 null), `comparison`(`job` 두 개 또는 null), `view`(버전 7과 같되 `mode`는 0–7이며 선택한 실행의
+모드 수보다 작음). 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
+
+| 키 | 형식 | |
+| --- | --- | --- |
+| `job`, `completedAt`, `label`, `pinned`, `origin`, `serverVersion`, `input` | 버전 7과 같음 | 필수 |
+| `settings` | 버전 7과 같되 `adapter: "optical-shapes-v8"`, `mode_count` 1–8 | 필수 |
+| `effective_index` | 수 k개 또는 `{"re": [k], "im": [k]}`. 1 ≤ k ≤ `mode_count`, Re n_eff 순서, 모든 Re가 1.45보다 큼 | 필수 |
+| `field` | 모드 k개의 `{node_coordinates, triangles, real, imag}` | 선택 |
+| `te_polarization_fraction` | [0, 1]의 수 또는 null k개: 엔진의 값 | 선택, `field`가 없으면 필수 |
+| `effective_area` | 0보다 큰 m² 단위 수 또는 null k개: 엔진의 값 | 선택, `field`가 없으면 필수 |
+| `group_index`, `group_index_method` | 수 또는 null k개; 1–64자 텍스트(`group_index`와 함께만) | 선택, 군굴절률용으로 예약 |
+| `digest` | `"sha256:<hex>"` | 필수 |
+
+digest는 digest를 뺀 실행을 키 정렬 JSON(버전 8의 수 규칙, 음의 0은 `-0.0`)으로 쓴 텍스트의 SHA-256이므로
+실행의 다른 모든 키를 덮습니다. 바뀐 실행은 *Run 1 changed after it was saved (its check value does not
+match).*로 거부하며, 모드 수가 8을 넘으면 *Run 1 asks for 9 modes; this Studio reads 1 to 8.*로 거부합니다.
+수는 버전 8처럼 쓰며, Studio가 읽은 실행(그때 origin은 `imported`)으로 쓴 파일은 다시 써도 바이트 단위로
+같습니다. digest는 손상되거나 손으로 고친 파일을 찾아낼 뿐 인증이 아닙니다.
+
+템플릿 메시(삼각형 2275개)에서 모드 8개인 실행 여섯 개는 약 9.4 MB, 모드당 약 0.2 MB로 16 MiB 한도 안입니다.
+한도를 넘는 세션은 다중물리 세션처럼 먼저 묻습니다. *Keep fields for selected and pinned runs*는 나머지
+실행을 `field` 없이 n_eff·TE 비율·유효 면적과 함께 쓰고, Cancel은 아무것도 쓰지 않으며, 선택·고정 실행만으로도
+한도를 넘으면 그 실행들을 밝혀 저장을 거부합니다. 브라우저 복구는 전체 텍스트가 한도를 넘으면 묻지 않고 선택·고정
+실행의 장만 보존합니다. 장이 없는 실행은 모드 표를 보이지만 장 보기는 없고, Compare는 그 모드를 겹침으로 짝지을
+수 없다고 알립니다.
 
 ### Compare의 모드 짝짓기
 
@@ -947,8 +1002,8 @@ entry point 대상은 보내지 않습니다. 오류 텍스트는 `providers()`�
 보내므로 가져오기에 실패한 모듈 같은 파일 이름이 들어 있을 수 있습니다. Studio는
 기본적으로 이 컴퓨터에만 제공됩니다([패키지 개요](overview.md) 참고). 목록 자체를 읽지
 못하면 패널에 그렇게 표시하고 자세한 내용은 서버 로그에 남깁니다.
-이 패널은 작업공간 capability 계약을 바꾸지 않습니다(지금은 Joule 가열 입력 때문에
-`/api/workspace/capabilities/v7`).
+이 패널은 작업공간 capability 계약을 바꾸지 않습니다(지금은 모드 1–8개 실행 때문에
+`/api/workspace/capabilities/v8`).
 설치된 공급자를 아직 작업공간의 물리로 제공하지는 않으며, 이 목록은 설치 상태만 보여 줍니다.
 
 검사: `tests/simcase/test_studio_providers.py`(내장 공급자만, 주입한 공급자, 사용 불가

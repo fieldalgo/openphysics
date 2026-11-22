@@ -210,8 +210,17 @@ exactly in the solver document. Set the wavelength (1400–1700 nm) in
 with one 500 × 220 nm silicon core at 1550 nm and 30 nm. The core mesh size applies
 to those guiding materials; silica, air, CaF2 and MgF2 shapes use the graded
 background mesh. The window is fixed at [-1.5, 1.5, -1.2, 1.2] µm, with PEC
-boundaries and two modes. Each result shows the shapes, wavelength and core
-mesh it used.
+boundaries. **Modes to find** (in **Optical modes** and in **Study**; a whole number from 1 to
+8, 2 by default) sets how many modes a run asks for; the engine keeps the modes above
+n = 1.45 (Re n_eff), ranked by Re n_eff. When fewer are guided, Results says so above the modes
+table, *Found 3 of 8 modes above n = 1.45*, and the table has those rows. Each result shows the
+shapes, wavelength and core mesh it used and keeps the count it asked for.
+
+Modes to find is page state: a session file keeps it with each run, and opening a session sets
+it from the selected run, but an input (project) file and a browser draft do not store it, and
+a change to it that has not been run is not saved. A new model starts at 2. With 2 modes the
+solver document is byte for byte the one earlier Studios sent, so its n_eff, TE fraction and
+effective area are unchanged.
 
 Material indices are evaluated at the chosen wavelength; the lower limit stays
 inside the silicon data range. A coarser core mesh is faster and gives smaller
@@ -591,8 +600,10 @@ its runs and Undo stay as they were:
   read as Open inputs file reads one (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 8 is refused by name (“This session file is version 9, newer than this Studio
-reads (versions 6–8). Open it in a newer Studio.”), as are another `application` (“This session
+A version above 9 is refused by name (“This session file is version 10, newer than this Studio
+reads (versions 6–9). Open it in a newer Studio.”; version 9 is an
+[optical session](#optical-session-files-version-9), and a version 8 layout under version 9 is
+refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
 result “multiphysics-run-v2”, which this Studio does not read.”) and another document envelope
 (the server reader's refusal, named in the run). Session files of versions 6 and 7 open as
@@ -680,6 +691,10 @@ samples (Run details: *Effective area · computed by Studio from the saved field
 8 run saved before Studio kept it shows “—” with *Run again to compute*; no session version
 changes and optical version 7 files are written byte for byte as before. Version 8 files now also read a
 complex effective index `{re, im}`. The run-table CSV keeps its `candidate` column name.
+An optical session of [version 9](#optical-session-files-version-9) keeps the engine's
+`te_polarization_fraction` and `effective_area` with each run, so a run opened from it shows
+*computed by the engine from the saved field*; a run whose fields that file did not keep shows
+*saved in the session file; its fields were not kept*.
 
 Save input JSON to keep the design, or save session JSON to include validated
 results. Open restores these files; input-only files are limited to 64 KiB and
@@ -714,7 +729,8 @@ page shows it) and the candidate number carry no unit.
 
 Optical session files are version 7, whose input is an input file of version 7 (a version 6
 session is still read, its input as a version 6 input file; a multiphysics model is saved as
-[version 8](#session-files-of-multiphysics-models-version-8)); version 6 was written since the units and naming batch: the workspace
+[version 8](#session-files-of-multiphysics-models-version-8); a session with a run that version 7
+cannot hold is saved as [version 9](#optical-session-files-version-9)); version 6 was written since the units and naming batch: the workspace
 builds a format 0.3 document (lengths as quantity strings such as `"1550 nm"`, materials
 under their exact `physmat:` names) and each run record keeps the result's
 `effective_index` (Re and Im under exp(−iωt)) and field samples with `node_coordinates` in
@@ -723,23 +739,75 @@ results under the earlier names and the document length unit; the workspace refu
 by version with a message instead of reading them under another meaning. Enter the design
 again, run it and save a new session.
 
-The workspace checks `/api/workspace/capabilities/v7` before enabling Run. Contract
-version 7 (the content of version 6, for a workspace that saves input and session files of
+The workspace checks `/api/workspace/capabilities/v8` before enabling Run. Contract
+version 8 (the content of version 7 with runs of 1 to 8 modes: the settings drop the fixed
+`mode_count: 2`, and `mode_count_range: [1, 8]` and `mode_count_default: 2` stand beside them;
+version 7 is the content of version 6, for a workspace that saves input and session files of
 version 7; version 6 is the content of version 5 for files of version 6 and the coded
 `diagnostics` of a document check) and adapter
-`optical-shapes-v7` declare the window in nm, at most eight
+`optical-shapes-v8` (the document of `optical-shapes-v7` with the mode count asked for) declare the window in nm, at most eight
 shapes and twelve polygon vertices, the shape types and the ten materials with their
 `physmat:` names, the 1400–1700 nm wavelength and 20–60 nm core mesh ranges (quantity
-strings), the fixed window, boundary and mode settings (`mode_count`),
-`optical: true`, `coupled: false` and `simcase_version`. A missing or incompatible
+strings), the fixed window and boundary settings, the mode count range,
+`optical: true`, `coupled: false` and `simcase_version`. A workspace request (one that names
+its `workspace_instance`) to `/api/validate` or `/api/run` whose `em.modes2d` physics asks
+for another `mode_count` is refused with *Modes to find must be a whole number from 1 to 8
+(got 9).*: 0, 9, 2.5, 2.0, `"2"` and `true` are refused; requests of the single-page Studio
+are read under the document's own rules. A missing or incompatible
 contract blocks execution; **Check connection** retries. Each submitted run
 captures its shapes, wavelength, core mesh and the reported simcase package version and preserves them in session JSON.
-The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v6`) remain
-available at the same paths and schema versions;
+The earlier capability endpoints (`/api/workspace/capabilities` and `/v2` to `/v7`) remain
+available at the same paths and schema versions, `/v7` with its fixed two modes;
 because every adapter now writes format 0.3 documents and reads the new result names, each
 names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,
 `optical-shapes-v6` and `-v7`), with its values as quantity strings.
 This is not a complete engine dependency or Git provenance record.
+
+### Optical session files (version 9)
+
+A session in which every run has two real modes and its fields is written as version 7, byte
+for byte as before. Version 9 is written once the session holds a run that version 7 cannot
+hold: a run of 1 or of 3 to 8 modes, a complex effective index, a run without its fields, or a
+view of mode 3 or higher. Opening a version 6 or 7 file never rewrites it: its runs read two
+modes, with the TE fraction and effective area Studio computes from the saved samples, and the
+session is written as version 7 again. A Studio before version 9 refuses a version 9 file with
+*This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a
+newer Studio.* Multiphysics sessions stay version 8. Browser recovery keeps the same text, so
+the same rules apply.
+
+A version 9 file is one JSON object with exactly the keys `format`
+(`"openphysics-studio-session"`), `version` (9), `application` (`"optical"`), `input` (an input
+file of version 7), `runs` (at most six), `selected` (a run's `job` or null), `comparison` (two
+`job`s or nulls) and `view` (as in version 7, with `mode` 0 to 7 and below the selected run's
+mode count). Each run has these keys, in this order; any other key is refused by name:
+
+| Key | Type | |
+| --- | --- | --- |
+| `job`, `completedAt`, `label`, `pinned`, `origin`, `serverVersion`, `input` | as in version 7 | required |
+| `settings` | version 7's, with `adapter: "optical-shapes-v8"` and `mode_count` 1 to 8 | required |
+| `effective_index` | k numbers, or `{"re": [k], "im": [k]}`; 1 ≤ k ≤ `mode_count`, ranked by Re n_eff, every Re above 1.45 | required |
+| `field` | `{node_coordinates, triangles, real, imag}` of k modes | optional |
+| `te_polarization_fraction` | k numbers in [0, 1] or null: the engine's | optional; required without `field` |
+| `effective_area` | k numbers in m² above 0 or null: the engine's | optional; required without `field` |
+| `group_index`, `group_index_method` | k numbers or null; a text of 1 to 64 characters (only with `group_index`) | optional, reserved for the group index |
+| `digest` | `"sha256:<hex>"` | required |
+
+The digest is the SHA-256 of the run without its digest, as sorted-key JSON with the number
+rules of version 8 (negative zero written `-0.0`), so it covers every other key the run has; a
+changed run is refused with *Run 1 changed after it was saved (its check value does not
+match).* A mode count over 8 is refused with *Run 1 asks for 9 modes; this Studio reads 1 to
+8.* Numbers are written as in version 8; a file Studio wrote from runs it read (whose origin is
+then `imported`) is written again byte for byte. The digest detects a damaged or hand-edited
+file; it is not an authentication.
+
+Six runs of 8 modes on the template's mesh (2275 triangles) are about 9.4 MB, about 0.2 MB per
+mode, under the 16 MiB limit. A session over the limit asks first, as a multiphysics session
+does: *Keep fields for selected and pinned runs* writes the other runs without `field`, with
+their n_eff, TE fractions and effective areas; Cancel writes nothing; when even the selected
+and pinned runs are over the limit, the save is refused, naming them. Browser recovery keeps
+the fields of the selected and pinned runs only, without asking, when the full text is over
+the limit. A run without fields shows its modes table, but no field view, and Compare says it
+cannot match its modes by overlap.
 
 ### Matching modes in Compare
 
@@ -1105,7 +1173,7 @@ sent as `providers()` reports it, so it can name a file, such as the module an
 import failed in; Studio serves only this computer by default (see the
 [package overview](overview.md)). If the list itself cannot be read, the panel
 says so and the server log holds the details. The panel does not change the workspace
-capability contract (now `/api/workspace/capabilities/v7`, for the Joule heating inputs). Installed providers are not yet offered as
+capability contract (now `/api/workspace/capabilities/v8`, for runs of 1 to 8 modes). Installed providers are not yet offered as
 workspace physics; the list only shows what is installed.
 
 Checks: `tests/simcase/test_studio_providers.py` (the built-in provider alone, an
