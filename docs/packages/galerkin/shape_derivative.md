@@ -199,7 +199,7 @@ h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - It must therefore compute with array operations on the points it is given, and be pure.
   A callback that returns NumPy numbers for live points (`np.asarray`, `np.ones(len(p))`),
   or raises on them, is refused with a `TypeError` that names it.
-- Not covered yet: coordinate callbacks in thermoelasticity and 3D heat, and callable coefficients
+- Not covered yet: coordinate callbacks in thermoelasticity, and callable coefficients
   (conductivity and the rest) or Dirichlet values.
 
 `tests/galerkin/test_shape_derivative_callbacks.py` holds E1–E7, pre-registered on 2026-11-22:
@@ -381,7 +381,13 @@ their nodes (the 3D solver has no flux or convection).
     always refused.
   - The extension solves the P1 Laplace problem in 3D per component (`"stiffened"`
     divides by the volume).
-- A source callback is refused with a motion: its sample points move.
+- A source callback of the (T, 3) centroids is taken with a motion (2026-11-22). It is
+  called once more at the live centroids, so it must compute with the JAX or PyTorch
+  array it gets; the result's `heat_source_density` then carries the derivative too.
+  `tests/galerkin/test_shape_derivative_3d_callbacks.py` holds E3D1–E3D6: every field
+  equals the moved mesh's ordinary solve within 1e-12, the derivative equals Richardson
+  differences within 1e-8, JAX and PyTorch agree within 1e-12, and the fixed source
+  Q0·x in a stretched box gives the closed-form heat rate and its derivative within 1e-10.
 
 `tests/galerkin/test_shape_derivative_3d.py` holds T1–T10, pre-registered on
 2026-11-21 before the implementation ran, and measured that day:
@@ -453,7 +459,7 @@ Each refusal names the reason:
   density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat, and coordinate
-  callbacks that compute with the live points in steady and transient heat, for the current density and in elasticity (above);
+  callbacks that compute with the live points in steady, transient and 3D heat, for the current density and in elasticity (above);
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
