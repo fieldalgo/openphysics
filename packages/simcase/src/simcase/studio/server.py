@@ -741,7 +741,7 @@ async def validate_multiphysics(request: Request):
     except RequestRefused as exc:
         return exc.reply()
     except Exception as exc:
-        return JSONResponse({"detail": reply_text(exc, "multiphysics validation")}, status_code=400,
+        return JSONResponse({"detail": reply_text(exc, "multiphysics validation")}, status_code=500,
                             headers={"Cache-Control": "no-store"})
 
 

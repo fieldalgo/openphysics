@@ -134,7 +134,7 @@ try {
   for (let i = 0; i < 120 && !target; i++) { try { target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json()).find(t => t.type === 'page'); } catch {} if (!target) await sleep(250); }
   if (!target) throw new Error('Browser DevTools endpoint unavailable');
   const page = new Page(target.webSocketDebuggerUrl); await page.ready;
-  await page.call('Runtime.enable'); await page.call('Page.enable');
+  await page.call('Runtime.enable'); await page.call('Page.enable'); await page.call('DOM.enable');
   const size = (width, height, mobile = false) => page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
   const overflow = () => page.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
   const runReady = () => page.until("!document.getElementById('run-multiphysics').disabled", 'Run enabled', 60000);
@@ -223,6 +223,24 @@ try {
   const alone = Number(await page.attr('[data-neff-alone="1"]', 'data-neff-value'));
   assert.ok(Number(shown) > alone, `coupled ${shown} above uncoupled ${alone}`);
   stage('MB6 uncoupled comparison', {uncoupled_neff: alone, shift: Number(shown) - alone});
+
+  // MB7a: Open model file: the server's reader sees the text; a duplicate key is refused by
+  // name and the model stays; the shipped heated slab example then opens as a model
+  const setFile = async path => {
+    const {root} = await page.call('DOM.getDocument');
+    const {nodeId} = await page.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#project-file'});
+    await page.call('DOM.setFileInputFiles', {nodeId, files: [path]});
+  };
+  const duplicate = join(out, 'duplicate-key.json');
+  await writeFile(duplicate, '{"openphysics": "0.3/multiphysics.1", "name": "a", "name": "b"}', 'utf8');
+  await setFile(duplicate);
+  await page.until("/Open failed: .*appears more than once/.test(document.getElementById('file-status').textContent)", 'duplicate key refused');
+  assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
+  await setFile(resolve('examples/simcase/multiphysics_heated_slab.json'));
+  await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'example opened');
+  await runReady();
+  assert.match(await page.text('#project'), /^Multiphysics model \/ Opened from multiphysics_heated_slab\.json$/);
+  stage('MB7a open model file');
 
   // MB7: the screens at 1440 x 900 and 390 px: no document overflow
   const screens = {};

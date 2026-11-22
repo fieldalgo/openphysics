@@ -153,6 +153,16 @@ def test_a_studio_run_gives_the_engines_numbers_with_progress_events(client):
     mesh = result["mesh"]
     assert len(mesh["triangles"]) == len(coupled["temperature"])
     assert mesh["region_names"] == list(engine.results["modes1"].region_names)
+    # n - n0 = (dn/dT)(T - T_ref) per triangle: Si 1.8e-4 1/K in the core, the heater's 0 1/K
+    change = result["physics"]["modes1"]["coupled"]["index_change"]
+    for t, r, dn in zip(coupled["temperature"], mesh["regions"], change):
+        name = mesh["region_names"][r]
+        expected = {"core": 1.8e-4 * (t - 300.0), "heater": 0.0, "background": 1.0e-5 * (t - 300.0)}[name]
+        assert dn == pytest.approx(expected, rel=1e-12, abs=1e-18)
+    # and the engine's n moved by exactly that much from n0 in the heater (dn/dT 0): n = 1.444
+    heater = mesh["region_names"].index("heater")
+    assert {n for n, r in zip(result["physics"]["modes1"]["coupled"]["refractive_index"]["n"], mesh["regions"])
+            if r == heater} == {1.444}
     # the heater warms the core: every core triangle is above 300 K
     core = mesh["region_names"].index("core")
     assert min(t for t, r in zip(coupled["temperature"], mesh["regions"]) if r == core) > 300.0
@@ -221,6 +231,18 @@ def test_a_failure_names_the_physics_and_an_unexpected_one_keeps_its_details_in_
     assert [e["event"] for e in events] == ["physics_started", "physics_finished", "physics_started"]
 
 
+def test_a_job_whose_thread_does_not_start_holds_no_slot(api):
+    jobs = api.Jobs()
+
+    def refuse(target, args):
+        raise RuntimeError("cannot start a thread")
+
+    for _ in range(api.MAX_RUNNING + 1):
+        with pytest.raises(RuntimeError):
+            jobs.start(template(), [], refuse)
+    assert jobs.jobs == {}
+
+
 def test_stop_ends_a_run_at_its_next_step_and_keeps_nothing(api):
     jobs = api.Jobs()
     held = []
@@ -257,6 +279,15 @@ def test_refusals_are_named(client, api, monkeypatch):
     assert checked["ok"] is True and checked["run_refusal"] == api.SWEEP_REFUSAL
     refused = client.post("/api/multiphysics/run", json={"doc": sweep})
     assert refused.status_code == 400 and refused.json()["detail"].startswith("Sweeps of coupled models cannot run")
+    # a one-physics sweep: this view runs one point
+    single = template()
+    del single["physics"]["heat1"], single["couplings"]
+    single["openphysics"] = "0.3"
+    for record in single["materials"].values():
+        record.pop("thermo_optic_coefficient"), record.pop("reference_temperature")
+    single["study"] = sweep["study"]
+    assert client.post("/api/multiphysics/validate", json={"doc": single}).json()["run_refusal"] == api.SINGLE_SWEEP_REFUSAL
+    assert client.post("/api/multiphysics/run", json={"doc": single}).status_code == 400
     # a kind Studio does not run
     other = template()
     other["physics"]["electric1"] = {"type": "electric.steady2d"}

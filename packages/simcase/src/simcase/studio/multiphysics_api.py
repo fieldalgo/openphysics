@@ -49,6 +49,8 @@ STUDIO_TYPES = {
 COMPOUND_TYPES = frozenset({"joule.steady2d", "joule.temperature2d", "mechanics.thermoelastic2d"})
 SWEEP_REFUSAL = ("Sweeps of coupled models cannot run in this release. Studio checks the sweep, but running it "
                  "is refused. Choose Single run, or sweep a model with one physics.")
+SINGLE_SWEEP_REFUSAL = ("This view runs one point. Sweep a model with one physics in its own application, or with "
+                        "simcase run.")
 MAX_RUNNING = 2
 MAX_FINISHED = 8
 
@@ -139,8 +141,8 @@ def studio_refusal(tree: dict) -> str | None:
         return ("Studio runs heat transfer and optical modes in a multiphysics model; this model also has "
                 + ", ".join(str(t) for t in others) + ". Run it with simcase run.")
     study = tree.get("study") if isinstance(tree.get("study"), dict) else {}
-    if tree.get("openphysics") == multiphysics.ENVELOPE and study.get("type") == "sweep":
-        return SWEEP_REFUSAL
+    if study.get("type") == "sweep":
+        return SWEEP_REFUSAL if tree.get("openphysics") == multiphysics.ENVELOPE else SINGLE_SWEEP_REFUSAL
     return None
 
 
@@ -186,8 +188,13 @@ class Jobs:
             for key in finished[:-MAX_FINISHED] if len(finished) > MAX_FINISHED else []:
                 del self.jobs[key]
             self.jobs[job_id] = {"status": "running", "events": [], "solving": None, "stop": False,
-                                 "error": None, "result": None, "started": time.time()}
-        start_thread(self.work, (job_id, doc))
+                                 "error": None, "result": None}
+        try:
+            start_thread(self.work, (job_id, doc))
+        except Exception:
+            with self.lock:
+                del self.jobs[job_id]          # never a job that holds a slot and never runs
+            raise
         return {"job": job_id, "solve_order": derived_order(tree)}
 
     def _event(self, job_id, event):
@@ -278,7 +285,32 @@ def _regions(res):
     return res.regions if hasattr(res, "regions") else res.triangle_regions
 
 
-def _physics_payload(type_name: str, res) -> dict:
+def _index_change(doc, res, temperature) -> list | None:
+    """n - n0 per triangle, (dn/dT)(T - T_ref), from the whole document's SI values (``doc.si``; a
+    physics' own view leaves out the keys another physics reads) and
+    physmat's thermo-optic data for a library material: the law the engine applies, so the map of
+    the change needs no unit parsing in the page. None when a material has no model."""
+    import physmat
+    per_region = []
+    for region in res.region_names:
+        ref = res.region_materials.get(region)
+        if isinstance(ref, str) and ref.startswith("physmat:"):
+            data = physmat.material(ref[len("physmat:"):]).properties.get("thermo_optic_dn_dT")
+            if data is None:
+                return None
+            per_region.append((float(data.value), float(multiphysics.LIBRARY_REFERENCE_TEMPERATURE)))
+        else:
+            record = (doc.si.get("materials") or {}).get(ref) or {}
+            if "thermo_optic_coefficient" not in record or "reference_temperature" not in record:
+                return None
+            per_region.append((float(record["thermo_optic_coefficient"]), float(record["reference_temperature"])))
+    regions = np.asarray(res.regions)
+    coefficient = np.array([c for c, _ in per_region])[regions]
+    reference = np.array([t for _, t in per_region])[regions]
+    return (coefficient * (np.asarray(temperature, dtype=float) - reference)).tolist()
+
+
+def _physics_payload(type_name: str, res, doc) -> dict:
     summary = json.loads(json.dumps(res.summary(), default=str))
     if type_name not in ("thermal.steady2d", "em.modes2d"):    # a kind without Studio views: its summary
         return {"type": type_name, "summary": summary}
@@ -294,7 +326,8 @@ def _physics_payload(type_name: str, res) -> dict:
         out["coupled"] = {"temperature": {"unit": "K", "location": "element",
                                           "values": np.asarray(coupled["temperature"], dtype=float).tolist()},
                           "refractive_index": {"location": "element", "n": n.real.tolist(),
-                                               "k": n.imag.tolist() if np.iscomplexobj(n) else None}}
+                                               "k": n.imag.tolist() if np.iscomplexobj(n) else None},
+                          "index_change": _index_change(doc, res, coupled["temperature"])}
     return out
 
 
@@ -304,7 +337,7 @@ def result_payload(result) -> dict:
     return {"result": summary["result"], "name": summary["name"], "solve_order": summary["solve_order"],
             "couplings": summary["couplings"], "loops": summary["loops"], "timing": summary["timing"],
             "diagnostics": summary["diagnostics"], "mesh": None if first is None else _mesh(first),
-            "physics": {name: _physics_payload(result.doc.si["physics"][name]["type"], r)
+            "physics": {name: _physics_payload(result.doc.si["physics"][name]["type"], r, result.doc)
                         for name, r in result.results.items()}}
 
 
@@ -314,4 +347,4 @@ def single_payload(doc: Document, name: str, res) -> dict:
     return {"result": summary.get("result_format") or summary.get("field_layout"), "name": doc.si.get("name"),
             "solve_order": [[name]], "couplings": {}, "loops": [], "timing": {},
             "diagnostics": [d.as_dict() for d in doc.diagnostics], "mesh": _mesh(res),
-            "physics": {name: _physics_payload(doc.si["physics"][name]["type"], res)}}
+            "physics": {name: _physics_payload(doc.si["physics"][name]["type"], res, doc)}}

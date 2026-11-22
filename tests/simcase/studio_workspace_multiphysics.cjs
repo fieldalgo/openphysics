@@ -39,6 +39,9 @@ test('the envelope follows the couplings and kinds: one physics is format 0.3, a
  assert.equal(added.name,'heat1');assert.equal(added.becameMultiphysics,true);assert.equal(added.doc.openphysics,'0.3/multiphysics.1');
  assert.equal(m.addPhysics(added.doc,c.types.get('thermal.steady2d')).name,'heat2');
  assert.throws(()=>m.addPhysics(one,c.types.get('joule.steady2d')),/solves its own coupling/);
+ // another format is kept as written, so the check refuses it by name; an opened file is not normalized
+ assert.equal(m.normalizeEnvelope({...heated(),openphysics:'0.2'}).openphysics,'0.2');
+ assert.equal(m.normalizeEnvelope({openphysics:'9',physics:{a:{type:'em.modes2d'}}}).openphysics,'9');
  // two physics of one kind and no coupling: one spelling, format 0.3
  const twoHeat=m.addPhysics(m.removePhysics(added.doc,'modes1'),c.types.get('thermal.steady2d')).doc;
  assert.equal(twoHeat.openphysics,'0.3');
@@ -116,6 +119,8 @@ test('the one-click fixes write what the design says: Accept iteration step, Fil
  const m=await mp,doc=relays({ab:{from:'a.y',to:'b.x',transfer:'same_mesh'},ba:{from:'b.y',to:'a.x',transfer:'same_mesh'}});
  const {doc:next,index}=m.acceptLoop(doc,cycleProposal);
  assert.equal(index,0);assert.deepEqual(next.study,{type:'single',loops:[cycleProposal]});assert.equal(m.loopIndexOf(next,['b','a']),0);
+ // accepting twice (a double click on a stale message) adds nothing
+ const again=m.acceptLoop(next,cycleProposal);assert.equal(again.already,true);assert.equal(again.doc.study.loops.length,1);
  assert.deepEqual(m.removeLoop(next,0).study,{type:'single'});
  const bare={...heated(),materials:{heater:{refractive_index:1.5,thermal_conductivity:'100 W/(m K)',source:'mine'}}};
  const filled=m.fillThermoOptic(bare,'heater');
@@ -166,10 +171,11 @@ test('progress rows follow the engine events: done, solving, iterations, did not
  const failed=m.progressRows([['a','b'],['c']],cyc,loopEv,'error',{code:'E-LOOP-DIVERGED',physics:['a','b'],residuals:[0.84],unit:'K'});
  assert.deepEqual(failed.map(r=>[r.state,r.text]),[['did-not-settle','Did not settle in 30 iterations'],['not-run','Not run']]);
  assert.equal(m.failureText({code:'E-LOOP-DIVERGED',physics:['a','b'],residuals:[1,0.84],unit:'K'},cyc),'a ⇄ b did not settle in 30 iterations. The largest change in the last iteration was 0.84 K (target 1e-6 K). No results were kept, because the last iteration is not a solution. Lower the relaxation (for example 0.3) or raise the iteration limit, then run again.');
+ assert.equal(m.formatValue(0),'0');assert.equal(m.formatValue(3.1e-4),'3.1e-4');
  assert.equal(m.failureText({message:'boom',physics:'modes1'},doc),'Modes 1 failed, so the run kept no result: boom');
  assert.equal(m.progressRows([['a','b']],cyc,[...loopEv,{event:'loop_finished',physics:['a','b'],iterations:9}],'done')[0].text,'Settled in 9 iterations');
 });
-test('results: the coupling check in words, n − n₀ from the material data, the uncoupled document',async()=>{
+test('results: the coupling check in words, the n_eff rows, the uncoupled document',async()=>{
  const m=await mp,doc=heated();
  // two triangles: one in the core (physmat:Si), one in the heater (dn/dT 0)
  const result={solve_order:[['heat1'],['modes1']],mesh:{node_coordinates:[[0,0],[1,0],[0,1],[1,1]],triangles:[[0,1,2],[1,3,2]],regions:[0,1],region_names:['core','heater','background']},
@@ -179,7 +185,6 @@ test('results: the coupling check in words, n − n₀ from the material data, t
   sent:'4 node temperatures, 300.0–303.5 K',received:'2 triangle means (mean of 3 nodes)',check:'Passed · max |received − sent| = 0 K · same mesh: node values arrived unchanged',passed:true}]);
  const failed=structuredClone(result);failed.couplings.heat1_to_modes1.max_abs_difference.value=1e-9;assert.equal(m.couplingCheckRows(failed,doc)[0].passed,false);
  const power=structuredClone(result);power.couplings.heat1_to_modes1.conservation_residual=2e-16;assert.match(m.couplingCheckRows(power,doc)[0].check,/conservation \|Σ sent − Σ received\| \/ \|Σ sent\| = 2\.0e-16/);
- const dn=m.indexChange(result,doc,'modes1');assert.ok(Math.abs(dn[0]-1.8e-4)<1e-15);assert.equal(dn[1],0);
  assert.deepEqual(m.effectiveIndexRows(result.physics.modes1),[{point:0,mode:1,value:2.6},{point:0,mode:2,value:2.1}]);
  assert.deepEqual(m.resultPages(result).map(p=>p.label),['Heat 1','Modes 1','Coupling check']);
  const alone=m.uncoupledDocument(doc,'modes1');

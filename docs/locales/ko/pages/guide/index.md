@@ -74,7 +74,7 @@ Python에서 제공하는 기능이 JSON/CLI나 Studio에도 자동으로 제공
 ## 실험적 모델 workspace
 
 [작업 공간 빠른 시작](../packages/simcase/workspace_quickstart.md)에서 설치, 설계 두 개, 비교, 복구를 따라 해 보세요. [Workspace 안내](../packages/simcase/workspace.md)는 제한된 광학 실행, 정상 열전도 판과
-입력·session 저장을 설명합니다. 가열 도파관 화면은 설정 미리보기이며 연계 물리를 실행하지 않습니다.
+입력·session 저장을 설명합니다. Heated silicon waveguide는 열 → 광 모드를 결합한 모델 하나로 풉니다.
 기존 광학·열 Studio와 파일 형식 및 지원 범위가 다릅니다.
 
 ## 내 모델로 확장하기

@@ -45,8 +45,11 @@ export function couplingTitle(doc,name){const c=doc.couplings?.[name];if(!isObje
 
 // ---- the envelope ---------------------------------------------------------------------------
 // A document with couplings or physics of two kinds is a multiphysics document; one with one
-// kind and no couplings is written as format 0.3. Empty couplings and loops are left out.
+// kind and no couplings is written as format 0.3. Empty couplings and loops are left out. Only
+// those two spellings are switched: another format is kept, so the check refuses it by name.
+// Applied after an edit that adds or removes physics, couplings or loops, never on open.
 export function normalizeEnvelope(doc){
+ if(doc?.openphysics!=='0.3'&&doc?.openphysics!==ENVELOPE)return clone(doc);
  const next=clone(doc);
  if(isObject(next.couplings)&&!Object.keys(next.couplings).length)delete next.couplings;
  if(isObject(next.study)&&Array.isArray(next.study.loops)&&!next.study.loops.length)delete next.study.loops;
@@ -142,6 +145,7 @@ export function suggestionText(s){
 // ---- loops ----------------------------------------------------------------------------------
 // Accept iteration step: the loop entry the engine proposed in its cycle diagnostic.
 export function acceptLoop(doc,proposal){
+ const existing=loopIndexOf(doc,proposal.physics||[]);if(existing>=0)return {doc:clone(doc),index:existing,already:true};
  const next=clone(doc);next.study=isObject(next.study)?next.study:{type:'single'};
  next.study.loops=[...(Array.isArray(next.study.loops)?next.study.loops:[]),clone(proposal)];
  return {doc:next,index:next.study.loops.length-1};
@@ -327,7 +331,7 @@ export function renderMultiphysicsGraph(layout,selection,states={}){
 
 // ---- running --------------------------------------------------------------------------------
 const seconds=s=>`${Number(s).toFixed(s<10?1:0)} s`;
-export function formatValue(v){return Math.abs(v)>=1e-3&&Math.abs(v)<1e5?String(Number(v.toPrecision(3))):v.toExponential(1);}
+export function formatValue(v){if(v===0)return '0';return Math.abs(v)>=1e-3&&Math.abs(v)<1e5?String(Number(v.toPrecision(3))):v.toExponential(1);}
 // One row per solve-order group: its state from the progress events of the run.
 export function progressRows(order,doc,events=[],status='running',error=null){
  const rows=order.map(group=>{const loop=group.length>1?loopIndexOf(doc,group):-1;
@@ -379,15 +383,6 @@ export function couplingCheckRows(result,doc){
 export function effectiveIndexRows(payload){
  const series=payload.effective_index,values=Array.isArray(series?.values)?series.values:Array.isArray(series?.re)?series.re:[];
  const rows=[];values.forEach((point,i)=>(Array.isArray(point)?point:[point]).forEach((v,m)=>rows.push({point:i,mode:m+1,value:v})));return rows;
-}
-function quantityNumber(value){if(typeof value==='number')return value;const n=parseFloat(String(value));return Number.isFinite(n)?n:null;}
-// n − n₀ per triangle from the material data: (dn/dT) (T − T_ref) of each triangle's material.
-export function indexChange(result,doc,name){
- const coupled=result.physics[name]?.coupled;if(!coupled)return null;
- const block=geometryBlock(doc),regionMaterial={};for(const f of block?.features||[])regionMaterial[f.name]=f.material;regionMaterial.background=block?.background?.material;
- const model=ref=>{if(PHYSMAT_THERMO_OPTIC[ref])return PHYSMAT_THERMO_OPTIC[ref];const r=doc.materials?.[ref];if(!isObject(r))return null;const c=quantityNumber(r.thermo_optic_coefficient),t=quantityNumber(r.reference_temperature);return c===null||t===null?null:{coefficient:c,reference:t};};
- const per=result.mesh.region_names.map(region=>model(regionMaterial[region]));
- return coupled.temperature.values.map((T,i)=>{const m=per[result.mesh.regions[i]];return m?m.coefficient*(T-m.reference):0;});
 }
 // The Results pages of a run: one per physics, then the coupling check.
 export function resultPages(result){return [...Object.keys(result.physics).map(n=>({id:'results:'+n,label:physicsLabel(n)})),...(Object.keys(result.couplings||{}).length?[{id:'results:check',label:'Coupling check'}]:[])];}

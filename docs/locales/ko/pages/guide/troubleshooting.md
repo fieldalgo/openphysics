@@ -36,8 +36,8 @@ Studio에서는 화면에 나온 작업·오류를 보존하고 연결·capabili
 반복 제출하지 마세요. 입력을 바꾼 뒤 남아 있는 오래된 화면은 새 모델의 결과가 아닙니다.
 
 [실험 workspace](../packages/simcase/workspace.md)는 자체 capability와 입력·session 형식을
-사용합니다. 가열 도파관은 설정 미리보기이므로 연계 카드가 보인다고 연계 계산이 가능한
-것은 아닙니다. 후보 index도 모드 추적을 뜻하지 않으며, 각자 정규화한 색상은 공통 전력
+사용합니다. Heated silicon waveguide는 열 → 광 모드 결합 하나를 실행하며, 예전 입력 파일의 개념
+미리보기에 보이는 다른 결합은 실행되지 않습니다. 후보 index도 모드 추적을 뜻하지 않으며, 각자 정규화한 색상은 공통 전력
 척도가 아닙니다. 기존 [정상](../packages/simcase/thermal_studio.md)·
 [과도](../packages/simcase/thermal_transient_studio.md) Studio는 별도 복구·자원 정책을 따릅니다.
 

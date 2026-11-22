@@ -8,7 +8,7 @@
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,
- mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,indexChange,resultPages,uncoupledDocument} from './workspace-multiphysics.mjs';
+ mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -32,8 +32,16 @@ export function createMultiphysicsView(ctx){
  async function loadCapabilities(){try{caps=await ctx.request('GET','/api/multiphysics/capabilities');catalog=kindCatalog(caps);capsError=null;}catch(e){capsError=e.message;}}
  async function open(tree,label,{fromFile=false}={}){
   if(!caps)await loadCapabilities();
-  active=true;doc=normalizeEnvelope(tree);undoStack=[];redoStack=[];savedSignature=fromFile?signature():null;savedFile=fromFile?{name:label,kind:'Opened from',at:null}:null;selection='model';lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
+  active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];savedSignature=fromFile?signature():null;savedFile=fromFile?{name:label,kind:'Opened from',at:null}:null;selection='model';lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   ctx.onHistory();validate(true);ctx.ui.page='Model';ctx.render();notice(`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`);
+ }
+ // A file is read by the server's reader first: a duplicate key or text that is not JSON is
+ // refused with the reader's words, never resolved silently by the browser's JSON.parse.
+ async function openText(text,name){
+  const reply=await ctx.requestRaw('/api/multiphysics/validate','{"doc":'+text+'}');
+  const unreadable=(reply.diagnostics||[]).filter(d=>d.code==='E-JSON'||d.code==='E-KEY-DUPLICATE');
+  if(reply.detail||unreadable.length)throw new Error(reply.detail||unreadable.map(d=>`${d.path?d.path+': ':''}${d.message}`).join('; '));
+  await open(JSON.parse(text),name,{fromFile:true});
  }
  async function openTemplate(){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide');}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
  function close(){active=false;stopPolling();}
@@ -49,11 +57,15 @@ export function createMultiphysicsView(ctx){
  function redo(){if(!redoStack.length)return;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();notice('Redo · model edit redone; nothing was computed.');}
  // ---- the live check ----
  function validate(now=false){
-  clearTimeout(checkTimer);check.pending=true;refreshRun();
-  const go=async()=>{const seq=++checkSeq,sent=clone(doc);
-   try{const reply=await ctx.request('POST','/api/multiphysics/validate',{doc:sent});if(seq!==checkSeq)return;check={pending:false,error:null,...reply};}
-   catch(e){if(seq!==checkSeq)return;check={pending:false,diagnostics:[],solve_order:check.solve_order,run_refusal:null,error:e.message};}
-   messages=mapDiagnostics(doc,catalog,check.diagnostics);if(active)ctx.render();};
+  // the sequence moves now, so a reply for an earlier document is dropped even if it arrives
+  // before this check is sent; until the new reply, the fixes of the old messages are disabled
+  clearTimeout(checkTimer);check.pending=true;const seq=++checkSeq;refreshRun();
+  const go=async()=>{if(seq!==checkSeq)return;const sent=clone(doc),sentSignature=JSON.stringify(sent);
+   let next;
+   try{const reply=await ctx.request('POST','/api/multiphysics/validate',{doc:sent});next={pending:false,error:null,...reply};}
+   catch(e){next={pending:false,diagnostics:[],solve_order:check.solve_order,run_refusal:null,error:e.message};}
+   if(seq!==checkSeq||sentSignature!==signature())return;
+   check=next;messages=mapDiagnostics(doc,catalog,check.diagnostics);if(active)ctx.render();};
   if(now)go();else checkTimer=setTimeout(go,250);
  }
  const errors=()=>messages.filter(m=>m.severity==='error');
@@ -83,12 +95,16 @@ export function createMultiphysicsView(ctx){
  async function poll(){
   if(!job)return;
   try{const s=await ctx.request('GET',`/api/multiphysics/jobs/${job.id}?after=${job.events.length}`);
-   job.events.push(...s.events);job.status=s.status;job.error=s.error;
-   if(s.status==='running'){renderDock();pollTimer=setTimeout(poll,300);return;}
+   const moved=s.events.length>0;job.events.push(...s.events);job.status=s.status;job.error=s.error;job.misses=0;
+   if(s.status==='running'){if(moved&&ctx.ui.page==='Connections')ctx.render();else renderDock();pollTimer=setTimeout(poll,300);return;}
    if(s.status==='done'){const result=await ctx.request('GET',`/api/multiphysics/jobs/${job.id}/result`);finish(result);return;}
    runFailure={events:job.events,order:job.order,status:s.status,error:s.error,doc:job.doc};const failed=job;job=null;refreshRun();ctx.render();
    notice(s.status==='stopped'?'Run stopped. No result was kept'+(lastRun?'; the previous complete run stays under Results.':'.'):failureText(s.error,failed.doc)+(lastRun?' The previous complete run stays under Results.':''));
-  }catch(e){runFailure={events:job.events,order:job.order,status:'error',error:{message:e.message},doc:job.doc};job=null;refreshRun();ctx.render();notice('The run could not be followed: '+e.message);}
+  }catch(e){
+   // a lost reply is retried with backoff, so Stop stays available; only a job the server no
+   // longer has ends the follow-up
+   if(job&&!/no such multiphysics job|has no result/.test(e.message)&&(job.misses=(job.misses||0)+1)<=8){notice(`Connection to the run lost (${e.message}); retrying…`);pollTimer=setTimeout(poll,Math.min(8000,500*2**job.misses));return;}
+   runFailure={events:job.events,order:job.order,status:'error',error:{message:e.message},doc:job.doc};job=null;refreshRun();ctx.render();notice('The run could not be followed: '+e.message);}
  }
  function finish(result){
   const done=job;job=null;
@@ -100,14 +116,14 @@ export function createMultiphysicsView(ctx){
  async function stop(){if(!job)return;try{await ctx.request('POST',`/api/multiphysics/jobs/${job.id}/stop`);notice('Stopping after the physics being solved finishes; no result will be kept.');}catch(e){notice('Stop failed: '+e.message);}}
  // ---- fixes ----
  function applyFix(fix){
-  if(!fix)return;
+  if(!fix)return;if(check.pending){notice('The model is being checked; try again when the check finishes.');return;}
   if(fix.action==='remove-coupling')commit(removeCoupling(doc,fix.coupling),`Coupling ${fix.coupling} removed.`,'model');
   else if(fix.action==='use-same-mesh'){const next=clone(doc);next.couplings[fix.coupling].transfer='same_mesh';commit(next,'Transfer set to Same mesh.');}
   else if(fix.action==='remove-mesh-key'){const next=clone(doc);delete next.mesh[fix.key];commit(next,`Mesh ${quantityWords(fix.key)} removed; both physics use the same mesh.`,'mesh');}
-  else if(fix.action==='accept-loop'){const {doc:next,index}=acceptLoop(doc,fix.proposal);commit(next,`Iteration step ${index+1} accepted with the default settings; Undo reverts it.`,'loop:'+index);}
+  else if(fix.action==='accept-loop'){const {doc:next,index,already}=acceptLoop(doc,fix.proposal);if(already){selection='loop:'+index;ctx.render();return;}commit(next,`Iteration step ${index+1} accepted with the default settings; Undo reverts it.`,'loop:'+index);}
   else if(fix.action==='fill-physmat')commit(fillThermoOptic(doc,fix.material,fix.ref),`Thermo-optic data of ${fix.ref} copied into ${materialLabel(fix.material)}; the source notes it.`);
  }
- const messageHtml=(m,i,show=true)=>`<div class="mp-message ${m.severity}" data-mp-message="${i}"><p>${esc(m.text)}</p><div class="mp-message-actions">${show?`<button type="button" data-mp-show="${i}">Show</button>`:''}${m.fix?`<button type="button" data-mp-fix="${i}">${esc(m.fix.label)}</button>`:''}<details><summary>Details</summary><code>${esc(m.code)}</code> at <code>${esc(m.path||'document')}</code>: ${esc(m.detail)}</details></div></div>`;
+ const messageHtml=(m,i,show=true)=>`<div class="mp-message ${m.severity}" data-mp-message="${i}"><p>${esc(m.text)}</p><div class="mp-message-actions">${show?`<button type="button" data-mp-show="${i}">Show</button>`:''}${m.fix?`<button type="button" data-mp-fix="${i}" ${check.pending?'disabled':''}>${esc(m.fix.label)}</button>`:''}<details><summary>Details</summary><code>${esc(m.code)}</code> at <code>${esc(m.path||'document')}</code>: ${esc(m.detail)}</details></div></div>`;
  function bindMessages(host){
   host.querySelectorAll('[data-mp-fix]').forEach(b=>b.onclick=()=>applyFix(messages[+b.dataset.mpFix].fix));
   host.querySelectorAll('[data-mp-show]').forEach(b=>b.onclick=()=>{selection=messages[+b.dataset.mpShow].node;if(ctx.ui.page!=='Connections')ctx.ui.page='Model';ctx.render();$('inspector').querySelector('.mp-message')?.scrollIntoView({block:'nearest'});});
@@ -331,7 +347,7 @@ export function createMultiphysicsView(ctx){
   if(!lastRun){host.innerHTML=`<h2>No result in this tab</h2><p>Press Run to solve every physics in solve order. Results are kept in this tab; Save model file keeps the model.</p>${runFailure?`<p class="validation-warning">${esc(runFailure.status==='stopped'?'The last run was stopped; no result was kept.':failureText(runFailure.error,runFailure.doc))}</p>`:''}`;return [];}
   const r=lastRun.result,pages=resultPages(r);if(!pages.find(p=>p.id===resultPage))resultPage=pages[0].id;
   const same=JSON.stringify(lastRun.doc)===signature();
-  host.innerHTML=`<div class="toolbar mp-result-tabs" role="tablist">${pages.map(p=>`<button role="tab" data-mp-node="${p.id}" aria-selected="${p.id===resultPage}">${esc(p.label)}</button>`).join('')}</div><p class="muted">Run ${lastRun.id} · ${new Date(lastRun.completedAt).toLocaleTimeString()} · ${same?'the current model':'the model changed since this run; this result is unchanged'}.${runFailure?' The last run failed; this is the previous complete run.':''}</p>`;
+  host.innerHTML=`<div class="toolbar mp-result-tabs" role="tablist">${pages.map(p=>`<button role="tab" data-mp-node="${esc(p.id)}" aria-selected="${p.id===resultPage}">${esc(p.label)}</button>`).join('')}</div><p class="muted">Run ${lastRun.id} · ${new Date(lastRun.completedAt).toLocaleTimeString()} · ${same?'the current model':'the model changed since this run; this result is unchanged'}.${runFailure?' The last run failed; this is the previous complete run.':''}</p>`;
   const id=resultPage.slice(8),maps=[];
   if(id==='check'){
    const rows=couplingCheckRows(r,lastRun.doc);
@@ -346,10 +362,10 @@ export function createMultiphysicsView(ctx){
   }else{
    const rows=effectiveIndexRows(p),alone=uncoupled[id],coupled=p.coupled;
    host.insertAdjacentHTML('beforeend',`<h2>${esc(physicsLabel(id))} · optical modes</h2>`);
-   if(coupled){const region=r.mesh.region_names.includes('core')?'core':null,dn=indexChange(r,lastRun.doc,id);
-    host.insertAdjacentHTML('beforeend',`<div class="mp-maps"><figure><figcaption>Temperature per triangle [K]${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="T" role="img"></canvas></div></figure><figure><figcaption><label>Show <select id="mp-index-view"><option value="n" ${indexView==='n'?'selected':''}>refractive index n</option><option value="dn" ${indexView==='dn'?'selected':''}>change n − n₀</option></select></label>${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="n" role="img"></canvas></div></figure></div><p class="muted">The coupled input as the optical solve used it: the mean of each triangle's 3 node temperatures, and n = n₀ + (dn/dT)(T − T_ref). The change is computed here from the material data.</p>`);
+   if(coupled){const region=r.mesh.region_names.includes('core')?'core':null,dn=coupled.index_change;
+    host.insertAdjacentHTML('beforeend',`<div class="mp-maps"><figure><figcaption>Temperature per triangle [K]${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="T" role="img"></canvas></div></figure><figure><figcaption><label>Show <select id="mp-index-view"><option value="n" ${indexView==='n'?'selected':''}>refractive index n</option>${dn?`<option value="dn" ${indexView==='dn'?'selected':''}>change n − n₀</option>`:''}</select></label>${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="n" role="img"></canvas></div></figure></div><p class="muted">The coupled input as the optical solve used it: the mean of each triangle's 3 node temperatures, and n = n₀ + (dn/dT)(T − T_ref). The change is (dn/dT)(T − T_ref) of each triangle's material.</p>`);
     maps.push(['T',()=>drawMap(host.querySelector('[data-mp-map=T]'),r,coupled.temperature.values,{region,label:'Temperature in K'})]);
-    maps.push(['n',()=>drawMap(host.querySelector('[data-mp-map=n]'),r,indexView==='n'?coupled.refractive_index.n:dn,{region,label:indexView==='n'?'Refractive index':'Index change n − n₀'})]);}
+    maps.push(['n',()=>drawMap(host.querySelector('[data-mp-map=n]'),r,indexView==='dn'&&dn?dn:coupled.refractive_index.n,{region,label:indexView==='dn'&&dn?'Index change n − n₀':'Refractive index'})]);}
    else host.insertAdjacentHTML('beforeend','<p>This physics had no coupled input in this run.</p>');
    const sameSource=alone&&alone.source===JSON.stringify(lastRun.doc);
    host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th>${alone?'<th>n_eff without heater</th><th>Shift</th>':''}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${alone?`<td data-neff-alone="${row.mode}" data-neff-value="${alone.rows[k]?.value??''}">${alone.rows[k]?alone.rows[k].value.toFixed(8):'—'}</td><td>${alone.rows[k]?(row.value-alone.rows[k].value).toExponential(3):'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>${pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength))}`+
@@ -394,14 +410,14 @@ export function createMultiphysicsView(ctx){
   else{canvas.innerHTML=`<h2>${esc(doc.name||'Model')}</h2>`+geometrySvg();canvas.querySelectorAll('[data-mp-pick]').forEach(el=>{const pick=()=>choose('material:'+el.dataset.mpPick);el.onclick=pick;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}};});}
   if(maps.length){const draw=()=>maps.forEach(([,f])=>{try{f();}catch(e){}});resize=new ResizeObserver(draw);canvas.querySelectorAll('canvas').forEach(c=>resize.observe(c));draw();}
   for(const id of ['add-physics','add-coupling'])if($(id))$(id).hidden=false;
-  for(const id of ['save-session','open-session']){const b=$(id);b.disabled=true;b.title='A multiphysics model is saved as its document: More › Save model file. Runs stay in this tab.';}
+  for(const id of ['save-session','open-session','save-draft']){const b=$(id);b.disabled=true;b.title='A multiphysics model is saved as its document: More › Save model file. Runs stay in this tab.';}
   $('save-project').textContent='Save model file';$('open-project').textContent='Open model file';
   renderDock();refreshRun();
  }
  function leave(){
   resize?.disconnect();resize=null;for(const id of ['add-physics','add-coupling','run-multiphysics','run-multiphysics-reason'])if($(id))$(id).hidden=true;
   const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();}
-  for(const id of ['save-session','open-session'])$(id).title=id==='save-session'?'Save inputs, completed runs and comparison to one file':'Open a saved session with its runs and comparison';
+  for(const id of ['save-session','open-session','save-draft']){$(id).disabled=false;if(id==='save-draft')$(id).removeAttribute('title');else $(id).title=id==='save-session'?'Save inputs, completed runs and comparison to one file':'Open a saved session with its runs and comparison';}
   $('save-project').textContent='Save inputs only';$('open-project').textContent='Open inputs file';
  }
  function saveFile(){
@@ -409,7 +425,7 @@ export function createMultiphysicsView(ctx){
   const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   savedSignature=signature();savedFile={name,kind:'Sent to model file',at:new Date()};ctx.onHistory();notice(`Model file ${name} sent to the browser's downloads. It holds the model; runs stay in this tab.`);
  }
- return {active:()=>active,open,openTemplate,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
+ return {active:()=>active,open,openText,openTemplate,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveFile,busy:()=>!!job,
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${!savedFile?'Not saved to a file · runs stay in this tab':savedSignature===signature()?`${savedFile.kind} ${savedFile.name}${savedFile.at?' · '+savedFile.at.toLocaleTimeString():''}`:`Changed since ${savedFile.kind.toLowerCase()} ${savedFile.name}`}`,
   // for checks: the current document and the last result

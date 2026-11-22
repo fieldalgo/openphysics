@@ -160,12 +160,23 @@ const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),not
 // A multiphysics model (contract D2) keeps its document in its own view; the other applications
 // do not see it. Names used before their declaration are wrapped.
 const multiView=createMultiphysicsView({$,ui,notice:text=>notice(text),announceResult:text=>announceResult(text),request:studioRequest,render:()=>render(),
+ // a raw body: the server's reader sees a file's text as written (duplicate keys, digits)
+ requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
+ // physics selections no application claims, so no single-physics view acts while it is open
+ onOpen:()=>Object.assign(state,{electric:true,heat:true,structure:true,optics:true}),
  onHistory:()=>{updateHistory();refreshPersistence();},applications:host=>{renderApplications(host,resumeOffer());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+// Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
+// Reset): refused while its run is going; false when refused.
+function leaveMultiphysics(){
+ if(!multiView.active())return true;
+ if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return false;}
+ multiView.close();multiView.leave();return true;
+}
 // The start page's cards: the coupled template opens the multiphysics model, the others the
 // application of their physics selection.
 function chooseTemplate(id){
- if(id==='heated-waveguide'){if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}Object.assign(state,{electric:true,heat:true,structure:true,optics:true});multiView.openTemplate();return;}
- if(multiView.active()){if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}multiView.close();multiView.leave();}
+ if(id==='heated-waveguide'){if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}multiView.openTemplate();return;}
+ if(!leaveMultiphysics())return;
  Object.assign(state,templatePhysics(id));select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 function refreshHeatControls(){
@@ -270,7 +281,7 @@ function refreshInputIssues(){
   const el=$(field.id);if(!el)continue;const issue=numericDrafts.get(key);el.setAttribute('aria-invalid',String(!!issue));
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max} ${field.unit}.`;
  }
- for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&['save-session','open-session'].includes(id));
+ for(const id of ['save-project','save-draft','save-session','open-project','open-session','restore-draft'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&['save-session','open-session','save-draft'].includes(id));
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(numericDrafts.invalid)$('status').textContent='Input errors · correct or restore the last valid values';
  else if(!applicationChosen())$('status').textContent='Choose an application to start';
@@ -412,6 +423,7 @@ function applyProject(doc,{saved=true,resetHistory=false}={}){
 const DEFAULT_INPUTS=current();
 const applicationChosen=()=>state.electric!==undefined;
 function requestLoad(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement}={}){
+  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
   workspaceLoads.invalidate();
   pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
@@ -438,6 +450,7 @@ $('confirm-load').onclick=()=>{
  completeLoad(pending);
 };
 function completeLoad(pending){
+ if(!leaveMultiphysics())return;
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
@@ -461,8 +474,8 @@ $('save-project').onclick=()=>{if(multiView.active()){multiView.saveFile();retur
 $('open-project').onclick=()=>{try{rejectInvalidInput();$('project-file').click();}catch(e){notice(e.message);}};
 $('project-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  // a multiphysics document opens as a multiphysics model; any document opens in one that is open
- if(file.size<=(1<<20)){const text=await file.text();let tree=null;try{tree=JSON.parse(text);}catch{}
-  if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');Object.assign(state,{electric:true,heat:true,structure:true,optics:true});await multiView.open(tree,file.name,{fromFile:true});return;}}
+ if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
+  if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');await multiView.openText(text,file.name);return;}}
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
@@ -483,7 +496,7 @@ try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recov
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
 
 function updateHistory(){ $('undo-edit').disabled=multiView.active()?!multiView.canUndo():!edits.canUndo;$('redo-edit').disabled=multiView.active()?!multiView.canRedo():!edits.canRedo; }
-function trackEdit(group=null){const before=edits.signature;edits.record(current(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();}updateHistory();refreshPersistence();}
+function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(current(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();}updateHistory();refreshPersistence();}
 function inputsChangedSinceResult(){
  if(resultNotice)notice('Inputs changed since the last result. Run again to compute the new inputs.');
  if(jobPhase==='done'){jobPhase='idle';$('job-message').textContent='';refreshJobControls();}
@@ -1002,6 +1015,6 @@ installProviderList($('installed-physics'),$('provider-list'),solverApi);
 installStatusPanels([$('installed-physics'),$('workspace-tools')],$('open-installed-physics'));
 $('run-heat').onclick=()=>{runHeat().catch(error=>notice('Heat run failed: '+error.message));};heatController?.loadCapability();
 $('run-joule').onclick=()=>{jouleView.run();};$('run-multiphysics').onclick=()=>multiView.run();$('add-physics').onclick=()=>multiView.addPhysics();$('add-coupling').onclick=()=>multiView.addCoupling();jouleView.loadCapability();
-const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
+const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{if(!leaveMultiphysics())return;numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
 
 installLayout(document.querySelector('main'),document.getElementById('reset-layout'),document.getElementById('layout-status'));
