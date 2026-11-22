@@ -574,7 +574,7 @@ print(n)`;
   assert.equal(await page.exists('#resume-optical'), false);
   // the switch note says the tab holds the runs until it is closed or reloaded, then how to get them back
   await openTemplate();
-  assert.match(await notice(), / Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery\) brings them back\.$/);
+  assert.match(await notice(), / Optical waveguide and its 2 runs stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to them\. After that, Models › Optical waveguide › Resume \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
   await openSession(c1.path);
   await page.until("/kept for recovery in this browser/.test(document.getElementById('autosave-status').textContent)||/^Opened /.test(document.getElementById('autosave-status').textContent)", 'heated session kept');
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'heated session in browser recovery', 20000);
@@ -599,7 +599,9 @@ print(n)`;
   // R2: each stored session once, newest first, the file named where a record came from one
   const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});
-  for (const list of [lists.resume, lists.earlier]) assert.equal(new Set(list).size, list.length, JSON.stringify(list));
+  // the same session saved at another time reads alike once the time is removed: compare without it
+  const untimed = t => t.replace(/ · (?:saved )?[^·]+$/, '');
+  for (const list of [lists.resume, lists.earlier]) assert.equal(new Set(list.map(untimed)).size, list.length, JSON.stringify(list));
   // the heated session open in this tab is not offered again, and its earlier copy is gone
   assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Heater 2e14')), JSON.stringify(lists.earlier));
   assert.ok(lists.earlier.some(t => /^Recover earlier session · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));

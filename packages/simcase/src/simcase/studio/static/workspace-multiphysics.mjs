@@ -438,10 +438,11 @@ export function originRows(rows,origin){
 }
 // What one solve step (a physics, or the physics of an iteration step) reads: its own physics
 // entries, the couplings into them, the shared parts of the model (geometry, materials, mesh,
-// study and any other part, not its name or envelope spelling) and, through those couplings,
-// every step upstream. Two models whose texts are equal give a step the same inputs.
+// study, its name and any other part, not the envelope spelling, which a coupling removal can
+// switch) and, through those couplings, every step upstream. The name is kept so the rows never
+// read current while the run as a whole (runFreshness) is out of date.
 export function stepInputs(doc,group){
- const shared=Object.fromEntries(Object.entries(isObject(doc)?doc:{}).filter(([k])=>!['openphysics','name','physics','couplings'].includes(k)));
+ const shared=Object.fromEntries(Object.entries(isObject(doc)?doc:{}).filter(([k])=>!['openphysics','physics','couplings'].includes(k)));
  const seen=new Set(),physics={},into={};
  const visit=name=>{
   if(seen.has(name))return;seen.add(name);physics[name]=doc?.physics?.[name]??null;

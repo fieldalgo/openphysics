@@ -146,15 +146,16 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    Joule heating (their results stay in the tab), and the heated silicon waveguide with its runs.
    Opening the heated model over optical runs says in Messages that this tab holds them until it
    is closed or reloaded and that **Models › Optical waveguide** brings them back, then what holds
-   them after that: **Models › Optical waveguide › Resume** (browser recovery) or **Open session**
+   them after that: **Models › Optical waveguide › Resume** (browser recovery, which keeps the four
+   newest sessions) or **Open session**
    with the session file that holds them, or that nothing does. While the tab holds no optical
    runs and browser recovery holds an optical session, for example after a restart, the Optical
    waveguide card offers it first, *Resume Optical waveguide · design A, design B · 2:25 PM (this
    browser)*, next to **Start new**. Every recovery entry names its model, its run count and its
    runs (a run's name, else *Run N*), for example *Optical waveguide · 2 runs · design A, Run 2*,
    and the session file its record was opened from or last sent to (*· file …json*). Each stored
-   session is listed once, newest first: an entry whose session text equals a newer one's is not
-   shown, and the session open in this tab is not offered. The start page uses
+   session is listed once, newest first: an entry whose session equals a newer one's but for its
+   view (page, selection, field view) is not shown, and the session open in this tab is not offered. The start page uses
    one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
@@ -950,10 +951,10 @@ solver is started. Input-only recovery and pending-job recovery remain separate.
 
 Starting new work without recovering does not discard the stored session. The first
 automatic save after a page opens moves the stored session to the earlier sessions,
-newest first, keeping at most three. A session text is stored once: when the text written equals
-the stored one (the same file opened again) the stored record is replaced, not moved, and an
-earlier copy of it (the unchanged model saved again after the tab moved to another model and
-back) is dropped. Browser recovery also keeps the name of the session file the notebook was
+newest first, keeping at most three. That save keeps a session once, compared without its view:
+when the session written equals the stored one (the same file opened again) the stored record is
+replaced, not moved, and an earlier copy of either (the unchanged model saved again after the tab
+moved to another model and back) is dropped. The lists hide any copy left. Browser recovery also keeps the name of the session file the notebook was
 opened from, for the lists; **Recover earlier session** lists each with its
 model, run count, run names and time and recovers it through the same replacement dialog. Recovering
 an earlier session keeps the current one as an earlier session at the next save.

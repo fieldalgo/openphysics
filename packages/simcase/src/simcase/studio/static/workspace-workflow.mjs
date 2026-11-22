@@ -33,7 +33,7 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
   {id:'Mesh',state:mesh?.signature===signature?'ready':mesh?'attention':'optional',detail:mesh?.signature===signature?'Preview current':mesh?'Inputs changed since preview':'Optional preview'},
   {id:'Study',state:invalid?'attention':busy?'busy':pending||block?'attention':'ready',detail:study,summary:state,wavelength:Number.isFinite(wavelength)?`λ ${wavelength} nm`:null},
   viewed?{id:'Results',state:viewed.signature===signature?'ready':'attention',detail:viewed.signature===signature?'Result for these inputs':'Current inputs differ from this run'}
-  :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Inputs changed since this result':'No run yet'}
+  :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Current inputs differ from this run':'No run yet'}
  ];
 }
 // The last-run state of the optical inputs, in the words of the multiphysics model. A run is

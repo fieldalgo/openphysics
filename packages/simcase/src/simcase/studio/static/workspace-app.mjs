@@ -232,7 +232,8 @@ function openTemplateCard(id){
 // recovery: browser recovery holds them, unless another tab has replaced the record.
 function opticalRunsNote(){
  const file=runs.length&&savedRunsState===runsStamp()?(lastSavedFile?.name||(loadedSession?.kind==='opened'?loadedSession.name:null)):null;
- const recovery=recoveryState!=='conflict'&&(recoveryState==='kept'||(loadedFrom()?.kind==='recovered'&&loadedFrom().current));
+ // 'updating': the record of these runs is being written (or an earlier one of them is stored)
+ const recovery=['kept','updating'].includes(recoveryState)||(recoveryState!=='conflict'&&loadedFrom()?.kind==='recovered'&&loadedFrom().current);
  return opticalRunsStayText({runs:runs.length,file,recovery});
 }
 function refreshHeatControls(){
@@ -706,7 +707,8 @@ async function renderEarlierSessions(){
   const button=document.createElement('button');button.type='button';button.dataset.earlier=String(index);
   button.textContent='Recover earlier session · '+sessionLine(recoveredEntry(recovered))+' · '+new Date(recovered.savedAt).toLocaleString();
   button.onclick=()=>recoverEarlier(index,button);box.append(button);}
- if(ui.page==='Applications')render();
+ // the start page lists the same entries; redrawn with the focus kept on the control that had it
+ if(ui.page==='Applications'){const el=document.activeElement,key=el?.id?'#'+el.id:el?.dataset?.template?`[data-template="${el.dataset.template}"]`:null;render();if(key)document.querySelector(key)?.focus({preventScroll:true});}
 }
 async function recoverEarlier(index,opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}

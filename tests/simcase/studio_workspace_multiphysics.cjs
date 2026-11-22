@@ -215,12 +215,13 @@ test('a model edit leaves the last run out of date; the same content again is cu
  // a heat edit flows through the coupling: both steps are out of date
  const hotter=heated();hotter.physics.heat1={...hotter.physics.heat1,prescribed_temperature:{bottom:'310 K'}};
  assert.deepEqual(m.staleRows(done,run.doc,hotter).map(r=>r.state),['stale','stale']);
- // an optical edit leaves the heat step current; a mesh edit (shared) makes both out of date; the name changes neither
+ // an optical edit leaves the heat step current; a mesh edit (shared) makes both out of date, and so
+ // does a new name, as it makes the run as a whole out of date (the heading and the rows agree)
  const longer=heated();longer.physics.modes1={...longer.physics.modes1,vacuum_wavelength:'1310 nm'};
  assert.deepEqual(m.staleRows(done,run.doc,longer).map(r=>r.state),['done','stale']);
  const finer=heated();finer.mesh={...finer.mesh,element_size:'0.2 um'};
  assert.deepEqual(m.staleRows(done,run.doc,finer).map(r=>r.state),['stale','stale']);
- const renamed={...heated(),name:'Other name'};assert.deepEqual(m.staleRows(done,run.doc,renamed).map(r=>r.state),['done','done']);
+ const renamed={...heated(),name:'Other name'};assert.equal(m.runFreshness(run,renamed),'stale');assert.deepEqual(m.staleRows(done,run.doc,renamed).map(r=>r.state),['stale','stale']);
  assert.deepEqual(m.staleRows(done,run.doc,back).map(r=>r.state),['done','done']);
  assert.equal(m.sequenceHeading('none'),'Nothing is computed until you press Run');
  assert.equal(m.sequenceHeading('stale',2),'Run 2 · the model changed since; press Run to update');
