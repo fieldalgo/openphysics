@@ -67,10 +67,10 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     W = _velocity(mesh, motion.design_velocity)
     axisymmetric = _axisymmetric(mesh, W, coordinate_system, t)
     _coefficient(conductivity, "thermal_conductivity")
-    _numpy_data(heat_source, "heat_source_density")
-    for name, table in (("outward_flux", outward_flux), ("convection", convection)):
-        for tag, value in _tags(table, name).items():
-            _numpy_data(value, _boundary_label(name, tag))
+    callbacks = _coordinate_callbacks(heat_source, outward_flux, convection)
+    if callbacks and axisymmetric:
+        raise TypeError("motion: coordinate callbacks with an axisymmetric motion are not covered in this slice; "
+                        "give constants or region tables")
     if not isinstance(dirichlet, Mapping):
         raise ValueError("prescribed_temperature must map node indices to temperatures in K")
     for node, value in dirichlet.items():
@@ -91,15 +91,19 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     tris = mesh.triangles
     b, c, area = _live_bc(xp, X, tris, np.sign(_signed_area(moved.nodes, tris)))
     k = _per_triangle(mesh, conductivity, "thermal_conductivity", positive=True)
-    Q = _per_triangle(mesh, heat_source, "heat_source_density")
+    sampled_source = callable(heat_source) and not is_per_region(heat_source)
+    Q = None if sampled_source else _per_triangle(mesh, heat_source, "heat_source_density")
     kk = lift(xp, k)[:, None, None]
     element = kk * (b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]) / (4.0 * area)[:, None, None]
     if axisymmetric:
         element = element * _cell_factor(xp, X, tris)[:, None, None]
     K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
                   xp.reshape(element, (-1,)), (n, n))
-    load = scatter_add(xp, n, tris.ravel(), xp.reshape(_cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric),
-                                                       (-1,)))
+    if sampled_source:
+        local = _sampled_cell_load(xp, X, tris, area, heat_source)
+    else:
+        local = _cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric)
+    load = scatter_add(xp, n, tris.ravel(), xp.reshape(local, (-1,)))
     # Work with the increment over each component's offset, as thermal.py does: K annihilates
     # constants, so a large common temperature times a rounding-level sum must not reach the
     # residual, reactions, convection or flux. The offset of a component is its first Dirichlet
@@ -113,6 +117,8 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
         if not anchored[labels[node]]:
             offsets[labels[node]], anchored[labels[node]] = float(value), True
     for tag, (h, ambient) in (convection or {}).items():
+        if callable(h) or callable(ambient):
+            continue                    # a sampled pair anchors nothing here; the guard below takes over
         if float(h) > 0:
             for node in np.asarray(mesh.boundary_edges[tag], dtype=int).ravel():
                 if not anchored[labels[node]]:
@@ -122,10 +128,27 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     H_terms, B, shifted_B, G = [], None, None, None
     for tag, g in (outward_flux or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
+        if callable(g):
+            rule = _edge_rule(xp, mesh, moved, X, edges)
+            values = _sampled(rule, g, _boundary_label("outward_flux", tag))
+            G = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, values), (-1,)), base=G)
+            continue
         G = scatter_add(xp, n, edges.ravel(), xp.reshape(_edge_load(xp, X, edges, length, float(g), axisymmetric),
                                                           (-1,)), base=G)
     for tag, (h, ambient) in (convection or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
+        if callable(h) or callable(ambient):
+            rule = _edge_rule(xp, mesh, moved, X, edges)
+            label = _boundary_label("convection", tag)
+            hv = _sampled(rule, h, label) if callable(h) else float(h) + 0 * rule.weights
+            av = _sampled(rule, ambient, label) if callable(ambient) else float(ambient) + 0 * rule.weights
+            H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
+                                     xp.reshape(_rule_mass(xp, rule, hv), (-1,)), (n, n)))
+            B = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, hv * av), (-1,)), base=B)
+            offset = lift(xp, offsets[labels[edges[:, 0]]])[:, None]
+            shifted_B = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, hv * (av - offset)), (-1,)),
+                                    base=shifted_B)
+            continue
         local = _edge_mass(xp, X, edges, length, float(h), axisymmetric)
         H_terms.append(CooMatrix(np.repeat(edges, 2, axis=1).ravel(), np.tile(edges, (1, 2)).ravel(),
                                  xp.reshape(local, (-1,)), (n, n)))
@@ -794,6 +817,119 @@ def _checked_step(mesh, W, t):
     return _moved_mesh(mesh, W, t0)
 
 # ----------------------------------------------------------------------------- helpers
+
+def _coordinate_callbacks(heat_source, outward_flux, convection):
+    """Check the steady heat data of a motion; True when a coordinate callback is among them.
+
+    A coordinate callback (the heat source of the points, a boundary value of the points and normals)
+    is called again with the live points and normals, so it must compute with JAX or PyTorch; live
+    values and ElementHeatSource stay refused, as do callbacks of the Dirichlet values."""
+    found = False
+    if callable(heat_source) and not is_per_region(heat_source):
+        found = True
+    else:
+        _numpy_data(heat_source, "heat_source_density")
+    for name, table in (("outward_flux", outward_flux), ("convection", convection)):
+        for tag, value in _tags(table, name).items():
+            items = value if isinstance(value, (tuple, list)) else (value,)
+            label = _boundary_label(name, tag)
+            for v in items:
+                if callable(v):
+                    found = True
+                elif is_live(v):
+                    raise TypeError(f"motion: {label} is live; in this slice only the motion's t carries a derivative")
+    return found
+
+
+@dataclass(frozen=True)
+class _EdgeRule:
+    """The ordinary solver's 4-point Gauss rule on boundary edges, on the live coordinates."""
+    points: object      # (E, 4, 2)
+    normals: object     # (E, 4, 2), unit, outward (the orientation of the moved mesh)
+    weights: object     # (E, 4): length * w
+    shape: object       # (4, 2) P1 edge shape functions at the points
+
+
+def _edge_rule(xp, mesh, moved, X, edges):
+    from .core.triangles import triangle_geometry
+    x, w = np.polynomial.legendre.leggauss(4)
+    x, w = (x + 1) / 2, w / 2
+    shape = np.column_stack((1 - x, x))
+    # outward sign of each edge, decided on the moved mesh exactly as core.boundary does
+    p, tris, *_ = triangle_geometry(moved)
+    owner = {}
+    for k, tri in enumerate(tris):
+        for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+            owner.setdefault(tuple(sorted((int(a), int(b)))), k)
+    signs = []
+    for a, b in edges:
+        v = p[b] - p[a]
+        normal = np.array([v[1], -v[0]])
+        inward = p[tris[owner[tuple(sorted((int(a), int(b))))]]].mean(axis=0) - (p[a] + p[b]) / 2
+        signs.append(-1.0 if normal @ inward > 0 else 1.0)
+    signs = lift(xp, np.asarray(signs))
+    Xa, Xb = X[edges[:, 0]], X[edges[:, 1]]
+    d = Xb - Xa
+    length = xp.sqrt(d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1])
+    unit = xp.stack([d[:, 1], -d[:, 0]], axis=1) / length[:, None] * signs[:, None]
+    S = lift(xp, shape)
+    points = S[None, :, 0, None] * Xa[:, None, :] + S[None, :, 1, None] * Xb[:, None, :]
+    normals = unit[:, None, :] * xp.ones((1, len(w), 1), dtype=xp.float64)
+    return _EdgeRule(points, normals, length[:, None] * lift(xp, w)[None, :], S)
+
+
+def _sampled(rule, callback, label):
+    """callback(points, normals) at the live rule points: the library's values, (E, 4)."""
+    count = rule.weights.shape
+    try:
+        values = callback(_flat(rule.points), _flat(rule.normals))
+    except Exception as exc:
+        raise TypeError(f"motion: the callback of {label} must compute with the JAX or PyTorch points and normals it "
+                        f"is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
+    return _live_values(values, count, label)
+
+
+def _sampled_cell_load(xp, X, tris, area, callback):
+    """The consistent load of a heat source callback(points) with the ordinary solver's 6 x 6 Duffy rule."""
+    from .core.quadrature import triangle_product_rule
+    bary, weights = triangle_product_rule()
+    P = X[tris]                                                       # (T, 3, 2)
+    B = lift(xp, bary)
+    points = xp.sum(B[None, :, :, None] * P[:, None, :, :], axis=2)   # (T, Q, 2)
+    try:
+        values = callback(_flat(points))
+    except Exception as exc:
+        raise TypeError("motion: the callback of heat_source_density must compute with the JAX or PyTorch points it "
+                        f"is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
+    values = _live_values(values, (P.shape[0], len(weights)), "heat_source_density")
+    local = xp.sum(lift(xp, weights)[None, :, None] * values[:, :, None] * B[None, :, :], axis=1)
+    return local * area[:, None]
+
+
+def _flat(a):
+    return a.reshape((-1, a.shape[-1]))
+
+
+def _live_values(values, count, label):
+    if not is_live(values):
+        raise TypeError(f"motion: the callback of {label} returned NumPy numbers for the live points of a motion; "
+                        "with a motion it must compute with the JAX or PyTorch points it is given (array API "
+                        "operations), so that the moving sample points carry the derivative")
+    if tuple(values.shape) != (count[0] * count[1],):
+        raise ValueError(f"the callback of {label} must return exactly shape (Q,)")
+    return values.reshape(count)
+
+
+def _rule_load(xp, rule, values):
+    """(E, 2) sum_q w_q f_q phi_a(q)."""
+    return xp.sum((rule.weights * values)[:, :, None] * rule.shape[None, :, :], axis=1)
+
+
+def _rule_mass(xp, rule, values):
+    """(E, 2, 2) sum_q w_q h_q phi_a(q) phi_b(q)."""
+    pair = rule.shape[:, :, None] * rule.shape[:, None, :]            # (4, 2, 2)
+    return xp.sum((rule.weights * values)[:, :, None, None] * pair[None], axis=1)
+
 
 def _axisymmetric(mesh, W, coordinate_system, t):
     """True for an axisymmetric heat motion; nodes on the symmetry axis at the step t must stay on it."""

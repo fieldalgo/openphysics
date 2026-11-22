@@ -322,9 +322,11 @@ def test_s8_refusals():
     t = xp.asarray(0.0)
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         solve_steady_heat(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match="heat_source_density is a callback"):
+    # coordinate callbacks take a motion since 2026-11-22 (test_shape_derivative_callbacks.py); a callback
+    # that computes with NumPy only is refused by name
+    with pytest.raises(TypeError, match="the callback of heat_source_density returned NumPy numbers"):
         solve_steady_heat(m, **common, heat_source_density=lambda p: np.ones(len(p)), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match=r"the heat flux on 'right' is a callback"):
+    with pytest.raises(TypeError, match=r"the callback of the heat flux on 'right' returned NumPy numbers"):
         solve_steady_heat(m, **common, inward_heat_flux={"right": lambda p, n: -(np.ones(len(p)))}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="thermal_conductivity is live"):
         solve_steady_heat(m, thermal_conductivity={"a": xp.asarray(2.0), "b": 5.0}, prescribed_temperature={i: 1.0 for i in left},
@@ -412,10 +414,11 @@ def test_review_live_or_callable_values_inside_a_convection_pair_are_refused():
     # a list pair with a live h once ran and returned dJ/dh = 0 (the correction removed it)
     with pytest.raises(TypeError, match=r"convection\['right'\] is live"):
         solve_steady_heat(m, **common, convection={"right": [h, 280.0]}, motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
+    # coordinate callbacks inside a pair take a motion since 2026-11-22; NumPy-only ones stay refused
+    with pytest.raises(TypeError, match=r"callback of convection\['right'\] returned NumPy numbers"):
         solve_steady_heat(m, **common, convection={"right": (lambda p, n: np.ones(len(p)), 280.0)},
                           motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match=r"convection\['right'\] is a callback"):
+    with pytest.raises(TypeError, match=r"callback of convection\['right'\] returned NumPy numbers"):
         solve_steady_heat(m, **common, convection={"right": [8.0, lambda p, n: np.ones(len(p))]},
                           motion=MeshMotion(design_velocity=W, t=t))
 

@@ -105,6 +105,22 @@ PyTorch는 `torch.tensor(0.0, dtype=torch.float64, requires_grad=True)`를 넘�
   어디서나처럼 거부합니다.
 - motion과 함께 쓰는 `checkpoint_every`는 거부합니다. 모든 스텝을 보관합니다.
 
+## 정상 열의 좌표 콜백
+
+Cartesian `solve_steady_heat`는 motion과 함께 좌표 콜백을 받습니다(2026-11-22). 열원 `callback(points)`, 내향 열유속
+`callback(points, normals)`, convection의 h와 ambient `callback(points, normals)`이며, 단독으로도 convection 쌍 안에서도 됩니다.
+- 콜백은 공간에 고정된 장을 나타냅니다. 표본점이 메시와 함께 움직이므로 미분에는 motion을 따른 콜백 자체의 변화 ∇f·W가 들어갑니다.
+- 이동 메시의 일반 풀이가 NumPy 점으로 한 번 부릅니다. live 조립은 같은 구적(삼각형 6 × 6 Duffy, 변 4점 Gauss)의 live 점과
+  단위 바깥 법선으로 한 번 더 부르며, 이들은 JAX 배열이나 PyTorch 텐서입니다.
+- 그래서 콜백은 받은 점으로 배열 연산을 해야 하고 순수해야 합니다. live 점에 NumPy 숫자를 돌려주거나(`np.asarray`,
+  `np.ones(len(p))`) live 점에서 예외가 나는 콜백은 이름을 밝힌 `TypeError`로 거부합니다.
+- 아직 다루지 않는 것: 축대칭 motion, 과도 열, 정상 전기 전도, 탄성, 3D 열의 좌표 콜백과 콜백인 계수(전도도 등)나 Dirichlet 값.
+
+`tests/galerkin/test_shape_derivative_callbacks.py`에 2026-11-22에 사전 등록한 E1–E7이 있습니다. 수치가 이동 메시 일반
+풀이와 1e-12 이내(E1); 세 종류 콜백을 모두 쓴 반력·온도 목적함수의 미분이 Richardson 중앙 차분과 1e-8 이내(E2), 법선
+방향으로 움직이는 변의 열유속 콜백도 같음(E5); JAX와 PyTorch가 1e-12 이내(E3); 고정 열원 Q0·x인 띠에서 x = 0의 해석
+dQ/dL = −Q0·L·H/3과 1e-10 이내(E4); NumPy만 쓰는 콜백은 이름을 밝혀 거부(E6); motion 없는 호출은 그대로(E7).
+
 ## 축대칭 열
 
 `coordinate_system="axisymmetric"`인 `solve_steady_heat`와 `solve_transient_heat`도 Cartesian 풀이와 같은 입력으로 motion을
@@ -280,7 +296,8 @@ galerkin은 재메시하지 않습니다. 미분은 그것을 계산한 메시�
 - live 메시 속도; 모양이 틀리거나 유한하지 않은 속도.
 - 허용 구간 밖 스텝(`ElementInversion`).
 - 열원·경계 열유속·convection·전류밀도·체적력·traction의 좌표 콜백(convection 쌍 안의 것 포함),
-  `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받습니다.
+  `ElementHeatSource`와 `ElementConductivity`: 표본점이 메시와 함께 움직입니다. 과도 열에서는 시간만의 콜백을 받고,
+  Cartesian 정상 열에서는 live 점으로 계산하는 좌표 콜백을 받습니다(위).
 - 콜백인 계수나 Dirichlet 값(과도 열의 시간 콜백 제외): motion은 상수를 받습니다.
 - motion과 함께 쓰는 live 전도도·열원·경계값·Dirichlet·기준 전위·탄성 상수·열팽창 계수·기준 온도·체적력·traction·열용량·초기 온도·유전율·투자율·파수·`n_target` 값:
   그런 호출에서 live 입력은 t 하나입니다.
