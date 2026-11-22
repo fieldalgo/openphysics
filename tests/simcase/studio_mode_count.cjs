@@ -169,8 +169,13 @@ test('M4-e: over 16 MiB a session keeps the fields of the selected and pinned ru
  assert.match(M.SOURCE_TEXT.file,/fields were not kept/);
  // written again, the run without fields stays without fields and keeps its values
  assert.equal(N.sessionText(read.input,read.runs,read.selected,read.comparison,read.view),write(read.runs.map(r=>r),view).replace(/"selected":"[0-9a-f]+","comparison":\[[^\]]*\]/,`"selected":"00000003","comparison":["00000001","00000004"]`));
- // a field-less run must carry its values
- assert.throws(()=>N.parseSession(edit(kept.text,d=>{delete d.runs[0].effective_area;})),{message:'Run 1 has no fields and no saved TE fractions and effective areas.'});
+ // V17: a field-less run round-trips bit for bit (a file of the runs Studio read, whose origin is imported)
+ const once=N.sessionText(read.input,read.runs,read.selected,read.comparison,read.view),reread=N.parseSession(once);
+ assert.equal(N.sessionText(reread.input,reread.runs,reread.selected,reread.comparison,reread.view),once);
+ assert.equal('field' in JSON.parse(once).runs[0],false);assert.equal(Object.is(reread.runs[0].effective_index[0],read.runs[0].effective_index[0]),true);
+ // a field-less run must carry its values: without TE fractions or without effective areas it is refused
+ for(const key of ['te_polarization_fraction','effective_area'])
+  assert.throws(()=>N.parseSession(edit(kept.text,d=>{delete d.runs[0][key];})),{message:'Run 1 has no fields and no saved TE fractions and effective areas.'},key);
  // even the selected and pinned runs over the limit: refused, naming them
  const tight=N.writeOpticalSession(input(),runs,'00000003',['00000001','00000004'],view,{limit:1000,keepSelected:true});
  assert.equal(tight.ok,false);assert.match(tight.refusal,/^The selected and pinned runs \(Run 2, Run 3\) are [\d.]+ MB with their fields, over the 16 MiB session limit\. Unpin some of them\.$/);
