@@ -920,6 +920,7 @@ try {
   // with it off shows "—" with the help, a run with it on shows the engine's n_g (a real 3-solve job,
   // checked against a direct engine run of the same document to 4 decimals); Compare n_g A and B;
   // no horizontal overflow at 390 × 844.
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'M5 models page');
   await page.click('[data-template=optical]');
   await answerDialogs("!!document.querySelector('#shape-w')", 'M5 optical model');
   await toNode('Study');
