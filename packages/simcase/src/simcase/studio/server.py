@@ -732,6 +732,8 @@ def multiphysics_template():
     return Response(multiphysics_api.template(), media_type="application/json", headers={"Cache-Control": "no-store"})
 
 
+# A refusal written for users reaches these routes as RequestRefused or multiphysics_api.Refused;
+# anything else is unexpected: the fixed message, with the traceback in the log.
 @app.post("/api/multiphysics/validate")
 async def validate_multiphysics(request: Request):
     _check_workspace_instance(request)
@@ -741,7 +743,7 @@ async def validate_multiphysics(request: Request):
     except RequestRefused as exc:
         return exc.reply()
     except Exception as exc:
-        return JSONResponse({"detail": reply_text(exc, "multiphysics validation")}, status_code=500,
+        return JSONResponse({"detail": unexpected(exc, "multiphysics validation")}, status_code=500,
                             headers={"Cache-Control": "no-store"})
 
 
@@ -757,7 +759,7 @@ async def start_multiphysics_run(request: Request):
     except multiphysics_api.Refused as exc:
         return _multiphysics_refusal(exc)
     except Exception as exc:
-        return JSONResponse({"detail": reply_text(exc, "multiphysics run request")}, status_code=500,
+        return JSONResponse({"detail": unexpected(exc, "multiphysics run request")}, status_code=500,
                             headers={"Cache-Control": "no-store"})
 
 
