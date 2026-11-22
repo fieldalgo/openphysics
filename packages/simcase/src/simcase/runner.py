@@ -826,7 +826,18 @@ def _kernel_group_index(parameter, values, neff, vector, tracked):
         return None
     wl = np.asarray(values, dtype=float)
     order = 2 if tracked else 1
+    # a cut-off scalar mode (beta^2 <= 0) comes back as the fill n_eff = 0 (physics_em_modes2d clips
+    # the square root): a real lossless n_eff is exactly 0 only there. It has no group index, so it
+    # enters the difference as NaN, which np.gradient carries to every point whose stencil uses it;
+    # those n_g are null (NaN), every other value is unchanged.
+    neff = np.where(_cut_off(neff), np.nan, neff)
     return neff - wl[:, None] * np.gradient(neff, wl, axis=0, edge_order=order)
+
+
+def _cut_off(neff) -> np.ndarray:
+    """The fill values of cut-off modes: a real n_eff of exactly 0 (False for complex n_eff)."""
+    a = np.asarray(neff)
+    return np.zeros(a.shape, bool) if np.iscomplexobj(a) else a == 0.0
 
 
 def _public_group_index_method(doc: Document, group: dict) -> dict:
@@ -952,6 +963,10 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
     if parameter is not None and not wavelength_sweep:
         study_values = np.asarray(study["values"])
     group = None if "cluster_offsets" in kernel else _kernel_group_index(parameter, values, neff, vector, tracked)
+    if group is not None and log is not None:
+        for i, j in zip(*np.nonzero(np.isnan(group))):
+            log.append(f"n_g undefined at {_location(doc, parameter, values[i])}, mode {j + 1}: "
+                       f"n_eff^2 <= 0 (cut off) at a wavelength of its difference")
     group_method = None
     if "group_index" in kernel:
         group, group_method = kernel["group_index"]["values"], _public_group_index_method(doc, kernel["group_index"])
