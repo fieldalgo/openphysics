@@ -9,7 +9,7 @@ import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsName
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoices,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
  mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
- runFreshness,freshnessAgain,editNotice,staleRows,sequenceHeading,readyStatus,CANDIDATE_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
+ runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,CANDIDATE_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {persistenceTitle,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
@@ -46,12 +46,13 @@ export function createMultiphysicsView(ctx){
  const signature=()=>JSON.stringify(doc);
  // ---- model lifecycle ----
  async function loadCapabilities(){try{caps=await ctx.request('GET','/api/multiphysics/capabilities');catalog=kindCatalog(caps);capsError=null;}catch(e){capsError=e.message;}}
- async function open(tree,label,{fromFile=false}={}){
+ // note: a sentence added to the opening notice (where the previous model's runs are)
+ async function open(tree,label,{fromFile=false,note=''}={}){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];selection='model';runs=[];lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   baselineOption=baselinePhysics(doc).length>0;baselineQueue=[];baselineErrors={};lastRemoval=null;indexView='n';
   ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;
-  ctx.onHistory();validate(true);ctx.render();notice(fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`);
+  ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?' '+note:''));
  }
  // A session file of version 8 (or browser recovery), already checked (§3): the model, its runs,
  // the without-heater results and the view. Nothing is run, a without-heater run included.
@@ -77,7 +78,7 @@ export function createMultiphysicsView(ctx){
   if(reply.detail||unreadable.length)throw new Error(reply.detail||unreadable.map(d=>`${d.path?d.path+': ':''}${d.message}`).join('; '));
   await open(JSON.parse(text),name,{fromFile:asSession?'session':true});
  }
- async function openTemplate(){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide');}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
+ async function openTemplate({note=''}={}){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide',{note});}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
  function close(){active=false;stopPolling();}
  function commit(next,message,select){
   undoStack.push(doc);if(undoStack.length>100)undoStack.shift();redoStack=[];
@@ -121,8 +122,8 @@ export function createMultiphysicsView(ctx){
   const button=$('run-multiphysics'),reason=$('run-multiphysics-reason');if(!button)return;
   button.hidden=!active;reason.hidden=!active;if(!active)return;
   const block=runBlock(),fresh=freshness();button.disabled=!!block;button.textContent=job?'Running… (stop it under Study)':'Run';reason.textContent=job?'':block;
-  $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number);
-  const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number);
+  $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin);
+  const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number,lastRun?.origin);
   const option=$('run-baseline-option'),box=$('run-baseline');
   if(option){const o=baselineOptionState(doc,{on:baselineOption,busy:!!job});option.hidden=false;option.classList.toggle('unavailable',!o.available);box.checked=o.checked;box.disabled=o.disabled;option.title=o.title;}
  }
@@ -448,7 +449,7 @@ export function createMultiphysicsView(ctx){
  }
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
- const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Browser recovery result — not recomputed or authenticated.':' Imported file result — not recomputed or authenticated.';
+ const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed. Studio checks the file for damage, not who made it.';
  const runItem=run=>`${run.pinned?'Pinned · ':''}${runTitle(run)} · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}${run.maps==='not kept'?' · values only':''}`;
  // Results › Runs: the run list, in the optical words; selecting a run shows it, the model stays
  function runList(host){
@@ -514,6 +515,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const coupledJob=job&&!job.alone?job:null,src=coupledJob||runFailure||lastRun,order=src?.order||check.solve_order||[];
   if(!src)return order.map(g=>({group:g,label:g.length>1?g.map(physicsLabel).join(' ⇄ '):physicsLabel(g[0]),state:'ready',text:'Ready'}));
   let rows=progressRows(order,src.doc,src.events||[],coupledJob?'running':runFailure?runFailure.status:'done',runFailure?.error);
+  if(src===lastRun)rows=originRows(rows,lastRun.origin);
   if(!coupledJob&&src===lastRun&&runFreshness(lastRun,doc)==='stale')rows=staleRows(rows);
   if(job?.alone)rows.push(...progressRows([[job.alone]],job.doc,job.events,'running').map(r=>({...r,label:r.label+' without heater'})));
   return rows;

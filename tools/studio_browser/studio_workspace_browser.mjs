@@ -189,6 +189,13 @@ try {
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   // the chooser: a plain sentence about choosing, and Joule heating with its own card icon
   assert.match(await text('.application-contract'), /Choosing a model sets which physics it solves\. Dimensions you entered and runs you completed are kept, and Undo takes the choice back/);
+  // every chooser sentence says what Save session keeps today; no sentence about other views
+  const chooser = await text('.application-contract'); stage('chooser notes', {chooser, message: await text('#file-status')});
+  assert.match(chooser, /Heated silicon waveguide: .*Save session keeps the model with its runs, their names and pins, and the without-heater results\./);
+  assert.match(chooser, /Save session keeps the plate inputs; heat results stay in this tab\./); assert.match(chooser, /Save session keeps the inputs; Joule heating results stay in this tab\./);
+  assert.match(chooser, /The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here\./);
+  assert.doesNotMatch(chooser, /Save model file keeps|Results stay in the tab|Existing thermal Studio views/);
+  assert.equal(await text('#file-status'), 'Choose a model to begin. Save session keeps the inputs with the optical or multiphysics runs; heat and Joule heating results stay in this tab.');
   const icons = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,getComputedStyle(b,'::before').content]))");
   stage('model card icons', icons); assert.notEqual(icons.joule, icons.optical); assert.equal(new Set(Object.values(icons)).size, Object.keys(icons).length);
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
@@ -246,6 +253,8 @@ try {
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
   await sleep(150);
   const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · design A · 600 × 300 nm/);
+  // the run list gives the time with seconds, so runs of the same minute read apart
+  assert.match(named, / · \d{1,2}:\d\d:\d\d(?: [AP]M)?$/);
   // a pinned run offers Unpin; after it, Enter in Run name pins it again
   assert.equal(await text('#pin-run'), 'Unpin this run'); await page.click('#pin-run'); await sleep(150);
   assert.equal(await page.eval("document.getElementById('pin-run')"), null); assert.match(await text('.run-item'), /^design A · /);
@@ -312,7 +321,7 @@ try {
   // the routes back say which copy is durable
   const routes = await page.eval("({latest:document.getElementById('resume-latest').textContent,open:document.getElementById('resume-open-file').textContent,note:document.querySelector('.resume-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
-  assert.match(routes.latest, /^Recover \(this browser only\): Last session in this browser · 2 runs · saved /); assert.equal(routes.open, 'Open session file (portable)…');
+  assert.match(routes.latest, /^Recover \(this browser only\): Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved /); assert.equal(routes.open, 'Open session file (portable)…');
   assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
@@ -322,6 +331,19 @@ try {
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
   assert.ok(recoveredHeader.includes(`Recovered from this browser (last sent to a file: ${sessionFile} at `), 'the recovered title says it was recovered and names the last session file as history: ' + recoveredHeader);
+  // the recovered run is current, and the dock and footer say where it came from
+  const recoveredSequence = await opticalSequence(); stage('recovered sequence', recoveredSequence);
+  assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · press Run to compute it here'});
+  // switching to the heated model says where the optical runs stay, and they come back
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'models page');
+  await page.click('[data-template=heated-waveguide]');
+  await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'heated model', 30000);
+  const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('project').textContent")});
+  assert.match(switched, /^Heated silicon waveguide ready\. Edit settings and couplings, then press Run\. Optical waveguide and its 2 runs stay in this tab, browser recovery(?: and \S+\.json)?; choose Models › Optical waveguide to return to them\.$/);
+  await noOverflow('heated model after optical runs');
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
+  await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
+  assert.equal((await opticalSequence()).heading, 'Run 2 · recovered from this browser, not recomputed', 'the optical runs came back');
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and

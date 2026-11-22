@@ -3,11 +3,11 @@
 
 const {before}=require('node:test');
 let solverApi;
-let APPLICATIONS,templatePhysics,resumeChoices;
+let APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE;
 let opticalBlock,opticalDocument;
 before(async()=>{
 ({solverApi}=await import('../../packages/simcase/src/simcase/studio/static/workspace-api.mjs'));
-({APPLICATIONS,templatePhysics,resumeChoices}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
+({APPLICATIONS,templatePhysics,resumeChoices,sessionRunNames,CHOOSER_NOTES,CHOOSER_CHOICE}=await import('../../packages/simcase/src/simcase/studio/static/workspace-applications.mjs'));
 ({opticalBlock,opticalDocument}=await import('../../packages/simcase/src/simcase/studio/static/workspace-optical.mjs'));
 });
 const test=require('node:test');
@@ -65,4 +65,24 @@ test('the landing page offers the latest and earlier browser sessions to resume'
 test('an earlier session choice keeps its storage index when an unreadable record is skipped',()=>{
  const choices=resumeChoices(null,[{runs:1,savedAt:'T0',index:0},{runs:2,savedAt:'T2',index:2}],t=>t);
  assert.deepEqual(choices.map(c=>c.index),[0,2]);
+});
+test('every recovery entry names its model and its runs',()=>{
+ assert.deepEqual(sessionRunNames({runs:[{label:'design A'},{label:''}]}),['design A','Run 2']);
+ assert.deepEqual(sessionRunNames({runs:[{number:3,label:''},{number:4,label:'heater 10 mW'}]}),['Run 3','heater 10 mW']);
+ assert.deepEqual(resumeChoices({runs:2,savedAt:'T1',model:'Optical waveguide',names:['design A','Run 2']},[{runs:1,savedAt:'T0',model:'Heated silicon waveguide',names:['Run 1'],index:0}],t=>t),[
+  {kind:'latest',label:'Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
+  {kind:'earlier',index:0,label:'Earlier session · Heated silicon waveguide · 1 run · Run 1 · saved T0'}]);
+});
+test('the Models page says what Save session keeps of each model, and how to leave the coupled one',()=>{
+ const [optical,heat,joule,coupled]=CHOOSER_NOTES;
+ assert.match(optical,/Save session keeps the inputs, the runs and the comparison\.$/);
+ assert.match(heat,/Save session keeps the plate inputs; heat results stay in this tab\.$/);
+ assert.match(joule,/Save session keeps the inputs; Joule heating results stay in this tab\.$/);
+ assert.match(coupled,/^Heated silicon waveguide: .*Save session keeps the model with its runs, their names and pins, and the without-heater results\.$/);
+ assert.ok(CHOOSER_NOTES.every(t=>!/Save model file|results stay in the tab|Existing thermal Studio views/.test(t)));
+ assert.match(CHOOSER_CHOICE,/Undo takes the choice back between the optical, steady heat and Joule heating models\. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here\.$/);
+});
+test('no Studio page calls a loaded or recovered result unauthenticated',()=>{
+ const fs=require('node:fs'),path=require('node:path'),dir=path.join(__dirname,'../../packages/simcase/src/simcase/studio/static');
+ for(const name of fs.readdirSync(dir).filter(n=>/\.(mjs|html|js)$/.test(n)))assert.doesNotMatch(fs.readFileSync(path.join(dir,name),'utf8'),/authenticated/,name);
 });

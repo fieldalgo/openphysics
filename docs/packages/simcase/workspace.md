@@ -89,7 +89,10 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    the current inputs* (the status bar adds *press Run to solve again*), after an edit
    *Inputs changed since run 1 · press Run to update*, and before any run *Nothing is
    computed until you press Run* and *Optical adapter ready · explicit Run required*. A run's
-   number is its place in the run list, the oldest first. While something holds Run (input
+   number is its place in the run list, the oldest first. A current run that this tab did not
+   compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
+   session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
+   bar adds *press Run to compute it here*). Run list entries give the time with seconds. While something holds Run (input
    errors, a computation or job in progress, an unsupported input), the heading repeats the
    status bar's words instead.
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
@@ -133,7 +136,15 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    *Choose a model to start* and the Study sequence lists no steps. A model just chosen
    reads *New model · not saved* until its first edit, then *Unsaved inputs*. The start
    page says what choosing does: it sets which physics the model solves, keeps the
-   dimensions you entered and the runs you completed, and Undo takes it back. The start page uses
+   dimensions you entered and the runs you completed, and Undo takes it back between the
+   optical, steady heat and Joule heating models; the heated silicon waveguide has its own Undo
+   for its edits, and you leave it by choosing another model. Each model's note says what Save
+   session keeps of it: the inputs and runs of the optical model, the inputs of steady heat and
+   Joule heating (their results stay in the tab), and the heated silicon waveguide with its runs.
+   Opening the heated model over optical runs says in Messages where those runs stay (this tab,
+   and browser recovery or the session file that holds them) and that **Models › Optical
+   waveguide** brings them back. Every recovery entry names its model, its run count and its
+   runs (a run's name, else *Run N*), for example *Optical waveguide · 2 runs · design A, Run 2*. The start page uses
    one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
@@ -382,7 +393,11 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
   coupling removed and added back, or Undo) makes it current again, and Messages, the dock
   heading and the footer then say the same sentence, “Model matches run 1 again: its results are
-  current. Run makes a new run with the same inputs”, which says what Run would do.
+  current. Run makes a new run with the same inputs”, which says what Run would do. A run read
+  from a session file or recovered from this browser has no solve times: its rows read **From
+  file** or **From this browser**, the dock heading “Run 1 · read from file, not recomputed” (or
+  “recovered from this browser, not recomputed”) and the footer adds “press Run to compute it
+  here”; a run made in the tab keeps the words above.
 - **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
   take a coupled temperature opens. After the coupled run, Studio solves the optical model alone
   with no temperature input, through the same run route, and fills the heater-off column. It is
@@ -502,7 +517,10 @@ opening there. This section is the public statement of the format.
   the record without its `digest`, written as JSON with the keys of every object sorted and
   the same number rules. It detects a truncated, damaged or hand-edited file. It is not an
   authentication: whoever edits a file can recompute it, so opened results still read
-  “Imported file result — not recomputed or authenticated”.
+  “Loaded from file, not recomputed. Studio checks the file for damage, not who made it.”
+  Recovered results read “Recovered from this browser, not recomputed.” An optical session
+  file carries no digest; its opened results read “Loaded from file, not recomputed. Studio
+  checks that the file is well formed, not who made it.”
 - **Size.** A file is at most 16 MiB, checked before it is read, and each document in it at
   most 1 MiB. Save session writes every run with its maps when the file fits (six runs of the
   template mesh are about 2.5 MB). When it does not, it writes nothing and asks, naming the
@@ -554,7 +572,7 @@ the selected and pinned runs only, without a dialog, and the indicator says “k
 this browser without the maps of 2 runs · Save session to keep them”; when even that is over the
 limit it writes nothing new (“browser recovery unavailable: session over 16 MiB”) and the earlier
 record stays. **Recover last session** and **Recover earlier session · Heated silicon waveguide ·
-3 runs · time** run the same checks as Open session.
+3 runs · Run 1, Run 2, Run 3 · time** run the same checks as Open session.
 
 The module checks are in `tests/simcase/studio_workspace_multiphysics_session.cjs` (the optical
 files of versions 6 and 7 written by the Studio before version 8, in
@@ -832,7 +850,7 @@ solver is started. Input-only recovery and pending-job recovery remain separate.
 Starting new work without recovering does not discard the stored session. The first
 automatic save after a page opens moves the stored session to the earlier sessions,
 newest first, keeping at most three; **Recover earlier session** lists each with its
-run count and time and recovers it through the same replacement dialog. Recovering
+model, run count, run names and time and recovers it through the same replacement dialog. Recovering
 an earlier session keeps the current one as an earlier session at the next save.
 
 The latest snapshot is a single record for the browser origin, shared across tabs.

@@ -305,3 +305,17 @@ test('the Messages line says when the without-heater option returns ticked',asyn
  assert.equal(m.baselineReturnText(doc,doc,true),'');
  assert.equal(m.baselineReturnText(doc,removed,true),'');
 });
+test('a run read from a file or recovered says where it came from in the heading, footer and step rows',async()=>{
+ const m=await mp;
+ assert.equal(m.sequenceHeading('current',2,'imported'),'Run 2 · read from file, not recomputed');
+ assert.equal(m.sequenceHeading('current',2,'recovered'),'Run 2 · recovered from this browser, not recomputed');
+ assert.equal(m.readyStatus('current',2,'imported'),'Run 2 · read from file, not recomputed · press Run to compute it here');
+ assert.equal(m.sequenceHeading('current',2,'local'),'Run 2 · solved from the current model');
+ assert.equal(m.sequenceHeading('stale',2,'imported'),'Run 2 · the model changed since; press Run to update');
+ assert.equal(m.sequenceHeading('again',2,'imported'),m.matchesAgainText(2));
+ const rows=[{label:'Heat 1',state:'done',text:'Done in 0.2 s'},{label:'Modes 1',state:'done',text:'Done in 0.9 s'}];
+ assert.deepEqual(m.originRows(rows,'imported').map(r=>r.text),['From file','From file']);
+ assert.deepEqual(m.originRows(rows,'recovered').map(r=>r.text),['From this browser','From this browser']);
+ assert.deepEqual(m.originRows(rows,'local'),rows);
+ assert.deepEqual(m.staleRows(m.originRows(rows,'imported')).map(r=>r.text),['Out of date (last run: From file)','Out of date (last run: From file)']);
+});

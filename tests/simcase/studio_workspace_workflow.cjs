@@ -60,3 +60,19 @@ test('the dock heading and the footer name the same optical run: none, current, 
   assert.equal(steps[4].state==='ready',state.state==='current');
  }
 });
+test('a current optical run read from a file or recovered says so, not that it was solved here',async()=>{
+ const W=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs');
+ const doc=input(),sig=JSON.stringify(doc);
+ let f=W.opticalFreshness(doc,[{signature:sig,origin:'imported'}]);
+ assert.deepEqual(f,{state:'current',run:1,origin:'imported'});
+ assert.equal(W.opticalSequenceHeading(f),'Run 1 · read from file, not recomputed');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · read from file, not recomputed · press Run to compute it here');
+ f=W.opticalFreshness(doc,[{signature:sig,origin:'recovered'}]);
+ assert.equal(W.opticalSequenceHeading(f),'Run 1 · recovered from this browser, not recomputed');
+ // a later run made in this tab with the same inputs keeps today's words
+ f=W.opticalFreshness(doc,[{signature:sig,origin:'imported'},{signature:sig,origin:'local'}]);
+ assert.deepEqual(f,{state:'current',run:2});
+ assert.equal(W.opticalSequenceHeading(f),'Run 2 · solved from the current inputs');
+ // freshness is unchanged: an edit names the latest run as before
+ assert.deepEqual(W.opticalFreshness({x:1},[{signature:sig,origin:'imported'}]),{state:'stale',run:1});
+});
