@@ -61,8 +61,12 @@ areas A_T of ``node_coordinates``, summed over every triangle of the window, all
 
 with x the document's horizontal axis and E_z left out; f_TM = 1 - f_TE. It needs no kernel
 call, so any reader of the saved samples gets the same number (``te_polarization_fraction``).
-Two modes whose Re n_eff differ by at most 1e-4 are a degenerate pair: each member's fraction is
+Two modes whose Re n_eff differ by at most 1e-3 are a degenerate pair: each member's fraction is
 then an arbitrary rotation within the pair and only their sum is defined; both are still saved.
+The threshold is 1e-3 because the mesh splits a symmetric pair (a square core) by 1e-4 to 6e-4 at
+core element sizes of 40 to 10 nm, below the n_eff discretization error at those meshes. A mesh
+split above 1e-3, possible on very coarse meshes, is not recognised as a pair, and a member's
+fraction is then a rotation chosen by the mesh.
 
 Not computed: PML results (the saved transverse coefficients are covariant integrals in
 complex-stretched coordinates, so the lossless Poynting formula on the whole window is not the
@@ -295,9 +299,11 @@ def summary_block(arrays: dict, *, vector: bool, region_names: list[str], gaussi
             "unit": "1", "values": _part(arrays["te_polarization_fraction"]),
             "description": "f_TE = sum_T A_T |E_x|^2 / sum_T A_T (|E_x|^2 + |E_y|^2) on the saved centroid field "
                            "unnormalized_electric_field over every triangle of the window, x horizontal, E_z left "
-                           "out; f_TM = 1 - f_TE. For two modes whose Re n_eff differ by at most 1e-4 (a degenerate "
+                           "out; f_TM = 1 - f_TE. For two modes whose Re n_eff differ by at most 1e-3 (a degenerate "
                            "pair) each member's value is an arbitrary rotation within the pair and is still saved; "
-                           "only the pair's sum is defined"}
+                           "only the pair's sum is defined. A mesh split of a symmetric pair above 1e-3 (very "
+                           "coarse meshes) is not recognised, and a member's value is then a rotation chosen by "
+                           "the mesh"}
     if gaussian is not None:
         out["coupling_efficiency"] = {
             "unit": "1", "values": _part(arrays["coupling_efficiency"]),

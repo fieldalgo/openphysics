@@ -32,20 +32,22 @@ test('words: TE-like at f_TE >= 0.9, TM-like at <= 0.1, otherwise hybrid; percen
  assert.deepEqual(rows.map(r=>[r.label,r.neff,r.polarization.text,r.loss]),[['Mode 1','2.44406001','TE-like · 98.2 % TE','lossless'],['Mode 2','1.70000000','TM-like · 1.2 % TE','lossless']]);
  assert.equal(rows[0].polarization.title,'TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal');
 });
-test('degenerate pairs: Re n_eff within 1e-4 (inclusive) make one merged cell with the mean',()=>{
- assert.deepEqual(M.degenerateGroups([2.0,2.0001]),[[0,1]],'exactly 1e-4 is a pair');
- assert.deepEqual(M.degenerateGroups([2.0,2.00010001]),[]);
- assert.deepEqual(M.degenerateGroups([2.1,1.9,2.099985]),[],'only adjacent rows make a pair');
- assert.deepEqual(M.degenerateGroups([2,2.00009,2.00018]),[[0,1]],'no chaining: the whole group lies within 1e-4');
+test('degenerate pairs: Re n_eff within 1e-3 (inclusive) make one merged cell with the mean',()=>{
+ assert.equal(M.PAIR_TOLERANCE,1e-3);
+ assert.deepEqual(M.degenerateGroups([2.0,2.001]),[[0,1]],'exactly 1e-3 is a pair');
+ assert.deepEqual(M.degenerateGroups([2.0,2.0010001]),[]);
+ assert.deepEqual(M.degenerateGroups([2.0,1.99974]),[[0,1]],'a mesh split of 2.6e-4 (the square core at 10 nm) is a pair');
+ assert.deepEqual(M.degenerateGroups([2.1,1.9,2.09985]),[],'only adjacent rows make a pair');
+ assert.deepEqual(M.degenerateGroups([2,2.0009,2.0018]),[[0,1]],'no chaining: the whole group lies within 1e-3');
  // every row has its columns: a merged cell spans adjacent rows only
- const layout=M.modeTableRows([{re:2.00012,im:0,fte:.9,loss:null},{re:2.00005,im:0,fte:.2,loss:null},{re:1.9,im:0,fte:.95,loss:null}]).rows;
+ const layout=M.modeTableRows([{re:2.0012,im:0,fte:.9,loss:null},{re:2.0005,im:0,fte:.2,loss:null},{re:1.9,im:0,fte:.95,loss:null}]).rows;
  let covered=0;for(const r of layout){if(r.polarization){assert.equal(covered,0);covered=r.polarization.rowspan-1;}else{assert.ok(covered>0,'a row without a cell is covered by the one above');covered--;}}
  // a pair without fractions keeps each row's reason, not a merged "—"
  const missing=M.modeTableRows([{re:2.5,im:0,fte:null,loss:null},{re:2.49999,im:0,fte:null,loss:null}],{missing:'PML result'});
  assert.deepEqual(missing.rows.map(r=>[r.polarization.text,r.polarization.title]),[['—','PML result'],['—','PML result']]);
  const {rows,groups}=M.modeTableRows([{re:2.5,im:0,fte:.73,loss:null},{re:2.499985,im:0,fte:.27,loss:null},{re:2.1,im:0,fte:.95,loss:null}]);
  assert.deepEqual(groups,[[0,1]]);
- assert.equal(rows[0].polarization.text,'pair (n_eff within 0.0001) · 50 % TE together');
+ assert.equal(rows[0].polarization.text,'pair (n_eff within 1e-3) · 50 % TE together');
  assert.equal(rows[0].polarization.rowspan,2);assert.equal(rows[1].polarization,null);
  assert.match(rows[0].polarization.title,/Each member's polarization is not defined/);
  assert.equal(rows[2].polarization.text,'TE-like · 95.0 % TE');

@@ -604,10 +604,13 @@ engine and older session files give the same number from the same samples:
   horizontal”), shown as a word and the TE percentage, e.g. *TE-like · 98.2 % TE*. Studio's words
   are **TE-like** at f_TE ≥ 0.9, **TM-like** at f_TE ≤ 0.1, otherwise **hybrid**; the engine saves
   only the number (`te_polarization_fraction`, [result format](overview.md#mode-post-processing)).
-- **Degenerate pairs**: two adjacent modes of one run whose Re n_eff differ by at most 1e-4 share one
-  merged cell (shown only when both have a fraction), *pair (n_eff within 0.0001) · 50 % TE together*, the mean of their two fractions;
+- **Degenerate pairs**: two adjacent modes of one run whose Re n_eff differ by at most 1e-3 share one
+  merged cell (shown only when both have a fraction), *pair (n_eff within 1e-3) · 50 % TE together*, the mean of their two fractions;
   its tooltip says each member's polarization is not defined (any rotation within the pair is a
-  solution). The field view's mode picker names a member *pair*.
+  solution). The field view's mode picker names a member *pair*. The threshold is 1e-3 because the
+  mesh splits a symmetric pair (a square core) by 1e-4 to 6e-4 at 40 to 10 nm, below the solver's
+  n_eff error at those meshes. A mesh split above 1e-3, possible on very coarse meshes, is not
+  flagged, and a member's polarization is then a rotation chosen by the mesh.
 - **Loss** is `propagation_loss` / 100 in dB/cm to 4 significant digits, where `propagation_loss
   = (40π / ln 10) · Im n_eff / λ0` in dB/m (exp(−iωt), Im n_eff > 0 is loss). Where Im n_eff is
   exactly 0 the row reads *lossless*, and once below the table: “Lossless: all materials have k =

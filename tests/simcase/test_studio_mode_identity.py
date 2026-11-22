@@ -109,3 +109,23 @@ def test_v13_studio_te_fraction_equals_the_engine(tmp_path):
     assert studio[0]["labels"][1].startswith("Mode 2 · TM-like · n_eff ")
     assert studio[0]["groups"] == []
     assert studio[-1]["loss"] == "37.49 dB/cm"
+
+
+_GROUPS = r"""
+const M = await import(process.argv[1]);
+process.stdout.write(JSON.stringify(JSON.parse(process.argv[2]).map(re => M.degenerateGroups(re))));
+"""
+
+
+@pytest.mark.slow
+def test_v5_studio_flags_the_square_pair_and_v5b_not_distinct_modes():
+    """Studio's pair rule on the engine's n_eff: the 400 x 400 nm square is one pair at 40, 20 and
+    10 nm for both grading centres (V5); the template strip and the 400 x 380 nm core are not (V5b)."""
+    T = polarization_module()
+    square = [run(T.square(h, centre), verbose=False).effective_index[0].real.tolist()
+              for centre in (T.THICKNESS / 2, 0.2) for h in T.SIZES]
+    distinct = [run(T.strip(h, mode_count=2), verbose=False).effective_index[0].real.tolist() for h in T.SIZES]
+    distinct += [run(T.square(h, 0.19, h=0.38), verbose=False).effective_index[0].real.tolist() for h in T.SIZES]
+    groups = call(_GROUPS, (STATIC / "workspace-modes.mjs").as_uri(), json.dumps(square + distinct))
+    assert groups[:len(square)] == [[[0, 1]]] * len(square)
+    assert groups[len(square):] == [[]] * len(distinct)

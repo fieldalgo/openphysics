@@ -519,9 +519,11 @@ Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.” �
   도움말: “TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal”). 낱말과 TE 백분율로 보여 줍니다(예:
   *TE-like · 98.2 % TE*). Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
   **hybrid**이며, 엔진은 수만 저장합니다(`te_polarization_fraction`, [결과 형식](overview.md)).
-- **축퇴 쌍**: 한 실행에서 Re n_eff 차이가 1e-4 이하인 이웃한 두 모드는(둘 다 비율이 있을 때) 합친 칸 하나 *pair (n_eff within 0.0001) ·
+- **축퇴 쌍**: 한 실행에서 Re n_eff 차이가 1e-3 이하인 이웃한 두 모드는(둘 다 비율이 있을 때) 합친 칸 하나 *pair (n_eff within 1e-3) ·
   50 % TE together*(두 비율의 평균)를 씁니다. 도움말은 각 모드의 편광이 정의되지 않는다고 밝힙니다(쌍 안의
-  어떤 회전도 해입니다). 장 보기의 모드 선택은 그 모드를 *pair*로 부릅니다.
+  어떤 회전도 해입니다). 장 보기의 모드 선택은 그 모드를 *pair*로 부릅니다. 임계값이 1e-3인 까닭은 메시가 대칭 쌍(정사각형
+  코어)을 40~10 nm에서 1e-4~6e-4만큼 갈라 놓는데, 이는 같은 메시에서 솔버의 n_eff 오차보다 작기 때문입니다. 아주 성긴
+  메시에서 생길 수 있는 1e-3 초과의 분리는 표시되지 않으며, 그때 각 모드의 편광은 메시가 고른 회전입니다.
 - **Loss**는 `propagation_loss` / 100을 dB/cm로 유효숫자 4자리까지 보인 값이며, `propagation_loss = (40π / ln 10)
   · Im n_eff / λ0`(dB/m, exp(−iωt), Im n_eff > 0이 손실)입니다. Im n_eff가 정확히 0이면 행에 *lossless*를
   쓰고, 표 아래에 한 번 “Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not
