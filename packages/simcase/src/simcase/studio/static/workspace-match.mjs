@@ -191,6 +191,8 @@ export function unitArea(run,unit){
  * members' dB/cm ("0 dB/cm" when every member is lossless); "—" without a unit or a value. The
  * values come from the saved indices, so a run without fields has them too. */
 export function unitLoss(run,unit){
+ // optical runs only: the optical adapter has no open boundary (PML), so Compare's loss is absorption
+ // only; a run with a PML would need lossColumn({open:true}) here and in Compare's headers
  const help=lossColumn().help;
  if(!unit)return {text:'—',value:null,title:help};
  const modes=opticalModes(run),members=unit.map(i=>modes[i]);

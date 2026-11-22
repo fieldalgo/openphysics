@@ -1011,14 +1011,14 @@ Study.
 The model builder of every model is an ARIA tree named *Model tree*. Its group headings
 (*Component 1*, *Physics*, *Analysis*; in the multiphysics model *Couplings*, *Study* and the
 results of the last run) are tree items at level 1 that open and close their group, their nodes
-are tree items at level 2, and a node under another (a material, an iteration step, a results
-page) is at level 3; no two items share a name. A node is marked selected (`aria-selected`) only
+are tree items at level 2 (a results page included), and a node under another (a material, an
+iteration step) is at level 3; no two items share a name. A node is marked selected (`aria-selected`) only
 while its settings or page are shown: on Results the optical tree marks no node (it has no
 Results node) and the multiphysics tree marks the results page shown; on Compare none is marked.
-The tree is one tab stop, the selected node. **Up** and **Down** move between the visible items,
+The tree is one tab stop, the selected node (the arrows move it while the tree has the focus). **Up** and **Down** move between the visible items,
 **Home** and **End** to the first and the last, **Enter** or **Space** selects a node (the same
 as a click) or opens and closes a group, **Right** opens a group or moves into it, and **Left**
-closes a group or moves from a node to the item above it. Connections explains that no coupled interfaces are present and links
+closes a group or moves from a node to its parent, the item one level up. Connections explains that no coupled interfaces are present and links
 back to application choice. The conceptual preview of older input files keeps the broader
 setup tree and runs nothing; the Heated silicon waveguide is a separate, runnable model.
 

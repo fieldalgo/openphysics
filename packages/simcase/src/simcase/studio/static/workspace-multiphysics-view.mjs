@@ -212,16 +212,16 @@ export function createMultiphysicsView(ctx){
   const warned=new Map(unsourcedInputs(doc,catalog).map(w=>[w.physics,w.text]));
   const warn=n=>warned.has(n)?`<span class="warn-badge" title="${esc(warned.get(n))}" aria-label="warning: ${esc(warned.get(n))}">!</span>`:'';
   const physics=physicsNames(doc).map(n=>item('physics:'+n,`${physicsLabel(n)} · ${catalog.types.get(doc.physics[n].type)?.label||doc.physics[n].type}`,TYPE_MARK[doc.physics[n].type]||MARK.physics,multi?badge(n):'').replace(/<\/button>$/,warn(n)+'</button>')).join('');
-  const couplings=couplingNames(doc).map(c=>item('coupling:'+c,couplingTitle(doc,c),MARK.coupling)).join('')||'<p class="muted tree-empty">No couplings</p>';
+  const couplings=couplingNames(doc).map(c=>item('coupling:'+c,couplingTitle(doc,c),MARK.coupling)).join('')||`<div role="treeitem" aria-level="2" aria-disabled="true" tabindex="-1" class="muted tree-empty">No couplings</div>`;
   const loops=(Array.isArray(doc.study?.loops)?doc.study.loops:[]).map((l,i)=>item('loop:'+i,`Iteration step ${i+1} · ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`,MARK.loop,'',true)).join('');
   const materials=materialUses(doc).map(u=>item('material:'+u.ref,u.label,'·','',true)).join('');
-  const results=lastRun?[{id:'results:runs',label:`Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT}`},...resultPages(lastRun.result)].map(p=>item(p.id,p.label,MARK.results,'',true)).join(''):'';
+  const results=lastRun?[{id:'results:runs',label:`Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT}`},...resultPages(lastRun.result)].map(p=>item(p.id,p.label,MARK.results,'',true,2)).join(''):'';
   return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">${multi?'Multiphysics model':'Model 1'}</span></div>${treeOpen()}<div class="model-root" role="none"><button type="button" data-mp-node="model" ${itemAttributes(1,shown('model'))}><span aria-hidden="true">▾ ◇</span><strong>${esc(doc.name||'Untitled model')}</strong></button></div>`+
    `<section class="tree-group" role="none">${group('Component 1')}${item('geometry','Geometry 1',MARK.geometry,'',false)}${item('materials','Materials',MARK.materials)}${materials}${item('mesh',multi?'Mesh 1 · shared':'Mesh 1',MARK.mesh)}</section>`+
    `<section class="tree-group" role="none">${group('Physics')}${physics}</section>`+
    (multi?`<section class="tree-group" role="none">${group('Couplings')}${couplings}</section>`:'')+
    `<section class="tree-group" role="none">${group('Study')}${item('study','Study 1',MARK.study)}${multi?item('order','Solve order (from couplings)',MARK.order,'',true):''}${loops}</section>`+
-   (results?`<section class="tree-group" role="none">${group(`Results · run ${lastRun.number}`)}${results}</section>`:'')+`</div>`+
+   (results?`<section class="tree-group" role="none">${groupHeading('Results',!treeView.collapsed.has('Results'),`Results · run ${lastRun.number}`)}${results}</section>`:'')+`</div>`+
    `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>Solver available</strong><p>${multi?'Multiphysics model · one Run solves every physics in order':physicsNames(doc).length>1?`${physicsNames(doc).length} physics · no couplings · format 0.3`:'One physics · format 0.3'}</p></div>`;
  }
  // ---- fields ----
