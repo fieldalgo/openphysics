@@ -87,10 +87,11 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
    n_eff has 8 decimals everywhere; field plots and the point inspector use nm, like the
    inputs.
 4. Back in **Geometry**, set the width to 700 nm and run again.
-5. Open **Compare**. Runs A and B are chosen for you; a table lists n_eff of A and B,
-   Δ (B − A) and Δ % of A for each mode rank, with each run's name, size and
-   wavelength in its column header, below the two field plots. Mode ranks are not
-   matched modes.
+5. Open **Compare**. Runs A and B are chosen for you; below the two field plots a table
+   matches their modes by field overlap: one row per matched mode, *A mode 1 ↔ B mode 1*, with
+   both polarizations, the overlap, n_eff of A and B, Δn_eff (B − A) and Δ % of A, and each
+   run's name, size and wavelength in its column header. A mode without a match says so and
+   shows no Δn_eff.
 
 ## 5. Keep your work
 

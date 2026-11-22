@@ -95,13 +95,10 @@ test('the session confirmation says what comes back and what is replaced',()=>{
  assert.match(P.sessionLoadText({runs:[],comparison:[null,null]}).description,/^Brings back no completed runs\. /);
 });
 
-test('the Compare table has one row per candidate rank with both indices, their difference and its percentage of A',()=>{
- const rows=C.compareRows([2.6,2.1],[2.65,2.0]);
- assert.equal(rows.length,2);assert.deepEqual(rows.map(r=>r.rank),[1,2]);
- assert.equal(rows[0].a,2.6);assert.equal(rows[0].b,2.65);assert.equal(C.formatIndex(rows[0].delta),'0.05000000');
- assert.equal(C.formatPercent(rows[0].percent),'1.9231 %');assert.equal(C.formatPercent(rows[1].percent),'-4.7619 %');
- assert.equal(C.formatPercent(C.compareRows([0],[1])[0].percent),'—');
- assert.equal(C.compareRows([1,2,3],[1,2]).length,2);
+test('Compare formats: n_eff to 8 decimals, the difference as a percentage of A, run headings',()=>{
+ assert.equal(C.formatIndex(2.65-2.6),'0.05000000');
+ assert.equal(C.formatPercent(0.05/2.6*100),'1.9231 %');assert.equal(C.formatPercent(-0.1/2.1*100),'-4.7619 %');
+ assert.equal(C.formatPercent(null),'—');
  assert.equal(C.runHeading(run('aaaaaaaa',600,'design A')),'design A · 600 × 300 nm · Silicon · λ 1550 nm');
  assert.equal(C.runHeading(run('aaaaaaaa',700)),'700 × 300 nm · Silicon · λ 1550 nm');
  // a Compare field heading never repeats the side as the run's name (round 3, N6)

@@ -22,8 +22,9 @@ import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot} from './works
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession} from './workspace-notebook.mjs';
-import {compareRows,runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
+import {runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,modeTableRows,modeOptionLabel,opticalModes,engineTeFraction} from './workspace-modes.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
 import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -770,7 +771,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':'Inputs changed since this result')+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=`${same?'Result for the current inputs':'Inputs changed since this result; your edits are kept'} · ${designSummary(solverRun.input.model)} · λ ${solverRun.input.model.wavelength} nm · core mesh ${solverRun.input.model.coreMesh} nm`;$('canvas').append(desc);
   renderField();$('canvas').append(modesTable(solverRun));
-  const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
+  const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Models → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
  if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+`<label>Wavelength [nm]<input id="wavelength-number" type="number" min="1400" max="1700" step="any" value="${state.wavelength}"></label>`+pair('Material data','Refractive indices at this wavelength')+pair('Modes','2')+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
@@ -854,9 +855,9 @@ function renderField(){
  for(const [id,key] of [['field-mode','mode'],['field-component','component'],['field-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;drawField();profileRedraw();};
  probeOutput(host,'field-probe');addProbeControls(host,()=>drawField());fieldResize=new ResizeObserver(()=>{if($('optical-field'))drawField();});fieldResize.observe(host);drawField();renderLineProfile(host,[solverRun]);
 }
-function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('field-description'),sampleTarget=$('field-probe'),redraw=()=>drawField()){
+function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('field-description'),sampleTarget=$('field-probe'),redraw=()=>drawField(),mode=fieldView.mode){
  if(!canvas||!run)return;
- const {values,maximum}=fieldScalars(run.field,fieldView.mode,fieldView.component);
+ const {values,maximum}=fieldScalars(run.field,mode,fieldView.component);
  const box=canvas.getBoundingClientRect(),w=box.width,h=box.height;if(w<1||h<1)return;
  const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.fillStyle='#12202a';ctx.fillRect(0,0,w,h);
  const full=fieldView.window==='Full window',region=regionBounds(run.input.model,.4,.9,.72),xmin=full?-1.5:region[0],xmax=full?1.5:region[1],ymin=full?-1.2:region[2],ymax=full?1.2:region[3];
@@ -871,7 +872,7 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
  for(const x of nmTicks(xmin,xmax,Math.max(3,Math.min(7,Math.floor(pw/64)))))ctx.fillText(formatNm(x),X(x),top+ph+18);
  ctx.fillText('x [nm]',left+pw/2,top+ph+38);ctx.textAlign='right';for(const y of nmTicks(ymin,ymax,Math.max(3,Math.min(7,Math.floor(ph/40)))))ctx.fillText(formatNm(y),left-8,Y(y)+4);
  ctx.save();ctx.translate(13,top+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('y [nm]',0,0);ctx.restore();
- const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';const description=`Mode ${fieldView.mode+1}: ${q} / max|E|, relative amplitude (0–1). Each mode uses its own vector maximum. Triangle-centroid samples, constant color per triangle; dashed outlines = shapes. Not absolute power.${maximum===0?' Zero field returned.':''}`;
+ const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';const description=`Mode ${mode+1}: ${q} / max|E|, relative amplitude (0–1). Each mode uses its own vector maximum. Triangle-centroid samples, constant color per triangle; dashed outlines = shapes. Not absolute power.${maximum===0?' Zero field returned.':''}`;
  if(descriptionTarget)descriptionTarget.textContent=description;canvas.setAttribute('aria-label',description);
  if(sampleTarget){
   sampleTarget.textContent='No point selected.';
@@ -891,21 +892,23 @@ function drawField(canvas=$('optical-field'),run=solverRun,descriptionTarget=$('
 }
 
 
-function renderLineProfile(host,profileRuns,updateFields=()=>drawField()){
+// "mode 1" when every run shows the same rank, else "A mode 1 · B mode 3"
+const modeWords=modes=>modes.every(m=>m===modes[0])?`mode ${modes[0]+1}`:modes.map((m,i)=>`${i?'B':'A'} mode ${m+1}`).join(' · ');
+function renderLineProfile(host,profileRuns,updateFields=()=>drawField(),modes=profileRuns.map(()=>fieldView.mode)){
  const details=document.createElement('details');details.className='line-profile';details.open=profileState.open;
  const summary=document.createElement('summary');summary.textContent='Line profile and CSV';details.append(summary);
  const form=document.createElement('form');form.className='profile-controls';form.innerHTML='<label>Profile direction<select id="profile-axis" aria-label="Profile direction"><option value="x">Horizontal · along x</option><option value="y">Vertical · along y</option></select></label><label>Fixed coordinate [nm]<input id="profile-coordinate" type="number" step="any" required></label><button type="submit">Show profile</button>';details.append(form);
  const description=document.createElement('p');description.setAttribute('role','status');details.append(description);
  const canvas=document.createElement('canvas');canvas.style.cssText='display:block;width:100%;height:260px';canvas.setAttribute('role','img');details.append(canvas);
  const legend=document.createElement('div');legend.className='profile-legend';details.append(legend);
- const note=document.createElement('p');note.textContent='Step segments use the stored value of each intersected triangle. No interpolation, absolute power or mode matching. Each mode uses its own max|E| normalization.';details.append(note);
+ const note=document.createElement('p');note.textContent='Step segments use the stored value of each intersected triangle. No interpolation or absolute power. Each mode uses its own max|E| normalization.';details.append(note);
  const csv=document.createElement('button');csv.type='button';csv.textContent='Export profile CSV';csv.disabled=true;details.append(csv);const png=document.createElement('button');png.type='button';png.textContent='Export profile PNG';png.style.marginLeft='8px';png.disabled=true;details.append(png);host.append(details);
  $('profile-axis').value=profileState.axis;$('profile-coordinate').value=nmValue(profileState.coordinate);
  const range=()=>{const extent=$('profile-axis').value==='x'?1200:1500;$('profile-coordinate').min=-extent;$('profile-coordinate').max=extent;};range();$('profile-axis').onchange=range;
  let series=[],cacheKey='';
  profileRedraw=()=>{if(!details.isConnected||!details.open)return;try{
-  const key=JSON.stringify([profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component]);if(key!==cacheKey){series=profileRuns.map(run=>({run,segments:lineProfile(run.field,fieldScalars(run.field,fieldView.mode,fieldView.component).values,profileState.axis,profileState.coordinate)}));cacheKey=key;}
-  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1)} nm · mode ${fieldView.mode+1} · ${q} / max|E| (0–1). Full-domain profile; the amber dashed line marks its location in the field view when visible.`;
+  const key=JSON.stringify([profileState.axis,profileState.coordinate,modes,fieldView.component]);if(key!==cacheKey){series=profileRuns.map((run,i)=>({run,mode:modes[i],segments:lineProfile(run.field,fieldScalars(run.field,modes[i],fieldView.component).values,profileState.axis,profileState.coordinate)}));cacheKey=key;}
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';description.textContent=`Displayed: ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1)} nm · ${modeWords(modes)} · ${q} / max|E| (0–1). Full-domain profile; the amber dashed line marks its location in the field view when visible.`;
   legend.replaceChildren();series.forEach((item,i)=>{const line=document.createElement('p');line.style.color=i?'#e7bc73':'#80d7c0';line.textContent=`${i?'B':'A'} · ${runLabel(item.run)} · ${item.segments.length} intervals`;legend.append(line);});
   drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);png.disabled=csv.disabled;
  }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;png.disabled=true;}};
@@ -914,10 +917,10 @@ function renderLineProfile(host,profileRuns,updateFields=()=>drawField()){
  csv.onclick=()=>downloadFile(new Blob([profileCsv(series,profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component)],{type:'text/csv'}),'studio-profile.csv');
  png.onclick=()=>{
   const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height+180;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,0,0);ctx.font='14px Segoe UI';ctx.fillStyle='#cfdae0';
-  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';ctx.fillText(`Line ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1).replace('−','-')} nm | mode ${fieldView.mode+1} | ${q} / max|E|`,12,canvas.height+24);
+  const q=fieldView.component==='magnitude'?'|E|':'|'+fieldView.component+'|';ctx.fillText(`Line ${profileState.axis==='x'?'y':'x'} = ${formatNm(profileState.coordinate,1).replace('−','-')} nm | ${modeWords(modes)} | ${q} / max|E|`,12,canvas.height+24);
   ctx.fillText('Relative amplitude 0 to 1 per mode. Stored triangle values; no interpolation.',12,canvas.height+48);
   series.forEach((item,i)=>{ctx.fillStyle=i?'#e7bc73':'#80d7c0';ctx.fillText(`${i?'B':'A'}: ${item.run.job} | ${designSummary(item.run.input.model)} | ${item.run.input.model.wavelength} nm | ${item.run.origin}`,12,canvas.height+76+i*24);});
-  ctx.fillStyle='#cfdae0';ctx.fillText('Full domain. No absolute-power or cross-design mode matching claim.',12,canvas.height+142);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-profile.png');},'image/png');
+  ctx.fillStyle='#cfdae0';ctx.fillText('Full domain. No absolute-power claim.',12,canvas.height+142);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-profile.png');},'image/png');
  };
  profileResize=new ResizeObserver(profileRedraw);profileResize.observe(canvas);profileRedraw();
 }
@@ -1013,24 +1016,42 @@ function renderRunList(){
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent='Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. Save session keeps every run in one file; Export this run writes one run to its own file. Modes are not tracked between designs.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. Save session keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
 }
-// Effective index of each mode rank of A and B, with the difference (ranks, not matched modes).
-function compareTable(a,b){
+// The modes of A and B matched by field overlap on a common grid (workspace-match.mjs): one row
+// per matched mode (or degenerate pair), then each mode of A and of B without a match.
+function compareTable(a,b,match){
  const box=document.createElement('div');box.className='compare-table';
- const table=document.createElement('table');table.id='compare-neff';
- const caption=document.createElement('caption');caption.textContent='Effective index n_eff by mode rank';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
+ if(match.error){box.append(cell('p','Modes not matched: '+match.error,{class:'table-note',id:'compare-match-error'}));return box;}
+ const table=document.createElement('table');table.id='compare-neff';
+ const caption=document.createElement('caption');caption.textContent='Modes of A and B matched by field overlap';table.append(caption);
  const head=document.createElement('thead'),row=document.createElement('tr');
- row.append(cell('th','Mode rank',{scope:'col'}));
+ row.append(cell('th','Modes',{scope:'col'}),cell('th','Polarization A',{scope:'col',title:POLARIZATION_HELP}),cell('th','Polarization B',{scope:'col',title:POLARIZATION_HELP}),cell('th','Overlap',{scope:'col'}));
  for(const [side,run] of [['A',a],['B',b]]){const th=cell('th','n_eff '+side,{scope:'col'});const name=document.createElement('span');name.className='run-heading';name.textContent=runHeading(run);th.append(name);row.append(th);}
- row.append(cell('th','Δ (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}));head.append(row);table.append(head);
+ row.append(cell('th','Δn_eff (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}));head.append(row);table.append(head);
+ // n_eff of a unit: the mode's, or the mean of a pair
+ const index=(run,unit)=>unit.reduce((t,i)=>t+run.effective_index[i],0)/unit.length;
+ const indexText=(run,unit)=>unit?(unit.length>1?'mean ':'')+formatIndex(index(run,unit)):'—';
  const body=document.createElement('tbody');
- for(const r of compareRows(a.effective_index,b.effective_index)){const tr=document.createElement('tr');tr.append(cell('th',String(r.rank),{scope:'row'}),cell('td',formatIndex(r.a)),cell('td',formatIndex(r.b)),cell('td',formatIndex(r.delta)),cell('td',formatPercent(r.percent)));body.append(tr);}
+ for(const r of compareMatchRows(match)){
+  const tr=document.createElement('tr');
+  if(r.kind==='match'){
+   const mean=index(a,r.unitA);tr.dataset.match=`${r.unitA.join('-')}:${r.unitB.join('-')}`;
+   tr.append(cell('th',`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`,{scope:'row',title:r.text}),cell('td',unitPolarization(a,r.unitA)),cell('td',unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta)}),
+    cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td',formatDelta(r.pair.delta)),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100)));
+  }else{
+   tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
+   tr.append(cell('th',r.text,{scope:'row'}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'));
+  }
+  body.append(tr);
+ }
  table.append(body);
- const note=document.createElement('p');note.className='table-note';note.textContent='Note: modes are compared by rank, not matched. Mode 1 of A and Mode 1 of B are each run\'s highest n_eff and need not be the same mode.';
+ const note=cell('p',MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
  box.append(table,note);return box;
 }
+// The matched modes shown in the Compare plots (in memory only: session files keep the Results mode)
+let compareChoice=null;
 function renderComparison(){
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
  if(runs.length<2){host.insertAdjacentHTML('beforeend','<p>Compute two designs to compare their fields and inputs. Existing results stay attached to their original inputs.</p>');return;}
@@ -1038,14 +1059,20 @@ function renderComparison(){
  if(!runs.some(r=>r.job===compareIds[1]))compareIds[1]=runs.at(-1).job;
  const bar=document.createElement('div');bar.className='toolbar compare-selection';
  for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;render();};label.append(select);bar.append(label);}host.append(bar);
- const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label>Mode rank <select id="compare-mode"><option value="0" ${fieldView.mode===0?'selected':''}>1</option><option value="1" ${fieldView.mode===1?'selected':''}>2</option></select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
- const description=document.createElement('p');const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. Δn_eff (B − A), mode rank ${fieldView.mode+1}: ${(b.effective_index[fieldView.mode]-a.effective_index[fieldView.mode]).toFixed(8)}. ${a.job===b.job?'Same run on both sides. ':''}`;host.append(description);
- const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run);const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
- const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each mode is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their mode vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b));
- const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw);};addProbeControls(host,redraw);
- for(const [id,key] of [['compare-mode','mode'],['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=key==='mode'?+$(id).value:$(id).value;render();};
- fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw);
+ const match=opticalMatch(a,b),choices=match.error?[]:fieldChoices(match);
+ const chosen=choices.find(c=>compareChoice&&c.a===compareChoice.a&&c.b===compareChoice.b)||choices.find(c=>compareChoice&&c.a===compareChoice.a)||choices[0]||null;
+ const shown=chosen?[chosen.a,chosen.b]:[0,0];
+ const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label>Matched modes <select id="compare-mode" ${choices.length?'':'disabled'}>${choices.length?choices.map((c,i)=>`<option value="${i}" ${c===chosen?'selected':''}>${escapeHtml(c.label)}</option>`).join(''):'<option>No matched modes</option>'}</select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
+ const pairOf=chosen&&match.pairs.find(p=>p.accepted&&p.unitA.includes(chosen.a));
+ const shownText=chosen?`Shown: A mode ${chosen.a+1} ↔ B mode ${chosen.b+1}, overlap ${formatOverlap(pairOf.eta)}, Δn_eff (B − A) ${formatDelta(pairOf.delta)}${pairOf.unitA.length>1?' (difference of the pair means)':''}.`:match.error?`Modes not matched (${match.error}); the plots show mode 1 of each run.`:'No mode of A matches a mode of B; the plots show mode 1 of each run, not matched.';
+ const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. ${shownText} ${a.job===b.job?'Same run on both sides. ':''}`;host.append(description);
+ const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run);const which=document.createElement('p');which.className='compare-field-mode';which.id=i?'compare-shown-b':'compare-shown-a';which.textContent=`Mode ${shown[i]+1} · ${unitPolarization(run,[shown[i]])}${chosen?'':' · not matched'}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:340px;display:block';canvas.setAttribute('role','img');article.append(h,which,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});host.append(grid);
+ const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each mode is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their mode vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b,match));
+ const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw,shown[0]);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw,shown[1]);};addProbeControls(host,redraw);
+ $('compare-mode').onchange=()=>{const c=choices[+$('compare-mode').value];if(c){compareChoice={a:c.a,b:c.b};render();}};
+ for(const [id,key] of [['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=$(id).value;render();};
+ fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw,shown);
 }
 let pendingRunImport=null;
 const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.setAttribute('aria-labelledby','run-import-title');runImportDialog.setAttribute('aria-describedby','run-import-summary run-import-description');runImportDialog.innerHTML='<h2 id="run-import-title">Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p id="run-import-description">Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);

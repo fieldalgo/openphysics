@@ -341,8 +341,9 @@ This is installed acceptance, not a full macOS or Windows regression.
 It also installs the Studio extra's pins (`tools/requirements-py312-studio.txt`, the
 Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
-session, a server restart with the page open and recovery from the start page, then the
-Joule heating application: the default strip by Picard and by Newton (iteration counts,
+session, a server restart with the page open and recovery from the start page, Compare's
+mode matching on two more designs (500 → 450 nm: both modes matched with overlap ≥ 0.95, the
+picker listing matched pairs), then the Joule heating application: the default strip by Picard and by Newton (iteration counts,
 balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the region
 mesh differs between macOS arm64 and the other platforms, so mesh-dependent values are
 checked within the discretization error), a
