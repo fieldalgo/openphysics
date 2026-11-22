@@ -150,7 +150,8 @@ export function formatOverlap(eta){
  const text=eta.toFixed(2);
  return eta<MATCH_THRESHOLD&&text==='0.80'?(Math.floor(eta*1000)/1000).toFixed(3):text;
 }
-export const formatDelta=d=>(d>=0?'+':'−')+Math.abs(d).toFixed(8);
+// a difference that rounds to zero reads +0.00000000, never −0.00000000
+export const formatDelta=d=>(d>=0||Math.abs(d).toFixed(8)===(0).toFixed(8)?'+':'−')+Math.abs(d).toFixed(8);
 /** "A mode 1 ↔ B mode 1 · overlap 0.99 · Δn_eff +0.00214000" */
 export function matchText(pair){
  return `A ${unitName(pair.unitA)} ↔ B ${unitName(pair.unitB)} · overlap ${formatOverlap(pair.eta)} · Δn_eff ${formatDelta(pair.delta)}`;

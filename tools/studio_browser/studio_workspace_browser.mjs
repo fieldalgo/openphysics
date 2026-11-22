@@ -369,6 +369,13 @@ try {
   assert.match(await text('#compare-shown-a'), /^Mode 2 · /, 'the plots show the chosen matched pair');
   assert.match(await text('#compare-shown-b'), /^Mode 2 · /); assert.match(await text('#compare-description'), /Shown: A mode 2 ↔ B mode 2, overlap /);
   await page.screenshot('compare-matched');
+  // Results: the line profile follows the Mode picker (it read the mode once before this check)
+  await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('field-mode')", 'Results field');
+  await page.eval("(()=>{const d=document.querySelector('.line-profile');if(!d.open)d.querySelector('summary').click();})()"); await sleep(300);
+  await page.eval("(()=>{const s=document.getElementById('field-mode');s.value='1';s.dispatchEvent(new Event('change'));})()"); await sleep(300);
+  const profileMode = await page.eval("document.querySelector('.line-profile p[role=status]').textContent"); stage('Results profile after Mode 2', {profileMode});
+  assert.match(profileMode, / · mode 2 · /, 'the profile shows the chosen mode');
+  await page.eval("(()=>{const s=document.getElementById('field-mode');s.value='0';s.dispatchEvent(new Event('change'));document.querySelector('.line-profile summary').click();})()"); await sleep(300);
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
