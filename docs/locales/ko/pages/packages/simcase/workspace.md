@@ -208,6 +208,19 @@ Modes to find는 페이지 상태입니다. 세션 파일은 실행마다 이 �
 않은 변경은 저장되지 않습니다. 새 모델은 2로 시작합니다. 모드 2개일 때 솔버 문서는 이전 Studio가
 보낸 문서와 바이트 단위로 같으므로 n_eff, TE 비율, 유효 면적이 바뀌지 않습니다.
 
+**Study**의 **Also compute group index (3 solves)**(기본값 꺼짐)는 실행 문서에
+`results.group_index = {"wavelength_step": "1 nm"}`를 더합니다. 그러면 엔진은 같은 메시를
+λ0 − 1 nm와 λ0 + 1 nm에서도 풀고(재료는 파장마다 값을 구함), 중앙 차분으로
+n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배입니다([단일 study의 군굴절률](group_index.md)).
+꺼져 있으면 문서는 이전과 같은 `optical-shapes-v8` 문서이며 바이트 단위로 같습니다. 켜면 달라지는 것은
+`results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 페이지
+상태입니다. 새 모델은 꺼진 상태로 시작하고 입력 파일은 이 값을 저장하지 않습니다. 어댑터는
+`optical-shapes-v8` 그대로이고 실행의 `settings`도 바뀌지 않습니다.
+
+n_g가 있는 실행은 그 값을 버전 9 칸 `group_index`와 `group_index_method`에 보관합니다. 그 문서는 다른
+실행처럼 settings에서 다시 만들고, `results.group_index`를 더합니다. 그 `wavelength_step`은
+`group_index_method`에 적힌 간격입니다.
+
 재료 굴절률은 선택한 파장에서 계산하며, 하한은 실리콘 데이터 범위 안에 있습니다.
 코어 메시를 거칠게 하면 계산이 빠르고 세션 파일이 작아지지만 n_eff가 달라집니다.
 1400 nm에서 500 × 220 nm 실리콘 코어는 20 nm와 60 nm 메시 사이에 약 0.01 차이가 납니다.
@@ -567,8 +580,8 @@ waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은
 
 ### 모드 표
 
-결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |가 광 애플리케이션과 다중물리 모델의
-Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(광 애플리케이션은 “Compare matches them between runs by field overlap.”을 덧붙임) 모든 값은 저장된 중심 장
+결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |가 광 애플리케이션에 나오고,
+다중물리 모델의 Modes 1 페이지에는 n_g가 없는 같은 표가 나옵니다. “Modes are ranked by effective index.”(광 애플리케이션은 “Compare matches them between runs by field overlap.”을 덧붙임) 모든 값은 저장된 중심 장
 `unnormalized_electric_field`에서 정의되므로 Studio, 엔진, 이전 세션 파일이 같은 샘플에서 같은 값을 얻습니다.
 
 - **Polarization**은 창의 모든 삼각형에 대한 TE 비율 `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)`입니다(열
@@ -603,6 +616,14 @@ Modes 1 페이지에 나옵니다. “Modes are ranked by effective index.”(�
   (∫|E|²)²/∫|E|⁴ over the window, all three field components”, `effective_area`, [결과 형식](overview.md)).
   흔한 모드 솔버 형식이며 벡터 비선형 면적이 아닙니다. 축퇴 쌍의 각 모드는 자기 값을 보이고, 도움말은 그 값이
   쌍 안의 회전에 따라 달라진다고 밝힙니다. 스칼라 다중물리 결과는 엔진의 |φ|² 면적을 보입니다.
+- **n_g**(광 애플리케이션만)는 **Also compute group index**를 켠 실행의 엔진 군굴절률이며 소수 4자리로
+  보입니다. 열 도움말은 “n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± 1 nm (3 solves),
+  materials evaluated at each wavelength”입니다. 칸은 두 경우에 **—**입니다.
+  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study”입니다.
+  - 엔진이 옆 파장에서 그 모드를 대응시키지 못했을 때(`null`, 예: 축퇴 쌍의 한 모드). 그 실행을
+    한 탭에서는 도움말이 엔진의 이유 *Not matched: vacuum_wavelength 1.549 um: …*를 보입니다. 세션
+    파일은 이유를 보관하지 않으므로, 파일을 연 뒤에는 “Not matched at λ0 ± 1 nm; the reason is not
+    kept in session files”입니다.
 - 장 보기의 모드 선택은 *Mode 1 · TE-like · n_eff 2.44406001*처럼 읽힙니다.
 
 Run details는 비율과 유효 면적의 출처를 밝힙니다. 이 탭에서 계산한 실행은 *computed by the engine from the saved
@@ -688,7 +709,7 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 | `field` | 모드 k개의 `{node_coordinates, triangles, real, imag}`(버전 7처럼 이 네 키만 읽음. `field` 안의 다른 키는 거부하지 않으며 digest가 덮고 다시 쓰지 않음) | 선택 |
 | `te_polarization_fraction` | [0, 1]의 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
 | `effective_area` | 0보다 큰 m² 단위 수 또는 null k개: 엔진의 값(`field` 없이 쓴 실행은 그 실행이 보이던 값) | 선택, `field`가 없으면 필수 |
-| `group_index`, `group_index_method` | 수 또는 null k개; 1–64자 텍스트(`group_index`와 함께만) | 선택, 군굴절률용으로 예약 |
+| `group_index`, `group_index_method` | 수 또는 null k개(null: 엔진이 대응시키지 못한 모드); 1–64자 텍스트(`group_index`와 함께만), `central_difference <간격> <추적기>` 형식, 예: `central_difference 1 nm electric-l2-assignment-v1` | 선택: Also compute group index로 실행한 경우 |
 | `digest` | `"sha256:<hex>"` | 필수 |
 
 digest는 digest를 뺀 실행을 키 정렬 JSON(버전 8의 수 규칙, 음의 0은 `-0.0`)으로 쓴 텍스트의 SHA-256이므로
@@ -726,7 +747,8 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다), 그 뒤에 A와 B의
   흡수 손실(*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*)이 짝지어진 행과 짝이 없는 행 모두에 나옵니다:
   저장된 지수에서 얻은 모드 표의 값이며, 짝지어진 쌍은 두 모드 dB/cm의 *mean*이고, 광 어댑터의 재료는
-  무손실이라 광학 실행은 *0 dB/cm*입니다. 좁은 화면에서는 표가 자기 상자 안에서 옆으로 스크롤되고 페이지는
+  무손실이라 광학 실행은 *0 dB/cm*입니다. 그 뒤에 *n_g A*와 *n_g B*가 나옵니다(모드 표의 값, 짝지어진 쌍은
+  두 모드 값의 *mean*, 실행에 값이 없으면 모드 표의 도움말과 함께 **—**). 좁은 화면에서는 표가 자기 상자 안에서 옆으로 스크롤되고 페이지는
   넘치지 않습니다. 짝이 없는 모드는 *A mode 2: no match in B
   (best overlap 0.43, with B mode 2)*로 읽히며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape
