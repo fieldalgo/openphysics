@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes} from './workspace-modes.mjs';
+import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
 // runs). Each run keeps its own centroid samples, so the overlap is taken on a common grid:
@@ -176,6 +176,15 @@ export function unitPolarization(run,unit){
  const {rows}=modeTableRows(opticalModes(run)),cell=rows[unit[0]].polarization;
  if(cell)return cell.text;
  const f=opticalModes(run)[unit[0]].fte;return Number.isFinite(f)?`${polarizationWord(f)} · ${tePercent(f)}`:'—';
+}
+/** The effective area of one unit of a run, {text, value, title}: the mode's, in µm², or for a
+ * degenerate pair "mean x" (each member's value depends on the rotation within the pair). */
+export function unitArea(run,unit){
+ const modes=opticalModes(run),values=unit.map(i=>modes[i].area);
+ if(!values.every(Number.isFinite))return {text:'—',value:null,title:AREA_HELP};
+ if(unit.length===1){const pair=degenerateGroups(modes.map(m=>m.re)).some(g=>g.includes(unit[0]));return {text:areaText(values[0]),value:values[0],title:pair?AREA_HELP+'. '+AREA_PAIR_NOTE:AREA_HELP};}
+ const mean=values.reduce((t,v)=>t+v,0)/values.length;
+ return {text:'mean '+areaText(mean),value:mean,title:AREA_HELP+'. '+AREA_MEAN_NOTE};
 }
 /** The Compare table rows of a match: accepted pairs and unmatched A units in A's rank order,
  * then the unmatched B units. kind: 'match' | 'a' | 'b'. */

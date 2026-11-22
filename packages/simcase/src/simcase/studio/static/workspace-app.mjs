@@ -23,8 +23,8 @@ import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent} from './workspace-compare.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,modeTableRows,modeOptionLabel,opticalModes,engineTeFraction} from './workspace-modes.mjs';
-import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,LOSSLESS_NOTE,SOURCE_TEXT,AREA_HELP,modeTableRows,modeOptionLabel,opticalModes,engineTeFraction,engineEffectiveArea} from './workspace-modes.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
 import {sessionFileName,persistenceTitle,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -964,7 +964,7 @@ function downloadFile(blob,name){const url=URL.createObjectURL(blob),a=document.
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 function runLabel(run){return `${run.label?run.label+' · ':''}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
 // Where a run came from, kept out of the primary labels and available on request.
-// The modes table of a run: | Mode | n_eff | Polarization | Loss |, one merged polarization
+// The modes table of a run: | Mode | n_eff | Polarization | Loss | A_eff (µm²) |, one merged polarization
 // cell per degenerate pair, and the lossless note once below the table.
 function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
@@ -972,20 +972,20 @@ function modesTable(run){
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent='Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th','Loss',{scope:'col'}));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th','Loss',{scope:'col'}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  const body=document.createElement('tbody');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
-  tr.append(cell('td',r.loss,{'data-loss':String(r.mode)}));body.append(tr);}
+  tr.append(cell('td',r.loss,{'data-loss':String(r.mode)}),cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));body.append(tr);}
  table.append(body);box.append(table);
- const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid.`;box.append(help);
+ const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${AREA_HELP}.`;box.append(help);
  if(lossless){const note=document.createElement('p');note.className='table-note';note.id='lossless-note';note.textContent=LOSSLESS_NOTE;box.append(note);}
  return box;
 }
 function runDetails(run){
  opticalModes(run);
- const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[]),['Polarization (TE fraction)',SOURCE_TEXT[run.te.source]]];
+ const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[]),['Polarization (TE fraction)',SOURCE_TEXT[run.te.source]],['Effective area',SOURCE_TEXT[run.area.source]]];
  return '<details class="run-details" id="run-details"'+(ui.runDetailsOpen?' open':'')+'><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
 }
 const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save session to keep it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.';
@@ -1061,20 +1061,22 @@ function compareTable(a,b,match){
  const head=document.createElement('thead'),row=document.createElement('tr');
  row.append(cell('th','Modes',{scope:'col'}),cell('th','Polarization A',{scope:'col',title:POLARIZATION_HELP}),cell('th','Polarization B',{scope:'col',title:POLARIZATION_HELP}),cell('th','Overlap',{scope:'col'}));
  for(const [side,run] of [['A',a],['B',b]]){const th=cell('th','n_eff '+side,{scope:'col'});const name=document.createElement('span');name.className='run-heading';name.textContent=runHeading(run);th.append(name);row.append(th);}
- row.append(cell('th','Δn_eff (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}));head.append(row);table.append(head);
+ row.append(cell('th','Δn_eff (B − A)',{scope:'col'}),cell('th','Δ % (of A)',{scope:'col'}),cell('th','A_eff A (µm²)',{scope:'col',title:AREA_HELP}),cell('th','A_eff B (µm²)',{scope:'col',title:AREA_HELP}));head.append(row);table.append(head);
  // n_eff of a unit: the mode's, or the mean of a pair
  const index=(run,unit)=>unit.reduce((t,i)=>t+run.effective_index[i],0)/unit.length;
  const indexText=(run,unit)=>unit?(unit.length>1?'mean ':'')+formatIndex(index(run,unit)):'—';
+ // A_eff of a unit: the mode's, or the mean of a pair with its note
+ const areaCell=(run,unit,side)=>{if(!unit)return cell('td','—');const v=unitArea(run,unit);return cell('td',v.text,{title:v.title,['data-area-'+side]:v.value===null?'':String(v.value)});};
  const body=document.createElement('tbody');
  for(const r of compareMatchRows(match)){
   const tr=document.createElement('tr');
   if(r.kind==='match'){
    const mean=index(a,r.unitA);tr.dataset.match=`${r.unitA.join('-')}:${r.unitB.join('-')}`;
    tr.append(cell('th',`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`,{scope:'row',title:r.text}),cell('td',unitPolarization(a,r.unitA)),cell('td',unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta)}),
-    cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td',formatDelta(r.pair.delta)),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100)));
+    cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td',formatDelta(r.pair.delta)),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100)),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'));
   }else{
    tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
-   tr.append(cell('th',r.text,{scope:'row'}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'));
+   tr.append(cell('th',r.text,{scope:'row'}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'));
   }
   body.append(tr);
  }
@@ -1198,7 +1200,8 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.wavelength,input.model.coreMesh),input,effective_index:[...index],field:readOpticalField(result),origin:'local',serverVersion:pending.serverVersion});
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);
  // the engine's fractions, kept on the run in this tab only (never written to a session file)
- const te=engineTeFraction(result.summary);if(te&&te.length===2&&te.every(Number.isFinite))Object.defineProperty(solverRun,'te',{value:{values:te,source:'engine'},enumerable:false,configurable:true,writable:true});compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
+ const te=engineTeFraction(result.summary);if(te&&te.length===2&&te.every(Number.isFinite))Object.defineProperty(solverRun,'te',{value:{values:te,source:'engine'},enumerable:false,configurable:true,writable:true});
+ const area=engineEffectiveArea(result.summary);if(area&&area.length===2&&area.every(Number.isFinite))Object.defineProperty(solverRun,'area',{value:{values:area,source:'engine'},enumerable:false,configurable:true,writable:true});compareIds=[runs.length>1?runs.at(-2).job:solverRun.job,solverRun.job];ui.page='Results';
 }});
 function refreshJobControls(){
  if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}

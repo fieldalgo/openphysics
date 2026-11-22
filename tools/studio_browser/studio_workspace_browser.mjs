@@ -238,10 +238,17 @@ try {
   await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
   // n_eff with 8 decimals in the mode list as in the modes table; plot axes and the inspector in nm
-  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
+  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
-  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss']);
+  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss', 'A_eff (µm²)']);
+  // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
+  assert.equal(resultsView.area.length, 2);
+  assert.equal(resultsView.areaSource, 'Effective areacomputed by the engine from the saved field');
+  for (const a of resultsView.area) {
+    assert.match(a.text, /^\d\.\d{4}$/); assert.ok(a.value > 0.05e-12 && a.value < 1e-12, a.value);
+    assert.equal(a.text, (a.value * 1e12).toPrecision(4)); assert.equal(a.title, 'Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components');
+  }
   // a TM-like cell names its TM share first: "TM-like · 96.9 % TM (3.1 % TE)"
   assert.equal(resultsView.polarization.length, 2); for (const p of resultsView.polarization) assert.match(p, /^(?:(?:TE-like|hybrid) · \d+\.\d % TE|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/);
   // the modes table first, then the field plot with its sample and line profile
@@ -288,6 +295,9 @@ try {
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
+  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)']);
+  // both sides of a matched row give their A_eff in µm²
+  for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
   assert.match(neffTable.head[4], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
   assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
   assert.equal(neffTable.rows[0][6], before, 'the table and the sentence give the same Δn_eff');
