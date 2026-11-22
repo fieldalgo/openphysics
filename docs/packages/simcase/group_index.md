@@ -29,9 +29,15 @@ returns it when the document asks for it:
 
   The side solves search the sweep's candidate count, max(2 mode_count, mode_count + 4).
   These are the tracker's default settings. `study.tracking` is not read by a single study.
+  The λ0 solve is the run's own, with mode_count candidates, so at λ0 the degeneracy test
+  sees only the requested modes and there is no search-boundary test. A requested mode
+  close to an unrequested λ0 candidate is caught only where it is still close at a side
+  wavelength, which the side solves test against all their candidates. This is weaker than
+  the middle point of a sweep.
 - **Difference.** The three matched values go through the same second-order `np.gradient`
   as a tracked sweep, on the kernel's micrometre wavelengths λ0 ∓ Δλ. Those are
   `float(exact metres × 10⁶)` of the written values, as a sweep's values are.
+- The run checks that the materials are lossless at the three wavelengths before any solve.
 - **A mode that is not matched** on either side has no value: `null` in `summary.json`,
   NaN in `fields.npz`. Its reason names the side wavelength and the failed test. The run
   does not fail.
@@ -94,7 +100,7 @@ Python 3.12.
 |---|---|---|
 | V8 | 220 nm physmat:Si film spanning the PEC window in physmat:SiO2, λ0 1.55 µm, Δλ = 10 nm, against the central difference of `refsol.slab` TE n_eff at 1.54, 1.55 and 1.56 µm with physmat's indices (n_g = 3.706704). Film element h, background 5h, grading h to 5h, h = 24, 12, 6 nm. Gate: ≤ 3e-3 at 6 nm and strictly decreasing. **Not blind**: the sweep's errors on this mesh family were measured before registration | 3.72e-3, 8.89e-4, 2.29e-4 |
 | V9 | the option against the middle point of today's sweep over λ0 ∓ Δλ: tracked vector sweep (Δλ 1 and 10 nm), untracked scalar sweep with mode_count = the option's candidate count. Gate: 1e-12 relative | passed. The scalar fixture was changed after its first result: with the vector fixture's PEC side walls the scalar window is cut off (n_eff = 0), so it now has PMC side walls |
-| V10 | round fibre, a = 1.3 µm, core n² = 1 + 1.1 λ²/(λ² − 0.01 µm²) (the Sellmeier core of refsol's fibre tests), cladding 0.9 × core, PEC box ±5a, mode_count 3, Δλ = 1 nm, against `refsol.fiber`'s implicit dispersive group index. Core element h, background 4h, h = 0.16, 0.08, 0.04 µm. Gate: TE01 ≤ 2e-3 relative at 0.04 µm and strictly decreasing; HE11 null with a reason or within the same bound. Blind | TE01 6.18e-4, 2.88e-4, 1.17e-4. HE11: matched at 0.16 and 0.08 µm (relative error ≤ 2e-5), null at 0.04 µm, where the mesh splits the pair by 2.9e-6, below the 1e-5 tolerance: "near-degenerate with another requested mode" |
+| V10 | round fibre, a = 1.3 µm, core n² = 1 + 1.1 λ²/(λ² − 0.01 µm²) (the Sellmeier core of refsol's fibre tests), cladding 0.9 × core, PEC box ±5a, mode_count 3, Δλ = 1 nm, against `refsol.fiber`'s implicit dispersive group index. Core element h, background 4h, h = 0.16, 0.08, 0.04 µm. Gate: TE01 ≤ 2e-3 relative at 0.04 µm and strictly decreasing; HE11 null with a reason or within the same bound. Blind | TE01 6.18e-4, 2.88e-4, 1.17e-4. HE11: matched at 0.16 and 0.08 µm (relative error ≤ 2e-5), null at 0.04 µm, where the mesh splits the pair by 2.9e-6, below the 1e-5 tolerance: "vacuum_wavelength 1.55 um: near-degenerate with another requested mode" |
 | M5-f | refusals for sweeps, PML, bend, coupling and lossy materials; step range edges; unknown keys by name; the option adds only `group_index`, `group_index_method`, their field-map entries and the step default; the λ0 arrays are bit-identical; HE11 alone (degenerate partner) gives null with a reason and the CLI exits 0; a failed side solve gives null with a reason; three solves at the exact side wavelengths | passed |
 
 The refsol fibre tests use cladding 0.993 × core. There, TE01, TM01 and HE21 lie within

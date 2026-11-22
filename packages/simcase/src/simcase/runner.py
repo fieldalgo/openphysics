@@ -686,6 +686,9 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
                         settings=settings, points=[])
         say(f"{'scalar' if scalar_tracking else 'vector'} sweep: tracking resolved modes by L2 overlap; check "
             "wavelength-step convergence")
+    if "group_index" in k["results"]:
+        from .group_index import check_lossless
+        check_lossless(model, k["results"]["group_index"]["wavelengths"])
     t0 = time.time()
     for v in values:
         d = k.copy()
