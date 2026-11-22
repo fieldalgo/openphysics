@@ -364,15 +364,15 @@ names the kind, and `solve(t)` returns that solver's result):
 | `mechanics.elasticity2d` | `elasticity.solve_elasticity` |
 | `mechanics.thermoelastic2d` | `thermal_mechanical.solve_steady_thermoelasticity`: the heat stage is solved again on the moving mesh, so the temperature moves with the geometry |
 | `thermal.steady2d`, `thermal.transient2d` on an `axisymmetric` component | the same solvers with `coordinate_system="axisymmetric"`, as `run` solves them (2026-11-22). Nodes on the symmetry axis keep a zero radial velocity: the radial component is extended again with them held at 0. A design that moves a point of the axis off it is refused |
-| `em.modes2d`, vector formulation | the runner's vector solve (`galerkin.kernels.solve_modes` on the mesh over the wavelength) and its choice of modes; `solve(t)` returns `{"effective_index": ...}` under exp(−iωt). A degenerate mode's derivative is NaN with a `DegenerateModeWarning`, as in galerkin |
+| `em.modes2d`, vector formulation | the runner's vector solve (`galerkin.kernels.solve_modes` on the mesh over the wavelength) and its choice of modes; `solve(t)` returns `{"effective_index": ...}` under exp(−iωt). A degenerate mode's derivative is NaN with a `DegenerateModeWarning`, as in galerkin. With a `pml` (2026-11-22), the modes are chosen from the numbers on the moved mesh, as `run` chooses them. The design velocity leaves the layer in place: it is zero on every node of an element whose factors are not 1, and its normal component is zero on the outer faces |
 
 Refused by name (`DocumentError`):
 - a flat geometry block;
 - an `axisymmetric` component of another physics;
 - another physics, such as Joule heating;
 - for modes: the scalar formulation (simcase's own eigensolver has no moving-mesh
-  path), a PML or bend (not yet wired into simcase's modes document path), a sweep and
-  mode tracking;
+  path), a bend (its factor depends on every node), a design that moves a point
+  inside the PML or across an outer face, a sweep and mode tracking;
 - a `mechanics.thermoelastic2d` document with an inward heat flux, a convection or
   a traction: the workflow takes Dirichlet temperatures, a heat source and
   insulation, prescribed displacements and a body force only;

@@ -108,8 +108,10 @@ def test_q4_refusals_name_the_reason():
     scalar["physics"]["em1"].pop("effective_index_threshold")      # the scalar formulation reads none
     with pytest.raises(DocumentError, match="formulation is 'scalar'; .*vector formulation"):
         shape_problem(scalar, "w")
-    with pytest.raises(DocumentError, match="has a PML or a bend"):
-        shape_problem(strip(pml={"pml_thickness": {"top": "0.3 um", "bottom": "0.3 um"}}, target_effective_index=2.4), "w")
+    # a PML takes a motion since 2026-11-22 (test_shape_problem_pml.py); a bend stays refused
+    with pytest.raises(DocumentError, match="has a bend"):
+        shape_problem(strip(pml={"pml_thickness": {"top": "0.3 um", "bottom": "0.3 um"}}, target_effective_index=2.4,
+                            bend={"bend_radius": "20 um", "bend_origin": "0 um", "axis": "y"}), "w")
     sweep = strip()
     sweep["study"] = {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
                       "values": {"unit": "um", "values": [1.5, 1.55, 1.6]}}

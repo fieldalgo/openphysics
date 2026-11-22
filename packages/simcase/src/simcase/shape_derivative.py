@@ -44,8 +44,11 @@ callback of the normals, and a motion takes constant tractions only.
   modes' effective indices under exp(-i omega t); a degenerate mode's derivative is NaN with a
   ``DegenerateModeWarning``, as in galerkin (not tested separately here). The kernel mesh is in
   micrometres, so its nodes move with 1e6 W. The mode choice reads numbers, so ``solve`` cannot run
-  under ``jax.jit``. The scalar formulation (simcase's own eigensolver), a PML or bend (coordinate
-  factors move with the mesh), a sweep and mode tracking are refused.
+  under ``jax.jit``. With a ``pml`` the modes are chosen from the numbers on the moved mesh,
+  as run() chooses them, and the design velocity leaves the layer in place (zero on every node
+  of a stretched element, a zero normal component on the outer faces; a design moving a point
+  there is refused). The scalar formulation (simcase's own eigensolver), a bend (its factor
+  depends on every node), a sweep and mode tracking are refused.
 
 An ``axisymmetric`` component of ``thermal.steady2d`` or ``thermal.transient2d`` is solved with
 ``coordinate_system="axisymmetric"``, as run() solves it; nodes on the symmetry axis keep a zero
@@ -228,9 +231,9 @@ def _modes_problem(given, doc, name, parameter):
         raise DocumentError(f"shape_problem: {where}.formulation is {point.formulation!r}; the shape derivative "
                             "of modes covers the vector formulation (galerkin's solve_modes); the scalar one is "
                             "simcase's own eigensolver, which has no moving-mesh path")
-    if point.pml is not None or point.bend is not None:
-        raise DocumentError(f"shape_problem: {where} has a PML or a bend; their coordinate factors depend on the "
-                            "node positions, and galerkin refuses them with a motion")
+    if point.bend is not None:
+        raise DocumentError(f"shape_problem: {where} has a bend; its coordinate factor depends on every node "
+                            "position, and galerkin refuses a bend with a motion")
     if k["study"]["type"] != "single" or modes_document.kernel_tracking(k):
         raise DocumentError("shape_problem: the shape derivative of modes is taken at one point (study single, "
                             "no mode tracking); set the wavelength and call shape_problem for each point")
@@ -238,12 +241,42 @@ def _modes_problem(given, doc, name, parameter):
     _check_same_complex(meshed, dv.complex)
     nv = replace(dv, complex=meshed).node_velocity(model.kernel_tri)
     mesh_um = model.solver_mesh
-    W = extend_velocity(mesh_um, nv.values, nv.on_curve)
+    if point.pml is not None:
+        W = _layer_kept(mesh_um, point.pml, nv.values, nv.on_curve, extend_velocity)
+    else:
+        W = extend_velocity(mesh_um, nv.values, nv.on_curve)
     lo, hi = admissible_interval(mesh_um, design_velocity=W)
     arguments = dict(mesh=mesh_um, eps=_to_kernel(model._permittivity(point.wavelength)), inputs=point)
     # t is metres of the parameter: the kernel mesh is in micrometres, so its nodes move with 1e6 W
     return ShapeProblem(doc, parameter, MODES, model.mesh, W, np.asarray(nv.on_curve),
                         (float(lo) * 1e-6, float(hi) * 1e-6), arguments)
+
+
+def _layer_kept(mesh, pml, values, on_curve, extend_velocity):
+    """W that leaves a modal PML in place, as galerkin requires: zero on every node of an element whose
+    coordinate factors are not 1, and a zero normal component on the outer faces (sliding along a face
+    keeps the window rectangular). Each component is extended with its own known nodes; a curve point
+    that the design moves where it must stay is refused."""
+    from .physics_pml_modes import coordinates
+    c = coordinates(mesh, pml)
+    stretched = np.zeros(mesh.num_nodes, dtype=bool)
+    stretched[np.unique(mesh.triangles[np.any(c.factors != 1, axis=1)])] = True
+    on = np.asarray(on_curve, dtype=bool)
+    values = np.array(values, dtype=float)
+    out = np.empty_like(values)
+    for axis, faces in ((0, ("left", "right")), (1, ("bottom", "top"))):
+        held = stretched.copy()
+        for face in faces:
+            held[np.asarray(mesh.boundary.get(face, []), dtype=int)] = True
+        moving = held & on & (values[:, axis] != 0)
+        if np.any(moving):
+            raise DocumentError(f"shape_problem: the parameter moves {int(np.count_nonzero(moving))} point(s) of the "
+                                "geometry inside the PML or across an outer face; with a PML the design must leave "
+                                "the layer and the window's edges in place")
+        component = values.copy()
+        component[held, axis] = 0.0
+        out[:, axis] = extend_velocity(mesh, component, on | held)[:, axis]
+    return out
 
 
 def _solve_modes(arguments, motion):
@@ -255,7 +288,7 @@ def _solve_modes(arguments, motion):
     kernel_motion = MeshMotion(design_velocity=1e6 * np.asarray(motion.design_velocity, dtype=float), t=motion.t)
     try:                              # the runner's checks and its messages under the document's names
         result = solve(arguments["mesh"], arguments["eps"], p.wavelength, p.boundary, p.num_modes, p.formulation,
-                       p.n_cladding, n_target=p.n_target, motion=kernel_motion)
+                       p.n_cladding, n_target=p.n_target, pml=p.pml, bend=p.bend, motion=kernel_motion)
     except ValueError as exc:
         raise ValueError(modes_document.public_kernel_message(str(exc))) from exc
     # runner._to_public is the one kernel-to-public boundary of the mode path (P2-15)
