@@ -46,7 +46,7 @@ PHYSICS_KERNEL = {"vacuum_wavelength": "wavelength", "mode_count": "num_modes", 
                   "effective_index_threshold": "n_cladding", "formulation": "formulation", "type": "type",
                   "boundary": "boundary", "pml": "pml", "bend": "bend"}
 PML_KERNEL = {"pml_thickness": "thickness", "pml_strength": "strength", "pml_order": "order",
-              "pml_minimum_physical_fraction": "min_physical_fraction"}
+              "pml_minimum_physical_fraction": "min_physical_fraction", "pml_search_mode_count": "search_count"}
 #: the kernel's bend order (radius, axis, origin), as format 0.2 documents wrote it
 BEND_KERNEL = (("bend_radius", "radius"), ("axis", "axis"), ("bend_origin", "origin"))
 TRACKING_KERNEL = {"method": "method", "search_mode_count": "search_modes", "mode_tracking_threshold": "min_overlap",
@@ -119,6 +119,9 @@ def modes_slots() -> tuple[dict, ...]:
            q("pml.pml_order", "pml_order", ("BC",), default=2, default_reason="count default: a quadratic profile"),
            q("pml.pml_minimum_physical_fraction", "pml_minimum_physical_fraction", ("BD",), default=0.1,
              default_reason="dimensionless default: the candidate filter"),
+           # no default is recorded: an absent count keeps max(2 mode_count, 6) candidates, and the
+           # documents and results that do not write it stay as they were
+           q("pml.pml_search_mode_count", "pml_search_mode_count", ("BC",)),
            obj(f"{p}.bend"), q("bend.bend_radius", "bend_radius", required=True),
            q("bend.bend_origin", "bend_origin", required=True),
            enum(f"{p}.bend.axis", ("x", "y"), default="x",
@@ -362,6 +365,9 @@ def _physics(doc, name, p, a, path, dom):
         _refuse(f"{path}.pml.pml_thickness: the PML strips leave no physical window", f"{path}.pml.pml_thickness")
     if pml["pml_order"] not in (2, 3, 4):
         _refuse(f"{path}.pml.pml_order: expected 2, 3 or 4", f"{path}.pml.pml_order", "E-DOMAIN")
+    if "pml_search_mode_count" in pml and int(pml["pml_search_mode_count"]) < int(p["mode_count"]):
+        _refuse(f"{path}.pml.pml_search_mode_count: the search must hold at least mode_count "
+                f"({int(p['mode_count'])}) candidates", f"{path}.pml.pml_search_mode_count")
     if "bend" in p:
         bend = p["bend"]
         radius = Fraction(_exact(doc, f"{path}.bend.bend_radius"))
@@ -398,12 +404,27 @@ def _study(doc, name, p, path):
             _refuse("study.values: vector sweep wavelengths must be strictly monotone (no duplicates)",
                     "study.values")
         _tracking(doc, int(p["mode_count"]), tracking)
+        _sweep_search(doc, p, path)
         return
     if tracking is not None:
         _refuse("study.tracking: tracking settings are read for vector wavelength sweeps only", "study.tracking")
+    _sweep_search(doc, p, path)
     if parameter == f"{path}.formulation" and "vector" in values:
         _refuse("study.values: a scalar sweep cannot switch to vector; use a vector wavelength sweep",
                 "study.values")
+
+
+def _sweep_search(doc, p, path):
+    """A PML sweep tracks its modes: each point asks the kernel for the tracker's search count
+    (``study.tracking.search_mode_count``), which an authored ``pml_search_mode_count`` must hold."""
+    search = (p.get("pml") or {}).get("pml_search_mode_count")
+    if search is None:
+        return
+    from .tracking import tracking_settings
+    count = tracking_settings(int(p["mode_count"]), kernel_tracking(doc))["search_modes"]
+    if int(search) < count:
+        _refuse(f"{path}.pml.pml_search_mode_count: a sweep searches study.tracking.search_mode_count ({count}) "
+                "modes at each point; give at least that many candidates", f"{path}.pml.pml_search_mode_count")
 
 
 def kernel_tracking(doc):
@@ -430,6 +451,7 @@ KERNEL_MESSAGES = (
      "passive modes need Im eps >= 0 under exp(-i omega t); a material with gain is refused"),
     ("check the cladding index,", "check effective_index_threshold,"),
     ("min_physical_fraction", "pml_minimum_physical_fraction"),
+    ("pml.search_count", "pml.pml_search_mode_count"),
     ("n_target", "target_effective_index"),
     ("n_cladding", "effective_index_threshold"),
 )
@@ -646,8 +668,8 @@ def kernel_physics(doc, name) -> dict:
         for key in a["pml"]:
             if key == "pml_thickness":
                 pml["thickness"] = {side: um(doc, f"{path}.pml.pml_thickness.{side}") for side in a["pml"][key]}
-            elif key == "pml_order":
-                pml["order"] = int(p["pml"][key])
+            elif key in ("pml_order", "pml_search_mode_count"):
+                pml[PML_KERNEL[key]] = int(p["pml"][key])
             else:
                 pml[PML_KERNEL[key]] = float(p["pml"][key])
         out["pml"] = pml
@@ -741,8 +763,8 @@ def stage_point(physics: dict) -> dict:
         for key, value in physics["pml"].items():
             if key == "pml_thickness":
                 pml["thickness"] = {side: mu(v) for side, v in value.items()}
-            elif key == "pml_order":
-                pml["order"] = int(value)
+            elif key in ("pml_order", "pml_search_mode_count"):
+                pml[PML_KERNEL[key]] = int(value)
             else:
                 pml[PML_KERNEL[key]] = float(value)
         out["pml"] = pml
