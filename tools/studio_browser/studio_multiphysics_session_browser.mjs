@@ -164,7 +164,8 @@ try {
   async function nextDownload(before, label) {
     const end = Date.now() + 60000;
     while (Date.now() < end) {
-      const fresh = [...await listed()].filter(f => !before.has(f) && !f.endsWith('.crdownload'));
+      // the session file only: Chrome on Windows can leave other files there (downloads.htm)
+      const fresh = [...await listed()].filter(f => !before.has(f) && f.endsWith('.json'));
       if (fresh.length) {
         const path = join(downloads, fresh[0]);
         let text = '', last = -1;
@@ -350,7 +351,8 @@ print(n)`;
   const before = await shown();
   // the values shown are the installed engine's runs of the template and of its optical model
   // alone (the mesh, and so n_eff, depends on the installed mesher: 2.44565013 / 2.44349927 /
-  // +0.00215086 with one, 2.44556247 / 2.44341167 / +0.00215081 with another)
+  // +0.00215086 with one, 2.44556247 / 2.44341167 / +0.00215081 on the Linux and Windows runners,
+  // 2.44564247 / 2.44349160 / +0.00215087 on the macOS runner)
   const engineNeff = tree => {
     const done = spawnSync(args.python, ['-I', '-c', 'import json,sys\nfrom simcase import Document, multiphysics, run\nd=Document.from_dict(json.loads(sys.stdin.read()))\nr=multiphysics.run(d,verbose=False).results["modes1"] if d["openphysics"]==multiphysics.ENVELOPE else run(d,verbose=False)\nprint(repr(float(r.effective_index[0][0])))'],
       {input: JSON.stringify(tree), encoding: 'utf8'});
