@@ -1240,14 +1240,17 @@ OUTPUT_AND_API = ("unnormalized_electric_field", "unnormalized_electric_field_li
 # The registry addition of L3 commit 11d0 (spec rule R(3), map M3 Q18's first name): the fiber core and
 # scattering cylinder radii.
 PHASE3_L3_RADIUS_MENUS = {"radius": L_MENU}
+# The registry addition of the single-point group index (results.group_index.wavelength_step), written from
+# that commit's table.
+GROUP_INDEX_MENUS = {"wavelength_step": ("pm", "nm", "um", "m")}
 
 
 def test_r11_every_menu_equals_the_design_table():
     tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY,
-              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY, PHASE3_L3_RADIUS_MENUS)
+              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY, PHASE3_L3_RADIUS_MENUS, GROUP_INDEX_MENUS)
     assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
     for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS, **PHASE3_L3_MENUS,
-                       **PHASE3_L3_RADIUS_MENUS}.items():
+                       **PHASE3_L3_RADIUS_MENUS, **GROUP_INDEX_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
