@@ -81,15 +81,15 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
    beside it, which opens the wavelength field under **Physics › Optical modes** (as
    **Study → Edit wavelength** does).
 3. Select **Run optical study**. The result shows the field and the effective index
-   of two candidates, and the Study step reads *Run complete*. Type a **Run name**, for
+   of two modes in the modes table (Mode, n_eff, Polarization, Loss), and the Study step reads *Run complete*. Type a **Run name**, for
    example *design A*, and press Enter: a named run is pinned, so new runs do not
    replace it (**Unpin this run** releases it; there is no separate Pin button).
    n_eff has 8 decimals everywhere; field plots and the point inspector use nm, like the
    inputs.
 4. Back in **Geometry**, set the width to 700 nm and run again.
 5. Open **Compare**. Runs A and B are chosen for you; a table lists n_eff of A and B,
-   Δ (B − A) and Δ % of A for each candidate rank, with each run's name, size and
-   wavelength in its column header, below the two field plots. Candidate ranks are not
+   Δ (B − A) and Δ % of A for each mode rank, with each run's name, size and
+   wavelength in its column header, below the two field plots. Mode ranks are not
    matched modes.
 
 ## 5. Keep your work

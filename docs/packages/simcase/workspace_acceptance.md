@@ -43,17 +43,17 @@ including the coupled Heated silicon waveguide.
 | Enter an out-of-range dimension, then navigate away and back | Invalid draft remains visible; Run is blocked; accepted model is preserved. Correcting it restores readiness. |
 | Generate Mesh; change width to 700 nm | Preview belongs to earlier inputs until explicitly regenerated; no silent solve. |
 | Check inputs, then change the model | Check report identifies its captured input, lists the server's coded diagnostics and becomes stale. Run validates a fresh snapshot. |
-| Run at 600 × 300 nm; type a run name and press Enter | Actual fields and two candidate indices appear; the Study step reads *Run complete*. The name applies on Enter and pins the run. Job, input and version provenance are under **Run details**, not in run labels. |
+| Run at 600 × 300 nm; type a run name and press Enter | Actual fields and the modes table (Mode, n_eff, Polarization, Loss) appears; the Study step reads *Run complete*. The name applies on Enter and pins the run. Job, input and version provenance are under **Run details**, not in run labels. |
 | Edit the width after the run | The completion message is replaced, the Study step reads *Ready to run* and Results reads *Inputs changed since this result*. |
 | Study → Edit wavelength, and the step bar's *λ 1550 nm* | **Optical modes** (its settings headed *Optical modes*) opens with the wavelength field focused. |
-| Run at 700 × 300 nm; Compare A/B | Captured dimensions and material are identifiable; the field panel headings do not repeat a run's name and the plots come before the n_eff table. Candidate ranks are explicitly not matched modes. |
+| Run at 700 × 300 nm; Compare A/B | Captured dimensions and material are identifiable; the field panel headings do not repeat a run's name and the plots come before the n_eff table. Mode ranks are explicitly not matched modes. |
 | Add a 3000 × 90 nm silicon slab, draw it earlier than the core, add an air circle and a polygon | The list, drawing and draw order agree; an overlap note names the shape that wins. Out-of-window or crossing values stay as blocked drafts or are refused with the shape unchanged. |
 | Drag the core, move it with arrow keys, drag a rectangle edge; Undo and Redo | Each completed gesture is one undoable edit; Escape cancels a preview. The numeric inspector follows every change. |
 | Run the multi-shape design; generate its mesh; save and reopen the session; open an input file of version 5 or earlier | Results, history and comparison name the shape summary; field outlines show every shape. Reopened shapes match. The earlier file is refused with a message naming its version, and the current inputs stay. |
 | Choose Steady heat conduction; set 40 × 20 mm, Q = 2e5 W/m³, a convective top; try a negative height, mismatched corner temperatures and a 200 × 100 mesh | Each problem blocks Run with its reason; correcting it restores readiness. |
 | Run the heat study; probe the plot; switch to \|q\|; edit k; Undo; save and reopen the input file | Temperature and flux appear on the result mesh with point values; the edit marks the result as an earlier snapshot; the reopened file restores the plate. |
 | Run at 1600 nm / 40 nm core mesh, then 1400 nm / 25 nm; Compare | Results, history and comparison name each captured wavelength and core mesh. Values outside 1400–1700 nm or 20–60 nm stay as blocked drafts. |
-| Change candidate/component; inspect a point and a line | Both plots use the same physical coordinates, in nm with round ticks, as the inspector does; n_eff has 8 decimals in the candidate list and everywhere else. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
+| Change mode/component; inspect a point and a line | Both plots use the same physical coordinates, in nm with round ticks, as the inspector does; n_eff has 8 decimals in the mode list and everywhere else. Values are stored triangle samples with relative normalization, not interpolated absolute fields. |
 | Save session and Export this run; reopen each | Inputs, result count, names, pins, comparison and view state match the file's scope. The title reads *Opened …* with the file name; opening does not recompute. |
 | Export the run table and a line profile CSV | Every quantity column is headed `name [unit]` and holds SI values (a 1550 nm wavelength is `0.00000155`, a 0.5 µm coordinate `5e-7`). |
 | Before a file save the title and footer both read *Not saved to a file · kept for recovery in this browser*; Save session | Both then read *Session file … sent to your browser's Downloads · time*; neither claims the file is on disk. |
@@ -129,7 +129,7 @@ checkout. These checks do not replace the full repository CI.
 
 The installed `simcase-studio --workspace` entry point completed 600/700 × 300 nm
 silicon designs in a fresh browser origin. Naming/pinning the baseline, comparison,
-candidate/component changes, probe/profile, session download, reload/recovery
+mode/component changes, probe/profile, session download, reload/recovery
 and reopening the downloaded file preserved two runs, one pin and the view state.
 No browser console errors or warnings were observed. Repeating both captured
 solver documents through the installed Python API gave identical effective
@@ -171,7 +171,7 @@ and ridge overlapping), a silicon nitride circle, a trapezoid, an air top
 cladding, a shape touching the window edge and an eight-shape design (at 1550 nm,
 30 nm core mesh, at most 2.2 s and 1.3 MB). Submitted as four corners, the legacy core gave
 the same 2275-triangle mesh as the earlier rectangle document and n_eff within 2.5e-15. For the r = 600 nm silicon nitride circle, the two
-candidates (1.82841 and 1.82821 at 30 nm; 1.82844 and 1.82827 at 20 nm) approach
+modes (1.82841 and 1.82821 at 30 nm; 1.82844 and 1.82827 at 20 nm) approach
 the exact step-index HE11 value 1.828466 computed independently from the vector
 eigenvalue equation; the PEC window splits the pair. The worst case tried, silicon
 filling the window at 20 nm, took 22 s with a 14 MB result. Windows/macOS, other

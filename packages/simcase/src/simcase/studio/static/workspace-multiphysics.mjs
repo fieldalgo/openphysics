@@ -400,9 +400,9 @@ export function effectiveIndexRows(payload){
  const series=payload.effective_index,values=Array.isArray(series?.values)?series.values:Array.isArray(series?.re)?series.re:[];
  const rows=[];values.forEach((point,i)=>(Array.isArray(point)?point:[point]).forEach((v,m)=>rows.push({point:i,mode:m+1,value:v})));return rows;
 }
-// The caveat under a modes table, in the words of the optical application, and the number of
-// modes the model asks for, named by its setting: the rows are candidates, not matched modes.
-export const CANDIDATE_CAVEAT='Candidates are ranked by effective index and are not matched between designs.';
+// The sentence under a modes table, in the words of the optical application (RANKING_TEXT of
+// workspace-modes.mjs), and the number of modes the model asks for, named by its setting.
+export const RANKING_CAVEAT='Modes are ranked by effective index.';
 // past: the model changed since the run, so the count is the run's, not the model's.
 export function modeCountText(doc,name,{past=false}={}){
  const n=doc?.physics?.[name]?.mode_count,where=`${physicsLabel(name)} › Modes to find`;

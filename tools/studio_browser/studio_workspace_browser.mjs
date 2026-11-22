@@ -175,7 +175,7 @@ try {
     }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
-  const delta = () => page.eval("(document.getElementById('canvas').innerText.match(/Δn_eff \\(B − A\\), candidate rank 1: (-?[0-9]+\\.[0-9]+)/)||[])[1]||null");
+  const delta = () => page.eval("(document.getElementById('canvas').innerText.match(/Δn_eff \\(B − A\\), mode rank 1: (-?[0-9]+\\.[0-9]+)/)||[])[1]||null");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
@@ -236,10 +236,13 @@ try {
   // one save indicator: before a file save it says which copy exists, and the footer repeats it
   await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
-  // n_eff with 8 decimals in the candidate list as in the results; plot axes and the inspector in nm
-  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#canvas .pair strong')].map(e=>e.textContent),probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
+  // n_eff with 8 decimals in the mode list as in the modes table; plot axes and the inspector in nm
+  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
-  for (const option of resultsView.options) assert.match(option, /^\d · n_eff \d\.\d{8}$/);
+  for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
+  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss']);
+  assert.equal(resultsView.polarization.length, 2); for (const p of resultsView.polarization) assert.match(p, /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/);
+  assert.deepEqual(resultsView.loss, ['lossless', 'lossless']); assert.match(resultsView.lossless, /^Lossless: all materials have k = 0/);
   assert.equal(resultsView.options[0].split('n_eff ')[1], resultsView.values[0]);
   assert.deepEqual(resultsView.probe, ['x [nm]', 'y [nm]']);
   // an unnamed run offers no separate Pin button: naming it pins it

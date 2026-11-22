@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {designSummary} from './workspace-shapes.mjs';
 
-// The Compare table: one row per candidate rank of two runs. Ranks are the solver's
+// The Compare table: one row per mode rank of two runs. Ranks are the solver's
 // ordering by effective index, not modes matched across designs.
 export function compareRows(a,b){
  const n=Math.min(a.length,b.length);
@@ -18,6 +18,6 @@ export function fieldHeading(side,run){
  const named=run.label&&run.label.trim().toLowerCase()!==side.toLowerCase();
  return `${side} · ${runHeading(named?run:{...run,label:''})}`;
 }
-// n_eff everywhere (results, candidate select, Compare): 8 decimals.
+// n_eff everywhere (results, mode select, Compare): 8 decimals.
 export const formatIndex=value=>value.toFixed(8);
 export const formatPercent=value=>value===null?'—':value.toFixed(4)+' %';
