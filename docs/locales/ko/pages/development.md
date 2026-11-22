@@ -311,8 +311,9 @@ Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 �
 **Use this run's inputs**와 그것을 되돌리는 Undo, 다음 실행의 입력을 밝히고 파장을 고치는 Study 설정(1300 nm는
 Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다. 모델과 함께 저장되는 study
 설정도 확인합니다: Modes to find 변경, 군굴절률 상자 변경, 모드 수와 상자가 다른 실행의 **Use this run's
-inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Save inputs only**가 이전 버전 7 파일
-(`tests/simcase/studio_session_fixtures/inputs-v7-optical.json`)을 바이트 단위로 같게 쓰고 `modeCount` 4나
+inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Save inputs only**가 버전 7을 쓰고(설정 키를
+뺀 버전 8 파일과 같은 바이트. 템플릿의 파일은 `tests/simcase/studio_project_study.cjs`가
+`tests/simcase/studio_session_fixtures/inputs-v7-optical.json`과 비교) `modeCount` 4나
 `groupIndex` true이면 버전 8을 쓰며 각 파일을 다시 열면 그 설정이 되는지, 버전 8 입력의 세션이 버전 9로
 저장되는지 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을

@@ -368,8 +368,9 @@ and Undo taking it back, the Study settings naming the next run's inputs and edi
 wavelength (1300 nm refused there as in Optical modes), and a restore card naming the file's
 save time. It also checks the study settings saved with the model: Undo and Redo over a Modes to
 find change, a group index box change and **Use this run's inputs** of a run with another count
-and box; **Save inputs only** writing the version 7 file of before byte for byte with 2 modes and
-the box off (`tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
+and box; **Save inputs only** writing version 7 with 2 modes and the box off (the same bytes as the
+version 8 file without its settings key; `tests/simcase/studio_project_study.cjs` checks the
+template's file against `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
 `modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
 inputs saved as version 9.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
