@@ -17,6 +17,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   index % 2 ? pairs : [...pairs, [value.replace(/^--/, ''), all[index + 1]]], []));
@@ -236,7 +237,8 @@ try {
   await setFile(duplicate);
   await page.until("/Open failed: .*appears more than once/.test(document.getElementById('file-status').textContent)", 'duplicate key refused');
   assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
-  await setFile(resolve('examples/simcase/multiphysics_heated_slab.json'));
+  // the checkout's example, found from this script: the check runs outside the checkout
+  await setFile(fileURLToPath(new URL('../../examples/simcase/multiphysics_heated_slab.json', import.meta.url)));
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'example opened');
   await runReady();
   assert.match(await page.text('#project'), /^Multiphysics model \/ Opened from multiphysics_heated_slab\.json$/);
