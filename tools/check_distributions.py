@@ -421,6 +421,10 @@ def main():
                       for filename in ("studio_steady_thermal.cjs", "studio_transient_thermal.cjs")]
         node_tests.extend(str(copy(path, node_root / "tests" / "simcase" / path.name))
                           for path in sorted((ROOT / "tests" / "simcase").glob("studio_workspace_*.cjs")))
+        # the optical and multiphysics session fixtures those tests read (S3, S4 and the
+        # version 8 file of studio_workspace_multiphysics_session.cjs)
+        for path in sorted((ROOT / "tests" / "simcase" / "studio_session_fixtures").iterdir()):
+            copy(path, node_root / "tests" / "simcase" / "studio_session_fixtures" / path.name)
         # The copies are working-tree bytes; say whether they match the commit.
         sources = sorted({entry["source"] for entry in copied.values()})
         unchanged = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *sources],
