@@ -381,7 +381,9 @@ function refreshPersistence(){
 function refreshSaveIndicator(){
  const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});
  $('project').textContent=!applicationChosen()||!text?'No model chosen':(isOptical()?'Optical waveguide':isHeat()?'Heat conduction':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+text;
- $('autosave-status').textContent=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:'No model chosen · nothing to save yet';
+ // Rewritten only on a change: the footer is a status region read out by screen readers.
+ const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';
+ if($('autosave-status').textContent!==footer)$('autosave-status').textContent=footer;
 }
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
@@ -703,7 +705,7 @@ function addProbeControls(host,redraw){
  const form=document.createElement('form');form.className='probe-controls';
  form.innerHTML='<strong>Inspect displayed sample</strong><label>x [nm]<input id="probe-x" type="number" step="any" min="-1500" max="1500" required></label><label>y [nm]<input id="probe-y" type="number" step="any" min="-1200" max="1200" required></label><button type="submit">Inspect point</button><button type="button" id="clear-probe">Clear point</button><span>Click a plot or enter coordinates. Values belong to triangle centroids; no interpolation.</span>';
  host.append(form);$('probe-x').value=nmValue(fieldProbe.x);$('probe-y').value=nmValue(fieldProbe.y);
- form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;fieldProbe.x=Number($('probe-x').value)/1000;fieldProbe.y=Number($('probe-y').value)/1000;fieldProbe.active=true;redraw();refreshPersistence();};
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;fieldProbe.x=Number($('probe-x').value+'e-3');fieldProbe.y=Number($('probe-y').value+'e-3');fieldProbe.active=true;redraw();refreshPersistence();};
  $('clear-probe').onclick=()=>{fieldProbe.active=false;redraw();refreshPersistence();};
 }
 // A µm view coordinate as an nm input value (0.1 nm resolution, a plain number for the field).
@@ -772,7 +774,7 @@ function renderLineProfile(host,profileRuns,updateFields=()=>drawField()){
   legend.replaceChildren();series.forEach((item,i)=>{const line=document.createElement('p');line.style.color=i?'#e7bc73':'#80d7c0';line.textContent=`${i?'B':'A'} · ${runLabel(item.run)} · ${item.segments.length} intervals`;legend.append(line);});
   drawProfile(canvas,series,profileState.axis,profileState.coordinate);csv.disabled=!series.some(item=>item.segments.length);png.disabled=csv.disabled;
  }catch(error){description.textContent='Profile unavailable: '+error.message;csv.disabled=true;png.disabled=true;}};
- form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value)/1000;profileRedraw();updateFields();refreshPersistence();};
+ form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;profileState.axis=$('profile-axis').value;profileState.coordinate=Number($('profile-coordinate').value+'e-3');profileRedraw();updateFields();refreshPersistence();};
  details.ontoggle=()=>{if(!details.isConnected)return;profileState.open=details.open;profileRedraw();updateFields();refreshPersistence();};
  csv.onclick=()=>downloadFile(new Blob([profileCsv(series,profileState.axis,profileState.coordinate,fieldView.mode,fieldView.component)],{type:'text/csv'}),'studio-profile.csv');
  png.onclick=()=>{

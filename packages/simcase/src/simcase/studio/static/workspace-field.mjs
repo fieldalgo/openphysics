@@ -25,14 +25,15 @@ export function fieldScalars(field,mode,component='magnitude'){
  return {values:values.map(v=>maximum===0?0:v/maximum),maximum};
 }
 // Plot axes in nanometres (display only; the views and the stored state stay in µm).
-// Ticks fall on round nanometre values (1, 2 or 5 × 10^k nm) inside [min, max] µm: the
-// smallest such step that gives at most maxTicks ticks (at least 2 apart from tiny ranges).
+// Ticks fall on round nanometre values (1, 2, 2.5 or 5 × 10^k nm, whole nm) inside [min, max]
+// µm: the finest such step with 2 to maxTicks ticks; if none has, the step with the fewest
+// ticks above one (a short axis may then hold one more than maxTicks).
 export function nmTicks(min,max,maxTicks=5){
  if(!Number.isFinite(min)||!Number.isFinite(max)||!(max>min)||!(maxTicks>=2))throw new Error('Invalid axis range.');
  const lo=min*1000,hi=max*1000,count=step=>Math.floor(hi/step+1e-9)-Math.ceil(lo/step-1e-9)+1;
- let power=10**Math.floor(Math.log10((hi-lo)/maxTicks)),step;
- for(;;power*=10){step=[1,2,5].map(f=>f*power).find(s=>count(s)<=maxTicks);if(step)break;}
- const ticks=[];for(let k=Math.ceil(lo/step-1e-9);k<=Math.floor(hi/step+1e-9);k++)ticks.push(k===0?0:Math.round(k*step)/1000);
+ const steps=[];for(let power=Math.max(1,10**Math.floor(Math.log10((hi-lo)/maxTicks)));steps.length<40;power*=10)steps.push(power,2*power,...(power>=10?[2.5*power]:[]),5*power);
+ const step=steps.find(s=>count(s)>=2&&count(s)<=maxTicks)??steps.filter(s=>count(s)>=2).at(-1)??steps[0];
+ const ticks=[];for(let k=Math.ceil(lo/step-1e-9);k<=Math.floor(hi/step+1e-9);k++)ticks.push(k===0?0:Number((k*step).toPrecision(12))/1000);
  return ticks;
 }
 // A µm coordinate as nanometres for display, at most `digits` decimals without trailing

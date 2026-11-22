@@ -28,6 +28,13 @@ test('plot axes tick on round nanometre values inside the view, labelled in nm',
   for(const t of ticks){assert.ok(t>=a-1e-12&&t<=b+1e-12);assert.ok(Number.isInteger(Math.round(t*1e7)/1e4),'whole or round nm');}
  }
  assert.ok(!nmTicks(-1,1,5).some(t=>Object.is(t,-0)),'no negative zero');
+ // never a single label where two fit, even if one more than maxTicks (review of round 3)
+ assert.deepEqual(nm(-0.247,0.451,3),['0','250']);
+ assert.deepEqual(nm(0.101,0.199,3),['125','150','175']);
+ for(let a=-1.5;a<1;a+=0.0137)for(let w=0.2;w<1.7;w+=0.0291)for(let n=3;n<=7;n++){const t=nmTicks(a,a+w,n);assert.ok(t.length>=2&&t.length<=n+1,`${a} ${a+w} ${n}: ${t}`);}
+ // whole nanometre steps only: no duplicate labels on a sub-nm range, and no hang on a range below double precision
+ assert.deepEqual(nm(0,0.002,5),['0','1','2']);
+ assert.deepEqual(nmTicks(0.5621777412998128,0.5621777412998129,5).length<=1,true);
  assert.throws(()=>nmTicks(1,1));assert.throws(()=>nmTicks(0,NaN));assert.throws(()=>nmTicks(0,1,1));
  assert.equal(formatNm(-0.57),'−570');assert.equal(formatNm(0.1234567,1),'123.5');assert.equal(formatNm(-0.00001),'0');assert.equal(formatNm(0.15,1),'150');
 });

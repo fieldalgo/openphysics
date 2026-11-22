@@ -9,7 +9,7 @@ export function opticalStudy(wavelengthNm=1550,coreMeshNm=30){
  return {vacuumWavelength:wavelengthNm+' nm',coreElementSize:coreMeshNm+' nm'};
 }
 export function opticalBlock(state,setup){
- if(state.electric!==false||state.heat||state.structure||!state.optics)return 'Choose Applications → Optical waveguide. Coupled physics are not connected.';
+ if(state.electric!==false||state.heat||state.structure||!state.optics)return 'Choose Models → Optical waveguide. Coupled physics are not connected.';
  if(setup.materials.Oxide!=='Silica')return 'The optical background must be silica.';
  return shapesBlock(designShapes(state,setup));
 }
