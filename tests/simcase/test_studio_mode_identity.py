@@ -1,7 +1,7 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""V13: Studio's TE fraction (workspace-modes.mjs, in Node) equals the engine's saved
-``te_polarization_fraction`` on the same samples, to 1e-12 relative.
+"""V13: Studio's TE fraction and effective area (workspace-modes.mjs, in Node) equal the engine's
+saved ``te_polarization_fraction`` and ``effective_area`` on the same samples, to 1e-12 relative.
 
 The samples are what Studio holds of a run: node_coordinates in metres, the triangles and the
 complex centroid field per mode. The cases: the optical template as Studio builds it
@@ -38,6 +38,7 @@ const M = await import(process.argv[1]);
 const cases = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const out = cases.map(c => ({
   fractions: c.field.real.map((_, i) => M.teFraction(c.field, i)),
+  areas: c.field.real.map((_, i) => M.effectiveArea(c.field, i)),
   groups: M.degenerateGroups(c.neff),
   labels: c.neff.map((_, i) => M.modeOptionLabel(i, c.neff.map((re, j) => ({re, fte: M.teFraction(c.field, j)})))),
   loss: c.loss === null ? null : M.lossText(c.loss.im, c.loss.db_per_m)}));
@@ -104,6 +105,16 @@ def test_v13_studio_te_fraction_equals_the_engine(tmp_path):
     print(f"\nV13 worst relative difference Studio vs engine over {sum(len(g['fractions']) for g in studio)} modes: "
           f"{worst:.2e}")
     assert worst <= 1e-12
+    worst_area = 0.0
+    for result, got in zip(results + [lossy], studio):
+        engine = result.postprocessing["effective_area"][0]
+        assert len(got["areas"]) == len(engine)
+        for a, b in zip(got["areas"], engine):
+            assert np.isfinite(b) and b > 0 and a is not None
+            worst_area = max(worst_area, abs(a - b) / b)
+    print(f"V13 worst relative difference of A_eff Studio vs engine over {sum(len(g['areas']) for g in studio)} "
+          f"modes: {worst_area:.2e}")
+    assert worst_area <= 1e-12
     # the template's picker and the k = 1e-4 strip's loss text
     assert studio[0]["labels"][0].startswith("Mode 1 · TE-like · n_eff ")
     assert studio[0]["labels"][1].startswith("Mode 2 · TM-like · n_eff ")
