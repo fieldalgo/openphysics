@@ -37,7 +37,8 @@ from scipy.integrate import quad
 from galerkin import EdgeSpace, Mesh
 from galerkin.mode_overlap import (confinement_factor, coupling_efficiency, interpolate_vector_field,
                                    overlap_matrix, scalar_confinement_factor, scalar_coupling_efficiency,
-                                   scalar_overlap, scalar_power, vector_field_overlap, vector_power)
+                                   scalar_effective_area, scalar_overlap, scalar_power, vector_field_overlap,
+                                   vector_power)
 from simcase import Document, DocumentError
 from simcase.runner import _kernel_solve, build_mesh, run
 
@@ -47,8 +48,9 @@ PAD, HALF_WIDTH = 1.1, 0.05
 SIZES = (0.04, 0.02, 0.01)
 WAIST, CENTER = THICKNESS, (0.0, THICKNESS / 2)
 POST_KEYS = {"vector": {"unnormalized_mode_power", "confinement_factor", "unnormalized_field_overlap",
-                        "te_polarization_fraction"},
-             "scalar": {"unnormalized_mode_field_square_integral", "confinement_factor", "unnormalized_field_overlap"}}
+                        "te_polarization_fraction", "effective_area"},
+             "scalar": {"unnormalized_mode_field_square_integral", "confinement_factor", "unnormalized_field_overlap",
+                        "effective_area"}}
 COMMON_KEYS = {"node_coordinates", "triangles", "regions", "region_names", "vacuum_wavelength", "effective_index",
                "field_layout", "study_parameter", "metadata_json"}
 VECTOR_KEYS = {"field_representation", "edges", "unnormalized_electric_field_line_integral",
@@ -177,7 +179,8 @@ def test_q1_saved_values_are_byte_identical_to_galerkin_calls(study):
             conf = np.array([[scalar_confinement_factor(mesh, p, m) for m in masks] for p in phi])
             overlap = np.array([[scalar_overlap(mesh, a, b) for b in phi] for a in phi])
             eta = np.array([scalar_coupling_efficiency(mesh, p, g(mesh.nodes[:, 0], mesh.nodes[:, 1])) for p in phi])
-            converted = {"unnormalized_mode_field_square_integral": power * 1e-12}
+            converted = {"unnormalized_mode_field_square_integral": power * 1e-12,
+                         "effective_area": np.array([scalar_effective_area(mesh, p) for p in phi]) * 1e-12}
         else:
             space = EdgeSpace(mesh)
             vf = res["vector_field"]
