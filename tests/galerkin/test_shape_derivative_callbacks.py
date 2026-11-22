@@ -208,13 +208,8 @@ def test_e6_numpy_only_callbacks_are_refused_by_name(name, label, over):
     assert "JAX or PyTorch" in str(caught.value)
 
 
-def test_e6_callbacks_with_an_axisymmetric_motion_stay_refused():
-    m, W, kw, _left = _plate()
-    W = W.copy()
-    W[np.isclose(m.nodes[:, 0], 0), 0] = 0.0
-    with pytest.raises(TypeError, match="coordinate callbacks with an axisymmetric motion"):
-        solve_steady_heat(m, **kw, coordinate_system="axisymmetric",
-                          motion=MeshMotion(design_velocity=W, t=_leaf("jax")))
+# Coordinate callbacks with an axisymmetric motion were refused in this first slice; they are
+# taken since e2, checked in test_shape_derivative_callbacks_axisymmetric.py (EA1-EA7).
 
 
 def test_e7_without_a_motion_nothing_changes():

@@ -156,7 +156,7 @@ convection on boundary tags (they move with their edges), and Dirichlet values.
 
 ## Coordinate callbacks in steady heat
 
-Cartesian `solve_steady_heat` takes coordinate callbacks with a motion (2026-11-22): the heat
+`solve_steady_heat` takes coordinate callbacks with a motion (Cartesian and axisymmetric, 2026-11-22): the heat
 source `callback(points)`, the inward heat flux `callback(points, normals)` and the convection
 h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - The callback describes a field fixed in space. Its sample points move with the mesh, so
@@ -164,10 +164,12 @@ h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - The ordinary solve on the moved mesh calls it once with NumPy points. The live assembly
   calls it once more with the live points and unit outward normals of the same rules (the
   6 × 6 Duffy rule on triangles, 4-point Gauss on edges), as JAX arrays or PyTorch tensors.
+  With `coordinate_system="axisymmetric"` the weights carry 2πr at the live points, as in
+  the ordinary solve.
 - It must therefore compute with array operations on the points it is given, and be pure.
   A callback that returns NumPy numbers for live points (`np.asarray`, `np.ones(len(p))`),
   or raises on them, is refused with a `TypeError` that names it.
-- Not covered yet: coordinate callbacks with an axisymmetric motion, in transient heat,
+- Not covered yet: coordinate callbacks in transient heat,
   steady electric conduction, elasticity and 3D heat, and callable coefficients
   (conductivity and the rest) or Dirichlet values.
 
@@ -178,6 +180,10 @@ differences within 1e-8 (E2), as does a flux callback on a side moving along its
 JAX and PyTorch agree within 1e-12 (E3); a strip with the fixed source Q0·x gives the
 analytic dQ/dL = −Q0·L·H/3 at x = 0 within 1e-10 (E4); NumPy-only callbacks are refused by
 name (E6); and a call without a motion is unchanged (E7).
+`tests/galerkin/test_shape_derivative_callbacks_axisymmetric.py` holds EA1–EA7 for the
+axisymmetric solve, with the same bounds; EA4 checks a hollow cylinder insulated except at
+z = 0, where heat balance gives the reaction and its derivative in the length and in the
+outer radius in closed form, within 1e-10.
 
 ## Axisymmetric heat
 
@@ -418,7 +424,7 @@ Each refusal names the reason:
   density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat, and coordinate
-  callbacks that compute with the live points in Cartesian steady heat (above);
+  callbacks that compute with the live points in steady heat (above);
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,

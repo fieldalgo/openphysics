@@ -67,10 +67,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     W = _velocity(mesh, motion.design_velocity)
     axisymmetric = _axisymmetric(mesh, W, coordinate_system, t)
     _coefficient(conductivity, "thermal_conductivity")
-    callbacks = _coordinate_callbacks(heat_source, outward_flux, convection)
-    if callbacks and axisymmetric:
-        raise TypeError("motion: coordinate callbacks with an axisymmetric motion are not covered in this slice; "
-                        "give constants or region tables")
+    _coordinate_callbacks(heat_source, outward_flux, convection)
     if not isinstance(dirichlet, Mapping):
         raise ValueError("prescribed_temperature must map node indices to temperatures in K")
     for node, value in dirichlet.items():
@@ -100,7 +97,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     K = CooMatrix(np.repeat(tris, 3, axis=1).ravel(), np.tile(tris, (1, 3)).ravel(),
                   xp.reshape(element, (-1,)), (n, n))
     if sampled_source:
-        local = _sampled_cell_load(xp, X, tris, area, heat_source)
+        local = _sampled_cell_load(xp, X, tris, area, heat_source, axisymmetric)
     else:
         local = _cell_load(xp, X, tris, area, lift(xp, Q), axisymmetric)
     load = scatter_add(xp, n, tris.ravel(), xp.reshape(local, (-1,)))
@@ -129,7 +126,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     for tag, g in (outward_flux or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
         if callable(g):
-            rule = _edge_rule(xp, mesh, moved, X, edges)
+            rule = _edge_rule(xp, mesh, moved, X, edges, axisymmetric)
             values = _sampled(rule, g, _boundary_label("outward_flux", tag))
             G = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, values), (-1,)), base=G)
             continue
@@ -138,7 +135,7 @@ def solve_steady_heat_moving(mesh: Mesh, motion: MeshMotion, *, thermal_conducti
     for tag, (h, ambient) in (convection or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
         if callable(h) or callable(ambient):
-            rule = _edge_rule(xp, mesh, moved, X, edges)
+            rule = _edge_rule(xp, mesh, moved, X, edges, axisymmetric)
             label = _boundary_label("convection", tag)
             hv = _sampled(rule, h, label) if callable(h) else float(h) + 0 * rule.weights
             av = _sampled(rule, ambient, label) if callable(ambient) else float(ambient) + 0 * rule.weights
@@ -850,7 +847,7 @@ class _EdgeRule:
     shape: object       # (4, 2) P1 edge shape functions at the points
 
 
-def _edge_rule(xp, mesh, moved, X, edges):
+def _edge_rule(xp, mesh, moved, X, edges, axisymmetric=False):
     from .core.triangles import triangle_geometry
     x, w = np.polynomial.legendre.leggauss(4)
     x, w = (x + 1) / 2, w / 2
@@ -875,7 +872,10 @@ def _edge_rule(xp, mesh, moved, X, edges):
     S = lift(xp, shape)
     points = S[None, :, 0, None] * Xa[:, None, :] + S[None, :, 1, None] * Xb[:, None, :]
     normals = unit[:, None, :] * xp.ones((1, len(w), 1), dtype=xp.float64)
-    return _EdgeRule(points, normals, length[:, None] * lift(xp, w)[None, :], S)
+    weights = length[:, None] * lift(xp, w)[None, :]
+    if axisymmetric:                    # the 2 pi r(q) surface measure of core.measure.boundary_samples
+        weights = weights * (2.0 * math.pi * points[:, :, 0])
+    return _EdgeRule(points, normals, weights, S)
 
 
 def _sampled(rule, callback, label):
@@ -889,8 +889,9 @@ def _sampled(rule, callback, label):
     return _live_values(values, count, label)
 
 
-def _sampled_cell_load(xp, X, tris, area, callback):
-    """The consistent load of a heat source callback(points) with the ordinary solver's 6 x 6 Duffy rule."""
+def _sampled_cell_load(xp, X, tris, area, callback, axisymmetric=False):
+    """The consistent load of a heat source callback(points) with the ordinary solver's 6 x 6 Duffy rule
+    (times 2 pi r at the points when axisymmetric, as core.loads._weighted_source_load)."""
     from .core.quadrature import triangle_product_rule
     bary, weights = triangle_product_rule()
     P = X[tris]                                                       # (T, 3, 2)
@@ -902,6 +903,8 @@ def _sampled_cell_load(xp, X, tris, area, callback):
         raise TypeError("motion: the callback of heat_source_density must compute with the JAX or PyTorch points it "
                         f"is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
     values = _live_values(values, (P.shape[0], len(weights)), "heat_source_density")
+    if axisymmetric:
+        values = values * (2.0 * math.pi * points[:, :, 0])
     local = xp.sum(lift(xp, weights)[None, :, None] * values[:, :, None] * B[None, :, :], axis=1)
     return local * area[:, None]
 
