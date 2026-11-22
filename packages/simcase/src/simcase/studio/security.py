@@ -15,10 +15,11 @@ before any route runs:
   ``Origin`` must come from the same origin; without ``Origin``, a ``Referer`` or
   ``Sec-Fetch-Site`` naming another site is refused. Requests with none of these
   headers (command-line clients, test clients) are unchanged;
-- the optical JSON routes and the geometry lab's evaluation take only ``application/json``
-  bodies up to a byte cap; the routes then read the buffered bytes with ``simcase.reader``
-  (``bodies.read_envelope``), which refuses duplicate keys, ``NaN``, ``Infinity``, malformed
-  and non-UTF-8 text and accepts a leading UTF-8 byte order mark.
+- the optical JSON routes, the geometry lab's evaluation and the multiphysics validate and run
+  routes take only ``application/json`` bodies up to a byte cap; the routes then read the
+  buffered bytes with ``simcase.reader`` (``bodies.read_envelope``), which refuses duplicate
+  keys, ``NaN``, ``Infinity``, malformed and non-UTF-8 text and accepts a leading UTF-8 byte
+  order mark.
 
 Every response carries a Content-Security-Policy that the shipped pages satisfy.
 """
@@ -37,7 +38,8 @@ from urllib.parse import urlsplit
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 OPTICAL_BODY_ROUTES = frozenset({"/api/validate", "/api/mesh", "/api/run", "/api/materials/preview",
-                                 "/api/geometry-lab/evaluate"})
+                                 "/api/geometry-lab/evaluate", "/api/multiphysics/validate",
+                                 "/api/multiphysics/run"})
 OPTICAL_BODY_BYTES = 1 << 20
 _DIGITS = re.compile(r"[0-9]{1,20}")  # ASCII only: str.isdigit() accepts "²", which int() refuses
 
