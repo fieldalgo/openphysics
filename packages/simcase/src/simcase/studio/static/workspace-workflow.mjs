@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {designSummary,shapesBlock} from './workspace-shapes.mjs';
+import {originText} from './workspace-multiphysics.mjs';
 
 // Readiness describes the current editor and retained artifacts, not accuracy.
 export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[]}){
@@ -22,19 +23,23 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
 }
 // The last-run state of the optical inputs, in the words of the multiphysics model. A run is
 // numbered by its place in the run list (oldest = 1). 'current': a run solved these exact
-// inputs; 'stale': runs exist but none of these inputs; 'none' before any run.
+// inputs; 'stale': runs exist but none of these inputs; 'none' before any run. origin: where the
+// current run came from when it was not computed in this tab ('imported' or 'recovered').
 export function opticalFreshness(input,runs=[]){
  const signature=JSON.stringify(input),index=runs.findLastIndex(run=>run.signature===signature);
- if(index>=0)return {state:'current',run:index+1};
+ const origin=runs[index]?.origin;
+ if(index>=0)return origin==='imported'||origin==='recovered'?{state:'current',run:index+1,origin}:{state:'current',run:index+1};
  return runs.length?{state:'stale',run:runs.length}:{state:'none',run:null};
 }
 // The dock heading and the ready footer for that state: both name the same run.
-export function opticalSequenceHeading({state,run}){
+export function opticalSequenceHeading({state,run,origin}){
+ if(state==='current'&&originText(origin))return `Run ${run} · ${originText(origin)}`;
  if(state==='current')return `Run ${run} · solved from the current inputs`;
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Nothing is computed until you press Run';
 }
-export function opticalReadyStatus({state,run}){
+export function opticalReadyStatus({state,run,origin}){
+ if(state==='current'&&originText(origin))return `Run ${run} · ${originText(origin)} · press Run to compute it here`;
  if(state==='current')return `Run ${run} · solved from the current inputs · press Run to solve again`;
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Optical adapter ready · explicit Run required';

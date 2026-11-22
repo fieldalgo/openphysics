@@ -91,3 +91,12 @@ export function leaveConfirmText({from,runs=0,saved=false,target='the other mode
   save:{kind:'session',label:'Save session, then continue'},leave:'Continue without saving',stay:'Keep this model'};}
  return null;
 }
+// The Messages line when another model opens over optical runs: where those runs are now. They
+// always stay in this tab and come back with the optical model; file: the session file that holds
+// them as they are, recovery: browser recovery holds them. '' when there are no optical runs.
+export function opticalRunsStayText({runs=0,file=null,recovery=false}){
+ if(!runs)return '';
+ const places=['this tab',...(recovery?['browser recovery']:[]),...(file?[file]:[])];
+ const where=places.length>1?places.slice(0,-1).join(', ')+' and '+places.at(-1):places[0];
+ return `Optical waveguide and its ${plural(runs,'run')} stay in ${where}; choose Models › Optical waveguide to return to ${runs===1?'it':'them'}.`;
+}

@@ -78,6 +78,9 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    *press Run to solve again*을 덧붙임), 편집 뒤에는 *Inputs changed since run 1 · press Run to
    update*, 실행 전에는 *Nothing is computed until you press Run*과 *Optical adapter ready ·
    explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
+   이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
+   file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
+   상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목의 시각은 초까지 나옵니다.
    입력 오류, 진행 중인 계산이나 작업, 지원하지 않는 입력처럼 Run을 막는 것이 있으면 도크 제목은
    상태 표시줄의 문구를 그대로 씁니다.
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
@@ -118,7 +121,14 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    *No model chosen*, 상태 표시줄에 *Choose a model to start*가 나오고 Study sequence에는
    단계가 없습니다. 방금 고른 모델은 첫 편집 전까지 *New model · not saved*, 그 뒤에는
    *Unsaved inputs*로 표시됩니다. 시작 화면은 모델을 고르면 무엇이 일어나는지 밝힙니다: 모델이
-   풀 물리를 정하고, 입력한 치수와 완료한 실행은 그대로 두며, Undo로 되돌릴 수 있습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
+   풀 물리를 정하고, 입력한 치수와 완료한 실행은 그대로 두며, 광학·정상 열·줄 가열 모델 사이에서는
+   Undo로 되돌릴 수 있습니다. 가열 실리콘 도파로는 자기 편집용 Undo를 따로 가지며, 다른 모델을
+   고르면 빠져나옵니다. 모델마다 Save session이 무엇을 남기는지 적혀 있습니다: 광학 모델은 입력과
+   실행, 정상 열과 줄 가열은 입력(결과는 탭에만 남음), 가열 실리콘 도파로는 모델과 그 실행입니다.
+   광학 실행이 있는 채로 가열 모델을 열면 Messages가 그 실행이 남는 곳(이 탭, 그리고 그것을 가진
+   브라우저 복구나 세션 파일)과 **Models › Optical waveguide**로 되돌아갈 수 있음을 알려 줍니다.
+   복구 항목은 모두 모델, 실행 수, 실행 이름(이름이 없으면 *Run N*)을 보여 줍니다. 예:
+   *Optical waveguide · 2 runs · design A, Run 2*. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
    *Model library · Choose a model*.
 
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
@@ -329,7 +339,10 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
   제목, 하단은 같은 문장 “Model matches run 1 again: its results are current. Run makes a new run with the
-  same inputs”를 보여 주어 Run이 무엇을 하는지 밝힙니다.
+  same inputs”를 보여 주어 Run이 무엇을 하는지 밝힙니다. 세션 파일에서 읽었거나 이 브라우저에서
+  복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**, 도크 제목은
+  “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고
+  하단은 “press Run to compute it here”를 덧붙입니다. 탭에서 만든 실행은 위 문구를 그대로 씁니다.
 - **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
@@ -433,7 +446,10 @@ Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, s
 - **다이제스트.** 실행과 기준 결과마다 `"digest": "sha256:<hex>"`가 있습니다. `digest`를 뺀 기록을
   모든 객체의 키를 정렬하고 같은 숫자 규칙으로 쓴 JSON의 SHA-256입니다. 잘리거나 손상되거나 손으로
   고친 파일을 알아냅니다. 인증은 아닙니다: 파일을 고치는 사람은 다시 계산할 수 있으므로, 연 결과는
-  계속 “Imported file result — not recomputed or authenticated”로 표시합니다.
+  계속 “Loaded from file, not recomputed. Studio checks the file for damage, not who made it.”으로
+  표시합니다. 복구한 결과는 “Recovered from this browser, not recomputed.”입니다. 광학 세션 파일에는
+  다이제스트가 없으므로 연 결과는 “Loaded from file, not recomputed. Studio checks that the file is
+  well formed, not who made it.”으로 표시합니다.
 - **크기.** 파일은 최대 16 MiB이며 읽기 전에 검사하고, 그 안의 문서는 각각 최대 1 MiB입니다. Save
   session은 파일이 맞으면 모든 실행을 맵과 함께 씁니다(템플릿 메시 실행 여섯 개는 약 2.5 MB). 맞지
   않으면 아무것도 쓰지 않고 크기를 밝혀 묻습니다: “Session is 22 MB; the limit is 16 MiB. Keep the
@@ -476,7 +492,7 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · Save session to
 keep them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
 MiB”) 이전 기록이 남습니다. **Recover last session**과 **Recover earlier session · Heated silicon
-waveguide · 3 runs · 시각**은 Open session과 같은 검사를 합니다.
+waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**은 Open session과 같은 검사를 합니다.
 
 모듈 검사는 `tests/simcase/studio_workspace_multiphysics_session.cjs`에 있습니다(버전 8 이전 Studio가
 쓴 버전 6, 7 광학 파일이 `tests/simcase/studio_session_fixtures/`에 있고, 이전처럼 열리며 바이트
@@ -715,7 +731,7 @@ Connection, recovery and layout help → Recover last session으로 복원합니
 
 복구하지 않고 새 작업을 시작해도 저장된 세션은 버리지 않습니다. 페이지를 연 뒤 첫 자동
 저장이 저장돼 있던 세션을 이전 세션 목록으로 옮깁니다(최신순, 최대 세 개). **Recover earlier
-session**이 각 세션의 실행 수와 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
+session**이 각 세션의 모델, 실행 수, 실행 이름과 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
 세션을 복구하면 다음 저장 때 지금 세션이 이전 세션으로 남습니다.
 
 최신 스냅샷은 같은 브라우저 origin의 한 건이며 탭 간 공유됩니다. 저장할 때 같은 데이터베이스

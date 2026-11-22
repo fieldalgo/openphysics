@@ -146,3 +146,9 @@ test('a model just chosen reads as new until its first edit, save or open',async
  assert.equal(P.persistenceTitle({fresh:true,clean:false,runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.match(P.persistenceTitle({fresh:true,invalid:true,clean:false}),/^Invalid input draft/);
 });
+test('switching models says where the optical runs stay',()=>{
+ assert.equal(P.opticalRunsStayText({runs:0}),'');
+ assert.equal(P.opticalRunsStayText({runs:1}),'Optical waveguide and its 1 run stay in this tab; choose Models › Optical waveguide to return to it.');
+ assert.equal(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
+  'Optical waveguide and its 2 runs stay in this tab, browser recovery and optical-waveguide-session-2026-11-22-0922.json; choose Models › Optical waveguide to return to them.');
+});

@@ -376,7 +376,13 @@ print(n)`;
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened results');
   const after = await shown();
   assert.deepEqual(after, before, 'S2: the same strings after the open');
-  assert.match(await page.text('[data-mp-run-line]'), /Imported file result — not recomputed or authenticated\.$/);
+  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed\. Studio checks the file for damage, not who made it\.$/);
+  // the dock, the footer and the step rows say the result was read from the file, with no solve times
+  const openedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,sequence:document.getElementById('sequence').textContent})");
+  stage('opened run status', openedDock);
+  assert.equal(openedDock.heading, 'Run 1 · read from file, not recomputed');
+  assert.equal(openedDock.status, 'Run 1 · read from file, not recomputed · press Run to compute it here');
+  assert.match(openedDock.sequence, /Heat 1 · From file.*Modes 1 · From file/); assert.doesNotMatch(openedDock.sequence, /Done in/);
   const a2 = await saveSession('template again');
   assert.equal(a2.text, a1.text, 'S1: the second file is byte-identical');
   const s1Template = {...compareArrays(a1.text), python: comparePython(a1.path), bytes: Buffer.byteLength(a1.text)};
@@ -493,7 +499,11 @@ print(n)`;
   const recoveredRuns = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.ok(recoveredRuns.every(t => / · recovered$/.test(t)), JSON.stringify(recoveredRuns));
   await page.click('#tree [data-mp-node="results:modes1"]');
-  assert.match(await page.text('[data-mp-run-line]'), /Browser recovery result — not recomputed or authenticated\.$/);
+  assert.match(await page.text('[data-mp-run-line]'), /Recovered from this browser, not recomputed\.$/);
+  const recoveredDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,sequence:document.getElementById('sequence').textContent})");
+  stage('recovered run status', recoveredDock);
+  assert.match(recoveredDock.heading, /^Run \d · recovered from this browser, not recomputed$/);
+  assert.match(recoveredDock.sequence, /Heat 1 · From this browser.*Modes 1 · From this browser/); assert.doesNotMatch(recoveredDock.sequence, /Done in/);
   const r1 = await saveSession('recovered');
   await fetchReplies(r1.text);
   const s8Identity = {...compareArrays(r1.text), python: comparePython(r1.path)};
@@ -513,6 +523,11 @@ print(n)`;
   await page.until("document.querySelectorAll('#earlier-sessions button').length===3", 'three earlier sessions');
   const earlier = await page.eval("[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)");
   assert.ok(earlier.every(t => /^Recover earlier session · Heated silicon waveguide · \d+ runs · /.test(t)), JSON.stringify(earlier));
+  // every entry names its runs: one name (or "Run N") per run
+  for (const t of earlier) {
+    const m = /^Recover earlier session · Heated silicon waveguide · (\d+) runs?(?: · (.+?))? · ([^·]+)$/.exec(t);
+    assert.ok(m, t); assert.equal(m[2] ? m[2].split(', ').length : 0, Number(m[1]), t);
+  }
   await page.click('#earlier-sessions button');
   await page.until("/^Recovered from this browser \\(Earlier browser session/.test(document.getElementById('file-status').textContent)", 'earlier recovered');
   stage('S8 earlier sessions', {earlier});
