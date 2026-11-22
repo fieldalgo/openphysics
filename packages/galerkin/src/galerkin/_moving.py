@@ -281,6 +281,8 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, electrical_c
         raise TypeError("motion: electrical_conductivity is an ElementConductivity; give a scalar or a region table")
     _coefficient(conductivity, "electrical_conductivity")
     for tag, value in _tags(outward_current, "outward_current_density").items():
+        if callable(value):
+            continue                   # sampled at the live points below; NumPy-only results are refused there
         _numpy_data(value, f"the current density on {tag!r}")
     for name, table in (("prescribed_electric_potential", dirichlet),
                         ("reference_electric_potential", reference_potential or {})):
@@ -311,6 +313,12 @@ def solve_steady_electric_moving(mesh: Mesh, motion: MeshMotion, *, electrical_c
     outward = xp.zeros(n, dtype=xp.float64)
     for tag, g in (outward_current or {}).items():
         edges, length = _boundary_edges(xp, mesh, X, tag)
+        if callable(g):
+            rule = _edge_rule(xp, mesh, moved, X, edges)
+            values = _sampled(rule, g, f"the current density on {tag!r}")
+            outward = scatter_add(xp, n, edges.ravel(), xp.reshape(_rule_load(xp, rule, values), (-1,)),
+                                  base=outward)
+            continue
         outward = scatter_add(xp, n, edges.ravel(), xp.reshape((float(g) * length / 2.0)[:, None]
                                                                 * xp.ones((1, 2), dtype=xp.float64), (-1,)),
                               base=outward)
@@ -1098,6 +1106,14 @@ def _check_neumann_balance(mesh, W, moved, labels, count, anchored, dirichlet, o
     scale = np.zeros(count)
     for tag, g in (outward_current or {}).items():
         edges = np.asarray(mesh.boundary_edges[tag], dtype=int)
+        if callable(g):
+            free = sorted({int(labels[e]) for e in edges[:, 0]} - {int(labels[n]) for n in dirichlet})
+            if free:
+                raise TypeError(f"motion: the current density on {tag!r} is a callback on component {free[0]}, "
+                                "which has no prescribed_electric_potential; the change of its net current along "
+                                "the motion is not checked in this slice. Give that component a "
+                                "prescribed_electric_potential, or a constant current density")
+            continue
         e = moved.nodes[edges[:, 1]] - moved.nodes[edges[:, 0]]
         de = W[edges[:, 1]] - W[edges[:, 0]]
         dlen = np.sum(e * de, axis=1) / np.hypot(e[:, 0], e[:, 1])
