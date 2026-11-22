@@ -261,7 +261,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 그곳에서 n = n₀ + (dn/dT)(T − T_ref)를 씁니다. 히터는 손실 없는 임시 굴절률을 가진 로컬
 기록이며, 금속 손실은 이후 작업입니다.
 
-작업 공간은 문서 자체를 편집하므로 양식이 없는 키도 그대로 둡니다. **More › Open model file**로
+작업 공간은 문서 자체를 편집하므로 양식이 없는 키도 그대로 둡니다. **Open model file**(Project)로
 배포된 [가열 슬랩 예제](../../../../../../examples/simcase/multiphysics_heated_slab.json) 같은
 다중물리 문서를 열 수 있습니다.
 
@@ -279,7 +279,14 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 - **Add coupling**은 출력을 고른 뒤 그것을 받을 수 있는 입력 하나를 고릅니다. 나머지는 이유와
   함께 회색입니다(같은 물리, 다른 양, 다른 단위, 이미 소스 하나를 받은 입력). 전달은 이번 릴리스의
   유일한 방식인 Same mesh입니다. 분명히 이을 수 있는 입력(Heat 1에서 받는 Modes 1 온도)이 있으면
-  Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다.
+  Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다. 그동안 Modes 1은
+  트리, Connections 노드, Settings, Messages에 경고를 답니다: “Temperature input has no source:
+  uses n₀ at T_ref (300 K)”. 결합된 온도가 없으면 광 풀이는 굴절률을 바꾸지 않으므로 모든 재료가
+  n₀, 곧 자기 기준 온도에서의 굴절률을 그대로 씁니다(모든 재료의 T_ref가 같을 때만 그 값을
+  적습니다). 결합을 지우면 다음 편집까지 **Undo**가 있는 메시지가 남습니다.
+- **포트는 끌지 않습니다.** 포트 점은 각 물리가 보내고 받는 것을 보여 주며, 도움말은 짝을 검사하는
+  **Add coupling**을 가리킵니다. 트리에서 열전달은 ∿, 광 모드는 λ로 표시해 단일 물리
+  애플리케이션과 같습니다.
 - **Connections**는 결합으로 그립니다. 풀이 순서 열에 노드를 놓고, 왼쪽에 입력 핀, 오른쪽에 출력
   핀을 단위와 함께 그리며, 결합마다 선 하나를 긋습니다. 검사에 실패한 결합은 빨간 점선과 짧은
   원인으로 그리고, 물리가 없으면 그림 아래에 나열합니다. 순환은 상자로 묶습니다. 반복 단계가
@@ -293,21 +300,33 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   열광학 계수와 기준 온도가 필요합니다. `physmat:Si`와 `physmat:SiO2`는 이를 갖고 있고, 로컬
   기록에서는 **Fill from physmat**이 physmat 값을 복사해 넣거나(출처를 적음) **Use physmat:…
   instead**가 그 영역을 라이브러리 재료로 바꿉니다.
-- **Run**은 모든 물리를 풀이 순서대로 풉니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
+- **Run**은 **Run optical study**와 같은 ▶와 함께 모든 물리를 풀이 순서대로 풉니다. Study 도크는 물리나 반복 단계마다 상태(Waiting,
   Solving…, Done in 0.3 s, 마지막 변화와 함께 Iteration 7 of up to 30, Did not settle, Not run)를
   보여 주고, Connections도 열려 있는 동안 같은 상태를 보여 줍니다. **Stop run**은 엔진의 다음
   단계에서 실행을 멈춥니다. 풀고 있는 물리가 끝난 뒤, 반복 단계 안에서는 지금 반복이 끝난
   뒤입니다. 실패하거나 멈춘 실행은 부분 결과를 남기지 않습니다. Messages가 실패한 물리를
   밝히고, 앞선 완전한 실행은 그대로 남습니다. 스윕은 검사만 하고 실행하지 않습니다(실행 이유에
-  적힙니다).
+  적힙니다). 실행 뒤 편집하면 도크와 Connections의 행이 **Out of date (last run: Done in 0.3 s)**가
+  되고, 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
+  since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
+  되돌린 편집(결합을 지웠다가 다시 추가)은 다시 현재가 됩니다.
+- **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
+  있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
+  열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다.
 - **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 코어의 결합 온도와 굴절률(또는 서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref)), n_eff 표를 보여 줍니다.
-  **Run Modes 1 alone**은 요청할 때만 광 모델을 결합 없이 풀고 “n_eff without heater” 열을
-  더합니다. 결과는 자기 실행을 밝히며 모델을 고쳐도 바뀌지 않습니다.
-- **파일.** **Save model file**과 **Open model file**(More 아래)은 문서를 쓰고 읽습니다.
-  다중물리 모델에는 Save session을 쓰지 않으며, 실행 결과는 탭에 남습니다. 연 파일은
+  n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
+  소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
+  Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K”.
+  이 열은 따로 푼 광 모델(실행 문서에서 결합, 반복, 열광학 키를 뺀 것을 키 정렬로 비교)이 보이는
+  실행의 것과 같을 때 유효합니다. 아니면 “(other model)”로 표시하고 Δn_eff를 비우며,
+  **Run Modes 1 alone**으로 새로 풉니다. 결과는 자기 실행을 밝히며 모델을 고쳐도 바뀌지 않습니다.
+- **파일.** 다중물리 모델에서는 리본의 Project 묶음에 **Open model file**과 **Save model file**이
+  나오며 문서를 읽고 씁니다. 다중물리 실행은 파일에 담기지 않으므로 세션 명령은 숨깁니다(다중물리
+  세션 파일은 이후 작업). 제목도 그렇게 밝힙니다: “Not saved to a file · runs stay in this tab”,
+  저장 뒤에는 “… · runs stay in this tab, not in the file”. 연 파일은
   서버가 먼저 읽으므로 중복 키나 JSON이 아닌 글은 이름을 밝혀 거부합니다. 저장한 파일은
   숫자를 가장 짧은 꼴로 씁니다. 스윕은 검사하되 이 화면은 한 점만 실행합니다.
 

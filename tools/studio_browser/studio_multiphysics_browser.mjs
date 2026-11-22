@@ -4,7 +4,10 @@
 // silicon waveguide template, its Connections view, a coupling removed and added back through
 // the port pickers, a material problem and its one-click fix, a Run with per-physics progress,
 // the coupled n_eff (exactly the engine's for the same document), the coupling check, and the
-// optical model run alone. Then the same screens at 1440 x 900 and 390 px wide with no
+// optical model run alone. Round 4: an edit marks the run out of date, a removed coupling
+// leaves a warning and Undo, the heater-off column is solved with the run ("Also solve without
+// heater") and stays valid when the same model is run again, and Δn_eff (coupled − without
+// heater) equals the engine's runs of the same documents exactly. Then the same screens at 1440 x 900 and 390 px wide with no
 // horizontal document overflow. Any page exception or console.error fails the check.
 // Drives a preinstalled Chrome through the DevTools protocol with Node's built-in fetch and
 // WebSocket; no npm package and no browser download. Fails, never skips, when no browser is found.
@@ -150,7 +153,16 @@ try {
   await page.until("!!document.querySelector('#tree [data-mp-node=\"physics:heat1\"]')", 'multiphysics tree');
   await runReady();
   assert.match(await page.text('#tree [data-mp-node="physics:heat1"]'), /^∿ 1 Heat 1 · Heat transfer$/);
-  assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^∿ 2 Modes 1 · Optical modes$/);
+  assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^λ 2 Modes 1 · Optical modes$/);
+  // the ribbon: Run as Run optical study draws it, the heater-off option on, the model file commands in Project
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics'),'::before').content"), '"▶"');
+  assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics')).fontWeight"), await page.eval("getComputedStyle(document.getElementById('run-optical')).fontWeight"));
+  assert.equal(await page.eval("!document.getElementById('run-baseline-option').hidden&&document.getElementById('run-baseline').checked"), true);
+  assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');
+  assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open model file', 'Save model file']);
+  assert.match(await page.attr('#save-project', 'title'), /Runs stay in this tab and are not in the file/);
+  assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
+  assert.equal(await page.text('#status'), 'Model checked · press Run');
   assert.equal(await page.text('#tree [data-mp-node="coupling:heat1_to_modes1"]'), '⇄ Heat 1 temperature → Modes 1 temperature');
   assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
@@ -161,6 +173,10 @@ try {
   await page.until("document.querySelectorAll('.mp-stage .graph-wires path.temperature').length===1", 'one wire');
   assert.deepEqual(await page.eval("[...document.querySelectorAll('.mp-stage .graph-node-title')].map(e=>e.innerText.split('\\n')[0].trim())"), ['1Heat 1', '2Modes 1']);
   assert.equal(await page.eval("document.querySelector('.mp-stage .graph-wires path.temperature').dataset.coupling"), 'heat1_to_modes1');
+  assert.equal(await page.text('#view-detail'), 'Drawn from the couplings');
+  // the port dots are not dragged: a static cursor and a pointer to Add coupling
+  assert.equal(await page.eval("getComputedStyle(document.querySelector('.mp-stage .graph-port')).cursor"), 'default');
+  assert.match(await page.attr('.mp-stage .graph-port', 'title'), /To connect ports, use Add coupling…$/);
   stage('MB2 connections');
 
   // MB3: remove the coupling, get the suggestion, add it back through the dialog; Undo/Redo
@@ -170,6 +186,20 @@ try {
   await page.click('[data-mp-remove-coupling]');
   await page.until("/Modes 1 can take its temperature from Heat 1/.test(document.getElementById('mp-messages').innerText)", 'suggestion');
   await runReady();          // two physics without a coupling still run; nothing is coupled silently
+  // the input without a source is a warning in Messages, the tree and the node; the removal offers Undo
+  const unsourced = 'Temperature input has no source: uses n₀ at T_ref (300 K)';
+  assert.equal(await page.text('#mp-messages [data-mp-warning="modes1"] p'), 'Modes 1: ' + unsourced + '.');
+  assert.equal(await page.attr('#tree [data-mp-node="physics:modes1"] .warn-badge', 'title'), unsourced);
+  assert.equal(await page.text('.mp-stage [data-mp-warning="modes1"]'), '! ' + unsourced);
+  assert.equal(await page.text('#view-detail'), '2 physics · no couplings');
+  assert.equal(await page.text('#mp-messages [data-mp-removal] p'), 'Coupling Heat 1 temperature → Modes 1 temperature removed.');
+  assert.match(await page.text('#file-status'), /removed\. Undo restores it\./);
+  await page.click('#mp-messages [data-mp-undo]');
+  await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat1_to_modes1\"]')&&!document.querySelector('#tree .warn-badge')", 'removal undone');
+  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings again');
+  await page.click('[data-mp-remove-coupling]');
+  await page.until("!!document.querySelector('#mp-messages [data-mp-add-coupling]')", 'suggestion again');
   await page.click('#mp-messages [data-mp-add-coupling]');
   await page.until("!!document.querySelector('dialog.mp-dialog #mp-to')", 'coupling dialog');
   assert.equal(await page.eval("document.querySelector('#mp-from').value"), 'heat1.temperature');
@@ -200,30 +230,89 @@ try {
   stage('MB4 material problem fixed');
 
   // MB5: Run: per-physics progress, the coupled n_eff, exactly the engine's for the same document
+  // the engine's n_eff of a document: the coupled run, or the optical model alone (format 0.3)
+  const engineNeff = tree => {
+    const done = spawnSync(args.python, ['-I', '-c', 'import json,sys\nfrom simcase import Document, multiphysics, run\nd=Document.from_dict(json.loads(sys.stdin.read()))\nr=multiphysics.run(d,verbose=False).results["modes1"] if d["openphysics"]==multiphysics.ENVELOPE else run(d,verbose=False)\nprint(repr(float(r.effective_index[0][0])))'],
+      {input: JSON.stringify(tree), encoding: 'utf8'});
+    assert.equal(done.status, 0, done.stderr);
+    return done.stdout.trim();
+  };
+  const uncoupledOf = tree => page.on('function(t){return import("/static/workspace-multiphysics.mjs").then(m=>m.uncoupledDocument(t,"modes1"))}', tree);
   await page.click('#run-multiphysics');
   await page.until("!!document.querySelector('[data-neff=\"1\"]')", 'result', 120000);
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
+  // Also solve without heater: the heater-off column follows by itself
+  await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
+  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) n_eff without heater Δn_eff (coupled − without heater)');
+  assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
   const shown = await page.attr('[data-neff="1"]', 'data-neff-value');
   const documentSent = JSON.parse(await page.eval("fetch('/api/multiphysics/template').then(r=>r.text())"));
   documentSent.materials.heater.thermo_optic_coefficient = '1.0e-5 1/K';
   documentSent.materials.heater.source += '; thermo-optic data copied from physmat:SiO2 (physmat)';
-  const engine = spawnSync(args.python, ['-I', '-c', 'import json,sys\nfrom simcase import Document, multiphysics\nr=multiphysics.run(Document.from_dict(json.loads(sys.stdin.read())),verbose=False)\nprint(repr(float(r.results["modes1"].effective_index[0][0])))'],
-    {input: JSON.stringify(documentSent), encoding: 'utf8'});
-  assert.equal(engine.status, 0, engine.stderr);
-  assert.equal(shown, engine.stdout.trim(), 'the coupled n_eff is the engine run of the same document');
-  stage('MB5 run', {coupled_neff: shown, engine_neff: engine.stdout.trim()});
+  const engine = engineNeff(documentSent), engineAlone = engineNeff(await uncoupledOf(documentSent));
+  assert.equal(shown, engine, 'the coupled n_eff is the engine run of the same document');
+  assert.equal(await page.attr('[data-neff-alone="1"]', 'data-neff-value'), engineAlone, 'the heater-off n_eff is the engine run of the optical model alone');
+  const d = Number(engine) - Number(engineAlone), shiftShown = await page.text('[data-neff-shift="1"]');
+  assert.equal(shiftShown, (d < 0 ? '−' : '+') + Math.abs(d).toFixed(8), 'Δn_eff is the difference of the two engine runs');
+  assert.equal(await page.text('.dock-title>span'), 'Run 1 · solved from the current model');
+  stage('MB5 run', {coupled_neff: shown, engine_neff: engine, without_heater_neff: engineAlone, shift: shiftShown});
   await page.click('[data-mp-node="results:check"]');
   await page.until("/Coupling check/.test(document.getElementById('canvas').innerText)", 'coupling check');
   assert.match(await page.text('.mp-check tbody'), /node temperatures, 300\.0–[0-9.]+ K .*triangle means \(mean of 3 nodes\) Passed · max \|received − sent\| = 0 K/);
 
-  // MB6: the optical model alone adds the uncoupled column; the heater shifts n_eff upward
-  await page.click('[data-mp-node="results:modes1"]');
-  await page.until("!!document.getElementById('mp-run-alone')", 'modes page');
-  await page.click('#mp-run-alone');
-  await page.until("!!document.querySelector('[data-neff-alone=\"1\"]')", 'uncoupled result', 120000);
-  const alone = Number(await page.attr('[data-neff-alone="1"]', 'data-neff-value'));
-  assert.ok(Number(shown) > alone, `coupled ${shown} above uncoupled ${alone}`);
-  stage('MB6 uncoupled comparison', {uncoupled_neff: alone, shift: Number(shown) - alone});
+  // MB6: an edit marks the run out of date; the same model again is current, and a second Run
+  // keeps the heater-off column valid (same content) without solving it again
+  await page.click('nav [data-page=Connections]');
+  await page.click('#tree [data-mp-node="coupling:heat1_to_modes1"]');
+  await page.until("!!document.querySelector('[data-mp-remove-coupling]')", 'coupling settings after the run');
+  await page.click('[data-mp-remove-coupling]');
+  await page.until("/Out of date/.test(document.getElementById('sequence').innerText)", 'out of date');
+  assert.match(await page.text('#sequence'), /^1 Heat 1 · Out of date \(last run: Done in [0-9.]+ s\) 2 Modes 1 · Out of date \(last run: Done in [0-9.]+ s\)$/);
+  assert.equal(await page.text('.dock-title>span'), 'Run 1 · the model changed since; press Run to update');
+  await page.until("document.getElementById('status').textContent==='Model edited since run 1 · press Run to update'", 'footer out of date');
+  assert.match(await page.text('.mp-stage [data-mp-node="modes1"] .mp-state'), /^Out of date/);
+  assert.equal(await page.text('#mp-messages [data-mp-warning="modes1"] p'), 'Modes 1: ' + unsourced + '.');
+  await page.click('#mp-messages [data-mp-add-coupling]');
+  await page.until("!!document.querySelector('dialog.mp-dialog #mp-to')", 'coupling dialog after the run');
+  await page.click('#mp-coupling-add');
+  await page.until("!document.querySelector('dialog[open]')&&!/Out of date/.test(document.getElementById('sequence').innerText)", 'same model again');
+  await runReady();
+  assert.equal(await page.text('#status'), 'Run 1 matches the model · press Run to solve again');
+  await page.click('#run-multiphysics');
+  await page.until("/^Run 2 complete/.test(document.getElementById('file-status').textContent)", 'second run', 120000);
+  // the kept column has the same content, so no heater-off solve follows
+  assert.equal(await page.text('#file-status'), 'Run 2 complete. Its results belong to that run; editing the model does not change them.');
+  await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'results of run 2');
+  assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
+  assert.equal(await page.text('[data-neff-shift="1"]'), shiftShown);
+  assert.equal(await page.exists('#mp-run-alone'), false, 'a valid column needs no refresh');
+  assert.doesNotMatch(await page.text('#canvas'), /different optical model|earlier model/);
+  assert.equal(await page.text('#status'), 'Run 2 matches the model · press Run to solve again');
+  stage('MB6 out of date, then the same model again');
+
+  // MB6b: the template as shipped: Δn_eff of the heater, exactly the engine's
+  await page.click('nav [data-page=Applications]');
+  await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page again');
+  // the cards line up: one row, the same header heights and title tops, all above the fold at 1440 × 900
+  const cards = await page.eval("[...document.querySelectorAll('.cards button')].map(b=>{const r=b.getBoundingClientRect(),t=b.querySelector('strong').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),title:Math.round(t.top)}})");
+  assert.equal(new Set(cards.map(c => c.top)).size, 1, JSON.stringify(cards));
+  assert.equal(new Set(cards.map(c => c.title)).size, 1, JSON.stringify(cards));
+  assert.ok(cards.every(c => c.top < 900), JSON.stringify(cards));
+  await page.screenshot('mb6b-start-page');
+  await page.click('[data-template=heated-waveguide]');
+  await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'template opened again');
+  await runReady();
+  assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
+  await page.click('#run-multiphysics');
+  await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'template heater-off column', 120000);
+  const template = JSON.parse(await page.eval("fetch('/api/multiphysics/template').then(r=>r.text())"));
+  const tCoupled = engineNeff(template), tAlone = engineNeff(await uncoupledOf(template)), td = Number(tCoupled) - Number(tAlone);
+  const tShift = await page.text('[data-neff-shift="1"]');
+  assert.equal(await page.attr('[data-neff="1"]', 'data-neff-value'), tCoupled);
+  assert.equal(await page.attr('[data-neff-alone="1"]', 'data-neff-value'), tAlone);
+  assert.equal(tShift, (td < 0 ? '−' : '+') + Math.abs(td).toFixed(8));
+  await page.screenshot('mb6b-template-results');
+  stage('MB6b template Δn_eff', {coupled: tCoupled, without_heater: tAlone, shift: tShift});
 
   // MB7a: Open model file: the server's reader sees the text; a duplicate key is refused by
   // name and the model stays; the shipped heated slab example then opens as a model
@@ -241,7 +330,7 @@ try {
   await setFile(fileURLToPath(new URL('../../examples/simcase/multiphysics_heated_slab.json', import.meta.url)));
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'example opened');
   await runReady();
-  assert.match(await page.text('#project'), /^Multiphysics model \/ Opened from multiphysics_heated_slab\.json$/);
+  assert.match(await page.text('#project'), /^Multiphysics model \/ Opened from multiphysics_heated_slab\.json · runs stay in this tab, not in the file$/);
   stage('MB7a open model file');
 
   // MB7: the screens at 1440 x 900 and 390 px: no document overflow
