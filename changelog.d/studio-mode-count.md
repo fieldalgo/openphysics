@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Studio: **Modes to find** (1 to 8, 2 by default) in Physics › Optical modes and in Study sets how many modes an optical run asks for; when fewer are guided, Results says *Found 3 of 8 modes above n = 1.45* and the modes table has those rows. The workspace contract is `/api/workspace/capabilities/v8` with adapter `optical-shapes-v8` (the settings give `mode_count_range: [1, 8]` instead of a fixed `mode_count: 2`); the server refuses another count from a workspace request with a message. With 2 modes the solver document, its values and version 7 session files are byte for byte as before. Optical sessions with a run that version 7 cannot hold are written as **session version 9** (runs of 1 to 8 modes, complex `effective_index`, the engine's `te_polarization_fraction` and `effective_area`, reserved group index slots, a digest per run); over 16 MiB, Studio offers to keep fields for the selected and pinned runs only. Modes to find is kept with each run of a session, not in input files. [Optical session files (version 9)](docs/packages/simcase/workspace.md#optical-session-files-version-9).
+
+## 한국어
+
+- Studio: Physics › Optical modes와 Study의 **Modes to find**(1–8, 기본값 2)가 광학 실행이 요청하는 모드 수를 정합니다. 도파 모드가 그보다 적으면 Results가 *Found 3 of 8 modes above n = 1.45*라고 알리고 모드 표에는 그만큼의 행만 있습니다. 작업공간 계약은 `/api/workspace/capabilities/v8`, 어댑터는 `optical-shapes-v8`입니다(settings는 고정 `mode_count: 2` 대신 `mode_count_range: [1, 8]`을 알림). 서버는 작업공간 요청의 다른 모드 수를 메시지와 함께 거부합니다. 모드 2개일 때 솔버 문서, 그 값, 버전 7 세션 파일은 이전과 바이트 단위로 같습니다. 버전 7이 담을 수 없는 실행이 있는 광학 세션은 **세션 버전 9**로 씁니다(모드 1–8개 실행, 복소 `effective_index`, 엔진의 `te_polarization_fraction`과 `effective_area`, 예약된 군굴절률 자리, 실행마다 digest). 16 MiB를 넘으면 선택·고정 실행의 장만 보존할지 묻습니다. Modes to find는 입력 파일이 아니라 세션의 실행마다 보존됩니다. [광학 세션 파일(버전 9)](packages/simcase/workspace.md#광학-세션-파일버전-9).

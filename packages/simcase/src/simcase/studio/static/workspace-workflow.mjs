@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {designSummary,shapesBlock} from './workspace-shapes.mjs';
 import {originText} from './workspace-multiphysics.mjs';
+import {studySignature} from './workspace-notebook.mjs';
 
 // The words for a result whose inputs are not the current ones (optical, heat, Joule heating):
 // neutral, since an opened file or another selected run differs without any edit, and naming
@@ -26,8 +27,9 @@ export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.mo
 // Readiness describes the current editor and retained artifacts, not accuracy.
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.
-export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed}){
- const signature=JSON.stringify(input);
+// modeCount: Modes to find of the page; a run is of these inputs when it also found that count.
+export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed,modeCount}){
+ const signature=studySignature(input,modeCount),inputs=JSON.stringify(input);
  const materialBlock=input.setup.materials.Oxide!=='Silica'?'Background must be silica':shapesBlock(input.model.shapes),materialOK=!materialBlock;
  const currentRun=runs.findLast(run=>run.signature===signature);
  // A run of these exact inputs is done; an edit makes the study ready to run again.
@@ -38,7 +40,7 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
  return [
   {id:'Geometry',state:invalid?'attention':'ready',detail:invalid?'Correct input draft':designSummary(input.model)},
   {id:'Materials',state:materialOK?'ready':'attention',detail:materialOK?[...new Set(input.model.shapes.map(s=>s.material))].join(', ')+' in silica':'Assign supported materials'},
-  {id:'Mesh',state:mesh?.signature===signature?'ready':mesh?'attention':'optional',detail:mesh?.signature===signature?'Preview current':mesh?'Inputs changed since preview':'Optional preview'},
+  {id:'Mesh',state:mesh?.signature===inputs?'ready':mesh?'attention':'optional',detail:mesh?.signature===inputs?'Preview current':mesh?'Inputs changed since preview':'Optional preview'},
   {id:'Study',state:invalid?'attention':busy?'busy':pending||block?'attention':'ready',detail:study,summary:state,wavelength:Number.isFinite(wavelength)?`λ ${wavelength} nm`:null},
   viewed?{id:'Results',state:viewed.signature===signature?'ready':'attention',detail:viewed.signature===signature?'Result for these inputs':'Current inputs differ from this run'}
   :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Current inputs differ from this run':'No run yet'}
@@ -54,8 +56,8 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // if any; 'stale': runs exist but none is viewed and none has these inputs; 'none' before any
 // run. origin: where the run came from when it was not computed in this tab ('imported' or
 // 'recovered'). name: the run's name (absent when it has none).
-export function opticalFreshness(input,runs=[],viewed=null){
- const signature=JSON.stringify(input),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
+export function opticalFreshness(input,runs=[],viewed=null,modeCount){
+ const signature=studySignature(input,modeCount),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
  if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{})};
  if(index>=0)return {state:'current',run:index+1,...name,...from};

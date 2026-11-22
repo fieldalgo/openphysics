@@ -42,8 +42,10 @@ test('projects (version 7) carry wavelength and core mesh; earlier versions are 
 });
 test('runs keep the captured wavelength and core mesh; mismatched provenance is rejected',()=>{
  const input=snapshot(model({wavelength:1600,coreMesh:45}),setup()),r=run(input);
- assert.equal(r.settings.adapter,'optical-shapes-v7');assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.vacuum_wavelength,'1600 nm');assert.equal(r.settings.core_element_size,'45 nm');
+ assert.equal(r.settings.adapter,'optical-shapes-v8');assert.equal(r.settings.mode_count,2);assert.equal(r.settings.height_nm,undefined);assert.equal(r.settings.vacuum_wavelength,'1600 nm');assert.equal(r.settings.core_element_size,'45 nm');
  const session=createSession(input,[r],r.job,[r.job,null]);assert.equal(session.version,7);
+ // a run of two real modes is written as version 7, with the settings of optical-shapes-v7
+ assert.equal(session.runs[0].settings.adapter,'optical-shapes-v7');assert.equal(session.runs[0].settings.mode_count,2);
  const restored=parseSession(JSON.stringify(session));assert.equal(restored.runs[0].input.model.wavelength,1600);assert.equal(restored.runs[0].settings.core_element_size,'45 nm');
  for(const change of [d=>d.runs[0].settings.vacuum_wavelength='1550 nm',d=>d.runs[0].settings.core_element_size='30 nm',d=>d.runs[0].settings.vacuum_wavelength=1600,d=>d.runs[0].input.model.wavelength=1650,d=>d.runs[0].settings.adapter='optical-rectangle-v2']){
   const d=JSON.parse(JSON.stringify(session));change(d);assert.throws(()=>parseSession(JSON.stringify(d)));
@@ -56,5 +58,5 @@ test('sessions with results of earlier adapters are refused by name (saved befor
  const v2settings={adapter:'optical-rectangle-v2',height_nm:220,wavelength_nm:1550,core_mesh_nm:30,window_um:[-1.5,1.5,-1.2,1.2],boundary:'PEC',candidates:2,solver_version:'not reported'};
  const session={format:'openphysics-studio-session',version:2,input:legacy,runs:[{...run(legacy,v2settings),neff:[2.5,1.8]}],selected:'abcdef12',comparison:['abcdef12',null]};
  assert.throws(()=>parseSession(JSON.stringify(session)),/version 2\) was saved before the units and naming batch/);
- assert.equal(OPTICAL_SETTINGS.adapter,'optical-shapes-v7');
+ assert.equal(OPTICAL_SETTINGS.adapter,'optical-shapes-v8');
 });

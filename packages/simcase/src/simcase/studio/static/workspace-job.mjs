@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {parseProject} from './workspace-project.mjs';
 import {opticalBlock} from './workspace-optical.mjs';
+import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
 export const PENDING_JOB_KEY='openphysics.studio.pending-optical.v1';
 export function validatePending(record){
  if(record?.version!==1||typeof record.job!=='string'||!/^[a-f0-9]{8}$/.test(record.job))throw new Error('Invalid pending job.');
@@ -10,7 +11,9 @@ export function validatePending(record){
  if(typeof record.startedAt!=='string'||!Number.isFinite(Date.parse(record.startedAt)))throw new Error('Invalid pending timestamp.');
  if(!Number.isSafeInteger(record.revision)||record.revision<0)throw new Error('Invalid pending revision.');
  const input=parseProject(JSON.stringify(record.input));const block=opticalBlock(input.model,input.setup);if(block)throw new Error(block);
- return {version:1,job:record.job,serverInstance:record.serverInstance,serverVersion:record.serverVersion,startedAt:record.startedAt,revision:record.revision,input};
+ // the mode count the job asked for (a record written before mode counts could change asked for 2)
+ let modeCount=DEFAULT_MODE_COUNT;if(record.modeCount!==undefined){try{modeCount=checkModeCount(record.modeCount);}catch{throw new Error('Invalid pending mode count.');}}
+ return {version:1,job:record.job,serverInstance:record.serverInstance,serverVersion:record.serverVersion,startedAt:record.startedAt,revision:record.revision,input,...(modeCount===DEFAULT_MODE_COUNT?{}:{modeCount})};
 }
 export function readPending(storage){const raw=storage.getItem(PENDING_JOB_KEY);if(!raw)return null;if(new TextEncoder().encode(raw).length>70000)throw new Error('Pending record is too large.');return validatePending(JSON.parse(raw));}
 export function storePending(storage,record){if(record===null)storage.removeItem(PENDING_JOB_KEY);else storage.setItem(PENDING_JOB_KEY,JSON.stringify(validatePending(record)));}

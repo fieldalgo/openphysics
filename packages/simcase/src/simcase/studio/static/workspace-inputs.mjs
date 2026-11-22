@@ -5,6 +5,8 @@ export const INPUT_FIELDS=Object.freeze({
  height:Object.freeze({label:'Core height',unit:'nm',min:100,max:500,id:'height-number',node:'Geometry'}),
  width:Object.freeze({label:'Core width',unit:'nm',min:300,max:900,id:'width-number',node:'Geometry'}),
  wavelength:Object.freeze({label:'Wavelength',unit:'nm',min:1400,max:1700,id:'wavelength-number',node:'Optical modes'}),
+ // the number of modes a run asks for: a whole number, no unit (page state; not in the project file)
+ modeCount:Object.freeze({label:'Modes to find',unit:'',min:1,max:8,id:'mode-count-number',node:'Optical modes',integer:true}),
  coreMesh:Object.freeze({label:'Core mesh size',unit:'nm',min:20,max:60,id:'core-mesh-number',node:'Mesh'}),
  // Selected-shape properties; whole-shape limits (window, minimum size) are checked after parsing.
  shapeX:Object.freeze({label:'Left x',unit:'nm',min:-1500,max:1490,id:'shape-x',node:'Geometry',prop:'x'}),
@@ -23,11 +25,14 @@ const signed=v=>String(v).replace(/^-/,'−');
 export function editNoticeText(key,value,{leftX=null,afterResult=false}={}){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
  const moved=leftX===null?'':` Left x moved to ${signed(leftX)} ${INPUT_FIELDS.shapeX.unit} to keep the centre.`;
- return `${field.label} set to ${signed(value)} ${field.unit}.${moved} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
+ return `${field.label} set to ${signed(value)}${field.unit?' '+field.unit:''}.${moved} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
 }
 export function parseNumeric(key,raw){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
  const text=String(raw).trim(),range=`${field.min}–${field.max} ${field.unit}`;
+ // a count: a whole number in its range, one message for every refusal
+ if(field.integer){const whole=`${field.label} must be a whole number from ${field.min} to ${field.max}.`;
+  if(!/^[+]?\d+$/.test(text))return {ok:false,message:whole};const n=Number(text);return n>=field.min&&n<=field.max?{ok:true,value:n}:{ok:false,message:whole};}
  if(!text)return {ok:false,message:`${field.label} is required. Enter ${range}.`};
  if(!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)||!Number.isFinite(Number(text)))return {ok:false,message:`${field.label} must be a finite number in ${range}.`};
  const value=Number(text);
