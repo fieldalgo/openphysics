@@ -239,8 +239,9 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
         PML: classifying physical modes is the caller's task.
     motion: ``galerkin.shape.MeshMotion(design_velocity=..., t=...)`` solves on the nodes
         X0 + t design_velocity, with the derivative with respect to a JAX or PyTorch t. With a ``pml``
-        the design velocity must be 0 on every node of a PML element (the layer stays put); a motion
-        is refused with a ``bend``.
+        the design velocity must be 0 on every node of a PML element (the layer stays put) and
+        tangential on the outer faces; with a ``bend`` the window elements move, and their bend factor
+        follows the nodes.
 
     Returns a ``WaveguideModes``. A mode whose eigenvalue lies within a relative ``DEGENERATE_GAP`` of
     another one has NaN derivatives and raises ``DegenerateModeWarning``.
@@ -262,9 +263,6 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
         raise ValueError("a bend needs a ModalPML: its coordinates are built with the layer")
     factors = None
     if pml is not None:
-        if motion is not None and bend is not None:
-            raise ValueError("motion: the bend coordinates depend on every node position; a motion is refused "
-                             "with a bend")
         if bend is not None:
             axis = 0 if bend.bend_axis == "x" else 1
             if not bend.bend_radius + mesh.nodes[:, axis].min() - bend.bend_origin > 0:
@@ -297,7 +295,8 @@ def solve_waveguide_modes(mesh, *, relative_permittivity, vacuum_wavelength=None
                                 "derivative")
     n_eff, space, et, ez = _solve_modes(mesh, to_kernel(eps), k0, to_kernel(target), int(search_mode_count),
                                         to_kernel(mu), pec_nodes, pec_edges=pec_edges, coordinate_factors=factors,
-                                        motion=motion)
+                                        motion=motion, **({} if motion is None or bend is None else dict(
+                                            coordinate_bend=(bend.bend_radius, bend.bend_axis, bend.bend_origin))))
     return WaveguideModes(to_public(n_eff), to_public(et), to_public(1j * ez), space, k0, eps, mu)
 
 
