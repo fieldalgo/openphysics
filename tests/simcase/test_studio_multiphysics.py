@@ -436,3 +436,21 @@ def test_a_missing_thermo_optic_model_offers_fill_from_physmat(client):
                                "(K). Add them in Materials > Heater.")
     assert message["fix"] == {"action": "fill-physmat", "material": "heater", "ref": "physmat:SiO2",
                               "label": "Fill from physmat:SiO2 (1.0e-5 1/K at 300 K)"}
+
+
+def test_an_unexpected_failure_of_validate_or_run_keeps_its_text_in_the_log(client, api, monkeypatch, caplog):
+    from simcase.studio.bodies import UNEXPECTED
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(api, "validation_payload", boom)
+    from simcase.studio import server
+    monkeypatch.setattr(server._multiphysics_jobs, "start", boom)
+    with caplog.at_level("WARNING", logger="simcase.studio"):
+        for route in ("/api/multiphysics/validate", "/api/multiphysics/run"):
+            reply = client.post(route, json={"doc": template()})
+            assert reply.status_code == 500 and reply.json() == {"detail": UNEXPECTED}
+            assert "secret" not in reply.text
+    assert "multiphysics validation failed unexpectedly" in caplog.text
+    assert "multiphysics run request failed unexpectedly" in caplog.text and "secret internal detail" in caplog.text
