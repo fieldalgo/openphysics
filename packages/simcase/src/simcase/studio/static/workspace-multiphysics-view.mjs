@@ -25,14 +25,14 @@ export function createMultiphysicsView(ctx){
  const {$,notice}=ctx;
  let active=false,doc=null,caps=null,catalog={types:new Map(),providers:[]},capsError=null;
  let check={pending:false,diagnostics:[],solve_order:[],run_refusal:null,error:null},messages=[],checkSeq=0,checkTimer=null;
- let selection='model',undoStack=[],redoStack=[],savedSignature=null,announcedMultiphysics=false;
+ let selection='model',undoStack=[],redoStack=[],savedSignature=null,savedFile=null,announcedMultiphysics=false;
  let job=null,lastRun=null,runFailure=null,uncoupled={},resultPage=null,indexView='n',resize=null;
  const signature=()=>JSON.stringify(doc);
  // ---- model lifecycle ----
  async function loadCapabilities(){try{caps=await ctx.request('GET','/api/multiphysics/capabilities');catalog=kindCatalog(caps);capsError=null;}catch(e){capsError=e.message;}}
  async function open(tree,label,{fromFile=false}={}){
   if(!caps)await loadCapabilities();
-  active=true;doc=normalizeEnvelope(tree);undoStack=[];redoStack=[];savedSignature=fromFile?signature():null;selection='model';lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
+  active=true;doc=normalizeEnvelope(tree);undoStack=[];redoStack=[];savedSignature=fromFile?signature():null;savedFile=fromFile?{name:label,kind:'Opened from',at:null}:null;selection='model';lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   ctx.onHistory();validate(true);ctx.ui.page='Model';ctx.render();notice(`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`);
  }
  async function openTemplate(){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide');}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
@@ -407,11 +407,11 @@ export function createMultiphysicsView(ctx){
  function saveFile(){
   const text=JSON.stringify(doc,null,2)+'\n',name=(String(doc.name||'model').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'model')+'.json';
   const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  savedSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to the browser's downloads. It holds the model; runs stay in this tab.`);
+  savedSignature=signature();savedFile={name,kind:'Sent to model file',at:new Date()};ctx.onHistory();notice(`Model file ${name} sent to the browser's downloads. It holds the model; runs stay in this tab.`);
  }
  return {active:()=>active,open,openTemplate,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveFile,busy:()=>!!job,
-  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${savedSignature===null?'not saved':savedSignature===signature()?'saved':'changed since saved'}`,
+  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${!savedFile?'Not saved to a file · runs stay in this tab':savedSignature===signature()?`${savedFile.kind} ${savedFile.name}${savedFile.at?' · '+savedFile.at.toLocaleTimeString():''}`:`Changed since ${savedFile.kind.toLowerCase()} ${savedFile.name}`}`,
   // for checks: the current document and the last result
   document:()=>clone(doc),lastResult:()=>lastRun?.result||null};
 }

@@ -151,7 +151,7 @@ try {
   assert.match(await page.text('#tree [data-mp-node="physics:heat1"]'), /^∿ 1 Heat 1 · Heat transfer$/);
   assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^∿ 2 Modes 1 · Optical modes$/);
   assert.equal(await page.text('#tree [data-mp-node="coupling:heat1_to_modes1"]'), '⇄ Heat 1 temperature → Modes 1 temperature');
-  assert.equal(await page.text('#project'), 'Multiphysics model / not saved');
+  assert.equal(await page.text('#project'), 'Multiphysics model / Not saved to a file · runs stay in this tab');
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
   stage('MB1 template', {tree: await page.text('#tree')});
 

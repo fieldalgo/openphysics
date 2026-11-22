@@ -42,7 +42,7 @@
   },
   "materials": {
     "heater": {
-      "refractive_index": 1.5,
+      "refractive_index": 1.444,
       "thermal_conductivity": "100 W/(m K)",
       "thermo_optic_coefficient": "0 1/K",
       "reference_temperature": "300 K",
@@ -61,9 +61,10 @@
     },
     "modes1": {
       "type": "em.modes2d",
-      "formulation": "scalar",
+      "formulation": "vector",
       "vacuum_wavelength": "1550 nm",
-      "mode_count": 1
+      "mode_count": 1,
+      "effective_index_threshold": 1.5
     }
   },
   "couplings": {
