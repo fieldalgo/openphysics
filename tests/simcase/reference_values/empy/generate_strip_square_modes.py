@@ -3,14 +3,15 @@
 """Write the stored EMpy reference of the SOI strip and the square core (V16 of the mode TE fraction).
 
 EMpy's vector finite-difference mode solver (EMpy.modesolvers.FD.VFDModeSolver, Fallahkhair, Li
-and Murphy 2008) on uniform grids, in the window and at the indices of
+and Murphy 2008) on rectilinear grids, in the window and at the indices of
 tests/simcase/test_mode_polarization.py, held here as plain numbers: this script imports only
 EMpy, NumPy and SciPy (no openphysics package), so the reference stays independent.
 
 For each case and grid it records the two highest effective indices and their TE fractions,
-f_TE = sum |E_x|^2 / sum (|E_x|^2 + |E_y|^2) over every cell (the grid is uniform, so every cell
-has the same area; EMpy samples E at the cell centres). That is the definition the product uses
-on its triangle centroids. Install the pinned environment beside this file into its own virtual
+f_TE = sum A |E_x|^2 / sum A (|E_x|^2 + |E_y|^2) over every cell, A the cell area (EMpy samples E
+at the cell centres). That is the definition the product uses on its triangle centroids. The grid
+puts a node on every window and core edge and splits each segment between them into equal cells
+no larger than the step h, so the core edges lie on cell boundaries for any h. Install the pinned environment beside this file into its own virtual
 environment, then run from this directory:
 
     python -m pip install --require-hashes --only-binary :all: -r requirements.txt
@@ -50,7 +51,9 @@ INPUTS = {
         "square": {"x": -0.2, "y": 0.0, "w": 0.4, "h": 0.4},
     },
     "kept_modes": 2,
-    "te_fraction": "sum |E_x|^2 divided by sum (|E_x|^2 + |E_y|^2) over every cell of the window, E at cell centres",
+    "te_fraction": "sum A |E_x|^2 divided by sum A (|E_x|^2 + |E_y|^2) over every cell of the window, A the cell "
+                   "area, E at cell centres",
+    "grid": "nodes on every window and core edge; each segment in equal cells of at most the step h",
 }
 #: PEC walls for the transverse H of VFDModeSolver, in its order North, South, East, West: at a
 #: wall normal to y (north, south) H_y is odd and H_x even ("S"); at a wall normal to x (east,
@@ -59,11 +62,14 @@ BOUNDARY = "SSAA"
 SEARCHED = 4
 
 
-def grid(lo, hi, h):
-    count = int(round((hi - lo) / h))
-    if not np.isclose(count * h, hi - lo, rtol=0, atol=1e-12):
-        raise SystemExit(f"grid {h} um does not divide the window [{lo}, {hi}]")
-    return np.linspace(lo, hi, count + 1)
+def grid(breaks, h):
+    """Nodes on every break (window and core edges), each segment in equal cells of at most h."""
+    breaks = sorted(set(float(b) for b in breaks))
+    nodes = [breaks[0]]
+    for a, b in zip(breaks[:-1], breaks[1:]):
+        count = max(1, int(np.ceil((b - a) / h - 1e-9)))
+        nodes.extend(np.linspace(a, b, count + 1)[1:])
+    return np.array(nodes)
 
 
 def permittivity(core):
@@ -80,11 +86,9 @@ def permittivity(core):
 
 def solve(core, h, boundary=BOUNDARY):
     w = INPUTS["window_um"]
-    x, y = grid(w["xmin"], w["xmax"], h), grid(w["ymin"], w["ymax"], h)
-    for edge, lo in ((core["x"], w["xmin"]), (core["x"] + core["w"], w["xmin"]),
-                     (core["y"], w["ymin"]), (core["y"] + core["h"], w["ymin"])):
-        if not np.isclose((edge - lo) / h, round((edge - lo) / h), rtol=0, atol=1e-9):
-            raise SystemExit(f"core edge {edge} um is not on a cell boundary of the {h} um grid")
+    x = grid([w["xmin"], core["x"], core["x"] + core["w"], w["xmax"]], h)
+    y = grid([w["ymin"], core["y"], core["y"] + core["h"], w["ymax"]], h)
+    area = np.outer(np.diff(x), np.diff(y))           # (cells in x, cells in y), the shape of E
     start = time.perf_counter()
     solver = VFDModeSolver(INPUTS["vacuum_wavelength_um"], x, y, permittivity(core), boundary)
     solver.solve(SEARCHED, 0, INPUTS["core_index"])
@@ -93,7 +97,7 @@ def solve(core, h, boundary=BOUNDARY):
     neff = np.array([complex(m.neff) for m in modes])
     fraction = []
     for m in modes:
-        ex, ey = np.sum(np.abs(m.Ex) ** 2), np.sum(np.abs(m.Ey) ** 2)
+        ex, ey = np.sum(area * np.abs(m.Ex) ** 2), np.sum(area * np.abs(m.Ey) ** 2)
         fraction.append(float(ex / (ex + ey)))
     return neff, np.array(fraction), seconds
 
@@ -127,7 +131,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("output", type=Path, help="the record to write (JSON)")
     parser.add_argument("--grids", type=float, nargs="+", default=[0.02, 0.01, 0.005],
-                        help="uniform grid steps in um, coarse to fine")
+                        help="largest cell sizes in um, coarse to fine")
     parser.add_argument("--product-commit", default=None, help="the repository commit this generator was read from")
     args = parser.parse_args(argv)
     grids = sorted(args.grids, reverse=True)
@@ -181,7 +185,8 @@ def main(argv=None):
                         "lock": "tests/simcase/reference_values/empy/requirements.txt (hash-pinned)"},
             "settings": {"function": "EMpy.modesolvers.FD.VFDModeSolver(...).solve(neigs, tol, guess)",
                          "boundary": BOUNDARY, "neigs": SEARCHED, "tol": 0, "guess": "the core index",
-                         "kept": "the two largest n_eff of four", "grid": "uniform dx = dy, core edges on cell boundaries"},
+                         "kept": "the two largest n_eff of four",
+                         "grid": "nodes on the window and core edges, each segment in equal cells of at most h"},
             "discretization": {"kind": "vector finite differences (Fallahkhair, Li, Murphy 2008)",
                                "permittivity": "cell-centred staircase", "grids_um": grids},
             "arrays": ["*"],
@@ -201,8 +206,8 @@ def main(argv=None):
         "inputs": INPUTS,
         "matched": ["window and both cores", "PEC on all walls (VFDModeSolver boundary SSAA)",
                     "material indices: physmat Si and SiO2 at 1550 nm, as plain numbers",
-                    "the TE fraction definition, with equal cell areas"],
-        "not_matched": ["discretization: finite differences on a uniform grid against edge finite elements on a "
+                    "the TE fraction definition, weighted by cell area"],
+        "not_matched": ["discretization: finite differences on a near-uniform rectilinear grid against edge finite elements on a "
                         "graded mesh", "interfaces: staircase cell-centred permittivity against mesh-conforming "
                         "interfaces", "samples: cell centres against triangle centroids", "eigen solver"],
         "reference_self_check": self_check,
