@@ -149,6 +149,7 @@ test('A_eff = (Σ A|E|²)² / Σ A|E|⁴ with all three components, complex part
  const g=square([[[[3,-4],0,[0,2]],[0,[1,1],0]]]),h=square([[[[6,-8],0,[0,4]],[0,[2,2],0]]]);
  assert.ok(Math.abs(M.effectiveArea(g,0)/M.effectiveArea(h,0)-1)<=1e-15);
  assert.equal(M.areaText(1.9094544e-13),'0.1909');assert.equal(M.areaText(null),'—');
+ assert.equal(M.areaText(12345.6e-12),'12346','no exponent for large windows');assert.equal(M.areaText(999.94e-12),'999.9');
  assert.equal(M.AREA_HELP,'Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components');
 });
 test('the modes table gives each mode its A_eff; a pair member keeps its own value with a note',()=>{
@@ -158,6 +159,11 @@ test('the modes table gives each mode its A_eff; a pair member keeps its own val
  assert.equal(rows[2].area.title,M.AREA_HELP);
  const none=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null,area:null}],{areaMissing:'Run again to compute: x'}).rows[0].area;
  assert.deepEqual([none.text,none.title],['—','Run again to compute: x']);
+ assert.equal(M.modeTableRows([{re:2.4,im:0,fte:1,loss:null,area:null}]).rows[0].area.title,'No field: no effective area');
+ // a scalar result names |φ|², not three field components
+ const scalar=M.physicsModes({effective_index:{unit:'1',values:[[2.4]]},summary:{formulation:'scalar',mode_postprocessing:{effective_area:{unit:'m^2',values:[[2e-13]]}}}});
+ const cell=M.modeTableRows(scalar.modes,{areaHelp:scalar.areaHelp}).rows[0].area;
+ assert.equal(cell.text,'0.2000');assert.equal(cell.title,M.SCALAR_AREA_HELP);assert.match(cell.title,/φ/);
 });
 test('Compare: a matched pair shows the mean A_eff of its members with a note, a single mode its own',async()=>{
  const X=await import(STATIC+'workspace-match.mjs');
@@ -172,9 +178,15 @@ test('V17-M3: optical v6 and v7 sessions open with A_eff computed by Studio; v7 
   const session=N.parseSession(fixture(name));
   for(const run of session.runs){
    const modes=M.opticalModes(run);
-   for(let i=0;i<2;i++){const a=M.effectiveArea(run.field,i);assert.ok(Number.isFinite(a)&&a>0,name);assert.equal(modes[i].area,a);}
+   // each mode against the formula written out here, independently of the module
+   const X=run.field.node_coordinates;
+   for(let i=0;i<2;i++){
+    let num=0,den=0;run.field.triangles.forEach((t,k)=>{const [a,b,c]=t.map(j=>X[j]),A=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))/2;
+     let d=0;for(let q=0;q<3;q++)d+=run.field.real[i][k][q]**2+run.field.imag[i][k][q]**2;num+=A*d;den+=A*d*d;});
+    assert.ok(Math.abs(modes[i].area/(num*num/den)-1)<=1e-12,name);
+   }
    assert.equal(M.SOURCE_TEXT[run.area.source],'computed by Studio from the saved field');
-   assert.ok(M.modeTableRows(modes).rows.every(r=>/^\d\.\d{3,4}$|^\d+\.\d+$/.test(r.area.text)),name);
+   assert.ok(M.modeTableRows(modes).rows.every(r=>r.area.text===M.areaText(r.area.value)&&/^\d+(\.\d+)?$/.test(r.area.text)),name);
   }
   const written=JSON.stringify(N.createSession(session.input,session.runs,session.selected,session.comparison,session.view));
   assert.equal(written.includes('effective'+'_area'),false,name);

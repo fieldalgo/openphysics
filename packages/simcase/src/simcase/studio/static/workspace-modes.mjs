@@ -19,6 +19,7 @@ export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the 
 export const RUN_AGAIN='Run again to compute';
 export const AREA_HELP='Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components';
 export const AREA_PAIR_NOTE='A member of a degenerate pair: its effective area depends on the rotation within the pair, which any solution may choose.';
+export const SCALAR_AREA_HELP='Effective area (∫|φ|²)²/∫|φ|⁴ of the scalar mode field over the window';
 export const AREA_MEAN_NOTE='Mean of the pair members: each member’s effective area is defined only up to a rotation within the pair.';
 
 /** f_TE of one mode: Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²) over every triangle, with A_T from the
@@ -51,8 +52,9 @@ export function effectiveArea(field,mode){
  });
  return den>0?num*num/den:null;
 }
-/** An area in m² as µm² to 4 significant digits, "—" when unknown. */
-export const areaText=a=>Number.isFinite(a)?(a*1e12).toPrecision(4):'—';
+/** An area in m² as µm² to 4 significant digits (whole µm² from 1000 µm² up, never an exponent),
+ * "—" when unknown. */
+export const areaText=a=>{if(!Number.isFinite(a))return '—';const u=a*1e12;return Math.abs(u)>=1000?u.toFixed(0):u.toPrecision(4);};
 // Studio's words, not the engine's: TE-like at f_TE >= 0.9, TM-like at f_TE <= 0.1, else hybrid.
 export function polarizationWord(f){return f>=0.9?'TE-like':f<=0.1?'TM-like':'hybrid';}
 export const tePercent=f=>(f*100).toFixed(1)+' % TE';
@@ -89,13 +91,13 @@ export const propagationLoss=(im,lambda0)=>40*Math.PI/Math.LN10*im/lambda0;
  * missing: the reason the fractions are absent ('' when they are present); areaMissing: the same
  * for the effective areas. One merged polarization cell per degenerate group, on its first row
  * with rowspan; each member keeps its own effective area, with a note. */
-export function modeTableRows(modes,{missing='',areaMissing=''}={}){
+export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP}={}){
  const close=new Set(degenerateGroups(modes.map(m=>m.re)).flat());
  // a group is merged only when each member has its fraction (a result without them keeps its reason)
  const groups=degenerateGroups(modes.map(m=>m.re)).filter(g=>g.every(i=>Number.isFinite(modes[i].fte))),groupOf=new Map();groups.forEach(g=>g.forEach(i=>groupOf.set(i,g)));
  const rows=modes.map((m,i)=>{
   const row={mode:i+1,label:`Mode ${i+1}`,neff:formatIndex(m.re),loss:lossText(m.im,m.loss),lossless:m.im===0};
-  row.area=Number.isFinite(m.area)?{text:areaText(m.area),value:m.area,title:close.has(i)?AREA_HELP+'. '+AREA_PAIR_NOTE:AREA_HELP}:{text:'—',value:null,title:areaMissing||AREA_HELP};
+  row.area=Number.isFinite(m.area)?{text:areaText(m.area),value:m.area,title:close.has(i)?areaHelp+'. '+AREA_PAIR_NOTE:areaHelp}:{text:'—',value:null,title:areaMissing||'No field: no effective area'};
   const g=groupOf.get(i);
   if(g&&g.length>1){
    if(g[0]!==i){row.polarization=null;return row;}
@@ -152,5 +154,5 @@ export function physicsModes(p){
  const fits=fte&&fte.length===re.length;
  const area=engineEffectiveArea(p.summary),areaFits=area&&area.length===re.length;
  const areaMissing=areaFits?'':area?'The saved effective areas do not match the modes':p.summary?.open_boundary?'PML result: its fields are in stretched coordinates, so no effective area is computed':RUN_AGAIN+': this run was saved before Studio kept the effective area';
- return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null};
+ return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null,areaHelp:vector?AREA_HELP:SCALAR_AREA_HELP};
 }
