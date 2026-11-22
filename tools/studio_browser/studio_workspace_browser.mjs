@@ -320,7 +320,7 @@ try {
   const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
-  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)']);
+  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
   // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
   assert.equal(resultsView.area.length, 2);
   assert.equal(resultsView.areaSource, 'Effective areacomputed by the engine from the saved field');
@@ -381,7 +381,7 @@ try {
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
   assert.match(neffTable.head[4], /^n_eff A Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B Run 2 · 700 × 300 nm · Silicon · λ 1550 nm$/);
-  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)']);
+  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)', 'n_g A', 'n_g B']);
   // both sides of a matched row give their A_eff in µm²
   for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
   assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
