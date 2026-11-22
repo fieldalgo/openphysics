@@ -694,9 +694,14 @@ function fillResultTable() {
   if (sub) { fillSubspaceTable(sub); return; }
   const neff = re(resultData.effective_index), neffImag = im(resultData.effective_index), loss = resultData.propagation_loss;
   const nm = neff[0].length, ng = re(resultData.group_index), ngImag = im(resultData.group_index);
-  const tracked = !!resultData.summary.mode_tracking, ngCount = ng ? (tracked ? nm : 1) : 0;
+  // n_g of every mode: a tracked sweep's branches, or a single study with results.group_index
+  // (group_index_method), where an unmatched mode is null with its reason
+  const tracked = !!resultData.summary.mode_tracking, ngMethod = resultData.summary.group_index_method;
+  const ngCount = ng ? (tracked || ngMethod ? nm : 1) : 0;
+  const ngText = (i, j) => Number.isFinite(ng[i][j]) ? ng[i][j].toFixed(4) + (ngImag ? `<br>Im n_g: ${ngImag[i][j].toExponential(4)}` : '')
+    : `<span title="${esc('Not matched: ' + (ngMethod?.reasons?.[j] || 'no group index'))}">—</span>`;
   let h = '<div id="resultTableScroll" class="result-table-scroll" tabindex="0" role="region" aria-label="Mode results"><table class="res"><tr><th>' + esc(studyLabel(resultData)) + '</th>' + Array.from({ length: nm }, (_, j) => `<th>n_eff ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + Array.from({ length: ngCount }, (_, j) => `<th>n_g ${tracked ? 'branch ' : ''}${j + 1}</th>`).join('') + '</tr>';
-  studyValues(resultData).forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + neff[i].map((x,j) => `<td>${x.toFixed(6)}${neffImag ? `<br>Im n_eff: ${neffImag[i][j].toExponential(4)}<br>${re(loss)[i][j].toExponential(4)} ${esc(loss.unit)}` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ng[i][j].toFixed(4)}${ngImag ? `<br>Im n_g: ${ngImag[i][j].toExponential(4)}` : ''}</td>`).join('') + '</tr>'; });
+  studyValues(resultData).forEach((v, i) => { h += `<tr><td>${esc(v)}</td>` + neff[i].map((x,j) => `<td>${x.toFixed(6)}${neffImag ? `<br>Im n_eff: ${neffImag[i][j].toExponential(4)}<br>${re(loss)[i][j].toExponential(4)} ${esc(loss.unit)}` : ''}</td>`).join('') + Array.from({ length: ngCount }, (_, j) => `<td>${ngText(i, j)}</td>`).join('') + '</tr>'; });
   h += '</table></div>';
   if (neffImag) h += '<div class="hint">Time convention exp(−iωt), fields ∝ exp(i(βz − ωt)): Im n_eff &gt; 0 means attenuation; the loss is 40π/ln 10 · Im n_eff / λ0 in dB/m.</div>';
   if (neffImag && !resultData.summary.open_boundary) h += '<div class="hint">Material absorption only. Fields have relative amplitude. Complex n_g is a spectral derivative, not an energy velocity.</div>';

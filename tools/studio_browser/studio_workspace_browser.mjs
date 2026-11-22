@@ -915,6 +915,48 @@ try {
   assert.match(await text('.compare-no-fields'), /^Run \d has no saved fields, so its modes cannot be matched by overlap\.$/);
   await noOverflow('M4-e Compare without fields');
 
+  // M5-s (group index; pre-registered): Also compute group index in Study, off by default; a run
+  // with it off shows "—" with the help, a run with it on shows the engine's n_g (a real 3-solve job,
+  // checked against a direct engine run of the same document to 4 decimals); Compare n_g A and B;
+  // no horizontal overflow at 390 × 844.
+  await page.click('[data-template=optical]');
+  await answerDialogs("!!document.querySelector('#shape-w')", 'M5 optical model');
+  await toNode('Study');
+  const m5box = () => page.eval("(()=>{const e=document.getElementById('group-index-check');return e?{label:e.closest('label').textContent.trim(),checked:e.checked}:null})()");
+  const m5off = await m5box(); stage('M5 Study checkbox', m5off);
+  assert.deepEqual(m5off, {label: 'Also compute group index (3 solves)', checked: false});
+  await runAndWait(); await page.until("!!document.getElementById('modes-table')", 'M5 results off');
+  const ngCells = () => page.eval("({head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),cells:[...document.querySelectorAll('#modes-table [data-group-index]')].map(e=>({text:e.textContent,title:e.title,value:e.dataset.groupIndexValue??null})),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)})");
+  const offView = await ngCells(); stage('M5 results off', offView);
+  assert.equal(offView.head.at(-1), 'n_g');
+  assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study'), JSON.stringify(offView.cells));
+  await toNode('Study'); await page.click('#group-index-check'); await page.until("document.getElementById('group-index-check')?.checked===true", 'M5 checkbox on');
+  const t0 = Date.now(); await runAndWait(); const onSeconds = (Date.now() - t0) / 1000;
+  await page.until("!!document.querySelector('#modes-table [data-group-index-value]')", 'M5 results on');
+  const onView = await ngCells(); stage('M5 results on', {...onView, seconds: onSeconds});
+  // the same document run directly by the engine (the template's state, as the node tests build it)
+  const doc = await page.eval(`import('/workspace-assets/workspace-optical.mjs').then(O=>JSON.stringify(O.opticalDocument({height:220,width:500,wavelength:1550,coreMesh:30,electric:false,heat:false,structure:false,optics:true,modeCount:2,groupIndex:true,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}]},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''})))`);
+  const engine = spawnSync(args.python, ['-c', 'import json,sys\nfrom simcase import Document, run\nr=run(Document.from_dict(json.loads(sys.stdin.read())),False)\ns=r.summary()\nprint(json.dumps({"ng":s["group_index"]["values"][0],"neff":s["effective_index"]["values"][0],"method":s["group_index_method"]}))'], {input: doc, encoding: 'utf8'});
+  assert.equal(engine.status, 0, engine.stderr);
+  const direct = JSON.parse(engine.stdout); stage('M5 direct engine run', direct);
+  assert.deepEqual(JSON.parse(doc).results, {save_fields: true, plots: false, group_index: {wavelength_step: '1 nm'}});
+  assert.equal(onView.cells.length, direct.ng.length);
+  onView.cells.forEach((c, i) => {
+    assert.equal(c.text, direct.ng[i] === null ? '—' : direct.ng[i].toFixed(4), 'mode ' + (i + 1));
+    assert.ok(direct.ng[i] === null || /central difference over λ0 ± 1 nm \(3 solves\)/.test(c.title), c.title);
+  });
+  assert.deepEqual(onView.neff, offView.neff, 'the option leaves n_eff as it was');
+  await noOverflow('M5 results with n_g');
+  // Compare: the off run as A, the on run as B
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'M5 Compare');
+  const m5compare = await page.eval("({head:[...document.querySelectorAll('#compare-neff thead th')].map(e=>e.firstChild.textContent),a:[...document.querySelectorAll('#compare-neff [data-group-index-a]')].map(e=>e.textContent),b:[...document.querySelectorAll('#compare-neff [data-group-index-b]')].map(e=>e.textContent)})");
+  stage('M5 Compare', m5compare);
+  assert.deepEqual(m5compare.head.slice(-2), ['n_g A', 'n_g B']);
+  assert.ok(m5compare.a.length && m5compare.a.every(t => t === '—'), JSON.stringify(m5compare.a));
+  assert.ok(m5compare.b.some(t => /^\d\.\d{4}$/.test(t)), JSON.stringify(m5compare.b));
+  await noOverflow('M5 Compare with n_g');
+  await page.screenshot('m5-compare');
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);

@@ -401,3 +401,7 @@ dialog::backdrop{background:#162a4b66}
 @media (min-width:1200px){.cards{grid-template-columns:repeat(4,minmax(0,1fr))}.cards button[data-template]::before{height:88px}}
 .mp-file-details{margin:8px 0;font-size:11px}.mp-file-details>summary{cursor:pointer;color:var(--accent);padding:6px 0}
 .study-wavelength{font-size:11px;margin:6px 0}
+
+/* Study: Also compute group index */
+.check-field{display:flex;align-items:center;gap:6px}
+.check-field input{width:auto;margin:0}
