@@ -186,8 +186,13 @@ function leaveText(target,toMultiphysics){
  if(toMultiphysics&&isOptical())return leaveConfirmText({from:'optical',runs:runs.length,saved:savedRunsState===runsStamp(),target});
  return null;
 }
+// a model file being read after its confirmation: no second open starts until it is done
+let openingModel=false;
 function guardLeave(target,toMultiphysics,proceed){
+ if(openingModel){notice('Wait until the model file has been opened.');return;}
  const text=leaveText(target,toMultiphysics);if(!text){proceed();return;}
+ // Save session cannot run over an invalid input draft: then only Keep and Continue are offered
+ if(text.save?.kind==='session'&&$('save-session').disabled)text.save=null;
  pendingLeave={proceed,kind:text.save?.kind||null,opener:document.activeElement};
  $('leave-confirm-title').textContent=text.title;$('leave-confirm-description').textContent=text.description;
  $('leave-stay').textContent=text.stay;$('leave-go').textContent=text.leave;$('leave-save').hidden=!text.save;$('leave-save').textContent=text.save?.label||'';
@@ -335,10 +340,11 @@ function bindNumericInputs(){
    if(key==='width'||key==='height'||field.prop){const slider=$('width');if(slider&&key==='width'){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
   // a committed value is said in Messages, with the Left x a Width edit moved (the value at focus)
-  let leftBefore=null;el.onfocus=()=>{leftBefore=field.prop?selectedShape()?.x??null:null;};
+  // resultNotice is read at focus: the first keystroke already replaces the result's notice
+  let leftBefore=null,afterResult=false;el.onfocus=()=>{leftBefore=field.prop?selectedShape()?.x??null:null;afterResult=resultNotice;};
   el.onchange=()=>{if(numericDrafts.get(key))return;const shape=field.prop?selectedShape():null,value=key==='temperature'?setup.temperature:shape?shape[field.prop]:state[key];
    const leftX=field.prop==='w'&&leftBefore!==null&&shape.x!==leftBefore?shape.x:null;if(shape)leftBefore=shape.x;
-   if(value!==undefined)notice(editNoticeText(key,value,{leftX,afterResult:resultNotice}));};
+   if(value!==undefined)notice(editNoticeText(key,value,{leftX,afterResult}));afterResult=false;};
   el.onkeydown=e=>{if(e.key==='Escape'){numericDrafts.clear(key);el.value=key==='temperature'?setup.temperature:field.prop?selectedShape()[field.prop]:state[key];refreshInputIssues();}};
  }
 }
@@ -479,14 +485,16 @@ const applicationChosen=()=>state.electric!==undefined;
 function requestLoad(doc,options={}){
   if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
   // a multiphysics run in this tab is named before the inputs are replaced
+  if(!options.opener)options={...options,opener:document.activeElement};
   if(!options.leaveChecked&&multiView.active()&&multiView.runInTab()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
   loadInputs(doc,options);
 }
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,opener=document.activeElement,leaveChecked=false}={}){
   workspaceLoads.invalidate();
   pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,opener,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
-  if(untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
+  // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
+  if((leaveChecked&&!session)||untouchedWorkspace(current(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
   const text=session?sessionLoadText(session,{runs:runs.length,unsaved:runs.length>0&&savedRunsState!==runsStamp()},source):null;
   $('load-confirm').querySelector('h2').textContent=text?text.title:'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=text?text.description:'Save your current design first if you want to keep it.';
@@ -535,7 +543,7 @@ $('project-file').onchange=async event=>{const file=event.target.files[0];event.
  // a multiphysics document opens as a multiphysics model; any document opens in one that is open
  if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
   if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');
-   guardLeave(file.name,true,()=>multiView.openText(text,file.name).catch(e=>notice('Open failed: '+e.message+' Current inputs kept.')));return;}}
+   guardLeave(file.name,true,()=>{openingModel=true;multiView.openText(text,file.name).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Project exceeds 64 KiB.');return parseProject(await file.text());});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-project')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}};
