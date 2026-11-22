@@ -366,7 +366,12 @@ tree node selected on Results or Compare and a node under the pointer keeping th
 the title's short *(other inputs)* only on Results and Compare, **Use this run's inputs** without a question
 and Undo taking it back, the Study settings naming the next run's inputs and editing the
 wavelength (1300 nm refused there as in Optical modes), and a restore card naming the file's
-save time.
+save time. It also checks the study settings saved with the model: Undo and Redo over a Modes to
+find change, a group index box change and **Use this run's inputs** of a run with another count
+and box; **Save inputs only** writing the version 7 file of before byte for byte with 2 modes and
+the box off (`tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
+`modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
+inputs saved as version 9.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff

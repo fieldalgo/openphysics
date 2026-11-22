@@ -1,0 +1,9 @@
+# Changed
+
+## English
+
+- Studio: **Modes to find and the group index option are saved with the model.** The inputs file of **Save inputs only** is version 8 when they are not the defaults (`model.modeCount`, written only when not 2; `model.groupIndex: true`, written only when the box is on); with 2 modes and the box off it is version 7, byte for byte as before. Browser drafts, recovery and a session's input keep them too. A session whose input is of version 8 is written as optical session version 9; one of version 7 inputs is written as before. **Undo** and **Redo** cover a Modes to find change, a box change and **Use this run's inputs**, which now takes back the run's Modes to find and box with its inputs. Opening an inputs file sets both from the file; an earlier Studio refuses a version 8 file with *Unsupported project format or version.* [Study settings in input files](docs/packages/simcase/workspace.md#study-settings-in-input-files-version-8).
+
+## 한국어
+
+- Studio: **Modes to find와 군굴절률 선택이 모델과 함께 저장됩니다.** **Save inputs only**의 입력 파일은 이 값이 기본값이 아니면 버전 8입니다(`model.modeCount`는 2가 아닐 때만, `model.groupIndex: true`는 상자를 켰을 때만 씀). 모드 2개에 상자가 꺼져 있으면 이전과 바이트 단위로 같은 버전 7입니다. 브라우저 초안, 복구, 세션의 입력도 이 값을 보존합니다. 입력이 버전 8인 세션은 광학 세션 버전 9로 쓰고, 버전 7 입력의 세션은 이전처럼 씁니다. **Undo**와 **Redo**가 Modes to find 변경, 상자 변경, **Use this run's inputs**를 다루며, 이제 Undo는 실행의 입력과 함께 그 Modes to find와 상자도 되돌립니다. 입력 파일을 열면 두 값이 파일에서 설정되며, 이전 Studio는 버전 8 파일을 *Unsupported project format or version.*으로 거부합니다. [입력 파일의 study 설정](packages/simcase/workspace.md#입력-파일의-study-설정버전-8).

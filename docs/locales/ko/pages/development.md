@@ -309,7 +309,12 @@ Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 �
 이름이 남는 세션 파일, 보이던 페이지를 여는 복구를 확인합니다. 11차부터는 Results나 Compare에서 고른 트리 노드가 없고
 포인터가 올라간 노드도 일반 배경을 유지함, 짧은 *(other inputs)*가 Results와 Compare에서만 제목에 붙음, 묻지 않는
 **Use this run's inputs**와 그것을 되돌리는 Undo, 다음 실행의 입력을 밝히고 파장을 고치는 Study 설정(1300 nm는
-Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다.
+Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다. 모델과 함께 저장되는 study
+설정도 확인합니다: Modes to find 변경, 군굴절률 상자 변경, 모드 수와 상자가 다른 실행의 **Use this run's
+inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Save inputs only**가 이전 버전 7 파일
+(`tests/simcase/studio_session_fixtures/inputs-v7-optical.json`)을 바이트 단위로 같게 쓰고 `modeCount` 4나
+`groupIndex` true이면 버전 8을 쓰며 각 파일을 다시 열면 그 설정이 되는지, 버전 8 입력의 세션이 버전 9로
+저장되는지 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는

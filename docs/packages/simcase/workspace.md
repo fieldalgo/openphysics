@@ -97,8 +97,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    read as unsaved edits (on the Model tab the title describes the current inputs only). Under
    the Inputs row of the selected run, **Use this run's inputs** loads that run's inputs (and its
    Modes to find and group index option) as the current inputs at once, without a question,
-   since the runs stay as they are; it is one input edit, so **Undo** takes it back (Undo does not
-   change Modes to find or the group index option, which are page state); before any run *Nothing is computed until you press Run* and *Optical adapter
+   since the runs stay as they are; it is one input edit, so **Undo** takes all of it back, Modes
+   to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
@@ -251,9 +251,13 @@ n = 1.45 (Re n_eff), ranked by Re n_eff. When fewer are guided, Results says so 
 table, *Found 3 of 8 modes above n = 1.45*, and the table has those rows. Each result shows the
 shapes, wavelength and core mesh it used and keeps the count it asked for.
 
-Modes to find is page state: a session file keeps it with each run, and opening a session sets
-it from the selected run, but an input (project) file and a browser draft do not store it, and
-a change to it that has not been run is not saved. A new model starts at 2. With 2 modes the
+Modes to find is saved with the model: the input (project) file, a browser draft, browser
+recovery and a session's input keep it ([version 8](#study-settings-in-input-files-version-8)),
+and each run of a session keeps the count it asked for. A change to it is an input edit:
+**Undo** and **Redo** cover it, and the title reads *Unsaved inputs* until it is saved. Opening an
+input file sets it from the file (2 for a file of version 6 or 7). Opening a session sets it from
+the session's input when that is of version 8, else from the selected run, as before. A new
+model starts at 2. With 2 modes the
 solver document is byte for byte the one earlier Studios sent, so its n_eff, TE fraction and
 effective area are unchanged.
 
@@ -264,9 +268,10 @@ wavelength, and returns n_g = n_eff − λ0 dn_eff/dλ0 by a central difference.
 three times as long ([group index of a single study](group_index.md)). With the box off, the
 document is the `optical-shapes-v8` document as before, byte for byte. With it on, the only
 difference is `results.group_index`, and n_eff and the fields at λ0 are the same values. The
-box is page state, like Modes to find. A new model starts with it off, and an input file does
-not store it. Opening a session, or **Use this run's inputs**, sets it from the run: on for
-a run with n_g. It is part of the study a run is compared with: with the box on, a run without
+box is saved with the model, like Modes to find, and **Undo** and **Redo** cover it. A new model
+starts with it off. Opening an input file sets it from the file (off for version 6 or 7). Opening
+a session sets it from the session's input when that is of version 8, else from the selected
+run. **Use this run's inputs** sets it from the run: on for a run with n_g. It is part of the study a run is compared with: with the box on, a run without
 n_g is not of the current inputs, and a document check made with the box off is of earlier
 inputs. The adapter stays `optical-shapes-v8` and the run's `settings` are unchanged. The run
 table CSV has n_g in its `group_index [1]` column.
@@ -795,7 +800,8 @@ and session indicators compare against the last save/open snapshot or download
 request; an unchanged indicator does not certify download completion. Browser
 recovery reports its own committed storage state separately.
 
-Input files are version 7: version 6 (the units and naming batch) plus the Joule heating
+Input files are version 7, or [version 8](#study-settings-in-input-files-version-8) when they
+hold study settings. Version 7 is version 6 (the units and naming batch) plus the Joule heating
 inputs (`model.joule`, lengths in mm, `units.joule_length`). A version 6 file is still read,
 with the default Joule inputs; a project whose only interfaces are electric currents and
 heat opens in the Joule heating application. They record the
@@ -853,12 +859,25 @@ names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-
 `optical-shapes-v6` and `-v7`), with its values as quantity strings.
 This is not a complete engine dependency or Git provenance record.
 
+### Study settings in input files (version 8)
+
+Version 8 is version 7 with the optical study settings in `model`, after `model.joule`:
+`modeCount` (Modes to find, a whole number from 1 to 8), written only when it is not 2, and
+`groupIndex` (`true`), written only when **Also compute group index** is on. Inputs with
+2 modes and the box off are written as version 7, byte for byte as before, so such a file still
+opens in an earlier Studio, and opening a version 6 or 7 file never rewrites it. A version 8
+file is read with both keys checked (a `modeCount` outside 1 to 8 or a `groupIndex` that is not
+a boolean is refused); one whose values are the defaults reads as version 7 inputs. A Studio
+before version 8 refuses a version 8 file with *Unsupported project format or version.* A run
+keeps its inputs as version 7: its `settings.mode_count` and its group index hold its study.
+
 ### Optical session files (version 9)
 
 A session in which every run has two real modes and its fields is written as version 7, byte
 for byte as before. Version 9 is written once the session holds a run that version 7 cannot
 hold: a run of 1 or of 3 to 8 modes, a complex effective index, a run without its fields, or a
-view of mode 3 or higher. Opening a version 6 or 7 file never rewrites it: its runs read two
+view of mode 3 or higher, or an input of
+[version 8](#study-settings-in-input-files-version-8). Opening a version 6 or 7 file never rewrites it: its runs read two
 modes, with the TE fraction and effective area Studio computes from the saved samples, and the
 session is written as version 7 again. A Studio before version 9 refuses a version 9 file with
 *This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a
@@ -869,7 +888,11 @@ A version 9 file is one JSON object with exactly the keys `format`
 (`"openphysics-studio-session"`), `version` (9), `application` (`"optical"`), `input` (an input
 file of version 7), `runs` (at most six), `selected` (a run's `job` or null), `comparison` (two
 `job`s or nulls) and `view` (all required; as in version 7, with `mode` 0 to 7 and below the selected run's
-mode count). Each run has these keys, in this order; any other key is refused by name:
+mode count). Its `input` may also be an input file of version 8 (study settings): a session
+whose input is of version 8 is written as version 9 even when every run fits version 7, and a
+version 7 session holding one is refused with *A version 7 session holds an input file of version
+6 or 7.* A Studio before input version 8 refuses such a version 9 file with *Unsupported project
+format or version.* Each run has these keys, in this order; any other key is refused by name:
 
 | Key | Type | |
 | --- | --- | --- |

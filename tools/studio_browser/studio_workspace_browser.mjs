@@ -590,12 +590,12 @@ try {
   // Use this run's inputs: run 1's inputs become the current ones at once (no question: the runs
   // stay), the title and the step bar agree, and Undo takes them back
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 Use this run\'s inputs');
-  assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes the geometry and the wavelength back\.$/);
+  assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes them back\.$/);
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')&&/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'L3 inputs used');
   const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
-  assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm · Modes to find 2\. The next run uses them; Undo takes the geometry and the wavelength back\.$/);
+  assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm · Modes to find 2\. The next run uses them; Undo takes them back\.$/);
   await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'L3 study after use');
   assert.match(await text('#next-run-inputs'), /^Next run uses 600 × 300 nm · Silicon · /);
   await page.click('#undo-edit'); await sleep(200);
@@ -1011,6 +1011,53 @@ try {
   assert.ok(m5compare.b.some(t => /^\d\.\d{4}$/.test(t)), JSON.stringify(m5compare.b));
   await noOverflow('M5 Compare with n_g');
   await page.screenshot('m5-compare');
+
+  // P1 (study settings with the inputs; pre-registered): Undo and Redo cover Modes to find, the
+  // group index box and Use this run's inputs; Save inputs only writes version 7 byte for byte with
+  // 2 modes and the box off, version 8 otherwise, and Open inputs file sets both from the file.
+  const study = () => page.eval("({modes:document.getElementById('mode-count-number').value,box:document.getElementById('group-index-check').checked})");
+  const undo = async () => { await page.click('#undo-edit'); await sleep(200); }, redo = async () => { await page.click('#redo-edit'); await sleep(200); };
+  await toNode('Study'); assert.deepEqual(await study(), {modes: '2', box: true}, 'P1 start: the M5 inputs');
+  await page.type('#mode-count-number', 4); assert.deepEqual(await study(), {modes: '4', box: true});
+  await undo(); const u1 = await study(); await redo(); const r1 = await study(); stage('P1 U1 Modes to find', {undo: u1, redo: r1});
+  assert.deepEqual(u1, {modes: '2', box: true}); assert.deepEqual(r1, {modes: '4', box: true});
+  await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '4', box: false});
+  await undo(); const u2 = await study(); await redo(); const r2 = await study(); stage('P1 U2 group index box', {undo: u2, redo: r2});
+  assert.deepEqual(u2, {modes: '4', box: true}); assert.deepEqual(r2, {modes: '4', box: false});
+  const saveInputs = async () => { const before = await listDownloads(); await page.click('#save-project'); const name = await newDownload(before); assert.equal(name, 'studio-workspace-v2.json'); return readFile(join(downloads, name), 'utf8'); };
+  const fourText = await saveInputs(), four = JSON.parse(fourText);
+  await page.click('#group-index-check'); await page.type('#mode-count-number', 2); assert.deepEqual(await study(), {modes: '2', box: true});
+  const boxText = await saveInputs(), box = JSON.parse(boxText);
+  await page.click('#group-index-check'); const plainText = await saveInputs();
+  const fixtureText = await readFile(new URL('../../tests/simcase/studio_session_fixtures/inputs-v7-optical.json', import.meta.url), 'utf8');
+  stage('P1 inputs files', {four: [four.version, four.model.modeCount, four.model.groupIndex ?? null], box: [box.version, box.model.modeCount ?? null, box.model.groupIndex], plain: [JSON.parse(plainText).version, Buffer.byteLength(plainText)]});
+  assert.equal(plainText, fixtureText, '2 modes and the box off: the version 7 file of before, byte for byte');
+  assert.deepEqual([four.version, four.model.modeCount, 'groupIndex' in four.model], [8, 4, false]);
+  assert.deepEqual([box.version, 'modeCount' in box.model, box.model.groupIndex], [8, false, true]);
+  // each file opened again sets Modes to find and the box from it
+  await writeFile(join(out, 'p1-four.json'), fourText); await writeFile(join(out, 'p1-box.json'), boxText);
+  for (const [name, expected] of [['p1-four.json', {modes: '4', box: false}], ['p1-box.json', {modes: '2', box: true}], ['p1-four.json', {modes: '4', box: false}]]) {
+    await setFile('#project-file', join(out, name));
+    await answerDialogs(`/^Project inputs restored · ${name}/.test(document.getElementById('file-status').textContent)`, 'P1 open ' + name);
+    await toNode('Study'); const opened = await study(); stage('P1 reopened ' + name, opened); assert.deepEqual(opened, expected);
+  }
+  // a session of these inputs holds them as an input of version 8
+  const p1Before = await listDownloads(); await page.click('#save-session');
+  const p1Session = JSON.parse(await readFile(join(downloads, await newDownload(p1Before)), 'utf8'));
+  stage('P1 session input', {version: p1Session.version, input: p1Session.input.version, modeCount: p1Session.input.model.modeCount});
+  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [9, 8, 4]);
+  // U3: Use this run's inputs with a run of other Modes to find and box (the M5 run with the box off)
+  await page.type('#mode-count-number', 5); await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '5', box: true});
+  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length>=2", 'P1 run list');
+  const offJob = await page.eval("[...document.querySelectorAll('.run-item')].at(-2).dataset.run");
+  await page.click(`.run-item[data-run="${offJob}"]`); await page.until("!!document.getElementById('restore-run-input')", 'P1 Use this run\'s inputs');
+  await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')", 'P1 inputs used');
+  const usedMessage = await text('#file-status');
+  await toNode('Study'); const used3 = await study(); await undo(); const u3 = await study(); await redo(); const r3 = await study();
+  stage('P1 U3 Use this run\'s inputs', {message: usedMessage, used: used3, undo: u3, redo: r3});
+  assert.match(usedMessage, /Modes to find 2\. The next run uses them; Undo takes them back\.$/);
+  assert.deepEqual(used3, {modes: '2', box: false}); assert.deepEqual(u3, {modes: '5', box: true}); assert.deepEqual(r3, used3);
+  await noOverflow('P1 study settings');
 
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
