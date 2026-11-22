@@ -38,7 +38,7 @@ CASES = {
     "C11": (lambda h: builder.nested_spheres(h), [(f"sphere{i}", "sphere", (0, 0, 0), r)
                                                    for i, r in enumerate((0.5, 0.75, 1.0))]),
 }
-SIZES = {"C1": (0.2, 0.1), "C4": (0.2, 0.1), "C5": (0.24, 0.12), "C11": (0.1,)}  # C11 0.05, 0.025: test_quality V24
+SIZES = {"C1": (0.2, 0.1), "C4": (0.2, 0.1), "C5": (0.24, 0.12), "C11": (0.1,)}  # C11 0.05, 0.025: V24 in test_quality_v24.py
 
 
 def delta(p, kind, centre, radius):
