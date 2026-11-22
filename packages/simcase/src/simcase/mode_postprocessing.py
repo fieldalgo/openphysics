@@ -68,6 +68,20 @@ core element sizes of 40 to 10 nm, below the n_eff discretization error at those
 split above 1e-3, possible on very coarse meshes, is not recognised as a pair, and a member's
 fraction is then a rotation chosen by the mesh.
 
+Effective area. ``effective_area[p, m]`` (m^2) is, for vector results, defined on the same saved
+centroid field and triangle areas, with all three components, summed over every triangle of the
+window, all regions:
+
+    A_eff = (sum_T A_T |E_T|^2)^2 / sum_T A_T |E_T|^4,   |E_T|^2 = |E_x,T|^2 + |E_y,T|^2 + |E_z,T|^2
+
+This is the common form behind commercial mode solvers' "effective area"; it is not the vectorial
+nonlinear effective area of Afshar and Monro (which weights by the Poynting vector and E . E). It
+converges to the same limit as ``galerkin.kernels.effective_area(..., include_longitudinal=True)``
+on the Whitney/P1 field (tests/simcase/test_mode_effective_area.py). For scalar results it is
+``scalar_effective_area(mesh, phi)`` in the kernel frame times 1e-12 (|phi|^2 at the nodes, the P1
+mass in the numerator). Each member of a degenerate pair has its own value, which depends on the
+rotation the mesh chose within the pair.
+
 Not computed: PML results (the saved transverse coefficients are covariant integrals in
 complex-stretched coordinates, so the lossless Poynting formula on the whole window is not the
 physical power and the window is not the physical one) and subspace sweeps (cluster frames, not
@@ -82,11 +96,11 @@ import numpy as np
 
 from galerkin import EdgeSpace, Mesh
 from galerkin.kernels import (confinement_factor, coupling_efficiency, interpolate_vector_field, overlap_matrix,
-                              scalar_coupling_efficiency, scalar_confinement_factor, scalar_overlap, scalar_power,
-                              vector_power)
+                              scalar_coupling_efficiency, scalar_confinement_factor, scalar_effective_area,
+                              scalar_overlap, scalar_power, vector_power)
 
 __all__ = ["validate_mode_overlap", "gaussian_settings", "vector_postprocessing", "scalar_postprocessing",
-           "te_polarization_fraction", "stack_points", "summary_block"]
+           "te_polarization_fraction", "effective_area", "stack_points", "summary_block"]
 
 #: The one accepted post-processing input, ``results.mode_overlap``.
 _OVERLAP_KEYS = frozenset({"gaussian"})
@@ -221,7 +235,8 @@ def scalar_postprocessing(nodes, triangles, fields, regions, num_regions, gaussi
     for a in range(modes):
         for b in range(modes):
             overlap[a, b] = scalar_overlap(mesh, phi[a], phi[b])
-    out = {"mode_power": power, "confinement": confinement, "field_overlap": overlap}
+    out = {"mode_power": power, "confinement": confinement, "field_overlap": overlap,
+           "effective_area": np.array([scalar_effective_area(mesh, phi[m]) for m in range(modes)])}
     if gaussian is not None:
         amplitude = _gaussian(gaussian)(mesh.nodes[:, 0], mesh.nodes[:, 1])
         out["coupling_efficiency"] = np.array([scalar_coupling_efficiency(mesh, phi[m], amplitude)
@@ -248,6 +263,27 @@ def te_polarization_fraction(node_coordinates, triangles, electric) -> np.ndarra
     den = num + area @ ey
     with np.errstate(invalid="ignore", divide="ignore"):
         return np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
+
+
+def effective_area(node_coordinates, triangles, electric) -> np.ndarray:
+    """A_eff (M,) of one study point from the saved centroid field (module docstring), in the
+    coordinates' length unit squared.
+
+    Arguments as ``te_polarization_fraction``. A mode with no field gives NaN. Each term is written
+    out (|E|^2 = re^2 + im^2 per component, A_T = |cross| / 2) so that a reader in another language
+    reproduces it to rounding.
+    """
+    x = np.asarray(node_coordinates, dtype=float)
+    t = np.asarray(triangles)
+    e = np.asarray(electric)
+    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
+    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    density = (e[:, :, 0].real ** 2 + e[:, :, 0].imag ** 2) + (e[:, :, 1].real ** 2 + e[:, :, 1].imag ** 2) \
+        + (e[:, :, 2].real ** 2 + e[:, :, 2].imag ** 2)
+    num = area @ density
+    den = area @ (density * density)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den > 0, num * num / np.where(den > 0, den, 1.0), np.nan)
 
 
 def stack_points(points: list[dict]) -> dict:
@@ -304,6 +340,16 @@ def summary_block(arrays: dict, *, vector: bool, region_names: list[str], gaussi
                            "only the pair's sum is defined. A mesh split of a symmetric pair above 1e-3 (very "
                            "coarse meshes) is not recognised, and a member's value is then a rotation chosen by "
                            "the mesh"}
+    if "effective_area" in arrays:
+        out["effective_area"] = {
+            "unit": "m^2", "values": _part(arrays["effective_area"]),
+            "description": ("A_eff = (sum_T A_T |E|^2)^2 / sum_T A_T |E|^4 on the saved centroid field "
+                            "unnormalized_electric_field over every triangle of the window, |E|^2 = |E_x|^2 + "
+                            "|E_y|^2 + |E_z|^2; the common mode-solver effective area, not the vectorial "
+                            "nonlinear area of Afshar and Monro. Each member of a degenerate pair has its own "
+                            "value, which depends on the rotation within the pair" if vector else
+                            "A_eff = (int |phi|^2 dA)^2 / int |phi|^4 dA of the saved nodal field (P1 mass, "
+                            "degree-4 triangle rule)")}
     if gaussian is not None:
         out["coupling_efficiency"] = {
             "unit": "1", "values": _part(arrays["coupling_efficiency"]),
