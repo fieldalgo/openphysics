@@ -40,7 +40,7 @@ export function lineProfile(field,values,axis,coordinate){
 const metres=um=>{const [digits,power='0']=String(um).split(/e/i);return Number(`${digits}e${Number(power)-6}`);};
 export function profileCsv(series,axis,coordinate,mode,component){
  const rows=['job,origin,candidate,component,axis,fixed_coordinate [m],start [m],end [m],triangle,centroid_x [m],centroid_y [m],relative_amplitude [1]'];
- for(const item of series)for(const s of item.segments)rows.push([item.run.job,item.run.origin,mode+1,component,axis,metres(coordinate),metres(s.start),metres(s.end),s.index+1,...s.centroid.map(metres),s.value].join(','));
+ for(const item of series)for(const s of item.segments)rows.push([item.run.job,item.run.origin,(item.mode??mode)+1,component,axis,metres(coordinate),metres(s.start),metres(s.end),s.index+1,...s.centroid.map(metres),s.value].join(','));
  return rows.join('\n')+'\n';
 }
 

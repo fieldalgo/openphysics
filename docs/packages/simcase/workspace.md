@@ -98,10 +98,12 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 5. Type a **Run name** and press Enter: a named run is pinned, so new runs do not
    replace it. There is no separate Pin button: **Unpin this run** releases a pinned run,
    and Enter in Run name pins a named run again. Change the model and run again,
-   then use **Compare** to choose A/B, mode, component, probe and line profile.
+   then use **Compare** to choose A/B, matched modes, component, probe and line profile.
    The two field plots come first, headed by the side and the run (a run named *A* on side
-   A is not named twice); below them a table lists, for each mode rank, n_eff of A
-   and B, Δ (B − A) and Δ % of A; its column headers name each run (name, size, λ).
+   A is not named twice); below them a table matches the modes of A and B by field overlap
+   ([matching modes](#matching-modes-in-compare)): one row per matched mode, *A mode 1 ↔ B mode 1*,
+   with both polarizations, the overlap, n_eff of A and B, Δn_eff (B − A) and Δ % of A; its column
+   headers name each run (name, size, λ).
    n_eff has 8 decimals everywhere (results, mode list, Compare).
 6. **Save session**, the first save button, creates a portable file with the model,
    retained results and view settings, named from the application and the local
@@ -150,8 +152,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 
 Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
 the model. Use **Open session** to replace both model and notebook. *Result for these
-inputs* and *Inputs changed since this result* say which design a result belongs to; mode ranks do not
-establish mode correspondence between designs.
+inputs* and *Inputs changed since this result* say which design a result belongs to; between designs,
+Compare pairs modes by field overlap, not by rank.
 
 ## Working with a model
 
@@ -588,14 +590,16 @@ mesh shared between runs, adding runs from a file, and mode fields of coupled ru
 ## Results and files
 
 The notebook retains up to six successful runs, preserving pinned references. Select a mode to inspect
-its field or compare two runs. Mode numbers are ranks, not a mode-tracking result.
+its field or compare two runs. Mode numbers are ranks by effective index; Compare matches modes between
+two runs by field overlap.
 Field colours use the vector magnitude normalized separately per mode;
 they do not represent optical power or a common physical colour scale.
 
 ### Modes table
 
 Results show one table per run, | Mode | n_eff | Polarization | Loss |, in the optical
-application and in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.”
+application and in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.” (the optical
+application adds “Compare matches them between runs by field overlap.”)
 Every value is defined on the saved centroid field `unnormalized_electric_field`, so Studio, the
 engine and older session files give the same number from the same samples:
 
@@ -685,6 +689,51 @@ because every adapter now writes format 0.3 documents and reads the new result n
 names its family's next adapter version (`optical-fixed-v2`, `optical-rectangle-v4` and `-v5`,
 `optical-shapes-v6` and `-v7`), with its values as quantity strings.
 This is not a complete engine dependency or Git provenance record.
+
+### Matching modes in Compare
+
+Compare matches the modes of runs A and B by their fields, so a row pairs the same mode even
+when the ranks change between designs (for example a wider core whose second TE-like mode
+overtakes the TM-like one). Matching is always on, and the ranks stay in every row.
+
+- **Common grid.** The runs can have different meshes, and each keeps only its own centroid
+  samples, so Studio samples both on one grid: uniform cell centres over the intersection of the
+  two windows, spacing ½ · min(core mesh of A, of B), at most 400 × 400 points. A point takes the
+  centroid E_t = (E_x, E_y) of the triangle that contains it; a point in no triangle of a run is
+  left out of every sum.
+- **Overlap.** η(a, b) = |Σ_g conj(E_A,a)·E_B,b|² / (Σ_g |E_A,a|² · Σ_g |E_B,b|²), with the
+  transverse field only, like the engine's sweep tracker; η does not depend on a mode's arbitrary
+  phase or scale. A degenerate pair (n_eff within 1e-3, as in the [modes table](#modes-table)) is
+  matched as one unit by the mean squared cosine of the principal angles between the two 2-mode
+  spans, and its Δn_eff is the difference of the pair means. A pair against a single mode scores
+  at most 0.5 and is never matched.
+- **Assignment.** Studio computes η for every pair of modes and keeps the one-to-one assignment
+  with the largest total η (every assignment is tried; at most 8 modes per run). A match is
+  accepted when η ≥ 0.8 and η exceeds the next-best value in its row and in its column by at
+  least 0.1: the tracker's defaults `mode_tracking_threshold` and
+  `mode_tracking_margin_threshold`.
+- **Table.** One row per matched mode, *A mode 1 ↔ B mode 1*, with the polarization of both sides
+  (word and TE percentage), the overlap to 2 decimals, n_eff of A and B, Δn_eff (B − A) and Δ % of
+  A. A mode without a match reads *A mode 2: no match in B (best overlap 0.43, with B mode 2)* and
+  shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
+  0.8 on a common grid. A low overlap means the mode changed shape between designs.”
+- **Field picker.** *Matched modes* lists the matched pairs (*A mode 1 ↔ B mode 1 · overlap
+  0.99*; the members of a matched degenerate pair read *pair, any rotation*), and the two plots
+  and the line profile show the chosen pair. With no match the picker is disabled and the plots
+  show mode 1 of each run, marked *not matched*. The choice is not saved: session files are
+  written exactly as before.
+- **Older files.** Matching uses only the stored samples, so it works on every optical run of
+  version 6 and 7 session files, and nothing is added to the files.
+- **Limitations.** η is computed from piecewise-constant centroid samples, so it carries a
+  discretization error of about 1.2 (h / w)² for a mode of width w on a mesh of size h (about
+  1.5e-3 for a 0.4 µm wide mode on 30 and 25 nm meshes), falling as h² when the meshes are
+  refined; this is far below the 0.8 and 0.1 decision gaps. A mode near cutoff can change shape
+  between designs: a low overlap then says so instead of forcing a match. The multiphysics Modes
+  page has no Compare and keeps ranks.
+
+The checks are `tests/simcase/studio_mode_matching.cjs` (shifted Gaussians on two meshes against
+the exact overlap, with the grid and mesh study) and `tests/simcase/test_studio_mode_matching.py`
+(engine runs of silicon strips and the 400 × 400 nm square core fed into Studio's matching).
 
 ## Scope and validation
 
@@ -853,8 +902,8 @@ same line and 0–1 relative scale; each mode retains its own max|E| denominator
 Changing mode/component updates the profile. Line choices are view state saved with the session and browser notebook recovery.
 
 Each plotted step is the stored centroid value of the triangle intersected by
-that interval. There is no field interpolation, smoothing, absolute-power estimate
-or mode tracking. Shared/coincident edges follow the last painted triangle; mesh
+that interval. There is no field interpolation, smoothing or absolute-power estimate;
+on Compare the profile shows the pair chosen in *Matched modes*. Shared/coincident edges follow the last painted triangle; mesh
 gaps remain gaps. The CSV (`studio-profile.csv`) exports job, origin, candidate,
 component, axis, the fixed coordinate, interval endpoints, triangle number, centroid and
 normalized value; every quantity column is `name [unit]` with its SI value

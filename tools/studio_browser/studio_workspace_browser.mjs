@@ -175,7 +175,8 @@ try {
     }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
-  const delta = () => page.eval("(document.getElementById('canvas').innerText.match(/Δn_eff \\(B − A\\), mode rank 1: (-?[0-9]+\\.[0-9]+)/)||[])[1]||null");
+  const delta = () => page.eval("(document.getElementById('compare-description')?.textContent.match(/^.* Shown: A mode 1 ↔ B mode 1, overlap [0-9.]+, Δn_eff \\(B − A\\) ([+−][0-9]+\\.[0-9]+)\\./)||[])[1]||null");
+  const compareTableRows = () => page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent)),matched:[...t.tBodies[0].rows].map(r=>r.dataset.match||null),overlap:[...t.querySelectorAll('[data-overlap]')].map(c=>Number(c.dataset.overlap)),note:document.getElementById('compare-match-note')?.textContent,picker:[...document.querySelectorAll('#compare-mode option')].map(o=>o.textContent)}})()");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
@@ -278,11 +279,14 @@ try {
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
-  const neffTable = await page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent))}})()");
+  const neffTable = await compareTableRows();
   stage('two designs compared', {deltaNeff: before, table: neffTable});
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
-  assert.match(neffTable.head[1], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[2], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
-  assert.equal(neffTable.rows[0][3], before, 'the table and the sentence give the same Δn_eff');
+  assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
+  assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
+  assert.match(neffTable.head[4], /^n_eff A design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B 700 × 300 nm · Silicon · λ 1550 nm$/);
+  assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
+  assert.equal(neffTable.rows[0][6], before, 'the table and the sentence give the same Δn_eff');
   // the field panels do not repeat the name, and come before the n_eff table
   const panels = await page.eval("({headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>h.textContent),plotsFirst:!!(document.querySelector('.compare-grid').compareDocumentPosition(document.getElementById('compare-neff'))&Node.DOCUMENT_POSITION_FOLLOWING),plotTop:Math.round(document.getElementById('compare-field-a').getBoundingClientRect().top+scrollY),viewport:innerHeight})");
   stage('compare panels', panels);
@@ -347,6 +351,24 @@ try {
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
   assert.equal((await opticalSequence()).heading, 'Run 2 · recovered from this browser, not recomputed', 'the optical runs came back');
+  // V17-M2: Compare matches the modes of two runs by field overlap, 500 → 450 nm (both modes
+  // matched with overlap >= 0.95, as V15 (a) on the engine); the picker lists matched pairs and
+  // the old rank note is gone; the Results sentence names the matching
+  for (const width of [500, 450]) { await toGeometry(); await page.type('#shape-w', width); await runAndWait(); }
+  const resultsNote = await text('#canvas'); assert.match(resultsNote, /Modes are ranked by effective index\. Compare matches them between runs by field overlap\./);
+  await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare 500 → 450 nm');
+  const matched = await compareTableRows(); stage('V17-M2 Compare 500 → 450 nm', matched);
+  assert.match(matched.head[4], /^n_eff A 500 × 300 nm/); assert.match(matched.head[5], /^n_eff B 450 × 300 nm/);
+  assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
+  assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
+  for (const r of matched.rows) { assert.match(r[1], /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/); assert.match(r[2], /^(TE-like|TM-like|hybrid) · \d+\.\d % TE$/); assert.match(r[6], /^[+−]\d\.\d{8}$/); }
+  assert.equal(matched.note, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
+  assert.deepEqual(matched.picker.map(o => o.replace(/ · overlap .*$/, '')), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
+  assert.doesNotMatch(await text('#canvas'), /compared by rank|not matched modes|mode rank/i);
+  await page.eval("(()=>{const s=document.getElementById('compare-mode');s.value='1';s.dispatchEvent(new Event('change'));})()"); await sleep(300);
+  assert.match(await text('#compare-shown-a'), /^Mode 2 · /, 'the plots show the chosen matched pair');
+  assert.match(await text('#compare-shown-b'), /^Mode 2 · /); assert.match(await text('#compare-description'), /Shown: A mode 2 ↔ B mode 2, overlap /);
+  await page.screenshot('compare-matched');
 
   // Joule heating (checks JB1-JB7, pre-registered 2026-11-21 with values measured on Linux): the
   // default two-material strip by Picard and by Newton, a server refusal shown with its text, and
