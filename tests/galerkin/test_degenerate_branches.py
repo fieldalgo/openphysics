@@ -234,3 +234,61 @@ def test_d6_the_measured_branch_slopes_of_2026_11_11():
     steep, gentle = group.effective_index_derivative
     assert 5.70 * 0.97 <= steep <= 5.82 * 1.03 and 2.276 * 0.97 <= gentle <= 2.283 * 1.03, (steep, gentle)
     assert 5.53 * 0.95 <= steep <= 5.63 * 1.05 and 2.251 * 0.95 <= gentle <= 2.254 * 1.05, (steep, gentle)
+
+
+# ---------------------------------------------------------------- D10', D10b' the branch combinations (2026-11-22)
+#
+# Re-registered on 2026-11-22 (HQ work record): the first D10 asked for an O(h) decay that does not exist
+# (the agreement is at rounding already) and the first D10b for both coefficients >= 0.2, which depends on
+# the arbitrary basis the eigensolver returns for a degenerate pair. D10' bounds the precise sine in the
+# coefficients; D10b' compares fields, which no choice of basis changes.
+
+def _diagonal_stretch(mesh):
+    x, y = mesh.nodes[:, 0], mesh.nodes[:, 1]
+    taper = (np.clip((1.5 - np.abs(x - 1.5)) / 1.2 + 0.2, 0, 1) * np.clip((1.5 - np.abs(y - 1.5)) / 1.2 + 0.2, 0, 1))
+    g = np.clip((x - 1.5) + (y - 1.5), -0.3, 0.3) / 0.6 * taper
+    W = np.stack([g, g], axis=1)
+    W[np.isclose(x, 0.0) | np.isclose(x, 3.0) | np.isclose(y, 0.0) | np.isclose(y, 3.0)] = 0.0
+    return W
+
+
+def _sorted_fields(mesh, eps, W, h):
+    """The two upper modes' field vectors (et, ez) on X0 + h W, sorted by real effective index."""
+    moved = Mesh(mesh.nodes + h * W, mesh.triangles, mesh.boundary)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        n, _space, et, ez = solve_modes(moved, eps, K0, N_CORE, num_modes=3)
+    order = np.argsort(-np.real(n))
+    return [np.concatenate([et[i], ez[i]]) for i in order[:2]]
+
+
+def _orthogonal_sine(direction, vector):
+    """|v - (d.v) d| / |v| with d = direction / |direction| (precise for small angles)."""
+    d = direction / np.linalg.norm(direction)
+    v = vector / np.linalg.norm(vector)
+    return float(np.linalg.norm(v - np.vdot(d, v) * d))
+
+
+def test_d10_prime_coefficients_follow_the_branch(square):
+    mesh, eps, W = square
+    (group,) = _branches(mesh, eps, W, "jax")
+    combos = np.asarray(group.mode_combination)
+    base = np.stack(_sorted_fields(mesh, eps, W, 0.0), axis=1)
+    for sign, branch in ((1.0, 0), (-1.0, 1)):
+        for h in (1e-4, 1e-5):
+            c = np.linalg.lstsq(base, _sorted_fields(mesh, eps, W, sign * h)[0], rcond=None)[0]
+            assert _orthogonal_sine(combos[:, branch], c) <= 1e-8, (sign, h)
+
+
+def test_d10b_prime_fields_follow_the_branch_under_a_diagonal_stretch(square):
+    mesh, eps, _W = square
+    W = _diagonal_stretch(mesh)
+    (group,) = _branches(mesh, eps, W, "jax")
+    combos = np.asarray(group.mode_combination)
+    base = np.stack(_sorted_fields(mesh, eps, W, 0.0), axis=1)
+    for sign, branch in ((1.0, 0), (-1.0, 1)):
+        predicted = base @ combos[:, branch]
+        for h in (1e-4, 1e-5):
+            moved = _sorted_fields(mesh, eps, W, sign * h)[0]
+            projected = base @ np.linalg.lstsq(base, moved, rcond=None)[0]
+            assert _orthogonal_sine(predicted, projected) <= 1e-8, (sign, h)
