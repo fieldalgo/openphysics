@@ -370,7 +370,7 @@ def solve_elasticity_moving(mesh: Mesh, motion: MeshMotion, *, youngs_modulus, p
     young_modulus, dirichlet, body_force = youngs_modulus, prescribed_displacement, body_force_density
     xp, t = _live_t(motion.t)
     W = _velocity(mesh, motion.design_velocity)
-    _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet)
+    _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet, callbacks=True)
     moved = _checked_step(mesh, W, t)
     base = elasticity.solve_elasticity(moved, youngs_modulus=young_modulus, poisson_ratio=poisson_ratio, plane=plane,
                                        prescribed_displacement=dirichlet, body_force_density=body_force,
@@ -810,14 +810,23 @@ def _elastic_live(xp, mesh, moved, t, W, young_modulus, poisson_ratio, plane, bo
     size = 2 * n
     K = CooMatrix(np.repeat(dofs, 6, axis=1).ravel(), np.tile(dofs, (1, 6)).ravel(), xp.reshape(ke, (-1,)),
                   (size, size))
-    f = np.asarray(to_numpy(body_force), dtype=float).reshape(2)
-    body = scatter_add(xp, size, dofs.ravel(),
-                       xp.reshape((area / 3.0)[:, None, None] * lift(xp, np.broadcast_to(f, (1, 3, 2))), (-1,)))
+    if callable(body_force):
+        local = _sampled_vector_cell_load(xp, X, tris, area, body_force)
+    else:
+        f = np.asarray(to_numpy(body_force), dtype=float).reshape(2)
+        local = (area / 3.0)[:, None, None] * lift(xp, np.broadcast_to(f, (1, 3, 2)))
+    body = scatter_add(xp, size, dofs.ravel(), xp.reshape(local, (-1,)))
     line = xp.zeros(size, dtype=xp.float64)
     for tag, value in _tags(traction, "traction").items():
-        g = np.asarray(value, dtype=float).reshape(2)
         edges, length = _boundary_edges(xp, mesh, X, tag)
         edofs = (2 * edges[:, :, None] + np.arange(2)).reshape(-1)
+        if callable(value):
+            rule = _edge_rule(xp, mesh, moved, X, edges)
+            values = _sampled(rule, value, f"traction[{tag!r}]", vector=True)          # (E, 4, 2)
+            local = xp.sum((rule.weights[:, :, None] * values)[:, :, None, :] * rule.shape[None, :, :, None], axis=1)
+            line = scatter_add(xp, size, edofs, xp.reshape(local, (-1,)), base=line)
+            continue
+        g = np.asarray(value, dtype=float).reshape(2)
         local = (length / 2.0)[:, None, None] * lift(xp, np.broadcast_to(g, (1, 2, 2)))
         line = scatter_add(xp, size, edofs, xp.reshape(local, (-1,)), base=line)
     return _ElasticLive(B, d, area, dofs, K, body, line)
@@ -838,16 +847,20 @@ def _corrected(xp, live, u_base, load, dirichlet):
     return u, residual, reaction
 
 
-def _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet):
+def _check_elastic_data(young_modulus, poisson_ratio, body_force, traction, dirichlet, *, callbacks=False):
+    """``callbacks``: coordinate callbacks of the body force and traction are sampled at the live points
+    (elasticity); the thermoelastic paths keep refusing them."""
     for name, value in (("youngs_modulus", young_modulus), ("poisson_ratio", poisson_ratio)):
         _coefficient(value, name)
-    if callable(body_force):
+    if callable(body_force) and not callbacks:
         raise TypeError("motion: body_force_density is a callback; with a moving mesh its sample points move too, "
                         "which this slice does not differentiate. Give a constant (2,) vector")
     if is_live(body_force) or (isinstance(body_force, (tuple, list)) and any(is_live(v) for v in body_force)):
         raise TypeError("motion: body_force_density is live; in this slice only the motion's t carries a "
                         "derivative")
     for tag, value in _tags(traction, "traction").items():
+        if callable(value) and callbacks:
+            continue
         if callable(value):
             raise TypeError(f"motion: traction[{tag!r}] is a callback; with a moving mesh its sample points move "
                             "too, which this slice does not differentiate. Give a constant (2,) vector")
@@ -958,15 +971,15 @@ def _edge_rule(xp, mesh, moved, X, edges, axisymmetric=False):
     return _EdgeRule(points, normals, weights, S)
 
 
-def _sampled(rule, callback, label):
-    """callback(points, normals) at the live rule points: the library's values, (E, 4)."""
+def _sampled(rule, callback, label, *, vector=False):
+    """callback(points, normals) at the live rule points: the library's values, (E, 4) or (E, 4, 2)."""
     count = rule.weights.shape
     try:
         values = callback(_flat(rule.points), _flat(rule.normals))
     except Exception as exc:
         raise TypeError(f"motion: the callback of {label} must compute with the JAX or PyTorch points and normals it "
                         f"is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
-    return _live_values(values, count, label)
+    return _live_values(values, count, label, components=2 if vector else None)
 
 
 def _sampled_cell_load(xp, X, tris, area, callback, axisymmetric=False):
@@ -993,14 +1006,35 @@ def _flat(a):
     return a.reshape((-1, a.shape[-1]))
 
 
-def _live_values(values, count, label):
+def _live_values(values, count, label, components=None):
     if not is_live(values):
         raise TypeError(f"motion: the callback of {label} returned NumPy numbers for the live points of a motion; "
                         "with a motion it must compute with the JAX or PyTorch points it is given (array API "
                         "operations), so that the moving sample points carry the derivative")
-    if tuple(values.shape) != (count[0] * count[1],):
-        raise ValueError(f"the callback of {label} must return exactly shape (Q,)")
-    return values.reshape(count)
+    if components is None:
+        if tuple(values.shape) != (count[0] * count[1],):
+            raise ValueError(f"the callback of {label} must return exactly shape (Q,)")
+        return values.reshape(count)
+    if tuple(values.shape) != (count[0] * count[1], components):
+        raise ValueError(f"the callback of {label} must return exactly shape (Q, {components})")
+    return values.reshape((count[0], count[1], components))
+
+
+def _sampled_vector_cell_load(xp, X, tris, area, callback):
+    """(T, 3, 2) consistent loads of a body force callback(points) -> (Q, 2) with the 6 x 6 Duffy rule of
+    _mechanics_kernels.body_load, at the live points."""
+    from .core.quadrature import triangle_product_rule
+    bary, weights = triangle_product_rule()
+    B = lift(xp, bary)
+    points = xp.sum(B[None, :, :, None] * X[tris][:, None, :, :], axis=2)   # (T, Q, 2)
+    try:
+        values = callback(_flat(points))
+    except Exception as exc:
+        raise TypeError("motion: the callback of body_force_density must compute with the JAX or PyTorch points it "
+                        f"is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
+    values = _live_values(values, (len(tris), len(weights)), "body_force_density", components=2)
+    local = xp.sum((lift(xp, weights)[None, :, None] * values)[:, :, None, :] * B[None, :, :, None], axis=1)
+    return local * area[:, None, None]
 
 
 def _rule_load(xp, rule, values):

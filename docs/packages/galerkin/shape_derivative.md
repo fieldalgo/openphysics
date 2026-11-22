@@ -113,6 +113,16 @@ stress and the applied, reaction and residual forces per depth carry d/dt.
 - A large rigid displacement offset (Dirichlet values far larger than the
   elastic deformation) costs precision in the result and its derivative, as it
   does in the solver itself.
+- The body force may be a `callback(points) -> (Q, 2)` and a traction a
+  `callback(points, outward_normals) -> (Q, 2)` (2026-11-22). They are called once more at
+  the live points of the ordinary rules (6 × 6 Duffy, 4-point Gauss on edges, unit outward
+  normals), so they must compute with the JAX or PyTorch points they get. The
+  thermoelastic solves below still take constants only.
+  `tests/galerkin/test_shape_derivative_elastic_callbacks.py` holds EL1–EL7: every field
+  equals the moved mesh's ordinary solve within 1e-12, the derivative equals Richardson
+  differences within 1e-8 (also for a pressure on a tilting side), JAX and PyTorch agree
+  within 1e-12, and a fixed body force and a traction on a growing side give the
+  closed-form applied force and its derivative within 1e-10.
 
 ## Thermoelasticity
 
@@ -189,7 +199,7 @@ h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - It must therefore compute with array operations on the points it is given, and be pure.
   A callback that returns NumPy numbers for live points (`np.asarray`, `np.ones(len(p))`),
   or raises on them, is refused with a `TypeError` that names it.
-- Not covered yet: coordinate callbacks in elasticity and 3D heat, and callable coefficients
+- Not covered yet: coordinate callbacks in thermoelasticity and 3D heat, and callable coefficients
   (conductivity and the rest) or Dirichlet values.
 
 `tests/galerkin/test_shape_derivative_callbacks.py` holds E1–E7, pre-registered on 2026-11-22:
@@ -443,7 +453,7 @@ Each refusal names the reason:
   density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat, and coordinate
-  callbacks that compute with the live points in steady and transient heat and for the current density (above);
+  callbacks that compute with the live points in steady and transient heat, for the current density and in elasticity (above);
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,

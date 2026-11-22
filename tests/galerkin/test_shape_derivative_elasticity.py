@@ -293,9 +293,11 @@ def test_m8_refusals():
     common = dict(youngs_modulus=70e9, poisson_ratio=0.33, plane="stress", prescribed_displacement=_clamped_left(m))
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         solve_elasticity(m, **common, motion=MeshMotion(design_velocity=W, t=0.0))
-    with pytest.raises(TypeError, match="body_force_density is a callback"):
+    # body force and traction callbacks take a motion since e5 (test_shape_derivative_elastic_callbacks.py);
+    # NumPy-only ones are refused by name
+    with pytest.raises(TypeError, match="the callback of body_force_density returned NumPy numbers"):
         solve_elasticity(m, **common, body_force_density=lambda p: np.zeros((len(p), 2)), motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match=r"traction\['right'\] is a callback"):
+    with pytest.raises(TypeError, match=r"the callback of traction\['right'\] returned NumPy numbers"):
         solve_elasticity(m, **common, traction={"right": lambda p, n: np.zeros((len(p), 2))}, motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match=r"traction\['right'\] is live"):
         solve_elasticity(m, **common, traction={"right": (xp.asarray(1.0), 0.0)}, motion=MeshMotion(design_velocity=W, t=t))
