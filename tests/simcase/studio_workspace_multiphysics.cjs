@@ -319,3 +319,9 @@ test('a run read from a file or recovered says where it came from in the heading
  assert.deepEqual(m.originRows(rows,'local'),rows);
  assert.deepEqual(m.staleRows(m.originRows(rows,'imported')).map(r=>r.text),['Out of date (last run: From file)','Out of date (last run: From file)']);
 });
+test('an iteration step read from a file keeps its iteration count',async()=>{
+ const m=await mp;
+ const rows=[{group:['heat1','modes1'],label:'Iteration step 1 · Heat 1 ⇄ Modes 1',state:'done',text:'Settled in 7 iterations'},{group:['modes2'],label:'Modes 2',state:'done',text:'Done in 0.4 s'}];
+ assert.deepEqual(m.originRows(rows,'imported').map(r=>r.text),['Settled in 7 iterations · from file','From file']);
+ assert.deepEqual(m.originRows(rows,'recovered').map(r=>r.text),['Settled in 7 iterations · from this browser','From this browser']);
+});

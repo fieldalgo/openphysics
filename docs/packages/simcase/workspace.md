@@ -395,7 +395,8 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   heading and the footer then say the same sentence, “Model matches run 1 again: its results are
   current. Run makes a new run with the same inputs”, which says what Run would do. A run read
   from a session file or recovered from this browser has no solve times: its rows read **From
-  file** or **From this browser**, the dock heading “Run 1 · read from file, not recomputed” (or
+  file** or **From this browser** (an iteration step keeps its count, *Settled in 7 iterations · from
+  file*), the dock heading “Run 1 · read from file, not recomputed” (or
   “recovered from this browser, not recomputed”) and the footer adds “press Run to compute it
   here”; a run made in the tab keeps the words above.
 - **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
