@@ -8,7 +8,7 @@
 // The flat markup carries the hierarchy in aria-level. One tab stop: the selected node, else the
 // first; Up/Down move between visible items, Home/End to the first/last, Enter or Space selects a
 // node (its click handler, unchanged) or opens and closes a group, Right opens a group or moves to
-// its first node, Left closes a group or moves from a node to its group.
+// its first node, Left closes a group or moves from a node to its parent (the item one level up).
 
 export const TREE_NAME='Model tree';
 const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -16,8 +16,9 @@ const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 /** The tree's opening tag: one role="tree" with its accessible name. */
 export const treeOpen=()=>`<div role="tree" aria-label="${TREE_NAME}" class="model-tree">`;
 /** A group heading: a treeitem at level 1 with aria-expanded, not itself selectable. */
-export function groupHeading(name,expanded=true){
- return `<button type="button" role="treeitem" class="tree-heading" aria-level="1" aria-expanded="${expanded}" data-tree-group="${esc(name)}" tabindex="-1"><span aria-hidden="true">${expanded?'▾':'▸'}</span>${esc(name)}</button>`;
+// name: the key its open state is kept under; label: the words shown (default the name)
+export function groupHeading(name,expanded=true,label=name){
+ return `<button type="button" role="treeitem" class="tree-heading" aria-level="1" aria-expanded="${expanded}" data-tree-group="${esc(name)}" tabindex="-1"><span aria-hidden="true">${expanded?'▾':'▸'}</span>${esc(label)}</button>`;
 }
 /** The ARIA attributes of a node: level (1 for a node outside any group, 2 in a group, 3 indented
  * under another node) and whether it is the selected one. */
@@ -44,10 +45,12 @@ export function bindTree(host,state,redraw){
  }
  const visible=()=>[...tree.querySelectorAll('[role=treeitem]')].filter(el=>!el.hidden);
  const items=visible();if(!items.length)return;
- // one tab stop: the item focused last (kept across redraws), else the selected one, else the first
- const stop=find(tree,state.focusKey)||items.find(el=>el.getAttribute('aria-selected')==='true')||items[0];
+ // one tab stop: the selected node, else the first item; the arrows move it while the tree has the
+ // focus, and it goes back to the selected node when the focus leaves the tree
+ const home=()=>visible().find(el=>el.getAttribute('aria-selected')==='true')||visible()[0];
  const roving=target=>{for(const el of tree.querySelectorAll('[role=treeitem]'))el.tabIndex=el===target?0:-1;};
- roving(stop.hidden?items[0]:stop);
+ roving(home());
+ tree.addEventListener('focusout',event=>{if(!tree.contains(event.relatedTarget))roving(home());});
  const move=target=>{if(!target)return;roving(target);state.focusKey=keyOf(target);target.focus();};
  tree.addEventListener('focusin',event=>{const el=event.target.closest?.('[role=treeitem]');if(el){roving(el);state.focusKey=keyOf(el);}});
  tree.addEventListener('keydown',event=>{

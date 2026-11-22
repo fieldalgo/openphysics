@@ -273,8 +273,15 @@ try {
   assert.equal(await page.eval("[...document.querySelectorAll('#tree [data-node=Mesh],#tree [data-node=Study]')].every(e=>e.hidden)"), true);
   await press('End'); assert.equal((await focused()).name, 'Analysis', 'End skips the nodes of a closed group');
   await press('ArrowRight'); assert.equal((await focused()).expanded, 'true'); await press('ArrowRight'); assert.equal((await focused()).name, 'Mesh');
+  // Enter and Space on a group heading close and open it once each (no second, native click)
+  await press('ArrowLeft'); at = await focused(); assert.deepEqual([at.name, at.expanded], ['Analysis', 'true']);
+  await press('Enter'); assert.equal((await focused()).expanded, 'false'); await press(' '); assert.equal((await focused()).expanded, 'true');
   await press('Home'); await press('ArrowDown'); await press('Enter'); at = await focused();
   assert.deepEqual([at.name, at.selected], ['Geometry', 'true']); await page.until("!!document.querySelector('#shape-w')", 'Geometry by keyboard');
+  // the tab stop goes back to the selected node when the focus leaves the tree
+  await page.onElement('function(s){const e=[...this.querySelectorAll(s)].find(b=>b.dataset.node==="Geometry");e.focus();return true}', '#tree [role=treeitem]');
+  await press('ArrowDown'); await press('ArrowDown'); assert.equal((await focused()).name, 'Physics'); await press('Tab');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#tree [role=treeitem][tabindex=\"0\"]')].map(e=>e.dataset.node)"), ['Geometry']);
   await checkTree('optical after keys', opticalNodes);
   await page.type('#shape-w', 600);
   assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / Unsaved inputs');

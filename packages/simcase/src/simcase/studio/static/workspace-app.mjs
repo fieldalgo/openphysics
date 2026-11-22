@@ -587,7 +587,7 @@ function completeLoad(pending){
   render();
   savedNotebookState=pending.source==='file'||matched?notebookStamp():null;savedRunsState=pending.source==='file'||matched?runsStamp():null;
   // a record without a session file belongs to a notebook never saved: no file name carries over
-  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:matched?saveStamp():null,recovered:true}:null;
+  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:file.current===true?saveStamp():null,recovered:true}:null;
   // the title says what is open until the next change: the file opened, or browser recovery
   // file: the session file the notebook came from (opened, or named by the recovered record), and
   // whether the record said it still matched it
@@ -1170,7 +1170,8 @@ function frameComparePlots(grid){
  if(need>0)pane.scrollTop+=Math.min(need,Math.max(0,room));
 }
 function renderComparison(){
- const opening=!compareOpen;compareOpen=true;
+ // set once the plots are drawn: a Compare shown without plots (one run, a run without fields) frames them when they come
+ const opening=!compareOpen;
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
  if(runs.length<2){host.insertAdjacentHTML('beforeend','<p>Compute two designs to compare their fields and inputs. Existing results stay attached to their original inputs.</p>');return;}
  if(!runs.some(r=>r.job===compareIds[0]))compareIds[0]=runs.at(-2).job;
@@ -1196,7 +1197,7 @@ function renderComparison(){
  $('compare-mode').onchange=()=>{const c=choices[+$('compare-mode').value];if(c){compareChoice={a:c.a,b:c.b};render();}};
  for(const [id,key] of [['compare-component','component'],['compare-window','window']])$(id).onchange=()=>{fieldView[key]=$(id).value;render();};
  fieldResize=new ResizeObserver(redraw);fieldResize.observe(grid);redraw();renderLineProfile(host,[a,b],redraw,()=>shown);
- if(opening)frameComparePlots(grid);
+ compareOpen=true;if(opening)frameComparePlots(grid);
 }
 let pendingRunImport=null;
 const runImportDialog=document.createElement('dialog');runImportDialog.id='run-import-confirm';runImportDialog.setAttribute('aria-labelledby','run-import-title');runImportDialog.setAttribute('aria-describedby','run-import-summary run-import-description');runImportDialog.innerHTML='<h2 id="run-import-title">Add saved runs to this notebook?</h2><p id="run-import-summary"></p><p id="run-import-description">Current model inputs stay unchanged. Matching existing runs retain their names, pins and provenance. Imported fields are not recomputed.</p><button id="cancel-run-import">Keep notebook</button> <button id="confirm-run-import">Import runs</button>';document.body.append(runImportDialog);
