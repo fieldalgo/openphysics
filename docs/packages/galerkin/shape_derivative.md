@@ -87,6 +87,16 @@ and call `.backward()`.
   data) are both taken. On a gauge component the motion must keep the net imposed
   current at zero, for example by keeping the current-carrying sides' lengths.
   Otherwise the problem has no solution next to t, and the call is refused.
+- A current density may be a `callback(position, outward_normal)` (2026-11-22). It is
+  called once more at the live points and normals of the ordinary 4-point Gauss edge rule,
+  so it must compute with the JAX or PyTorch points it gets. On a component without
+  prescribed volts (a gauge component) a callback current is refused by name: the check
+  above takes constant current densities only.
+  `tests/galerkin/test_shape_derivative_electric_callbacks.py` holds EE1–EE7: every field
+  equals the moved mesh's ordinary solve within 1e-12, the power derivative equals
+  Richardson differences within 1e-8 (also for a normal-dependent current on a tilting
+  side), JAX and PyTorch agree within 1e-12, and a current J0·y on a growing side gives
+  the closed-form reaction −J0·H²/2 and its derivative within 1e-10.
 - As in the solver, volts are taken relative to each component's offset, so a
   large common-mode voltage does not reach the power or its derivative.
 - The discrete power identity, Joule power = supplied power, also holds for the
@@ -179,7 +189,7 @@ h and ambient `callback(points, normals)`, alone or inside a convection pair.
 - It must therefore compute with array operations on the points it is given, and be pure.
   A callback that returns NumPy numbers for live points (`np.asarray`, `np.ones(len(p))`),
   or raises on them, is refused with a `TypeError` that names it.
-- Not covered yet: coordinate callbacks in steady electric conduction, elasticity and 3D heat, and callable coefficients
+- Not covered yet: coordinate callbacks in elasticity and 3D heat, and callable coefficients
   (conductivity and the rest) or Dirichlet values.
 
 `tests/galerkin/test_shape_derivative_callbacks.py` holds E1–E7, pre-registered on 2026-11-22:
@@ -433,7 +443,7 @@ Each refusal names the reason:
   density, body force or traction, also inside a convection pair, and
   `ElementHeatSource` and `ElementConductivity`: their sample points move with
   the mesh. Callbacks of time alone are taken in transient heat, and coordinate
-  callbacks that compute with the live points in steady and transient heat (above);
+  callbacks that compute with the live points in steady and transient heat and for the current density (above);
 - callable coefficients or Dirichlet values (other than callbacks of time in
   transient heat): a motion takes constants;
 - live conductivity, source, boundary, Dirichlet, reference, elastic-constant,
