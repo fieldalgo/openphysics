@@ -196,7 +196,7 @@ def _free_dofs(mesh, space, pec_nodes, pec_edges):
 
 def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                 num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None, coordinate_factors=None,
-                motion=None):
+                motion=None, coordinate_bend=None):
     """Guided modes with effective index near n_target.
 
     eps_r, mu_r and k0 may be JAX or PyTorch values; n_eff, et and ez are then
@@ -245,10 +245,16 @@ def solve_modes(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     and n_eff, et and ez carry the derivative with respect to the JAX or PyTorch
     scalar t (a shape derivative; docs/packages/galerkin/shape_derivative.md).
     Degenerate modes get NaN derivatives and a DegenerateModeWarning, as above.
+    With a motion, coordinate_factors are those of the mesh at the step t; an element whose
+    stretch (sx, sy) is not 1 must keep every node in place. coordinate_bend=(radius, axis,
+    origin) names the bend of those factors (axis "x" or "y"): the window elements then move,
+    and their h = 1 + (centroid - origin) / radius follows the nodes (with a motion only).
     """
     if motion is not None:
         return _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_nodes, pec_edges,
-                                   coordinate_factors)
+                                   coordinate_factors, coordinate_bend)
+    if coordinate_bend is not None:
+        raise ValueError("coordinate_bend is taken with a motion only; without one, coordinate_factors hold the bend")
     if contains_live(coordinate_factors):
         raise TypeError("coordinate_factors: derivatives with respect to modal coordinates are "
                         "not provided; pass NumPy factors")
@@ -361,7 +367,7 @@ _MIDPOINT_LAMBDA = 0.5 * (np.ones((3, 3)) - np.eye(3))     # lambda_i at the edg
 
 
 def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_nodes, pec_edges,
-                        coordinate_factors):
+                        coordinate_factors, coordinate_bend=None):
     """``solve_modes`` on X0 + t W with the derivative with respect to ``motion.t``.
 
     The NumPy eigensolve runs on the moved mesh; each mode then takes the bordered
@@ -376,16 +382,34 @@ def _solve_modes_moving(mesh, motion, eps_r, k0, n_target, num_modes, mu_r, pec_
         if contains_live(value):
             raise TypeError(f"motion: {name} is live; in this slice only the motion's t carries a derivative")
     step = motion_step(mesh, motion)
+    if coordinate_bend is not None and coordinate_factors is None:
+        raise ValueError("motion: coordinate_bend needs the coordinate_factors of the bend")
     if coordinate_factors is not None:
-        coordinate_factors = _fixed_coordinate_factors(mesh, step.design_velocity, coordinate_factors)
+        coordinate_factors = _fixed_coordinate_factors(mesh, step.design_velocity, coordinate_factors,
+                                                       bend=coordinate_bend is not None)
+    bend = None if coordinate_bend is None else _checked_bend(coordinate_bend)
     n_eff0, space, et0, ez0 = _solve_modes_numpy(step.moved, eps_r, k0, n_target, num_modes, mu_r, pec_nodes,
                                                  pec_edges=pec_edges, coordinate_factors=coordinate_factors)
     xp, A, B, free = _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges,
-                                    coordinate_factors=coordinate_factors)
+                                    coordinate_factors=coordinate_factors, coordinate_bend=bend)
     return _refined_modes(xp, A, B, (step.t,), free, space, float(k0), n_eff0, et0, ez0)
 
 
-def _fixed_coordinate_factors(mesh, W, coordinate_factors):
+def _checked_bend(coordinate_bend):
+    """(radius, axis index, origin) of coordinate_bend=(radius, "x" | "y", origin)."""
+    try:
+        radius, axis, origin = coordinate_bend
+    except (TypeError, ValueError):
+        raise ValueError("motion: coordinate_bend must be (radius, axis, origin)") from None
+    if axis not in ("x", "y"):
+        raise ValueError("motion: coordinate_bend axis must be 'x' or 'y'")
+    radius, origin = float(radius), float(origin)
+    if not (np.isfinite(radius) and radius > 0 and np.isfinite(origin)):
+        raise ValueError("motion: coordinate_bend needs a finite positive radius and a finite origin")
+    return radius, 0 if axis == "x" else 1, origin
+
+
+def _fixed_coordinate_factors(mesh, W, coordinate_factors, *, bend=False):
     """Coordinate factors that a motion leaves unchanged, or a refusal by name.
 
     The factors are those of the moved mesh at the step t (diagonal (sx, sy, h) per element). A PML
@@ -397,7 +421,8 @@ def _fixed_coordinate_factors(mesh, W, coordinate_factors):
     if contains_live(coordinate_factors) or f.shape != (mesh.num_triangles, 3) or not np.isfinite(f).all() \
             or np.any(f == 0):
         raise ValueError("motion: coordinate_factors must be finite nonzero NumPy numbers (triangles, 3)")
-    stretched = np.any(f != 1, axis=1)
+    # with a bend every h differs from 1; only the stretch (sx, sy) marks a PML element then
+    stretched = np.any((f[:, :2] if bend else f) != 1, axis=1)
     nodes = np.unique(mesh.triangles[stretched])
     moving = nodes[np.any(np.asarray(W)[nodes] != 0, axis=1)]
     if len(moving):
@@ -562,7 +587,8 @@ def _jacobian(xp, function, t0):
     return torch.autograd.functional.jacobian(function, torch.tensor(t0, dtype=torch.float64)).detach().numpy()
 
 
-def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, coordinate_factors=None):
+def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, coordinate_factors=None,
+                   coordinate_bend=None):
     """(xp, A, B, free): the restricted pencil assembled from the live node coordinates of ``step``.
 
     ``coordinate_factors`` (NumPy (T, 3), sx, sy, h) weigh the blocks as in ``_mode_blocks``; a motion
@@ -600,7 +626,17 @@ def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, 
     else:
         # J = diag(sx, sy, h): the coefficients of _mode_blocks, with the 2 x 2 diagonal tensors written
         # per component (x: the b / first components, y: the c / second ones)
-        sx, sy, h = (lift(xp, column) for column in np.asarray(coordinate_factors).T)
+        f = np.asarray(coordinate_factors)
+        sx, sy, h = (lift(xp, column) for column in f.T)
+        if coordinate_bend is not None:
+            # window elements (sx = sy = 1) move: their h = 1 + (centroid - origin) / R follows the live
+            # centroid, written as the number at the step plus the live change (exact derivative)
+            radius, axis, _origin = coordinate_bend
+            window = np.all(f[:, :2] == 1, axis=1)
+            X = lift(xp, mesh.nodes) + step.t * lift(xp, step.design_velocity)
+            centre = xp.sum(X[:, axis][cells], axis=1) / 3.0
+            centre0 = step.moved.nodes[cells][:, :, axis].mean(axis=1)
+            h = h + lift(xp, window.astype(float)) * (centre - lift(xp, centre0)) / radius
         dx, dy = inv_mu * sy / (sx * h), inv_mu * sx / (sy * h)
 
         def weighted(cx, cy):
