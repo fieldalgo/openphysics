@@ -432,6 +432,8 @@
 {"default": {"plots": false, "save_fields": true}, "default_reason": "structural default of mechanics documents", "kind": "override", "pattern": "results", "physics_kind": "mechanics"},
 {"default": {"plots": false, "save_fields": true}, "default_reason": "structural default of heat documents", "kind": "override", "pattern": "results", "physics_kind": "thermal.steady2d"},
 {"default": {"plots": false, "save_fields": true}, "default_reason": "structural default of heat documents", "kind": "override", "pattern": "results", "physics_kind": "thermal.transient2d"},
+{"forms": ["OBJECT"], "kind": "structural", "pattern": "results.group_index", "physics_kind": "em.modes2d"},
+{"default": "1 nm", "default_reason": "length default: a 1 nm central-difference step", "forms": ["QS", "AV"], "kind": "quantity", "pattern": "results.group_index.wavelength_step", "physics_kind": "em.modes2d", "quantity": "wavelength_step"},
 {"forms": ["OBJECT"], "kind": "structural", "pattern": "results.mode_overlap", "physics_kind": "em.modes2d"},
 {"forms": ["OBJECT"], "kind": "structural", "pattern": "results.mode_overlap.gaussian", "physics_kind": "em.modes2d", "required": true},
 {"forms": ["QS", "AV"], "kind": "quantity", "pattern": "results.mode_overlap.gaussian.beam_waist_radius", "physics_kind": "em.modes2d", "quantity": "beam_waist_radius", "required": true},

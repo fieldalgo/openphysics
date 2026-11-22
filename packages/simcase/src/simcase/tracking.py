@@ -161,3 +161,68 @@ class ModeTracker:
         evidence = dict(candidate_count=count, candidate_ranks=(selected + 1).tolist(),
                         overlaps=None if overlap is None else overlap.tolist(), margins=margins)
         return neff[selected], aligned, evidence
+
+
+def match_modes(tracker: ModeTracker, reference, neff, field, reference_neff, location):
+    """Match each reference mode to a candidate of one other solve on the same mesh, mode by mode.
+
+    The tests are those of ``ModeTracker.step`` with the tracker's settings and product: the
+    optimal assignment of the normalized squared L2 overlaps, overlap >= the overlap threshold,
+    full-assignment margin >= the margin threshold, not the last candidate of a full search,
+    no other candidate (nor other reference mode) within the degeneracy tolerance. Where
+    ``step`` raises on the first failure, this returns, for each reference mode, the matched
+    candidate column (-1 when unmatched) and None or the reason it is unmatched.
+    """
+    settings, count, requested = tracker.settings, len(neff), tracker.num_modes
+    columns = np.full(requested, -1)
+    reasons: list[str | None] = [None] * requested
+
+    def fail(mode, reason):
+        if reasons[mode] is None:
+            reasons[mode] = f"{location}: {reason}"
+
+    for mode in range(requested):
+        others = np.delete(reference_neff, mode)
+        if len(others) and np.min(abs(others - reference_neff[mode])) <= settings["degeneracy_tolerance"]:
+            fail(mode, f"near-degenerate with another requested mode within n_eff tolerance "
+                       f"{settings['degeneracy_tolerance']:g}")
+    if count == 0:
+        for mode in range(requested):
+            fail(mode, "no guided candidate (cutoff or incomplete search)")
+        return columns, reasons
+    cross = tracker.product(reference, field)
+    old_norm = np.diag(tracker.product(reference, reference)).real
+    new_norm = np.diag(tracker.product(field, field)).real
+    if (not np.isfinite(cross).all() or not np.isfinite(old_norm).all() or not np.isfinite(new_norm).all()
+            or np.any(old_norm <= 0) or np.any(new_norm <= 0)):
+        for mode in range(requested):
+            fail(mode, "non-finite or zero L2 norm")
+        return columns, reasons
+    scores = np.clip(abs(cross) ** 2 / (old_norm[:, None] * new_norm[None, :]), 0, 1)
+    rows, selected = linear_sum_assignment(scores, maximize=True)
+    overlap = scores[rows, selected]
+    best = float(overlap.sum())
+    boundary = count - 1
+    for mode, column, score in zip(rows, selected, overlap):
+        if score < settings["min_overlap"]:
+            fail(mode, f"weak overlap {score:.6g} < {settings['min_overlap']:g} (lost or unresolved branch)")
+        alternative = scores.copy()
+        alternative[mode, column] = -np.inf
+        try:
+            r, c = linear_sum_assignment(alternative, maximize=True)
+            margin = max(0.0, best - float(alternative[r, c].sum()))
+        except ValueError:  # no alternative complete assignment exists
+            margin = None
+        if margin is not None and margin < settings["min_margin"]:
+            fail(mode, f"ambiguous assignment margin {margin:.6g} < {settings['min_margin']:g}")
+        if count >= settings["search_modes"] and column == boundary:
+            fail(mode, "the match is the last candidate of the search (an unseen partner may exist)")
+        others = np.delete(neff, column)
+        if len(others) and np.min(abs(others - neff[column])) <= settings["degeneracy_tolerance"]:
+            fail(mode, f"near-degenerate within n_eff tolerance {settings['degeneracy_tolerance']:g}")
+        columns[mode] = column
+    for mode in range(requested):
+        if mode not in rows:
+            fail(mode, f"found only {count} candidates for {requested} modes (cutoff or incomplete search)")
+    columns[[reason is not None for reason in reasons]] = -1
+    return columns, reasons

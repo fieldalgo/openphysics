@@ -139,7 +139,8 @@ applied automatically at every wavelength of a sweep. `study.parameter` must be 
 existing dotted path under `physics.`; the wavelength is `physics.<name>.vacuum_wavelength`,
 whose values are a tagged array (`{"unit": "um", "values": [...]}`). Geometry, mesh and material sweeps are
 rejected because the mesh is built once. Sweeping a wavelength also yields the
-group index.
+group index; a single study yields it with `results.group_index`, three solves on
+the same mesh ([group index of a single study](group_index.md)).
 
 For optical modes the physics is `em.modes2d`, either `scalar` (exact for TE slab modes,
 an approximation for 2D high-contrast cores) or full `vector` for single points
@@ -422,7 +423,7 @@ doc = Document.load("model.json")
 res = run(doc)
 res.effective_index      # (study points, modes); Im >= 0 is loss under exp(-i omega t)
 res.vacuum_wavelength    # (study points,), metres
-res.group_index()        # when sweeping the wavelength
+res.group_index()        # when sweeping the wavelength, or with results.group_index
 res.propagation_loss()   # dB/m: (40 pi / ln 10) Im(n_eff) / lambda0
 res.save("out/")
 ```
@@ -742,6 +743,7 @@ script / CLI  ->  runs the document      simcase.run
 | Multiphysics documents | [Contract](multiphysics_document.md) | [한국어](../../locales/ko/pages/packages/simcase/multiphysics_document.md) |
 | Waveguide tutorial | [Analyse your own waveguide](waveguide_tutorial.md) | [한국어](../../locales/ko/pages/packages/simcase/waveguide_tutorial.md) |
 | Vector subspace tracking | [Guide](vector_subspace_tracking.md) | [한국어](../../locales/ko/pages/packages/simcase/vector_subspace_tracking.md) |
+| Group index of a single study | [Contract](group_index.md) | [한국어](../../locales/ko/pages/packages/simcase/group_index.md) |
 | Cavity documents | [Contract](cavity3d.md) | [한국어](../../locales/ko/pages/packages/simcase/cavity3d.md) |
 | Steady heat documents | [Contract](thermal_steady2d.md) | [한국어](../../locales/ko/pages/packages/simcase/thermal_steady2d.md) |
 | Steady heat validation | [Report](thermal_simcase_independent_validation.md) | [한국어](../../locales/ko/pages/packages/simcase/thermal_simcase_independent_validation.md) |

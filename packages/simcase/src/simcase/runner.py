@@ -352,6 +352,9 @@ class RunResult:
     study_values: np.ndarray | None = None
     #: n_g = n_eff - lambda dn/dlambda (computed in the kernel frame), None when not defined
     group_index_values: np.ndarray | None = None
+    #: with ``results.group_index`` (a single study): how ``group_index_values`` was computed and
+    #: why a mode's value is null (``group_index_method``); None otherwise
+    group_index_method: dict | None = None
     #: the coupled inputs of a multiphysics run, saved in fields.npz (``temperature`` per triangle,
     #: ``refractive_index`` per study point and triangle); None for a single-physics run
     coupled_inputs: dict | None = None
@@ -373,7 +376,8 @@ class RunResult:
         return self.propagation_loss() * (np.pi * bend["bend_radius"] / 2)
 
     def group_index(self) -> np.ndarray | None:
-        """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength (else None)."""
+        """n_g = n_eff - lambda dn/dlambda when the study sweeps the wavelength or a single study
+        asks for ``results.group_index`` (NaN for a mode the tracker did not match; else None)."""
         return self.group_index_values
 
     # -- output ------------------------------------------------------------
@@ -402,6 +406,8 @@ class RunResult:
             arrays["field_representation"] = self._representation()
         if self.mode_tracking is not None:
             arrays.update(mode_tracking_json=json.dumps(self.mode_tracking), group_index=self.group_index())
+        if self.group_index_method is not None:
+            arrays["group_index"] = self.group_index()
         if self.postprocessing is not None:
             arrays.update(self.postprocessing)
         if self.open_boundary is not None:
@@ -473,6 +479,8 @@ class RunResult:
                 out["bend_loss"] = _series(loss, "bend_loss")
         if self.mode_tracking is not None:
             out["mode_tracking"] = copy.deepcopy(self.mode_tracking)
+        if self.group_index_method is not None:
+            out["group_index_method"] = copy.deepcopy(self.group_index_method)
         if self.postprocessing is not None:
             out["mode_postprocessing"] = mode_postprocessing.summary_block(
                 self.postprocessing, vector=self.vector_fields is not None, region_names=self.region_names,
@@ -731,11 +739,18 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
         say(f"  {location}: n_eff = " + ", ".join(_shown(n) for n in res["neff"]) +
             ("  (PML candidates; stability not checked)" if open_diagnostics is not None
              else "" if res["guided"].all() else "  (some modes below cladding index: not guided)"))
+    group = None
+    if "group_index" in k["results"]:
+        from .group_index import single_point
+        group = single_point(model, kp, k["results"]["group_index"]["wavelengths"], neffs[0],
+                             fields[0] if vector_fields is None else vector_fields[0], say)
     t_solve = time.time() - t0
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
     kernel = dict(parameter=parameter, values=values, wavelength=kp["wavelength"], neff=np.array(neffs),
                   fields=fields, vector_fields=vector_fields, tracking=tracking, open_boundary=open_diagnostics,
                   postprocessing=None if postprocessing is None else mode_postprocessing.stack_points(postprocessing))
+    if group is not None:
+        kernel["group_index"] = group
     return _to_public(doc, model, kernel, {"mesh": t_mesh, "solve": t_solve}, log)
 
 
@@ -809,6 +824,15 @@ def _kernel_group_index(parameter, values, neff, vector, tracked):
     wl = np.asarray(values, dtype=float)
     order = 2 if tracked else 1
     return neff - wl[:, None] * np.gradient(neff, wl, axis=0, edge_order=order)
+
+
+def _public_group_index_method(doc: Document, group: dict) -> dict:
+    """``group_index_method`` of a single study with ``results.group_index``: the step in metres
+    from its exact value, the tracker's name and the reason of each null value."""
+    step = float(Fraction(modes_document._exact(doc, "results.group_index.wavelength_step")))
+    return {"method": "central_difference",
+            "wavelength_step": results_common.value_object(step, "wavelength_step"),
+            "tracking": group["tracking"], "reasons": list(group["reasons"])}
 
 
 def _public_tracking(tracking: dict | None) -> dict | None:
@@ -925,6 +949,9 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
     if parameter is not None and not wavelength_sweep:
         study_values = np.asarray(study["values"])
     group = None if "cluster_offsets" in kernel else _kernel_group_index(parameter, values, neff, vector, tracked)
+    group_method = None
+    if "group_index" in kernel:
+        group, group_method = kernel["group_index"]["values"], _public_group_index_method(doc, kernel["group_index"])
     public_fields = None if not vector else [field(f) for f in kernel["vector_fields"]]
     common = dict(doc=doc, node_coordinates=model.tri.nodes, triangles=model.tri.triangles,
                   regions=model.tri.regions, region_names=list(model.tri.region_names),
@@ -937,7 +964,8 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
                   open_boundary=None if kernel["open_boundary"] is None
                   else [_public_open_boundary(d) for d in kernel["open_boundary"]],
                   postprocessing=postprocessing(kernel["postprocessing"], vector, public_fields),
-                  study_values=study_values, group_index_values=None if group is None else np.conj(group))
+                  study_values=study_values, group_index_values=None if group is None else np.conj(group),
+                  group_index_method=group_method)
     if "cluster_offsets" not in kernel:
         return RunResult(**common)
     from .subspace_result import SubspaceSweepResult, kernel_cluster_means

@@ -246,6 +246,12 @@ n_eff 2.4441  n_g 4.1923
 The group index needs the same mesh check as n_eff, and also a wavelength step
 fine enough for the finite difference.
 
+For one wavelength, keep `"study": {"type": "single"}` and add
+`"results": {"group_index": {"wavelength_step": "1 nm"}}`: the run solves the same
+mesh at λ ∓ 1 nm as well (about three times the time) and saves `group_index` per
+mode, `null` with a reason for a mode it cannot match
+([group index of a single study](group_index.md)).
+
 `result.save("strip_results")` (or `python -m simcase run`) writes the folder
 from step 1:
 

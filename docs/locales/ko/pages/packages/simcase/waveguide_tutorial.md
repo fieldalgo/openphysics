@@ -234,6 +234,11 @@ n_eff 2.4441  n_g 4.1923
 군굴절률에도 n_eff와 같은 메시 점검이 필요하고, 유한차분에 충분히 촘촘한 파장
 간격도 필요합니다.
 
+한 파장에서는 `"study": {"type": "single"}`을 그대로 두고
+`"results": {"group_index": {"wavelength_step": "1 nm"}}`를 더하세요. 실행은 같은
+메시를 λ ∓ 1 nm에서도 풀고(시간은 약 세 배) 모드마다 `group_index`를 저장합니다.
+대응시키지 못한 모드는 이유와 함께 `null`입니다([단일 study의 군굴절률](group_index.md)).
+
 `result.save("strip_results")`(또는 `python -m simcase run`)는 1단계의 폴더를
 씁니다.
 

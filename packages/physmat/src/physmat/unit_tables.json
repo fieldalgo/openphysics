@@ -2725,6 +2725,7 @@
   "volumetric_heat_capacity": "volumetric_heat_capacity",
   "von_mises_stress": "von_mises_stress",
   "wall_time": "wall_time",
+  "wavelength_step": "wavelength_step",
   "wavenumber_squared": "wavenumber_squared",
   "youngs_modulus": "youngs_modulus"
  },
@@ -2739,6 +2740,6 @@
   "outward_heat_flux": {"rank": ["scalar"]}
  },
  "display_groups": {
-  "length": {"menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil"], "quantities": ["air_wavelength", "beam_waist_radius", "bend_origin", "bend_radius", "box_size", "depth", "design_velocity", "displacement", "displacement_r", "displacement_x", "displacement_y", "displacement_z", "element_size", "expected_extent", "huray_sphere_radius", "length", "line_length", "lower_corner_position", "maximum_displacement", "maximum_displacement_r", "maximum_displacement_x", "maximum_displacement_y", "maximum_displacement_z", "mode_field_diameter", "node_coordinates", "perimeter", "pml_thickness", "position", "prescribed_displacement", "prescribed_displacement_r", "prescribed_displacement_x", "prescribed_displacement_y", "prescribed_displacement_z", "radius", "refinement_distance", "resonance_wavelength", "rms_roughness", "sheet_thickness", "skin_depth", "thickness", "unnormalized_electric_field_line_integral", "upper_corner_position", "vacuum_wavelength"], "shape_numbers": true}
+  "length": {"menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil"], "quantities": ["air_wavelength", "beam_waist_radius", "bend_origin", "bend_radius", "box_size", "depth", "design_velocity", "displacement", "displacement_r", "displacement_x", "displacement_y", "displacement_z", "element_size", "expected_extent", "huray_sphere_radius", "length", "line_length", "lower_corner_position", "maximum_displacement", "maximum_displacement_r", "maximum_displacement_x", "maximum_displacement_y", "maximum_displacement_z", "mode_field_diameter", "node_coordinates", "perimeter", "pml_thickness", "position", "prescribed_displacement", "prescribed_displacement_r", "prescribed_displacement_x", "prescribed_displacement_y", "prescribed_displacement_z", "radius", "refinement_distance", "resonance_wavelength", "rms_roughness", "sheet_thickness", "skin_depth", "thickness", "unnormalized_electric_field_line_integral", "upper_corner_position", "vacuum_wavelength", "wavelength_step"], "shape_numbers": true}
  }
 }
