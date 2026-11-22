@@ -31,7 +31,14 @@ const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return 
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
-export function persistenceTitle({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// viewed: {run, name} when the run Results shows has other inputs than the current ones and no
+// input was edited: the title says so, so it agrees with the step bar and the dock ("current inputs
+// differ from this run") without reading as unsaved edits.
+export function persistenceTitle(state,when){
+ const base=titleOf(state,when),v=state.viewed;
+ return v&&!state.invalid?`${base} · viewing Run ${v.run}${v.name?' · '+v.name:''}, which used other inputs`:base;
+}
+function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
  const problem=runsUnsaved||saved||loaded?.current?(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:''):'';
@@ -92,12 +99,15 @@ export function leaveConfirmText({from,runs=0,saved=false,target='the other mode
  return null;
 }
 // The Messages line when another model opens over optical runs: where those runs are, in words
-// that stay true. This tab holds them until it is closed or reloaded; file: the session file that
-// holds them as they are, recovery: browser recovery holds them. After a reload only those hold
-// them, so the line says how to get them back from each. '' when there are no optical runs.
+// that stay true. text: one short line; more: the rest, shown behind More. This tab holds them
+// until it is closed or reloaded; file: the session file that holds them as they are, recovery:
+// browser recovery holds them. After a reload only those hold them, so more says how to get them
+// back from each. {text: '', more: ''} when there are no optical runs.
 export function opticalRunsStayText({runs=0,file=null,recovery=false}){
- if(!runs)return '';
- const them=runs===1?'it':'them',tab=`Optical waveguide and its ${plural(runs,'run')} stay in this tab until it is closed or reloaded; choose Models › Optical waveguide to return to ${them}.`;
+ if(!runs)return {text:'',more:''};
+ const one=runs===1,them=one?'it':'them';
+ const text=`Optical waveguide ${one?'run stays':'runs stay'} in this tab · Models › Optical waveguide returns to ${them}`;
  const back=[...(recovery?['Models › Optical waveguide › Resume (browser recovery, which keeps the four newest sessions)']:[]),...(file?[`Open session with ${file}`]:[])];
- return tab+(back.length?` After that, ${back.join(' or ')} brings ${them} back.`:` After that, no file or browser recovery holds ${them}.`);
+ const more=`This tab holds ${plural(runs,'run')} until it is closed or reloaded.`+(back.length?` After that, ${back.join(' or ')} brings ${them} back.`:` After that, no file or browser recovery holds ${them}.`);
+ return {text,more};
 }

@@ -92,3 +92,36 @@ test('the Results step describes the run being viewed, in neutral words that nam
  assert.equal(inputsDifferText(['a'],['a']),'Current inputs differ from this run in other settings');
  for(const text of [steps[4].detail,inputsDifferText(['a'],['b'])])assert.doesNotMatch(text,/edit/i);
 });
+test('round 9 (J4): the line under a result names each difference once, then what is unchanged',async()=>{
+ const W=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs');
+ const older=input();older.model.wavelength=1550;older.model.coreMesh=30;older.model.shapes=[{...older.model.shapes[0],w:600,h:300}];
+ const newer=structuredClone(older);newer.model.shapes=[{...newer.model.shapes[0],w:700}];
+ const line=W.runInputsLine(W.opticalInputParts(older),W.opticalInputParts(newer));
+ assert.equal(line,'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm');
+ for(const part of ['600 × 300 nm','700 × 300 nm','λ 1550 nm','core mesh 30 nm'])assert.equal(line.split(part).length,2,part);
+ assert.equal(W.runInputsLine(W.opticalInputParts(older),W.opticalInputParts(older)),'Result for the current inputs · 600 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ assert.equal(W.runInputsLine(['a','b'],['c','d']),'Current inputs differ from this run: this run a · b, current c · d');
+});
+test('round 9 (J5): the dock heading and the footer describe the run being viewed, named with its number',async()=>{
+ const W=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs');
+ const older=input(),newer=input();newer.model.shapes=[{...newer.model.shapes[0],w:700}];
+ const runs=[{signature:JSON.stringify(older),label:'Design A',origin:'recovered'},{signature:JSON.stringify(newer),label:'Design B',origin:'recovered'}];
+ // Design A (run 1) viewed, the inputs are Design B's (run 2)
+ let f=W.opticalFreshness(newer,runs,runs[0]);
+ assert.deepEqual(f,{state:'other',run:1,name:'Design A',origin:'recovered',has:2});
+ assert.equal(W.opticalSequenceHeading(f),'Run 1 · Design A · current inputs differ from this run');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · Design A · current inputs differ from this run · Run 2 has them');
+ // the step bar says the same of the same run
+ assert.equal(W.opticalWorkflow({input:newer,runs,viewed:runs[0]})[4].detail,'Current inputs differ from this run');
+ // Design B viewed: it is the current inputs' run, recovered
+ f=W.opticalFreshness(newer,runs,runs[1]);
+ assert.equal(W.opticalSequenceHeading(f),'Run 2 · Design B · recovered from this browser, not recomputed');
+ assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B · recovered from this browser, not recomputed · press Run to compute it here');
+ // an edit no run has: the viewed run differs and Run computes the inputs
+ const edited=input();edited.model.shapes=[{...edited.model.shapes[0],w:800}];
+ f=W.opticalFreshness(edited,runs,runs[1]);
+ assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B · current inputs differ from this run · press Run to compute them');
+ // an unnamed run reads as before; without a viewed run the newest run of these inputs is described
+ assert.equal(W.opticalSequenceHeading(W.opticalFreshness(older,[{signature:JSON.stringify(older)}],null)),'Run 1 · solved from the current inputs');
+ assert.equal(W.runTitle(1,'Design A'),'Run 1 · Design A');assert.equal(W.runTitle(2,''),'Run 2');
+});

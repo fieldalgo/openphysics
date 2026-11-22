@@ -99,6 +99,9 @@ textarea{font:12px/1.5 ui-monospace,monospace}
 .pair{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid #e5eaf0;font-size:12px;overflow-wrap:anywhere}
 .pair span{color:var(--muted)}
 .pair strong{font-weight:500;text-align:right}
+/* a label is never broken inside a word ("Inputs" on one line); the value beside it wraps */
+.pair>span{overflow-wrap:normal;flex:none;max-width:45%}
+.pair>strong{min-width:0}
 .inspector .pair{font-size:11px;gap:10px}
 .property-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
 .property-grid>div{min-width:0}
@@ -179,6 +182,7 @@ main.choosing .workspace>.note{display:none}
 .sequence b{font-size:9px;color:#285db1;background:#e8eff9;padding:1px 5px;margin-right:7px;border-radius:2px}
 .message-line{display:flex;align-items:baseline;gap:18px;padding:6px 16px;border-top:1px solid #e4e9ef;font-size:10px;max-height:56px;overflow:auto}
 .message-label{font-weight:600;flex:none;color:#59708d}
+.message-more{display:inline}.message-more>summary{display:inline;cursor:pointer;color:var(--accent,#2d6da3)}.message-more[open]>.message-more-text{display:block}
 #file-status{color:#7b8798}
 footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;padding:3px 12px;background:#e2e8f1;border-top:1px solid #c2cddb;font-size:10px;color:#586c87;z-index:10}
 #status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -239,6 +243,10 @@ main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .compare-selection select{min-width:0;max-width:100%;text-overflow:ellipsis}
 .compare-options{flex-wrap:wrap;padding:10px 0;gap:12px}
 .compare-options label{flex:0 1 160px}
+/* the matched-modes picker shows the whole pair when closed: its own row, as wide as the pane */
+.canvas>.toolbar.compare-options label.compare-mode-label{flex:1 1 100%;max-width:100%;flex-direction:column;align-items:stretch;gap:4px}.canvas>.toolbar.compare-options label.compare-mode-label select{width:100%;max-width:100%}
+/* a number keeps its unit ("0.1234 %") and its sign on one line */
+.compare-table td.num{white-space:nowrap}
 .load-summary{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;margin:18px 0}
 .load-summary dt{color:var(--muted)}
 .load-summary dd{margin:0;overflow-wrap:anywhere}

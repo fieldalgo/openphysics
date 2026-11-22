@@ -8,7 +8,8 @@ import {formatIndex} from './workspace-compare.mjs';
 
 export const RANKING_TEXT='Modes are ranked by effective index.';
 export const POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal';
-export const LOSSLESS_NOTE='Lossless: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.';
+// A loss of 0 dB/cm (Im n_eff exactly 0) is absorption only: the cell's help and the note under the table.
+export const LOSSLESS_NOTE='Absorption only: all materials have k = 0 at this wavelength. Leakage and radiation are not computed in a closed window.';
 // 1e-3, not smaller: the mesh splits a symmetric pair by 1e-4 to 6e-4 at 40-10 nm, below the solver's n_eff
 // error at the same meshes, so two modes closer than 1e-3 cannot be told apart by this solver.
 export const PAIR_TOLERANCE=1e-3;
@@ -56,10 +57,12 @@ export function degenerateGroups(re){
  }
  return groups;
 }
-/** Loss text from propagation_loss in dB/m (exp(-i omega t), Im n_eff > 0 is loss): dB/cm to 4
- * significant digits, or "lossless" when Im n_eff is exactly 0. */
+/** Loss text from propagation_loss in dB/m (exp(-i omega t), Im n_eff > 0 is loss):
+ * dB/cm = 20 log10(e) k0 Im(n_eff) / 100 with k0 = 2 pi / lambda0 in 1/m, to 4 significant digits;
+ * "0 dB/cm" when Im n_eff is exactly 0 (a real n_eff: the engine solved a problem without loss).
+ * No threshold: a nonzero Im n_eff, however small, is shown as it is. */
 export function lossText(im,dbPerM){
- if(im===0)return 'lossless';
+ if(im===0)return '0 dB/cm';
  if(!Number.isFinite(dbPerM))return '—';
  return (dbPerM/100).toPrecision(4)+' dB/cm';
 }

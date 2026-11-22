@@ -26,7 +26,7 @@ const TYPE_MARK={'thermal.steady2d':'∿','em.modes2d':'λ','electric.steady2d':
 // a quantity string "1550 nm" -> {number, unit}; a bare number has unit ''
 function parseQuantity(value){if(typeof value==='number')return {number:value,unit:''};const m=/^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(.*)$/.exec(String(value??''));return m?{number:Number(m[1]),unit:m[2].trim()}:null;}
 
-// ctx: {$, notice(text), announceResult(text), request(method, url, body), render(), ui,
+// ctx: {$, notice(text, more), announceResult(text), request(method, url, body), render(), ui,
 // applications(host), onHistory()}
 export function createMultiphysicsView(ctx){
  const {$,notice}=ctx;
@@ -48,13 +48,14 @@ export function createMultiphysicsView(ctx){
  const signature=()=>JSON.stringify(doc);
  // ---- model lifecycle ----
  async function loadCapabilities(){try{caps=await ctx.request('GET','/api/multiphysics/capabilities');catalog=kindCatalog(caps);capsError=null;}catch(e){capsError=e.message;}}
- // note: a sentence added to the opening notice (where the previous model's runs are)
- async function open(tree,label,{fromFile=false,note=''}={}){
+ // note: {text, more} added to the opening notice (where the previous model's runs are): text
+ // on the line, more behind More
+ async function open(tree,label,{fromFile=false,note=null}={}){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];selection='model';runs=[];lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   baselineOption=baselinePhysics(doc).length>0;baselineQueue=[];baselineErrors={};lastRemoval=null;indexView='n';
   ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;sourceFile=fromFile?label:null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;
-  ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?' '+note:''));
+  ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?.text?' '+note.text:''),note?.more||'');
  }
  // A session file of version 8 (or browser recovery), already checked (§3): the model, its runs,
  // the without-heater results and the view. Nothing is run, a without-heater run included.
@@ -81,7 +82,7 @@ export function createMultiphysicsView(ctx){
   if(reply.detail||unreadable.length)throw new Error(reply.detail||unreadable.map(d=>`${d.path?d.path+': ':''}${d.message}`).join('; '));
   await open(JSON.parse(text),name,{fromFile:asSession?'session':true});
  }
- async function openTemplate({note=''}={}){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide',{note});}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
+ async function openTemplate({note=null}={}){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide',{note});}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
  function close(){active=false;stopPolling();}
  function commit(next,message,select){
   undoStack.push(doc);if(undoStack.length>100)undoStack.shift();redoStack=[];
@@ -442,7 +443,7 @@ export function createMultiphysicsView(ctx){
    // the table holds the first study point's modes; rows of a later point keep their columns
    const cellOf=row=>row.point===0?table.rows[row.mode-1]:undefined;
    const polarization=row=>{const r=cellOf(row);if(!r)return '<td>—</td>';const c=r.polarization;return c?`<td data-polarization="${row.mode}" title="${esc(c.title)}"${c.rowspan>1?` rowspan="${c.rowspan}"`:''}>${esc(c.text)}</td>`:'';};
-   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th><th title="${esc(POLARIZATION_HELP)}">Polarization</th><th>Loss</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Mode ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${polarization(row)}<td data-loss="${row.mode}">${esc(cellOf(row)?.loss??'—')}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(RANKING_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
+   host.insertAdjacentHTML('beforeend',`<div class="table-scroll"><table class="mp-neff"><thead><tr><th>Mode</th><th>n_eff${coupled?' (coupled)':''}</th><th title="${esc(POLARIZATION_HELP)}">Polarization</th><th>Loss</th>${head}</tr></thead><tbody>${rows.map((row,k)=>`<tr><td>Mode ${row.mode}</td><td data-neff="${row.mode}" data-neff-value="${row.value}">${row.value.toFixed(8)}</td>${polarization(row)}<td data-loss="${row.mode}"${cellOf(row)?.lossless?` title="${esc(LOSSLESS_NOTE)}"`:''}>${esc(cellOf(row)?.loss??'—')}</td>${cells(row,k)}</tr>`).join('')}</tbody></table></div><p class="muted" id="mp-candidate-note">${esc(RANKING_CAVEAT)} ${link('physics:'+id,modeCountText(lastRun.doc,id,{past:freshness()==='stale'}))}</p>`+
     `<p class="muted" data-mp-polarization-note>Polarization: ${esc(POLARIZATION_HELP)}${identity.source?'; '+esc(SOURCE_TEXT[identity.source]):identity.missing?' · '+esc(identity.missing):''}.</p>`+(table.lossless?`<p class="muted" data-mp-lossless>${esc(LOSSLESS_NOTE)}</p>`:'')+
     (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    // the answer first, then the coupled input it was solved from
@@ -459,7 +460,7 @@ export function createMultiphysicsView(ctx){
  }
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
- const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed. Studio checks the file for damage, not who made it.';
+ const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed; the file passed its damage check (this does not show who made it).';
  const runItem=run=>`${run.pinned?'Pinned · ':''}${runTitle(run)} · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}${run.maps==='not kept'?' · values only':''}`;
  // Results › Runs: the run list, in the optical words; selecting a run shows it, the model stays
  function runList(host){

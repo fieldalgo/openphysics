@@ -67,8 +67,8 @@ test('an earlier session choice keeps its storage index when an unreadable recor
  assert.deepEqual(choices.map(c=>c.index),[0,2]);
 });
 test('every recovery entry names its model and its runs',()=>{
- assert.deepEqual(sessionRunNames({runs:[{label:'design A'},{label:''}]}),['design A','Run 2']);
- assert.deepEqual(sessionRunNames({runs:[{number:3,label:''},{number:4,label:'heater 10 mW'}]}),['Run 3','heater 10 mW']);
+ assert.deepEqual(sessionRunNames({runs:[{label:'design A'},{label:''}]}),['Run 1 · design A','Run 2']);
+ assert.deepEqual(sessionRunNames({runs:[{number:3,label:''},{number:4,label:'heater 10 mW'}]}),['Run 3','Run 4 · heater 10 mW']);
  assert.deepEqual(resumeChoices({runs:2,savedAt:'T1',model:'Optical waveguide',names:['design A','Run 2']},[{runs:1,savedAt:'T0',model:'Heated silicon waveguide',names:['Run 1'],index:0}],t=>t),[
   {kind:'latest',label:'Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
   {kind:'earlier',index:0,label:'Earlier session · Heated silicon waveguide · 1 run · Run 1 · saved T0'}]);
@@ -93,6 +93,8 @@ test('a recovery entry names the session file its record came from',()=>{
 });
 test('the Optical waveguide card offers the optical session in browser recovery before Start new',()=>{
  assert.deepEqual(opticalResumeChoice({runs:2,names:['design A','design B'],savedAt:'T'},t=>'2:25 PM'),{label:'Resume Optical waveguide · design A, design B · 2:25 PM (this browser)'});
+ // the record's session file, when it names one
+ assert.deepEqual(opticalResumeChoice({runs:2,names:['Run 1 · design A','Run 2'],file:'optical-waveguide-session-2026-11-22-1425.json',savedAt:'T'},t=>'2:25 PM'),{label:'Resume Optical waveguide · Run 1 · design A, Run 2 · file optical-waveguide-session-2026-11-22-1425.json · 2:25 PM (this browser)'});
  const now=new Date(2026,10,22,15,0),today=new Date(2026,10,22,14,25).toISOString(),before=new Date(2026,10,20,14,25).toISOString();
  assert.doesNotMatch(offerTime(today,now),/2026|20/);assert.match(offerTime(before,now),/20/);
 });

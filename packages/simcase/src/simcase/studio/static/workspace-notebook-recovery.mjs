@@ -13,23 +13,33 @@ export function readNotebookRecovery(record){
 }
 // any letters (a Korean file name included), no path separators or control characters
 export const openedFileName=name=>typeof name==='string'&&/^[^\u0000-\u001f\u007f/\\]{1,200}\.json$/u.test(name)&&!/^\.\.?$/.test(name)?name:null;
-// What makes two stored sessions the same: the session text without its view (the page, the
-// selection, the field view), which a tab click or a selected run changes but the model and its
-// runs do not. A text that does not parse is compared as it is.
+// What makes two stored sessions the same: the model or inputs and the runs. The view (the page,
+// the field view), the selected run, the Compare choice and each run's origin (computed here,
+// opened from a file or recovered) are left out: a tab click, a selected run, an open or a
+// recovery changes them, but not the session. A text that does not parse is compared as it is.
 export function sessionKey(text){
  if(typeof text!=='string')return null;
- try{const doc=JSON.parse(text.replace(/^\uFEFF/,''));if(doc&&typeof doc==='object'&&!Array.isArray(doc)){delete doc.view;return JSON.stringify(doc);}}catch{}
+ try{const doc=JSON.parse(text.replace(/^\uFEFF/,''));if(doc&&typeof doc==='object'&&!Array.isArray(doc)){
+  delete doc.view;delete doc.selected;delete doc.comparison;
+  if(Array.isArray(doc.runs))doc.runs=doc.runs.map(run=>{if(run&&typeof run==='object'&&!Array.isArray(run)){const {origin,...rest}=run;return rest;}return run;});
+  return JSON.stringify(doc);}}catch{}
  return text;
 }
+// The session file a record names: the file it was last sent to, else the file it was opened from.
+export const recordFile=record=>validateSavedFile(record?.savedFile)?.name||openedFileName(record?.openedFile)||null;
 // One session in a recovery list: the newest record of each session (sessionKey). records: the latest
-// record (null when none) and the earlier ones, as stored; returns {record, index} newest first,
+// record (null when none) and the earlier ones, as stored; returns {record, index, file} newest first,
 // index being the record's place among the earlier sessions (-1 for the latest), so two
-// entries never hold the same session.
+// entries never hold the same session. file: the session file of the newest record of the session
+// that names one (a merged older record can name the file the newest does not).
 export function distinctRecords(latest,earlier=[]){
  const all=[...(latest?[{record:latest,index:-1}]:[]),...earlier.map((record,index)=>({record,index}))].filter(e=>e.record&&typeof e.record.session==='string');
  all.sort((a,b)=>(Date.parse(b.record.savedAt)||0)-(Date.parse(a.record.savedAt)||0)||a.index-b.index);
- const seen=new Set();
- return all.filter(e=>{const key=sessionKey(e.record.session);if(seen.has(key))return false;seen.add(key);return true;});
+ const kept=new Map();
+ for(const e of all){const key=sessionKey(e.record.session),first=kept.get(key);
+  if(!first){kept.set(key,{...e,file:recordFile(e.record)});continue;}
+  if(!first.file)first.file=recordFile(e.record);}
+ return [...kept.values()];
 }
 
 // A legacy record has no revision; include its payload to detect same-time writes.
