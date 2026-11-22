@@ -260,9 +260,9 @@ by 7.7e-4, 2.5e-4 and 5.2e-5 (TE-like mode) and 1.5e-4, 6.7e-5 and 1.3e-5 (TM-li
 at 40, 20 and 10 nm, and an x-polarised Gaussian sampled at the centroids of a disk mesh gives
 π w0² to 1.7e-6 at a ring spacing of w0/32 (`tests/simcase/test_mode_effective_area.py`). Each
 member of a degenerate pair has its own value, which depends on the rotation within the pair;
-both are saved. `E_z` is part of the sum: for the 500 × 220 nm strip's TE-like mode it raises A_eff
-by about 27 % over the transverse-only value. The key is additive, like
-`te_polarization_fraction`: `field_layout` and every other key are unchanged.
+both are saved. `E_z` is part of the sum: for the 500 × 220 nm strip's TE-like mode at 20 nm,
+V12 prints a kernel A_eff of 0.191 µm² with `E_z` and 0.150 µm² without it (an observation, not
+a gate).
 `confinement_factor`, `coupling_efficiency` and `te_polarization_fraction` are dimensionless. `summary.json` repeats the
 values under `mode_postprocessing` as value objects with a `unit` and `description` per key
 (complex values as `re`/`im` with `time_convention`, `confinement_factor` with its region names).
