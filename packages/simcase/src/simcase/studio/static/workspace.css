@@ -148,7 +148,7 @@ main.choosing .workspace>.note{display:none}
 .cards button{text-align:left;padding:0 22px 22px;background:#fff;border:1px solid #ccd6e2;border-radius:4px;overflow:hidden;box-shadow:0 2px 5px #35517408}
 .cards button::before{content:'◇';display:flex;align-items:center;justify-content:center;height:112px;margin:0 -22px 20px;background:#e8eef8;color:#4678ba;font:64px/1 Georgia,serif;border-bottom:1px solid #d6dfec}
 .cards button[data-template=heat]::before{content:'∿';background:#f6eee2;color:#ac7941}
-.cards button[data-template=multi]::before{content:'⇄';background:#ecedf6;color:#7973ac}
+.cards button[data-template=multi]::before,.cards button[data-template=heated-waveguide]::before{content:'⇄';background:#ecedf6;color:#7973ac}
 .cards strong{display:block;font-size:16px;font-weight:600;margin-bottom:10px}
 .cards p{font-size:12px;margin:12px 0}
 .cards span:last-child{font-size:11px;color:#718197;display:block}
@@ -309,3 +309,49 @@ dialog::backdrop{background:#162a4b66}
 /* The Study step's wavelength opens the wavelength field (Physics › Optical modes). */
 .workflow-wavelength{flex:none;align-self:center;margin:0 8px 0 -6px;padding:3px 8px;border:1px solid #c9d3df;border-radius:999px;background:#fff;color:var(--accent);font-size:11px;white-space:nowrap}
 .workflow-wavelength:hover{background:#e8f0fc}
+/* Multiphysics models (D2): a graph drawn from the couplings, solve-order badges, cycles, Messages. */
+.mp-stage{display:flex;align-items:flex-start;gap:96px;height:auto;min-height:280px;min-width:min-content;padding:36px 32px 72px}
+.mp-stage .graph-node{position:relative;width:230px}
+.mp-column{display:flex;flex-direction:column;gap:28px;flex:none}
+.mp-cycle{display:flex;flex-direction:column;gap:20px;padding:26px 12px 12px;border:1.5px dashed #c48a2a;border-radius:4px;background:#fbf4e6;position:relative}
+.mp-cycle.accepted{border:1.5px solid #7c9fce;background:#eef4fc}
+.mp-cycle-label{position:absolute;top:5px;left:10px;right:10px;font-size:10px;color:#89621e}.mp-cycle.accepted .mp-cycle-label{color:#255da9}
+.order-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;margin-right:6px;padding:0 4px;border-radius:9px;background:#285db1;color:#fff;font-size:10px;font-weight:600}
+.order-badge.cycle{background:#b47a20}
+.problem-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;margin-left:6px;padding:0 4px;border-radius:9px;background:#b3261e;color:#fff;font-size:10px;font-weight:600}
+.tree-child{padding-left:22px!important;font-size:12px}.tree-empty{font-size:11px;margin:2px 0 6px 8px}
+.model-root button{border:0;background:transparent;padding:0;min-height:0;text-align:left}
+.graph-port.missing{color:#b3261e}.graph-port.missing .port-dot{border-color:#b3261e}
+.graph-wires path.invalid{stroke:#b3261e;stroke-dasharray:6 4}.graph-wires path.selected{stroke-width:3.2}
+.graph-wires path.wire-hit{stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}
+.mp-marks{position:absolute;inset:0;pointer-events:none}
+.mp-wire-mark{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;min-height:0;padding:1px 6px;font-size:10px;color:#b3261e;border-color:#e3a5a0;background:#fff5f4;white-space:nowrap}
+.mp-state{font-weight:600}.mp-state.done{color:#2f7a3d}.mp-state.solving{color:#255da9}.mp-state.did-not-settle,.mp-state.failed{color:#b3261e}.mp-state.not-run{color:#7b8ca3}
+.mp-dangling{margin:0;padding:8px 16px;list-style:none;background:#fff;border-top:1px solid var(--line)}.mp-dangling button{color:#b3261e;font-size:11px}
+.mp-graph-messages{padding:8px 16px;background:#fff;border-top:1px solid var(--line)}
+.mp-messages{max-height:180px;overflow:auto;padding:4px 12px;border-top:1px solid var(--line);background:#fff}
+.mp-message{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:6px 0;border-bottom:1px solid #eef1f5;font-size:12px}
+.mp-message p{margin:0;flex:1 1 320px}.mp-message.error p::before{content:"● ";color:#b3261e}.mp-message.warning p::before{content:"● ";color:var(--warning)}.mp-message.info p::before{content:"ℹ ";color:var(--accent)}
+.mp-message-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.mp-message-actions button{min-height:24px;padding:2px 8px;font-size:11px}
+.mp-message details{font-size:10px;color:var(--muted)}.mp-message details summary{cursor:pointer}
+.inspector .mp-message p{flex:none}.inspector .mp-message{flex-direction:column;align-items:stretch;border:1px solid #e3a5a0;background:#fff5f4;padding:6px 8px;margin:6px 0;border-radius:3px}
+.mp-suggestion{background:#eef4fc;border:1px solid #bcd2ee;padding:6px 8px;border-radius:3px}
+.heat-side.needed{border-color:#b3261e}.inspector input[data-mp-quantity][aria-invalid=true]{border-color:#b3261e;outline-color:#b3261e}
+.link-button{border:0;background:transparent;color:var(--accent);padding:0;min-height:0;text-decoration:underline;text-align:left}
+.run-reason{align-self:center;max-width:220px;font-size:11px;color:var(--warning);line-height:1.3}
+.mp-row{display:inline-flex;align-items:center;gap:4px}.mp-row b{color:#fff}.mp-row.ready b,.mp-row.waiting b{color:inherit}.mp-row.done b{background:#2f7a3d}.mp-row.solving b{background:#285db1}.mp-row.did-not-settle b,.mp-row.failed b{background:#b3261e}.mp-row.not-run b{background:#9aa8ba}
+.mp-dialog{max-width:min(640px,calc(100vw - 32px));width:100%;border:1px solid var(--line);border-radius:4px;padding:16px}
+.mp-dialog h2{font-size:15px;margin:0 0 10px}.mp-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.mp-dialog label{display:block;margin:8px 0}.mp-dialog select{display:block;width:100%;margin-top:3px}
+.mp-kind{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid #eef1f5}.mp-kind ul{margin:4px 0;padding-left:18px;font-size:11px}.mp-kind.unavailable{opacity:.62}
+.mp-provider h3{font-size:12px;margin:10px 0 4px}.mp-note{background:#eef4fc;border:1px solid #bcd2ee;padding:6px 8px}
+.mp-choice-reasons{font-size:11px;color:var(--muted);padding-left:18px}
+.mp-maps{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mp-maps figure{margin:0;min-width:0}.mp-maps figcaption{font-size:11px;margin-bottom:4px}
+.mp-plot canvas{display:block;width:100%;height:260px;border:1px solid var(--line);background:#fff}
+.table-scroll{overflow-x:auto}.mp-check,.mp-neff{border-collapse:collapse;font-size:12px;margin:8px 0}.mp-check th,.mp-check td,.mp-neff th,.mp-neff td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.mp-check td.passed{color:#2f7a3d}.mp-check td.failed{color:#b3261e}
+.mp-residuals{width:100%;max-width:420px;height:auto;display:block}.mp-order{margin:4px 0 8px;padding-left:20px}
+@media(max-width:600px){.mp-maps{grid-template-columns:1fr}.mp-stage{gap:64px;padding:28px 20px 64px}.run-reason{max-width:150px}}
+.tree [data-mp-node]{white-space:normal;text-align:left;height:auto}
+.mp-result-tabs [aria-selected=true]{color:#184e9b;border-color:#7c9fce;background:var(--selected)}
+.mp-maps figcaption label{display:inline;margin:0}.mp-maps figcaption select{display:inline-block;width:auto;margin:0 4px}
