@@ -270,17 +270,19 @@ def test_h8_refusals():
 
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
         call(t=0.0)
-    with pytest.raises(TypeError, match="heat_source_density is a callback; with a moving mesh its sample points move"):
+    # coordinate callbacks take a motion since e3 (test_shape_derivative_transient_callbacks.py);
+    # NumPy-only ones are refused by name
+    with pytest.raises(TypeError, match="the callback of heat_source_density returned NumPy numbers"):
         call(heat_source_density=lambda points, time: np.zeros(len(points)))
-    with pytest.raises(TypeError, match="the heat flux on 'top' is a callback of coordinates"):
+    with pytest.raises(TypeError, match="the callback of the heat flux on 'top' returned NumPy numbers"):
         call(inward_heat_flux={"top": lambda points, normals: np.zeros(len(points))})
-    with pytest.raises(TypeError, match=r"convection\['right'\] is a callback of coordinates"):
+    with pytest.raises(TypeError, match=r"the callback of convection\['right'\] returned NumPy numbers"):
         call(convection={"right": (lambda points, normals, time: np.ones(len(points)), 290.0)})
     with pytest.raises(TypeError, match="prescribed_temperature is a callback of coordinates"):
         call(prescribed_temperature={0: lambda a, b: 300.0})
     with pytest.raises(TypeError, match="must be a constant or a callback\\(time\\) with one positional"):
         call(prescribed_temperature={0: lambda: 300.0})
-    with pytest.raises(TypeError, match=r"the heat flux on 'top' must be a constant or a callback\(time\)"):
+    with pytest.raises(TypeError, match=r"the heat flux on 'top' must be a constant, a callback\(time\)"):
         call(inward_heat_flux={"top": lambda *, time: 1.0})
     with pytest.raises(TypeError, match="initial_temperature is live"):
         call(initial_temperature=[xp.asarray(300.0)] * m.num_nodes)
