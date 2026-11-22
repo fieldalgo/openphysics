@@ -129,7 +129,8 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
     motion: ``galerkin.shape.MeshMotion(design_velocity=W, t=t)`` with W (N, 3) solves on
         the nodes X0 + t W and carries the derivative with respect to the JAX or PyTorch
         scalar t (a shape derivative; docs/packages/galerkin/shape_derivative.md). The
-        inputs stay NumPy constants or region tables; a source callback is refused.
+        inputs stay NumPy constants or region tables, or a source callback, which is called
+        again at the live centroids and must compute with the JAX or PyTorch array it gets.
 
     NumPy only otherwise: JAX or PyTorch values raise TypeError, and so does a str for a
     quantity (SI numbers only). Raises ValueError on invalid input, a singular

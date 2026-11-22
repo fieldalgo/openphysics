@@ -284,7 +284,8 @@ def test_t9_refusals():
     with pytest.raises(TypeError, match="live"):
         solve_steady_heat_3d(m, thermal_conductivity=2.0, prescribed_temperature={0: jnp.asarray(300.0)},
                              motion=MeshMotion(design_velocity=W, t=t))
-    with pytest.raises(TypeError, match="heat_source_density is a callback"):
+    # a source callback takes a motion since e6 (test_shape_derivative_3d_callbacks.py); NumPy-only is refused
+    with pytest.raises(TypeError, match="the callback of heat_source_density returned NumPy numbers"):
         solve_steady_heat_3d(m, thermal_conductivity=2.0, prescribed_temperature=bc,
                              heat_source_density=lambda c: np.ones(len(c)), motion=MeshMotion(design_velocity=W, t=t))
     with pytest.raises(TypeError, match="NumPy does not differentiate"):
