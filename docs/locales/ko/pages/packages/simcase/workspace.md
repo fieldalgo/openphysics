@@ -321,11 +321,11 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
   이 옵션은 그 자리에 남아 꺼진 채 “needs a temperature coupling”이라고 이유를 밝힙니다.
-- **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 광 모드 쪽에서는 n_eff 표가 먼저
-  나오고 결합 입력의 지도는 그 아래에 있습니다. 쓰인 풀이 순서와, 결합마다 보낸
+- **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
-  Modes 1은 코어의 결합 온도와 굴절률(또는 서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref)), n_eff 표를 보여 줍니다.
+  Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
+  서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
   소수 8자리로 나옵니다(템플릿은 +0.00215086). 표 아래 문장이 기준을 밝힙니다: “without heater =
   Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K”.

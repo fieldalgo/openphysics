@@ -374,14 +374,13 @@ The workspace edits the document itself, so it keeps every key it has no form fo
   with no temperature input, through the same run route, and fills the heater-off column. It is
   skipped when the kept column has the same content. While no coupling sets an optical
   temperature the option stays in place, disabled, and says “needs a temperature coupling”.
-- **Results** has a page per physics and a **Coupling check**. On an optical page the n_eff table
-  comes first and the maps of its coupled input below it: the solve order used and, per
+- **Results** has a page per physics and a **Coupling check**: the solve order used and, per
   coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
   (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
-  0 K”). Heat 1 shows the temperature map; Modes 1 shows the coupled temperature and the
-  refractive index (or its change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the
-  document's values) on the core, and the
-  n_eff table with “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
+  0 K”). Heat 1 shows the temperature map. Modes 1 shows the answer first, the n_eff table, and
+  below it the maps of its coupled input: the temperature and the refractive index (or its
+  change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
+  core. The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
   what the baseline is: “without heater = Modes 1 alone with no temperature input: every material
   keeps n₀, its index at T_ref = 300 K”. The column is valid while the optical model solved alone
