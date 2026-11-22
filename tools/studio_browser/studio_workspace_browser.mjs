@@ -1030,7 +1030,7 @@ try {
   const boxText = await saveInputs(), box = JSON.parse(boxText);
   await page.click('#group-index-check'); const plainText = await saveInputs();
   // the same inputs as version 7 writes them (the key order of before: the settings keys are the
-  // last of model); the node suite checks the template's file against main's fixture
+  // last of model); the node suite checks the template's file against the fixture of the writer before version 8
   const {modeCount: _m, ...fourModel} = four.model, version7Text = JSON.stringify({...four, version: 7, model: fourModel}, null, 2) + '\n';
   stage('P1 inputs files', {four: [four.version, four.model.modeCount, four.model.groupIndex ?? null], box: [box.version, box.model.modeCount ?? null, box.model.groupIndex], plain: [JSON.parse(plainText).version, Buffer.byteLength(plainText)]});
   assert.equal(plainText, version7Text, '2 modes and the box off: a version 7 file, byte for byte');
@@ -1051,14 +1051,18 @@ try {
   // U3: Use this run's inputs with a run of other Modes to find and box (the M5 run with the box off)
   await page.type('#mode-count-number', 5); await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '5', box: true});
   await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length>=2", 'P1 run list');
-  const offJob = await page.eval("[...document.querySelectorAll('.run-item')].at(-2).dataset.run");
+  // any run but the newest (the M5 run with the box on): its box is off
+  const offJob = await page.eval("(()=>{const items=[...document.querySelectorAll('.run-item')].map(e=>({job:e.dataset.run,n:Number(/Run (\\d+)/.exec(e.textContent)?.[1])}));const newest=Math.max(...items.map(i=>i.n));return items.find(i=>i.n!==newest).job;})()");
   await page.click(`.run-item[data-run="${offJob}"]`); await page.until("!!document.getElementById('restore-run-input')", 'P1 Use this run\'s inputs');
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')", 'P1 inputs used');
   const usedMessage = await text('#file-status');
   await toNode('Study'); const used3 = await study(); await undo(); const u3 = await study(); await redo(); const r3 = await study();
   stage('P1 U3 Use this run\'s inputs', {message: usedMessage, used: used3, undo: u3, redo: r3});
-  assert.match(usedMessage, /Modes to find 2\. The next run uses them; Undo takes them back\.$/);
-  assert.deepEqual(used3, {modes: '2', box: false}); assert.deepEqual(u3, {modes: '5', box: true}); assert.deepEqual(r3, used3);
+  // the run's count, from the message (the M5 runs have the box off on one of them; the run list
+  // order is not assumed): another count and box than the current 5 and on
+  const runModes = /Modes to find (\d)\. The next run uses them; Undo takes them back\.$/.exec(usedMessage)?.[1];
+  assert.ok(runModes && runModes !== '5', usedMessage);
+  assert.deepEqual(used3, {modes: runModes, box: false}); assert.deepEqual(u3, {modes: '5', box: true}); assert.deepEqual(r3, used3);
   await noOverflow('P1 study settings');
 
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');

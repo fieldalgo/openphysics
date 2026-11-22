@@ -244,7 +244,7 @@ export function createSession(input,runs,selected,comparison,view={mode:0,compon
  if(version===SESSION_VERSION)return {format:'openphysics-studio-session',version,input:checked,runs:runs.map(run=>sessionRun(run)),selected,comparison:[...comparison],view:sessionView(view)};
  // what a version 9 reader refuses is not written: a run read from an earlier file whose indices
  // are not ranked above the threshold, or a view of a mode the selected run does not have
- runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it. Remove the run or save it in a session of its own.`);});
+ runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it${checked.version===STUDY_PROJECT_VERSION&&sessionVersion(runs,view,keep)===SESSION_VERSION?' (the current Modes to find or group index option is saved in version 9 only; set 2 modes and the option off to save as version 7)':''}. Remove the run or save it in a session of its own.`);});
  const shown=runs.find(run=>run.job===selected);if(shown&&validateView(view).mode>=shown.effective_index.length)throw new Error('Unsupported saved field view.');
  return {format:'openphysics-studio-session',version,application:'optical',input:checked,runs:runs.map(run=>sessionRun(run,version,!keep||keep.has(run.job))),selected,comparison:[...comparison],view:sessionView(view)};
 }

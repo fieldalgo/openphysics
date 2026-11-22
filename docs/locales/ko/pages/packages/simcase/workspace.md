@@ -720,9 +720,10 @@ from 1 to 8 (got 9).*로 거부합니다. 0, 9, 2.5, 2.0, `"2"`, `true`는 거�
 1–8의 정수)는 2가 아닐 때만, `groupIndex`(`true`)는 **Also compute group index**를 켰을 때만 씁니다.
 모드 2개에 상자가 꺼진 입력은 이전과 바이트 단위로 같은 버전 7로 쓰므로 이전 Studio에서도 열리며, 버전 6·7
 파일을 열어도 다시 쓰지 않습니다. 버전 8 파일은 두 키를 검사해 읽습니다(1–8 밖의 `modeCount`나 boolean이
-아닌 `groupIndex`는 거부). 값이 기본값이면 버전 7 입력으로 읽습니다. 버전 8 이전의 Studio는 버전 8 파일을
-*Unsupported project format or version.*으로 거부합니다. 실행은 입력을 버전 7로 보존하며, 실행의 study는
-`settings.mode_count`와 군굴절률이 담습니다.
+아닌 `groupIndex`는 거부). 값이 기본값이면 버전 7 입력으로 읽습니다. 입력 파일을 버전 7까지 읽는 Studio는
+버전 8 파일을 *Unsupported project format or version.*으로 거부합니다. 실행은 입력을 버전 7로 보존하며, 실행의
+study는 `settings.mode_count`와 군굴절률이 담습니다. 실행이 없는 세션은 입력만으로 설정을 정합니다(버전 7
+입력이면 2와 꺼짐).
 
 ### 광학 세션 파일(버전 9)
 
@@ -738,8 +739,10 @@ session file is version 9, newer than this Studio reads (versions 6–8). Open i
 `version`(9), `application`(`"optical"`), `input`(버전 7 입력 파일), `runs`(최대 여섯 개), `selected`(실행의
 `job` 또는 null), `comparison`(`job` 두 개 또는 null), `view`(모두 필수. 버전 7과 같되 `mode`는 0–7이며 선택한 실행의
 모드 수보다 작음). `input`은 버전 8 입력 파일(study 설정)일 수도 있습니다. 입력이 버전 8인 세션은 모든 실행이
-버전 7에 맞아도 버전 9로 쓰며, 그런 입력을 담은 버전 7 세션은 *A version 7 session holds an input file of
-version 6 or 7.*로 거부합니다. 입력 버전 8 이전의 Studio는 그런 버전 9 파일을 *Unsupported project format or
+버전 7에 맞아도 버전 9로 쓰며, 그런 입력을 담은 버전 6·7 세션은 거부합니다(*A version 7 session holds an
+input file of version 6 or 7.*, 버전 6도 마찬가지). 그래서 버전 6·7 파일에서 읽은 실행의 굴절률이 n = 1.45 위에서
+순서대로가 아니면 Modes to find가 2가 아니거나 군굴절률 선택이 켜진 동안 저장할 수 없습니다. 거부는 그 실행을
+밝히고 설정이 버전 9를 요구한다고 말합니다(그동안 그 노트북의 브라우저 복구도 멈춤). 입력 파일을 버전 7까지 읽는 Studio는 그런 버전 9 파일을 *Unsupported project format or
 version.*으로 거부합니다. 실행마다 다음 키를 이 순서로 가지며, 다른 키는 이름을 밝혀 거부합니다.
 
 | 키 | 형식 | |

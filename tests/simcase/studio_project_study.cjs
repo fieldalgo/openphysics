@@ -3,7 +3,9 @@
 // Study settings with the inputs (inputs file version 8): Modes to find (model.modeCount, written
 // only when not 2) and the group index option (model.groupIndex, written only when on). With the
 // defaults the inputs file is version 7, byte for byte as before, and so is a session written from
-// it; an input of version 8 is held by an optical session of version 9 only.
+// it; an input of version 8 is held by an optical session of version 9 only. The fixture
+// inputs-v7-optical.json is the file the writer before version 8 (main at ef15b75) wrote for the
+// Optical waveguide template; B1 pins its bytes.
 const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
 const STATIC='../../packages/simcase/src/simcase/studio/static/';
@@ -91,6 +93,14 @@ test('S-a: a version 9 session with a version 8 input round-trips bit for bit an
  const read=N.parseSession(text);
  assert.equal(read.input.version,8);assert.deepEqual(P.projectStudy(read.input),{modeCount:3,groupIndex:true});
  assert.equal(N.sessionText(read.input,read.runs,read.selected,read.comparison,read.view),text);
+});
+
+test('a run version 9 cannot hold names the study setting that asked for version 9',()=>{
+ // a run read from a version 7 file whose second index is not above 1.45 stays in a version 7
+ // session; with Modes to find 3 the session needs version 9, and the refusal says why
+ const st=JSON.parse(fixture('state-one.json')),r={...st.runs[0],effective_index:[st.runs[0].effective_index[0],1.40]};
+ assert.equal(JSON.parse(N.sessionText(st.input,[r],r.job,[r.job,r.job],view)).version,7);
+ assert.throws(()=>N.sessionText(P.withStudy(st.input,{modeCount:3}),[r],r.job,[r.job,r.job],view),{message:/^Run 1: its effective indices are not ranked by Re n_eff above n = 1\.45, so a version 9 session cannot hold it \(the current Modes to find or group index option is saved in version 9 only; set 2 modes and the option off to save as version 7\)\. Remove the run or save it in a session of its own\.$/});
 });
 
 test('S-c: a version 7 session does not hold a version 8 input, and a run keeps version 7 inputs',()=>{

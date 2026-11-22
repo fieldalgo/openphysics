@@ -868,9 +868,11 @@ Version 8 is version 7 with the optical study settings in `model`, after `model.
 2 modes and the box off are written as version 7, byte for byte as before, so such a file still
 opens in an earlier Studio, and opening a version 6 or 7 file never rewrites it. A version 8
 file is read with both keys checked (a `modeCount` outside 1 to 8 or a `groupIndex` that is not
-a boolean is refused); one whose values are the defaults reads as version 7 inputs. A Studio
-before version 8 refuses a version 8 file with *Unsupported project format or version.* A run
-keeps its inputs as version 7: its `settings.mode_count` and its group index hold its study.
+a boolean is refused); one whose values are the defaults reads as version 7 inputs. A Studio that
+reads input files up to version 7 refuses a version 8 file with *Unsupported project format or
+version.* A run keeps its inputs as version 7: its `settings.mode_count` and its group index hold
+its study. A session with no runs takes its settings from its input alone (2 and off for a
+version 7 input).
 
 ### Optical session files (version 9)
 
@@ -891,8 +893,11 @@ file of version 7), `runs` (at most six), `selected` (a run's `job` or null), `c
 `job`s or nulls) and `view` (all required; as in version 7, with `mode` 0 to 7 and below the selected run's
 mode count). Its `input` may also be an input file of version 8 (study settings): a session
 whose input is of version 8 is written as version 9 even when every run fits version 7, and a
-version 7 session holding one is refused with *A version 7 session holds an input file of version
-6 or 7.* A Studio before input version 8 refuses such a version 9 file with *Unsupported project
+version 6 or 7 session holding one is refused (*A version 7 session holds an input file of version
+6 or 7.*, and likewise for version 6). A run read from a version 6 or 7 file whose indices are not
+ranked above n = 1.45 can therefore not be saved while Modes to find is not 2 or the group index
+option is on: the refusal names the run and says that the setting asks for version 9 (browser
+recovery of that notebook stops until then). A Studio that reads input files up to version 7 refuses such a version 9 file with *Unsupported project
 format or version.* Each run has these keys, in this order; any other key is refused by name:
 
 | Key | Type | |

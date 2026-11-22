@@ -19,7 +19,7 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 
 import {INPUT_FIELDS,NumericDrafts,editNoticeText} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
-import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy} from './workspace-project.mjs';
+import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
@@ -580,7 +580,7 @@ function completeLoad(pending){
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
-  const input=session.input.version===8||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});
+  const input=session.input.version===STUDY_PROJECT_VERSION||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});
   // A recovered notebook that still matched its saved file, or the file it was opened from, reads
   // as saved, as the file would.
   const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
