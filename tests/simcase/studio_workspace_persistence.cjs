@@ -19,19 +19,26 @@ test('a session file name holds the application and the local date-time to the m
  assert.throws(()=>P.sessionFileName('../x',new Date()));assert.throws(()=>P.sessionFileName('',new Date()));
 });
 
-test('the title shows the saved file until the next edit, and after recovery what the record kept',()=>{
+test('the save indicator shows the file the session was sent to until the next edit, and after recovery what the record kept',()=>{
  const when=()=>'13:05',saved={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
- assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Session file optical-waveguide-session-2026-11-21-1305.json · 13:05');
+ assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'Sent to session file optical-waveguide-session-2026-11-21-1305.json · 13:05');
+ // the browser copy does not change what the indicator says about the file
+ assert.equal(P.persistenceTitle({saved,recovery:'kept'},when),P.persistenceTitle({saved},when));
  const recovered={kind:'recovered',name:null,current:true};
  assert.equal(P.persistenceTitle({saved,loaded:recovered},when),'Recovered from this browser · last session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05)');
  assert.equal(P.persistenceTitle({loaded:recovered},when),'Recovered from this browser');
  // a recovered notebook never saved to a file still says its results are not in one
- assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · results not in a session file yet');
- for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,loaded:recovered},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · not saved to a file');
+ for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,loaded:recovered},when),P.persistenceTitle({saved,recovery:'kept'},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false},when),'Unsaved inputs');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · Save session to keep the changes');
- assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Results not saved · Save session to keep them');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,recovery:'kept'},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · kept for recovery in this browser');
+ // before a file save the indicator says which copy exists: none in a file, and the browser copy's state
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept'},when),'Not saved to a file · kept for recovery in this browser');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'updating'},when),'Not saved to a file · updating browser recovery');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'unavailable'},when),'Not saved to a file · browser recovery unavailable');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'conflict'},when),'Not saved to a file · browser recovery changed in another tab');
+ assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Not saved to a file · not in browser recovery yet');
  assert.equal(P.persistenceTitle({}),'No unsaved input changes');
  // an invalid draft outranks a saved state
  assert.equal(P.persistenceTitle({invalid:true,clean:true,saved},when),'Invalid input draft · last valid inputs unchanged');
@@ -40,10 +47,10 @@ test('the title shows the saved file until the next edit, and after recovery wha
 test('after an open the title names the file opened; after the next change it says what changed',()=>{
  const opened={kind:'opened',name:'design-a.json',current:true};
  assert.equal(P.persistenceTitle({loaded:opened}),'Opened design-a.json');
- assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true}),'Results not saved · Save session to keep them');
+ assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false}),'Unsaved inputs');
  // a save after the open names the new file, not the one opened
- assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),'Session file b.json · 13:05');
+ assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),'Sent to session file b.json · 13:05');
  // the title carries no revision counter: it would differ after a restore
  for(const title of [P.persistenceTitle({loaded:opened}),P.persistenceTitle({}),P.persistenceTitle({clean:false})])assert.doesNotMatch(title,/revision/i);
 });
@@ -57,7 +64,7 @@ test('a malformed saved-file entry in a recovery record is ignored, not trusted'
 test('physics lists only what a model holds; the start state names no multiphysics placeholder',()=>{
  const optical=input({electric:false,heat:false,structure:false}).model;
  assert.equal(P.physicsList(optical),'Optical');assert.equal(P.physicsList(input().model),'Electric + Heat + Mechanics + Optical');
- assert.equal(P.physicsList(input().model,false),'No application chosen');
+ assert.equal(P.physicsList(input().model,false),'No model chosen');
 });
 
 test('only default inputs with no results open without a confirmation; the chosen application does not count',()=>{
@@ -93,4 +100,11 @@ test('the Compare table has one row per candidate rank with both indices, their 
  assert.equal(C.compareRows([1,2,3],[1,2]).length,2);
  assert.equal(C.runHeading(run('aaaaaaaa',600,'design A')),'design A · 600 × 300 nm · Silicon · λ 1550 nm');
  assert.equal(C.runHeading(run('aaaaaaaa',700)),'700 × 300 nm · Silicon · λ 1550 nm');
+ // a Compare field heading never repeats the side as the run's name (round 3, N6)
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A')),'A · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,' b ')),'B · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'design A')),'A · design A · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700)),'B · 700 × 300 nm · Silicon · λ 1550 nm');
+ // one n_eff precision everywhere: 8 decimals
+ assert.equal(C.formatIndex(2.785604861),'2.78560486');
 });

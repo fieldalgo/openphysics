@@ -26,7 +26,7 @@ Compute에는 고른 애플리케이션의 실행 명령(**Run optical study**, 
 엽니다. 리본, 헤더, Messages 모두 이 저장을 "Save session" 한 이름으로 부릅니다. **More**에
 입력 전용 파일(**More › Save inputs only**, **Open inputs file**), 브라우저 초안, Reset design이 있습니다. 하단 상태줄의
 **Workspace tools**에서 연결, 복구, Reset layout에 접근하고, 그 옆에 **Installed physics**가 있습니다.
-둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Applications를
+둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Models를
 포함한 모든 페이지에서 쓸 수 있습니다. 1000 px보다 좁으면 Compute 명령이 보이도록 리본에서
 Physics 묶음을 뺍니다. Installed physics는 상태줄에 그대로 있습니다. 열 결과와 Joule 가열 결과는 현재 탭에만 남습니다.
 
@@ -55,52 +55,60 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 
 ## 첫 광학 해석
 
-1. **Applications → Optical waveguide**를 선택합니다. 가열 도파관 카드는 설정
+1. **Models → Optical waveguide**를 선택합니다(시작 화면이며 탭 이름은 **Models**). 가열 도파관 카드는 설정
    미리보기이며 연성 계산을 실행하지 않습니다.
 2. **Geometry**에서 코어를 숫자로 편집하거나 코어·가장자리를 드래그합니다.
    슬랩·슬롯·클래딩·구멍은 사각형·원·다각형을 추가해 만들고 형상마다 재료를 고릅니다.
    실리카 배경은 유지됩니다. 사각형의 **Width**를 바꾸면 가로 중심이 유지되고(Left x가
    변화량의 절반만큼 움직임) **Height**를 바꾸면 아래 변이 유지되므로, y = 0에 놓인 코어는
    그 자리에서 가운데를 지킵니다. 계산창을 벗어나는 크기는 기존 규칙대로 거부됩니다. 이전에
-   저장한 프로젝트는 저장된 좌표를 그대로 씁니다. 단계 표시줄의 **4. Study**에 파장이
-   나옵니다(예: *λ 1550 nm · Ready to run*). 현재 입력의 결과가 생기면 *Run complete*가 나옵니다.
-   필요하면 **Optical modes**에서 파장을(**Study → Edit wavelength**가 입력란에 포커스를 둔 채
-   엽니다), **Mesh**에서 코어 메시 크기를 바꿉니다.
+   저장한 프로젝트는 저장된 좌표를 그대로 씁니다. 단계 표시줄의 **4. Study**에는 *Ready to run*이,
+   현재 입력의 결과가 생기면 *Run complete*가 나오고, 옆의 파장(예: **λ 1550 nm**)은 파장 입력란을
+   여는 버튼입니다. 필요하면 **Physics › Optical modes**에서 파장을(설정 제목도 *Optical modes*이며,
+   **Study → Edit wavelength**와 단계 표시줄의 파장이 입력란에 포커스를 둔 채 엽니다), **Mesh**에서
+   코어 메시 크기를 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.
 4. **Run optical study**를 누릅니다. 기다리는 동안 모델을 바꿔도 결과는 실행 당시
    입력을 유지합니다. Stop waiting은 상태 조회만 중단합니다. 입력을 바꾸면 완료 메시지가
    바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다.
 5. **Run name**을 입력하고 Enter를 누릅니다. 이름을 붙인 실행은 고정되어 새 실행이 교체하지
-   않습니다(**Unpin this run**으로 해제). 모델을 변경해
+   않습니다. 별도의 Pin 버튼은 없으며, **Unpin this run**으로 해제하고 Run name에서 Enter를 누르면 이름 붙은
+   실행을 다시 고정합니다. 모델을 변경해
    다시 실행한 뒤 **Compare**에서 A/B, 후보, 성분, probe와 단면을 선택합니다.
-   표에는 후보 순위마다 A와 B의 n_eff, Δ (B − A), A 대비 Δ %가 나오고, 열 머리글에
-   각 실행(이름, 크기, λ)이 표시됩니다.
+   두 장(field) 그림이 먼저 나오고, 제목은 쪽과 실행으로 이루어집니다(A 쪽의 *A*라는 이름의 실행은
+   이름을 두 번 쓰지 않음). 그 아래 표에는 후보 순위마다 A와 B의 n_eff, Δ (B − A), A 대비 Δ %가
+   나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 후보 목록,
+   Compare) 소수 8자리입니다.
 6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
    파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
    `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어갑니다. Studio는
    파일을 브라우저에 넘길 뿐 실제로 보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음)
    Messages에 *Session file … sent to the browser's downloads (check your Downloads folder)*가
-   나오고, 다음 편집이나 실행 전까지 헤더에 *Session file … · 시각*이 표시됩니다.
-   **More › Save inputs only**는 결과 없이 모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 헤더에
-   *Results not saved · Save session to keep them*(세션 파일이 있었다면 *Changed since session
-   file …*)가 표시됩니다. **Open session** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
+   나옵니다. 저장 표시는 헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 다음 편집이나
+   실행 전까지 *Sent to session file … · 시각*이 표시됩니다. **More › Save inputs only**는 결과 없이
+   모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 *Not saved to a file · kept for recovery in
+   this browser*(기록 중에는 *· updating browser recovery*, 쓸 수 없으면 *· browser recovery
+   unavailable*), 세션 파일 저장 뒤 바뀌었으면 *Changed since session file … (시각) · kept for
+   recovery in this browser*가 표시됩니다. **Open session** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
    뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 마지막 세션 파일 이름과
    시각을 함께 보관하므로 복구한 세션에는 *last session file … (시각)*이 덧붙습니다(저장 뒤 바뀐
-   작업이면 *changed since session file …*, 저장한 적이 없으면 *results not in a session file yet*).
+   작업이면 *changed since session file …*, 저장한 적이 없으면 *not saved to a file*).
    둘 다 다음 변경이나 다른 파일 열기까지 유지됩니다. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되며 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
-   입력란 아래 **More about width and height**). 하단에는 기록 중 *Updating browser recovery…*가
-   나오며, 로컬 복구를 사용하려면 **Browser recovery saved**를 확인합니다. 새로고침하거나 Studio를 다시
-   켜면 시작 화면에 **Continue where you left off** 카드가 마지막 브라우저 세션과 이전
-   세션을 보여 줍니다. 하나를 골라 복구하거나, 세션 파일을 열거나, 새로 시작합니다.
+   입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
+   browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
+   켜면 시작 화면의 **Continue where you left off** 카드에 **Recover (this browser only): Last
+   session in this browser …**와 이전 세션, **Open session file (portable)…**, **Start new**가 나오고,
+   세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다고 알려 줍니다.
    기본 입력이고 결과가 없는 작업 공간에서는 열기와 복구가 확인 없이 진행됩니다. 그 밖에는
    **Open saved session?**(또는 **Recover saved session?**) 창이 돌아올 실행(이름과 고정
-   포함)과 비교, 바뀌는 것, 실제로 있는 물리만 보여 줍니다. 응용을 고르기 전에는 헤더에
-   *No model chosen*, 상태 표시줄에 *Choose an application to start*가 나오고 Study sequence에는
-   단계가 없습니다.
+   포함)과 비교, 바뀌는 것, 실제로 있는 물리만 보여 줍니다. 모델을 고르기 전에는 헤더에
+   *No model chosen*, 상태 표시줄에 *Choose a model to start*가 나오고 Study sequence에는
+   단계가 없습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
+   *Model library · Choose a model*.
 
-현재 모델을 유지하고 결과만 추가하려면 **Import runs from file**을, 모델과 노트북을
+현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
 모두 교체하려면 **Open session**을 사용합니다. *Result for these inputs*와 *Inputs changed
 since this result* 표시는 결과의
 설계 출처를 나타내며, 서로 다른 설계의 후보 번호는 동일 모드를 보장하지 않습니다.
@@ -178,7 +186,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 
 ## 정상 열전도 판
 
-**Applications → Steady heat conduction**을 고르면 JSON 없이 정상 열전도 문제를 편집합니다.
+**Models → Steady heat conduction**을 고르면 JSON 없이 정상 열전도 문제를 편집합니다.
 판은 왼쪽 아래 모서리가 (0, 0)인 균질 직사각형 하나이며 크기는 mm, 열전도도 k [W/(m·K)]와
 균일 열원 Q [W/m³]는 상수입니다. 그림에서 변을 선택하거나 **Heat transfer**를 열어 변마다
 조건 하나를 줍니다. 단열(열유속 0), 고정 온도 [K], 안쪽 방향 열유속 [W/m²](양수는 판 안으로
@@ -202,7 +210,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 
 ## 이름 붙은 영역의 Joule 가열
 
-**Applications → Joule heating**을 고르면 JSON 없이 이름 붙은 재료 영역의 정상 Joule 가열을
+**Models → Joule heating**을 고르면 JSON 없이 이름 붙은 재료 영역의 정상 Joule 가열을
 설정합니다. 계산 영역은 왼쪽 아래 모서리가 (0, 0)인 mm 단위 직사각형과 바탕 재료입니다.
 **Geometry**에서 사각형·원·다각형을 최대 여덟 개 더하며(겹치는 곳은 나중 형상이 이김), 각
 형상은 재료 하나의 이름 붙은 영역입니다. **Materials**에는 이름 붙은 재료를 최대 여섯 개 두고,
@@ -349,8 +357,9 @@ HTTP 자산을 다룹니다. 배포 검사에서도 설치 자산을 복사해 �
 
 ## 장 샘플 조회
 
-Results 또는 Compare에서 그림 내부를 클릭하거나 x/y 좌표(µm)를 입력하고
-**Inspect point**를 누릅니다. 십자 표시와 수치는 물리 좌표를 사용하며 Compare는
+Results 또는 Compare에서 그림 내부를 클릭하거나 x/y 좌표(nm)를 입력하고
+**Inspect point**를 누릅니다. 십자 표시와 수치는 모델 입력과 같은 nm 물리 좌표를 사용하고, 장·메시·단면
+그림의 축도 nm이며 눈금은 둥근 값에 놓입니다. 세션 파일은 이 위치를 µm 단위 양 문자열로 그대로 보관합니다. Compare는
 두 메시의 같은 위치를 조회합니다. 값은 해당 위치를 포함하는 삼각형의 정규화된
 저장 중심 샘플이며 보간한 점별 장 값이 아닙니다. 삼각형 번호와 중심 좌표를 함께
 표시하고, 메시 밖이면 샘플이 없음을 알립니다. 공유 경계에서는 마지막으로 그린
@@ -370,7 +379,7 @@ Runs 목록은 각 실행을 이름, 크기, 파장, 완료 시각으로 표시�
 변경 번호는 Results의 **Run details**에 있습니다. **Export this run**은 선택한 결과와 원래 입력만
 포함한 독립 세션 파일을 내보냅니다.
 여섯 실행 한도에서 고정하지 않은 오래된 결과가 제외되기 전에 개별 보존할 수 있습니다.
-하단 상태는 세션 변경과 입력만 저장한 파일을 구분합니다. 입력 파일·브라우저 draft
+저장 표시(헤더와 하단)는 세션 변경과 입력만 저장한 파일을 구분합니다. 입력 파일·브라우저 draft
 저장은 결과 노트북을 저장한 것으로 표시하지 않으며, 개별 결과 내보내기도 전체
 노트북을 저장한 것으로 처리하지 않습니다. **Export field PNG**는 Results 그림을 그리므로
 Compare에서는 사용할 수 없고, 버튼 아래 문구가 Results에서 실행을 열라고 안내합니다.
@@ -383,7 +392,7 @@ Ctrl/Cmd+Shift+Z 또는 Ctrl+Y로 다시 실행합니다. 텍스트 필드는 �
 
 광학 모델에서 **Mesh → Generate mesh**를 누르면 모드 계산 없이 기존 서버 메시
 생성기를 호출합니다. 실제 삼각형과 영역 색, 노드·요소 수, 최소각, 평균 품질을
-표시합니다. Full window 또는 Core region을 선택하며 µm 좌표에 x/y 동일 축척을
+표시합니다. Full window 또는 Core region을 선택하며 nm 축에 x/y 동일 축척을
 사용합니다. 설계를 바꾸면 이전 메시를 남기되 이전 입력이라고 표시하고 명시적
 재생성 시 갱신합니다. 생성 실패는 마지막 정상 미리보기를 보존합니다.
 미리보기는 탭에만 보관하고 세션 JSON에 저장하지 않습니다. 광학 실행은 같은 입력
@@ -436,7 +445,7 @@ Studio를 다시 켜면 저절로 다시 연결합니다. **Check connection**�
 ## 단면 그래프
 
 Results와 Compare의 Line profile and CSV를 펼쳐 가로(y 고정) 또는 세로(x 고정)
-단면을 선택하고 고정 좌표를 µm로 입력한 뒤 Show profile을 누릅니다. 비교하는 두
+단면을 선택하고 고정 좌표를 nm로 입력한 뒤 Show profile을 누릅니다. 비교하는 두
 실행은 같은 선과 0–1 상대 척도를 사용하되 각 후보의 max|E| 정규화 분모는 유지합니다.
 후보/성분을 바꾸면 그래프도 갱신합니다. 단면 설정은 뷰 상태이며 세션과 브라우저 노트북 복구에
 저장합니다.
@@ -446,7 +455,7 @@ Results와 Compare의 Line profile and CSV를 펼쳐 가로(y 고정) 또는 세
 따르며 메시가 없는 구간은 연결하지 않습니다. CSV(`studio-profile.csv`)에는 작업·출처·후보·성분·
 축, 고정 좌표, 구간 시작/끝, 삼각형 번호, 중심 좌표, 정규화 값을 기록하며, 모든 양의 열은
 `name [unit]` 머리글과 SI 값입니다(`fixed_coordinate [m]`, `start [m]`, `end [m]`,
-`centroid_x [m]`, `centroid_y [m]`, `relative_amplitude [1]`). 패널의 입력과 표시는 마이크로미터입니다. 구간 끝점 한 점의 값에 대해
+`centroid_x [m]`, `centroid_y [m]`, `relative_amplitude [1]`). 패널의 입력과 표시는 나노미터입니다. 구간 끝점 한 점의 값에 대해
 별도 point probe와 같다고 주장하지 않습니다.
 
 정사각형의 정확한 가로/세로 구간, 역방향 삼각형, 중첩, 빈 영역 기준을 시험했습니다.
@@ -456,8 +465,9 @@ Results와 Compare의 Line profile and CSV를 펼쳐 가로(y 고정) 또는 세
 
 탭에 계산 또는 가져온 결과가 생기면 유효 입력·선택·이름 변경을 브라우저
 IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름, 비교 및 장 보기
-설정을 포함합니다. 연속 변경은 묶고 저장은 순서대로 수행하며, footer에 대기·저장 중·
-저장 완료·실패를 파일 저장 상태와 구분해 표시합니다. 빈 새 탭은 기존 노트북을
+설정을 포함합니다. 연속 변경은 묶고 저장은 순서대로 수행하며, 세션 파일에 실행이 없는 동안 저장 표시는
+브라우저 사본의 상태(*updating browser recovery*, *kept for recovery in this browser*,
+*browser recovery unavailable*)를, 세션 파일이 생기면 그 파일을 보여 줍니다. 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
 새로고침 후 시작 화면의 **Continue where you left off** 카드에서 마지막 세션을 고르거나
@@ -502,7 +512,8 @@ Studio 업데이트
 
 ## 기준 실행 고정
 
-**Pin this run**(또는 실행에 이름 붙이기)으로 결과를 고정하면 새 실행이 교체하지 않습니다. 새 결과는
+실행에 이름을 붙이면 고정되어 새 실행이 교체하지 않습니다. 별도의 Pin 버튼은 없으며 **Unpin this run**으로
+해제하고, Run name에서 Enter를 누르면 이름 붙은 실행을 다시 고정합니다. 새 결과는
 고정하지 않은 가장 오래된 실행을 교체하며 총 여섯 개 한도는 유지합니다. 여섯 개
 모두 고정하면 하나를 해제할 때까지 Run을 차단하되 문서 점검과 메시 미리보기는
 허용합니다. 고정 상태는 세션·브라우저 복구·실행 표 CSV에 저장하며 입력·장·입력 Undo
@@ -512,7 +523,7 @@ Studio 업데이트
 
 ## 모델을 교체하지 않고 실행 가져오기
 
-Results/Compare → Import runs from file에서 세션 파일 또는 **Export this run**으로 내보낸 개별 실행 파일을 읽습니다.
+Results/Compare → **Add runs from file (inputs unchanged)**에서 세션 파일 또는 **Export this run**으로 내보낸 개별 실행 파일을 읽습니다.
 추가·일치·교체될 비고정 실행 수를 검토한 뒤 적용합니다. 현재 모델 입력과 입력 Undo는
 보존하고 가져온 선택 결과를 보관 결과와 비교합니다. 새 결과는 `imported`로 표시합니다.
 입력과 노트북을 모두 교체하려면 Open session을 사용합니다.
@@ -547,7 +558,7 @@ Export profile PNG에는 축·정규화·후보·단면 위치·작업 ID·형�
 상태가 바뀌면 소스를 다시 선택하세요. 교체 확인창에는 소스·이전/새 치수·코어 재료·
 결과 수·Undo 동작을 표시합니다. 확인 시 작업공간 상태를 다시 검사하므로 검토 중
 계산이 완료돼도 오래된 확인창으로 새 결과를 조용히 버리지 않습니다.
-Import runs는 계속 현재 모델 입력을 유지합니다.
+Add runs from file은 계속 현재 모델 입력을 유지합니다.
 
 ## 설치된 물리
 
