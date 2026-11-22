@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
 // runs). Each run keeps its own centroid samples, so the overlap is taken on a common grid:
@@ -202,6 +202,15 @@ export function unitLoss(run,unit){
  const mean=members.reduce((t,m)=>t+(m.im===0?0:m.loss),0)/members.length;
  // lossText's digits for a nonzero Im n_eff: dB/m → dB/cm to 4 significant digits
  return {text:'mean '+(mean/100).toPrecision(4)+' dB/cm',value:mean/100,title:help};
+}
+/** The group index of one unit of a run, {text, value, title}, as its modes table shows it: the
+ * mode's, or for a degenerate pair "mean x" of the members' n_g ("—" when a member has none). */
+export function unitGroupIndex(run,unit){
+ if(!unit)return {text:'—',value:null,title:''};
+ const cells=unit.map(i=>groupIndexCell(run,i));
+ if(unit.length===1||cells.some(c=>c.value===null))return unit.length===1?cells[0]:{...cells.find(c=>c.value===null)};
+ const mean=cells.reduce((t,c)=>t+c.value,0)/cells.length;
+ return {text:'mean '+mean.toFixed(4),value:mean,title:cells[0].title};
 }
 /** The Compare table rows of a match: accepted pairs and unmatched A units in A's rank order,
  * then the unmatched B units. kind: 'match' | 'a' | 'b'. */

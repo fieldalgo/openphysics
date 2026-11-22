@@ -136,6 +136,23 @@ export function modeOptionLabel(i,modes){
  const word=inPair?'pair':Number.isFinite(m.fte)?polarizationWord(m.fte):null;
  return `Mode ${i+1}${word?' · '+word:''} · n_eff ${formatIndex(m.re)}`;
 }
+// The n_g column: the engine's group index of a run run with Also compute group index (Study),
+// n_g = n_eff - λ0 dn_eff/dλ0 by a central difference over λ0 ± the step; "—" otherwise.
+export const groupIndexHelp=(step='1 nm')=>`n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± ${step} (3 solves), materials evaluated at each wavelength`;
+export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study';
+export const groupIndexKeptHelp=(step='1 nm')=>`Not matched at λ0 ± ${step}; the reason is not kept in session files`;
+// the step of a group_index_method ("central_difference 1 nm electric-l2-assignment-v1")
+const methodStep=method=>/^central_difference (\S+ \S+) \S+$/.exec(method??'')?.[1]??'1 nm';
+/** The n_g cell of mode i of a run: {text, value, title}. A run without group_index: "—", with the
+ * help to turn the option on; a mode the engine could not match (null): "—" with the engine's
+ * reason when this tab has it (groupIndexReasons, not written to files), else the kept-in-files note. */
+export function groupIndexCell(run,i){
+ if(!Array.isArray(run.group_index))return {text:'—',value:null,title:GROUP_INDEX_OFF_HELP};
+ const v=run.group_index[i],step=methodStep(run.group_index_method);
+ if(Number.isFinite(v))return {text:v.toFixed(4),value:v,title:groupIndexHelp(step)};
+ const reason=run.groupIndexReasons?.[i];
+ return {text:'—',value:null,title:typeof reason==='string'&&reason?'Not matched: '+reason:groupIndexKeptHelp(step)};
+}
 /** The modes of an optical run (1 to 8 modes, real or complex indices, its vector samples or,
  * for a run of a file without fields, the values saved with it). f_TE and A_eff: the engine's
  * when they came with the run, else computed by Studio from the saved field. */

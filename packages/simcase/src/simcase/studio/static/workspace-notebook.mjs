@@ -151,6 +151,23 @@ export function engineRunValues(summary,k){
  take('te_polarization_fraction','1',x=>x>=0&&x<=1);take('effective_area','m^2',x=>x>0);
  return out;
 }
+/** The engine's group index of a new result (summary.group_index with group_index_method, the
+ * single-study option results.group_index): {group_index: k numbers or null, group_index_method:
+ * "central_difference <step> <tracker>"}, or {} when the summary has none. */
+export function engineGroupIndex(summary,k){
+ const g=summary?.group_index,m=summary?.group_index_method;
+ if(!m||m.method!=='central_difference'||g?.unit!=='1'||!valueList(g.values?.[0],k,()=>true))return {};
+ const step=m.wavelength_step;
+ if(step?.unit!=='m'||!(step.value>0)||typeof m.tracking!=='string'||!/^[a-z0-9-]{1,40}$/.test(m.tracking))return {};
+ const method=`central_difference ${+(step.value*1e9).toPrecision(6)} nm ${m.tracking}`;
+ return METHOD.test(method)?{group_index:[...g.values[0]],group_index_method:method}:{};
+}
+/** The engine's reason of each null group index of a new result (summary.group_index_method.reasons):
+ * k strings or null, or null. Kept on the run in this tab only: a session file does not hold them. */
+export function engineGroupIndexReasons(summary,k){
+ const r=summary?.group_index_method?.reasons;
+ return Array.isArray(r)&&r.length===k&&r.every(x=>x===null||typeof x==='string')?[...r]:null;
+}
 const RUN_KEYS_9=['job','completedAt','label','pinned','origin','serverVersion','settings','input','effective_index','field','te_polarization_fraction','effective_area','group_index','group_index_method','digest'];
 /** Whether a version 7 file holds a run: two real modes with their fields and nothing else. */
 export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.mode_count===2&&run.effective_index.length===2&&!run.effective_index_im&&run.field!==null&&run.group_index===undefined);
