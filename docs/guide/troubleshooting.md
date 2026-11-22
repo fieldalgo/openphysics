@@ -39,8 +39,8 @@ and unavailable result. Do not repeatedly submit a solve to recover a failed rea
 A stale view after editing is not a new result for the changed model.
 
 The [experimental workspace](../packages/simcase/workspace.md) has its own capability
-and input/session format. Its heated-waveguide application is a setup preview;
-visible coupling cards do not mean coupled execution is available. Its candidate
+and input/session format. Its Heated silicon waveguide runs one coupling, heat → optical modes;
+other couplings shown in the conceptual preview of older input files do not run. Its candidate
 indices do not establish mode tracking, and independently normalized colors are
 not a common power scale. Original [steady](../packages/simcase/thermal_studio.md)
 and [transient](../packages/simcase/thermal_transient_studio.md) Studio routes have

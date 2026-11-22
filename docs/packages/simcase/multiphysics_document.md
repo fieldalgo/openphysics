@@ -291,5 +291,4 @@ and [`tests/simcase/test_multiphysics_document.py`](../../../tests/simcase/test_
   `E-CONTRACT` at `study.type` ("a multiphysics sweep is validated but not run in this
   release").
 - Transfers other than `same_mesh`.
-- Studio: it does not edit or show multiphysics documents yet.
 - Other providers' kinds in couplings (the hook is internal).

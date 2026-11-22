@@ -27,9 +27,9 @@ session; its steady heat application solves one homogeneous rectangular plate
 with a condition per side. After installing `simcase[studio]` in the configured
 runtime, launch it with `simcase-studio --workspace`. The `openphysics` command does
 the same; it comes with the `openphysics` distribution, which the workspace quick
-start installs and the source installation below does not. The heated-waveguide
-application card is setup only: electrical heating and mechanical deformation
-do not run in this workspace yet.
+start installs and the source installation below does not. Its Heated silicon waveguide
+card opens a coupled model, steady heat feeding the optical modes through n(T) on one mesh;
+electrical heating and mechanical deformation do not run in this workspace's coupled models yet.
 
 ## What you can solve
 
