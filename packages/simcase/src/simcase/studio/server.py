@@ -8,8 +8,8 @@ can use the same endpoints. Everything is JSON; arrays are sent as
 plain lists (fine for the mesh sizes a 2D study uses).
 
 Imports from simcase are absolute and limited to ``simcase.__all__`` and the public modules
-``simcase.reader``, ``simcase.quantities`` and ``simcase.providers`` on purpose: this file is
-written as an ordinary consumer of the engine, not as a part of it.
+``simcase.reader``, ``simcase.quantities``, ``simcase.providers`` and ``simcase.multiphysics`` on
+purpose: this file is written as an ordinary consumer of the engine, not as a part of it.
 
 Every route that takes a document (``/api/validate``, ``/api/mesh``, ``/api/run`` and the thermal
 routes) reads the request's raw bytes with ``simcase.reader``: numbers keep their written digits,
@@ -46,6 +46,7 @@ from . import joule_regions_api as joule
 from . import transient_thermal_api as transient
 from . import security
 from . import geometry_api
+from . import multiphysics_api
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="simcase studio", version=__version__)
@@ -66,6 +67,7 @@ app.router.routes[:] = [r for r in app.router.routes
                         if getattr(r, "path", None) not in ("/docs", "/docs/oauth2-redirect", "/redoc")]
 _thermal_jobs = thermal.ThermalJobs()
 _region_limits = regions.RegionLimits()
+_multiphysics_jobs = multiphysics_api.Jobs()
 
 
 class MaterialPreview(BaseModel):
@@ -704,6 +706,88 @@ async def job_result(job_id: str, request: Request):
         raise HTTPException(409, f"job is {job['status']}")
     return job["result"]
 
+
+
+
+# -- multiphysics models (contract D2): one document, several physics and their couplings -----------
+
+def _multiphysics_refusal(exc: "multiphysics_api.Refused"):
+    return JSONResponse({"detail": exc.message}, status_code=exc.status, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/multiphysics/capabilities")
+def multiphysics_capabilities():
+    """What Add physics lists: the installed kinds, their ports and whether Studio adds them."""
+    try:
+        body = json.dumps(multiphysics_api.capabilities(), ensure_ascii=True, allow_nan=False)
+    except Exception as exc:
+        return JSONResponse({"detail": unexpected(exc, "multiphysics capabilities")}, status_code=500,
+                            headers={"Cache-Control": "no-store"})
+    return Response(body, media_type="application/json", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/multiphysics/template")
+def multiphysics_template():
+    """The Heated silicon waveguide document of the start page."""
+    return Response(multiphysics_api.template(), media_type="application/json", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/multiphysics/validate")
+async def validate_multiphysics(request: Request):
+    _check_workspace_instance(request)
+    try:
+        tree, found = await _document_body(request)
+        return exact_json(await run_in_threadpool(multiphysics_api.validation_payload, tree["doc"], found))
+    except RequestRefused as exc:
+        return exc.reply()
+    except Exception as exc:
+        return JSONResponse({"detail": reply_text(exc, "multiphysics validation")}, status_code=400,
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/multiphysics/run")
+async def start_multiphysics_run(request: Request):
+    _check_workspace_instance(request)
+    try:
+        tree, found = await _document_body(request)
+        reply = await run_in_threadpool(_multiphysics_jobs.start, tree["doc"], found, _start_thermal_thread)
+        return JSONResponse(reply, headers={"Cache-Control": "no-store"})
+    except RequestRefused as exc:
+        return exc.reply()
+    except multiphysics_api.Refused as exc:
+        return _multiphysics_refusal(exc)
+    except Exception as exc:
+        return JSONResponse({"detail": reply_text(exc, "multiphysics run request")}, status_code=500,
+                            headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/multiphysics/jobs/{job_id}")
+def multiphysics_job(job_id: str, request: Request, after: int = 0):
+    """The job's status and its progress events after the first ``after``."""
+    _check_workspace_instance(request)
+    try:
+        return JSONResponse(_multiphysics_jobs.status(job_id, max(0, after)), headers={"Cache-Control": "no-store"})
+    except multiphysics_api.Refused as exc:
+        return _multiphysics_refusal(exc)
+
+
+@app.post("/api/multiphysics/jobs/{job_id}/stop")
+def stop_multiphysics_job(job_id: str, request: Request):
+    """Stop a run at its next step: the physics being solved finishes, then nothing is kept."""
+    _check_workspace_instance(request)
+    try:
+        return JSONResponse(_multiphysics_jobs.stop(job_id), headers={"Cache-Control": "no-store"})
+    except multiphysics_api.Refused as exc:
+        return _multiphysics_refusal(exc)
+
+
+@app.get("/api/multiphysics/jobs/{job_id}/result")
+def multiphysics_result(job_id: str, request: Request):
+    _check_workspace_instance(request)
+    try:
+        return JSONResponse(_multiphysics_jobs.result(job_id), headers={"Cache-Control": "no-store"})
+    except multiphysics_api.Refused as exc:
+        return _multiphysics_refusal(exc)
 
 
 

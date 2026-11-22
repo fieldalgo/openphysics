@@ -1,0 +1,87 @@
+{
+  "openphysics": "0.3/multiphysics.1",
+  "name": "Heated silicon waveguide",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "xs": {
+        "dimension": "2d",
+        "length_unit": "um",
+        "depth": null,
+        "domain": {
+          "xmin": -3,
+          "xmax": 3,
+          "ymin": -2,
+          "ymax": 2.5
+        },
+        "background": {
+          "material": "physmat:SiO2"
+        },
+        "features": [
+          {
+            "name": "core",
+            "type": "rect",
+            "x": -0.25,
+            "y": 0,
+            "w": 0.5,
+            "h": 0.22,
+            "material": "physmat:Si"
+          },
+          {
+            "name": "heater",
+            "type": "rect",
+            "x": -1,
+            "y": 1.32,
+            "w": 2,
+            "h": 0.1,
+            "material": "heater"
+          }
+        ]
+      }
+    }
+  },
+  "materials": {
+    "heater": {
+      "refractive_index": 1.5,
+      "thermal_conductivity": "100 W/(m K)",
+      "thermo_optic_coefficient": "0 1/K",
+      "reference_temperature": "300 K",
+      "source": "Studio template: a lossless placeholder index; metal loss is later work"
+    }
+  },
+  "physics": {
+    "heat1": {
+      "type": "thermal.steady2d",
+      "prescribed_temperature": {
+        "bottom": "300 K"
+      },
+      "heat_source_density": {
+        "heater": "2e14 W/m^3"
+      }
+    },
+    "modes1": {
+      "type": "em.modes2d",
+      "formulation": "scalar",
+      "vacuum_wavelength": "1550 nm",
+      "mode_count": 1
+    }
+  },
+  "couplings": {
+    "heat1_to_modes1": {
+      "from": "heat1.temperature",
+      "to": "modes1.temperature",
+      "transfer": "same_mesh"
+    }
+  },
+  "mesh": {
+    "element_size": "0.25 um",
+    "controls": [
+      {
+        "select": "core",
+        "near": "0.03 um",
+        "far": "0.25 um",
+        "refinement_distance": "1 um"
+      }
+    ]
+  }
+}

@@ -29,7 +29,7 @@ __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "run", "RunResult", "ElectricJouleRunResult", "JouleConvergenceError", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError",
            "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area",
            "GeometryError", "parse_geometry", "evaluate_geometry", "reader", "quantities",
-           "providers"]
+           "providers", "multiphysics"]
 
 
 _loading = False
@@ -71,7 +71,7 @@ def _import_runner() -> None:
     from .physics_pml_modes import ModeSelectionError
     from .geometry_document import GeometryError, parse as parse_geometry
     from .geometry_engine import evaluate as evaluate_geometry
-    from . import providers, quantities, reader
+    from . import multiphysics, providers, quantities, reader
     names = dict(locals())
     globals().update({k: names[k] for k in __all__ if k != "__version__"})
 
