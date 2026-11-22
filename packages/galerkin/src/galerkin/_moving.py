@@ -198,10 +198,9 @@ def solve_steady_heat_3d_moving(mesh, motion: MeshMotion, *, thermal_conductivit
     W = _velocity(mesh, motion.design_velocity)
     _coefficient(thermal_conductivity, "thermal_conductivity")
     source = 0.0 if heat_source_density is None else heat_source_density
-    if callable(source) and not is_per_region(source):
-        raise TypeError("motion: heat_source_density is a callback; with a moving mesh its sample points move "
-                        "too, which this slice does not differentiate. Give a scalar or a region table")
-    _numpy_data(source, "heat_source_density")
+    sampled_source = callable(source) and not is_per_region(source)
+    if not sampled_source:
+        _numpy_data(source, "heat_source_density")
     if not isinstance(prescribed_temperature, Mapping):
         raise ValueError("prescribed_temperature must map exterior node indices to temperatures in K")
     for node, value in prescribed_temperature.items():
@@ -221,7 +220,17 @@ def solve_steady_heat_3d_moving(mesh, motion: MeshMotion, *, thermal_conductivit
     grads = xp.concatenate([-xp.sum(g, axis=1)[:, None, :], g], axis=1)              # (T, 4, 3)
     volume = det / 6.0
     k = lift(xp, np.asarray(base.thermal_conductivity, dtype=float))
-    Q = lift(xp, np.asarray(base.heat_source_density, dtype=float))
+    if sampled_source:
+        # the ordinary solve's centroid rule, at the live centroids
+        centroids = (X[tets[:, 0]] + X[tets[:, 1]] + X[tets[:, 2]] + X[tets[:, 3]]) / 4.0
+        try:
+            Q = source(centroids)
+        except Exception as exc:
+            raise TypeError("motion: the callback of heat_source_density must compute with the JAX or PyTorch "
+                            f"centroids it is given with a motion (it raised {type(exc).__name__}: {exc})") from exc
+        Q = _live_values(Q, (len(tets), 1), "heat_source_density").reshape((-1,))
+    else:
+        Q = lift(xp, np.asarray(base.heat_source_density, dtype=float))
     element = (k * volume)[:, None, None] * xp.sum(grads[:, :, None, :] * grads[:, None, :, :], axis=3)
     K = CooMatrix(np.repeat(tets, 4, axis=1).ravel(), np.tile(tets, (1, 4)).ravel(),
                   xp.reshape(element, (-1,)), (n, n))
@@ -248,7 +257,8 @@ def solve_steady_heat_3d_moving(mesh, motion: MeshMotion, *, thermal_conductivit
     reaction = scatter_add(xp, n, fixed_nodes, residual[fixed_nodes])
     flux = -k[:, None] * xp.sum(grads * increment[tets][:, :, None], axis=1)
     return thermal3d.SteadyHeat3DResult(temperature, flux, load, reaction, residual, base.thermal_conductivity,
-                                        base.heat_source_density, base.relative_conservation_residual,
+                                        Q if sampled_source else base.heat_source_density,
+                                        base.relative_conservation_residual,
                                         base.prescribed_node_ids)
 
 
