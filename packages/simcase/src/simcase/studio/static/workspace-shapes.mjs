@@ -117,6 +117,17 @@ export function designSummary(model){
  }
  return `${shapes.length} shapes · ${[...new Set(shapes.map(s=>s.material||'unassigned'))].join(', ')}`;
 }
+// The geometry alone, as the status line and the save notice name it (round 14): "650 × 300 nm",
+// "r 300 nm circle", "5-vertex polygon", or "2 shapes".
+export function geometryWords(model){
+ const shapes=model.shapes;
+ if(shapes.length===1){const s=shapes[0];
+  if(s.type==='rect')return `${nm(s.w)} × ${nm(s.h)} nm`;
+  if(s.type==='circle')return `r ${nm(s.r)} nm circle`;
+  return `${s.points.length}-vertex polygon`;
+ }
+ return `${shapes.length} shapes`;
+}
 function uniqueName(base,shapes){const used=new Set(shapes.map(s=>s.name.toLowerCase()));for(let i=1;;i++){const name=`${base} ${i}`;if(!used.has(name.toLowerCase()))return name;}}
 export function newShape(type,shapes){
  const name=uniqueName(type==='rect'?'Rectangle':type==='circle'?'Circle':'Polygon',shapes);

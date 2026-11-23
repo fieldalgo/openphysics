@@ -109,12 +109,12 @@ test('round 9 (J4): the line under a result names each difference once, then wha
 test('round 9 (J5): the dock heading and the footer describe the run being viewed, named with its number',async()=>{
  const W=await import('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs');
  const older=input(),newer=input();newer.model.shapes=[{...newer.model.shapes[0],w:700}];
- const runs=[{signature:JSON.stringify(older),label:'Design A',origin:'recovered'},{signature:JSON.stringify(newer),label:'Design B',origin:'recovered'}];
- // Design A (run 1) viewed, the inputs are Design B's (run 2)
+ const runs=[{signature:JSON.stringify(older),input:older,label:'Design A',origin:'recovered'},{signature:JSON.stringify(newer),input:newer,label:'Design B',origin:'recovered'}];
+ // Design A (run 1) viewed, the inputs are Design B's (run 2); since round 14 (Q7) both geometries are named
  let f=W.opticalFreshness(newer,runs,runs[0]);
- assert.deepEqual(f,{state:'other',run:1,name:'Design A',origin:'recovered',has:2});
- assert.equal(W.opticalSequenceHeading(f),'Run 1 · Design A · current inputs differ from this run');
- assert.equal(W.opticalReadyStatus(f),'Run 1 · Design A · current inputs differ from this run · Run 2 has them');
+ assert.deepEqual(f,{state:'other',run:1,name:'Design A',origin:'recovered',has:2,geometry:'500 × 220 nm',currentGeometry:'700 × 220 nm',changes:['Width 500 → 700 nm']});
+ assert.equal(W.opticalSequenceHeading(f),'Run 1 · Design A 500 × 220 nm · current inputs 700 × 220 nm');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · Design A 500 × 220 nm · current inputs 700 × 220 nm · Run 2 has them');
  // the step bar says the same of the same run
  assert.equal(W.opticalWorkflow({input:newer,runs,viewed:runs[0]})[4].detail,'Current inputs differ from this run');
  // Design B viewed: it is the current inputs' run, recovered
@@ -124,7 +124,16 @@ test('round 9 (J5): the dock heading and the footer describe the run being viewe
  // an edit no run has: the viewed run differs and Run computes the inputs
  const edited=input();edited.model.shapes=[{...edited.model.shapes[0],w:800}];
  f=W.opticalFreshness(edited,runs,runs[1]);
- assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B · current inputs differ from this run · press Run to compute them');
+ assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B 700 × 220 nm · current inputs 800 × 220 nm · press Run to compute them');
+ // the same geometry: the changes are named instead, at most two
+ const other=structuredClone(newer);other.model.wavelength=1310;newer.model.wavelength=1550;
+ f=W.opticalFreshness(other,runs,runs[1]);
+ assert.equal(W.opticalSequenceHeading(f),'Run 2 · Design B 700 × 220 nm · current inputs differ: Wavelength 1550 → 1310 nm');
+ other.model.coreMesh=25;newer.model.coreMesh=30;other.model.shapes[0].material='Silicon nitride';
+ assert.equal(W.opticalSequenceHeading(W.opticalFreshness(other,runs,runs[1])),'Run 2 · Design B 700 × 220 nm · current inputs differ: Wavelength 1550 → 1310 nm · Core mesh size 30 → 25 nm …');
+ // an unnamed run: its number and geometry; nothing listed differs: the plain words
+ assert.equal(W.otherInputsText({run:1,geometry:'500 × 220 nm',currentGeometry:'700 × 220 nm'}),'Run 1 · 500 × 220 nm · current inputs 700 × 220 nm');
+ assert.equal(W.otherInputsText({run:1,name:'A',geometry:'500 × 220 nm',currentGeometry:'500 × 220 nm',changes:[]}),'Run 1 · A 500 × 220 nm · current inputs differ from this run');
  // an unnamed run reads as before; without a viewed run the newest run of these inputs is described
  assert.equal(W.opticalSequenceHeading(W.opticalFreshness(older,[{signature:JSON.stringify(older)}],null)),'Run 1 · solved from the current inputs');
  assert.equal(W.runTitle(1,'Design A'),'Run 1 · Design A');assert.equal(W.runTitle(2,''),'Run 2');
@@ -138,4 +147,13 @@ test('round 11: the Study panel names the inputs the next run uses, whatever run
  // round 12: the group index option is named when it is on
  assert.equal(nextRunText(doc,2,true),'Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2 · group index on');
  assert.equal(nextRunText(doc,2,false),nextRunText(doc,2));
+});
+test('round 14 (Q2, Q7): the geometry alone, in words',async()=>{
+ const S=await import('../../packages/simcase/src/simcase/studio/static/workspace-shapes.mjs');
+ const m=shapes=>({shapes});
+ assert.equal(S.geometryWords(m([{type:'rect',w:650,h:300}])),'650 × 300 nm');
+ assert.equal(S.geometryWords(m([{type:'rect',w:600.5,h:300}])),'600.5 × 300 nm');
+ assert.equal(S.geometryWords(m([{type:'circle',r:300}])),'r 300 nm circle');
+ assert.equal(S.geometryWords(m([{type:'polygon',points:[[0,0],[1,0],[1,1],[0,1],[0,2]]}])),'5-vertex polygon');
+ assert.equal(S.geometryWords(m([{type:'rect',w:1,h:1},{type:'circle',r:1}])),'2 shapes');
 });

@@ -11,7 +11,7 @@ import {OpticalJobMonitor,readPending,storePending,validatePending} from './work
 import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
 import {installShapeEditor,SNAP_STEPS} from './workspace-shape-editor.mjs';
 import {sectionSvg,MATERIAL_FILL,WINDOW_VIEW,shapesView} from './workspace-section.mjs';
-import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,editShapeProperty,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS} from './workspace-shapes.mjs';
+import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,editShapeProperty,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS,geometryWords} from './workspace-shapes.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
 import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHABLE_MESSAGE,RECONNECTED_MESSAGE,requestFailedText} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
@@ -477,6 +477,10 @@ if(ui.page==='Model'&&ui.selection==='Study'){
 
 let pendingLoad=null;
 let currentFile=null,fileScope=0,savingFile=false,overflowSaveAs=false;
+// The change list of the last Use this run's inputs, shown in the run panel while the edit
+// revision is the one it made and its run is the one shown: {text, revision, job} or null.
+let runInputsNote=null;
+const runInputsNoteFor=run=>runInputsNote&&run&&runInputsNote.revision===edits.revision&&runInputsNote.job===run.job?runInputsNote.text:null;
 const workspaceLoads=new LatestWorkspaceLoad(()=>loadContext());
 function loadContext(){return JSON.stringify({notebook:notebookStamp(),revision:edits.revision,invalid:numericDrafts.issues,jobOperation,pendingJob:pendingJob?.job||null});}
 // resultNotice: the message line announces a completed run; an input edit then replaces it,
@@ -665,10 +669,11 @@ function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
  const prior=inputsFile(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined}));workspaceLoads.invalidate();newModelInputs=null;
- restoreEdit(doc,null);inputsChangedSinceResult();
- // only the settings that change, from → to (round 13)
- const changed=inputChanges(prior,doc);
- notice(`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`);
+ // only the settings that change, from → to (round 13); the same words stay where the button was
+ // until the next input edit (round 14), so they are kept before the redraw
+ const changed=inputChanges(prior,doc),text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`;
+ runInputsNote={text,revision:edits.revision,job:run.job};
+ restoreEdit(doc,null);inputsChangedSinceResult();notice(text);
 }
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)
@@ -923,7 +928,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
   const runG=solverRun.group_index_method!==undefined,runParts=studyParts(solverRun.input,runModeCount(solverRun),runModeCount(solverRun),runG,state.groupIndex),nowParts=studyParts(current(),state.modeCount,runModeCount(solverRun),state.groupIndex,runG);
-  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>File › Save keeps this run with its fields in the session file. File › Export › Model file keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
+  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same&&!runInputsNoteFor(solverRun)?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>File › Save keeps this run with its fields in the session file. File › Export › Model file keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=runInputsLine(runParts,nowParts);$('canvas').append(desc);
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
   const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}
@@ -1246,6 +1251,7 @@ function renderRunList(){
   if(solverRun.signature!==signature()){const restore=document.createElement('button');restore.id='restore-run-input';restore.className='primary';restore.textContent='Use this run’s inputs';const target=solverRun;restore.onclick=()=>useRunInputs(target);restore.disabled=numericDrafts.invalid;
    const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes them back.`;restore.setAttribute('aria-describedby',why.id);
    const slot=$('use-run-slot');if(slot)slot.append(restore,why);else panel.append(restore,why);}
+  else if(runInputsNoteFor(solverRun)){const done=document.createElement('p');done.id='restore-run-input-done';done.className='input-hint';done.textContent=runInputsNoteFor(solverRun);const slot=$('use-run-slot');if(slot)slot.append(done);else panel.append(done);}
   const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
@@ -1444,10 +1450,12 @@ async function saveOpticalSession({keepSelected=false,saveAs=false}={}){
  const inputs=inputsFile(),out=writeOpticalSession(inputs,runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
  if(!out.ok){if(out.refusal)throw new Error(out.refusal);overflowSaveAs=saveAs;setOverflowKeepText(false);$('session-overflow-description').textContent=opticalOverflowQuestion(out.bytes);if(!overflowDialog.open)overflowDialog.showModal();return;}
  const notebook=notebookStamp(),runsNow=runsStamp(),stampNow=saveStamp(),count=runs.length,inputsText=JSON.stringify(inputs);
+ // the current inputs without a run of their own are said, so the file is not read as holding them (round 14)
+ const noRun=count&&!runs.some(r=>r.signature===signature())?` Current inputs (${geometryWords(inputs.model)}) have no run yet.`:'';
  // the inputs saved are recorded now, so an edit made while the dialog is open stays on top of them
  edits.record(inputs);
  const result=await deliverSession(out.text,sessionFileName(applicationSlug()),{saveAs});if(!result.written){notice(result.message);return;}
- const name=result.name;newModelInputs=null;if(JSON.stringify(inputsFile())===inputsText)edits.markSaved();savedNotebookState=notebook;savedRunsState=runsNow;lastSavedFile={name,savedAt:new Date().toISOString(),stamp:stampNow,recovered:false,written:result.via==='picker'};loadedSession=null;refreshPersistence();notice(`${savedWhere(result)}: current inputs, ${count===1?'1 run':count+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:'')+result.after);
+ const name=result.name;newModelInputs=null;if(JSON.stringify(inputsFile())===inputsText)edits.markSaved();savedNotebookState=notebook;savedRunsState=runsNow;lastSavedFile={name,savedAt:new Date().toISOString(),stamp:stampNow,recovered:false,written:result.via==='picker'};loadedSession=null;refreshPersistence();notice(`${savedWhere(result)}: current inputs, ${count===1?'1 run':count+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:'')+noRun+result.after);
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
