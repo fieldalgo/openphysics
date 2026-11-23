@@ -242,18 +242,23 @@ def test_q2_no_gaussian_means_no_coupling_key(tmp_path):
     assert "coupling_efficiency" not in summary["mode_postprocessing"]
 
 
-def test_q2_pml_results_gain_no_keys(tmp_path):
+def test_q2_pml_results_gain_no_power_confinement_overlap_or_coupling(tmp_path):
+    # changed by slice P3: a vector PML result (no bend) gains te_polarization_fraction and
+    # effective_area on its physical window and integration_region; nothing else
     d = json.loads((ROOT / "examples/simcase/pml_leaky_slab.json").read_text(encoding="utf-8"))
     d["results"] = {"plots": False, "mode_overlap": {"gaussian": {"beam_waist_radius": "0.22 um",
                                                                   "position": ["0 um", "0.11 um"]}}}
     d["mesh"]["element_size"] = "0.1 um"
     result = run(Document.from_dict(d), verbose=False)
-    assert result.postprocessing is None and result.open_boundary is not None
+    assert set(result.postprocessing) == {"te_polarization_fraction", "effective_area"}
+    assert result.open_boundary is not None
     result.save(tmp_path)
     with np.load(tmp_path / "fields.npz", allow_pickle=False) as archive:
-        assert not (set(archive.files) & (POST_KEYS["vector"] | POST_KEYS["scalar"] | {"coupling_efficiency"}))
+        assert set(archive.files) & (POST_KEYS["vector"] | POST_KEYS["scalar"] | {"coupling_efficiency"}) == \
+            {"te_polarization_fraction", "effective_area"}
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
-    assert "mode_postprocessing" not in summary
+    assert list(summary["mode_postprocessing"]) == ["te_polarization_fraction", "effective_area", "integration_region"]
+    assert summary["mode_postprocessing"]["integration_region"] == "physical_window"
 
 
 # -- Q3, Q4 --------------------------------------------------------------------------

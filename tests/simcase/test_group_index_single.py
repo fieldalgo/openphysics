@@ -199,15 +199,16 @@ def test_the_option_is_refused_for_sweeps(study):
     assert info.value.path == "results.group_index"
 
 
-@pytest.mark.parametrize("key", ["pml", "bend"])
-def test_the_option_is_refused_with_open_boundaries(key):
+def test_the_option_is_refused_with_a_bend():
+    # slice P3: accepted with pml (complex n_g, tests/simcase/test_open_boundary_mode_identity.py);
+    # a bent guide is still refused
     d = copy.deepcopy(examples.VECTOR_SLAB)
     p = d["physics"]["em1"]
     p.update(target_effective_index=2.8, pml={"pml_thickness": {"top": "0.5 um"}})
-    if key == "bend":
-        p["bend"] = {"bend_radius": "10 um", "bend_origin": "0 um"}
     d["results"] = {"group_index": {}}
-    with pytest.raises(DocumentError, match=f"results.group_index: not read with physics.em1.{key}"):
+    Document.from_dict(copy.deepcopy(d)).validate()
+    p["bend"] = {"bend_radius": "10 um", "bend_origin": "0 um"}
+    with pytest.raises(DocumentError, match="results.group_index: not read with physics.em1.bend"):
         Document.from_dict(d).validate()
 
 

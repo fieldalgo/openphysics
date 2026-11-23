@@ -20,6 +20,8 @@ window (simcase.mode_postprocessing). Pre-registered checks, written before any 
   registered.
 - Format: the key is in fields.npz and the summary, a recompute from fields.npz alone equals the
   saved value bit for bit, ``field_layout`` is unchanged, and PML and bend results get no key.
+  Changed by slice P3 (open boundary): a vector PML result without a bend gets the key, on its
+  physical window (tests/simcase/test_open_boundary_mode_identity.py); a bend still gets none.
 """
 import json
 from pathlib import Path
@@ -30,7 +32,7 @@ import pytest
 from galerkin import EdgeSpace, Mesh
 from galerkin.kernels import effective_area as kernel_effective_area
 from simcase import Document, run
-from simcase.mode_postprocessing import effective_area
+from simcase.mode_postprocessing import effective_area, physical_window
 
 from test_mode_polarization import SIZES, THICKNESS, document, orders, report, strictly_decreasing
 
@@ -166,9 +168,8 @@ def test_format_saved_key_recomputes_from_fields_npz_alone(tmp_path):
     assert np.all((area > 0.05e-12) & (area < 1e-12)), area
 
 
-@pytest.mark.parametrize("example", ["pml_leaky_slab.json", "pml_bent_slab.json"])
-def test_format_pml_and_bend_results_get_no_effective_area(example, tmp_path):
-    d = json.loads((ROOT / "examples/simcase" / example).read_text(encoding="utf-8"))
+def test_format_bend_results_get_no_effective_area(tmp_path):
+    d = json.loads((ROOT / "examples/simcase" / "pml_bent_slab.json").read_text(encoding="utf-8"))
     d["results"] = {"plots": False}
     d["mesh"]["element_size"] = "0.1 um"
     result = run(Document.from_dict(d), verbose=False)
@@ -178,3 +179,22 @@ def test_format_pml_and_bend_results_get_no_effective_area(example, tmp_path):
         assert "effective_area" not in archive.files
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert "mode_postprocessing" not in summary and "effective_area" not in summary.get("field_units", {})
+
+
+def test_format_pml_results_get_the_effective_area_on_the_physical_window(tmp_path):
+    # slice P3 (was: no key for PML results): the formula on the triangles inside physical_bounds
+    d = json.loads((ROOT / "examples/simcase" / "pml_leaky_slab.json").read_text(encoding="utf-8"))
+    d["results"] = {"plots": False}
+    d["mesh"]["element_size"] = "0.1 um"
+    result = run(Document.from_dict(d), verbose=False)
+    result.save(tmp_path)
+    with np.load(tmp_path / "fields.npz", allow_pickle=False) as archive:
+        nodes, triangles = archive["node_coordinates"], archive["triangles"]
+        electric, saved = archive["unnormalized_electric_field"], archive["effective_area"]
+    summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    window = physical_window(nodes, triangles, summary["open_boundary"][0]["physical_bounds"]["values"])
+    assert 0 < window.sum() < len(triangles)
+    assert np.array_equal(saved[0], effective_area(nodes, triangles, electric[0], window))
+    block = summary["mode_postprocessing"]
+    assert block["integration_region"] == "physical_window" and block["effective_area"]["values"] == saved.tolist()
+    assert summary["field_units"]["effective_area"] == "m^2"
