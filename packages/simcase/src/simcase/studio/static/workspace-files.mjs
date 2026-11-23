@@ -62,14 +62,15 @@ const errorText = error => (error && (error.message || error.name)) || String(er
  * saveAs: ask for a file even when there is a target. Returns a promise of one of
  *   {status: 'saved', handle, name}            written through the picker or the target;
  *   {status: 'cancelled'}                      the user closed the picker;
- *   {status: 'failed', name, error}            the write failed; the file is unchanged;
+ *   {status: 'failed', name, error, fresh}     the write failed: a kept file is unchanged; a file
+ *                                              just chosen (fresh) may have been created empty;
  *   {status: 'unavailable', error}             no picker, or it threw: ask for a name instead.
  * The picker is called before anything is awaited, so it stays inside the click or key press.
  */
 export function saveToFile(text, {suggestedName, target = null, saveAs = false, win = globalThis}) {
   if (target && !saveAs) {
     return writeHandle(target.handle, text).then(() => ({status: 'saved', handle: target.handle, name: target.name}),
-      error => ({status: 'failed', name: target.name, error: errorText(error)}));
+      error => ({status: 'failed', name: target.name, error: errorText(error), fresh: false}));
   }
   if (!pickerAvailable(win)) return Promise.resolve({status: 'unavailable', error: null});
   let picked;
@@ -77,14 +78,15 @@ export function saveToFile(text, {suggestedName, target = null, saveAs = false, 
   catch (error) { picked = Promise.reject(error); }
   return Promise.resolve(picked).then(handle => {
     const name = String(handle?.name || suggestedName);
+    // a file just chosen in the picker: Chromium may already have created or emptied it
     return writeHandle(handle, text).then(() => ({status: 'saved', handle, name}),
-      error => ({status: 'failed', name, error: errorText(error)}));
+      error => ({status: 'failed', name, error: errorText(error), fresh: true}));
   }, error => error?.name === 'AbortError' ? {status: 'cancelled'} : {status: 'unavailable', error: errorText(error)});
 }
 
 /** The notice for a save that did not write: a cancel, or a failed write. */
 export function notWrittenNotice(result, {saveAs}) {
   if (result.status === 'cancelled') return `${saveAs ? 'Save As' : 'Save'} cancelled; nothing was written.`;
-  if (result.status === 'failed') return `Session not saved: ${result.name} could not be written (${result.error}); the file is unchanged.`;
+  if (result.status === 'failed') return `Session not saved: ${result.name} could not be written (${result.error}); `+(result.fresh ? 'the browser may have left it empty.' : 'the file is unchanged.');
   return 'Session not saved: nothing was written.';
 }

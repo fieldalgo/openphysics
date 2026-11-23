@@ -94,3 +94,9 @@ test('the save indicator says "Saved to" only after the save dialog wrote the fi
  assert.equal(P.persistenceTitle({saved:{...saved,written:true}},when),'Saved to chosen.json · 10:15');
  assert.equal(P.persistenceTitle({saved},when),"Session file chosen.json sent to your browser's Downloads · 10:15");
 });
+test('a failed write to a file just chosen does not claim the file is unchanged',async()=>{
+ const file=fakeFile('picked.json','OLD');file.failNext=new DOMException('Disk full','QuotaExceededError');
+ const r=await F.saveToFile('NEW',{suggestedName:'picked.json',win:fakeWindow(async()=>file.handle)});
+ assert.equal(r.status,'failed');assert.equal(r.fresh,true);
+ assert.equal(F.notWrittenNotice(r,{saveAs:true}),'Session not saved: picked.json could not be written (Disk full); the browser may have left it empty.');
+});

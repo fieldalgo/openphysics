@@ -172,7 +172,7 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more)=>notice(text,mor
  // a raw body: the server's reader sees a file's text as written (duplicate keys, digits)
  requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
  // physics selections no application claims, so no single-physics view acts while it is open
- onOpen:()=>Object.assign(state,{electric:true,heat:true,structure:true,optics:true}),
+ onOpen:()=>{fileScope++;Object.assign(state,{electric:true,heat:true,structure:true,optics:true});},
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),deliverSession:(text,name,options)=>deliverSession(text,name,options),serverVersion:()=>connection.version,validateRunLabel,
  // the optical runs this tab holds beside the multiphysics model (the save message names them)
  opticalRunCount:()=>runs.length,
@@ -626,7 +626,7 @@ async function openModelFile(file){try{
  if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
   if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');
    guardLeave(file.name,true,()=>{openingModel=true;fileScope++;multiView.openText(text,file.name).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
- const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Model file exceeds 64 KiB.');return parseProject(await file.text());});
+ const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Model file exceeds 64 KiB.');return parseProject((await file.text()).replace(/^\uFEFF/,''));});
  if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-session')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}}
 $('save-draft').onclick=()=>{try{rejectInvalidInput();const doc=inputsFile();localStorage.setItem(DRAFT_KEY,JSON.stringify(doc));edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
@@ -640,7 +640,7 @@ function showRecovery(){
 }
 function checkpointRecovery(){
  try{writeRecovery(localStorage,inputsFile());recoverable=readRecovery(localStorage);showRecovery();}
- catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use Save session, or More › Save inputs only.';}
+ catch(error){$('recovery-status').textContent='Automatic input recovery unavailable: '+error.message+' Use File › Save, or File › Export › Model file.';}
 }
 try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
@@ -679,7 +679,10 @@ document.addEventListener('keydown',event=>{
  // File › Open (Ctrl+O), Save (Ctrl+S) and Save As (Shift+Ctrl+S), also from a text field: run
  // inside this key press, so the save picker may open
  const fileKey=event.key.toLowerCase();
- if(fileKey==='o'&&!event.shiftKey||fileKey==='s'){event.preventDefault();if(event.repeat)return;const item=$(fileKey==='o'?'menu-open':event.shiftKey?'menu-save-as':'menu-save');if(!item.disabled)item.click();else notice('Fix or discard the invalid inputs first.');return;}
+ if(fileKey==='o'&&!event.shiftKey||fileKey==='s'){event.preventDefault();if(event.repeat)return;
+  // a text field commits its value on change: blur it first, so the file holds what is shown
+  if(document.activeElement?.matches('input,textarea,select'))document.activeElement.blur();
+ const item=$(fileKey==='o'?'menu-open':event.shiftKey?'menu-save-as':'menu-save');if(!item.disabled)item.click();else notice('Fix or discard the invalid inputs first.');return;}
  if(event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
  const canUndo=multiView.active()?multiView.canUndo():edits.canUndo,canRedo=multiView.active()?multiView.canRedo():edits.canRedo;
  if(event.key.toLowerCase()==='z'){event.preventDefault();if(event.shiftKey){if(canRedo)$('redo-edit').click();}else if(canUndo)$('undo-edit').click();}
@@ -911,7 +914,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
   const runG=solverRun.group_index_method!==undefined,runParts=studyParts(solverRun.input,runModeCount(solverRun),runModeCount(solverRun),runG,state.groupIndex),nowParts=studyParts(current(),state.modeCount,runModeCount(solverRun),state.groupIndex,runG);
-  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>Save session keeps this run with its fields. More › Save inputs only keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
+  const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>File › Save keeps this run with its fields in the session file. File › Export › Model file keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=runInputsLine(runParts,nowParts);$('canvas').append(desc);
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
   const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}
@@ -1100,7 +1103,7 @@ function askFileName(suggested,{saveAs,unavailable=null}){
   const input=$('save-name-input');input.value=suggested;nameDialog.showModal();input.focus();input.select();
  });
 }
-$('save-name-input').oninput=event=>{const el=event.target,clean=el.value.replace(/[^A-Za-z0-9 ._()-]+/g,'');if(clean!==el.value){const at=el.selectionStart-(el.value.length-clean.length);el.value=clean;el.setSelectionRange(Math.max(0,at),Math.max(0,at));}};
+$('save-name-input').oninput=event=>{if(event.isComposing)return;const el=event.target,clean=el.value.replace(/[^A-Za-z0-9 ._()-]+/g,'');if(clean!==el.value){const at=el.selectionStart-(el.value.length-clean.length);el.value=clean;el.setSelectionRange(Math.max(0,at),Math.max(0,at));}};
 nameDialog.querySelector('form').onsubmit=event=>{event.preventDefault();nameAnswer?.(sanitizeFileName($('save-name-input').value,$('save-name-input').defaultValue||'session.json'));};
 $('save-name-cancel').onclick=()=>nameAnswer?.(null);
 nameDialog.oncancel=event=>{event.preventDefault();nameAnswer?.(null);};
@@ -1403,11 +1406,13 @@ if(/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||''))for(const
 // Save session: the file as it is, or, over 16 MiB, the dialog (fields of the selected and pinned
 // runs only); nothing is written on Cancel or when even that is over the limit.
 async function saveOpticalSession({keepSelected=false,saveAs=false}={}){
- newModelInputs=null;const inputs=inputsFile(),out=writeOpticalSession(inputs,runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
+ const inputs=inputsFile(),out=writeOpticalSession(inputs,runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
  if(!out.ok){if(out.refusal)throw new Error(out.refusal);overflowSaveAs=saveAs;setOverflowKeepText(false);$('session-overflow-description').textContent=opticalOverflowQuestion(out.bytes);if(!overflowDialog.open)overflowDialog.showModal();return;}
- const notebook=notebookStamp(),runsNow=runsStamp(),stampNow=saveStamp(),count=runs.length;
+ const notebook=notebookStamp(),runsNow=runsStamp(),stampNow=saveStamp(),count=runs.length,inputsText=JSON.stringify(inputs);
+ // the inputs saved are recorded now, so an edit made while the dialog is open stays on top of them
+ edits.record(inputs);
  const result=await deliverSession(out.text,sessionFileName(applicationSlug()),{saveAs});if(!result.written){notice(result.message);return;}
- const name=result.name;edits.record(inputs);edits.markSaved();savedNotebookState=notebook;savedRunsState=runsNow;lastSavedFile={name,savedAt:new Date().toISOString(),stamp:stampNow,recovered:false,written:result.via==='picker'};loadedSession=null;refreshPersistence();notice(`${savedWhere(result)}: current inputs, ${count===1?'1 run':count+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:'')+result.after);
+ const name=result.name;newModelInputs=null;if(JSON.stringify(inputsFile())===inputsText)edits.markSaved();savedNotebookState=notebook;savedRunsState=runsNow;lastSavedFile={name,savedAt:new Date().toISOString(),stamp:stampNow,recovered:false,written:result.via==='picker'};loadedSession=null;refreshPersistence();notice(`${savedWhere(result)}: current inputs, ${count===1?'1 run':count+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:'')+result.after);
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{

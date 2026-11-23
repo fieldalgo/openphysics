@@ -69,8 +69,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 ## File menu and file kinds
 
 The **File** menu, at the left of the ribbon, is a menu button: Enter, Space or Down opens it on its
-first item, Up and Down move, Right opens a submenu (or the **Edit** menu), Left and Escape close one
-level, and Tab closes the menus. Its shortcuts are shown beside the items.
+first item, Up and Down move, Right opens a submenu (or the next menu), Left closes a submenu (or
+opens the previous menu), Escape closes one level and returns focus, and Tab closes the menus. Its shortcuts are shown beside the items.
 
 | Item | Shortcut | What it does |
 |---|---|---|
@@ -98,15 +98,18 @@ file with runs a *session file*, never a project.
 **Where Save As saves.** Where the browser has a save dialog for web pages
 (`showSaveFilePicker`, in a secure context: `http://127.0.0.1` and `http://localhost` qualify),
 Save As opens it from your click or key press with the suggested name, one JSON file type and the
-Documents folder (or the current file's folder) to start in, and writes the chosen file. Chromium
-replaces the file only when the write is finished, so a write that fails leaves the file as it was,
-and Messages says *Session not saved: … could not be written (…); the file is unchanged.* Studio
+Documents folder (or the current file's folder) to start in, and writes the chosen file. Studio
 keeps the file it wrote, so **Save** writes it again without a dialog until another model or file
-is opened, the model is switched or the design is reset. Closing the dialog says *Save As
-cancelled; nothing was written.*, and Messages says *Saved to <name>* after a write. Elsewhere
+is opened, the model is switched or the design is reset. Chromium replaces a kept file only when
+the write is finished, so a Save whose write fails leaves it as it was: *Session not saved: …
+could not be written (…); the file is unchanged.* A file just chosen in the dialog may already
+have been created or emptied by the browser, so a failed first write says *…; the browser may
+have left it empty.* Closing the dialog says *Save As cancelled; nothing was written.* (*Save
+cancelled; …* when Save opened it), and Messages says *Saved to <name>* after a write. Elsewhere
 (Firefox, Safari, a page that is not a secure context), or when the save dialog cannot be used (for
 example a managed browser that refuses it), Studio asks for the **File name** in its own dialog:
-letters, digits, spaces and `.`, `_`, `-`, `(`, `)` only, with `.json` added if missing. It notes
+ASCII letters, digits, spaces and `.`, `_`, `-`, `(`, `)` only (other characters are removed),
+with `.json` added if missing. It notes
 that your browser saves to its Downloads folder, or asks where if you set it to, and **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its

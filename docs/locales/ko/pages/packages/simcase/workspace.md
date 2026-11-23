@@ -60,8 +60,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 ## File 메뉴와 파일 종류
 
 리본 왼쪽의 **File** 메뉴는 메뉴 버튼입니다. Enter, Space, Down은 첫 항목에서 메뉴를 열고, Up과 Down은
-항목을 옮기며, Right는 하위 메뉴(또는 **Edit** 메뉴)를 열고, Left와 Escape는 한 단계를 닫고, Tab은 메뉴를
-모두 닫습니다. 단축키는 항목 옆에 보입니다.
+항목을 옮기며, Right는 하위 메뉴(또는 다음 메뉴)를 열고, Left는 하위 메뉴를 닫거나(또는 이전 메뉴를 열고),
+Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 닫습니다. 단축키는 항목 옆에 보입니다.
 
 | 항목 | 단축키 | 하는 일 |
 |---|---|---|
@@ -89,13 +89,15 @@ Messages는 입력만 담은 파일을 *model file*, 실행을 담은 파일을 
 **Save As가 저장하는 곳.** 브라우저에 웹 페이지용 저장 대화상자(`showSaveFilePicker`, 보안
 컨텍스트에서만: `http://127.0.0.1`과 `http://localhost` 포함)가 있으면 Save As는 사용자의 클릭이나 키
 입력에서 바로 그 대화상자를 열고, 제안 이름, JSON 파일 형식 하나, 시작 폴더 Documents(또는 현재 파일의
-폴더)를 넘긴 뒤 고른 파일에 씁니다. Chromium은 쓰기가 끝나야 파일을 바꾸므로 쓰기가 실패하면 파일은
-그대로이고, Messages에 *Session not saved: … could not be written (…); the file is unchanged.*가
-나옵니다. Studio는 쓴 파일을 기억하므로 다른 모델이나 파일을 열거나, 모델을 바꾸거나, 설계를 초기화할
-때까지 **Save**는 대화상자 없이 그 파일에 다시 씁니다. 대화상자를 닫으면 *Save As cancelled; nothing was
-written.*, 쓰기 뒤에는 *Saved to <name>*이 나옵니다. 그 밖의 경우(Firefox, Safari, 보안 컨텍스트가 아닌
+폴더)를 넘긴 뒤 고른 파일에 씁니다. Studio는 쓴 파일을 기억하므로 다른 모델이나 파일을 열거나, 모델을
+바꾸거나, 설계를 초기화할 때까지 **Save**는 대화상자 없이 그 파일에 다시 씁니다. Chromium은 기억한 파일을
+쓰기가 끝나야 바꾸므로 Save의 쓰기가 실패하면 파일은 그대로이고 *Session not saved: … could not be written
+(…); the file is unchanged.*가 나옵니다. 대화상자에서 방금 고른 파일은 브라우저가 이미 만들거나 비웠을 수
+있으므로 첫 쓰기가 실패하면 *…; the browser may have left it empty.*가 나옵니다. 대화상자를 닫으면 *Save As
+cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), 쓰기 뒤에는 *Saved to <name>*이 나옵니다. 그 밖의 경우(Firefox, Safari, 보안 컨텍스트가 아닌
 페이지)나 저장 대화상자를 쓸 수 없을 때(예: 이를 막는 관리형 브라우저) Studio는 자체 대화상자에서
-**File name**을 묻습니다. 글자, 숫자, 공백과 `.`, `_`, `-`, `(`, `)`만 받고, `.json`이 없으면 붙입니다.
+**File name**을 묻습니다. 영문(ASCII) 글자, 숫자, 공백과 `.`, `_`, `-`, `(`, `)`만 받고(다른 문자, 예를 들어
+한글은 지워짐), `.json`이 없으면 붙입니다.
 브라우저가 Downloads 폴더에 저장하거나, 그렇게 설정했다면 위치를 묻는다고 안내하며, **Download**는 파일을
 브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
