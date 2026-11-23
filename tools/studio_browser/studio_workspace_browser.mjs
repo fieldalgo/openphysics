@@ -1304,8 +1304,13 @@ try {
   assert.deepEqual(onView.neff, offView.neff, 'the option leaves n_eff as it was');
   assert.deepEqual(onView.neff, direct.neff.map(n => n.toFixed(8)), 'the engine run is of the same document');
   await noOverflow('M5 results with n_g');
-  // Compare: the off run as A, the on run as B
+  // Compare: the off run as A, the on run as B. Round 16 (S3): a pair picked on Compare earlier
+  // stays when new runs come, so the two newest runs are picked here with the A and B selects
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'M5 Compare');
+  for (const [id, back] of [['compare-a', 2], ['compare-b', 1]]) {
+    await page.eval(`(()=>{const s=document.getElementById('${id}');s.value=s.options[s.options.length-${back}].value;s.dispatchEvent(new Event('change'));return true})()`);
+    await page.until("!!document.getElementById('compare-neff')", 'M5 Compare ' + id);
+  }
   const m5compare = await page.eval("({head:[...document.querySelectorAll('#compare-neff thead [data-column]')].map(e=>e.dataset.column),hint:!!document.querySelector('#compare-neff [data-group-index-hint]'),a:[...document.querySelectorAll('#compare-neff [data-group-index-a]')].map(e=>e.textContent),b:[...document.querySelectorAll('#compare-neff [data-group-index-b]')].map(e=>e.textContent)})");
   stage('M5 Compare', m5compare);
   assert.deepEqual(m5compare.head.slice(-2), ['n_g A', 'n_g B']); assert.equal(m5compare.hint, false, 'no hint when run B computed n_g');

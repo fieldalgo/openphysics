@@ -28,6 +28,24 @@ export function defaultComparison(runs){
  if(!runs.length)return [null,null];
  return [(runs.at(-2)||runs.at(-1)).job,runs.at(-1).job];
 }
+// Whether Compare keeps its pair when new runs come (round 16): a pair the user picked on Compare
+// (picked), or one whose two runs are both named; never one run on both sides (the pair a single
+// run gives). Otherwise the default pair is the two newest.
+export function pairKept(runs,[a,b],picked=false){
+ const ra=runs.find(r=>r.job===a),rb=runs.find(r=>r.job===b);
+ return !!ra&&!!rb&&a!==b&&(picked||!!ra.label&&!!rb.label);
+}
+// The pair after a run is added: the kept pair, else the default (defaultComparison).
+export function comparisonAfterRun(runs,ids,picked=false){return pairKept(runs,ids,picked)?[...ids]:defaultComparison(runs);}
+// A pair read from a file or browser recovery is kept when it is not the default pair (someone
+// chose it) or when both runs are named.
+export const pairChosen=(runs,ids)=>{const d=defaultComparison(runs);return ids[0]!==d[0]||ids[1]!==d[1];};
+// The newest run outside a pair, when it is newer than both runs of the pair (runs oldest first),
+// for the line "Run 5 is newer than this pair · Compare Run 5 with B"; else null.
+export function newerThanPair(runs,[a,b]){
+ const last=runs.at(-1),ia=runs.findIndex(r=>r.job===a),ib=runs.findIndex(r=>r.job===b);
+ return last&&ia>=0&&ib>=0&&runs.length-1>Math.max(ia,ib)?last:null;
+}
 // The side a run card names on Compare: "A", "B", "A and B" (one run on both sides) or ''.
 export function compareSide(job,[a,b]){return job===a&&job===b?'A and B':job===a?'A':job===b?'B':'';}
 // n_eff everywhere (results, mode select, Compare): 8 decimals.
