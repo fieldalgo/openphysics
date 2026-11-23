@@ -188,17 +188,18 @@ try {
   await runReady();
   assert.match(await page.text('#tree [data-mp-node="physics:heat1"]'), /^∿ 1 Heat 1 · Heat transfer$/);
   assert.match(await page.text('#tree [data-mp-node="physics:modes1"]'), /^λ 2 Modes 1 · Optical modes$/);
-  // the ribbon: Run as Run study draws it, the heater-off option on, Open session and Save session in Project
+  // the ribbon: Run as Run study draws it, the heater-off option on, Open and Save in Project (P2: the File menu's shortcuts)
   // the ▶ is decoration with an empty alternative text: the accessible names are the labels
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics'),'::before').content"), '"▶" / ""');
   assert.equal(await page.axName('#run-multiphysics'), 'Run study');
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics')).fontWeight"), await page.eval("getComputedStyle(document.getElementById('run-optical')).fontWeight"));
   assert.equal(await page.eval("!document.getElementById('run-baseline-option').hidden&&document.getElementById('run-baseline').checked"), true);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater (about 1 s more)');
-  assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open session', 'Save session']);
-  // the model file alone is More › Save inputs only and Open inputs file
-  assert.deepEqual(await page.eval("['save-project','open-project'].map(id=>document.getElementById(id).textContent+':'+!document.getElementById(id).hidden+':'+!!document.getElementById(id).closest('.file-menu'))"),
-    ['Save inputs only:true:true', 'Open inputs file:true:true']);
+  assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open…', 'Save']);
+  // the model file alone is File › Export › Model file…; File › Open opens it (P2: no Open inputs file)
+  assert.deepEqual(await page.eval("['save-project','menu-open'].map(id=>document.getElementById(id).querySelector('span').textContent+':'+!document.getElementById(id).hidden+':'+document.getElementById(id).closest('[role=menu]').id)"),
+    ['Model file…:true:export-menu', 'Open…:true:file-menu']);
+  assert.equal(await page.eval("document.getElementById('open-project')"), null);
   assert.doesNotMatch(await page.eval('document.body.innerText'), /runs stay in this tab/i);
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
   assert.equal(await page.text('#status'), 'Model checked · press Run');
@@ -516,9 +517,9 @@ try {
   await page.until("!!document.querySelector('[data-template=optical]')", 'start page before leaving');
   await page.click('[data-template=optical]');
   await page.until("!document.getElementById('open-session').hidden&&!document.getElementById('save-session').hidden", 'session commands back');
-  assert.deepEqual(await page.eval("[...document.querySelector('.file-menu-items').children].slice(0,3).map(b=>b.id+':'+b.textContent+':'+!b.hidden)"),
-    ['save-project:Save inputs only:true', 'open-project:Open inputs file:true', 'save-draft:Save browser draft:true']);
-  assert.match(await page.attr('#save-project', 'aria-description'), /^Saves the model inputs only/);
+  assert.deepEqual(await page.eval("['save-project','menu-open','save-draft'].map(id=>{const b=document.getElementById(id);return b.id+':'+b.querySelector('span').textContent+':'+!b.hidden})"),
+    ['save-project:Model file…:true', 'menu-open:Open…:true', 'save-draft:Save browser draft:true']);
+  assert.match(await page.attr('#save-project', 'aria-description'), /^Downloads the model file: the model inputs only/);
   assert.equal(await page.eval("document.getElementById('run-baseline-option').hidden&&document.getElementById('run-multiphysics').hidden"), true);
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
   stage('MB8 back to a single-physics model');

@@ -69,7 +69,7 @@ test('version 8 is read with checked study settings; versions 6 and 7 ignore the
 
 test('F1: a version newer than the reader reads is refused with the existing message',()=>{
  const doc=JSON.parse(fileText({modeCount:4}));
- for(const version of [9,10])assert.throws(()=>P.parseProject(JSON.stringify({...doc,version})),{message:'Unsupported project format or version.'});
+ for(const version of [9,10])assert.throws(()=>P.parseProject(JSON.stringify({...doc,version})),{message:'Unsupported model file format or version.'});
 });
 
 const v8Input=()=>P.parseProject(fileText({modeCount:3,groupIndex:true}));

@@ -134,7 +134,7 @@ export function createJouleView(ctx){
  }
  function results(){
   const host=$('canvas');resize?.disconnect();
-  if(!result){host.innerHTML='<h2>No Joule heating result in this tab</h2><p>Edit the model and run the study. Joule heating results are kept in this tab only; saved projects and sessions keep the inputs.</p>';$('inspector').innerHTML='<h2>Joule heating results</h2><p>No completed run.</p>';return;}
+  if(!result){host.innerHTML='<h2>No Joule heating result in this tab</h2><p>Edit the model and run the study. Joule heating results are kept in this tab only; model files and session files keep the inputs.</p>';$('inspector').innerHTML='<h2>Joule heating results</h2><p>No completed run.</p>';return;}
   const run=result,p=run.payload,summary=p.summary,same=run.signature===signature();
   host.innerHTML='<h2>Joule heating result</h2>';
   const desc=document.createElement('p');desc.textContent=`${runInputsLine([jouleSummary(run.input)],[jouleSummary(j())])} · ${p.result_format}`;host.append(desc);

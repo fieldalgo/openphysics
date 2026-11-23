@@ -17,12 +17,14 @@ export function validateSavedFile(value){
  return {name:value.name,savedAt:value.savedAt,current:value.current};
 }
 // The one save indicator: the title bar shows it and the footer repeats it, so the two never
-// disagree. saved: {name, savedAt, current} (the last session file this notebook was sent to)
+// disagree. saved: {name, savedAt, current, written} (the last session file this notebook was sent
+// to; written when the browser's save dialog wrote it, File › Save As, rather than a download)
 // or null; loaded: {kind: 'opened' | 'recovered', name, current} (the session file opened, or
 // browser recovery) or null; current means nothing changed since. recovery: the browser copy
 // of the completed runs, 'kept' | 'updating' | 'unavailable' | 'conflict', or null before any.
-// Studio hands the file to the browser's downloads and cannot know it was kept, so the
-// indicator names the file the session was sent to and never claims it was saved. No revision
+// A download is handed to the browser, which Studio cannot see keep it, so the indicator then
+// names the file the session was sent to and never claims it was saved; "Saved to" only after
+// the save dialog's write finished. No revision
 // counter: it counts input changes in this tab only and would differ after a restore.
 // overLimit and kept:N are a multiphysics session's (version 8): over 16 MiB, recovery keeps the
 // maps of the selected and pinned runs only, and writes nothing when even that is over the limit.
@@ -54,7 +56,8 @@ function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=n
   // the last session file is history: the session came from browser recovery, not from that file
   return 'Recovered from this browser'+(saved?` (last sent to a file: ${saved.name} at ${when(saved.savedAt)}; changed since)`:loaded.file?` (opened from ${loaded.file}; changed since)`:runsUnsaved?' · not saved to a file':'')+problem;
  }
- if(saved?.current)return `${sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
+ // written: the browser's save dialog wrote the file (File › Save As); else it was a download
+ if(saved?.current)return `${saved.written?`Saved to ${saved.name}`:sentToDownloads('Session',saved.name)} · ${when(saved.savedAt)}`+problem;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
  const file=saved?`${saved.name} (${when(saved.savedAt)})`:loaded?.file||null;
  if(runsUnsaved)return (file?`Changed since session file ${file}`:'Not saved to a file')+' · '+browser;

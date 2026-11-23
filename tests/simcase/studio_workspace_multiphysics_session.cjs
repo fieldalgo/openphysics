@@ -205,11 +205,13 @@ test('the open question and the save notice use the optical words',()=>{
  const t=M.multiphysicsLoadText(session,{runs:1});
  assert.equal(t.title,'Open saved session?');assert.equal(t.runs,'Run 1 Heater 10 mW (pinned); Run 2; Run 3');
  assert.equal(t.description,'Brings back 3 runs with their names and pins. Replaces the current model and 1 run in this tab; input undo starts at the opened session.');
- assert.equal(M.savedNotice('heated-silicon-waveguide-session-2026-11-22-1015.json',{runs:3,baseline:true}),"Session file heated-silicon-waveguide-session-2026-11-22-1015.json sent to the browser's downloads (check your Downloads folder): the model, 3 runs and the without-heater result.");
+ assert.equal(M.savedNotice('heated-silicon-waveguide-session-2026-11-22-1015.json',{runs:3,baseline:true}),"Session file heated-silicon-waveguide-session-2026-11-22-1015.json sent to your browser's Downloads: the model, 3 runs and the without-heater result.");
+ // File › Save through the browser's save dialog: the words say the file was written, and no more
+ assert.equal(M.savedNotice('heater.json',{runs:3,baseline:true,via:'picker'}),'Saved to heater.json: the model, 3 runs and the without-heater result.');
  // round 10: the optical runs of the tab are not in a multiphysics session file, and the message says where they are kept
  const base=M.savedNotice('h.json',{runs:1});assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:0}),base);
- assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:2}),base+' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide › Save session keeps them in their own file.');
- assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:1}),base+' The Optical waveguide run of this tab is not in this file; Library › Optical waveguide › Save session keeps it in its own file.');
+ assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:2}),base+' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.');
+ assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:1}),base+' The Optical waveguide run of this tab is not in this file; Library › Optical waveguide, then File › Save, keeps it in its own file.');
  assert.ok(session.runs.every(r=>r.origin==='imported'));
 });
 

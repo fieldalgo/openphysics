@@ -192,6 +192,11 @@ try {
   const downloads = join(out, 'downloads');
   await mkdir(downloads, {recursive: true});
   await page.call('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: downloads});
+  // This browser has a save picker on 127.0.0.1, which a headless run cannot answer: it is removed
+  // at document start, so Save asks for a name in Studio's dialog and the browser downloads the
+  // file under the name Studio suggests, as before the File menu.
+  await page.call('Page.addScriptToEvaluateOnNewDocument', {source: 'delete window.showSaveFilePicker;delete Window.prototype.showSaveFilePicker;'});
+  const confirmName = async label => { await page.until("document.getElementById('save-name-dialog')?.open", label + ': name dialog'); await page.click('#save-name-download'); };
   const listed = async () => new Set(await readdir(downloads));
   await mkdir(join(out, 'saved'), {recursive: true});
   let savedCount = 0;
@@ -215,9 +220,9 @@ try {
     throw new Error('no download: ' + label);
   }
   async function saveSession(label) {
-    const before = await listed(); await clearNotice(); await page.click('#save-session');
+    const before = await listed(); await clearNotice(); await page.click('#save-session'); await confirmName(label);
     const file = await nextDownload(before, label);
-    await page.until("/^Session file .* sent to the browser's downloads/.test(document.getElementById('file-status').textContent)", 'save notice ' + label);
+    await page.until("/^Session file .* sent to your browser's Downloads: /.test(document.getElementById('file-status').textContent)", 'save notice ' + label);
     return file;
   }
   const setFile = async (selector, path) => {
@@ -333,7 +338,7 @@ print(n)`;
     throw new Error('inputs file not opened: ' + name);
   };
 
-  // S10: one Open session and one Save session in every model, the inputs file in More, no
+  // S10: one Open and one Save in every model (P2: the File menu's shortcuts), the model file in File › Export, no
   // "Runs stay in this tab", no horizontal overflow, at 1440 x 900 and 390 x 844
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page');
@@ -350,11 +355,11 @@ print(n)`;
       const seen = await page.eval(`(()=>{const visible=b=>!b.hidden&&getComputedStyle(b).display!=='none'&&b.getClientRects().length>0;
         const all=[...document.querySelectorAll('button')].filter(visible).map(b=>b.innerText.trim());
         const group=[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&visible(b)).map(b=>b.innerText.trim());
-        const menu=[...document.querySelector('.file-menu-items').children].filter(b=>!b.hidden).map(b=>b.textContent.trim());
-        return {open:all.filter(t=>t==='Open session').length,save:all.filter(t=>t==='Save session').length,first:group.slice(0,2),menu:menu.slice(0,2),
+        const menu=[...document.querySelectorAll('#export-menu [role=menuitem]')].filter(b=>!b.hidden).map(b=>b.textContent.trim());
+        return {open:all.filter(t=>t==='Open…').length,save:all.filter(t=>t==='Save').length,first:group.slice(0,2),menu:menu.slice(0,2),
           stay:/runs stay in this tab/i.test(document.body.innerText+document.body.textContent),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
       words[`${tag}-${card}`] = seen;
-      assert.deepEqual([seen.open, seen.save, seen.first, seen.menu, seen.stay, seen.overflow], [1, 1, ['Open session', 'Save session'], ['Save inputs only', 'Open inputs file'], false, 0], `${tag} ${card}: ${JSON.stringify(seen)}`);
+      assert.deepEqual([seen.open, seen.save, seen.first, seen.menu, seen.stay, seen.overflow], [1, 1, ['Open…', 'Save'], ['Model file…', 'Model with runs (session file)…'], false, 0], `${tag} ${card}: ${JSON.stringify(seen)}`);
       await page.screenshot(`s10-${tag}-${card}`);
     }
   }
@@ -401,7 +406,7 @@ print(n)`;
   assert.equal(await page.text('#autosave-status'), 'Not saved to a file · kept for recovery in this browser');
   const a1 = await saveSession('template');
   assert.match(a1.name, /^heated-silicon-waveguide-session-\d{4}-\d\d-\d\d-\d{4}\.json$/);
-  assert.match(await notice(), /^Session file heated-silicon-waveguide-session-.*\.json sent to the browser's downloads \(check your Downloads folder\): the model, 1 run and the without-heater result\.$/);
+  assert.match(await notice(), /^Session file heated-silicon-waveguide-session-.*\.json sent to your browser's Downloads: the model, 1 run and the without-heater result\.$/);
   assert.match(await page.text('#autosave-status'), /^Session file heated-silicon-waveguide-session-.*\.json sent to your browser's Downloads · \d{1,2}:\d\d(?: [AP]M)?$/);
   await fetchReplies(a1.text);
   const openedA = await openSession(a1.path);
@@ -646,7 +651,7 @@ print(n)`;
   // round 10 (K10): Save session of the heated model says the optical runs of the tab are not in its file
   const heatedWithOptical = await saveSession('heated with optical runs'); const savedWords = await notice();
   stage('K10 heated save with optical runs', {file: String(heatedWithOptical?.path ?? heatedWithOptical), savedWords});
-  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide › Save session keeps them in their own file.'), savedWords);
+  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.'), savedWords);
   // round 10 (K7): the Library page has one phrase for browser recovery
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page K7');
   assert.doesNotMatch(await page.text('#canvas'), /Recover|\(this browser/);
@@ -725,7 +730,7 @@ print(n)`;
   // Keep maps for selected and pinned runs: the file fits and says which runs keep values only
   const before5 = await listed(); await clearNotice(); await page.click('#save-session');
   await page.until("document.getElementById('session-overflow').open", 'overflow question again');
-  await page.click('#overflow-keep');
+  await page.click('#overflow-keep'); await confirmName('six 0.08 runs');
   const big = await nextDownload(before5, 'six 0.08 runs');
   await page.until("/keep values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
