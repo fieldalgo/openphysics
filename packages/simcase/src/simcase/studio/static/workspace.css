@@ -275,8 +275,8 @@ main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .compare-table thead tr:first-child th:first-child,.compare-table tbody th{text-align:left;position:sticky;left:0;z-index:1;background:var(--panel,#fff);box-shadow:inset -1px 0 #dfe5ee}.compare-table thead tr:first-child th:first-child{background:#f3f6fa;z-index:2}
 .compare-table .table-runs{margin:0 0 6px;font-size:11px;color:#586c87;display:flex;flex-wrap:wrap;gap:2px 16px}.compare-table .table-runs span{overflow-wrap:anywhere;min-width:0}
 .compare-table .table-note{margin:6px 0 0;font-size:11px;color:#586c87}
-/* the visible hint under an n_g header when no run shown computed n_g */
-.th-hint{display:block;font-weight:400;font-size:11px;line-height:1.3;color:#586c87;white-space:normal;min-width:12em;max-width:16em;margin-inline:auto}
+/* round 15: the n_g hint on a line above the modes table when the run has no n_g (the header reads "n_g") */
+.modes-table .table-hint{margin:0 0 6px;font-size:11px;color:#586c87}
 .compare-selection{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:8px 0}
 .compare-selection label,.compare-options label{min-width:0;margin:0}
 .compare-selection select{min-width:0;max-width:100%;text-overflow:ellipsis}

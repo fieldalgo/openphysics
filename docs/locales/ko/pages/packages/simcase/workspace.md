@@ -703,8 +703,9 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
 
 - **Polarization**은 창의 모든 삼각형에 대한 TE 비율 `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)`입니다(열
   도움말: “TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal”). 낱말과 TE 백분율로 보여 줍니다(예:
-  *TE-like · 98.2 % TE*). TM-like 칸은 TM 비율을 먼저 씁니다: *TM-like · 96.9 % TM (3.1 % TE)*(보이는 두
-  값의 합은 100.0). Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
+  *TE-like · 98.2 % TE*). TM-like 칸은 TM 비율을 먼저 씁니다: *TM-like · 96.9 % TM (3.1 % TE)*. hybrid 칸은 둘 다
+  씁니다: *hybrid · 21.7 % TE / 78.3 % TM*. 두 비율은 한 값에서 나옵니다: TE는 f_TE × 100을 소수 한 자리로
+  반올림한 값, TM은 100에서 그 반올림한 TE를 뺀 값이므로 보이는 두 값의 합은 정확히 100.0입니다. Studio의 낱말은 f_TE ≥ 0.9이면 **TE-like**, f_TE ≤ 0.1이면 **TM-like**, 그 밖에는
   **hybrid**이며, 엔진은 수만 저장합니다(`te_polarization_fraction`, [결과 형식](overview.md)).
 - **축퇴 쌍**: 한 실행에서 Re n_eff 차이가 1e-3 이하인 이웃한 두 모드는(둘 다 비율이 있을 때) 합친 칸 하나 *pair (n_eff within 1e-3) ·
   50 % TE together*(두 비율의 평균)를 씁니다. 도움말은 각 모드의 편광이 정의되지 않는다고 밝힙니다(쌍 안의
@@ -736,9 +737,9 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
 - **n_g**(광 애플리케이션만)는 **Also compute group index**를 켠 실행의 엔진 군굴절률이며 소수 4자리로
   보입니다. 열 도움말은 “n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± 1 nm (3 solves),
   materials evaluated at each wavelength”입니다. 칸은 두 경우에 **—**입니다.
-  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study or Optical modes”이고, n_g
-    머리글 이름 아래에 *Off · turn on in Study or Optical modes*가 보입니다(Compare에서는 두 실행 모두 n_g가 없을 때 n_g 열이 좁게
-    유지되도록 대신 표 위 줄에 *n_g: Off · turn on in Study or Optical modes*가 나옵니다).
+  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study or Optical modes”이고, 모드
+    표 위 줄에 *n_g: Off · turn on in Study or Optical modes*가 나오고 머리글은 *n_g*뿐입니다(Compare도 두 실행 모두
+    n_g가 없을 때 n_g 열이 좁게 유지되도록 표 위 줄에 같은 말을 보여 줍니다).
   - 엔진이 옆 파장에서 그 모드를 대응시키지 못했을 때(`null`, 예: 축퇴 쌍의 한 모드). 그 실행을
     한 탭에서는 도움말이 엔진의 이유 *Not matched: vacuum_wavelength 1.549 um: …*를 보입니다. 세션
     파일은 이유를 보관하지 않으므로, 파일을 연 뒤에는 “Not matched at λ0 ± 1 nm; the reason is not

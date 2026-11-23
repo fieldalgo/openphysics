@@ -1169,8 +1169,10 @@ function modesTable(run){
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent='Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}),groupIndexHeader(cell('th','n_g',{scope:'col',title:groupIndexHelp()}),[run]));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}),cell('th','n_g',{scope:'col',title:groupIndexHelp()}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
+ // the n_g hint, when the run has no n_g: on a line above the table (as Compare has it), the header just "n_g"
+ if(!hasGroupIndex(run))box.append(groupIndexHintLine('modes-table-hint'));
  const body=document.createElement('tbody');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
@@ -1263,11 +1265,10 @@ function renderRunList(){
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
  const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
 }
-// The n_g header with the visible hint (#…-hint) when none of the runs shown computed n_g.
-function groupIndexHeader(th,shown){
- if(shown.some(hasGroupIndex))return th;
- const hint=document.createElement('small');hint.className='th-hint';hint.dataset.groupIndexHint='';hint.textContent=GROUP_INDEX_HINT;hint.title=GROUP_INDEX_OFF_HELP;th.append(hint);return th;
-}
+// The n_g hint ("Off · turn on in Study or Optical modes", its help as title) after "n_g: ",
+// for a line above a table whose runs did not compute n_g.
+function groupIndexHint(){const hint=document.createElement('small');hint.dataset.groupIndexHint='';hint.textContent=GROUP_INDEX_HINT;hint.title=GROUP_INDEX_OFF_HELP;return hint;}
+function groupIndexHintLine(id){const line=document.createElement('p');line.id=id;line.className='table-hint';line.append('n_g: ',groupIndexHint());return line;}
 // The modes of A and B matched by field overlap on a common grid (workspace-match.mjs): one row
 // per matched mode (or degenerate pair), then each mode of A and of B without a match. The columns
 // (Modes, Polarization A B, Overlap, n_eff A B, Δn_eff, Δ %, A_eff A B, absorption loss A B, n_g A B)
@@ -1289,7 +1290,7 @@ function compareTable(a,b,match){
  const runs=document.createElement('p');runs.id='compare-table-runs';runs.className='table-runs';
  for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run));runs.append(line);}
  // the n_g hint, when neither run computed n_g: on this line, so the n_g columns stay narrow
- if(![a,b].some(hasGroupIndex)){const line=document.createElement('span');line.className='table-hint';const hint=document.createElement('small');hint.dataset.groupIndexHint='';hint.textContent=GROUP_INDEX_HINT;hint.title=GROUP_INDEX_OFF_HELP;line.append('n_g: ',hint);runs.append(line);}
+ if(![a,b].some(hasGroupIndex)){const line=document.createElement('span');line.className='table-hint';line.append('n_g: ',groupIndexHint());runs.append(line);}
  const frame=document.createElement('div');frame.className='compare-table-frame';
  const more=cell('p','Scroll sideways for all 14 columns ›',{class:'table-note scroll-hint','data-scroll-hint':''});more.hidden=true;
  const scroll=document.createElement('div');scroll.className='compare-table-scroll';scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-labelledby','compare-neff-caption');
