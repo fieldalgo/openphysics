@@ -1794,10 +1794,23 @@ try {
     await toTree('Geometry', "!!document.querySelector('#shape-w')");
     await ob.click('[data-add-shape=rect]'); await ob.until("document.querySelectorAll('.shape-item').length===2", 'OB substrate added');
     await ob.type('#shape-name', 'Substrate'); await ob.choose('#shape-material', 'Silicon');
-    // a width or height edit keeps the shape centred: the size first, then the position
-    await ob.type('#shape-w', 3000); await ob.type('#shape-h', 700); await ob.type('#shape-x', -1500); await ob.type('#shape-y', -1200);
+    // round 16 (S2): T16's entry order, typed key by key (one input event per character): Left x
+    // −1500, Bottom y −1200, Width 3000 (centred it would leave the window, so Left x is kept),
+    // Height 700. A Width once refused is tried again when Left x changes.
+    const typeKeys = async (selector, text) => {
+      await ob.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', selector);
+      for (const ch of String(text)) await ob.call('Input.insertText', {text: ch});
+      await ob.onElement('function(selector){this.querySelector(selector).blur();return true}', selector); await sleep(150);
+    };
+    const obStatus = () => ob.eval("document.getElementById('file-status').textContent");
+    await typeKeys('#shape-x', -1500); await typeKeys('#shape-y', -1200); await typeKeys('#shape-w', 3000);
+    const widthNotice = await obStatus();
+    await typeKeys('#shape-h', 700);
     const substrate = await ob.eval("['shape-x','shape-y','shape-w','shape-h'].map(id=>document.getElementById(id).value)");
-    stage('OB substrate', {substrate}); assert.deepEqual(substrate, ['-1500', '-1200', '3000', '700']);
+    const substrateInvalid = await ob.eval("[...document.querySelectorAll('#inspector input[aria-invalid=true]')].map(e=>e.id)");
+    stage('OB substrate', {substrate, widthNotice, invalid: substrateInvalid}); assert.deepEqual(substrate, ['-1500', '-1200', '3000', '700']);
+    assert.ok(widthNotice.startsWith('Width set to 3000 nm. Left x kept at −1500 nm: centred, the shape would leave the window. '), widthNotice);
+    assert.deepEqual(substrateInvalid, []);
     await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
     await ob.click('input[name="outer-boundary"][value="open"]'); await ob.until("!!document.getElementById('target-number')", 'OB leakage Open');
     // the document the browser sends is P1's build("strip_substrate", 2) (tests/simcase/open_boundary_fixtures.py), byte for byte

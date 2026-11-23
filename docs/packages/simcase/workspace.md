@@ -262,8 +262,15 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
    each shape's material; the silica background stays. A rectangle's **Width** edit
    keeps its horizontal centre (Left x moves by half the change) and a **Height** edit
-   keeps its bottom edge, so a core resting on y = 0 stays centred there; the window
-   rule still refuses a size that would leave the window. Projects saved earlier keep
+   keeps its bottom edge, so a core resting on y = 0 stays centred there. Where the centred
+   shape would leave the window but the shape with its left edge kept fits, the Width keeps
+   the left edge and Messages says so: *Width set to 3000 nm. Left x kept at −1500 nm:
+   centred, the shape would leave the window.* (a 3000 nm substrate typed as Left x −1500,
+   Bottom y −1200, Width 3000, Height 700 is a 3000 × 700 nm rectangle at (−1500, −1200)). A
+   Width is computed from the shape as it was when the field took focus, so the digits typed on
+   the way do not move it. The window rule still refuses a size that fits neither way; a
+   refused value stays in its field and is tried again when another value of the same shape
+   changes. Projects saved earlier keep
    their stored coordinates. The step bar's **4. Study** shows *Ready to run*, and *Run
    complete* once these inputs have a result; next to it the wavelength (for example
    **λ 1550 nm**) is a button, named *Wavelength 1550 nm, edit*, that opens the wavelength field. Optionally set the
