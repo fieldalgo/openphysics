@@ -86,7 +86,7 @@ Si 220 nm, 그 아래 Si, PEC 옆벽, TE, 1 nm 간격. 기준값은 physmat 분�
   Re n_eff가 −4.76e-3 벗어납니다. 이 오차는 메시를 반으로 나눌 때마다 줄어듭니다.
 - dn_eff/dλ0는 상대 1e-3 안입니다.
 - 그래서 기본 메시에서 등록한 1e-3 / 2 % 기준은 실패했고, 결과를 본 뒤 다른 점검으로 바뀌었습니다
-  ([`test_open_boundary_group_index.py`](../../../../../../tests/simcase/test_open_boundary_group_index.py)).
+  ([열린 경계의 모드 식별](workspace.md#열린-경계의-모드-식별)).
 
 `field_layout`과 다른 모든 키는 그대로입니다. 선택이 없는 결과는 이전 릴리스의 결과와
 같습니다. 로그에는 옆 파장, null 모드와 그 이유, 값이 나옵니다. 실행 시간은 단일 지점

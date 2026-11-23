@@ -93,7 +93,7 @@ TE, a 1 nm step. The reference is the central difference of
   of n_eff itself: Re n_eff is −4.76e-3 off. The error decreases on each halving of the mesh.
 - dn_eff/dλ0 is within 1e-3 relative.
 - The registered 1e-3 / 2 % gate at the default mesh therefore failed and was replaced after the
-  result ([`test_open_boundary_group_index.py`](../../../tests/simcase/test_open_boundary_group_index.py)).
+  result ([open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary)).
 
 `field_layout` and every other key are unchanged. Results without the option are those of
 earlier releases. The log lists the side wavelengths, each null mode with its reason, and
