@@ -367,6 +367,9 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 보이는 동안 모든 탭, 리본 버튼, File 메뉴 버튼, 트리의 첫 항목이 그 중심점의 요소이며, 배너 밖의 보이는
 컨트롤이 배너와 겹치지 않고 배너의 버튼은 누를 수 있습니다. Compare에서 실행 목록의 *Compare A*, *Compare B*는
 레이블 뒤의 테두리 있는 배지이고, 버튼의 접근 가능한 이름은 여전히 *· Compare A*, *· Compare B*로 끝납니다.
+광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
+*Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
+보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는
