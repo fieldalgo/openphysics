@@ -274,7 +274,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
    가리키고(*Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
-   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. Compare는 가장 새 실행 두 개로 열리며,
+   Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. 형상이 여럿인 실행은 처음 세 형상의 이름과
+   크기를, 그 뒤는 *+N more*로 적습니다: *Run 5 · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon*. 열린 경계
+   실행은 실행 목록과 Compare 선택 목록에 *· open (PML 1 µm)*을 덧붙입니다. Compare는 가장 새 실행 두 개로 열리며,
    오래된 쪽이 A, 새 쪽이 B입니다(방금 계산한 실행이 B). 실행 목록은 새 실행이 위에 오므로 Compare에서는
    두 카드 끝에 *Compare A*, *Compare B* 배지가 붙습니다(*· Compare A*, *· Compare B*로 읽힘). 고른 실행이 사라지면 둘 다 그 쌍으로 돌아갑니다.
    고른 것으로 보이는 실행 카드는 정확히

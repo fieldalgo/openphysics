@@ -8,6 +8,12 @@ export function runHeading(run,number=null){
  const name=Number.isInteger(number)?`Run ${number}${run.label?' · '+run.label:''} · `:run.label?run.label+' · ':'';
  return `${name}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm`;
 }
+// A run's design as the run list and the Compare pickers name it (round 16): designSummary, and
+// "open (PML 1 µm)" for a run with an open boundary (its PML thickness as the run kept it).
+export function runDesign(run){
+ const pml=run.settings?.boundary==='PML'?run.settings.pml?.thickness:null,t=typeof pml==='string'?Number.parseFloat(pml):NaN;
+ return designSummary(run.input.model)+(Number.isFinite(t)?` · open (PML ${t/1000} µm)`:'');
+}
 // A Compare field panel heading: the side, then the run without repeating the side as its name
 // (a run named "A" on side A reads "A · 600 × 300 nm · …", not "A · A · 600 × 300 nm · …").
 export function fieldHeading(side,run,number=null){

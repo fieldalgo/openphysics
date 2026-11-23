@@ -312,7 +312,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
    bar adds *press Run to compute it here*). Run list entries name a run by its number with its
    name, *Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*, and give the time
-   with seconds; the Compare pickers and headings name runs the same way. Compare opens with
+   with seconds; the Compare pickers and headings name runs the same way. A run of several
+   shapes names each shape and its size, the first three, then *+N more*: *Run 5 · Core 500 ×
+   220 + Substrate 3000 × 700 nm · Silicon*; a run with an open boundary adds *· open (PML
+   1 µm)* in the run list and the Compare pickers. Compare opens with
    the two newest runs, the older as A and the newer as B (a run just computed is B); the run
    list shows the newest first, so on Compare the two cards end with a *Compare A* and a *Compare
    B* badge (read out as *· Compare A* and *· Compare B*). A pick whose run is gone sets both back to that pair. Exactly one run card
