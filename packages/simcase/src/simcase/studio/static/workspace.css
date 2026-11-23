@@ -211,9 +211,11 @@ footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;paddin
 .workspace-tools-content>p{margin:0 0 12px}
 .layout-help{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 0;font-size:11px;color:var(--muted)}
 .layout-help button{font-size:11px}
-#job-panel{padding:8px 16px;background:#edf4ff;border-bottom:1px solid #c2d6f2;flex:none}
+.workspace{position:relative}
+#job-panel{position:absolute;top:0;right:0;z-index:6;box-sizing:border-box;max-width:100%;height:34px;margin:0;padding:0 12px;flex-wrap:nowrap;gap:12px;white-space:nowrap;overflow:hidden;background:#edf4ff;border:solid #c2d6f2;border-width:0 0 1px 1px;box-shadow:0 2px 6px #1e345e1f}
+#job-panel>span{min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}#job-panel>span:empty{display:none}
+#job-panel button{flex:none}
 #job-panel button:disabled{display:none}
-#job-panel:not(:has(button:not(:disabled))){padding-block:4px}
 #job-input{font-weight:600}
 #job-storage:not(:empty),.validation-warning{color:var(--warning)}
 #input-problems{padding:10px 16px;background:#fff3e7;border-bottom:1px solid #e3c5a2;font-size:12px;max-height:160px;overflow:auto;flex:none}
@@ -234,7 +236,9 @@ input[aria-invalid=true],textarea[aria-invalid=true]{border-color:#bd5b41;outlin
 .run-item{display:block;width:100%;text-align:left;overflow-wrap:anywhere;margin:8px 0;font-size:12px}
 /* one run card reads as selected: hover changes the border only, never the selected fill */
 .run-item:hover:not([aria-pressed=true]){background:var(--panel)}
-.compare-side{font-weight:600}
+.compare-side{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid #9fb6d8;border-radius:9px;background:#e8f0fb;color:#244f8b;font-size:10px;font-weight:600;line-height:16px;white-space:nowrap;vertical-align:1px}
+/* the separator stays in the text and the accessible name ("… · Compare A"), not on screen */
+.compare-side-sep{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .run-item[aria-pressed=true]{box-shadow:inset 3px 0 var(--accent);font-weight:600}
 .tree:has(.run-item){padding:12px}
 .run-name label{margin-bottom:8px}
