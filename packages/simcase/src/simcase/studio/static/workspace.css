@@ -459,6 +459,8 @@ dialog::backdrop{background:#162a4b66}
 .radio-field{display:flex;align-items:center;gap:6px;margin:4px 0}
 .radio-field input{width:auto;margin:0}
 #modes-table td[data-neff]{white-space:nowrap}
+/* round 17 (U1): the note row of a closed-window mode mostly in a shape touching the window edge */
+#modes-table td.edge-note{white-space:normal;font-size:12px;color:#8a4b00;background:#fff7e8;text-align:left}
 .other-candidates{margin:8px 0}.other-candidates>summary{cursor:pointer;color:var(--accent);padding:6px 0}
 .other-candidates .table-scroll{max-width:100%;overflow-x:auto}
 .other-candidates td.num{white-space:nowrap}

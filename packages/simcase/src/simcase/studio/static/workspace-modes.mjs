@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {formatIndex} from './workspace-compare.mjs';
 import {isOpenRun,NO_WINDOW_TITLE} from './workspace-open-run.mjs';
+import {WINDOW_NM,shapeBounds} from './workspace-shapes.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -242,4 +243,71 @@ export function physicsModes(p){
  const area=engineEffectiveArea(p.summary),areaFits=area&&area.length===re.length;
  const areaMissing=areaFits?'':area?'The saved effective areas do not match the modes':p.summary?.open_boundary?'PML result: its fields are in stretched coordinates, so no effective area is computed':RUN_AGAIN+': this run was saved before Studio kept the effective area';
  return {modes:re.map((r,i)=>({re:r,im:im[i]??0,fte:fits?fte[i]:null,loss:lossAt(i),area:areaFits?area[i]:null})),missing:fits||!fte?missing:'The saved TE fractions do not match the modes',source:fits?'engine':null,areaMissing,areaSource:areaFits?'engine':null,areaHelp:vector?AREA_HELP:SCALAR_AREA_HELP,open:!!p.summary?.open_boundary};
+}
+
+// ---- Closed-window placement (round 17, U1) ----------------------------------------------------
+// In a closed window a shape that touches the window edge meets the PEC walls there, so a mode that
+// lives mostly in it (a substrate slab mode) has an n_eff that depends on the window, not only on the core. Studio
+// computes this from the stored samples and the run's shapes; the engine and the files are unchanged.
+// A mode is named when more than EDGE_SHARE of its |E|² lies in one shape that touches the window
+// edge AND at least EDGE_NEAR of it lies within EDGE_BAND_NM of the window edges that shape touches.
+// EDGE_NEAR is a heuristic chosen after measurement (round 17, coordinator decision): rib modes over
+// a slab spanning the window have 1.4e-4 to 2.5e-3 near the walls, slab-like modes
+// 0.087 and up (T18's strip over a substrate 0.72); 20-nm etched ribs (0.024, 0.046), whose n_eff
+// moves by about 1e-3 with the window width, are named.
+export const EDGE_SHARE=0.5,EDGE_NEAR=0.01,EDGE_BAND_NM=300;
+/** The window edges a shape touches (its bounds reach the window): a subset of left, right, bottom, top. */
+export function touchedEdges(shape){
+ const b=shapeBounds(shape),w=WINDOW_NM;
+ return [b.xmin<=w.xmin&&'left',b.xmax>=w.xmax&&'right',b.ymin<=w.ymin&&'bottom',b.ymax>=w.ymax&&'top'].filter(Boolean);
+}
+/** Whether a point (nm) lies in a shape, its boundary included. */
+export function insideShape(shape,x,y){
+ if(shape.type==='rect')return x>=shape.x&&x<=shape.x+shape.w&&y>=shape.y&&y<=shape.y+shape.h;
+ if(shape.type==='circle')return Math.hypot(x-shape.cx,y-shape.cy)<=shape.r;
+ const p=shape.points;let inside=false;
+ for(let i=0,j=p.length-1;i<p.length;j=i++){const [xi,yi]=p[i],[xj,yj]=p[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside;}
+ return inside;
+}
+/** Per mode of a closed run with fields: {shape, share, near} for a shape touching the window edge
+ * that holds the largest share of the mode's |E|² among such shapes (share = Σ A_T |E_T|² over the
+ * triangles whose centroid lies in it, the later shape winning where shapes overlap, as the geometry
+ * contract layers them, over Σ of every triangle; near = the same share for the triangles whose
+ * centroid lies within EDGE_BAND_NM of an edge that shape touches), named: whether both bounds hold;
+ * null for a mode without such a shape. [] for an open run or a run without fields. */
+export function edgePlacement(run){
+ if(isOpenRun(run)||!run.field)return [];
+ const shapes=run.input.model.shapes,edges=shapes.map(touchedEdges);
+ if(!edges.some(e=>e.length))return run.effective_index.map(()=>null);
+ const X=run.field.node_coordinates,w=WINDOW_NM,band=EDGE_BAND_NM;
+ const tri=run.field.triangles.map(t=>{
+  const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]],area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
+  const x=(p0[0]+p1[0]+p2[0])/3*1e9,y=(p0[1]+p1[1]+p2[1])/3*1e9;
+  let owner=-1;for(let k=shapes.length-1;k>=0;k--)if(insideShape(shapes[k],x,y)){owner=k;break;}
+  const near={left:x-w.xmin<=band,right:w.xmax-x<=band,bottom:y-w.ymin<=band,top:w.ymax-y<=band};
+  return {area,owner,near};
+ });
+ return run.effective_index.map((_,mode)=>{
+  const re=run.field.real[mode],im=run.field.imag[mode],inShape=shapes.map(()=>0),nearShape=shapes.map(()=>0);let total=0;
+  tri.forEach((t,i)=>{const r=re[i],m=im[i],e=t.area*((r[0]*r[0]+m[0]*m[0])+(r[1]*r[1]+m[1]*m[1])+(r[2]*r[2]+m[2]*m[2]));total+=e;
+   if(t.owner>=0)inShape[t.owner]+=e;edges.forEach((list,k)=>{if(list.some(side=>t.near[side]))nearShape[k]+=e;});});
+  if(!(total>0))return null;
+  let best=-1;edges.forEach((list,k)=>{if(list.length&&(best<0||inShape[k]>inShape[best]))best=k;});
+  if(best<0)return null;
+  const share=inShape[best]/total,near=nearShape[best]/total;
+  return {shape:shapes[best].name,share,near,named:share>EDGE_SHARE&&near>=EDGE_NEAR};
+ });
+}
+/** "Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff is set by
+ * the closed window. Use Open boundary, or ask for more modes to reach the core mode." */
+export function edgeNoteText(mode,p){
+ return `Mode ${mode+1} is mostly in ${p.shape} (${Math.round(p.share*100)} % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.`;
+}
+/** The notes of a run: [{mode, text}] for each mode named by edgePlacement. */
+const edgeCache=new WeakMap();
+export function edgeNotes(run){
+ if(edgeCache.has(run))return edgeCache.get(run);
+ const notes=edgePlacement(run).map((p,mode)=>p?.named?{mode,text:edgeNoteText(mode,p)}:null).filter(Boolean);
+ // a run's samples never change: its notes are kept per run object
+ edgeCache.set(run,notes);return notes;
 }

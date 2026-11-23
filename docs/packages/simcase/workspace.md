@@ -1002,6 +1002,24 @@ engine and older session files give the same number from the same samples:
   mesh splits a symmetric pair (a square core) by 1e-4 to 6e-4 at 40 to 10 nm, below the solver's
   n_eff error at those meshes. A mesh split above 1e-3, possible on very coarse meshes, is not
   flagged, and a member's polarization is then a rotation chosen by the mesh.
+- **Modes at the window edge (round 17).** In a closed window a shape that touches the window edge
+  meets the PEC walls there, so a mode that lives mostly in it (a substrate slab mode) has an
+  n_eff that depends on the window, not only on the core. Studio computes, from the run's stored samples
+  and its shapes (the engine and the files are unchanged), for each shape that touches the window
+  edge, the share *f* of a mode's |E|² (Σ A_T |E_T|², all three components) over the triangles
+  whose centroid lies in that shape (the later shape winning where shapes overlap, as the geometry
+  contract layers them) and the share *g* over the triangles whose centroid lies within 300 nm of
+  the window edges that shape touches. When *f* > 0.5 and *g* ≥ 0.01 for the shape with the largest
+  *f*, a note row under the mode's row reads *Mode 1 is mostly in Substrate (99 % of |E|²), which
+  touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more
+  modes to reach the core mode.*, and Compare repeats it for that run (*A · Run 3: Mode 1 is …*),
+  which also says why such a run matches none of an open run's modes. The 0.01 bound on *g* is a
+  heuristic chosen after measurement (engine fields, Linux): on the strip over a substrate (Core
+  500 × 220 + Substrate 3000 × 700 nm) both modes have *f* 0.994 and *g* 0.72; on a rib drawn over
+  a slab that spans the window, the rib mode has *f* 0.60 to 0.71 but *g* 1.4e-4 to 2.5e-3 and is
+  not named, while the slab-like modes have *g* 0.087 and more; ribs etched only 20 nm (*g* 0.024 and
+  0.046, n_eff moving by about 1e-3 when the window widens) are named. The template, with no shape
+  at the window edge, never shows it. Open runs and runs without fields are not checked.
 - **Absorption loss (dB/cm)** comes from Im n_eff: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100 with k0 = 2π / λ0 in
   1/m (exp(−iωt), Im n_eff > 0 is loss), the engine's `propagation_loss = (40π / ln 10) · Im n_eff
   / λ0` in dB/m divided by 100, shown to 4 significant digits (*37.49 dB/cm*). In a closed window
