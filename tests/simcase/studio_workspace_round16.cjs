@@ -83,3 +83,25 @@ test('S8: a multi-shape run names each shape and size; an open run its PML; one 
  assert.ok(read('workspace-app.mjs').includes('${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}'));
 });
 
+test('S3: a picked or named pair is kept when new runs come; otherwise the two newest',async()=>{
+ const C=await import(STATIC+'workspace-compare.mjs');
+ const run=(job,label='')=>({job,label});
+ const named=[run('a','Design A'),run('b','Design B'),run('c'),run('d'),run('e')];
+ assert.deepEqual(C.comparisonAfterRun(named,['a','b']),['a','b']);
+ const plain=[run('a'),run('b'),run('c')];
+ assert.deepEqual(C.comparisonAfterRun(plain,['a','b']),['b','c']);
+ assert.deepEqual(C.comparisonAfterRun(plain,['a','b'],true),['a','b']);
+ // T5: two runs, nothing picked: Run 1 vs Run 2
+ assert.deepEqual(C.comparisonAfterRun([run('a'),run('b')],[ 'a','a']),['a','b']);
+ assert.deepEqual(C.comparisonAfterRun([run('a','A'),run('b')],['a','a']),['a','b'],'the one-run pair is not kept');
+ // one named run is not a named pair
+ assert.deepEqual(C.comparisonAfterRun([run('a','A'),run('b'),run('c')],['a','b']),['b','c']);
+ // a pair whose run is gone is not kept
+ assert.deepEqual(C.comparisonAfterRun(plain,['x','b'],true),['b','c']);
+ assert.equal(C.newerThanPair(named,['a','b']).job,'e');assert.equal(C.newerThanPair(named,['d','e']),null);assert.equal(C.newerThanPair(named,['e','a']),null);
+ assert.equal(C.pairChosen(named,['a','b']),true);assert.equal(C.pairChosen(named,['d','e']),false);
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';"));
+ assert.ok(app.includes("line.append(`Run ${n} is newer than this pair · `)")&&app.includes("swap.textContent=`Compare Run ${n} with B`;"));
+});
+

@@ -316,7 +316,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    shapes names each shape and its size, the first three, then *+N more*: *Run 5 · Core 500 ×
    220 + Substrate 3000 × 700 nm · Silicon*; a run with an open boundary adds *· open (PML
    1 µm)* in the run list and the Compare pickers. Compare opens with
-   the two newest runs, the older as A and the newer as B (a run just computed is B); the run
+   the two newest runs, the older as A and the newer as B (a run just computed is B). A pair
+   picked on Compare, or a pair of two named runs, stays when new runs come: Compare then
+   reads *Run 5 is newer than this pair · Compare Run 5 with B*, and the button compares the
+   newest run (as B) with the pair's B (as A). The project file stores that pair, and opening
+   it shows it again; a pair read from a file that is not the two newest runs is kept as
+   picked. The run
    list shows the newest first, so on Compare the two cards end with a *Compare A* and a *Compare
    B* badge (read out as *· Compare A* and *· Compare B*). A pick whose run is gone sets both back to that pair. Exactly one run card
    reads as selected (the pointer over another card changes only its border). On Compare a click on
