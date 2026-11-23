@@ -113,7 +113,10 @@ cancelled; …* when Save opened it), and Messages says *Saved to <name>* after 
 example a managed browser that refuses it), Studio asks for the **File name** in its own dialog:
 ASCII letters, digits, spaces and `.`, `_`, `-`, `(`, `)` only (other characters are removed),
 with `.json` added if missing. It notes
-that your browser saves to its Downloads folder, or asks where if you set it to, and **Download**
+that your browser saves to its Downloads folder, or asks where if you set it to, and (opened by
+Save As) that later saves download again under this name and that Chrome and Edge save to the
+same file. A browser without the save dialog cannot overwrite a file: it keeps each save as a new
+download. **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
 Downloads folder already has a file of that name. Studio cannot know that a download was kept.
