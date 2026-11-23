@@ -305,7 +305,7 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    (the selected run), named by its number with its name: after a run *Run 1 · solved from
    the current inputs* (the status bar adds *press Run to solve again*); when the viewed run has
    other inputs, after an edit or with an older run selected, both geometries, *Run 1 · design A
-   600 × 300 nm · current inputs 700 × 300 nm* (with the same geometry, at most two of the
+   600 × 300 nm · current inputs 700 × 300 nm*; several shapes are named by name and size as in the run list, *Run 6 · Core 500 × 220 + Substrate 3000 × 700 nm* (round 17; it read *2 shapes*) (with the same geometry, at most two of the
    settings that differ: *· current inputs differ: Wavelength 1550 → 1310 nm*) (the status bar adds *Run 2 has them* when another run has the current
    inputs, else *press Run to compute them*), and when no input was edited the title adds
    *viewing Run 1 · design A (other inputs)* on Results and Compare, so the difference does not

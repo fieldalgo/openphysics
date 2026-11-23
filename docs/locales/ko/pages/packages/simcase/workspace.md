@@ -267,7 +267,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    단계 막대는 보고 있는 실행(고른 실행)을 번호와 이름으로 가리킵니다: 실행 뒤에는 *Run 1 · solved
    from the current inputs*(상태 표시줄은 *press Run to solve again*을 덧붙임), 보고 있는 실행의 입력이
    다르면(편집 뒤나 이전 실행을 골랐을 때) 두 기하를 모두 밝혀 *Run 1 · design A 600 × 300 nm · current
-   inputs 700 × 300 nm*(기하가 같으면 다른 설정을 두 개까지: *· current inputs differ: Wavelength 1550 →
+   inputs 700 × 300 nm*. 형상이 여럿이면 실행 목록처럼 이름과 크기로 밝힙니다: *Run 6 · Core 500 × 220 + Substrate 3000 × 700 nm*(round 17; 전에는 *2 shapes*)(기하가 같으면 다른 설정을 두 개까지: *· current inputs differ: Wavelength 1550 →
    1310 nm*)(상태
    표시줄은 다른 실행이 현재 입력을 가지면 *Run 2 has them*, 아니면 *press Run to compute them*을
    덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
