@@ -328,19 +328,23 @@ function renameProject(value){
 function chooseTemplate(id){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  if(openingModel){notice('Wait until the model file has been opened.');return;}
- if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page=multiView.returnPage();render();}else multiView.show();return;}
+ if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page=multiView.returnPage();render();}else multiView.show();topOfPage();return;}
  // the workspace's card while the multiphysics model is shown: the workspace as it was left (its
  // card shown again from the workspace itself chooses that model again, as before)
  if(id!=='heated-waveguide'&&multiView.active()&&workspaceInProject()&&workspaceCard()===id){
   const from=multiView.projectTitle();if(!leaveMultiphysics())return;
-  // round 16 (S9): the page and run it was left on (Results or Compare when its runs allow it)
+  // round 17 (U7; round 16 S9 returned to Compare too): a model with runs lands on Results with the
+  // run last viewed, whatever page it was left on; a model without runs on Model
   const back=workspaceReturn,run=back&&runs.find(r=>r.job===back.run);if(run)solverRun=run;
   ui.page='Model';select(ui.selection&&names.includes(ui.selection)?ui.selection:'Geometry');
-  if(back&&(back.page==='Results'&&runs.length||back.page==='Compare'&&runs.length>1)){ui.page=back.page;if(ui.selection==='Study')ui.selection='Geometry';render();}
-  notice(`${workspaceTitle()} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; ${from} stays in this project. Nothing was computed.`);return;
+  if(runs.length){if(!solverRun)solverRun=runs.at(-1);ui.page='Results';if(ui.selection==='Study')ui.selection='Geometry';render();}
+  topOfPage();notice(`${workspaceTitle()} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; ${from} stays in this project. Nothing was computed.`);return;
  }
  openTemplateCard(id);
 }
+// round 17 (U7): a model switched to starts at the top of its page (the heated model's Results table
+// was left scrolled out of view by the other model's page)
+function topOfPage(){for(const id of ['canvas','inspector']){const el=$(id);if(el)el.scrollTop=0;}}
 function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
