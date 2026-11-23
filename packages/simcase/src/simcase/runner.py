@@ -348,8 +348,9 @@ class RunResult:
     #: (scalar, m^2) (P, M), ``confinement_factor`` (P, M, R), ``unnormalized_field_overlap``
     #: (P, M, M, m^2), with ``results.mode_overlap.gaussian`` ``coupling_efficiency`` (P, M) and,
     #: for vector results, ``te_polarization_fraction`` (P, M) of the saved centroid field, and
-    #: ``effective_area`` (P, M, m^2);
-    #: None for PML results (``simcase.mode_postprocessing``)
+    #: ``effective_area`` (P, M, m^2); for a vector PML result without a bend only
+    #: ``te_polarization_fraction`` and ``effective_area`` on its physical window; None for other
+    #: PML results (``simcase.mode_postprocessing``)
     postprocessing: dict | None = None
     #: the swept values of a sweep over another slot than the wavelength, in SI
     study_values: np.ndarray | None = None
@@ -487,9 +488,10 @@ class RunResult:
         if self.group_index_method is not None:
             out["group_index_method"] = copy.deepcopy(self.group_index_method)
         if self.postprocessing is not None:
-            out["mode_postprocessing"] = mode_postprocessing.summary_block(
+            out["mode_postprocessing"] = (mode_postprocessing.open_summary_block(self.postprocessing)
+                                          if self.open_boundary is not None else mode_postprocessing.summary_block(
                 self.postprocessing, vector=self.vector_fields is not None, region_names=self.region_names,
-                gaussian=_gaussian_echo(self.doc))
+                gaussian=_gaussian_echo(self.doc)))
         results_common.dumps_summary(out)                # finite JSON only
         return out
 
@@ -663,8 +665,11 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
     open_diagnostics = [] if "pml" in kp else None
     # Power, confinement, overlaps and Gaussian coupling of every saved mode, in the kernel
     # frame (simcase.mode_postprocessing). PML results are skipped: their coefficients are
-    # covariant integrals in stretched coordinates and the window is not the physical one.
+    # covariant integrals in stretched coordinates and the window is not the physical one. A vector
+    # PML result without a bend gets the TE fraction and the effective area on its physical window
+    # (_to_public, from the public samples).
     postprocessing = [] if open_diagnostics is None else None
+    open_identity = open_diagnostics is not None and kp["formulation"] == "vector" and "bend" not in kp
     gaussian = mode_postprocessing.gaussian_settings(k["results"])
     vector_fields = [] if kp["formulation"] == "vector" else None
     tracker, tracking = None, None
@@ -756,7 +761,8 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
     kernel = dict(parameter=parameter, values=values, wavelength=kp["wavelength"], neff=np.array(neffs),
                   fields=fields, vector_fields=vector_fields, tracking=tracking, open_boundary=open_diagnostics,
-                  postprocessing=None if postprocessing is None else mode_postprocessing.stack_points(postprocessing))
+                  postprocessing=None if postprocessing is None else mode_postprocessing.stack_points(postprocessing),
+                  open_identity=open_identity)
     if group is not None:
         kernel["group_index"] = group
     return _to_public(doc, model, kernel, {"mesh": t_mesh, "solve": t_solve}, log)
@@ -924,6 +930,18 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
         return VectorField(f.edges, np.conj(f.transverse) * KERNEL_LENGTH, np.conj(f.longitudinal),
                            np.conj(f.electric), f.normalization)
 
+    def open_identity(fields: list[VectorField], diagnostics: list[dict]) -> dict:
+        # the TE fraction and the effective area on each point's physical window, from the public
+        # samples and the public physical_bounds (metres): what a reader of the result recomputes
+        nodes, triangles = model.tri.nodes, model.tri.triangles
+        windows = [mode_postprocessing.physical_window(nodes, triangles, d["physical_bounds"]["values"])
+                   for d in diagnostics]
+        return {"te_polarization_fraction": np.stack([
+                    mode_postprocessing.te_polarization_fraction(nodes, triangles, f.electric, w)
+                    for f, w in zip(fields, windows)]),
+                "effective_area": np.stack([mode_postprocessing.effective_area(nodes, triangles, f.electric, w)
+                                            for f, w in zip(fields, windows)])}
+
     def postprocessing(arrays: dict | None, vector: bool, fields: list[VectorField] | None) -> dict | None:
         if arrays is None:
             return None
@@ -980,6 +998,10 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
     if "group_index" in kernel:
         group, group_method = kernel["group_index"]["values"], _public_group_index_method(doc, kernel["group_index"])
     public_fields = None if not vector else [field(f) for f in kernel["vector_fields"]]
+    public_open = None if kernel["open_boundary"] is None else [_public_open_boundary(d) for d in kernel["open_boundary"]]
+    public_post = postprocessing(kernel["postprocessing"], vector, public_fields)
+    if kernel.get("open_identity"):
+        public_post = open_identity(public_fields, public_open)
     common = dict(doc=doc, node_coordinates=model.tri.nodes, triangles=model.tri.triangles,
                   regions=model.tri.regions, region_names=list(model.tri.region_names),
                   region_materials=dict(model.region_materials),
@@ -988,9 +1010,7 @@ def _to_public(doc: Document | None, model: MeshedModel | None, kernel: dict, ti
                   mode_fields=[np.conj(f) for f in kernel["fields"]], timings=timings, log=log,
                   vector_fields=public_fields,
                   mode_tracking=_public_tracking(kernel["tracking"]),
-                  open_boundary=None if kernel["open_boundary"] is None
-                  else [_public_open_boundary(d) for d in kernel["open_boundary"]],
-                  postprocessing=postprocessing(kernel["postprocessing"], vector, public_fields),
+                  open_boundary=public_open, postprocessing=public_post,
                   study_values=study_values, group_index_values=None if group is None else np.conj(group),
                   group_index_method=group_method)
     if "cluster_offsets" not in kernel:

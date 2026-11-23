@@ -10,7 +10,9 @@ solves its points. Each mode of the lambda0 solve is matched to a candidate of e
 with the resolved-mode tracker's own tests (``tracking.match_modes``); the difference is that
 of a tracked sweep (``runner._kernel_group_index``, second-order ``np.gradient``) on the three
 matched values. A mode that is not matched on either side has no value (NaN, null in JSON) and
-a reason; the run does not fail. Everything here is in the kernel frame (micrometres,
+a reason; the run does not fail. With an open boundary (pml, no bend) n_eff and so n_g are
+complex: the side solves keep the entry's target and PML, and the overlaps of the matching are
+taken on the physical window (the tracker's physical weights), as in a tracked sweep. Everything here is in the kernel frame (micrometres,
 exp(+i omega t)); ``runner._to_public`` converts once.
 """
 
@@ -48,7 +50,15 @@ def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, 
     requested = len(neff0)
     check_lossless(model, wavelengths)
     settings = tracking_settings(int(physics["num_modes"]))     # the search a sweep of this entry makes
-    tracker = ModeTracker(model.solver_mesh, requested, settings, scalar=not vector)
+    weights, seed = 1.0, None
+    if "pml" in physics:
+        # an open boundary: the overlaps of the matching on the physical window and the first match
+        # near the target, as a tracked sweep of the same entry makes them (runner.run)
+        from .physics_pml_modes import coordinates
+        weights = coordinates(model.solver_mesh, physics["pml"], physics.get("bend")).physical.astype(float)
+        seed = physics["n_target"]
+    tracker = ModeTracker(model.solver_mesh, requested, settings, scalar=not vector, physical_weights=weights,
+                          seed_target=seed)
     key = "vector_field" if vector else "fields"
     name = VECTOR_TRACKING if vector else SCALAR_TRACKING
     say(f"group index: central difference over {wavelengths[0]:g}, {wavelengths[1]:g} and {wavelengths[2]:g} um; "
