@@ -870,8 +870,14 @@ Limits of the open boundary, from its validation:
   most 0.02 % and n_eff by about 1e-8, so it adds no accuracy; it adds PML modes near the target,
   which pushed the TM-like mode of the strip over a substrate out of a search of 16. 32 keeps
   it at every thickness tested.
-- **Mesh error at the default mesh.** The default-mesh loss error is not yet established
-  (the mesh convergence check is under diagnosis).
+- **Mesh error at the default mesh.** The default mesh overestimates the strip-over-substrate
+  loss by about 3 % (TE-like +2.8 %, TM-like +1.8 %, against the value extrapolated from 0.7, 0.5
+  and 0.35 × the element lengths: 28.35 and 988.7 dB/cm). The leaky slab against its analytic
+  pole is an independent check of the same size: +2.96 % (TE) and −1.41 % (TM) at the default
+  mesh. As first registered, the convergence check (× 1, 0.7, 0.5) failed: the TE-like loss
+  changes were 0.096 then 0.301 dB/cm, so it was registered again, after that result, at 0.7, 0.5
+  and 0.35 ×. The values it was planned from (28.72 and 28.55 dB/cm at 0.7 and 0.5 ×) were
+  reproduced neither with the refinement distance fixed nor with it scaled.
 - **The PML settings are part of the search.** Changing the PML thickness, strength or order
   changes the spectrum of the PML's own modes and can make a fixed search miss modes: with a search
   of 32 near 2.46, the TM-like mode of the strip over a substrate is missing at strength 1.5. The
