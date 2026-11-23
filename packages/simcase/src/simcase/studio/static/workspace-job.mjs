@@ -28,19 +28,43 @@ export function validatePending(record){
 }
 export function readPending(storage){const raw=storage.getItem(PENDING_JOB_KEY);if(!raw)return null;if(new TextEncoder().encode(raw).length>70000)throw new Error('Pending record is too large.');return validatePending(JSON.parse(raw));}
 export function storePending(storage,record){if(record===null)storage.removeItem(PENDING_JOB_KEY);else storage.setItem(PENDING_JOB_KEY,JSON.stringify(validatePending(record)));}
+// The time since a job started, as m:ss (0:05, 3:07, 12:40).
+export function elapsedText(ms){const s=Math.max(0,Math.floor(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+// What a pending job solves, from the record alone (round 16): "Open boundary · 2 modes · PML
+// check (up to 2 more solves)", "PML check · mode 1 of 2", "2 modes". The server reports no stage
+// while a job runs, so none is shown.
+export function jobWhat(pending){
+ if(pending.checkOf)return `PML check · mode ${pending.checkIndex+1} of ${pending.checkCount}`;
+ const n=pending.modeCount??DEFAULT_MODE_COUNT,modes=n===1?'1 mode':n+' modes';
+ if(!pending.openBoundary)return modes;
+ return `Open boundary · ${modes}`+(pending.pmlCheck?` · PML check (up to ${n===1?'1 more solve':n+' more solves'})`:'');
+}
 // Stopping this client detaches polling. It never claims to stop server computation.
+// While the server answers that the job is running, the monitor keeps waiting, however long the
+// job takes (round 16). limitMs bounds only the time without an answer: a status request that
+// fails (no connection, a server error) is tried again every 700 ms, and once no request has been
+// answered for limitMs the monitor detaches; Resume checks the job again. A missing job (404) or a
+// changed server (409) ends at once, as a failed solver does.
 export class OpticalJobMonitor {
  constructor({api,onState=()=>{},onResult=()=>{},wait=ms=>new Promise(r=>setTimeout(r,ms)),now=()=>Date.now(),limitMs=180000}){Object.assign(this,{api,onState,onResult,wait,now,limitMs});this.generation=0;this.busy=false;}
  stop(){this.generation++;this.busy=false;this.onState({phase:'detached',message:'Stopped waiting. Server computation may continue; resume to retrieve its result.'});}
  async follow(record,instance){
   if(this.busy)throw new Error('Already watching a job.');
   const pending=validatePending(record);if(instance!==pending.serverInstance)throw Object.assign(new Error('The server restarted or changed. Detach this job before starting another calculation.'),{status:409});
-  const token=++this.generation;this.busy=true;const deadline=this.now()+this.limitMs;
-  const active=()=>token===this.generation;
+  const token=++this.generation;this.busy=true;let answered=this.now(),silent=false;
+  const active=()=>token===this.generation,what=jobWhat(pending);
   try{
    while(active()){
-    this.onState({phase:'running',message:'Computing job '+pending.job+' · elapsed '+Math.max(0,Math.floor((this.now()-Date.parse(pending.startedAt))/1000))+' s',pending});
-    const job=await this.api('/api/jobs/'+pending.job+'?workspace_instance='+pending.serverInstance);if(!active())return;
+    const quiet=silent?` · no answer from the server for ${elapsedText(this.now()-answered)}; still checking`:'';
+    this.onState({phase:'running',message:'Computing job '+pending.job+' · '+elapsedText(this.now()-Date.parse(pending.startedAt))+' · '+what+quiet,pending});
+    let job;
+    try{job=await this.api('/api/jobs/'+pending.job+'?workspace_instance='+pending.serverInstance);}
+    catch(error){
+     if(!active())return;if([404,409].includes(error.status))throw error;
+     silent=true;if(this.now()-answered>=this.limitMs){this.onState({phase:'detached',message:'The server has not answered for three minutes. Resume to check this job again.',pending});return;}
+     await this.wait(700);continue;
+    }
+    if(!active())return;answered=this.now();silent=false;
     if(job.status==='error')throw Object.assign(new Error(typeof job.error==='string'?job.error:'Solver failed.'),{code:'solver-failed'});
     if(job.status==='done'){
      this.onState({phase:'loading',message:'Loading completed result '+pending.job,pending});
@@ -49,7 +73,6 @@ export class OpticalJobMonitor {
      this.onState({phase:'done',message:'Optical run complete. The result keeps the inputs it was run with.',pending});return;
     }
     if(job.status!=='running')throw new Error('Unsupported job status.');
-    if(this.now()>=deadline){this.onState({phase:'detached',message:'Stopped waiting after three minutes. Resume to check this job again.',pending});return;}
     await this.wait(700);
    }
   }catch(error){if(active()){const canResume=![404,409].includes(error.status)&&error.code!=='solver-failed';this.onState({phase:'error',canResume,message:error.message+' No new result stored. '+(canResume?'Resume to retry retrieving this job.':'Detach this job before starting another calculation.'),pending});}}
