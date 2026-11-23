@@ -251,8 +251,10 @@ _WINDOW_NM = {"xmin": -1500, "xmax": 1500, "ymin": -1200, "ymax": 1200}
 _PML_FIXED = {"pml_strength": 3, "pml_order": 2, "pml_minimum_physical_fraction": 0.5,
               "pml_search_mode_count": 32}
 # The optional PML check of a Studio run (slice P2) solves the same document again with the PML
-# twice as strong: strength 6 is the one other value a workspace request may carry.
+# twice as strong, once near each mode found (its target), with a search of 16: strength 6 with
+# search 16 is the one other combination a workspace request may carry.
 _PML_CHECK_STRENGTH = 6
+_PML_CHECK_SEARCH = 16
 
 
 @app.get("/api/workspace/capabilities/v9")
@@ -261,7 +263,7 @@ def workspace_capabilities_v9():
     caps.update(schema_version=9, adapter="optical-shapes-v9", open_boundary={
         "edges": ["left", "right", "bottom", "top"], "edge_states": ["closed", "open"], "edge_default": "closed",
         "pml_thickness_range": list(_PML_THICKNESS_RANGE), "pml_thickness_default": "1 um",
-        **_PML_FIXED, "pml_check_strength": _PML_CHECK_STRENGTH,
+        **_PML_FIXED, "pml_check_strength": _PML_CHECK_STRENGTH, "pml_check_search_mode_count": _PML_CHECK_SEARCH,
         "target_effective_index_default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
         "target_effective_index_bounds": "above 1.45 and below n_max"})
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
@@ -283,15 +285,21 @@ def workspace_open_boundary_refusal(tree) -> str | None:
             continue
         pml = entry["pml"]
         text = ("The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3 "
-                "(6 for the PML check), order 2, physical fraction 0.5 and a search of 32 candidates.")
+                "(6 for the PML check), order 2, physical fraction 0.5 and a search of 32 candidates (16 "
+                "for the PML check).")
         if not isinstance(pml, dict) or set(pml) != {"pml_thickness", *_PML_FIXED}:
             return text
         # 3, 2 and 32 are JSON integers; 0.5 may arrive as an exact decimal
-        allowed = {key: (value, _PML_CHECK_STRENGTH) if key == "pml_strength" else (value,)
+        allowed = {key: (value, _PML_CHECK_STRENGTH) if key == "pml_strength" else
+                   (value, _PML_CHECK_SEARCH) if key == "pml_search_mode_count" else (value,)
                    for key, value in _PML_FIXED.items()}
         if any(isinstance(pml[key], bool) or not isinstance(pml[key], (int, float, Decimal)) or pml[key] not in values
                or (type(values[0]) is int and type(pml[key]) is not int) for key, values in allowed.items()):
             return text
+        # the check's strength and search go together: 3 with 32, 6 with 16
+        if (pml["pml_strength"] == _PML_CHECK_STRENGTH) != (pml["pml_search_mode_count"] == _PML_CHECK_SEARCH):
+            return ("A PML check request (strength 6) searches 16 candidates, and a run (strength 3) "
+                    "searches 32.")
         widths = pml["pml_thickness"]
         if not isinstance(widths, dict) or not widths or len(set(widths.values())) != 1:
             return text

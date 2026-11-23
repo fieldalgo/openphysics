@@ -21,8 +21,11 @@ export const TARGET_HELP='Search near n_eff: the solver returns the modes neares
 export const PML_DETAILS='PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched';
 export const GROUP_INDEX_OPEN_NOTE='Group index with an open boundary comes in a later version';
 export const LATER_TITLE='Computed on the physical window in a later version';
-export const CHECK_LABEL='Also check the PML (1 more solve)';
-export const CHECK_NOTE='Solves the same mesh again with the PML twice as strong (strength 6) and compares each mode: a leakage loss that changes is not converged.';
+/** "Also check the PML (2 more solves)": one solve per mode, n = Modes to find. */
+export const checkLabel=n=>`Also check the PML (${n} more solve${n===1?'':'s'})`;
+export const CHECK_NOTE='Solves the same mesh again with the PML twice as strong (strength 6), once near each mode found, and compares each mode: a leakage loss that changes is not converged.';
+/** With an open edge the group index is not computed: its box is off and disabled. */
+export const groupIndexLocked=ob=>hasOpenEdge(ob);
 /** The open boundary of a new choice of Open: every edge open, the default target. */
 export const openChoice=()=>({edges:Object.fromEntries(EDGES.map(e=>[e,'open'])),target:null});
 /** The edges of an open boundary that are open, in the order left, right, bottom, top. */
@@ -154,7 +157,12 @@ export const MOVE_TARGET_TEXT='Move Search near n_eff (Physics › Optical modes
 export const openTableTitle=()=>`Modes (open boundary, ${PML_WORDS})`;
 
 // -- the PML check -----------------------------------------------------------------------------
-export const CHECK_STRENGTH=6;
+export const CHECK_STRENGTH=6,CHECK_SEARCH=16;
+/** The documents of the PML check of a run made from `doc`: one per mode, with strength 6, a search
+ * of 16 and the target at that mode's Re n_eff to 6 decimals; everything else (the mesh) is doc's. */
+export function checkDocuments(doc,re){
+ return re.map(r=>{const d=JSON.parse(JSON.stringify(doc)),em=d.physics.em1;em.pml.pml_strength=CHECK_STRENGTH;em.pml.pml_search_mode_count=CHECK_SEARCH;em.target_effective_index=Math.round(r*1e6)/1e6;return d;});
+}
 export const PAIR_LIMIT=2e-3,RE_LIMIT=5e-4,LOSS_SHARE=0.02;
 /** Within the pairing distance |Δn_eff| <= 2e-3. */
 export const withinPair=delta=>delta<=PAIR_LIMIT;
@@ -167,10 +175,10 @@ export const lossIndependent=(l1,l2)=>Math.abs(l2-l1)<=Math.max(LOSS_SHARE*Math.
 export function eligibleCandidates(record){
  return record.candidates.filter(c=>c.reasons.length>0&&c.reasons.every(r=>r==='selected_near_target'||r==='outside_requested_count')&&c.effective_index.re>SILICA_THRESHOLD).map(c=>({re:c.effective_index.re,im:c.effective_index.im}));
 }
-/** Each first-solve mode paired with the nearest eligible candidate of the check, or null when
- * none lies within 2e-3: the pml_check a run keeps. */
-export function pairCheck(re,im,checkRecord){
- const pool=eligibleCandidates(checkRecord);
+/** Each first-solve mode paired with the nearest eligible candidate of the check solves (their
+ * candidate records pooled), or null when none lies within 2e-3: the pml_check a run keeps. */
+export function pairCheck(re,im,checkRecords){
+ const pool=(Array.isArray(checkRecords)?checkRecords:[checkRecords]).flatMap(eligibleCandidates);
  return {pml_strength:CHECK_STRENGTH,paired:re.map((r,i)=>{
   let best=null,bestD=Infinity;
   for(const c of pool){const d=Math.hypot(c.re-r,c.im-im[i]);if(d<bestD){best=c;bestD=d;}}
@@ -181,11 +189,12 @@ export function checkPmlCheck(check,k,which='This run'){
  if(!isObject(check)||Object.keys(check).join()!=='pml_strength,paired'||check.pml_strength!==CHECK_STRENGTH||!Array.isArray(check.paired)||check.paired.length!==k||!check.paired.every(p=>p===null||(isObject(p)&&Object.keys(p).join()==='re,im'&&Number.isFinite(p.re)&&Number.isFinite(p.im))))throw new Error(`${which}: invalid PML check.`);
  return {pml_strength:CHECK_STRENGTH,paired:check.paired.map(p=>p&&{re:p.re,im:p.im})};
 }
-const percent=x=>(x<10?x.toFixed(1):x.toFixed(0))+' %';
+// "12 %", "0.1 %", "0.0038 %": two significant digits below 0.1 %, never "0.0 %"
+const percent=x=>(x>=10?x.toFixed(0):x>=0.1?x.toFixed(1):x===0?'0':x.toPrecision(2))+' %';
 export const NOT_FOUND_HELP='The check solve did not find this mode near the search value; this does not by itself mean the mode depends on the PML.';
 export const DEPENDS_HELP='This loss changes with the PML; it is not a converged leakage loss.';
 export const CHECK_HEADER='PML check';
-export const CHECK_HELP='The same mesh solved again with PML strength 6. PML-independent: Re n_eff within 5e-4 and the loss within max(2 %, 0.01 dB/cm).';
+export const CHECK_HELP='The same mesh solved again with PML strength 6, near each mode. PML-independent: Re n_eff within 5e-4 and the loss within max(2 %, 0.01 dB/cm).';
 /** The verdict of one mode: {status: independent | depends | not_found, text, title}. */
 export function checkVerdict(re,im,paired,lambda0){
  if(!paired)return {status:'not_found',text:'Not found in the check solve',title:NOT_FOUND_HELP};
@@ -195,6 +204,10 @@ export function checkVerdict(re,im,paired,lambda0){
  const what=!lossOk?`loss changes ${change??Math.abs(l2-l1).toPrecision(2)+' dB/cm'}`:`Re n_eff changes ${Math.abs(dRe).toExponential(1)}`;
  return {status:'depends',text:`Depends on the PML: ${what}`,title:DEPENDS_HELP};
 }
+
+/** The candidate record of a check solve's result (its own record: the check keeps every
+ * candidate, whatever Studio would show). */
+export const checkResultRecord=result=>checkCandidateRecord(result?.summary?.open_boundary?.[0],'The PML check');
 
 // -- Compare -----------------------------------------------------------------------------------
 export const boundaryName=run=>isOpenRun(run)?`(open, ${PML_WORDS})`:'(closed)';

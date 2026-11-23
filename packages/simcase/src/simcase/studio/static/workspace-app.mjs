@@ -20,12 +20,12 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
-import {checkCandidateRecord,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,LATER_TITLE,GROUP_INDEX_OPEN_NOTE,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
+import {checkResultRecord,checkDocuments,checkLabel,groupIndexLocked,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,LATER_TITLE,GROUP_INDEX_OPEN_NOTE,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
@@ -615,7 +615,7 @@ function completeLoad(pending){
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
-  const input=[STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(session.input.version)||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});
+  const input=sessionStudyInput(session.input,solverRun);
   // A recovered notebook that still matched its saved file, or the file it was opened from, reads
   // as saved, as the file would.
   const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
@@ -735,7 +735,7 @@ const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.n
 // What a session file is "the same as" for the title: the model inputs and the runs (their names
 // and pins). The selected run, the Compare choice and the field view are left out: a click on a
 // run, a page or a mode does not make the notebook differ from its file.
-const saveStamp=()=>JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])])});
+const saveStamp=()=>JSON.stringify({input:inputsFile(),runs:runs.map(runStampEntry)});
 // The content stamp when the notebook was opened from openedFile (or recovered while it still
 // matched it); null when no file was opened. Browser recovery keeps whether it still matches.
 let openedStamp=null;
@@ -900,8 +900,8 @@ $('confirm-recovery-replace').onclick=async()=>{
 function currentView(){return {...fieldView,mode:Math.max(0,Math.min(fieldView.mode,(solverRun?.effective_index.length??8)-1)),probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 // The completed runs as a session file keeps them; inputs and view settings are not results.
-function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])]));}
-function notebookStamp(){return JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
+function runsStamp(){return JSON.stringify(runs.map(runStampEntry));}
+function notebookStamp(){return JSON.stringify({input:inputsFile(),runs:runs.map(runStampEntry),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
 // The application the last recovery record was scheduled for: when the tab moves between an
 // optical and a multiphysics model, the stored record is kept as an earlier session.
 let recoveryKind=null;
@@ -923,7 +923,7 @@ const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept wit
 // results.group_index and the engine solves λ0 − 1 nm and λ0 + 1 nm as well (workspace-optical.mjs)
 const GROUP_INDEX_LABEL='Also compute group index (3 solves)';
 // With an open boundary the group index is not computed (slice P3): the box is off and disabled.
-const groupIndexField=()=>hasOpenEdge(state.openBoundary)?`<label class="check-field"><input id="group-index-check" type="checkbox" disabled aria-describedby="group-index-open-note"> ${GROUP_INDEX_LABEL}</label><p class="input-note" id="group-index-open-note">${GROUP_INDEX_OPEN_NOTE}.</p>`:`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
+const groupIndexField=()=>groupIndexLocked(state.openBoundary)?`<label class="check-field"><input id="group-index-check" type="checkbox" disabled aria-describedby="group-index-open-note"> ${GROUP_INDEX_LABEL}</label><p class="input-note" id="group-index-open-note">${GROUP_INDEX_OPEN_NOTE}.</p>`:`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
 // Outer boundary (Physics › Optical modes): Closed window (PEC) or Open boundary (PML), and
 // Search near n_eff, kept to 3 decimals. Choosing Open turns the group index option off.
 const bindBoundaryField=()=>{
@@ -997,8 +997,8 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
- bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;notice(box.checked?'PML check on: the next run solves the same mesh again with strength 6 (1 more solve).':'PML check off: the next run is one solve.');};}
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true,state.modeCount)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
+ bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;notice(box.checked?`PML check on: the next run solves the same mesh again with strength 6, once per mode (${state.modeCount} more solve${state.modeCount===1?'':'s'} at most).`:'PML check off: the next run is one solve.');};}
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
@@ -1553,9 +1553,11 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  const input=pending.input;
  // the PML check of a run (slice P2): each of its modes paired with the check solve's candidates
  if(pending.checkOf){
-  const run=runs.find(r=>r.job===pending.checkOf);if(!run)throw Object.assign(new Error('The run of this PML check is no longer kept; the check is not stored. Detach this job.'),{code:'solver-failed'});
-  const checked=validateRun({...run,pml_check:pairCheck(run.effective_index,run.effective_index_im,checkCandidateRecord(result?.summary?.open_boundary?.[0],'The PML check'))});
-  checked.inputRevision=run.inputRevision;runs=runs.map(r=>r===run?checked:r);if(solverRun===run)solverRun=checked;return;
+  const run=runs.find(r=>r.job===pending.checkOf);if(!run)withPmlCheck(runs,solverRun,pending.checkOf,null);
+  // one solve per mode: the records are pooled in this tab until every solve is in
+  const pool=checkPools.get(run.job)??[];pool[pending.checkIndex]=checkResultRecord(result);checkPools.set(run.job,pool);
+  if(pool.filter(Boolean).length<pending.checkCount)return;
+  checkPools.delete(run.job);({runs,selected:solverRun}=withPmlCheck(runs,solverRun,run.job,pairCheck(run.effective_index,run.effective_index_im,pool)));return;
  }
  // an open boundary: the modes above n = 1.45 with their candidate record, no TE fraction,
  // effective area or group index (slice P3)
@@ -1616,16 +1618,24 @@ $('run-optical').onclick=async()=>{
  finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
 };
 
-// The PML check (slice P2): once the run of `record` is kept, the same document with PML strength 6
-// is solved on the same mesh, and its candidates are paired with the run's modes (pml_check).
+// The PML check (slice P2): once the run of `record` is kept, one solve per mode of the same
+// document with PML strength 6, a search of 16 and the target at that mode's Re n_eff, on the same
+// mesh; their candidates, pooled, are paired with the run's modes (pml_check). A resumed check job
+// continues with the next mode; solves finished before a reload are not kept, so the check is
+// then incomplete and not stored.
+const checkPools=new Map();
 async function followPmlCheck(record){
- if(!record.pmlCheck||jobPhase!=='done'||!runs.some(r=>r.job===record.job))return;
- const doc=pendingDocument(record);doc.physics.em1.pml.pml_strength=CHECK_STRENGTH;
- solverBusy=true;jobPhase='validating';$('job-message').textContent='Checking the PML: the same mesh again with strength 6…';notice($('job-message').textContent);render();refreshJobControls();
- const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
- jobPhase='submitting';const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});
- const {pmlCheck,...rest}=record,check=validatePending({...rest,job:started.job,startedAt:new Date().toISOString(),checkOf:record.job});
- setPending(check);await jobMonitor.follow(check,record.serverInstance);
+ if(jobPhase!=='done')return;
+ const job=record.checkOf??(record.pmlCheck?record.job:null),run=job&&runs.find(r=>r.job===job);if(!run)return;
+ const from=record.checkOf?record.checkIndex+1:0,docs=checkDocuments(pendingDocument(record),run.effective_index),{pmlCheck,checkOf,checkIndex,checkCount,...base}=record;
+ for(let i=from;i<docs.length;i++){
+  solverBusy=true;jobPhase='validating';$('job-message').textContent=`Checking the PML: mode ${i+1} of ${docs.length}, the same mesh with strength 6…`;notice($('job-message').textContent);render();refreshJobControls();
+  const doc=docs[i],validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
+  jobPhase='submitting';const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});
+  const check=validatePending({...base,job:started.job,startedAt:new Date().toISOString(),checkOf:job,checkIndex:i,checkCount:docs.length});
+  setPending(check);await jobMonitor.follow(check,record.serverInstance);if(jobPhase!=='done')return;
+ }
+ if(!runs.find(r=>r.job===job)?.pml_check){checkPools.delete(job);notice('The PML check is incomplete (the page was reloaded during it); run again to check the PML.');}
 }
 // The document a pending job was run with, built again from its captured inputs and choices.
 function pendingDocument(record){

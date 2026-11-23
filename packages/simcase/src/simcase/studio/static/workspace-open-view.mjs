@@ -5,7 +5,7 @@
 // modes, the edge switch of Geometry › Boundaries, the Study summary and PML check option, and the
 // Results parts of an open run (found line, PML check column, other candidates). HTML text or DOM
 // nodes only; the page binds them.
-import {BOUNDARY_CHOICES,OPEN_HELP,TARGET_HELP,PML_DETAILS,PML_WORDS,CHECK_LABEL,CHECK_NOTE,targetText,effectiveTarget,studySummary,openEdges,otherCandidates,otherCandidatesTitle,OTHER_CANDIDATES_NOTE,openFoundText,MOVE_TARGET_TEXT} from './workspace-open-run.mjs';
+import {BOUNDARY_CHOICES,OPEN_HELP,TARGET_HELP,PML_DETAILS,PML_WORDS,checkLabel,CHECK_NOTE,targetText,effectiveTarget,studySummary,openEdges,otherCandidates,otherCandidatesTitle,OTHER_CANDIDATES_NOTE,openFoundText,MOVE_TARGET_TEXT} from './workspace-open-run.mjs';
 import {maxIndex,TARGET_FLOOR,hasOpenEdge} from './workspace-open-boundary.mjs';
 
 const escape=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -24,9 +24,9 @@ export function boundaryFieldHtml(ob,shapes){
  return html+`<details class="pml-details" id="pml-details"><summary>Details</summary><p>${escape(PML_DETAILS)}</p></details>`;
 }
 /** Study: the summary line and the PML check option (an open boundary only), else ''. */
-export function studyOpenHtml(ob,shapes,checkOn){
+export function studyOpenHtml(ob,shapes,checkOn,modeCount){
  const summary=studySummary(ob,shapes);if(!summary)return '';
- return `<p id="open-boundary-summary" class="next-run">${escape(summary)}</p><label class="check-field"><input id="pml-check" type="checkbox"${checkOn?' checked':''}> ${escape(CHECK_LABEL)}</label><p class="input-note">${escape(CHECK_NOTE)}</p>`;
+ return `<p id="open-boundary-summary" class="next-run">${escape(summary)}</p><label class="check-field"><input id="pml-check" type="checkbox"${checkOn?' checked':''}> ${escape(checkLabel(modeCount))}</label><p class="input-note">${escape(CHECK_NOTE)}</p>`;
 }
 /** Geometry › Boundaries, an optical edge selected while Open boundary is chosen: its state and
  * the "Close this edge" switch. */

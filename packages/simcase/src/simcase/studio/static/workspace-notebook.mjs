@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {validateProject,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
+import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
@@ -226,6 +226,25 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true){
 }
 // The TE fractions and effective areas a run shows (opticalModes keeps them on the run).
 const modeValues=run=>{const modes=opticalModes(run);return {te:modes.map(m=>m.fte),area:modes.map(m=>m.area)};};
+/** A run's part of the save and recovery stamps: what makes a saved file stale. The PML check
+ * arrives after its run, so it is part of it. */
+export const runStampEntry=r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])];
+/** The inputs a session opens with: its own when they hold study settings or an outer boundary
+ * (version 8 or 9), or when no run is selected; for an input of version 6 or 7, Modes to find and
+ * the group index option of the selected run, as before. The outer boundary is never taken from a
+ * run: only a version 10 file holds an open run, and it records the choice in its inputs. */
+export function sessionStudyInput(input,selected){
+ if([STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(input.version)||!selected)return input;
+ return withStudy(input,{modeCount:runModeCount(selected),groupIndex:selected.group_index_method!==undefined});
+}
+/** The runs with the PML check of run `job` stored, and the selected run (the same object unless
+ * it is that run). A run no longer kept cannot take its check: an error that says to detach. */
+export function withPmlCheck(runs,selected,job,check){
+ const run=runs.find(r=>r.job===job);
+ if(!run)throw Object.assign(new Error('The run of this PML check is no longer kept; the check is not stored. Detach this job.'),{code:'solver-failed'});
+ const checked=validateRun({...run,pml_check:check});if(Number.isInteger(run.inputRevision))checked.inputRevision=run.inputRevision;
+ return {runs:runs.map(r=>r===run?checked:r),selected:selected===run?checked:selected};
+}
 export function appendRun(runs,run){
  const previous=runs.find(r=>r.job===run.job);
  const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];

@@ -142,12 +142,36 @@ test('PML check: each mode paired with the nearest eligible candidate; a mode no
  assert.equal(R.checkVerdict(RE[0],IM[0],paired.paired[0],LAMBDA).text,'PML check: loss changes less than 0.01 dB/cm');
  const l=8.2797609e-5;
  assert.deepEqual(R.checkVerdict(2.441263,l,{re:2.441263,im:l*1.001},LAMBDA),{status:'independent',text:'PML check: loss changes 0.1 %',title:R.CHECK_HELP});
+ assert.equal(R.checkVerdict(2.441263,l,{re:2.441263,im:l*(1-3.8e-5)},LAMBDA).text,'PML check: loss changes 0.0038 %');
  // depends: the loss by 12 %, or Re n_eff by more than 5e-4
  const d=R.checkVerdict(2.441263,l,{re:2.441263,im:l*1.12},LAMBDA);
  assert.deepEqual(d,{status:'depends',text:'Depends on the PML: loss changes 12 %',title:'This loss changes with the PML; it is not a converged leakage loss.'});
  assert.equal(R.checkVerdict(2.441263,l,{re:2.441263+7e-4,im:l},LAMBDA).text,'Depends on the PML: Re n_eff changes 7.0e-4');
  assert.deepEqual(R.checkPmlCheck(paired,2),paired);
  for(const bad of [{...paired,pml_strength:3},{pml_strength:6,paired:[null]},{pml_strength:6,paired:[{re:1},null]},{...paired,extra:1}])assert.throws(()=>R.checkPmlCheck(bad,2),/invalid PML check/);
+});
+
+test('PML check (c1): one document per mode, strength 6, search 16, target at its Re n_eff; the candidates pooled',()=>{
+ const state={height:220,width:500,wavelength:1550,coreMesh:30,electric:false,heat:false,structure:false,optics:true,shapes:[STRIP]};
+ const doc=O.opticalDocument({...state,openBoundary:R.openChoice()},setup()),docs=R.checkDocuments(doc,RE);
+ assert.equal(docs.length,2);
+ docs.forEach((d,i)=>{const em=d.physics.em1;assert.deepEqual([em.pml.pml_strength,em.pml.pml_search_mode_count,em.target_effective_index],[6,16,[2.442909,1.769996][i]]);
+  // everything else is the run's document: the same geometry and mesh
+  assert.deepEqual({...d,physics:{em1:{...em,target_effective_index:2.46,pml:{...em.pml,pml_strength:3,pml_search_mode_count:32}}}},doc);});
+ assert.equal(R.checkLabel(2),'Also check the PML (2 more solves)');assert.equal(R.checkLabel(1),'Also check the PML (1 more solve)');
+ // pooled: the TE-like mode from one solve, the TM-like one from another
+ const first=record([candidate(1,2.4429,1e-11,0.999,['selected_near_target'])]),second=record([candidate(1,1.7701,1.4e-8,0.9999,['selected_near_target'])]);
+ assert.deepEqual(R.pairCheck(RE,IM,[first,second]).paired,[{re:2.4429,im:1e-11},{re:1.7701,im:1.4e-8}]);
+ assert.deepEqual(R.pairCheck(RE,IM,[first]).paired,[{re:2.4429,im:1e-11},null]);
+});
+test('review: a check whose selected modes are all at or below 1.45 still pairs with its other eligible candidates',()=>{
+ const result={summary:{open_boundary:[record([candidate(1,1.44,1e-3,0.9,['selected_near_target']),candidate(2,1.7700,1.4e-8,0.99,['outside_requested_count'])])]}};
+ const rec=R.checkResultRecord(result);
+ assert.deepEqual(R.pairCheck([1.77],[1.36e-8],[rec]).paired,[{re:1.77,im:1.4e-8}]);
+});
+test('review: the group index box is locked only with an open edge',()=>{
+ assert.equal(R.groupIndexLocked(R.openChoice()),true);assert.equal(R.groupIndexLocked(null),false);
+ assert.equal(R.groupIndexLocked({edges:{left:'closed',right:'closed',bottom:'closed',top:'closed'}}),false);
 });
 
 // -- Compare ----------------------------------------------------------------------------------
@@ -246,11 +270,36 @@ test('V15: what a version 10 file may hold is checked by name',()=>{
  // a version 9 session does not hold inputs of version 9
  const nine=JSON.parse(closed);nine.version=9;assert.throws(()=>N.parseSession(S.sessionJson(redigest(nine))),{message:'A version 9 session holds an input file of version 6 to 8.'});
 });
+test('review: the save and recovery stamps change when a run\'s PML check arrives',()=>{
+ const run=N.validateRun(openRun('0000000b'));
+ const before=JSON.stringify(N.runStampEntry(run)),after=JSON.stringify(N.runStampEntry({...run,pml_check:R.pairCheck(RE,IM,record())}));
+ assert.notEqual(before,after);
+ // a closed run's entry is as before
+ assert.deepEqual(N.runStampEntry(N.validateRun(closedRun('0000000a'))),['0000000a','2026-11-22T01:00:00.000Z','',false]);
+});
+test('review: a session opens with its own outer boundary choice; only v6/v7 inputs take the selected run\'s study',()=>{
+ const open=N.validateRun(openRun('0000000b'));
+ // a version 10 file whose inputs chose Closed (version 7) and an open run: the inputs stay closed
+ assert.deepEqual(N.sessionStudyInput(input(),open),input());
+ assert.equal(P.projectBoundary(N.sessionStudyInput(input(),open)),null);
+ const v9=P.withStudy(input(),{openBoundary:R.openChoice()});assert.equal(N.sessionStudyInput(v9,open),v9);
+ // as before: a version 7 input takes Modes to find of the selected run
+ const four=N.validateRun({...closedRun('0000000a'),settings:N.opticalSettings(1550,30,4)});
+ assert.equal(N.sessionStudyInput(input(),four).model.modeCount,4);
+});
+test('review: a PML check is stored on its run without changing the selected run; a run no longer kept cannot take it',()=>{
+ const a=N.validateRun(closedRun('0000000a')),b=N.validateRun(openRun('0000000b')),check=R.pairCheck(RE,IM,record());
+ const done=N.withPmlCheck([a,b],a,'0000000b',check);
+ assert.equal(done.selected,a);assert.deepEqual(done.runs[1].pml_check,check);assert.equal(done.runs[0],a);
+ assert.equal(N.withPmlCheck([a,b],b,'0000000b',check).selected.pml_check.pml_strength,6);
+ assert.throws(()=>N.withPmlCheck([a],a,'0000000b',check),e=>e.code==='solver-failed'&&/no longer kept; the check is not stored\. Detach this job\./.test(e.message));
+});
 test('a pending job keeps its open boundary, the PML check request and the run a check belongs to',()=>{
  const base={version:1,job:'0000000c',serverInstance:'0'.repeat(32),serverVersion:'0.0.0',startedAt:'2026-11-23T01:00:00.000Z',revision:0,input:input()};
  assert.deepEqual(J.validatePending({...base,openBoundary:{edges:ALL,target:2.46},pmlCheck:true}).openBoundary,{edges:ALL,target:2.46});
- assert.equal(J.validatePending({...base,openBoundary:{edges:ALL,target:2.46},checkOf:'0000000b'}).checkOf,'0000000b');
+ assert.deepEqual((({checkOf,checkIndex,checkCount})=>[checkOf,checkIndex,checkCount])(J.validatePending({...base,openBoundary:{edges:ALL,target:2.46},checkOf:'0000000b',checkIndex:1,checkCount:2})),['0000000b',1,2]);
  assert.equal(J.validatePending(base).openBoundary,undefined);
- for(const bad of [{pmlCheck:true},{openBoundary:{edges:ALL}},{openBoundary:{edges:{left:'closed',right:'closed',bottom:'closed',top:'closed'},target:2.46}},{openBoundary:{edges:ALL,target:2.46},checkOf:'x'},{openBoundary:{edges:ALL,target:2.46},pmlCheck:true,checkOf:'0000000b'}])
+ for(const bad of [{pmlCheck:true},{openBoundary:{edges:ALL}},{openBoundary:{edges:{left:'closed',right:'closed',bottom:'closed',top:'closed'},target:2.46}},{openBoundary:{edges:ALL,target:2.46},checkOf:'x',checkIndex:0,checkCount:1},{openBoundary:{edges:ALL,target:2.46},pmlCheck:true,checkOf:'0000000b',checkIndex:0,checkCount:1},
+  {openBoundary:{edges:ALL,target:2.46},checkOf:'0000000b'},{openBoundary:{edges:ALL,target:2.46},checkOf:'0000000b',checkIndex:2,checkCount:2},{checkIndex:0}])
   assert.throws(()=>J.validatePending({...base,...bad}),/Invalid pending/);
 });
