@@ -384,8 +384,13 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 15차부터 재료 분산에 대한 군굴절률 설명과 Optical modes의 *Material data*도 확인합니다.
 15차부터 단계 막대의 파장이 접근성 트리에서 *Wavelength 1550 nm, edit*라는 이름의 버튼인지도 확인하고, 다중물리
 검사는 트리 경고 배지가 *Modes 1: Temperature input has no source: …*라는 이름의 이미지인지, 세션 검사는 Library
-카드마다의 *Open (runs stay in this tab)*과 카드 제안의 *Start new (no runs)*를 읽습니다.
-15차부터 Save As 안내 *Chrome and Edge save to the same file.*도 확인합니다.
+카드마다의 *Open model*(16차부터, 이전에는 *Open (runs stay in this tab)*), *Runs stay in this tab until you close it.*로
+끝나는 카드 설명, 카드 제안의 *Start new (no runs)*를 읽습니다.
+16차부터 Save As 안내 *This browser cannot write to the file, so later saves download again under this name and may add
+“ (1)”.*(15차는 *Chrome and Edge save to the same file.*을 확인했으며 이제 사용 안내에만 있음), 파일 이름에서 온 프로젝트
+이름이 Save As를 따라가는지(*chosen*, 그다음 *design-a-ng*), 누설 사례의 기판을 T16 순서(Left x −1500, Bottom y −1200,
+Width 3000, Height 700)로 한 글자씩 입력하면 (−1500, −1200)에 놓인 3000 × 700 nm 사각형이 되고 *Width set to 3000 nm.
+Left x kept at −1500 nm: centred, the shape would leave the window.*가 나오는지도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
@@ -420,7 +425,13 @@ recomputed. Results match the file's checksum.*으로 표시되고 출처 주의
 Open, 두 모델이 실행 없이 같은 값 문자열을 다시 읽음. 저장, 열기, 다시 저장(저장 시각과 광학 실행의 출처 말고는
 같고, 그다음은 저장 시각 말고는 바이트까지 같음), 손상되거나 더 새로운 파일을 탭 그대로 거부, 경계에서 바꾼
 `window.showSaveFilePicker`로 Save As, Save, 취소, 실패한 쓰기. `--old-python <python>`을 주면 이전 Studio에서
-파일을 여는 것도 봅니다(손으로만, CI는 주지 않음). P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
+파일을 여는 것도 봅니다(손으로만, CI는 주지 않음). 16차부터(사전 등록) 이어서 새 프로필에서 1440 × 900으로 그 파일을
+엽니다: Library › Heated silicon waveguide는 그 Results로, Library › Optical waveguide는 마지막으로 본 실행의 Results로
+돌아가고, *Design A*, *Design B*로 이름 붙인 Run 1과 Run 2는 세 번째 실행이 생겨도 Compare에 남으며(*Run 3 is newer than
+this pair · Compare Run 3 with B*), `design-ab.json`으로 Save As해도 이름 *Heater study*와 그 쌍이 유지되고, 새로고침 뒤
+두 카드 제안 모두 *same as file design-ab.json*을 말하며(저장할 때 가열 모델은 보이지 않았음), 광학 제안을 복원하면
+헤더가 *Heater study · design-ab.json · saved …*이고 Save As가 `design-ab.json`을 제안하며, 다시 연 파일은 Design A와
+Design B를 비교합니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를

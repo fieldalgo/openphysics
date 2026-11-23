@@ -460,8 +460,15 @@ Optical modes.
 Since round 15 it also checks the step bar's wavelength as a button named *Wavelength 1550 nm,
 edit* in the accessibility tree; the multiphysics check names the tree's warning badge as an image
 *Modes 1: Temperature input has no source: …*, and the session check reads each Library card's
-*Open (runs stay in this tab)* and the card offer's *Start new (no runs)*.
-Since round 15 it also checks the Save As note *Chrome and Edge save to the same file.*
+*Open model* (round 16; *Open (runs stay in this tab)* before), its description ending in *Runs
+stay in this tab until you close it.*, and the card offer's *Start new (no runs)*.
+Since round 16 it checks the Save As note *This browser cannot write to the file, so later saves
+download again under this name and may add “ (1)”.* (round 15 checked *Chrome and Edge save to the
+same file.*, now in the user guide only), a project name taken from a file name following Save As
+(*chosen*, then *design-a-ng*), and the leakage case's substrate typed key by key in T16's order
+(Left x −1500, Bottom y −1200, Width 3000, Height 700) giving a 3000 × 700 nm rectangle at (−1500,
+−1200) with *Width set to 3000 nm. Left x kept at −1500 nm: centred, the shape would leave the
+window.*
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -510,6 +517,14 @@ both models reading back the same value strings with no run started; save, open 
 time); damaged and newer files refused with the tab unchanged; and Save As, Save, a cancel and a
 failed write through `window.showSaveFilePicker` stubbed at its boundary. With `--old-python <python>`
 it also opens the file in an older Studio (by hand; CI does not pass it).
+Since round 16 (pre-registered) it then opens the file in a new profile at 1440 × 900: Library ›
+Heated silicon waveguide lands on its Results and Library › Optical waveguide on Results with the
+run last viewed; Run 1 and Run 2 named *Design A* and *Design B* stay on Compare when a third run
+comes (*Run 3 is newer than this pair · Compare Run 3 with B*); Save As `design-ab.json` keeps the
+name *Heater study* and the pair; after a reload both cards' offers name *same as file
+design-ab.json* (the heated model was not shown when it was saved); restoring the optical one gives
+the header *Heater study · design-ab.json · saved …* and Save As suggests `design-ab.json`; and the
+file opened again shows Design A against Design B.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
 (session file)…**, as **File › Save** writes the project file.
 
