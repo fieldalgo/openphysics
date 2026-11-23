@@ -1648,8 +1648,10 @@ try {
     assert.deepEqual(template.italic, template.check.map(([status]) => status === 'depends'));
     assert.deepEqual(template.pol, [['—', 'Computed on the physical window in a later version'], ['—', 'Computed on the physical window in a later version']]); assert.deepEqual(template.area, ['—', '—']);
     assert.ok(template.neff.every(t => /^\d\.\d{8} [+−] \d\.\d{2}e-\d+i$/.test(t)), 'n_eff with its Im part');
-    for (const [status, words] of template.check)
-      assert.ok((status === 'independent' && /^PML check: loss changes /.test(words)) || (status === 'depends' && /^Depends on the PML: /.test(words)) || (status === 'not_found' && words === 'Not found in the check solve'), words);
+    // both modes found again by the per-mode check. Below the display floor with check losses under
+    // 0.05 dB/cm: no verdict (decided after the TM-like result 0.00480 -> 0.01706 dB/cm, registered as
+    // independent; the engine gives 0.0048 and below for both, and 0.017 at most on the check)
+    assert.deepEqual(template.check, [['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)'], ['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)']]);
     assert.equal(template.note, 'Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.');
     // pre-registered: 32 searched, 2 shown, 30 other candidates, none with a field view
     assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls], ['Other candidates (30) — not shown as modes', 30, 0]);

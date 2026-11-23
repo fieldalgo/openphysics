@@ -195,10 +195,19 @@ export const NOT_FOUND_HELP='The check solve did not find this mode near the sea
 export const DEPENDS_HELP='This loss changes with the PML; it is not a converged leakage loss.';
 export const CHECK_HEADER='PML check';
 export const CHECK_HELP='The same mesh solved again with PML strength 6, near each mode. PML-independent: Re n_eff within 5e-4 and the loss within max(2 %, 0.01 dB/cm).';
-/** The verdict of one mode: {status: independent | depends | not_found, text, title}. */
-export function checkVerdict(re,im,paired,lambda0){
+// Below the display floor the check solve (strength 6) leaves a larger residue than the run's
+// solve: the template's TM-like mode, registered as independent, went 0.00480 -> 0.01706 dB/cm
+// ("Depends on the PML: loss changes 256 %"). After that result: a mode whose cell reads
+// "< 0.01 dB/cm" and whose check loss is below 0.05 dB/cm (about 3 x that residue) gets no verdict.
+export const CHECK_FLOOR=0.05;
+export const UNRESOLVED_TEXT=`PML check: no leakage resolved (both solves below ${CHECK_FLOOR} dB/cm)`;
+export const UNRESOLVED_HELP='The check solve (strength 6) leaves a larger residue than the run\'s solve on tiny losses: below the display floor the check says only that no leakage is resolved; it does not certify independence.';
+/** The verdict of one mode: {status: independent | depends | unresolved | not_found, text, title}.
+ * status: the first solve's attenuation_status (numerically_unresolved reads as below the floor). */
+export function checkVerdict(re,im,paired,lambda0,status=null){
  if(!paired)return {status:'not_found',text:'Not found in the check solve',title:NOT_FOUND_HELP};
  const l1=dbPerCm(im,lambda0),l2=dbPerCm(paired.im,lambda0),dRe=paired.re-re,lossOk=lossIndependent(l1,l2),reOk=reIndependent(dRe);
+ if(openLoss(im,lambda0,status).floor&&l2<CHECK_FLOOR)return {status:'unresolved',text:UNRESOLVED_TEXT,title:UNRESOLVED_HELP};
  const change=l1>=LOSS_FLOOR?percent(Math.abs(l2-l1)/Math.abs(l1)*100):null;
  if(lossOk&&reOk)return {status:'independent',text:change?`PML check: loss changes ${change}`:`PML check: loss changes less than ${LOSS_FLOOR} dB/cm`,title:CHECK_HELP};
  const what=!lossOk?`loss changes ${change??Math.abs(l2-l1).toPrecision(2)+' dB/cm'}`:`Re n_eff changes ${Math.abs(dRe).toExponential(1)}`;

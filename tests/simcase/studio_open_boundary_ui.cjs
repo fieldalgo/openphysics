@@ -138,8 +138,18 @@ test('PML check: each mode paired with the nearest eligible candidate; a mode no
  // nothing within 2e-3: not found
  assert.deepEqual(R.pairCheck([2.0],[1e-4],check).paired,[null]);
  assert.deepEqual(R.checkVerdict(2.0,1e-4,null,LAMBDA),{status:'not_found',text:'Not found in the check solve',title:'The check solve did not find this mode near the search value; this does not by itself mean the mode depends on the PML.'});
- // independent: below the floor on both solves, and a 0.1 % change
- assert.equal(R.checkVerdict(RE[0],IM[0],paired.paired[0],LAMBDA).text,'PML check: loss changes less than 0.01 dB/cm');
+ // below the display floor with a check loss below 0.05 dB/cm: no verdict (decision after the template
+ // TM-like result 0.00480 -> 0.01706 dB/cm, registered as independent)
+ const unresolved={status:'unresolved',text:'PML check: no leakage resolved (both solves below 0.05 dB/cm)',title:'The check solve (strength 6) leaves a larger residue than the run\'s solve on tiny losses: below the display floor the check says only that no leakage is resolved; it does not certify independence.'};
+ assert.deepEqual(R.checkVerdict(RE[0],IM[0],paired.paired[0],LAMBDA),unresolved);
+ const im0=0.00480*LAMBDA*100*Math.log(10)/(40*Math.PI),im17=0.01706*LAMBDA*100*Math.log(10)/(40*Math.PI);
+ assert.deepEqual(R.checkVerdict(1.77,im0,{re:1.77,im:im17},LAMBDA),unresolved);
+ // the check at 0.05 dB/cm exactly, or above: the existing rule ("Depends on the PML")
+ const at=0.05*LAMBDA*100*Math.log(10)/(40*Math.PI);let i5=at;while(R.dbPerCm(i5,LAMBDA)<0.05)i5=nextUp(i5);while(R.dbPerCm(nextDown(i5),LAMBDA)>=0.05)i5=nextDown(i5);
+ assert.equal(R.checkVerdict(1.77,im0,{re:1.77,im:i5},LAMBDA).status,'depends');assert.deepEqual(R.checkVerdict(1.77,im0,{re:1.77,im:nextDown(i5)},LAMBDA),unresolved);
+ // numerically_unresolved reads as below the floor; a first solve at the floor keeps the rule
+ const big=8.5e-8;assert.deepEqual(R.checkVerdict(1.77,big,{re:1.77,im:big},LAMBDA,'numerically_unresolved'),unresolved);
+ assert.equal(R.checkVerdict(1.77,big,{re:1.77,im:big},LAMBDA).status,'independent');
  const l=8.2797609e-5;
  assert.deepEqual(R.checkVerdict(2.441263,l,{re:2.441263,im:l*1.001},LAMBDA),{status:'independent',text:'PML check: loss changes 0.1 %',title:R.CHECK_HELP});
  assert.equal(R.checkVerdict(2.441263,l,{re:2.441263,im:l*(1-3.8e-5)},LAMBDA).text,'PML check: loss changes 0.0038 %');

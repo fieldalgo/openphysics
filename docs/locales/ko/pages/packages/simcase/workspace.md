@@ -909,8 +909,8 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
 
 **Study와 그림.**
 
-- Study는 *Open boundary · PML 1 µm · search near 2.460*과 선택 사항 **Also check the PML (1 more
-  solve)**(기본 꺼짐)를 보입니다.
+- Study는 *Open boundary · PML 1 µm · search near 2.460*과 선택 사항 **Also check the PML (N more
+  solves)**(기본 꺼짐, N = Modes to find)를 보입니다.
 - 그림은 열린 변마다 창 밖에 *PML 1 µm* 라벨이 붙은 회색 띠를 그립니다. 창이 보이도록 띠는 1 µm보다
   좁게 그립니다. 단면 문구는 “… · open boundary (PML 1 µm) on N edges”로 끝납니다.
 
@@ -942,18 +942,47 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
 
 **PML 점검.**
 
-- 선택 사항이 켜져 있으면 Studio는 같은 문서를 강도 6으로 다시 풉니다. 메시는 절점까지 같습니다.
-- 각 모드는 두 번째 풀이의 가장 가까운 적격 후보와 짝지어집니다. 적격 후보는 엔진 필터를 통과하고(선택됨,
-  또는 개수를 넘어서만 제외됨) Re > 1.45인 후보입니다. 짝은 |Δn_eff| ≤ 2e-3일 때 받아들입니다.
+- 선택 사항이 켜져 있으면 Studio는 실행의 문서를 찾은 모드마다 한 번씩 다시 풉니다: PML 강도 6, 후보 16개,
+  Search near n_eff는 그 모드의 Re n_eff(소수 여섯째 자리). 메시는 절점까지 같습니다.
+- 이 풀이들의 후보를 모읍니다. 각 모드는 가장 가까운 적격 후보와 짝지어집니다. 적격 후보는 엔진 필터를
+  통과하고(선택됨, 또는 개수를 넘어서만 제외됨) Re > 1.45인 후보입니다. 짝은 |Δn_eff| ≤ 2e-3일 때
+  받아들입니다.
 - |ΔRe| ≤ 5e-4이고 손실 변화가 max(2 %, 0.01 dB/cm) 이하이면 그 모드는 PML에 무관합니다.
+- 표시 하한 아래에서는 점검 풀이가 아주 작은 손실에 실행의 풀이보다 큰 잔차를 남깁니다. 모드의 칸이
+  *< 0.01 dB/cm*이고 점검 손실이 0.05 dB/cm 미만이면 점검은 판정하지 않습니다. 분해된 누설이 없다고만 말할
+  뿐, 무관함을 보증하지 않습니다.
 - 그러면 **PML check** 열은 다음 가운데 하나입니다.
-  - *PML check: loss changes 0.1 %*(하한 아래면 *… less than 0.01 dB/cm*);
+  - *PML check: loss changes 0.016 %*(0.1 % 미만은 유효숫자 2자리);
   - **Depends on the PML**: *loss changes 12 %*(또는 *Re n_eff changes 7.0e-4*). 손실 칸은 기울임꼴이며,
     도움말은 “This loss changes with the PML; it is not a converged leakage loss.”입니다;
-  - *Not found in the check solve*.
-- 엔진의 `stability: "not_checked"`는 각 풀이에 그대로 참이며, 점검은 실행에 기록됩니다(`pml_check`).
-- 템플릿에서 TM-like 모드는 *Not found in the check solve*입니다. 강도 6에서는 2.46 근처 탐색이 이 모드를
-  놓치며, P1의 두께 점검에서도 그랬습니다.
+  - *PML check: no leakage resolved (both solves below 0.05 dB/cm)*(기울임꼴 없음);
+  - *Not found in the check solve*. 도움말은 “The check solve did not find this mode near the search
+    value; this does not by itself mean the mode depends on the PML.”입니다.
+- 하한 아래이지만 점검 손실이 0.05 dB/cm 이상인 모드는 *Depends on the PML* 그대로입니다. 하한이 PML에 따라
+  움직이기 때문입니다.
+- 엔진의 `stability: "not_checked"`는 각 풀이에 그대로 참이며, 점검은 실행에 기록됩니다(`pml_check`). 점검은
+  모든 풀이가 끝나야 저장됩니다. 페이지를 다시 불러오기 전에 끝난 풀이는 보존되지 않으므로, 그 점검은
+  불완전하여 저장되지 않습니다.
+- **점검을 고른 방법.** 점검 풀이 하나(강도 6, 실행의 목표 근처 후보 32개)는 템플릿과 누설 사례의 TM-like
+  모드를 놓쳤습니다. 후보 64개로도 놓쳤습니다: 개수가 아니라 목표가 결정합니다. 엔진 수준, 한 스레드, 느리지
+  않은 테스트 묶음이 함께 돌 때 잰 값입니다(시간은 상대 비교용).
+
+  | 점검 | 템플릿 | 누설 사례 | 모든 모드를 다시 찾음 |
+  |---|---|---|---|
+  | 풀이 하나, 목표 근처 후보 32개 | 2.8 s | 35.4 s | 아니오(TM-like 놓침) |
+  | 풀이 하나, 후보 64개 | 5.2 s | 91.8 s | 아니오 |
+  | 모드마다 그 Re에서 풀이 하나, 후보 32개 | 5.0 s | 64.5 s | 예 |
+  | 모드마다 그 Re에서 풀이 하나, 후보 16개(채택) | 2.6 s | 43.8 s | 예 |
+
+  첫 풀이는 3.5 s와 36.3 s였습니다.
+- **실패한 등록 결과.** 모드별 점검에서 템플릿의 TM-like 모드는 PML에 무관하다고 등록했습니다. 손실이
+  0.00480에서 0.01706 dB/cm로 바뀌어 “Depends on the PML: loss changes 256 %”로 읽혔습니다. 하한 아래 손실
+  규칙은 그 결과 뒤에 더했습니다. 측정 전에 등록한 대로 700 × 300 nm 템플릿 코어, 모드 4개에서 확인했습니다:
+  모든 모드가 하한 아래이고 점검 손실은 많아야 0.00026 dB/cm입니다.
+- 점검을 켠 결과:
+  - 템플릿: 두 모드 모두 *no leakage resolved*;
+  - 누설 사례: TE-like 29.1528 → 29.1517 dB/cm(*loss changes 0.0038 %*), TM-like 1005.96 → 1005.80 dB/cm
+    (*0.016 %*), 둘 다 PML에 무관.
 
 **Compare.**
 
@@ -986,9 +1015,11 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
   10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.*로 거부합니다. 다중물리
   세션은 버전 8 그대로입니다.
 
-**서버.** 작업 공간 요청은 `pml_strength` 3 또는 6(점검)만 담을 수 있습니다.
-`/api/workspace/capabilities/v9`는 `pml_check_strength` 6을 나열합니다. 이는 P1의 계약을 바꿉니다: P1은 강도
-6을 거부했습니다.
+**서버.** 작업 공간 요청은 `pml_strength` 3과 후보 32개(실행), 또는 6과 후보 16개(점검 풀이)를 담습니다.
+점검 풀이는 모드를 겨누므로 목표는 1.45보다 큰 어떤 값이든 됩니다. 그 밖의 것은 이름을 밝혀 거부합니다:
+“A PML check request (strength 6) searches 16 candidates, and a run (strength 3) searches 32.” 또는 열린
+경계 문구. `/api/workspace/capabilities/v9`는 `pml_check_strength` 6과 `pml_check_search_mode_count` 16을
+나열합니다. 이는 P1의 계약을 바꿉니다: P1은 강도 6과 32가 아닌 후보 수를 거부했습니다.
 
 **검증**(Linux, Python 3.12, Node 22, 브라우저 점검 `tools/studio_browser/studio_workspace_browser.mjs`의
 OB 단계):

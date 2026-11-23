@@ -1091,7 +1091,7 @@ leakage out of the window.
 **Study and drawing.**
 
 - Study shows *Open boundary · PML 1 µm · search near 2.460* and the option **Also check the
-  PML (1 more solve)**, off by default.
+  PML (N more solves)**, off by default, with N = Modes to find.
 - The drawing shows a grey band labelled *PML 1 µm* outside each open edge. The band is drawn
   narrower than 1 µm so the window stays in view. The section line ends “… · open boundary
   (PML 1 µm) on N edges”.
@@ -1127,23 +1127,53 @@ leakage out of the window.
 
 **PML check.**
 
-- With the option on, Studio solves the same document again with strength 6: the same mesh,
-  node for node.
-- Each mode is paired with the nearest eligible candidate of the second solve. An eligible
-  candidate passed the engine's filter (selected, or set aside only as beyond the count) and has
-  Re > 1.45. A pair is accepted when |Δn_eff| ≤ 2e-3.
+- With the option on, Studio solves the run's document again once per mode found: PML strength 6,
+  a search of 16 candidates and Search near n_eff at that mode's Re n_eff (to 6 decimals). The
+  mesh is the same, node for node.
+- The candidates of these solves are pooled. Each mode is paired with the nearest eligible
+  candidate: one that passed the engine's filter (selected, or set aside only as beyond the
+  count) and has Re > 1.45. A pair is accepted when |Δn_eff| ≤ 2e-3.
 - A mode is PML-independent when |ΔRe| ≤ 5e-4 and the loss changes by at most
   max(2 %, 0.01 dB/cm).
+- Below the display floor the check solve leaves a larger residue than the run's solve on tiny
+  losses. When a mode's cell reads *< 0.01 dB/cm* and its check loss is below 0.05 dB/cm, the
+  check gives no verdict. It says only that no leakage is resolved; it does not certify
+  independence.
 - The **PML check** column then reads one of:
-  - *PML check: loss changes 0.1 %* (or *… less than 0.01 dB/cm* below the floor);
+  - *PML check: loss changes 0.016 %* (two significant digits below 0.1 %);
   - **Depends on the PML**: *loss changes 12 %* (or *Re n_eff changes 7.0e-4*), with the loss
     cell in italics and the help “This loss changes with the PML; it is not a converged leakage
     loss.”;
-  - *Not found in the check solve*.
+  - *PML check: no leakage resolved (both solves below 0.05 dB/cm)*, without italics;
+  - *Not found in the check solve*, with the help “The check solve did not find this mode near
+    the search value; this does not by itself mean the mode depends on the PML.”
+- A mode below the floor whose check loss is 0.05 dB/cm or more keeps *Depends on the PML*: the
+  floor moves with the PML.
 - The engine's `stability: "not_checked"` stays true of each solve; the run records the check
-  (`pml_check`).
-- On the template, the TM-like mode is *Not found in the check solve*: at strength 6 the search
-  near 2.46 misses it, as P1's thickness check found.
+  (`pml_check`). A check is stored when all its solves are in. Solves finished before a page
+  reload are not kept: that check is incomplete and is not stored.
+- **How the check was chosen.** A single check solve (strength 6, search 32 near the run's
+  target) missed the TM-like mode of the template and of the leakage case. A search of 64 missed
+  it too: the target, not the count, decides. Measured one thread, engine level, with the
+  non-slow test suite running alongside (times relative):
+
+  | Check | Template | Leakage case | Every mode found again |
+  |---|---|---|---|
+  | one solve, search 32 near the target | 2.8 s | 35.4 s | no (TM-like missed) |
+  | one solve, search 64 | 5.2 s | 91.8 s | no |
+  | one solve per mode at its Re, search 32 | 5.0 s | 64.5 s | yes |
+  | one solve per mode at its Re, search 16 (shipped) | 2.6 s | 43.8 s | yes |
+
+  The first solves took 3.5 s and 36.3 s.
+- **A registered result that failed.** With the per-mode check, the template's TM-like mode was
+  registered as PML-independent. It went from 0.00480 to 0.01706 dB/cm, so it read “Depends on
+  the PML: loss changes 256 %”. The rule for losses below the floor was added after that result.
+  It was confirmed, as registered before measuring, on the template core at 700 × 300 nm with 4
+  modes: every mode is below the floor, with check losses of at most 0.00026 dB/cm.
+- Results with the check on:
+  - the template: both modes *no leakage resolved*;
+  - the leakage case: TE-like 29.1528 → 29.1517 dB/cm (*loss changes 0.0038 %*), TM-like
+    1005.96 → 1005.80 dB/cm (*0.016 %*), both PML-independent.
 
 **Compare.**
 
@@ -1178,9 +1208,12 @@ leakage out of the window.
   file with *This session file is version 10, newer than this Studio reads (versions 6–9). Open
   it in a newer Studio.* Multiphysics sessions stay version 8.
 
-**Server.** A workspace request may carry `pml_strength` 3 or 6 (the check) and nothing else.
-`/api/workspace/capabilities/v9` lists `pml_check_strength` 6. This changes P1's contract: P1
-refused strength 6.
+**Server.** A workspace request carries `pml_strength` 3 with a search of 32 (a run), or 6 with
+a search of 16 (a check solve). Its target may be any value above 1.45, since a check solve aims
+at a mode. Anything else is refused by name: “A PML check request (strength 6) searches 16
+candidates, and a run (strength 3) searches 32.” or the open boundary's message.
+`/api/workspace/capabilities/v9` lists `pml_check_strength` 6 and `pml_check_search_mode_count`
+16. This changes P1's contract: P1 refused strength 6 and a search other than 32.
 
 **Validation** (Linux, Python 3.12, Node 22, in the browser check
 `tools/studio_browser/studio_workspace_browser.mjs`, stage OB):

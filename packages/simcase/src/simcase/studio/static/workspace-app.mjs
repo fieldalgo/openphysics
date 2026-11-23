@@ -1198,7 +1198,7 @@ function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
  const open=isOpenRun(run),{rows,loss}=modeTableRows(opticalModes(run),{open});
  const lambda0=run.input.model.wavelength*1e-9,im=run.effective_index_im,candidates=open?openStatuses(run):null;
- const checks=open&&run.pml_check?run.effective_index.map((re,i)=>checkVerdict(re,im[i],run.pml_check.paired[i],lambda0)):null;
+ const checks=open&&run.pml_check?run.effective_index.map((re,i)=>checkVerdict(re,im[i],run.pml_check.paired[i],lambda0,candidates[i])):null;
  if(open)rows.forEach((r,i)=>{const cell=openLoss(im[i],lambda0,candidates[i]);r.neff=openIndexText(run.effective_index[i],im[i]);r.loss=cell.text;r.lossTitle=cell.title;r.lossFloor=cell.floor;r.depends=checks?.[i].status==='depends';if(r.depends)r.lossTitle=DEPENDS_HELP;r.polarization={text:'—',title:LATER_TITLE,rowspan:1};r.area={text:'—',value:null,title:LATER_TITLE};});
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent=open?openTableTitle():'Computed modes';table.append(caption);

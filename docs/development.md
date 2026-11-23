@@ -399,10 +399,10 @@ right-edge shadow that goes at the right end.
 Since slice P2 it checks the optical open boundary in a browser context of its own (stage OB):
 the Outer boundary radios, Search near n_eff, the PML check box and the *Close this edge* switch
 by role and name, the PML bands of the drawing, the template run all open with the PML check
-(found line, *< 0.01 dB/cm* cells, 30 other candidates), a version 10 session, Compare with a
+(found line, *< 0.01 dB/cm* cells, 30 other candidates, both modes *no leakage resolved*), a version 10 session, Compare with a
 closed run (matching off, per-side loss headers and note, 24 px to spare at 1440 × 900), and the
 leakage case built in Geometry, whose document is P1's strip over a substrate (*29.15 dB/cm* and
-*1006 dB/cm*, and the mode near the cladding index at Search near n_eff 1.600), with no
+*1006 dB/cm*, both PML-independent with the per-mode check, a loss change under 2 %, and the mode near the cladding index at Search near n_eff 1.600), with no
 horizontal overflow at 1440 × 900 and 390 × 844
 ([open boundary](packages/simcase/workspace.md#open-boundary-in-the-optical-workspace)).
 Since the File menu it checks the menus by role and name in the accessibility tree and by keyboard
