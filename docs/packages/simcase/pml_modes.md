@@ -81,9 +81,9 @@ there. `mode_postprocessing` then holds those two keys and `integration_region:
 "physical_window"`. For a strongly leaking mode the effective area depends on the window. A closed
 result gains no key. Bend and scalar PML results gain none either. `results.group_index` is
 accepted with `pml` (not with `bend`) and gives a complex n_g ([group index](group_index.md)).
-Validation: checks V9 and V10 of
-[`tests/simcase/test_open_boundary_mode_identity.py`](../../../tests/simcase/test_open_boundary_mode_identity.py) and V11 of
-[`tests/simcase/test_open_boundary_group_index.py`](../../../tests/simcase/test_open_boundary_group_index.py).
+Validation: [open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary), checks V9, V10, V12 and V13 of
+`tests/simcase/test_open_boundary_mode_identity.py` and V11 of
+`tests/simcase/test_open_boundary_group_index.py`.
 
 Each `openphysics.pml-candidates/2` point records all searched candidates,
 one-based candidate numbers, the complex `effective_index`, the original-pencil

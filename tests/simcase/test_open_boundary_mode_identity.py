@@ -16,18 +16,34 @@ there (simcase.mode_postprocessing), and n_g is the complex central difference o
 - V10: effective area, the template open against closed: relative difference <= 1e-2 for both
   modes (measured before, 7e-4).
 - V11 (n_g under the PML): tests/simcase/test_open_boundary_group_index.py.
-- V12 and V13 (Studio's formulas and matching on the same samples) are added with the Studio
-  change.
+- V12 (blind): Studio's teFraction and effectiveArea (workspace-modes.mjs, in Node) on the
+  physical window of the saved samples equal the engine's values to 1e-12 relative, on the
+  template and the strip over a substrate, all edges open; the window equals galerkin's own
+  physical mask of the solve.
+- V13 (registered after the result, decision pml-p3-v13-v11-reregistration): P2's blind check
+  (closed against open, eta >= 0.99) failed with 0.9903 / 0.9875; the diagnosis found the default
+  mesh's discretization error, not the PML. Not blind; measured values in the commit:
+  - V13a: the open template against the same document with the PML removed (PEC at the outer
+    edge, the same mesh), both on the physical window: eta >= 0.9999 for both modes.
+  - V13b: the template closed against open at x 1: both modes paired with their own counterpart
+    by Studio's rule (eta >= 0.8, margin >= 0.1).
+  - V13c: TE-like, 1 - eta(closed, open) decreasing over x 1, 1/2, 1/4; TM-like reported where
+    the open run returns it (on refined meshes the filter can drop it: a known issue).
 """
 from __future__ import annotations
 
 import copy
+import json
+import subprocess
 
 import numpy as np
 import pytest
 
-from open_boundary_fixtures import ALL, CLOSED, TOP_BOTTOM, build, scaled
+from open_boundary_fixtures import ALL, CLOSED, STATIC, TOP_BOTTOM, build, node, scaled
 from simcase import Document, run
+from simcase.mode_postprocessing import physical_window
+from simcase.physics_pml_modes import coordinates
+from simcase.runner import build_mesh
 
 
 def solve(d):
@@ -38,6 +54,63 @@ def solve(d):
 
 def template(edges, factor=1):
     return scaled(build("template", 2, edges=edges), factor)
+
+
+def without_pml(d):
+    """The open document with its PML removed: PEC at the outer edge, the same mesh."""
+    d = copy.deepcopy(d)
+    del d["physics"]["em1"]["pml"], d["physics"]["em1"]["target_effective_index"]
+    return d
+
+
+def bounds(result):
+    return result.open_boundary[0]["physical_bounds"]["values"]
+
+
+def studio_side(result, physical_bounds=None):
+    """A run as Studio's matching reads it (workspace-match.mjs matchSide)."""
+    e = result.vector_fields[0].electric.transpose(1, 0, 2)
+    side = {"settings": {"boundary": "PEC"}, "input": {"model": {"coreMesh": 30}},
+            "effective_index": np.real(result.effective_index[0]).tolist(),
+            "field": {"node_coordinates": result.node_coordinates.tolist(), "triangles": result.triangles.tolist(),
+                      "real": e.real.tolist(), "imag": e.imag.tolist()}}
+    if physical_bounds is not None:
+        side["settings"] = {"boundary": "PML"}
+        side["open_boundary"] = {"physical_bounds": {"unit": "m", "values": physical_bounds}}
+    return side
+
+
+_NODE = r"""
+import fs from 'node:fs';
+const M = await import(process.argv[1]);
+const X = await import(process.argv[2]);
+const job = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+let out;
+if (job.kind === 'identity') {
+  out = job.runs.map(r => {
+    const w = M.physicalWindow(r.field, M.physicalBounds(r.open_boundary));
+    return {window: w, te: r.effective_index.map((_, i) => M.teFraction(r.field, i, w)),
+            area: r.effective_index.map((_, i) => M.effectiveArea(r.field, i, w))};
+  });
+} else {
+  out = job.pairs.map(([a, b]) => {
+    const m = X.opticalMatch(a, b);
+    return {eta: m.eta, pairs: m.pairs.map(p => ({a: p.unitA, b: p.unitB, eta: p.eta, accepted: p.accepted})),
+            disabled: m.disabled ?? null};
+  });
+}
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def studio(job, tmp_path):
+    path = tmp_path / "job.json"
+    path.write_text(json.dumps(job), encoding="utf-8")
+    done = subprocess.run([node(), "--input-type=module", "-e", _NODE, (STATIC / "workspace-modes.mjs").as_uri(),
+                           (STATIC / "workspace-match.mjs").as_uri(), str(path)],
+                          capture_output=True, text=True, encoding="utf-8")
+    assert done.returncode == 0, done.stdout + done.stderr
+    return json.loads(done.stdout)
 
 
 def te_fraction(result):
@@ -87,3 +160,54 @@ def test_v9_film_te_fraction_converges_to_one():
     assert deficits[0] > deficits[1] > deficits[2], deficits
 
 
+# -- V12: the same formula in the engine and in Studio ----------------------------------------------
+
+@pytest.mark.parametrize("kind", ["template", "strip_substrate"])
+def test_v12_studio_equals_the_engine_on_the_physical_window(kind, tmp_path):
+    d = json.loads(build(kind, 2, edges=ALL))
+    result = solve(d)
+    side = studio_side(result, bounds(result))
+    got = studio({"kind": "identity", "runs": [side]}, tmp_path)[0]
+    window = physical_window(result.node_coordinates, result.triangles, bounds(result))
+    # the window is galerkin's own physical mask of the solve (in the micrometre frame)
+    model = build_mesh(Document.from_dict({**d, "results": {"plots": False}}))
+    kp = model.kernel_doc.sole_physics()[1]
+    assert np.array_equal(window, coordinates(model.solver_mesh, kp["pml"], kp.get("bend")).physical)
+    assert got["window"] == window.tolist()
+    te = np.abs(np.array(got["te"]) / te_fraction(result) - 1)
+    a = np.abs(np.array(got["area"]) / area(result) - 1)
+    print(f"\nV12 {kind}: {int(window.sum())} of {len(window)} triangles; relative f_TE {te}, A_eff {a}")
+    assert np.all(te <= 1e-12) and np.all(a <= 1e-12), (te, a)
+
+
+# -- V13: matching a closed and an open run -------------------------------------------------------
+
+def test_v13a_v13b_the_pml_changes_no_overlap_and_the_modes_pair(template_runs, tmp_path):
+    closed, opened = template_runs
+    pec = solve(without_pml(template(ALL)))
+    assert np.array_equal(pec.triangles, opened.triangles)
+    b = bounds(opened)
+    a13, b13 = studio({"kind": "match", "pairs": [[studio_side(pec, b), studio_side(opened, b)],
+                                                  [studio_side(closed), studio_side(opened, b)]]}, tmp_path)
+    eta_a = [a13["eta"][i][i] for i in range(2)]
+    print(f"\nV13a eta(PEC outer edge, open) {eta_a}")
+    print(f"V13b closed vs open: {b13['pairs']}")
+    assert all(e >= 0.9999 for e in eta_a), eta_a
+    assert b13["disabled"] is None
+    assert sorted((p["a"], p["b"], p["accepted"]) for p in b13["pairs"]) == [([0], [0], True), ([1], [1], True)], b13
+
+
+@pytest.mark.slow
+def test_v13c_the_overlap_deficit_converges(tmp_path):
+    deficits, tm = [], []
+    for factor in (1, 0.5, 0.25):
+        closed, opened = solve(template(CLOSED, factor)), solve(template(ALL, factor))
+        m = studio({"kind": "match", "pairs": [[studio_side(closed), studio_side(opened, bounds(opened))]]},
+                   tmp_path)[0]
+        deficits.append(1 - m["eta"][0][0])
+        found = te_fraction(opened) <= 0.1
+        tm.append((factor, np.real(opened.effective_index[0]).tolist(),
+                   1 - m["eta"][1][int(np.flatnonzero(found)[0])] if found.any() else "not returned"))
+    print(f"\nV13c TE-like 1 - eta at x 1, 1/2, 1/4: {deficits}")
+    print(f"V13c TM-like (factor, open n_eff, 1 - eta or not returned): {tm}")
+    assert deficits[0] > deficits[1] > deficits[2], deficits

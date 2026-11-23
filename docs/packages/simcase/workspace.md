@@ -1233,8 +1233,8 @@ leakage out of the window.
   open edge reads *Optical left boundary · Open (PML)*, and a **Close this edge** switch closes or
   reopens it. A closed edge reads as before (PEC). With every edge closed, a run is a closed
   window.
-- Open turns **Also compute group index** off and disables it, with the note “Group index with
-  an open boundary comes in a later version”. The engine refuses it too.
+- **Also compute group index** works with Open too (slice P3). The engine's n_g is then complex,
+  and the n_g column shows Re n_g (see [mode identity](#mode-identity-with-an-open-boundary)).
 
 **Parameters.**
 
@@ -1269,8 +1269,8 @@ leakage out of the window.
   without Im n_eff reads “—”.
 - n_eff shows Re as a closed run does, with Im to 3 significant digits: *2.44126325 +
   8.28e-5i*.
-- Polarization, A_eff and n_g read “—”, titled “Computed on the physical window in a later
-  version”: the field extends into the PML, where it is not physical.
+- Polarization and A_eff are computed over the 3 × 2.4 µm physical window, with the PML
+  excluded. n_g shows Re n_g. See [mode identity](#mode-identity-with-an-open-boundary).
 - The note under the table adds “Leakage depends on what lies outside the window: shapes
   touching an open edge continue through the PML.” A closed run's note adds “For leakage, choose
   Open boundary in Physics › Optical modes.”
@@ -1340,11 +1340,13 @@ leakage out of the window.
 - When the two differ, a note reads “A counts material absorption only; B also counts leakage.
   Their difference is not a leakage loss.”
 - With an open run, the line above the table names each run *(closed)* or *(open, PML 1 µm)*.
-- **Matching is off** when either run is open. The table lists every mode of A and of B, not
-  matched, with “Matching with an open boundary comes in a later version.”, and the plots show
-  mode 1 of each run. The registered check (V13: the template, closed against open, both modes
-  matched with η ≥ 0.99 on the physical window) failed: η = 0.9903 for the TE-like mode and
-  0.9875 for the TM-like mode.
+- Matching with an open run is on (slice P3). It compares the fields on the common grid over
+  the intersection of the two runs' physical windows. Each matched row names its runs in the
+  header, for example *A · Run 1 (closed)* and *B · Run 2 (open, PML 1 µm)*. In slice P2 it was
+  off: the blind check V13 (closed against open, η ≥ 0.99) failed with η = 0.9903 for the TE-like
+  mode and 0.9875 for the TM-like mode. See
+  [mode identity](#mode-identity-with-an-open-boundary) for the diagnosis and the checks that
+  replaced it.
 
 **Files.**
 
@@ -1361,8 +1363,13 @@ leakage out of the window.
 - Such a run also keeps `open_boundary`, the engine's candidate record of its search, and
   `pml_check {"pml_strength": 6, "paired": [{"re", "im"} or null per mode]}` when the check ran.
   The digest covers both.
-- Its field implies the normalization above. It has no TE fractions, effective areas or group
-  index.
+- Its field implies the normalization above.
+- Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
+  `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
+  "im"}` with `group_index_method`. A closed run's `group_index` stays a list. A run written by
+  slice P2 has none of these keys. Studio computes its TE fraction and effective area from its
+  stored field over the window that its `open_boundary.physical_bounds` gives, and saves the
+  run as it was.
 - A [project file](#project-files) holds such a session as its workspace entry: its reader takes
   optical sessions of version 6, 7, 9 and 10.
 - A version 9 session does not hold inputs of version 9. Studio 4b58fb7 refuses a version 10
@@ -1404,6 +1411,91 @@ candidates, and a run (strength 3) searches 32.” or the open boundary's messag
     in loss, are far inside the default mesh's error of about 3 %;
 - Search near n_eff 1.600 with 4 modes on that case finds the mode near the cladding index,
   *1.48642654 + 7.92e-3i* / *2789 dB/cm*, as registered.
+
+### Mode identity with an open boundary
+
+Slice P3 gives an open run the TE fraction, the effective area, the group index and matching in
+Compare, all defined on its **physical window**. The physical window is the set of triangles whose
+centroid lies inside the engine's `physical_bounds`, the 3 × 2.4 µm window without the PML. There
+the saved centroid field is the physical E. For a closed run the physical window is the whole
+window, so every closed formula and value is unchanged.
+
+- **Polarization** (f_TE) uses the closed formula summed over the physical window. Its help
+  reads “TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML
+  excluded”.
+- **A_eff** is (Σ A_T |E|²)² / Σ A_T |E|⁴ over the same triangles. Its help reads “Effective area
+  over the 3 × 2.4 µm window, PML excluded. For a strongly leaking mode it depends on the
+  window.”
+- The engine writes both values (`mode_postprocessing`, `integration_region: "physical_window"`).
+  Studio uses the engine's values, and for a run saved by slice P2 computes the same numbers from
+  the stored field. *Run details* name the source: “computed by the engine (or by Studio) from the
+  saved field on the physical window (PML excluded)”.
+- **n_g** is complex with an open boundary; the column shows Re n_g. Its help adds “With an open
+  boundary n_eff and n_g are complex: Re n_g is shown; Im n_g …. At the default mesh n_g is
+  about 5e-3 low in the slab check; the error comes from n_eff and shrinks when the core mesh is
+  refined.” The PML check's solves leave the group index out.
+- **Compare** matches an open run on the intersection of the two physical windows. An open
+  sample is used only on a triangle of its physical window.
+
+**Validation** (`tests/simcase/test_open_boundary_mode_identity.py` and, for V11,
+`tests/simcase/test_open_boundary_group_index.py`; Linux, Python 3.12, one BLAS thread):
+
+| Check | Case and criterion | Result |
+|---|---|---|
+| V9 | template open against closed, \|Δf_TE\| ≤ 1e-3 | 1.70e-4 (TE-like 0.98166 → 0.98149), 1.5e-5 (TM-like): passed |
+| V9 | the V1 film (TE, PEC side walls) at × 1, ½, ¼: 1 − f_TE ≤ 1e-3 and decreasing; halvings blind | 5.70e-4, 2.76e-4, 1.08e-4: passed |
+| V10 | template open against closed, relative ΔA_eff ≤ 1e-2 | 7.2e-4, 9.9e-5: passed |
+| V12 | Studio's formula in Node against the engine's on the same samples, ≤ 1e-12 relative; blind | ≤ 3.4e-15 on the template (2,283 of 4,557 triangles in the window) and the strip over a substrate (11,591 of 40,658): passed. The window equals the solver's own physical mask |
+| V13a | open template against the same mesh with PEC at the outer edge, η ≥ 0.9999 | 1 − 4e-14, 1 − 2e-11: passed |
+| V13b | template closed against open at × 1, both modes paired with their own counterpart (η ≥ 0.8, margin ≥ 0.1) | 0.99033, 0.98754: passed |
+| V13c | TE-like 1 − η(closed, open) decreasing at × 1, ½, ¼ | 9.67e-3, 3.15e-3, 9.44e-4: passed. TM-like: 1.25e-2 at × 1; at × ½ and × ¼ the open run does not return the mode (the known issue below) |
+| V11a | dn_eff/dλ0 of the V1 film against refsol, ≤ 1e-3 relative at × 1, ½ and ¼ (decided after the result; first registered with “not growing”, which FAILED) | 5.61e-4, 7.29e-4, 7.29e-4: passed; the slope settles at a plateau (below) |
+| V11b | Re and Im n_g errors against refsol decreasing at × 1, ½, ¼ | Re 5.24e-3, 2.81e-3, 1.50e-3; Im 2.69 %, 1.06 %, 0.40 %: passed |
+| V11c | single-point n_g against the tracked sweep, ≤ 1e-12 relative | equal (relative difference 0): passed |
+
+- **V11 as first registered failed.** The gates were |ΔRe n_g| ≤ 1e-3 and Im within 2 % at
+  × 1, against refsol's central difference at 1549 and 1551 nm with physmat's dispersion,
+  3.706654 − 2.688e-4i. They sat below the default mesh's own n_eff error, which V1 gates only
+  at × ¼. V11a–c replaced them after that result.
+
+  | Mesh | Re n_eff error | Re n_g error | Im n_g error |
+  |---|---|---|---|
+  | × 1 | 4.76e-3 | 5.24e-3 | 2.69 % |
+  | × ½ | 2.18e-3 | 2.81e-3 | 1.06 % |
+  | × ¼ | 0.87e-3 | 1.50e-3 | 0.40 % |
+
+  The tracked sweep gives the same n_g. Almost all of the error is n_eff's.
+- **The plateau of dn_eff/dλ0 (V11a).** The FEM slope settles about 7.3e-4 (relative) from
+  refsol's, which is about 6e-4 in Re n_g, against 5.2e-3 at the default mesh. Cases tried at × ½
+  (relative slope error):
+
+  | Case | Slope error |
+  |---|---|
+  | shipped recipe, × ½ (× ¼) | 7.29e-4 (7.29e-4) |
+  | PML strength 6 instead of 3 | 7.29e-4 |
+  | PML 2 µm instead of 1 µm | 6.84e-4 |
+  | constant n for Si and SiO2 in both models | 6.82e-4 |
+  | a 2 nm step in both models | 7.29e-4 |
+  | far size and element size halved again | 1.18e-3 |
+  | refinement distance 2 µm | 1.15e-3 |
+
+  The offset does not change with the PML strength, the dispersion, the difference step or the
+  core mesh. It moves −6 % with a 2 µm PML. It grows above 1e-3 when the mesh away from the core
+  is refined, while n_eff comes closer to refsol. **Cause not found.** The 1e-3 gate holds on the
+  shipped mesh recipe, not on a refined cladding.
+- **V13 as first registered** (slice P2, η ≥ 0.99, blind) failed with 0.9903 and 0.9875. The
+  cause is the default mesh's discretization error, not the PML:
+  - two different meshes of one closed design differ as much (× 1 against × ½: 0.9933 and
+    0.9920);
+  - the common grid moves η by at most 6e-4 (spacing 15 to 3.75 nm).
+
+  V13a–c replaced the check after that result.
+- **Limitations.**
+  - On refined open meshes a lossless TM-like mode can be dropped. Its tiny Im n_eff comes out
+    with the wrong sign and the engine rejects it as `negative_imaginary_index`. The template's
+    TM-like mode is missing at × ½ and × ¼.
+  - A bent guide and the scalar formulation get none of these values.
+  - The effective area of a strongly leaking mode depends on the window.
 
 ### Optical session files (version 9)
 
