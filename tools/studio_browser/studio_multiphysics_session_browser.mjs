@@ -411,7 +411,7 @@ print(n)`;
   const a1 = await saveSession('template');
   assert.match(a1.name, /^heated-silicon-waveguide-session-\d{4}-\d\d-\d\d-\d{4}\.json$/);
   assert.match(await notice(), /^Session file heated-silicon-waveguide-session-.*\.json sent to your browser's Downloads: the model, 1 run and the without-heater result\.$/);
-  assert.match(await page.text('#autosave-status'), /^heated-silicon-waveguide-session-.*\.json · saved \d{1,2}:\d\d(?: [AP]M)? \(download\)$/);
+  assert.match(await page.text('#autosave-status'), /^heated-silicon-waveguide-session-.*\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
   await fetchReplies(a1.text);
   const openedA = await openSession(a1.path);
   assert.equal(openedA, `Opened ${basename(a1.path)}. Its results were read from the file, not recomputed; input undo starts here.`);
@@ -511,7 +511,8 @@ print(n)`;
     stage('O1 multiphysics Save after Save As', {first: first.name, second: second.name, message, footer});
     assert.match(second.name, /^heated-design(?: \(\d\))?\.json$/); assert.deepEqual(JSON.parse(second.text).runs.map(r => r.job), JSON.parse(first.text).runs.map(r => r.job), 'the same runs');
     assert.match(message, /^Downloaded heated-design\.json again: the model, 2 runs.*A download cannot replace the earlier file, so your browser may name it heated-design \(1\)\.json\.$/);
-    assert.match(footer, /^heated-design\.json · saved .+ \(download\)$/); }
+    assert.match(footer, /^heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.equal(await page.eval("document.getElementById('autosave-status').title"), 'Your browser may have added “ (1)” to the file name.'); }
   assert.equal(c2.text, c1.text, 'S1: the two-run file byte-identical');
   // the next run is numbered after the highest stored
   await runAndWait(3);
@@ -579,7 +580,7 @@ print(n)`;
   // which the box above does not list again; the record is the same as the file just saved, so the
   // card names that file with its save time, and the restored title says "same as file"
   // the session's own file name (the browser may give the download another name)
-  const r1Name = (await page.text('#autosave-status')).match(/^(\S+\.json) · saved /)?.[1];
+  const r1Name = (await page.text('#autosave-status')).match(/^(\S+\.json) · downloaded /)?.[1];
   assert.ok(r1Name, await page.text('#autosave-status'));
   await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(r1Name)}&&r.savedFile.current===true})`, 'record of the saved session', 30000);
   await page.call('Page.reload');
@@ -597,6 +598,10 @@ print(n)`;
   await clearNotice(); await page.click('#resume-heated-waveguide');
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'heated card restored');
   assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
+  // round 14 (Q3): the file the restored record still matched is the current file: Save As suggests it
+  await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog').open", 'Q3 Save As after a restore');
+  assert.equal(await page.eval("document.getElementById('save-name-input').value"), r1Name, 'Q3 Save As prefill');
+  await page.click('#save-name-cancel'); await page.until("!document.getElementById('save-name-dialog').open", 'Q3 Save As cancelled');
   assert.equal(await page.text('#project'), `Multiphysics model / Recovered from this browser · same as file ${r1Name}`);
 
   // S8: three earlier sessions, from four pages that each edited the model

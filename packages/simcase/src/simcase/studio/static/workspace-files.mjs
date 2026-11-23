@@ -51,11 +51,12 @@ export function pickerOptions(suggestedName, handle = null) {
 // One file name per model: the name Save As or the Save name dialog chose, the file the picker
 // wrote, or the file File › Open read. scope names the model it belongs to (the open model and how
 // many opens, model switches and resets came before); any of those moves the scope on, so the
-// name, and a picker handle with it, is dropped. how: 'picker' (handle kept), 'download' or 'opened'.
+// name, and a picker handle with it, is dropped. how: 'picker' (handle kept), 'download', 'opened',
+// or 'recovered' (a browser restore whose record still matched the session file it names).
 
 /** The current file record, or null for a name the name dialog would not accept. */
 export function rememberFile({name, handle = null, how, scope}) {
-  if (typeof name !== 'string' || !/^[A-Za-z0-9._ ()-]{1,200}\.json$/i.test(name) || !['picker', 'download', 'opened'].includes(how)) return null;
+  if (typeof name !== 'string' || !/^[A-Za-z0-9._ ()-]{1,200}\.json$/i.test(name) || !['picker', 'download', 'opened', 'recovered'].includes(how)) return null;
   return {name, handle: how === 'picker' ? handle : null, how, scope};
 }
 /** The current file of the model whose scope is given, or null when it belongs to another one. */
@@ -77,6 +78,9 @@ export function saveRoute(file, {saveAs = false, picker = false} = {}) {
   if (!saveAs && file) return 'download';
   return 'ask';
 }
+/** The Save As name dialog's line on what later saves do (round 14). */
+export const LATER_SAVES_NOTE = 'Later saves download again under this name; your browser may add “ (1)”.';
+
 /** The sentence after a download under a name already downloaded: the browser cannot replace it. */
 export function downloadAgainNote(name) {
   return `A download cannot replace the earlier file, so your browser may name it ${String(name).replace(/\.json$/i, '')} (1).json.`;

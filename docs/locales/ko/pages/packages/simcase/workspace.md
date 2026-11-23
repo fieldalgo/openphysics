@@ -193,22 +193,26 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음) Messages에 *Session file … sent to your
    browser's Downloads*가 나오고, 저장 대화상자로 쓰기를 마치면 *Saved to …*가 나옵니다. 저장 표시는
    헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 현재 파일 이름과 상태가 나오며,
-   다음 편집이나 실행 전까지 *design-a.json · saved 03:42 (download)*(저장 대화상자로 쓴 뒤에는
-   *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since saved*(**File › Open…** 뒤에는
-   *· changed since opened*)입니다. 다음 **Save**는 묻지 않고 같은 이름으로 내려받습니다. **File › Export › Model file…**은 결과 없이
+   다음 편집이나 실행 전까지 *design-a.json · downloaded 03:42*(저장 대화상자로 쓴 뒤에는
+   *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since downloaded*(저장 대화상자로 쓴
+   뒤에는 *· changed since saved*, **File › Open…** 뒤에는 *· changed since opened*, 복원 뒤에는 *· changed
+   since restored*)입니다. 내려받은 뒤에는 헤더와 하단에 *Your browser may have added “ (1)” to the file
+   name.*이라는 title 텍스트가 붙고, Save As 이름 대화상자는 *Later saves download again under this name;
+   your browser may add “ (1)”.*이라고 알려 줍니다. 다음 **Save**는 묻지 않고 같은 이름으로 내려받습니다. **File › Export › Model file…**은 결과 없이
    모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 *Not saved to a file · kept for recovery in
    this browser*(기록 중에는 *· updating browser recovery*, 쓸 수 없으면 *· browser recovery
-   unavailable*), 세션 파일 저장 뒤 바뀌었으면 *design-a.json · changed since saved · kept for
+   unavailable*), 세션 파일 저장 뒤 바뀌었으면 *design-a.json · changed since downloaded · kept for
    recovery in this browser*가 표시됩니다. **File › Open…** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
    뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 노트북을 마지막으로 보낸 세션 파일이나
    연 세션 파일과, 노트북이 그 파일과 아직 같았는지를 함께 보관하므로 복구한 세션은 그 파일을 밝힙니다:
    같았으면 *Recovered from this browser · same as file …json*, 바뀌었으면 *Recovered from this browser
    (last sent to a file: … at 13:05; changed since)* 또는 *(opened from …json; changed since)*, 저장하거나 연
-   파일이 없으면 *· not saved to a file*. 이 제목과 저장 뒤의 *… · saved … (download)*는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
+   파일이 없으면 *· not saved to a file*. 그 파일과 아직 같았던 복원은 그 파일을 현재 파일로 삼으므로
+   **Save**는 바로 그 이름으로 내려받고 **Save As**는 그 이름을 제안합니다. 이 제목과 저장 뒤의 *… · downloaded …*(또는 *· saved …*)는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
    때까지 유지됩니다. 탭 클릭(**Library**, **Model**, **Connections**, **Results**, **Compare**), 고른 실행,
    Compare 선택, 장 보기는 변경이 아닙니다. 변경 뒤에는 제목이 무엇이 바뀌었는지 말합니다: 입력 편집이면
-   *design-a.json · changed since saved*(모델에 현재 파일이 없으면 *Unsaved inputs*), 실행이면
-   *design-a.json · changed since saved · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   *design-a.json · changed since downloaded*(모델에 현재 파일이 없으면 *Unsaved inputs*), 실행이면
+   *design-a.json · changed since downloaded · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
@@ -544,7 +548,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.” **File › Open…**은 이런
   파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
   runs.”). **File › Export › Model file…**은 문서만 모델 이름을 딴 모델 파일로 씁니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
-  browser”, “heated-silicon-waveguide-session-….json · saved 10:15 (download)”, “Opened …”, “Recovered from
+  browser”, “heated-silicon-waveguide-session-….json · downloaded 10:15”, “Opened …”, “Recovered from
   this browser”. 세션 파일에 없는 실행을 가진 모델을 떠나기 전(다른 모델 카드, 템플릿 다시 열기,
   파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave this model? 3 runs are only in this tab and in
   browser recovery. Save session first to keep them in a file.” 버튼은 **Cancel**, **Save session**,

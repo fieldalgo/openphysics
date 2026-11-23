@@ -344,7 +344,9 @@ Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440
 (`my run/<x>?`은 `my runx.json`으로 내려받음). 13차부터는 다운로드 경로에서 모델의 현재 파일 이름도
 확인합니다: Save As *design-a-ng*, Width 편집 뒤 Save와 Ctrl+S가 이름 대화상자 없이 `design-a-ng.json`으로
 다시 내려받음(바이트에 새 폭, Messages에 “ (1)” 안내와 함께 *Downloaded design-a-ng.json again*), 파일
-이름을 밝히는 헤더(*design-a-ng.json · changed since saved*, *· saved … (download)*), 그 이름으로 채워진
+이름을 밝히는 헤더(14차부터 *design-a-ng.json · downloaded …*와 *· changed since downloaded*, 그리고 picker
+경로에는 없는 title 텍스트 *Your browser may have added “ (1)” to the file name.*, Save As 대화상자의 줄
+*Later saves download again under this name; your browser may add “ (1)”.*), 그 이름으로 채워진
 Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이 됨(*Opened design-a-ng.json*, 이어서
 *· changed since opened*, Save가 이름을 유지), **Reset design**이 이름을 버려 Save가 모델 기반 이름으로
 묻는 것, 그리고 **File › Open…**으로 연 64 KiB 넘는 모델 파일이 *Model file exceeds 64 KiB*로 거부되는
@@ -370,8 +372,9 @@ results*도 확인합니다.
 waveguide 카드가 자기 가장 새 기록을 복원하고(위 상자는 그 기록을 나열하지 않음) 세션 파일의 저장 시각을 밝히는지,
 복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다. 13차부터는 Save As 이름
 뒤의 Save가 대화상자 없이 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
-*heated-design.json · saved … (download)*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
-유지하는지도 확인합니다.
+“ (1)” title 텍스트와 함께 *heated-design.json · downloaded …*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
+유지하는지도 확인합니다. 14차부터 두 스크립트는 제목이 *same as file X*인 복원이 X를 현재 파일로 삼는지(Save As가
+X를 제안함) 확인하고, workspace 스크립트는 입력 편집 뒤와 실행 이름을 바꾼 뒤 *X · changed since restored*를 확인합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

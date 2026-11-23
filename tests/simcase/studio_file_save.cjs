@@ -90,11 +90,11 @@ test('the picker is called before anything is awaited (inside the click)',()=>{
  const file=fakeFile('a.json');let called=false;const win=fakeWindow(async()=>{called=true;return file.handle;});
  F.saveToFile('x',{suggestedName:'a.json',win});assert.equal(called,true);
 });
-test('the save indicator names the file, and says "(download)" unless the save dialog wrote it',async()=>{
+test('the save indicator names the file, and says "downloaded" unless the save dialog wrote it',async()=>{
  const P=await import(STATIC+'workspace-persistence.mjs');
  const when=()=>'10:15',saved={name:'chosen.json',savedAt:'2026-11-23T10:15:00Z',current:true};
  assert.equal(P.persistenceTitle({saved:{...saved,written:true}},when),'chosen.json · saved 10:15');
- assert.equal(P.persistenceTitle({saved},when),'chosen.json · saved 10:15 (download)');
+ assert.equal(P.persistenceTitle({saved},when),'chosen.json · downloaded 10:15');
 });
 test('a failed write to a file just chosen does not claim the file is unchanged',async()=>{
  const file=fakeFile('picked.json','OLD');file.failNext=new DOMException('Disk full','QuotaExceededError');
@@ -118,6 +118,13 @@ test('the current file is remembered for its model and dropped on another scope'
  assert.equal(F.rememberFile({name:'a.json',how:'other',scope:'s'}),null);
  assert.equal(F.rememberFile({name:'a.json',how:'opened',handle:{},scope:'s'}).handle,null);
  const h={};assert.equal(F.rememberFile({name:'a.json',how:'picker',handle:h,scope:'s'}).handle,h);
+ // round 14 (Q3): a restored record that still matched its file makes it current, without a handle:
+ // Save downloads under it at once and Save As suggests it
+ const back=F.rememberFile({name:'waveguide-designs-A-B.json',how:'recovered',handle:{},scope:'s'});
+ assert.deepEqual([back.how,back.handle],['recovered',null]);
+ assert.equal(F.saveRoute(back),'download');assert.equal(F.saveRoute(back,{saveAs:true}),'ask');
+ assert.equal(F.suggestedSaveName(back,'optical-waveguide-session.json'),'waveguide-designs-A-B.json');
+ assert.equal(F.LATER_SAVES_NOTE,'Later saves download again under this name; your browser may add “ (1)”.');
  // the name a save suggests: the current file's, else the model-based one
  assert.equal(F.suggestedSaveName(a,'optical-waveguide-session-2026-11-23-0342.json'),'design-a-ng.json');
  assert.equal(F.suggestedSaveName(null,'optical-waveguide-session-2026-11-23-0342.json'),'optical-waveguide-session-2026-11-23-0342.json');
@@ -147,10 +154,23 @@ test('saveToFile: a known name without a picker is downloaded as is; the picker 
 test('the header names the current file and its state; "Unsaved inputs" only without a name',async()=>{
  const P=await import(STATIC+'workspace-persistence.mjs'),when=()=>'03:42';
  const saved={name:'design-a-ng.json',savedAt:'2026-11-23T03:42:00Z',current:true};
- assert.equal(P.persistenceTitle({saved,file:'design-a-ng.json'},when),'design-a-ng.json · saved 03:42 (download)');
+ assert.equal(P.persistenceTitle({saved,file:'design-a-ng.json'},when),'design-a-ng.json · downloaded 03:42');
  assert.equal(P.persistenceTitle({saved:{...saved,written:true},file:'design-a-ng.json'},when),'design-a-ng.json · saved 03:42');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false,file:'design-a-ng.json'},when),'design-a-ng.json · changed since saved');
- assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,recovery:'kept',file:'design-a-ng.json'},when),'design-a-ng.json · changed since saved · kept for recovery in this browser');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false,file:'design-a-ng.json'},when),'design-a-ng.json · changed since downloaded');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,recovery:'kept',file:'design-a-ng.json'},when),'design-a-ng.json · changed since downloaded · kept for recovery in this browser');
+ // round 14 (Q1, Q3): the word after "changed since" follows how the file became current
+ const changed={saved:{...saved,current:false},clean:false,file:'design-a-ng.json'};
+ assert.equal(P.persistenceTitle({...changed,fileHow:'download'},when),'design-a-ng.json · changed since downloaded');
+ assert.equal(P.persistenceTitle({...changed,saved:{...changed.saved,written:true},fileHow:'picker'},when),'design-a-ng.json · changed since saved');
+ assert.equal(P.persistenceTitle({...changed,fileHow:'recovered'},when),'design-a-ng.json · changed since restored');
+ assert.equal(P.persistenceTitle({clean:false,file:'x.json',fileHow:'opened'},when),'x.json · changed since opened');
+ // the title text on the download path only
+ assert.equal(P.DOWNLOAD_NAME_HINT,'Your browser may have added “ (1)” to the file name.');
+ assert.equal(P.persistenceHint({saved,file:'design-a-ng.json',fileHow:'download'}),P.DOWNLOAD_NAME_HINT);
+ assert.equal(P.persistenceHint({...changed,fileHow:'download'}),P.DOWNLOAD_NAME_HINT);
+ assert.equal(P.persistenceHint({saved:{...saved,written:true},file:'design-a-ng.json',fileHow:'picker'}),'');
+ assert.equal(P.persistenceHint({clean:false,file:'x.json',fileHow:'opened'}),'');
+ assert.equal(P.persistenceHint({clean:false}),'');
  const opened={kind:'opened',name:'design-a-ng.json',current:true,file:'design-a-ng.json',fileCurrent:true};
  assert.equal(P.persistenceTitle({loaded:opened,file:'design-a-ng.json'},when),'Opened design-a-ng.json');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false,file:'design-a-ng.json'},when),'design-a-ng.json · changed since opened');

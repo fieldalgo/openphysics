@@ -409,7 +409,10 @@ name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`
 it checks the model's current file name on the download path: Save As *design-a-ng*, a Width edit,
 then Save and Ctrl+S downloading under `design-a-ng.json` again with no name dialog (the bytes
 holding the new width, Messages saying *Downloaded design-a-ng.json again* with the “ (1)” note),
-the header naming the file (*design-a-ng.json · changed since saved*, *· saved … (download)*),
+the header naming the file (since round 14 *design-a-ng.json · downloaded …* and *· changed since
+downloaded*, with the title text *Your browser may have added “ (1)” to the file name.*, which the
+picker path does not have, and the Save As dialog's line *Later saves download again under this
+name; your browser may add “ (1)”.*),
 Save As prefilled with it, **File › Open…** of that file setting it (*Opened design-a-ng.json*,
 then *· changed since opened*, and Save keeping the name), **Reset design** dropping it so Save asks
 with the model-based name, and a model file over 64 KiB opened through **File › Open…** refused
@@ -442,8 +445,10 @@ waveguide card restores its own newest record after a reload (the box above not 
 naming the session file's save time, the restored title reads *same as file …*, and the
 Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
 name downloading under it again with no dialog (*Downloaded heated-design.json again*, the footer
-*heated-design.json · saved … (download)*), and Save after an opened model or session file keeping
-that file's name.
+*heated-design.json · downloaded …* with the “ (1)” title text), and Save after an opened model or
+session file keeping that file's name. Since round 14 both scripts check that a restore whose title
+reads *same as file X* makes X the current file: Save As suggests X (the workspace script then
+reads *X · changed since restored* after an input edit and after a run is renamed).
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

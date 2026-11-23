@@ -46,7 +46,16 @@ export function persistenceTitle(state,when){
 // loaded.file: the session file a notebook was opened from (or that its recovery record names as
 // opened), and loaded.fileCurrent whether the inputs and runs were still that file's. "Current"
 // counts the model inputs and the runs only: a selected run, a page or a field view is not a change.
-function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null,file:current=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// The title text (tooltip) of the indicator on the download path: the browser, not Studio, names
+// a downloaded file, and may have added " (1)" (round 14). '' elsewhere.
+export const DOWNLOAD_NAME_HINT='Your browser may have added “ (1)” to the file name.';
+export function persistenceHint(state){
+ return /· downloaded |· changed since downloaded/.test(titleOf(state,()=>''))?DOWNLOAD_NAME_HINT:'';
+}
+// The word after "changed since" for the current file, by how it became current: the save dialog
+// wrote it (saved), a download (downloaded), File › Open (opened) or a browser restore (restored).
+const SINCE=Object.freeze({picker:'saved',download:'downloaded',opened:'opened',recovered:'restored'});
+function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null,file:current=null,fileHow=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
  const problem=runsUnsaved||saved||loaded?.current?(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:''):'';
@@ -58,12 +67,13 @@ function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=n
   // the last session file is history: the session came from browser recovery, not from that file
   return 'Recovered from this browser'+(saved?` (last sent to a file: ${saved.name} at ${when(saved.savedAt)}; changed since)`:loaded.file?` (opened from ${loaded.file}; changed since)`:runsUnsaved?' · not saved to a file':'')+problem;
  }
- // the current file's name first, then its state: "x.json · saved 03:42", with " (download)" when
- // the browser was handed a download (written: the browser's save dialog wrote it, File › Save As)
- if(saved?.current)return `${saved.name} · saved ${when(saved.savedAt)}${saved.written?'':' (download)'}`+problem;
+ // the current file's name first, then its state: "x.json · saved 03:42" when the browser's save
+ // dialog wrote it (written), "x.json · downloaded 03:42" when the browser was handed a download,
+ // which Studio cannot see it keep under that name (round 14)
+ if(saved?.current)return `${saved.name} · ${saved.written?'saved':'downloaded'} ${when(saved.savedAt)}`+problem;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
  // current: the model's current file (saved to, or opened), whose name File › Save uses again
- if(current){const since=saved?.name===current?'saved':'opened';
+ if(current){const since=SINCE[fileHow]||(saved?.name===current?(saved.written?'saved':'downloaded'):'opened');
   return `${current} · changed since ${since}`+(runsUnsaved?' · '+browser:problem);}
  const file=saved?`${saved.name} (${when(saved.savedAt)})`:loaded?.file||null;
  if(runsUnsaved)return (file?`Changed since session file ${file}`:'Not saved to a file')+' · '+browser;

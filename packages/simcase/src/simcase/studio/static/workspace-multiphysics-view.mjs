@@ -14,7 +14,7 @@ import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsName
  mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
  runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,RANKING_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
-import {persistenceTitle,sessionFileName} from './workspace-persistence.mjs';
+import {persistenceTitle,persistenceHint,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
  MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView} from './workspace-multiphysics-session.mjs';
 
@@ -531,11 +531,12 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const editedSinceOpen=()=>signature()!==openedSignature;
  function indicator(){
   return {clean:signature()===cleanSignature||(!cleanSignature&&!editedSinceOpen()),runsUnsaved:(runs.length>0||editedSinceOpen())&&!sessionCurrent(),
-   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),written:sessionFile.written===true}:null,file:ctx.currentFileName?.()||null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
+   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),written:sessionFile.written===true}:null,file:ctx.currentFileName?.()||null,fileHow:ctx.currentFileHow?.()||null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
    // a template just opened, not yet edited, run, saved or opened
    fresh:freshSignature!==null&&signature()===freshSignature&&!runs.length&&!sessionFile&&!loaded};
  }
  function saveState(){return persistenceTitle({...indicator(),recovery:ctx.recoveryState?.()||null});}
+ function saveHint(){return persistenceHint({...indicator(),recovery:ctx.recoveryState?.()||null});}
  // Save session: the file if it fits; else the §2 dialog, or the refusal that names the run
  // saveAs: File › Save As (ask for a file); else Save (the file Save As chose, or ask). The
  // file is written, or downloaded, before anything is marked saved; a cancel marks nothing.
@@ -642,7 +643,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  return {active:()=>active,open,openText,openTemplate,openSession,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
   setBaseline:on=>{baselineOption=!!on;refreshRun();ctx.onHistory();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
-  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,
+  title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,saveHint,
   // what leaving would lose: the runs no session file holds
   unsavedRuns:()=>active?unsavedRuns():0,edited:()=>active&&editedSinceOpen(),runCount:()=>active?runs.length:0,modelName:()=>doc?.name||'this model',
   // for checks: the current document, the shown result and the run list
