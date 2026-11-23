@@ -135,7 +135,8 @@ function cardSlot(button,offer,key){
 // their restore offers stay in the first screen; the project line heads the page in its view title
 // row. Rename takes 1 to 80 characters with no control characters; an empty name is refused by
 // name, and the field shows the name kept. project: {name, onRename(value) -> accepted}.
-export const RENAME_NOTE='The name is written to the project file on the next File › Save. Save As does not rename a named project.';
+// Round 16: a name taken from a file name follows Save As; a name set here stays.
+export const RENAME_NOTE='The name is written to the project file on the next File › Save. A name set here stays when Save As uses another file name.';
 function projectNameForm(project){
  const form=document.createElement('form');form.id='project-name-form';form.className='project-name';
  const label=document.createElement('label');label.htmlFor='project-name-input';label.textContent='Project name';

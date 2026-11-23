@@ -105,3 +105,15 @@ test('S3: a picked or named pair is kept when new runs come; otherwise the two n
  assert.ok(app.includes("line.append(`Run ${n} is newer than this pair · `)")&&app.includes("swap.textContent=`Compare Run ${n} with B`;"));
 });
 
+test('S6: a project name from a file name follows Save As; a name set with Rename stays',async()=>{
+ const P=await import(STATIC+'workspace-project-file.mjs'),A=await import(STATIC+'workspace-applications.mjs');
+ assert.equal(P.savedProjectName({},'waveguide-AB.json'),'waveguide-AB');
+ assert.equal(P.savedProjectName({name:'waveguide-AB',from:'file'},'design-a-ng.json'),'design-a-ng');
+ assert.equal(P.savedProjectName({name:'Heater study',from:'user'},'design-a-ng.json'),'Heater study');
+ assert.equal(P.nameSource('design-a-ng','design-a-ng.json'),'file');assert.equal(P.nameSource('Heater study','heater-study.json'),'user');
+ assert.equal(A.RENAME_NOTE,'The name is written to the project file on the next File › Save. A name set here stays when Save As uses another file name.');
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("project.name=name;project.nameFrom='user';refreshPersistence();"));
+ assert.ok(app.includes("resetProject({name:read.name,nameFrom:nameSource(read.name,fileName),"));
+});
+

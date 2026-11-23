@@ -175,7 +175,11 @@ the **Project name** field with **Rename** sits at the right of its **Open file�
 the cards and their restore offers stay in the first screen): 1 to 80 characters, no control characters, trimmed; an empty name is
 refused by name and the field shows the name kept. A rename is written on the next File › Save. An
 untitled project takes the chosen file's name without `.json` when it is first saved (`design-a-ng.json`
-names it *design-a-ng*); Save As does not rename a named project.
+names it *design-a-ng*). A name that came from a file name follows the file: Save As to
+`design-b.json` names the project *design-b*, and the header and the Open notice use that name. A
+name set with **Rename** stays when Save As uses another file name. Opening a project file whose
+name is its file name without `.json` counts as a name from a file; any other name as a name set
+with Rename. The file format (`name`) is unchanged.
 
 **Switching models.** Choosing another card keeps every model in the tab: the card of a model in the
 project but not shown reads *In this project · N runs*, and choosing it shows that model as it was

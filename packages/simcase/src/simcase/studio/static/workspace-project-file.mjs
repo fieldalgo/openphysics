@@ -61,6 +61,14 @@ export function nameFromFile(fileName){
  const stem=String(fileName??'').replace(/\.json$/i,'').replace(CONTROL,'').trim();
  try{return validateProjectName([...stem].slice(0,NAME_LIMIT).join(''));}catch{return UNTITLED_PROJECT;}
 }
+/** Where a project name came from (round 16): 'file' when it is a file's stem (an untitled
+ * project's first save, or an opened file whose name is its stem), 'user' for a name set with
+ * Rename or one an opened file holds that is not its stem. */
+export const nameSource=(name,fileName)=>name===nameFromFile(fileName)?'file':'user';
+/** The project name a save writes into `fileName` (round 16): a name the user set stays; a name
+ * that came from a file name (or none) follows the file, so Save As to design-b.json names the
+ * project design-b. The file format's `name` is unchanged. */
+export function savedProjectName({name=null,from=null},fileName){return name&&from==='user'?name:nameFromFile(fileName);}
 /** The text a session object's own writer gives: versions 6 and 7 through JSON.stringify, as Studio
  * writes version 7; every other version through sessionJson (versions 8 and 9: negative zero kept). */
 export function sessionWriterText(session){
