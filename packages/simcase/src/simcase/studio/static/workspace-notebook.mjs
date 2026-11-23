@@ -93,11 +93,11 @@ export function csvCell(value){const text=String(value);const safe=typeof value=
 // The columns up to origin are the earlier table's, in place: effective_index [1] is Re n_eff. Two
 // columns follow: effective_index_imag [1], Im n_eff (exp(-iωt); a run of this tab keeps it in
 // effective_index_im; 0 for a lossless run, whose n_eff is real), and group_index [1], n_g of a run with the group index ('' when the run has none
-// or the mode has no value).
+// or the mode has no value; Re n_g for an open run, whose n_g is complex).
 export function runTableCsv(runs){
  const rows=[['job','name','pinned','completed_at','core_width [m]','core_height [m]','vacuum_wavelength [m]','core_element_size [m]','core_material','shapes','candidate','effective_index [1]','origin','effective_index_imag [1]','group_index [1]']];
  for(const r of runs){const shapes=r.input.model.shapes,single=shapes.length===1&&shapes[0].type==='rect'?shapes[0]:null;
-  const e=r.effective_index,re=Array.isArray(e)?e:e.re,im=Array.isArray(e)?(Array.isArray(r.effective_index_im)?r.effective_index_im:null):e.im,ng=Array.isArray(r.group_index)?r.group_index:null;
+  const e=r.effective_index,re=Array.isArray(e)?e:e.re,im=Array.isArray(e)?(Array.isArray(r.effective_index_im)?r.effective_index_im:null):e.im,ng=Array.isArray(r.group_index)?r.group_index:Array.isArray(r.group_index?.re)?r.group_index.re:null;
   re.forEach((n,i)=>rows.push([r.job,r.label||'',r.pinned===true,r.completedAt,si(single?single.w:'',-9),si(single?single.h:'',-9),si(r.input.model.wavelength,-9),si(r.input.model.coreMesh,-9),single?single.material:'',shapes.map(shapeText).join(' | '),i+1,n,r.origin,im?im[i]:0,ng&&Number.isFinite(ng[i])?ng[i]:'']));}
  return rows.map(row=>row.map(csvCell).join(',')).join('\n')+'\n';
 }
@@ -141,10 +141,20 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  // the engine's values per mode (version 9 and this tab); a version 7 file holds none
  const extra={};
  if(format!==7){
-  for(const [key,ok,text] of [['te_polarization_fraction',x=>x>=0&&x<=1,'TE fractions'],['effective_area',x=>x>0,'effective areas'],['group_index',()=>true,'group indices']]){
+  for(const [key,ok,text] of [['te_polarization_fraction',x=>x>=0&&x<=1,'TE fractions'],['effective_area',x=>x>0,'effective areas']]){
    if(record[key]===undefined)continue;
    if(!valueList(record[key],k,ok))throw new Error(`${which}: invalid saved ${text}.`);
    extra[key]=[...record[key]];
+  }
+  // n_g: k numbers or null; complex for an open run ({re, im} in a file, group_index and
+  // group_index_im on a run of this tab), each mode null in both parts or in neither
+  if(record.group_index!==undefined){
+   const g=record.group_index,bad=()=>{throw new Error(`${which}: invalid saved group indices.`);};
+   let gre=g,gim=null;
+   if(isObject(g)){if(format===null||Object.keys(g).join()!=='re,im')bad();gre=g.re;gim=g.im;}
+   else if(format===null&&record.group_index_im!==undefined)gim=record.group_index_im;
+   if(!valueList(gre,k,()=>true)||(gim!==null&&(!valueList(gim,k,()=>true)||gre.some((x,i)=>(x===null)!==(gim[i]===null)))))bad();
+   extra.group_index=[...gre];if(gim!==null)extra.group_index_im=[...gim];
   }
   if(record.group_index_method!==undefined){
    if(extra.group_index===undefined||typeof record.group_index_method!=='string'||!METHOD.test(record.group_index_method))throw new Error(`${which}: invalid group index method.`);
@@ -154,13 +164,14 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  // an open run: the engine's candidate record (each mode one of its selected candidates), no
  // group index, and the PML check when it ran; a closed run has neither
  if(settings.adapter===OPEN_ADAPTER){
-  if(extra.group_index!==undefined)throw new Error(`${which}: a run with an open boundary has no group index.`);
+  if(extra.group_index!==undefined&&extra.group_index_im===undefined)throw new Error(`${which}: a run with an open boundary has a complex group index.`);
   if(im===null)throw new Error(`${which}: a run with an open boundary has complex effective indices.`);
   const ob=checkCandidateRecord(record.open_boundary,which);
   if(modeCandidates(ob,re,im).some(c=>c===null))throw new Error(`${which}: its modes are not the selected candidates of its open boundary record.`);
   extra.open_boundary=ob;
   if(record.pml_check!==undefined)extra.pml_check=checkPmlCheck(record.pml_check,k,which);
  }else if(record.open_boundary!==undefined||record.pml_check!==undefined)throw new Error(`${which}: a closed window has no open boundary record.`);
+ else if(extra.group_index_im!==undefined)throw new Error(`${which}: a closed window has a real group index.`);
  const f=record.field;let field=null;
  if(f==null){
   // only a version 9 file leaves fields out (absent there; null on a run read from one)
@@ -184,14 +195,17 @@ export function engineRunValues(summary,k){
 }
 /** The engine's group index of a new result (summary.group_index with group_index_method, the
  * single-study option results.group_index): {group_index: k numbers or null, group_index_method:
- * "central_difference <step> <tracker>"}, or {} when the summary has none. */
+ * "central_difference <step> <tracker>"}, with group_index_im (k numbers or null) when n_g is
+ * complex (an open boundary), or {} when the summary has none. */
 export function engineGroupIndex(summary,k){
  const g=summary?.group_index,m=summary?.group_index_method;
- if(!m||m.method!=='central_difference'||g?.unit!=='1'||!valueList(g.values?.[0],k,()=>true))return {};
+ const complex=Array.isArray(g?.re)&&Array.isArray(g?.im),values=complex?g.re[0]:g?.values?.[0];
+ if(!m||m.method!=='central_difference'||g?.unit!=='1'||!valueList(values,k,()=>true))return {};
+ if(complex&&(!valueList(g.im[0],k,()=>true)||values.some((x,i)=>(x===null)!==(g.im[0][i]===null))))return {};
  const step=m.wavelength_step;
  if(step?.unit!=='m'||!(step.value>0)||typeof m.tracking!=='string'||!/^[a-z0-9-]{1,40}$/.test(m.tracking))return {};
  const method=`central_difference ${+(step.value*1e9).toPrecision(6)} nm ${m.tracking}`;
- return METHOD.test(method)?{group_index:[...g.values[0]],group_index_method:method}:{};
+ return METHOD.test(method)?{group_index:[...values],...(complex?{group_index_im:[...g.im[0]]}:{}),group_index_method:method}:{};
 }
 /** The engine's reason of each null group index of a new result (summary.group_index_method.reasons):
  * k strings or null, or null. Kept on the run in this tab only: a session file does not hold them. */
@@ -208,7 +222,7 @@ export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.
  * left out when keepField is false (the TE fractions and areas the run shows are then written),
  * and the digest of the record. */
 function sessionRun(run,version=SESSION_VERSION,keepField=true){
- const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_method,open_boundary,pml_check,...record}=validateRun(run);
+ const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_im,group_index_method,open_boundary,pml_check,...record}=validateRun(run);
  const fields=field&&{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag};
  if(version===SESSION_VERSION)return {...record,settings:v7Settings(record.settings),field:fields};
  const settings=record.settings.adapter===V7_ADAPTER?{...record.settings,adapter:OPTICAL_ADAPTER}:record.settings;
@@ -218,7 +232,7 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true){
  if(keepField&&fields)out.field=fields;
  if(te_polarization_fraction||shown)out.te_polarization_fraction=shown?shown.te:te_polarization_fraction;
  if(effective_area||shown)out.effective_area=shown?shown.area:effective_area;
- if(group_index)out.group_index=group_index;
+ if(group_index)out.group_index=group_index_im?{re:group_index,im:group_index_im}:group_index;
  if(group_index_method!==undefined)out.group_index_method=group_index_method;
  if(open_boundary)out.open_boundary=open_boundary;
  if(pml_check)out.pml_check=pml_check;

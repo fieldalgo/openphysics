@@ -1,7 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {formatIndex} from './workspace-compare.mjs';
-import {isOpenRun,LATER_TITLE} from './workspace-open-run.mjs';
+import {isOpenRun,NO_WINDOW_TITLE} from './workspace-open-run.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -32,21 +32,38 @@ export function lossColumn({open=false,lossless=false}={}){
 export const PAIR_TOLERANCE=1e-3;
 const PAIR_TEXT='1e-3';
 export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TEXT}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
-export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field',file:'saved in the session file; its fields were not kept',open:'not computed for an open boundary: '+LATER_TITLE.toLowerCase()});
+export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field',file:'saved in the session file; its fields were not kept',
+ engineWindow:'computed by the engine from the saved field on the physical window (PML excluded)',studioWindow:'computed by Studio from the saved field on the physical window (PML excluded)',noWindow:NO_WINDOW_TITLE.toLowerCase()});
 export const RUN_AGAIN='Run again to compute';
 export const AREA_HELP='Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components';
 export const AREA_PAIR_NOTE='A member of a degenerate pair: its effective area depends on the rotation within the pair, which any solution may choose.';
 export const SCALAR_AREA_HELP='Effective area (∫|φ|²)²/∫|φ|⁴ of the scalar mode field over the window';
 export const AREA_MEAN_NOTE='Mean of the pair members: each member’s effective area is defined only up to a rotation within the pair.';
 
-/** f_TE of one mode: Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²) over every triangle, with A_T from the
- * node coordinates (any length unit) and |E|² = re² + im², written as the engine writes it.
+/** The physical window of an open run: for each triangle, whether its centroid (p0 + p1 + p2) / 3
+ * lies inside bounds [[x0, y0], [x1, y1]] (the engine's physical_bounds, the coordinates' unit),
+ * the bounds included; written as the engine writes it (simcase.mode_postprocessing.physical_window). */
+export function physicalWindow(field,bounds){
+ const X=field.node_coordinates,[[x0,y0],[x1,y1]]=bounds;
+ return field.triangles.map(t=>{const cx=(X[t[0]][0]+X[t[1]][0]+X[t[2]][0])/3,cy=(X[t[0]][1]+X[t[1]][1]+X[t[2]][1])/3;return cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1;});
+}
+/** The physical bounds [[x0, y0], [x1, y1]] in metres of an open run's candidate record
+ * (physical_bounds, {unit: 'm', values}), or null when it has none that is valid. */
+export function physicalBounds(record){
+ const b=record?.physical_bounds,v=b?.values;
+ if(b?.unit!=='m'||!Array.isArray(v)||v.length!==2||!v.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))return null;
+ return v[0][0]<v[1][0]&&v[0][1]<v[1][1]?[[v[0][0],v[0][1]],[v[1][0],v[1][1]]]:null;
+}
+/** f_TE of one mode: Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²) over every triangle (or over those of
+ * `window`, physicalWindow's list, for an open run), with A_T from the node coordinates (any length
+ * unit) and |E|² = re² + im², written as the engine writes it.
  * field: {node_coordinates, triangles, real, imag}, real/imag[mode][triangle] = [x, y, z].
  * null when the mode has no transverse field. */
-export function teFraction(field,mode){
+export function teFraction(field,mode,window=null){
  const X=field.node_coordinates,re=field.real[mode],im=field.imag[mode];
  let num=0,den=0;
  field.triangles.forEach((t,i)=>{
+  if(window&&!window[i])return;
   const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]];
   const area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
   const ex=re[i][0]*re[i][0]+im[i][0]*im[i][0],ey=re[i][1]*re[i][1]+im[i][1]*im[i][1];
@@ -55,13 +72,15 @@ export function teFraction(field,mode){
  den+=num;
  return den>0?num/den:null;
 }
-/** A_eff of one mode: (Σ A_T |E_T|²)² / Σ A_T |E_T|⁴ over every triangle, |E|² = |E_x|² + |E_y|² +
- * |E_z|², in the node coordinates' unit squared (metres for Studio runs), written as the engine
- * writes it (simcase.mode_postprocessing.effective_area). null when the mode has no field. */
-export function effectiveArea(field,mode){
+/** A_eff of one mode: (Σ A_T |E_T|²)² / Σ A_T |E_T|⁴ over every triangle (or those of `window`),
+ * |E|² = |E_x|² + |E_y|² + |E_z|², in the node coordinates' unit squared (metres for Studio runs),
+ * written as the engine writes it (simcase.mode_postprocessing.effective_area). null when the mode
+ * has no field. */
+export function effectiveArea(field,mode,window=null){
  const X=field.node_coordinates,re=field.real[mode],im=field.imag[mode];
  let num=0,den=0;
  field.triangles.forEach((t,i)=>{
+  if(window&&!window[i])return;
   const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]];
   const area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
   const r=re[i],m=im[i],d=(r[0]*r[0]+m[0]*m[0])+(r[1]*r[1]+m[1]*m[1])+(r[2]*r[2]+m[2]*m[2]);
@@ -113,7 +132,7 @@ export const propagationLoss=(im,lambda0)=>40*Math.PI/Math.LN10*im/lambda0;
  * missing: the reason the fractions are absent ('' when they are present); areaMissing: the same
  * for the effective areas. One merged polarization cell per degenerate group, on its first row
  * with rowspan; each member keeps its own effective area, with a note. */
-export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP,open=false}={}){
+export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HELP,polarizationHelp=POLARIZATION_HELP,open=false}={}){
  const allLossless=modes.length>0&&modes.every(m=>m.im===0),column=lossColumn({open,lossless:allLossless});
  const close=new Set(degenerateGroups(modes.map(m=>m.re)).flat());
  // a group is merged only when each member has its fraction (a result without them keeps its reason)
@@ -129,7 +148,7 @@ export function modeTableRows(modes,{missing='',areaMissing='',areaHelp=AREA_HEL
    row.polarization={text:`${name} (n_eff within ${PAIR_TEXT}) · ${known?(mean*100).toFixed(0)+' % TE together':'—'}`,title:PAIR_TITLE,rowspan:g.length,pair:true,mean};
    return row;
   }
-  row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${polarizationShare(m.fte)}`,title:POLARIZATION_HELP,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};
+  row.polarization=Number.isFinite(m.fte)?{text:`${polarizationWord(m.fte)} · ${polarizationShare(m.fte)}`,title:polarizationHelp,rowspan:1,word:polarizationWord(m.fte)}:{text:'—',title:missing||'No transverse field',rowspan:1};
   return row;
  });
  return {rows,lossless:modes.some(m=>m.im===0),groups,loss:column};
@@ -154,6 +173,8 @@ export const OPTICAL_MATERIAL_DATA='physmat materials, evaluated at each wavelen
 export const GROUP_INDEX_HINT='Off · turn on in Study or Optical modes';
 /** Whether a run computed n_g (it has the engine's group_index). */
 export const hasGroupIndex=run=>Array.isArray(run?.group_index);
+// An open run's n_g is complex (its n_eff is): the cell shows Re n_g, its help Im n_g.
+export const OPEN_GROUP_INDEX_NOTE='With an open boundary n_eff and n_g are complex: Re n_g is shown';
 export const groupIndexKeptHelp=(step='1 nm')=>`Not matched at λ0 ± ${step}; the reason is not kept in session files`;
 /** The step of a run's group_index_method ("central_difference 1 nm electric-l2-assignment-v1"), or null. */
 export function groupIndexStep(method){const m=/^central_difference (\S+ (?:pm|nm|um|m)) \S+$/.exec(method??'');return m?m[1]:null;}
@@ -164,18 +185,24 @@ const methodStep=method=>groupIndexStep(method)??'1 nm';
 export function groupIndexCell(run,i){
  if(!Array.isArray(run.group_index))return {text:'—',value:null,title:GROUP_INDEX_OFF_HELP};
  const v=run.group_index[i],step=methodStep(run.group_index_method);
- if(Number.isFinite(v))return {text:v.toFixed(4),value:v,title:groupIndexHelp(step)};
+ const im=Array.isArray(run.group_index_im)?run.group_index_im[i]:null;
+ if(Number.isFinite(v))return {text:v.toFixed(4),value:v,title:groupIndexHelp(step)+(Number.isFinite(im)?`. ${OPEN_GROUP_INDEX_NOTE}; Im n_g ${im.toExponential(2)}`:'')};
  const reason=run.groupIndexReasons?.[i];
  return {text:'—',value:null,title:typeof reason==='string'&&reason?'Not matched: '+reason:groupIndexKeptHelp(step)};
 }
 /** The modes of an optical run (1 to 8 modes, real or complex indices, its vector samples or,
  * for a run of a file without fields, the values saved with it). f_TE and A_eff: the engine's
- * when they came with the run, else computed by Studio from the saved field. */
+ * when they came with the run, else computed by Studio from the saved field; for an open run on
+ * its physical window (the PML excluded), whose bounds its candidate record holds. */
 export function opticalModes(run){
  const keep=(key,values,source)=>Object.defineProperty(run,key,{value:{values,source},enumerable:false,configurable:true,writable:true});
  const source=run.field?'engine':'file';
- // an open run: its field extends into the PML, so no TE fraction or effective area yet (slice P3)
- if(isOpenRun(run)){if(!run.te)keep('te',run.effective_index.map(()=>null),'open');if(!run.area)keep('area',run.effective_index.map(()=>null),'open');}
+ if(isOpenRun(run)){
+  const bounds=physicalBounds(run.open_boundary),window=run.field&&bounds?physicalWindow(run.field,bounds):null;
+  const computed=(key,f)=>window?keep(key,run.effective_index.map((_,i)=>f(run.field,i,window)),'studioWindow'):keep(key,run.effective_index.map(()=>null),'noWindow');
+  if(!run.te)run.te_polarization_fraction?keep('te',run.te_polarization_fraction,run.field?'engineWindow':'file'):computed('te',teFraction);
+  if(!run.area)run.effective_area?keep('area',run.effective_area,run.field?'engineWindow':'file'):computed('area',effectiveArea);
+ }
  if(!run.te)run.te_polarization_fraction?keep('te',run.te_polarization_fraction,source):keep('te',run.effective_index.map((_,i)=>teFraction(run.field,i)),'studio');
  // a run without samples and without saved areas (a test may build one) has no A_eff
  if(!run.area)run.effective_area?keep('area',run.effective_area,source):keep('area',run.effective_index.map((_,i)=>run.field?effectiveArea(run.field,i):null),'studio');

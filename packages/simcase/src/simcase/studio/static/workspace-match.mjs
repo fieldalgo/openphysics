@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {degenerateGroups,physicalBounds,physicalWindow,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 import {isOpenRun,openLoss,LOSS_FLOOR,FLOOR_TEXT,FLOOR_HELP} from './workspace-open-run.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
@@ -28,9 +28,10 @@ export function fieldWindow(field){
 /** The common grid: cell centres of n_x × n_y cells over the intersection of the two windows,
  * n = min(cap, ceil(L / s)), so the spacing is at most s (or L / cap). null when the windows
  * do not overlap. */
-export function commonGrid(fieldA,fieldB,spacing,{cap=MAX_GRID_POINTS}={}){
+export function commonGrid(fieldA,fieldB,spacing,{cap=MAX_GRID_POINTS,windowA=null,windowB=null}={}){
  if(!(spacing>0))throw new Error('The grid spacing must be positive.');
- const a=fieldWindow(fieldA),b=fieldWindow(fieldB);
+ // an open run's window is its physical window ({x0, x1, y0, y1}), not its mesh with the PML
+ const a=windowA??fieldWindow(fieldA),b=windowB??fieldWindow(fieldB);
  const x0=Math.max(a.x0,b.x0),x1=Math.min(a.x1,b.x1),y0=Math.max(a.y0,b.y0),y1=Math.min(a.y1,b.y1);
  if(!(x1>x0&&y1>y0))return null;
  const nx=Math.max(1,Math.min(cap,Math.ceil((x1-x0)/spacing*(1-1e-12)))),ny=Math.max(1,Math.min(cap,Math.ceil((y1-y0)/spacing*(1-1e-12))));
@@ -100,7 +101,8 @@ export function bestAssignment(eta){
 }
 /**
  * Match the modes of runs A and B. Each side: {field: {node_coordinates (m), triangles, real,
- * imag}, neff: [Re n_eff, ...], coreSize: core element size in the coordinates' unit}.
+ * imag}, neff: [Re n_eff, ...], coreSize: core element size in the coordinates' unit, window:
+ * optional {x0, x1, y0, y1}, the window of the grid (default: the bounding box of the nodes)}.
  * options.spacing overrides ½ · min(coreSize); options.cap the 400 points per axis.
  * Returns {grid, points, unitsA, unitsB, eta (units × units), pairs: [{a, b, eta, accepted,
  * rowNext, columnNext, delta}], rows (per A unit: {unit, match|null, best}), unmatchedB
@@ -110,7 +112,7 @@ export function matchModes(A,B,{spacing=null,cap=MAX_GRID_POINTS}={}){
  const unitsA=modeUnits(A.neff),unitsB=modeUnits(B.neff);
  if(unitsA.length>MAX_MATCH_MODES||unitsB.length>MAX_MATCH_MODES)return {error:`Matching compares at most ${MAX_MATCH_MODES} modes per run.`};
  const s=spacing??0.5*Math.min(A.coreSize,B.coreSize);
- const grid=commonGrid(A.field,B.field,s,{cap});if(!grid)return {error:'The two runs\' windows do not overlap.'};
+ const grid=commonGrid(A.field,B.field,s,{cap,windowA:A.window??null,windowB:B.window??null});if(!grid)return {error:'The two runs\' windows do not overlap.'};
  const la=locate(A.field,grid),lb=locate(B.field,grid);
  const points=[];for(let p=0;p<la.length;p++)if(la[p]>=0&&lb[p]>=0)points.push(p);
  if(!points.length)return {error:'No grid point lies in both meshes.'};
@@ -164,22 +166,35 @@ export function noMatchText(side,unit,best){
 }
 
 // ---- Optical runs -----------------------------------------------------------------------
-const cache=new WeakMap();
+const cache=new WeakMap(),offCache=new WeakMap();
 // Matching with an open run on either side is off (slice P2, V13): on the template, a closed and an
 // open run gave overlaps of 0.9903 (TE-like) and 0.9875 (TM-like) on the physical window, below the
-// 0.99 registered. Every mode is then listed unmatched, each run with its own columns.
+// 0.99 registered. Every mode is then listed unmatched, each run with its own columns. Slice P3
+// diagnosed it (the default mesh's discretization error: two different meshes of one design, not the
+// PML) and keeps it off until the criterion recorded after that result is met: OPEN_MATCHING.
 export const MATCH_OPEN_TEXT='Matching with an open boundary comes in a later version';
+export const OPEN_MATCHING=false;
+/** The side of a run that matching reads: an open run's samples restricted to its physical window
+ * (the triangles whose centroid lies inside physical_bounds) and that window as the grid's; a
+ * closed run's samples as they are. null when an open run has no physical bounds. */
+export function matchSide(run){
+ const side={field:run.field,neff:run.effective_index,coreSize:run.input.model.coreMesh*1e-9};
+ if(!isOpenRun(run))return side;
+ const bounds=physicalBounds(run.open_boundary);if(!bounds)return null;
+ const inside=physicalWindow(run.field,bounds),keep=(list)=>list.filter((_,k)=>inside[k]);
+ return {...side,field:{node_coordinates:run.field.node_coordinates,triangles:keep(run.field.triangles),real:run.field.real.map(keep),imag:run.field.imag.map(keep)},window:{x0:bounds[0][0],x1:bounds[1][0],y0:bounds[0][1],y1:bounds[1][1]}};
+}
 /** The rows of two runs that are not matched: every unit of A, then every unit of B. */
 export function unmatchedModes(neffA,neffB){
  return {pairs:[],disabled:MATCH_OPEN_TEXT,rows:modeUnits(neffA).map(unit=>({unit,match:null,best:null})),unmatchedB:modeUnits(neffB).map(unit=>({unit,best:null}))};
 }
 /** The match of two optical runs (two-mode Studio runs, core mesh in nm, samples in metres),
  * kept per pair of run objects: a run's samples never change. With an open run on either side,
- * unmatchedModes. */
-export function opticalMatch(a,b){
- let byB=cache.get(a);if(!byB){byB=new WeakMap();cache.set(a,byB);}
- if(!byB.has(b)&&(isOpenRun(a)||isOpenRun(b)))byB.set(b,unmatchedModes(a.effective_index,b.effective_index));
- if(!byB.has(b))byB.set(b,matchModes({field:a.field,neff:a.effective_index,coreSize:a.input.model.coreMesh*1e-9},{field:b.field,neff:b.effective_index,coreSize:b.input.model.coreMesh*1e-9}));
+ * unmatchedModes unless `open` (OPEN_MATCHING by default): then on the physical windows. */
+export function opticalMatch(a,b,{open=OPEN_MATCHING}={}){
+ const off=!open&&(isOpenRun(a)||isOpenRun(b)),store=off?offCache:cache;
+ let byB=store.get(a);if(!byB){byB=new WeakMap();store.set(a,byB);}
+ if(!byB.has(b)){const A=off?null:matchSide(a),B=off?null:matchSide(b);byB.set(b,A&&B?matchModes(A,B):unmatchedModes(a.effective_index,b.effective_index));}
  return byB.get(b);
 }
 /** The polarization words of one unit of a run, as its modes table shows them. */

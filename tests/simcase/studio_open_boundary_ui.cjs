@@ -179,9 +179,16 @@ test('review: a check whose selected modes are all at or below 1.45 still pairs 
  const rec=R.checkResultRecord(result);
  assert.deepEqual(R.pairCheck([1.77],[1.36e-8],[rec]).paired,[{re:1.77,im:1.4e-8}]);
 });
-test('review: the group index box is locked only with an open edge',()=>{
- assert.equal(R.groupIndexLocked(R.openChoice()),true);assert.equal(R.groupIndexLocked(null),false);
- assert.equal(R.groupIndexLocked({edges:{left:'closed',right:'closed',bottom:'closed',top:'closed'}}),false);
+test('slice P3: the group index is no longer locked with an open edge; the PML check documents leave it out',()=>{
+ assert.equal(R.groupIndexLocked,undefined);assert.equal(R.GROUP_INDEX_OPEN_NOTE,undefined);
+ const doc={physics:{em1:{pml:{pml_strength:3,pml_search_mode_count:32},target_effective_index:2.46}},results:{plots:false,group_index:{wavelength_step:'1 nm'}}};
+ const docs=R.checkDocuments(doc,[2.4429,1.77]);
+ assert.deepEqual(docs.map(d=>d.results),[{plots:false},{plots:false}]);assert.deepEqual(doc.results.group_index,{wavelength_step:'1 nm'});
+ assert.deepEqual(docs.map(d=>[d.physics.em1.pml.pml_strength,d.physics.em1.target_effective_index]),[[6,2.4429],[6,1.77]]);
+});
+test('slice P3: the engine values of a new open result follow the modes Studio keeps',()=>{
+ assert.deepEqual(R.keptValues({te_polarization_fraction:[0.98,0.5,0.04],group_index:[4.19,null,3.73],group_index_im:[1e-10,null,1e-8],group_index_method:'central_difference 1 nm electric-l2-assignment-v1'},[0,2]),
+  {te_polarization_fraction:[0.98,0.04],group_index:[4.19,3.73],group_index_im:[1e-10,1e-8],group_index_method:'central_difference 1 nm electric-l2-assignment-v1'});
 });
 
 // -- Compare ----------------------------------------------------------------------------------

@@ -82,10 +82,19 @@ on the Whitney/P1 field (tests/simcase/test_mode_effective_area.py). For scalar 
 mass in the numerator). Each member of a degenerate pair has its own value, which depends on the
 rotation the mesh chose within the pair.
 
-Not computed: PML results (the saved transverse coefficients are covariant integrals in
-complex-stretched coordinates, so the lossless Poynting formula on the whole window is not the
-physical power and the window is not the physical one) and subspace sweeps (cluster frames, not
-modes). Those results gain no post-processing keys.
+Open boundary (PML). A vector PML result without a bend gets ``te_polarization_fraction`` and
+``effective_area`` only, by the same formulas summed over its physical window: the triangles whose
+centroid (p0 + p1 + p2) / 3 lies inside the result's ``physical_bounds`` (``physical_window``, the
+bounds included), from ``node_coordinates`` and ``physical_bounds`` in metres. There the saved
+centroid field is the physical E (the solver divides the stretched components by the coordinate
+factors, which are 1 there); the PML is excluded. Its ``mode_postprocessing`` holds those two keys
+and ``integration_region: "physical_window"``. For a closed window the physical window is the
+whole window, so the formulas are those above and no key is added.
+
+Not computed: power, confinement, overlaps and coupling of PML results (the saved transverse
+coefficients are covariant integrals in complex-stretched coordinates, so the lossless Poynting
+formula on the whole window is not the physical power), any value of a PML result with a bend
+or of a scalar PML result, and subspace sweeps (cluster frames, not modes). Those gain no keys.
 """
 
 from __future__ import annotations
@@ -100,7 +109,8 @@ from galerkin.kernels import (confinement_factor, coupling_efficiency, interpola
                               scalar_overlap, scalar_power, vector_power)
 
 __all__ = ["validate_mode_overlap", "gaussian_settings", "vector_postprocessing", "scalar_postprocessing",
-           "te_polarization_fraction", "effective_area", "stack_points", "summary_block"]
+           "te_polarization_fraction", "effective_area", "physical_window", "stack_points", "summary_block",
+           "open_summary_block", "PHYSICAL_WINDOW"]
 
 #: The one accepted post-processing input, ``results.mode_overlap``.
 _OVERLAP_KEYS = frozenset({"gaussian"})
@@ -244,19 +254,43 @@ def scalar_postprocessing(nodes, triangles, fields, regions, num_regions, gaussi
     return out
 
 
-def te_polarization_fraction(node_coordinates, triangles, electric) -> np.ndarray:
+def physical_window(node_coordinates, triangles, bounds) -> np.ndarray:
+    """The physical window of an open-boundary (PML) result: a mask (T,) of the triangles whose
+    centroid (p0 + p1 + p2) / 3 lies inside ``bounds`` = [[x0, y0], [x1, y1]] (the result's
+    ``physical_bounds``, in the coordinates' unit), the bounds included. Each term is written out so
+    that a reader in another language reproduces it exactly."""
+    x = np.asarray(node_coordinates, dtype=float)
+    t = np.asarray(triangles)
+    (x0, y0), (x1, y1) = np.asarray(bounds, dtype=float)
+    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
+    cx = (p0[:, 0] + p1[:, 0] + p2[:, 0]) / 3.0
+    cy = (p0[:, 1] + p1[:, 1] + p2[:, 1]) / 3.0
+    return (cx >= x0) & (cx <= x1) & (cy >= y0) & (cy <= y1)
+
+
+def _areas(node_coordinates, triangles, electric, window):
+    x = np.asarray(node_coordinates, dtype=float)
+    t = np.asarray(triangles)
+    e = np.asarray(electric)
+    if window is not None:
+        window = np.asarray(window, dtype=bool)
+        t, e = t[window], e[window]
+    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
+    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    return area, e
+
+
+def te_polarization_fraction(node_coordinates, triangles, electric, window=None) -> np.ndarray:
     """f_TE (M,) of one study point from the saved centroid field (module docstring).
 
     ``node_coordinates`` (N, 2), ``triangles`` (T, 3) and ``electric`` (T, M, 3), the complex
     E_x, E_y, E_z of each mode at each triangle centroid; the coordinates' length unit cancels.
-    A mode with no transverse field gives NaN. Each term is written out (|E|^2 = re^2 + im^2,
-    A_T = |cross| / 2) so that a reader in another language reproduces it to rounding.
+    ``window`` (T,) bool: sum over those triangles only (``physical_window`` of an open-boundary
+    result); None sums over every triangle. A mode with no transverse field gives NaN. Each term
+    is written out (|E|^2 = re^2 + im^2, A_T = |cross| / 2) so that a reader in another language
+    reproduces it to rounding.
     """
-    x = np.asarray(node_coordinates, dtype=float)
-    t = np.asarray(triangles)
-    e = np.asarray(electric)
-    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
-    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    area, e = _areas(node_coordinates, triangles, electric, window)
     ex = e[:, :, 0].real ** 2 + e[:, :, 0].imag ** 2
     ey = e[:, :, 1].real ** 2 + e[:, :, 1].imag ** 2
     num = area @ ex
@@ -265,7 +299,7 @@ def te_polarization_fraction(node_coordinates, triangles, electric) -> np.ndarra
         return np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
 
 
-def effective_area(node_coordinates, triangles, electric) -> np.ndarray:
+def effective_area(node_coordinates, triangles, electric, window=None) -> np.ndarray:
     """A_eff (M,) of one study point from the saved centroid field (module docstring), in the
     coordinates' length unit squared.
 
@@ -273,11 +307,7 @@ def effective_area(node_coordinates, triangles, electric) -> np.ndarray:
     out (|E|^2 = re^2 + im^2 per component, A_T = |cross| / 2) so that a reader in another language
     reproduces it to rounding.
     """
-    x = np.asarray(node_coordinates, dtype=float)
-    t = np.asarray(triangles)
-    e = np.asarray(electric)
-    p0, p1, p2 = x[t[:, 0]], x[t[:, 1]], x[t[:, 2]]
-    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    area, e = _areas(node_coordinates, triangles, electric, window)
     density = (e[:, :, 0].real ** 2 + e[:, :, 0].imag ** 2) + (e[:, :, 1].real ** 2 + e[:, :, 1].imag ** 2) \
         + (e[:, :, 2].real ** 2 + e[:, :, 2].imag ** 2)
     num = area @ density
@@ -358,3 +388,29 @@ def summary_block(arrays: dict, *, vector: bool, region_names: list[str], gaussi
             "description": "|<E_mode, E_in>|^2 / (<E_mode, E_mode> <E_in, E_in>) of the Gaussian into each mode"
                            + (" (transverse field only)" if vector else "")}
     return out
+
+
+#: ``mode_postprocessing.integration_region`` of an open-boundary (PML) result
+PHYSICAL_WINDOW = "physical_window"
+
+
+def open_summary_block(arrays: dict) -> dict:
+    """The ``mode_postprocessing`` entry of an open-boundary (PML) vector result: the TE fraction
+    and the effective area on the physical window (module docstring), ``integration_region``
+    "physical_window"; no power, confinement, overlap or coupling."""
+    where = ("over the physical window (the triangles whose centroid lies inside open_boundary's "
+             "physical_bounds, bounds included; the PML excluded)")
+    return {
+        "te_polarization_fraction": {
+            "unit": "1", "values": _part(arrays["te_polarization_fraction"]),
+            "description": "f_TE = sum_T A_T |E_x|^2 / sum_T A_T (|E_x|^2 + |E_y|^2) on the saved centroid field "
+                           f"unnormalized_electric_field {where}, x horizontal, E_z left out; f_TM = 1 - f_TE. For "
+                           "two modes whose Re n_eff differ by at most 1e-3 each member's value is an arbitrary "
+                           "rotation within the pair; only the pair's sum is defined"},
+        "effective_area": {
+            "unit": "m^2", "values": _part(arrays["effective_area"]),
+            "description": "A_eff = (sum_T A_T |E|^2)^2 / sum_T A_T |E|^4 on the saved centroid field "
+                           f"unnormalized_electric_field {where}, |E|^2 = |E_x|^2 + |E_y|^2 + |E_z|^2. For a "
+                           "strongly leaking mode it depends on the window. Each member of a degenerate pair has "
+                           "its own value"},
+        "integration_region": PHYSICAL_WINDOW}
