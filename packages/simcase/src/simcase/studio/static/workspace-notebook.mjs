@@ -307,6 +307,9 @@ export function recoveryStudyNote(input){
 /** The refusal of a session file newer than a Studio reads (versions 6 to highest). */
 export const newerVersionText=(version,highest)=>`This session file is version ${version}, newer than this Studio reads (versions 6–${highest}). Open it in a newer Studio.`;
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
+/** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
+ * accepts these, so a later version is added here only (workspace-project-file.mjs). */
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION]);
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
@@ -321,7 +324,7 @@ export function parseSession(text,{recovered=false}={}){
  if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>OPTICAL_SESSION_VERSION)throw new Error(newerVersionText(doc.version,OPTICAL_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
  const nine=doc?.version===OPTICAL_SESSION_VERSION;
- if(doc?.format!=='openphysics-studio-session'||![6,SESSION_VERSION,OPTICAL_SESSION_VERSION].includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
+ if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
   if(doc.application!=='optical')throw new Error('A version 9 session file holds an optical model (application "optical").');
