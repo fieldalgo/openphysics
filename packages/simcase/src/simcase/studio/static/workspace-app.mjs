@@ -1861,7 +1861,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  clearTimeout(doneBannerTimer);doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
- $('job-message').textContent=state.message;
+ $('job-message').textContent=state.message;$('job-message').title=state.title||''; // round 17 (U11): the job id of a loading result is its title
  if(state.phase==='done')setPending(null);
  if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
 },onResult:(result,pending)=>{

@@ -167,3 +167,10 @@ test('U10: the toolbar Open… button is named by its visible text',()=>{
  assert.ok(html.includes('title="Open a project, session or model file (Ctrl+O)" aria-label="Open…"'));
  assert.ok(!html.includes('aria-label="Open"'));
 });
+test('U11: a completed result loads in user words, the job id in the title',async()=>{
+ const {OpticalJobMonitor}=await import(STATIC+'workspace-job.mjs');
+ const states=[];const m=new OpticalJobMonitor({api:async path=>path.includes('/result?')?{}:{status:'done'},onState:s=>states.push(s),onResult:()=>{}});
+ const pending={version:1,job:'65eb796b',serverInstance:'a'.repeat(32),serverVersion:'0.1.0',revision:3,startedAt:'2026-11-23T12:00:00Z',input:input()};await m.follow(pending,pending.serverInstance);
+ const loading=states.find(s=>s.phase==='loading');
+ assert.equal(loading.message,'Loading the result of this run…');assert.equal(loading.title,'Job 65eb796b');
+});
