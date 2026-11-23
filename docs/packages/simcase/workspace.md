@@ -870,16 +870,19 @@ Limits of the open boundary, from its validation:
   most 0.02 % and n_eff by about 1e-8, so it adds no accuracy; it adds PML modes near the target,
   which pushed the TM-like mode of the strip over a substrate out of a search of 16. 32 keeps
   it at every thickness tested.
-- **Mesh error at the default mesh.** The strip over a substrate gives a TE-like loss of
-  29.15 dB/cm and a TM-like loss of 1006 dB/cm at the default element lengths, and 29.06 and
-  993 dB/cm at 0.7 × them: the default mesh overestimates these losses by at least 0.3 % and
-  1.3 %. (The extrapolated error is being measured at 0.5 ×; until it is in, take the default
-  mesh as a first estimate and check the loss on a finer mesh.)
+- **Mesh error at the default mesh.** The default-mesh loss error is not yet established
+  (the mesh convergence check is under diagnosis).
+- **The PML settings are part of the search.** Changing the PML thickness, strength or order
+  changes the spectrum of the PML's own modes and can make a fixed search miss modes: with a search
+  of 32 near 2.46, the TM-like mode of the strip over a substrate is missing at strength 1.5. The
+  page does not let these settings change.
 - As first validated, the thickness check (V4: the window meshed again for each thickness,
   search of 16) failed four times: at 1.5 µm the TE-like loss moved by +1.28 % and n_eff by 8.7e-4
   (a remeshing difference: −0.31 % and 4.3e-4 at 0.7 × the element lengths), and the TM-like mode
-  was missing at 2 µm and at strength 1.5 and 6. The check was registered again on one mesh after
-  that result.
+  was missing at 2 µm and at strength 1.5 and 6. Registered again on one mesh with the search of
+  32, it failed a fifth time: the TM-like mode was missing at strength 1.5. PML independence is
+  now checked with a search that reaches every reference mode, and the shipped search separately
+  for completeness.
 
 ### Optical session files (version 9)
 
