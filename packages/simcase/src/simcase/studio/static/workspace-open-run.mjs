@@ -19,13 +19,14 @@ export const BOUNDARY_CHOICES=Object.freeze({closed:'Closed window (PEC)',open:'
 export const OPEN_HELP='Open boundary adds an absorbing layer (PML) outside the window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge continue through the layer.';
 export const TARGET_HELP='Search near n_eff: the solver returns the modes nearest this effective index. Default (n_max + n_SiO2)/2, rounded to 0.01. A single search can miss modes far from it, notably near the cladding index (Re below about 1.6): lowering Search near n_eff finds them.';
 export const PML_DETAILS='PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched';
-export const GROUP_INDEX_OPEN_NOTE='Group index with an open boundary comes in a later version';
-export const LATER_TITLE='Computed on the physical window in a later version';
+// Slice P3: the TE fraction, the effective area and n_g of an open run are defined on its physical
+// window, the triangles whose centroid lies inside the engine's physical_bounds (the PML excluded).
+export const OPEN_POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded';
+export const OPEN_AREA_HELP='Effective area over the 3 × 2.4 µm window, PML excluded. For a strongly leaking mode it depends on the window.';
+export const NO_WINDOW_TITLE='This run has no physical window: run again to compute';
 /** "Also check the PML (2 more solves)": one solve per mode, n = Modes to find. */
 export const checkLabel=n=>`Also check the PML (${n} more solve${n===1?'':'s'})`;
 export const CHECK_NOTE='Solves the same mesh again with the PML twice as strong (strength 6), once near each mode found, and compares each mode: a leakage loss that changes is not converged.';
-/** With an open edge the group index is not computed: its box is off and disabled. */
-export const groupIndexLocked=ob=>hasOpenEdge(ob);
 /** The open boundary of a new choice of Open: every edge open, the default target. */
 export const openChoice=()=>({edges:Object.fromEntries(EDGES.map(e=>[e,'open'])),target:null});
 /** The edges of an open boundary that are open, in the order left, right, bottom, top. */
@@ -159,9 +160,10 @@ export const openTableTitle=()=>`Modes (open boundary, ${PML_WORDS})`;
 // -- the PML check -----------------------------------------------------------------------------
 export const CHECK_STRENGTH=6,CHECK_SEARCH=16;
 /** The documents of the PML check of a run made from `doc`: one per mode, with strength 6, a search
- * of 16 and the target at that mode's Re n_eff to 6 decimals; everything else (the mesh) is doc's. */
+ * of 16 and the target at that mode's Re n_eff to 6 decimals; everything else (the mesh) is doc's,
+ * without results.group_index (the check compares n_eff only). */
 export function checkDocuments(doc,re){
- return re.map(r=>{const d=JSON.parse(JSON.stringify(doc)),em=d.physics.em1;em.pml.pml_strength=CHECK_STRENGTH;em.pml.pml_search_mode_count=CHECK_SEARCH;em.target_effective_index=Math.round(r*1e6)/1e6;return d;});
+ return re.map(r=>{const d=JSON.parse(JSON.stringify(doc)),em=d.physics.em1;em.pml.pml_strength=CHECK_STRENGTH;em.pml.pml_search_mode_count=CHECK_SEARCH;em.target_effective_index=Math.round(r*1e6)/1e6;if(d.results)delete d.results.group_index;return d;});
 }
 export const PAIR_LIMIT=2e-3,RE_LIMIT=5e-4,LOSS_SHARE=0.02;
 /** Within the pairing distance |Δn_eff| <= 2e-3. */
@@ -224,6 +226,9 @@ export const COMPARE_LOSS_NOTE='A counts material absorption only; B also counts
 export const COMPARE_LOSS_NOTE_BA='B counts material absorption only; A also counts leakage. Their difference is not a leakage loss.';
 
 // -- a new result ------------------------------------------------------------------------------
+/** The engine's per-mode values of a new open result (engineRunValues, engineGroupIndex) reduced to
+ * the modes Studio keeps (`keep`, openResultValues); other values (group_index_method) as they are. */
+export const keptValues=(values,keep)=>Object.fromEntries(Object.entries(values).map(([key,v])=>[key,Array.isArray(v)?keep.map(i=>v[i]):v]));
 /** The modes of a new open result that Studio keeps: Re n_eff above 1.45, in the engine's order.
  * {re, im, keep (the engine's indices), record (the candidate record of the first point), data
  * (the result with the vector samples of the kept modes only)}. Throws when no mode is kept. */
