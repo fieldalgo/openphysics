@@ -137,6 +137,12 @@ mode near the cladding index (n ≈ 1.486 + 7.9e-3i) that a search of 32 near 2.
   `pml_minimum_physical_fraction` to exclude PML-dominated candidates. With a low fraction such
   as 0.1, a lossy candidate can be ranked first (`examples/simcase/pml_leaky_slab.json` with a
   further search 2.0/8 returns 3.4396 + 0.0513i instead of 2.8521). Studio's documents use 0.5.
+- Limitation: with additional searches, modes are ranked by descending Re. A request for fewer
+  modes than lie above a wanted lower-Re mode (another polarization branch, for example) does not
+  return it: ask for more modes, or use a single target near it. The leaky slab with PMC side walls
+  and 1 mode returns the TE-polarized slab mode 2.833018 + 1.915e-5i, not the TM pole
+  2.0555 + 6.82e-4i; the TM candidate (2.054060 + 6.724e-4i) is the 8th by Re and returned with
+  `mode_count` 8.
 
 `abs(Im n)<=1e-10 max(1,|Re n|)` is labelled `numerically_unresolved`; its signed
 value and attenuation are preserved, never clamped to zero. This threshold is
