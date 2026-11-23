@@ -17,7 +17,7 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {INPUT_FIELDS,NumericDrafts,editNoticeText} from './workspace-inputs.mjs';
+import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
@@ -168,7 +168,7 @@ const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),not
  request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(inputsFile())});
 // A multiphysics model (contract D2) keeps its document in its own view; the other applications
 // do not see it. Names used before their declaration are wrapped.
-const multiView=createMultiphysicsView({$,ui,notice:(text,more)=>notice(text,more),announceResult:text=>announceResult(text),request:studioRequest,render:()=>render(),
+const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(text,more,action),announceResult:text=>announceResult(text),request:studioRequest,render:()=>render(),
  // a raw body: the server's reader sees a file's text as written (duplicate keys, digits)
  requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
  // physics selections no application claims, so no single-physics view acts while it is open
@@ -483,7 +483,9 @@ function loadContext(){return JSON.stringify({notebook:notebookStamp(),revision:
 // so it does not stay on screen as if it described the edited inputs.
 let resultNotice=false;
 // more: optional words shown behind More after the line (one short line, the rest on request).
-const notice = (text,more='') => {resultNotice=false;const host=$('file-status');host.textContent = text;
+// action: {label, data, run}, a button after the text (e.g. Show Run 1), whose data-* attributes are data
+const notice = (text,more='',action=null) => {resultNotice=false;const host=$('file-status');host.textContent = text;
+ if(action){const button=document.createElement('button');button.type='button';button.className='message-action';button.textContent=action.label;for(const [k,v] of Object.entries(action.data||{}))button.dataset[k]=v;button.onclick=()=>action.run();host.append(' ',button);}
  if(more){const details=document.createElement('details');details.className='message-more';const summary=document.createElement('summary');summary.textContent='More';const body=document.createElement('span');body.className='message-more-text';body.textContent=more;details.append(summary,body);host.append(' ',details);}};
 function announceResult(text){notice(text);resultNotice=true;}
 // current(): the model inputs (version 7), as a run keeps them; inputsFile(): those inputs with
@@ -660,9 +662,11 @@ function inputsChangedSinceResult(){
 function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
- const doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined}));workspaceLoads.invalidate();newModelInputs=null;
+ const prior=inputsFile(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined}));workspaceLoads.invalidate();newModelInputs=null;
  restoreEdit(doc,null);inputsChangedSinceResult();
- notice(`Current inputs set from ${runNumberTitle(run)}: ${designSummary(doc.model)} · λ ${doc.model.wavelength} nm · Modes to find ${state.modeCount}. The next run uses them; Undo takes them back.`);
+ // only the settings that change, from → to (round 13)
+ const changed=inputChanges(prior,doc);
+ notice(`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`);
 }
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)

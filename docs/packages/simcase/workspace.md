@@ -176,7 +176,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    read as unsaved edits (on the Model tab the title describes the current inputs only). Under
    the Inputs row of the selected run, **Use this run's inputs** loads that run's inputs (and its
    Modes to find and group index option) as the current inputs at once, without a question,
-   since the runs stay as they are; it is one input edit, so **Undo** takes all of it back, Modes
+   since the runs stay as they are. Messages lists only the settings that change, from → to
+   (*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find 4 → 2. The next
+   run uses them; Undo takes them back.*). It is one input edit, so **Undo** takes all of it back, Modes
    to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
@@ -587,8 +589,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   Run to update”. Whether a run is current is decided by content: an edit undone by hand (a
   coupling removed and added back, or Undo) makes it current again, and Messages, the dock
   heading and the footer then say the same sentence, “No need to run: Run 1 already has these
-  results. Run again to make a copy”, which says first that nothing needs running (Messages adds
-  “Also solve without heater” is ticked again when an Undo ticked it again). A run read
+  results. Run study adds a copy with the same values”, which says first that nothing needs running
+  (Messages adds “Also solve without heater” is ticked again when an Undo ticked it again). Messages
+  also offers **Show Run 1**, which shows that run under Results without changing the model. A run read
   from a session file or recovered from this browser has no solve times: its rows read **From
   file** or **From this browser** (an iteration step keeps its count, *Settled in 7 iterations · from
   file*), the dock heading “Run 1 · read from file, not recomputed” (or

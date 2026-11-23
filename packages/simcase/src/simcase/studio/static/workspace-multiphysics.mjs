@@ -476,7 +476,7 @@ export function freshnessAgain(freshness,diverged){return freshness==='current'&
 // it; an unnamed run keeps the words it had ("run 2" inside a sentence).
 const runWords=(runId,label,inSentence=false)=>label?`Run ${runId} · ${label}`:`${inSentence?'run':'Run'} ${runId}`;
 // It says first that nothing needs running, then what Run would still do (a copy).
-export const matchesAgainText=(runId,label='')=>`No need to run: ${runWords(runId,label)} already has these results. Run again to make a copy`;
+export const matchesAgainText=(runId,label='')=>`No need to run: ${runWords(runId,label)} already has these results. Run study adds a copy with the same values`;
 export function editNotice(message,freshness,runId,label=''){return message+(freshness==='again'?` ${matchesAgainText(runId,label)}.`:' Press Run to compute the new model.');}
 // Where a result shown as current came from, when this tab did not compute it (optical and
 // multiphysics alike); null for a run computed here.

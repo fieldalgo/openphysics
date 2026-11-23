@@ -246,8 +246,8 @@ test('a model edit leaves the last run out of date; the same content again is cu
  assert.equal(m.sequenceHeading('current',2,'imported','design A'),'Run 2 · design A · read from file, not recomputed');
  assert.equal(m.readyStatus('current',2,'local','design A'),'Run 2 · design A matches the model · press Run to solve again');
  assert.equal(m.readyStatus('stale',2,'local','design A'),'Model edited since Run 2 · design A · press Run to update');
- assert.equal(m.readyStatus('again',2,'local','design A'),'No need to run: Run 2 · design A already has these results. Run again to make a copy');
- assert.equal(m.matchesAgainText(2),'No need to run: Run 2 already has these results. Run again to make a copy');
+ assert.equal(m.readyStatus('again',2,'local','design A'),'No need to run: Run 2 · design A already has these results. Run study adds a copy with the same values');
+ assert.equal(m.matchesAgainText(2),'No need to run: Run 2 already has these results. Run study adds a copy with the same values');
  assert.equal(m.canonicalJson({b:[{d:1,c:2}],a:null}),'{"a":null,"b":[{"c":2,"d":1}]}');
 });
 test('the heater-off column is valid by the content of the optical model it solved, not by run order',async()=>{
@@ -298,7 +298,7 @@ test('each wire is anchored on the ports its coupling joins; every port has its 
 test('the model back at the last run says so in one sentence everywhere, without asking for a Run',async()=>{
  const m=await mp;
  assert.equal(m.freshnessAgain('current',false),'current');assert.equal(m.freshnessAgain('current',true),'again');assert.equal(m.freshnessAgain('stale',true),'stale');
- const again='No need to run: Run 1 already has these results. Run again to make a copy';
+ const again='No need to run: Run 1 already has these results. Run study adds a copy with the same values';
  assert.equal(m.sequenceHeading('again',1),again);assert.equal(m.readyStatus('again',1),again);
  assert.equal(m.editNotice('Coupling Heat 1 temperature → Modes 1 temperature added.','again',1),'Coupling Heat 1 temperature → Modes 1 temperature added. '+again+'.');
  assert.equal(m.editNotice('Value updated.','stale',1),'Value updated. Press Run to compute the new model.');
