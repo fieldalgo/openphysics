@@ -217,8 +217,13 @@ Results read from a project are marked as from a file (*Loaded from file, not re
 the file's checksum.*), and opening never starts a run. A session file or a model file opened with File ›
 Open opens as before and becomes an untitled project holding that one model; Save then asks for a name
 and never writes a project file over the session file's name. A restore from this browser (the
-Library's per-card **Restore from this browser**) replaces that one model inside the project and does
-not set the project file.
+Library's per-card **Restore from this browser**) replaces that one model inside the project. When
+the restored record was the same as the project file it was saved to (its card read *same as file
+…json*), the project names that file and its name again: the header reads *untitled-project ·
+untitled-project.json · saved 2:24 PM* and File › Save writes or suggests that file. With another
+model of the tab beside it, the header reads *changed since*. A File › Save of the project relinks
+the browser recovery record of every model it wrote, shown or not, so each card names the newest
+project file.
 
 **The file.** One compact JSON object, its keys in this order:
 
