@@ -34,7 +34,7 @@ test('the template opened on all four edges: the domain grows by t, the fixed PM
  assert.deepEqual(doc.physics.em1.boundary,{left:'pec',right:'pec',top:'pec',bottom:'pec'});
  assert.equal(doc.physics.em1.target_effective_index,2.46);
  assert.deepEqual(doc.physics.em1.pml,{pml_thickness:{left:'1000 nm',right:'1000 nm',bottom:'1000 nm',top:'1000 nm'},
-  pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:16});
+  pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:32});
  // everything else is the v8 document
  const rest=d=>({...d,geometry:{...d.geometry,domain:null},physics:{em1:{...d.physics.em1,target_effective_index:null,pml:null}}});
  assert.deepEqual(rest(doc),rest({...v8,physics:{em1:{...v8.physics.em1,target_effective_index:2.46,pml:{}}}}));
@@ -42,9 +42,13 @@ test('the template opened on all four edges: the domain grows by t, the fixed PM
 
 test('a substrate along open edges continues through the layer, its open corner filled',()=>{
  const shapes=[STRIP,SUBSTRATE];
- const bottom=O.opticalDocument(state({shapes,openBoundary:{edges:edges('bottom','top'),thickness:1500}}),setup());
- assert.deepEqual(bottom.geometry.domain,{xmin:-1500,xmax:1500,ymin:-2700,ymax:2700});
- assert.deepEqual(bottom.geometry.shapes[1].points,[[-1500,-2700],[1500,-2700],[1500,-500],[-1500,-500]]);
+ const bottom=O.opticalDocument(state({shapes,openBoundary:{edges:edges('bottom','top'),thickness:1000}}),setup());
+ assert.deepEqual(bottom.geometry.domain,{xmin:-1500,xmax:1500,ymin:-2200,ymax:2200});
+ assert.deepEqual(bottom.geometry.shapes[1].points,[[-1500,-2200],[1500,-2200],[1500,-500],[-1500,-500]]);
+ // the extrusion itself takes any thickness (the builder offers 1 um only)
+ const thick=B.applyOpenBoundary(JSON.parse(JSON.stringify(O.opticalDocument(state({shapes}),setup()))),{edges:edges('bottom','top'),thickness:1500,target:2.46});
+ assert.deepEqual(thick.geometry.domain,{xmin:-1500,xmax:1500,ymin:-2700,ymax:2700});
+ assert.deepEqual(thick.geometry.shapes[1].points,[[-1500,-2700],[1500,-2700],[1500,-500],[-1500,-500]]);
  assert.deepEqual(Object.keys(bottom.physics.em1.pml.pml_thickness),['bottom','top']);
  const all=O.opticalDocument(state({shapes,openBoundary:{edges:edges('left','right','bottom','top')}}),setup());
  assert.deepEqual(all.geometry.shapes[1].points,[[-2500,-2200],[2500,-2200],[2500,-500],[-2500,-500]]);
@@ -90,8 +94,8 @@ test('the default target and its bounds',()=>{
 });
 
 test('refusals: thickness, edge words, group index with an open boundary',()=>{
- for(const thickness of [999,2001,1500.5,'1000',NaN])
-  assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:edges('top'),thickness}}),setup()),/PML thickness must be a whole number of nm from 1000 to 2000/);
+ for(const thickness of [999,1001,1500,2000,1000.5,'1000',NaN])
+  assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:edges('top'),thickness}}),setup()),/PML thickness must be 1000 nm \(1 µm\)/);
  assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:{...edges(),top:'pml'}}}),setup()),/top edge must be open or closed/);
  assert.throws(()=>O.opticalDocument(state({openBoundary:'open'}),setup()),/Invalid open boundary/);
  assert.throws(()=>O.opticalDocument(state({groupIndex:true,openBoundary:{edges:edges('top')}}),setup()),/Group index is not computed with an open boundary/);
@@ -99,10 +103,10 @@ test('refusals: thickness, edge words, group index with an open boundary',()=>{
  assert.ok(O.opticalDocument(state({groupIndex:true,openBoundary:{edges:edges()}}),setup()).results.group_index);
 });
 
-test('2 um on the right only',()=>{
- const doc=O.opticalDocument(state({openBoundary:{edges:edges('right'),thickness:2000}}),setup());
- assert.deepEqual(doc.geometry.domain,{xmin:-1500,xmax:3500,ymin:-1200,ymax:1200});
- assert.deepEqual(doc.physics.em1.pml.pml_thickness,{right:'2000 nm'});
+test('1 um on the right only',()=>{
+ const doc=O.opticalDocument(state({openBoundary:{edges:edges('right'),thickness:1000}}),setup());
+ assert.deepEqual(doc.geometry.domain,{xmin:-1500,xmax:2500,ymin:-1200,ymax:1200});
+ assert.deepEqual(doc.physics.em1.pml.pml_thickness,{right:'1000 nm'});
 });
 
 test('a vertex within 1e-6 nm of an open edge is on it; the design\'s own collinear vertices stay',()=>{

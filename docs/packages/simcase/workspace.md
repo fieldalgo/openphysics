@@ -836,15 +836,15 @@ This is not a complete engine dependency or Git provenance record.
 adapter's document builder (`opticalDocument` with `openBoundary: {edges, thickness, target}`)
 can open any edge of the window:
 
-- a perfectly matched layer (PML) of thickness *t* (a whole number of nm from 1000 to 2000,
-  1000 by default) lies **outside** the 3 × 2.4 µm window on each open edge: the domain grows
-  by *t* there and the outer wall stays PEC. Closed edges stay PEC walls;
+- a perfectly matched layer (PML) of thickness *t* = 1 µm (1000 nm, the one value offered)
+  lies **outside** the 3 × 2.4 µm window on each open edge: the domain grows by *t* there and
+  the outer wall stays PEC. Closed edges stay PEC walls;
 - a polygon edge along an open edge continues straight through the layer, and where two open
   edges meet at a shape's corner the corner square is filled too (a substrate that fills the
   bottom of the window reaches the outer wall). A circle meets an edge only at a point and is
   written as before;
 - the PML settings are fixed: `pml_strength` 3, `pml_order` 2,
-  `pml_minimum_physical_fraction` 0.5 and `pml_search_mode_count` 16;
+  `pml_minimum_physical_fraction` 0.5 and `pml_search_mode_count` 32;
 - **Search near n_eff** (`target_effective_index`) is above 1.45 and below the largest
   index of the design. By default it is (n_max + n_SiO2) / 2 to two decimals, from the
   materials' indices at 1550 nm (2.46 for a silicon core);
@@ -854,9 +854,32 @@ With every edge closed, or without `openBoundary`, the document is the `optical-
 document byte for byte, and its results are those of that document. A workspace request whose
 `em.modes2d` physics has any other `pml` (another thickness, unequal thicknesses or another fixed
 value), a target of 1.45 or below, or a domain other than the window grown by the thickness on
-exactly the open edges (in nm) is refused with *The open boundary of a workspace run has a PML of 1–2 µm on each open edge
-with strength 3, order 2, physical fraction 0.5 and a search of 16 candidates.* The PML results
+exactly the open edges (in nm) is refused with *The open boundary of a workspace run has a PML of 1 µm on each open edge
+with strength 3, order 2, physical fraction 0.5 and a search of 32 candidates.* The PML results
 are candidates under the [PML mode rules](pml_modes.md).
+
+Limits of the open boundary, from its validation:
+
+- **One search target.** The candidates are the eigenvalues nearest **Search near n_eff**, and the
+  PML's own modes crowd the region around it. A mode far from the target can be missed even when
+  fewer modes are found than asked: a strip over a silicon substrate has a third mode near the
+  cladding index (n ≈ 1.486 + 0.008i, about 2800 dB/cm) that the default target 2.46 does not
+  reach with 32 candidates. To find modes near the cladding index
+  (Re n_eff below about 1.6), lower Search near n_eff (for example to 1.95).
+- **Why 1 µm and 32.** With the mesh held fixed, a 1.5 or 2 µm layer changes the loss by at
+  most 0.02 % and n_eff by about 1e-8, so it adds no accuracy; it adds PML modes near the target,
+  which pushed the TM-like mode of the strip over a substrate out of a search of 16. 32 keeps
+  it at every thickness tested.
+- **Mesh error at the default mesh.** The strip over a substrate gives a TE-like loss of
+  29.15 dB/cm and a TM-like loss of 1006 dB/cm at the default element lengths, and 29.06 and
+  993 dB/cm at 0.7 × them: the default mesh overestimates these losses by at least 0.3 % and
+  1.3 %. (The extrapolated error is being measured at 0.5 ×; until it is in, take the default
+  mesh as a first estimate and check the loss on a finer mesh.)
+- As first validated, the thickness check (V4: the window meshed again for each thickness,
+  search of 16) failed four times: at 1.5 µm the TE-like loss moved by +1.28 % and n_eff by 8.7e-4
+  (a remeshing difference: −0.31 % and 4.3e-4 at 0.7 × the element lengths), and the TM-like mode
+  was missing at 2 µm and at strength 1.5 and 6. The check was registered again on one mesh after
+  that result.
 
 ### Optical session files (version 9)
 

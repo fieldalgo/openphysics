@@ -245,11 +245,11 @@ def workspace_capabilities_v8():
 # through it, the outer wall is PEC) with the fixed settings below and a search target that the
 # page sets (by default (n_max + n_SiO2) / 2 of the design at 1550 nm, to two decimals).
 # Versions 1 to 8 stay as they were.
-_PML_THICKNESS_RANGE = ["1 um", "2 um"]
-_PML_THICKNESS_NM = (1000, 2000)
+_PML_THICKNESS_RANGE = ["1 um", "1 um"]
+_PML_THICKNESS_NM = (1000, 1000)
 _WINDOW_NM = {"xmin": -1500, "xmax": 1500, "ymin": -1200, "ymax": 1200}
 _PML_FIXED = {"pml_strength": 3, "pml_order": 2, "pml_minimum_physical_fraction": 0.5,
-              "pml_search_mode_count": 16}
+              "pml_search_mode_count": 32}
 
 
 @app.get("/api/workspace/capabilities/v9")
@@ -279,11 +279,11 @@ def workspace_open_boundary_refusal(tree) -> str | None:
         if not isinstance(entry, dict) or entry.get("type") != "em.modes2d" or "pml" not in entry:
             continue
         pml = entry["pml"]
-        text = ("The open boundary of a workspace run has a PML of 1–2 µm on each open edge with strength 3, "
-                "order 2, physical fraction 0.5 and a search of 16 candidates.")
+        text = ("The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3, "
+                "order 2, physical fraction 0.5 and a search of 32 candidates.")
         if not isinstance(pml, dict) or set(pml) != {"pml_thickness", *_PML_FIXED}:
             return text
-        # 3, 2 and 16 are JSON integers; 0.5 may arrive as an exact decimal
+        # 3, 2 and 32 are JSON integers; 0.5 may arrive as an exact decimal
         if any(isinstance(pml[key], bool) or not isinstance(pml[key], (int, float, Decimal)) or pml[key] != value
                or (type(value) is int and type(pml[key]) is not int) for key, value in _PML_FIXED.items()):
             return text

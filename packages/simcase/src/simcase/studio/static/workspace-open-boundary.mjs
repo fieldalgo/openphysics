@@ -10,10 +10,12 @@ import {WINDOW_NM,SHAPE_MATERIALS} from './workspace-shapes.mjs';
 
 export const OPEN_BOUNDARY_ADAPTER='optical-shapes-v9';
 export const EDGES=Object.freeze(['left','right','bottom','top']);
-export const PML_THICKNESS_RANGE_NM=Object.freeze([1000,2000]);
+// 1 um only for now: on a fixed mesh a thicker layer changes no result, and it adds PML modes near
+// the search target that push guided ones out of the candidates.
+export const PML_THICKNESS_RANGE_NM=Object.freeze([1000,1000]);
 export const PML_THICKNESS_DEFAULT_NM=1000;
 // The fixed settings of a Studio open boundary (the engine's pml keys).
-export const PML_FIXED=Object.freeze({pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:16});
+export const PML_FIXED=Object.freeze({pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:32});
 // Refractive indices at 1550 nm of the Studio materials (physmat, four decimals), for the default
 // search target only: (n_max + n_SiO2) / 2 rounded to two decimals. A Python test checks them.
 export const INDEX_1550=Object.freeze({Silicon:3.4777,'Silicon nitride':1.9963,Silica:1.4440,Air:1,'Sapphire (ordinary)':1.7462,'Lithium niobate (ordinary)':2.2111,'Indium phosphide':3.1649,'Gallium arsenide':3.3702,'Calcium fluoride':1.426,'Magnesium fluoride (ordinary)':1.3705});
@@ -36,7 +38,7 @@ export function checkOpenBoundary(ob,shapes){
  for(const e of EDGES){const v=ob.edges?.[e]??'closed';if(v!=='open'&&v!=='closed')throw new Error(`The ${e} edge must be open or closed.`);edges[e]=v;}
  if(!EDGES.some(e=>edges[e]==='open'))return {edges};
  const t=ob.thickness??PML_THICKNESS_DEFAULT_NM,[lo,hi]=PML_THICKNESS_RANGE_NM;
- if(!Number.isInteger(t)||t<lo||t>hi)throw new Error(`PML thickness must be a whole number of nm from ${lo} to ${hi} (${lo/1000}–${hi/1000} µm).`);
+ if(!Number.isInteger(t)||t<lo||t>hi)throw new Error(lo===hi?`PML thickness must be ${lo} nm (${lo/1000} µm).`:`PML thickness must be a whole number of nm from ${lo} to ${hi} (${lo/1000}–${hi/1000} µm).`);
  const nmax=maxIndex(shapes),target=ob.target??defaultTarget(shapes);
  if(typeof target!=='number'||!Number.isFinite(target)||target<=TARGET_FLOOR||target>=nmax)throw new Error(`Search near n_eff must lie between ${TARGET_FLOOR} and ${nmax}.`);
  return {edges,thickness:t,target};
