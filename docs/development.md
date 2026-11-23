@@ -374,7 +374,8 @@ template's file against `tests/simcase/studio_session_fixtures/inputs-v7-optical
 `modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
 inputs saved as version 9. Since round 12 it also checks the page tabs as a tab list named
 *Pages* (Library first, one selected tab and one Tab stop, Left, Right, Home and End opening the
-next, previous, first and last page); the Compare table at 1440 × 900 and 390 × 844 with two
+next, previous, first and last page; since round 13 one `role=tabpanel` page panel that every tab
+controls, named by the selected tab after each key); the Compare table at 1440 × 900 and 390 × 844 with two
 header rows (short labels, then A | B), the run names in the line above it, *1 ↔ 1* row headers
 whose accessible names are the full pairs, the first column frozen while the others scroll inside
 the table's box, every column reachable there and headers and row headers on one line; the group

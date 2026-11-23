@@ -96,14 +96,14 @@ function resumeCard(resume){
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
  actions.append(fresh);card.append(heading,note,actions);return card;
 }
-// The Library page notes: what each model supports and what Save session keeps of it. A session
+// The Library page notes: what each model supports and what File › Save keeps of it. A session
 // file holds the inputs of every single-physics model and the optical runs, or a multiphysics
 // model with its runs; heat and Joule heating results are not written to it.
 export const CHOOSER_NOTES=Object.freeze([
- 'Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, 1 to 8 modes (Modes to find, 2 by default). Save session keeps the inputs, the runs and the comparison.',
- 'Steady heat: one homogeneous rectangle with constant conductivity and source; each side insulated, at fixed temperature, with inward heat flux or with convection. Save session keeps the plate inputs; heat results stay in this tab.',
- 'Joule heating: a rectangle in mm with up to 8 rectangles, circles or polygons over a background material, up to 6 materials with thermal conductivity and a constant or linear-resistivity electrical conductivity; each side insulating, at fixed potential or with inward current, and insulated, at fixed temperature, with inward heat flux or with convection. Temperature-dependent materials iterate (Picard, or Newton chosen under Study). Save session keeps the inputs; Joule heating results stay in this tab.',
- 'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. Save session keeps the model with its runs, their names and pins, and the without-heater results.'
+ 'Optical: up to 8 rectangles, circles or polygons of ten lossless materials (silicon, silicon nitride, silica, air, sapphire, lithium niobate, InP, GaAs, CaF2, MgF2) in a silica background; wavelength 1400–1700 nm, core mesh 20–60 nm, 1 to 8 modes (Modes to find, 2 by default). File › Save keeps the inputs, the runs and the comparison.',
+ 'Steady heat: one homogeneous rectangle with constant conductivity and source; each side insulated, at fixed temperature, with inward heat flux or with convection. File › Save keeps the plate inputs; heat results stay in this tab.',
+ 'Joule heating: a rectangle in mm with up to 8 rectangles, circles or polygons over a background material, up to 6 materials with thermal conductivity and a constant or linear-resistivity electrical conductivity; each side insulating, at fixed potential or with inward current, and insulated, at fixed temperature, with inward heat flux or with convection. Temperature-dependent materials iterate (Picard, or Newton chosen under Study). File › Save keeps the inputs; Joule heating results stay in this tab.',
+ 'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. File › Save keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
 const PORTABLE_NOTE='A session file is the copy that moves between computers; browser recovery stays in this browser.';

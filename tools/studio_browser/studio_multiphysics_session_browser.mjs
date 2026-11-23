@@ -735,7 +735,7 @@ print(n)`;
   await openInputs('variant-008.json', variant('0.08 um', '0.01 um'));
   for (let n = 1; n <= 6; n++) await runAndWait(n);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
-  await page.until("/kept for recovery in this browser without the maps of 5 runs · Save session to keep them$/.test(document.getElementById('autosave-status').textContent)", 'recovery without five maps', 60000);
+  await page.until("/kept for recovery in this browser without the maps of 5 runs · File › Save keeps them$/.test(document.getElementById('autosave-status').textContent)", 'recovery without five maps', 60000);
   const recoveryPartial = await page.text('#autosave-status');
   // Save session asks; Cancel writes nothing
   const unchanged = await listed();

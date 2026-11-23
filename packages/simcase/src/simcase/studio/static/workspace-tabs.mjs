@@ -6,12 +6,16 @@
 // previous and next tab and open its page, Home and End to the first and last.
 const tabs = nav => [...nav.querySelectorAll('[role=tab]')];
 
-/** Marks the tab of page as selected (aria-selected, tabindex 0) and the others not (tabindex -1). */
+/** Marks the tab of page as selected (aria-selected, tabindex 0) and the others not (tabindex -1),
+ * and names the page panel (role=tabpanel, the tabs' aria-controls) after the selected tab. */
 export function markPageTabs(nav, page) {
   for (const tab of tabs(nav)) {
     const on = tab.dataset.page === page;
     tab.setAttribute('aria-selected', String(on));
     tab.tabIndex = on ? 0 : -1;
+    // the one page panel (role=tabpanel) every tab controls is named by the selected tab
+    const panel = on && tab.id ? nav.ownerDocument?.getElementById(tab.getAttribute('aria-controls')) : null;
+    if (panel) panel.setAttribute('aria-labelledby', tab.id);
   }
 }
 
