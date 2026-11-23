@@ -45,13 +45,13 @@
 
 | 키 | 형식 | 기본값 | 허용 |
 |---|---|---|---|
-| `results.group_index` | 객체 | 없음: 군굴절률 없음 | `pml`과 `bend`가 없는 무손실 항목의 `single` study |
+| `results.group_index` | 객체 | 없음: 군굴절률 없음 | `bend`가 없는 무손실 항목의 `single` study(`pml`이 있으면 값은 복소수) |
 | `results.group_index.wavelength_step` | 단위를 붙인 길이(`"1 nm"`, `"0.001 um"`, `{"value": .., "unit": ..}`) | `"1 nm"`, `defaults_applied`에 기록 | 1 pm ≤ Δλ ≤ λ0 / 20(정확한 값), 아니면 `E-DOMAIN` |
 
 다음 경우 이 키는 `E-CONTRACT`로 거절됩니다.
 
 - sweep과 함께 쓸 때(파장 sweep은 이미 `group_index`를 줍니다)
-- `pml`이나 `bend`와 함께 쓸 때
+- `bend`와 함께 쓸 때
 - 실행 시 세 파장 중 어디서든 재료가 손실성일 때
 
 다중물리 문서는 알 수 없는 `results` 키로 거절합니다(`E-KEY-UNKNOWN`). 이번 릴리스 이전의
@@ -74,6 +74,20 @@ results.group_index: unknown key "group_index" in results. … (E-KEY-UNKNOWN)
 
 `reasons`는 모드마다 항목이 하나입니다. 값이 있는 모드는 `null`, 없는 모드는 그 이유입니다.
 
+**열린 경계(PML).** `pml`이 있고 `bend`가 없으면 n_eff가 복소수이므로 n_g = n_eff −
+λ0 dn_eff/dλ0도 복소수입니다. 이때 `group_index`는 `effective_index`처럼 `{"re", "im"}`입니다. 옆
+풀이는 항목의 PML과 목표를 그대로 씁니다. 짝짓기는 추적기의 물리 가중치를 쓰므로 겹침을 물리
+창에서 잽니다. 첫 짝짓기는 목표 근처에서 하고, 탐색의 가장자리는 목표에서 가장 먼 후보입니다.
+추적하는 PML sweep과 같은 방식입니다. null 규칙은 같습니다. 복소 n_g는 스펙트럼 미분이며 에너지
+속도가 아닙니다. 검증(slice P3, V11)은 열린 경계 점검의 누설 슬래브를 씁니다: 실리카 500 nm 위
+Si 220 nm, 그 아래 Si, PEC 옆벽, TE, 1 nm 간격. 기준값은 physmat 분산을 넣어 1549 nm와 1551 nm에서
+구한 `refsol.lossy_slab.substrate_leaky_mode`의 중앙 차분 3.706654 − 2.688e-4i입니다.
+- 기본 메시에서 n_g는 Re가 5.24e-3 낮고 Im이 2.7 % 벗어납니다. 거의 모두 n_eff 자체의 오차입니다:
+  Re n_eff가 −4.76e-3 벗어납니다. 이 오차는 메시를 반으로 나눌 때마다 줄어듭니다.
+- dn_eff/dλ0는 상대 1e-3 안입니다.
+- 그래서 기본 메시에서 등록한 1e-3 / 2 % 기준은 실패했고, 결과를 본 뒤 다른 점검으로 바뀌었습니다
+  ([`test_open_boundary_group_index.py`](../../../../../../tests/simcase/test_open_boundary_group_index.py)).
+
 `field_layout`과 다른 모든 키는 그대로입니다. 선택이 없는 결과는 이전 릴리스의 결과와
 같습니다. 로그에는 옆 파장, null 모드와 그 이유, 값이 나옵니다. 실행 시간은 단일 지점
 풀이의 약 세 배이고, 옆 풀이가 후보를 더 많이 탐색하므로 조금 더 걸립니다.
@@ -81,7 +95,7 @@ results.group_index: unknown key "group_index" in results. … (E-KEY-UNKNOWN)
 계산하지 않는 것은 다음과 같습니다.
 
 - 장 적분 군굴절률
-- 손실·개방(PML) 모드
+- 손실 모드, 굽힘의 개방(PML) 모드
 - 결합된 다중물리 항목
 - 어떤 매개변수의 sweep
 

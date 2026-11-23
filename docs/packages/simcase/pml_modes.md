@@ -72,6 +72,19 @@ lossless Poynting formula over the whole window is not the physical power and
 a physical-window variant is not offered. A `results.mode_overlap` block is
 validated but ignored for them.
 
+A vector PML result without a bend saves `te_polarization_fraction` and `effective_area`
+(`fields.npz` and `summary.json`), computed over its **physical window**. That window is the set of
+triangles whose centroid (p0 + p1 + p2)/3 lies inside `physical_bounds`, bounds included,
+evaluated on `node_coordinates` and `physical_bounds` in metres. It is the solver's own physical
+mask. The formulas are the closed-window ones on the saved centroid field, which is the physical E
+there. `mode_postprocessing` then holds those two keys and `integration_region:
+"physical_window"`. For a strongly leaking mode the effective area depends on the window. A closed
+result gains no key. Bend and scalar PML results gain none either. `results.group_index` is
+accepted with `pml` (not with `bend`) and gives a complex n_g ([group index](group_index.md)).
+Validation: checks V9 and V10 of
+[`tests/simcase/test_open_boundary_mode_identity.py`](../../../tests/simcase/test_open_boundary_mode_identity.py) and V11 of
+[`tests/simcase/test_open_boundary_group_index.py`](../../../tests/simcase/test_open_boundary_group_index.py).
+
 Each `openphysics.pml-candidates/2` point records all searched candidates,
 one-based candidate numbers, the complex `effective_index`, the original-pencil
 `relative_residual`, positive physical/PML L2 fractions, selected numbers, reasons and
@@ -144,7 +157,10 @@ Results show all candidate reasons and residuals; artificial PML fields are
 grey. Scalar is exact for the invariant-axis TE slab polarization, an
 approximation for general 2D high-contrast guides. Variable curvature, 3D open
 modes, automatic PML convergence certification and non-Hermitian degenerate
-subspace tracking are outside this contract.
+subspace tracking are outside this contract. Known issue: on refined open meshes a lossless
+TM-like mode can be dropped. Its tiny Im n_eff comes out with the wrong sign, beyond
+−1e-10 max(1, |Re n|), and it is rejected as `negative_imaginary_index`. The Studio template's
+TM-like mode (Re 1.7712, physical fraction 1.0) is missing at every element length × ½ and × ¼.
 
 Validation uses independent outgoing slab transfer roots, complex-order
 cylindrical J/Y/Hankel matching, three meshes, independent PML/window variation,

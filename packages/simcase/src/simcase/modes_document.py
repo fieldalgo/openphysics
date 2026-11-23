@@ -501,7 +501,7 @@ def _gaussian(doc, dom):
 
 
 def _group_index(doc, p, path):
-    """``results.group_index``: a single study of a lossless entry without pml or bend, with
+    """``results.group_index``: a single study of a lossless entry without a bend (pml allowed), with
     1 pm <= wavelength_step <= lambda0 / 20 (exact metres)."""
     if (doc.si.get("results") or {}).get("group_index") is None:
         return
@@ -511,10 +511,9 @@ def _group_index(doc, p, path):
         _refuse(f"{where}: read by a single study only; " + (
             "a wavelength sweep already gives group_index" if wavelength else
             "a sweep over another parameter does not compute the group index"), where)
-    for key in ("bend", "pml"):
-        if key in p:
-            _refuse(f"{where}: not read with {path}.{key} (the group index of open or lossy modes is not "
-                    "computed)", where)
+    # with pml (an open boundary) n_g is complex, tracked with physical weights; a bend is refused
+    if "bend" in p:
+        _refuse(f"{where}: not read with {path}.bend (the group index of a bent guide is not computed)", where)
     step = Fraction(_exact(doc, f"{where}.wavelength_step"))
     wavelength = Fraction(_exact(doc, f"{path}.vacuum_wavelength"))
     if not GROUP_INDEX_MIN_STEP <= step <= GROUP_INDEX_MAX_FRACTION * wavelength:

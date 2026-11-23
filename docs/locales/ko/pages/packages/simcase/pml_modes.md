@@ -66,6 +66,17 @@ exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
 적분이어서 창 전체의 무손실 Poynting 식은 물리 전력이 아니며, 물리 창 변형은
 제공하지 않습니다. `results.mode_overlap` 블록은 검증만 하고 무시합니다.
 
+굽힘이 없는 벡터 PML 결과는 `te_polarization_fraction`과 `effective_area`를 **물리 창**에서 계산해
+`fields.npz`와 `summary.json`에 저장합니다. 물리 창은 중심 (p0 + p1 + p2)/3이 `physical_bounds`
+안(경계 포함)에 있는 삼각형들이며, 미터 단위 `node_coordinates`와 `physical_bounds`로 판정합니다.
+이는 풀이기 자신의 물리 마스크와 같습니다. 식은 닫힌 창의 식을 저장된 중심 장에 그대로 쓴 것이며,
+그곳에서 중심 장은 물리적인 E입니다. 이때 `mode_postprocessing`에는 이 두 키와 `integration_region:
+"physical_window"`가 들어갑니다. 누설이 강한 모드의 유효 면적은 창에 따라 달라집니다. 닫힌 결과에는
+키가 늘지 않고, 굽힘과 스칼라 PML 결과에도 늘지 않습니다. `results.group_index`는 `pml`과 함께
+받으며(`bend`와는 받지 않음) 복소 n_g를 줍니다([군굴절률](group_index.md)). 검증:
+[`tests/simcase/test_open_boundary_mode_identity.py`](../../../../../../tests/simcase/test_open_boundary_mode_identity.py)의 V9·V10과
+[`tests/simcase/test_open_boundary_group_index.py`](../../../../../../tests/simcase/test_open_boundary_group_index.py)의 V11.
+
 각 `openphysics.pml-candidates/2` 점은 전체 후보의 1부터 시작하는 번호,
 복소 `effective_index`, 원래 pencil 상대잔차 `relative_residual`, 양의 물리/PML L2 비율,
 선택 번호와 이유, 미터 단위 `physical_bounds`를 기록합니다. `pml_search_mode_count`가 없으면 검색 수는 최소 6개 또는 요청 수의
@@ -125,7 +136,10 @@ electric은 각 Jacobian 성분으로 나눈 요소중심 장입니다. PML 내�
 Studio에서 PML 면·강도·차수·비율·목표 및 굽힘을 입력합니다(길이는 양 문자열). 결과는 모든
 후보 이유와 잔차를 표시하며 인공 PML 장은 회색으로 가립니다. scalar는 불변축
 TE slab 편광의 정확식이고 일반 2D 고대비 도파관에서는 근사입니다. 가변곡률,
-3D 열린 모드, 자동 PML 수렴 인증, 비Hermitian 축퇴 부분공간 추적은 범위 밖입니다.
+3D 열린 모드, 자동 PML 수렴 인증, 비Hermitian 축퇴 부분공간 추적은 범위 밖입니다. 알려진 문제:
+세밀한 열린 메시에서는 무손실 TM-like 모드가 빠질 수 있습니다. 아주 작은 Im n_eff가 −1e-10
+max(1, |Re n|)를 넘는 반대 부호로 나와 `negative_imaginary_index`로 거절되기 때문입니다. Studio
+템플릿의 TM-like 모드(Re 1.7712, 물리 비율 1.0)는 모든 요소 길이 × ½와 × ¼에서 빠집니다.
 
 검증은 독립 outgoing slab 전달식, 복소차수 원통 J/Y/Hankel 매칭, 3개 메시,
 독립 PML/창 변화, bound 무손실·큰 반경 극한, 별도 scikit-fem 조립+dense QZ를

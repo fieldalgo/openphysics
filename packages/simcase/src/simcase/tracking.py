@@ -197,7 +197,9 @@ def match_modes(tracker: ModeTracker, reference, neff, field, location):
     rows, selected = linear_sum_assignment(scores, maximize=True)
     overlap = scores[rows, selected]
     best = float(overlap.sum())
-    boundary = count - 1
+    # the edge of the search: its last candidate, or with a target (an open boundary) the candidate
+    # farthest from it, as in ModeTracker.step
+    boundary = count - 1 if tracker.seed_target is None else int(np.argmax(abs(neff - tracker.seed_target)))
     for mode, column, score in zip(rows, selected, overlap):
         if score < settings["min_overlap"]:
             fail(mode, f"weak overlap {score:.6g} < {settings['min_overlap']:g} (lost or unresolved branch)")
