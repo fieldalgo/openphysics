@@ -261,9 +261,11 @@ def test_w1_strip_over_substrate_returns_the_mode_near_the_cladding():
 
 
 def _core(kind, w, h):
+    """The builder's document with its 500 x 220 nm core (shape s1) made w x h nm."""
     d = json.loads(build(kind, 2))
-    core = next(s for s in d["geometry"]["shapes"] if s["name"] == "Core")
-    core.update(x=f"{-w / 2:g} nm", w=f"{w} nm", h=f"{h} nm")
+    core = d["geometry"]["shapes"][0]
+    assert core["name"] == "s1" and core["points"] == [[-250, 0], [250, 0], [250, 220], [-250, 220]], core
+    core["points"] = [[-w // 2, 0], [w // 2, 0], [w // 2, h], [-w // 2, h]]
     return d
 
 
