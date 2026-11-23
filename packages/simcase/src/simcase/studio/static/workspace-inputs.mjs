@@ -1,5 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
+import {fitShapeEdit} from './workspace-shapes.mjs';
 
 export const INPUT_FIELDS=Object.freeze({
  height:Object.freeze({label:'Core height',unit:'nm',min:100,max:500,id:'height-number',node:'Geometry'}),
@@ -22,10 +23,14 @@ export const INPUT_FIELDS=Object.freeze({
 // The Messages line after a numeric edit: what changed, a Left x that a Width edit moved to keep
 // the centre, and that nothing is computed until Run. afterResult: a result was just announced.
 const signed=v=>String(v).replace(/^-/,'−');
-export function editNoticeText(key,value,{leftX=null,afterResult=false}={}){
+// kept 'left' (round 16): the Width kept Left x at leftX, as centred the shape would leave the window.
+// also: the refused values of the same shape applied after this edit ([{key, value}]).
+export function editNoticeText(key,value,{leftX=null,afterResult=false,kept=null,also=[]}={}){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
- const moved=leftX===null?'':` Left x moved to ${signed(leftX)} ${INPUT_FIELDS.shapeX.unit} to keep the centre.`;
- return `${field.label} set to ${signed(value)}${field.unit?' '+field.unit:''}.${moved} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
+ const unit=f=>f.unit?' '+f.unit:'';
+ const moved=leftX===null?'':kept==='left'?` Left x kept at ${signed(leftX)} ${INPUT_FIELDS.shapeX.unit}: centred, the shape would leave the window.`:` Left x moved to ${signed(leftX)} ${INPUT_FIELDS.shapeX.unit} to keep the centre.`;
+ const more=also.map(a=>` ${INPUT_FIELDS[a.key].label} set to ${signed(a.value)}${unit(INPUT_FIELDS[a.key])} too.`).join('');
+ return `${field.label} set to ${signed(value)}${unit(field)}.${moved}${more} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
 }
 export function parseNumeric(key,raw){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
@@ -49,6 +54,18 @@ export class NumericDrafts {
  get invalid(){return this.#pending.size>0;}
  clear(key){if(key===undefined)this.#pending.clear();else this.#pending.delete(key);}
  assertValid(){if(this.invalid)throw new Error('Correct the highlighted inputs or restore their last valid values before saving or running.');}
+}
+// A refused shape draft is tried again when another field of the same shape changes (round 16):
+// each draft (other than `except`) whose text is a number in range is applied to `shape` as typed
+// now (fitShapeEdit), and its draft cleared. Returns {shape, applied: [{key, value, kept}]}.
+export function retryShapeDrafts(drafts,shape,except,{index=0}={}){
+ let current=shape;const applied=[];
+ for(const d of drafts.issues){
+  const field=INPUT_FIELDS[d.key];if(!field.prop||d.key===except)continue;
+  const parsed=parseNumeric(d.key,d.raw);if(!parsed.ok)continue;
+  try{const fit=fitShapeEdit(current,field.prop,parsed.value,{index});current=fit.shape;drafts.clear(d.key);applied.push({key:d.key,value:parsed.value,kept:fit.kept});}catch{}
+ }
+ return {shape:current,applied};
 }
 // The settings that differ between two inputs files (optical, version 7 or 8), from → to in the
 // inspector's words, for "Use this run's inputs": "Width 700 → 600 nm · Modes to find 4 → 2".

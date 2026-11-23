@@ -11,13 +11,13 @@ import {OpticalJobMonitor,readPending,storePending,validatePending} from './work
 import {readRecovery,writeRecovery} from './workspace-recovery.mjs';
 import {installShapeEditor,SNAP_STEPS} from './workspace-shape-editor.mjs';
 import {sectionSvg,MATERIAL_FILL,WINDOW_VIEW,shapesView} from './workspace-section.mjs';
-import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,editShapeProperty,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS,geometryWords} from './workspace-shapes.mjs';
+import {SHAPE_MATERIALS,MAX_SHAPES,designSummary,designBounds,newShape,duplicateShape,validateShape,editShapeProperty,fitShapeEdit,validateShapes,validatePolygon,overlappingPairs,shapesBlock,shapeCorners,alignShape,ALIGN_ACTIONS,geometryWords} from './workspace-shapes.mjs';
 import {SchematicCamera,installViewport} from './workspace-viewport.mjs';
 import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHABLE_MESSAGE,RECONNECTED_MESSAGE,requestFailedText} from './workspace-connection.mjs';
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges} from './workspace-inputs.mjs';
+import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,groupIndexLocked,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,LATER_TITLE,GROUP_INDEX_OPEN_NOTE,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
@@ -473,21 +473,32 @@ function refreshInputIssues(){
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
  const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow());if(next.textContent!==text)next.textContent=text;}
 }
+// widthBase: the selected shape when its Width field took focus (round 16); lastKept: what the last
+// Width entry kept ('centre', 'left'); alsoApplied: refused values applied since the field took focus
+let widthBase=null,lastKept=null,alsoApplied=[];
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
   const el=$(field.id);if(!el)continue;el.step=field.integer?'1':'any';const issue=numericDrafts.get(key);if(issue)el.value=issue.raw;
   const hint=document.createElement('p');hint.id=field.id+'-hint';hint.className='input-hint';el.closest('label').after(hint);el.setAttribute('aria-describedby',hint.id);
   el.oninput=()=>{const parsed=numericDrafts.update(key,el.value);if(parsed.ok){if(key==='temperature')setup.temperature=parsed.value;
-   else if(field.prop){try{setShape(ui.shape,validateShape(editShapeProperty(selectedShape(),field.prop,parsed.value),ui.shape));}catch(error){numericDrafts.reject(key,el.value,error.message);refreshInputIssues();return;}if(field.prop==='w'){const left=$('shape-x');if(left&&!numericDrafts.get('shapeX'))left.value=selectedShape().x;}}
+   else if(field.prop){
+    // round 16 (S2): a Width keeps the centre, else the left edge, of the shape at focus; then the
+    // refused values of the same shape are tried again on the shape as it now is
+    let fit;try{fit=fitShapeEdit(selectedShape(),field.prop,parsed.value,{base:field.prop==='w'&&widthBase||selectedShape(),index:ui.shape});}catch(error){numericDrafts.reject(key,el.value,error.message);refreshInputIssues();return;}
+    lastKept=fit.kept;const retried=retryShapeDrafts(numericDrafts,fit.shape,key,{index:ui.shape});setShape(ui.shape,retried.shape);
+    for(const a of retried.applied)if(!alsoApplied.some(b=>b.key===a.key))alsoApplied.push(a);else alsoApplied.find(b=>b.key===a.key).value=a.value;
+    for(const [k,f] of Object.entries(INPUT_FIELDS))if(f.prop&&k!==key&&!numericDrafts.get(k)&&$(f.id))$(f.id).value=selectedShape()[f.prop];}
    else state[key]=parsed.value;
    if(key==='width'||key==='height'||field.prop){const slider=$('width');if(slider&&key==='width'){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
   // a committed value is said in Messages, with the Left x a Width edit moved (the value at focus)
   // resultNotice is read at focus: the first keystroke already replaces the result's notice
-  let leftBefore=null,afterResult=false;el.onfocus=()=>{leftBefore=field.prop?selectedShape()?.x??null:null;afterResult=resultNotice;};
+  let leftBefore=null,afterResult=false;el.onfocus=()=>{leftBefore=field.prop?selectedShape()?.x??null:null;widthBase=field.prop==='w'?{...selectedShape()}:null;lastKept=null;alsoApplied=[];afterResult=resultNotice;};
   el.onchange=()=>{if(numericDrafts.get(key))return;const shape=field.prop?selectedShape():null,value=key==='temperature'?setup.temperature:shape?shape[field.prop]:state[key];
-   const leftX=field.prop==='w'&&leftBefore!==null&&shape.x!==leftBefore?shape.x:null;if(shape)leftBefore=shape.x;
-   if(value!==undefined)notice(editNoticeText(key,value,{leftX,afterResult}));afterResult=false;};
+   const kept=field.prop==='w'?lastKept:null,leftX=field.prop==='w'&&leftBefore!==null&&(shape.x!==leftBefore||kept==='left')?shape.x:null;if(shape)leftBefore=shape.x;
+   // the base of the next Width entry is the shape as committed now
+   if(field.prop==='w')widthBase={...shape};
+   if(value!==undefined)notice(editNoticeText(key,value,{leftX,afterResult,kept,also:alsoApplied}));afterResult=false;lastKept=null;alsoApplied=[];};
   el.onkeydown=e=>{if(e.key==='Escape'){numericDrafts.clear(key);el.value=key==='temperature'?setup.temperature:field.prop?selectedShape()[field.prop]:state[key];refreshInputIssues();}};
  }
 }
@@ -504,7 +515,7 @@ function shapeInspector(){
  const overlaps=overlappingPairs(state.shapes).map(([a,b])=>`<li>${escapeHtml(state.shapes[a].name)} and ${escapeHtml(state.shapes[b].name)} may overlap; ${escapeHtml(state.shapes[b].name)} (drawn later) wins there.</li>`).join('');
  const block=shapesBlock(state.shapes);
  return `<div class="shape-list" role="group" aria-label="Shapes in draw order">${list}</div>`+
-  `<h3 class="property-heading">${escapeHtml(shape.name)} · ${shape.type==='rect'?'rectangle':shape.type}</h3><div class="property-grid"><div><label>Name<input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></label></div><div><label>Material<select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></label></div>${props.map(key=>'<div>'+field(key)+'</div>').join('')}</div>${shape.type==='rect'?'<p class="input-hint" id="shape-size-hint">Width keeps the shape centred; Height keeps its bottom edge.</p><details class="input-hint shape-size-more"><summary>More about width and height</summary><p>A Width change moves Left x by half the change, so an odd change gives a half-nanometre Left x (the centre is exact; typed values are not snapped to the drag step). A core resting on y = 0 stays there when its height changes. Left x and Bottom y move the shape.</p></details>':''}${vertices}`+
+  `<h3 class="property-heading">${escapeHtml(shape.name)} · ${shape.type==='rect'?'rectangle':shape.type}</h3><div class="property-grid"><div><label>Name<input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></label></div><div><label>Material<select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></label></div>${props.map(key=>'<div>'+field(key)+'</div>').join('')}</div>${shape.type==='rect'?'<p class="input-hint" id="shape-size-hint">Width keeps the shape centred (or its left edge, where centred it would leave the window); Height keeps its bottom edge.</p><details class="input-hint shape-size-more"><summary>More about width and height</summary><p>A Width change moves Left x by half the change, so an odd change gives a half-nanometre Left x (the centre is exact; typed values are not snapped to the drag step). Where the centred shape would leave the window, Left x stays and the right edge moves. A value refused because the shape would leave the window is tried again when you change another value of the shape. A core resting on y = 0 stays there when its height changes. Left x and Bottom y move the shape.</p></details>':''}${vertices}`+
   `<h3>Geometry tools</h3><div class="toolbar shape-actions">${add}<button type="button" id="duplicate-shape" ${n>=MAX_SHAPES?'disabled':''}>Duplicate</button><button type="button" id="delete-shape" ${n<=1?'disabled':''}>Delete</button><button type="button" id="shape-earlier" ${ui.shape===0?'disabled':''}>Draw earlier</button><button type="button" id="shape-later" ${ui.shape===n-1?'disabled':''}>Draw later</button></div>`+
   alignControls(shape)+pair('Draw order',`${ui.shape+1} of ${n} · later shapes win where they overlap`)+(block?`<p class="validation-warning">${escapeHtml(block)}</p>`:'')+(overlaps?`<ul class="shape-notes">${overlaps}</ul>`:'')+pair('Background','Silica · fills the rest of the window')+pair('Up to',`${MAX_SHAPES} shapes inside x ±1500 nm, y ±1200 nm`);
 }

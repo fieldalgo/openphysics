@@ -164,3 +164,16 @@ export function editShapeProperty(shape,prop,value){
  if(shape.type==='rect'&&prop==='w')return {...shape,x:tidy(shape.x+shape.w/2-value/2),w:value};
  return {...shape,[prop]:value};
 }
+// A typed shape value, checked (round 16): {shape, kept}. A rectangle's Width keeps its centre when
+// the shape then fits the window, else its left edge when that fits (kept 'left'), else it is
+// refused with the centred shape's reason. base: the shape when the Width field took focus, so the
+// keystrokes of one entry (3, 30, 300, 3000) do not move the centre or the left edge they keep.
+// kept is 'centre' or 'left' for a Width, null for other fields.
+export function fitShapeEdit(shape,prop,value,{base=shape,index=0}={}){
+ if(shape.type==='rect'&&prop==='w'){
+  const from={...shape,x:base.x,w:base.w};
+  try{return {shape:validateShape(editShapeProperty(from,'w',value),index),kept:'centre'};}
+  catch(error){try{return {shape:validateShape({...from,w:value},index),kept:'left'};}catch{throw error;}}
+ }
+ return {shape:validateShape(editShapeProperty(shape,prop,value),index),kept:null};
+}
