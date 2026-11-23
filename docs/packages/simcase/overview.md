@@ -280,8 +280,11 @@ and `position = [x0, y0]`, each a length with its unit. For vector results the i
 x-polarised and compared with the transverse mode field alone; for scalar
 results it is a scalar amplitude. The waist must be positive, the centre must
 lie inside the geometry window and no other key is accepted under
-`mode_overlap` or `gaussian`. Scalar results have no `te_polarization_fraction`. PML results
-(bends included) and subspace sweeps gain none of
+`mode_overlap` or `gaussian`. Scalar results have no `te_polarization_fraction`. A vector PML
+result without a bend gains only `te_polarization_fraction` and `effective_area`, computed over its
+physical window (the triangles whose centroid lies inside `physical_bounds`), with
+`integration_region: "physical_window"` in `mode_postprocessing`. Other PML results (bends,
+scalar) and subspace sweeps gain none of
 these keys: PML coefficients are covariant integrals in stretched coordinates,
 so the lossless Poynting formula over the window is not the physical power, and
 subspace frames are not modes ([PML modes](pml_modes.md),

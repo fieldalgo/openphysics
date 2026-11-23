@@ -50,13 +50,13 @@ returns it when the document asks for it:
 
 | Key | Form | Default | Allowed |
 |---|---|---|---|
-| `results.group_index` | object | absent: no group index | a `single` study of a lossless entry without `pml` or `bend` |
+| `results.group_index` | object | absent: no group index | a `single` study of a lossless entry without `bend` (with `pml` the value is complex) |
 | `results.group_index.wavelength_step` | length with its unit (`"1 nm"`, `"0.001 um"`, `{"value": .., "unit": ..}`) | `"1 nm"`, echoed in `defaults_applied` | 1 pm ≤ Δλ ≤ λ0 / 20 (exact), else `E-DOMAIN` |
 
 The key is refused with `E-CONTRACT` in these cases:
 
 - with a sweep (a wavelength sweep already gives `group_index`);
-- with `pml` or `bend`;
+- with `bend`;
 - at run time, when a material is lossy at any of the three wavelengths.
 
 Multiphysics documents refuse it as an unknown `results` key (`E-KEY-UNKNOWN`). Readers
@@ -79,6 +79,17 @@ results.group_index: unknown key "group_index" in results. … (E-KEY-UNKNOWN)
 
 `reasons` has one entry per mode: `null` when the mode has a value, else the reason.
 
+**Open boundary (PML).** With `pml` (no `bend`) n_eff is complex, and so is n_g = n_eff −
+λ0 dn_eff/dλ0: `group_index` is then `{"re", "im"}` like `effective_index`. The side solves keep
+the entry's PML and target. The matching uses the tracker's physical weights, so the overlaps are
+taken on the physical window. The first match is near the target, and the edge of the search is
+the candidate farthest from the target, as in a tracked PML sweep. The null rules are the same.
+A complex n_g is a spectral derivative, not an energy velocity. Validation (slice P3, V11): the
+leaky slab of the open-boundary checks (220 nm Si over 500 nm silica on Si, PEC side walls, TE)
+with a 1 nm step against the central difference of `refsol.lossy_slab.substrate_leaky_mode` at
+1549 and 1551 nm with physmat's dispersion, 3.706654 − 2.688e-4i
+([open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary)).
+
 `field_layout` and every other key are unchanged. Results without the option are those of
 earlier releases. The log lists the side wavelengths, each null mode with its reason, and
 the values. A run takes about three times the solve time of the single point, slightly
@@ -87,7 +98,7 @@ more because the side solves search more candidates.
 Not computed:
 
 - the field-integral group index;
-- lossy or open (PML) modes;
+- lossy modes, and open (PML) modes of a bend;
 - coupled multiphysics entries;
 - a sweep over any parameter.
 

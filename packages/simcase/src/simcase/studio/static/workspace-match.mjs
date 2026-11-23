@@ -166,14 +166,15 @@ export function noMatchText(side,unit,best){
 }
 
 // ---- Optical runs -----------------------------------------------------------------------
-const cache=new WeakMap(),offCache=new WeakMap();
-// Matching with an open run on either side is off (slice P2, V13): on the template, a closed and an
-// open run gave overlaps of 0.9903 (TE-like) and 0.9875 (TM-like) on the physical window, below the
-// 0.99 registered. Every mode is then listed unmatched, each run with its own columns. Slice P3
-// diagnosed it (the default mesh's discretization error: two different meshes of one design, not the
-// PML) and keeps it off until the criterion recorded after that result is met: OPEN_MATCHING.
-export const MATCH_OPEN_TEXT='Matching with an open boundary comes in a later version';
-export const OPEN_MATCHING=false;
+const cache=new WeakMap();
+// An open run is matched on its physical window (slice P3). In slice P2 matching with an open run
+// was off: the blind check V13 (template, closed against open, eta >= 0.99) failed with 0.9903 and
+// 0.9875. P3 found the cause in the default mesh's discretization error, the same between any two
+// meshes of one design, not in the PML: on the same mesh, PEC at the outer edge against the PML
+// gives eta = 1.00000. The checks registered after that result (V13a-c,
+// tests/simcase/test_open_boundary_mode_identity.py) pass. An open run without its physical
+// bounds (none written by Studio) is listed unmatched with this text.
+export const MATCH_OPEN_TEXT='An open run without its physical window is not matched';
 /** The side of a run that matching reads: an open run's samples restricted to its physical window
  * (the triangles whose centroid lies inside physical_bounds) and that window as the grid's; a
  * closed run's samples as they are. null when an open run has no physical bounds. */
@@ -188,13 +189,12 @@ export function matchSide(run){
 export function unmatchedModes(neffA,neffB){
  return {pairs:[],disabled:MATCH_OPEN_TEXT,rows:modeUnits(neffA).map(unit=>({unit,match:null,best:null})),unmatchedB:modeUnits(neffB).map(unit=>({unit,best:null}))};
 }
-/** The match of two optical runs (two-mode Studio runs, core mesh in nm, samples in metres),
- * kept per pair of run objects: a run's samples never change. With an open run on either side,
- * unmatchedModes unless `open` (OPEN_MATCHING by default): then on the physical windows. */
-export function opticalMatch(a,b,{open=OPEN_MATCHING}={}){
- const off=!open&&(isOpenRun(a)||isOpenRun(b)),store=off?offCache:cache;
- let byB=store.get(a);if(!byB){byB=new WeakMap();store.set(a,byB);}
- if(!byB.has(b)){const A=off?null:matchSide(a),B=off?null:matchSide(b);byB.set(b,A&&B?matchModes(A,B):unmatchedModes(a.effective_index,b.effective_index));}
+/** The match of two optical runs (Studio runs, core mesh in nm, samples in metres), kept per pair of
+ * run objects: a run's samples never change. An open run is matched on its physical window
+ * (matchSide); one without physical bounds gives unmatchedModes. */
+export function opticalMatch(a,b){
+ let byB=cache.get(a);if(!byB){byB=new WeakMap();cache.set(a,byB);}
+ if(!byB.has(b)){const A=matchSide(a),B=matchSide(b);byB.set(b,A&&B?matchModes(A,B):unmatchedModes(a.effective_index,b.effective_index));}
  return byB.get(b);
 }
 /** The polarization words of one unit of a run, as its modes table shows them. */

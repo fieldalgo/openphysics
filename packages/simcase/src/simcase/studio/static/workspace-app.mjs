@@ -1487,7 +1487,7 @@ function compareTable(a,b,match){
  // the scroll cue: the line and the right-edge shadow while columns are hidden on the right
  const cue=()=>{const over=scroll.scrollWidth>scroll.clientWidth+1;more.hidden=!over;frame.classList.toggle('more-right',over&&scroll.scrollLeft+scroll.clientWidth<scroll.scrollWidth-1);};
  scroll.addEventListener('scroll',cue,{passive:true});new ResizeObserver(cue).observe(scroll);
- // with an open run, matching is off (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
+ // an open run without physical bounds is not matched (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
  const note=cell('p',match.disabled?match.disabled+'. Every mode of A and of B is listed, not matched.':MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
  box.append(runs,more,frame,note);
  // the two loss columns count different things: say so

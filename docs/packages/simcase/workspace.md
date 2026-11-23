@@ -1205,8 +1205,8 @@ leakage out of the window.
   open edge reads *Optical left boundary · Open (PML)*, and a **Close this edge** switch closes or
   reopens it. A closed edge reads as before (PEC). With every edge closed, a run is a closed
   window.
-- Open turns **Also compute group index** off and disables it, with the note “Group index with
-  an open boundary comes in a later version”. The engine refuses it too.
+- **Also compute group index** works with Open too (slice P3). The engine's n_g is then complex,
+  and the n_g column shows Re n_g (see [mode identity](#mode-identity-with-an-open-boundary)).
 
 **Parameters.**
 
@@ -1241,8 +1241,8 @@ leakage out of the window.
   without Im n_eff reads “—”.
 - n_eff shows Re as a closed run does, with Im to 3 significant digits: *2.44126325 +
   8.28e-5i*.
-- Polarization, A_eff and n_g read “—”, titled “Computed on the physical window in a later
-  version”: the field extends into the PML, where it is not physical.
+- Polarization and A_eff are computed over the 3 × 2.4 µm physical window, with the PML
+  excluded. n_g shows Re n_g. See [mode identity](#mode-identity-with-an-open-boundary).
 - The note under the table adds “Leakage depends on what lies outside the window: shapes
   touching an open edge continue through the PML.” A closed run's note adds “For leakage, choose
   Open boundary in Physics › Optical modes.”
@@ -1312,11 +1312,13 @@ leakage out of the window.
 - When the two differ, a note reads “A counts material absorption only; B also counts leakage.
   Their difference is not a leakage loss.”
 - With an open run, the line above the table names each run *(closed)* or *(open, PML 1 µm)*.
-- **Matching is off** when either run is open. The table lists every mode of A and of B, not
-  matched, with “Matching with an open boundary comes in a later version.”, and the plots show
-  mode 1 of each run. The registered check (V13: the template, closed against open, both modes
-  matched with η ≥ 0.99 on the physical window) failed: η = 0.9903 for the TE-like mode and
-  0.9875 for the TM-like mode.
+- Matching with an open run is on (slice P3). It compares the fields on the common grid over
+  the intersection of the two runs' physical windows. Each matched row names its runs in the
+  header, for example *A · Run 1 (closed)* and *B · Run 2 (open, PML 1 µm)*. In slice P2 it was
+  off: the blind check V13 (closed against open, η ≥ 0.99) failed with η = 0.9903 for the TE-like
+  mode and 0.9875 for the TM-like mode. See
+  [mode identity](#mode-identity-with-an-open-boundary) for the diagnosis and the checks that
+  replaced it.
 
 **Files.**
 
@@ -1333,8 +1335,13 @@ leakage out of the window.
 - Such a run also keeps `open_boundary`, the engine's candidate record of its search, and
   `pml_check {"pml_strength": 6, "paired": [{"re", "im"} or null per mode]}` when the check ran.
   The digest covers both.
-- Its field implies the normalization above. It has no TE fractions, effective areas or group
-  index.
+- Its field implies the normalization above.
+- Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
+  `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
+  "im"}` with `group_index_method`. A closed run's `group_index` stays a list. A run written by
+  slice P2 has none of these keys. Studio computes its TE fraction and effective area from its
+  stored field over the window that its `open_boundary.physical_bounds` gives, and saves the
+  run as it was.
 - A [project file](#project-files) holds such a session as its workspace entry: its reader takes
   optical sessions of version 6, 7, 9 and 10.
 - A version 9 session does not hold inputs of version 9. Studio 4b58fb7 refuses a version 10

@@ -1593,8 +1593,8 @@ try {
   // start page, its own storage and downloads): the Outer boundary choice and Search near n_eff in
   // Physics › Optical modes, an edge closed again in Geometry › Boundaries, the Study summary and
   // the PML check, the template run all open (found line, loss cells, other candidates, the check
-  // column), a session of version 10, Compare with a closed run of the template (matching off since
-  // V13 failed; per-side loss headers, the note, O2's 24 px), and the leakage case built here: a
+  // column), a session of version 10, Compare with a closed run of the template (matched on the physical
+  // windows since slice P3; per-side loss headers, the note, O2's 24 px), and the leakage case built here: a
   // silicon substrate under a 500 nm BOX.
   {
     const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
@@ -1637,7 +1637,8 @@ try {
     const resultsView = () => ob.eval(`(()=>{const t=document.getElementById('modes-table');const rows=[...t.tBodies[0].rows];
       return {caption:t.caption.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.textContent),lossTitle:t.tHead.rows[0].cells[3].title,
        neff:rows.map(r=>r.querySelector('[data-neff]').textContent),loss:rows.map(r=>r.querySelector('[data-loss]').textContent),lossTitles:rows.map(r=>r.querySelector('[data-loss]').title),
-       pol:rows.map(r=>[r.querySelector('[data-polarization]')?.textContent,r.querySelector('[data-polarization]')?.title]),area:rows.map(r=>r.querySelector('[data-area]').textContent),
+       pol:rows.map(r=>[r.querySelector('[data-polarization]')?.textContent,r.querySelector('[data-polarization]')?.title]),area:rows.map(r=>r.querySelector('[data-area]').textContent),areaTitles:rows.map(r=>r.querySelector('[data-area]').title),
+       ng:rows.map(r=>r.querySelector('[data-group-index]').textContent),ngTitles:rows.map(r=>r.querySelector('[data-group-index]').title),
        check:rows.map(r=>{const c=r.querySelector('[data-pml-check]');return c?[c.dataset.pmlCheckStatus,c.textContent]:null}),italic:rows.map(r=>!!r.querySelector('[data-loss] em')),
        found:document.getElementById('modes-found')?.textContent??null,note:document.getElementById('loss-note')?.textContent??document.getElementById('lossless-note')?.textContent??null,
        candidates:(()=>{const d=document.getElementById('other-candidates');return d&&{summary:d.querySelector('summary').textContent,rows:d.querySelectorAll('tbody tr').length,reasons:[...new Set([...d.querySelectorAll('tbody tr')].map(r=>r.cells[3].textContent))],controls:d.querySelectorAll('button,canvas,a').length}})()};})()`);
@@ -1658,8 +1659,9 @@ try {
       details: await ob.eval("document.querySelector('#pml-details p').textContent"), targetHelp: await obText('#target-help')};
     stage('OB choice, open', openChoice);
     assert.deepEqual([openChoice.open.checked, openChoice.target.count, openChoice.value, openChoice.thickness], ['true', 1, '2.460', 'PML thickness PML 1 µm']);
-    assert.deepEqual([openChoice.groupIndex.count, openChoice.groupIndex.disabled], [1, true]);
-    assert.equal(openChoice.groupNote, 'Group index with an open boundary comes in a later version.');
+    // slice P3: the group index box stays enabled with an open boundary, without P2's note
+    assert.deepEqual([openChoice.groupIndex.count, openChoice.groupIndex.disabled], [1, false]);
+    assert.equal(openChoice.groupNote, null);
     assert.equal(openChoice.details, 'PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched');
     assert.match(openChoice.targetHelp, /rounded to 0\.01\. .*lowering Search near n_eff finds them\.$/);
     await obOverflow('Physics › Optical modes, Open');
@@ -1712,6 +1714,11 @@ try {
     assert.deepEqual([studyView.summary, studyView.check.count, studyView.check.checked], ['Open boundary · PML 1 µm · search near 2.460', 1, 'false']);
     await ob.click('#pml-check'); assert.equal((await control('checkbox', 'Also check the PML (2 more solves)')).checked, 'true');
     await obOverflow('Study with the PML check');
+    // slice P3: the template run also computes the group index (complex with an open boundary)
+    await toTree('Optical modes', "!!document.getElementById('group-index-check')"); await ob.click('#group-index-check');
+    assert.equal((await control('checkbox', 'Also compute group index (3 solves)')).checked, 'true');
+    const templateDoc = await solverDocument();
+    assert.deepEqual(templateDoc.results.group_index, {wavelength_step: '1 nm'}); assert.equal(templateDoc.physics.em1.pml.pml_strength, 3);
     const templateSeconds = await obRun();
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
     const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
@@ -1723,7 +1730,25 @@ try {
     assert.deepEqual(template.loss, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     template.lossTitles.forEach((t, i) => assert.equal(t, template.check[i][0] === 'depends' ? 'This loss changes with the PML; it is not a converged leakage loss.' : 'Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.'));
     assert.deepEqual(template.italic, template.check.map(([status]) => status === 'depends'));
-    assert.deepEqual(template.pol, [['—', 'Computed on the physical window in a later version'], ['—', 'Computed on the physical window in a later version']]); assert.deepEqual(template.area, ['—', '—']);
+    // slice P3: polarization, A_eff and Re n_g on the physical window: the strings of the engine run
+    // of the same document on this machine, formatted by the page's own functions
+    const templateEngine = spawnSync(args.python, ['-c', [
+      'import json,sys,pathlib,simcase',
+      'from simcase import Document, run',
+      's=run(Document.from_dict(json.loads(sys.stdin.read())),False).summary()',
+      'p=s["mode_postprocessing"]',
+      'print(json.dumps({"te":p["te_polarization_fraction"]["values"][0],"area":p["effective_area"]["values"][0],"region":p["integration_region"],"ng":s["group_index"]["re"][0],"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static")}))'].join('\n')],
+      {input: JSON.stringify(templateDoc), encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
+    assert.equal(templateEngine.status, 0, templateEngine.stderr);
+    const tEngine = JSON.parse(templateEngine.stdout), pageModes = await import(pathToFileURL(join(tEngine.static, 'workspace-modes.mjs')).href);
+    const expectedTemplate = {pol: tEngine.te.map(f => `${pageModes.polarizationWord(f)} · ${pageModes.polarizationShare(f)}`), area: tEngine.area.map(pageModes.areaText), ng: tEngine.ng.map(g => g.toFixed(4))};
+    stage('OB template, engine on this machine', {...expectedTemplate, region: tEngine.region});
+    assert.equal(tEngine.region, 'physical_window');
+    assert.deepEqual({pol: template.pol.map(([text]) => text), area: template.area, ng: template.ng}, expectedTemplate);
+    assert.deepEqual(template.pol.map(([, title]) => title), ['TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded', 'TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded']);
+    assert.deepEqual(template.pol.map(([text]) => text.split(' · ')[0]), ['TE-like', 'TM-like']);
+    assert.ok(template.areaTitles.every(t => t === 'Effective area over the 3 × 2.4 µm window, PML excluded. For a strongly leaking mode it depends on the window.'), JSON.stringify(template.areaTitles));
+    assert.ok(template.ngTitles.every(t => /: Re n_g is shown; Im n_g -?\d\.\d{2}e[-+]\d+$/.test(t)), JSON.stringify(template.ngTitles));
     assert.ok(template.neff.every(t => /^\d\.\d{8} [+−] \d\.\d{2}e-\d+i$/.test(t)), 'n_eff with its Im part');
     // both modes found again by the per-mode check. Below the display floor with check losses under
     // 0.05 dB/cm: no verdict (decided after the TM-like result 0.00480 -> 0.01706 dB/cm, registered as
@@ -1757,7 +1782,7 @@ try {
     assert.deepEqual(v10.runs[0].settings.pml, {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'});
     assert.equal(v10.runs[0].pml_check.pml_strength, 6); assert.equal(v10.runs[0].pml_check.paired.length, 2); assert.equal(v10.runs[0].open_boundary.candidates.length, 32);
 
-    // 6. the closed template run, and Compare: matching off (V13) and the per-side words
+    // 6. the closed template run, and Compare: matched on the physical windows (slice P3) and the per-side words
     await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
     await ob.click('input[name="outer-boundary"][value="closed"]'); await ob.until("!document.getElementById('target-number')", 'OB Closed chosen');
     await obRun();
@@ -1776,15 +1801,17 @@ try {
       lossA:[...t.querySelectorAll('[data-loss-a]')].map(c=>c.textContent),lossB:[...t.querySelectorAll('[data-loss-b]')].map(c=>c.textContent),
       slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),comparing:document.getElementById('tree').parentElement.classList.contains('comparing')}})()`);
     stage('OB Compare closed vs open', compared);
-    // V13 (pre-registered, blind) failed: on the physical window the template's closed and open runs
-    // matched with overlaps 0.9903 (TE-like) and 0.9875 (TM-like), below 0.99. As registered, matching
-    // is off with an open run: every mode of A and of B is listed, not matched
-    assert.deepEqual([compared.matched.length, compared.unmatched], [0, 4]);
-    assert.equal(compared.matchNote, 'Matching with an open boundary comes in a later version. Every mode of A and of B is listed, not matched.');
+    // Slice P3: matching with an open run is on, on the physical windows. P2's blind V13 (eta >= 0.99)
+    // failed at 0.9903 / 0.9875; the cause was the default mesh's discretization error, and the checks
+    // registered after that result pass (V13a-c, tests/simcase/test_open_boundary_mode_identity.py).
+    // V13b in the page: both modes paired with their own counterpart by Studio's rule
+    assert.deepEqual(compared.matched.map(([id]) => id), ['0:0', '1:1']); assert.equal(compared.unmatched, 0);
+    assert.ok(compared.matched.every(([, eta]) => eta >= 0.8), JSON.stringify(compared.matched));
+    assert.equal(compared.matchNote, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
     assert.ok(compared.sides.includes('Absorption loss A (dB/cm)') && compared.sides.includes('Loss B (dB/cm)'), JSON.stringify(compared.sides));
     assert.equal(compared.lossNote, 'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
     assert.ok(compared.runs[0].endsWith(' (closed)') && compared.runs[1].endsWith(' (open, PML 1 µm)'), JSON.stringify(compared.runs));
-    assert.deepEqual(compared.lossA, ['0 dB/cm', '0 dB/cm', '—', '—']); assert.deepEqual(compared.lossB, ['—', '—', '< 0.01 dB/cm', '< 0.01 dB/cm']);
+    assert.deepEqual(compared.lossA, ['0 dB/cm', '0 dB/cm']); assert.deepEqual(compared.lossB, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     // O2 (round 13): at 1440 × 900 the Compare table keeps at least 24 px to spare
     assert.equal(compared.comparing, true); assert.ok(compared.slack >= 24, `OB Compare: ${compared.slack} px to spare at 1440`);
     await ob.screenshot('open-boundary-compare-1440');

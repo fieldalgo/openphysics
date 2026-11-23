@@ -151,7 +151,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
   if(record.group_index!==undefined){
    const g=record.group_index,bad=()=>{throw new Error(`${which}: invalid saved group indices.`);};
    let gre=g,gim=null;
-   if(isObject(g)){if(format===null||Object.keys(g).join()!=='re,im')bad();gre=g.re;gim=g.im;}
+   if(isObject(g)){if(format===7||Object.keys(g).join()!=='re,im')bad();gre=g.re;gim=g.im;}
    else if(format===null&&record.group_index_im!==undefined)gim=record.group_index_im;
    if(!valueList(gre,k,()=>true)||(gim!==null&&(!valueList(gim,k,()=>true)||gre.some((x,i)=>(x===null)!==(gim[i]===null)))))bad();
    extra.group_index=[...gre];if(gim!==null)extra.group_index_im=[...gim];
