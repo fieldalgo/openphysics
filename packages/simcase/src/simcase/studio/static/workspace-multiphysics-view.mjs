@@ -82,7 +82,7 @@ export function createMultiphysicsView(ctx){
   // a record that still matched the file it was opened from reads as that file, as an optical one does
   const openedMatch=source!=='file'&&!savedFile&&!!openedFile&&openedCurrent===true;
   openedSignature=signature();const matched=source==='file'||savedFile?.current===true||openedMatch;cleanSignature=matched?signature():null;sourceFile=source==='file'?label:openedFile;freshSignature=null;
-  sessionFile=source==='file'||openedMatch?{name:source==='file'?label:openedFile,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map()}:null;
+  sessionFile=source==='file'||openedMatch?{name:source==='file'?label:openedFile,savedAt:null,stamp:null,jobs:filed(),opened:true}:savedFile?{name:savedFile.name,savedAt:savedFile.savedAt,stamp:null,jobs:matched?filed():new Map(),...(savedFile.projectName?{projectName:savedFile.projectName}:{})}:null;
   ctx.ui.page=v.page==='Results'&&!lastRun?'Model':v.page;validate(true);ctx.onHistory();
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp(),file:sourceFile,fileCurrent:source==='file'||openedMatch};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
   openedStamp=source==='file'||openedMatch?loaded.stamp:null;
@@ -578,7 +578,8 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   if(!out.ok)return out.reduced?{ok:false,question:overflowQuestion(out.bytes)}:{ok:false,refusal:out.refusal};
   const at={stamp:stamp(),jobs:filed(),signature:signature(),runs:runs.length};
   return {ok:true,text:out.text,notKept:out.notKept,baselines:out.baselines,runs:at.runs,
-   mark:(name,savedAt,written)=>{sessionFile={name,savedAt,stamp:at.stamp,jobs:at.jobs,written};cleanSignature=at.signature;loaded=null;freshSignature=null;ctx.onHistory();}};
+   // projectName (round 16): the file is the project file of that name, which a restore names again
+   mark:(name,savedAt,written,projectName=null)=>{sessionFile={name,savedAt,stamp:at.stamp,jobs:at.jobs,written,...(projectName?{projectName}:{})};cleanSignature=at.signature;loaded=null;freshSignature=null;ctx.onHistory();}};
  }
  // What the project's "changed" counts of this model: its document, its runs (names, pins, maps)
  // and the without-heater results; not the view or the selected run.
@@ -586,13 +587,16 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  // browser recovery (§4): written while the model has a run or was edited since it was opened
  function recovery(){
   if(!active||!(runs.length||editedSinceOpen()))return null;
-  const savedFile=sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null;
+  const savedFile=sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),...(sessionFile.projectName?{projectName:sessionFile.projectName}:{})}:null;
   const state={...sessionState(),runs:[...runs],baselines:savedBaselines()};
   // the maps recovery leaves out of a record over 16 MiB: the runs that still have them here
   // openedCurrent: the inputs and runs are still those of the file it was opened from
   const openedCurrent=sourceFile?openedStamp!==null&&openedStamp===stamp():null;
   return {stamp:stamp()+JSON.stringify([savedFile,openedCurrent]),savedFile,openedFile:sourceFile,openedCurrent,makeText:()=>{const out=recoveryText(state);recoveryDropped=out.notKept.filter(n=>state.runs.find(r=>r.number===n)?.maps!=='not kept').length;return out.text;}};
  }
+ // the text browser recovery holds for this model as it is now (shown or not), so a project save can
+ // relink its record (round 16); null without a model or over 16 MiB
+ function recoveryTextNow(){if(!doc)return null;try{return recoveryText({...sessionState(),runs:[...runs],baselines:savedBaselines()}).text;}catch{return null;}}
  let recoveryDropped=0;
  // ---- the dock ----
  // The Study sequence: the coupled run's rows (out of date once the model changed), then the
@@ -673,7 +677,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   cleanSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to your browser's Downloads. It has the model but no runs; Save keeps the runs too, in the session file.`);
  }
  return {active:()=>active,open,openText,openTemplate,openSession,close,leave,show,discard,projectEntry,contentStamp,inProject:()=>doc!==null,card:()=>card,projectRuns:()=>doc?runs.length:0,projectUnsavedRuns:()=>doc?unsavedRuns():0,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
-  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
+  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryTextNow,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
   setBaseline:on=>{baselineOption=!!on;refreshRun();ctx.onHistory();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,saveHint,
   // what leaving would lose: the runs no session file holds

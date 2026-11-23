@@ -10,11 +10,14 @@ export function sessionFileName(application,date=new Date()){
  return `${application}-session-${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}.json`;
 }
 // The last session file this notebook was saved to, as browser recovery keeps it:
-// {name, savedAt, current}; current means the notebook still matched that file.
+// {name, savedAt, current, projectName?}; current means the notebook still matched that file;
+// projectName, that the file is a project file (File › Save) of that project name.
 export function validateSavedFile(value){
  if(value==null)return null;
  if(typeof value!=='object'||typeof value.name!=='string'||!/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(value.name)||typeof value.savedAt!=='string'||!Number.isFinite(Date.parse(value.savedAt))||typeof value.current!=='boolean')return null;
- return {name:value.name,savedAt:value.savedAt,current:value.current};
+ // projectName (optional, round 16): the file is a project file of that name; a malformed one is ignored
+ const project=typeof value.projectName==='string'&&/^[^\u0000-\u001f\u007f]{1,80}$/u.test(value.projectName)&&value.projectName.trim()===value.projectName?{projectName:value.projectName}:{};
+ return {name:value.name,savedAt:value.savedAt,current:value.current,...project};
 }
 // The one save indicator: the title bar shows it and the footer repeats it, so the two never
 // disagree. file: the name of the model's current file (File › Save downloads or writes it
@@ -90,7 +93,8 @@ function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=n
 //   "Heater study · heater-study.json · changed since downloaded 13:15 · kept for recovery in this browser"
 //   "Untitled project · not saved to a file · kept for recovery in this browser"
 export const UNTITLED_PROJECT='Untitled project';
-const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'opened'});
+// recovered (round 16): a browser restore of a record that matched its project file, saved at that time
+const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'opened',recovered:'saved'});
 export function projectTitle({name=null,models=0,file=null,current=false,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  const title=name||UNTITLED_PROJECT;
  if(!models)return `${title} · no model chosen`;
