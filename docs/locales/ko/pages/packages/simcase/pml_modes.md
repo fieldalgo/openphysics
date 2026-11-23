@@ -19,7 +19,8 @@ PML 인공 모드가 포함될 수 있으므로 메시·물리 창·PML 두께·
     "pml_thickness": {"bottom": "0.5 um", "top": "0.5 um"},
     "pml_strength": 3.0,
     "pml_order": 2,
-    "pml_minimum_physical_fraction": 0.1
+    "pml_minimum_physical_fraction": 0.1,
+    "pml_search_mode_count": 16
   },
   "bend": {"bend_radius": "5 um", "axis": "y", "bend_origin": "0 um"}
 }
@@ -67,8 +68,11 @@ exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
 
 각 `openphysics.pml-candidates/2` 점은 전체 후보의 1부터 시작하는 번호,
 복소 `effective_index`, 원래 pencil 상대잔차 `relative_residual`, 양의 물리/PML L2 비율,
-선택 번호와 이유, 미터 단위 `physical_bounds`를 기록합니다. 검색 수는 최소 6개 또는 요청 수의
-두 배이며 자유 DOF에 제한됩니다. 적격 기준은 양수 실수부, 잔차<=1e-8
+선택 번호와 이유, 미터 단위 `physical_bounds`를 기록합니다. `pml_search_mode_count`가 없으면 검색 수는 최소 6개 또는 요청 수의
+두 배이고, 있으면 정확히 그 수입니다(1부터 64까지의 정수이며 `mode_count` 이상, 스윕에서는
+추적기의 `study.tracking.search_mode_count` 이상이어야 하고 아니면 `E-CONTRACT`). 어느 쪽이든
+자유 DOF에 제한됩니다. 검색을 넓히면 좁은 검색이 목표 근처에서 놓치는 물리 모드를 찾습니다.
+이 키는 `defaults_applied`에 기록하지 않으므로 이 키가 없는 문서는 키가 생기기 전과 같은 결과를 냅니다. 적격 기준은 양수 실수부, 잔차<=1e-8
 (`relative_residual_threshold`), 물리 비율>=`pml_minimum_physical_fraction`(기본 0.1, (0, 1]),
 허수부>=-1e-10 max(1,|Re n|)입니다(이득처럼 보이는 후보는 `negative_imaginary_index`로 제외). 적격 후보 중 목표와 가까운 것을 선택하고
 첫 점에서 실수부 내림차순으로 반환합니다. 제외·미선택 후보도 기록합니다.

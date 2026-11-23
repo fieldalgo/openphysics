@@ -2572,6 +2572,7 @@
   "pml_l2_fraction": "pml_l2_fraction",
   "pml_minimum_physical_fraction": "pml_minimum_physical_fraction",
   "pml_order": "pml_order",
+  "pml_search_mode_count": "pml_search_mode_count",
   "pml_strength": "pml_strength",
   "pml_thickness": "pml_thickness",
   "poisson_ratio": "poisson_ratio",

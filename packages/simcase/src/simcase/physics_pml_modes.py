@@ -22,6 +22,12 @@ def coordinates(mesh, pml, bend=None):
                             bend_axis=bend.get('axis','x'), bend_origin=bend.get('origin',0.))
 
 
+def search_count(pml, num_modes):
+    """The candidates searched before the filter: ``pml['search_count']`` when given, else
+    max(2 num_modes, 6) (the count before the setting existed)."""
+    return int(pml['search_count']) if 'search_count' in pml else max(2*num_modes,6)
+
+
 def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion=None):
     """With ``motion`` (a galerkin MeshMotion of the nodes in the mesh's unit; internal:
     simcase.shape_derivative), the modes are chosen from the numbers on the moved mesh exactly as
@@ -34,7 +40,7 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         raise ValueError('PML modes require explicit positive n_target')
     from .pml_contract import validate
     lo, hi = mesh.nodes.min(axis=0), mesh.nodes.max(axis=0)
-    settings = dict(pml=pml, n_target=n_target, boundary=boundary)
+    settings = dict(pml=pml, n_target=n_target, boundary=boundary, num_modes=num_modes)
     if bend is not None: settings["bend"] = bend
     validate(settings, dict(xmin=lo[0], xmax=hi[0], ymin=lo[1], ymax=hi[1]), "modes", ValueError)
     c=coordinates(mesh,pml,bend)
@@ -46,7 +52,7 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         if width>0 and boundary.get(side)!='pec':
             raise ValueError('PML outer faces must use PEC truncation')
     fixed=np.unique(np.concatenate([mesh.boundary[s] for s in sides])) if sides else np.zeros(0,int)
-    search=max(2*num_modes,6)
+    search=search_count(pml,num_modes)
     if formulation=='vector':
         space=EdgeSpace(scaled)
         ids={tuple(e):i for i,e in enumerate(space.edges)}
@@ -154,7 +160,7 @@ def _solve_moving(mesh, eps, wavelength, boundary, num_modes, formulation, n_tar
     ids = {tuple(e): i for i, e in enumerate(space.edges)}
     edges = np.unique([ids[tuple(sorted(e))] for s in sides for e in mesh.boundary_edges[s]]).astype(int)
     free = np.setdiff1d(np.arange(space.num_edges + mesh.num_nodes), np.r_[edges, space.num_edges + fixed])
-    search = min(max(2 * num_modes, 6), len(free) - 2)
+    search = min(search_count(pml, num_modes), len(free) - 2)
     scaled_motion = MeshMotion(design_velocity=np.asarray(motion.design_velocity, dtype=float) / wavelength,
                                t=motion.t)
     live, *_ = solve_modes(scaled, eps, 2 * np.pi, n_target, search, pec_nodes=fixed, pec_edges=edges,

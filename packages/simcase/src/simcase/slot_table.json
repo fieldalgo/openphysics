@@ -276,6 +276,7 @@
 {"forms": ["OBJECT"], "kind": "structural", "pattern": "physics.*{em.modes2d}.pml", "physics_kind": "em.modes2d"},
 {"default": 0.1, "default_reason": "dimensionless default: the candidate filter", "forms": ["BD"], "kind": "quantity", "pattern": "physics.*{em.modes2d}.pml.pml_minimum_physical_fraction", "physics_kind": "em.modes2d", "quantity": "pml_minimum_physical_fraction"},
 {"default": 2, "default_reason": "count default: a quadratic profile", "forms": ["BC"], "kind": "quantity", "pattern": "physics.*{em.modes2d}.pml.pml_order", "physics_kind": "em.modes2d", "quantity": "pml_order"},
+{"forms": ["BC"], "kind": "quantity", "pattern": "physics.*{em.modes2d}.pml.pml_search_mode_count", "physics_kind": "em.modes2d", "quantity": "pml_search_mode_count"},
 {"default": 3.0, "default_reason": "dimensionless default: the PML stretching strength", "forms": ["BD"], "kind": "quantity", "pattern": "physics.*{em.modes2d}.pml.pml_strength", "physics_kind": "em.modes2d", "quantity": "pml_strength"},
 {"forms": ["OBJECT"], "kind": "structural", "pattern": "physics.*{em.modes2d}.pml.pml_thickness", "physics_kind": "em.modes2d", "required": true},
 {"forms": ["QS", "AV"], "kind": "quantity", "pattern": "physics.*{em.modes2d}.pml.pml_thickness.bottom", "physics_kind": "em.modes2d", "quantity": "pml_thickness"},

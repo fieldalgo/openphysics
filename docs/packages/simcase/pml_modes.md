@@ -20,7 +20,8 @@ Add these settings to an existing `physics.em1` entry:
     "pml_thickness": {"bottom": "0.5 um", "top": "0.5 um"},
     "pml_strength": 3.0,
     "pml_order": 2,
-    "pml_minimum_physical_fraction": 0.1
+    "pml_minimum_physical_fraction": 0.1,
+    "pml_search_mode_count": 16
   },
   "bend": {"bend_radius": "5 um", "axis": "y", "bend_origin": "0 um"}
 }
@@ -74,9 +75,13 @@ validated but ignored for them.
 Each `openphysics.pml-candidates/2` point records all searched candidates,
 one-based candidate numbers, the complex `effective_index`, the original-pencil
 `relative_residual`, positive physical/PML L2 fractions, selected numbers, reasons and
-`physical_bounds` in metres. Search uses
-at least six candidates, otherwise twice the requested count, limited by free
-DOFs. Eligible candidates have positive real index, residual <=1e-8 (`relative_residual_threshold`), physical
+`physical_bounds` in metres. Without `pml_search_mode_count` the search uses
+at least six candidates, otherwise twice the requested count; with it, exactly that many
+(an integer from 1 to 64 and at least `mode_count`; in a sweep, at least the tracker's
+`study.tracking.search_mode_count`, else `E-CONTRACT`). Either way it is limited by free
+DOFs. A wider search finds physical modes that a narrow one misses near the target; the
+key is never recorded in `defaults_applied`, so documents without it give the results they
+gave before it existed. Eligible candidates have positive real index, residual <=1e-8 (`relative_residual_threshold`), physical
 fraction >= `pml_minimum_physical_fraction` (default 0.1, in (0, 1]), and imaginary
 index >= -1e-10 max(1,|Re n|) (a gain-like candidate is rejected as `negative_imaginary_index`). The nearest eligible candidates to the target are
 returned, ordered by descending real index at the seed point. Rejected and

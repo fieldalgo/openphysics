@@ -1243,14 +1243,16 @@ PHASE3_L3_RADIUS_MENUS = {"radius": L_MENU}
 # The registry addition of the single-point group index (results.group_index.wavelength_step), written from
 # that commit's table.
 GROUP_INDEX_MENUS = {"wavelength_step": ("pm", "nm", "um", "m")}
+# The registry addition of the open-boundary search (physics.*.pml.pml_search_mode_count), a count.
+PML_SEARCH_MENUS = {"pml_search_mode_count": ("1",)}
 
 
 def test_r11_every_menu_equals_the_design_table():
     tables = (DESIGN_MENUS, OUTPUT_ONLY, PHASE2_MENUS, PHASE2_OUTPUT_ONLY, PHASE3_MENUS, PHASE3_OUTPUT_ONLY,
-              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY, PHASE3_L3_RADIUS_MENUS, GROUP_INDEX_MENUS)
+              PHASE3_L3_MENUS, PHASE3_L3_OUTPUT_ONLY, PHASE3_L3_RADIUS_MENUS, GROUP_INDEX_MENUS, PML_SEARCH_MENUS)
     assert set().union(*tables) == set(BASES) and sum(len(t) for t in tables) == len(BASES)
     for base, menu in {**DESIGN_MENUS, **PHASE2_MENUS, **PHASE3_MENUS, **PHASE3_L3_MENUS,
-                       **PHASE3_L3_RADIUS_MENUS, **GROUP_INDEX_MENUS}.items():
+                       **PHASE3_L3_RADIUS_MENUS, **GROUP_INDEX_MENUS, **PML_SEARCH_MENUS}.items():
         want = menu + ((CANONICAL_ADDED[base],) if base in CANONICAL_ADDED else ())
         assert units.menu(base) == want, (base, units.menu(base), want)
     for base, unit in CANONICAL_ADDED.items():
@@ -1504,8 +1506,9 @@ def test_p2_names_are_legal_with_their_unit_and_places():
     # added the 7 bases and 2 role names of P3_L2_NAMES, 249 and 376 until L3 commit 9 added the 9 bases of
     # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS), 259 and 386 until the mode
     # TE fraction added te_polarization_fraction (a result fraction), 260 and 387 until the single-point group
-    # index added wavelength_step (the step of results.group_index)
-    assert len(units._ENTRIES) == 261 and len(names) == 388
+    # index added wavelength_step (the step of results.group_index), 261 and 388 until the open-boundary
+    # search added pml_search_mode_count (a count of physics.*.pml)
+    assert len(units._ENTRIES) == 262 and len(names) == 389
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
