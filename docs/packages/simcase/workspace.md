@@ -219,26 +219,32 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    cannot know that it was kept (a download can be cancelled), so Messages reports *Session file
    … sent to your browser's Downloads*; after the save dialog's write it reports *Saved to …*.
    The header holds the one save indicator, and the footer repeats it word for word: the
-   current file's name and its state, *design-a.json · saved 03:42 (download)* (or *design-a.json
+   current file's name and its state, *design-a.json · downloaded 03:42* (or *design-a.json
    · saved 03:42* after the save dialog's write) until the next edit or run, then *design-a.json ·
-   changed since saved* (*· changed since opened* after **File › Open…**). The next **Save**
+   changed since downloaded* (*· changed since saved* after the save dialog's write, *· changed
+   since opened* after **File › Open…**, *· changed since restored* after a restore). After a
+   download the header and the footer have the title text *Your browser may have added “ (1)” to
+   the file name.*, and the Save As name dialog says *Later saves download again under this name;
+   your browser may add “ (1)”.* The next **Save**
    downloads under the same name without asking. **File › Export › Model file…**
    keeps the model without results; while completed runs are not in a session file, the indicator says *Not saved
    to a file · kept for recovery in this browser* (*· updating browser recovery* while it
    writes, *· browser recovery unavailable* if it cannot), or *design-a.json · changed
-   since saved · kept for recovery in this browser* after a file save.
+   since downloaded · kept for recovery in this browser* after a file save.
    After **File › Open…** the header says *Opened …* with the file name, and after a
    recovery *Recovered from this browser*. Browser recovery keeps the session file the notebook
    was last sent to or opened from, and whether the notebook still matched it, so a recovered
    session names it: *Recovered from this browser · same as file …json* when it still matched,
    *Recovered from this browser (last sent to a file: … at 13:05; changed since)* or *(opened
    from …json; changed since)* when it had changed, *· not saved to a file* when no file was
-   saved or opened. These titles, and *… · saved … (download)* after a
+   saved or opened. A restore that still matched its file makes that file the current file:
+   **Save** downloads under its name at once and **Save As** suggests it. These titles, and
+   *… · downloaded …* (or *· saved …*) after a
    save, last until the model or a run changes (an input edit, a run added, renamed, pinned or
    unpinned) or another open: a tab click (**Library**, **Model**, **Connections**, **Results**,
    **Compare**), a selected run, a Compare choice or a field view is not a change. After a
-   change the title says what changed: *design-a.json · changed since saved* for an input edit
-   (*Unsaved inputs* when the model has no current file), *design-a.json · changed since saved ·
+   change the title says what changed: *design-a.json · changed since downloaded* for an input edit
+   (*Unsaved inputs* when the model has no current file), *design-a.json · changed since downloaded ·
    kept for recovery in this browser* for a run. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, Messages says
    where Left x moved (*Width set to 600 nm. Left x moved to −300 nm to keep the centre.*), and
@@ -640,7 +646,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   **File › Open…** opens such a file, an optical session, or a model file alone (“Opened model
   file …: it holds the model but no runs.”). **File › Export › Model file…** writes the document
   alone, as a model file named after the model. The title uses the optical
-  words: “Not saved to a file · kept for recovery in this browser”, “heated-silicon-waveguide-session-….json · saved 10:15 (download)”, “Opened …”, “Recovered from this browser”. Before leaving a model
+  words: “Not saved to a file · kept for recovery in this browser”, “heated-silicon-waveguide-session-….json · downloaded 10:15”, “Opened …”, “Recovered from this browser”. Before leaving a model
   whose runs no session file holds (another model card, the template again, an opened file or
   inputs), Studio asks first: “Leave this model? 3 runs are only in this tab and in browser
   recovery. Save session first to keep them in a file.”, with **Cancel**, **Save session** and
