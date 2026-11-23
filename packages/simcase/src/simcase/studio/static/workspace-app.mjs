@@ -19,7 +19,9 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 
 import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
-import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
+import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
+import {openChoice,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,LATER_TITLE,GROUP_INDEX_OPEN_NOTE,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
+import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
@@ -44,7 +46,7 @@ import {setupMenus} from './workspace-file-menu.mjs';
 (()=>{'use strict';const $=id=>document.getElementById(id);
 // A reload always opens the start page, so a restored scroll position would hide its top.
 if('scrollRestoration' in history)history.scrollRestoration='manual';
-const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
@@ -64,7 +66,7 @@ function bindWidthEditor(){disposeWidthEditor();disposeWidthEditor=()=>{};if(ui.
 function geom(){
 if(isHeat())return heatSvg();
 if(isJoule())return jouleView.svg();
-if(isOptical())return sectionSvg(state.shapes,{selected:ui.shape,selectedEdge:pick.boundary,mode:pick.mode});
+if(isOptical())return sectionSvg(state.shapes,{selected:ui.shape,selectedEdge:pick.boundary,mode:pick.mode,openEdges:openEdges(state.openBoundary)});
 const w=state.width/500;
 const attrs=body=>`data-pick-body="${body}" role="button" tabindex="0" aria-label="Select ${body} body" stroke="${ui.body===body?'#2860bd':'#7a939f'}" stroke-width="${ui.body===body?3:1}"`;
 const edge=(id,path,label)=>`<g data-pick-edge="${id}" role="button" tabindex="0" aria-label="Select ${label}">${path==='M65 260 H535'?'<rect x="65" y="250" width="470" height="20" fill="transparent"/>':''}<path d="${path}" fill="none" stroke="transparent" stroke-width="20"/><path d="${path}" fill="none" stroke="${pick.boundary===id?'#2860bd':'#b5c9d3'}" stroke-width="${pick.boundary===id?5:2}" pointer-events="none"/></g>`;
@@ -84,10 +86,11 @@ function pickingPanel(){
 if(ui.page!=='Model'||!$('canvas').querySelector('svg'))return;
 const bar=document.createElement('div');bar.className='toolbar';bar.innerHTML=['Bodies','Boundaries'].map(v=>`<button data-pick-mode="${v}" aria-pressed="${pick.mode===v}">${v}</button>`).join('')+'<span>Click geometry or use Tab + Enter</span>';$('canvas').prepend(bar);
 bar.querySelectorAll('[data-pick-mode]').forEach(el=>el.onclick=()=>{pick.mode=el.dataset.pickMode;pick.boundary=null;render();});
-const hint=document.createElement('p');hint.className='muted';hint.textContent=pick.mode==='Bodies'?(isOptical()?`Selected shape: ${selectedShape().name}`:`Selected body: ${ui.body}`):isOptical()?'Optical window: select one of four fixed PEC edges.':ui.view==='Section'?'Cross section: oxide bottom. Switch to Perspective for longitudinal ends.':'Select a highlighted boundary to assign its condition.';$('canvas').append(hint);
+const hint=document.createElement('p');hint.className='muted';hint.textContent=pick.mode==='Bodies'?(isOptical()?`Selected shape: ${selectedShape().name}`:`Selected body: ${ui.body}`):isOptical()?(state.openBoundary?'Optical window: select an edge to close or open it (Open boundary is chosen in Physics › Optical modes).':'Optical window: select one of four fixed PEC edges.'):ui.view==='Section'?'Cross section: oxide bottom. Switch to Perspective for longitudinal ends.':'Select a highlighted boundary to assign its condition.';$('canvas').append(hint);
 bindPicking();
 if(pick.mode==='Boundaries'&&pick.boundary){
 const info=document.createElement('section');info.className='boundary-selection';
+if(pick.boundary.startsWith('optical-')&&state.openBoundary){const side=pick.boundary.slice(8),panel=edgePanel(side,state.openBoundary);panel.querySelector('#close-edge').onchange=e=>{const closed=e.target.checked;state.openBoundary={...state.openBoundary,edges:{...state.openBoundary.edges,[side]:closed?'closed':'open'}};render();notice(`Optical ${side} edge ${closed?'closed (PEC)':'open (PML 1 µm)'}. Run explicitly to compute new results.`);};$('inspector').prepend(panel);return;}
 if(pick.boundary.startsWith('optical-')){const heading=document.createElement('h3');heading.textContent='Optical '+pick.boundary.slice(8)+' boundary';const note=document.createElement('p');note.textContent='PEC · fixed by the optical adapter. This edge is not a thermal boundary or a mechanical support.';info.append(heading,note);$('inspector').prepend(info);return;}
 const id=pick.boundary;const labels={'heater-start':'Heater start','heater-end':'Heater end','oxide-bottom':'Oxide bottom','left-end':'Left end','right-end':'Right end'};
 info.innerHTML=`<h3>Selected boundary: ${labels[id]}</h3>`;
@@ -237,7 +240,7 @@ function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
  if(!leaveMultiphysics())return;
- Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
+ Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
 // file: the session file that holds these runs (as the leave question decides it), by name;
@@ -358,7 +361,7 @@ function opticalHold(){
 // model sets its own heading, and the other models keep the default words.
 function refreshSequenceHeading(){
  if(multiView.active())return;const heading=document.querySelector('.dock-title>span');if(!heading)return;
- const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex)):opticalSequenceHeading({state:'none'});
+ const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow())):opticalSequenceHeading({state:'none'});
  if(heading.textContent!==text)heading.textContent=text;
 }
 function refreshInputIssues(){
@@ -376,10 +379,10 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
- else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex));
+ else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
- const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex);if(next.textContent!==text)next.textContent=text;}
+ const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow());if(next.textContent!==text)next.textContent=text;}
 }
 function bindNumericInputs(){
  for(const [key,field] of Object.entries(INPUT_FIELDS)){
@@ -498,11 +501,13 @@ function announceResult(text){notice(text);resultNotice=true;}
 // Modes to find and the group index option (version 8 when they are not the defaults), as the
 // inputs file, a session, a draft, recovery and the edit history keep them.
 const current = () => snapshot(state, setup);
-const inputsFile = () => withStudy(current(), {modeCount: state.modeCount, groupIndex: state.groupIndex});
-const setStudy = doc => Object.assign(state, projectStudy(doc));
+const inputsFile = () => withStudy(current(), {modeCount: state.modeCount, groupIndex: state.groupIndex, openBoundary: state.openBoundary});
+const setStudy = doc => Object.assign(state, projectStudy(doc), {openBoundary: projectBoundary(doc)});
+// The open boundary of the page as a run's settings hold it ({open_edges, target}), or null.
+const pmlNow = () => isOptical() ? signaturePml(state.openBoundary, state.shapes) : null;
 // The study a run is compared with: the inputs, Modes to find and the group index option
 // (workspace-notebook.mjs studySignature).
-const signature = () => studySignature(current(), state.modeCount, state.groupIndex);
+const signature = () => studySignature(current(), state.modeCount, state.groupIndex, pmlNow());
 const inputSignature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(inputsFile());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
@@ -534,7 +539,7 @@ function refreshSaveIndicator(){
 function downloadHint(hint){for(const id of ['project','autosave-status']){const el=$(id);if(hint)el.title=hint;else el.removeAttribute('title');}}
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
+ const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
  steps.forEach((step,index)=>{
   let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;if(step.tone)button.dataset.tone=step.tone;else delete button.dataset.tone;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
@@ -601,7 +606,7 @@ function completeLoad(pending){
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
-  const input=session.input.version===STUDY_PROJECT_VERSION||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),groupIndex:solverRun.group_index_method!==undefined});
+  const input=[STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(session.input.version)||!solverRun?session.input:withStudy(session.input,{modeCount:runModeCount(solverRun),openBoundary:runChoice(solverRun),groupIndex:solverRun.group_index_method!==undefined});
   // A recovered notebook that still matched its saved file, or the file it was opened from, reads
   // as saved, as the file would.
   const file=pending.source==='file'?null:pending.savedFile,openedMatch=pending.source!=='file'&&!!pending.openedFile&&pending.openedCurrent===true,matched=file?.current===true||openedMatch;
@@ -670,7 +675,7 @@ function inputsChangedSinceResult(){
 function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
- const prior=inputsFile(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined}));workspaceLoads.invalidate();newModelInputs=null;
+ const prior=inputsFile(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
  // only the settings that change, from → to (round 13); the same words stay where the button was
  // until the next input edit (round 14), so they are kept before the redraw
  const changed=inputChanges(prior,doc),text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`;
@@ -886,7 +891,7 @@ $('confirm-recovery-replace').onclick=async()=>{
 function currentView(){return {...fieldView,mode:Math.max(0,Math.min(fieldView.mode,(solverRun?.effective_index.length??8)-1)),probe:{...fieldProbe},profile:{...profileState}};}
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 // The completed runs as a session file keeps them; inputs and view settings are not results.
-function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]));}
+function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])]));}
 function notebookStamp(){return JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
 // The application the last recovery record was scheduled for: when the tab moves between an
 // optical and a multiphysics model, the stored record is kept as an earlier session.
@@ -908,7 +913,19 @@ const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept wit
 // Also compute group index (off by default, saved with the inputs): the run's document gains
 // results.group_index and the engine solves λ0 − 1 nm and λ0 + 1 nm as well (workspace-optical.mjs)
 const GROUP_INDEX_LABEL='Also compute group index (3 solves)';
-const groupIndexField=()=>`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
+// With an open boundary the group index is not computed (slice P3): the box is off and disabled.
+const groupIndexField=()=>state.openBoundary?`<label class="check-field"><input id="group-index-check" type="checkbox" disabled aria-describedby="group-index-open-note"> ${GROUP_INDEX_LABEL}</label><p class="input-note" id="group-index-open-note">${GROUP_INDEX_OPEN_NOTE}.</p>`:`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
+// Outer boundary (Physics › Optical modes): Closed window (PEC) or Open boundary (PML), and
+// Search near n_eff, kept to 3 decimals. Choosing Open turns the group index option off.
+const bindBoundaryField=()=>{
+ document.querySelectorAll('input[name="outer-boundary"]').forEach(radio=>radio.onchange=()=>{
+  const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;
+  state.openBoundary=open?openChoice():null;if(open)state.groupIndex=false;
+  render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');});
+ const target=$('target-number');if(target)target.onchange=()=>{
+  let t;try{t=parseTarget(target.value,state.shapes);}catch(error){notice(error.message);target.value=(state.openBoundary.target??Number(target.defaultValue)).toFixed(3);return;}
+  state.openBoundary={...state.openBoundary,target:t};render();notice(`Search near n_eff ${t.toFixed(3)}: the next run returns the modes nearest it.`);};
+};
 // The group index box in Study or Optical modes (one panel at a time): the option, then Messages says what the next run does.
 const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.onchange=e=>{state.groupIndex=e.target.checked;render();notice(groupIndexNotice(state.groupIndex));};};
 // The wavelength and Modes to find: one field each, the same in Physics › Optical modes and in
@@ -917,7 +934,7 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; 3 × 2.4 µm window; PEC outer edges; 1 to 8 modes (Modes to find, 2 by default). Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -933,13 +950,15 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same&&!runInputsNoteFor(solverRun)?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>File › Save keeps this run with its fields in the session file. File › Export › Model file keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=runInputsLine(runParts,nowParts);$('canvas').append(desc);
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
-  const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}
-  $('canvas').append(modesTable(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent='This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
+  // an open run: "Found 2 of 2 modes near n_eff 2.460" always (the target decides what is found)
+  if(isOpenRun(solverRun))$('canvas').append(foundLine(solverRun));
+  else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
+  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent='This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
- if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+``+wavelengthField()+pair('Material data','Refractive indices at this wavelength')+modeCountField()+`<p class="input-note">${MODE_COUNT_NOTE}</p>`+groupIndexField()+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
- if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())bindGroupIndexField();
+ if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+``+wavelengthField()+pair('Material data','Refractive indices at this wavelength')+modeCountField()+`<p class="input-note">${MODE_COUNT_NOTE}</p>`+groupIndexField()+boundaryFieldHtml(state.openBoundary,state.shapes)+'<p>Run from Study to compute optical fields for the current cross section.</p>';
+ if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical()){bindGroupIndexField();bindBoundaryField();}
  if(ui.page==='Connections'&&isOptical()){$('inspector').innerHTML='<h2>Active interfaces</h2>'+pair('Optical modes','Enabled')+pair('Couplings','None')+'<p>This application computes optical modes only.</p>';document.querySelector('.workspace > .note').textContent='One optical interface; no thermal or mechanical field transfer is configured.';}
  if(ui.page==='Model'&&ui.selection==='Mesh'&&isOptical())renderMeshPreview();
  if(ui.page==='Model'&&ui.selection==='Study'&&isOptical())renderOpticalStudy();
@@ -969,8 +988,8 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>';
- bindGroupIndexField();
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
+ bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;notice(box.checked?'PML check on: the next run solves the same mesh again with strength 6 (1 more solve).':'PML check off: the next run is one solve.');};}
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
@@ -1163,25 +1182,40 @@ function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+
 // Where a run came from, kept out of the primary labels and available on request.
 // The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
 // cell per degenerate pair, and the absorption-loss note once below the table.
+// An open run (slice P2): "Loss (dB/cm)" with the open boundary's cells ("< 0.01 dB/cm" below what it
+// resolves), n_eff with its Im part, "—" for polarization, A_eff and n_g (computed on the physical
+// window in a later version), and the PML check column when the check ran.
 function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
- const {rows,loss}=modeTableRows(opticalModes(run));
+ const open=isOpenRun(run),{rows,loss}=modeTableRows(opticalModes(run),{open});
+ const lambda0=run.input.model.wavelength*1e-9,im=run.effective_index_im,candidates=open?openStatuses(run):null;
+ const checks=open&&run.pml_check?run.effective_index.map((re,i)=>checkVerdict(re,im[i],run.pml_check.paired[i],lambda0)):null;
+ if(open)rows.forEach((r,i)=>{const cell=openLoss(im[i],lambda0,candidates[i]);r.neff=openIndexText(run.effective_index[i],im[i]);r.loss=cell.text;r.lossTitle=cell.title;r.lossFloor=cell.floor;r.depends=checks?.[i].status==='depends';if(r.depends)r.lossTitle=DEPENDS_HELP;r.polarization={text:'—',title:LATER_TITLE,rowspan:1};r.area={text:'—',value:null,title:LATER_TITLE};});
  const table=document.createElement('table');table.id='modes-table';
- const caption=document.createElement('caption');caption.textContent='Computed modes';table.append(caption);
+ const caption=document.createElement('caption');caption.textContent=open?openTableTitle():'Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}),groupIndexHeader(cell('th','n_g',{scope:'col',title:groupIndexHelp()}),[run]));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}),open?cell('th','n_g',{scope:'col',title:GROUP_INDEX_OPEN_NOTE}):groupIndexHeader(cell('th','n_g',{scope:'col',title:groupIndexHelp()}),[run]));
+ if(checks)head.append(cell('th',CHECK_HEADER,{scope:'col',title:CHECK_HELP}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  const body=document.createElement('tbody');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
-  tr.append(cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle}),cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
-  {const g=groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
+  {const lossCell=cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle,...(r.depends?{'data-pml-dependent':'',class:'pml-dependent'}:{})});if(r.depends){lossCell.textContent='';const em=document.createElement('em');em.textContent=r.loss;lossCell.append(em);}tr.append(lossCell);}
+  tr.append(cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
+  {const g=open?{text:'—',value:null,title:GROUP_INDEX_OPEN_NOTE}:groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
+  if(checks){const c=checks[r.mode-1],td=cell('td','',{'data-pml-check':String(r.mode),'data-pml-check-status':c.status,title:c.title});if(c.status==='depends'){const strong=document.createElement('strong');strong.textContent='Depends on the PML';td.append(strong,c.text.slice('Depends on the PML'.length));}else td.textContent=c.text;tr.append(td);}
   body.append(tr);}
  table.append(body);box.append(table);
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${AREA_HELP}.`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0
- {const note=document.createElement('p');note.className='table-note';note.id=rows.every(r=>r.lossless)?'lossless-note':'loss-note';note.textContent=loss.note;box.append(note);}
+ // (a closed window adds where leakage is found: Open boundary in Physics › Optical modes)
+ {const note=document.createElement('p');note.className='table-note';note.id=rows.every(r=>r.lossless)?'lossless-note':'loss-note';note.textContent=open?loss.note:loss.note+' '+CLOSED_POINTER;box.append(note);}
  return box;
+}
+// The attenuation status of each mode of an open run (its candidate's), or null.
+function openStatuses(run){
+ const c=run.open_boundary.candidates;
+ return run.effective_index.map((re,i)=>c.find(x=>x.selected&&x.effective_index.re===re&&x.effective_index.im===run.effective_index_im[i])?.attenuation_status??null);
 }
 function runDetails(run){
  opticalModes(run);
@@ -1287,21 +1321,24 @@ function compareTable(a,b,match){
   kind.className='pol-kind';kind.textContent=text.slice(0,at);sep.className='pol-sep';sep.textContent=' · ';share.className='pol-share';share.textContent=text.slice(at+3);td.append(kind,sep,share);return td;};
  if(match.error){box.append(cell('p','Modes not matched: '+match.error,{class:'table-note',id:'compare-match-error'}));return box;}
  const runs=document.createElement('p');runs.id='compare-table-runs';runs.className='table-runs';
- for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run));runs.append(line);}
+ // with an open run on either side, each run names its boundary: "(closed)" or "(open, PML 1 µm)"
+ const anyOpen=isOpenRun(a)||isOpenRun(b);
+ for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run))+(anyOpen?' '+boundaryName(run):'');runs.append(line);}
  // the n_g hint, when neither run computed n_g: on this line, so the n_g columns stay narrow
  if(![a,b].some(hasGroupIndex)){const line=document.createElement('span');line.className='table-hint';const hint=document.createElement('small');hint.dataset.groupIndexHint='';hint.textContent=GROUP_INDEX_HINT;hint.title=GROUP_INDEX_OFF_HELP;line.append('n_g: ',hint);runs.append(line);}
  const frame=document.createElement('div');frame.className='compare-table-frame';
  const more=cell('p','Scroll sideways for all 14 columns ›',{class:'table-note scroll-hint','data-scroll-hint':''});more.hidden=true;
  const scroll=document.createElement('div');scroll.className='compare-table-scroll';scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-labelledby','compare-neff-caption');
  const table=document.createElement('table');table.id='compare-neff';
- const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent='Modes of A and B matched by field overlap';table.append(caption);
+ const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent=match.disabled?'Modes of A and B (not matched)':'Modes of A and B matched by field overlap';table.append(caption);
  const head=document.createElement('thead'),top=document.createElement('tr'),sides=document.createElement('tr');
  // [short header, full label (one column) or the full label's start (A and B), help]
- const columns=[['Modes','Modes'],['Polarization','Polarization',POLARIZATION_HELP,true],['Overlap','Overlap'],['n_eff','n_eff',null,true],['Δn_eff (B − A)','Δn_eff (B − A)'],['Δ % (of A)','Δ % (of A)'],['A_eff (µm²)','A_eff',AREA_HELP,true,' (µm²)'],['Absorption loss (dB/cm)','Absorption loss',ABSORPTION_HELP,true,' (dB/cm)'],['n_g','n_g',groupIndexHelp(),true]];
+ const columns=[['Modes','Modes'],['Polarization','Polarization',POLARIZATION_HELP,true],['Overlap','Overlap'],['n_eff','n_eff',null,true],['Δn_eff (B − A)','Δn_eff (B − A)'],['Δ % (of A)','Δ % (of A)'],['A_eff (µm²)','A_eff',AREA_HELP,true,' (µm²)'],[isOpenRun(a)||isOpenRun(b)?'Loss (dB/cm)':'Absorption loss (dB/cm)','Absorption loss',isOpenRun(a)&&isOpenRun(b)?OPEN_LOSS_HELP:isOpenRun(a)||isOpenRun(b)?'Each side follows its run: material absorption only in a closed window, with leakage for an open boundary':ABSORPTION_HELP,true,' (dB/cm)'],['n_g','n_g',groupIndexHelp(),true]];
  for(const [short,full,help,paired,unit=''] of columns){
   if(!paired){top.append(cell('th',short,{scope:'col',rowspan:'2','data-column':full,...(help?{title:help}:{})}));continue;}
   const group=cell('th',short,{scope:'colgroup',colspan:'2',...(help?{title:help}:{})});top.append(group);
-  for(const side of ['A','B'])sides.append(cell('th',side,{scope:'col','data-column':`${full} ${side}${unit}`,title:`${full} ${side}${unit}`+(help?': '+help:''),...(full==='Polarization'?{class:'pol'}:{})}));
+  // the loss of each side follows its own run: "Absorption loss A (dB/cm)" and "Loss B (dB/cm)"
+  for(const [side,run] of [['A',a],['B',b]]){const loss=full==='Absorption loss'&&isOpenRun(run),name=loss?'Loss':full,h=loss?OPEN_LOSS_HELP:help;sides.append(cell('th',side,{scope:'col','data-column':`${name} ${side}${unit}`,title:`${name} ${side}${unit}`+(h?': '+h:''),...(full==='Polarization'?{class:'pol'}:{})}));}
  }
  // one column group per header of the first row, so its scope=colgroup headers name their two columns
  for(const [,,,paired] of columns){const group=document.createElement('colgroup');if(paired)group.span=2;table.append(group);}
@@ -1334,8 +1371,12 @@ function compareTable(a,b,match){
  // the scroll cue: the line and the right-edge shadow while columns are hidden on the right
  const cue=()=>{const over=scroll.scrollWidth>scroll.clientWidth+1;more.hidden=!over;frame.classList.toggle('more-right',over&&scroll.scrollLeft+scroll.clientWidth<scroll.scrollWidth-1);};
  scroll.addEventListener('scroll',cue,{passive:true});new ResizeObserver(cue).observe(scroll);
- const note=cell('p',MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
- box.append(runs,more,frame,note);return box;
+ // with an open run, matching is off (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
+ const note=cell('p',match.disabled?match.disabled+'. Every mode of A and of B is listed, not matched.':MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
+ box.append(runs,more,frame,note);
+ // the two loss columns count different things: say so
+ if(isOpenRun(a)!==isOpenRun(b))box.append(cell('p',isOpenRun(b)?COMPARE_LOSS_NOTE:COMPARE_LOSS_NOTE_BA,{class:'table-note',id:'compare-loss-note'}));
+ return box;
 }
 // The matched modes shown in the Compare plots (in memory only: session files keep the Results mode)
 let compareChoice=null;
@@ -1366,7 +1407,7 @@ function renderComparison(){
  const shown=chosen?[chosen.a,chosen.b]:[0,0];
  const opts=document.createElement('div');opts.className='toolbar compare-options';opts.innerHTML=`<label class="compare-mode-label">Matched modes <select id="compare-mode" ${choices.length?'':'disabled'}>${choices.length?choices.map((c,i)=>`<option value="${i}" ${c===chosen?'selected':''}>${escapeHtml(c.label)}</option>`).join(''):'<option>No matched modes</option>'}</select></label><label>Quantity <select id="compare-component">${['magnitude','Ex','Ey','Ez'].map(c=>`<option value="${c}" ${fieldView.component===c?'selected':''}>${c==='magnitude'?'|E|':'|'+c+'|'}</option>`).join('')}</select></label><label>View <select id="compare-window">${['Core region','Full window'].map(v=>`<option ${fieldView.window===v?'selected':''}>${v}</option>`).join('')}</select></label>`;host.append(opts);
  const pairOf=chosen&&match.pairs.find(p=>p.accepted&&p.unitA.includes(chosen.a));
- const shownText=chosen?`Shown: A mode ${chosen.a+1} ↔ B mode ${chosen.b+1}, overlap ${formatOverlap(pairOf.eta)}, Δn_eff (B − A) ${formatDelta(pairOf.delta)}${pairOf.unitA.length>1?' (difference of the pair means)':''}.`:match.error?`Modes not matched (${match.error}); the plots show mode 1 of each run.`:'No mode of A matches a mode of B; the plots show mode 1 of each run, not matched.';
+ const shownText=chosen?`Shown: A mode ${chosen.a+1} ↔ B mode ${chosen.b+1}, overlap ${formatOverlap(pairOf.eta)}, Δn_eff (B − A) ${formatDelta(pairOf.delta)}${pairOf.unitA.length>1?' (difference of the pair means)':''}.`:match.disabled?`${match.disabled}; the plots show mode 1 of each run, not matched.`:match.error?`Modes not matched (${match.error}); the plots show mode 1 of each run.`:'No mode of A matches a mode of B; the plots show mode 1 of each run, not matched.';
  const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. ${shownText} ${a.job===b.job?'Same run on both sides. ':''}`;
  const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run,runNumber(run));const which=document.createElement('p');which.className='compare-field-mode';which.id=i?'compare-shown-b':'compare-shown-a';which.textContent=`Mode ${shown[i]+1} · ${unitPolarization(run,[shown[i]])}${chosen?'':' · not matched'}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:var(--optical-plot-height,340px);display:block';canvas.setAttribute('role','img');article.append(h,which,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});
  // the plots first, right under the pickers (as Results shows its plot), then what they show
@@ -1501,11 +1542,24 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  const asked=pending.modeCount??DEFAULT_MODE_COUNT,e=result.effective_index,re=Array.isArray(e?.values)?e.values[0]:e?.re?.[0],im=Array.isArray(e?.im)?e.im[0]:null;
  if(e?.unit!=='1'||!Array.isArray(re)||re.length<1||re.length>asked||!re.every(Number.isFinite)||(im!==null&&(!Array.isArray(im)||im.length!==re.length||!im.every(Number.isFinite))))throw new Error('Unsupported optical result.');
  const input=pending.input;
- const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings:opticalSettings(input.model.wavelength,input.model.coreMesh,asked),input,effective_index:im?{re:[...re],im:[...im]}:[...re],field:readOpticalField(result,re.length),origin:'local',serverVersion:pending.serverVersion,
+ // the PML check of a run (slice P2): each of its modes paired with the check solve's candidates
+ if(pending.checkOf){
+  const run=runs.find(r=>r.job===pending.checkOf);if(!run)throw new Error('The run of this PML check is no longer kept; the check is not stored.');
+  if(im===null)throw new Error('Unsupported optical result.');
+  const checked=validateRun({...run,pml_check:pairCheck(run.effective_index,run.effective_index_im,openResultValues(result,re,im,run.settings.pml.target).record)});
+  checked.inputRevision=run.inputRevision;runs=runs.map(r=>r===run?checked:r);solverRun=checked;ui.page='Results';return;
+ }
+ // an open boundary: the modes above n = 1.45 with their candidate record, no TE fraction,
+ // effective area or group index (slice P3)
+ const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target.toFixed(3));})():null;
+ const kept=open?open.re:re,keptIm=open?open.im:im;
+ const settings=open?openSettings(opticalSettings(input.model.wavelength,input.model.coreMesh,asked),pending.openBoundary,input.model.shapes):opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
+ const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
+  ...(open?{open_boundary:open.record}:{
   // the engine's TE fractions and effective areas, kept with the run (a version 9 file keeps them)
   ...engineRunValues(result.summary,re.length),
   // the engine's group index with Also compute group index (a version 9 file keeps it)
-  ...engineGroupIndex(result.summary,re.length)});
+  ...engineGroupIndex(result.summary,re.length)})});
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=reasons;}
@@ -1527,7 +1581,7 @@ try{pendingJob=readPending(sessionStorage);if(pendingJob){jobPhase='detached';$(
 $('stop-waiting').onclick=()=>{if(jobMonitor.busy){jobOperation++;jobMonitor.stop();}};
 $('resume-job').onclick=async()=>{
  if(!pendingJob||solverBusy||!connection.ready||jobResumeBlocked)return;
- jobOperation++;try{await jobMonitor.follow(pendingJob,connection.instance);}catch(error){if([404,409].includes(error.status))jobResumeBlocked=true;$('job-message').textContent=error.message;}
+ jobOperation++;const resumed=pendingJob;try{await jobMonitor.follow(resumed,connection.instance);await followPmlCheck(resumed);}catch(error){if([404,409].includes(error.status))jobResumeBlocked=true;$('job-message').textContent=error.message;}finally{if(solverBusy&&!jobMonitor.busy){solverBusy=false;render();}}
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
@@ -1539,8 +1593,11 @@ $('run-optical').onclick=async()=>{
   const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
   jobPhase='submitting';$('job-message').textContent='Submitting calculation…';
   const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance),{doc});
-  const record=validatePending({version:1,job:started.job,input:withoutStudy(capture.input),revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count});
+  // an open boundary: the choice the run was made with, and whether the PML check follows it
+  const ob=builderBoundary(state.openBoundary,state.shapes),openRecord=ob?{openBoundary:{edges:ob.edges,target:ob.target},...(ui.pmlCheck===true?{pmlCheck:true}:{})}:{};
+  const record=validatePending({version:1,job:started.job,input:withoutStudy(capture.input),revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count,...openRecord});
   setPending(record);await jobMonitor.follow(record,serverInstance);
+  if(operation===jobOperation)await followPmlCheck(record);
  }catch(error){
   const phase=jobPhase,kind=connectionFailure(error);jobPhase='error';
   if(kind==='restarted'){await connectWorkspace();$('job-message').textContent=connection.ready?RESTARTED_MESSAGE:connection.message;}
@@ -1551,6 +1608,22 @@ $('run-optical').onclick=async()=>{
  finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
 };
 
+// The PML check (slice P2): once the run of `record` is kept, the same document with PML strength 6
+// is solved on the same mesh, and its candidates are paired with the run's modes (pml_check).
+async function followPmlCheck(record){
+ if(!record.pmlCheck||jobPhase!=='done'||!runs.some(r=>r.job===record.job))return;
+ const doc=pendingDocument(record);doc.physics.em1.pml.pml_strength=CHECK_STRENGTH;
+ solverBusy=true;jobPhase='validating';$('job-message').textContent='Checking the PML: the same mesh again with strength 6…';notice($('job-message').textContent);render();refreshJobControls();
+ const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
+ jobPhase='submitting';const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(record.serverInstance),{doc});
+ const {pmlCheck,...rest}=record,check=validatePending({...rest,job:started.job,startedAt:new Date().toISOString(),checkOf:record.job});
+ setPending(check);await jobMonitor.follow(check,record.serverInstance);
+}
+// The document a pending job was run with, built again from its captured inputs and choices.
+function pendingDocument(record){
+ const model=record.input.model,ob=record.openBoundary;
+ return buildOpticalDocument({...model,modeCount:record.modeCount??DEFAULT_MODE_COUNT,...(ob?{openBoundary:{edges:ob.edges,target:ob.target}}:{})},record.input.setup);
+}
 async function connectWorkspace(){
  connection.ready=false;connection.message='Checking Studio compatibility…';$('connect-workspace').disabled=true;
  $('connection-status').textContent=connection.message;render();
@@ -1588,6 +1661,6 @@ installProviderList($('installed-physics'),$('provider-list'),solverApi);
 installStatusPanels([$('installed-physics'),$('workspace-tools')],$('open-installed-physics'));
 $('run-heat').onclick=()=>{runHeat().catch(error=>notice('Heat run failed: '+error.message));};heatController?.loadCapability();
 $('run-joule').onclick=()=>{jouleView.run();};$('run-multiphysics').onclick=()=>multiView.run();$('run-baseline').onchange=e=>multiView.setBaseline(e.target.checked);$('add-physics').onclick=()=>multiView.addPhysics();$('add-coupling').onclick=()=>multiView.addCoupling();jouleView.loadCapability();
-const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});installPageTabs(document.querySelector('.page-tabs'));document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{if(!leaveMultiphysics())return;fileScope++;numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
+const originalActive=active;active=()=>state.electric===false?originalActive().filter(n=>n!=='Electric currents'):originalActive();document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ui.page=b.dataset.page;if(ui.page==='Connections')ui.selection='Couplings';render();});installPageTabs(document.querySelector('.page-tabs'));document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.view;if(ui.view==='Section'&&pick.boundary!=='oxide-bottom')pick.boundary=null;render();});$('reset').onclick=()=>{if(!leaveMultiphysics())return;fileScope++;numericDrafts.clear();pick.mode='Bodies';pick.boundary=null;ui.body='Core';Object.assign(setup,{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''});Object.assign(ui,{page:'Model',selection:'Geometry',view:'Perspective'});ui.shape=0;heatDrafts.clear();Object.assign(state,{openBoundary:null,height:220,width:500,wavelength:1550,coreMesh:30,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true,electric:true});render();};render();refreshPersistence();connectWorkspace();loadNotebookRecovery();})();
 
 installLayout(document.querySelector('main'),document.getElementById('reset-layout'),document.getElementById('layout-status'));

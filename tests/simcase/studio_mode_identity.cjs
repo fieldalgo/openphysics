@@ -102,7 +102,7 @@ test('round 10: the loss column of a closed window is "Absorption loss (dB/cm)",
  assert.equal(open.loss.header,'Loss (dB/cm)');
  assert.equal(open.loss.help,'Material absorption (k) and leakage into the PML of the open boundary');
  assert.equal(open.rows[0].lossTitle,open.loss.help);assert.equal(open.rows[0].loss,'35.21 dB/cm');
- assert.equal(open.loss.note,'Loss includes material absorption (k) and leakage into the PML of the open boundary.');
+ assert.equal(open.loss.note,'Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.');
  assert.doesNotMatch(open.loss.header+open.loss.help+open.loss.note,/Absorption loss|only/);
  // a closed multiphysics result keeps the absorption header
  assert.equal(M.physicsModes({effective_index:{unit:'1',values:[[2.4]]},summary:{formulation:'vector'}}).open,false);

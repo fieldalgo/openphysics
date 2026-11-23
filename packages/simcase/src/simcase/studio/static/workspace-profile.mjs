@@ -8,6 +8,8 @@ export function lineProfile(field,values,axis,coordinate){
  if(!Array.isArray(values)||values.length!==field.triangles.length||!values.every(Number.isFinite))throw new Error('Invalid profile values.');
  const along=axis==='x'?0:1,fixed=1-along,events=[],slices=new Map();
  field.triangles.forEach((triangle,index)=>{
+  // a field of an open boundary: the physical window only (the field in the PML is not physical)
+  if(field.physical&&!field.physical[index])return;
   const points=triangle.map(n=>field.nodes[n]),[a,b,c]=points;
   if((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])===0)return;
   const hits=[];

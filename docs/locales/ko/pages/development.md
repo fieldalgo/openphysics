@@ -334,6 +334,13 @@ Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n
 잘리거나 칸 밖으로 나간 머리글·칸 글자가 없고, 모든 칸이 상자 안에 있으며, Polarization 칸은 두 줄이고 n_g
 안내는 표 위 줄에 있습니다. 390 × 844에서는 표가 상자 안에서 스크롤되며 *Scroll sideways for all 14 columns ›*
 줄과 오른쪽 끝에 닿으면 사라지는 오른쪽 가장자리 그림자가 나옵니다.
+슬라이스 P2부터는 별도의 브라우저 컨텍스트에서 광학 열린 경계를 확인합니다(OB 단계): Outer boundary 라디오,
+Search near n_eff, PML 점검 상자, *Close this edge* 스위치를 역할과 이름으로 찾고, 그림의 PML 띠, PML 점검을 켠
+모든 변 열린 템플릿 실행(찾은 개수 줄, *< 0.01 dB/cm* 칸, 다른 후보 30개), 버전 10 세션, 닫힌 실행과의
+Compare(짝짓기 꺼짐, 쪽마다의 손실 머리글과 안내, 1440 × 900에서 24 px 여유), Geometry에서 만든 누설 사례(문서가
+P1의 기판 위 스트립과 같고 *29.15 dB/cm*와 *1006 dB/cm*, Search near n_eff 1.600에서 클래딩 굴절률 근처 모드)를
+확인하며, 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다
+([열린 경계](packages/simcase/workspace.md#광학-작업-공간의-열린-경계)).
 File 메뉴가 생긴 뒤로는 접근성 트리에서 역할과 이름으로, 그리고 키보드로(Export와 Browser copy 하위
 메뉴와 Edit 메뉴를 지나는 Enter, Up, Down, Home, End, Right, Left, 한 단계씩 닫고 초점을 돌려주는
 Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440 × 900과 390 × 844에서 페이지 안에

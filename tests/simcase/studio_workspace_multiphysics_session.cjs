@@ -180,8 +180,9 @@ test('S7 module: newer versions, another application and another result are refu
  const text=M.writeMultiphysicsSession(stateOf()).text;
  const change=f=>{const d=JSON.parse(text);f(d);return M.sessionJson(redigest(d));};
  // version 9 is now an optical session (application "optical"): a version 8 layout under it is refused, and the
- // newer-version refusal names version 10; a Studio before version 9 refused version 9 with the same template
- assert.throws(()=>N.parseSession(change(d=>{d.version=10;})),{message:'This session file is version 10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.'});
+ // newer-version refusal names version 11 (version 10 is the optical open boundary since slice P2); a Studio
+ // before version 9 refused version 9 with the same template
+ assert.throws(()=>N.parseSession(change(d=>{d.version=11;})),{message:'This session file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.'});
  assert.equal(N.newerVersionText(9,8),'This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.');
  assert.throws(()=>N.parseSession(change(d=>{d.version=9;})),{message:'Unknown key "document" in the session file.'});
  assert.throws(()=>N.parseSession(change(d=>{d.application='other';})),{message:'This session file holds a “other” model, which this Studio does not read.'});

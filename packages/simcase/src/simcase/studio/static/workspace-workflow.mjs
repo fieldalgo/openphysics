@@ -28,13 +28,14 @@ export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.mo
 // What the next run computes, in the Study panel: the current inputs, whatever run Results shows.
 // "Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2", with
 // " · group index on" when the group index option is on.
-export const nextRunText=(input,modeCount,groupIndex=false)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[]),...(groupIndex===true?['group index on']:[])].join(' · ')}`;
+// pml: the open boundary of the page (settings.pml form, workspace-open-run.mjs), or null.
+export const nextRunText=(input,modeCount,groupIndex=false,pml=null)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[]),...(groupIndex===true?['group index on']:[]),...(pml?[`open boundary (PML 1 µm) on ${pml.open_edges.length} edge${pml.open_edges.length===1?'':'s'}`,`search near ${pml.target}`]:[])].join(' · ')}`;
 // Readiness describes the current editor and retained artifacts, not accuracy.
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.
 // modeCount: Modes to find of the page; a run is of these inputs when it also found that count.
-export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed,modeCount,groupIndex=false}){
- const signature=studySignature(input,modeCount,groupIndex),inputs=JSON.stringify(input);
+export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed,modeCount,groupIndex=false,pml=null}){
+ const signature=studySignature(input,modeCount,groupIndex,pml),inputs=JSON.stringify(input);
  const materialBlock=input.setup.materials.Oxide!=='Silica'?'Background must be silica':shapesBlock(input.model.shapes),materialOK=!materialBlock;
  const currentRun=runs.findLast(run=>run.signature===signature);
  // A run of these exact inputs is done; an edit makes the study ready to run again.
@@ -64,8 +65,8 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // 'recovered'). name: the run's name (absent when it has none). For 'other', geometry and
 // currentGeometry: the two geometries in words, and changes: what differs, from the run to the
 // current inputs (inputChanges), which names them when the geometry is the same (round 14).
-export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false){
- const signature=studySignature(input,modeCount,groupIndex),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
+export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false,pml=null){
+ const signature=studySignature(input,modeCount,groupIndex,pml),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
  if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
  if(index>=0)return {state:'current',run:index+1,...name,...from};

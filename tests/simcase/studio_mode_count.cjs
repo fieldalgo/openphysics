@@ -150,7 +150,10 @@ test('V17: the digest covers every key of a version 9 run; unknown keys and mode
  assert.throws(()=>N.parseSession(edit(text,d=>{d.runs[0].field.real.pop();d.runs[0].field.imag.pop();})),{message:'Invalid complex field samples.'});
  assert.throws(()=>N.parseSession(edit(text,d=>{d.view.mode=2;d.selected=d.runs[1].job;})),{message:'Unsupported saved field view.'});
  // a newer file is refused by name; a Studio before version 9 refused this one with the same template
- assert.throws(()=>N.parseSession(edit(text,d=>{d.version=10;})),{message:'This session file is version 10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.'});
+ // (version 10, the open boundary, is read since slice P2: version 11 is the newer one; the
+ // refusal Studio 4b58fb7 gave a version 10 file is newerVersionText(10, 9))
+ assert.throws(()=>N.parseSession(edit(text,d=>{d.version=11;})),{message:'This session file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.'});
+ assert.equal(N.newerVersionText(10,9),'This session file is version 10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.');
  assert.equal(N.newerVersionText(9,8),'This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.');
 });
 test('M4-e: over 16 MiB a session keeps the fields of the selected and pinned runs only, when asked; the others keep n_eff, TE and A_eff',()=>{

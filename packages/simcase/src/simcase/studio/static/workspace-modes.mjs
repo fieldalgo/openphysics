@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {formatIndex} from './workspace-compare.mjs';
+import {isOpenRun,LATER_TITLE} from './workspace-open-run.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -19,7 +20,7 @@ export const ABSORPTION_HELP='Absorption (material k) only; leakage and radiatio
 export const PML_LOSS_HELP='Material absorption (k) and leakage into the PML of the open boundary';
 export const ABSORPTION_NOTE='Absorption loss counts material absorption (k) only. Leakage and radiation are not computed in a closed window.';
 export const LOSSLESS_NOTE='Absorption loss counts material absorption (k) only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a closed window.';
-export const PML_LOSS_NOTE='Loss includes material absorption (k) and leakage into the PML of the open boundary.';
+export const PML_LOSS_NOTE='Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.';
 /** The loss column of a table: {header, help, note}; open: the result has an open boundary (PML);
  * lossless: every mode has Im n_eff exactly 0. */
 export function lossColumn({open=false,lossless=false}={}){
@@ -31,7 +32,7 @@ export function lossColumn({open=false,lossless=false}={}){
 export const PAIR_TOLERANCE=1e-3;
 const PAIR_TEXT='1e-3';
 export const PAIR_TITLE=`Two modes whose n_eff differ by at most ${PAIR_TEXT}: a degenerate pair. Each member's polarization is not defined (any rotation within the pair is a solution); only the pair's TE share together is.`;
-export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field',file:'saved in the session file; its fields were not kept'});
+export const SOURCE_TEXT=Object.freeze({engine:'computed by the engine from the saved field',studio:'computed by Studio from the saved field',file:'saved in the session file; its fields were not kept',open:'not computed for an open boundary: '+LATER_TITLE.toLowerCase()});
 export const RUN_AGAIN='Run again to compute';
 export const AREA_HELP='Effective area (∫|E|²)²/∫|E|⁴ over the window, all three field components';
 export const AREA_PAIR_NOTE='A member of a degenerate pair: its effective area depends on the rotation within the pair, which any solution may choose.';
@@ -167,6 +168,8 @@ export function groupIndexCell(run,i){
 export function opticalModes(run){
  const keep=(key,values,source)=>Object.defineProperty(run,key,{value:{values,source},enumerable:false,configurable:true,writable:true});
  const source=run.field?'engine':'file';
+ // an open run: its field extends into the PML, so no TE fraction or effective area yet (slice P3)
+ if(isOpenRun(run)){if(!run.te)keep('te',run.effective_index.map(()=>null),'open');if(!run.area)keep('area',run.effective_index.map(()=>null),'open');}
  if(!run.te)run.te_polarization_fraction?keep('te',run.te_polarization_fraction,source):keep('te',run.effective_index.map((_,i)=>teFraction(run.field,i)),'studio');
  // a run without samples and without saved areas (a test may build one) has no A_eff
  if(!run.area)run.effective_area?keep('area',run.effective_area,source):keep('area',run.effective_index.map((_,i)=>run.field?effectiveArea(run.field,i):null),'studio');
