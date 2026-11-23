@@ -1,7 +1,8 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {parseProject,validateOpenChoice} from './workspace-project.mjs';
-import {hasOpenEdge} from './workspace-open-boundary.mjs';
+import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
+import {searchesText} from './workspace-open-run.mjs';
 import {opticalBlock} from './workspace-optical.mjs';
 import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
 export const PENDING_JOB_KEY='openphysics.studio.pending-optical.v1';
@@ -30,14 +31,16 @@ export function readPending(storage){const raw=storage.getItem(PENDING_JOB_KEY);
 export function storePending(storage,record){if(record===null)storage.removeItem(PENDING_JOB_KEY);else storage.setItem(PENDING_JOB_KEY,JSON.stringify(validatePending(record)));}
 // The time since a job started, as m:ss (0:05, 3:07, 12:40).
 export function elapsedText(ms){const s=Math.max(0,Math.floor(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
-// What a pending job solves, from the record alone (round 16): "Open boundary · 2 modes · PML
-// check (up to 2 more solves)", "PML check · mode 1 of 2", "2 modes". The server reports no stage
-// while a job runs, so none is shown.
+// What a pending job solves, from the record alone (round 16): "Open boundary · 2 modes · searches
+// near 2.46 and 1.95 · PML check (up to 2 more solves)" (slice T2; "search near 2.460" below a
+// target of 1.466), "PML check · mode 1 of 2", "2 modes". The server reports no stage while a job
+// runs, so none is shown.
 export function jobWhat(pending){
  if(pending.checkOf)return `PML check · mode ${pending.checkIndex+1} of ${pending.checkCount}`;
  const n=pending.modeCount??DEFAULT_MODE_COUNT,modes=n===1?'1 mode':n+' modes';
  if(!pending.openBoundary)return modes;
- return `Open boundary · ${modes}`+(pending.pmlCheck?` · PML check (up to ${n===1?'1 more solve':n+' more solves'})`:'');
+ const t=pending.openBoundary.target,low=lowerTarget(t),searches=low===null?`search near ${t.toFixed(3)}`:`searches near ${searchesText(t,low)}`;
+ return `Open boundary · ${modes} · ${searches}`+(pending.pmlCheck?` · PML check (up to ${n===1?'1 more solve':n+' more solves'})`:'');
 }
 // Stopping this client detaches polling. It never claims to stop server computation.
 // While the server answers that the job is running, the monitor keeps waiting, however long the

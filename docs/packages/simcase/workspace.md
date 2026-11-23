@@ -1164,6 +1164,12 @@ can open any edge of the window:
 - **Search near n_eff** (`target_effective_index`) is above 1.45 and below the largest
   index of the design. By default it is (n_max + n_SiO2) / 2 to two decimals, from the
   materials' indices at 1550 nm (2.46 for a silicon core);
+- since slice T2 a second search of 16 candidates near t_low = (t + n_SiO2) / 2 to two decimals
+  is added after the fixed settings: `"pml_additional_searches": [{"target_effective_index": 1.95,
+  "pml_search_mode_count": 16}]` for t = 2.46 ([further searches](pml_modes.md#further-searches)).
+  t_low is computed in thousandths, halves rounded up (2.20 → 1.82, sapphire 1.60 → 1.52, silicon
+  nitride 1.72 → 1.58). Below t = 1.466 there is no second search: t_low would round to the 1.45
+  floor (1.465 → 1.45), so such a run searches near t only;
 - the group index is not computed with an open boundary.
 
 With every edge closed, or without `openBoundary`, the document is the `optical-shapes-v8`
@@ -1171,17 +1177,35 @@ document byte for byte, and its results are those of that document. A workspace 
 `em.modes2d` physics has any other `pml` (another thickness, unequal thicknesses or another fixed
 value), a target of 1.45 or below, or a domain other than the window grown by the thickness on
 exactly the open edges (in nm) is refused with *The open boundary of a workspace run has a PML of 1 µm on each open edge
-with strength 3, order 2, physical fraction 0.5 and a search of 32 candidates.* The PML results
-are candidates under the [PML mode rules](pml_modes.md).
+with strength 3, order 2, physical fraction 0.5, a search of 32 candidates near the target and one
+of 16 near (target + 1.444) / 2 to two decimals; a PML check has strength 6 and one search of 16.*
+A run (strength 3) must carry exactly the second search of its target, as an exact decimal with
+the integer count 16, from t = 1.466; below 1.466, and in a PML check, it carries none. A run
+from t = 1.466 without a second search is the document of a page loaded before Studio was updated
+to slice T2: it is refused with *This page was loaded before Studio was updated; reload the page
+to run again.* No path of the page sends a stored document: a run, the PML check, the preflight
+check, the mesh preview and a run made again from a run's inputs all build the document from
+the inputs, and session, project and pending-job files keep no document. `/api/workspace/capabilities/v9`
+lists `additional_search_count` 16 and `additional_search_target` "(target + n_SiO2) / 2, two
+decimals". The PML results are candidates under the [PML mode rules](pml_modes.md).
 
 Limits of the open boundary, from its validation:
 
-- **One search target.** The candidates are the eigenvalues nearest **Search near n_eff**, and the
-  PML's own modes crowd the region around it. A mode far from the target can be missed even when
-  fewer modes are found than asked: a strip over a silicon substrate has a third mode near the
-  cladding index (n ≈ 1.486 + 0.008i, about 2800 dB/cm) that the default target 2.46 does not
-  reach with 32 candidates. To find modes near the cladding index
-  (Re n_eff below about 1.6), lower Search near n_eff (for example to 1.95).
+- **Two search targets.** The candidates are the eigenvalues nearest **Search near n_eff** and,
+  since slice T2, those nearest t_low = (t + n_SiO2) / 2; the PML's own modes crowd the region
+  around each. A search near 2.46 alone misses the third mode of a strip over a silicon substrate
+  near the cladding index (n ≈ 1.486 + 0.008i, about 2800 dB/cm); the search near 1.95 finds it
+  (W1). With the two searches the modes are the eligible candidates of highest Re n_eff, listed by
+  descending Re as in a closed run; a candidate that both searches find is kept once. Modes far
+  from both targets can still be missed: move Search near n_eff to find them. Below t = 1.466
+  there is one search (see above). The ranking relies on the minimum physical fraction 0.5 to
+  keep PML-dominated candidates out, and a request for fewer modes than lie above a wanted lower-Re
+  mode does not return it ([further searches](pml_modes.md#further-searches)).
+- The engine validations of the open boundary (P1's V1 to V8, and P3's mode identity and group
+  index) solve the single-search documents of P1 (`build(..., single=True)` in
+  `tests/simcase/open_boundary_fixtures.py`): they validate the PML and the post-processing, not
+  the selection. The Studio defaults, with both searches, are covered by W1, W4 and W6 and the
+  Studio checks.
 - **Why 1 µm and 32.** With the mesh held fixed, a 1.5 or 2 µm layer changes the loss by at
   most 0.02 % and n_eff by about 1e-8, so it adds no accuracy; it adds PML modes near the target,
   which pushed the TM-like mode of the strip over a substrate out of a search of 16. 32 keeps
@@ -1240,17 +1264,23 @@ leakage out of the window.
 
 - The PML is 1 µm thick, shown read-only as *PML 1 µm*; there is no thickness field.
 - Strength 3, order 2 and a minimum physical fraction of 0.5 are fixed and listed under
-  *Details*; the search takes 32 candidates.
+  *Details*: *… · 32 candidates searched near n_eff, 16 near the second index*.
 - **Search near n_eff** can be edited. Its default is (n_max + n_SiO2)/2 at 1550 nm rounded to
   0.01 (2.46 for silicon, shown *2.460*). Edits are kept to 3 decimals, and the value shown is
   the value sent. It must lie strictly between 1.45 and n_max.
-- A single target can miss modes far from it, notably near the cladding index (Re ≲ 1.6). The
-  help says that lowering Search near n_eff finds them.
+- The second target is shown beside it as text, not editable, and follows the shown target:
+  *Also searches near 1.95, for modes close to the silica index.* (2.20 → 1.82). The help reads
+  “Studio searches for modes near this index and near a second index halfway to the silica index
+  (1.95). Modes are listed by n_eff, highest first.”
+- Below 1.466 there is one search: no second target is shown, and the help keeps P2's words (a
+  single target can miss modes far from it, notably near the cladding index).
 
 **Study and drawing.**
 
-- Study shows *Open boundary · PML 1 µm · search near 2.460* and the option **Also check the
-  PML (N more solves)**, off by default, with N = Modes to find.
+- Study shows *Open boundary · PML 1 µm · searches near 2.46 and 1.95* (*search near 1.465*
+  below 1.466) and the option **Also check the PML (N more solves)**, off by default, with N =
+  Modes to find. In the words of two searches a target is written to 3 decimals with one trailing
+  zero dropped (2.46, 2.455, 2.50), and t_low to 2.
 - The drawing shows a grey band labelled *PML 1 µm* outside each open edge. The band is drawn
   narrower than 1 µm so the window stays in view. The section line ends “… · open boundary
   (PML 1 µm) on N edges”.
@@ -1274,13 +1304,18 @@ leakage out of the window.
 - The note under the table adds “Leakage depends on what lies outside the window: shapes
   touching an open edge continue through the PML.” A closed run's note adds “For leakage, choose
   Open boundary in Physics › Optical modes.”
-- The found line is always shown: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff
-  (Physics › Optical modes) to find other modes.*
+- The found line is always shown: *Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near
+  n_eff to find other modes.* A run of one search (below 1.466, or a run of slice P2) reads as
+  before: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to
+  find other modes.*
 - Studio keeps the engine's modes with Re n_eff above 1.45.
 - **Other candidates (n) — not shown as modes** lists every searched candidate that is not shown,
   with its n_eff, physical share and reason. The reasons read *Mostly in the PML (a PML mode)*,
   *Gains power (not a passive mode)*, *Not converged (residual above 1e-8)*, *Beyond the modes
   asked for* and *Below the silica index (cladding radiation)*. These rows have no field view.
+- With two searches the table also has a **Search** column (*near 2.46*, *near 1.95*). A candidate
+  of the second search that repeats one of the first (the engine's `duplicate_of`) is not listed;
+  the title counts them: *Other candidates (41) — not shown as modes · 3 found by both searches*.
 - The field view, its colour scale and the line profile use the physical window only. The
   engine normalizes an open run's field to its largest |E| there (`physical_max_centroid_magnitude`).
 
@@ -1288,7 +1323,8 @@ leakage out of the window.
 
 - With the option on, Studio solves the run's document again once per mode found: PML strength 6,
   a search of 16 candidates and Search near n_eff at that mode's Re n_eff (to 6 decimals). The
-  mesh is the same, node for node.
+  mesh is the same, node for node. The check searches once: the run's second search is left out,
+  so the check documents are those of slice P2 byte for byte.
 - The candidates of these solves are pooled. Each mode is paired with the nearest eligible
   candidate: one that passed the engine's filter (selected, or set aside only as beyond the
   count) and has Re > 1.45. A pair is accepted when |Δn_eff| ≤ 2e-3.
@@ -1363,6 +1399,13 @@ leakage out of the window.
 - Such a run also keeps `open_boundary`, the engine's candidate record of its search, and
   `pml_check {"pml_strength": 6, "paired": [{"re", "im"} or null per mode]}` when the check ran.
   The digest covers both.
+- Slice T2 changes neither the settings nor the file version. A run of two searches keeps the
+  engine's record `openphysics.pml-candidates/3`, whose `searches` must be exactly 32 near the
+  run's target and 16 near its t_low; any other /3 record is refused as an invalid open boundary
+  record. A run with a record /2 (one search: a run of slice P2, or a target below 1.466) reads with
+  its words as before. A version 10 file written before slice T2 opens with the same values and
+  words, and **Use this run's inputs** followed by a run builds the document of both searches.
+  The study signature is unchanged, so such a run still reads as made with the current inputs.
 - Its field implies the normalization above.
 - Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
   `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
@@ -1655,7 +1698,8 @@ core dimensions and materials with links back to their editors.
 
 The job panel shows the submitted dimensions/material, job ID, elapsed time (m:ss), what the
 run solves and the result-loading state, for example *Computing job 1a2b3c4d · 12:40 · Open
-boundary · 2 modes · PML check (up to 2 more solves)* or *PML check · mode 1 of 2*. The server
+boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)* or *PML check ·
+mode 1 of 2*. The server
 reports no stage while a job runs, so none is shown. **Stop waiting** stops browser polling only; the optical
 server continues its computation. **Resume job** retrieves that same job with
 its captured inputs, even after editing the current design or reloading the

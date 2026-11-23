@@ -20,7 +20,7 @@ import {mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile} from 'node:fs/pr
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {launchBrowser} from './browser_launch.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
@@ -1653,7 +1653,8 @@ try {
        ng:rows.map(r=>r.querySelector('[data-group-index]').textContent),ngTitles:rows.map(r=>r.querySelector('[data-group-index]').title),
        check:rows.map(r=>{const c=r.querySelector('[data-pml-check]');return c?[c.dataset.pmlCheckStatus,c.textContent]:null}),italic:rows.map(r=>!!r.querySelector('[data-loss] em')),
        found:document.getElementById('modes-found')?.textContent??null,note:document.getElementById('loss-note')?.textContent??document.getElementById('lossless-note')?.textContent??null,
-       candidates:(()=>{const d=document.getElementById('other-candidates');return d&&{summary:d.querySelector('summary').textContent,rows:d.querySelectorAll('tbody tr').length,reasons:[...new Set([...d.querySelectorAll('tbody tr')].map(r=>r.cells[3].textContent))],controls:d.querySelectorAll('button,canvas,a').length}})()};})()`);
+       candidates:(()=>{const d=document.getElementById('other-candidates');if(!d)return null;const head=[...d.querySelectorAll('thead th')].map(c=>c.textContent),rows=[...d.querySelectorAll('tbody tr')],col=head.indexOf('Search');
+        return {summary:d.querySelector('summary').textContent,head,rows:rows.length,reasons:[...new Set(rows.map(r=>r.cells[r.cells.length-1].textContent))],searches:col<0?null:[...new Set(rows.map(r=>r.cells[col].textContent))].sort(),controls:d.querySelectorAll('button,canvas,a').length}})()};})()`);
 
     await ob.call('Page.navigate', {url: base + '/workspace'});
     await ob.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'OB connected start page');
@@ -1668,14 +1669,17 @@ try {
     await ob.click('input[name="outer-boundary"][value="open"]'); await ob.until("!!document.getElementById('target-number')", 'OB Open chosen');
     const openChoice = {open: await control('radio', 'Open boundary (PML)'), target: await control('spinbutton', 'Search near n_eff'), value: await obValue('#target-number'),
       thickness: await obText('#pml-thickness'), groupIndex: await control('checkbox', 'Also compute group index (3 solves)'), groupNote: await obText('#group-index-open-note'),
-      details: await ob.eval("document.querySelector('#pml-details p').textContent"), targetHelp: await obText('#target-help')};
+      details: await ob.eval("document.querySelector('#pml-details p').textContent"), targetHelp: await obText('#target-help'), lower: await obText('#lower-target')};
     stage('OB choice, open', openChoice);
     assert.deepEqual([openChoice.open.checked, openChoice.target.count, openChoice.value, openChoice.thickness], ['true', 1, '2.460', 'PML thickness PML 1 µm']);
     // slice P3: the group index box stays enabled with an open boundary, without P2's note
     assert.deepEqual([openChoice.groupIndex.count, openChoice.groupIndex.disabled], [1, false]);
     assert.equal(openChoice.groupNote, null);
-    assert.equal(openChoice.details, 'PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched');
-    assert.match(openChoice.targetHelp, /rounded to 0\.01\. .*lowering Search near n_eff finds them\.$/);
+    // slice T2 (pre-registered): the second search near (2.46 + 1.444) / 2 = 1.95, shown as text
+    assert.equal(openChoice.details, 'PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched near n_eff, 16 near the second index');
+    assert.equal(openChoice.lower, 'Also searches near 1.95, for modes close to the silica index.');
+    assert.equal(openChoice.targetHelp, 'Studio searches for modes near this index and near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first.');
+    assert.equal(await ob.eval("document.getElementById('target-number').getAttribute('aria-describedby')"), 'lower-target target-help');
     await obOverflow('Physics › Optical modes, Open');
 
     // 2. the drawing: a grey band outside each open edge; Geometry › Boundaries closes the bottom edge
@@ -1703,10 +1707,15 @@ try {
 
     // 3. Search near n_eff: an edit changes target_effective_index; the default document is P1's
     const defaultDoc = await solverDocument(); assert.equal(defaultDoc.physics.em1.target_effective_index, 2.46);
+    assert.deepEqual(defaultDoc.physics.em1.pml.pml_additional_searches, [{target_effective_index: 1.95, pml_search_mode_count: 16}]);
     await toTree('Optical modes', "!!document.getElementById('target-number')"); await ob.type('#target-number', '2.3');
-    const editedDoc = await solverDocument(); stage('OB Search near n_eff 2.3', {target: editedDoc.physics.em1.target_effective_index});
+    const lowerEdited = await obText('#lower-target');
+    const editedDoc = await solverDocument(); stage('OB Search near n_eff 2.3', {target: editedDoc.physics.em1.target_effective_index, searches: editedDoc.physics.em1.pml.pml_additional_searches, lower: lowerEdited});
     assert.equal(editedDoc.physics.em1.target_effective_index, 2.3);
-    assert.deepEqual({...editedDoc, physics: {em1: {...editedDoc.physics.em1, target_effective_index: 2.46}}}, defaultDoc);
+    // slice T2: the second search follows the target, (2.3 + 1.444) / 2 = 1.872 -> 1.87
+    assert.equal(lowerEdited, 'Also searches near 1.87, for modes close to the silica index.');
+    assert.deepEqual(editedDoc.physics.em1.pml.pml_additional_searches, [{target_effective_index: 1.87, pml_search_mode_count: 16}]);
+    assert.deepEqual({...editedDoc, physics: {em1: {...editedDoc.physics.em1, target_effective_index: 2.46, pml: {...editedDoc.physics.em1.pml, pml_additional_searches: defaultDoc.physics.em1.pml.pml_additional_searches}}}}, defaultDoc);
     // an edited target that a material edit puts out of range (silicon nitride: n_max 1.9963) goes back
     // to the new design's default, with a message, and every input write keeps working
     await toTree('Geometry', "!!document.querySelector('#shape-w')"); await ob.choose('#shape-material', 'Silicon nitride');
@@ -1723,7 +1732,7 @@ try {
     await toTree('Study', "!!document.getElementById('open-boundary-summary')");
     const studyView = {summary: await obText('#open-boundary-summary'), check: await control('checkbox', 'Also check the PML (2 more solves)')};
     stage('OB Study', studyView);
-    assert.deepEqual([studyView.summary, studyView.check.count, studyView.check.checked], ['Open boundary · PML 1 µm · search near 2.460', 1, 'false']);
+    assert.deepEqual([studyView.summary, studyView.check.count, studyView.check.checked], ['Open boundary · PML 1 µm · searches near 2.46 and 1.95', 1, 'false']);
     await ob.click('#pml-check'); assert.equal((await control('checkbox', 'Also check the PML (2 more solves)')).checked, 'true');
     await obOverflow('Study with the PML check');
     // slice P3: the template run also computes the group index (complex with an open boundary)
@@ -1737,7 +1746,7 @@ try {
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
     assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm)', 'A_eff (µm²)', 'n_g', 'PML check']);
     assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
-    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
     // pre-registered: both modes below what the open boundary resolves
     assert.deepEqual(template.loss, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     template.lossTitles.forEach((t, i) => assert.equal(t, template.check[i][0] === 'depends' ? 'This loss changes with the PML; it is not a converged leakage loss.' : 'Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.'));
@@ -1749,7 +1758,9 @@ try {
       'from simcase import Document, run',
       's=run(Document.from_dict(json.loads(sys.stdin.read())),False).summary()',
       'p=s["mode_postprocessing"]',
-      'print(json.dumps({"te":p["te_polarization_fraction"]["values"][0],"area":p["effective_area"]["values"][0],"region":p["integration_region"],"ng":s["group_index"]["re"][0],"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static")}))'].join('\n')],
+      'ob=s["open_boundary"][0]',
+      'print(json.dumps({"te":p["te_polarization_fraction"]["values"][0],"area":p["effective_area"]["values"][0],"region":p["integration_region"],"ng":s["group_index"]["re"][0],"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static"),',
+      '"schema":ob["schema"],"searches":ob["searches"],"candidates":len(ob["candidates"]),"duplicates":sum("duplicate_of" in c for c in ob["candidates"]),"selected":len(ob["selected_candidates"])}))'].join('\n')],
       {input: JSON.stringify(templateDoc), encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
     assert.equal(templateEngine.status, 0, templateEngine.stderr);
     const tEngine = JSON.parse(templateEngine.stdout), pageModes = await import(pathToFileURL(join(tEngine.static, 'workspace-modes.mjs')).href);
@@ -1767,8 +1778,19 @@ try {
     // independent; the engine gives 0.0048 and below for both, and 0.017 at most on the check)
     assert.deepEqual(template.check, [['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)'], ['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)']]);
     assert.equal(template.note, 'Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.');
-    // pre-registered: 32 searched, 2 shown, 30 other candidates, none with a field view
-    assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls], ['Other candidates (30) — not shown as modes', 30, 0]);
+    // pre-registered (P2): 32 searched, 2 shown, 30 other candidates, none with a field view. Slice T2
+    // (pre-registered): 32 near 2.46 and 16 near 1.95; the list leaves out the 2 shown and the
+    // candidates both searches found, counted in the title, as the engine run of the same document
+    // on this machine records them
+    assert.deepEqual([tEngine.schema, tEngine.searches.map(x => [x.search, x.target_effective_index, x.search_mode_count]), tEngine.selected],
+      ['openphysics.pml-candidates/3', [[1, 2.46, 32], [2, 1.95, 16]], 2]);
+    assert.equal(tEngine.candidates, tEngine.searches[0].candidate_count + tEngine.searches[1].candidate_count);
+    const otherCount = tEngine.candidates - 2 - tEngine.duplicates;
+    stage('OB template candidates, engine on this machine', {candidates: tEngine.candidates, duplicates: tEngine.duplicates, other: otherCount});
+    assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls],
+      [`Other candidates (${otherCount}) — not shown as modes` + (tEngine.duplicates ? ` · ${tEngine.duplicates} found by both searches` : ''), otherCount, 0]);
+    assert.deepEqual(template.candidates.head, ['Candidate', 'Search', 'n_eff', 'Physical share', 'Reason']);
+    assert.deepEqual(template.candidates.searches, ['near 1.95', 'near 2.46']);
     await obOverflow('Results, open run');
 
     // 5. Save: the project file (P3) holds the workspace model as a session of version 10 with the
@@ -1792,7 +1814,9 @@ try {
     stage('OB version 10 saved', {file: saved, version: v10.version, settings: v10.runs[0].settings.pml, check: v10.runs[0].pml_check, candidates: v10.runs[0].open_boundary.candidates.length});
     assert.deepEqual([v10.version, v10.runs[0].settings.adapter, v10.runs[0].settings.boundary], [10, 'optical-shapes-v9', 'PML']);
     assert.deepEqual(v10.runs[0].settings.pml, {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'});
-    assert.equal(v10.runs[0].pml_check.pml_strength, 6); assert.equal(v10.runs[0].pml_check.paired.length, 2); assert.equal(v10.runs[0].open_boundary.candidates.length, 32);
+    // slice T2: the run's settings are P2's; its record is the engine's /3 of both searches
+    assert.equal(v10.runs[0].pml_check.pml_strength, 6); assert.equal(v10.runs[0].pml_check.paired.length, 2);
+    assert.equal(v10.runs[0].open_boundary.schema, 'openphysics.pml-candidates/3'); assert.equal(v10.runs[0].open_boundary.candidates.length, tEngine.candidates);
 
     // 6. the closed template run, and Compare: matched on the physical windows (slice P3) and the per-side words
     await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
@@ -1856,11 +1880,13 @@ try {
     assert.deepEqual(substrateInvalid, []);
     await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
     await ob.click('input[name="outer-boundary"][value="open"]'); await ob.until("!!document.getElementById('target-number')", 'OB leakage Open');
-    // the document the browser sends is P1's build("strip_substrate", 2) (tests/simcase/open_boundary_fixtures.py), byte for byte
+    // the document the browser sends is build("strip_substrate", 2) (tests/simcase/open_boundary_fixtures.py), byte
+    // for byte: P1's strip over a substrate with the second search near 1.95 (slice T2; the fixture is P1's
+    // optical-document-strip-substrate-open.json with that key only, tests/simcase/test_studio_open_boundary_p2.py)
     const leakDoc = await solverDocument();
-    const p1Leak = await readFile(new URL('../../tests/simcase/studio_session_fixtures/optical-document-strip-substrate-open.json', import.meta.url), 'utf8');
+    const p1Leak = await readFile(new URL('../../tests/simcase/studio_session_fixtures/optical-document-strip-substrate-open-searches.json', import.meta.url), 'utf8');
     stage('OB leakage document', {domain: leakDoc.geometry.domain, shapes: leakDoc.geometry.shapes.length, same: JSON.stringify(leakDoc) === p1Leak});
-    assert.equal(JSON.stringify(leakDoc), p1Leak, 'the UI-built leakage document is P1\'s strip over a substrate');
+    assert.equal(JSON.stringify(leakDoc), p1Leak, 'the UI-built leakage document is P1\'s strip over a substrate with both searches');
     // the PML check on (one solve per mode): pre-registered, both modes found again and PML-independent,
     // the loss changing by less than 2 %
     await toTree('Study', "!!document.getElementById('pml-check')");
@@ -1876,7 +1902,8 @@ try {
     // CI failed on them: ubuntu-24.04 TE Re 2.44128662 (dRe 2.3e-5), macos-15 TE "29.18 dB/cm" (+0.10 %)
     // and Re 2.44113899. Now the strings on screen must equal, exactly, those of the engine run of P1's
     // document (the one the page sends, byte for byte, checked above) on this machine, formatted by the
-    // page's own formatter (workspace-open-run.mjs of the installed simcase).
+    // page's own formatter (workspace-open-run.mjs of the installed simcase). Slice T2: the expected
+    // strings move with the document (both searches).
     const engineStrings = spawnSync(args.python, ['-c', [
       'import json,sys,pathlib,simcase',
       'from simcase import Document, run',
@@ -1951,7 +1978,35 @@ try {
     assert.equal(withoutTime(third.text), withoutTime(second.text), 'V-P1 (b): byte-identical but for savedAt');
     assert.deepEqual(workspaceSession(third.text).runs.map(r => r.origin), Array(runCount).fill('imported'));
     assert.deepEqual([reopened.neff, reopened.loss, reopened.check], [leak.neff, leak.loss, leak.check], 'the open run reads the same after the open');
-    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+
+    // W1 through the builder (slice T2, pre-registered): the strip over a substrate asking for 8 modes
+    // returns all three modes, the one near the cladding index included (1.4864 + 7.92e-3i), with the
+    // strings of the engine run of the same document on this machine
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); await ob.type('#mode-count-number', 8);
+    await toTree('Study', "!!document.getElementById('pml-check')"); if (await ob.eval("document.getElementById('pml-check').checked")) await ob.click('#pml-check');
+    const eightDoc = await solverDocument();
+    assert.deepEqual({...eightDoc, physics: {em1: {...eightDoc.physics.em1, mode_count: 2}}}, JSON.parse(p1Leak));
+    const eightSeconds = await obRun();
+    const eight = await resultsView();
+    const eightEngine = spawnSync(args.python, ['-c', [
+      'import json,sys',
+      'from simcase import Document, run',
+      's=run(Document.from_dict(json.loads(sys.stdin.read())),False).summary()',
+      'ob=s["open_boundary"][0]["candidates"];re=s["effective_index"]["re"][0];im=s["effective_index"]["im"][0]',
+      'st=[next((c.get("attenuation_status") for c in ob if c["selected"] and c["effective_index"]["re"]==a and c["effective_index"]["im"]==b),None) for a,b in zip(re,im)]',
+      'print(json.dumps({"re":re,"im":im,"status":st}))'].join('\n')],
+      {input: JSON.stringify(eightDoc), encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
+    assert.equal(eightEngine.status, 0, eightEngine.stderr);
+    const e8 = JSON.parse(eightEngine.stdout), keep8 = e8.re.map((r, i) => r > 1.45 ? i : -1).filter(i => i >= 0);
+    const expectedEight = {neff: keep8.map(i => pageFormat.openIndexText(e8.re[i], e8.im[i])), loss: keep8.map(i => pageFormat.openLoss(e8.im[i], 1.55e-6, e8.status[i]).text)};
+    stage('W1 strip over a substrate, 8 modes', {neff: eight.neff, loss: eight.loss, found: eight.found, engine: expectedEight, seconds: eightSeconds});
+    assert.deepEqual({neff: eight.neff, loss: eight.loss}, expectedEight, 'the screen strings are the engine run of the same document on this machine');
+    assert.equal(eight.neff.length, 3, JSON.stringify(eight.neff));
+    assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    const cladding = eight.neff.map(t => /^(\d\.\d{8}) ([+−]) (\d\.\d{2}e-\d+)i$/.exec(t)).map(m => ({re: Number(m[1]), im: (m[2] === '−' ? -1 : 1) * Number(m[3])}));
+    assert.deepEqual(eight.neff.slice(0, 2), leak.neff, 'TE-like and TM-like first, as with 2 modes');
+    assert.ok(Math.abs(cladding[2].re - 1.4864) <= 5e-4 && Math.abs(cladding[2].im / 7.92e-3 - 1) <= 0.05, JSON.stringify(cladding));
 
     // 8. Search near n_eff lowered to 1.600 with 4 modes finds the mode near the cladding index
     // (pre-registered: within 5e-4 of Re 1.4864 and 5 % of Im 7.92e-3, about 2789 dB/cm)
@@ -1963,7 +2018,8 @@ try {
       .find(m => Math.abs(m.re - 1.4864) <= 5e-4);
     assert.ok(near, 'the near-cladding mode is shown: ' + JSON.stringify(low.neff));
     assert.ok(Math.abs(near.im / 7.92e-3 - 1) <= 0.05, JSON.stringify(near)); assert.ok(Math.abs(Number(near.loss.split(' ')[0]) / 2789 - 1) <= 0.05, JSON.stringify(near));
-    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.600\. /);
+    // slice T2: the search near 1.600 is paired with one near (1.600 + 1.444) / 2 = 1.52
+    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.60 and 1\.52\. Move Search near n_eff to find other modes\.$/);
     // review: choosing the optical model again clears the PML check option with the open boundary
     await toTree('Study', "!!document.getElementById('pml-check')"); await ob.click('#pml-check'); assert.equal(await ob.eval("document.getElementById('pml-check').checked"), true);
     await ob.click('nav [data-page=Applications]'); await ob.until("!!document.querySelector('[data-template=optical]')", 'OB Library');
@@ -1972,6 +2028,31 @@ try {
     await ob.click('input[name="outer-boundary"][value="open"]'); await toTree('Study', "!!document.getElementById('pml-check')");
     const afterReset = await ob.eval("document.getElementById('pml-check').checked"); stage('OB the template clears the PML check option', {afterReset});
     assert.equal(afterReset, false);
+
+    // Amendment (a) of slice T2 (pre-registered): a version 10 file written by P2's Studio (f8ece10;
+    // runs of one search, records /2) opens with P2's words, and its run's inputs make the document
+    // of both searches. The words are those f8ece10's page showed for the strip over a substrate.
+    {
+      await ob.eval("document.getElementById('file-status').textContent=''");
+      const {root} = await ob.call('DOM.getDocument'); const {nodeId} = await ob.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#session-file'});
+      await ob.call('DOM.setFileInputFiles', {nodeId, files: [fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v10-open-f8ece10.json', import.meta.url))]});
+      const end = Date.now() + 60000;
+      while (!(await ob.eval("/^Opened /.test(document.getElementById('file-status').textContent)"))) {
+        assert.ok(Date.now() < end, 'P2 file: ' + await obText('#file-status'));
+        if (await ob.eval("!!document.getElementById('leave-confirm')?.open")) await ob.click('#leave-go');
+        else if (await ob.eval("!!document.getElementById('load-confirm')?.open")) await ob.click('#confirm-load');
+        await sleep(150);
+      }
+      await ob.click('nav [data-page=Results]'); await ob.until("!!document.getElementById('modes-table')", 'P2 file Results');
+      const p2 = await resultsView(); stage('T2 (a) a P2 file opened', {found: p2.found, neff: p2.neff, loss: p2.loss, check: p2.check, candidates: p2.candidates});
+      assert.equal(p2.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+      assert.deepEqual([p2.neff, p2.loss, p2.check], [['2.44126325 + 8.28e-5i', '1.77279036 + 2.86e-3i'], ['29.15 dB/cm', '1006 dB/cm'],
+        [['independent', 'PML check: loss changes 0.0038 %'], ['independent', 'PML check: loss changes 0.016 %']]]);
+      assert.deepEqual([p2.candidates.summary, p2.candidates.rows, p2.candidates.head, p2.candidates.searches], ['Other candidates (30) — not shown as modes', 30, ['Candidate', 'n_eff', 'Physical share', 'Reason'], null]);
+      if (await ob.eval("!!document.getElementById('restore-run-input')")) { await ob.click('#restore-run-input'); await sleep(300); }
+      const again = await solverDocument(); stage('T2 (a) the P2 run\'s inputs, run again', {target: again.physics.em1.target_effective_index, searches: again.physics.em1.pml.pml_additional_searches});
+      assert.equal(JSON.stringify(again), p1Leak, 'running the P2 run again sends the document of both searches');
+    }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

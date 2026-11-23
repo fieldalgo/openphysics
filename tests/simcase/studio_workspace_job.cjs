@@ -72,9 +72,12 @@ test('S1: what a job solves, from its pending record',async()=>{
  assert.deepEqual([5000,187000,760000,-3].map(elapsedText),['0:05','3:07','12:40','0:00']);
  assert.equal(jobWhat({}),'2 modes');assert.equal(jobWhat({modeCount:1}),'1 mode');
  const ob={edges:{left:'open'},target:3.4};
- assert.equal(jobWhat({openBoundary:ob}),'Open boundary · 2 modes');
- assert.equal(jobWhat({openBoundary:ob,pmlCheck:true}),'Open boundary · 2 modes · PML check (up to 2 more solves)');
- assert.equal(jobWhat({openBoundary:ob,pmlCheck:true,modeCount:1}),'Open boundary · 1 mode · PML check (up to 1 more solve)');
+ // slice T2: both searches of the run (t and (t + 1.444) / 2 to two decimals); one below 1.466
+ assert.equal(jobWhat({openBoundary:ob}),'Open boundary · 2 modes · searches near 3.40 and 2.42');
+ assert.equal(jobWhat({openBoundary:ob,pmlCheck:true}),'Open boundary · 2 modes · searches near 3.40 and 2.42 · PML check (up to 2 more solves)');
+ assert.equal(jobWhat({openBoundary:ob,pmlCheck:true,modeCount:1}),'Open boundary · 1 mode · searches near 3.40 and 2.42 · PML check (up to 1 more solve)');
+ assert.equal(jobWhat({openBoundary:{...ob,target:1.465}}),'Open boundary · 2 modes · search near 1.465');
+ assert.equal(jobWhat({openBoundary:{...ob,target:1.466}}),'Open boundary · 2 modes · searches near 1.466 and 1.46');
  assert.equal(jobWhat({openBoundary:ob,checkOf:'1234abcd',checkIndex:0,checkCount:2}),'PML check · mode 1 of 2');
 });
 test('S1: Stop during a 12-minute running job stops it; the elapsed text at 3:07',async()=>{
@@ -86,5 +89,5 @@ test('S1: Stop during a 12-minute running job stops it; the elapsed text at 3:07
  assert.equal(states.at(-1).phase,'detached');assert.equal(states.at(-1).message,'Stopped waiting. Server computation may continue; resume to retrieve its result.');
  // no poll is answered after Stop: the last running message is the one before it
  assert.match(states.filter(s=>s.phase==='running').at(-1).message,/ · 11:5\d · /);
- assert.ok(states.some(s=>s.message==='Computing job 1234abcd · 3:07 · Open boundary · 2 modes · PML check (up to 2 more solves)'));
+ assert.ok(states.some(s=>s.message==='Computing job 1234abcd · 3:07 · Open boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)'));
 });

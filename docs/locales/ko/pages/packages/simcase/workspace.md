@@ -969,20 +969,40 @@ study는 `settings.mode_count`와 군굴절률이 담습니다. 실행이 없는
 - **Search near n_eff**(`target_effective_index`)는 1.45보다 크고 설계의 최대 굴절률보다 작습니다.
   기본값은 재료의 1550 nm 굴절률로 구한 (n_max + n_SiO2) / 2를 소수 둘째 자리로 반올림한 값입니다
   (실리콘 코어는 2.46).
+- slice T2부터 고정 설정 뒤에 t_low = (t + n_SiO2) / 2(소수 둘째 자리) 근처 후보 16개의 두 번째 검색을
+  더합니다. t = 2.46이면 `"pml_additional_searches": [{"target_effective_index": 1.95,
+  "pml_search_mode_count": 16}]`입니다([추가 검색](pml_modes.md#추가-검색)). t_low는 천분의 일 단위로
+  계산하고 반은 올립니다(2.20 → 1.82, 사파이어 1.60 → 1.52, 질화규소 1.72 → 1.58). t가 1.466 미만이면 두
+  번째 검색이 없습니다. t_low가 하한 1.45로 반올림되기 때문이며(1.465 → 1.45), 이런 실행은 t 근처만
+  검색합니다.
 - 열린 경계에서는 군굴절률을 계산하지 않습니다.
 
 모든 변이 닫혔거나 `openBoundary`가 없으면 문서는 `optical-shapes-v8` 문서와 바이트 단위로 같고 결과도
 그 문서의 결과입니다. 작업공간 요청의 `em.modes2d` 물리에 다른 `pml`(다른 두께, 서로 다른 두께, 다른 고정값)이 있거나, 목표가 1.45 이하이거나, 영역이 열린 변에서만 그 두께만큼 커진 계산창(nm)이 아니면 *The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3,
-order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니다. PML 결과는
+order 2, physical fraction 0.5, a search of 32 candidates near the target and one of 16 near (target +
+1.444) / 2 to two decimals; a PML check has strength 6 and one search of 16.*로 거부합니다. 실행(강도
+3)은 t = 1.466부터 그 목표의 두 번째 검색을 정확히 하나(정확한 십진수 목표, 정수 개수 16) 가져야 하고,
+1.466 미만과 PML 점검에서는 가지지 않습니다. t = 1.466 이상인데 두 번째 검색이 없는 실행은 Studio가 slice
+T2로 갱신되기 전에 열린 페이지의 문서이며 *This page was loaded before Studio was updated; reload the
+page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 보내는 경로가 없습니다: 실행, PML 점검,
+사전 점검, 메시 미리보기, 실행의 입력으로 다시 한 실행 모두 입력에서 문서를 만들고, 세션·프로젝트·대기
+작업 파일은 문서를 보존하지 않습니다. `/api/workspace/capabilities/v9`는 `additional_search_count` 16과
+`additional_search_target` "(target + n_SiO2) / 2, two decimals"를 나열합니다. PML 결과는
 [PML 모드 규칙](pml_modes.md)을 따르는 후보입니다.
 
 검증에서 드러난 열린 경계의 한계:
 
-- **검색 목표는 하나.** 후보는 **Search near n_eff**에 가장 가까운 고유값이며 그 주변은 PML 자체의
-  모드로 붐빕니다. 목표에서 먼 모드는 요청보다 적게 찾았을 때도 놓칠 수 있습니다. 실리콘 기판 위
-  스트립에는 클래딩 굴절률 근처의 세 번째 모드(n ≈ 1.486 + 0.008i, 약 2800 dB/cm)가 있는데 기본 목표
-  2.46으로는 후보 32개로도 찾지 못합니다. 클래딩 굴절률 근처(Re n_eff 약 1.6 미만)의 모드를 찾으려면 Search near
-  n_eff를 낮춥니다(예: 1.95).
+- **검색 목표는 둘.** 후보는 **Search near n_eff**에 가장 가까운 고유값과, slice T2부터 t_low = (t +
+  n_SiO2) / 2에 가장 가까운 고유값이며 각 목표 주변은 PML 자체의 모드로 붐빕니다. 2.46 근처 검색만으로는
+  실리콘 기판 위 스트립의 클래딩 굴절률 근처 세 번째 모드(n ≈ 1.486 + 0.008i, 약 2800 dB/cm)를 놓치지만
+  1.95 근처 검색이 찾습니다(W1). 두 검색에서는 Re n_eff가 가장 큰 적격 후보가 모드이며 닫힌 실행처럼 Re
+  내림차순으로 나열합니다. 두 검색이 모두 찾은 후보는 한 번만 남깁니다. 두 목표 모두에서 먼 모드는 여전히
+  놓칠 수 있으니 Search near n_eff를 옮겨 찾습니다. t가 1.466 미만이면 검색은 하나입니다(위 참조). 순위는
+  PML이 지배하는 후보를 빼는 데 최소 물리 비율 0.5에 기대며, 원하는 낮은 Re 모드 위에 있는 모드 수보다
+  적게 요청하면 그 모드는 돌아오지 않습니다([추가 검색](pml_modes.md#추가-검색)).
+- 열린 경계의 엔진 검증(P1의 V1–V8, P3의 모드 식별과 군굴절률)은 P1의 단일 검색 문서를 풉니다
+  (`tests/simcase/open_boundary_fixtures.py`의 `build(..., single=True)`). 이 검증은 선택 규칙이 아니라
+  PML과 후처리를 검증합니다. 두 검색을 쓰는 Studio 기본값은 W1, W4, W6과 Studio 점검이 다룹니다.
 - **1 µm와 32인 이유.** 메시를 고정하면 1.5나 2 µm 층은 손실을 최대 0.02 %, n_eff를 약 1e-8만
   바꾸므로 정확도를 높이지 않습니다. 대신 목표 근처에 PML 모드를 늘려 기판 위 스트립의 TM 유사 모드를
   후보 16개 밖으로 밀어냈습니다. 32이면 시험한 모든 두께에서 그 모드를 찾습니다.
@@ -1031,17 +1051,23 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
 **매개변수.**
 
 - PML 두께는 1 µm이며 읽기 전용 *PML 1 µm*로 보입니다. 두께 입력란은 없습니다.
-- 강도 3, 차수 2, 최소 물리 비율 0.5는 고정이며 *Details*에 나열됩니다. 탐색 후보는 32개입니다.
+- 강도 3, 차수 2, 최소 물리 비율 0.5는 고정이며 *Details*에 나열됩니다: *… · 32 candidates searched near
+  n_eff, 16 near the second index*.
 - **Search near n_eff**는 고칠 수 있습니다. 기본값은 1550 nm에서 (n_max + n_SiO2)/2를 0.01로 반올림한
   값입니다(실리콘이면 2.46, *2.460*으로 표시). 고친 값은 소수 셋째 자리로 보존되며 보이는 값이 그대로
   보내집니다. 1.45와 n_max 사이(양 끝 제외)여야 합니다.
-- 목표 하나로는 그로부터 먼 모드, 특히 클래딩 굴절률 근처(Re ≲ 1.6)의 모드를 놓칠 수 있습니다. 도움말은
-  Search near n_eff를 낮추면 찾을 수 있다고 안내합니다.
+- 두 번째 목표는 그 옆에 글로 보이며 고칠 수 없고, 보이는 목표를 따릅니다: *Also searches near 1.95, for
+  modes close to the silica index.* (2.20 → 1.82). 도움말은 “Studio searches for modes near this index and
+  near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first.”입니다.
+- 1.466 미만이면 검색은 하나입니다. 두 번째 목표는 보이지 않고 도움말은 P2의 문장(목표 하나로는 그로부터
+  먼 모드, 특히 클래딩 굴절률 근처의 모드를 놓칠 수 있음)을 유지합니다.
 
 **Study와 그림.**
 
-- Study는 *Open boundary · PML 1 µm · search near 2.460*과 선택 사항 **Also check the PML (N more
-  solves)**(기본 꺼짐, N = Modes to find)를 보입니다.
+- Study는 *Open boundary · PML 1 µm · searches near 2.46 and 1.95*(1.466 미만이면 *search near 1.465*)와
+  선택 사항 **Also check the PML (N more solves)**(기본 꺼짐, N = Modes to find)를 보입니다. 두 검색의
+  문구에서 목표는 소수 셋째 자리에서 끝의 0 하나를 뺀 값(2.46, 2.455, 2.50)이고 t_low는 소수 둘째
+  자리입니다.
 - 그림은 열린 변마다 창 밖에 *PML 1 µm* 라벨이 붙은 회색 띠를 그립니다. 창이 보이도록 띠는 1 µm보다
   좁게 그립니다. 단면 문구는 “… · open boundary (PML 1 µm) on N edges”로 끝납니다.
 
@@ -1061,20 +1087,25 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
 - 표 아래 안내에 “Leakage depends on what lies outside the window: shapes touching an open edge
   continue through the PML.”이 붙습니다. 닫힌 실행의 안내에는 “For leakage, choose Open boundary in
   Physics › Optical modes.”가 붙습니다.
-- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics ›
-  Optical modes) to find other modes.*
+- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find
+  other modes.* 검색이 하나인 실행(1.466 미만, 또는 slice P2의 실행)은 이전처럼 *Found 2 of 2 modes near
+  n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.*로 읽힙니다.
 - Studio는 엔진의 모드 가운데 Re n_eff가 1.45보다 큰 것만 남깁니다.
 - **Other candidates (n) — not shown as modes**는 탐색했지만 보이지 않는 후보마다 n_eff, 물리 비율, 이유를
   나열합니다. 이유는 *Mostly in the PML (a PML mode)*, *Gains power (not a passive mode)*, *Not converged
   (residual above 1e-8)*, *Beyond the modes asked for*, *Below the silica index (cladding radiation)*입니다.
   이 행에는 장 보기가 없습니다.
+- 두 검색에서는 표에 **Search** 열(*near 2.46*, *near 1.95*)이 더해집니다. 두 번째 검색의 후보가 첫
+  검색의 후보를 되풀이하면(엔진의 `duplicate_of`) 나열하지 않고 제목에서 셉니다: *Other candidates (41) —
+  not shown as modes · 3 found by both searches*.
 - 장 보기, 그 색 척도, 선 프로파일은 물리 창만 씁니다. 엔진은 열린 실행의 장을 그 안의 최대 |E|로
   정규화합니다(`physical_max_centroid_magnitude`).
 
 **PML 점검.**
 
 - 선택 사항이 켜져 있으면 Studio는 실행의 문서를 찾은 모드마다 한 번씩 다시 풉니다: PML 강도 6, 후보 16개,
-  Search near n_eff는 그 모드의 Re n_eff(소수 여섯째 자리). 메시는 절점까지 같습니다.
+  Search near n_eff는 그 모드의 Re n_eff(소수 여섯째 자리). 메시는 절점까지 같습니다. 점검은 한 번만
+  검색합니다: 실행의 두 번째 검색은 빼므로 점검 문서는 slice P2의 문서와 바이트 단위로 같습니다.
 - 이 풀이들의 후보를 모읍니다. 각 모드는 가장 가까운 적격 후보와 짝지어집니다. 적격 후보는 엔진 필터를
   통과하고(선택됨, 또는 개수를 넘어서만 제외됨) Re > 1.45인 후보입니다. 짝은 |Δn_eff| ≤ 2e-3일 때
   받아들입니다.
@@ -1142,6 +1173,12 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
 - 이런 실행은 엔진의 탐색 후보 기록 `open_boundary`도 보존하고, 점검을 했다면 `pml_check
   {"pml_strength": 6, "paired": [모드마다 {"re", "im"} 또는 null]}`도 보존합니다. 다이제스트는 둘 다
   포함합니다.
+- slice T2는 settings도 파일 버전도 바꾸지 않습니다. 두 검색의 실행은 엔진의 기록
+  `openphysics.pml-candidates/3`을 보존하며, 그 `searches`는 정확히 실행의 목표 근처 32개와 그 t_low 근처
+  16개여야 합니다. 다른 /3 기록은 잘못된 열린 경계 기록으로 거부합니다. 기록이 /2인 실행(검색 하나:
+  slice P2의 실행이나 1.466 미만의 목표)은 이전 문구 그대로 읽힙니다. slice T2 이전에 쓴 버전 10 파일은
+  같은 값과 문구로 열리고, **Use this run's inputs** 다음의 실행은 두 검색의 문서를 만듭니다. 연구 서명은
+  바뀌지 않으므로 그런 실행은 여전히 현재 입력으로 만든 실행으로 읽힙니다.
 - 그 장은 위의 정규화를 따른다고 봅니다.
 - slice P3: 새 열린 실행은 엔진의 `te_polarization_fraction`과 `effective_area`(물리 창)도 보존합니다.
   군굴절률을 켜면 `group_index`를 `{"re", "im"}`로, `group_index_method`와 함께 보존합니다. 닫힌 실행의
@@ -1405,7 +1442,7 @@ HTTP 자산을 다룹니다. 배포 검사에서도 설치 자산을 복사해 �
 ## 실행·대기 중단·재개
 
 작업 패널은 제출한 치수·재료, 작업 ID, 경과 시간(m:ss), 실행이 푸는 것, 결과 로딩 상태를 표시합니다. 예:
-*Computing job 1a2b3c4d · 12:40 · Open boundary · 2 modes · PML check (up to 2 more solves)*, *PML check · mode 1 of 2*.
+*Computing job 1a2b3c4d · 12:40 · Open boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)*, *PML check · mode 1 of 2*.
 서버는 작업 중 단계를 보고하지 않으므로 단계는 보이지 않습니다.
 **Stop waiting**은 브라우저의 조회만 중단하며 서버 계산은 계속될 수 있습니다.
 **Resume job**은 현재 설계를 수정하거나 같은 탭을 새로고침한 뒤에도 실행 당시

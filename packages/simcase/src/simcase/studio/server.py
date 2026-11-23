@@ -22,7 +22,7 @@ back byte for byte apart from whitespace and the spelling of string escapes.
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 import logging
 import sys
 import threading
@@ -255,6 +255,21 @@ _PML_FIXED = {"pml_strength": 3, "pml_order": 2, "pml_minimum_physical_fraction"
 # search 16 is the one other combination a workspace request may carry.
 _PML_CHECK_STRENGTH = 6
 _PML_CHECK_SEARCH = 16
+# Slice T2: a run (strength 3) also searches 16 candidates near t_low = (t + n_SiO2) / 2 to two
+# decimals (pml.pml_additional_searches, one entry), from a target t of 1.466: below it t_low would
+# round to the 1.45 floor and the run searches near t only. The PML check searches once.
+_ADDITIONAL_SEARCH_COUNT = 16
+_LOWER_SEARCH_FROM = Decimal("1.466")
+_SILICA_INDEX = Decimal("1.444")
+
+
+def _lower_target(target) -> Decimal | None:
+    """t_low of the page (workspace-open-boundary.mjs lowerTarget): (t + 1.444) / 2 to two decimals,
+    halves rounded up, of t to 3 decimals; None below 1.466."""
+    t = Decimal(str(target)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+    if t < _LOWER_SEARCH_FROM:
+        return None
+    return ((t + _SILICA_INDEX) / 2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 @app.get("/api/workspace/capabilities/v9")
@@ -264,6 +279,8 @@ def workspace_capabilities_v9():
         "edges": ["left", "right", "bottom", "top"], "edge_states": ["closed", "open"], "edge_default": "closed",
         "pml_thickness_range": list(_PML_THICKNESS_RANGE), "pml_thickness_default": "1 um",
         **_PML_FIXED, "pml_check_strength": _PML_CHECK_STRENGTH, "pml_check_search_mode_count": _PML_CHECK_SEARCH,
+        "additional_search_count": _ADDITIONAL_SEARCH_COUNT,
+        "additional_search_target": "(target + n_SiO2) / 2, two decimals",
         "target_effective_index_default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
         "target_effective_index_bounds": "above 1.45 and below n_max"})
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
@@ -274,7 +291,10 @@ def workspace_open_boundary_refusal(tree) -> str | None:
     optical-shapes-v9 writes, else None: thicknesses of 1000 to 2000 nm (one value on every open
     side), the fixed strength, order, physical fraction and search count of capabilities v9, a
     target above 1.45, and a domain in nm that is the window grown by that thickness on exactly
-    the open sides (the layer lies outside the window)."""
+    the open sides (the layer lies outside the window). Slice T2: a run (strength 3) with a target
+    of 1.466 or more has exactly one additional search, 16 candidates near t_low of its target
+    (_lower_target, compared as exact decimals); below 1.466, and in a PML check (strength 6),
+    it has none."""
     doc = tree.get("doc") if isinstance(tree, dict) else None
     physics = doc.get("physics") if isinstance(doc, dict) else None
     if not isinstance(physics, dict):
@@ -284,10 +304,10 @@ def workspace_open_boundary_refusal(tree) -> str | None:
         if not isinstance(entry, dict) or entry.get("type") != "em.modes2d" or "pml" not in entry:
             continue
         pml = entry["pml"]
-        text = ("The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3 "
-                "(6 for the PML check), order 2, physical fraction 0.5 and a search of 32 candidates (16 "
-                "for the PML check).")
-        if not isinstance(pml, dict) or set(pml) != {"pml_thickness", *_PML_FIXED}:
+        text = ("The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3, "
+                "order 2, physical fraction 0.5, a search of 32 candidates near the target and one of 16 "
+                "near (target + 1.444) / 2 to two decimals; a PML check has strength 6 and one search of 16.")
+        if not isinstance(pml, dict) or set(pml) - {"pml_additional_searches"} != {"pml_thickness", *_PML_FIXED}:
             return text
         # 3, 2 and 32 are JSON integers; 0.5 may arrive as an exact decimal
         allowed = {key: (value, _PML_CHECK_STRENGTH) if key == "pml_strength" else
@@ -311,6 +331,24 @@ def workspace_open_boundary_refusal(tree) -> str | None:
         # compared as exact decimals: the reader gives 1.45 as Decimal("1.45"), above the binary float 1.45
         if isinstance(target, bool) or not isinstance(target, (int, float, Decimal)) \
                 or not Decimal(str(target)) > Decimal("1.45"):
+            return text
+        # the second search (slice T2): a run's, near t_low; none below 1.466 or in a PML check
+        low = _lower_target(target) if pml["pml_strength"] != _PML_CHECK_STRENGTH else None
+        searches = pml.get("pml_additional_searches")
+        if low is None:
+            if "pml_additional_searches" in pml:
+                return text
+        elif searches is None:
+            # a single-search run of P2 with a target that now has a second search: a page whose
+            # modules were loaded before Studio was updated
+            return "This page was loaded before Studio was updated; reload the page to run again."
+        elif not (isinstance(searches, list) and len(searches) == 1 and isinstance(searches[0], dict)
+                  and set(searches[0]) == {"target_effective_index", "pml_search_mode_count"}
+                  and type(searches[0]["pml_search_mode_count"]) is int
+                  and searches[0]["pml_search_mode_count"] == _ADDITIONAL_SEARCH_COUNT
+                  and not isinstance(searches[0]["target_effective_index"], bool)
+                  and isinstance(searches[0]["target_effective_index"], (int, float, Decimal))
+                  and Decimal(str(searches[0]["target_effective_index"])) == low):
             return text
         geometry = doc.get("geometry")
         t = int(next(iter(widths.values()))[:-3])

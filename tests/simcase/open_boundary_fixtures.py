@@ -3,6 +3,13 @@
 """Shared helpers of the open-boundary validation (tests/simcase/test_open_boundary_*.py): the
 documents Studio's optical-shapes-v9 builder writes, mesh scaling, the solve, the slab reference.
 
+Since slice T2 the builder adds a second search (pml.pml_additional_searches, 16 near
+(t + 1.444) / 2) to an open document. The engine validations of P1 and P3 (V1 to V8, mode
+identity, group index) validate the PML and the post-processing, not the selection: they solve
+the single-search documents of P1, ``build(..., single=True)``, the builder's document without that
+key (byte for byte what the builder wrote before T2). The Studio defaults, with both searches, are
+covered by W1, W4 and W6 (test_pml_additional_searches.py) and the Studio checks.
+
 Mesh scaling multiplies every element length of the built document (mesh.element_size, the
 grading's near and far, each shape's element_size); refinement_distance is a distance and stays.
 """
@@ -31,7 +38,7 @@ DB = 10 * np.log10(np.e)
 
 _BUILD = r"""
 const O = await import(process.argv[1]);
-const [kind, modes, t, target, edges] = process.argv.slice(2);
+const [kind, modes, t, target, edges, single] = process.argv.slice(2);
 const strip = {name: 'Core', type: 'rect', material: 'Silicon', x: -250, y: 0, w: 500, h: 220};
 const film = {name: 'Film', type: 'rect', material: 'Silicon', x: -1500, y: 0, w: 3000, h: 220};
 const substrate = {name: 'Substrate', type: 'rect', material: 'Silicon', x: -1500, y: -1200, w: 3000, h: 700};
@@ -49,6 +56,8 @@ else {
   const checked = B.checkOpenBoundary({...openBoundary, thickness: 1000}, shapes);
   doc = B.applyOpenBoundary(O.opticalDocument(state, setup), {...checked, thickness: Number(t)});
 }
+// P1's single-search document: the key deleted, every other key in its place
+if (single === 'single' && doc.physics.em1.pml) delete doc.physics.em1.pml.pml_additional_searches;
 process.stdout.write(JSON.stringify(doc));
 """
 ALL = {"left": "open", "right": "open", "bottom": "open", "top": "open"}
@@ -63,10 +72,11 @@ def node():
     return found
 
 
-def build(kind, modes, thickness=1000, target="-", edges=ALL, script=_BUILD):
-    """The document Studio's optical-shapes-v9 builder writes (exact text and parsed)."""
+def build(kind, modes, thickness=1000, target="-", edges=ALL, script=_BUILD, single=False):
+    """The document Studio's optical-shapes-v9 builder writes (exact text); with ``single`` P1's
+    single-search document (without pml.pml_additional_searches)."""
     done = subprocess.run([node(), "--input-type=module", "-e", script, (STATIC / "workspace-optical.mjs").as_uri(),
-                           kind, str(modes), str(thickness), str(target), json.dumps(edges)],
+                           kind, str(modes), str(thickness), str(target), json.dumps(edges), "single" if single else "both"],
                           capture_output=True, text=True, encoding="utf-8")
     assert done.returncode == 0, done.stdout + done.stderr
     return done.stdout
@@ -132,6 +142,7 @@ def physical_modes(candidates):
 
 def reference_modes(text, target):
     wide = json.loads(text)
+    wide["physics"]["em1"]["pml"].pop("pml_additional_searches", None)      # one search, near target
     wide["physics"]["em1"]["pml"]["pml_search_mode_count"] = 32
     wide["physics"]["em1"]["target_effective_index"] = target
     return physical_modes(solve(wide)[3])
@@ -140,6 +151,7 @@ def reference_modes(text, target):
 def mode_near(d, z):
     """The variant's mode nearest the reference mode z, by a search targeted at Re z (32 candidates)."""
     d = copy.deepcopy(d)
+    d["physics"]["em1"]["pml"].pop("pml_additional_searches", None)         # one search, near Re z
     d["physics"]["em1"]["target_effective_index"] = round(float(z.real), 6)
     d["physics"]["em1"]["pml"]["pml_search_mode_count"] = 32
     n, loss, fraction, _ = solve(d)
