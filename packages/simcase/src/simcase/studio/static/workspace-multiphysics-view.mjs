@@ -104,7 +104,9 @@ export function createMultiphysicsView(ctx){
  // Round 16 (S9): the page it was left on (Model, Connections, or Results with its result page).
  let lastPage='Model';
  function rememberPage(page){if(['Model','Connections','Results'].includes(page))lastPage=page;}
- function returnPage(){return lastPage==='Results'&&!(lastRun&&resultPage)?'Model':lastPage;}
+ // round 17 (U7): a model with a run returns to Results (its last-viewed result page), whatever page
+ // it was left on; without a run to Model. lastPage is kept for the record only.
+ function returnPage(){return lastRun&&resultPage?'Results':'Model';}
  function show(){
   if(!doc)return;active=true;ctx.onOpen?.();ctx.ui.page=returnPage();if(ctx.ui.page==='Results')selection=resultPage;validate(true);ctx.onHistory();ctx.render();
   notice(`${doc.name||'Model'} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; nothing was computed.`);

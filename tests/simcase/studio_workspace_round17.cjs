@@ -174,3 +174,10 @@ test('U11: a completed result loads in user words, the job id in the title',asyn
  const loading=states.find(s=>s.phase==='loading');
  assert.equal(loading.message,'Loading the result of this run…');assert.equal(loading.title,'Job 65eb796b');
 });
+test('U7: a model of the tab with runs lands on Results, else Model, at the top of the page',()=>{
+ const app=read('workspace-app.mjs'),mp=read('workspace-multiphysics-view.mjs');
+ assert.ok(app.includes("if(runs.length){if(!solverRun)solverRun=runs.at(-1);ui.page='Results';"));
+ assert.ok(!app.includes("back.page==='Compare'&&runs.length>1"));
+ assert.ok(mp.includes("function returnPage(){return lastRun&&resultPage?'Results':'Model';}"));
+ assert.ok(app.includes("function topOfPage(){for(const id of ['canvas','inspector'])"));
+});

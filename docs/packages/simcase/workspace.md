@@ -442,8 +442,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    runs, as the card itself does. Each card ends in **Open model**, and its description ends in
    *Runs stay in this tab until you close it.*: choosing a model keeps the runs this tab holds,
    and the restore offer brings back the browser's runs. Opening a model of the tab that has
-   runs returns to the page it was left on: the optical model to its Results or Compare and the
-   run last viewed, the heated model to its Results. The Heated silicon waveguide card does the
+   runs lands on its Results, whatever page it was left on (round 17; round 16 returned to Compare
+   too): the optical model with the run last viewed, the heated model with its last result page; a
+   model without runs opens on Model. The page starts at its top. The Heated silicon waveguide card does the
    same for the newest multiphysics session while the tab holds no multiphysics runs, *Restore
    from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. An
    offer whose record is the same as the session file it was saved to names the file's save
