@@ -79,8 +79,8 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 | 종류 | 담는 것 | 이름 | 만드는 명령 |
 |---|---|---|---|
 | 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
-| 세션 파일 | 한 모델의 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 고른 이름 | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
-| 모델 파일 | 모델 입력만: 실행도 계산 결과도 없음(광학, 정상 열, Joule 가열 입력, 버전 7 또는 8, 또는 다중물리 문서). | 모델 이름. 예: `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
+| 세션 파일 | 한 모델의 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9, [열린 경계](#광학-작업-공간의-열린-경계)가 있으면 10), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 고른 이름 | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
+| 모델 파일 | 모델 입력만: 실행도 계산 결과도 없음(광학, 정상 열, Joule 가열 입력, 버전 7 또는 8, 열린 경계가 있으면 9, 또는 다중물리 문서). | 모델 이름. 예: `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | 브라우저 초안 | 광학 입력, 이 브라우저에만(파일 아님). | — | **File › Browser copy › Save browser draft** |
 | 브라우저 복구 | 완료한 실행이 있는 최근 세션, 이 브라우저에만(파일 아님). | — | 자동([노트북 자동 복구](#노트북-자동-복구)) |
 
@@ -769,8 +769,8 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-9보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 10, newer than this Studio reads
-(versions 6–9). Open it in a newer Studio.”. 버전 9는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
+10보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 11, newer than this Studio reads
+(versions 6–10). Open it in a newer Studio.”. 버전 9와 10은 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
@@ -828,9 +828,12 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
   only. Leakage and radiation are not computed in a closed window.”입니다. 모든 Im n_eff가 정확히 0이면 행마다
   *0 dB/cm*(계산된 누설 0이 아니라 무손실 실행)를 쓰고, 안내는 “Absorption loss counts material absorption (k)
   only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed
-  in a closed window.”입니다. 열린 경계(PML)가 있는 다중물리 결과는 Im n_eff가 PML로의 누설을 포함하므로 열이
+  in a closed window.”입니다. 광 애플리케이션은 닫힌 실행의 안내에 “For leakage, choose Open boundary in
+  Physics › Optical modes.”를 덧붙입니다. [열린 경계](#광학-작업-공간의-열린-경계)가 있는 실행은 자기 칸을
+  씁니다. 열린 경계(PML)가 있는 다중물리 결과는 Im n_eff가 PML로의 누설을 포함하므로 열이
   **Loss (dB/cm)**이고, 도움말은 “Material absorption (k) and leakage into the PML of the open boundary”, 안내는
-  “Loss includes material absorption (k) and leakage into the PML of the open boundary.”입니다. 그 밖의 표는 모두
+  “Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends
+  on what lies outside the window: shapes touching an open edge continue through the PML.”입니다. 그 밖의 표는 모두
   **Absorption loss (dB/cm)**입니다. Compare는 같은 값을 *Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*로
   보입니다. 문턱값은 없습니다:
   0이 아닌 Im n_eff는 아무리 작아도 그대로 보입니다. 엔진은 k > 0인 재료나 PML이 있을 때만 복소 n_eff를
@@ -932,7 +935,8 @@ study는 `settings.mode_count`와 군굴절률이 담습니다. 실행이 없는
 ### 열린 경계 문서(optical-shapes-v9)
 
 `/api/workspace/capabilities/v9`는 버전 8에 어댑터 `optical-shapes-v9`와 `open_boundary` 블록을
-더한 것입니다. 페이지는 아직 버전 8을 확인하며 이를 위한 조작은 없습니다. 어댑터의 문서 작성기
+더한 것입니다. 페이지는 버전 8을 확인하며, 슬라이스 P2부터 이 선택을 제공합니다
+([광학 작업 공간의 열린 경계](#광학-작업-공간의-열린-경계)). 어댑터의 문서 작성기
 (`openBoundary: {edges, thickness, target}`를 받은 `opticalDocument`)는 계산창의 어느 변이든 열 수 있습니다.
 
 - 열린 변마다 두께 *t* = 1 µm(1000 nm, 제공하는 유일한 값)의 완전 정합층(PML)이 3 × 2.4 µm
@@ -986,6 +990,159 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
   들면서 돌아오지 않은 모드로 정했습니다. 그런 모드는 모드 8개를 요청한 기판 위 스트립의 1.486 근처 모드
   하나뿐입니다.
 
+### 광학 작업 공간의 열린 경계
+
+슬라이스 P2부터 페이지는 [optical-shapes-v9](#열린-경계-문서optical-shapes-v9)의 열린 경계를 제공합니다.
+이를 쓰면 실행의 손실에 창 밖으로의 누설이 포함됩니다.
+
+**선택.**
+
+- **Physics › Optical modes**에 *Outer boundary: Closed window (PEC) / Open boundary (PML)*가 있습니다.
+  기본값은 Closed입니다. 도움말은 “Open boundary adds an absorbing layer (PML) outside the window, so
+  light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge
+  continue through the layer.”입니다.
+- 이 선택은 Modes to find처럼 각 실행에 함께 보존되는 물리 설정입니다.
+- Open이면 모든 변이 열립니다. **Geometry › Boundaries**에서 각 변을 다시 닫을 수 있습니다. 열린 변은
+  *Optical left boundary · Open (PML)*로 읽히고, **Close this edge** 스위치로 닫거나 다시 엽니다. 닫힌
+  변은 이전처럼(PEC) 읽힙니다. 모든 변이 닫히면 실행은 닫힌 창입니다.
+- Open은 **Also compute group index**를 끄고 비활성화하며, 안내 “Group index with an open boundary
+  comes in a later version”을 보입니다. 엔진도 이를 거부합니다.
+
+**매개변수.**
+
+- PML 두께는 1 µm이며 읽기 전용 *PML 1 µm*로 보입니다. 두께 입력란은 없습니다.
+- 강도 3, 차수 2, 최소 물리 비율 0.5는 고정이며 *Details*에 나열됩니다. 탐색 후보는 32개입니다.
+- **Search near n_eff**는 고칠 수 있습니다. 기본값은 1550 nm에서 (n_max + n_SiO2)/2를 0.01로 반올림한
+  값입니다(실리콘이면 2.46, *2.460*으로 표시). 고친 값은 소수 셋째 자리로 보존되며 보이는 값이 그대로
+  보내집니다. 1.45와 n_max 사이(양 끝 제외)여야 합니다.
+- 목표 하나로는 그로부터 먼 모드, 특히 클래딩 굴절률 근처(Re ≲ 1.6)의 모드를 놓칠 수 있습니다. 도움말은
+  Search near n_eff를 낮추면 찾을 수 있다고 안내합니다.
+
+**Study와 그림.**
+
+- Study는 *Open boundary · PML 1 µm · search near 2.460*과 선택 사항 **Also check the PML (N more
+  solves)**(기본 꺼짐, N = Modes to find)를 보입니다.
+- 그림은 열린 변마다 창 밖에 *PML 1 µm* 라벨이 붙은 회색 띠를 그립니다. 창이 보이도록 띠는 1 µm보다
+  좁게 그립니다. 단면 문구는 “… · open boundary (PML 1 µm) on N edges”로 끝납니다.
+
+**열린 실행의 결과.**
+
+- 표 제목은 *Modes (open boundary, PML 1 µm)*입니다. 손실 열은 **Loss (dB/cm)**이며, 도움말은 “Material
+  absorption (k) and leakage into the PML of the open boundary”입니다.
+- 손실은 같은 식(dB/cm = 20 · log10(e) · k0 · Im n_eff / 100)으로 유효숫자 4자리입니다(*29.15 dB/cm*). 숫자
+  칸의 도움말은 측정한 메시 오차를 덧붙입니다: “At the default mesh this loss is about 3 % above the
+  converged value (TE-like +2.8 %, TM-like +1.8 % on a strip over a substrate).”
+- 0.01 dB/cm 미만이면 칸은 **< 0.01 dB/cm**입니다. 음의 Im n_eff와 엔진이 `numerically_unresolved`로
+  표시한 값도 여기에 듭니다. 도움말은 “Below what this open boundary resolves for a 3 × 2.4 µm window
+  (0.01 dB/cm). The mode does not leak measurably here.”입니다. Im n_eff가 없는 모드는 “—”입니다.
+- n_eff는 닫힌 실행처럼 Re를 보이고 Im을 유효숫자 3자리로 덧붙입니다: *2.44126325 + 8.28e-5i*.
+- Polarization, A_eff, n_g는 “—”이며 제목은 “Computed on the physical window in a later version”입니다.
+  장이 PML 안까지 이어지는데, 그 안의 장은 물리적이지 않기 때문입니다.
+- 표 아래 안내에 “Leakage depends on what lies outside the window: shapes touching an open edge
+  continue through the PML.”이 붙습니다. 닫힌 실행의 안내에는 “For leakage, choose Open boundary in
+  Physics › Optical modes.”가 붙습니다.
+- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics ›
+  Optical modes) to find other modes.*
+- Studio는 엔진의 모드 가운데 Re n_eff가 1.45보다 큰 것만 남깁니다.
+- **Other candidates (n) — not shown as modes**는 탐색했지만 보이지 않는 후보마다 n_eff, 물리 비율, 이유를
+  나열합니다. 이유는 *Mostly in the PML (a PML mode)*, *Gains power (not a passive mode)*, *Not converged
+  (residual above 1e-8)*, *Beyond the modes asked for*, *Below the silica index (cladding radiation)*입니다.
+  이 행에는 장 보기가 없습니다.
+- 장 보기, 그 색 척도, 선 프로파일은 물리 창만 씁니다. 엔진은 열린 실행의 장을 그 안의 최대 |E|로
+  정규화합니다(`physical_max_centroid_magnitude`).
+
+**PML 점검.**
+
+- 선택 사항이 켜져 있으면 Studio는 실행의 문서를 찾은 모드마다 한 번씩 다시 풉니다: PML 강도 6, 후보 16개,
+  Search near n_eff는 그 모드의 Re n_eff(소수 여섯째 자리). 메시는 절점까지 같습니다.
+- 이 풀이들의 후보를 모읍니다. 각 모드는 가장 가까운 적격 후보와 짝지어집니다. 적격 후보는 엔진 필터를
+  통과하고(선택됨, 또는 개수를 넘어서만 제외됨) Re > 1.45인 후보입니다. 짝은 |Δn_eff| ≤ 2e-3일 때
+  받아들입니다.
+- |ΔRe| ≤ 5e-4이고 손실 변화가 max(2 %, 0.01 dB/cm) 이하이면 그 모드는 PML에 무관합니다.
+- 표시 하한 아래에서는 점검 풀이가 아주 작은 손실에 실행의 풀이보다 큰 잔차를 남깁니다. 모드의 칸이
+  *< 0.01 dB/cm*이고 점검 손실이 0.05 dB/cm 미만이면 점검은 판정하지 않습니다. 분해된 누설이 없다고만 말할
+  뿐, 무관함을 보증하지 않습니다.
+- 그러면 **PML check** 열은 다음 가운데 하나입니다.
+  - *PML check: loss changes 0.016 %*(0.1 % 미만은 유효숫자 2자리);
+  - **Depends on the PML**: *loss changes 12 %*(또는 *Re n_eff changes 7.0e-4*). 손실 칸은 기울임꼴이며,
+    도움말은 “This loss changes with the PML; it is not a converged leakage loss.”입니다;
+  - *PML check: no leakage resolved (both solves below 0.05 dB/cm)*(기울임꼴 없음);
+  - *Not found in the check solve*. 도움말은 “The check solve did not find this mode near the search
+    value; this does not by itself mean the mode depends on the PML.”입니다.
+- 하한 아래이지만 점검 손실이 0.05 dB/cm 이상인 모드는 *Depends on the PML* 그대로입니다. 하한이 PML에 따라
+  움직이기 때문입니다.
+- 엔진의 `stability: "not_checked"`는 각 풀이에 그대로 참이며, 점검은 실행에 기록됩니다(`pml_check`). 점검은
+  모든 풀이가 끝나야 저장됩니다. 페이지를 다시 불러오기 전에 끝난 풀이는 보존되지 않으므로, 그 점검은
+  불완전하여 저장되지 않습니다.
+- **점검을 고른 방법.** 점검 풀이 하나(강도 6, 실행의 목표 근처 후보 32개)는 템플릿과 누설 사례의 TM-like
+  모드를 놓쳤습니다. 후보 64개로도 놓쳤습니다: 개수가 아니라 목표가 결정합니다. 엔진 수준, 한 스레드, 느리지
+  않은 테스트 묶음이 함께 돌 때 잰 값입니다(시간은 상대 비교용).
+
+  | 점검 | 템플릿 | 누설 사례 | 모든 모드를 다시 찾음 |
+  |---|---|---|---|
+  | 풀이 하나, 목표 근처 후보 32개 | 2.8 s | 35.4 s | 아니오(TM-like 놓침) |
+  | 풀이 하나, 후보 64개 | 5.2 s | 91.8 s | 아니오 |
+  | 모드마다 그 Re에서 풀이 하나, 후보 32개 | 5.0 s | 64.5 s | 예 |
+  | 모드마다 그 Re에서 풀이 하나, 후보 16개(채택) | 2.6 s | 43.8 s | 예 |
+
+  첫 풀이는 3.5 s와 36.3 s였습니다.
+- **실패한 등록 결과.** 모드별 점검에서 템플릿의 TM-like 모드는 PML에 무관하다고 등록했습니다. 손실이
+  0.00480에서 0.01706 dB/cm로 바뀌어 “Depends on the PML: loss changes 256 %”로 읽혔습니다. 하한 아래 손실
+  규칙은 그 결과 뒤에 더했습니다. 측정 전에 등록한 대로 700 × 300 nm 템플릿 코어, 모드 4개에서 확인했습니다:
+  모든 모드가 하한 아래이고 점검 손실은 많아야 0.00026 dB/cm입니다.
+- 점검을 켠 결과:
+  - 템플릿: 두 모드 모두 *no leakage resolved*;
+  - 누설 사례: TE-like 29.1528 → 29.1517 dB/cm(*loss changes 0.0038 %*), TM-like 1005.96 → 1005.80 dB/cm
+    (*0.016 %*), 둘 다 PML에 무관.
+
+**Compare.**
+
+- 각 쪽의 손실 머리글은 그 실행을 따릅니다(*Absorption loss A (dB/cm)*, *Loss B (dB/cm)*).
+- 둘이 다르면 안내 “A counts material absorption only; B also counts leakage. Their difference is not a
+  leakage loss.”가 붙습니다.
+- 열린 실행이 있으면 표 위 줄이 각 실행을 *(closed)* 또는 *(open, PML 1 µm)*로 부릅니다.
+- 어느 한 실행이라도 열려 있으면 **짝짓기는 꺼집니다.** 표는 A와 B의 모든 모드를 짝짓지 않은 채
+  “Matching with an open boundary comes in a later version.”과 함께 나열하고, 그림은 각 실행의 모드 1을
+  보입니다. 등록한 점검(V13: 템플릿의 닫힌 실행과 열린 실행에서 두 모드 모두 물리 창 위 η ≥ 0.99로 짝지어짐)이
+  실패했습니다: TE-like η = 0.9903, TM-like η = 0.9875.
+
+**파일.**
+
+- Open을 고른 모델 파일은 입력 버전 9입니다. 버전 8에 `model.openBoundary {edges: {left, right, bottom,
+  top}: "open" | "closed", target}`을 더한 것이며, `target`(Search near n_eff, 소수 셋째 자리)은 고쳤을
+  때만 씁니다.
+- Open이 아니면 파일은 이전처럼 버전 7 또는 8을 바이트 그대로 씁니다. 슬라이스 P2 이전의 Studio 4b58fb7은
+  버전 9 입력 파일을 *Unsupported model file format or version.*으로 거부합니다.
+- 실행에 열린 경계가 있거나 입력이 Open을 고르면(입력 버전 9) 세션은 **버전 10**으로 씁니다. 그렇지 않으면
+  이전처럼 버전 9 또는 7을 바이트 그대로 씁니다.
+- 버전 10은 버전 9에 `optical-shapes-v9` 실행을 더한 것입니다. 그 `settings`에는 `adapter
+  "optical-shapes-v9"`, `boundary "PML"`, `pml {"thickness": "1000 nm", "open_edges": [...], "target":
+  "2.460"}`이 들어갑니다.
+- 이런 실행은 엔진의 탐색 후보 기록 `open_boundary`도 보존하고, 점검을 했다면 `pml_check
+  {"pml_strength": 6, "paired": [모드마다 {"re", "im"} 또는 null]}`도 보존합니다. 다이제스트는 둘 다
+  포함합니다.
+- 그 장은 위의 정규화를 따른다고 봅니다. TE 비율, 유효 면적, 군굴절률은 없습니다.
+- 버전 9 세션은 버전 9 입력을 담지 않습니다. Studio 4b58fb7은 버전 10 파일을 *This session file is version
+  10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.*로 거부합니다. 다중물리
+  세션은 버전 8 그대로입니다.
+
+**서버.** 작업 공간 요청은 `pml_strength` 3과 후보 32개(실행), 또는 6과 후보 16개(점검 풀이)를 담습니다.
+점검 풀이는 모드를 겨누므로 목표는 1.45보다 큰 어떤 값이든 됩니다. 그 밖의 것은 이름을 밝혀 거부합니다:
+“A PML check request (strength 6) searches 16 candidates, and a run (strength 3) searches 32.” 또는 열린
+경계 문구. `/api/workspace/capabilities/v9`는 `pml_check_strength` 6과 `pml_check_search_mode_count` 16을
+나열합니다. 이는 P1의 계약을 바꿉니다: P1은 강도 6과 32가 아닌 후보 수를 거부했습니다.
+
+**검증**(Linux, Python 3.12, Node 22, 브라우저 점검 `tools/studio_browser/studio_workspace_browser.mjs`의
+OB 단계):
+
+- 템플릿, 모든 변 열림: 등록한 대로 두 손실 칸 모두 *< 0.01 dB/cm*(엔진은 TE-like Im n_eff −5.1e-12,
+  `numerically_unresolved`, TM-like 1.36e-8, 0.0048 dB/cm를 줌). 다른 후보는 30개입니다;
+- Geometry에서 만든 누설 사례(코어 아래 x −1500, y −1200, 3000 × 700 nm의 실리콘 기판, BOX 500 nm, 모든 변
+  열림): 그 문서는 P1의 기판 위 스트립과 바이트 그대로 같습니다. *2.44126325 + 8.28e-5i* / *29.15 dB/cm*와
+  *1.77279036 + 2.86e-3i* / *1006 dB/cm*로 P1의 값을 보입니다;
+- 같은 사례에서 Search near n_eff 1.600, 모드 4개는 등록한 대로 클래딩 굴절률 근처 모드 *1.48642654 +
+  7.92e-3i* / *2789 dB/cm*를 찾습니다.
+
 ### 광학 세션 파일(버전 9)
 
 모든 실행이 실수 모드 두 개와 장을 가진 세션은 이전과 바이트 단위로 같은 버전 7로 씁니다. 버전 7이 담을 수
@@ -1035,8 +1192,8 @@ Studio는 스스로 거부할 파일을 쓰지 않습니다. 버전 6·7 파일�
 ### Compare의 모드 짝짓기
 
 Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이에 순위가 바뀌어도(예: 코어를 넓혀 두
-번째 TE-like 모드가 TM-like 모드를 앞지르는 경우) 한 행은 같은 모드를 잇습니다. 짝짓기는 늘 켜져 있고
-각 행에 순위가 그대로 보입니다.
+번째 TE-like 모드가 TM-like 모드를 앞지르는 경우) 한 행은 같은 모드를 잇습니다. 짝짓기는 두 닫힌 실행에서
+켜져 있고(열린 실행이 있으면 꺼짐: [열린 경계](#광학-작업-공간의-열린-경계)) 각 행에 순위가 그대로 보입니다.
 
 - **공통 격자.** 두 실행의 메시는 다를 수 있고 각 실행은 자기 중심 샘플만 갖고 있으므로, Studio는 둘을
   한 격자에서 샘플합니다. 두 계산창의 교집합 위의 균일한 셀 중심이고, 간격은 ½ · min(A의 코어 메시,

@@ -21,8 +21,18 @@ export function gridSvg(){
  for(let y=WINDOW_NM.ymin+100;y<WINDOW_NM.ymax;y+=100){const [,sy]=toSvg(0,y);lines.push(`<path d="M150 ${sy} H450" stroke-opacity="${y%500===0?.22:.09}"/>`);}
  return `<g data-grid="100 nm" stroke="#73859d" stroke-width=".5" vector-effect="non-scaling-stroke" pointer-events="none">${lines.join('')}</g>`;
 }
-export function sectionSvg(shapes,{selected=0,selectedEdge=null,mode='Bodies'}={}){
+// The PML of an open edge: a grey band outside the window, drawn narrower than its 1 µm (the
+// drawing keeps the window in view), labelled with its true thickness.
+export const PML_BAND=30;
+function pmlBands(open,dx,dy,dw,dh){
+ const B=PML_BAND,box={left:[dx-B,dy,B,dh],right:[dx+dw,dy,B,dh],bottom:[dx,dy+dh,dw,B],top:[dx,dy-B,dw,B]};
+ return open.map(side=>{const [x,y,w,h]=box[side],cx=x+w/2,cy=y+h/2,vertical=side==='left'||side==='right';
+  return `<g data-pml="${side}" role="img" aria-label="PML 1 µm outside the ${side} edge"><title>PML 1 µm outside the ${side} edge (band not to scale)</title><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#c3c9d1" stroke="#8a9bb2" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/><text x="${cx}" y="${cy+3}" font-size="9" fill="#354760" text-anchor="middle"${vertical?` transform="rotate(-90 ${cx} ${cy})"`:''}>PML 1 µm</text></g>`;}).join('');
+}
+/** The optical cross section. openEdges: the edges with an open boundary (a PML outside them). */
+export function sectionSvg(shapes,{selected=0,selectedEdge=null,mode='Bodies',openEdges=[]}={}){
  const [dx,dy]=toSvg(WINDOW_NM.xmin,WINDOW_NM.ymax),dw=(WINDOW_NM.xmax-WINDOW_NM.xmin)/10,dh=(WINDOW_NM.ymax-WINDOW_NM.ymin)/10;
+ const open=['left','right','bottom','top'].filter(side=>openEdges.includes(side));
  const pickable=mode==='Bodies';
  const body=shapes.map((s,i)=>{
   const {tag,attrs}=shapeSvgAttributes(s),on=i===selected;
@@ -32,7 +42,7 @@ export function sectionSvg(shapes,{selected=0,selectedEdge=null,mode='Bodies'}={
  }).join('');
  const paths={left:`M${dx} ${dy} v${dh}`,right:`M${dx+dw} ${dy} v${dh}`,top:`M${dx} ${dy} h${dw}`,bottom:`M${dx} ${dy+dh} h${dw}`};
  const hits={left:{x:dx-6,y:dy,w:12,h:dh},right:{x:dx+dw-6,y:dy,w:12,h:dh},top:{x:dx,y:dy-6,w:dw,h:12},bottom:{x:dx,y:dy+dh-6,w:dw,h:12}};
- const edges=mode==='Boundaries'?Object.entries(paths).map(([side,path])=>`<g data-pick-edge="optical-${side}" role="button" tabindex="0" aria-label="Select optical ${side} PEC boundary"><rect x="${hits[side].x}" y="${hits[side].y}" width="${hits[side].w}" height="${hits[side].h}" fill="transparent"/><path d="${path}" fill="none" stroke="transparent" stroke-width="12"/><path d="${path}" fill="none" stroke="${selectedEdge==='optical-'+side?'#d9480f':'#2860bd'}" stroke-width="${selectedEdge==='optical-'+side?3.5:2}" vector-effect="non-scaling-stroke" pointer-events="none"/></g>`).join(''):'';
+ const edges=mode==='Boundaries'?Object.entries(paths).map(([side,path])=>`<g data-pick-edge="optical-${side}" role="button" tabindex="0" aria-label="Select optical ${side} ${open.includes(side)?'open boundary (PML)':'PEC boundary'}"><rect x="${hits[side].x}" y="${hits[side].y}" width="${hits[side].w}" height="${hits[side].h}" fill="transparent"/><path d="${path}" fill="none" stroke="transparent" stroke-width="12"/><path d="${path}" fill="none" stroke="${selectedEdge==='optical-'+side?'#d9480f':'#2860bd'}" stroke-width="${selectedEdge==='optical-'+side?3.5:2}" vector-effect="non-scaling-stroke" pointer-events="none"/></g>`).join(''):'';
  const chosen=shapes[selected];let dims='';
  if(chosen&&pickable){
   const b=shapeBounds(chosen),[x0,y0]=toSvg(b.xmin,b.ymax),[x1,y1]=toSvg(b.xmax,b.ymin);
@@ -42,11 +52,11 @@ export function sectionSvg(shapes,{selected=0,selectedEdge=null,mode='Bodies'}={
  <rect data-pick-body="Oxide" ${pickable?'role="button" tabindex="0" aria-label="Select silica background"':''} x="${dx}" y="${dy}" width="${dw}" height="${dh}" fill="#e4ebf3" stroke="#8a9bb2" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
  ${gridSvg()}
  <path d="M150 175 H450 M300 55 V295" stroke="#8a9bb2" stroke-dasharray="3 4" stroke-width=".6" pointer-events="none"/>
- ${body}${edges}
+ ${pmlBands(open,dx,dy,dw,dh)}${body}${edges}
  <g fill="#354760" font-size="10" text-anchor="middle" pointer-events="none">
- <text x="300" y="47">Optical cross section · equal x/y scale · later shapes win where they overlap</text>
+ <text x="300" y="${open.includes('top')?14:47}">Optical cross section · equal x/y scale · later shapes win where they overlap</text>
  ${dims}
- <text x="300" y="306">x: −1500 … +1500 nm · y: −1200 … +1200 nm · silica background · four fixed PEC edges</text>
+ <text x="300" y="${open.includes('bottom')?340:306}">x: −1500 … +1500 nm · y: −1200 … +1200 nm · silica background · ${open.length?`open boundary (PML 1 µm) on ${open.length} edge${open.length===1?'':'s'}`:'four fixed PEC edges'}</text>
  <text x="315" y="188">(0, 0)</text>
  </g></svg>`;
 }

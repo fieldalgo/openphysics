@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Studio: the optical workspace offers an open boundary. Physics › Optical modes chooses *Closed window (PEC)* or *Open boundary (PML)*, with a fixed 1 µm PML outside the window and an editable Search near n_eff (default 2.460 for silicon); Geometry › Boundaries closes single edges again, and the drawing shows the PML bands. An open run's loss column is *Loss (dB/cm)*: material absorption and leakage, *< 0.01 dB/cm* below what the boundary resolves, with the measured mesh error in its help. It also shows the found line, the other candidates of the search with their reasons, and, with *Also check the PML (N more solves)*, a PML check column from one more solve per mode at strength 6 (below the display floor it says only that no leakage is resolved). Polarization, A_eff and n_g read “—” and the group index is off for open runs; Compare does not match modes when either run is open. Sessions with an open run (or inputs choosing Open) are version 10 and model files choosing Open are version 9; otherwise files are written as before, byte for byte. [Open boundary in the optical workspace](docs/packages/simcase/workspace.md#open-boundary-in-the-optical-workspace).
+
+## 한국어
+
+- Studio: 광학 작업 공간이 열린 경계를 제공합니다. Physics › Optical modes에서 *Closed window (PEC)*와 *Open boundary (PML)* 가운데 고르며, 계산창 바깥의 1 µm PML은 고정이고 Search near n_eff는 고칠 수 있습니다(실리콘 기본값 2.460). Geometry › Boundaries에서 변을 하나씩 다시 닫을 수 있고 그림에 PML 띠가 보입니다. 열린 실행의 손실 열은 *Loss (dB/cm)*로 재료 흡수와 누설을 함께 세며, 경계가 분해하는 값보다 작으면 *< 0.01 dB/cm*이고 도움말에 측정한 메시 오차가 있습니다. 찾은 개수 줄, 탐색의 다른 후보와 그 이유, 그리고 *Also check the PML (N more solves)*를 켜면 모드마다 강도 6으로 한 번 더 푼 PML 점검 열도 보입니다(표시 하한 아래에서는 분해된 누설이 없다고만 말함). 열린 실행의 Polarization, A_eff, n_g는 “—”이고 군굴절률은 꺼지며, 어느 한 실행이라도 열려 있으면 Compare는 모드를 짝짓지 않습니다. 열린 실행이 있거나 입력이 Open을 고른 세션은 버전 10, Open을 고른 모델 파일은 버전 9이며, 그 밖에는 이전처럼 바이트 그대로 씁니다. [광학 작업 공간의 열린 경계](packages/simcase/workspace.md#광학-작업-공간의-열린-경계).

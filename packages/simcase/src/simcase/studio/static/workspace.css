@@ -451,3 +451,13 @@ dialog::backdrop{background:#162a4b66}
 /* Study: Also compute group index */
 .check-field{display:flex;align-items:center;gap:6px}
 .check-field input{width:auto;margin:0}
+
+/* Open boundary (slice P2): the Outer boundary choice, the n_eff with its Im part, the other candidates */
+.boundary-choice{border:1px solid var(--line,#d4dce6);border-radius:6px;margin:8px 0;padding:4px 10px 6px}
+.boundary-choice legend{padding:0 4px;font-weight:600}
+.radio-field{display:flex;align-items:center;gap:6px;margin:4px 0}
+.radio-field input{width:auto;margin:0}
+#modes-table td[data-neff]{white-space:nowrap}
+.other-candidates{margin:8px 0}.other-candidates>summary{cursor:pointer;color:var(--accent);padding:6px 0}
+.other-candidates .table-scroll{max-width:100%;overflow-x:auto}
+.other-candidates td.num{white-space:nowrap}
