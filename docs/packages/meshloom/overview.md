@@ -319,6 +319,21 @@ See [third-party software](../../third-party.md).
   (none so far in the tests) is an error, not yet repaired with extra points. The
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
+- A closed triangle surface given as one facet per triangle (an STL-like input) is slow
+  and not always meshed. Every triangle edge is then a segment, which refinement splits
+  as it does an input edge. Measured 2026-11-23 on meshloom's own boundaries of C1–C7
+  at the plan's three sizes, unlocked:
+  - 15 of 21 mesh, and their volume and surface area match the input to 1e-15. They take
+    1.9–7.1 times as long as the same case from its builder or polygon input. Where V10
+    has a gate, none reaches it: the smallest dihedral angle is 3.9–9.2°, against 15°
+    (13.8° on C3).
+  - C3 at h = 0.2 and C7 at h = 0.03 and 0.015 raise `RefineError` ("subfacet … is
+    degenerate in doubles"). C3 at h = 0.4 and C7 at h = 0.06 run past 10 minutes.
+    Subfacets split towards a vertex where coplanar triangles meet at a small angle.
+  - The same unit cube as six polygons meshes in 0.06–3.4 s at h = 0.5–0.12, and as
+    triangles in 0.03–23 s.
+  - Locking those triangles (`locked_facets`) raises `RecoveryError` on C2–C7: recovery
+    would need a point on a locked facet.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.

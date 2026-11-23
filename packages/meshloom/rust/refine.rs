@@ -85,6 +85,9 @@ struct State<'a> {
     /// subsegment -> chain index
     seg: HashMap<(u32, u32), u32>,
     chains: Vec<Vec<u32>>,
+    /// input segment (its end points, as ekey) -> its chains: the pieces an S point of that
+    /// segment may split, found without scanning every subsegment
+    chain_of: HashMap<(u32, u32), Vec<u32>>,
     /// per input vertex: whether two segments meet there at less than 60 degrees
     small_apex: Vec<bool>,
     /// facets the caller locked (curved surfaces sampled on the surface): no point is
@@ -1814,12 +1817,9 @@ impl State<'_> {
         // a lone subsegment (no subfacet through it) containing p
         if self.g.s[(p as usize) - self.g.input.len()].kind() == crate::mixed::Kind::Segment {
             let sp = self.g.s[(p as usize) - self.g.input.len()];
-            let lone: Vec<(u32, u32)> = self.seg.keys().copied()
-                .filter(|e| {
-                    let c = &self.chains[self.seg[e] as usize];
-                    (c[0] == sp.a && c[c.len() - 1] == sp.b) || (c[0] == sp.b && c[c.len() - 1] == sp.a)
-                })
-                .filter(|e| e.0 != p && e.1 != p).collect();
+            let lone: Vec<(u32, u32)> = self.chain_of.get(&ekey(sp.a, sp.b)).into_iter().flatten()
+                .flat_map(|&c| self.chains[c as usize].windows(2).map(|w| ekey(w[0], w[1])).collect::<Vec<_>>())
+                .filter(|e| self.seg.contains_key(e) && e.0 != p && e.1 != p).collect();
             for e in lone {
                 if self.g.collinear(e.0, e.1, p) && self.g.view().dot_sign(self.pt(p), self.pt(e.0), self.pt(e.1)) < 0 {
                     let c = self.seg.remove(&e).unwrap();
@@ -1901,18 +1901,22 @@ impl State<'_> {
         let (tu, tv) = (t_of(e.0, self), t_of(e.1, self));
         let mut tm = tu + (tv - tu) / 2.0;
         // concentric shells (Ruppert 1995; Shewchuk 2002, section 4): a subsegment with exactly
-        // one input endpoint splits at the power-of-two distance from that endpoint nearest its
-        // midpoint, so that subsegments meeting at a small input angle split at equal radii and
-        // stop encroaching each other
+        // one input endpoint splits at a power-of-two distance from that endpoint, between a
+        // third and two thirds of its length, so that subsegments meeting at a small input angle
+        // split at equal radii and stop encroaching each other
         let apex = |v: u32| (v == a || v == b) && self.small_apex[v as usize];
         let (ia, ib) = (apex(e.0), apex(e.1));
         if ia != ib {
             let d = sub3(&self.xyz[b as usize], &self.xyz[a as usize]);
             let len = dot(&d, &d).sqrt();
             let (t0, t1) = if ia { (tu, tv) } else { (tv, tu) };
-            let half = (t1 - t0).abs() * len / 2.0;
-            if len > 0.0 && half > 0.0 {
-                let r = 2f64.powf((half.log2()).round());
+            let piece = (t1 - t0).abs() * len;
+            if len > 0.0 && piece > 0.0 {
+                // the power of two in [piece/3, 2 piece/3), which always exists (rounding the
+                // midpoint's exponent can land outside that window; the midpoint split then left
+                // pieces at unequal radii around a fan of segments, which encroached each other
+                // until their points met in doubles)
+                let r = 2f64.powf((piece / 3.0).log2().ceil());
                 let tr = t0 + (t1 - t0).signum() * r / len;
                 if (tr - t0).abs() > (t1 - t0).abs() / 3.0 && (tr - t0).abs() < 2.0 * (t1 - t0).abs() / 3.0 {
                     tm = tr;
@@ -2390,8 +2394,12 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             }
         }
     }
+    let mut chain_of: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
+    for (c, ch) in b.plc.rec.chains.iter().enumerate() {
+        chain_of.entry(ekey(ch[0], ch[ch.len() - 1])).or_default().push(c as u32);
+    }
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), small_apex, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };

@@ -1,0 +1,9 @@
+# Fixed
+
+## English
+
+- `meshloom`: **refinement no longer cascades at a fan of segments meeting at a small angle.** A subsegment with one end at the apex of a small input angle is split on concentric shells, at a power-of-two distance from the apex. That distance came from rounding the exponent of half the piece, so it could fall outside a third to two thirds of the piece. The split then fell back to the midpoint, and the pieces of the fan encroached each other until their points met in doubles. The distance is now 2^⌈log₂(piece/3)⌉, which always lies in that window. On the unit cube given as meshloom's own boundary triangles, one facet per triangle, this failed before: `RefineError` ("subfacet … is degenerate in doubles") at h = 0.34 and 0.2, and a run past 30 minutes at h = 0.12. These inputs now mesh in about 2, 6 and 23–27 s. Every earlier meshloom test passes unchanged. A segment's new point also finds the pieces it may split through an index instead of a scan of every subsegment. Triangle-surface input is still slow and fails on some cases; see the limits. New test: `tests/meshloom/test_triangle_surface.py`. [meshloom](docs/packages/meshloom/overview.md#limits).
+
+## 한국어
+
+- `meshloom`: **작은 각으로 만나는 선분 부채꼴에서 세분화가 더 이상 연쇄하지 않습니다.** 작은 입력 각의 꼭짓점에 한 끝이 있는 subsegment는 동심 껍질 위에서, 꼭짓점에서 2의 거듭제곱 거리에 나눕니다. 이 거리는 조각 절반의 지수를 반올림해 정했기 때문에, 조각의 1/3–2/3 밖으로 나갈 수 있었습니다. 그러면 분할이 중점으로 떨어졌고, 부채꼴의 조각들이 서로 침범하다가 결국 점들이 double에서 겹쳤습니다. 이제 거리는 2^⌈log₂(조각/3)⌉이며, 언제나 그 구간 안에 있습니다. 단위 정육면체를 meshloom 자신의 경계 삼각형으로, 삼각형마다 facet 하나씩 주면 전에는 실패했습니다. h = 0.34와 0.2에서는 `RefineError`("subfacet … is degenerate in doubles")가 났고, h = 0.12에서는 30분 넘게 걸렸습니다. 이제 이 입력은 각각 약 2초, 6초, 23–27초에 메시가 됩니다. 기존 meshloom 시험은 바뀌지 않고 모두 통과합니다. 또 선분의 새 점이 나눌 수 있는 조각을 모든 subsegment를 훑지 않고 색인으로 찾습니다. 삼각형 표면 입력은 아직 느리고, 일부 사례에서는 실패합니다(한계 참고). 새 시험: `tests/meshloom/test_triangle_surface.py`. [meshloom](packages/meshloom/overview.md#한계).
