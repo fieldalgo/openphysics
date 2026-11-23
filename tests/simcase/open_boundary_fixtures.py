@@ -19,10 +19,12 @@ import pytest
 
 import physmat
 import refsol.lossy_slab
+import simcase
 from simcase import Document, run
 
 HERE = Path(__file__).resolve().parent
-STATIC = HERE.parents[1] / "packages" / "simcase" / "src" / "simcase" / "studio" / "static"
+#: the imported simcase package's page modules: the source tree here, the installed wheel in the installed-package run
+STATIC = Path(simcase.__file__).resolve().parent / "studio" / "static"
 FIXTURES = HERE / "studio_session_fixtures"
 WAVELENGTH = 1.55e-6
 DB = 10 * np.log10(np.e)
