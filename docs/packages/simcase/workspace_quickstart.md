@@ -103,8 +103,9 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
   same file without asking. In Firefox and Safari Studio asks for the file name and hands the
   file to your browser's Downloads (the browser may ask where to save it, or add “ (1)” if that
   name exists); Messages reports *Session file … sent to your browser's Downloads* and the
-  title shows *Session file … sent to your browser's Downloads · time* until your next edit or
-  run. **File › Save As…** (Shift+Ctrl+S) chooses another name; see
+  title shows *<name> · saved time (download)* until your next edit or run. Studio remembers the
+  name: the next **Save** downloads under it again without asking (the browser may add “ (1)”),
+  and the title reads *<name> · changed since saved* after an edit. **File › Save As…** (Shift+Ctrl+S) chooses another name; see
   [File menu and file kinds](workspace.md#file-menu-and-file-kinds) for what each file holds. The footer repeats the title's save indicator; before a file save it reads *Not
   saved to a file · kept for recovery in this browser*.
   **File › Export › Model file…** keeps the model without results (`optical-waveguide.json`); **Export this run** in

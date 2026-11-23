@@ -21,7 +21,7 @@ test('a session file name holds the application and the local date-time to the m
 
 test('the save indicator shows the file the session was sent to until the next edit, and after recovery what the record kept',()=>{
  const when=()=>'13:05',saved={name:'optical-waveguide-session-2026-11-21-1305.json',savedAt:'2026-11-21T04:05:00Z',current:true};
- assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),"Session file optical-waveguide-session-2026-11-21-1305.json sent to your browser's Downloads · 13:05");
+ assert.equal(P.persistenceTitle({saved,runsUnsaved:false},when),'optical-waveguide-session-2026-11-21-1305.json · saved 13:05 (download)');
  // the browser copy does not change what the indicator says about the file
  assert.equal(P.persistenceTitle({saved,recovery:'kept'},when),P.persistenceTitle({saved},when));
  const recovered={kind:'recovered',name:null,current:true};
@@ -30,7 +30,9 @@ test('the save indicator shows the file the session was sent to until the next e
  assert.equal(P.persistenceTitle({loaded:recovered},when),'Recovered from this browser');
  // a recovered notebook never saved to a file still says its results are not in one
  assert.equal(P.persistenceTitle({runsUnsaved:true,loaded:recovered},when),'Recovered from this browser · not saved to a file');
- for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,loaded:recovered},when),P.persistenceTitle({saved,recovery:'kept'},when)])assert.doesNotMatch(title,/saved/i,'the title never claims the browser kept the file');
+ // round 13 (O1): a download names the file and says it was a download, not that the browser kept it
+ for(const title of [P.persistenceTitle({saved},when),P.persistenceTitle({saved,recovery:'kept'},when)])assert.match(title,/ \(download\)$/,'a download says so');
+ assert.doesNotMatch(P.persistenceTitle({saved,loaded:recovered},when),/saved/i);
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false},when),'Unsaved inputs');
  assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,recovery:'kept'},when),'Changed since session file optical-waveguide-session-2026-11-21-1305.json (13:05) · kept for recovery in this browser');
  // before a file save the indicator says which copy exists: none in a file, and the browser copy's state
@@ -40,7 +42,7 @@ test('the save indicator shows the file the session was sent to until the next e
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'conflict'},when),'Not saved to a file · browser recovery changed in another tab');
  assert.equal(P.persistenceTitle({runsUnsaved:true},when),'Not saved to a file · not in browser recovery yet');
  // a failing or conflicting browser copy is said after a file save, an open or a recovery too
- assert.equal(P.persistenceTitle({saved,recovery:'conflict'},when),"Session file optical-waveguide-session-2026-11-21-1305.json sent to your browser's Downloads · 13:05 · browser recovery changed in another tab");
+ assert.equal(P.persistenceTitle({saved,recovery:'conflict'},when),'optical-waveguide-session-2026-11-21-1305.json · saved 13:05 (download) · browser recovery changed in another tab');
  assert.equal(P.persistenceTitle({loaded:recovered,recovery:'unavailable'},when),'Recovered from this browser · browser recovery unavailable');
  assert.equal(P.persistenceTitle({recovery:'unavailable'},when),'No unsaved input changes');
  assert.equal(P.persistenceTitle({}),'No unsaved input changes');
@@ -55,7 +57,7 @@ test('after an open the title names the file opened; after the next change it sa
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
  assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false}),'Unsaved inputs');
  // a save after the open names the new file, not the one opened
- assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),"Session file b.json sent to your browser's Downloads · 13:05");
+ assert.equal(P.persistenceTitle({saved:{name:'b.json',savedAt:'2026-11-21T04:05:00Z',current:true},loaded:null},()=>'13:05'),'b.json · saved 13:05 (download)');
  // the title carries no revision counter: it would differ after a restore
  for(const title of [P.persistenceTitle({loaded:opened}),P.persistenceTitle({}),P.persistenceTitle({clean:false})])assert.doesNotMatch(title,/revision/i);
 });
@@ -116,9 +118,9 @@ test('browser recovery of a multiphysics session over 16 MiB says which maps it 
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'overLimit'}),'Not saved to a file · browser recovery unavailable: session over 16 MiB');
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
 });
-test('the title says the session file went to the browser Downloads, never that it was saved',()=>{
+test('the title names the session file a download went to and says it was a download',()=>{
  const title=P.persistenceTitle({saved:{name:'s.json',savedAt:'2026-11-21T04:05:00Z',current:true}},()=>'13:05');
- assert.match(title,/^Session file s\.json sent to your browser's Downloads · 13:05$/);assert.doesNotMatch(title,/saved|disk/i);
+ assert.match(title,/^s\.json · saved 13:05 \(download\)$/);assert.doesNotMatch(title,/disk/i);
  assert.equal(P.sentToDownloads('Model','m.json'),"Model file m.json sent to your browser's Downloads");
 });
 test('leaving a model whose runs only this tab holds asks first, names what is lost and offers the save that fits',()=>{

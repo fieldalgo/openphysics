@@ -520,7 +520,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const editedSinceOpen=()=>signature()!==openedSignature;
  function indicator(){
   return {clean:signature()===cleanSignature||(!cleanSignature&&!editedSinceOpen()),runsUnsaved:(runs.length>0||editedSinceOpen())&&!sessionCurrent(),
-   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),written:sessionFile.written===true}:null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
+   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),written:sessionFile.written===true}:null,file:ctx.currentFileName?.()||null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
    // a template just opened, not yet edited, run, saved or opened
    fresh:freshSignature!==null&&signature()===freshSignature&&!runs.length&&!sessionFile&&!loaded};
  }
@@ -536,7 +536,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   if(!result.written){notice(result.message);return {ok:false,cancelled:true};}
   const name=result.name;
   sessionFile={name,savedAt:new Date().toISOString(),stamp:at.stamp,jobs:at.jobs,written:result.via==='picker'};cleanSignature=at.signature;loaded=null;freshSignature=null;ctx.onHistory();
-  notice(savedNotice(name,{runs:at.runs,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0,via:result.via})+result.after);
+  notice(savedNotice(name,{runs:at.runs,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0,via:result.via,known:result.known===true,again:result.again===true,after:result.after}));
   return {ok:true,name};
  }
  // browser recovery (§4): written while the model has a run or was edited since it was opened

@@ -38,7 +38,7 @@ import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText} from './workspace-multiphysics-session.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice} from './workspace-files.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -176,6 +176,8 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more)=>notice(text,mor
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),deliverSession:(text,name,options)=>deliverSession(text,name,options),serverVersion:()=>connection.version,validateRunLabel,
  // the optical runs this tab holds beside the multiphysics model (the save message names them)
  opticalRunCount:()=>runs.length,
+ // the model's current file name (File › Save downloads under it again), which the header names
+ currentFileName:()=>currentFileNow()?.name||null,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
  recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),cardResumeOffers(),{onOpenFile:()=>$('open-session').click()});host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
@@ -474,6 +476,7 @@ if(ui.page==='Model'&&ui.selection==='Study'){
 
 
 let pendingLoad=null;
+let currentFile=null,fileScope=0,savingFile=false,overflowSaveAs=false;
 const workspaceLoads=new LatestWorkspaceLoad(()=>loadContext());
 function loadContext(){return JSON.stringify({notebook:notebookStamp(),revision:edits.revision,invalid:numericDrafts.issues,jobOperation,pendingJob:pendingJob?.job||null});}
 // resultNotice: the message line announces a completed run; an input edit then replaces it,
@@ -508,7 +511,7 @@ function refreshPersistence(){
   // the viewed run has other inputs, and none was edited: the title says so on Results and Compare
   // (as the dock and the step bar do); on the Model tab it describes the current inputs only
   const seen=isOptical()&&['Results','Compare'].includes(ui.page)?viewedRun():null,viewed=seen&&clean&&seen.signature!==signature()?{run:runNumber(seen),name:seen.label||''}:null;
-  saveIndicator={invalid:numericDrafts.invalid,clean,fresh,runsUnsaved,saved:savedFile()&&{...savedFile(),written:lastSavedFile.written===true},loaded:loadedFrom(),viewed};refreshSaveIndicator();
+  saveIndicator={invalid:numericDrafts.invalid,clean,fresh,runsUnsaved,saved:savedFile()&&{...savedFile(),written:lastSavedFile.written===true},file:currentFileNow()?.name||null,loaded:loadedFrom(),viewed};refreshSaveIndicator();
   refreshNotebook();refreshWorkflow();
 }
 function refreshSaveIndicator(){
@@ -553,9 +556,9 @@ function requestLoad(doc,options={}){
   if(!options.leaveChecked&&multiView.active()&&multiView.unsavedRuns()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
   loadInputs(doc,options);
 }
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,fileName=null}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,fileName,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
   if((leaveChecked&&!session)||untouchedWorkspace(inputsFile(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
@@ -609,9 +612,9 @@ function completeLoad(pending){
   // whether the record said it still matched it
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
-  refreshPersistence();
+  rememberOpened(pending.fileName);refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
- }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
+ }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
   rejectInvalidInput();const doc=inputsFile();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
@@ -625,9 +628,9 @@ async function openModelFile(file){try{
  // a multiphysics document opens as a multiphysics model; any document opens in one that is open
  if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
   if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');
-   guardLeave(file.name,true,()=>{openingModel=true;fileScope++;multiView.openText(text,file.name).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
+   guardLeave(file.name,true,()=>{openingModel=true;fileScope++;multiView.openText(text,file.name).then(()=>rememberOpened(file.name)).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Model file exceeds 64 KiB.');return parseProject((await file.text()).replace(/^\uFEFF/,''));});
- if(loaded)requestLoad(loaded.value,{label:file.name,opener:$('open-session')});
+ if(loaded)requestLoad(loaded.value,{label:file.name,fileName:file.name,opener:$('open-session')});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}}
 $('save-draft').onclick=()=>{try{rejectInvalidInput();const doc=inputsFile();localStorage.setItem(DRAFT_KEY,JSON.stringify(doc));edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
@@ -1081,11 +1084,16 @@ function renderLineProfile(host,profileRuns,updateFields=()=>drawField(),shownMo
 
 function downloadFile(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 // ---- File › Save and Save As (workspace-files.mjs) ----
-// fileTarget: the file the save picker last wrote this session to, {handle, name, scope}. Save
-// writes it again only while scope still names the same model: every open, model switch and
-// Reset design moves fileScope on, so Save never writes one model's session into another's file.
-let fileTarget=null,fileScope=0,savingFile=false,overflowSaveAs=false;
-const fileScopeKey=()=>(multiView.active()?'multiphysics':applicationSlug())+':'+fileScope;
+// currentFile: the model's current file (workspace-files.mjs rememberFile), {name, handle, how,
+// scope}: the name Save As or the Save name dialog chose, the file the picker wrote, or the file
+// File › Open read. Save writes the picker's file again, or downloads under the name, while scope
+// still names the same model: every open, model switch and Reset design moves fileScope on, so
+// Save never writes one model's session into another's file or under another model's name.
+// (declared with pendingLoad, above: the header reads it from the first render)
+function fileScopeKey(){return (multiView.active()?'multiphysics':applicationSlug())+':'+fileScope;}
+function currentFileNow(){return currentFileFor(currentFile,fileScopeKey());}
+// a file File › Open read becomes the current file of the model it opened (after that open's scope)
+function rememberOpened(name){if(name){currentFile=rememberFile({name,how:'opened',scope:fileScopeKey()});refreshPersistence();}}
 // The name dialog, where the browser has no save picker or the picker could not be used: the
 // file name (letters, digits, spaces, . _ - ( ) only; .json added), then a download.
 const nameDialog=document.createElement('dialog');nameDialog.id='save-name-dialog';nameDialog.setAttribute('aria-labelledby','save-name-title');nameDialog.setAttribute('aria-describedby','save-name-note');
@@ -1111,20 +1119,24 @@ nameDialog.oncancel=event=>{event.preventDefault();nameAnswer?.(null);};
 // picker works), else the name dialog and a download. Resolves {written, name, via, after} or
 // {written: false, message}. Called inside the click or key press, before anything is awaited.
 function deliverSession(text,suggestedName,{saveAs}){
- savingFile=true;const scope=fileScopeKey(),target=fileTarget&&fileTarget.scope===scope?fileTarget:null;
- return saveToFile(text,{suggestedName:target?target.name:suggestedName,target,saveAs}).then(async result=>{
-  if(result.status==='saved'){fileTarget={handle:result.handle,name:result.name,scope};return {written:true,name:result.name,via:'picker',after:''};}
+ savingFile=true;const scope=fileScopeKey(),target=currentFileNow(),prefill=suggestedSaveName(target,suggestedName);
+ const keep=(name,how,handle=null)=>{if(fileScopeKey()===scope)currentFile=rememberFile({name,how,handle,scope});};
+ return saveToFile(text,{suggestedName:prefill,target,saveAs}).then(async result=>{
+  if(result.status==='saved'){keep(result.name,'picker',result.handle);return {written:true,name:result.name,via:'picker',after:''};}
+  // Save with a known name and no picker: downloaded again under it, without asking
+  if(result.status==='known'){downloadFile(new Blob([text],{type:'application/json'}),result.name);keep(result.name,'download');
+   return {written:true,name:result.name,via:'download',again:target.how==='download',known:true,after:' '+downloadAgainNote(result.name)};}
   if(result.status!=='unavailable')return {written:false,message:notWrittenNotice(result,{saveAs})};
-  $('save-name-input').defaultValue=suggestedName;
-  const name=await askFileName(suggestedName,{saveAs,unavailable:result.error});
+  $('save-name-input').defaultValue=prefill;
+  const name=await askFileName(prefill,{saveAs,unavailable:result.error});
   if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs})};
-  downloadFile(new Blob([text],{type:'application/json'}),name);
+  downloadFile(new Blob([text],{type:'application/json'}),name);keep(name,'download');
   // the name dialog said before the download that the browser may add " (1)"; Messages says what happened
   return {written:true,name,via:'download',after:''};
  }).finally(()=>{savingFile=false;});
 }
 // The start of a save notice: what happened to the file, and no more.
-const savedWhere=result=>result.via==='picker'?`Saved to ${result.name}`:`Session file ${result.name} sent to your browser's Downloads`;
+const savedWhere=result=>result.via==='picker'?`Saved to ${result.name}`:result.known&&result.again?`Downloaded ${result.name} again`:`Session file ${result.name} sent to your browser's Downloads`;
 // A run as the run list, Compare and the profile legend name it: its name, design, wavelength
 // and completion time. The job id is in Run details, not here: hash ids made labels wrap.
 // with seconds: unnamed runs of the same minute read apart
@@ -1362,7 +1374,7 @@ function requestMultiphysicsSession(session,{label,source,opener=document.active
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  const asked=!!leaveText(label,true);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file')rememberOpened(label);}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.runCount(),unsaved:multiView.unsavedRuns()>0,model:'the current model'},source);
@@ -1417,7 +1429,8 @@ async function saveOpticalSession({keepSelected=false,saveAs=false}={}){
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
  // an optical, heat or Joule heating model file (inputs only) opens as Open did for it before
- if(file.size<=MAX_BYTES){let tree=null;try{tree=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{}if(tree?.format==='openphysics-studio-workspace'){openModelFile(file);return;}}
+ // (read up to 1 MiB, so a model file over its 64 KiB limit gets the model reader's refusal)
+ if(file.size<=(1<<20)){let tree=null;try{tree=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{}if(tree?.format==='openphysics-studio-workspace'){openModelFile(file);return;}}
  if(multiView.busy())throw new Error('Wait for the multiphysics run to finish, or stop it under Study.');
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
   const text=await file.text();
@@ -1429,7 +1442,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   return {session};});
  if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');
  if(loaded.value.model!==undefined){const text=loaded.value.model,asked=!!leaveText(file.name,true);
-  const open=()=>{openingModel=true;fileScope++;multiView.openText(text,file.name,{asSession:true}).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});};
+  const open=()=>{openingModel=true;fileScope++;multiView.openText(text,file.name,{asSession:true}).then(()=>rememberOpened(file.name)).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});};
   // an edited model or one with runs is replaced only after the open question, as a session is
   guardLeave(file.name,true,()=>{if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){open();return;}
    const runsNow=multiView.runCount();
@@ -1440,7 +1453,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   return;}
  const session=loaded.value.session;
  if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
- requestLoad(session.input,{session,label:file.name,opener:$('open-session')});
+ requestLoad(session.input,{session,label:file.name,fileName:file.name,opener:$('open-session')});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;

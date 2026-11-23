@@ -329,13 +329,20 @@ Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440
 확인합니다. 헤드리스 실행에서는 브라우저의 실제 저장 대화상자에 답할 수 없으므로 스크립트는 문서 시작 시
 `window.showSaveFilePicker`를 지우고, Save는 Studio의 이름 대화상자를 거칩니다(Download는 제안 이름을
 유지하므로 파일 이름과 바이트를 전처럼 확인). 이어서 Chromium처럼 닫을 때만 파일이 바뀌는 대역(stub)을 그
-경계에 넣어 Save As(대화상자 옵션: 제안 이름, JSON 형식 하나, `id` `openphysics-project`, `startIn`
-`documents`, 그다음엔 현재 파일), 같은 상태의 다운로드와 같은 바이트, 대화상자를 다시 부르지 않고 같은
+경계에 넣어 Save As(대화상자 옵션: 제안 이름, JSON 형식 하나, `id` `openphysics-project`, 파일을 고르기
+전에는 `startIn` 없음, 그다음엔 현재 파일), 같은 상태의 다운로드와 같은 바이트, 대화상자를 다시 부르지 않고 같은
 파일에 쓰는 Save, 아무것도 쓰지 않는 취소, 중단되어 이전 내용이 온전한 실패한 쓰기, `NotAllowedError`를
 던지는 대화상자에서 이름 대화상자로 넘어가는 것을 확인합니다. 헤드리스 브라우저는 `navigator.webdriver`를 알리며, 이때 Studio는 저장 대화상자를 부르지 않습니다
 (부르면 예외를 던질 대역이 불리지 않고 Save As가 입력한 이름으로 내려받음). 대화상자 점검은 그 경계에서
 `navigator.webdriver`를 false로 둡니다. 이름 대화상자에 입력한 이름은 정리됩니다
-(`my run/<x>?`은 `my runx.json`으로 내려받음). 데스크톱 Chrome의 실제 저장 대화상자는 어떤 점검도
+(`my run/<x>?`은 `my runx.json`으로 내려받음). 13차부터는 다운로드 경로에서 모델의 현재 파일 이름도
+확인합니다: Save As *design-a-ng*, Width 편집 뒤 Save와 Ctrl+S가 이름 대화상자 없이 `design-a-ng.json`으로
+다시 내려받음(바이트에 새 폭, Messages에 “ (1)” 안내와 함께 *Downloaded design-a-ng.json again*), 파일
+이름을 밝히는 헤더(*design-a-ng.json · changed since saved*, *· saved … (download)*), 그 이름으로 채워진
+Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이 됨(*Opened design-a-ng.json*, 이어서
+*· changed since opened*, Save가 이름을 유지), **Reset design**이 이름을 버려 Save가 모델 기반 이름으로
+묻는 것, 그리고 **File › Open…**으로 연 64 KiB 넘는 모델 파일이 *Model file exceeds 64 KiB*로 거부되는
+것입니다. 다른 흐름에서도 연 파일 뒤의 저장은 그 이름을 유지합니다. 데스크톱 Chrome의 실제 저장 대화상자는 어떤 점검도
 조작하지 않습니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
@@ -355,7 +362,10 @@ results*도 확인합니다.
 실행을 제안하고 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
 가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 Heated silicon
 waveguide 카드가 자기 가장 새 기록을 복원하고(위 상자는 그 기록을 나열하지 않음) 세션 파일의 저장 시각을 밝히는지,
-복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다.
+복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다. 13차부터는 Save As 이름
+뒤의 Save가 대화상자 없이 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
+*heated-design.json · saved … (download)*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
+유지하는지도 확인합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

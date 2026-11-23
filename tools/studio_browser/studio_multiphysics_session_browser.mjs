@@ -219,8 +219,12 @@ try {
     }
     throw new Error('no download: ' + label);
   }
-  async function saveSession(label) {
-    const before = await listed(); await clearNotice(); await page.click('#save-session'); await confirmName(label);
+  // named: the model has a current file (an opened file, or a name chosen before), so Save
+  // downloads under it with no name dialog (round 13, O1)
+  async function saveSession(label, {named = false} = {}) {
+    const before = await listed(); await clearNotice(); await page.click('#save-session');
+    if (named) { for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, label + ': no name dialog'); await sleep(100); } }
+    else await confirmName(label);
     const file = await nextDownload(before, label);
     await page.until("/^Session file .* sent to your browser's Downloads: /.test(document.getElementById('file-status').textContent)", 'save notice ' + label);
     return file;
@@ -407,7 +411,7 @@ print(n)`;
   const a1 = await saveSession('template');
   assert.match(a1.name, /^heated-silicon-waveguide-session-\d{4}-\d\d-\d\d-\d{4}\.json$/);
   assert.match(await notice(), /^Session file heated-silicon-waveguide-session-.*\.json sent to your browser's Downloads: the model, 1 run and the without-heater result\.$/);
-  assert.match(await page.text('#autosave-status'), /^Session file heated-silicon-waveguide-session-.*\.json sent to your browser's Downloads · \d{1,2}:\d\d(?: [AP]M)?$/);
+  assert.match(await page.text('#autosave-status'), /^heated-silicon-waveguide-session-.*\.json · saved \d{1,2}:\d\d(?: [AP]M)? \(download\)$/);
   await fetchReplies(a1.text);
   const openedA = await openSession(a1.path);
   assert.equal(openedA, `Opened ${basename(a1.path)}. Its results were read from the file, not recomputed; input undo starts here.`);
@@ -423,7 +427,7 @@ print(n)`;
   assert.equal(openedDock.heading, 'Run 1 · read from file, not recomputed');
   assert.equal(openedDock.status, 'Run 1 · read from file, not recomputed · press Run to compute it here');
   assert.match(openedDock.sequence, /Heat 1 · From file.*Modes 1 · From file/); assert.doesNotMatch(openedDock.sequence, /Done in/);
-  const a2 = await saveSession('template again');
+  const a2 = await saveSession('template again', {named: true});
   assert.equal(a2.text, a1.text, 'S1: the second file is byte-identical');
   const s1Template = {...compareArrays(a1.text), python: comparePython(a1.path), bytes: Buffer.byteLength(a1.text)};
   stage('S1 S2 template', {before, after, ...s1Template});
@@ -433,13 +437,14 @@ print(n)`;
   await runAndWait(1);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.12', 180000);
   await runReady();
-  const b0 = await shown(), b1 = await saveSession('0.12');
+  // round 13 (O1): the model file opened above is the current file, so Save keeps its name
+  const b0 = await shown(), b1 = await saveSession('0.12', {named: true}); assert.match(b1.name, /^variant-012(?: \(\d\))?\.json$/);
   await fetchReplies(b1.text);
   await openSession(b1.path);
   await page.clickTreeItem('Modes 1');
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened 0.12');
   assert.deepEqual(await shown(), b0);
-  const b2 = await saveSession('0.12 again');
+  const b2 = await saveSession('0.12 again', {named: true});
   assert.equal(b2.text, b1.text, 'S1: 0.12 µm second file byte-identical');
   const s1Fine = {...compareArrays(b1.text), python: comparePython(b1.path), bytes: Buffer.byteLength(b1.text), triangles: JSON.parse(b1.text).runs[0].result.mesh.triangles.length};
   stage('S1 0.12 um', {shown: b0, ...s1Fine});
@@ -491,7 +496,22 @@ print(n)`;
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs back');
   const back = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(back[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)? · from file$/); assert.match(back[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)? · from file$/);
-  const c2 = await saveSession('two runs again');
+  const c2 = await saveSession('two runs again', {named: true});
+  // round 13 (O1): the opened file's name is the current file; Save As offers it, and Save after a
+  // Save As name downloads under that name again with no dialog, and the header names the file
+  assert.match(c2.name, /^\d\d-heated-silicon-waveguide-session-.*\.json$/, 'Save after Open keeps the opened name');
+  { const before = await listed(); await clearNotice(); await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog')?.open", 'O1 Save As');
+    assert.equal(await page.eval("document.getElementById('save-name-input').value"), c2.name.replace(/ \(\d\)\.json$/, '.json'));
+    await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='heated-design';})()"); await page.click('#save-name-download');
+    const first = await nextDownload(before, 'O1 Save As'); assert.equal(first.name, 'heated-design.json');
+    assert.match(await page.text('#file-status'), /^Session file heated-design\.json sent to your browser's Downloads: /);
+    const again = await listed(); await clearNotice(); await page.click('#menu-save');
+    for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'O1 Save: no name dialog'); await sleep(100); }
+    const second = await nextDownload(again, 'O1 Save'); const message = await page.text('#file-status'), footer = await page.text('#autosave-status');
+    stage('O1 multiphysics Save after Save As', {first: first.name, second: second.name, message, footer});
+    assert.match(second.name, /^heated-design(?: \(\d\))?\.json$/); assert.deepEqual(JSON.parse(second.text).runs.map(r => r.job), JSON.parse(first.text).runs.map(r => r.job), 'the same runs');
+    assert.match(message, /^Downloaded heated-design\.json again: the model, 2 runs.*A download cannot replace the earlier file, so your browser may name it heated-design \(1\)\.json\.$/);
+    assert.match(footer, /^heated-design\.json · saved .+ \(download\)$/); }
   assert.equal(c2.text, c1.text, 'S1: the two-run file byte-identical');
   // the next run is numbered after the highest stored
   await runAndWait(3);
@@ -559,7 +579,7 @@ print(n)`;
   // which the box above does not list again; the record is the same as the file just saved, so the
   // card names that file with its save time, and the restored title says "same as file"
   // the session's own file name (the browser may give the download another name)
-  const r1Name = (await page.text('#autosave-status')).match(/^Session file (\S+\.json) sent/)?.[1];
+  const r1Name = (await page.text('#autosave-status')).match(/^(\S+\.json) · saved /)?.[1];
   assert.ok(r1Name, await page.text('#autosave-status'));
   await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(r1Name)}&&r.savedFile.current===true})`, 'record of the saved session', 30000);
   await page.call('Page.reload');
@@ -730,13 +750,14 @@ print(n)`;
   // Keep maps for selected and pinned runs: the file fits and says which runs keep values only
   const before5 = await listed(); await clearNotice(); await page.click('#save-session');
   await page.until("document.getElementById('session-overflow').open", 'overflow question again');
-  await page.click('#overflow-keep'); await confirmName('six 0.08 runs');
-  const big = await nextDownload(before5, 'six 0.08 runs');
-  await page.until("/keep values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
+  // round 13 (O1): the model file opened above (variant-008.json) is the current file: no name dialog
+  await page.click('#overflow-keep'); for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'six 0.08 runs: no name dialog'); await sleep(100); }
+  const big = await nextDownload(before5, 'six 0.08 runs'); assert.match(big.name, /^variant-008(?: \(\d\))?\.json$/);
+  await page.until("/keep values only, without maps\\. A download cannot replace the earlier file, so your browser may name it variant-008 \\(1\\)\\.json\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
   assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024);
   assert.deepEqual(bigSession.runs.map(r => r.maps), ['not kept', 'not kept', 'not kept', 'not kept', 'not kept', 'kept']);
-  assert.match(bigNotice, /: the model, 6 runs and the without-heater result\. 5 runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) keep values only, without maps\.$/);
+  assert.match(bigNotice, /: the model, 6 runs and the without-heater result\. 5 runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) keep values only, without maps\. A download cannot replace the earlier file, so your browser may name it variant-008 \(1\)\.json\.$/);
   await fetchReplies(big.text);
   const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2, 3, 4, 5]}), python: comparePython(big.path)};
   // pinned runs: five pinned, with their maps, are over the limit together
