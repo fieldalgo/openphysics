@@ -219,7 +219,70 @@ def half_matrix(a, b, *, order=8):
     value[i, j] = mean_log_pairs(aa, bb, ci, di, order=order) - mean_log_pairs(aa, bb, cc, dd, order=order)
     return value
 
-def matrix(a, b, W, H, *, degree=10, order=8, images=8):
+WALL_BOXES = 256
+
+
+def wall_distance(lower, upper, W, H, *, bottom):
+    """Distance from a box to the nearest image source: side walls, top wall,
+    and with bottom=True the bottom plane."""
+    gaps = [lower[0], W - upper[0], H - upper[1]] + ([lower[1]] if bottom else [])
+    return min(gaps)
+
+
+def wall_box_count(polygons, W, H, *, bottom):
+    """Boxes wall_labels makes for these conductors (from their bounding boxes)."""
+    total = 0
+    for polygon in polygons:
+        lower, upper = polygon.min(axis=0), polygon.max(axis=0)
+        total += max(1, int(np.ceil((upper[0] - lower[0]) / wall_distance(lower, upper, W, H, bottom=bottom))))
+    return total
+
+
+def wall_labels(a, b, owners, W, H, *, bottom):
+    """Equal x intervals of each conductor no wider than its wall_distance.
+
+    The smooth kernel holds the wall and plane images; on one box much wider
+    than a conductor's distance to them the tensor interpolation converges
+    slowly. Labels follow conductor order, then x.
+    """
+    mids = (a + b) / 2
+    labels = np.empty(len(a), dtype=int)
+    start = 0
+    for owner in np.unique(owners):
+        group = np.flatnonzero(owners == owner)
+        points = np.concatenate((a[group], b[group]))
+        lower, upper = points.min(axis=0), points.max(axis=0)
+        count = max(1, int(np.ceil((upper[0] - lower[0]) / wall_distance(lower, upper, W, H, bottom=bottom))))
+        bins = np.minimum(((mids[group, 0] - lower[0]) / (upper[0] - lower[0]) * count).astype(int), count - 1)
+        labels[group] = start + bins
+        start += count
+    return labels
+
+
+def _blockwise(a, b, labels, W, H, degree, smooth):
+    """Sum of the smooth kernel on separate interpolation boxes per label."""
+    groups = [np.flatnonzero(labels == label) for label in np.unique(labels)]
+    boxes = []
+    nodes, weights = leggauss(degree)
+    for group in groups:
+        points = np.concatenate((a[group], b[group]))
+        lower, upper = points.min(axis=0), points.max(axis=0)
+        if np.any(upper <= lower):
+            raise ValueError('wall-scaled interpolation box has zero extent')
+        grid, _ = tensor_basis((a[group] + b[group]) / 2, lower, upper, degree)
+        S = np.zeros((len(group), degree ** 2))
+        for node, weight in zip(nodes, weights / 2):
+            _, values = tensor_basis(a[group] + (node + 1) / 2 * (b[group] - a[group]), lower, upper, degree)
+            S += weight * values
+        boxes.append((grid, S))
+    out = np.zeros((len(a), len(a)))
+    for i, rows in enumerate(groups):
+        for j, columns in enumerate(groups):
+            out[np.ix_(rows, columns)] = boxes[i][1] @ smooth(boxes[i][0], boxes[j][0]) @ boxes[j][1].T
+    return out
+
+
+def matrix(a, b, W, H, *, degree=10, order=8, images=8, labels=None):
     """Symmetric Galerkin energy matrix. Interpolate only the smooth wall correction; verify raw reciprocity before averaging roundoff. Return the matrix and raw relative residual."""
     points = np.concatenate((a, b))
     lower = points.min(axis=0)
@@ -227,6 +290,13 @@ def matrix(a, b, W, H, *, degree=10, order=8, images=8):
     span = upper - lower
     if np.any(span <= 0) or lower[1] <= 0:
         raise ValueError('positive-height two-dimensional panel cluster required')
+    if labels is not None:
+        result = half_matrix(a, b, order=order) + _blockwise(
+            a, b, labels, W, H, degree, lambda t, u: smooth_correction(t, u, W, H, images))
+        symmetry = float(np.max(abs(result - result.T)) / np.max(abs(result)))
+        if symmetry > 1e-10:
+            raise ValueError('panel integration reciprocity residual exceeded')
+        return ((result + result.T) / 2, symmetry)
     if min(lower[0], W - upper[0], H - upper[1]) < max(span):
         raise ValueError('panel cluster too close to side/top walls')
     grid, _ = tensor_basis((a + b) / 2, lower, upper, degree)
