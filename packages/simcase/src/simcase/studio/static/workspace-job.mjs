@@ -67,7 +67,7 @@ export class OpticalJobMonitor {
     if(!active())return;answered=this.now();silent=false;
     if(job.status==='error')throw Object.assign(new Error(typeof job.error==='string'?job.error:'Solver failed.'),{code:'solver-failed'});
     if(job.status==='done'){
-     this.onState({phase:'loading',message:'Loading completed result '+pending.job,pending});
+     this.onState({phase:'loading',message:'Loading the result of this run…',title:'Job '+pending.job,pending});
      const result=await this.api('/api/jobs/'+pending.job+'/result?workspace_instance='+pending.serverInstance);if(!active())return;
      await this.onResult(result,pending);if(!active())return;
      this.onState({phase:'done',message:'Optical run complete. The result keeps the inputs it was run with.',pending});return;
