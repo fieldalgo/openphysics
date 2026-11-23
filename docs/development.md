@@ -394,6 +394,9 @@ the suggested name, one JSON type, `id` `openphysics-project` and `startIn` `doc
 current file), the written bytes equal to the download of the same state, Save writing the same
 file with no second picker call, a cancel writing nothing, a failed write aborted with the old
 content whole, and a picker that throws `NotAllowedError` falling back to the name dialog. The
+headless browser reports `navigator.webdriver`, where Studio never calls the picker (a stub that
+would throw is not called and Save As downloads under the typed name); the picker checks set
+`navigator.webdriver` to false at that boundary. The
 name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`). The real save
 dialog of desktop Chrome is not driven by any check.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the

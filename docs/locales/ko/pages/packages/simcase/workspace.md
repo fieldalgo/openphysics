@@ -97,8 +97,8 @@ written.*, 쓰기 뒤에는 *Saved to <name>*이 나옵니다. 그 밖의 경우
 페이지)나 저장 대화상자를 쓸 수 없을 때(예: 이를 막는 관리형 브라우저) Studio는 자체 대화상자에서
 **File name**을 묻습니다. 글자, 숫자, 공백과 `.`, `_`, `-`, `(`, `)`만 받고, `.json`이 없으면 붙입니다.
 브라우저가 Downloads 폴더에 저장하거나, 그렇게 설정했다면 위치를 묻는다고 안내하며, **Download**는 파일을
-브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나오고,
-**Save** 뒤에는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고 알립니다.
+브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
+**Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
 Studio는 다운로드가 보관됐는지 알 수 없습니다. **Export › Model file…**은 늘 내려받습니다.
 
 저장 대화상자(`window.showSaveFilePicker`)의 브라우저 지원. 2026-11-23에
@@ -114,7 +114,8 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. **Export › Mod
 | Firefox(데스크톱, Android) | 미지원 | Studio의 이름 대화상자, 그다음 다운로드 |
 | Safari(macOS, iOS) | 미지원 | Studio의 이름 대화상자, 그다음 다운로드 |
 
-이 데이터에서 API는 실험적(experimental)으로 표시됩니다. 자동 점검은 데스크톱 Chrome의 실제 대화상자를
+자동화되거나 헤드리스인 브라우저(`navigator.webdriver`)는 저장 대화상자를 보여 줄 수 없으므로 Studio가 입력한
+이름으로 파일을 내려받습니다. 이 데이터에서 API는 실험적(experimental)으로 표시됩니다. 자동 점검은 데스크톱 Chrome의 실제 대화상자를
 조작하지 않고 `showSaveFilePicker`를 그 경계에서 바꿔 넣습니다([개발 안내](../../development.md) 참고).
 
 ## 첫 광학 해석

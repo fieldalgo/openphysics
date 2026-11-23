@@ -1232,7 +1232,20 @@ try {
     assert.equal(typed, 'my runx'); assert.equal(fallbackName, 'my runx.json');
     assert.match(fallbackMessage, /^Session file my runx\.json sent to your browser's Downloads: current inputs, \d+ runs and the comparison\./);
     assert.doesNotMatch(fallbackMessage, /^Saved to/);
-    // F3: the picker stubbed at the boundary
+    // F5 (C1(f)): this headless browser reports navigator.webdriver; with a picker stub that throws
+    // if called, Save As asks for a name and downloads, and the stub is never called
+    assert.equal(await page.eval("navigator.webdriver"), true, 'the harness browser is automated');
+    await page.eval("window.__pickerCalls=0;window.showSaveFilePicker=()=>{window.__pickerCalls++;throw new Error('the picker must not be called');}");
+    before = await listDownloads();
+    await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'F5 automated name dialog');
+    const automated = {unavailable: await page.eval("document.getElementById('save-name-unavailable').hidden")};
+    await page.click('#save-name-download'); automated.file = await newDownload(before); automated.calls = await page.eval('window.__pickerCalls');
+    stage('F5 automated browser', automated);
+    assert.equal(automated.calls, 0); assert.equal(automated.unavailable, true, 'the same dialog as a browser without the picker');
+    assert.match(automated.file, /^optical-waveguide-session-.*\.json$/); assert.match(await status(), /sent to your browser's Downloads/);
+    // F3: the picker stubbed at both boundaries, window.showSaveFilePicker (R8) and
+    // navigator.webdriver (false, as in a browser people use)
+    await page.eval("Object.defineProperty(navigator,'webdriver',{get:()=>false,configurable:true})");
     await page.eval(`(()=>{window.__picker={calls:[],files:{'chosen.json':'OLD CONTENT'},writes:0,aborts:0,mode:'ok',failWrite:false};
       window.showSaveFilePicker=async options=>{const p=window.__picker;p.calls.push({...options,startIn:typeof options.startIn==='string'?options.startIn:'handle:'+options.startIn.name});
         if(p.mode==='abort')throw new DOMException('The user aborted a request.','AbortError');if(p.mode==='deny')throw new DOMException('Not allowed in this browser.','NotAllowedError');

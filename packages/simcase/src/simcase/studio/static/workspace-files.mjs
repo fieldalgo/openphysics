@@ -29,9 +29,11 @@ export function modelFileName(name) {
   return (s || 'model') + '.json';
 }
 
-/** Whether Save As can use the browser's save picker. */
+/** Whether Save As can use the browser's save picker. An automated browser
+ * (navigator.webdriver, e.g. headless Chromium) has the function but rejects every call at once
+ * as AbortError, which reads as a user cancel: it takes the name dialog and a download instead. */
 export function pickerAvailable(win = globalThis) {
-  return !!win && win.isSecureContext === true && typeof win.showSaveFilePicker === 'function';
+  return !!win && win.isSecureContext === true && typeof win.showSaveFilePicker === 'function' && win.navigator?.webdriver !== true;
 }
 
 /** The picker's options: the suggested name, one JSON type, the remembered folder id, and the

@@ -109,8 +109,8 @@ example a managed browser that refuses it), Studio asks for the **File name** in
 letters, digits, spaces and `.`, `_`, `-`, `(`, `)` only, with `.json` added if missing. It notes
 that your browser saves to its Downloads folder, or asks where if you set it to, and **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
-Downloads*, and after **Save** that the browser may add “ (1)” when its Downloads folder already
-has a file of that name. Studio cannot know that a download was kept. **Export › Model file…**
+Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
+Downloads folder already has a file of that name. Studio cannot know that a download was kept. **Export › Model file…**
 always downloads.
 
 Browser support for the save dialog (`window.showSaveFilePicker`), checked on 2026-11-23 in
@@ -126,7 +126,8 @@ Browser support for the save dialog (`window.showSaveFilePicker`), checked on 20
 | Firefox (desktop and Android) | No | Studio's name dialog, then a download |
 | Safari (macOS and iOS) | No | Studio's name dialog, then a download |
 
-The API is marked experimental in the data. The real dialog of desktop Chrome is not driven by the
+Automated or headless browsers (`navigator.webdriver`) cannot show the save dialog; Studio downloads
+the file under the name you give. The API is marked experimental in the data. The real dialog of desktop Chrome is not driven by the
 automated checks: they replace `showSaveFilePicker` at its boundary (see the
 [development guide](../../development.md)).
 

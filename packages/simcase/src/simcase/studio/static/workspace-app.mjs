@@ -1116,7 +1116,8 @@ function deliverSession(text,suggestedName,{saveAs}){
   const name=await askFileName(suggestedName,{saveAs,unavailable:result.error});
   if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs})};
   downloadFile(new Blob([text],{type:'application/json'}),name);
-  return {written:true,name,via:'download',after:saveAs?'':' If your Downloads folder already had a file of this name, the browser may have added “ (1)”.'};
+  // the name dialog said before the download that the browser may add " (1)"; Messages says what happened
+  return {written:true,name,via:'download',after:''};
  }).finally(()=>{savingFile=false;});
 }
 // The start of a save notice: what happened to the file, and no more.

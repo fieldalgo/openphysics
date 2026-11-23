@@ -17,7 +17,8 @@ function fakeFile(name,content=''){
   close:async()=>{file.content=pending;file.writes++;},abort:async()=>{file.aborts++;}};}};
  return file;
 }
-const fakeWindow=(pick)=>({isSecureContext:true,calls:[],showSaveFilePicker(options){this.calls.push(options);return pick(options);}});
+// navigator.webdriver false: a browser people use (C1(f) below covers an automated one)
+const fakeWindow=(pick)=>({isSecureContext:true,navigator:{webdriver:false},calls:[],showSaveFilePicker(options){this.calls.push(options);return pick(options);}});
 
 test('sanitizeFileName keeps letters, digits, spaces and . _ - ( ) and adds .json',()=>{
  assert.equal(F.sanitizeFileName('my run/<x>?'),'my runx.json');
@@ -43,6 +44,12 @@ test('the picker is used only in a secure context that has it',()=>{
  assert.equal(F.pickerAvailable({isSecureContext:true,showSaveFilePicker(){}}),true);
  assert.equal(F.pickerAvailable({isSecureContext:false,showSaveFilePicker(){}}),false);
  assert.equal(F.pickerAvailable({isSecureContext:true}),false);
+});
+test('an automated browser (navigator.webdriver) never calls the picker and asks for a name',async()=>{
+ assert.equal(F.pickerAvailable({isSecureContext:true,navigator:{webdriver:true},showSaveFilePicker(){}}),false);
+ let called=0;const win={isSecureContext:true,navigator:{webdriver:true},showSaveFilePicker(){called++;throw new Error('must not be called');}};
+ assert.deepEqual(await F.saveToFile('x',{suggestedName:'a.json',win}),{status:'unavailable',error:null});
+ assert.equal(called,0);
 });
 test('Save As calls the picker with one JSON type, the id and Documents, and writes the bytes',async()=>{
  const file=fakeFile('chosen.json','old'),win=fakeWindow(async()=>file.handle);

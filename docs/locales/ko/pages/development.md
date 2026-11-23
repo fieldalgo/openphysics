@@ -332,7 +332,9 @@ Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440
 경계에 넣어 Save As(대화상자 옵션: 제안 이름, JSON 형식 하나, `id` `openphysics-project`, `startIn`
 `documents`, 그다음엔 현재 파일), 같은 상태의 다운로드와 같은 바이트, 대화상자를 다시 부르지 않고 같은
 파일에 쓰는 Save, 아무것도 쓰지 않는 취소, 중단되어 이전 내용이 온전한 실패한 쓰기, `NotAllowedError`를
-던지는 대화상자에서 이름 대화상자로 넘어가는 것을 확인합니다. 이름 대화상자에 입력한 이름은 정리됩니다
+던지는 대화상자에서 이름 대화상자로 넘어가는 것을 확인합니다. 헤드리스 브라우저는 `navigator.webdriver`를 알리며, 이때 Studio는 저장 대화상자를 부르지 않습니다
+(부르면 예외를 던질 대역이 불리지 않고 Save As가 입력한 이름으로 내려받음). 대화상자 점검은 그 경계에서
+`navigator.webdriver`를 false로 둡니다. 이름 대화상자에 입력한 이름은 정리됩니다
 (`my run/<x>?`은 `my runx.json`으로 내려받음). 데스크톱 Chrome의 실제 저장 대화상자는 어떤 점검도
 조작하지 않습니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
