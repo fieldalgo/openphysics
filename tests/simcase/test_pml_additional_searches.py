@@ -309,11 +309,20 @@ def test_w4_w6_w7_the_leaky_slab_returns_the_mode_nearest_the_pole(pol, target):
 
 @pytest.mark.slow
 def test_w8_strip_over_substrate_at_three_strengths():
+    """Identified by P1's V4 bound, |dRe| <= 5e-4 from the strength-3 value; the loss change is printed,
+    not gated. The 1.486 mode is not gated at strength 6."""
     base = json.loads(build("strip_substrate", 8))
-    for strength in (1.5, 3, 6):
-        n, _, block = _run(base, pml_strength=strength)
+    runs = {s: _run(base, pml_strength=s) for s in (3, 1.5, 6)}
+    n3, loss3, _ = runs[3]
+    reference = [n3[np.argmin(abs(n3 - z))] for z in (TE_LIKE, TM_LIKE, NEAR_CLADDING)]
+    assert all(abs(r - z) <= 1e-6 for r, z in zip(reference, (TE_LIKE, TM_LIKE, NEAR_CLADDING))), reference
+    for strength, (n, loss, block) in runs.items():
         _check_merge(block, n)
-        tolerance = 1e-6 if strength == 3 else 5e-4           # V4a's |dRe| gate when the PML changes
-        for z in (TE_LIKE, TM_LIKE) + ((NEAR_CLADDING,) if strength != 6 else ()):
-            assert np.min(abs(n.real - z.real)) <= tolerance, (strength, z, n)
-        print(f"W8 strength {strength}: {n}")
+        for m, z in enumerate(reference):
+            i = int(np.argmin(abs(n.real - z.real)))
+            found = abs(n[i].real - z.real) <= 5e-4
+            j = int(np.argmin(abs(n3 - z)))
+            print(f"W8 strength {strength} mode {m}: {n[i]} (found {found}), loss change "
+                  f"{loss[i] / loss3[j] - 1:+.4f}" if found else f"W8 strength {strength} mode {m}: not found")
+            if m < 2 or strength != 6:
+                assert found, (strength, z, n)
