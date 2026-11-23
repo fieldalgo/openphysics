@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {designSummary,shapesBlock} from './workspace-shapes.mjs';
+import {designSummary,shapesBlock,geometryWords} from './workspace-shapes.mjs';
+import {inputChanges} from './workspace-inputs.mjs';
 import {originText} from './workspace-multiphysics.mjs';
 import {studySignature} from './workspace-notebook.mjs';
 
@@ -60,28 +61,39 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // inputs; 'other': the viewed run has other inputs, and has: the number of a run of these inputs,
 // if any; 'stale': runs exist but none is viewed and none has these inputs; 'none' before any
 // run. origin: where the run came from when it was not computed in this tab ('imported' or
-// 'recovered'). name: the run's name (absent when it has none).
+// 'recovered'). name: the run's name (absent when it has none). For 'other', geometry and
+// currentGeometry: the two geometries in words, and changes: what differs, from the run to the
+// current inputs (inputChanges), which names them when the geometry is the same (round 14).
 export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false){
  const signature=studySignature(input,modeCount,groupIndex),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
- if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{})};
+ if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
  if(index>=0)return {state:'current',run:index+1,...name,...from};
  return runs.length?{state:'stale',run:runs.length}:{state:'none',run:null};
 }
+// The viewed run and the current inputs, both named (round 14): "Run 1 · Design A 600 × 300 nm ·
+// current inputs 700 × 300 nm"; with the same geometry, at most two changes ("· current inputs
+// differ: Wavelength 1550 → 1310 nm"), and the plain words when no listed setting differs.
+export function otherInputsText({run,name='',geometry,currentGeometry,changes=[]}){
+ const viewed=geometry?`Run ${run} · ${name?name+' ':''}${geometry}`:runTitle(run,name);
+ if(geometry&&currentGeometry&&geometry!==currentGeometry)return `${viewed} · current inputs ${currentGeometry}`;
+ if(changes.length)return `${viewed} · current inputs differ: ${changes.slice(0,2).join(' · ')}${changes.length>2?' …':''}`;
+ return `${viewed} · current inputs differ from this run`;
+}
 // The dock heading and the ready footer for that state: both name the same run.
-export function opticalSequenceHeading({state,run,name='',origin}){
+export function opticalSequenceHeading({state,run,name='',origin,...other}){
  const title=runTitle(run,name);
  if(state==='current'&&originText(origin))return `${title} · ${originText(origin)}`;
  if(state==='current')return `${title} · solved from the current inputs`;
- if(state==='other')return `${title} · current inputs differ from this run`;
+ if(state==='other')return otherInputsText({run,name,...other});
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Nothing is computed until you press Run';
 }
-export function opticalReadyStatus({state,run,name='',origin,has}){
+export function opticalReadyStatus({state,run,name='',origin,has,...other}){
  const title=runTitle(run,name);
  if(state==='current'&&originText(origin))return `${title} · ${originText(origin)} · press Run to compute it here`;
  if(state==='current')return `${title} · solved from the current inputs · press Run to solve again`;
- if(state==='other')return `${title} · current inputs differ from this run · `+(has?`Run ${has} has them`:'press Run to compute them');
+ if(state==='other')return otherInputsText({run,name,...other})+' · '+(has?`Run ${has} has them`:'press Run to compute them');
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Optical adapter ready · explicit Run required';
 }

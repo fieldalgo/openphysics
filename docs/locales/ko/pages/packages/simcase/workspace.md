@@ -150,14 +150,17 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다. 도크 제목, 상태 표시줄, 제목 표시줄과
    단계 막대는 보고 있는 실행(고른 실행)을 번호와 이름으로 가리킵니다: 실행 뒤에는 *Run 1 · solved
    from the current inputs*(상태 표시줄은 *press Run to solve again*을 덧붙임), 보고 있는 실행의 입력이
-   다르면(편집 뒤나 이전 실행을 골랐을 때) *Run 1 · design A · current inputs differ from this run*(상태
+   다르면(편집 뒤나 이전 실행을 골랐을 때) 두 기하를 모두 밝혀 *Run 1 · design A 600 × 300 nm · current
+   inputs 700 × 300 nm*(기하가 같으면 다른 설정을 두 개까지: *· current inputs differ: Wavelength 1550 →
+   1310 nm*)(상태
    표시줄은 다른 실행이 현재 입력을 가지면 *Run 2 has them*, 아니면 *press Run to compute them*을
    덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
    (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
    입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
    군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. Messages는 바뀌는
    설정만 이전 → 이후로 밝힙니다(*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find
-   4 → 2. The next run uses them; Undo takes them back.*). 입력
+   4 → 2. The next run uses them; Undo takes them back.*). 같은 문구는 다음 입력 편집까지 실행 패널의 버튼이
+   있던 자리에도 남습니다. 입력
    편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
@@ -191,7 +194,8 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    대화상자에서 이름을 바꿀 수 있음), 브라우저에 저장 대화상자가 있으면 거기서 고른 파일에 씁니다
    ([Save As가 저장하는 곳](#file-메뉴와-파일-종류)). Studio는 다운로드를 브라우저에 넘길 뿐 실제로
    보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음) Messages에 *Session file … sent to your
-   browser's Downloads*가 나오고, 저장 대화상자로 쓰기를 마치면 *Saved to …*가 나옵니다. 저장 표시는
+   browser's Downloads*가 나오고, 저장 대화상자로 쓰기를 마치면 *Saved to …*가 나옵니다. 현재 입력의 실행이
+   없으면 알림이 그렇다고 말합니다: *Current inputs (650 × 300 nm) have no run yet.* 저장 표시는
    헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 현재 파일 이름과 상태가 나오며,
    다음 편집이나 실행 전까지 *design-a.json · downloaded 03:42*(저장 대화상자로 쓴 뒤에는
    *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since downloaded*(저장 대화상자로 쓴
