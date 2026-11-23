@@ -33,6 +33,21 @@ DUPLICATE_RULE = {"effective_index_distance": 1e-9, "field_overlap": 0.99,
                   "overlap_metric": "computational_transverse_electric_l2", "degenerate_span": 0.99}
 
 
+#: K of the gain bound (gain_bound): chosen from 27 measured solves, 3.9 x above the largest
+#: lossless ratio |Im n| / (f_pml max(1, |Re n|)) (2.57e-3) and 5.7 x below the smallest gain-like
+#: one (5.67e-2). Empirical, not a proof (docs/packages/simcase/pml_modes.md).
+GAIN_BOUND_FACTOR = 1e-2
+
+
+def gain_bound(value, pml_fraction):
+    """b = max(1e-10, K f_pml) max(1, |Re n|): a candidate is gain-like when its imaginary index
+    lies beyond b on the gain side (kernel frame exp(+iwt): Im n > b). f_pml is the candidate's
+    PML L2 fraction; a lossless mode's Im n is PML noise of either sign within this bound. A
+    nonfinite fraction gives the 1e-10 floor."""
+    scale = GAIN_BOUND_FACTOR*pml_fraction if np.isfinite(pml_fraction) and pml_fraction > 0 else 0.
+    return max(1e-10, scale)*max(1., abs(value.real))
+
+
 def transverse_gram(mesh, edges, et):
     """The Hermitian Gram matrix <a, b> of the candidates' transverse edge coefficients ``et`` (m, E)
     with the edge mass matrix of the whole computational ``mesh``: the transverse part of
@@ -181,12 +196,18 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         if not np.isfinite(value) or value.real<=0: reasons.append('not_finite_forward')
         if not np.isfinite(residual[i]) or residual[i]>1e-8: reasons.append('pencil_residual')
         if not np.isfinite(fraction[i]) or fraction[i]<threshold: reasons.append('low_physical_l2_fraction')
-        if value.imag>1e-10*max(1.,abs(value.real)): reasons.append('positive_imaginary_index')
+        floor=1e-10*max(1.,abs(value.real))
+        gain=value.imag>gain_bound(value,1-fraction[i])
+        if gain: reasons.append('positive_imaginary_index')
         if not reasons: acceptable.append(i)
+        # gain side beyond the floor yet within the bound: PML noise of a lossless mode (public: a
+        # negative Im n within the bound); its signed value is kept, never clamped
+        status=('numerically_unresolved' if abs(value.imag)<=floor else
+                'negative_within_pml_bound' if value.imag>floor and not gain else 'resolved_sign')
         records.append(dict(candidate=i+1,neff_real=float(value.real),neff_imag=float(value.imag),
                             pencil_residual=float(residual[i]),physical_l2_fraction=float(fraction[i]),
                             pml_l2_fraction=float(1-fraction[i]),reasons=reasons,selected=False,
-                            attenuation_status='numerically_unresolved' if abs(value.imag)<=1e-10*max(1.,abs(value.real)) else 'resolved_sign'))
+                            attenuation_status=status))
     if extra:
         keep=_merge(records,acceptable,n,transverse_gram(scaled,space.edges,et),origin,num_modes)
     else:

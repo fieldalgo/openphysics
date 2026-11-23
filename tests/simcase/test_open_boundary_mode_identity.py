@@ -28,7 +28,8 @@ there (simcase.mode_postprocessing), and n_g is the complex central difference o
   - V13b: the template closed against open at x 1: both modes paired with their own counterpart
     by Studio's rule (eta >= 0.8, margin >= 0.1).
   - V13c: TE-like, 1 - eta(closed, open) decreasing over x 1, 1/2, 1/4; TM-like reported where
-    the open run returns it (on refined meshes the filter can drop it: a known issue).
+    the open run returns it (before the gain bound of pml_modes.md the filter dropped it on refined
+    meshes; since, it is returned at every level).
 """
 from __future__ import annotations
 

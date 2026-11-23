@@ -1531,7 +1531,7 @@ window, so every closed formula and value is unchanged.
 | V12 | Studio's formula in Node against the engine's on the same samples, ≤ 1e-12 relative; blind | ≤ 3.4e-15 on the template (2,283 of 4,557 triangles in the window) and the strip over a substrate (11,591 of 40,658): passed. The window equals the solver's own physical mask |
 | V13a | open template against the same mesh with PEC at the outer edge, η ≥ 0.9999 | 1 − 4e-14, 1 − 2e-11: passed |
 | V13b | template closed against open at × 1, both modes paired with their own counterpart (η ≥ 0.8, margin ≥ 0.1) | 0.99033, 0.98754: passed |
-| V13c | TE-like 1 − η(closed, open) decreasing at × 1, ½, ¼ | 9.67e-3, 3.15e-3, 9.44e-4: passed. TM-like: 1.25e-2 at × 1; at × ½ and × ¼ the open run does not return the mode (the known issue below) |
+| V13c | TE-like 1 − η(closed, open) decreasing at × 1, ½, ¼ | 9.67e-3, 3.15e-3, 9.44e-4: passed. TM-like (reported, not gated): 1.25e-2, 3.94e-3, 1.12e-3. Before the [gain bound](pml_modes.md#the-gain-bound) the open run did not return the mode at × ½ and × ¼ (see the limitations below) |
 | V11a | dn_eff/dλ0 of the V1 film against refsol, ≤ 1e-3 relative at × 1, ½ and ¼ (decided after the result; first registered with “not growing”, which FAILED) | 5.61e-4, 7.29e-4, 7.29e-4: passed; the slope settles at a plateau (below) |
 | V11b | Re and Im n_g errors against refsol decreasing at × 1, ½, ¼ | Re 5.24e-3, 2.81e-3, 1.50e-3; Im 2.69 %, 1.06 %, 0.40 %: passed |
 | V11c | single-point n_g against the tracked sweep, ≤ 1e-12 relative | equal (relative difference 0): passed |
@@ -1574,9 +1574,10 @@ window, so every closed formula and value is unchanged.
 
   V13a–c replaced the check after that result.
 - **Limitations.**
-  - On refined open meshes a lossless TM-like mode can be dropped. Its tiny Im n_eff comes out
-    with the wrong sign and the engine rejects it as `negative_imaginary_index`. The template's
-    TM-like mode is missing at × ½ and × ¼.
+  - Until the [gain bound](pml_modes.md#the-gain-bound), a lossless TM-like mode was dropped on
+    refined open meshes: its tiny Im n_eff came out with the wrong sign and the engine rejected
+    it as `negative_imaginary_index` (the template's TM-like mode at × ½ and × ¼). The bound
+    returns it, labelled `negative_within_pml_bound`.
   - A bent guide and the scalar formulation get none of these values.
   - The effective area of a strongly leaking mode depends on the window.
 
