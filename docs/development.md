@@ -68,7 +68,7 @@ Optional tools and data:
   Scientific Data **11**, 94 (2024), https://doi.org/10.1038/s41597-023-02898-2.
 - **Chrome or Chromium**: the installed Studio browser check uses an already
   installed browser. If none is found, the check fails; it is never skipped. The workspace,
-  multiphysics and multiphysics session scripts start it through
+  multiphysics, multiphysics session and project scripts start it through
   `tools/studio_browser/browser_launch.mjs`: they wait up to 60 s for its DevTools endpoint to list
   a page and, when it does not, stop it and start it once more on a new port with a new profile
   directory. Every failed attempt is recorded in `report.json` (`browserLaunch`: the command line,
@@ -474,6 +474,18 @@ reads *same as file X* makes X the current file: Save As suggests X (the workspa
 reads *X · changed since restored* after an input edit and after a run is renamed), and the session
 script checks a run opened from a file reading *Loaded from file, not recomputed. Results match the
 file's checksum.* with the provenance caveat as that sentence's title text.
+A fourth script (`tools/studio_browser/studio_project_browser.mjs`) checks [project
+files](packages/simcase/workspace.md#project-files): at 1440 × 900 and at 390 × 844, by role and
+accessible name and with no horizontal overflow at any step, two optical runs (one with Modes to
+find 4) and a heated run with its without-heater result, File › Save As *Heater study*, Save again
+under the remembered name, then the server restarted and a new browser profile, File › Open, and
+both models reading back the same value strings with no run started; save, open and save again
+(equal but for the save time and the optical runs' provenance, then byte-identical but for the save
+time); damaged and newer files refused with the tab unchanged; and Save As, Save, a cancel and a
+failed write through `window.showSaveFilePicker` stubbed at its boundary. With `--old-python <python>`
+it also opens the file in an older Studio (by hand; CI does not pass it).
+Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
+(session file)…**, as **File › Save** writes the project file.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with
