@@ -34,7 +34,7 @@ not establish an independent installation of the whole stack.
 
 Start `simcase-studio --workspace` on an unused local port. Use a separate browser
 profile or test origin for a fresh-user check; preserve existing sessions first.
-The initial Models page (one word, model, throughout) must name what each card runs,
+The initial Library page (one word, model, throughout) must name what each card runs,
 including the coupled Heated silicon waveguide.
 
 | Task | Expected observation |

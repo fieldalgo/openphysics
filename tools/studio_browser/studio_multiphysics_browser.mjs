@@ -194,7 +194,7 @@ try {
   assert.equal(await page.axName('#run-multiphysics'), 'Run study');
   assert.equal(await page.eval("getComputedStyle(document.getElementById('run-multiphysics')).fontWeight"), await page.eval("getComputedStyle(document.getElementById('run-optical')).fontWeight"));
   assert.equal(await page.eval("!document.getElementById('run-baseline-option').hidden&&document.getElementById('run-baseline').checked"), true);
-  assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');
+  assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater (about 1 s more)');
   assert.deepEqual(await page.eval("[...document.getElementById('open-session').parentElement.children].filter(b=>b.tagName==='BUTTON'&&!b.hidden).map(b=>b.innerText.trim())"), ['Open session', 'Save session']);
   // the model file alone is More › Save inputs only and Open inputs file
   assert.deepEqual(await page.eval("['save-project','open-project'].map(id=>document.getElementById(id).textContent+':'+!document.getElementById(id).hidden+':'+!!document.getElementById(id).closest('.file-menu'))"),
@@ -386,7 +386,7 @@ try {
   assert.equal(shiftShown, (d < 0 ? '−' : '+') + Math.abs(d).toFixed(8), 'Δn_eff is the difference of the two engine runs');
   assert.equal(await page.text('.dock-title>span'), 'Run 1 · solved from the current model');
   // round 10 (K6): on Results the tree marks the results page shown, not Study
-  const onResults = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),selected:[...document.querySelectorAll('#tree [aria-selected=true]')].map(e=>e.dataset.mpNode)})");
+  const onResults = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),selected:[...document.querySelectorAll('#tree [aria-selected=true]')].map(e=>e.dataset.mpNode)})");
   stage('K6 tree on Results', onResults); assert.deepEqual(onResults.page, ['Results']);
   assert.equal(onResults.selected.length, 1); assert.match(onResults.selected[0], /^results:/);
   assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.name === 'Study 1').map(n => n.selected), [false]);
@@ -423,7 +423,7 @@ try {
   assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again.');
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
-  assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater ~1 s');
+  assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater (about 1 s more)');
   await page.click('#run-multiphysics');
   await page.until("/^Run 2 complete/.test(document.getElementById('file-status').textContent)", 'second run', 120000);
   // the kept column has the same content, so no heater-off solve follows

@@ -73,7 +73,7 @@ test('every recovery entry names its model and its runs',()=>{
   {kind:'latest',label:'Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
   {kind:'earlier',index:0,label:'Earlier session · Heated silicon waveguide · 1 run · Run 1 · saved T0'}]);
 });
-test('the Models page says what Save session keeps of each model, and how to leave the coupled one',()=>{
+test('the Library page says what Save session keeps of each model, and how to leave the coupled one',()=>{
  const [optical,heat,joule,coupled]=CHOOSER_NOTES;
  assert.match(optical,/Save session keeps the inputs, the runs and the comparison\.$/);
  assert.match(heat,/Save session keeps the plate inputs; heat results stay in this tab\.$/);

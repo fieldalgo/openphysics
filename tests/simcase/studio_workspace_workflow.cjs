@@ -135,4 +135,7 @@ test('round 11: the Study panel names the inputs the next run uses, whatever run
  assert.equal(nextRunText(doc),'Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
  // the same parts the inputs words compare
  assert.ok(nextRunText(doc,2).startsWith('Next run uses '+opticalInputParts(doc).join(' · ')));
+ // round 12: the group index option is named when it is on
+ assert.equal(nextRunText(doc,2,true),'Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2 · group index on');
+ assert.equal(nextRunText(doc,2,false),nextRunText(doc,2));
 });

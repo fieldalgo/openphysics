@@ -140,6 +140,13 @@ export function modeOptionLabel(i,modes){
 // n_g = n_eff - λ0 dn_eff/dλ0 by a central difference over λ0 ± the step; "—" otherwise.
 export const groupIndexHelp=(step='1 nm')=>`n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± ${step} (3 solves), materials evaluated at each wavelength`;
 export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study';
+// The box's note in Study and Optical modes, the message when it is ticked or cleared, and the
+// visible hint under an n_g header when no run shown computed n_g.
+export const GROUP_INDEX_NOTE='Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.';
+export const groupIndexNotice=on=>on?'Group index on: the next run also solves at λ ± 1 nm and gives n_g (about 3× slower).':'Group index off: the next run is one solve, without n_g.';
+export const GROUP_INDEX_HINT='Off · turn on in Study or Optical modes';
+/** Whether a run computed n_g (it has the engine's group_index). */
+export const hasGroupIndex=run=>Array.isArray(run?.group_index);
 export const groupIndexKeptHelp=(step='1 nm')=>`Not matched at λ0 ± ${step}; the reason is not kept in session files`;
 /** The step of a run's group_index_method ("central_difference 1 nm electric-l2-assignment-v1"), or null. */
 export function groupIndexStep(method){const m=/^central_difference (\S+ (?:pm|nm|um|m)) \S+$/.exec(method??'');return m?m[1]:null;}

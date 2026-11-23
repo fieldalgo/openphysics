@@ -72,7 +72,7 @@ py -3.12 -m venv "$HOME\op-studio"
 
 1. **Choose a starting model**에서 **Optical waveguide**를 고릅니다. 고르기 전에는 제목에
    *No model chosen*, 상태 표시줄에 *Choose a model to start*가 나오고 Study sequence는
-   비어 있습니다. 이 화면의 탭 이름은 **Models**입니다.
+   비어 있습니다. 이 화면의 탭 이름은 **Library**입니다.
 2. **Geometry**에서 코어 폭을 600 nm, 높이를 300 nm로 정합니다. Width를 바꾸면 코어가
    가운데를 지키고(Left x가 −300 nm가 됨) Height를 바꾸면 바닥이 y = 0에 남으므로
    **Centre on x = 0**을 누를 필요가 없습니다. 재료는 실리콘, 파장은 1550 nm이며 단계

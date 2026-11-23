@@ -33,7 +33,7 @@ export function sessionLine(item){
 // The session file a recovery entry names: " · same as file x" when the record still matched it,
 // " · file x, changed since" when it did not, " · file x" when the record does not say.
 export const fileWords=item=>!item.file?'':item.fileCurrent===true?' · same as file '+item.file:item.fileCurrent===false?' · file '+item.file+', changed since':' · file '+item.file;
-// One phrase for browser recovery on the Models page; "Open session file…" is for files.
+// One phrase for browser recovery on the Library page; "Open session file…" is for files.
 export const RESTORE_TEXT='Restore from this browser';
 // The time an offer names: the time of day for a session saved today, else the date and time.
 export function offerTime(savedAt,now=new Date()){
@@ -98,7 +98,7 @@ function resumeCard(resume){
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
  actions.append(open,fresh);card.append(heading,note,actions,portable);return card;
 }
-// The Models page notes: what each model supports and what Save session keeps of it. A session
+// The Library page notes: what each model supports and what Save session keeps of it. A session
 // file holds the inputs of every single-physics model and the optical runs, or a multiphysics
 // model with its runs; heat and Joule heating results are not written to it.
 export const CHOOSER_NOTES=Object.freeze([

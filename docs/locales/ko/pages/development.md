@@ -315,7 +315,13 @@ inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Sav
 뺀 버전 8 파일과 같은 바이트. 템플릿의 파일은 `tests/simcase/studio_project_study.cjs`가
 `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`과 비교) `modeCount` 4나
 `groupIndex` true이면 버전 8을 쓰며 각 파일을 다시 열면 그 설정이 되는지, 버전 8 입력의 세션이 버전 9로
-저장되는지 확인합니다.
+저장되는지 확인합니다. 12차부터는 *Pages*라는 탭 목록인 페이지 탭(Library가 처음, 선택된 탭과 Tab 정지점은
+하나, 오른쪽·왼쪽 화살표와 Home, End가 다음·이전·처음·마지막 페이지를 엶), 1440 × 900과 390 × 844에서 Compare 표의
+두 머리글 줄(짧은 이름, 이어서 A | B), 표 위 줄의 실행 이름, 접근 가능한 이름이 전체 짝인 *1 ↔ 1* 행 머리글, 나머지 열이
+표 상자 안에서 스크롤되는 동안 고정된 첫 열, 그 안에서 닿는 모든 열과 한 줄인 머리글·행 머리글, 그리고 군굴절률 상자의
+쉬운 설명, Physics › Optical modes에도 있어 Study와 양쪽으로, Undo로도 맞춰지는 같은 상자, 켜고 끌 때마다의
+Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n_g를 계산하지 않았을 때 n_g 머리글 아래의
+*Off · turn on in Study or Optical modes*도 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는

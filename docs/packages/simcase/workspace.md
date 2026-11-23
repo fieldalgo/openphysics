@@ -15,7 +15,9 @@ New to the workspace? Start with the [quick start](workspace_quickstart.md). For
 
 ## Workspace layout and visual foundations
 
-The workbench has a command ribbon, a model builder and adjacent Settings panel
+The page tabs at the top, **Library**, **Model**, **Connections**, **Results** and **Compare**,
+are a tab list: the shown page's tab is selected and is the one Tab stop, and Left, Right, Home and
+End move to another tab and open its page. The workbench has a command ribbon, a model builder and adjacent Settings panel
 on the left, a large Graphics workspace on the right, and a Study/Messages dock
 below. The ribbon groups Project, Edit, Model setup, Physics and Compute. **Geometry**,
 **Materials**, **Mesh** and **Study** open the same settings as the model tree.
@@ -31,7 +33,7 @@ one name for that save in the ribbon, the header and Messages, in every model (o
 Joule heating and multiphysics). **More** contains input-only files (**More › Save
 inputs only**, **Open inputs file**), browser drafts and Reset design. **Workspace tools** in the bottom status bar contains connection,
 recovery and Reset layout; **Installed physics** sits next to it. Both open above the
-status bar, one at a time, on every page including Models; Escape closes the open
+status bar, one at a time, on every page including Library; Escape closes the open
 one. Below 1000 px the ribbon leaves out the Physics group, so its Compute commands stay in
 view; Installed physics remains in the status bar. Heat and Joule heating
 results remain in the current tab only.
@@ -65,7 +67,7 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
 
 ## First optical study
 
-1. Choose **Models → Optical waveguide** (the start page; its tab is **Models**). (The Heated
+1. Choose **Library → Optical waveguide** (the start page; its tab is **Library**). (The Heated
    silicon waveguide card opens a coupled heat and optical model instead; see [Multiphysics models](#multiphysics-models-heat--optical-modes).)
 2. In **Geometry**, edit the core numerically or drag it and its edges. Add
    rectangles, circles or polygons for slabs, slots, claddings or holes, and choose
@@ -80,7 +82,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    the Study's execution settings: both hold the same field, as both hold **Modes to find**
    (**Study → Edit wavelength** and the step bar's wavelength open it under Optical modes,
    focused). The Study settings also say which inputs the next run uses, *Next run uses 700 ×
-   300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, whatever run Results shows.
+   300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, with *· group index on* when
+   **Also compute group index** is ticked, whatever run Results shows.
    Set the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.
@@ -124,9 +127,9 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    the plots is in view with the matched-modes picker still above them. The probe line
    (*No point selected.*) is under each plot, and the sentence naming the geometry, wavelength
    and core mesh of A and B follows the plots. Below them a table matches the modes of A and B by field overlap
-   ([matching modes](#matching-modes-in-compare)): one row per matched mode, *A mode 1 ↔ B mode 1*,
-   with both polarizations, the overlap, n_eff of A and B, Δn_eff (B − A), Δ % of A, A_eff and
-   absorption loss of A and B; its column headers name each run (name, size, λ).
+   ([matching modes](#matching-modes-in-compare)): one row per matched mode, *1 ↔ 1* (A mode 1 ↔
+   B mode 1), with both polarizations, the overlap, n_eff of A and B, Δn_eff (B − A), Δ % of A,
+   A_eff, absorption loss and n_g of A and B; the line above it names each run (name, size, λ).
    n_eff has 8 decimals everywhere (results, mode list, Compare).
 6. **Save session**, the first save button, creates a portable file with the model,
    retained results and view settings, named from the application and the local
@@ -148,7 +151,7 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    from …json; changed since)* when it had changed, *· not saved to a file* when no file was
    saved or opened. These titles, and *Session file … sent to your browser's Downloads* after a
    save, last until the model or a run changes (an input edit, a run added, renamed, pinned or
-   unpinned) or another open: a tab click (**Models**, **Model**, **Connections**, **Results**,
+   unpinned) or another open: a tab click (**Library**, **Model**, **Connections**, **Results**,
    **Compare**), a selected run, a Compare choice or a field view is not a change. After a
    change the title says what changed: *Unsaved inputs* for an input edit, *Changed since
    session file … · kept for recovery in this browser* for a run. The header has no revision counter. A Width edit by an odd
@@ -161,7 +164,7 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    **Restore from this browser: Last session in this browser …** and any earlier ones
    (**Restore earlier from this browser: …**), **Open session file (portable)…** and **Start
    new**, and says that a session file is the copy that moves between computers; browser
-   recovery stays in this browser. The Models page has one phrase for browser recovery,
+   recovery stays in this browser. The Library page has one phrase for browser recovery,
    *Restore from this browser*; **Open session file…** is for files. A restore opens the page
    shown when the record was written (Model, Results or Compare) with the run that was
    selected; a record written before Studio kept the page, and an opened session file (which
@@ -179,8 +182,8 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    session keeps of it: the inputs and runs of the optical model, the inputs of steady heat and
    Joule heating (their results stay in the tab), and the heated silicon waveguide with its runs.
    Opening the heated model over optical runs says in one line of Messages *Optical waveguide runs
-   stay in this tab · Models › Optical waveguide returns to them*; **More** after it says that the
-   tab holds them until it is closed or reloaded, then what holds them after that: **Models ›
+   stay in this tab · Library › Optical waveguide returns to them*; **More** after it says that the
+   tab holds them until it is closed or reloaded, then what holds them after that: **Library ›
    Optical waveguide › Restore from this browser** (browser recovery, which keeps the four newest sessions) or **Open
    session** with the session file that holds them, or that nothing does. While the tab holds no optical
    runs and browser recovery holds an optical session, for example after a restart, the Optical
@@ -202,7 +205,7 @@ returns below the nodes. It has no interface checkboxes; the wires cannot be rew
    field view), selected run, Compare choice, the runs' origin (computed here, opened from a file
    or recovered), file link or save time differ. The newest is shown, naming the file if any of
    the merged records named one, and the session open in this tab is not offered. The start page uses
-   one word, model: the **Models** tab, *Choose a starting model*, *Model library ·
+   one word, model: the **Library** tab, *Choose a starting model*, *Model library ·
    Choose a model*.
 
 Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
@@ -262,7 +265,11 @@ from the selected run, as before; so a session saved at 2 modes while a run of 4
 solver document is byte for byte the one earlier Studios sent, so its n_eff, TE fraction and
 effective area are unchanged.
 
-**Also compute group index (3 solves)** in **Study** (off by default) adds
+**Also compute group index (3 solves)** in **Study** and in **Physics › Optical modes** (one box
+shown in both, off by default; its note reads “Also solves at λ ± 1 nm and takes n_g from the
+change (about 3× slower). Off: one solve, no n_g.”, and ticking or clearing it says in Messages
+what the next run does, *Group index on: the next run also solves at λ ± 1 nm and gives n_g (about
+3× slower).* or *Group index off: the next run is one solve, without n_g.*) adds
 `results.group_index = {"wavelength_step": "1 nm"}` to the run's document. The engine then also
 solves the same mesh at λ0 − 1 nm and λ0 + 1 nm, with each material evaluated at each
 wavelength, and returns n_g = n_eff − λ0 dn_eff/dλ0 by a central difference. The run takes about
@@ -337,7 +344,7 @@ gesture start, so zoom and pan do not change the unit conversion.
 
 ## Steady heat plate
 
-Choose **Models → Steady heat conduction** to edit a steady heat problem
+Choose **Library → Steady heat conduction** to edit a steady heat problem
 without JSON. The plate is one homogeneous rectangle with its lower-left corner at
 (0, 0), sized in mm, with constant isotropic conductivity k [W/(m·K)] and a uniform
 heat source Q [W/m³]. Select a side in the drawing or open **Heat transfer** to give
@@ -368,7 +375,7 @@ interfaces for them.
 
 ## Joule heating on named regions
 
-Choose **Models → Joule heating** to set up steady Joule heating on named
+Choose **Library → Joule heating** to set up steady Joule heating on named
 material regions without JSON. The domain is a rectangle in mm with its lower-left
 corner at (0, 0) and a background material; **Geometry** adds up to eight
 rectangles, circles or polygons (later shapes win where they overlap), each a named
@@ -421,7 +428,7 @@ refused Newton run shown with its text, and constant materials.
 
 ## Multiphysics models: heat → optical modes
 
-Choose **Models → Heated silicon waveguide** (“Heat → optical modes · coupled”) to open a
+Choose **Library → Heated silicon waveguide** (“Heat → optical modes · coupled”) to open a
 [multiphysics document](multiphysics_document.md): two physics on one geometry and one mesh,
 joined by a coupling, solved by one **Run**. The template is a 500 × 220 nm `physmat:Si` core on
 `physmat:SiO2` in a 6 × 4.5 µm window, with a 2 µm × 100 nm heater 1.1 µm above the core. **Heat 1**
@@ -508,7 +515,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   heading and the footer, as in the optical application: “Run 1 · Heater 2e14 · solved from the
   current model”, “Run 1 · Heater 2e14 matches the model · press Run to solve again”, “Model
   edited since Run 1 · Heater 2e14 · press Run to update”.
-- **Also solve without heater** (beside Run, about 1 s) is on when a model whose optical modes
+- **Also solve without heater** (beside Run, *(about 1 s more)*) is on when a model whose optical modes
   take a coupled temperature opens. After the coupled run, Studio solves the optical model alone
   with no temperature input, through the same run route, and fills the heater-off column. It is
   skipped when the kept column has the same content. While no coupling sets an optical
@@ -542,7 +549,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   name lowercased, other characters as hyphens, at most 40 characters, else `multiphysics`),
   described in [Session files of multiphysics models](#session-files-of-multiphysics-models-version-8).
   When the tab also holds Optical waveguide runs, the save message says they are not in this
-  file: “The 2 Optical waveguide runs of this tab are not in this file; Models › Optical
+  file: “The 2 Optical waveguide runs of this tab are not in this file; Library › Optical
   waveguide › Save session keeps them in their own file.”
   **Open session** opens such a file, an optical session, or a model file alone (“Opened model
   file …: it holds the model but no runs.”). **More › Save inputs only** writes the document
@@ -765,7 +772,9 @@ engine and older session files give the same number from the same samples:
   **Also compute group index** on. The column help reads “n_g = n_eff − λ0 dn_eff/dλ0: central
   difference over λ0 ± 1 nm (3 solves), materials evaluated at each wavelength”. A cell reads
   **—** in two cases:
-  - The run did not compute n_g. The help reads “Turn on Also compute group index in Study”.
+  - The run did not compute n_g. The help reads “Turn on Also compute group index in Study”,
+    and the n_g header shows *Off · turn on in Study or Optical modes* under its name (in
+    Compare when neither run computed n_g).
   - The engine could not match that mode at a side wavelength (`null`, for example one member
     of a degenerate pair). In the tab that ran it, the help gives the engine's reason,
     *Not matched: vacuum_wavelength 1.549 um: …*. A session file does not keep the reasons, so
@@ -952,7 +961,8 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   accepted when η ≥ 0.8 and η exceeds the next-best value in its row and in its column by at
   least 0.1: the tracker's defaults `mode_tracking_threshold` and
   `mode_tracking_margin_threshold`.
-- **Table.** One row per matched mode, *A mode 1 ↔ B mode 1*, with the polarization of both sides
+- **Table.** One row per matched mode, headed *1 ↔ 1* (*1–2 ↔ 1–2* for a pair; its accessible
+  name is the full *A mode 1 ↔ B mode 1*, its title adds the overlap and Δn_eff), with the polarization of both sides
   (word and TE percentage), the overlap to 2 decimals, n_eff of A and B, Δn_eff (B − A) and Δ % of
   A, then A_eff of A and of B in µm² (a matched degenerate pair shows *mean* of its members' values,
   with a tooltip that each member's value is defined only up to a rotation within the pair), then
@@ -960,8 +970,13 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   on matched and unmatched rows: the modes table's value from the saved indices, *mean* of the
   members' dB/cm for a matched pair; optical runs read *0 dB/cm*, as the optical adapter's
   materials are lossless), then *n_g A* and *n_g B* (the modes table's value, *mean* of the
-  members' values for a matched pair, **—** with the modes table's help when a run has none). On a narrow screen the table scrolls sideways inside its box; the page
-  does not. A mode without a match reads *A mode 2: no match in B (best overlap 0.43, with B mode 2)* and
+  members' values for a matched pair, **—** with the modes table's help when a run has none). The
+  headers are short and grouped: *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*
+  and *n_g* each over an **A** and a **B** column, *Modes*, *Overlap*, *Δn_eff (B − A)* and *Δ % (of
+  A)* over one; a line above the table names run A and run B. The first column stays in view while
+  the others scroll sideways inside the table's box; the page does not scroll sideways. A mode
+  without a match is headed *1 ↔ —* or *— ↔ 2*, with the full *A mode 2: no match in B (best
+  overlap 0.43, with B mode 2)* as its title and accessible name, and
   shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
   0.8 on a common grid. A low overlap means the mode changed shape between designs.”
 - **Field picker.** *Matched modes* lists the matched pairs (*A mode 1 ↔ B mode 1 · overlap

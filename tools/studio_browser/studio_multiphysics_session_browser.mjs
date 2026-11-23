@@ -587,7 +587,7 @@ print(n)`;
   await page.call('Page.reload');
   await page.until("document.querySelectorAll('#earlier-sessions button').length===3", 'three earlier sessions');
   const earlier = await page.eval("[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)");
-  // round 11: the Workspace tools say Restore … from this browser, as the Models page does
+  // round 11: the Workspace tools say Restore … from this browser, as the Library page does
   assert.ok(earlier.every(t => /^Restore earlier session from this browser · Heated silicon waveguide · \d+ runs · /.test(t)), JSON.stringify(earlier));
   // every entry names its runs: one name (or "Run N") per run
   for (const t of earlier) {
@@ -641,13 +641,13 @@ print(n)`;
   // the switch note says the tab holds the runs until it is closed or reloaded, then how to get them back
   await openTemplate();
   // round 9 (J7): one short line, the rest behind More
-  assert.match(await page.eval("document.getElementById('file-status').textContent"), / Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them More\s*This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
+  assert.match(await page.eval("document.getElementById('file-status').textContent"), / Optical waveguide runs stay in this tab · Library › Optical waveguide returns to them More\s*This tab holds 2 runs until it is closed or reloaded\. After that, Library › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\) brings them back\.$/);
   assert.equal(await page.eval("document.querySelector('#file-status details.message-more')?.open"), false, 'the rest is behind More, closed');
   // round 10 (K10): Save session of the heated model says the optical runs of the tab are not in its file
   const heatedWithOptical = await saveSession('heated with optical runs'); const savedWords = await notice();
   stage('K10 heated save with optical runs', {file: String(heatedWithOptical?.path ?? heatedWithOptical), savedWords});
-  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Models › Optical waveguide › Save session keeps them in their own file.'), savedWords);
-  // round 10 (K7): the Models page has one phrase for browser recovery
+  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide › Save session keeps them in their own file.'), savedWords);
+  // round 10 (K7): the Library page has one phrase for browser recovery
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page K7');
   assert.doesNotMatch(await page.text('#canvas'), /Recover|\(this browser/);
   await page.click('nav [data-page=Model]'); await page.until("!!document.querySelector('#tree [data-mp-node=\"physics:heat1\"]')", 'heated model again');
