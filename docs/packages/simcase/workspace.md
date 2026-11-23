@@ -1207,15 +1207,18 @@ The optical solve builds its own mesh using the same input contract; previewing
 is not mesh reuse or a convergence certification.
 
 An optical-only model tree shows Geometry, Materials, Optical modes, Mesh and
-Study.
+Study and, once there is a run, a *Results · run N* group (N the run shown) with *Runs · N of 6*,
+which opens Results, and, with two runs or more, *Compare*, which opens Compare. The 6 is the
+run limit the run list's note states (*Up to six runs are kept*); both come from one constant.
 
 The model builder of every model is an ARIA tree named *Model tree*. Its group headings
 (*Component 1*, *Physics*, *Analysis*; in the multiphysics model *Couplings*, *Study* and the
 results of the last run) are tree items at level 1 that open and close their group, their nodes
 are tree items at level 2 (a results page included), and a node under another (a material, an
 iteration step) is at level 3; no two items share a name. A node is marked selected (`aria-selected`) only
-while its settings or page are shown: on Results the optical tree marks no node (it has no
-Results node) and the multiphysics tree marks the results page shown; on Compare none is marked.
+while its settings or page are shown: on Results the optical tree marks *Runs* and the
+multiphysics tree marks the results page shown; on Compare the optical tree marks *Compare*
+(the tree is hidden on that page) and the multiphysics tree marks none.
 The tree is one tab stop, the selected node (the arrows move it while the tree has the focus). **Up** and **Down** move between the visible items,
 **Home** and **End** to the first and the last, **Enter** or **Space** selects a node (the same
 as a click) or opens and closes a group, **Right** opens a group or moves into it, and **Left**

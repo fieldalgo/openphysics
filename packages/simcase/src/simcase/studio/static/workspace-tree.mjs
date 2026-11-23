@@ -28,6 +28,15 @@ export const itemAttributes=(level,selected)=>`role="treeitem" aria-level="${lev
 const keyOf=el=>el?.dataset.node!=null?'node:'+el.dataset.node:el?.dataset.mpNode!=null?'mp:'+el.dataset.mpNode:el?.dataset.treeGroup!=null?'group:'+el.dataset.treeGroup:null;
 const find=(tree,key)=>[...tree.querySelectorAll('[role=treeitem]')].find(el=>keyOf(el)===key)||null;
 
+/** The optical tree's Results group (round 14), as the multiphysics tree has one: a heading
+ * "Results · run N" (N the run shown) over "Runs · N of M" (runsLabel), which opens Results, and,
+ * with two runs or more, "Compare", which opens Compare. A node is selected while its page is
+ * shown. '' without runs. */
+export function resultsGroup({runs=0,shownRun=null,page,expanded=true,runsLabel}){
+ if(!runs)return '';
+ const nodes=[['results:runs',runsLabel,'▤',page==='Results'],...(runs>1?[['results:compare','Compare','⇆',page==='Compare']]:[])];
+ return '<section class="tree-group" role="none">'+groupHeading('Results',expanded,`Results · run ${shownRun||runs}`)+nodes.map(([id,label,mark,selected])=>`<button type="button" data-node="${esc(id)}" ${itemAttributes(2,selected)}><span class="tree-node-mark" aria-hidden="true">${mark}</span>${esc(label)}</button>`).join('')+'</section>';
+}
 /** Collapsed groups of one tree, kept for the tab (not saved anywhere). */
 export function treeState(){return {collapsed:new Set(),focusKey:null};}
 

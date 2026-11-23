@@ -436,6 +436,11 @@ an edit removes it; while it shows, every tab, ribbon button, the File menu butt
 first item is the element at its centre, no visible control outside it intersects it and its own
 buttons are clickable. On Compare the run list's *Compare A* and *Compare B* are bordered badges
 after the label, and the buttons' accessible names still end in *· Compare A* and *· Compare B*.
+The optical tree's Results group (pre-registered) is checked by role and name with two runs
+(*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
+stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
+opening Results on the run shown), and the round-11 marks now expect exactly Runs selected on
+Results and Compare on Compare.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff
