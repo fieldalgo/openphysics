@@ -73,12 +73,12 @@ test('every recovery entry names its model and its runs',()=>{
   {kind:'latest',label:'Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
   {kind:'earlier',index:0,label:'Earlier session · Heated silicon waveguide · 1 run · Run 1 · saved T0'}]);
 });
-test('the Library page says what Save session keeps of each model, and how to leave the coupled one',()=>{
+test('the Library page says what File › Save keeps of each model, and how to leave the coupled one',()=>{
  const [optical,heat,joule,coupled]=CHOOSER_NOTES;
- assert.match(optical,/Save session keeps the inputs, the runs and the comparison\.$/);
- assert.match(heat,/Save session keeps the plate inputs; heat results stay in this tab\.$/);
- assert.match(joule,/Save session keeps the inputs; Joule heating results stay in this tab\.$/);
- assert.match(coupled,/^Heated silicon waveguide: .*Save session keeps the model with its runs, their names and pins, and the without-heater results\.$/);
+ assert.match(optical,/File › Save keeps the inputs, the runs and the comparison\.$/);
+ assert.match(heat,/File › Save keeps the plate inputs; heat results stay in this tab\.$/);
+ assert.match(joule,/File › Save keeps the inputs; Joule heating results stay in this tab\.$/);
+ assert.match(coupled,/^Heated silicon waveguide: .*File › Save keeps the model with its runs, their names and pins, and the without-heater results\.$/);
  assert.ok(CHOOSER_NOTES.every(t=>!/Save model file|results stay in the tab|Existing thermal Studio views/.test(t)));
  assert.match(CHOOSER_CHOICE,/Undo takes the choice back between the optical, steady heat and Joule heating models\. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here\.$/);
 });

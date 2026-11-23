@@ -265,14 +265,14 @@ try {
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   // the chooser: a plain sentence about choosing, and Joule heating with its own card icon
   assert.match(await text('.application-contract'), /Choosing a model sets which physics it solves\. Dimensions you entered and runs you completed are kept, and Undo takes the choice back/);
-  // every chooser sentence says what Save session keeps today; no sentence about other views
+  // every chooser sentence says what File › Save keeps today; no sentence about other views
   const chooser = await text('.application-contract'); stage('chooser notes', {chooser, message: await text('#file-status')});
-  assert.match(chooser, /Heated silicon waveguide: .*Save session keeps the model with its runs, their names and pins, and the without-heater results\./);
-  assert.match(chooser, /Save session keeps the plate inputs; heat results stay in this tab\./); assert.match(chooser, /Save session keeps the inputs; Joule heating results stay in this tab\./);
+  assert.match(chooser, /Heated silicon waveguide: .*File › Save keeps the model with its runs, their names and pins, and the without-heater results\./);
+  assert.match(chooser, /File › Save keeps the plate inputs; heat results stay in this tab\./); assert.match(chooser, /File › Save keeps the inputs; Joule heating results stay in this tab\./);
   assert.match(chooser, /The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here\./);
   assert.doesNotMatch(chooser, /Save model file keeps|Results stay in the tab|Existing thermal Studio views/);
   await libraryOpenFile('without offers');
-  assert.equal(await text('#file-status'), 'Choose a model to begin. Save session keeps the inputs with the optical or multiphysics runs; heat and Joule heating results stay in this tab.');
+  assert.equal(await text('#file-status'), 'Choose a model to begin. File › Save keeps the inputs with the optical or multiphysics runs; heat and Joule heating results stay in this tab.');
   const icons = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,getComputedStyle(b,'::before').content]))");
   stage('model card icons', icons); assert.notEqual(icons.joule, icons.optical); assert.equal(new Set(Object.values(icons)).size, Object.keys(icons).length);
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
@@ -284,7 +284,10 @@ try {
   // page's tab selected and the one tab stop; Left, Right, Home and End move between them and open the page
   const tabState = async () => ({ax: (await page.axTree(['tablist', 'tab'])).map(n => [n.role, n.name, n.selected === true]),
     stops: await page.eval("[...document.querySelectorAll('nav [role=tab]')].filter(b=>b.tabIndex===0).map(b=>b.textContent)"), focus: (await focused()).name,
-    page: await page.eval("document.querySelector('main').dataset.page")});
+    page: await page.eval("document.querySelector('main').dataset.page"),
+    // round 13 (F4): one page panel, role=tabpanel, that every tab controls and the selected tab names
+    panel: (await page.axTree(['tabpanel'])).map(n => n.name), controls: await page.eval("[...new Set([...document.querySelectorAll('nav [role=tab]')].map(b=>b.getAttribute('aria-controls')))]"),
+    labelledby: await page.eval("(()=>{const p=document.getElementById('workspace-panel');return [p.getAttribute('role'),p.getAttribute('aria-labelledby')]})()")});
   let tabs = await tabState(); stage('N7 page tabs', tabs);
   assert.deepEqual(tabs.ax, [['tablist', 'Pages', false], ['tab', 'Library', false], ['tab', 'Model', true], ['tab', 'Connections', false], ['tab', 'Results', false], ['tab', 'Compare', false]]);
   assert.deepEqual(tabs.stops, ['Model']);
@@ -293,6 +296,8 @@ try {
     await press(key); tabs = await tabState(); stage('N7 ' + key, tabs);
     assert.deepEqual([tabs.focus, tabs.stops, tabs.page], [name, [name], shown], key);
     assert.deepEqual(tabs.ax.filter(n => n[2]).map(n => n[1]), [name], key + ': one tab selected');
+    assert.deepEqual(tabs.panel, [name], key + ': the tab panel is named by the selected tab'); assert.deepEqual(tabs.controls, ['workspace-panel']);
+    assert.deepEqual(tabs.labelledby, ['tabpanel', 'page-tab-' + shown]);
   }
   await page.clickTreeItem('Geometry'); await page.until("!!document.querySelector('#shape-w')", 'N7 back on Geometry');
   // round 10 (K9): the optical model builder is an ARIA tree, used with the keyboard alone
@@ -1120,7 +1125,7 @@ try {
   const offView = await ngCells(); stage('M5 results off', offView);
   assert.equal(offView.head.at(-1), 'n_g');
   assert.equal(offView.hint?.text, 'Off · turn on in Study or Optical modes'); assert.ok(offView.hint.height > 0, 'the hint is visible');
-  assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study'), JSON.stringify(offView.cells));
+  assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study or Optical modes'), JSON.stringify(offView.cells));
   await toNode('Study'); await page.click('#group-index-check'); await page.until("document.getElementById('group-index-check')?.checked===true", 'M5 checkbox on');
   // the document the page submits, read from its /api/run request
   await page.eval("(()=>{const f=window.fetch;window.__m5Runs=[];window.fetch=(u,o)=>{if(String(u).includes('/api/run'))window.__m5Runs.push(o.body);return f(u,o);};})()");

@@ -83,7 +83,7 @@ export function createMultiphysicsView(ctx){
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp(),file:sourceFile,fileCurrent:source==='file'||openedMatch};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
   openedStamp=source==='file'||openedMatch?loaded.stamp:null;
   ctx.onHistory();ctx.render();
-  notice(source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
+  notice(source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'));
  }
  // A file is read by the server's reader first: a duplicate key or text that is not JSON is
  // refused with the reader's words, never resolved silently by the browser's JSON.parse.
@@ -445,7 +445,7 @@ export function createMultiphysicsView(ctx){
  }
  const wavelengthText=w=>{const v=Number(w?.values?.[0]??w?.value);return w?.unit==='m'&&Number.isFinite(v)?`${Number((v*1e9).toPrecision(9))} nm`:`${w?.values?.[0]??w?.value??''} ${w?.unit||''}`;};
  function results(host){
-  if(!lastRun){host.innerHTML=`<h2>No result in this tab</h2><p>Press Run to solve every physics in solve order. Save session keeps the model and its runs in one file.</p>${runFailure?`<p class="validation-warning">${esc(runFailure.status==='stopped'?'The last run was stopped; no result was kept.':failureText(runFailure.error,runFailure.doc))}</p>`:''}`;return [];}
+  if(!lastRun){host.innerHTML=`<h2>No result in this tab</h2><p>Press Run to solve every physics in solve order. File › Save keeps the model and its runs in one file.</p>${runFailure?`<p class="validation-warning">${esc(runFailure.status==='stopped'?'The last run was stopped; no result was kept.':failureText(runFailure.error,runFailure.doc))}</p>`:''}`;return [];}
   const r=lastRun.result,pages=[{id:'results:runs',label:'Runs'},...resultPages(r)];if(!pages.find(p=>p.id===resultPage))resultPage=pages[1].id;
   const same=JSON.stringify(lastRun.doc)===signature(),kept=lastRun.maps!=='not kept',counts=kept?meshCounts(r):lastRun.counts;
   host.innerHTML=`<div class="toolbar mp-result-tabs" role="tablist">${pages.map(p=>`<button role="tab" data-mp-node="${esc(p.id)}" aria-selected="${p.id===resultPage}">${esc(p.label)}</button>`).join('')}</div><p class="muted" data-mp-run-line>${esc(runTitle(lastRun))} · ${new Date(lastRun.completedAt).toLocaleTimeString()} · ${same?'the current model':'the model changed since this run; this result is unchanged'}.${runFailure?' The last run failed; this is the previous complete run.':''}${originNote(lastRun)}</p>`+(kept?'':`<p class="validation-warning" data-mp-values-only>${esc(MAPS_NOT_KEPT)}</p>`);
@@ -499,7 +499,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   host.insertAdjacentHTML('beforeend',`<h2 id="mp-run-list-heading">Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT} · ${pinned} pinned</h2><div class="mp-run-list">${[...runs].reverse().map(r=>`<button type="button" class="run-item" data-mp-run="${esc(r.job)}" aria-pressed="${r===lastRun}">${esc(runItem(r))}</button>`).join('')}</div>
    <form class="run-name" id="mp-run-name"><label>Run name<input id="mp-run-name-input" type="text" maxlength="80" value="${esc(lastRun.label)}" placeholder="For example: heater 10 mW" aria-describedby="mp-run-name-hint"></label><button id="mp-rename-run" type="submit">Apply name</button><p id="mp-run-name-hint" class="input-hint">Press Enter to apply. Naming a run pins it, so new runs do not replace it; Enter on a named, unpinned run pins it again.</p></form>
    ${lastRun.pinned?'<button type="button" id="mp-unpin-run">Unpin this run</button>':''}
-   <p>Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. Save session keeps every run in one file.</p>`);
+   <p>Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file.</p>`);
   host.querySelectorAll('[data-mp-run]').forEach(b=>b.onclick=()=>{const r=runs.find(x=>x.job===b.dataset.mpRun);if(!r)return;lastRun=r;ctx.onHistory();ctx.render();notice(`${runTitle(r)} shown under Results; the model is unchanged.`);});
   const input=host.querySelector('#mp-run-name-input'),form=host.querySelector('#mp-run-name'),target=lastRun;
   const apply=()=>nameRun(target,input.value);
@@ -510,7 +510,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   let label;try{label=ctx.validateRunLabel(value);}catch(e){notice(e.message);return;}
   if(label===(run.label||'')&&(!label||run.pinned))return;
   run.label=label;if(label)run.pinned=true;ctx.onHistory();ctx.render();
-  notice(label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
+  notice(label?`Run named “${label}” and pinned: new runs will not replace it. File › Save keeps it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
  }
  // ---- the session file (§1-§2) and the save indicator ----
  // the selection as a file can hold it: an item an Undo removed (a coupling, an iteration step)

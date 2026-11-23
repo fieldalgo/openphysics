@@ -615,7 +615,7 @@ function completeLoad(pending){
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
   rememberOpened(pending.fileName);refreshPersistence();
-  notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'Save session to keep it in a file; input undo starts here.'));
+  notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'));
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
@@ -641,7 +641,7 @@ $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage
 let recoverable=null;
 function showRecovery(){
  $('recover-inputs').disabled=!recoverable;
- $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are kept automatically for recovery in this browser. Save session for a file with the results.';
+ $('recovery-status').textContent=recoverable?'Recent valid inputs available ('+new Date(recoverable.savedAt).toLocaleString()+'). Results and invalid drafts are not included.':'Valid input changes are kept automatically for recovery in this browser. Use File › Save for a file with the results.';
 }
 function checkpointRecovery(){
  try{writeRecovery(localStorage,inputsFile());recoverable=readRecovery(localStorage);showRecovery();}
@@ -732,7 +732,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current')recoveryState='kept';
- if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Save session for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
+ if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
  refreshSaveIndicator();
 }});
@@ -885,8 +885,8 @@ let recoveryKind=null;
 function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKind!==kind)notebookStore.keepPrevious();recoveryKind=kind;notebookAutosave.schedule(stamp,makeText,extra);}
 function refreshNotebook(){
  if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile,openedCurrent:rec.openedCurrent});
-  $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
- const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · Save session to keep it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+  $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -926,7 +926,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
   const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}
   $('canvas').append(modesTable(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent='This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
-  const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' Save session to keep the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
+  const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
  if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+``+wavelengthField()+pair('Material data','Refractive indices at this wavelength')+modeCountField()+`<p class="input-note">${MODE_COUNT_NOTE}</p>`+groupIndexField()+pair('Outer boundary','PEC')+'<p>Run from Study to compute optical fields for the current cross section.</p>';
@@ -1176,7 +1176,7 @@ function runDetails(run){
  const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[]),['Polarization (TE fraction)',SOURCE_TEXT[run.te.source]],['Effective area',SOURCE_TEXT[run.area.source]]];
  return '<details class="run-details" id="run-details"'+(ui.runDetailsOpen?' open':'')+'><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
 }
-const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. Save session to keep it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.';
+const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. File › Save keeps it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.';
 // Naming applies on Enter or when the field is left, and pins the run. Leaving the field
 // updates the panel in place, so a click on another control in it is not lost to a redraw.
 function nameRun(run,value,redraw){
@@ -1195,7 +1195,7 @@ function nameRun(run,value,redraw){
   // the dock heading, the footer and the title name the run too (refreshInputIssues rewrites all three)
   if($('open-in-results')&&run===solverRun)$('open-in-results').textContent=`Open ${runTitle(runNumber(run),run.label)} in Results`;if($('run-name-value'))$('run-name-value').textContent=run.label||'Not named';refreshInputIssues();
  }
- notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; press Enter in Run name when the calculation ends to pin it.`:label?`Run named “${label}” and pinned: new runs will not replace it. Save session to keep it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
+ notice(label&&pinBlocked?`Run named “${label}”. It is not pinned while a calculation runs; press Enter in Run name when the calculation ends to pin it.`:label?`Run named “${label}” and pinned: new runs will not replace it. File › Save keeps it in a file.`:'Run name cleared.'+(run.pinned?' The run stays pinned until you unpin it.':''));
 }
 // Naming a run pins it, so the run list offers only Unpin, for a pinned run; an unpinned run is
 // kept again by naming it (Enter in Run name). Updated in place so the name field keeps focus.
@@ -1248,7 +1248,7 @@ function renderRunList(){
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent=ui.page==='Compare'?'Field images export from Results: Open in Results shows the selected run there.':'Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. Save session keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
 }
 // The n_g header with the visible hint (#…-hint) when none of the runs shown computed n_g.
 function groupIndexHeader(th,shown){

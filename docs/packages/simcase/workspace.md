@@ -17,7 +17,8 @@ New to the workspace? Start with the [quick start](workspace_quickstart.md). For
 
 The page tabs at the top, **Library**, **Model**, **Connections**, **Results** and **Compare**,
 are a tab list: the shown page's tab is selected and is the one Tab stop, and Left, Right, Home and
-End move to another tab and open its page. The workbench has a command ribbon, a model builder and adjacent Settings panel
+End move to another tab and open its page. The page below them is the tab panel (`role=tabpanel`)
+that every tab controls, named by the selected tab. The workbench has a command ribbon, a model builder and adjacent Settings panel
 on the left, a large Graphics workspace on the right, and a Study/Messages dock
 below. The ribbon groups Project, Edit, Model setup, Physics and Compute. **Geometry**,
 **Materials**, **Mesh** and **Study** open the same settings as the model tree.
@@ -776,7 +777,7 @@ same limits (one latest and three earlier sessions, each at most 16 MiB, written
 change, the cross-tab conflict rule). It writes once the model has a run or was edited since it
 was opened, as the version 8 text Save session would write. Over 16 MiB it keeps the maps of
 the selected and pinned runs only, without a dialog, and the indicator says “kept for recovery in
-this browser without the maps of 2 runs · Save session to keep them”; when even that is over the
+this browser without the maps of 2 runs · File › Save keeps them”; when even that is over the
 limit it writes nothing new (“browser recovery unavailable: session over 16 MiB”) and the earlier
 record stays. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · time** (Workspace tools) and
@@ -856,7 +857,7 @@ engine and older session files give the same number from the same samples:
   **Also compute group index** on. The column help reads “n_g = n_eff − λ0 dn_eff/dλ0: central
   difference over λ0 ± 1 nm (3 solves), materials evaluated at each wavelength”. A cell reads
   **—** in two cases:
-  - The run did not compute n_g. The help reads “Turn on Also compute group index in Study”,
+  - The run did not compute n_g. The help reads “Turn on Also compute group index in Study or Optical modes”,
     and the n_g header shows *Off · turn on in Study or Optical modes* under its name (in
     Compare, when neither run computed n_g, the line above the table reads *n_g: Off · turn on in
     Study or Optical modes* instead, so the n_g columns stay narrow).
