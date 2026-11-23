@@ -469,6 +469,19 @@ same file.*, now in the user guide only), a project name taken from a file name 
 (Left x −1500, Bottom y −1200, Width 3000, Height 700) giving a 3000 × 700 nm rectangle at (−1500,
 −1200) with *Width set to 3000 nm. Left x kept at −1500 nm: centred, the shape would leave the
 window.*
+Since round 17 (pre-registered) it ends with a stage in a browser context of its own: the workspace
+note and the closed Study panel saying the outer boundary is chosen in *Physics › Optical modes*;
+*group index on · 3 solves* beside Run study while the option is ticked, none once cleared; seven
+template runs (core mesh 30 to 42 nm) listed as Run 7 to Run 2 with *Run 1 (500 × 220 nm · 2 modes)
+was dropped: up to six runs are kept; pin a run to keep it.* and the status line on Run 7; Run 5
+and Run 6 named and compared, an eighth run dropping Run 2 and reading *Run 8 is newer than this
+pair · Compare Run 8 with B*; the Compare pickers named *Run A* and *Run B* in the accessibility
+tree, titled with the full label, the run number and name fitting the visible width at 1440 × 900
+and 390 × 844; the T18 substrate (3000 × 700 nm at (−1500, −1200)) in a closed window with a note
+row under modes 1 and 2 (*Mode 1 is mostly in Substrate (… % of |E|²), which touches the window
+edge; …*, more than 50 %); after a wavelength edit the status line *Run 9 · Core 500 × 220 +
+Substrate 3000 × 700 nm …*; and the template core against the substrate run on Compare with the
+note for B, each unmatched row's *best x (< 0.8, not matched)* and O2's 24 px at 1440 × 900.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -524,7 +537,13 @@ comes (*Run 3 is newer than this pair · Compare Run 3 with B*); Save As `design
 name *Heater study* and the pair; after a reload both cards' offers name *same as file
 design-ab.json* (the heated model was not shown when it was saved); restoring the optical one gives
 the header *Heater study · design-ab.json · saved …* and Save As suggests `design-ab.json`; and the
-file opened again shows Design A against Design B.
+file opened again shows Design A against Design B. Since round 17 (pre-registered) the optical
+model left on Compare comes back on Results with a run pressed, and each model switched to starts at
+the top of its page (scrollTop 0 after it was scrolled); and in a new profile a project saved by
+download with the optical model alone, then given the heated model, makes **Save** open the Save
+As dialog prefilled with `u8-optical.json` and *This project now holds Optical waveguide and Heated
+silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*;
+Cancel downloads nothing; saved with both models, the next Save downloads at once.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
 (session file)…**, as **File › Save** writes the project file.
 
