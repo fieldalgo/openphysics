@@ -45,7 +45,7 @@ test('readiness needs assigned materials, a guiding shape and a silica backgroun
 });
 test('summaries, overlaps and new shapes stay unique and inside the window',()=>{
  const shapes=[rect('Slab',-1500,0,3000,90),rect('Rib',-250,0,500,220),{name:'Rod',type:'circle',material:'Air',cx:1000,cy:-800,r:100}];
- assert.equal(S.designSummary({shapes:[shapes[1]]}),'500 × 220 nm · Silicon');assert.equal(S.designSummary({shapes}),'3 shapes · Silicon, Air');
+ assert.equal(S.designSummary({shapes:[shapes[1]]}),'500 × 220 nm · Silicon');assert.equal(S.designSummary({shapes}),'Slab 3000 × 90 + Rib 500 × 220 + Rod r 100 nm · Silicon, Air');
  assert.equal(S.designSummary({shapes:[shapes[2]]}),'r 100 nm circle · Air');
  assert.deepEqual(S.overlappingPairs(shapes),[[0,1]]);
  let list=[...shapes];for(const type of ['rect','circle','polygon','rect']){const shape=S.newShape(type,list);S.validateShape(shape);list=[...list,shape];}

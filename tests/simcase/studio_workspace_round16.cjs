@@ -67,3 +67,19 @@ test('S2: the size hint says where the left edge stays',()=>{
  assert.ok(read('workspace-app.mjs').includes('Width keeps the shape centred (or its left edge, where centred it would leave the window); Height keeps its bottom edge.'));
 });
 
+test('S8: a multi-shape run names each shape and size; an open run its PML; one shape as before',async()=>{
+ const C=await import(STATIC+'workspace-compare.mjs');
+ const rect=(name,w,h,material='Silicon')=>({name,type:'rect',material,x:-w/2,y:0,w,h});
+ const core=rect('Core',500,220),sub={...rect('Substrate',3000,700),x:-1500,y:-1200};
+ assert.equal(S.designSummary({shapes:[core,sub]}),'Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ assert.equal(S.designSummary({shapes:[core,sub,rect('Cap',100,50,'Air'),rect('Pad',10,10),rect('Pin',20,10)]}),'Core 500 × 220 + Substrate 3000 × 700 + Cap 100 × 50 nm +2 more · Silicon, Air');
+ const tooth={name:'Tooth',type:'polygon',material:'Silicon',points:[[0,0],[100,0],[50,80]]};
+ assert.equal(S.designSummary({shapes:[core,tooth]}),'Core 500 × 220 nm + Tooth 3-vertex polygon · Silicon');
+ // one shape: exactly as before round 16
+ assert.equal(S.designSummary({shapes:[core]}),'500 × 220 nm · Silicon');
+ const model={shapes:[core,sub],wavelength:1550};
+ assert.equal(C.runDesign({input:{model},settings:{boundary:'PML',pml:{thickness:'1000 nm'}}}),'Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · open (PML 1 µm)');
+ assert.equal(C.runDesign({input:{model:{shapes:[core]}},settings:{}}),'500 × 220 nm · Silicon');
+ assert.ok(read('workspace-app.mjs').includes('${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}'));
+});
+
