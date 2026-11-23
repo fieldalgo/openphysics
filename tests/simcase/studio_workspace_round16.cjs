@@ -117,3 +117,31 @@ test('S6: a project name from a file name follows Save As; a name set with Renam
  assert.ok(app.includes("resetProject({name:read.name,nameFrom:nameSource(read.name,fileName),"));
 });
 
+test('S4/S5: a record names its project file; a project save relinks every record of a model it wrote',async()=>{
+ const R=await import(STATIC+'workspace-notebook-recovery.mjs'),P=await import(STATIC+'workspace-persistence.mjs');
+ const file={name:'untitled-project.json',savedAt:'2026-11-23T10:00:00Z',current:true};
+ assert.deepEqual(P.validateSavedFile({...file,projectName:'untitled-project'}),{...file,projectName:'untitled-project'});
+ // an old record (no projectName) and a malformed one read as before
+ assert.deepEqual(P.validateSavedFile(file),file);assert.deepEqual(P.validateSavedFile({...file,projectName:' x'}),file);assert.deepEqual(P.validateSavedFile({...file,projectName:7}),file);
+ const heated=JSON.stringify({application:'multiphysics',runs:[1],view:{page:'Model'}}),optical=JSON.stringify({application:'optical',runs:[2]});
+ const rec=(session,name)=>({version:1,savedAt:'2026-11-23T09:00:00Z',session,revision:'r-'+name,savedFile:{name:name+'.json',savedAt:'2026-11-23T09:00:00Z',current:true}});
+ const latest=rec(optical,'optical'),earlier=[rec(heated,'heated-waveguide'),rec(JSON.stringify({application:'optical',runs:[9]}),'other')];
+ const newer={name:'project-b.json',savedAt:'2026-11-23T10:00:00Z',current:true,projectName:'project-b'};
+ // the session written may carry another view: sessionKey leaves it out
+ const out=R.relinkRecords(latest,earlier,[JSON.stringify({application:'multiphysics',runs:[1],view:{page:'Results'}})],newer);
+ assert.equal(out.changed,true);assert.equal(out.latest,latest);assert.deepEqual(out.earlier[0],{...earlier[0],savedFile:newer});assert.equal(out.earlier[0].revision,'r-heated-waveguide');assert.equal(out.earlier[1],earlier[1]);
+ assert.equal(R.relinkRecords(latest,earlier,['{}'],newer).changed,false);
+ // an older Studio (f8ece10) reads such a record: its validateSavedFile, copied verbatim, keeps the
+ // name and ignores projectName (and a project flag); checked once by hand against f8ece10's own
+ // readNotebookRecovery with a record this branch wrote (see the commit)
+ const oldValidateSavedFile=value=>{
+  if(value==null)return null;
+  if(typeof value!=='object'||typeof value.name!=='string'||!/^[A-Za-z0-9._ ()-]{1,200}\.json$/.test(value.name)||typeof value.savedAt!=='string'||!Number.isFinite(Date.parse(value.savedAt))||typeof value.current!=='boolean')return null;
+  return {name:value.name,savedAt:value.savedAt,current:value.current};
+ };
+ for(const extra of [{projectName:'Heater study'},{projectName:'Heater study',project:true}])assert.deepEqual(oldValidateSavedFile({...file,recovered:false,...extra}),file);
+ assert.deepEqual(P.validateSavedFile({...file,projectName:'Heater study',project:true}),{...file,projectName:'Heater study'});
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("relinkRecovery(parts.flatMap(p=>[p.text,p.recovery].filter(t=>typeof t==='string')),{name:result.name,savedAt,current:true,projectName:name});"));
+ assert.ok(app.includes("restoreProjectFile(file);"));
+});

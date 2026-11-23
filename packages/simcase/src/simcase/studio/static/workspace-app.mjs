@@ -305,6 +305,15 @@ function libraryOptions(){
  if(multiView.inProject()&&!multiView.active())inProject['heated-waveguide']=multiView.projectRuns();
  return {onOpenFile:()=>$('open-session').click(),inProject,project:{line:projectLine(),name:project.name,onRename:renameProject}};
 }
+// A browser restore of a record that still matched its project file (S4, round 16): the project
+// names that file and its name again, so the header and Save name it. The project reads as saved
+// when the restored model is its only model; with another model in the tab it reads as changed since.
+function restoreProjectFile(file){
+ if(file?.current!==true||!file.projectName)return;
+ project.name=file.projectName;project.nameFrom=nameSource(file.projectName,file.name);
+ const kept=rememberFile({name:file.name,how:'recovered',scope:project.scope});if(!kept)return;
+ project.file={...kept,savedAt:file.savedAt};project.stamp=projectModels().length===1?projectStamp():null;
+}
 function renameProject(value){
  let name;try{name=validateProjectName(value);}catch(e){notice(e.message+' The project name is unchanged.');return false;}
  if(name===project.name)return true;
@@ -746,13 +755,13 @@ function completeLoad(pending){
   render();
   savedNotebookState=pending.source==='file'||matched?notebookStamp():null;savedRunsState=pending.source==='file'||matched?runsStamp():null;
   // a record without a session file belongs to a notebook never saved: no file name carries over
-  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:file.current===true?saveStamp():null,recovered:true}:null;
+  lastSavedFile=file?{name:file.name,savedAt:file.savedAt,stamp:file.current===true?saveStamp():null,recovered:true,...(file.projectName?{projectName:file.projectName}:{})}:null;
   // the title says what is open until the next change: the file opened, or browser recovery
   // file: the session file the notebook came from (opened, or named by the recovered record), and
   // whether the record said it still matched it
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
-  rememberOpened(pending.fileName);if(pending.source!=='file')rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');refreshPersistence();
+  rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file);}refreshPersistence();
   notice(pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'));
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
@@ -864,7 +873,7 @@ const openedCurrent=()=>openedFile?openedStamp!==null&&openedStamp===saveStamp()
 // counts as Model), so a restore opens the same view.
 let recordedPage=null;
 const pageForRecord=()=>{if(['Model','Results','Compare'].includes(ui.page))recordedPage=ui.page;else if(ui.page==='Connections')recordedPage='Model';return recordedPage;};
-const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp(),recovered:lastSavedFile.recovered===true}:null;
+const savedFile=()=>lastSavedFile?{name:lastSavedFile.name,savedAt:lastSavedFile.savedAt,current:lastSavedFile.stamp===saveStamp(),recovered:lastSavedFile.recovered===true,...(lastSavedFile.projectName?{projectName:lastSavedFile.projectName}:{})}:null;
 const applicationSlug=()=>isOptical()?'optical-waveguide':isHeat()?'heat-conduction':isJoule()?'joule-heating':state.electric===undefined?'workspace':'multiphysics';
 // Browser recovery also keeps the last saved file, so its stamp includes it.
 const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurrent(),pageForRecord()]);
@@ -957,6 +966,15 @@ async function renderEarlierSessions(){
   button.onclick=()=>recoverEarlier(index,button);box.append(button);}
  // the start page lists the same entries; redrawn with the focus kept on the control that had it
  if(ui.page==='Applications'){const el=document.activeElement,key=el?.id?'#'+el.id:el?.dataset?.template?`[data-template="${el.dataset.template}"]`:null;render();if(key)document.querySelector(key)?.focus({preventScroll:true});}
+}
+// After a project save: the stored records of the models written name the project file (S5, round
+// 16); the lists are read again so the Library cards say so. A failure leaves the records as they were.
+async function relinkRecovery(sessions,savedFile){
+ try{if(!await notebookStore.relink(sessions,savedFile))return;
+  const record=await notebookStore.load();notebookRecoveryRecord=record||null;
+  if(latestOffer){const recovered=readNotebookRecovery(record);if(recovered)latestOffer={...latestOffer,recovered,entry:recoveredEntry(recovered)};}
+  await renderEarlierSessions();if(ui.page==='Applications')render();
+ }catch{}
 }
 async function recoverEarlier(index,opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
@@ -1579,7 +1597,7 @@ function requestMultiphysicsSession(session,{label,source,opener=document.active
  // a file replaces the project (P3); a browser restore replaces the multiphysics model only
  const model=source==='file'?false:'multiphysics',asked=!!leaveText(label,model);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile);refreshPersistence();}}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.projectRuns(),unsaved:multiView.projectUnsavedRuns()>0,model:'the current model'},source);
@@ -1640,12 +1658,14 @@ function saveProject({saveAs,keep}){
    noRun=at.shown&&runs.length&&!runs.some(r=>r.signature===signature())?` Current inputs (${geometryWords(inputs.model)}) have no run yet.`:'';
    // the inputs saved are recorded now, so an edit made while the dialog is open stays on top of them
    if(at.shown)edits.record(inputs);
-   parts.push({model:m,text:out.text,words:modelParts(m.card==='optical'||runs.length?{runs:runs.length,comparison:runs.length>1}:{inputsOnly:true}),notKept:out.notKept,
-    mark:(name,savedAt,written)=>{newModelInputs=null;if(at.shown&&!mpFlags&&JSON.stringify(inputsFile())===at.inputs)edits.markSaved();savedNotebookState=at.notebook;savedRunsState=at.runs;lastSavedFile={name,savedAt,stamp:at.stamp,recovered:false,written};loadedSession=null;}});
+   // recovery: the text browser recovery holds for this model now, so its record names the file (round 16)
+   let recoveryNow=null;if(runs.length){try{recoveryNow=captureSession(inputs,runs,solverRun?.job||null,compareIds,currentView())();}catch{}}
+   parts.push({model:m,text:out.text,recovery:recoveryNow,words:modelParts(m.card==='optical'||runs.length?{runs:runs.length,comparison:runs.length>1}:{inputsOnly:true}),notKept:out.notKept,
+    mark:(name,savedAt,written,projectName)=>{newModelInputs=null;if(at.shown&&!mpFlags&&JSON.stringify(inputsFile())===at.inputs)edits.markSaved();savedNotebookState=at.notebook;savedRunsState=at.runs;lastSavedFile={name,savedAt,stamp:at.stamp,recovered:false,written,projectName};loadedSession=null;}});
   }else{
    const out=multiView.projectEntry({keepSelected:keep.has(m.id)});
    if(!out.ok){if(out.refusal)throw new Error(`${m.title}: ${out.refusal}`);askProjectOverflow(m,out.question,true,{saveAs,keep});return Promise.resolve();}
-   parts.push({model:m,text:out.text,words:modelParts({runs:out.runs,baseline:out.baselines>0}),notKept:out.notKept,mark:out.mark});
+   parts.push({model:m,text:out.text,recovery:multiView.recoveryTextNow(),words:modelParts({runs:out.runs,baseline:out.baselines>0}),notKept:out.notKept,mark:out.mark});
   }
  }
  const entries=parts.map(p=>projectEntry({...p.model,text:p.text})),content=projectContent(),active=(multiView.active()?models.find(m=>m.kind==='multiphysics'):models[0]).id;
@@ -1658,8 +1678,10 @@ function saveProject({saveAs,keep}){
   if(!result.written){notice(result.message);return;}
   const savedAt=new Date().toISOString(),name=nameFor(result.name);
   project.name=name;if(project.nameFrom!=='user')project.nameFrom='file';if(project.file)project.file.savedAt=savedAt;project.stamp=projectStamp(name,content);
-  for(const p of parts)p.mark(result.name,savedAt,result.via==='picker');
+  for(const p of parts)p.mark(result.name,savedAt,result.via==='picker',name);
   refreshPersistence();
+  // every stored record of a model just written names this project file, shown or not (round 16)
+  relinkRecovery(parts.flatMap(p=>[p.text,p.recovery].filter(t=>typeof t==='string')),{name:result.name,savedAt,current:true,projectName:name});
   notice(projectSavedNotice({name,file:result.name,via:result.via,known:result.known===true,again:result.again===true,after:noRun+result.after,
    models:parts.map(p=>({title:p.model.title,parts:p.words})),notKept:parts.filter(p=>p.notKept.length).map(p=>({title:p.model.title,kind:p.model.kind,runs:p.notKept}))}));
  });

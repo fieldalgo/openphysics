@@ -57,6 +57,16 @@ export function distinctRecords(latest,earlier=[]){
  return [...kept.values()];
 }
 
+// After a project save (round 16): every stored record whose session is one of the sessions just
+// written (sessionKey) names the project file, so the Library card of a model that was not shown
+// names the newest file too. Its revision is kept (the record's session is unchanged), so no tab
+// reads this as another tab's change. Returns {latest, earlier, changed}.
+export function relinkRecords(latest,earlier,sessions,savedFile){
+ const keys=new Set(sessions.map(sessionKey)),file=validateSavedFile(savedFile);let changed=false;
+ const relink=record=>{if(!file||!record||typeof record.session!=='string'||!keys.has(sessionKey(record.session)))return record;changed=true;return {...record,savedFile:file};};
+ const list=Array.isArray(earlier)?earlier.map(relink):earlier;
+ return {latest:relink(latest),earlier:list,changed};
+}
 // A legacy record has no revision; include its payload to detect same-time writes.
 export function recoveryRevision(record){return record==null?null:record.revision??record.savedAt+'\0'+record.session;}
 // How many earlier sessions the store keeps. The first save after a page adopts a
@@ -113,7 +123,23 @@ export function indexedNotebookStore(factory=globalThis.indexedDB){
  // keepPrevious: the next save keeps the stored record as an earlier session (the tab moved
  // between an optical and a multiphysics model, so its next record is another session)
  const keepPrevious=()=>{wroteSinceAdopt=false;};
- return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record),movedEarlier,keepPrevious};
+ // relinkRecords in one transaction; a record another tab wrote meanwhile is relinked as it is now
+ const relink=(sessions,savedFile)=>new Promise((resolve,reject)=>{
+  if(!factory){reject(new Error('Browser database unavailable.'));return;}
+  const opening=factory.open('openphysics-studio-notebook',1);
+  opening.onupgradeneeded=()=>{const db=opening.result;if(!db.objectStoreNames.contains('snapshots'))db.createObjectStore('snapshots');};
+  opening.onerror=()=>reject(opening.error||new Error('Cannot open browser database.'));
+  opening.onblocked=()=>reject(new Error('Browser database upgrade is blocked by another tab.'));
+  opening.onsuccess=()=>{
+   const db=opening.result;let tx,result=false;
+   try{tx=db.transaction('snapshots','readwrite');const snapshots=tx.objectStore('snapshots'),latest=snapshots.get('latest'),earlier=snapshots.get('earlier');
+    earlier.onsuccess=()=>{const out=relinkRecords(latest.result??null,earlier.result,sessions,savedFile);result=out.changed;
+     if(out.changed){if(out.latest)snapshots.put(out.latest,'latest');if(Array.isArray(out.earlier))snapshots.put(out.earlier,'earlier');}};
+   }catch(error){db.close();reject(error);return;}
+   tx.oncomplete=()=>{db.close();resolve(result);};tx.onabort=()=>{db.close();reject(tx.error||new Error('Browser recovery transaction aborted.'));};tx.onerror=()=>{};
+  };
+ });
+ return {load:()=>transact('readonly'),loadEarlier,adopt,save:record=>transact('readwrite',record),movedEarlier,keepPrevious,relink};
 }
 
 // Coalesce rapid edits and serialize writes so an older completion cannot win.
