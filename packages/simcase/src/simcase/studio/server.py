@@ -238,6 +238,81 @@ def workspace_capabilities_v8():
     return JSONResponse(caps, headers={"Cache-Control": "no-store"})
 
 
+# Version 9 (open boundary): the contract of a workspace whose optical document may open edges of
+# the window. Everything of version 8 stands; the adapter is optical-shapes-v9, which writes the
+# optical-shapes-v8 document while every edge is closed. An open edge gets a perfectly matched layer
+# outside the 3 x 2.4 um window (the domain grows by its thickness, shapes along that edge continue
+# through it, the outer wall is PEC) with the fixed settings below and a search target that the
+# page sets (by default (n_max + n_SiO2) / 2 of the design at 1550 nm, to two decimals).
+# Versions 1 to 8 stay as they were.
+_PML_THICKNESS_RANGE = ["1 um", "1 um"]
+_PML_THICKNESS_NM = (1000, 1000)
+_WINDOW_NM = {"xmin": -1500, "xmax": 1500, "ymin": -1200, "ymax": 1200}
+_PML_FIXED = {"pml_strength": 3, "pml_order": 2, "pml_minimum_physical_fraction": 0.5,
+              "pml_search_mode_count": 32}
+
+
+@app.get("/api/workspace/capabilities/v9")
+def workspace_capabilities_v9():
+    caps = json.loads(workspace_capabilities_v8().body)
+    caps.update(schema_version=9, adapter="optical-shapes-v9", open_boundary={
+        "edges": ["left", "right", "bottom", "top"], "edge_states": ["closed", "open"], "edge_default": "closed",
+        "pml_thickness_range": list(_PML_THICKNESS_RANGE), "pml_thickness_default": "1 um",
+        **_PML_FIXED,
+        "target_effective_index_default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
+        "target_effective_index_bounds": "above 1.45 and below n_max"})
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
+def workspace_open_boundary_refusal(tree) -> str | None:
+    """The refusal of a workspace request whose em.modes2d physics has a pml other than the one
+    optical-shapes-v9 writes, else None: thicknesses of 1000 to 2000 nm (one value on every open
+    side), the fixed strength, order, physical fraction and search count of capabilities v9, a
+    target above 1.45, and a domain in nm that is the window grown by that thickness on exactly
+    the open sides (the layer lies outside the window)."""
+    doc = tree.get("doc") if isinstance(tree, dict) else None
+    physics = doc.get("physics") if isinstance(doc, dict) else None
+    if not isinstance(physics, dict):
+        return None
+    lo, hi = _PML_THICKNESS_NM
+    for entry in physics.values():
+        if not isinstance(entry, dict) or entry.get("type") != "em.modes2d" or "pml" not in entry:
+            continue
+        pml = entry["pml"]
+        text = ("The open boundary of a workspace run has a PML of 1 µm on each open edge with strength 3, "
+                "order 2, physical fraction 0.5 and a search of 32 candidates.")
+        if not isinstance(pml, dict) or set(pml) != {"pml_thickness", *_PML_FIXED}:
+            return text
+        # 3, 2 and 32 are JSON integers; 0.5 may arrive as an exact decimal
+        if any(isinstance(pml[key], bool) or not isinstance(pml[key], (int, float, Decimal)) or pml[key] != value
+               or (type(value) is int and type(pml[key]) is not int) for key, value in _PML_FIXED.items()):
+            return text
+        widths = pml["pml_thickness"]
+        if not isinstance(widths, dict) or not widths or len(set(widths.values())) != 1:
+            return text
+        for width in widths.values():
+            number = width[:-3] if isinstance(width, str) and width.endswith(" nm") else None
+            if number is None or not number.isdigit() or not lo <= int(number) <= hi:
+                return text
+        target = entry.get("target_effective_index")
+        # compared as exact decimals: the reader gives 1.45 as Decimal("1.45"), above the binary float 1.45
+        if isinstance(target, bool) or not isinstance(target, (int, float, Decimal)) \
+                or not Decimal(str(target)) > Decimal("1.45"):
+            return text
+        geometry = doc.get("geometry")
+        t = int(next(iter(widths.values()))[:-3])
+        grown = {side: edge + (t if side in widths else 0) * sign for side, edge, sign in (
+            ("left", _WINDOW_NM["xmin"], -1), ("right", _WINDOW_NM["xmax"], 1),
+            ("bottom", _WINDOW_NM["ymin"], -1), ("top", _WINDOW_NM["ymax"], 1))}
+        domain = geometry.get("domain") if isinstance(geometry, dict) else None
+        if (not isinstance(domain, dict) or geometry.get("length_unit") != "nm"
+                or set(domain) != {"xmin", "xmax", "ymin", "ymax"}
+                or any(isinstance(domain[key], bool) or domain[key] != grown[side]
+                       for key, side in (("xmin", "left"), ("xmax", "right"), ("ymin", "bottom"), ("ymax", "top")))):
+            return text
+    return None
+
+
 def workspace_mode_count_refusal(tree) -> str | None:
     """The refusal of a workspace request (one that names its workspace_instance) whose em.modes2d
     physics asks for a mode count outside 1 to 8 or not a whole number, else None. The JSON
@@ -370,7 +445,8 @@ async def validate(request: Request):
         tree, found = await _document_body(request)
     except RequestRefused as exc:
         return exc.reply()
-    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)):
+    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)
+                                                         or workspace_open_boundary_refusal(tree)):
         raise HTTPException(400, refusal)
     return exact_json(await run_in_threadpool(validation_payload, tree["doc"], found))
 
@@ -498,7 +574,8 @@ async def start_run(request: Request):
         tree, found = await _document_body(request)
     except RequestRefused as exc:
         return exc.reply()
-    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)):
+    if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)
+                                                         or workspace_open_boundary_refusal(tree)):
         raise HTTPException(400, refusal)
     return await run_in_threadpool(_start_job, tree, found)
 
