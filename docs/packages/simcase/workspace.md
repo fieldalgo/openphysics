@@ -1533,8 +1533,10 @@ core dimensions and materials with links back to their editors.
 
 ## Running, stopping the wait and resuming
 
-The job panel shows the submitted dimensions/material, job ID, elapsed time and
-result-loading state. **Stop waiting** stops browser polling only; the optical
+The job panel shows the submitted dimensions/material, job ID, elapsed time (m:ss), what the
+run solves and the result-loading state, for example *Computing job 1a2b3c4d · 12:40 · Open
+boundary · 2 modes · PML check (up to 2 more solves)* or *PML check · mode 1 of 2*. The server
+reports no stage while a job runs, so none is shown. **Stop waiting** stops browser polling only; the optical
 server continues its computation. **Resume job** retrieves that same job with
 its captured inputs, even after editing the current design or reloading the
 same tab. The pending-job record uses session storage, separately from input
@@ -1547,7 +1549,12 @@ Neither case changes retained results or current model inputs.
 
 Only one job is tracked per tab. Resume or **Detach job** before starting another.
 Detaching forgets this tab's job reference and does not cancel server work.
-Polling stops after three minutes and can be resumed; failed requests do not
+While the server answers that the job is running, Studio keeps waiting, however long the
+job takes (an open-boundary solve can take a quarter of an hour on a busy machine). Only when
+the server stops answering, a status request failing for three minutes, does the panel say
+*The server has not answered for three minutes. Resume to check this job again.*; a failed
+request is tried again every 0.7 s until then, and the panel adds how long the server has not
+answered. Failed requests do not
 replace existing results. Late responses after stopping are ignored. The panel
 reports elapsed time rather than inventing a completion percentage. No server
 cancellation or durable server job persistence is implemented. Save completed
