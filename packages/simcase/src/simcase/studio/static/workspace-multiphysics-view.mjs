@@ -101,13 +101,17 @@ export function createMultiphysicsView(ctx){
  function close(){active=false;stopPolling();}
  // A model of the project shown again (its Library card, P3): its document, runs, without-heater
  // results and its own Undo are as they were left.
+ // Round 16 (S9): the page it was left on (Model, Connections, or Results with its result page).
+ let lastPage='Model';
+ function rememberPage(page){if(['Model','Connections','Results'].includes(page))lastPage=page;}
+ function returnPage(){return lastPage==='Results'&&!(lastRun&&resultPage)?'Model':lastPage;}
  function show(){
-  if(!doc)return;active=true;ctx.onOpen?.();ctx.ui.page='Model';validate(true);ctx.onHistory();ctx.render();
+  if(!doc)return;active=true;ctx.onOpen?.();ctx.ui.page=returnPage();if(ctx.ui.page==='Results')selection=resultPage;validate(true);ctx.onHistory();ctx.render();
   notice(`${doc.name||'Model'} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; nothing was computed.`);
  }
  // The model leaves the project (a file replaced the project): nothing of it stays in the tab.
  function discard(){
-  active=false;stopPolling();doc=null;runs=[];lastRun=null;runFailure=null;uncoupled={};undoStack=[];redoStack=[];resultPage=null;
+  active=false;stopPolling();doc=null;runs=[];lastRun=null;runFailure=null;uncoupled={};undoStack=[];redoStack=[];resultPage=null;lastPage='Model';
   sessionFile=null;loaded=null;openedSignature=null;cleanSignature=null;sourceFile=null;freshSignature=null;openedStamp=null;card=null;baselineQueue=[];baselineErrors={};lastRemoval=null;
  }
  function commit(next,message,select){
@@ -677,7 +681,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   cleanSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to your browser's Downloads. It has the model but no runs; Save keeps the runs too, in the session file.`);
  }
  return {active:()=>active,open,openText,openTemplate,openSession,close,leave,show,discard,projectEntry,contentStamp,inProject:()=>doc!==null,card:()=>card,projectRuns:()=>doc?runs.length:0,projectUnsavedRuns:()=>doc?unsavedRuns():0,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
-  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryTextNow,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
+  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryTextNow,rememberPage,returnPage,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
   setBaseline:on=>{baselineOption=!!on;refreshRun();ctx.onHistory();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,saveHint,
   // what leaving would lose: the runs no session file holds

@@ -219,6 +219,8 @@ const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduct
 // nameFrom: 'file' for a name taken from a file name, which follows Save As; 'user' for a name
 // set with Rename, which stays (round 16); null for an untitled project
 const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0};
+// the page and run the workspace was last shown on (round 16, S9; rememberReturn)
+let workspaceReturn=null;
 function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
 // a file replaced the project: an untitled project of the models now in the tab
 function resetProject({name=null,ids=null,nameFrom=null}={}){
@@ -251,7 +253,7 @@ function projectLine(){
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
 function clearWorkspace(){
- runs=[];solverRun=null;compareIds=[null,null];comparePicked=false;lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
+ runs=[];solverRun=null;compareIds=[null,null];comparePicked=false;workspaceReturn=null;lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
  const shown=multiView.active(),page=ui.page;
  applyProject(DEFAULT_INPUTS,{saved:true,resetHistory:true,quiet:true});
  if(shown){workspacePhysics=null;ui.page=page;}else Object.assign(state,INITIAL_PHYSICS);
@@ -326,12 +328,15 @@ function renameProject(value){
 function chooseTemplate(id){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  if(openingModel){notice('Wait until the model file has been opened.');return;}
- if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page='Model';render();}else multiView.show();return;}
+ if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page=multiView.returnPage();render();}else multiView.show();return;}
  // the workspace's card while the multiphysics model is shown: the workspace as it was left (its
  // card shown again from the workspace itself chooses that model again, as before)
  if(id!=='heated-waveguide'&&multiView.active()&&workspaceInProject()&&workspaceCard()===id){
   const from=multiView.projectTitle();if(!leaveMultiphysics())return;
+  // round 16 (S9): the page and run it was left on (Results or Compare when its runs allow it)
+  const back=workspaceReturn,run=back&&runs.find(r=>r.job===back.run);if(run)solverRun=run;
   ui.page='Model';select(ui.selection&&names.includes(ui.selection)?ui.selection:'Geometry');
+  if(back&&(back.page==='Results'&&runs.length||back.page==='Compare'&&runs.length>1)){ui.page=back.page;if(ui.selection==='Study')ui.selection='Geometry';render();}
   notice(`${workspaceTitle()} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; ${from} stays in this project. Nothing was computed.`);return;
  }
  openTemplateCard(id);
@@ -425,7 +430,9 @@ function renderConnectionOverview(){return renderConnectionGraph(state,ui.select
 // The inspector is rebuilt in stages with layout reads in between, which can clamp its scroll;
 // a redraw of the same panel keeps its scroll position and the focused field in view.
 let panelKey=null;
-function render(){if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
+// Round 16 (S9): the page each model was last shown on (not the Library), so its Library card returns there
+function rememberReturn(){if(ui.page==='Applications')return;if(multiView.active())multiView.rememberPage(ui.page);else if(workspaceInProject())workspaceReturn={page:ui.page,run:solverRun?.job||null};}
+function render(){rememberReturn();if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
 function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?projectLine():'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
