@@ -24,6 +24,8 @@ class RectangleBoundaryResult:
     by permittivity. ``current_gram[k]`` is integral(j_i*j_j ds) in 1/metre
     for unit integrated current on conductor i, with grounded return current.
     These are homogeneous static boundary factors, not frequency-domain loss.
+    ``smooth_interpolation_boxes`` is 1 for a conductor cluster at least its
+    own extent from the side/top walls; closer clusters use wall-scaled boxes.
     """
 
     capacitance_per_permittivity: np.ndarray
@@ -36,6 +38,7 @@ class RectangleBoundaryResult:
     current_error: float
     matrix_refinement_error: float
     ground_refinement_error: float
+    smooth_interpolation_boxes: int = 1
 
     def __post_init__(self):
         for name in ("capacitance_per_permittivity", "current_gram", "current_integrals"):
@@ -120,9 +123,10 @@ def _admit(polygons, width, height, count):
                 raise ValueError("conductor boundaries must be disjoint and separated")
     points = np.concatenate(accepted)
     lower, upper = points.min(axis=0), points.max(axis=0)
-    if min(lower[0], w - upper[0], h - upper[1]) < np.max(upper - lower):
-        raise ValueError("conductor cluster must be one cluster extent away from side/top walls")
-    return accepted, unit, w, h
+    clear = bool(min(lower[0], w - upper[0], h - upper[1]) >= np.max(upper - lower))
+    if not clear and kernel.wall_box_count(accepted, w, h, bottom=False) > kernel.WALL_BOXES:
+        raise ValueError("conductors are too close to the side/top walls for wall-scaled interpolation")
+    return accepted, unit, w, h, clear
 
 
 def _relative(a, b):
@@ -134,8 +138,10 @@ def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, gro
     """Solve convex closed conductors over a grounded bottom in a rectangle.
 
     Side/top normal flux is zero. All lengths are metres. Each polygon is a
-    real (n,2) vertex array, implicitly closed. No touching, nested, concave,
-    zero-thickness or side/top-near conductors are accepted. There are at most
+    real (n,2) vertex array, implicitly closed. No touching, nested, concave
+    or zero-thickness conductors are accepted. A cluster closer to the side/top
+    walls than its own extent is interpolated on wall-scaled boxes (at most
+    256; closer conductors are refused). There are at most
     16 conductors and 2048 total panels, with cubic endpoint grading on each
     edge. Width/height is in [0.25,4]. The total height includes all material
     layers when this homogeneous kernel is composed with a dielectric model.
@@ -152,14 +158,17 @@ def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, gro
     degree = _integer(interpolation_degree, "interpolation_degree", 10, 16)
     if degree % 2:
         raise ValueError("interpolation_degree must be one of 10, 12, 14, 16")
-    polygons, unit, w, h = _admit(polygons, width, height, count)
+    polygons, unit, w, h, clear = _admit(polygons, width, height, count)
     a, b, owners = kernel.panels(polygons, count, "cubic")
     length = np.linalg.norm(b - a, axis=1)
     if np.any(length <= 128 * np.finfo(float).eps):
         raise ValueError("graded panel length is unresolved at the domain scale")
     images = max(8, int(np.ceil((h / w) * np.log(1e14) / np.pi)) + 1)
-    coarse, _ = kernel.matrix(a, b, w, h, degree=degree - 2, order=6, images=images)
-    matrix, reciprocity = kernel.matrix(a, b, w, h, degree=degree, order=8, images=images + 2)
+    # A cluster closer to the walls than its extent is interpolated on boxes no
+    # wider than each conductor's wall distance; others keep the one-box path.
+    labels = None if clear else kernel.wall_labels(a, b, owners, w, h, bottom=False)
+    coarse, _ = kernel.matrix(a, b, w, h, degree=degree - 2, order=6, images=images, labels=labels)
+    matrix, reciprocity = kernel.matrix(a, b, w, h, degree=degree, order=8, images=images + 2, labels=labels)
     matrix_error = _relative(coarse, matrix)
     if not np.isfinite(matrix_error) or matrix_error > 1e-10:
         raise ValueError("boundary matrix quadrature/interpolation did not converge")
@@ -202,5 +211,5 @@ def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, gro
     return RectangleBoundaryResult(
         capacitance, np.asarray(parts), integrated, len(a), condition,
         max(reciprocity, capacitance_reciprocity), residual, current_error,
-        matrix_error, ground_error,
+        matrix_error, ground_error, 1 if labels is None else int(labels.max() + 1),
     )

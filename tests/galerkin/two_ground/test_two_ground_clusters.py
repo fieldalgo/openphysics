@@ -44,7 +44,7 @@ def test_failed_one_box_check_is_repeated_on_plane_scaled_boxes(geometry):
     assert result.single_box_matrix_error > 1e-10 and result.smooth_interpolation_boxes > 1
     assert result.matrix_refinement_error <= 1e-10
     a, b, owners, w, h, images = normalized(polygons, width, 64)
-    labels = module._clusters(a, b, owners, h)
+    labels = module._clusters(a, b, owners, w, h)
     mids = (a + b) / 2
     for label in np.unique(labels):
         group = labels == label
@@ -66,7 +66,7 @@ def test_failed_one_box_check_is_repeated_on_plane_scaled_boxes(geometry):
 
 def test_plane_scaled_boxes_reproduce_one_box_where_both_converge():
     a, b, owners, w, h, images = normalized(*single(5e-4), 64)
-    labels = module._clusters(a, b, owners, h)
+    labels = module._clusters(a, b, owners, w, h)
     assert labels.max() > 0
     one = module._matrix(a, b, w, h, degree=16, order=8, images=images + 2)[0]
     split = module._matrix(a, b, w, h, degree=16, order=8, images=images + 2, labels=labels)[0]
@@ -78,6 +78,22 @@ def test_passing_one_box_check_never_builds_plane_scaled_boxes(monkeypatch):
     polygons, width = single()
     result = solve(polygons, width=width, height=H, panels_per_edge=64, interpolation_degree=14)
     assert result.smooth_interpolation_boxes == 1 and result.single_box_matrix_error is None
+
+
+def side_wall():
+    """A 0.4 mm trace 0.05 mm from the left wall, centred between the planes."""
+    y0 = (H - 17.5e-6) / 2
+    return [rectangle(5e-5, 4e-4, y0, 17.5e-6)], 3e-3
+
+
+def test_cluster_near_a_side_wall_uses_wall_scaled_boxes_without_a_one_box_attempt():
+    polygons, width = side_wall()
+    result = solve(polygons, width=width, height=H, panels_per_edge=64, ground_modes=512, interpolation_degree=14)
+    assert result.smooth_interpolation_boxes > 1 and result.single_box_matrix_error is None
+    assert result.matrix_refinement_error <= 1e-10
+    finer = solve(polygons, width=width, height=H, panels_per_edge=128, ground_modes=512, interpolation_degree=16)
+    c = result.capacitance_per_permittivity
+    assert np.max(abs(finer.capacitance_per_permittivity - c)) / np.max(abs(c)) < 1e-5
 
 
 def test_zero_extent_box_is_refused_not_interpolated():

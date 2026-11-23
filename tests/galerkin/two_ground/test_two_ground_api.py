@@ -46,7 +46,7 @@ def test_geometry_rejected_before_field_solve(monkeypatch,case):
     if case=="touch":p[1][:,0]-=.0003
     if case=="concave":p[0][1]=p[0].mean(axis=0)
     if case=="outside":p[0][:,1]-=.001
-    if case=="side":p=[p[0]-[.0034,0]]
+    if case=="side":p=[p[0]-[.00345-1e-7,0]]  # closer than the wall-scaled box limit allows
     if case=="cap":p=p+[p[0]+[.0015,0]];count=256
     monkeypatch.setattr(module.kernel, "panels", lambda *a,**k: pytest.fail("field solve reached"))
     with pytest.raises(ValueError):solve(p,width=.008,height=.002,panels_per_edge=count)
