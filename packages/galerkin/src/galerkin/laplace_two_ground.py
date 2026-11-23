@@ -44,7 +44,7 @@ class TwoGroundRectangleResult:
             frozen = np.frombuffer(value.tobytes(), dtype=float).reshape(value.shape)
             object.__setattr__(self, name, frozen)
 
-def _admit(polygons, width, height, count):
+def _admit(polygons, width, height, count, side_walls=True):
     if not isinstance(polygons, (list, tuple)) or not 1 <= len(polygons) <= 16:
         raise ValueError('polygons must be a list or tuple of 1..16 convex conductor boundaries')
     unit = max(width, height)
@@ -96,7 +96,7 @@ def _admit(polygons, width, height, count):
                 raise ValueError('conductor boundaries must be disjoint and separated')
     points = np.concatenate(accepted)
     lower, upper = (points.min(axis=0), points.max(axis=0))
-    if min(lower[0], w - upper[0]) < np.max(upper - lower):
+    if side_walls and min(lower[0], w - upper[0]) < np.max(upper - lower):
         raise ValueError('conductor cluster must be one cluster extent away from side walls')
     return (accepted, unit, w, h)
 
@@ -131,28 +131,15 @@ def _projection(a, b, lower, upper, degree):
         projection += weight * values
     return grid, projection
 
-def _clusters(a, b, owners, height):
-    """Panel groups of each conductor no wider than its distance to the nearer plane.
+def _clusters(a, b, owners, width, height):
+    """Panel groups of each conductor no wider than its distance to the nearest
+    plane or side wall (kernel.wall_labels with the bottom plane included).
 
-    The smooth kernel holds the images of the planes. Interpolating it over one
-    box much wider than a conductor's distance from a plane converges slowly
-    (coupled, layered and broadside striplines), so each conductor is split
-    into equal x intervals of at most that distance. Labels follow conductor
-    order, then x.
+    The smooth kernel holds the plane and side-wall images. Interpolating it over
+    one box much wider than a conductor's distance from them converges slowly
+    (coupled, layered and broadside striplines, conductors near a side wall).
     """
-    mids = (a + b) / 2
-    labels = np.empty(len(a), dtype=int)
-    start = 0
-    for owner in np.unique(owners):
-        group = np.flatnonzero(owners == owner)
-        points = np.concatenate((a[group], b[group]))
-        lower, upper = (points.min(axis=0), points.max(axis=0))
-        gap = min(lower[1], height - upper[1])
-        count = max(1, int(np.ceil((upper[0] - lower[0]) / gap)))
-        bins = np.minimum(((mids[group, 0] - lower[0]) / (upper[0] - lower[0]) * count).astype(int), count - 1)
-        labels[group] = start + bins
-        start += count
-    return labels
+    return kernel.wall_labels(a, b, owners, width, height, bottom=True)
 
 def _matrix(a, b, width, height, *, degree, order, images, labels=None):
     points = np.concatenate((a, b))
@@ -192,23 +179,31 @@ def _solve(polygons, *, width, height, panels_per_edge=32, interpolation_degree=
     degree = _integer(interpolation_degree, 'interpolation_degree', 10, 16)
     if degree % 2:
         raise ValueError('even interpolation degree required')
-    polygons, unit, w, h = _admit(polygons, width, height, count)
+    polygons, unit, w, h = _admit(polygons, width, height, count, side_walls=False)
+    points = np.concatenate(polygons)
+    lower, upper = (points.min(axis=0), points.max(axis=0))
+    clear = bool(min(lower[0], w - upper[0]) >= np.max(upper - lower))
+    if not clear and kernel.wall_box_count(polygons, w, h, bottom=True) > kernel.WALL_BOXES:
+        raise ValueError('conductors are too close to the side walls for wall-scaled interpolation')
     a, b, owners = kernel.panels(polygons, count, 'cubic')
     length = np.linalg.norm(b - a, axis=1)
     if np.any(length <= 128 * np.finfo(float).eps):
         raise ValueError('unresolved graded panel length')
     images = max(8, int(np.ceil(h / w * np.log(100000000000000.0) / np.pi)) + 1)
-    coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images)
-    fine, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2)
-    error = _relative(coarse, fine)
     clustered = {}
-    if not np.isfinite(error) or error > 1e-10:
-        # One bounding box failed the unchanged check; repeat it on plane-scaled boxes.
-        labels = _clusters(a, b, owners, h)
-        if labels.max() > 0:
+    if clear:
+        coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images)
+        fine, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2)
+        error = _relative(coarse, fine)
+    if not clear or not np.isfinite(error) or error > 1e-10:
+        # The one-box check failed, or the cluster is nearer a side wall than its
+        # extent: use boxes scaled to each conductor's plane and wall distance.
+        labels = _clusters(a, b, owners, w, h)
+        if labels.max() > 0 or not clear:
             coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images, labels=labels)
             fine, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2, labels=labels)
-            clustered = dict(single_box_matrix_error=error, smooth_interpolation_boxes=int(labels.max() + 1))
+            clustered = dict(single_box_matrix_error=error if clear else None,
+                             smooth_interpolation_boxes=int(labels.max() + 1))
             error = _relative(coarse, fine)
     if not np.isfinite(error) or error > 1e-10:
         raise ValueError(f'matrix quadrature/interpolation failed: {error}')

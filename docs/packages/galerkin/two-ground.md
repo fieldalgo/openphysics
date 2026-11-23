@@ -28,8 +28,10 @@ vertical placements. Arrays own immutable bytes; their write flags cannot be
 re-enabled.
 
 The API admits 1–16 strictly convex, disjoint, closed, finite-thickness polygons
-strictly inside a rectangle with width/height in [0.25,16]. The side clearance must
-be at least the conductor cluster extent. It uses at most 2048 total panels,
+strictly inside a rectangle with width/height in [0.25,16]. A conductor cluster
+closer to a side wall than its extent is interpolated on boxes scaled to each
+conductor's distance from the planes and side walls (at most 256, else refused
+before a field solve). It uses at most 2048 total panels,
 with 1–256 cubic-graded panels per polygon edge. Touching, nested, concave,
 zero-thickness and unresolved edges are rejected. The admission bounds do not
 establish numerical convergence everywhere within them.
@@ -46,7 +48,7 @@ never silently changes a requested setting.
 The smooth part is first interpolated on one box around every conductor. When
 that degree−2 comparison exceeds 1e-10, the same comparison is repeated once,
 with the same degree, panels and quadrature, on boxes that split each conductor
-into equal x intervals no wider than its distance to the nearer plane. One wide
+into equal x intervals no wider than its distance to the nearest plane or side wall. One wide
 box converges slowly for coupled, layered and broadside striplines because the
 plane images lie close to it. The result then reports
 `smooth_interpolation_boxes` (>1) and the failed `single_box_matrix_error`;
