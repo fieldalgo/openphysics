@@ -1399,7 +1399,8 @@ try {
     };
     const status = () => text('#file-status');
     await page.click('nav [data-page=Model]'); await sleep(200);
-    for (const [role, name] of [['button', 'File'], ['button', 'Edit'], ['button', 'Open'], ['button', 'Save']]) assert.equal(await axNamed(role, name), 1, `${role} ${name}`);
+    // round 17 (U10): the toolbar Open… button's name is its visible text, "Open…" (was "Open")
+    for (const [role, name] of [['button', 'File'], ['button', 'Edit'], ['button', 'Open…'], ['button', 'Save']]) assert.equal(await axNamed(role, name), 1, `${role} ${name}`);
     await page.eval("document.getElementById('file-menu-button').focus()"); await press('Enter');
     const fileMenu = await page.eval("(()=>{const m=document.getElementById('file-menu');return {open:!m.hidden,expanded:document.getElementById('file-menu-button').getAttribute('aria-expanded'),role:m.getAttribute('role'),label:m.getAttribute('aria-label'),items:[...m.querySelectorAll(':scope>[role=menuitem],:scope>[role=none]>[role=menuitem]')].map(b=>[b.querySelector('span').textContent,b.getAttribute('aria-keyshortcuts'),b.querySelector('.menu-keys')?.textContent??null])}})()");
     // the shortcuts as the platform writes them: ⌘ on macOS, Ctrl elsewhere
