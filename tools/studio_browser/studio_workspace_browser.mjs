@@ -1760,7 +1760,8 @@ try {
       'p=s["mode_postprocessing"]',
       'ob=s["open_boundary"][0]',
       'print(json.dumps({"te":p["te_polarization_fraction"]["values"][0],"area":p["effective_area"]["values"][0],"region":p["integration_region"],"ng":s["group_index"]["re"][0],"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static"),',
-      '"schema":ob["schema"],"searches":ob["searches"],"candidates":len(ob["candidates"]),"duplicates":sum("duplicate_of" in c for c in ob["candidates"]),"selected":len(ob["selected_candidates"])}))'].join('\n')],
+      '"schema":ob["schema"],"searches":ob["searches"],"candidates":len(ob["candidates"]),"duplicates":sum("duplicate_of" in c for c in ob["candidates"]),"selected":len(ob["selected_candidates"]),',
+      '"listed":sorted({c["search"] for c in ob["candidates"] if "duplicate_of" not in c and c["candidate"] not in ob["selected_candidates"]})}))'].join('\n')],
       {input: JSON.stringify(templateDoc), encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
     assert.equal(templateEngine.status, 0, templateEngine.stderr);
     const tEngine = JSON.parse(templateEngine.stdout), pageModes = await import(pathToFileURL(join(tEngine.static, 'workspace-modes.mjs')).href);
@@ -1790,7 +1791,9 @@ try {
     assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls],
       [`Other candidates (${otherCount}) — not shown as modes` + (tEngine.duplicates ? ` · ${tEngine.duplicates} found by both searches` : ''), otherCount, 0]);
     assert.deepEqual(template.candidates.head, ['Candidate', 'Search', 'n_eff', 'Physical share', 'Reason']);
-    assert.deepEqual(template.candidates.searches, ['near 1.95', 'near 2.46']);
+    // the searches of the listed candidates, as the engine's record gives them (for the template every
+    // candidate of the search near 1.95 repeats one of the search near 2.46: 16 duplicates)
+    assert.deepEqual(template.candidates.searches, tEngine.listed.map(k => 'near ' + ['2.46', '1.95'][k - 1]).sort());
     await obOverflow('Results, open run');
 
     // 5. Save: the project file (P3) holds the workspace model as a session of version 10 with the
