@@ -520,18 +520,23 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const editedSinceOpen=()=>signature()!==openedSignature;
  function indicator(){
   return {clean:signature()===cleanSignature||(!cleanSignature&&!editedSinceOpen()),runsUnsaved:(runs.length>0||editedSinceOpen())&&!sessionCurrent(),
-   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent()}:null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
+   saved:sessionFile&&sessionFile.savedAt?{name:sessionFile.name,savedAt:sessionFile.savedAt,current:sessionCurrent(),written:sessionFile.written===true}:null,loaded:loaded?{kind:loaded.kind,name:loaded.name,current:loaded.stamp===stamp(),file:loaded.file||null,fileCurrent:loaded.fileCurrent===true}:null,
    // a template just opened, not yet edited, run, saved or opened
    fresh:freshSignature!==null&&signature()===freshSignature&&!runs.length&&!sessionFile&&!loaded};
  }
  function saveState(){return persistenceTitle({...indicator(),recovery:ctx.recoveryState?.()||null});}
  // Save session: the file if it fits; else the §2 dialog, or the refusal that names the run
- function saveSession({keepSelected=false}={}){
+ // saveAs: File › Save As (ask for a file); else Save (the file Save As chose, or ask). The
+ // file is written, or downloaded, before anything is marked saved; a cancel marks nothing.
+ async function saveSession({keepSelected=false,saveAs=false}={}){
   const out=writeMultiphysicsSession(sessionState(),{keepSelected});
   if(!out.ok){if(out.reduced)return {ok:false,question:overflowQuestion(out.bytes)};notice('Session not saved: '+out.refusal);return {ok:false,refused:out.refusal};}
-  const name=sessionFileName(modelSlug(doc.name));ctx.download(new Blob([out.text],{type:'application/json'}),name);
-  sessionFile={name,savedAt:new Date().toISOString(),stamp:stamp(),jobs:filed()};cleanSignature=signature();loaded=null;freshSignature=null;ctx.onHistory();
-  notice(savedNotice(name,{runs:runs.length,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0}));
+  const at={stamp:stamp(),jobs:filed(),signature:signature(),runs:runs.length};
+  const result=await ctx.deliverSession(out.text,sessionFileName(modelSlug(doc.name)),{saveAs});
+  if(!result.written){notice(result.message);return {ok:false,cancelled:true};}
+  const name=result.name;
+  sessionFile={name,savedAt:new Date().toISOString(),stamp:at.stamp,jobs:at.jobs,written:result.via==='picker'};cleanSignature=at.signature;loaded=null;freshSignature=null;ctx.onHistory();
+  notice(savedNotice(name,{runs:at.runs,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0,via:result.via})+result.after);
   return {ok:true,name};
  }
  // browser recovery (§4): written while the model has a run or was edited since it was opened
@@ -601,10 +606,10 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   // the page and the selection are part of a session: the save indicator and recovery follow them
   ctx.onHistory();
  }
- // The ribbon's Project group: Open session and Save session, as in every model (§6); the model
- // file alone is More › Save inputs only and Open inputs file. The browser draft holds optical
- // inputs, so it is hidden here and comes back on leaving.
- const SESSION_WORDS={'open-session':'Opens a saved session file: the multiphysics model with its runs, or a model file alone.','save-session':'Saves the multiphysics model, its completed runs with their names and pins, and the without-heater results to one file.'};
+ // The ribbon's Project group: Open and Save, as in every model (§6), File › Open, Save and
+ // Save As; the model file alone is File › Export › Model file. The browser draft holds optical
+ // inputs, so File › Browser copy › Save browser draft is hidden here and comes back on leaving.
+ const SESSION_WORDS={'open-session':'Opens a saved session file: the multiphysics model with its runs, or a model file alone.','save-session':'Saves the multiphysics model, its completed runs with their names and pins, and the without-heater results to one session file.'};
  let describedBefore=null;
  function projectCommands(on){
   if($('save-draft'))$('save-draft').hidden=on;
@@ -617,11 +622,11 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();}
   projectCommands(false);
  }
- // More › Save inputs only: the document alone, as a model file
+ // File › Export › Model file: the document alone
  function saveInputs(){
   const text=JSON.stringify(doc,null,2)+'\n',name=(String(doc.name||'model').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'model')+'.json';
   ctx.download(new Blob([text],{type:'application/json'}),name);
-  cleanSignature=signature();ctx.onHistory();notice(`Inputs file ${name} sent to the browser's downloads. It has the model but no runs; Save session keeps the runs too.`);
+  cleanSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to your browser's Downloads. It has the model but no runs; Save keeps the runs too, in the session file.`);
  }
  return {active:()=>active,open,openText,openTemplate,openSession,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,

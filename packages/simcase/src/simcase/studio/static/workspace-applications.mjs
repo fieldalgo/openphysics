@@ -86,7 +86,6 @@ function resumeCard(resume){
  const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
  const heading=document.createElement('h3');heading.id='resume-heading';heading.textContent='Continue where you left off';
  const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
- const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;
  const actions=document.createElement('div');actions.className='resume-actions';
  for(const choice of choices){
   const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?RESTORE_TEXT+': ':'Restore earlier from this browser: ')+choice.label;
@@ -94,9 +93,8 @@ function resumeCard(resume){
   else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);
  }
- const open=openFileButton(resume.onOpenFile);
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
- actions.append(open,fresh);card.append(heading,note,actions,portable);return card;
+ actions.append(fresh);card.append(heading,note,actions);return card;
 }
 // The Library page notes: what each model supports and what Save session keeps of it. A session
 // file holds the inputs of every single-physics model and the optical runs, or a multiphysics
@@ -109,28 +107,31 @@ export const CHOOSER_NOTES=Object.freeze([
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
 const PORTABLE_NOTE='A session file is the copy that moves between computers; browser recovery stays in this browser.';
-const openFileButton=onOpenFile=>{const open=document.createElement('button');open.type='button';open.id='resume-open-file';open.textContent='Open session file (portable)…';open.onclick=()=>onOpenFile();return open;};
+// "Open session file…" has one place, at the top of the Library: it opens a session file or a
+// model file (File › Open), whatever the cards below offer.
+function libraryFiles(onOpenFile){
+ const bar=document.createElement('div');bar.className='library-files';
+ const open=document.createElement('button');open.type='button';open.id='library-open-file';open.textContent='Open session file…';open.setAttribute('aria-keyshortcuts','Control+O Meta+O');open.onclick=()=>onOpenFile();
+ const portable=document.createElement('p');portable.className='library-portable';portable.textContent=PORTABLE_NOTE;
+ bar.append(open,portable);return bar;
+}
 // A model card with its resume offer under it: Resume first, then Start new. key: the id the
 // buttons carry (resume-optical, optical-start-new; resume-heated-waveguide, ...).
-// offer.onOpenFile: no box above lists other sessions, so the session file route and its note
-// are here, beside the only other way back.
 function cardSlot(button,offer,key){
  const slot=document.createElement('div');slot.className='card-slot';
  const actions=document.createElement('div');actions.className='card-resume';
  const go=document.createElement('button');go.type='button';go.id='resume-'+key;go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
  const fresh=document.createElement('button');fresh.type='button';fresh.id=key+'-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
  actions.append(go,fresh);slot.append(button,actions);
- if(offer.onOpenFile){actions.append(openFileButton(offer.onOpenFile));const portable=document.createElement('p');portable.className='resume-portable';portable.textContent=PORTABLE_NOTE;slot.append(portable);}
  return slot;
 }
 // offers: each model card's resume offer by card id ({optical, 'heated-waveguide'}), each
-// {label, record, onResume(button), onStartNew()}; a card without one has none.
-export function renderApplications(host,resume=null,offers={}){
+// {label, record, onResume(button), onStartNew()}; a card without one has none. onOpenFile:
+// the Library's one "Open session file…", at the top of the page.
+export function renderApplications(host,resume=null,offers={},{onOpenFile=null}={}){
  host.replaceChildren();offers={...(offers||{})};
+ if(onOpenFile)host.append(libraryFiles(onOpenFile));
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
- // no box above: the first card with an offer carries the session file route
- const first=Object.keys(offers).find(id=>offers[id]);
- if(!card&&resume&&first)offers[first]={...offers[first],onOpenFile:resume.onOpenFile};
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';
  const cards=document.createElement('div');cards.className='cards';

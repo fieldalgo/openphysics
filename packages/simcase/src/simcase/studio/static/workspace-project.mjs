@@ -32,10 +32,10 @@ const bool = (value, name) => {
   return value;
 };
 export function validateProject(doc) {
-  if (doc?.format === 'openphysics-studio-workspace' && [1,2,3,4,5].includes(doc.version)) throw new Error(`This project (version ${doc.version}) was saved before the units and naming batch and is not read. Enter its inputs again and save a new project.`);
-  if (!doc || doc.format !== 'openphysics-studio-workspace' || !READ_VERSIONS.includes(doc.version)) throw new Error('Unsupported project format or version.');
+  if (doc?.format === 'openphysics-studio-workspace' && [1,2,3,4,5].includes(doc.version)) throw new Error(`This model file (version ${doc.version}) was saved before the units and naming batch and is not read. Enter its inputs again and save a new model file.`);
+  if (!doc || doc.format !== 'openphysics-studio-workspace' || !READ_VERSIONS.includes(doc.version)) throw new Error('Unsupported model file format or version.');
   const s = doc.model, c = doc.setup;
-  if (!s || !c || !c.materials) throw new Error('Project inputs are missing.');
+  if (!s || !c || !c.materials) throw new Error('Model file inputs are missing.');
   if(doc.units?.height!=='nm')throw new Error('Invalid height units.');
   if(doc.units?.wavelength!=='nm'||doc.units?.core_mesh!=='nm')throw new Error('Invalid optical study units.');
   if(doc.units?.shapes!=='nm')throw new Error('Invalid shape units.');
@@ -77,10 +77,10 @@ export function validateProject(doc) {
   return {format: 'openphysics-studio-workspace', version, units: {height:'nm',width: 'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm',joule_length:'mm', voltage: 'V', temperature: 'K'}, model, setup};
 }
 export function parseProject(text) {
-  if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('Project exceeds 64 KiB.');
+  if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('Model file exceeds 64 KiB.');
   let doc;
-  try { doc = JSON.parse(text); } catch { throw new Error('Project is not valid JSON.'); }
-  if (doc?.units?.width !== 'nm' || doc?.units?.voltage !== 'V' || doc?.units?.temperature !== 'K') throw new Error('Unsupported or missing project units.');
+  try { doc = JSON.parse(text); } catch { throw new Error('Model file is not valid JSON.'); }
+  if (doc?.units?.width !== 'nm' || doc?.units?.voltage !== 'V' || doc?.units?.temperature !== 'K') throw new Error('Unsupported or missing model file units.');
   return validateProject(doc);
 }
 export function snapshot(state, setup) {
