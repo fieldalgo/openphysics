@@ -368,7 +368,7 @@ and Undo taking it back, the Study settings naming the next run's inputs and edi
 wavelength (1300 nm refused there as in Optical modes), and a restore card naming the file's
 save time. It also checks the study settings saved with the model: Undo and Redo over a Modes to
 find change, a group index box change and **Use this run's inputs** of a run with another count
-and box; **Save inputs only** writing version 7 with 2 modes and the box off (the same bytes as the
+and box; **File › Export › Model file…** (`optical-waveguide.json`) writing version 7 with 2 modes and the box off (the same bytes as the
 version 8 file without its settings key; `tests/simcase/studio_project_study.cjs` checks the
 template's file against `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
 `modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
@@ -381,6 +381,24 @@ the table's box, every column reachable there and headers and row headers on one
 index box's plain note, the same box in Physics › Optical modes, synced with Study both ways and
 through Undo, a Messages line each way, *· group index on* in the next run's inputs, and the
 *Off · turn on in Study or Optical modes* hint under an n_g header when no run shown computed n_g.
+Since the File menu it checks the menus by role and name in the accessibility tree and by keyboard
+(Enter, Up, Down, Home, End, Right and Left through the Export and Browser copy submenus and the
+Edit menu, Escape closing one level and returning focus), the shortcuts shown and in
+`aria-keyshortcuts`, the open menus inside the page at 1440 × 900 and 390 × 844, and the one
+**Open session file…** at the top of the Library at both sizes, with and without a resume offer.
+The browser's real save dialog cannot be answered in a headless run, so the scripts remove
+`window.showSaveFilePicker` at document start and Save goes through Studio's name dialog (Download
+keeps the suggested name, so file names and bytes are checked as before); then a stub at that
+boundary, whose file changes only on close as in Chromium, checks Save As (the picker options:
+the suggested name, one JSON type, `id` `openphysics-project` and `startIn` `documents`, then the
+current file), the written bytes equal to the download of the same state, Save writing the same
+file with no second picker call, a cancel writing nothing, a failed write aborted with the old
+content whole, and a picker that throws `NotAllowedError` falling back to the name dialog. The
+headless browser reports `navigator.webdriver`, where Studio never calls the picker (a stub that
+would throw is not called and Save As downloads under the typed name); the picker checks set
+`navigator.webdriver` to false at that boundary. The
+name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`). The real save
+dialog of desktop Chrome is not driven by any check.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff

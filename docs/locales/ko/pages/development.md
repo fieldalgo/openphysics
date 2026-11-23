@@ -311,7 +311,7 @@ Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 �
 **Use this run's inputs**와 그것을 되돌리는 Undo, 다음 실행의 입력을 밝히고 파장을 고치는 Study 설정(1300 nm는
 Optical modes에서처럼 거부), 파일 저장 시각을 밝히는 복구 카드도 확인합니다. 모델과 함께 저장되는 study
 설정도 확인합니다: Modes to find 변경, 군굴절률 상자 변경, 모드 수와 상자가 다른 실행의 **Use this run's
-inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Save inputs only**가 버전 7을 쓰고(설정 키를
+inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **File › Export › Model file…**(`optical-waveguide.json`)이 버전 7을 쓰고(설정 키를
 뺀 버전 8 파일과 같은 바이트. 템플릿의 파일은 `tests/simcase/studio_project_study.cjs`가
 `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`과 비교) `modeCount` 4나
 `groupIndex` true이면 버전 8을 쓰며 각 파일을 다시 열면 그 설정이 되는지, 버전 8 입력의 세션이 버전 9로
@@ -322,6 +322,21 @@ inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Sav
 쉬운 설명, Physics › Optical modes에도 있어 Study와 양쪽으로, Undo로도 맞춰지는 같은 상자, 켜고 끌 때마다의
 Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n_g를 계산하지 않았을 때 n_g 머리글 아래의
 *Off · turn on in Study or Optical modes*도 확인합니다.
+File 메뉴가 생긴 뒤로는 접근성 트리에서 역할과 이름으로, 그리고 키보드로(Export와 Browser copy 하위
+메뉴와 Edit 메뉴를 지나는 Enter, Up, Down, Home, End, Right, Left, 한 단계씩 닫고 초점을 돌려주는
+Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440 × 900과 390 × 844에서 페이지 안에
+들어가는 열린 메뉴, 두 크기에서 복구 제안이 있든 없든 Library 맨 위 한 곳의 **Open session file…**도
+확인합니다. 헤드리스 실행에서는 브라우저의 실제 저장 대화상자에 답할 수 없으므로 스크립트는 문서 시작 시
+`window.showSaveFilePicker`를 지우고, Save는 Studio의 이름 대화상자를 거칩니다(Download는 제안 이름을
+유지하므로 파일 이름과 바이트를 전처럼 확인). 이어서 Chromium처럼 닫을 때만 파일이 바뀌는 대역(stub)을 그
+경계에 넣어 Save As(대화상자 옵션: 제안 이름, JSON 형식 하나, `id` `openphysics-project`, `startIn`
+`documents`, 그다음엔 현재 파일), 같은 상태의 다운로드와 같은 바이트, 대화상자를 다시 부르지 않고 같은
+파일에 쓰는 Save, 아무것도 쓰지 않는 취소, 중단되어 이전 내용이 온전한 실패한 쓰기, `NotAllowedError`를
+던지는 대화상자에서 이름 대화상자로 넘어가는 것을 확인합니다. 헤드리스 브라우저는 `navigator.webdriver`를 알리며, 이때 Studio는 저장 대화상자를 부르지 않습니다
+(부르면 예외를 던질 대역이 불리지 않고 Save As가 입력한 이름으로 내려받음). 대화상자 점검은 그 경계에서
+`navigator.webdriver`를 false로 둡니다. 이름 대화상자에 입력한 이름은 정리됩니다
+(`my run/<x>?`은 `my runx.json`으로 내려받음). 데스크톱 Chrome의 실제 저장 대화상자는 어떤 점검도
+조작하지 않습니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는

@@ -95,21 +95,24 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 
 ## 5. Keep your work
 
-- **Save session** in the ribbon's Project group writes one file with the inputs,
-  all completed runs, their names and pins, and the comparison. Use it before you stop.
-  The file is named after the application and the local time, for example
-  `optical-waveguide-session-2026-11-21-1305.json`, and is handed to your browser's
-  downloads (the browser may ask where to save it, or add a number if that name exists).
-  Messages reports *Session file … sent to the browser's downloads (check your Downloads
-  folder)* and the title shows *Session file … sent to your browser's Downloads · time* until your next edit or
-  run. The footer repeats the title's save indicator; before a file save it reads *Not
+- **File › Save** (Ctrl+S, or **Save** in the ribbon's Project group) writes one session file
+  with the inputs, all completed runs, their names and pins, and the comparison. Use it before
+  you stop. The file is named after the application and the local time, for example
+  `optical-waveguide-session-2026-11-21-1305.json`. In Chrome and Edge the browser's save
+  dialog asks where to save it, Messages reports *Saved to …*, and the next Save writes the
+  same file without asking. In Firefox and Safari Studio asks for the file name and hands the
+  file to your browser's Downloads (the browser may ask where to save it, or add “ (1)” if that
+  name exists); Messages reports *Session file … sent to your browser's Downloads* and the
+  title shows *Session file … sent to your browser's Downloads · time* until your next edit or
+  run. **File › Save As…** (Shift+Ctrl+S) chooses another name; see
+  [File menu and file kinds](workspace.md#file-menu-and-file-kinds) for what each file holds. The footer repeats the title's save indicator; before a file save it reads *Not
   saved to a file · kept for recovery in this browser*.
-  **More › Save inputs only** keeps the model without results; **Export this run** in
+  **File › Export › Model file…** keeps the model without results (`optical-waveguide.json`); **Export this run** in
   the Runs list writes one run to its own file.
 - After a reload or a restart, the start page shows **Continue where you left off**.
   **Recover (this browser only)** brings back the last session or an earlier one from this
-  browser; **Open session file (portable)…** opens a file, the copy that moves between
-  computers. On a fresh page
+  browser; **Open session file…**, at the top of the Library, or **File › Open…** (Ctrl+O)
+  opens a file, the copy that moves between computers. On a fresh page
   (default inputs, no runs) it opens at once; otherwise **Open saved session?** lists the
   runs and the comparison that come back and what is replaced. Messages names what was
   opened. The title then reads *Opened …* with the file name, or *Recovered from this
