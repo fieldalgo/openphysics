@@ -26,7 +26,7 @@ import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
-import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign} from './workspace-compare.mjs';
+import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
@@ -249,7 +249,7 @@ function projectLine(){
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
 function clearWorkspace(){
- runs=[];solverRun=null;compareIds=[null,null];lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
+ runs=[];solverRun=null;compareIds=[null,null];comparePicked=false;lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
  const shown=multiView.active(),page=ui.page;
  applyProject(DEFAULT_INPUTS,{saved:true,resetHistory:true,quiet:true});
  if(shown){workspacePhysics=null;ui.page=page;}else Object.assign(state,INITIAL_PHYSICS);
@@ -726,7 +726,7 @@ function completeLoad(pending){
  projectId('workspace');
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
-  const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
+  const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];comparePicked=pairChosen(runs,compareIds);restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
   const input=sessionStudyInput(session.input,solverRun);
@@ -838,7 +838,8 @@ document.addEventListener('keydown',event=>{
 
 // The run Results shows (the selected run), which the dock, the footer, the step bar and the title describe.
 function viewedRun(){return runs.includes(solverRun)?solverRun:null;}
-let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null];const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
+// comparePicked: the pair was picked on Compare (or read as chosen from a file), so new runs keep it (round 16)
+let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null],comparePicked=false;const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
 let notebookRecoveryRecord=null,notebookLoadVersion=0;
 // The last session file saved (or recovered as saved): {name, savedAt, stamp}; stamp is the
 // inputs and runs it held, so the title shows it as saved until the next edit or run.
@@ -1522,9 +1523,11 @@ function renderComparison(){
  const host=$('canvas');host.innerHTML='<h2>Compare two runs</h2>';
  if(runs.length<2){host.insertAdjacentHTML('beforeend','<p>Compute two designs to compare their fields and inputs. Existing results stay attached to their original inputs.</p>');return;}
  // a pick whose run is gone: both back to the default pair (workspace-compare.mjs defaultComparison)
- if(!compareIds.every(id=>runs.some(r=>r.job===id)))compareIds=defaultComparison(runs);
+ if(!compareIds.every(id=>runs.some(r=>r.job===id))){compareIds=defaultComparison(runs);comparePicked=false;}
  const bar=document.createElement('div');bar.className='toolbar compare-selection';
- for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;compareChoice=null;render();};label.append(select);bar.append(label);}host.append(bar);
+ for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;comparePicked=true;compareChoice=null;render();};label.append(select);bar.append(label);}host.append(bar);
+ // a kept pair (round 16): the newest run, when newer than both, is offered beside it
+ const newer=newerThanPair(runs,compareIds);if(newer){const line=document.createElement('p');line.id='compare-newer';line.className='compare-newer';const n=runNumber(newer);line.append(`Run ${n} is newer than this pair · `);const swap=document.createElement('button');swap.type='button';swap.id='compare-newer-button';swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;compareChoice=null;render();notice(`Compare shows Run ${n} with the run that was B, now A.`);};line.append(swap);host.append(line);}
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
  // a run of a file without fields: its modes cannot be matched by overlap or drawn
  const withoutFields=[a,b].filter(r=>!r.field);
@@ -1824,7 +1827,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=reasons;}
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);
- compareIds=defaultComparison(runs);ui.page='Results';
+ compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';
 }});
 function refreshJobControls(){
  if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}
