@@ -98,6 +98,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: the two-ground boundary solver repeats a failed one-box smooth-kernel interpolation check once on plane-scaled boxes (each conductor split into x intervals no wider than its distance to the nearer plane), with the same degree, panels, quadrature and 1e-10 limit; results that passed before are unchanged bit for bit, and `TwoGroundRectangleResult` reports `smooth_interpolation_boxes` and `single_box_matrix_error`. Coupled, layered and broadside striplines that failed with "matrix quadrature/interpolation failed" are admitted. [Two-ground solver](docs/packages/galerkin/two-ground.md).
+
 - Add an explicit two-mode corner field for one or two all-active conductors, preserving physical current moments and separate numerical, panel, outer and analytic checks.
 
 - Assemble bounded two-mode corner half-space Green matrices with explicit partitioned mixed interactions, raw numerical refusals and preserved P0/energy/reference checks.
