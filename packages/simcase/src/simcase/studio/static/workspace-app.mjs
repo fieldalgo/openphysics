@@ -1405,7 +1405,7 @@ function nameRun(run,value,redraw){
  run.label=label;if(label&&!pinBlocked)run.pinned=true;
  if(redraw)render();else{
   document.querySelectorAll('[data-run]').forEach(b=>{const r=runs.find(x=>x.job===b.dataset.run);if(r)b.textContent=runItemText(r);});
-  document.querySelectorAll('#compare-a option,#compare-b option').forEach(o=>{const r=runs.find(x=>x.job===o.value);if(r)o.textContent=runLabel(r);});
+  document.querySelectorAll('#compare-a option,#compare-b option').forEach(o=>{const r=runs.find(x=>x.job===o.value);if(r){o.textContent=runLabel(r);o.title=o.textContent;}});document.querySelectorAll('#compare-a,#compare-b').forEach(sel=>{sel.title=sel.selectedOptions[0]?.textContent||'';});
   document.querySelectorAll('.compare-grid article h3').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=fieldHeading(i?'B':'A',r,runNumber(r));});
   profileRedraw();syncUnpinButton();if($('run-list-heading'))$('run-list-heading').textContent=runListHeading();
   document.querySelectorAll('#compare-table-runs [data-side]').forEach((h,i)=>{const r=runs.find(x=>x.job===compareIds[i]);if(r)h.textContent=h.dataset.side+' · '+runHeading(r,runNumber(r));});
@@ -1581,7 +1581,10 @@ function renderComparison(){
  // a pick whose run is gone: both back to the default pair (workspace-compare.mjs defaultComparison)
  if(!compareIds.every(id=>runs.some(r=>r.job===id))){compareIds=defaultComparison(runs);comparePicked=false;}
  const bar=document.createElement('div');bar.className='toolbar compare-selection';
- for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.selected=r.job===compareIds[side];select.append(o);}select.onchange=()=>{compareIds[side]=select.value;comparePicked=true;compareChoice=null;render();};label.append(select);bar.append(label);}host.append(bar);
+ for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';
+  // round 17 (U9): the accessible name says what is picked; the full run label is the title, so an
+  // ellipsis at a narrow width hides no part of it (the label starts with the run's number and name)
+  select.setAttribute('aria-label',side?'Run B':'Run A');for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.title=o.textContent;o.selected=r.job===compareIds[side];select.append(o);}select.title=select.selectedOptions[0]?.textContent||'';select.onchange=()=>{compareIds[side]=select.value;comparePicked=true;compareChoice=null;render();};label.append(select);bar.append(label);}host.append(bar);
  // a kept pair (round 16): the newest run, when newer than both, is offered beside it
  const newer=newerThanPair(runs,compareIds);if(newer){const line=document.createElement('p');line.id='compare-newer';line.className='compare-newer';const n=runNumber(newer);line.append(`Run ${n} is newer than this pair · `);const swap=document.createElement('button');swap.type='button';swap.id='compare-newer-button';swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;compareChoice=null;render();notice(`Compare shows Run ${n} with the run that was B, now A.`);};line.append(swap);host.append(line);}
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
