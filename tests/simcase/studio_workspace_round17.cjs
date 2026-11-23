@@ -151,3 +151,9 @@ test('U3: the slow options of the next run, beside Run study',async()=>{
  assert.ok(W.nextRunText(input(),2,true).includes(' · group index on'));
  assert.ok(read('workspace.html').includes('<button id="run-optical" disabled>Run study</button><span id="run-options" class="run-options" hidden></span>'));
 });
+test('U5: the outer boundary is a choice: the workspace note and the closed Study panel say where',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes('Shapes, materials, wavelength and core mesh editable; window fixed; outer boundary chosen in Physics › Optical modes.'));
+ assert.ok(!app.includes('window/PEC fixed'));assert.ok(!app.includes('Window and boundaries are fixed.'));
+ assert.equal(app.split('<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes.').length,3);
+});

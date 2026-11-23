@@ -1144,7 +1144,7 @@ try {
   stage('M4-d refused and accepted', m4refused);
   await toNode('Study');
   const m4study = await page.eval("({value:document.getElementById('mode-count-number').value,text:document.getElementById('inspector').innerText})");
-  assert.equal(m4study.value, '8'); assert.match(m4study.text, /Window and boundaries are fixed\./); assert.doesNotMatch(m4study.text, /mode count are fixed|candidate count/i);
+  assert.equal(m4study.value, '8'); assert.ok(m4study.text.includes('The window is fixed; the outer boundary is chosen in Physics › Optical modes.'), m4study.text); // round 17 U5 (pre-registered; was /Window and boundaries are fixed\./) assert.doesNotMatch(m4study.text, /mode count are fixed|candidate count/i);
   await noOverflow('M4 Study');
   // M4-c: the template (500 x 220 nm) asking for 8
   await runAndWait();
