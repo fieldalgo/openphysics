@@ -1361,7 +1361,7 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   상자 오른쪽 가장자리의 그림자와 *Scroll sideways for all 14 columns ›* 줄이 숨은 열이 있음을 알립니다.
   페이지는 옆으로 넘치지 않습니다. 짝이 없는
   모드는 *1 ↔ —* 또는 *— ↔ 2*로 시작하고 제목과 접근 가능한 이름이 전체 *A mode 2: no match in B
-  (best overlap 0.43, with B mode 2)*이며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
+  (best overlap 0.43, with B mode 2)*이며, Overlap 열에 가장 좋은 겹침을 두 줄로 보이고(*best 0.43 (< 0.8, not matched)*, round 17; 가장 좋은 값이 0.8 이상이지만 다음 값보다 0.1 넘게 크지 않으면 *(margin < 0.1, not matched)*; 규칙 자체는 그대로) Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape
   between designs.”
 - **장 선택.** *Matched modes*는 짝지어진 쌍을 나열하고(*A mode 1 ↔ B mode 1 · overlap 0.99 · TE-like*,
