@@ -39,12 +39,14 @@ test('Q9: "Runs · N of M" and "Up to six runs are kept" both come from RUN_LIMI
  assert.doesNotMatch(app,/Up to six runs are kept/,'no literal copy of the limit in the optical run list');
  assert.match(app,/runsLabel:runsNodeLabel\(runs\.length\)/);
 });
-test('Q6: the run banner is inside the workspace, positioned out of the layout',()=>{
+// round 15 (R2) moved the banner into the document-tab row, after the view title: it covers no heading
+test('Q6: the run banner is in the document-tab row, after the view title, and the row keeps its height',()=>{
  const html=read('workspace.html'),css=read('workspace.css');
- const workspace=html.indexOf('<section class="workspace">'),panel=html.indexOf('<section id="job-panel"'),end=html.indexOf('</main>');
- assert.ok(workspace>0&&panel>workspace&&panel<end,'#job-panel is inside .workspace');
- assert.match(css,/\.workspace\{position:relative\}/);
- assert.match(css,/#job-panel\{position:absolute;top:0;right:0;[^}]*height:34px;/);
+ const tab=html.indexOf('<div class="document-tab">'),title=html.indexOf('<strong id="view-title">'),panel=html.indexOf('<section id="job-panel"'),detail=html.indexOf('<span id="view-detail">'),end=html.indexOf('</div>',detail);
+ assert.ok(tab>0&&title>tab&&panel>title&&detail>panel&&end>detail,'#job-panel is between #view-title and #view-detail in .document-tab');
+ assert.match(css,/\.document-tab\{display:flex;[^}]*height:34px;/);
+ assert.doesNotMatch(css,/#job-panel\{[^}]*position:absolute/);
+ assert.match(css,/#job-panel\{[^}]*height:26px;/);
 });
 test('Q8: the Compare side is a badge after a hidden separator',()=>{
  const app=read('workspace-app.mjs'),css=read('workspace.css');

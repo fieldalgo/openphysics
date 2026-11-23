@@ -167,8 +167,11 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
 4. Select **Run study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
    An input edit replaces the completion message, so it never describes edited inputs. The run
-   banner (*Optical run complete…*, and **Stop waiting** while a run goes) sits on the right of the
-   view's title row, over no control, so it never moves the panels when it appears or leaves.
+   banner (*Optical run complete…*, and **Stop waiting** while a run goes) is part of the view's
+   title row, after the view title (*Results*, *Comparison*): it covers no heading and no control,
+   and the row keeps its height, so it never moves the panels when it appears or leaves. The
+   *Optical run complete…* banner leaves after 6 seconds, or at your next click, tap or key press if
+   that comes first; Messages keeps the words.
    The dock heading, the status bar, the title and the step bar describe the run being viewed
    (the selected run), named by its number with its name: after a run *Run 1 · solved from
    the current inputs* (the status bar adds *press Run to solve again*); when the viewed run has
