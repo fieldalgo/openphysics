@@ -889,6 +889,12 @@ Limits of the open boundary, from its validation:
   32, it failed a fifth time: the TM-like mode was missing at strength 1.5. PML independence is
   now checked with a search that reaches every reference mode, and the shipped search separately
   for completeness.
+- The filter check (V8) first asked that the analytic slab mode come back within 1e-3 of its pole,
+  a tolerance chosen when the test was written, not registered. It failed for 1 to 4 modes: the
+  returned TE mode is 4.76e-3 from the pole at the default mesh, the discretization error the slab
+  convergence check measures (it gates n_eff within 1e-3 only at 1/4 of the element lengths). After
+  that result the mode is identified as the one nearest the pole and must meet the slab check's
+  default-mesh gate (loss within 3.5 %; it is +2.96 %).
 
 ### Optical session files (version 9)
 
