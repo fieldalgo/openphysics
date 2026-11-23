@@ -437,6 +437,14 @@ try {
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
+  // round 14 (Q8): the run list's Compare A / Compare B is a badge of its own after the label, and the
+  // button's accessible name still ends in "· Compare A" / "· Compare B"
+  const badges = await page.eval("[...document.querySelectorAll('.run-item')].filter(b=>b.querySelector('.compare-side')).map(b=>{const t=b.querySelector('.compare-side'),c=getComputedStyle(t),r=t.getBoundingClientRect(),br=b.getBoundingClientRect(),range=document.createRange();range.setStart(b.firstChild,0);range.setEnd(b.firstChild,b.firstChild.length);const label=[...range.getClientRects()].at(-1);return {text:t.textContent,inside:r.left>=br.left-0.5&&r.right<=br.right+0.5,after:r.left>=label.right-0.5||r.top>=label.bottom-0.5,border:parseFloat(c.borderTopWidth)>0&&c.borderTopStyle!=='none',fill:c.backgroundColor!==getComputedStyle(b).backgroundColor}})");
+  const badgeNames = (await page.axTree(['button', 'toggleButton'])).filter(n => / · Compare [AB]$/.test(n.name || '')).map(n => n.name.slice(-11));
+  stage('Q8 Compare badges', {badges, badgeNames});
+  assert.deepEqual(badges.map(b => b.text).sort(), ['Compare A', 'Compare B']);
+  assert.ok(badges.every(b => b.inside && b.after && b.border && b.fill), JSON.stringify(badges));
+  assert.deepEqual(badgeNames.sort(), ['· Compare A', '· Compare B']);
   const neffTable = await compareTableRows();
   stage('two designs compared', {deltaNeff: before, table: neffTable});
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
@@ -729,7 +737,57 @@ try {
   // V17-M2: Compare matches the modes of two runs by field overlap, 500 → 450 nm (both modes
   // matched with overlap >= 0.95, as V15 (a) on the engine); the picker lists matched pairs and
   // the old rank note is gone; the Results sentence names the matching
-  for (const width of [500, 450]) { await toGeometry(); await page.type('#shape-w', width); await runAndWait(); }
+  // round 14 (Q6; pre-registered): the run banner takes no layout space and covers no control. At
+  // 1440 × 900 (the 500 nm run) and 390 × 844 (the 450 nm run): the tree, the settings pane and the
+  // workspace keep their boxes exactly before the banner, while it shows (running, then "Optical
+  // run complete…") and after it leaves (an input edit, then the width back) (on a phone the
+  // workspace's height follows the page shown, Results after the run, so there its place is
+  // compared); hiding the banner while it shows changes no box at all; while it shows, every
+  // tab, ribbon button, the File menu button and the tree's first item is the element at its
+  // centre, no visible control outside the banner intersects it, and its own buttons are clickable
+  const layoutBoxes = () => page.eval("JSON.stringify(['#tree','.settings-pane','.workspace'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.left,r.top+scrollY,r.width,r.height]}))");
+  // the boxes with the banner as it is and with it hidden by the check: the banner's own effect
+  const withoutBanner = () => page.eval("(()=>{const b=document.getElementById('job-panel'),boxes=()=>JSON.stringify(['#tree','.settings-pane','.workspace'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.left,r.top+scrollY,r.width,r.height]}));const shown=boxes();b.hidden=true;const hidden=boxes();b.hidden=false;return {shown,hidden}})()");
+  // the tree, the settings pane, and the workspace's place (its height follows the page shown on a phone)
+  const place = boxes => JSON.parse(boxes).map((r, i) => i < 2 ? r : r.slice(0, 3));
+  const bannerCover = () => page.eval(`(()=>{const banner=document.getElementById('job-panel'),b=banner.getBoundingClientRect();
+    const clip=e=>{let r=e.getBoundingClientRect(),box={l:r.left,t:r.top,r:r.right,b:r.bottom};for(let a=e.parentElement;a;a=a.parentElement){const c=getComputedStyle(a);if(c.overflowX!=='visible'||c.overflowY!=='visible'){const q=a.getBoundingClientRect();box={l:Math.max(box.l,q.left),t:Math.max(box.t,q.top),r:Math.min(box.r,q.right),b:Math.min(box.b,q.bottom)};}}
+      box={l:Math.max(box.l,0),t:Math.max(box.t,0),r:Math.min(box.r,innerWidth),b:Math.min(box.b,innerHeight)};return box.r-box.l>1&&box.b-box.t>1?box:null;};
+    const shown=e=>!e.closest('[hidden]')&&getComputedStyle(e).visibility!=='hidden'&&e.getClientRects().length>0&&!!clip(e);
+    const name=e=>e.id||e.dataset.page||e.dataset.node||e.textContent.trim().slice(0,40);
+    const hit=e=>{const c=clip(e),t=document.elementFromPoint((c.l+c.r)/2,(c.t+c.b)/2);return !!t&&(t===e||e.contains(t));};
+    const named=[...document.querySelectorAll('nav [data-page]'),...document.querySelectorAll('.ribbon-commands>button'),document.getElementById('file-menu-button'),document.querySelector('#tree [role=treeitem]')].filter(e=>e&&shown(e));
+    const controls=[...document.querySelectorAll('button,select,input,a[href],summary,[role=treeitem],[role=tab],[tabindex]:not([tabindex="-1"])')].filter(e=>!banner.contains(e)&&shown(e));
+    const under=controls.filter(e=>{const c=clip(e);return c.l<b.right&&c.r>b.left&&c.t<b.bottom&&c.b>b.top;}).map(name);
+    const own=[...banner.querySelectorAll('button')].filter(shown);
+    return {banner:!banner.hidden&&b.width>0,inView:b.left>=0&&b.right<=innerWidth&&b.top>=0,message:document.getElementById('job-message').textContent,named:named.length,covered:named.filter(e=>!hit(e)).map(name),under,own:own.map(name),ownBlocked:own.filter(e=>!hit(e)).map(name)}})()`);
+  const checkCover = (seen, tag) => {
+    assert.ok(seen.banner && seen.inView, tag + ': the banner shows inside the page');
+    assert.ok(seen.named >= 10, tag + ': the tabs, ribbon buttons, File and the tree are checked');
+    assert.deepEqual([seen.covered, seen.under, seen.ownBlocked], [[], [], []], tag + ': the banner covers no control and its own buttons are clickable');
+  };
+  for (const [width, w, h, mobile] of [[500, 1440, 900, false], [450, 390, 844, true]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width: w, height: h, deviceScaleFactor: 1, mobile}); await sleep(300);
+    await toGeometry(); await page.type('#shape-w', width); await sleep(300);
+    const before = await layoutBoxes();
+    await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical');
+    await page.until("!document.getElementById('job-panel').hidden", 'Q6 banner shown');
+    await page.eval('scrollTo(0,0)');
+    const running = await layoutBoxes(), runningCover = await bannerCover(), runningOwn = await withoutBanner();
+    await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'Q6 optical run', 120000);
+    await sleep(200); await page.eval('scrollTo(0,0)'); const done = await layoutBoxes(), doneCover = await bannerCover(), doneOwn = await withoutBanner();
+    await toGeometry(); await page.type('#shape-w', width + 2); await page.until("document.getElementById('job-panel').hidden", 'Q6 banner gone after an edit');
+    const after = await layoutBoxes(); await page.type('#shape-w', width); await sleep(200);
+    await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('optical-field')", 'Q6 back on Results');
+    stage('Q6 banner ' + w, {before, running, done, after, runningCover, doneCover, runningOwn, doneOwn});
+    assert.deepEqual([running, done, after].map(place), [before, before, before].map(place), `Q6 at ${w} × ${h}: no layout shift`);
+    if (!mobile) assert.deepEqual([running, done, after], [before, before, before], `Q6 at ${w} × ${h}: the same boxes`);
+    assert.deepEqual([runningOwn.hidden, doneOwn.hidden], [runningOwn.shown, doneOwn.shown], `Q6 at ${w} × ${h}: the banner itself moves and resizes nothing`);
+    checkCover(runningCover, `Q6 ${w} running`); checkCover(doneCover, `Q6 ${w} complete`);
+    assert.match(doneCover.message, /^Optical run complete\./);
+    assert.ok(await page.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth') <= 0, `Q6 at ${w}: no horizontal overflow`);
+  }
+  await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   const resultsNote = await text('#canvas'); assert.match(resultsNote, /Modes are ranked by effective index\. Compare matches them between runs by field overlap\./);
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare 500 → 450 nm');
   const matched = await compareTableRows(); stage('V17-M2 Compare 500 → 450 nm', matched);
