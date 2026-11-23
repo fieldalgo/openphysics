@@ -162,3 +162,8 @@ test('U9: the Compare pickers are named Run A and Run B, with the full run label
  assert.ok(app.includes("select.setAttribute('aria-label',side?'Run B':'Run A')"));
  assert.ok(app.includes("select.title=select.selectedOptions[0]?.textContent||''"));
 });
+test('U10: the toolbar Open… button is named by its visible text',()=>{
+ const html=read('workspace.html');
+ assert.ok(html.includes('title="Open a project, session or model file (Ctrl+O)" aria-label="Open…"'));
+ assert.ok(!html.includes('aria-label="Open"'));
+});

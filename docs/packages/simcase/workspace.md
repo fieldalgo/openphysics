@@ -75,7 +75,7 @@ opens the previous menu), Escape closes one level and returns focus, and Tab clo
 
 | Item | Shortcut | What it does |
 |---|---|---|
-| **Open…** | Ctrl+O (⌘O) | Opens a project file, a session file or a model file of any model. The ribbon's **Open…** and the Library's **Open file…** are the same. |
+| **Open…** | Ctrl+O (⌘O) | Opens a project file, a session file or a model file of any model. The ribbon's **Open…** (whose accessible name is its visible *Open…* since round 17; it was *Open*) and the Library's **Open file…** are the same. |
 | **Save** | Ctrl+S (⌘S) | Saves the [project file](#project-files): every model of the tab with its runs. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads again under the project file's name (the name chosen in Save As or Save, or the project file opened) without asking. With no project file it asks, as Save As does. The ribbon's **Save** is the same. |
 | **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the project file under a name you choose; it starts with the project file's name, else the project name's (`untitled-project.json` for an untitled project). |
 | **Export › Model file…** | | Downloads the model file of the model shown (inputs only), named after the model, for example `optical-waveguide.json`. |
