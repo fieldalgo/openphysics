@@ -66,11 +66,11 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 
 | 항목 | 단축키 | 하는 일 |
 |---|---|---|
-| **Open…** | Ctrl+O (⌘O) | 어느 모델의 세션 파일이든 모델 파일이든 엽니다. 리본의 **Open…**과 같습니다. |
-| **Save** | Ctrl+S (⌘S) | 세션 파일을 저장합니다. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 씁니다. Studio가 대신 내려받는 경우에는 모델의 현재 파일 이름(Save As나 Save에서 고른 이름, 또는 연 파일)으로 묻지 않고 다시 내려받습니다. 현재 파일이 없으면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
-| **Save As…** | Shift+Ctrl+S (⇧⌘S) | 고른 이름으로 세션 파일을 저장합니다. 현재 파일 이름으로 시작합니다. |
-| **Export › Model file…** | | 모델 이름을 딴 모델 파일(입력만)을 내려받습니다. 예: `optical-waveguide.json`. |
-| **Export › Model with runs (session file)…** | | Save As와 같습니다. |
+| **Open…** | Ctrl+O (⌘O) | 프로젝트 파일, 또는 어느 모델의 세션 파일이나 모델 파일을 엽니다. 리본의 **Open…**과 Library의 **Open file…**도 같습니다. |
+| **Save** | Ctrl+S (⌘S) | [프로젝트 파일](#프로젝트-파일)을 저장합니다: 탭의 모든 모델과 실행. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 씁니다. Studio가 대신 내려받는 경우에는 프로젝트 파일 이름(Save As나 Save에서 고른 이름, 또는 연 프로젝트 파일)으로 묻지 않고 다시 내려받습니다. 프로젝트 파일이 없으면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
+| **Save As…** | Shift+Ctrl+S (⇧⌘S) | 고른 이름으로 프로젝트 파일을 저장합니다. 프로젝트 파일 이름, 없으면 프로젝트 이름을 딴 이름(이름 없는 프로젝트는 `untitled-project.json`)으로 시작합니다. |
+| **Export › Model file…** | | 보이는 모델의 모델 파일(입력만)을 모델 이름으로 내려받습니다. 예: `optical-waveguide.json`. |
+| **Export › Model with runs (session file)…** | | 보이는 모델과 그 실행을 이전 Studio도 여는 세션 파일로 저장합니다. 늘 이름을 묻습니다. |
 | **Browser copy › Save browser draft**, **Restore browser draft** | | 광학 입력을 이 브라우저에만 보관하거나 되돌립니다. |
 | **Edit › Reset design** | | 모델을 기본 설계로 되돌립니다. |
 
@@ -78,22 +78,23 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 
 | 종류 | 담는 것 | 이름 | 만드는 명령 |
 |---|---|---|---|
-| 세션 파일 | 모델 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 Save As에서 고른 이름 | **File › Save**, **Save As…**, **Export › Model with runs (session file)…** |
+| 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
+| 세션 파일 | 한 모델의 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 고른 이름 | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | 모델 파일 | 모델 입력만: 실행도 계산 결과도 없음(광학, 정상 열, Joule 가열 입력, 버전 7 또는 8, 또는 다중물리 문서). | 모델 이름. 예: `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | 브라우저 초안 | 광학 입력, 이 브라우저에만(파일 아님). | — | **File › Browser copy › Save browser draft** |
 | 브라우저 복구 | 완료한 실행이 있는 최근 세션, 이 브라우저에만(파일 아님). | — | 자동([노트북 자동 복구](#노트북-자동-복구)) |
 
-같은 모델과 실행이면 두 파일의 내용은 File 메뉴 이전과 같고, 바뀐 것은 이름과 저장 방법뿐입니다.
-Messages는 입력만 담은 파일을 *model file*, 실행을 담은 파일을 *session file*이라고 부르며 project라고
-부르지 않습니다.
+같은 모델과 실행이면 세션 파일과 모델 파일은 프로젝트 파일 이전에 Studio가 쓰던 것과 바이트까지 같습니다.
+Messages는 입력만 담은 파일을 *model file*, 한 모델과 그 실행을 *session file*, 탭 전체의 파일을 *project
+file*이라고 부르며, 화면의 "project"는 그 파일만 뜻합니다.
 
 **Save As가 저장하는 곳.** 브라우저에 웹 페이지용 저장 대화상자(`showSaveFilePicker`, 보안
 컨텍스트에서만: `http://127.0.0.1`과 `http://localhost` 포함)가 있으면 Save As는 사용자의 클릭이나 키
 입력에서 바로 그 대화상자를 열고, 제안 이름(현재 파일이 있으면 그 이름)과 JSON 파일 형식 하나를 넘긴 뒤
 고른 파일에 씁니다. 대화상자는 브라우저가 Studio에 마지막으로 쓴 폴더(대화상자 `id` `openphysics-project`)에서,
-파일을 고른 뒤에는 현재 파일의 폴더에서 열립니다(`startIn`은 그때만 넘김). Studio는 쓴 파일을 기억하므로 다른 모델이나 파일을 열거나, 모델을
-바꾸거나, 설계를 초기화할 때까지 **Save**는 대화상자 없이 그 파일에 다시 씁니다. Chromium은 기억한 파일을
-쓰기가 끝나야 바꾸므로 Save의 쓰기가 실패하면 파일은 그대로이고 *Session not saved: … could not be written
+파일을 고른 뒤에는 현재 파일의 폴더에서 열립니다(`startIn`은 그때만 넘김). Studio는 쓴 파일을 기억하므로 파일이 프로젝트를 대신할 때까지 **Save**는 대화상자 없이 그 파일에
+다시 씁니다. Chromium은 기억한 파일을
+쓰기가 끝나야 바꾸므로 Save의 쓰기가 실패하면 파일은 그대로이고 *Project not saved: … could not be written
 (…); the file is unchanged.*가 나옵니다. 대화상자에서 방금 고른 파일은 브라우저가 이미 만들거나 비웠을 수
 있으므로 첫 쓰기가 실패하면 *…; the browser may have left it empty.*가 나옵니다. 대화상자를 닫으면 *Save As
 cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), 쓰기 뒤에는 *Saved to <name>*이 나옵니다. 그 밖의 경우(Firefox, Safari, 보안 컨텍스트가 아닌
@@ -105,11 +106,13 @@ cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), �
 없는 브라우저는 파일을 덮어쓸 수 없어 저장할 때마다 새 다운로드로 남깁니다. **Download**는 파일을
 브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
-Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 이름을 **File › Open…**으로 연 파일의 이름처럼
-모델의 **현재 파일**로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 묻지 않고 그 이름으로 다시 내려받으며
+Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 이름을 **File › Open…**으로 연 프로젝트 파일의
+이름처럼 프로젝트의 파일로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 묻지 않고 그 이름으로 다시 내려받으며
 (*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name it
-<name> (1).json.*), Save As도 그 이름으로 시작합니다. 다른 파일이나 모델을 열거나, 모델을 바꾸거나,
-**Reset design**을 하면 저장 대화상자에서 기억한 파일처럼 이 이름도 버립니다. **Export › Model file…**은 늘 내려받습니다.
+<name> (1).json.*), Save As도 그 이름으로 시작합니다. 파일이 프로젝트를 대신하면 저장 대화상자에서 기억한
+파일처럼 이 이름도 버립니다. 모델을 바꾸거나 **Reset design**을 해도 같은 프로젝트이므로 이름은 남습니다.
+**Export › Model with runs (session file)…**은 각 모델의 세션 파일 이름(연 세션 파일, 또는 거기서 고른 이름)에
+같은 규칙을 쓰고 늘 묻습니다. **Export › Model file…**은 늘 내려받습니다.
 
 저장 대화상자(`window.showSaveFilePicker`)의 브라우저 지원. 2026-11-23에
 [MDN browser-compat-data](https://github.com/mdn/browser-compat-data) 8.1.10(2026-11-19 데이터,
@@ -127,6 +130,99 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
 자동화되거나 헤드리스인 브라우저(`navigator.webdriver`)는 저장 대화상자를 보여 줄 수 없으므로 Studio가 입력한
 이름으로 파일을 내려받습니다. 이 데이터에서 API는 실험적(experimental)으로 표시됩니다. 자동 점검은 데스크톱 Chrome의 실제 대화상자를
 조작하지 않고 `showSaveFilePicker`를 그 경계에서 바꿔 넣습니다([개발 안내](../../development.md) 참고).
+
+## 프로젝트 파일
+
+**프로젝트 파일**은 Studio 탭의 모든 모델을 담으므로, 파일 하나로 광 도파로와 가열 실리콘 도파로를 실행과
+함께 되돌립니다. **File › Save**와 **Save As…**가 쓰고 **File › Open…**이 읽습니다. 프로젝트에는 작업 공간
+모델(광학, 정상 열 또는 Joule 가열 입력과 광학 실행)이 그 카드를 고르거나 작업 공간 파일을 연 때부터, 다중물리
+모델이 그것을 연 때부터 들어갑니다.
+
+**탭의 프로젝트.** 제목 표시줄은 저장 표시의 말로 프로젝트와 그 파일을 알립니다.
+
+- 브라우저의 저장 대화상자가 쓴 뒤: *Heater study · heater-study.json · saved 13:15*
+- 내려받은 뒤: *Heater study · heater-study.json · downloaded 13:15*, 제목 텍스트는 *Your browser may have
+  added “ (1)” to the file name.*
+- File › Open 뒤: *Heater study · heater-study.json · opened*
+- 모델이 바뀐 뒤: *Heater study · heater-study.json · changed since saved 13:15 · kept for recovery in this
+  browser*
+- 처음 저장하기 전: *Untitled project · not saved to a file · kept for recovery in this browser*
+
+"Changed"는 모든 모델의 입력, study 설정, 실행, 이름, 고정, 비교와 프로젝트 이름을 셉니다. 페이지, 보기,
+선택한 실행은 바뀜이 아닙니다. 바닥줄은 전처럼 보이는 모델의 저장 표시를 보여 줍니다. Library도 제목 줄에
+같은 줄을 보여 주고, **Rename**이 붙은 **Project name** 칸은 **Open file…** 줄 오른쪽에 있습니다(한 줄이라 카드와
+복원 제안이 첫 화면에 남음). 이름은 앞뒤 공백을 뺀 1–80자이고 제어 문자는 받지
+않습니다. 빈 이름은 이유를 말하며 거부하고 칸은 남은 이름을 보여 줍니다. 바꾼 이름은 다음 File › Save에
+쓰입니다. 이름 없는 프로젝트는 처음 저장할 때 고른 파일 이름에서 `.json`을 뺀 이름을 받습니다
+(`design-a-ng.json`이면 *design-a-ng*). Save As는 이름 있는 프로젝트의 이름을 바꾸지 않습니다.
+
+**모델 바꾸기.** 다른 카드를 골라도 모든 모델은 탭에 남습니다. 프로젝트에 있지만 보이지 않는 모델의 카드에는
+*In this project · N runs*가 나오고, 고르면 그 모델이 실행과 자체 Undo까지 두고 간 그대로 보입니다. 아무것도
+묻지 않습니다. 떠나기 질문은 파일이 프로젝트를 대신할 때만 나옵니다: *Replace Heater study? Optical waveguide (2
+runs) and Heated silicon waveguide (1 run) have runs in no file. Save project first to keep them.*, 단추는
+**Cancel**, **Save project, then open**, **Open without saving**.
+
+**저장.** 각 모델의 세션은 그 모델의 writer가 쓰므로 Studio가 그 모델에 쓰는 세션 파일과 같습니다. 세션
+파일의 16 MiB 질문은 모델마다 그 이름과 함께 나옵니다(예: *Heated silicon waveguide: Session is 22 MB; the
+limit is 16 MiB. Keep the maps…*). 파일 전체는 64 MiB 이하이며, 넘는 저장은 거부하고 내보낼 모델을 알립니다.
+예: *The project is 71 MB, over the 64 MiB limit. Export Heated silicon waveguide (22 MB) to its own file, or
+remove runs.* (16 MiB 이하 모델 두 개로는 지금 이 한계에 닿지 않습니다.) 알림은 하나이며 모든 모델을 말합니다:
+*Saved Heater study to heater-study.json: Optical waveguide (2 runs, the comparison) and Heated silicon
+waveguide (1 run, the without-heater result).* 또는 *Project file heater-study.json sent to your browser's
+Downloads: …*, 그 뒤에 field나 map 없이 남은 실행. 다른 모델의 실행이 파일에 없다는 말은 **Export › Model with
+runs (session file)…**에만 나옵니다.
+
+**열기.** File › Open은 모든 검사를 통과한 뒤에만 프로젝트 파일을 읽으며, 그 전에는 탭에서 아무것도 바뀌지
+않습니다. 하나라도 실패하면 *Project not opened: <이유> The current project is unchanged.*로 파일 전체를 거부하고,
+작업 공간, 실행, Undo는 그대로입니다. 검사 순서:
+
+1. 텍스트를 해석하기 전에 크기(64 MiB 이하), 그다음 올바른 JSON(맨 앞 byte order mark는 뺌)
+2. 바깥 구조: `format`, `version`(더 새 버전은 이름을 들어 거부: *This project file is version 2, newer than
+   this Studio reads (version 1). Open it in a newer Studio.*), 모르는 키 없음, 형식, id가 겹치지 않는 1–8개
+   모델, 작업 공간 모델은 많아야 하나, `active`가 그중 하나를 가리킴
+3. 모델마다 종류와 세션 버전, 파일에서 다시 만든 세션 텍스트의 크기와 SHA-256(*Heated silicon waveguide changed
+   after it was saved (its check value does not match).*), 그리고 세션 파일처럼 읽은 세션. 메시지마다 모델
+   제목이 앞에 붙음
+4. 다중물리 모델마다 Open session처럼 서버의 검사. 서버가 없으면 아무것도 열지 않음
+
+프로젝트에서 읽은 결과는 파일에서 온 것으로 표시되고(*Loaded from file, not recomputed. Results match the
+file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open으로 연 세션 파일이나 모델 파일은 전처럼 열리고
+그 모델 하나를 담은 이름 없는 프로젝트가 됩니다. 그 뒤 Save는 이름을 묻고 세션 파일의 이름 위에 프로젝트 파일을
+쓰지 않습니다. 이 브라우저에서 복원(Library 카드의 **Restore from this browser**)하면 프로젝트 안의 그 모델만
+바뀌며 프로젝트 파일은 정해지지 않습니다.
+
+**파일.** 키가 이 순서인 compact JSON 객체 하나입니다.
+
+```json
+{"format":"openphysics-studio-project","version":1,"name":"Heater study","savedAt":"2026-11-23T13:15:00.000Z","studio":"0.0.2","active":"m2","models":[
+ {"id":"m1","kind":"workspace","title":"Optical waveguide","card":"optical","bytes":7422,"digest":"sha256:…","session":{…}},
+ {"id":"m2","kind":"multiphysics","title":"Heated silicon waveguide","card":"heated-waveguide","bytes":396949,"digest":"sha256:…","session":{…}}]}
+```
+
+(여기서는 여러 줄로 보였지만 파일에는 줄바꿈이 없습니다.) `name`은 프로젝트 이름(1–80자, 파일 이름 아님)입니다.
+`savedAt`과 `studio`는 표시용입니다. `active`는 열 때 보일 모델의 id입니다. 모델마다 `id`(`m`과 숫자 1–3개, 저장해도
+유지), `kind`(`workspace`: 세션 reader가 읽는 버전 6, 7, 9의 광학 세션, `multiphysics`: 버전 8 세션, 이 Studio는
+탭에 하나, 버전 1 파일에는 7개까지), 표시용 `title`과 `card`(`optical`, `heat`, `joule`, `heated-waveguide`
+또는 `null`), 그리고 바뀌지 않은 `session`이 있습니다. 그 세션을 writer로 따로 쓰면 Studio가 쓰는 세션 파일과
+바이트까지 같습니다(버전 7은 `JSON.stringify`, 버전 8과 9는 음의 0을 `-0.0`으로 유지). `bytes`와 `digest`는 그
+텍스트의 UTF-8 길이와 `sha256:`입니다. 손상되거나 편집된 파일을 찾을 뿐 인증하지는 않으며, 버전 8과 9 안의 실행별
+digest도 마찬가지입니다. 모델 하나는 16 MiB 이하라서 모든 모델을 이전 Studio가 여는 세션 파일로 여전히 내보낼
+수 있습니다. 버전 1에 없는 것: 모델 사이의 비교, 정상 열과 Joule 가열 결과(입력은 작업 공간 모델에 있음), undo
+기록, provider 목록, 실패하거나 멈춘 실행. 브라우저 복구는 전처럼 모델마다 기록하며 프로젝트 전체를 복원하지
+않습니다.
+
+**이전 Studio.** 프로젝트 파일은 이 Studio나 더 새 Studio가 필요합니다. 이전 Studio는 자체 메시지(*Session open
+failed: Unsupported session format or run count. …*)로 거부하고 작업 공간을 그대로 둡니다. **File › Export › Model
+with runs (session file)…**은 이전 Studio도 여는 파일을 씁니다.
+
+**검사.** `tests/simcase/studio_project_file.cjs`는 형식을 검사합니다: −0.0, subnormal, 1e308, 2^31보다 큰
+정수가 든 파일의 저장, 열기, 다시 저장이 바이트까지 같음(V-P1), 각 항목의 크기와 SHA-256이 node:crypto와
+`tests/simcase/test_studio_project_file.py`의 Python hashlib와 같음(V-P2), 읽기 검사마다 그 메시지로 거부(V-P3),
+16 MiB와 64 MiB 한계의 ±1 바이트, 64 MiB는 해석 전(V-P6). `tools/studio_browser/studio_project_browser.mjs`는
+1440 × 900과 390 × 844에서 역할과 접근 가능한 이름으로 브라우저 단계를 밟습니다: 두 모델 실행, 프로젝트 이름
+*Heater study*와 제안 이름 `heater-study.json`으로 Save As, 서버 재시작과 새 브라우저 프로필, File › Open, 두 모델이 실행 없이 같은 값을 다시 읽음(V-P7,
+V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`에서 바꾼 저장 대화상자(V-P10), 손상된 파일
+세 개를 탭 그대로 거부(V-P3). `--old-python`을 주면 이전 Studio에서 파일을 여는 것(V-P9)도 봅니다.
 
 ## 첫 광학 해석
 
@@ -194,8 +290,9 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    짝지어진 모드마다 행 하나 *1 ↔ 1*(A mode 1 ↔ B mode 1)에 양쪽 편광, 겹침, A와 B의 n_eff, Δn_eff (B − A),
    A 대비 Δ %, A와 B의 A_eff, 흡수 손실, n_g가 나오고, 표 위 줄에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
    Compare) 소수 8자리입니다.
-6. 첫 번째 저장 버튼인 **Save**(**File › Save**, Ctrl+S)로 모델·보관 결과·보기 설정의 세션 파일을
-   저장합니다. 파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
+6. 첫 번째 저장 버튼인 **Save**(**File › Save**, Ctrl+S)는 탭의 모든 모델과 보관 결과·보기 설정을
+   [프로젝트 파일](#프로젝트-파일)로 저장합니다. 이 모델만은 **File › Export › Model with runs (session
+   file)…**이 세션 파일로 씁니다. 파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
    `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어가거나(Studio의 이름
    대화상자에서 이름을 바꿀 수 있음), 브라우저에 저장 대화상자가 있으면 거기서 고른 파일에 씁니다
    ([Save As가 저장하는 곳](#file-메뉴와-파일-종류)). Studio는 다운로드를 브라우저에 넘길 뿐 실제로
@@ -229,8 +326,8 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면의 **Continue where you left off** 카드에 **Restore from this browser: Last
    session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), 상자만 닫는 **Not now (choose a model
-   below)**가 나옵니다. **Open session file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳에 고정되어
-   있고, 세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
+   below)**가 나옵니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
+   있고, 프로젝트 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
    함께 있습니다. 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
    from this browser*로 부릅니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
    그때 고른 실행과 함께 엽니다. Studio가 페이지를 보관하기 전에 쓴 기록과, 페이지를 담지 않는 세션 파일을 열
@@ -557,21 +654,23 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   “Run N · 이름 · 시각” 목록, **Run name**(Enter로 고정), **Unpin this run**이 있습니다. 고정한
   실행은 남고, 새 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
   최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 여섯 개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
-- **파일.** **File › Save**는 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
+- **파일.** **File › Save**는 탭의 모든 모델을 [프로젝트 파일](#프로젝트-파일)에 씁니다.
+  **File › Export › Model with runs (session file)…**은 이 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
   `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,
   최대 40자, 아니면 `multiphysics`). 형식은
   [다중물리 모델의 세션 파일](#다중물리-모델의-세션-파일버전-8)에 있습니다. 탭에 Optical waveguide 실행도
-  있으면 저장 메시지가 그 실행은 이 파일에 없다고 밝힙니다: “The 2 Optical waveguide runs of this tab are
-  not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.” **File › Open…**은 이런
+  있으면 그 메시지가 그 실행은 이 파일에 없다고 밝힙니다: “The 2 Optical waveguide runs of this tab are
+  not in this file; File › Save keeps them with this model in one project file.” **File › Open…**은 이런
   파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
-  runs.”). **File › Export › Model file…**은 문서만 모델 이름을 딴 모델 파일로 씁니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
+  runs.”). **File › Export › Model file…**은 문서만 모델 이름을 딴 모델 파일로 씁니다. 바닥줄은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
   browser”, “heated-silicon-waveguide-session-….json · downloaded 10:15”, “Opened …”, “Recovered from
-  this browser”. 세션 파일에 없는 실행을 가진 모델을 떠나기 전(다른 모델 카드, 템플릿 다시 열기,
-  파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave this model? 3 runs are only in this tab and in
-  browser recovery. Save session first to keep them in a file.” 버튼은 **Cancel**, **Save session**,
+  this browser”. 제목 표시줄은 [프로젝트](#프로젝트-파일)를 알립니다. 다른 모델 카드를 골라도 이 모델은
+  프로젝트에 남습니다. 그러면 이 카드에 “In this project · N runs”가 나오고, 고르면 실행과 Undo까지 그대로
+  다시 보이며 아무것도 묻지 않습니다. 파일이 프로젝트를 대신할 때 파일에 없는 실행이 있으면 먼저 묻습니다
+  (“Replace … ? Heated silicon waveguide (3 runs) has runs in no file. Save project first to keep them.”).
+  파일에 없는 실행 위로 이 모델을 브라우저에서 복원하면 “Leave this model? 3 runs are only in this tab and in
+  browser recovery. Save session first to keep them in a file.”라고 묻고, 버튼은 **Cancel**, **Save session**,
   **Leave**입니다.
-  세션 파일에 없는 광 실행이 있을 때 다중물리 모델을 열면 같은 방식으로 그 실행을 밝히고 **Save
-  session, then continue**를 제안합니다. 그 실행은 탭에 남아 광 모델로 돌아오면 다시 보입니다.
   그래픽 하단은 형상의 길이 단위를 밝힙니다(“Lengths in µm; …”). 연 파일은
   서버가 먼저 읽으므로 중복 키나 JSON이 아닌 글은 이름을 밝혀 거부합니다. 저장한 파일은
   숫자를 가장 짧은 꼴로 씁니다. 스윕은 검사하되 이 화면은 한 점만 실행합니다.
