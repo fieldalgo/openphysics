@@ -219,12 +219,15 @@ try {
     }
     throw new Error('no download: ' + label);
   }
-  // named: the model has a current file (an opened file, or a name chosen before), so Save
-  // downloads under it with no name dialog (round 13, O1)
+  // P3: File › Save writes the project file; the session file of the model shown is File › Export ›
+  // Model with runs, which always asks for the name. named: the model has a current file (an
+  // opened file, or a name chosen before), which the name dialog offers (round 13, O1)
   async function saveSession(label, {named = false} = {}) {
-    const before = await listed(); await clearNotice(); await page.click('#save-session');
-    if (named) { for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, label + ': no name dialog'); await sleep(100); } }
-    else await confirmName(label);
+    const before = await listed(); await clearNotice(); await page.click('#menu-export-session');
+    await page.until("document.getElementById('save-name-dialog')?.open", label + ': name dialog');
+    const offered = await page.eval("document.getElementById('save-name-input').value");
+    if (named) assert.doesNotMatch(offered, /^heated-silicon-waveguide-session-/, label + ': the current file offered');
+    await page.click('#save-name-download');
     const file = await nextDownload(before, label);
     await page.until("/^Session file .* sent to your browser's Downloads: /.test(document.getElementById('file-status').textContent)", 'save notice ' + label);
     return file;
@@ -317,6 +320,11 @@ print(n)`;
   };
   // the template card: waits for the template's own notice (another model has the same tree)
   const openTemplate = async (on = page) => {
+    // P3: the card of a multiphysics model in the project shows that model, so a fresh template
+    // needs a fresh tab: the page is reloaded first (files and browser recovery keep the runs)
+    if (await on.eval("!!document.querySelector('#tree [data-mp-node]')||!!document.querySelector('[data-template=heated-waveguide] .card-project')")) {
+      await on.call('Page.reload'); await on.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page for a fresh template');
+    }
     await on.eval("document.getElementById('file-status').textContent=''");
     await on.click('[data-template=heated-waveguide]');
     const end = Date.now() + 60000;
@@ -478,9 +486,9 @@ print(n)`;
   const c1 = await saveSession('two runs');
   assert.match(await notice(), /the model, 2 runs and the without-heater result\.$/);
   await fetchReplies(c1.text);
-  await page.click('nav [data-page=Applications]');
+  // a fresh template in a fresh tab (P3: in this tab the card shows the model of the project)
+  await page.call('Page.reload'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page for a fresh template');
   await page.click('[data-template=heated-waveguide]');
-  // the runs are in a session file: no question
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)&&!document.getElementById('leave-confirm').open", 'a fresh template');
   // the open question names the runs that come back
   await runAndWait(1);
@@ -488,33 +496,39 @@ print(n)`;
   await runReady();
   await setFile('#session-file', c1.path);
   await page.until("document.getElementById('leave-confirm').open", 'leave question before the open');
-  assert.equal(await page.text('#leave-confirm-title'), 'Leave this model?');
-  assert.equal(await page.text('#leave-confirm-description'), '1 run is only in this tab and in browser recovery. Save session first to keep it in a file.');
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Cancel', 'Save session', 'Leave']);
+  // P3: a file replaces the project, and the question names the model whose run no file holds
+  assert.equal(await page.text('#leave-confirm-title'), 'Replace Untitled project?');
+  assert.equal(await page.text('#leave-confirm-description'), 'Heated silicon waveguide (1 run) has a run in no file. Save project first to keep it.');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Cancel', 'Save project, then open', 'Open without saving']);
   await page.click('#leave-stay');
-  await page.until("document.getElementById('file-status').textContent==='Kept the current model and its runs.'", 'kept');
+  await page.until("document.getElementById('file-status').textContent==='Kept the current project and its runs.'", 'kept');
   await openSession(c1.path);
   await page.clickTreeItemLike(/^Runs · \d of 6$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs back');
   const back = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(back[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)? · from file$/); assert.match(back[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)? · from file$/);
   const c2 = await saveSession('two runs again', {named: true});
-  // round 13 (O1): the opened file's name is the current file; Save As offers it, and Save after a
-  // Save As name downloads under that name again with no dialog, and the header names the file
-  assert.match(c2.name, /^\d\d-heated-silicon-waveguide-session-.*\.json$/, 'Save after Open keeps the opened name');
+  // round 13 (O1): the opened file's name is the model's current file, which Export offers
+  assert.match(c2.name, /^\d\d-heated-silicon-waveguide-session-.*\.json$/, 'Export after Open offers the opened name');
+  // P3: the project file follows the same rules. The session file opened made an untitled project:
+  // Save As offers untitled-project.json; the name given becomes the project's name; Save then
+  // downloads under it again with no dialog, and the title bar and the footer name the file
   { const before = await listed(); await clearNotice(); await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog')?.open", 'O1 Save As');
-    assert.equal(await page.eval("document.getElementById('save-name-input').value"), c2.name.replace(/ \(\d\)\.json$/, '.json'));
+    assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'untitled-project.json');
     await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='heated-design';})()"); await page.click('#save-name-download');
     const first = await nextDownload(before, 'O1 Save As'); assert.equal(first.name, 'heated-design.json');
-    assert.match(await page.text('#file-status'), /^Session file heated-design\.json sent to your browser's Downloads: /);
+    assert.match(await page.text('#file-status'), /^Project file heated-design\.json sent to your browser's Downloads: Heated silicon waveguide \(2 runs, the without-heater result\)\.$/);
     const again = await listed(); await clearNotice(); await page.click('#menu-save');
     for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'O1 Save: no name dialog'); await sleep(100); }
-    const second = await nextDownload(again, 'O1 Save'); const message = await page.text('#file-status'), footer = await page.text('#autosave-status');
-    stage('O1 multiphysics Save after Save As', {first: first.name, second: second.name, message, footer});
-    assert.match(second.name, /^heated-design(?: \(\d\))?\.json$/); assert.deepEqual(JSON.parse(second.text).runs.map(r => r.job), JSON.parse(first.text).runs.map(r => r.job), 'the same runs');
-    assert.match(message, /^Downloaded heated-design\.json again: the model, 2 runs.*A download cannot replace the earlier file, so your browser may name it heated-design \(1\)\.json\.$/);
+    const second = await nextDownload(again, 'O1 Save'); const message = await page.text('#file-status'), footer = await page.text('#autosave-status'), title = await page.text('#project');
+    stage('O1 multiphysics Save after Save As', {first: first.name, second: second.name, message, footer, title});
+    const sessionOf = text => JSON.parse(text).models.find(m => m.kind === 'multiphysics').session;
+    assert.match(second.name, /^heated-design(?: \(\d\))?\.json$/); assert.deepEqual(sessionOf(second.text).runs.map(r => r.job), sessionOf(first.text).runs.map(r => r.job), 'the same runs');
+    assert.equal(JSON.stringify(sessionOf(first.text)), JSON.stringify(JSON.parse(c2.text)), 'the project entry is the session file of the same state');
+    assert.match(message, /^Downloaded heated-design\.json again: Heated silicon waveguide \(2 runs, the without-heater result\)\. A download cannot replace the earlier file, so your browser may name it heated-design \(1\)\.json\.$/);
     assert.match(footer, /^heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
-    assert.equal(await page.eval("document.getElementById('autosave-status').title"), 'Your browser may have added “ (1)” to the file name.'); }
+    assert.match(title, /^heated-design · heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.'); }
   assert.equal(c2.text, c1.text, 'S1: the two-run file byte-identical');
   // the next run is numbered after the highest stored
   await runAndWait(3);
@@ -601,10 +615,13 @@ print(n)`;
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'heated card restored');
   assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
   // round 14 (Q3): the file the restored record still matched is the current file: Save As suggests it
-  await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog').open", 'Q3 Save As after a restore');
+  // (P3: the session file's name is the model's, which Export › Model with runs offers)
+  await page.click('#menu-export-session'); await page.until("document.getElementById('save-name-dialog').open", 'Q3 Save As after a restore');
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), r1Name, 'Q3 Save As prefill');
   await page.click('#save-name-cancel'); await page.until("!document.getElementById('save-name-dialog').open", 'Q3 Save As cancelled');
-  assert.equal(await page.text('#project'), `Multiphysics model / Recovered from this browser · same as file ${r1Name}`);
+  assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
+  // a per-card restore never makes a session file the project file (P3 D6)
+  assert.match(await page.text('#project'), /^Untitled project · not saved to a file · /);
 
   // S8: three earlier sessions, from four pages that each edited the model
   for (const power of ['3e14', '4e14', '5e14', '6e14']) {
@@ -678,7 +695,7 @@ print(n)`;
   // round 10 (K10): Save session of the heated model says the optical runs of the tab are not in its file
   const heatedWithOptical = await saveSession('heated with optical runs'); const savedWords = await notice();
   stage('K10 heated save with optical runs', {file: String(heatedWithOptical?.path ?? heatedWithOptical), savedWords});
-  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.'), savedWords);
+  assert.ok(savedWords.endsWith(' The 2 Optical waveguide runs of this tab are not in this file; File › Save keeps them with this model in one project file.'), savedWords);
   // round 10 (K7): the Library page has one phrase for browser recovery
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page K7');
   assert.doesNotMatch(await page.text('#canvas'), /Recover|\(this browser/);
@@ -698,7 +715,8 @@ print(n)`;
   for (const tab of ['Applications', 'Connections', 'Results', 'Model', 'Applications']) {
     await page.click(`nav [data-page=${tab}]`); await sleep(300);
     titles[tab] = {project: await page.text('#project'), footer: await page.text('#autosave-status')};
-    assert.equal(titles[tab].footer, openedTitle, tab); assert.ok(titles[tab].project.endsWith(' / ' + openedTitle), titles[tab].project);
+    // the title bar names the project: a session file opened makes an untitled one (P3)
+    assert.equal(titles[tab].footer, openedTitle, tab); assert.ok(titles[tab].project.startsWith('Untitled project · not saved to a file · '), titles[tab].project);
   }
   // R1: the Optical waveguide card offers the runs from browser recovery first, then Start new
   await page.until("!!document.getElementById('resume-optical')", 'optical resume offer');
@@ -748,9 +766,9 @@ print(n)`;
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
   await page.until("/kept for recovery in this browser without the maps of 5 runs · File › Save keeps them$/.test(document.getElementById('autosave-status').textContent)", 'recovery without five maps', 60000);
   const recoveryPartial = await page.text('#autosave-status');
-  // Save session asks; Cancel writes nothing
+  // Export › Model with runs asks; Cancel writes nothing
   const unchanged = await listed();
-  await clearNotice(); await page.click('#save-session');
+  await clearNotice(); await page.click('#menu-export-session');
   await page.until("document.getElementById('session-overflow').open", 'overflow question');
   const question = await page.text('#session-overflow-description');
   assert.match(question, /^Session is 2\d MB; the limit is 16 MiB\. Keep the maps of the selected and pinned runs only\? The other runs keep n_eff, the coupling check and the iteration history, but not their maps\.$/);
@@ -758,17 +776,25 @@ print(n)`;
   await page.click('#overflow-cancel');
   assert.equal(await notice(), 'Session not saved: nothing was written.');
   await sleep(1000); assert.deepEqual([...await listed()].filter(f => !unchanged.has(f)), [], 'Cancel writes nothing');
+  // P3 (V-P6): File › Save of the project asks the same question for this model, naming it
+  await clearNotice(); await page.click('#save-session');
+  await page.until("document.getElementById('session-overflow').open", 'project overflow question');
+  const projectQuestion = await page.text('#session-overflow-description');
+  assert.equal(projectQuestion, 'Heated silicon waveguide: ' + question);
+  await page.click('#overflow-cancel'); assert.equal(await notice(), 'Project not saved: nothing was written.');
+  await sleep(1000); assert.deepEqual([...await listed()].filter(f => !unchanged.has(f)), [], 'Cancel writes nothing');
   // Keep maps for selected and pinned runs: the file fits and says which runs keep values only
-  const before5 = await listed(); await clearNotice(); await page.click('#save-session');
+  const before5 = await listed(); await clearNotice(); await page.click('#menu-export-session');
   await page.until("document.getElementById('session-overflow').open", 'overflow question again');
-  // round 13 (O1): the model file opened above (variant-008.json) is the current file: no name dialog
-  await page.click('#overflow-keep'); for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'six 0.08 runs: no name dialog'); await sleep(100); }
+  // round 13 (O1): the model file opened above (variant-008.json) is the current file, which the name dialog offers
+  await page.click('#overflow-keep'); await page.until("document.getElementById('save-name-dialog')?.open", 'six 0.08 runs: name dialog');
+  assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'variant-008.json'); await page.click('#save-name-download');
   const big = await nextDownload(before5, 'six 0.08 runs'); assert.match(big.name, /^variant-008(?: \(\d\))?\.json$/);
-  await page.until("/keep values only, without maps\\. A download cannot replace the earlier file, so your browser may name it variant-008 \\(1\\)\\.json\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
+  await page.until("/keep values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
   assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024);
   assert.deepEqual(bigSession.runs.map(r => r.maps), ['not kept', 'not kept', 'not kept', 'not kept', 'not kept', 'kept']);
-  assert.match(bigNotice, /: the model, 6 runs and the without-heater result\. 5 runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) keep values only, without maps\. A download cannot replace the earlier file, so your browser may name it variant-008 \(1\)\.json\.$/);
+  assert.match(bigNotice, /^Session file variant-008\.json sent to your browser's Downloads: the model, 6 runs and the without-heater result\. 5 runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) keep values only, without maps\.$/);
   await fetchReplies(big.text);
   const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2, 3, 4, 5]}), python: comparePython(big.path)};
   // pinned runs: five pinned, with their maps, are over the limit together
@@ -788,7 +814,7 @@ print(n)`;
   // browser recovery writes nothing new and says so; the record before stays
   await page.until("/ · browser recovery unavailable: session over 16 MiB$/.test(document.getElementById('autosave-status').textContent)", 'recovery over the limit', 60000);
   const recoveryOver = await page.text('#autosave-status');
-  await clearNotice(); await page.click('#save-session');
+  await clearNotice(); await page.click('#menu-export-session');
   await page.until("/^Session not saved: /.test(document.getElementById('file-status').textContent)", 'refused by name');
   const refusal = await notice();
   assert.match(refusal, /^Session not saved: The selected and pinned runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) are 1\d MB with their maps, over the 16 MiB session limit\. Unpin some of them\.$/);

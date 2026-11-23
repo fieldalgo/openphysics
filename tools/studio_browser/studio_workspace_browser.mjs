@@ -205,13 +205,14 @@ try {
     }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
-  // P2: the Library's one "Open session file…" is at the top of the page, under no card, at
+  // P2: the Library's one "Open file…" (P3: it opens project files too, and the project's name
+  // sits at the right of its row) is at the top of the page, under no card, at
   // 1440 × 900 and on a 390 × 844 phone; back to 1280 × 800 after
   const libraryOpenFile = async tag => {
     for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
       await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
-      const seen = await page.eval("(()=>{const all=[...document.querySelectorAll('#canvas button')].filter(b=>/Open session file/.test(b.textContent)),b=all[0],r=b?.getBoundingClientRect(),first=document.querySelector('#canvas>*:not(.library-files)')?.getBoundingClientRect();return {count:all.length,id:b?.id,underCard:!!b?.closest('.card-slot,.resume-card,[data-template]'),above:!!(r&&first&&r.bottom<=first.top),left:Math.round(r?.left??-1),right:Math.round(r?.right??-1),width:innerWidth}})()");
-      stage('P2 one Open session file ' + tag, {width, height, ...seen});
+      const seen = await page.eval("(()=>{const all=[...document.querySelectorAll('#canvas button')].filter(b=>/^Open file…$/.test(b.textContent)),b=all[0],r=b?.getBoundingClientRect(),first=document.querySelector('#canvas>*:not(.library-files)')?.getBoundingClientRect();return {count:all.length,id:b?.id,underCard:!!b?.closest('.card-slot,.resume-card,[data-template]'),above:!!(r&&first&&r.bottom<=first.top),left:Math.round(r?.left??-1),right:Math.round(r?.right??-1),width:innerWidth}})()");
+      stage('P2 one Open file ' + tag, {width, height, ...seen});
       assert.deepEqual([seen.count, seen.id, seen.underCard, seen.above], [1, 'library-open-file', false, true], `${tag} at ${width} × ${height}`);
       assert.ok(seen.left >= 0 && seen.right <= seen.width, `${tag}: the button is inside the page at ${width}`);
     }
@@ -262,7 +263,7 @@ try {
   // before an application is chosen: a neutral status and no study steps
   assert.equal(startPage.status, 'Choose a model to start'); assert.equal(startPage.steps, 0);
   // one word for one thing on the start page: model
-  assert.equal(startPage.tab, 'Library'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Choose a model');
+  assert.equal(startPage.tab, 'Library'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Untitled project · no model chosen', 'P3: the Library is headed by the project line');
   assert.doesNotMatch(await text('#canvas'), /template|application/i, 'the start page says model');
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   // the chooser: a plain sentence about choosing, and Joule heating with its own card icon
@@ -274,13 +275,15 @@ try {
   assert.match(chooser, /The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here\./);
   assert.doesNotMatch(chooser, /Save model file keeps|Results stay in the tab|Existing thermal Studio views/);
   await libraryOpenFile('without offers');
-  assert.equal(await text('#file-status'), 'Choose a model to begin. File › Save keeps the inputs with the optical or multiphysics runs; heat and Joule heating results stay in this tab.');
+  assert.equal(await text('#file-status'), 'Choose a model to begin. File › Save keeps every model of this tab in one project file, with the optical and multiphysics runs; heat and Joule heating results stay in this tab.');
   const icons = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,getComputedStyle(b,'::before').content]))");
   stage('model card icons', icons); assert.notEqual(icons.joule, icons.optical); assert.equal(new Set(Object.values(icons)).size, Object.keys(icons).length);
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical template');
   // before any edit or run: a new model, and the dock and footer keep the words before a run
   const opticalSequence = () => page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent})");
-  assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / New model · not saved');
+  assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'New model · not saved');
+  // P3: the title bar names the project; an untitled one says it is in no file
+  assert.match(await page.eval("document.getElementById('project').textContent"), /^Untitled project · not saved to a file · /);
   assert.deepEqual(await opticalSequence(), {heading: 'Nothing is computed until you press Run', status: 'Optical adapter ready · explicit Run required'});
   // round 12 (N7; pre-registered): the page tabs are a tablist named Pages, Library first, the shown
   // page's tab selected and the one tab stop; Left, Right, Home and End move between them and open the page
@@ -338,7 +341,7 @@ try {
   assert.deepEqual(await page.eval("[...document.querySelectorAll('#tree [role=treeitem][tabindex=\"0\"]')].map(e=>e.dataset.node)"), ['Geometry']);
   await checkTree('optical after keys', opticalNodes);
   await page.type('#shape-w', 600);
-  assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / Unsaved inputs');
+  assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Unsaved inputs');
   // Messages says the edit and the Left x it moved, instead of keeping "Model ready…"
   assert.equal(await text('#file-status'), 'Width set to 600 nm. Left x moved to −300 nm to keep the centre. Run explicitly to compute new results.');
   await page.type('#shape-h', 300);
@@ -381,10 +384,10 @@ try {
   assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · solved from the current inputs', status: 'Run 1 · solved from the current inputs · press Run to solve again'});
   await noOverflow('optical results');
   // after a run of these inputs the Study step says so, and the title carries no revision counter
-  const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('project').textContent})");
+  const afterRun = await page.eval("({study:[...document.querySelectorAll('#workflow .workflow-step')][3]?.innerText.replace(/\\s+/g,' '),title:document.getElementById('autosave-status').textContent})");
   stage('first run complete', afterRun); assert.match(afterRun.study, /Run complete/); assert.doesNotMatch(afterRun.title, /Revision/);
   // one save indicator: before a file save it says which copy exists, and the footer repeats it
-  await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
+  await page.until("document.getElementById('autosave-status').textContent==='Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
   // n_eff with 8 decimals in the mode list as in the modes table; plot axes and the inspector in nm
   const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:document.querySelector('#modes-table-hint [data-group-index-hint]')?.textContent??null,headText:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),hintInTable:!!document.querySelector('#modes-table [data-group-index-hint]'),hintAbove:(()=>{const h=document.getElementById('modes-table-hint'),t=document.getElementById('modes-table');return !!h&&!!t&&h.nextElementSibling===t&&h.getBoundingClientRect().bottom<=t.getBoundingClientRect().top})(),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
@@ -553,33 +556,37 @@ try {
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again');
   await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
   assert.deepEqual(await pressedPage(), ['Compare']); assert.match(await text('.run-item[aria-pressed=true]'), /^Run 2 · 700/);
-  await page.click('#save-session'); await confirmName('first save');
+  // P3: File › Save writes the project file; the session file of this model is File › Export ›
+  // Model with runs, which this stage and the recovery stages after it check
+  await page.click('#menu-export-session'); await confirmName('first save');
   let sessionFile;
   for (let i = 0; i < 100 && !sessionFile; i++) { sessionFile = (await readdir(downloads)).find(f => f.endsWith('.json')); if (!sessionFile) await sleep(100); }
   assert.ok(sessionFile, 'Save session downloaded a file');
   const session = JSON.parse(await readFile(join(downloads, sessionFile), 'utf8'));
-  const savedHeader = await page.eval("document.getElementById('project').textContent"), savedMessage = await page.eval("document.getElementById('file-status').textContent");
+  const savedHeader = await page.eval("document.getElementById('autosave-status').textContent"), savedMessage = await page.eval("document.getElementById('file-status').textContent");
   stage('session saved', {file: sessionFile, runs: session.runs?.length, header: savedHeader, message: savedMessage});
   assert.equal(session.runs?.length, 2);
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to your browser's Downloads: `), savedMessage);
   assert.doesNotMatch(savedMessage, /have no run yet/, 'Q2: Run 2 has the current inputs');
   // round 14 (Q1): a download reads "<name> · downloaded <time>", with the " (1)" note as title text
-  const savedPrefix = `Optical waveguide / ${sessionFile} · downloaded `;
+  const savedPrefix = `${sessionFile} · downloaded `;
   assert.ok(savedHeader.startsWith(savedPrefix), savedHeader); assert.match(savedHeader.slice(savedPrefix.length), /^\d{1,2}:\d\d(?: [AP]M)?$/, savedHeader);
-  assert.deepEqual(await page.eval("[document.getElementById('project').title,document.getElementById('autosave-status').title]"), ['Your browser may have added “ (1)” to the file name.', 'Your browser may have added “ (1)” to the file name.']);
+  // the footer is the model's indicator; the title bar names the project, which no file holds yet
+  assert.deepEqual(await page.eval("[document.getElementById('project').hasAttribute('title'),document.getElementById('autosave-status').title]"), [false, 'Your browser may have added “ (1)” to the file name.']);
+  assert.match(await page.eval("document.getElementById('project').textContent"), /^Untitled project · not saved to a file · /);
   // the title names the file and that it was downloaded, never that it reached the disk
   assert.doesNotMatch(savedHeader, /disk/i, 'the title never claims the file reached the disk');
   // the footer repeats the title's save indicator and never says "pending"
   const savedFooter = await page.eval("document.getElementById('autosave-status').textContent");
-  assert.equal('Optical waveguide / ' + savedFooter, savedHeader); assert.doesNotMatch(savedFooter, /pending/i);
+  assert.equal(savedFooter, savedHeader); assert.doesNotMatch(savedFooter, /pending/i);
   // round 10 (K3): a page, a run or a mode chosen is not a change: the title still names the file
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('field-mode')", 'Results after save');
   await page.choose('#field-mode', '1'); await sleep(300);
-  const keptName = await page.eval("document.getElementById('project').textContent"); stage('K3 title after a mode change', {keptName});
-  assert.ok(keptName.startsWith(`Optical waveguide / ${sessionFile} · downloaded `), keptName);
+  const keptName = await page.eval("document.getElementById('autosave-status').textContent"); stage('K3 title after a mode change', {keptName});
+  assert.ok(keptName.startsWith(`${sessionFile} · downloaded `), keptName);
   await page.choose('#field-mode', '0'); await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare after save');
-  assert.ok((await page.eval("document.getElementById('project').textContent")).startsWith(`Optical waveguide / ${sessionFile} · downloaded `));
+  assert.ok((await page.eval("document.getElementById('autosave-status').textContent")).startsWith(`${sessionFile} · downloaded `));
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'browser recovery updated', 20000);
 
   // Restart with the page open: Run reconnects and asks to run again.
@@ -604,33 +611,33 @@ try {
   const card = await page.eval("(()=>{const r=document.getElementById('resume-optical').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
   stage('resume card', card); assert.ok(card.inView, 'the Optical waveguide resume offer inside the first viewport');
   // the routes back say which copy is durable
-  const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/Open session file/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
+  const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
   // the offer names the session file the record was last sent to
   // round 10 (K3, K7): one phrase for browser recovery, and the file the record still matched
   // round 11 (L9): the record is the same as the file, so the offer names the file's save time, not the record's
   assert.ok(routes.latest.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · same as file ' + sessionFile + ', saved '), routes.latest);
   assert.match(routes.latest, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
-  assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open session file…');
+  assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open file…');
   assert.deepEqual(routes.listed, [], 'the record the card resumes is not listed again above it'); assert.equal(routes.box, false);
-  assert.equal(routes.beside, false, 'Open session file is not under a card'); assert.equal(routes.top, true, 'Open session file is at the top of the Library'); assert.equal(routes.count, 1);
+  assert.equal(routes.beside, false, 'Open file is not under a card'); assert.equal(routes.top, true, 'Open file is at the top of the Library'); assert.equal(routes.count, 1);
   await libraryOpenFile('with a resume offer');
-  assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
+  assert.equal(routes.note, 'A project file is the copy that moves between computers; browser recovery stays in this browser.');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
   // a fresh page holds nothing an open would lose, so recovery asks nothing
   await page.click('#resume-optical'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
   await treeMarks('Compare after a restore');
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
-  const after = await delta(), recoveredHeader = await page.eval("document.getElementById('project').textContent");
+  const after = await delta(), recoveredHeader = await page.eval("document.getElementById('autosave-status').textContent");
   stage('comparison recovered', {deltaNeff: after, header: recoveredHeader}); assert.equal(after, before);
   // round 10 (K3): the record still matched the file it was sent to: the title says so
-  assert.equal(recoveredHeader, `Optical waveguide / Recovered from this browser · same as file ${sessionFile}`);
+  assert.equal(recoveredHeader, `Recovered from this browser · same as file ${sessionFile}`);
   // round 14 (Q3): the file the restored record still matched is the current file: Save As suggests it
-  await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog').open", 'Q3 Save As after a restore');
+  await page.click('#menu-export-session'); await page.until("document.getElementById('save-name-dialog').open", 'Q3 Save As after a restore');
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), sessionFile, 'Q3 Save As prefill');
   await page.click('#save-name-cancel'); await page.until("!document.getElementById('save-name-dialog').open", 'Q3 Save As cancelled');
-  assert.equal(await page.eval("document.getElementById('project').textContent"), `Optical waveguide / Recovered from this browser · same as file ${sessionFile}`, 'a cancelled Save As changes nothing');
+  assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), `Recovered from this browser · same as file ${sessionFile}`, 'a cancelled Save As changes nothing');
   // the recovered run is current, and the dock and footer say where it came from
   const recoveredSequence = await opticalSequence(); stage('recovered sequence', recoveredSequence);
   assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · press Run to compute it here'});
@@ -639,7 +646,7 @@ try {
   await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list');
   await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Pinned · Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/600 × 300 nm/.test(document.querySelector('#canvas p')?.textContent||'')", 'older run shown');
-  const viewed = await page.eval("({step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),result:document.querySelector('#canvas p').textContent,inputs:[...document.querySelectorAll('#inspector .pair')].find(p=>p.firstElementChild?.textContent==='Inputs')?.lastElementChild.textContent,header:document.getElementById('project').textContent})");
+  const viewed = await page.eval("({step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),result:document.querySelector('#canvas p').textContent,inputs:[...document.querySelectorAll('#inspector .pair')].find(p=>p.firstElementChild?.textContent==='Inputs')?.lastElementChild.textContent,header:document.getElementById('autosave-status').textContent})");
   stage('older run viewed', viewed);
   assert.equal(viewed.step, '5. Results Current inputs differ from this run');
   // round 9 (J4): the line under the heading names each difference once
@@ -672,7 +679,7 @@ try {
   // round 11 (L3): on the Model tab the title describes the current inputs only, and the Study
   // settings say which geometry the next run uses
   await page.click('nav [data-page=Model]'); await sleep(200);
-  assert.doesNotMatch(await page.eval("document.getElementById('project').textContent"), /viewing/);
+  assert.doesNotMatch(await page.eval("document.getElementById('autosave-status').textContent"), /viewing/);
   await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'L3 study settings');
   assert.match(await text('#next-run-inputs'), /^Next run uses 700 × 300 nm · Silicon · λ 1550 nm · /);
   // Use this run's inputs: run 1's inputs become the current ones at once (no question: the runs
@@ -681,7 +688,7 @@ try {
   assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes them back\.$/);
   const useSlot = await page.eval("document.getElementById('restore-run-input').parentElement.id||document.getElementById('restore-run-input').parentElement.className");
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')&&/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'L3 inputs used');
-  const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
+  const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('autosave-status').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
   // round 13 (O5): only the settings that change, from → to (Width 700 → 600 nm keeps the centre, so Left x moves too)
@@ -700,13 +707,13 @@ try {
   assert.match(await text('#next-run-inputs'), /^Next run uses 700 × 300 nm · Silicon · /, 'Undo takes the run\'s inputs back');
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 back on Results');
   assert.equal(await usedNote(), null, 'Q4: the next input edit (Undo) ends the change list');
-  assert.match(await page.eval("document.getElementById('project').textContent"), / · viewing Run 1 · design A \(other inputs\)$/);
+  assert.match(await page.eval("document.getElementById('autosave-status').textContent"), / · viewing Run 1 · design A \(other inputs\)$/);
   assert.match(await text('.run-item[aria-pressed=true]'), /^Pinned · Run 1 · design A · /);
   // a name applied on leaving the field (change, no redraw) reaches the dock, the footer and the title too
   // the name is passed as an argument to a fixed function, so no page code is built from it
   const renameOnBlur = name => page.onElement("function(name){const e=this.getElementById('run-name-input');e.value=name;e.dispatchEvent(new Event('change'));return true}", name);
   await renameOnBlur('design A2'); await sleep(200);
-  const blurNamed = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,header:document.getElementById('project').textContent})");
+  const blurNamed = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,header:document.getElementById('autosave-status').textContent})");
   stage('renamed on blur', blurNamed);
   for (const t of Object.values(blurNamed)) assert.match(t, /Run 1 · design A2\b/);
   await renameOnBlur('design A'); await sleep(200); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/);
@@ -720,28 +727,28 @@ try {
   }
   await noOverflow('older run viewed');
   // round 10 (K3): a run chosen on Results is not a change: the recovered title still names the file
-  assert.ok(viewed.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), viewed.header);
+  assert.ok(viewed.header.startsWith(`Recovered from this browser · same as file ${sessionFile}`), viewed.header);
   // round 10 (K6): restoring opens the page shown when the record was written (Results, Run 1), not Compare or the newest run
   // the stored record names the page shown and the run selected (read back from browser storage)
   await page.until("import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();const d=JSON.parse(r.session);return r.page==='Results'&&d.selected===d.runs[0].job;})", 'recovery of the Results page', 20000);
   await page.call('Page.reload'); await page.until("!!document.querySelector('#resume-optical')", 'resume offer after Results');
   await page.click('#resume-optical'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
-  const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('project').textContent})");
+  const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('autosave-status').textContent})");
   stage('K6 restored on Results', restored);
   assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
-  assert.ok(restored.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), restored.header);
+  assert.ok(restored.header.startsWith(`Recovered from this browser · same as file ${sessionFile}`), restored.header);
   // round 10 (K3): a change of the model or a run ends "same as file". Since round 14 (Q3) the
   // file the record matched is the current file, so an input edit and a run renamed both read
   // "<file> · changed since restored"; the same content again names the file again
-  const header = () => page.eval("document.getElementById('project').textContent");
+  const header = () => page.eval("document.getElementById('autosave-status').textContent");
   await toGeometry(); await page.type('#shape-w', 750);
-  const editedHeader = await header(); stage('K3 after an input edit', {editedHeader}); assert.equal(editedHeader, `Optical waveguide / ${sessionFile} · changed since restored`);
-  await page.type('#shape-w', 700); assert.ok((await header()).startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), await header());
+  const editedHeader = await header(); stage('K3 after an input edit', {editedHeader}); assert.equal(editedHeader, `${sessionFile} · changed since restored`);
+  await page.type('#shape-w', 700); assert.ok((await header()).startsWith(`Recovered from this browser · same as file ${sessionFile}`), await header());
   await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list again');
   await renameOnBlur('design A3'); await sleep(300);
   const renamedHeader = await header(); stage('K3 after a run renamed', {renamedHeader});
-  assert.ok(renamedHeader.startsWith(`Optical waveguide / ${sessionFile} · changed since restored · `), renamedHeader);
-  await renameOnBlur('design A'); await sleep(300); assert.ok((await header()).startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), await header());
+  assert.ok(renamedHeader.startsWith(`${sessionFile} · changed since restored · `), renamedHeader);
+  await renameOnBlur('design A'); await sleep(300); assert.ok((await header()).startsWith(`Recovered from this browser · same as file ${sessionFile}`), await header());
   // the newer run viewed: every place says it is the result of the current inputs
   await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/^Result for the current inputs/.test(document.querySelector('#canvas p')?.textContent||'')", 'newer run shown');
@@ -750,7 +757,7 @@ try {
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'models page');
   await page.click('[data-template=heated-waveguide]');
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'heated model', 30000);
-  const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('project').textContent")});
+  const switched = await text('#file-status'); stage('switched to the heated model', {message: switched, header: await page.eval("document.getElementById('autosave-status').textContent")});
   // round 9 (J7): one short line, the rest behind More
   const switchedParts = await page.eval("({line:[...document.getElementById('file-status').childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim(),summary:document.querySelector('#file-status details.message-more>summary')?.textContent,more:document.querySelector('#file-status .message-more-text')?.textContent})");
   stage('switch message parts', switchedParts);
@@ -1179,7 +1186,8 @@ try {
   // the downloads as {name: modification time}: a save in the same minute may reuse a file name
   const listDownloads = async () => Object.fromEntries(await Promise.all((await readdir(downloads)).filter(n => n.endsWith('.json')).map(async n => [n, (await stat(join(downloads, n))).mtimeMs])));
   const newDownload = async before => { for (let i = 0; i < 300; i++) { const now = await listDownloads(), f = Object.keys(now).find(n => before[n] !== now[n]); if (f) { await sleep(500); return f; } await sleep(100); } throw new Error('no new download: ' + await text('#file-status')); };
-  let listed = await listDownloads(); await page.click('#save-session'); await confirmName('V17 save');
+  // (P3: the session file is File › Export › Model with runs; File › Save writes the project file)
+  let listed = await listDownloads(); await page.click('#menu-export-session'); await confirmName('V17 save');
   const v9File = await newDownload(listed), v9Text = await readFile(join(downloads, v9File), 'utf8'), v9 = JSON.parse(v9Text);
   stage('V17 version 9 saved', {file: v9File, bytes: Buffer.byteLength(v9Text), version: v9.version, counts: v9.runs.map(r => [r.settings.mode_count, Array.isArray(r.effective_index) ? r.effective_index.length : r.effective_index.re.length])});
   assert.equal(v9.version, 9); assert.equal(v9.application, 'optical');
@@ -1201,16 +1209,21 @@ try {
   await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Restore sets Modes to find');
   // M4-e: five more wide runs (6 kept: the newest unpinned replace the oldest) are over 16 MiB
   for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); }
-  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question');
+  await page.click('#menu-export-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question');
   const question = await page.eval("({text:document.getElementById('session-overflow-description').textContent,buttons:[...document.querySelectorAll('#session-overflow button')].map(b=>b.textContent)})");
   stage('M4-e overflow question', question);
   assert.match(question.text, /^Session is \d\d MB; the limit is 16 MiB\. Keep the fields of the selected and pinned runs only\? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields\.$/);
   assert.deepEqual(question.buttons, ['Cancel', 'Keep fields for selected and pinned runs']);
   listed = await listDownloads(); await page.click('#overflow-cancel'); await sleep(500);
   assert.match(await text('#file-status'), /^Session not saved: nothing was written\./); assert.deepEqual(await listDownloads(), listed, 'Cancel writes nothing');
-  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question again');
-  // round 13 (O1): the file opened above is the current file, so Save downloads under its name with no dialog
-  await page.click('#overflow-keep'); for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'M4-e: no name dialog'); await sleep(100); }
+  // P3 (V-P6): File › Save of the project asks the same question, naming the model
+  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e project overflow question');
+  assert.equal(await page.eval("document.getElementById('session-overflow-description').textContent"), 'Optical waveguide: ' + question.text);
+  await page.click('#overflow-cancel'); await sleep(300); assert.equal(await text('#file-status'), 'Project not saved: nothing was written.'); assert.deepEqual(await listDownloads(), listed, 'Cancel writes nothing');
+  await page.click('#menu-export-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question again');
+  // round 13 (O1): the file opened above is the current file, which the name dialog offers
+  await page.click('#overflow-keep'); await page.until("document.getElementById('save-name-dialog')?.open", 'M4-e name dialog');
+  assert.equal(await page.eval("document.getElementById('save-name-input').value"), v9File); await page.click('#save-name-download');
   const reducedFile = await newDownload(listed), reduced = JSON.parse(await readFile(join(downloads, reducedFile), 'utf8'));
   { const stem = v9File.replace(/\.json$/, ''); // the opened name, or the browser's "name (1).json" (compared as text, no regex built from it)
     assert.ok(reducedFile === v9File || (reducedFile.startsWith(stem + ' (') && /^ \(\d+\)\.json$/.test(reducedFile.slice(stem.length))), 'the reduced session keeps the opened file name: ' + reducedFile); }
@@ -1332,8 +1345,10 @@ try {
     await toNode('Study'); const opened = await study(); stage('P1 reopened ' + name, opened); assert.deepEqual(opened, expected);
   }
   // a session of these inputs holds them as an input of version 8
-  // round 13 (O1): the model file opened last is the current file: Save downloads under its name, no dialog
-  const p1Before = await listDownloads(); await page.click('#save-session');
+  // round 13 (O1): the model file opened last is the current file, which Export › Model with runs offers
+  const p1Before = await listDownloads(); await page.click('#menu-export-session');
+  await page.until("document.getElementById('save-name-dialog')?.open", 'P1 export name dialog');
+  assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'p1-four.json'); await page.click('#save-name-download');
   const p1Name = await newDownload(p1Before), p1Session = JSON.parse(await readFile(join(downloads, p1Name), 'utf8'));
   assert.match(p1Name, /^p1-four(?: \(\d\))?\.json$/); assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false);
   stage('P1 session input', {version: p1Session.version, input: p1Session.input.version, modeCount: p1Session.input.model.modeCount});
@@ -1428,7 +1443,8 @@ try {
     await page.until("document.getElementById('save-name-dialog').open", 'F2 Save name dialog');
     const saveDialog = await page.eval("({title:document.getElementById('save-name-title').textContent,name:document.getElementById('save-name-input').value,note:document.getElementById('save-name-note').textContent,unavailable:document.getElementById('save-name-unavailable').hidden,buttons:[...document.querySelectorAll('#save-name-dialog button')].map(b=>b.textContent),label:document.querySelector('#save-name-dialog label').textContent})");
     stage('F2 Save dialog', saveDialog);
-    assert.equal(saveDialog.title, 'Save'); assert.match(saveDialog.name, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/); assert.equal(saveDialog.label, 'File name');
+    // P3: Save writes the project file; an untitled project suggests untitled-project.json, never a model file's name
+    assert.equal(saveDialog.title, 'Save'); assert.equal(saveDialog.name, 'untitled-project.json'); assert.equal(saveDialog.label, 'File name');
     assert.equal(saveDialog.note, 'Your browser saves to its Downloads folder, or asks where if you set it to. If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
     assert.deepEqual(saveDialog.buttons, ['Cancel', 'Download']); assert.equal(saveDialog.unavailable, true);
     await page.click('#save-name-cancel'); await sleep(400);
@@ -1444,8 +1460,11 @@ try {
     const fallbackMessage = await status();
     stage('F2 name dialog download', {typed, file: fallbackName, message: fallbackMessage, bytes: Buffer.byteLength(fallbackText)});
     assert.equal(typed, 'my runx'); assert.equal(fallbackName, 'my runx.json');
-    assert.match(fallbackMessage, /^Session file my runx\.json sent to your browser's Downloads: current inputs, \d+ runs and the comparison\./);
-    assert.doesNotMatch(fallbackMessage, /^Saved to/);
+    assert.match(fallbackMessage, /^Project file my runx\.json sent to your browser's Downloads: Optical waveguide \(\d+ runs, the comparison\)/);
+    assert.doesNotMatch(fallbackMessage, /^Saved /); assert.doesNotMatch(fallbackMessage, /not in this file/);
+    // an untitled project takes the file's stem as its name on its first save (P3)
+    assert.match(await page.eval("document.getElementById('project').textContent"), /^my runx · my runx\.json · downloaded /);
+    assert.equal(JSON.parse(fallbackText).name, 'my runx'); assert.equal(JSON.parse(fallbackText).format, 'openphysics-studio-project');
     // F5 (C1(f)): an automated browser (navigator.webdriver true, as Playwright and WebDriver set it;
     // this harness's Chrome, started with --headless=new over DevTools, reports false, so the value
     // is set at that boundary): with a picker stub that throws if called, Save As asks for a name
@@ -1470,24 +1489,26 @@ try {
         const name='chosen.json';return {kind:'file',name,createWritable:async()=>{let buffer='';return {write:async t=>{if(p.failWrite)throw new DOMException('Disk full','QuotaExceededError');buffer+=t;},close:async()=>{p.files[name]=buffer;p.writes++;},abort:async()=>{p.aborts++;}};}};};})()`);
     const picker = () => page.eval("JSON.parse(JSON.stringify({calls:window.__picker.calls,writes:window.__picker.writes,aborts:window.__picker.aborts,content:window.__picker.files['chosen.json']}))");
     before = await listDownloads();
-    await key('s', ['Control', 'Shift']); await page.until("/^Saved to /.test(document.getElementById('file-status').textContent)", 'F3 Save As');
+    await key('s', ['Control', 'Shift']); await page.until("/^Saved my runx to /.test(document.getElementById('file-status').textContent)", 'F3 Save As');
     let p3 = await picker(); const saveAsMessage = await status();
     stage('F3 Save As', {calls: p3.calls, writes: p3.writes, message: saveAsMessage});
     assert.equal(p3.calls.length, 1); assert.equal(p3.writes, 1);
     // round 13 (F3): no startIn before a file is chosen, so the id alone restores the last folder;
     // (O1) the suggested name is the current file's, my runx.json from F2
-    assert.deepEqual({...p3.calls[0], suggestedName: undefined}, {suggestedName: undefined, types: [{description: 'OpenPhysics session file (JSON)', accept: {'application/json': ['.json']}}], id: 'openphysics-project'});
+    assert.deepEqual({...p3.calls[0], suggestedName: undefined}, {suggestedName: undefined, types: [{description: 'OpenPhysics project file (JSON)', accept: {'application/json': ['.json']}}], id: 'openphysics-project'});
     assert.equal('startIn' in p3.calls[0], false); assert.equal(p3.calls[0].suggestedName, 'my runx.json');
-    assert.equal(p3.content, fallbackText, 'the picker file has the bytes of the download of the same state');
-    assert.match(saveAsMessage, /^Saved to chosen\.json: current inputs, \d+ runs and the comparison\./);
+    // the save time is for display only and in no digest: every other byte is the download's
+    const withoutTime = t => String(t).replace(/"savedAt":"[^"]*"/, '"savedAt":""');
+    assert.equal(withoutTime(p3.content), withoutTime(fallbackText), 'the picker file has the bytes of the download of the same state');
+    assert.match(saveAsMessage, /^Saved my runx to chosen\.json: Optical waveguide \(\d+ runs, the comparison\)/);
     assert.deepEqual(await listDownloads(), before, 'a picker save downloads nothing');
-    assert.match(await page.eval("document.getElementById('project').textContent"), /^Optical waveguide \/ chosen\.json · saved [^(]+$/, 'the header names the file written, not as a download');
+    assert.match(await page.eval("document.getElementById('project').textContent"), /^my runx · chosen\.json · saved [^(]+$/, 'the header names the file written, not as a download');
     assert.equal(await page.eval("document.getElementById('project').hasAttribute('title')"), false, 'no (1) title text on the picker path');
     // Save: the same file again, no dialog
     await page.eval("document.getElementById('file-status').textContent=''");
-    await page.click('#menu-save'); await page.until("/^Saved to chosen\\.json/.test(document.getElementById('file-status').textContent)", 'F3 Save');
+    await page.click('#menu-save'); await page.until("/^Saved my runx to chosen\\.json/.test(document.getElementById('file-status').textContent)", 'F3 Save');
     p3 = await picker(); stage('F3 Save again', {calls: p3.calls.length, writes: p3.writes});
-    assert.equal(p3.calls.length, 1, 'Save asks nothing'); assert.equal(p3.writes, 2); assert.equal(p3.content, fallbackText);
+    assert.equal(p3.calls.length, 1, 'Save asks nothing'); assert.equal(p3.writes, 2); assert.equal(withoutTime(p3.content), withoutTime(fallbackText));
     // a cancel writes nothing and says so
     await page.eval("window.__picker.mode='abort'"); await key('s', ['Control', 'Shift']); await sleep(400);
     p3 = await picker(); stage('F3 cancel', {calls: p3.calls.length, writes: p3.writes, message: await status()});
@@ -1496,7 +1517,7 @@ try {
     await page.eval("window.__picker.mode='ok';window.__picker.files['chosen.json']='OLD CONTENT';window.__picker.failWrite=true");
     await key('s', ['Control']); await sleep(400);
     p3 = await picker(); const failMessage = await status(); stage('F3 failed write', {writes: p3.writes, aborts: p3.aborts, content: p3.content, message: failMessage});
-    assert.equal(failMessage, 'Session not saved: chosen.json could not be written (Disk full); the file is unchanged.');
+    assert.equal(failMessage, 'Project not saved: chosen.json could not be written (Disk full); the file is unchanged.');
     assert.equal(p3.content, 'OLD CONTENT'); assert.equal(p3.aborts, 1); assert.equal(p3.writes, 2);
     // F4: a picker that refuses falls back to the name dialog, which says so
     await page.eval("window.__picker.failWrite=false;window.__picker.mode='deny'"); before = await listDownloads();
@@ -1505,14 +1526,14 @@ try {
     stage('F4 picker refused', {refused});
     assert.equal(refused, "The browser's save dialog was not available (Not allowed in this browser.), so the file is downloaded instead.");
     await page.click('#save-name-download'); const f4Name = await newDownload(before);
-    assert.match(f4Name, /^chosen\.json$|^optical-waveguide-session-/); assert.match(await status(), /sent to your browser's Downloads/);
+    assert.match(f4Name, /^chosen\.json$/); assert.match(await status(), /sent to your browser's Downloads/);
     await page.eval("delete window.showSaveFilePicker");
     // round 13 (O1; pre-registered): with no picker, Save remembers the Save As name. Save and
     // Ctrl+S download under it again with no dialog; the header names the file and its state; File ›
     // Open sets the name to the opened file's; Reset design drops it, so Save asks again
     const header = () => page.eval("document.getElementById('project').textContent");
     const noDialog = async label => { for (let i = 0; i < 10; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, label + ': no name dialog'); await sleep(100); } };
-    const savedWidth = name => readFile(join(downloads, name), 'utf8').then(t => JSON.parse(t).input.model.shapes[0].w);
+    const savedWidth = name => readFile(join(downloads, name), 'utf8').then(t => JSON.parse(t).models.find(m => m.kind === 'workspace').session.input.model.shapes[0].w);
     before = await listDownloads();
     await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'O1 Save As');
     // round 14 (Q1): the Save As name dialog says later saves download again under this name; round 15 (R1):
@@ -1520,19 +1541,20 @@ try {
     assert.equal(await page.eval("document.getElementById('save-name-note').textContent"), 'Your browser saves to its Downloads folder, or asks where if you set it to. Later saves download again under this name; your browser may add “ (1)”. Chrome and Edge save to the same file.');
     await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='';i.focus();})()"); await page.call('Input.insertText', {text: 'design-a-ng'});
     await page.click('#save-name-download'); const o1First = await newDownload(before), o1FirstMessage = await status();
-    assert.equal(o1First, 'design-a-ng.json'); assert.match(o1FirstMessage, /^Session file design-a-ng\.json sent to your browser's Downloads: /, 'the first download says where it went');
-    assert.match(await header(), /^Optical waveguide \/ design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.equal(o1First, 'design-a-ng.json'); assert.match(o1FirstMessage, /^Project file design-a-ng\.json sent to your browser's Downloads: /, 'the first download says where it went');
+    // Save As does not rename a named project (P3)
+    assert.match(await header(), /^my runx · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.');
     await toGeometry(); await page.type('#shape-w', 650); await sleep(300);
-    const o1Edited = await header(); assert.equal(o1Edited, 'Optical waveguide / design-a-ng.json · changed since downloaded');
+    const o1Edited = await header(); assert.match(o1Edited, /^my runx · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.');
     before = await listDownloads(); await page.click('nav [data-page=Model]'); await page.click('#menu-save');
     await noDialog('O1 Save'); const o1Second = await newDownload(before), o1SecondMessage = await status(), o1SecondHeader = await header();
     stage('O1 Save under the Save As name', {first: o1First, edited: o1Edited, second: o1Second, message: o1SecondMessage, header: o1SecondHeader});
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
-    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: current inputs, \d+ runs? and the comparison\.(?: Fields not kept for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
-    assert.match(o1SecondHeader, /^Optical waveguide \/ design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
+    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
+    assert.match(o1SecondHeader, /^my runx · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
     // Ctrl+S after another edit: the same, no dialog
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
     await page.eval("document.activeElement?.blur()"); await key('s', ['Control']); await noDialog('O1 Ctrl+S');
@@ -1540,21 +1562,23 @@ try {
     // Save As is prefilled with the current name; Cancel writes nothing
     await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'O1 Save As again');
     assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'design-a-ng.json'); await page.click('#save-name-cancel'); await sleep(300);
-    // File › Open of that file: the name is the opened file's; an edit and Save keep it, with no dialog
+    // File › Open of that project file: the name is the opened file's; an edit and Save keep it, with no dialog
     await page.eval("document.getElementById('autosave-status').textContent=''");
     await setFile('#session-file', join(downloads, o1First));
     await answerDialogs("/^Opened design-a-ng\\.json/.test(document.getElementById('autosave-status').textContent)", 'O1 open');
-    await page.click('nav [data-page=Model]'); await sleep(200); const o1Opened = await header(); assert.equal(o1Opened, 'Optical waveguide / Opened design-a-ng.json');
+    await page.click('nav [data-page=Model]'); await sleep(200); const o1Opened = await header(); assert.equal(o1Opened, 'my runx · design-a-ng.json · opened');
+    assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Opened design-a-ng.json');
     await toGeometry(); await page.type('#shape-w', 640); await sleep(300);
-    const o1OpenedEdited = await header(); assert.equal(o1OpenedEdited, 'Optical waveguide / design-a-ng.json · changed since opened');
+    const o1OpenedEdited = await header(); assert.match(o1OpenedEdited, /^my runx · design-a-ng\.json · changed since opened · /);
     before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after Open');
     const o1Fourth = await newDownload(before); assert.match(o1Fourth, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Fourth), 640);
-    assert.match(await status(), /^Session file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
-    // Reset design drops the name: the header no longer names it and Save asks, with the model-based name
+    assert.match(await status(), /^Project file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
+    // P3 (intended change): Reset design edits a model of the project, so the project file is
+    // kept: the header still names it, changed, and Save downloads under it with no dialog
     await page.click('#reset'); await sleep(300); const o1Reset = await header();
-    assert.doesNotMatch(o1Reset, /design-a-ng/); assert.match(o1Reset, /^[A-Za-z ]+ \/ (?:Unsaved inputs|No unsaved input changes|Changed since session file .*|Not saved to a file.*)$/);
-    await page.click('#menu-save'); await page.until("document.getElementById('save-name-dialog').open", 'O1 Save after reset');
-    assert.match(await page.eval("document.getElementById('save-name-input').value"), /^[a-z-]+-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/); await page.click('#save-name-cancel'); await sleep(300);
+    assert.match(o1Reset, /^my runx · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
+    before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after reset');
+    assert.match(await newDownload(before), /^design-a-ng(?: \(\d\))?\.json$/);
     stage('O1 open and reset', {opened: o1Opened, openedEdited: o1OpenedEdited, fourth: o1Fourth, reset: o1Reset});
     // F2 (round 13): a model file over 64 KiB opened through File › Open is refused by the model reader
     const bigModel = JSON.parse(await readFile(join(out, 'p1-four.json'), 'utf8')); bigModel.padding = 'x'.repeat(70 * 1024);

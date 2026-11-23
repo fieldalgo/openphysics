@@ -184,3 +184,22 @@ test('the save notice names every model, and the maps or fields left out',()=>{
  assert.equal(PF.projectSavedNotice({name:'x',file:'x.json',known:true,again:true,models:[{title:'Steady heat conduction',parts:PF.modelParts({inputsOnly:true})}],notKept:[{title:'Heated silicon waveguide',kind:'multiphysics',runs:[1,3]}],after:' Then.'}),'Downloaded x.json again: Steady heat conduction (inputs). Heated silicon waveguide keeps values only for Run 1 and Run 3, without maps. Then.');
  assert.ok(!PF.projectSavedNotice({name:'x',file:'x.json',models}).includes('not in this file'));
 });
+test('the title bar’s project line and the leave question, in the round-14 words',async()=>{
+ const W=await import(STATIC+'workspace-persistence.mjs'),when=()=>'13:15';
+ const file=how=>({name:'heater-study.json',how,savedAt:'2026-11-23T13:15:00.000Z'});
+ assert.equal(W.UNTITLED_PROJECT,PF.UNTITLED_PROJECT);
+ assert.equal(W.projectTitle({name:'Heater study',models:2,file:file('picker'),current:true,recovery:'kept'},when),'Heater study · heater-study.json · saved 13:15');
+ assert.equal(W.projectTitle({name:'Heater study',models:2,file:file('download'),current:true,recovery:'kept'},when),'Heater study · heater-study.json · downloaded 13:15');
+ assert.equal(W.projectTitle({name:'Heater study',models:2,file:file('opened'),current:true},when),'Heater study · heater-study.json · opened');
+ assert.equal(W.projectTitle({name:'Heater study',models:2,file:file('picker'),current:false,recovery:'kept'},when),'Heater study · heater-study.json · changed since saved 13:15 · kept for recovery in this browser');
+ assert.equal(W.projectTitle({name:null,models:1,file:null,recovery:'kept'},when),'Untitled project · not saved to a file · kept for recovery in this browser');
+ assert.equal(W.projectTitle({name:null,models:1,file:null,recovery:null},when),'Untitled project · not saved to a file · not in browser recovery yet');
+ assert.equal(W.projectTitle({name:null,models:0},when),'Untitled project · no model chosen');
+ assert.equal(W.projectTitle({name:'H',models:1,file:file('picker'),current:true,recovery:'conflict'},when),'H · heater-study.json · saved 13:15 · browser recovery changed in another tab');
+ assert.equal(W.projectHint(file('download')),'Your browser may have added “ (1)” to the file name.');assert.equal(W.projectHint(file('picker')),'');assert.equal(W.projectHint(null),'');
+ assert.equal(W.projectLeaveText({name:'Heater study',models:[]}),null);assert.equal(W.projectLeaveText({models:[{title:'Optical waveguide',runs:0}]}),null);
+ assert.deepEqual(W.projectLeaveText({name:'Heater study',models:[{title:'Optical waveguide',runs:2},{title:'Heated silicon waveguide',runs:1}]}),{title:'Replace Heater study?',
+  description:'Optical waveguide (2 runs) and Heated silicon waveguide (1 run) have runs in no file. Save project first to keep them.',save:{kind:'project',label:'Save project, then open'},leave:'Open without saving',stay:'Cancel'});
+ assert.equal(W.projectLeaveText({models:[{title:'Optical waveguide',runs:1}]}).description,'Optical waveguide (1 run) has a run in no file. Save project first to keep it.');
+ assert.equal(W.projectLeaveText({models:[{title:'Optical waveguide',runs:1}]}).title,'Replace Untitled project?');
+});
