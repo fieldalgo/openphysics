@@ -26,7 +26,7 @@ import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
 import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
-import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide} from './workspace-compare.mjs';
+import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
@@ -1304,7 +1304,7 @@ const savedWhere=result=>result.via==='picker'?`Saved to ${result.name}`:result.
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 // A run in the run list and the Compare pickers: its number with its name, then its inputs and time.
 function runNumber(run){return runs.includes(run)?runs.indexOf(run)+1:null;}
-function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+' · ':run.label?run.label+' · ':''}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
+function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+' · ':run.label?run.label+' · ':''}${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
 // Where a run came from, kept out of the primary labels and available on request.
 // The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
 // cell per degenerate pair, and the absorption-loss note once below the table.

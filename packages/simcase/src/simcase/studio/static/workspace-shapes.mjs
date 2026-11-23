@@ -115,7 +115,13 @@ export function designSummary(model){
   if(s.type==='circle')return `r ${nm(s.r)} nm circle · ${s.material||'unassigned'}`;
   return `${s.points.length}-vertex polygon · ${s.material||'unassigned'}`;
  }
- return `${shapes.length} shapes · ${[...new Set(shapes.map(s=>s.material||'unassigned'))].join(', ')}`;
+ // several shapes (round 16): each shape's name and size, the first three, then "+N more":
+ // "Core 500 × 220 + Substrate 3000 × 700 nm · Silicon". The unit is said once at the end when
+ // every shape listed has a size in nm, else after each size ("Core 500 × 220 nm + Tooth 5-vertex polygon").
+ const listed=shapes.slice(0,3),once=listed.every(s=>s.type!=='polygon'),unit=once?'':' nm';
+ const part=s=>s.type==='rect'?`${s.name} ${nm(s.w)} × ${nm(s.h)}${unit}`:s.type==='circle'?`${s.name} r ${nm(s.r)}${unit}`:`${s.name} ${s.points.length}-vertex polygon`;
+ const more=shapes.length>3?` +${shapes.length-3} more`:'';
+ return `${listed.map(part).join(' + ')}${once?' nm':''}${more} · ${[...new Set(shapes.map(s=>s.material||'unassigned'))].join(', ')}`;
 }
 // The geometry alone, as the status line and the save notice name it (round 14): "650 × 300 nm",
 // "r 300 nm circle", "5-vertex polygon", or "2 shapes".

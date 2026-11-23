@@ -1849,6 +1849,23 @@ try {
     stage('OB leakage case, engine on this machine', {...expectedLeak, linuxContainer: {neff: ['2.44126325 + 8.28e-5i', '1.77279036 + 2.86e-3i'], loss: ['29.15 dB/cm', '1006 dB/cm']}});
     assert.deepEqual({neff: leak.neff, loss: leak.loss}, expectedLeak, 'the screen strings are the engine run of the same document on this machine');
     assert.ok(leak.lossTitles.every(t => t.endsWith('At the default mesh this loss is about 3 % above the converged value (TE-like +2.8 %, TM-like +1.8 % on a strip over a substrate).')));
+    // round 16 (S8): the multi-shape label in the run list, the Results status line and the Compare
+    // headings, with no page overflow at 390 × 844
+    {
+      const label = 'Core 500 × 220 + Substrate 3000 × 700 nm · Silicon', over = () => ob.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+      await obSize(390, 844, true);
+      const results = {item: await ob.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??''"), status: await ob.eval("document.getElementById('status').textContent"), over: await over()};
+      await ob.click('nav [data-page=Compare]'); await ob.until("!!document.getElementById('compare-b')", 'S8 Compare');
+      await ob.eval("(()=>{const s=document.getElementById('compare-b');s.value=s.options[s.options.length-1].value;s.dispatchEvent(new Event('change'));return true})()");
+      await ob.until("!!document.querySelector('.compare-grid article h3')", 'S8 Compare headings');
+      const compare = {headings: await ob.eval("[...document.querySelectorAll('.compare-grid article h3, #compare-table-runs [data-side]')].map(e=>e.textContent)"), picker: await ob.eval("document.getElementById('compare-b').selectedOptions[0].textContent"), over: await over()};
+      stage('S8 multi-shape label at 390 × 844', {results, compare});
+      assert.ok(results.item.includes('Run ') && results.item.includes(' · ' + label + ' · open (PML 1 µm) · '), results.item);
+      assert.equal(results.over <= 0, true, `Results overflows by ${results.over}px`);
+      assert.ok(compare.headings.some(h => h.includes(label)), JSON.stringify(compare.headings)); assert.ok(compare.picker.includes(label + ' · open (PML 1 µm)'), compare.picker);
+      assert.equal(compare.over <= 0, true, `Compare overflows by ${compare.over}px`);
+      await ob.click('nav [data-page=Results]'); await ob.until("!!document.getElementById('modes-table')", 'S8 back to Results'); await obSize(1280, 800);
+    }
 
     // V15 with P3 (pre-registered by the coordinator): the project file with the open leakage run and
     // its PML check, saved, opened and saved again, follows V-P1: (a) save 1 -> open -> save 2 differ
