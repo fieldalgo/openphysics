@@ -13,8 +13,8 @@ def validate(p, domain, where, error):
     if 'pml' not in p: return
     if 'n_target' not in p: fail('pml requires explicit positive n_target')
     c=p['pml']
-    if not isinstance(c,dict) or set(c)-{'thickness','strength','order','min_physical_fraction'}:
-        fail('pml accepts thickness, strength, order and min_physical_fraction')
+    if not isinstance(c,dict) or set(c)-{'thickness','strength','order','min_physical_fraction','search_count'}:
+        fail('pml accepts thickness, strength, order, min_physical_fraction and search_count')
     widths=c.get('thickness')
     if not isinstance(widths,dict) or not widths or set(widths)-{'left','right','bottom','top'}:
         fail('pml.thickness must map domain faces to lengths')
@@ -31,6 +31,11 @@ def validate(p, domain, where, error):
     fraction=c.get('min_physical_fraction',.1)
     number(fraction,'pml.min_physical_fraction')
     if not 0<=fraction<=1: fail('pml.min_physical_fraction must be in [0,1]')
+    if 'search_count' in c:
+        count=c['search_count']
+        if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=64:
+            fail('pml.search_count must be an integer from 1 to 64')
+        if 'num_modes' in p and count<p['num_modes']: fail('pml.search_count must be at least num_modes')
     if 'bend' in p:
         b=p['bend']
         if not isinstance(b,dict) or set(b)-{'radius','axis','origin'}: fail('bend accepts radius, axis, origin')

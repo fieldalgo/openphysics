@@ -3055,6 +3055,17 @@
    "places": ["document", "api", "result"],
    "description": {"en": "Smallest fraction of the domain that is not PML.", "ko": "영역에서 PML이 아닌 부분의 최소 비율."}
   },
+  "pml_search_mode_count": {
+   "dimension": {},
+   "unit": "1",
+   "menu": ["1"],
+   "kind": "count",
+   "rank": ["scalar"],
+   "domain": {"min": "1", "max": "64"},
+   "band": null,
+   "places": ["document", "api"],
+   "description": {"en": "Number of open-boundary candidates searched before the physical-fraction filter.", "ko": "물리 비율 필터를 적용하기 전에 찾는 열린 경계 후보의 개수."}
+  },
   "magnetic_field": {
    "dimension": {"I": 1, "L": -1},
    "unit": "A/m",
