@@ -103,8 +103,11 @@ def test_invalid_geometry_rejects_before_assembly(monkeypatch, case):
 def test_caps_clearance_and_star_polygon_reject():
     with pytest.raises(ValueError, match='2048'):
         solve_grounded_rectangle(polygons()+[polygons()[0]+[.5,0]], width=2.4, height=1., panels_per_edge=256)
-    with pytest.raises(ValueError, match='extent'):
-        solve_grounded_rectangle([polygons()[0]-[1.,0]], width=2.4, height=1.)
+    # A cluster nearer the walls than its extent now uses wall-scaled boxes
+    # (test_laplace_boundary_walls.py); beyond 256 boxes it is still refused.
+    near = polygons()[0] - [polygons()[0][:, 0].min() - 1e-4, 0]
+    with pytest.raises(ValueError, match='too close to the side/top walls'):
+        solve_grounded_rectangle([near], width=2.4, height=1.)
     with pytest.raises(ValueError, match='width/height'):
         solve_grounded_rectangle(polygons(), width=20., height=1.)
     theta=np.arange(5)*2*np.pi/5

@@ -35,8 +35,15 @@ closed, with no repeated closing vertex; either orientation is accepted.
 | `interpolation_degree` | One of the integers 10, 12, 14, 16, default 10. Compare degree−2 with the requested degree. No automatic change. |
 | `ground_modes` | Integer 64–4096, default 512. Compare this cosine truncation with twice as many modes; return the refined result. |
 
-The cluster bounding box must be at least its largest extent away from each
-side and the top wall. An edge or graded panel shorter than `128*eps` in
+A conductor cluster at least its largest extent away from each side and the top
+wall interpolates the smooth wall correction on one box, as before. A closer
+cluster interpolates it on boxes that split each conductor into equal x
+intervals no wider than its distance to the nearest side or top wall, with the
+same degree, quadrature and 1e-10 check; `smooth_interpolation_boxes` reports
+their number (1 otherwise). More than 256 such boxes is refused before a field
+solve. A grounded coplanar line in its default box, previously refused, agreed
+with an independent P2 volume solution within 1.2e-4 in capacitance on the
+finest of three meshes (tests/galerkin/test_laplace_boundary_walls.py). An edge or graded panel shorter than `128*eps` in
 coordinates normalized by `max(width,height)` is refused. Boolean scalar
 controls, nonfinite coordinates and unresolved systems are refused before a
 result is returned. The limits bound this implementation's verified domain and

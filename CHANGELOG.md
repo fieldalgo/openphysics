@@ -98,6 +98,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- `galerkin`: boundary-panel solvers no longer refuse a conductor cluster closer to the side/top walls than its own extent: such clusters interpolate the smooth wall/plane correction on boxes no wider than each conductor's distance to the nearest wall or plane (`galerkin._laplace_panels.wall_labels`), with the same degree, quadrature and 1e-10 check, and are refused before a field solve only beyond 256 boxes. Clusters that were admitted before keep the unchanged one-box path and bit-identical results; `RectangleBoundaryResult.smooth_interpolation_boxes` reports the box count. A grounded coplanar line in its default box agreed with an independent P2 volume solution within 1.2e-4 in capacitance. [Boundary panels](docs/packages/galerkin/laplace_boundary.md), [two-ground solver](docs/packages/galerkin/two-ground.md).
+
 - `galerkin`: the two-ground boundary solver repeats a failed one-box smooth-kernel interpolation check once on plane-scaled boxes (each conductor split into x intervals no wider than its distance to the nearer plane), with the same degree, panels, quadrature and 1e-10 limit; results that passed before are unchanged bit for bit, and `TwoGroundRectangleResult` reports `smooth_interpolation_boxes` and `single_box_matrix_error`. Coupled, layered and broadside striplines that failed with "matrix quadrature/interpolation failed" are admitted. [Two-ground solver](docs/packages/galerkin/two-ground.md).
 
 - Add an explicit two-mode corner field for one or two all-active conductors, preserving physical current moments and separate numerical, panel, outer and analytic checks.

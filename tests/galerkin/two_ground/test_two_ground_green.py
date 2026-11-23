@@ -52,6 +52,7 @@ def test_new_admission_keeps_original_dn_contract_unchanged():
     from galerkin.laplace_two_ground import _admit as _admit_dual_ground
     polygons=[np.array([[.35,.18],[.45,.18],[.45,.22],[.35,.22]]),
               np.array([[.55,.18],[.65,.18],[.65,.22],[.55,.22]])]
-    with pytest.raises(ValueError,match='side/top'):_admit(polygons,1.,.4,16)
+    # The one-cluster-extent top clearance is not met: wall-scaled boxes, not a refusal.
+    assert _admit(polygons,1.,.4,16)[4] is False
     accepted,unit,w,h=_admit_dual_ground(polygons,1.,.4,16)
     assert len(accepted)==2 and unit==1. and w==1. and h==.4

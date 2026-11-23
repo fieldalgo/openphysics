@@ -92,6 +92,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 경계 패널 해법이 옆·윗벽에서 자신의 크기보다 가까운 도체 군집을 더는 거부하지 않는다. 이런 군집은 각 도체의 가장 가까운 벽·평면 거리보다 넓지 않은 상자(`galerkin._laplace_panels.wall_labels`)에서 같은 차수·구적·1e-10 검사로 매끄러운 벽·평면 보정을 보간하고, 상자 256개를 넘을 때만 필드 계산 전에 거부한다. 전에 허용되던 군집은 기존 상자 하나 경로로 비트 단위로 같은 결과를 내며, `RectangleBoundaryResult.smooth_interpolation_boxes`가 상자 수를 보고한다. 기본 상자의 grounded coplanar 선로가 독립 P2 부피 해와 정전용량 1.2e-4 안에서 일치했다. [경계 패널](packages/galerkin/laplace_boundary.md), [두 접지 해법](packages/galerkin/two-ground.md).
+
 - `galerkin`: 두 접지 경계 해법이 실패한 단일 상자 매끄러운 핵 보간 검사를 평면 거리 기준 상자(각 도체를 가까운 평면까지 거리보다 넓지 않은 x 구간으로 나눔)에서 같은 차수·패널·구적·1e-10 한도로 한 번 다시 한다. 전에 통과하던 결과는 비트 단위로 같고, `TwoGroundRectangleResult`가 `smooth_interpolation_boxes`와 `single_box_matrix_error`를 보고한다. "matrix quadrature/interpolation failed"로 실패하던 결합·적층·broadside stripline이 계산된다. [두 접지 해법](packages/galerkin/two-ground.md).
 
 - 활성 도체 한두 개의 명시적 두 모드 모서리 장 계산을 추가하고 물리 전류 모멘트 및 수치·패널·외곽·해석식 검사를 구분해 유지했습니다.
