@@ -74,8 +74,9 @@ exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
 "physical_window"`가 들어갑니다. 누설이 강한 모드의 유효 면적은 창에 따라 달라집니다. 닫힌 결과에는
 키가 늘지 않고, 굽힘과 스칼라 PML 결과에도 늘지 않습니다. `results.group_index`는 `pml`과 함께
 받으며(`bend`와는 받지 않음) 복소 n_g를 줍니다([군굴절률](group_index.md)). 검증:
-[`tests/simcase/test_open_boundary_mode_identity.py`](../../../../../../tests/simcase/test_open_boundary_mode_identity.py)의 V9·V10과
-[`tests/simcase/test_open_boundary_group_index.py`](../../../../../../tests/simcase/test_open_boundary_group_index.py)의 V11.
+[열린 경계의 모드 식별](workspace.md#열린-경계의-모드-식별),
+`tests/simcase/test_open_boundary_mode_identity.py`의 V9, V10, V12, V13과
+`tests/simcase/test_open_boundary_group_index.py`의 V11.
 
 각 `openphysics.pml-candidates/2` 점은 전체 후보의 1부터 시작하는 번호,
 복소 `effective_index`, 원래 pencil 상대잔차 `relative_residual`, 양의 물리/PML L2 비율,

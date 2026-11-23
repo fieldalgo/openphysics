@@ -20,7 +20,7 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
-import {checkResultRecord,checkDocuments,checkLabel,groupIndexLocked,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,LATER_TITLE,GROUP_INDEX_OPEN_NOTE,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
+import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
@@ -1067,14 +1067,14 @@ const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept wit
 // Also compute group index (off by default, saved with the inputs): the run's document gains
 // results.group_index and the engine solves λ0 − 1 nm and λ0 + 1 nm as well (workspace-optical.mjs)
 const GROUP_INDEX_LABEL='Also compute group index (3 solves)';
-// With an open boundary the group index is not computed (slice P3): the box is off and disabled.
-const groupIndexField=()=>groupIndexLocked(state.openBoundary)?`<label class="check-field"><input id="group-index-check" type="checkbox" disabled aria-describedby="group-index-open-note"> ${GROUP_INDEX_LABEL}</label><p class="input-note" id="group-index-open-note">${GROUP_INDEX_OPEN_NOTE}.</p>`:`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
+// With an open boundary too (slice P3): the engine's n_g is then complex, and Re n_g is shown.
+const groupIndexField=()=>`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
 // Outer boundary (Physics › Optical modes): Closed window (PEC) or Open boundary (PML), and
-// Search near n_eff, kept to 3 decimals. Choosing Open turns the group index option off.
+// Search near n_eff, kept to 3 decimals. The group index option is kept either way.
 const bindBoundaryField=()=>{
  document.querySelectorAll('input[name="outer-boundary"]').forEach(radio=>radio.onchange=()=>{
   const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;
-  state.openBoundary=open?openChoice():null;if(open)state.groupIndex=false;
+  state.openBoundary=open?openChoice():null;
   render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');});
  const target=$('target-number');if(target)target.onchange=()=>{
   let t;try{t=parseTarget(target.value,state.shapes);}catch(error){notice(error.message);target.value=(state.openBoundary.target??Number(target.defaultValue)).toFixed(3);return;}
@@ -1339,32 +1339,32 @@ function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+
 // The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
 // cell per degenerate pair, and the absorption-loss note once below the table.
 // An open run (slice P2): "Loss (dB/cm)" with the open boundary's cells ("< 0.01 dB/cm" below what it
-// resolves), n_eff with its Im part, "—" for polarization, A_eff and n_g (computed on the physical
-// window in a later version), and the PML check column when the check ran.
+// resolves), n_eff with its Im part, and the PML check column when the check ran; polarization and
+// A_eff on the physical window, the PML excluded, and Re n_g (slice P3).
 function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
- const open=isOpenRun(run),{rows,loss}=modeTableRows(opticalModes(run),{open});
+ const open=isOpenRun(run),{rows,loss}=modeTableRows(opticalModes(run),{open,...(open?{areaHelp:OPEN_AREA_HELP,polarizationHelp:OPEN_POLARIZATION_HELP,missing:SOURCE_TEXT.noWindow,areaMissing:SOURCE_TEXT.noWindow}:{})});
  const lambda0=run.input.model.wavelength*1e-9,im=run.effective_index_im,candidates=open?openStatuses(run):null;
  const checks=open&&run.pml_check?run.effective_index.map((re,i)=>checkVerdict(re,im[i],run.pml_check.paired[i],lambda0,candidates[i])):null;
- if(open)rows.forEach((r,i)=>{const cell=openLoss(im[i],lambda0,candidates[i]);r.neff=openIndexText(run.effective_index[i],im[i]);r.loss=cell.text;r.lossTitle=cell.title;r.lossFloor=cell.floor;r.depends=checks?.[i].status==='depends';if(r.depends)r.lossTitle=DEPENDS_HELP;r.polarization={text:'—',title:LATER_TITLE,rowspan:1};r.area={text:'—',value:null,title:LATER_TITLE};});
+ if(open)rows.forEach((r,i)=>{const cell=openLoss(im[i],lambda0,candidates[i]);r.neff=openIndexText(run.effective_index[i],im[i]);r.loss=cell.text;r.lossTitle=cell.title;r.lossFloor=cell.floor;r.depends=checks?.[i].status==='depends';if(r.depends)r.lossTitle=DEPENDS_HELP;});
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent=open?openTableTitle():'Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:AREA_HELP}),open?cell('th','n_g',{scope:'col',title:GROUP_INDEX_OPEN_NOTE}):cell('th','n_g',{scope:'col',title:groupIndexHelp()}));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:open?OPEN_AREA_HELP:AREA_HELP}),cell('th','n_g',{scope:'col',title:groupIndexHelp()}));
  if(checks)head.append(cell('th',CHECK_HEADER,{scope:'col',title:CHECK_HELP}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  // the n_g hint, when the run has no n_g: on a line above the table (as Compare has it), the header just "n_g"
- if(open){}else if(!hasGroupIndex(run))box.append(groupIndexHintLine('modes-table-hint'));
+ if(!hasGroupIndex(run))box.append(groupIndexHintLine('modes-table-hint'));
  const body=document.createElement('tbody');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
   {const lossCell=cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle,...(r.depends?{'data-pml-dependent':'',class:'pml-dependent'}:{})});if(r.depends){lossCell.textContent='';const em=document.createElement('em');em.textContent=r.loss;lossCell.append(em);}tr.append(lossCell);}
   tr.append(cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
-  {const g=open?{text:'—',value:null,title:GROUP_INDEX_OPEN_NOTE}:groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
+  {const g=groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
   if(checks){const c=checks[r.mode-1],td=cell('td','',{'data-pml-check':String(r.mode),'data-pml-check-status':c.status,title:c.title});if(c.status==='depends'){const strong=document.createElement('strong');strong.textContent='Depends on the PML';td.append(strong,c.text.slice('Depends on the PML'.length));}else td.textContent=c.text;tr.append(td);}
   body.append(tr);}
  table.append(body);box.append(table);
- const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${AREA_HELP}.`;box.append(help);
+ const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${open?OPEN_AREA_HELP:AREA_HELP+'.'}`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0
  // (a closed window adds where leakage is found: Open boundary in Physics › Optical modes)
  {const note=document.createElement('p');note.className='table-note';note.id=rows.every(r=>r.lossless)?'lossless-note':'loss-note';note.textContent=open?loss.note:loss.note+' '+CLOSED_POINTER;box.append(note);}
@@ -1506,7 +1506,12 @@ function compareTable(a,b,match){
  // A_eff of a unit: the mode's, or the mean of a pair with its note
  const areaCell=(run,unit,side)=>{if(!unit)return cell('td','—');const v=unitArea(run,unit);return cell('td',v.text,{title:v.title,['data-area-'+side]:v.value===null?'':String(v.value)});};
  // absorption loss of a unit, from the saved indices (the mode's, or the mean of a pair)
- const lossCell=(run,unit,side)=>{const v=unitLoss(run,unit);return cell('td',v.text,{class:'num',title:v.title,['data-loss-'+side]:v.value===null?'':String(v.value)});};
+ // an open run's loss on two lines, the value then "dB/cm", as the polarization cells are (textContent
+ // unchanged): with matched rows, "< 0.01 dB/cm" would otherwise widen the table past 1440 px (O2)
+ const lossCell=(run,unit,side)=>{const v=unitLoss(run,unit),td=cell('td',v.text,{class:'num',title:v.title,['data-loss-'+side]:v.value===null?'':String(v.value)});
+  const at=v.text.lastIndexOf(' dB/cm');if(isOpenRun(run)&&at>0){td.textContent='';td.classList.add('loss-split');const value=document.createElement('span'),sep=document.createElement('span'),u=document.createElement('span');
+   value.className='loss-value';value.textContent=v.text.slice(0,at);sep.className='pol-sep';sep.textContent=' ';u.className='loss-unit';u.textContent='dB/cm';td.append(value,sep,u);}
+  return td;};
  // n_g of a unit: the mode's, or the mean of a pair; "—" with its help when the run has none
  const ngCell=(run,unit,side)=>{const v=unitGroupIndex(run,unit);return cell('td',v.text,{class:'num',title:v.title,['data-group-index-'+side]:v.value===null?'':String(v.value)});};
  // "1", or "1–2" for a pair or group; "—" for no unit
@@ -1528,7 +1533,7 @@ function compareTable(a,b,match){
  // the scroll cue: the line and the right-edge shadow while columns are hidden on the right
  const cue=()=>{const over=scroll.scrollWidth>scroll.clientWidth+1;more.hidden=!over;frame.classList.toggle('more-right',over&&scroll.scrollLeft+scroll.clientWidth<scroll.scrollWidth-1);};
  scroll.addEventListener('scroll',cue,{passive:true});new ResizeObserver(cue).observe(scroll);
- // with an open run, matching is off (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
+ // an open run without physical bounds is not matched (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
  const note=cell('p',match.disabled?match.disabled+'. Every mode of A and of B is listed, not matched.':MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
  box.append(runs,more,frame,note);
  // the two loss columns count different things: say so
@@ -1845,20 +1850,20 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
   if(pool.filter(Boolean).length<pending.checkCount)return;
   checkPools.delete(run.job);({runs,selected:solverRun}=withPmlCheck(runs,solverRun,run.job,pairCheck(run.effective_index,run.effective_index_im,pool)));return;
  }
- // an open boundary: the modes above n = 1.45 with their candidate record, no TE fraction,
- // effective area or group index (slice P3)
+ // an open boundary: the modes above n = 1.45 with their candidate record, and the engine's TE
+ // fractions, effective areas (physical window) and group index of those modes (slice P3)
  const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target.toFixed(3));})():null;
  const kept=open?open.re:re,keptIm=open?open.im:im;
  const settings=open?openSettings(opticalSettings(input.model.wavelength,input.model.coreMesh,asked),pending.openBoundary,input.model.shapes):opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
  const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
-  ...(open?{open_boundary:open.record}:{
+  ...(open?{open_boundary:open.record,...keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},open.keep)}:{
   // the engine's TE fractions and effective areas, kept with the run (a version 9 file keeps them)
   ...engineRunValues(result.summary,re.length),
   // the engine's group index with Also compute group index (a version 9 file keeps it)
   ...engineGroupIndex(result.summary,re.length)})});
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
- if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=reasons;}
+ if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):reasons;}
  completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';
 }});
