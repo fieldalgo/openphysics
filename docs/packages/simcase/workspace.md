@@ -964,7 +964,7 @@ change, the cross-tab conflict rule). It writes once the model has a run or was 
 was opened, as the version 8 text Save session would write. Over 16 MiB it keeps the maps of
 the selected and pinned runs only, without a dialog, and the indicator says “kept for recovery in
 this browser without the maps of 2 runs · File › Save keeps them”; when even that is over the
-limit it writes nothing new (“browser recovery unavailable: session over 16 MiB”) and the earlier
+limit it writes nothing new (“browser recovery unavailable: session over 16 MiB · File › Save keeps your work”) and the earlier
 record stays. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · time** (Workspace tools) and
 the Heated silicon waveguide card's **Restore from this browser** run the same checks as Open
@@ -1863,7 +1863,12 @@ queue a browser IndexedDB snapshot containing the current inputs, up to six
 completed runs, names, comparison and field view. Writes are debounced and serialized;
 the save indicator reports the browser copy (*updating browser recovery*, *kept for
 recovery in this browser*, *browser recovery unavailable*) while no session file holds
-the runs, and the session file once one does. An empty new tab does not erase the prior notebook.
+the runs, and the session file once one does. Since round 17 an unavailable recovery says why and
+what to do when the reason is known: *browser recovery unavailable: session over 16 MiB · File ›
+Save keeps your work* when the selected and pinned runs with their fields are over 16 MiB (two
+pinned open runs of a strip over a substrate are, at about 7.5 MB each), and *browser recovery
+unavailable: this browser’s storage is full · File › Save keeps your work* when the browser refuses
+the write for space. An empty new tab does not erase the prior notebook.
 
 After reload, choose the last session on its model's card (**Restore from this browser** under
 Optical waveguide or Heated silicon waveguide), on the start page's **Continue where you left

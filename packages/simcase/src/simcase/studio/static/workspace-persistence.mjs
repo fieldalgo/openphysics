@@ -33,7 +33,10 @@ export function validateSavedFile(value){
 // counter: it counts input changes in this tab only and would differ after a restore.
 // overLimit and kept:N are a multiphysics session's (version 8): over 16 MiB, recovery keeps the
 // maps of the selected and pinned runs only, and writes nothing when even that is over the limit.
-const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab',overLimit:'browser recovery unavailable: session over 16 MiB'});
+// round 17 (U6): a recovery that cannot be kept says why and what to do: over 16 MiB (the session, or
+// in the optical model its selected and pinned runs with their fields) or the browser's storage full
+const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab',overLimit:'browser recovery unavailable: session over 16 MiB · File › Save keeps your work',quota:'browser recovery unavailable: this browser’s storage is full · File › Save keeps your work'});
+const PROBLEMS=['unavailable','conflict','overLimit','quota'];
 const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
@@ -61,7 +64,7 @@ const SINCE=Object.freeze({picker:'saved',download:'downloaded',opened:'opened',
 function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=null,loaded=null,recovery=null,file:current=null,fileHow=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  if(invalid)return 'Invalid input draft · last valid inputs '+(clean?'unchanged':'unsaved');
  // A browser copy that fails or changed in another tab is said in every state with runs.
- const problem=runsUnsaved||saved||loaded?.current?(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:''):'';
+ const problem=runsUnsaved||saved||loaded?.current?(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:''):'';
  if(loaded?.current&&loaded.kind==='opened')return `Opened ${loaded.name}`+problem;
  if(loaded?.current&&loaded.kind==='recovered'){
   // a record whose file link still matched says so: the same as the file, not "not saved to a file"
@@ -101,7 +104,7 @@ export function projectTitle({name=null,models=0,file=null,current=false,recover
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
  if(!file)return `${title} · not saved to a file · ${browser}`;
  const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
- if(current)return `${title} · ${file.name} · ${word}${at}`+(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:'');
+ if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');
  return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
 }
 /** The project line's title text: the "(1)" note on the download path, '' elsewhere. */

@@ -190,3 +190,18 @@ test('U8: on the download path Save asks (Save As, prefilled) when the project m
  // the picker path is unchanged: saveToFile writes a kept handle before any of this
  const files=read('workspace-files.mjs');assert.ok(files.includes("if (!saveAs && file?.handle) return 'write';"));
 });
+test('U6: browser recovery that cannot be kept says why and what to do',async()=>{
+ const P=await import(STATIC+'workspace-persistence.mjs'),R=await import(STATIC+'workspace-notebook-recovery.mjs');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'quota'}),'Not saved to a file · browser recovery unavailable: this browser’s storage is full · File › Save keeps your work');
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'overLimit'}),'Not saved to a file · browser recovery unavailable: session over 16 MiB · File › Save keeps your work');
+ // a store whose write is refused for space, and an autosave whose snapshot is over the limit
+ const states=[];const quota=new R.NotebookAutosave({save:async()=>{throw Object.assign(new Error('The quota has been exceeded.'),{name:'QuotaExceededError'});}},{onState:s=>states.push(s),setTimer:()=>0,clearTimer:()=>{}});
+ quota.schedule('s1',()=>'{}');await quota.flush();
+ const failed=states.find(s=>s.phase==='error');assert.equal(failed.code,'recovery-quota');assert.ok(failed.message.startsWith('This browser’s storage is full'));
+ const over=[];const limit=new R.NotebookAutosave({save:async r=>r},{onState:s=>over.push(s),setTimer:()=>0,clearTimer:()=>{}});
+ limit.schedule('s2',()=>{throw Object.assign(new Error('Recovery snapshot exceeds 16 MiB: x'),{code:'recovery-over-limit'});});await limit.flush();
+ assert.equal(over.find(s=>s.phase==='error').code,'recovery-over-limit');
+ // the optical snapshot over 16 MiB (the selected and pinned runs with their fields) carries its code
+ const notebook=read('workspace-notebook.mjs');assert.ok(notebook.includes("{code:'recovery-over-limit'});return out.text;};"));
+ const app=read('workspace-app.mjs');assert.ok(app.includes("state.code==='recovery-quota'?'quota':'unavailable'"));
+});

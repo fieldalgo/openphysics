@@ -814,7 +814,8 @@ print(n)`;
     if (n < 5) await page.until(`/kept for recovery in this browser without the maps of ${6 - n} runs/.test(document.getElementById('autosave-status').textContent)`, 'recovery with ' + n + ' pinned', 60000);
   }
   // browser recovery writes nothing new and says so; the record before stays
-  await page.until("/ · browser recovery unavailable: session over 16 MiB$/.test(document.getElementById('autosave-status').textContent)", 'recovery over the limit', 60000);
+  // round 17 (U6): the words add what to do
+  await page.until("/ · browser recovery unavailable: session over 16 MiB · File › Save keeps your work$/.test(document.getElementById('autosave-status').textContent)", 'recovery over the limit', 60000);
   const recoveryOver = await page.text('#autosave-status');
   await clearNotice(); await page.click('#menu-export-session');
   await page.until("/^Session not saved: /.test(document.getElementById('file-status').textContent)", 'refused by name');

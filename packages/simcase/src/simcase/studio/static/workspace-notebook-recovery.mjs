@@ -164,7 +164,8 @@ export class NotebookAutosave {
   try{
    const session=capture.makeText();if(typeof session!=='string'||new TextEncoder().encode(session).length>MAX_SESSION_BYTES)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');
    const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile,...(typeof capture.extra.openedCurrent==='boolean'?{openedCurrent:capture.extra.openedCurrent}:{})}:{}),...(recordPage(capture.extra?.page)?{page:capture.extra.page}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record,note:typeof capture.makeText.note==='string'?capture.makeText.note:''});
-  }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error.code,message:error.message});}
+  // a write refused for space (QuotaExceededError) is named, so the page can say why (round 17, U6)
+  }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error?.code??(error?.name==='QuotaExceededError'?'recovery-quota':undefined),message:error?.name==='QuotaExceededError'?'This browser’s storage is full, so the session cannot be kept for recovery. File › Save keeps it in a file.':error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
  }
  async replaceReviewed(record,stamp,makeText,extra={}){
