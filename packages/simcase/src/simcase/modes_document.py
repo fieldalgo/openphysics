@@ -46,7 +46,8 @@ PHYSICS_KERNEL = {"vacuum_wavelength": "wavelength", "mode_count": "num_modes", 
                   "effective_index_threshold": "n_cladding", "formulation": "formulation", "type": "type",
                   "boundary": "boundary", "pml": "pml", "bend": "bend"}
 PML_KERNEL = {"pml_thickness": "thickness", "pml_strength": "strength", "pml_order": "order",
-              "pml_minimum_physical_fraction": "min_physical_fraction", "pml_search_mode_count": "search_count"}
+              "pml_minimum_physical_fraction": "min_physical_fraction", "pml_search_mode_count": "search_count",
+              "pml_additional_searches": "additional_searches"}
 #: the kernel's bend order (radius, axis, origin), as format 0.2 documents wrote it
 BEND_KERNEL = (("bend_radius", "radius"), ("axis", "axis"), ("bend_origin", "origin"))
 TRACKING_KERNEL = {"method": "method", "search_mode_count": "search_modes", "mode_tracking_threshold": "min_overlap",
@@ -122,6 +123,12 @@ def modes_slots() -> tuple[dict, ...]:
            # no default is recorded: an absent count keeps max(2 mode_count, 6) candidates, and the
            # documents and results that do not write it stay as they were
            q("pml.pml_search_mode_count", "pml_search_mode_count", ("BC",)),
+           # further searches beside the primary one; both keys of an entry are checked by
+           # _additional_searches (E-CONTRACT), so they are not required slots
+           {"pattern": f"{p}.pml.pml_additional_searches", "kind": "structural", "forms": ["LIST"]},
+           obj(f"{p}.pml.pml_additional_searches[]"),
+           q("pml.pml_additional_searches[].target_effective_index", "target_effective_index", ("BD",)),
+           q("pml.pml_additional_searches[].pml_search_mode_count", "pml_search_mode_count", ("BC",)),
            obj(f"{p}.bend"), q("bend.bend_radius", "bend_radius", required=True),
            q("bend.bend_origin", "bend_origin", required=True),
            enum(f"{p}.bend.axis", ("x", "y"), default="x",
@@ -368,6 +375,8 @@ def _physics(doc, name, p, a, path, dom):
     if "pml_search_mode_count" in pml and int(pml["pml_search_mode_count"]) < int(p["mode_count"]):
         _refuse(f"{path}.pml.pml_search_mode_count: the search must hold at least mode_count "
                 f"({int(p['mode_count'])}) candidates", f"{path}.pml.pml_search_mode_count")
+    if "pml_additional_searches" in pml:
+        _additional_searches(doc, p, path)
     if "bend" in p:
         bend = p["bend"]
         radius = Fraction(_exact(doc, f"{path}.bend.bend_radius"))
@@ -375,6 +384,45 @@ def _physics(doc, name, p, a, path, dom):
         if radius + dom[bend["axis"] + "min"] - origin <= 0:
             _refuse(f"{path}.bend: the whole window must lie at a positive radius (bend_radius + {bend['axis']}min - "
                     "bend_origin > 0)", f"{path}.bend.bend_radius")
+
+
+#: at most this many further searches beside the primary one (``pml.pml_additional_searches``)
+ADDITIONAL_SEARCHES_MAX = 3
+
+
+def _additional_searches(doc, p, path):
+    """``pml.pml_additional_searches``: 1 to 3 entries, each with a finite positive
+    ``target_effective_index`` that differs, as an exact decimal, from the primary target and from
+    every other entry, and a ``pml_search_mode_count`` (the registry's 1 to 64; the free degrees of
+    freedom limit it at the solve, as the primary count). Read with the vector formulation only."""
+    where = f"{path}.pml.pml_additional_searches"
+    searches = p["pml"]["pml_additional_searches"]
+    if not 1 <= len(searches) <= ADDITIONAL_SEARCHES_MAX:
+        _refuse(f"{where}: give 1 to {ADDITIONAL_SEARCHES_MAX} further searches (found {len(searches)})", where)
+    if p["formulation"] != "vector":
+        _refuse(f"{where}: pml_additional_searches is read with the vector formulation in this release",
+                where)
+    seen = {_decimal(doc, f"{path}.target_effective_index"): f"{path}.target_effective_index"}
+    for i, search in enumerate(searches):
+        item = f"{where}[{i}]"
+        for key in ("target_effective_index", "pml_search_mode_count"):
+            if key not in search:
+                _refuse(f"{item}: each further search gives target_effective_index and pml_search_mode_count "
+                        f"({key} is missing)", f"{item}.{key}")
+        target = search["target_effective_index"]
+        if not (math.isfinite(target) and target > 0):
+            _refuse(f"{item}.target_effective_index: expected a finite positive index",
+                    f"{item}.target_effective_index", "E-DOMAIN")
+        exact = _decimal(doc, f"{item}.target_effective_index")
+        if exact in seen:
+            _refuse(f"{item}.target_effective_index: {search['target_effective_index']} is already searched "
+                    f"({seen[exact]})", f"{item}.target_effective_index")
+        seen[exact] = f"{item}.target_effective_index"
+
+
+def _decimal(doc, path):
+    """The exact value of a dimensionless number as written (``1.95`` equals ``1.950``)."""
+    return Fraction(doc.exact(path))
 
 
 def _study(doc, name, p, path):
@@ -389,6 +437,9 @@ def _study(doc, name, p, path):
                 "E-KEY-MISSING")
     parameter, values = st["parameter"], st["values"]
     wavelength = f"{path}.vacuum_wavelength"
+    if "pml_additional_searches" in (p.get("pml") or {}):
+        _refuse(f"{path}.pml.pml_additional_searches: pml_additional_searches is not read with a study sweep in "
+                "this release; give one target", f"{path}.pml.pml_additional_searches")
     if "pml" in p and parameter != wavelength:
         _refuse("study.parameter: PML sweeps support only the vacuum wavelength, with fixed geometry and "
                 "coordinates", "study.parameter")
@@ -670,6 +721,8 @@ def kernel_physics(doc, name) -> dict:
                 pml["thickness"] = {side: um(doc, f"{path}.pml.pml_thickness.{side}") for side in a["pml"][key]}
             elif key in ("pml_order", "pml_search_mode_count"):
                 pml[PML_KERNEL[key]] = int(p["pml"][key])
+            elif key == "pml_additional_searches":
+                pml[PML_KERNEL[key]] = _kernel_searches(p["pml"][key])
             else:
                 pml[PML_KERNEL[key]] = float(p["pml"][key])
         out["pml"] = pml
@@ -680,6 +733,12 @@ def kernel_physics(doc, name) -> dict:
                 bend[kernel] = p["bend"]["axis"] if key == "axis" else um(doc, f"{path}.bend.{key}")
         out["bend"] = bend
     return out
+
+
+def _kernel_searches(searches) -> list[dict]:
+    """``pml.pml_additional_searches`` under the kernel's keys, in order."""
+    return [{"n_target": float(s["target_effective_index"]), "search_count": int(s["pml_search_mode_count"])}
+            for s in searches]
 
 
 def kernel_study(doc) -> dict:
@@ -765,6 +824,8 @@ def stage_point(physics: dict) -> dict:
                 pml["thickness"] = {side: mu(v) for side, v in value.items()}
             elif key in ("pml_order", "pml_search_mode_count"):
                 pml[PML_KERNEL[key]] = int(value)
+            elif key == "pml_additional_searches":
+                pml[PML_KERNEL[key]] = _kernel_searches(value)
             else:
                 pml[PML_KERNEL[key]] = float(value)
         out["pml"] = pml

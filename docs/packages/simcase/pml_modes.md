@@ -91,6 +91,59 @@ formulation's static `beta^2 = 0` family with `|beta^2| <= 1e-10 |sigma|` are no
 candidates, and a search of only such roots is refused like any search without
 an eligible candidate ([waveguide formulation](../galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation)).
 
+### Further searches
+
+One search near one target can miss a physical mode far from it: a strip over a substrate has a
+mode near the cladding index (n ≈ 1.486 + 7.9e-3i) that a search of 32 near 2.46 does not find.
+`pml.pml_additional_searches` lists 1 to 3 further searches beside the primary one
+(`target_effective_index` with `pml_search_mode_count`):
+
+```json
+"pml": {"pml_thickness": {"bottom": "1 um", "top": "1 um"}, "pml_search_mode_count": 32,
+        "pml_additional_searches": [{"target_effective_index": 1.95, "pml_search_mode_count": 16}]}
+```
+
+- Each entry gives both keys. Each target is finite, positive and differs, as written (exact
+  decimals: `1.95` and `1.950` are the same target), from the primary target and from every other
+  entry. Each count is an integer from 1 to 64 (the registry domain of `pml_search_mode_count`, as for
+  the primary count), limited by the free DOFs like the primary count; it
+  need not hold `mode_count`. Errors are `E-CONTRACT` or `E-DOMAIN` at the key's path.
+- The key is read with the vector formulation and a single study (a bend is allowed). A sweep is
+  refused (`E-CONTRACT`): "pml_additional_searches is not read with a study sweep in this release;
+  give one target".
+- The searches run in order on the same mesh and pencil, one factorization per target. The
+  matrices are identical, but each search assembles them again (1 + k assemblies). Candidates are numbered in that order and each is judged
+  eligible as above.
+- A candidate b of a later search is a **duplicate** of an earlier candidate a (one of an earlier
+  search that is itself no duplicate, eligible or not) when |n_b − n_a| ≤ 1e-9 max(1, |n_a|) and
+  η_w(a, b) = |⟨a, b⟩| / (‖a‖ ‖b‖) ≥ 0.99, with the transverse edge coefficients and the edge mass
+  matrix of the whole computational mesh. When several earlier candidates lie within the index
+  tolerance, b is a duplicate when its projection on their span holds at least 0.99 of its squared
+  norm. A duplicate keeps its record and is never selected: its reasons add `duplicate_candidate`
+  to its own, with `duplicate_of`, `duplicate_effective_index_distance`,
+  `duplicate_field_overlap` (the square root of the span fraction in the degenerate case) and, in
+  that case only, `duplicate_span`.
+- The `mode_count` eligible non-duplicate candidates with the **highest Re n_eff** are returned
+  in descending Re (`selected_descending_real_index`; the others `outside_requested_count`), not
+  the nearest to a target. None eligible raises `ModeSelectionError` with the merged diagnostics.
+- The record is `openphysics.pml-candidates/3`: every /2 key, plus `searches` (`search`,
+  `target_effective_index`, `search_mode_count`, `candidate_count`), `selection:
+  "descending_real_index"`, `duplicate_rule` and each candidate's `search` (1-based). The
+  summary's `selection` is `pml_heuristic_descending_real_index`; `mode_result_schema` and the
+  field layout do not change, and `resolved_inputs` echoes the searches. Without the key nothing
+  changes (schema /2, `selected_near_target`). A simcase older than the key refuses it by name
+  (`E-KEY-UNKNOWN`).
+- Limitation: with additional searches the ranking is by descending Re, so it relies on
+  `pml_minimum_physical_fraction` to exclude PML-dominated candidates. With a low fraction such
+  as 0.1, a lossy candidate can be ranked first (`examples/simcase/pml_leaky_slab.json` with a
+  further search 2.0/8 returns 3.4396 + 0.0513i instead of 2.8521). Studio's documents use 0.5.
+- Limitation: with additional searches, modes are ranked by descending Re. A request for fewer
+  modes than lie above a wanted lower-Re mode (another polarization branch, for example) does not
+  return it: ask for more modes, or use a single target near it. The leaky slab with PMC side walls
+  and 1 mode returns the TE-polarized slab mode 2.833018 + 1.915e-5i, not the TM pole
+  2.0555 + 6.82e-4i; the TM candidate (2.054060 + 6.724e-4i) is the 8th by Re and returned with
+  `mode_count` 8.
+
 `abs(Im n)<=1e-10 max(1,|Re n|)` is labelled `numerically_unresolved`; its signed
 value and attenuation are preserved, never clamped to zero. This threshold is
 a numerical sign diagnostic, not an accuracy claim. Fewer eligible candidates
