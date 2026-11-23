@@ -737,7 +737,7 @@ try {
   }
   // round 12 (N1; pre-registered): the Compare table fits at 1440 × 900 and 390 × 844: two header
   // rows (short labels, then A | B), the first column frozen while the others scroll inside the
-  // table box, every column reachable there, headers and row headers on one line, and the n_g
+  // table box (at 390; since round 13 nothing scrolls at 1440, see O2 above), every column reachable there, headers and row headers on one line, and the n_g
   // hint visible while neither run computed n_g
   const compareFit = () => page.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll'),rows=[...t.tBodies[0].rows];
     const linesOf=r=>new Set([...r.getClientRects()].map(x=>Math.round(x.top))).size,range=n=>{const r=document.createRange();r.selectNodeContents(n);return r};
@@ -746,8 +746,55 @@ try {
     const out={top:[...t.tHead.rows[0].cells].map(c=>c.firstChild.textContent),sides:side.map(c=>c.textContent),sticky:[t.tHead.rows[0].cells[0],...rows.map(r=>r.cells[0])].map(c=>getComputedStyle(c).position).filter(p=>p!=='sticky'),unpinned:side.map(c=>getComputedStyle(c).position).filter(p=>p==='sticky').length,
       firstLeft:[f0.left-b0.left,f1.left-b1.left,m.left-b1.left],modesOnTop:hit===t.tHead.rows[0].cells[0]||t.tHead.rows[0].cells[0].contains(hit),lastRight:Math.max(side.at(-1).getBoundingClientRect().right,...rows.map(r=>r.cells[r.cells.length-1].getBoundingClientRect().right))-b1.right,scroll:[box.scrollWidth,box.clientWidth,box.scrollLeft],
       wrapped:[...[...t.tHead.rows[0].cells].map(c=>[c.firstChild.textContent,linesOf(range(c.firstChild))]),...[...side,...rows.map(r=>r.cells[0])].map(c=>[c.textContent,linesOf(range(c))])].filter(x=>x[1]!==1),
-      hint:(()=>{const h=t.querySelector('thead [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})()};
+      hint:(()=>{const h=document.querySelector('#compare-table-runs [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})()};
     box.scrollLeft=0;return out})()`);
+  // round 13 (O2; pre-registered, with the coordinator's 24 px margin): at 1440 × 900 with the tree
+  // panel open every column is visible without scrolling, with at least 24 px to spare (the box's
+  // clientWidth minus the table's width: the box's scrollWidth is never below its clientWidth), no
+  // header or cell text clipped or outside its cell, every cell inside the box, and no scroll cue;
+  // at 390 × 844 the table scrolls inside the box, Modes frozen (N1 below), with the cue: the line
+  // and the right-edge shadow, gone at the right end. The Polarization cells have two lines.
+  const compareFits = () => page.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll'),frame=box.parentElement,b=box.getBoundingClientRect();
+    box.scrollLeft=0;const tree=document.getElementById('tree'),cells=[...t.querySelectorAll('th,td')],hint=document.querySelector('[data-scroll-hint]');
+    const texts=c=>{const w=document.createTreeWalker(c,NodeFilter.SHOW_TEXT),out=[];while(w.nextNode()){const n=w.currentNode;if(!n.textContent.trim()||n.parentElement.closest('.pol-sep'))continue;const r=document.createRange();r.selectNodeContents(n);out.push(...[...r.getClientRects()].filter(x=>x.width>0));}return out};
+    const lines=c=>new Set(texts(c).map(x=>Math.round(x.top))).size;
+    const out={slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),scroll:[box.scrollWidth,box.clientWidth],tree:getComputedStyle(tree).display,comparing:tree.parentElement.classList.contains('comparing'),pane:Math.round(document.querySelector('main>.settings-pane')?.getBoundingClientRect().width||0),
+      clipped:cells.filter(c=>c.scrollWidth>c.clientWidth).map(c=>c.textContent),
+      textOutside:cells.filter(c=>{const r=c.getBoundingClientRect();return texts(c).some(x=>x.left<r.left-0.5||x.right>r.right+0.5)}).map(c=>c.textContent),
+      cellOutside:cells.filter(c=>{const r=c.getBoundingClientRect();return r.left<b.left-0.5||r.right>b.right+0.5}).map(c=>c.textContent),
+      hint:hint?{hidden:hint.hidden,height:hint.getBoundingClientRect().height,text:hint.textContent}:null,shadowStart:frame.classList.contains('more-right'),
+      polLines:[...t.querySelectorAll('td.pol')].filter(c=>c.textContent.includes(' · ')).map(c=>lines(c)),polText:[...t.querySelectorAll('td.pol')].map(c=>c.textContent)};
+    return out})()`);
+  const shadowAt = async end => { await page.eval(`(()=>{const s=document.querySelector('.compare-table-scroll');s.scrollLeft=${end ? 's.scrollWidth' : '0'};s.dispatchEvent(new Event('scroll'));})()`); await sleep(300);
+    return page.eval("(()=>{const f=document.querySelector('.compare-table-frame');return {more:f.classList.contains('more-right'),opacity:getComputedStyle(f,'::after').opacity}})()"); };
+  const checkCompareFit = async tag => {
+    const result = {};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(400);
+      const fit = await compareFits(); result[width] = fit;
+      assert.deepEqual(fit.clipped, [], `${tag}: no clipped cell at ${width}`); assert.deepEqual(fit.textOutside, [], `${tag}: no text outside its cell at ${width}`);
+      assert.ok(fit.polLines.every(n => n === 2), `${tag}: Polarization cells on two lines at ${width}: ${fit.polLines}`);
+      if (width === 1440) {
+        // Compare hides the model tree (main.comparing) and keeps the run list pane open: the box is
+        // as wide as Compare ever makes it at 1440, with the pane at its width
+        assert.equal(fit.comparing, true); assert.equal(fit.tree, 'none', `${tag}: Compare shows no model tree`); assert.ok(fit.pane > 0, `${tag}: the run list pane is open`);
+        assert.ok(fit.scroll[0] <= fit.scroll[1], `${tag}: the table box scrolls at 1440: ${fit.scroll}`);
+        assert.ok(fit.slack >= 24, `${tag}: ${fit.slack} px to spare at 1440 (24 px pre-registered)`);
+        assert.deepEqual(fit.cellOutside, [], `${tag}: every cell inside the box at 1440`);
+        assert.equal(fit.hint.hidden, true, `${tag}: no scroll cue at 1440`); assert.equal(fit.shadowStart, false);
+      } else {
+        assert.ok(fit.scroll[0] > fit.scroll[1], `${tag}: the table scrolls inside its box at 390`);
+        assert.equal(fit.hint.hidden, false); assert.ok(fit.hint.height > 0); assert.equal(fit.hint.text, 'Scroll sideways for all 14 columns ›');
+        const start = await shadowAt(false), end = await shadowAt(true); result[width].shadow = {start, end};
+        assert.deepEqual([start.more, start.opacity], [true, '1'], `${tag}: the right-edge shadow while columns are hidden`);
+        assert.deepEqual([end.more, end.opacity], [false, '0'], `${tag}: no shadow at the right end`);
+        await shadowAt(false);
+      }
+    }
+    stage('O2 Compare table fit ' + tag, {slack: result[1440].slack, pane: result[1440].pane, scroll1440: result[1440].scroll, scroll390: result[390].scroll, shadow: result[390].shadow, polText: result[1440].polText});
+    return result;
+  };
+  await checkCompareFit('500 → 450 nm');
   for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
     await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
     const fit = await compareFit(); stage('N1 Compare table fit', {width, ...fit});
@@ -972,6 +1019,8 @@ try {
       const fit = await pickerFits(); m4compare[name]['fit ' + width] = {width: fit.width, need: fit.need};
       assert.ok(fit.need <= fit.width, `${name}: the widest matched pair needs ${fit.need} px, the picker has ${fit.width} px at ${width}`);
     }
+    // round 13 (O2): the 8-mode tables fit at 1440 × 900 with the same margin
+    m4compare[name].slack = (await checkCompareFit('M4 ' + name))[1440].slack;
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
     await noOverflow('M4 Compare ' + name);
   }
