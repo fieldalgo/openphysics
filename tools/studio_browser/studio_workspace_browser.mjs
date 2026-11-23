@@ -380,11 +380,14 @@ try {
   await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
   // n_eff with 8 decimals in the mode list as in the modes table; plot axes and the inspector in nm
-  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:document.querySelector('#modes-table [data-group-index-hint]')?.textContent??null,lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
+  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:document.querySelector('#modes-table-hint [data-group-index-hint]')?.textContent??null,headText:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),hintInTable:!!document.querySelector('#modes-table [data-group-index-hint]'),hintAbove:(()=>{const h=document.getElementById('modes-table-hint'),t=document.getElementById('modes-table');return !!h&&!!t&&h.nextElementSibling===t&&h.getBoundingClientRect().bottom<=t.getBoundingClientRect().top})(),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
   assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
-  assert.equal(resultsView.hint, 'Off · turn on in Study or Optical modes', 'round 12 (N4): the n_g header says how to turn it on');
+  assert.equal(resultsView.hint, 'Off · turn on in Study or Optical modes', 'round 12 (N4): the table says how to turn n_g on');
+  // round 15 (R3): the header reads just "n_g"; the hint is the line above the table, as on Compare
+  assert.deepEqual(resultsView.headText, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
+  assert.deepEqual([resultsView.hintInTable, resultsView.hintAbove], [false, true], 'R3: the n_g hint is above the table, not in it');
   // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
   assert.equal(resultsView.area.length, 2);
   assert.equal(resultsView.areaSource, 'Effective areacomputed by the engine from the saved field');
@@ -849,7 +852,8 @@ try {
   assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']); assert.deepEqual(matched.short, ['1 ↔ 1', '2 ↔ 2']);
   assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
   // the polarization cells use the modes table's words: a TM-like cell names its TM share first
-  const polarizationCell = /^(?:(?:TE-like|hybrid) · \d+\.\d % TE|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/;
+  // round 15 (R5): a hybrid cell names both shares, "hybrid · 21.7 % TE / 78.3 % TM"
+  const polarizationCell = /^(?:TE-like · \d+\.\d % TE|hybrid · \d+\.\d % TE \/ \d+\.\d % TM|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/;
   for (const r of matched.rows) { assert.match(r[1], polarizationCell); assert.match(r[2], polarizationCell); assert.match(r[6], /^[+−]\d\.\d{8}$/); }
   assert.equal(matched.note, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
   assert.deepEqual(matched.picker.map(o => o.replace(/ · overlap .*$/, '')), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
@@ -1251,9 +1255,9 @@ try {
   await noOverflow('N3 Optical modes with the group index box');
   await toNode('Study'); assert.deepEqual(await m5box(), m5off);
   await runAndWait(); await page.until("!!document.getElementById('modes-table')", 'M5 results off');
-  const ngCells = () => page.eval("({head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:(()=>{const h=document.querySelector('#modes-table [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})(),cells:[...document.querySelectorAll('#modes-table [data-group-index]')].map(e=>({text:e.textContent,title:e.title,value:e.dataset.groupIndexValue??null})),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)})");
+  const ngCells = () => page.eval("({head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:(()=>{const h=document.querySelector('#modes-table-hint [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})(),headText:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),cells:[...document.querySelectorAll('#modes-table [data-group-index]')].map(e=>({text:e.textContent,title:e.title,value:e.dataset.groupIndexValue??null})),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)})");
   const offView = await ngCells(); stage('M5 results off', offView);
-  assert.equal(offView.head.at(-1), 'n_g');
+  assert.equal(offView.head.at(-1), 'n_g'); assert.equal(offView.headText.at(-1), 'n_g', 'R3: the n_g header holds no hint');
   assert.equal(offView.hint?.text, 'Off · turn on in Study or Optical modes'); assert.ok(offView.hint.height > 0, 'the hint is visible');
   assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study or Optical modes'), JSON.stringify(offView.cells));
   await toNode('Study'); await page.click('#group-index-check'); await page.until("document.getElementById('group-index-check')?.checked===true", 'M5 checkbox on');

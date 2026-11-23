@@ -831,7 +831,9 @@ engine and older session files give the same number from the same samples:
 - **Polarization** is the TE fraction `f_TE = Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²)` over every
   triangle of the window (the column help: “TE = share of |E_x|² in |E_x|² + |E_y|², x
   horizontal”), shown as a word and the TE percentage, e.g. *TE-like · 98.2 % TE*; a TM-like cell names its TM
-  share first, *TM-like · 96.9 % TM (3.1 % TE)* (the two add to 100.0 as shown). Studio's words
+  share first, *TM-like · 96.9 % TM (3.1 % TE)*, and a hybrid cell names both, *hybrid · 21.7 % TE /
+  78.3 % TM*. Both shares come from the one fraction: TE is f_TE × 100 rounded to one decimal, and
+  TM is 100 minus that rounded TE, so the two add to exactly 100.0 as shown. Studio's words
   are **TE-like** at f_TE ≥ 0.9, **TM-like** at f_TE ≤ 0.1, otherwise **hybrid**; the engine saves
   only the number (`te_polarization_fraction`, [result format](overview.md#mode-post-processing)).
 - **Degenerate pairs**: two adjacent modes of one run whose Re n_eff differ by at most 1e-3 share one
@@ -874,9 +876,9 @@ engine and older session files give the same number from the same samples:
   difference over λ0 ± 1 nm (3 solves), materials evaluated at each wavelength”. A cell reads
   **—** in two cases:
   - The run did not compute n_g. The help reads “Turn on Also compute group index in Study or Optical modes”,
-    and the n_g header shows *Off · turn on in Study or Optical modes* under its name (in
-    Compare, when neither run computed n_g, the line above the table reads *n_g: Off · turn on in
-    Study or Optical modes* instead, so the n_g columns stay narrow).
+    and the line above the modes table reads *n_g: Off · turn on in Study or Optical modes*; the
+    header reads just *n_g* (Compare, when neither run computed n_g, has the same line above its
+    table, so the n_g columns stay narrow).
   - The engine could not match that mode at a side wavelength (`null`, for example one member
     of a degenerate pair). In the tab that ran it, the help gives the engine's reason,
     *Not matched: vacuum_wavelength 1.549 um: …*. A session file does not keep the reasons, so

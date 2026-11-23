@@ -327,8 +327,9 @@ inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Fil
 두 머리글 줄(짧은 이름, 이어서 A | B), 표 위 줄의 실행 이름, 접근 가능한 이름이 전체 짝인 *1 ↔ 1* 행 머리글, 나머지 열이
 표 상자 안에서 스크롤되는 동안 고정된 첫 열, 그 안에서 닿는 모든 열과 한 줄인 머리글·행 머리글, 그리고 군굴절률 상자의
 쉬운 설명, Physics › Optical modes에도 있어 Study와 양쪽으로, Undo로도 맞춰지는 같은 상자, 켜고 끌 때마다의
-Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n_g를 계산하지 않았을 때 n_g 머리글 아래의
-*Off · turn on in Study or Optical modes*도 확인합니다. 13차부터는 Compare 표가 1440 × 900에 들어가는지
+Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n_g를 계산하지 않았을 때의
+*Off · turn on in Study or Optical modes* 안내(15차부터는 Compare처럼 모드 표 위 줄에 있고 n_g 머리글은 *n_g*뿐)도
+확인합니다. 13차부터는 Compare 표가 1440 × 900에 들어가는지
 확인합니다(사전 등록): 500 → 450 nm 표와 8모드 표 두 개에서, Settings 창이 열린 채로(Compare는 모델 트리를
 숨김) 상자의 clientWidth가 표 너비보다 24 px 이상 크고(Linux에서 42–44 px 측정) scrollWidth를 넘지 않으며,
 잘리거나 칸 밖으로 나간 머리글·칸 글자가 없고, 모든 칸이 상자 안에 있으며, Polarization 칸은 두 줄이고 n_g
@@ -372,6 +373,7 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 그 중심점의 요소이며, 보기 제목이 보이고, 제목 줄, 보기 제목, 보기의 상자가 배너가 있을 때와 없을 때 같은지
 확인합니다. 입력이 없으면 완료 배너는 나타난 뒤 5.9–6.6초에 사라지고(1440 × 900, 페이지 안에서 측정), 실제 마우스
 누름이 있으면 300 ms 안에 사라집니다(390 × 844).
+15차부터 hybrid Polarization 문구(*hybrid · x % TE / y % TM*)도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.

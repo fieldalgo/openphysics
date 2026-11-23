@@ -74,11 +74,14 @@ export const areaText=a=>{if(!Number.isFinite(a))return '—';const u=a*1e12;ret
 // Studio's words, not the engine's: TE-like at f_TE >= 0.9, TM-like at f_TE <= 0.1, else hybrid.
 export function polarizationWord(f){return f>=0.9?'TE-like':f<=0.1?'TM-like':'hybrid';}
 export const tePercent=f=>(f*100).toFixed(1)+' % TE';
-/** The share a cell names: TE for TE-like and hybrid modes; for a TM-like mode the dominant TM share
- * first and its TE share after it, "96.9 % TM (3.1 % TE)", the two adding to 100.0. */
+/** The share a cell names: TE for a TE-like mode; for a TM-like mode the dominant TM share first and
+ * its TE share after it, "96.9 % TM (3.1 % TE)"; for a hybrid mode both, "21.7 % TE / 78.3 % TM".
+ * One fraction, one rounding: TE is f × 100 to one decimal (toFixed(1)) and TM is 100 minus that
+ * rounded TE, so the two always add to 100.0. */
 export function polarizationShare(f){
- if(polarizationWord(f)!=='TM-like')return tePercent(f);
- const te=(f*100).toFixed(1);return (100-Number(te)).toFixed(1)+' % TM ('+te+' % TE)';
+ const word=polarizationWord(f);if(word==='TE-like')return tePercent(f);
+ const te=(f*100).toFixed(1),tm=(100-Number(te)).toFixed(1);
+ return word==='TM-like'?tm+' % TM ('+te+' % TE)':te+' % TE / '+tm+' % TM';
 }
 /** Groups of consecutive modes (rows of the table, in the run's order) whose Re n_eff all lie
  * within 1e-3 of each other (the whole group, not a chain): a group of two is a degenerate pair.

@@ -388,7 +388,8 @@ whose accessible names are the full pairs, the first column frozen while the oth
 the table's box, every column reachable there and headers and row headers on one line; the group
 index box's plain note, the same box in Physics › Optical modes, synced with Study both ways and
 through Undo, a Messages line each way, *· group index on* in the next run's inputs, and the
-*Off · turn on in Study or Optical modes* hint under an n_g header when no run shown computed n_g.
+*Off · turn on in Study or Optical modes* hint when no run shown computed n_g (since round 15 on the
+line above the modes table, whose n_g header reads just *n_g*, as on Compare).
 Since round 13 the Compare table fits at 1440 × 900 (pre-registered): on the 500 → 450 nm table and
 the two 8-mode tables, with the Settings pane open (Compare hides the model tree), the box's
 clientWidth exceeds the table's width by at least 24 px (42 to 44 px measured on Linux) and its
@@ -443,6 +444,7 @@ is the element at its centre, the view title is visible, and the title row, the 
 view keep their boxes with it and without it. With no input the complete banner leaves 5.9 to 6.6 s
 after it appears (1440 × 900, measured in the page); a real mouse press leaves it within 300 ms
 (390 × 844).
+Since round 15 it also checks the hybrid Polarization words (*hybrid · x % TE / y % TM*).
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs

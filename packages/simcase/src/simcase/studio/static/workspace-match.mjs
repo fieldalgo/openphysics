@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,polarizationWord,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {degenerateGroups,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
 // runs). Each run keeps its own centroid samples, so the overlap is taken on a common grid:
@@ -175,7 +175,7 @@ export function opticalMatch(a,b){
 export function unitPolarization(run,unit){
  const {rows}=modeTableRows(opticalModes(run)),cell=rows[unit[0]].polarization;
  if(cell)return cell.text;
- const f=opticalModes(run)[unit[0]].fte;return Number.isFinite(f)?`${polarizationWord(f)} · ${tePercent(f)}`:'—';
+ const f=opticalModes(run)[unit[0]].fte;return Number.isFinite(f)?`${polarizationWord(f)} · ${polarizationWord(f)==='hybrid'?polarizationShare(f):tePercent(f)}`:'—';
 }
 /** The effective area of one unit of a run, {text, value, title}: the mode's, in µm², or for a
  * degenerate pair "mean x" (each member's value depends on the rotation within the pair). */
