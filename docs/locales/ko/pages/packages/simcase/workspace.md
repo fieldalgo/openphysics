@@ -262,7 +262,9 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    보기(페이지, 장 보기), 고른 실행, Compare 선택, 실행의 출처(여기서 계산, 파일에서 엶, 복구), 파일
    연결이나 저장 시각이 달라도 한 세션입니다. 가장 새 기록을 보여 주고, 합친 기록 중 하나라도 파일을
    가리키면 그 파일 이름을 붙이며, 이 탭에 열려 있는 세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Library** 탭, *Choose a starting model*,
-   *Model library · Choose a model*.
+   *Model library · Choose a model*. 카드의 표시는 돌리는 솔버를 적습니다: *Optical mode solver*, *Heat conduction
+   solver*, *Electric current and heat solver*, 가열 실리콘 도파로는 *Heat → optical modes · coupled*. **Run
+   study**를 누르기 전에는 아무것도 계산하지 않습니다.
 
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
 모두 교체하려면 **File › Open…**을 사용합니다. *Result for the current inputs*와 *Current inputs
@@ -314,11 +316,13 @@ Modes to find는 모델과 함께 저장됩니다. 모델 파일, 브라우저 �
 
 **Study**와 **Physics › Optical modes**의 **Also compute group index (3 solves)**(두 곳에 같은 상자 하나,
 기본값 꺼짐. 설명은 “Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one
-solve, no n_g.”이고, 켜거나 끄면 Messages가 다음 실행이 하는 일을 *Group index on: the next run also
+solve, no n_g. n_g includes the dispersion of the materials (evaluated at λ ± 1 nm).”이고, 켜거나 끄면 Messages가 다음 실행이 하는 일을 *Group index on: the next run also
 solves at λ ± 1 nm and gives n_g (about 3× slower).* 또는 *Group index off: the next run is one solve,
 without n_g.*로 알립니다)는 실행 문서에
 `results.group_index = {"wavelength_step": "1 nm"}`를 더합니다. 그러면 엔진은 같은 메시를
-λ0 − 1 nm와 λ0 + 1 nm에서도 풀고(재료는 파장마다 값을 구함), 중앙 차분으로
+λ0 − 1 nm와 λ0 + 1 nm에서도 풀고(광학 모델의 재료는 모두 physmat 기록이며 엔진이 푸는 파장마다 값을 구하므로
+n_g에 재료 분산이 들어감. **Physics › Optical modes**의 **Material data**가 *physmat materials, evaluated at
+each wavelength solved*로 알림), 중앙 차분으로
 n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배입니다([단일 study의 군굴절률](group_index.md)).
 꺼져 있으면 문서는 이전과 같은 `optical-shapes-v8` 문서이며 바이트 단위로 같습니다. 켜면 달라지는 것은
 `results.group_index`뿐이고, λ0의 n_eff와 장은 같은 값입니다. 이 상자는 Modes to find처럼 모델과 함께

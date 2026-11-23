@@ -31,6 +31,18 @@ test('R3: the modes table header reads n_g; the hint is a line above the table',
  assert.equal(M.GROUP_INDEX_HINT,'Off · turn on in Study or Optical modes');
 });
 
+test('R4: the group-index note names the material dispersion; Material data names physmat',()=>{
+ assert.ok(M.GROUP_INDEX_NOTE.endsWith(' n_g includes the dispersion of the materials (evaluated at λ ± 1 nm).'));
+ assert.equal(M.OPTICAL_MATERIAL_DATA,'physmat materials, evaluated at each wavelength solved');
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("pair('Material data',OPTICAL_MATERIAL_DATA)"));
+ assert.ok(!app.includes('Refractive indices at this wavelength'));
+ // every material Studio's optical model offers is a physmat record
+ const shapes=read('workspace-shapes.mjs'),line=shapes.split('\n').find(l=>l.startsWith('export const SHAPE_MATERIALS='));
+ const refs=[...line.matchAll(/:'([^']*)'/g)].map(m=>m[1]);
+ assert.ok(refs.length>=10&&refs.every(r=>r.startsWith('physmat:')),refs.join(','));
+});
+
 test('R5: a hybrid cell names both shares, which add to 100.0; TE-like and TM-like are unchanged',()=>{
  assert.equal(M.polarizationShare(.217),'21.7 % TE / 78.3 % TM');
  assert.equal(M.polarizationShare(.5),'50.0 % TE / 50.0 % TM');
@@ -49,4 +61,9 @@ test('R5: a hybrid cell names both shares, which add to 100.0; TE-like and TM-li
  const run={effective_index:[2.1],te_polarization_fraction:[.217],effective_area:[null],field:null,input:{model:{coreMesh:40}}};
  assert.equal(M.opticalModes(run)[0].fte,.217);
  assert.equal(W.unitPolarization(run,[0]),'hybrid · 21.7 % TE / 78.3 % TM');
+});
+
+test('R7: the Library statuses say what the model is, not "Live"',()=>{
+ assert.deepEqual(A.APPLICATIONS.map(a=>a.status),['Optical mode solver','Heat conduction solver','Electric current and heat solver']);
+ for(const app of [...A.APPLICATIONS,...A.COUPLED_TEMPLATES])assert.ok(!app.status.includes('Live'),app.status);
 });

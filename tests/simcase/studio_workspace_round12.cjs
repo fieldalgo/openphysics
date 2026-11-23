@@ -32,7 +32,7 @@ test('markPageTabs selects the shown page’s tab and makes it the one tab stop'
  assert.deepEqual(tabs.map(t=>[t.attrs['aria-selected'],t.tabIndex]),[['false',-1],['true',0],['false',-1]]);
 });
 test('the group index words: plain note, a message each way, a visible hint when n_g is off',()=>{
- assert.equal(M.GROUP_INDEX_NOTE,'Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.');
+ assert.equal(M.GROUP_INDEX_NOTE,'Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g. n_g includes the dispersion of the materials (evaluated at λ ± 1 nm).');
  assert.equal(M.groupIndexNotice(true),'Group index on: the next run also solves at λ ± 1 nm and gives n_g (about 3× slower).');
  assert.equal(M.groupIndexNotice(false),'Group index off: the next run is one solve, without n_g.');
  assert.equal(M.GROUP_INDEX_HINT,'Off · turn on in Study or Optical modes');

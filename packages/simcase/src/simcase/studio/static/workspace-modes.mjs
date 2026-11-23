@@ -145,8 +145,11 @@ export const groupIndexHelp=(step='1 nm')=>`n_g = n_eff − λ0 dn_eff/dλ0: cen
 export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study or Optical modes';
 // The box's note in Study and Optical modes, the message when it is ticked or cleared, and the
 // visible hint under an n_g header when no run shown computed n_g.
-export const GROUP_INDEX_NOTE='Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.';
+export const GROUP_INDEX_NOTE='Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g. n_g includes the dispersion of the materials (evaluated at λ ± 1 nm).';
 export const groupIndexNotice=on=>on?'Group index on: the next run also solves at λ ± 1 nm and gives n_g (about 3× slower).':'Group index off: the next run is one solve, without n_g.';
+// Optical modes › Material data: the materials are physmat records (SHAPE_MATERIALS), whose index the
+// engine evaluates at each wavelength it solves (λ, and λ ± 1 nm with the group index).
+export const OPTICAL_MATERIAL_DATA='physmat materials, evaluated at each wavelength solved';
 export const GROUP_INDEX_HINT='Off · turn on in Study or Optical modes';
 /** Whether a run computed n_g (it has the engine's group_index). */
 export const hasGroupIndex=run=>Array.isArray(run?.group_index);
