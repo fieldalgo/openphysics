@@ -541,7 +541,7 @@ function refreshWorkflow(){
   if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
   button.children[0].textContent=`${index+1}. ${step.id}`;button.children[1].textContent=step.wavelength?step.summary:step.detail;
   // The wavelength of the Study step is its own control: it opens the wavelength field.
-  if(step.id==='Study'){let chip=$('workflow-wavelength');if(!chip){chip=document.createElement('button');chip.type='button';chip.id='workflow-wavelength';chip.className='workflow-wavelength';chip.title='Edit the wavelength (Physics › Optical modes)';chip.onclick=()=>editWavelengthField();button.after(chip);}chip.hidden=!step.wavelength;chip.textContent=step.wavelength||'';chip.setAttribute('aria-label',`Wavelength ${step.wavelength?step.wavelength.slice(2):''}: edit`);}
+  if(step.id==='Study'){let chip=$('workflow-wavelength');if(!chip){chip=document.createElement('button');chip.type='button';chip.id='workflow-wavelength';chip.className='workflow-wavelength';chip.title='Edit the wavelength (Physics › Optical modes)';chip.onclick=()=>editWavelengthField();button.after(chip);}chip.hidden=!step.wavelength;chip.textContent=step.wavelength||'';chip.setAttribute('aria-label',`Wavelength ${step.wavelength?step.wavelength.slice(2):''}, edit`);}
  });
 }
 function rejectInvalidInput(){

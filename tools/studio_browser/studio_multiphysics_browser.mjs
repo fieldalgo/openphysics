@@ -292,7 +292,14 @@ try {
   // the input without a source is a warning in Messages, the tree and the node; the removal offers Undo
   const unsourced = 'Temperature input has no source: uses n₀ at T_ref (300 K)';
   assert.equal(await page.text('#mp-messages [data-mp-warning="modes1"] p'), 'Modes 1: ' + unsourced + '.');
-  assert.equal(await page.attr('#tree [data-mp-node="physics:modes1"] .warn-badge', 'title'), unsourced);
+  // round 15 (R9): the badge names the physics and the problem, as its title and its accessible name (an image)
+  assert.equal(await page.attr('#tree [data-mp-node="physics:modes1"] .warn-badge', 'title'), 'Modes 1: ' + unsourced);
+  {const {result: doc} = await page.call('Runtime.evaluate', {expression: 'document'});
+   const {nodes} = await page.call('Accessibility.queryAXTree', {objectId: doc.objectId, accessibleName: 'Modes 1: ' + unsourced, role: 'image'});
+   const found = nodes.filter(n => !n.ignored); assert.equal(found.length, 1, 'R9: one image named "Modes 1: ' + unsourced + '"');
+   const {object} = await page.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+   const badge = await page.call('Runtime.callFunctionOn', {objectId: object.objectId, functionDeclaration: 'function(){return this.className+" "+(this.closest("[data-mp-node]")?.dataset.mpNode||"")}', returnByValue: true});
+   assert.equal(badge.result.value, 'warn-badge physics:modes1');}
   assert.equal(await page.text('.mp-stage [data-mp-warning="modes1"]'), '! ' + unsourced);
   assert.equal(await page.text('#view-detail'), '2 physics · no couplings');
   // the heater-off option stays where it was, disabled, and says why

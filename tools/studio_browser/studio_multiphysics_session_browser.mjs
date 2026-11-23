@@ -591,7 +591,7 @@ print(n)`;
   stage('L7 heated card offer', heatedOffer);
   assert.ok(heatedOffer.text.startsWith('Restore from this browser · Heated silicon waveguide · Run '), heatedOffer.text);
   assert.ok(heatedOffer.text.includes(' · same as file ' + r1Name + ', saved '), heatedOffer.text); assert.match(heatedOffer.text, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
-  assert.equal(heatedOffer.next, 'Start new'); assert.equal(heatedOffer.card, 'heated-waveguide');
+  assert.equal(heatedOffer.next, 'Start new (no runs)'); assert.equal(heatedOffer.card, 'heated-waveguide');
   assert.ok(!heatedOffer.top.includes(heatedOffer.record), 'the box above does not list the record the card restores');
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
     await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'L7 ' + tag);
@@ -703,7 +703,11 @@ print(n)`;
   // R1: the Optical waveguide card offers the runs from browser recovery first, then Start new
   await page.until("!!document.getElementById('resume-optical')", 'optical resume offer');
   const offer = await page.eval("({resume:document.getElementById('resume-optical').textContent,next:document.getElementById('resume-optical').nextElementSibling?.textContent,card:document.getElementById('resume-optical').closest('.card-slot')?.querySelector('[data-template]')?.dataset.template})");
-  assert.match(offer.resume, /^Restore from this browser · Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(offer.next, 'Start new'); assert.equal(offer.card, 'optical');
+  assert.match(offer.resume, /^Restore from this browser · Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(offer.next, 'Start new (no runs)'); assert.equal(offer.card, 'optical');
+  // round 15 (R10): each card says what it does; the card offer keeps its words
+  {const cards = await page.eval("[...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action')?.textContent??null,(()=>{const r=b.querySelector('.card-action')?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0})()])");
+   stage('R10 card actions', {cards});
+   assert.deepEqual(cards, ['optical', 'heat', 'joule', 'heated-waveguide'].map(id => [id, 'Open (runs stay in this tab)', true]));}
   // R2: each stored session once, newest first, the file named where a record came from one
   const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});

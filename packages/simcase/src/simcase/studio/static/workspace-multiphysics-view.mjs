@@ -230,7 +230,9 @@ export function createMultiphysicsView(ctx){
   const group=name=>groupHeading(name,!treeView.collapsed.has(name));
   const multi=isMultiphysics(doc)||couplingNames(doc).length>0;
   const warned=new Map(unsourcedInputs(doc,catalog).map(w=>[w.physics,w.text]));
-  const warn=n=>warned.has(n)?`<span class="warn-badge" title="${esc(warned.get(n))}" aria-label="warning: ${esc(warned.get(n))}">!</span>`:'';
+  // the badge names the physics and the problem, as Messages does ("Modes 1: Temperature input has no
+  // source: …"), as its title and, as an image, its accessible name (a plain span's aria-label is not one)
+  const warn=n=>{if(!warned.has(n))return '';const words=esc(`${physicsLabel(n)}: ${warned.get(n)}`);return `<span class="warn-badge" role="img" title="${words}" aria-label="${words}">!</span>`;};
   const physics=physicsNames(doc).map(n=>item('physics:'+n,`${physicsLabel(n)} · ${catalog.types.get(doc.physics[n].type)?.label||doc.physics[n].type}`,TYPE_MARK[doc.physics[n].type]||MARK.physics,multi?badge(n):'').replace(/<\/button>$/,warn(n)+'</button>')).join('');
   const couplings=couplingNames(doc).map(c=>item('coupling:'+c,couplingTitle(doc,c),MARK.coupling)).join('')||`<div role="treeitem" aria-level="2" aria-disabled="true" tabindex="-1" class="muted tree-empty">No couplings</div>`;
   const loops=(Array.isArray(doc.study?.loops)?doc.study.loops:[]).map((l,i)=>item('loop:'+i,`Iteration step ${i+1} · ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`,MARK.loop,'',true)).join('');

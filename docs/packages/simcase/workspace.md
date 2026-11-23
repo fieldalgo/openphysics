@@ -154,7 +154,7 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    rule still refuses a size that would leave the window. Projects saved earlier keep
    their stored coordinates. The step bar's **4. Study** shows *Ready to run*, and *Run
    complete* once these inputs have a result; next to it the wavelength (for example
-   **λ 1550 nm**) is a button that opens the wavelength field. Optionally set the
+   **λ 1550 nm**) is a button, named *Wavelength 1550 nm, edit*, that opens the wavelength field. Optionally set the
    wavelength in **Physics › Optical modes** (its settings are headed *Optical modes*) or in
    the Study's execution settings: both hold the same field, as both hold **Modes to find**
    (**Study → Edit wavelength** and the step bar's wavelength open it under Optical modes,
@@ -262,7 +262,8 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    recovery (**Workspace tools** shows when it was last updated). After a reload or a
    Studio restart, the start page shows **Continue where you left off** with
    **Restore from this browser: Last session in this browser …** and any earlier ones
-   (**Restore earlier from this browser: …**) and **Start new**. **Open session file…** has one
+   (**Restore earlier from this browser: …**) and **Not now (choose a model below)**, which only
+   closes the box. **Open session file…** has one
    fixed place, at the top of the Library above the box and the cards, whatever they offer,
    with the note that a session file is the copy that moves between computers; browser
    recovery stays in this browser. It does what **File › Open…** does. The Library page has one phrase for browser recovery,
@@ -289,7 +290,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    session** with the session file that holds them, or that nothing does. While the tab holds no optical
    runs and browser recovery holds an optical session, for example after a restart, the Optical
    waveguide card offers it first, *Restore from this browser · Optical waveguide · Run 1 ·
-   design A, Run 2 · 2:25 PM*, next to **Start new**. The Heated silicon waveguide card does the
+   design A, Run 2 · 2:25 PM*, next to **Start new (no runs)**, which opens the model without those
+   runs, as the card itself does. Each card ends in *Open (runs stay in this tab)*: choosing a model
+   keeps the runs this tab holds, and the restore offer brings back the browser's runs. The Heated silicon waveguide card does the
    same for the newest multiphysics session while the tab holds no multiphysics runs, *Restore
    from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. An
    offer whose record is the same as the session file it was saved to names the file's save
@@ -570,7 +573,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   input could obviously be fed (Modes 1 temperature from Heat 1), Messages suggests the
   coupling; nothing is coupled until you add it. Until then Modes 1 carries a warning in the
   tree, on its Connections node, in its Settings and in Messages: “Temperature input has no
-  source: uses n₀ at T_ref (300 K)”. Without a coupled temperature the optical solve applies no
+  source: uses n₀ at T_ref (300 K)”. The tree's **!** badge is named with the physics and the
+  problem, as its tooltip and its accessible name: *Modes 1: Temperature input has no source: uses
+  n₀ at T_ref (300 K)*. Without a coupled temperature the optical solve applies no
   index change, so every material keeps n₀, its index at its reference temperature (the shared
   T_ref is named when every material has the same one). Removing a coupling leaves a message
   with **Undo** until the next edit.

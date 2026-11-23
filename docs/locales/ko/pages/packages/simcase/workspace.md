@@ -137,7 +137,7 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    그 자리에서 가운데를 지킵니다. 계산창을 벗어나는 크기는 기존 규칙대로 거부됩니다. 이전에
    저장한 프로젝트는 저장된 좌표를 그대로 씁니다. 단계 표시줄의 **4. Study**에는 *Ready to run*이,
    현재 입력의 결과가 생기면 *Run complete*가 나오고, 옆의 파장(예: **λ 1550 nm**)은 파장 입력란을
-   여는 버튼입니다. 필요하면 **Physics › Optical modes**(설정 제목도 *Optical modes*) 또는 Study 실행
+   여는 버튼이며 이름은 *Wavelength 1550 nm, edit*입니다. 필요하면 **Physics › Optical modes**(설정 제목도 *Optical modes*) 또는 Study 실행
    설정에서 파장을 바꿉니다. **Modes to find**처럼 두 곳은 같은 입력란이며, **Study → Edit wavelength**와
    단계 표시줄의 파장은 Optical modes의 그 입력란에 포커스를 둔 채 엽니다. Study 설정은 Results가 어느
    실행을 보여 주든 다음 실행이 쓸 입력도 밝힙니다: *Next run uses 700 × 300 nm · Silicon · λ 1550 nm ·
@@ -226,8 +226,8 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면의 **Continue where you left off** 카드에 **Restore from this browser: Last
-   session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), **Start new**가
-   나옵니다. **Open session file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳에 고정되어
+   session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), 상자만 닫는 **Not now (choose a model
+   below)**가 나옵니다. **Open session file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳에 고정되어
    있고, 세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
    함께 있습니다. 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
    from this browser*로 부릅니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
@@ -249,7 +249,9 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    **Library › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
    다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
-   waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 **Start new**. 탭에 다중물리 실행이 없으면 Heated
+   waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 그 실행 없이 모델을 여는(카드 자체와 같음) **Start new (no
+   runs)**. 카드마다 끝에 *Open (runs stay in this tab)*이 있습니다: 모델을 골라도 이 탭의 실행은 남고, 복원
+   제안은 브라우저의 실행을 되살립니다. 탭에 다중물리 실행이 없으면 Heated
    silicon waveguide 카드도 가장 새 다중물리 세션을 같은 방식으로 제안합니다: *Restore from this browser ·
    Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. 기록이 저장했던 세션 파일과 같으면
    기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은
@@ -483,7 +485,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   유일한 방식인 Same mesh입니다. 분명히 이을 수 있는 입력(Heat 1에서 받는 Modes 1 온도)이 있으면
   Messages가 결합을 제안하지만, 직접 추가하기 전에는 아무것도 결합되지 않습니다. 그동안 Modes 1은
   트리, Connections 노드, Settings, Messages에 경고를 답니다: “Temperature input has no source:
-  uses n₀ at T_ref (300 K)”. 결합된 온도가 없으면 광 풀이는 굴절률을 바꾸지 않으므로 모든 재료가
+  uses n₀ at T_ref (300 K)”. 트리의 **!** 배지는 물리와 문제를 이름으로 가집니다(도움말과 접근성 이름):
+  *Modes 1: Temperature input has no source: uses n₀ at T_ref (300 K)*. 결합된 온도가 없으면 광 풀이는 굴절률을 바꾸지 않으므로 모든 재료가
   n₀, 곧 자기 기준 온도에서의 굴절률을 그대로 씁니다(모든 재료의 T_ref가 같을 때만 그 값을
   적습니다). 결합을 지우면 다음 편집까지 **Undo**가 있는 메시지가 남습니다.
 - **포트는 끌지 않습니다.** 포트 점은 각 물리가 보내고 받는 것을 보여 주며, 도움말은 짝을 검사하는

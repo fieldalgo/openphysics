@@ -348,6 +348,13 @@ try {
   stage('600 × 300 nm design', sized); assert.deepEqual([sized.x, sized.y], ['-300', '0']); assert.match(sized.study, /Ready to run/);
   // the step bar's wavelength opens the wavelength field under Physics › Optical modes
   assert.equal(await text('#workflow-wavelength'), 'λ 1550 nm');
+  // round 15 (R8): a real button whose accessible name says what it does, as assistive technology finds it
+  {const {result: doc} = await page.call('Runtime.evaluate', {expression: 'document'});
+   const {nodes} = await page.call('Accessibility.queryAXTree', {objectId: doc.objectId, accessibleName: 'Wavelength 1550 nm, edit', role: 'button'});
+   const found = nodes.filter(n => !n.ignored); assert.equal(found.length, 1, 'R8: one button named "Wavelength 1550 nm, edit"');
+   const {object} = await page.call('DOM.resolveNode', {backendNodeId: found[0].backendDOMNodeId});
+   const chip = await page.call('Runtime.callFunctionOn', {objectId: object.objectId, functionDeclaration: 'function(){return this.id+" "+this.tagName+" "+this.type}', returnByValue: true});
+   stage('R8 wavelength chip', {ax: found[0].name?.value, element: chip.result.value}); assert.equal(chip.result.value, 'workflow-wavelength BUTTON button');}
   await page.click('#workflow-wavelength'); await sleep(200);
   const wavelengthField = await page.eval("({heading:document.querySelector('#inspector h2')?.textContent,focused:document.activeElement?.id,tree:document.querySelector('#tree [aria-current],#tree .selected,#tree [aria-selected=true]')?.textContent?.trim()||null})");
   stage('wavelength from the step bar', wavelengthField); assert.equal(wavelengthField.heading, 'Optical modes'); assert.equal(wavelengthField.focused, 'wavelength-number');
