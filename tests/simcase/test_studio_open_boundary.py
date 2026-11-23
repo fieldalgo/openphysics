@@ -36,7 +36,7 @@ def test_capabilities_v9_is_v8_with_the_open_boundary(client):
     assert v9.pop("open_boundary") == {
         "edges": ["left", "right", "bottom", "top"], "edge_states": ["closed", "open"], "edge_default": "closed",
         "pml_thickness_range": ["1 um", "1 um"], "pml_thickness_default": "1 um", "pml_strength": 3, "pml_order": 2,
-        "pml_minimum_physical_fraction": 0.5, "pml_search_mode_count": 32,
+        "pml_minimum_physical_fraction": 0.5, "pml_search_mode_count": 32, "pml_check_strength": 6,
         "target_effective_index_default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
         "target_effective_index_bounds": "above 1.45 and below n_max"}
     assert (v9.pop("schema_version"), v9.pop("adapter")) == (9, "optical-shapes-v9")
@@ -65,7 +65,8 @@ def _instance(client):
 
 
 @pytest.mark.parametrize("change", [
-    {"pml_strength": 6}, {"pml_order": 3}, {"pml_minimum_physical_fraction": 0.1}, {"pml_search_mode_count": 6},
+    # strength 6 is the PML check's (slice P2, a change of P1's contract): 4, 6.0 and 1.5 are refused
+    {"pml_strength": 4}, {"pml_strength": 6.0}, {"pml_strength": 1.5}, {"pml_order": 3}, {"pml_minimum_physical_fraction": 0.1}, {"pml_search_mode_count": 6},
     {"pml_search_mode_count": 16.0}, {"pml_order": True}, {"pml_thickness": {"top": "999 nm"}},
     {"pml_search_mode_count": 16}, {"pml_thickness": {"top": "1500 nm"}}, {"pml_thickness": {"top": "2000 nm"}},
     {"pml_thickness": {"top": "1 um"}}, {"pml_thickness": {"top": "1000 nm", "bottom": "1500 nm"}},
@@ -92,6 +93,14 @@ def test_the_server_refuses_another_workspace_pml(client, change):
 
 def test_the_server_takes_the_v9_document(client):
     doc = json.loads(build("strip_substrate", 2, edges=TOP_BOTTOM))
+    response = client.post("/api/validate", params=_instance(client), json={"doc": doc})
+    assert response.status_code == 200 and response.json()["ok"], response.text
+
+
+def test_the_server_takes_the_pml_check_document(client):
+    # the PML check (slice P2): the same document with strength 6
+    doc = json.loads(build("template", 2, edges=ALL))
+    doc["physics"]["em1"]["pml"]["pml_strength"] = 6
     response = client.post("/api/validate", params=_instance(client), json={"doc": doc})
     assert response.status_code == 200 and response.json()["ok"], response.text
 
