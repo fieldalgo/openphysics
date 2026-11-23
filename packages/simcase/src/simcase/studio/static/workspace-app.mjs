@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,slowOptionsText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -484,7 +484,7 @@ function refreshInputIssues(){
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max}${field.unit?' '+field.unit:''}.`;
  }
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
- $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;
+ $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
  else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
@@ -1089,6 +1089,9 @@ const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.oncha
 // The wavelength and Modes to find: one field each, the same in Physics › Optical modes and in
 // Study (only one of the two panels is shown at a time, so the ids stay unique).
 const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" type="number" min="1400" max="1700" step="any" value="${state.wavelength}"></label>`;
+// round 17 (U3): the slow options the next optical run uses, beside Run study; the options keep
+// their state (a task does not reset them), so a run that is slower than one solve says why first
+function refreshRunOptions(){const host=$('run-options');if(!host)return;const text=isOptical()&&!multiView.active()?slowOptionsText({groupIndex:state.groupIndex,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount}):'';host.textContent=text;host.hidden=!text;host.title=text?'Options of the next run that make it slower; change them in Study or Physics › Optical modes':'';}
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
@@ -1147,7 +1150,7 @@ function renderOpticalStudy(){
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
  panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true,state.modeCount)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>Window and boundaries are fixed. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
- bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;notice(box.checked?`PML check on: the next run solves the same mesh again with strength 6, once per mode (${state.modeCount} more solve${state.modeCount===1?'':'s'} at most).`:'PML check off: the next run is one solve.');};}
+ bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;refreshRunOptions();notice(box.checked?`PML check on: the next run solves the same mesh again with strength 6, once per mode (${state.modeCount} more solve${state.modeCount===1?'':'s'} at most).`:'PML check off: the next run is one solve.');};}
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
 }
