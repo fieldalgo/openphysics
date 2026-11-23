@@ -1172,8 +1172,11 @@ try {
     for (const [role, name] of [['button', 'File'], ['button', 'Edit'], ['button', 'Open'], ['button', 'Save']]) assert.equal(await axNamed(role, name), 1, `${role} ${name}`);
     await page.eval("document.getElementById('file-menu-button').focus()"); await press('Enter');
     const fileMenu = await page.eval("(()=>{const m=document.getElementById('file-menu');return {open:!m.hidden,expanded:document.getElementById('file-menu-button').getAttribute('aria-expanded'),role:m.getAttribute('role'),label:m.getAttribute('aria-label'),items:[...m.querySelectorAll(':scope>[role=menuitem],:scope>[role=none]>[role=menuitem]')].map(b=>[b.querySelector('span').textContent,b.getAttribute('aria-keyshortcuts'),b.querySelector('.menu-keys')?.textContent??null])}})()");
-    stage('F1 File menu', fileMenu);
-    assert.deepEqual(fileMenu, {open: true, expanded: 'true', role: 'menu', label: 'File', items: [['Open…', 'Control+O Meta+O', 'Ctrl+O'], ['Save', 'Control+S Meta+S', 'Ctrl+S'], ['Save As…', 'Control+Shift+S Meta+Shift+S', 'Shift+Ctrl+S'], ['Export', null, null], ['Browser copy', null, null]]});
+    // the shortcuts as the platform writes them: ⌘ on macOS, Ctrl elsewhere
+    const apple = await page.eval("/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')");
+    stage('F1 File menu', {...fileMenu, apple});
+    const shown = apple ? ['⌘O', '⌘S', '⇧⌘S'] : ['Ctrl+O', 'Ctrl+S', 'Shift+Ctrl+S'];
+    assert.deepEqual(fileMenu, {open: true, expanded: 'true', role: 'menu', label: 'File', items: [['Open…', 'Control+O Meta+O', shown[0]], ['Save', 'Control+S Meta+S', shown[1]], ['Save As…', 'Control+Shift+S Meta+Shift+S', shown[2]], ['Export', null, null], ['Browser copy', null, null]]});
     assert.equal(await axNamed('menu', 'File'), 1);
     for (const name of ['Open…', 'Save', 'Save As…', 'Export', 'Browser copy']) assert.equal(await axNamed('menuitem', name), 1, 'menuitem ' + name);
     const focusId = () => page.eval("document.activeElement.id");
