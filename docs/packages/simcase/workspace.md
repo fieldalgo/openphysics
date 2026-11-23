@@ -116,8 +116,9 @@ example a managed browser that refuses it), Studio asks for the **File name** in
 ASCII letters, digits, spaces and `.`, `_`, `-`, `(`, `)` only (other characters are removed),
 with `.json` added if missing. It notes
 that your browser saves to its Downloads folder, or asks where if you set it to, and (opened by
-Save As) that later saves download again under this name and that Chrome and Edge save to the
-same file. A browser without the save dialog cannot overwrite a file: it keeps each save as a new
+Save As) *This browser cannot write to the file, so later saves download again under this name
+and may add “ (1)”.* Chrome and Edge, where their save dialog works, write to the same file
+instead and never show this dialog. A browser without the save dialog cannot overwrite a file: it keeps each save as a new
 download. **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
@@ -428,10 +429,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    runs and browser recovery holds an optical session, for example after a restart, the Optical
    waveguide card offers it first, *Restore from this browser · Optical waveguide · Run 1 ·
    design A, Run 2 · 2:25 PM*, next to **Start new (no runs)**, which opens the model without those
-   runs, as the card itself does. Each card ends in *Open (runs stay in this tab)*: choosing a model
-   keeps the runs this tab holds, and the restore offer brings back the browser's runs. Opening a
-   model of the tab that has runs returns to the page it was left on: the optical model to its
-   Results or Compare and the run last viewed, the heated model to its Results. The Heated silicon waveguide card does the
+   runs, as the card itself does. Each card ends in **Open model**, and its description ends in
+   *Runs stay in this tab until you close it.*: choosing a model keeps the runs this tab holds,
+   and the restore offer brings back the browser's runs. Opening a model of the tab that has
+   runs returns to the page it was left on: the optical model to its Results or Compare and the
+   run last viewed, the heated model to its Results. The Heated silicon waveguide card does the
    same for the newest multiphysics session while the tab holds no multiphysics runs, *Restore
    from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. An
    offer whose record is the same as the session file it was saved to names the file's save

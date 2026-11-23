@@ -102,7 +102,9 @@ cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), �
 **File name**을 묻습니다. 영문(ASCII) 글자, 숫자, 공백과 `.`, `_`, `-`, `(`, `)`만 받고(다른 문자, 예를 들어
 한글은 지워짐), `.json`이 없으면 붙입니다.
 브라우저가 Downloads 폴더에 저장하거나, 그렇게 설정했다면 위치를 묻는다고 안내하고, (Save As로 열었을 때는)
-이후 저장은 이 이름으로 다시 내려받으며 Chrome과 Edge는 같은 파일에 저장한다고 알립니다. 저장 대화상자가
+*This browser cannot write to the file, so later saves download again under this name and may add “ (1)”.*라고
+알립니다(이 브라우저는 파일에 쓸 수 없어 이후 저장도 이 이름으로 다시 내려받고 “ (1)”이 붙을 수 있음). 저장
+대화상자가 동작하는 Chrome과 Edge는 이 대화상자를 보이지 않고 같은 파일에 씁니다. 저장 대화상자가
 없는 브라우저는 파일을 덮어쓸 수 없어 저장할 때마다 새 다운로드로 남깁니다. **Download**는 파일을
 브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
@@ -366,9 +368,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
    다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
    waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 그 실행 없이 모델을 여는(카드 자체와 같음) **Start new (no
-   runs)**. 카드마다 끝에 *Open (runs stay in this tab)*이 있습니다: 모델을 골라도 이 탭의 실행은 남고, 복원
-   제안은 브라우저의 실행을 되살립니다. 실행이 있는 탭의 모델을 열면 떠날 때의 페이지로 돌아갑니다: 광학 모델은
-   Results나 Compare와 마지막으로 본 실행으로, 가열 모델은 Results로. 탭에 다중물리 실행이 없으면 Heated
+   runs)**. 카드마다 끝에 **Open model**이 있고 설명 끝에 *Runs stay in this tab until you close it.*이 있습니다:
+   모델을 골라도 이 탭의 실행은 남고, 복원 제안은 브라우저의 실행을 되살립니다. 실행이 있는 탭의 모델을 열면 떠날
+   때의 페이지로 돌아갑니다: 광학 모델은 Results나 Compare와 마지막으로 본 실행으로, 가열 모델은 Results로. 탭에 다중물리 실행이 없으면 Heated
    silicon waveguide 카드도 가장 새 다중물리 세션을 같은 방식으로 제안합니다: *Restore from this browser ·
    Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. 기록이 저장했던 세션 파일과 같으면
    기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은

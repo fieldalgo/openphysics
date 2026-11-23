@@ -42,7 +42,7 @@ import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,LATER_SAVES_NOTE,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -1288,6 +1288,8 @@ const recoveredFileName=(savedFile,openedFile,openedCurrent)=>savedFile?.current
 const nameDialog=document.createElement('dialog');nameDialog.id='save-name-dialog';nameDialog.setAttribute('aria-labelledby','save-name-title');nameDialog.setAttribute('aria-describedby','save-name-note');
 nameDialog.innerHTML='<form method="dialog"><h2 id="save-name-title">Save As</h2><p id="save-name-unavailable" hidden></p><label for="save-name-input">File name</label><input id="save-name-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" aria-describedby="save-name-hint"><small id="save-name-hint">Letters, digits, spaces and . _ - ( ) only; .json is added if missing.</small><p id="save-name-note">Your browser saves to its Downloads folder, or asks where if you set it to.</p><div class="leave-actions"><button type="button" id="save-name-cancel">Cancel</button> <button type="submit" id="save-name-download" class="primary">Download</button></div></form>';
 document.body.append(nameDialog);
+// Round 16: the Save As note on the download path (the Chrome and Edge sentence is in the docs only)
+const DOWNLOAD_SAVE_AS_NOTE='This browser cannot write to the file, so later saves download again under this name and may add “ (1)”.';
 let nameAnswer=null;
 // Resolves the sanitised name, or null on Cancel or Escape.
 function askFileName(suggested,{saveAs,unavailable=null}){
@@ -1296,7 +1298,7 @@ function askFileName(suggested,{saveAs,unavailable=null}){
   nameAnswer=value=>{nameAnswer=null;if(nameDialog.open)nameDialog.close();restoreDialogFocus(opener);resolve(value);};
   $('save-name-title').textContent=saveAs?'Save As':'Save';
   $('save-name-unavailable').hidden=!unavailable;$('save-name-unavailable').textContent=unavailable?`The browser's save dialog was not available (${unavailable}), so the file is downloaded instead.`:'';
-  $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+LATER_SAVES_NOTE+' Chrome and Edge save to the same file.':' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
+  $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+DOWNLOAD_SAVE_AS_NOTE:' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
   const input=$('save-name-input');input.value=suggested;nameDialog.showModal();input.focus();input.select();
  });
 }
