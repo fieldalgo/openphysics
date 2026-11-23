@@ -43,6 +43,18 @@ or 16 (default12), compared with degree−2. Ground modes are explicitly 64–40
 (default128), compared with twice that count and higher quadrature. The solver
 never silently changes a requested setting.
 
+The smooth part is first interpolated on one box around every conductor. When
+that degree−2 comparison exceeds 1e-10, the same comparison is repeated once,
+with the same degree, panels and quadrature, on boxes that split each conductor
+into equal x intervals no wider than its distance to the nearer plane. One wide
+box converges slowly for coupled, layered and broadside striplines because the
+plane images lie close to it. The result then reports
+`smooth_interpolation_boxes` (>1) and the failed `single_box_matrix_error`;
+otherwise these are 1 and None, and the calculation is unchanged bit for bit.
+A box of zero extent, or a repeated comparison above 1e-10, is refused. With
+typical inputs this admitted all ten coupled, layered and broadside stripline
+templates of the SIPI catalog that previously failed this check.
+
 Internal matrix, reciprocity, residual, energy, current-conservation and ground
 refinement checks retain a 1e-10 gate. The matrix condition bound must be below
 1e10, and current Gram matrices must be positive semidefinite within the same
