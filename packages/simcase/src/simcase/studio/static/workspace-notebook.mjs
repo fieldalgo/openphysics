@@ -256,7 +256,7 @@ export function sessionStudyInput(input,selected){
 export function withPmlCheck(runs,selected,job,check){
  const run=runs.find(r=>r.job===job);
  if(!run)throw Object.assign(new Error('The run of this PML check is no longer kept; the check is not stored. Detach this job.'),{code:'solver-failed'});
- const checked=validateRun({...run,pml_check:check});if(Number.isInteger(run.inputRevision))checked.inputRevision=run.inputRevision;
+ const checked=validateRun({...run,pml_check:check});if(Number.isInteger(run.inputRevision))checked.inputRevision=run.inputRevision;if(Number.isInteger(run.number))checked.number=run.number;
  return {runs:runs.map(r=>r===run?checked:r),selected:selected===run?checked:selected};
 }
 export function appendRun(runs,run){
@@ -324,11 +324,13 @@ export const keptRuns=(runs,selected)=>new Set(runs.filter(run=>run.pinned||run.
 export function writeOpticalSession(input,runs,selected,comparison,view,{keepSelected=false,limit=MAX_SESSION_BYTES}={}){
  const size=text=>new TextEncoder().encode(text).length;
  const fullText=sessionText(input,runs,selected,comparison,view),full=size(fullText);
- const without=keep=>runs.map((run,i)=>!keep.has(run.job)||!run.field?i+1:0).filter(Boolean);
+ // a run's number in this tab (round 17, U2), else its place in the list
+ const number=(run,i)=>Number.isInteger(run.number)?run.number:i+1;
+ const without=keep=>runs.map((run,i)=>!keep.has(run.job)||!run.field?number(run,i):0).filter(Boolean);
  if(full<=limit)return {ok:true,text:fullText,bytes:full,notKept:without(new Set(runs.filter(r=>r.field).map(r=>r.job)))};
  const keep=keptRuns(runs,selected),reducedText=sessionText(input,runs,selected,comparison,view,{keep}),reduced=size(reducedText),notKept=without(keep);
  if(reduced<=limit)return keepSelected?{ok:true,text:reducedText,bytes:reduced,notKept}:{ok:false,bytes:full,reduced:{bytes:reduced,notKept},refusal:null};
- const kept=runs.map((run,i)=>keep.has(run.job)?'Run '+(i+1):null).filter(Boolean);
+ const kept=runs.map((run,i)=>keep.has(run.job)?'Run '+number(run,i):null).filter(Boolean);
  return {ok:false,bytes:full,reduced:null,refusal:`The selected and pinned runs (${kept.join(', ')}) are ${sizeText(reduced)} with their fields, over the 16 MiB session limit. Unpin some of them.`};
 }
 export function opticalOverflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the fields of the selected and pinned runs only? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields.`;}

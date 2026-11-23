@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -253,7 +253,7 @@ function projectLine(){
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
 function clearWorkspace(){
- runs=[];solverRun=null;compareIds=[null,null];comparePicked=false;workspaceReturn=null;lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
+ runs=[];runNumbersUsed=0;solverRun=null;compareIds=[null,null];comparePicked=false;workspaceReturn=null;lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
  const shown=multiView.active(),page=ui.page;
  applyProject(DEFAULT_INPUTS,{saved:true,resetHistory:true,quiet:true});
  if(shown){workspacePhysics=null;ui.page=page;}else Object.assign(state,INITIAL_PHYSICS);
@@ -744,7 +744,7 @@ function completeLoad(pending){
  projectId('workspace');
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
-  const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];comparePicked=pairChosen(runs,compareIds);restoreView(session.view);
+  const session=pending.session;runs=session.runs;runNumbersUsed=0;for(const r of runs)delete r.number;runNumbersUsed=numberRuns(runs);solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];comparePicked=pairChosen(runs,compareIds);restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
   const input=sessionStudyInput(session.input,solverRun);
@@ -857,7 +857,11 @@ document.addEventListener('keydown',event=>{
 // The run Results shows (the selected run), which the dock, the footer, the step bar and the title describe.
 function viewedRun(){return runs.includes(solverRun)?solverRun:null;}
 // comparePicked: the pair was picked on Compare (or read as chosen from a file), so new runs keep it (round 16)
-let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null],comparePicked=false;const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
+let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null],comparePicked=false;
+// the largest run number used in this tab (round 17, U2: workspace-workflow.mjs numberRuns)
+let runNumbersUsed=0;
+// the message of the runs a new run dropped (the run limit), said after the run's own message
+let droppedNote='';const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
 let notebookRecoveryRecord=null,notebookLoadVersion=0;
 // The last session file saved (or recovered as saved): {name, savedAt, stamp}; stamp is the
 // inputs and runs it held, so the title shows it as saved until the next edit or run.
@@ -1333,7 +1337,8 @@ const savedWhere=result=>result.via==='picker'?`Saved to ${result.name}`:result.
 // with seconds: unnamed runs of the same minute read apart
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 // A run in the run list and the Compare pickers: its number with its name, then its inputs and time.
-function runNumber(run){return runs.includes(run)?runs.indexOf(run)+1:null;}
+// a run's number in this tab (round 17, U2): it never changes while the run is kept
+function runNumber(run){return runs.includes(run)&&Number.isInteger(run.number)?run.number:null;}
 function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+' · ':run.label?run.label+' · ':''}${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
 // Where a run came from, kept out of the primary labels and available on request.
 // The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
@@ -1598,8 +1603,8 @@ $('confirm-run-import').onclick=()=>{
  const pending=pendingRunImport;pendingRunImport=null;workspaceLoads.invalidate();runImportDialog.close();if(!pending)return;
  if(solverBusy||pendingJob||runListStamp()!==pending.stamp){notice('Notebook changed while reviewing the import. Open the file again to review current changes.');return;}
  const previous=solverRun;const next=pending.merged.runs;const selected=next.find(run=>run.job===pending.session.selected)||next.findLast(run=>pending.session.runs.some(imported=>imported.job===run.job));
- runs=next;solverRun=selected||runs.at(-1);const other=runs.find(run=>run.job===previous?.job&&run.job!==solverRun.job)||runs.findLast(run=>run.job!==solverRun.job)||solverRun;
- compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.');
+ const dropped=runs.filter(r=>!next.includes(r));runNumbersUsed=numberRuns(next,runNumbersUsed);runs=next;solverRun=selected||runs.at(-1);const other=runs.find(run=>run.job===previous?.job&&run.job!==solverRun.job)||runs.findLast(run=>run.job!==solverRun.job)||solverRun;
+ compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.'+dropped.map(r=>' '+droppedRunText(r)).join(''));
 };
 
 // The server's check of a document (/api/multiphysics/validate), as the reader reads it.
@@ -1832,6 +1837,8 @@ const DONE_BANNER_MS=6000;let doneBannerTimer=0;
 function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}
 for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
+ // the runs this result dropped (the run limit) are named after the run's own message (round 17, U2)
+ if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  clearTimeout(doneBannerTimer);doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
  $('job-message').textContent=state.message;
@@ -1864,7 +1871,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):reasons;}
- completed.inputRevision=pending.revision;const next=appendRun(runs,completed);runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ completed.inputRevision=pending.revision;const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';
 }});
 function refreshJobControls(){

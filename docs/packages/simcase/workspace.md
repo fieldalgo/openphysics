@@ -317,7 +317,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    run uses them; Undo takes them back.*), and the same words stay in the run panel where the
    button was until the next input edit. It is one input edit, so **Undo** takes all of it back, Modes
    to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
-   ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
+   ready · explicit Run required*. A run keeps its number while the tab is open (round 17): a new run takes the largest number used
+   so far + 1, so when the six-run limit drops the oldest unpinned run the others keep theirs, and
+   Messages names the dropped run (*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are
+   kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Files do
+   not hold the number: opening a file or restoring a session from this browser numbers its runs
+   from 1 in file order, and runs added from a file continue after the largest number. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
    bar adds *press Run to compute it here*). Run list entries name a run by its number with its
