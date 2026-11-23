@@ -14,6 +14,9 @@ export const PICKER_ID = 'openphysics-project';
 /** The one file type the picker offers. */
 export const PICKER_TYPES = Object.freeze([Object.freeze({description: 'OpenPhysics session file (JSON)', accept: Object.freeze({'application/json': Object.freeze(['.json'])})})]);
 
+/** The picker's file type for a project file (File › Save and Save As). */
+export const PROJECT_PICKER_DESCRIPTION = 'OpenPhysics project file (JSON)';
+
 /** A file name the name dialog accepts: letters, digits, spaces, ".", "_", "-", "(" and ")" only,
  * trimmed, with ".json" added when missing; fallback when nothing is left. */
 export function sanitizeFileName(name, fallback = 'session.json') {
@@ -41,8 +44,8 @@ export function pickerAvailable(win = globalThis) {
  * (the current file, whose folder the picker then opens) only once a file was chosen. Without
  * startIn the id alone restores the folder last picked under it (WICG File System Access
  * §3.2.2 Starting Directory). */
-export function pickerOptions(suggestedName, handle = null) {
-  const options = {suggestedName, types: PICKER_TYPES.map(t => ({description: t.description, accept: {'application/json': [...t.accept['application/json']]}})), id: PICKER_ID};
+export function pickerOptions(suggestedName, handle = null, description = null) {
+  const options = {suggestedName, types: PICKER_TYPES.map(t => ({description: description || t.description, accept: {'application/json': [...t.accept['application/json']]}})), id: PICKER_ID};
   if (handle) options.startIn = handle;
   return options;
 }
@@ -113,28 +116,31 @@ const errorText = error => (error && (error.message || error.name)) || String(er
  *   {status: 'unavailable', error}             no picker, or it threw: ask for a name instead.
  * The picker is called before anything is awaited, so it stays inside the click or key press.
  */
-export function saveToFile(text, {suggestedName, target = null, saveAs = false, win = globalThis}) {
+export function saveToFile(text, {suggestedName, target = null, saveAs = false, win = globalThis, description = null}) {
+  // text may be a function of the file's name, called once the name is known: a project file
+  // holds its name, which an untitled project takes from the file chosen (P3)
+  const textFor = name => typeof text === 'function' ? text(name) : text;
   const route = saveRoute(target, {saveAs, picker: pickerAvailable(win)});
   if (route === 'write') {
-    return writeHandle(target.handle, text).then(() => ({status: 'saved', handle: target.handle, name: target.name}),
+    return Promise.resolve().then(() => writeHandle(target.handle, textFor(target.name))).then(() => ({status: 'saved', handle: target.handle, name: target.name}),
       error => ({status: 'failed', name: target.name, error: errorText(error), fresh: false}));
   }
   if (route === 'download') return Promise.resolve({status: 'known', name: target.name});
   if (route === 'ask') return Promise.resolve({status: 'unavailable', error: null});
   let picked;
-  try { picked = win.showSaveFilePicker(pickerOptions(suggestedName, target?.handle || null)); }
+  try { picked = win.showSaveFilePicker(pickerOptions(suggestedName, target?.handle || null, description)); }
   catch (error) { picked = Promise.reject(error); }
   return Promise.resolve(picked).then(handle => {
     const name = String(handle?.name || suggestedName);
     // a file just chosen in the picker: Chromium may already have created or emptied it
-    return writeHandle(handle, text).then(() => ({status: 'saved', handle, name}),
+    return Promise.resolve().then(() => writeHandle(handle, textFor(name))).then(() => ({status: 'saved', handle, name}),
       error => ({status: 'failed', name, error: errorText(error), fresh: true}));
   }, error => error?.name === 'AbortError' ? {status: 'cancelled'} : {status: 'unavailable', error: errorText(error)});
 }
 
 /** The notice for a save that did not write: a cancel, or a failed write. */
-export function notWrittenNotice(result, {saveAs}) {
+export function notWrittenNotice(result, {saveAs, kind = 'Session'}) {
   if (result.status === 'cancelled') return `${saveAs ? 'Save As' : 'Save'} cancelled; nothing was written.`;
-  if (result.status === 'failed') return `Session not saved: ${result.name} could not be written (${result.error}); `+(result.fresh ? 'the browser may have left it empty.' : 'the file is unchanged.');
-  return 'Session not saved: nothing was written.';
+  if (result.status === 'failed') return `${kind} not saved: ${result.name} could not be written (${result.error}); `+(result.fresh ? 'the browser may have left it empty.' : 'the file is unchanged.');
+  return `${kind} not saved: nothing was written.`;
 }

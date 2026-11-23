@@ -81,6 +81,27 @@ function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=n
  if(fresh)return 'New model · not saved';
  return clean?'No unsaved input changes':'Unsaved inputs';
 }
+// The title bar's project line (P3): the project's name, then its project file and that file's
+// state in the round-14 words. "Changed" counts the inputs, study settings, runs, names, pins and
+// comparisons of every model and the project name; the view and the selected run do not (the
+// caller compares). state: {name (null: untitled), models (how many), file: {name, how, savedAt}
+// or null, current, recovery}. how: 'picker' (saved), 'download' (downloaded) or 'opened'.
+//   "Heater study · heater-study.json · saved 13:15"
+//   "Heater study · heater-study.json · changed since downloaded 13:15 · kept for recovery in this browser"
+//   "Untitled project · not saved to a file · kept for recovery in this browser"
+export const UNTITLED_PROJECT='Untitled project';
+const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'opened'});
+export function projectTitle({name=null,models=0,file=null,current=false,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+ const title=name||UNTITLED_PROJECT;
+ if(!models)return `${title} · no model chosen`;
+ const browser=recoveryWords(recovery)||'not in browser recovery yet';
+ if(!file)return `${title} · not saved to a file · ${browser}`;
+ const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
+ if(current)return `${title} · ${file.name} · ${word}${at}`+(['unavailable','conflict','overLimit'].includes(recovery)?' · '+RECOVERY[recovery]:'');
+ return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
+}
+/** The project line's title text: the "(1)" note on the download path, '' elsewhere. */
+export const projectHint=file=>file?.how==='download'?DOWNLOAD_NAME_HINT:'';
 const PHYSICS=[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']];
 // The physics a model holds; chosen=false is the start state, before any model is chosen.
 export function physicsList(model,chosen=true){
@@ -126,6 +147,17 @@ export function leaveConfirmText({from,runs=0,saved=false,target='the other mode
   description:`${plural(runs,'optical run')} ${one?'is':'are'} in no file. ${one?'It stays':'They stay'} in this tab while ${target} is open and ${one?'comes':'come'} back with the optical model, but closing the tab can lose ${one?'it':'them'}. Save session keeps ${one?'it':'them'} in a file.`,
   save:{kind:'session',label:'Save session, then continue'},leave:'Continue without saving',stay:'Keep this model'};}
  return null;
+}
+// The confirmation before a file replaces the project (File › Open of a project, session or model
+// file) while some of its models have runs in no file, or null when nothing is at stake. Switching
+// models inside a project asks nothing: every model stays in the tab. name: the project's name
+// (null: untitled); models: [{title, runs}] the models with runs no file holds.
+export function projectLeaveText({name=null,models=[]}){
+ const atStake=models.filter(m=>m.runs>0);if(!atStake.length)return null;const one=atStake.length===1&&atStake[0].runs===1;
+ const list=atStake.map(m=>`${m.title} (${plural(m.runs,'run')})`),words=list.length<2?list[0]:list.slice(0,-1).join(', ')+' and '+list.at(-1);
+ return {title:`Replace ${name||UNTITLED_PROJECT}?`,
+  description:`${words} ${atStake.length===1?'has':'have'} ${one?'a run':'runs'} in no file. Save project first to keep ${one?'it':'them'}.`,
+  save:{kind:'project',label:'Save project, then open'},leave:'Open without saving',stay:'Cancel'};
 }
 // The Messages line when another model opens over optical runs: where those runs are, in words
 // that stay true. text: one short line; more: the rest, shown behind More. This tab holds them

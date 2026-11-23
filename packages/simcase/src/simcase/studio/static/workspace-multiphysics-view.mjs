@@ -49,6 +49,9 @@ export function createMultiphysicsView(ctx){
  // not saved"); openedStamp: the content when it was opened from sourceFile, or recovered from a
  // record that still matched it (whether the recovery record still matches that file)
  let freshSignature=null,openedStamp=null;
+ // card: the Library card this model came from ('heated-waveguide' for the template, else null),
+ // which a project file names; a model in the project stays while another model is shown (P3)
+ let card=null;
  // the heater-off comparison solved after each coupled run (on for a model with a coupled
  // temperature when it opens), the physics still to solve alone, and the last coupling removed
  let baselineOption=false,baselineQueue=[],baselineErrors={},lastRemoval=null,starting=false,stopAsked=false;
@@ -62,6 +65,7 @@ export function createMultiphysicsView(ctx){
   active=true;ctx.onOpen?.();doc=clone(tree);undoStack=[];redoStack=[];selection='model';runs=[];lastRun=null;runFailure=null;uncoupled={};resultPage=null;announcedMultiphysics=isMultiphysics(doc);
   baselineOption=baselinePhysics(doc).length>0;baselineQueue=[];baselineErrors={};lastRemoval=null;indexView='n';
   ctx.ui.page='Model';openedSignature=signature();cleanSignature=fromFile?signature():null;sessionFile=null;sourceFile=fromFile?label:null;loaded=fromFile?{kind:'opened',name:label,stamp:stamp()}:null;freshSignature=fromFile?null:signature();openedStamp=null;
+  card=fromFile?null:'heated-waveguide';
   ctx.onHistory();validate(true);ctx.render();notice((fromFile==='session'?`Opened model file ${label}: it holds the model but no runs.`:`${label||doc.name||'Model'} ready. Edit settings and couplings, then press Run.`)+(note?.text?' '+note.text:''),note?.more||'');
  }
  // A session file of version 8 (or browser recovery), already checked (§3): the model, its runs,
@@ -69,10 +73,10 @@ export function createMultiphysicsView(ctx){
  // source: 'file' | 'browser'; savedFile: the session file a recovered record was saved to.
  // openedFile: the file a recovered record was opened from, which the recovery lists name.
  // openedCurrent: whether the recovered record still matched openedFile (null when it does not say).
- async function openSession(session,{label,source='file',savedFile=null,openedFile=null,openedCurrent=null}){
+ async function openSession(session,{label,source='file',savedFile=null,openedFile=null,openedCurrent=null,card:from=null}){
   if(!caps)await loadCapabilities();
   active=true;ctx.onOpen?.();doc=structuredClone(session.document);undoStack=[];redoStack=[];runFailure=null;lastRemoval=null;baselineQueue=[];baselineErrors={};stopAsked=false;
-  runs=session.runs.map(r=>({...r}));lastRun=runs.find(r=>r.job===session.selected)||null;announcedMultiphysics=isMultiphysics(doc);
+  card=from;runs=session.runs.map(r=>({...r}));lastRun=runs.find(r=>r.job===session.selected)||null;announcedMultiphysics=isMultiphysics(doc);
   uncoupled={};for(const [name,b] of Object.entries(session.baselines))uncoupled[name]={rows:effectiveIndexRows(b.result),key:canonicalJson(b.document),completedAt:b.completedAt,job:b.job,document:b.document,result:b.result};
   const v=session.view;selection=v.selection;indexView=v.index_map==='change'?'dn':'n';baselineOption=v.baseline_option;resultPage=selection.startsWith('results:')?selection:null;
   // a record that still matched the file it was opened from reads as that file, as an optical one does
@@ -95,6 +99,17 @@ export function createMultiphysicsView(ctx){
  }
  async function openTemplate({note=null}={}){try{const tree=await ctx.request('GET','/api/multiphysics/template');await open(tree,'Heated silicon waveguide',{note});}catch(e){notice('The multiphysics template could not be loaded: '+e.message);}}
  function close(){active=false;stopPolling();}
+ // A model of the project shown again (its Library card, P3): its document, runs, without-heater
+ // results and its own Undo are as they were left.
+ function show(){
+  if(!doc)return;active=true;ctx.onOpen?.();ctx.ui.page='Model';validate(true);ctx.onHistory();ctx.render();
+  notice(`${doc.name||'Model'} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; nothing was computed.`);
+ }
+ // The model leaves the project (a file replaced the project): nothing of it stays in the tab.
+ function discard(){
+  active=false;stopPolling();doc=null;runs=[];lastRun=null;runFailure=null;uncoupled={};undoStack=[];redoStack=[];resultPage=null;
+  sessionFile=null;loaded=null;openedSignature=null;cleanSignature=null;sourceFile=null;freshSignature=null;openedStamp=null;card=null;baselineQueue=[];baselineErrors={};lastRemoval=null;
+ }
  function commit(next,message,select){
   undoStack.push(doc);if(undoStack.length>100)undoStack.shift();redoStack=[];
   const before=isMultiphysics(doc),prior=doc;doc=normalizeEnvelope(next);if(select)selection=select;lastRemoval=null;
@@ -555,6 +570,19 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   notice(savedNotice(name,{runs:at.runs,notKept:out.notKept,baseline:out.baselines>0,opticalRuns:ctx.opticalRunCount?.()||0,via:result.via,known:result.known===true,again:result.again===true,after:result.after}));
   return {ok:true,name};
  }
+ // The model's entry of a project file (P3): its session text as Save session writes it, or the
+ // 16 MiB question, or the refusal. mark(name, savedAt, written) records the project file as this
+ // model's file once it was written, as Save session does.
+ function projectEntry({keepSelected=false}={}){
+  const out=writeMultiphysicsSession(sessionState(),{keepSelected});
+  if(!out.ok)return out.reduced?{ok:false,question:overflowQuestion(out.bytes)}:{ok:false,refusal:out.refusal};
+  const at={stamp:stamp(),jobs:filed(),signature:signature(),runs:runs.length};
+  return {ok:true,text:out.text,notKept:out.notKept,baselines:out.baselines,runs:at.runs,
+   mark:(name,savedAt,written)=>{sessionFile={name,savedAt,stamp:at.stamp,jobs:at.jobs,written};cleanSignature=at.signature;loaded=null;freshSignature=null;ctx.onHistory();}};
+ }
+ // What the project's "changed" counts of this model: its document, its runs (names, pins, maps)
+ // and the without-heater results; not the view or the selected run.
+ const contentStamp=()=>doc?JSON.stringify({doc,runs:runs.map(r=>[r.job,r.label,r.pinned,r.maps]),baselines:Object.entries(uncoupled).map(([n,b])=>[n,b.job||null])}):null;
  // browser recovery (§4): written while the model has a run or was edited since it was opened
  function recovery(){
   if(!active||!(runs.length||editedSinceOpen()))return null;
@@ -599,7 +627,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   main.dataset.page=page;main.classList.toggle('connecting',page==='Connections');main.classList.toggle('choosing',page==='Applications');main.classList.remove('comparing');
   $('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[page];
   const count=physicsNames(doc).length;
-  $('view-detail').textContent=page==='Connections'?(couplingNames(doc).length?'Drawn from the couplings':count===1?'One physics':`${count} physics · no couplings`):page==='Model'?'Interactive model view':page==='Applications'?'Choose a model':'';
+  $('view-detail').textContent=page==='Connections'?(couplingNames(doc).length?'Drawn from the couplings':count===1?'One physics':`${count} physics · no couplings`):page==='Model'?'Interactive model view':page==='Applications'?(ctx.projectLine?.()||'Choose a model'):'';
   markPageTabs(document.querySelector('.page-tabs'),page);
   document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode]);});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
@@ -625,7 +653,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  // The ribbon's Project group: Open and Save, as in every model (§6), File › Open, Save and
  // Save As; the model file alone is File › Export › Model file. The browser draft holds optical
  // inputs, so File › Browser copy › Save browser draft is hidden here and comes back on leaving.
- const SESSION_WORDS={'open-session':'Opens a saved session file: the multiphysics model with its runs, or a model file alone.','save-session':'Saves the multiphysics model, its completed runs with their names and pins, and the without-heater results to one session file.'};
+ const SESSION_WORDS={'open-session':'Opens a project file, a saved session file (a multiphysics model with its runs) or a model file alone.','save-session':'Saves every model of this tab to one project file: this multiphysics model with its runs, their names and pins and the without-heater results, and the optical model.'};
  let describedBefore=null;
  function projectCommands(on){
   if($('save-draft'))$('save-draft').hidden=on;
@@ -644,12 +672,12 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   ctx.download(new Blob([text],{type:'application/json'}),name);
   cleanSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to your browser's Downloads. It has the model but no runs; Save keeps the runs too, in the session file.`);
  }
- return {active:()=>active,open,openText,openTemplate,openSession,close,leave,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
+ return {active:()=>active,open,openText,openTemplate,openSession,close,leave,show,discard,projectEntry,contentStamp,inProject:()=>doc!==null,card:()=>card,projectRuns:()=>doc?runs.length:0,projectUnsavedRuns:()=>doc?unsavedRuns():0,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
   addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
   setBaseline:on=>{baselineOption=!!on;refreshRun();ctx.onHistory();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,saveHint,
   // what leaving would lose: the runs no session file holds
-  unsavedRuns:()=>active?unsavedRuns():0,edited:()=>active&&editedSinceOpen(),runCount:()=>active?runs.length:0,modelName:()=>doc?.name||'this model',
+  unsavedRuns:()=>active?unsavedRuns():0,edited:()=>doc!==null&&editedSinceOpen(),runCount:()=>active?runs.length:0,modelName:()=>doc?.name||'this model',projectTitle:()=>doc?.name||'Multiphysics model',
   // for checks: the current document, the shown result and the run list
   document:()=>clone(doc),lastResult:()=>lastRun?.result||null,runs:()=>runs.map(r=>({job:r.job,number:r.number,label:r.label,pinned:r.pinned,maps:r.maps,origin:r.origin}))};
 }

@@ -249,7 +249,9 @@ try {
   await press('Home'); await press('Enter'); at = await focused(); assert.deepEqual([at.name, at.selected], ['Heated silicon waveguide', 'true']);
   await checkTree('multiphysics after keys', mpNodes);
   // round 11 (L9): a template just opened reads as new, not as saved
-  assert.equal(await page.text('#project'), 'Multiphysics model / New model · not saved');
+  assert.equal(await page.text('#autosave-status'), 'New model · not saved');
+  // P3: the title bar names the project, which no file holds yet
+  assert.match(await page.text('#project'), /^Untitled project · not saved to a file · /);
   assert.equal(await page.eval("document.getElementById('run-optical').hidden&&document.getElementById('run-heat').hidden&&document.getElementById('run-joule').hidden"), true);
   stage('MB1 template', {tree: await page.text('#tree')});
 
@@ -459,19 +461,15 @@ try {
   assert.equal(new Set(cards.map(c => c.title)).size, 1, JSON.stringify(cards));
   assert.ok(cards.every(c => c.top < 900), JSON.stringify(cards));
   await page.screenshot('mb6b-start-page');
-  // runs 1 and 2 are in no session file: opening the template again asks first
-  await page.click('[data-template=heated-waveguide]');
-  await page.until("document.getElementById('leave-confirm').open", 'leave confirmation');
-  assert.equal(await page.text('#leave-confirm-title'), 'Leave this model?');
-  assert.equal(await page.text('#leave-confirm-description'), '2 runs are only in this tab and in browser recovery. Save session first to keep them in a file.');
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Cancel', 'Save session', 'Leave']);
-  await page.screenshot('mb6b-leave-confirm');
-  await page.click('#leave-stay');
-  await page.until("!document.getElementById('leave-confirm').open&&document.getElementById('file-status').textContent==='Kept the current model and its runs.'", 'kept');
+  // P3 (intended change): the card of the model shown keeps it, with runs 1 and 2: switching models
+  // inside a project asks nothing and opens no fresh template over it
+  await page.click('[data-template=heated-waveguide]'); await sleep(400);
+  assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no question');
   assert.equal(await page.exists('[data-mp-node="results:check"]'), true, 'run 2 is still there');
+  // the template as shipped, in a fresh tab: a reload, then its card (runs 1 and 2 stay in browser recovery)
+  await page.call('Page.reload');
+  await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'start page after a reload');
   await page.click('[data-template=heated-waveguide]');
-  await page.until("document.getElementById('leave-confirm').open", 'leave confirmation again');
-  await page.click('#leave-go');
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'template opened again');
   await runReady();
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
@@ -496,19 +494,24 @@ try {
   const duplicate = join(out, 'duplicate-key.json');
   await writeFile(duplicate, '{"openphysics": "0.3/multiphysics.1", "name": "a", "name": "b"}', 'utf8');
   await setFile(duplicate);
-  // the template's run lives only in this tab: the open asks first
+  // the template's run lives only in this tab: a file replaces the project, so the open asks first (P3)
   await page.until("document.getElementById('leave-confirm').open", 'leave confirmation before an open');
-  assert.equal(await page.text('#leave-confirm-description'), '1 run is only in this tab and in browser recovery. Save session first to keep it in a file.');
+  assert.equal(await page.text('#leave-confirm-title'), 'Replace Untitled project?');
+  assert.equal(await page.text('#leave-confirm-description'), 'Heated silicon waveguide (1 run) has a run in no file. Save project first to keep it.');
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#leave-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent)"), ['Cancel', 'Save project, then open', 'Open without saving']);
+  await page.screenshot('mb7a-leave-confirm');
   await page.click('#leave-go');
   await page.until("/Open failed: .*appears more than once/.test(document.getElementById('file-status').textContent)", 'duplicate key refused');
-  assert.match(await page.text('#project'), /^Multiphysics model \/ Not saved to a file · (kept for recovery in this browser|updating browser recovery)$/);
+  assert.match(await page.text('#autosave-status'), /^Not saved to a file · (kept for recovery in this browser|updating browser recovery)$/);
   // the checkout's example, found from this script: the check runs outside the checkout
   await setFile(fileURLToPath(new URL('../../examples/simcase/multiphysics_heated_slab.json', import.meta.url)));
   await page.until("document.getElementById('leave-confirm').open", 'leave confirmation: the refused open kept the run');
   await page.click('#leave-go');
   await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'example opened');
   await runReady();
-  assert.equal(await page.text('#project'), 'Multiphysics model / Opened multiphysics_heated_slab.json');
+  assert.equal(await page.text('#autosave-status'), 'Opened multiphysics_heated_slab.json');
+  // a model file opened becomes an untitled project holding that one model (P3)
+  assert.match(await page.text('#project'), /^Untitled project · not saved to a file · /);
   stage('MB7a open model file');
 
   // MB7: the screens at 1440 x 900 and 390 px: no document overflow
@@ -537,20 +540,22 @@ try {
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
   stage('MB8 back to a single-physics model');
 
-  // MB9: optical runs in no session file: opening the heated model names them and offers Save
-  // session; they stay in this tab and come back with the optical model
+  // MB9 (P3, intended change): both models are in the project. The multiphysics model left for the
+  // optical one stays: its card reads "In this project", choosing it shows it as it was, with no
+  // question; the optical card then reads "In this project · 1 run"
   await page.until("!document.getElementById('run-optical').disabled", 'optical Run', 60000);
   await page.click('#run-optical');
   await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical run', 120000);
-  await page.click('nav [data-page=Applications]');
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'Library MB9');
+  const heatedCard = await page.text('[data-template=heated-waveguide] .card-project');
+  assert.equal(heatedCard, 'In this project · 0 runs');
   await page.click('[data-template=heated-waveguide]');
-  await page.until("document.getElementById('leave-confirm').open", 'optical leave confirmation');
-  assert.equal(await page.text('#leave-confirm-title'), 'Open Heated silicon waveguide?');
-  assert.equal(await page.text('#leave-confirm-description'), '1 optical run is in no file. It stays in this tab while Heated silicon waveguide is open and comes back with the optical model, but closing the tab can lose it. Save session keeps it in a file.');
-  assert.equal(await page.text('#leave-save'), 'Save session, then continue');
-  await page.click('#leave-go');
-  await page.until("!!document.querySelector('#tree [data-mp-node=\"physics:heat1\"]')", 'heated model after the optical run');
-  stage('MB9 optical runs named before leaving');
+  await page.until("!!document.querySelector('#tree [data-mp-node=\"coupling:heat_to_optics\"]')", 'the multiphysics model of the project shown again');
+  assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no question');
+  assert.equal(await page.text('#file-status'), 'Heated slab waveguide: steady heat -> n(T) -> optical modes shown with no runs; nothing was computed.');
+  await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical] .card-project')", 'optical card in this project');
+  assert.equal(await page.text('[data-template=optical] .card-project'), 'In this project · 1 run');
+  stage('MB9 two models in one project', {heatedCard});
 
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';

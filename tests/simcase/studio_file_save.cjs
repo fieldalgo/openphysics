@@ -178,3 +178,19 @@ test('the header names the current file and its state; "Unsaved inputs" only wit
  assert.equal(P.persistenceTitle({clean:false},when),'Unsaved inputs');
  assert.equal(P.persistenceTitle({fresh:true},when),'New model · not saved');
 });
+test('P3: the text may be made from the name chosen (a project names itself after its file), with the project file type',async()=>{
+ const file=fakeFile('design-a-ng.json'),win=fakeWindow(()=>Promise.resolve(file.handle)),made=[];
+ const text=name=>{made.push(name);return '{"name":'+JSON.stringify(name)+'}';};
+ const saved=await F.saveToFile(text,{suggestedName:'untitled-project.json',saveAs:true,win,description:F.PROJECT_PICKER_DESCRIPTION});
+ assert.deepEqual(saved,{status:'saved',handle:file.handle,name:'design-a-ng.json'});assert.deepEqual(made,['design-a-ng.json']);
+ assert.equal(file.content,'{"name":"design-a-ng.json"}');
+ assert.deepEqual(win.calls[0].types,[{description:'OpenPhysics project file (JSON)',accept:{'application/json':['.json']}}]);
+ // written again through the kept handle: made again with the kept name, no dialog
+ const again=await F.saveToFile(text,{suggestedName:'x.json',target:{name:'design-a-ng.json',handle:file.handle,how:'picker'},win});
+ assert.equal(again.status,'saved');assert.equal(win.calls.length,1);assert.deepEqual(made,['design-a-ng.json','design-a-ng.json']);
+ // a text that cannot be made (a project over the limit) is a failed write: the kept file is whole
+ const refused=await F.saveToFile(()=>{throw new Error('The project is 71 MB, over the 64 MiB limit.');},{suggestedName:'x.json',target:{name:'design-a-ng.json',handle:file.handle,how:'picker'},win});
+ assert.equal(refused.status,'failed');assert.equal(file.content,'{"name":"design-a-ng.json"}');
+ assert.equal(F.notWrittenNotice(refused,{saveAs:false,kind:'Project'}),'Project not saved: design-a-ng.json could not be written (The project is 71 MB, over the 64 MiB limit.); the file is unchanged.');
+ assert.equal(F.notWrittenNotice({status:'other'},{saveAs:false,kind:'Project'}),'Project not saved: nothing was written.');
+});

@@ -27,18 +27,19 @@ import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,comp
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
-import {sessionFileName,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText} from './workspace-persistence.mjs';
+import {sessionFileName,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
-import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardResumeChoice,cardRecords} from './workspace-applications.mjs';
+import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardResumeChoice,cardRecords,APPLICATIONS} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
-import {checkSessionModels,isModelDocument,multiphysicsLoadText} from './workspace-multiphysics-session.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,LATER_SAVES_NOTE} from './workspace-files.mjs';
+import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
+import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,LATER_SAVES_NOTE,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -172,20 +173,82 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  // a raw body: the server's reader sees a file's text as written (duplicate keys, digits)
  requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
  // physics selections no application claims, so no single-physics view acts while it is open
- onOpen:()=>{fileScope++;Object.assign(state,{electric:true,heat:true,structure:true,optics:true});},
+ // the workspace's own physics selection is kept while the multiphysics model is shown, so its
+ // project entry and its return keep it (P3)
+ onOpen:()=>{fileScope++;if(!mpFlags){workspacePhysics=applicationChosen()?physicsOf(state):null;mpFlags=true;}Object.assign(state,{electric:true,heat:true,structure:true,optics:true});projectId('multiphysics');},
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),deliverSession:(text,name,options)=>deliverSession(text,name,options),serverVersion:()=>connection.version,validateRunLabel,
  // the optical runs this tab holds beside the multiphysics model (the save message names them)
  opticalRunCount:()=>runs.length,
+ // the Library's view title row names the project (P3)
+ projectLine:()=>projectLine(),
  // the model's current file name (File › Save downloads under it again), which the header names
  currentFileName:()=>currentFileNow()?.name||null,currentFileHow:()=>currentFileNow()?.how||null,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
- recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),cardResumeOffers(),{onOpenFile:()=>$('open-session').click()});host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+ recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),cardResumeOffers(),libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
  if(!multiView.active())return true;
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return false;}
- fileScope++;multiView.close();multiView.leave();return true;
+ fileScope++;multiView.close();multiView.leave();restoreWorkspacePhysics();return true;
+}
+// ---- The project (P3, workspace-project-file.mjs): every model of this tab in one file ----
+// The workspace (optical, heat or Joule heating inputs with the optical runs) is in the project once
+// one of its cards was chosen or a workspace file opened; the multiphysics model once one was opened.
+// While the multiphysics model is shown, state holds the all-physics placeholder (mpFlags) and
+// workspacePhysics the workspace's own selection (null: none chosen).
+const PHYSICS_KEYS=['electric','heat','structure','optics'];
+const physicsOf=from=>Object.fromEntries(PHYSICS_KEYS.map(k=>[k,from[k]]));
+const INITIAL_PHYSICS=physicsOf(state);
+let workspacePhysics=null,mpFlags=false;
+function restoreWorkspacePhysics(){if(!mpFlags)return;mpFlags=false;Object.assign(state,workspacePhysics||INITIAL_PHYSICS);workspacePhysics=null;}
+const workspaceInProject=()=>mpFlags?workspacePhysics!==null:applicationChosen();
+const workspacePhysicsNow=()=>mpFlags?workspacePhysics||INITIAL_PHYSICS:physicsOf(state);
+// the workspace's inputs file (with its study settings), whichever model is shown
+const workspaceInputs=()=>mpFlags&&workspacePhysics?withStudy(snapshot({...state,...workspacePhysics},setup),{modeCount:state.modeCount,groupIndex:state.groupIndex}):inputsFile();
+const workspaceCard=()=>{const p=workspacePhysicsNow();return APPLICATIONS.find(a=>PHYSICS_KEYS.every(k=>a.physics[k]===!!p[k]))?.id||null;};
+const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduction',joule:'Joule heating'})[workspaceCard()]||'Multiphysics workspace';
+// name: null for an untitled project; ids: the id of each model (m1, m2, ... in the order they
+// joined, kept from an opened project); file: the project file (workspace-files.mjs rememberFile,
+// with savedAt); stamp: what the project held when it was saved or opened (projectStamp); scope:
+// moves on when a file replaces the project, so a save under way never names the new one
+const project={name:null,ids:{},next:1,file:null,stamp:null,scope:0};
+function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
+// a file replaced the project: an untitled project of the models now in the tab
+function resetProject({name=null,ids=null}={}){
+ Object.assign(project,{name,ids:{},next:1,file:null,stamp:null,scope:project.scope+1});
+ if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
+}
+// The models of the project, in Library order: {id, kind, title, card}
+function projectModels(){
+ const list=[];
+ if(workspaceInProject())list.push({id:projectId('workspace'),kind:'workspace',title:workspaceTitle(),card:workspaceCard()});
+ if(multiView.inProject())list.push({id:projectId('multiphysics'),kind:'multiphysics',title:multiView.projectTitle(),card:multiView.card()});
+ return list;
+}
+// What "changed" counts: the project name and every model's inputs, study settings, runs, names,
+// pins and comparison (multiphysics: its document, runs and without-heater results); not the view
+// or the selected run.
+const projectContent=()=>JSON.stringify([workspaceInProject()?{input:workspaceInputs(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),comparison:compareIds}:null,multiView.inProject()?multiView.contentStamp():null]);
+const projectStamp=(name=project.name,content=projectContent())=>JSON.stringify([name,content]);
+// The models whose runs no file holds (the leave question names them)
+function unsavedModels(){
+ const list=[];
+ if(workspaceInProject()&&runs.length&&savedRunsState!==runsStamp())list.push({title:workspaceTitle(),runs:runs.length});
+ if(multiView.projectUnsavedRuns())list.push({title:multiView.projectTitle(),runs:multiView.projectUnsavedRuns()});
+ return list;
+}
+function projectLine(){
+ const file=project.file&&project.file.scope===project.scope?project.file:null;
+ return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:recoveryState});
+}
+// The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
+// starts with and no application chosen.
+function clearWorkspace(){
+ runs=[];solverRun=null;compareIds=[null,null];lastSavedFile=null;loadedSession=null;savedRunsState=null;savedNotebookState=null;openedFile=null;openedStamp=null;newModelInputs=null;heatRun=null;
+ const shown=multiView.active(),page=ui.page;
+ applyProject(DEFAULT_INPUTS,{saved:true,resetHistory:true,quiet:true});
+ if(shown){workspacePhysics=null;ui.page=page;}else Object.assign(state,INITIAL_PHYSICS);
 }
 // Before leaving a model whose runs only this tab holds (another model, an opened file, a
 // recovered session): a confirmation that names what is lost and offers the save that fits.
@@ -194,18 +257,19 @@ const leaveDialog=document.createElement('dialog');leaveDialog.id='leave-confirm
 leaveDialog.innerHTML='<h2 id="leave-confirm-title"></h2><p id="leave-confirm-description"></p><div class="leave-actions"><button id="leave-stay"></button> <button id="leave-save"></button> <button id="leave-go"></button></div>';
 document.body.append(leaveDialog);
 let pendingLeave=null;
-function leaveText(target,toMultiphysics){
- if(multiView.active())return leaveConfirmText({from:'multiphysics',runs:multiView.unsavedRuns(),target});
- if(toMultiphysics&&isOptical())return leaveConfirmText({from:'optical',runs:runs.length,saved:savedRunsState===runsStamp(),target});
- return null;
+// A file replaces the project (P3): the question names the models whose runs no file holds.
+// model: a browser restore replaces one model only, the multiphysics one: its own question.
+function leaveText(target,model=false){
+ if(model==='multiphysics')return multiView.inProject()?leaveConfirmText({from:'multiphysics',runs:multiView.projectUnsavedRuns(),target}):null;
+ return projectLeaveText({name:project.name,models:unsavedModels()});
 }
 // a model file being read after its confirmation: no second open starts until it is done
 let openingModel=false;
-function guardLeave(target,toMultiphysics,proceed){
+function guardLeave(target,model,proceed){
  if(openingModel){notice('Wait until the model file has been opened.');return;}
- const text=leaveText(target,toMultiphysics);if(!text){proceed();return;}
- // Save session cannot run over an invalid input draft: then only Keep and Continue are offered
- if(text.save?.kind==='session'&&$('save-session').disabled)text.save=null;
+ const text=leaveText(target,model);if(!text){proceed();return;}
+ // Save cannot run over an invalid input draft: then only Keep and Continue are offered
+ if(['session','project'].includes(text.save?.kind)&&$('save-session').disabled)text.save=null;
  pendingLeave={proceed,kind:text.save?.kind||null,opener:document.activeElement};
  $('leave-confirm-title').textContent=text.title;$('leave-confirm-description').textContent=text.description;
  $('leave-stay').textContent=text.stay;$('leave-go').textContent=text.leave;$('leave-save').hidden=!text.save;$('leave-save').textContent=text.save?.label||'';
@@ -213,11 +277,11 @@ function guardLeave(target,toMultiphysics,proceed){
 }
 function endLeave(go){
  const pending=pendingLeave;pendingLeave=null;leaveDialog.close();if(!pending)return;
- if(go===false){restoreDialogFocus(pending.opener);notice('Kept the current model and its runs.');return;}
+ if(go===false){restoreDialogFocus(pending.opener);notice(pending.kind==='project'?'Kept the current project and its runs.':'Kept the current model and its runs.');return;}
  if(go==='save'){
-  saveSessionFile({saveAs:false}).then(()=>{
+  (pending.kind==='project'?saveProjectFile({saveAs:false}):saveSessionFile({saveAs:false})).then(()=>{
    // the file was not written (the 16 MiB question, a cancel or a refusal): stay, and say so
-   if(multiView.active()?multiView.unsavedRuns()>0:savedRunsState!==runsStamp()){if(overflowDialog.open)notice('Answer the 16 MiB question to save the session; nothing was opened. Choose again once the session is saved.');return;}
+   if(pending.kind==='project'?unsavedModels().length>0:multiView.projectUnsavedRuns()>0){if(overflowDialog.open)notice('Answer the 16 MiB question to save the project; nothing was opened. Open the file again once the project is saved.');return;}
    pending.proceed();
   });
   return;
@@ -227,16 +291,40 @@ function endLeave(go){
 $('leave-stay').onclick=()=>endLeave(false);$('leave-go').onclick=()=>endLeave(true);$('leave-save').onclick=()=>endLeave('save');
 leaveDialog.oncancel=event=>{event.preventDefault();endLeave(false);};
 const TEMPLATE_NAMES={'heated-waveguide':'Heated silicon waveguide',optical:'Optical waveguide',heat:'Heat conduction',joule:'Joule heating'};
+// The Library page (P3): headed by the project line and its name, which Rename sets; a card whose
+// model is in the project but not shown reads "In this project · N runs".
+function libraryOptions(){
+ const inProject={};
+ if(workspaceInProject()&&multiView.active()&&workspaceCard())inProject[workspaceCard()]=runs.length;
+ if(multiView.inProject()&&!multiView.active())inProject['heated-waveguide']=multiView.projectRuns();
+ return {onOpenFile:()=>$('open-session').click(),inProject,project:{line:projectLine(),name:project.name,onRename:renameProject}};
+}
+function renameProject(value){
+ let name;try{name=validateProjectName(value);}catch(e){notice(e.message+' The project name is unchanged.');return false;}
+ if(name===project.name)return true;
+ project.name=name;refreshPersistence();notice(`Project renamed to “${name}”. File › Save writes the new name.`);return true;
+}
 // The start page's cards: the coupled template opens the multiphysics model, the others the
 // application of their physics selection.
+// Switching models inside a project asks nothing (P3): a card whose model is in the project shows
+// it as it was left; the other cards add their model.
 function chooseTemplate(id){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
- guardLeave(TEMPLATE_NAMES[id]||'the new model',id==='heated-waveguide',()=>openTemplateCard(id));
+ if(openingModel){notice('Wait until the model file has been opened.');return;}
+ if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page='Model';render();}else multiView.show();return;}
+ // the workspace's card while the multiphysics model is shown: the workspace as it was left (its
+ // card shown again from the workspace itself chooses that model again, as before)
+ if(id!=='heated-waveguide'&&multiView.active()&&workspaceInProject()&&workspaceCard()===id){
+  const from=multiView.projectTitle();if(!leaveMultiphysics())return;
+  ui.page='Model';select(ui.selection&&names.includes(ui.selection)?ui.selection:'Geometry');
+  notice(`${workspaceTitle()} shown with ${runs.length===0?'no runs':runs.length===1?'its run':`its ${runs.length} runs`}; ${from} stays in this project. Nothing was computed.`);return;
+ }
+ openTemplateCard(id);
 }
 function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
- if(!leaveMultiphysics())return;
+ if(!leaveMultiphysics())return;projectId('workspace');
  Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
@@ -325,7 +413,7 @@ let panelKey=null;
 function render(){if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
-function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?'Choose a model':'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
+function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?projectLine():'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -339,7 +427,7 @@ else inspector+=pair('Status','Not executed')+'<p>Settings and validation will b
 if(isHeat())inspector=heatInspector();else if(isJoule())inspector=jouleView.inspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();if(isJoule())jouleView.bindInspector();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML=renderConnectionOverview();
-else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),cardResumeOffers(),{onOpenFile:()=>$('open-session').click()});
+else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),cardResumeOffers(),libraryOptions());
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=applicationChosen()?active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>':'<span class="sequence-empty">Study steps appear once you choose an application.</span>';
@@ -522,16 +610,24 @@ function refreshPersistence(){
   saveIndicator={invalid:numericDrafts.invalid,clean,fresh,runsUnsaved,saved:savedFile()&&{...savedFile(),written:lastSavedFile.written===true},file:currentFileNow()?.name||null,fileHow:currentFileNow()?.how||null,loaded:loadedFrom(),viewed};refreshSaveIndicator();
   refreshNotebook();refreshWorkflow();
 }
+// The title bar names the project and its file state (P3, projectLine); the footer keeps the shown
+// model's own indicator (persistenceTitle), so the two answer different questions.
+function refreshProjectLine(){
+ const line=projectLine();if($('project').textContent!==line)$('project').textContent=line;
+ const file=project.file&&project.file.scope===project.scope?project.file:null,hint=projectHint(file);if(hint)$('project').title=hint;else $('project').removeAttribute('title');
+ // the Library is headed by the same line, in its view title row
+ if(ui.page==='Applications'&&$('view-detail').textContent!==line)$('view-detail').textContent=line;
+}
 function refreshSaveIndicator(){
- if(multiView.active()){const state=multiView.saveState();$('project').textContent=multiView.title();if($('autosave-status').textContent!==state)$('autosave-status').textContent=state;downloadHint(multiView.saveHint());return;}
+ refreshProjectLine();
+ if(multiView.active()){const state=multiView.saveState();if($('autosave-status').textContent!==state)$('autosave-status').textContent=state;downloadHint(multiView.saveHint());return;}
  const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});downloadHint(applicationChosen()&&saveIndicator?persistenceHint({...saveIndicator,recovery:recoveryState}):'');
- $('project').textContent=!applicationChosen()||!text?'No model chosen':(isOptical()?'Optical waveguide':isHeat()?'Heat conduction':isJoule()?'Joule heating':'Multiphysics workspace')+' / '+text;
  // Rewritten only on a change: the footer is a status region read out by screen readers.
  const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.model?latestOffer.model+' · ':''}${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';
  if($('autosave-status').textContent!==footer)$('autosave-status').textContent=footer;
 }
 // the title text of the header and the footer on the download path (round 14), removed elsewhere
-function downloadHint(hint){for(const id of ['project','autosave-status']){const el=$(id);if(hint)el.title=hint;else el.removeAttribute('title');}}
+function downloadHint(hint){const el=$('autosave-status');if(hint)el.title=hint;else el.removeAttribute('title');}
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
  const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
@@ -548,36 +644,39 @@ function rejectInvalidInput(){
   numericDrafts.assertValid();if(heatDrafts.size)throw new Error('Correct or restore the highlighted heat inputs before saving or opening files.');
   if(jouleView.hasDrafts())throw new Error('Correct or restore the highlighted Joule inputs before saving or opening files.');
 }
-function applyProject(doc,{saved=true,resetHistory=false}={}){
+function applyProject(doc,{saved=true,resetHistory=false,quiet=false}={}){
   fileScope++;
   doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.reset();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);setStudy(doc);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
-  notice('Model inputs restored. Results and CAD geometry are not included.');
+  if(!quiet)notice('Model inputs restored. Results and CAD geometry are not included.');
 }
 // The inputs a fresh workspace starts with; an open over them (and no results) asks nothing.
 const DEFAULT_INPUTS=current();
 const applicationChosen=()=>state.electric!==undefined;
 function requestLoad(doc,options={}){
   if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
-  // a multiphysics run in this tab is named before the inputs are replaced
   if(!options.opener)options={...options,opener:document.activeElement};
-  if(!options.leaveChecked&&multiView.active()&&multiView.unsavedRuns()){guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,leaveChecked:true}));return;}
+  // a file opened with File › Open replaces the project (P3): the models whose runs no file holds
+  // are named first, and the open question is not asked again after that question
+  if(options.newProject&&!options.projectChecked){const asked=!!leaveText(options.label||'the opened inputs');guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,projectChecked:true,leaveChecked:asked}));return;}
   loadInputs(doc,options);
 }
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,fileName=null}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,fileName=null,newProject=false}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,fileName,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,fileName,newProject,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
-  if((leaveChecked&&!session)||untouchedWorkspace(inputsFile(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
+  if(leaveChecked||untouchedWorkspace(inputsFile(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
   const text=session?sessionLoadText(session,{runs:runs.length,unsaved:runs.length>0&&savedRunsState!==runsStamp()},source):null;
   $('load-confirm').querySelector('h2').textContent=text?text.title:'Replace current inputs?';
   $('load-confirm').querySelector('p').textContent=text?text.description:'Save your current design first if you want to keep it.';
   $('confirm-load').textContent=text?text.button:'Replace inputs';
   const summary=$('load-summary');summary.replaceChildren();
-  const entries=[['Source',label],...(text?[['Runs that come back',text.runs],['Comparison',text.comparison]]:[]),['Physics',`${physicsList(current().model,applicationChosen())} → ${physicsList(doc.model)}`],['Geometry',`${designSummary(current().model)} → ${designSummary(doc.model)}`],['Optical study',`λ ${state.wavelength} nm, core mesh ${state.coreMesh} nm → λ ${doc.model.wavelength} nm, core mesh ${doc.model.coreMesh} nm`],['Completed results',session?`${runs.length} now → ${session.runs.length} from the session`:`Keep ${runs.length} retained runs`],['Input Undo',session?'Starts at the opened session':'Replacement can be undone']];
+  const entries=[['Source',label],...(text?[['Runs that come back',text.runs],['Comparison',text.comparison]]:[]),['Physics',`${physicsList(current().model,applicationChosen())} → ${physicsList(doc.model)}`],['Geometry',`${designSummary(current().model)} → ${designSummary(doc.model)}`],['Optical study',`λ ${state.wavelength} nm, core mesh ${state.coreMesh} nm → λ ${doc.model.wavelength} nm, core mesh ${doc.model.coreMesh} nm`],['Completed results',session?`${runs.length} now → ${session.runs.length} from the session`:`Keep ${runs.length} retained runs`],['Input Undo',session?'Starts at the opened session':'Replacement can be undone'],
+   // a file replaces the project: the models that leave it are named (P3)
+   ...(newProject&&multiView.inProject()?[['Project',`${projectModels().map(m=>m.title).join(' and ')} → an untitled project of the opened model`]]:[])];
   for(const [name,value] of entries){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
   if(!$('load-confirm').open)$('load-confirm').showModal();
 }
@@ -596,6 +695,10 @@ $('confirm-load').onclick=()=>{
 function completeLoad(pending){
  if(pending.multiphysics){pending.multiphysics();return;}
  if(!leaveMultiphysics())return;
+ // a file opened with File › Open: an untitled project holding that one model (P3); a browser
+ // restore or a draft replaces the workspace inputs inside the project
+ if(pending.newProject){multiView.discard();resetProject();}
+ projectId('workspace');
  if(pending.session){
   if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
   const session=pending.session;runs=session.runs;solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];restoreView(session.view);
@@ -629,7 +732,7 @@ function completeLoad(pending){
 $('save-project').onclick=()=>{if(multiView.active()){multiView.saveInputs();return;}try{
   rejectInvalidInput();const doc=inputsFile();const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'});
   const name=modelFileName(applicationSlug());downloadFile(blob,name);
-  edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice(`Model file ${name} sent to your browser's Downloads. It has the inputs but no computed results`+(runs.length?'; Save keeps the runs too, in the session file.':'.'));
+  edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice(`Model file ${name} sent to your browser's Downloads. It has the inputs but no computed results`+(runs.length?'; File › Save keeps the runs too, in the project file.':'.'));
 }catch(e){notice(e.message);}};
 // A model file: an optical, heat or Joule heating inputs file, or a multiphysics model. File ›
 // Open (the session file input) sends model files here.
@@ -638,10 +741,13 @@ async function openModelFile(file){try{
  // a multiphysics document opens as a multiphysics model; any document opens in one that is open
  if(file.size<=(1<<20)){const text=(await file.text()).replace(/^\uFEFF/,'');let tree=null;try{tree=JSON.parse(text);}catch{}
   if(tree&&typeof tree==='object'&&!Array.isArray(tree)&&(tree.openphysics===ENVELOPE||(multiView.active()&&typeof tree.openphysics==='string'))){if(multiView.busy())throw new Error('Wait for the multiphysics run to finish.');
-   guardLeave(file.name,true,()=>{openingModel=true;fileScope++;multiView.openText(text,file.name).then(()=>rememberOpened(file.name)).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
+   guardLeave(file.name,false,()=>{openingModel=true;fileScope++;multiView.openText(text,file.name).then(()=>{multiphysicsProject();rememberOpened(file.name);}).catch(e=>notice('Open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});});return;}}
  const loaded=await workspaceLoads.read(async()=>{if(file.size>MAX_BYTES)throw new Error('Model file exceeds 64 KiB.');return parseProject((await file.text()).replace(/^\uFEFF/,''));});
- if(loaded)requestLoad(loaded.value,{label:file.name,fileName:file.name,opener:$('open-session')});
+ if(loaded)requestLoad(loaded.value,{label:file.name,fileName:file.name,opener:$('open-session'),newProject:true});
 }catch(e){notice('Open failed: '+e.message+' Current inputs kept.');}}
+// A multiphysics model or session file opened with File › Open: an untitled project holding that
+// one model (P3); the workspace and its runs leave the tab, after the leave question named them.
+function multiphysicsProject(){clearWorkspace();resetProject();projectId('multiphysics');render();refreshPersistence();}
 $('save-draft').onclick=()=>{try{rejectInvalidInput();const doc=inputsFile();localStorage.setItem(DRAFT_KEY,JSON.stringify(doc));edits.record(doc);edits.markSaved();newModelInputs=null;refreshPersistence();notice('Draft saved in this browser. Use Restore draft after reloading.');}catch(e){notice('Draft not saved: '+e.message);}};
 $('restore-draft').onclick=()=>{try{rejectInvalidInput();const text=localStorage.getItem(DRAFT_KEY);if(!text)throw new Error('No draft saved in this browser.');requestLoad(parseProject(text),{label:'Browser draft'});}catch(e){notice('Restore failed: '+e.message+' Current inputs kept.');}};
 
@@ -721,7 +827,7 @@ const loadedFrom=()=>loadedSession?{kind:loadedSession.kind,name:loadedSession.n
 // What a session file is "the same as" for the title: the model inputs and the runs (their names
 // and pins). The selected run, the Compare choice and the field view are left out: a click on a
 // run, a page or a mode does not make the notebook differ from its file.
-const saveStamp=()=>JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true])});
+const saveStamp=()=>JSON.stringify({input:workspaceInputs(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true])});
 // The content stamp when the notebook was opened from openedFile (or recovered while it still
 // matched it); null when no file was opened. Browser recovery keeps whether it still matches.
 let openedStamp=null;
@@ -786,7 +892,7 @@ function recoveryList(){
 // cardRecords): the Optical waveguide card for optical sessions, the Heated silicon waveguide card
 // for multiphysics ones.
 function cardRecordMap(){
- const busy=new Set([...(runs.length?['optical']:[]),...(multiView.active()&&multiView.runCount()?['heated-waveguide']:[])]);
+ const busy=new Set([...(runs.length?['optical']:[]),...(multiView.projectRuns()?['heated-waveguide']:[])]);
  const list=recoveryList().filter(e=>e.recovered.session.runs.length).map(e=>({...e,application:e.recovered.session.application}));
  return cardRecords(list,busy);
 }
@@ -887,7 +993,7 @@ function currentView(){return {...fieldView,mode:Math.max(0,Math.min(fieldView.m
 function restoreView(view){Object.assign(fieldView,{mode:view.mode,component:view.component,window:view.window});Object.assign(fieldProbe,view.probe||{x:0,y:.15,active:false});Object.assign(profileState,view.profile||{axis:'x',coordinate:.15,open:false});}
 // The completed runs as a session file keeps them; inputs and view settings are not results.
 function runsStamp(){return JSON.stringify(runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]));}
-function notebookStamp(){return JSON.stringify({input:inputsFile(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
+function notebookStamp(){return JSON.stringify({input:workspaceInputs(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),selected:solverRun?.job||null,comparison:compareIds,view:currentView()});}
 // The application the last recovery record was scheduled for: when the tab moves between an
 // optical and a multiphysics model, the stored record is kept as an earlier session.
 let recoveryKind=null;
@@ -895,7 +1001,7 @@ function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKi
 function refreshNotebook(){
  if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp,rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile,openedCurrent:rec.openedCurrent});
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
- const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
+ const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(workspaceInputs(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument(state,setup);
@@ -1404,19 +1510,20 @@ const validateModel=doc=>studioRequest('POST','/api/multiphysics/validate',{doc}
 // question when runs would be lost, else the open question when a model would be replaced.
 function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null}){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
- const asked=!!leaveText(label,true);
+ // a file replaces the project (P3); a browser restore replaces the multiphysics model only
+ const model=source==='file'?false:'multiphysics',asked=!!leaveText(label,model);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file')rememberOpened(label);else rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
-  if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){finish();return;}
-  const text=multiphysicsLoadText(session,{runs:multiView.runCount(),unsaved:multiView.unsavedRuns()>0,model:'the current model'},source);
+  if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){finish();return;}
+  const text=multiphysicsLoadText(session,{runs:multiView.projectRuns(),unsaved:multiView.projectUnsavedRuns()>0,model:'the current model'},source);
   $('load-confirm').querySelector('h2').textContent=text.title;$('load-confirm').querySelector('p').textContent=text.description;$('confirm-load').textContent=text.button;
   const summary=$('load-summary');summary.replaceChildren();
-  for(const [name,value] of [['Source',label],['Runs that come back',text.runs],['Model',`${multiView.modelName()} → ${session.document.name||'Untitled model'}`],['Completed results',`${multiView.runCount()} now → ${session.runs.length} from the session`],['Input Undo','Starts at the opened session']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
+  for(const [name,value] of [['Source',label],['Runs that come back',text.runs],['Model',`${multiView.modelName()} → ${session.document.name||'Untitled model'}`],['Completed results',`${multiView.projectRuns()} now → ${session.runs.length} from the session`],['Input Undo','Starts at the opened session']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
   pendingLoad={multiphysics:finish,opener,context:loadContext()};
   if(!$('load-confirm').open)$('load-confirm').showModal();
  };
- guardLeave(label,true,go);
+ guardLeave(label,model,go);
 }
 // A multiphysics session over 16 MiB asks first (§2): the maps of the selected and pinned runs
 // only, or nothing written. Studio never drops maps without asking.
@@ -1425,12 +1532,16 @@ overflowDialog.innerHTML='<h2 id="session-overflow-title">Session over 16 MiB</h
 document.body.append(overflowDialog);
 // an optical session over 16 MiB asks the same: the fields of the selected and pinned runs only
 const setOverflowKeepText=multi=>{$('overflow-keep').textContent=multi?'Keep maps for selected and pinned runs':'Keep fields for selected and pinned runs';};
-$('overflow-cancel').onclick=()=>{overflowDialog.close();notice('Session not saved: nothing was written.');};
-$('overflow-keep').onclick=()=>{overflowDialog.close();saveSessionFile({saveAs:overflowSaveAs,keepSelected:true});};
-overflowDialog.oncancel=event=>{event.preventDefault();overflowDialog.close();notice('Session not saved: nothing was written.');};
+// overflowProject: the question asked for a model of a project save ({saveAs, keep}), else null
+// (Export › Model with runs)
+let overflowProject=null;
+const overflowNothing=()=>notice(overflowProject?'Project not saved: nothing was written.':'Session not saved: nothing was written.');
+$('overflow-cancel').onclick=()=>{overflowDialog.close();overflowNothing();};
+$('overflow-keep').onclick=()=>{overflowDialog.close();const asked=overflowProject;overflowProject=null;if(asked)saveProjectFile(asked);else saveSessionFile({saveAs:overflowSaveAs,keepSelected:true});};
+overflowDialog.oncancel=event=>{event.preventDefault();overflowDialog.close();overflowNothing();};
 async function saveMultiphysicsSession({saveAs=false,keepSelected=false}={}){
  const out=await multiView.saveSession({keepSelected,saveAs});
- if(out.question){overflowSaveAs=saveAs;setOverflowKeepText(true);$('session-overflow-description').textContent=out.question;if(!overflowDialog.open)overflowDialog.showModal();}
+ if(out.question){overflowProject=null;overflowSaveAs=saveAs;setOverflowKeepText(true);$('session-overflow-description').textContent=out.question;if(!overflowDialog.open)overflowDialog.showModal();}
 }
 // File › Save (and the ribbon's Save) and File › Save As: the session file of the open model.
 // Save writes the file Save As chose; without one it asks, as Save As does. Resolves when done.
@@ -1439,9 +1550,83 @@ function saveSessionFile({saveAs=false,keepSelected=false}={}){
  if(multiView.active())return saveMultiphysicsSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));
  try{rejectInvalidInput();return saveOpticalSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));}catch(e){notice('Session not saved: '+e.message);return Promise.resolve();}
 }
-$('save-session').onclick=()=>{saveSessionFile({saveAs:false});};
-$('menu-save').onclick=()=>{saveSessionFile({saveAs:false});};
-$('menu-save-as').onclick=()=>{saveSessionFile({saveAs:true});};
+// ---- File › Save and Save As: the project file (P3, workspace-project-file.mjs) ----
+// Every model of the tab in one file. Each model's session is written by its own writer (the 16
+// MiB question is asked per model, naming it); the whole file is at most 64 MiB. Save writes the
+// picker's file again, or downloads under the project file's name; Save As always asks. The text is
+// made once the file is named (an untitled project takes the file's stem as its name), inside the
+// click or key press, so the picker keeps it. keep: the ids of the models whose 16 MiB question was
+// answered with Keep.
+function saveProjectFile({saveAs=false,keep=[]}={}){
+ if(savingFile){notice('A save is already in progress.');return Promise.resolve();}
+ try{return saveProject({saveAs,keep:new Set(keep)}).catch(e=>notice('Project not saved: '+e.message));}catch(e){notice('Project not saved: '+e.message);return Promise.resolve();}
+}
+function saveProject({saveAs,keep}){
+ const models=projectModels();if(!models.length){notice('Nothing to save yet: choose a model first.');return Promise.resolve();}
+ const parts=[];let noRun='';
+ for(const m of models){
+  if(m.kind==='workspace'){
+   rejectInvalidInput();
+   const inputs=workspaceInputs(),out=writeOpticalSession(inputs,runs,solverRun?.job||null,compareIds,currentView(),{keepSelected:keep.has(m.id)});
+   if(!out.ok){if(out.refusal)throw new Error(`${m.title}: ${out.refusal}`);askProjectOverflow(m,opticalOverflowQuestion(out.bytes),false,{saveAs,keep});return Promise.resolve();}
+   const at={notebook:notebookStamp(),runs:runsStamp(),stamp:saveStamp(),inputs:JSON.stringify(inputs),shown:!mpFlags};
+   // the current inputs without a run of their own are said, so the file is not read as holding them (round 14)
+   noRun=at.shown&&runs.length&&!runs.some(r=>r.signature===signature())?` Current inputs (${geometryWords(inputs.model)}) have no run yet.`:'';
+   // the inputs saved are recorded now, so an edit made while the dialog is open stays on top of them
+   if(at.shown)edits.record(inputs);
+   parts.push({model:m,text:out.text,words:modelParts(m.card==='optical'||runs.length?{runs:runs.length,comparison:runs.length>1}:{inputsOnly:true}),notKept:out.notKept,
+    mark:(name,savedAt,written)=>{newModelInputs=null;if(at.shown&&!mpFlags&&JSON.stringify(inputsFile())===at.inputs)edits.markSaved();savedNotebookState=at.notebook;savedRunsState=at.runs;lastSavedFile={name,savedAt,stamp:at.stamp,recovered:false,written};loadedSession=null;}});
+  }else{
+   const out=multiView.projectEntry({keepSelected:keep.has(m.id)});
+   if(!out.ok){if(out.refusal)throw new Error(`${m.title}: ${out.refusal}`);askProjectOverflow(m,out.question,true,{saveAs,keep});return Promise.resolve();}
+   parts.push({model:m,text:out.text,words:modelParts({runs:out.runs,baseline:out.baselines>0}),notKept:out.notKept,mark:out.mark});
+  }
+ }
+ const entries=parts.map(p=>projectEntry({...p.model,text:p.text})),content=projectContent(),active=(multiView.active()?models.find(m=>m.kind==='multiphysics'):models[0]).id;
+ const fileText=name=>{const out=writeProject({name,savedAt:new Date().toISOString(),studio:connection.version||'unknown',active,entries});if(!out.ok)throw new Error(out.refusal);return out.text;};
+ // the size before anything is asked (the name changes it by a few bytes at most)
+ const first=writeProject({name:project.name||'Untitled project',savedAt:new Date().toISOString(),studio:connection.version||'unknown',active,entries});
+ if(!first.ok)throw new Error(first.refusal);
+ const nameFor=fileName=>project.name||nameFromFile(fileName);
+ return deliverProject(fileName=>fileText(nameFor(fileName)),{saveAs}).then(result=>{
+  if(!result.written){notice(result.message);return;}
+  const savedAt=new Date().toISOString(),name=nameFor(result.name);
+  project.name=name;if(project.file)project.file.savedAt=savedAt;project.stamp=projectStamp(name,content);
+  for(const p of parts)p.mark(result.name,savedAt,result.via==='picker');
+  refreshPersistence();
+  notice(projectSavedNotice({name,file:result.name,via:result.via,known:result.known===true,again:result.again===true,after:noRun+result.after,
+   models:parts.map(p=>({title:p.model.title,parts:p.words})),notKept:parts.filter(p=>p.notKept.length).map(p=>({title:p.model.title,kind:p.model.kind,runs:p.notKept}))}));
+ });
+}
+// A model of the project over 16 MiB: the question names it; Keep saves the project again with the
+// fields (or maps) of that model's selected and pinned runs only.
+function askProjectOverflow(model,question,multi,{saveAs,keep}){
+ overflowProject={saveAs,keep:[...keep,model.id]};setOverflowKeepText(multi);
+ $('session-overflow-description').textContent=`${model.title}: ${question}`;if(!overflowDialog.open)overflowDialog.showModal();
+}
+// The project file's delivery: the picker's file (Save with a kept file, or where the picker works),
+// else the name dialog and a download; the name suggested is the project file's, else the project
+// name's (untitled-project.json), never a model file's name. Resolves {written, name, via, ...}.
+function deliverProject(makeText,{saveAs}){
+ savingFile=true;const scope=project.scope,target=project.file&&project.file.scope===scope?project.file:null;
+ const prefill=target?target.name:projectFileName(project.name);
+ const keep=(name,how,handle=null)=>{if(project.scope===scope)project.file=rememberFile({name,how,handle,scope});};
+ return saveToFile(makeText,{suggestedName:prefill,target,saveAs,description:PROJECT_PICKER_DESCRIPTION}).then(async result=>{
+  if(result.status==='saved'){keep(result.name,'picker',result.handle);return {written:true,name:result.name,via:'picker',after:''};}
+  if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');
+   return {written:true,name:result.name,via:'download',again:target.how==='download',known:true,after:' '+downloadAgainNote(result.name)};}
+  if(result.status!=='unavailable')return {written:false,message:notWrittenNotice(result,{saveAs,kind:'Project'})};
+  $('save-name-input').defaultValue=prefill;
+  const name=await askFileName(prefill,{saveAs,unavailable:result.error});
+  if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs})};
+  downloadFile(new Blob([makeText(name)],{type:'application/json'}),name);keep(name,'download');
+  return {written:true,name,via:'download',after:''};
+ }).finally(()=>{savingFile=false;});
+}
+$('save-session').onclick=()=>{saveProjectFile({saveAs:false});};
+$('menu-save').onclick=()=>{saveProjectFile({saveAs:false});};
+$('menu-save-as').onclick=()=>{saveProjectFile({saveAs:true});};
+// Export › Model with runs (session file): the shown model alone, as Save As wrote it before P3
 $('menu-export-session').onclick=()=>{saveSessionFile({saveAs:true});};
 $('menu-open').onclick=()=>$('open-session').click();
 setupMenus([$('file-menu-button'),$('edit-menu-button')]);
@@ -1451,7 +1636,7 @@ if(/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||''))for(const
 // runs only); nothing is written on Cancel or when even that is over the limit.
 async function saveOpticalSession({keepSelected=false,saveAs=false}={}){
  const inputs=inputsFile(),out=writeOpticalSession(inputs,runs,solverRun?.job||null,compareIds,currentView(),{keepSelected});
- if(!out.ok){if(out.refusal)throw new Error(out.refusal);overflowSaveAs=saveAs;setOverflowKeepText(false);$('session-overflow-description').textContent=opticalOverflowQuestion(out.bytes);if(!overflowDialog.open)overflowDialog.showModal();return;}
+ if(!out.ok){if(out.refusal)throw new Error(out.refusal);overflowProject=null;overflowSaveAs=saveAs;setOverflowKeepText(false);$('session-overflow-description').textContent=opticalOverflowQuestion(out.bytes);if(!overflowDialog.open)overflowDialog.showModal();return;}
  const notebook=notebookStamp(),runsNow=runsStamp(),stampNow=saveStamp(),count=runs.length,inputsText=JSON.stringify(inputs);
  // the current inputs without a run of their own are said, so the file is not read as holding them (round 14)
  const noRun=count&&!runs.some(r=>r.signature===signature())?` Current inputs (${geometryWords(inputs.model)}) have no run yet.`:'';
@@ -1460,11 +1645,57 @@ async function saveOpticalSession({keepSelected=false,saveAs=false}={}){
  const result=await deliverSession(out.text,sessionFileName(applicationSlug()),{saveAs});if(!result.written){notice(result.message);return;}
  const name=result.name;newModelInputs=null;if(JSON.stringify(inputsFile())===inputsText)edits.markSaved();savedNotebookState=notebook;savedRunsState=runsNow;lastSavedFile={name,savedAt:new Date().toISOString(),stamp:stampNow,recovered:false,written:result.via==='picker'};loadedSession=null;refreshPersistence();notice(`${savedWhere(result)}: current inputs, ${count===1?'1 run':count+' runs'} and the comparison.`+(out.notKept.length?` Fields not kept for ${out.notKept.map(n=>'Run '+n).join(', ')}.`:'')+noRun+result.after);
 }
+// ---- File › Open of a project file (P3) ----
+// Every check runs before the tab changes: the size, the envelope, each model's check value and
+// parseSession, and the server's check of each multiphysics model (as Open session does). One
+// failure refuses the whole file and leaves the workspace, its runs and Undo as they were. Then the
+// leave question, when some model's runs are in no file; nothing is run.
+async function openProjectFile(file){
+ try{
+  if(solverBusy||pendingJob)throw new Error('Wait for the current calculation, or detach its job, before opening a project.');
+  if(multiView.busy())throw new Error('Wait for the multiphysics run to finish, or stop it under Study.');
+  if(openingModel)throw new Error('Wait until the model file has been opened.');
+  if(file.size>MAX_PROJECT_BYTES)throw new Error(`This project file is ${sizeText(file.size)}, over the 64 MiB limit.`);
+  const loaded=await workspaceLoads.read(async()=>{
+   const read=readProject(await file.text()),multi=read.models.filter(m=>m.kind==='multiphysics');
+   if(multi.length>1)throw new Error(`This project holds ${multi.length} multiphysics models; this Studio holds one per tab.`);
+   for(const m of multi){try{await checkSessionModels(m.session,validateModel);}catch(e){throw new Error(`${m.title}: ${e.message}`);}}
+   return read;});
+  if(!loaded)return;
+  if(solverBusy||pendingJob||multiView.busy())throw new Error('A calculation started while reading the file.');
+  const read=loaded.value;
+  guardLeave(file.name,false,()=>{applyOpenedProject(read,file.name).catch(e=>notice('Project open failed: '+e.message));});
+ }catch(e){notice('Project not opened: '+e.message+' The current project is unchanged.');}
+}
+async function applyOpenedProject(read,fileName){
+ const ws=read.models.find(m=>m.kind==='workspace'),mp=read.models.find(m=>m.kind==='multiphysics');
+ if(solverBusy||multiView.busy()){notice('A calculation started; the project was not opened.');return;}
+ openingModel=true;
+ try{
+  if(!leaveMultiphysics())return;
+  multiView.discard();
+  resetProject({name:read.name,ids:Object.fromEntries(read.models.map(m=>[m.kind,m.id]))});
+  if(ws)completeLoad({input:ws.session.input,saved:true,session:ws.session,source:'file',label:fileName,page:null,opener:$('open-session'),context:loadContext()});
+  else clearWorkspace();
+  if(mp){
+   const page=ui.page;
+   await multiView.openSession(mp.session,{label:fileName,source:'file',card:mp.card});
+   if(read.active!==mp.id){leaveMultiphysics();ui.page=page;render();}
+  }
+  project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});project.stamp=projectStamp();
+  refreshPersistence();
+  const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
+  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);
+ }finally{openingModel=false;}
+}
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
 $('session-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{
+ // a project file (P3): its format is the first key Studio writes, so its first bytes say so
+ // before a file of up to 64 MiB is read; a hand-edited one is found by its parsed format below
+ if((await file.slice(0,4096).text()).includes(JSON.stringify(PROJECT_FORMAT))){openProjectFile(file);return;}
  // an optical, heat or Joule heating model file (inputs only) opens as Open did for it before
  // (read up to 1 MiB, so a model file over its 64 KiB limit gets the model reader's refusal)
- if(file.size<=(1<<20)){let tree=null;try{tree=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{}if(tree?.format==='openphysics-studio-workspace'){openModelFile(file);return;}}
+ if(file.size<=(1<<20)){let tree=null;try{tree=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{}if(tree?.format==='openphysics-studio-workspace'){openModelFile(file);return;}if(isProjectDocument(tree)){openProjectFile(file);return;}}
  if(multiView.busy())throw new Error('Wait for the multiphysics run to finish, or stop it under Study.');
  const loaded=await workspaceLoads.read(async()=>{if(solverBusy)throw new Error('Calculation is still running.');if(file.size>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
   const text=await file.text();
@@ -1475,11 +1706,11 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   if(session.application==='multiphysics')await checkSessionModels(session,validateModel);
   return {session};});
  if(!loaded)return;if(solverBusy)throw new Error('Calculation started while reading the file.');
- if(loaded.value.model!==undefined){const text=loaded.value.model,asked=!!leaveText(file.name,true);
-  const open=()=>{openingModel=true;fileScope++;multiView.openText(text,file.name,{asSession:true}).then(()=>rememberOpened(file.name)).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});};
+ if(loaded.value.model!==undefined){const text=loaded.value.model,asked=!!leaveText(file.name);
+  const open=()=>{openingModel=true;fileScope++;multiView.openText(text,file.name,{asSession:true}).then(()=>{multiphysicsProject();rememberOpened(file.name);}).catch(e=>notice('Session open failed: '+e.message+(multiView.active()?' The current model and its runs are kept.':' Current inputs kept.'))).finally(()=>{openingModel=false;});};
   // an edited model or one with runs is replaced only after the open question, as a session is
-  guardLeave(file.name,true,()=>{if(asked||!multiView.active()||(!multiView.runCount()&&!multiView.edited())){open();return;}
-   const runsNow=multiView.runCount();
+  guardLeave(file.name,false,()=>{if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){open();return;}
+   const runsNow=multiView.projectRuns();
    $('load-confirm').querySelector('h2').textContent='Open model file?';$('load-confirm').querySelector('p').textContent=`It holds the model but no runs. Replaces the current model${runsNow?` and ${runsNow} ${runsNow===1?'run':'runs'} in this tab`:''}; input undo starts at the opened model.`;$('confirm-load').textContent='Open model file';
    const summary=$('load-summary');summary.replaceChildren();
    for(const [name,value] of [['Source',file.name],['Runs that come back','None'],['Model',`${multiView.modelName()} → the model in the file`]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=name;detail.textContent=value;summary.append(term,detail);}
@@ -1487,7 +1718,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   return;}
  const session=loaded.value.session;
  if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
- requestLoad(session.input,{session,label:file.name,fileName:file.name,opener:$('open-session')});
+ requestLoad(session.input,{session,label:file.name,fileName:file.name,opener:$('open-session'),newProject:true});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 
 let pendingJob=null;
