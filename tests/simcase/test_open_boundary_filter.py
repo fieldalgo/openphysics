@@ -42,11 +42,11 @@ from open_boundary_fixtures import ALL, TOP_BOTTOM, build, db_per_cm, reference_
 def test_v8_the_filter_returns_physical_modes_only(kind, modes):
     edges = TOP_BOTTOM if kind == "slab" else ALL
     target = 2.85 if kind == "slab" else 2.46
-    text = build(kind, modes, target=target if kind == "slab" else "-", edges=edges)
+    text = build(kind, modes, target=target if kind == "slab" else "-", edges=edges, single=True)
     n, loss, fraction, _ = solve(json.loads(text))
     assert len(n) <= modes
     assert np.all(fraction >= 0.5) and np.all(n.real > 1.45), (n, fraction)
-    reference_text = build(kind, 8, target=target if kind == "slab" else "-", edges=edges)
+    reference_text = build(kind, 8, target=target if kind == "slab" else "-", edges=edges, single=True)
     near = sorted(reference_modes(reference_text, target), key=lambda z: abs(z - target))
     for z in near[:modes]:
         assert np.min(abs(n - z)) <= 1e-6, (z, n)
@@ -62,3 +62,26 @@ def test_v8_the_filter_returns_physical_modes_only(kind, modes):
     missed = [z for z in asked if np.min(abs(n - z)) > 1e-6]
     print(f"V8 {kind}-{modes}: known misses {missed}")
     assert all(z.real < 1.6 for z in missed), missed            # known misses: near the cladding index only
+
+
+# Slice T2 (registered before the result): the page's document searches near 2.46 and 1.95. With
+# it the strip over a substrate has no known miss: the list the test above prints is empty, by the
+# same union reference and the same rule.
+@pytest.mark.slow
+@pytest.mark.parametrize("modes", [2, 8])
+def test_v8_two_searches_leave_no_known_miss(modes):
+    text = build("strip_substrate", modes, edges=ALL)
+    assert json.loads(text)["physics"]["em1"]["pml"]["pml_additional_searches"] == [
+        {"target_effective_index": 1.95, "pml_search_mode_count": 16}]
+    n, _, fraction, _ = solve(json.loads(text))
+    assert len(n) <= modes
+    assert np.all(fraction >= 0.5) and np.all(n.real > 1.45), (n, fraction)
+    reference_text = build("strip_substrate", 8, edges=ALL, single=True)
+    union = list(reference_modes(reference_text, 2.46))
+    for z in reference_modes(reference_text, 1.95):
+        if np.min(abs(np.asarray(union) - z)) > 1e-6:
+            union.append(z)
+    asked = sorted(union, key=lambda z: abs(z - 2.46))[:modes]
+    missed = [z for z in asked if np.min(abs(n - z)) > 1e-6]
+    print(f"V8 two searches strip_substrate-{modes}: known misses {missed}")
+    assert missed == [], missed

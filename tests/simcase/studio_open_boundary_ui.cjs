@@ -66,7 +66,11 @@ test('Search near n_eff: the default 2.46 (P1, to 0.01) is shown 2.460; edits ar
  assert.equal(R.parseTarget('2.3',[STRIP]),2.3);assert.equal(R.parseTarget(' 2.34567 ',[STRIP]),2.346);assert.equal(R.parseTarget('1.6',[STRIP]),1.6);
  for(const bad of ['1.45','1.4504','3.4777','4','','x'])assert.throws(()=>R.parseTarget(bad,[STRIP]),/Search near n_eff must/,bad);
  assert.equal(R.parseTarget('1.4505',[STRIP]),1.451);
- assert.equal(R.studySummary(R.openChoice(),[STRIP]),'Open boundary · PML 1 µm · search near 2.460');
+ // slice T2: both searches; one search below a target of 1.466
+ assert.equal(R.studySummary(R.openChoice(),[STRIP]),'Open boundary · PML 1 µm · searches near 2.46 and 1.95');
+ assert.equal(R.studySummary({...R.openChoice(),target:2.2},[STRIP]),'Open boundary · PML 1 µm · searches near 2.20 and 1.82');
+ assert.equal(R.studySummary({...R.openChoice(),target:2.455},[STRIP]),'Open boundary · PML 1 µm · searches near 2.455 and 1.95');
+ assert.equal(R.studySummary({...R.openChoice(),target:1.465},[STRIP]),'Open boundary · PML 1 µm · search near 1.465');
  assert.equal(R.studySummary(null,[STRIP]),'');
  assert.equal(R.sectionWords(R.openChoice()),'open boundary (PML 1 µm) on 4 edges');
  assert.equal(R.sectionWords({edges:{...ALL,bottom:'closed',top:'closed',left:'closed'}}),'open boundary (PML 1 µm) on 1 edge');
@@ -77,7 +81,9 @@ test('the document of the page: the default target is P1\'s; an edit changes tar
  assert.deepEqual(O.opticalDocument({...state,openBoundary:R.openChoice()},setup()),base);
  const edited=O.opticalDocument({...state,openBoundary:{...R.openChoice(),target:2.3}},setup());
  assert.equal(edited.physics.em1.target_effective_index,2.3);
- assert.deepEqual({...edited,physics:{em1:{...edited.physics.em1,target_effective_index:2.46}}},base);
+ // slice T2: and the second search with it, (2.3 + 1.444) / 2 = 1.872 -> 1.87
+ assert.deepEqual(edited.physics.em1.pml.pml_additional_searches,[{target_effective_index:1.87,pml_search_mode_count:16}]);
+ assert.deepEqual({...edited,physics:{em1:{...edited.physics.em1,target_effective_index:2.46,pml:{...edited.physics.em1.pml,pml_additional_searches:[{target_effective_index:1.95,pml_search_mode_count:16}]}}}},base);
  // Geometry › Boundaries: one edge closed drops its side of the PML block and of the domain
  const closed=O.opticalDocument({...state,openBoundary:{edges:{...ALL,bottom:'closed'}}},setup());
  assert.deepEqual(Object.keys(closed.physics.em1.pml.pml_thickness),['left','right','top']);
@@ -167,7 +173,9 @@ test('PML check (c1): one document per mode, strength 6, search 16, target at it
  assert.equal(docs.length,2);
  docs.forEach((d,i)=>{const em=d.physics.em1;assert.deepEqual([em.pml.pml_strength,em.pml.pml_search_mode_count,em.target_effective_index],[6,16,[2.442909,1.769996][i]]);
   // everything else is the run's document: the same geometry and mesh
-  assert.deepEqual({...d,physics:{em1:{...em,target_effective_index:2.46,pml:{...em.pml,pml_strength:3,pml_search_mode_count:32}}}},doc);});
+  // slice T2: one search, near the mode; the run's second search is not repeated
+  assert.equal('pml_additional_searches' in em.pml,false);
+  assert.deepEqual({...d,physics:{em1:{...em,target_effective_index:2.46,pml:{...em.pml,pml_strength:3,pml_search_mode_count:32,pml_additional_searches:[{target_effective_index:1.95,pml_search_mode_count:16}]}}}},doc);});
  assert.equal(R.checkLabel(2),'Also check the PML (2 more solves)');assert.equal(R.checkLabel(1),'Also check the PML (1 more solve)');
  // pooled: the TE-like mode from one solve, the TM-like one from another
  const first=record([candidate(1,2.4429,1e-11,0.999,['selected_near_target'])]),second=record([candidate(1,1.7701,1.4e-8,0.9999,['selected_near_target'])]);

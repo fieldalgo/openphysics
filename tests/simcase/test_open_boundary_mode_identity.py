@@ -53,7 +53,7 @@ def solve(d):
 
 
 def template(edges, factor=1):
-    return scaled(build("template", 2, edges=edges), factor)
+    return scaled(build("template", 2, edges=edges, single=True), factor)
 
 
 def without_pml(d):
@@ -150,7 +150,7 @@ def test_v9_v10_template_open_against_closed(template_runs):
 
 @pytest.mark.slow
 def test_v9_film_te_fraction_converges_to_one():
-    text = build("slab", 1, target=2.85, edges=TOP_BOTTOM)
+    text = build("slab", 1, target=2.85, edges=TOP_BOTTOM, single=True)
     deficits = []
     for factor in (1, 0.5, 0.25):
         result = solve(scaled(text, factor))
@@ -164,7 +164,7 @@ def test_v9_film_te_fraction_converges_to_one():
 
 @pytest.mark.parametrize("kind", ["template", "strip_substrate"])
 def test_v12_studio_equals_the_engine_on_the_physical_window(kind, tmp_path):
-    d = json.loads(build(kind, 2, edges=ALL))
+    d = json.loads(build(kind, 2, edges=ALL, single=True))
     result = solve(d)
     side = studio_side(result, bounds(result))
     got = studio({"kind": "identity", "runs": [side]}, tmp_path)[0]

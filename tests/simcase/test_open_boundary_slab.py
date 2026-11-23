@@ -19,7 +19,7 @@ from open_boundary_fixtures import TOP_BOTTOM, build, db_per_cm, scaled, slab_re
 @pytest.mark.parametrize("pol,target", [("TE", 2.85), ("TM", 2.06)])
 def test_v1_v2_leaky_slab_converges_to_the_analytic_pole(pol, target):
     expected = slab_reference(pol)
-    text = build("slab", 1, target=target, edges=TOP_BOTTOM)
+    text = build("slab", 1, target=target, edges=TOP_BOTTOM, single=True)
     loss_errors, re_errors = [], []
     for factor in (1, 0.5, 0.25):
         d = scaled(text, factor)

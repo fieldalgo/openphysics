@@ -166,7 +166,8 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  if(settings.adapter===OPEN_ADAPTER){
   if(extra.group_index!==undefined&&extra.group_index_im===undefined)throw new Error(`${which}: a run with an open boundary has a complex group index.`);
   if(im===null)throw new Error(`${which}: a run with an open boundary has complex effective indices.`);
-  const ob=checkCandidateRecord(record.open_boundary,which);
+  // a run of two searches (/3) holds exactly the searches of its target (slice T2)
+  const ob=checkCandidateRecord(record.open_boundary,which,settings.pml.target);
   if(modeCandidates(ob,re,im).some(c=>c===null))throw new Error(`${which}: its modes are not the selected candidates of its open boundary record.`);
   extra.open_boundary=ob;
   if(record.pml_check!==undefined)extra.pml_check=checkPmlCheck(record.pml_check,k,which);

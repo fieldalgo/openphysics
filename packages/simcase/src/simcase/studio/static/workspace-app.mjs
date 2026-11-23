@@ -1852,7 +1852,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  }
  // an open boundary: the modes above n = 1.45 with their candidate record, and the engine's TE
  // fractions, effective areas (physical window) and group index of those modes (slice P3)
- const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target.toFixed(3));})():null;
+ const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target);})():null;
  const kept=open?open.re:re,keptIm=open?open.im:im;
  const settings=open?openSettings(opticalSettings(input.model.wavelength,input.model.coreMesh,asked),pending.openBoundary,input.model.shapes):opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
  const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
