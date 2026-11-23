@@ -47,7 +47,9 @@ test('V14: "< 0.01 dB/cm" below 0.01 dB/cm, for a negative Im and for numericall
  assert.equal(R.openLoss(im,LAMBDA).text,'0.01000 dB/cm');
  assert.equal(R.openLoss(nextDown(im),LAMBDA).text,'< 0.01 dB/cm');
  const help='Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.';
- for(const [value,status] of [[nextDown(im),null],[-5.1e-12,null],[-1e-3,null],[0,null],[1.36e-8,null],[1e-3,'numerically_unresolved']]){
+ // -1e-3 (|loss| 352 dB/cm) was here until the V14 change of slice T2 (decided by the coordinator):
+ // a negative Im whose |loss| reaches 0.01 dB/cm now reads "not resolved (|loss| < X dB/cm)", below
+ for(const [value,status] of [[nextDown(im),null],[-5.1e-12,null],[-6.17e-9,null],[0,null],[1.36e-8,null],[1e-3,'numerically_unresolved']]){
   const c=R.openLoss(value,LAMBDA,status);assert.equal(c.text,'< 0.01 dB/cm',String(value));assert.equal(c.title,help);assert.equal(c.floor,true);
  }
  for(const value of [null,undefined,NaN])assert.equal(R.openLoss(value,LAMBDA).text,'—');
@@ -124,6 +126,24 @@ test('the other candidates: every searched candidate not shown, with n_eff, phys
  assert.throws(()=>R.openResultValues({summary:{open_boundary:[low]}},[1.44],[1e-3],'1.600'),{message:'No mode above n = 1.45 was found near n_eff 1.600. Move Search near n_eff (Physics › Optical modes) to find other modes.'});
  assert.equal(R.openFoundText(2,2,'2.460'),'Found 2 of 2 modes near n_eff 2.460');
  assert.equal(R.openTableTitle(),'Modes (open boundary, PML 1 µm)');
+});
+
+test('V14 (changed in slice T2): a negative Im n_eff whose |loss| reaches 0.01 dB/cm is not resolved, below X rounded up to 2 digits',()=>{
+ // hand values at 1550 nm: 40 pi / ln 10 * 2.67e-7 / 1.55e-6 / 100 = 0.0940 dB/cm -> X = 0.095
+ assert.ok(Math.abs(handDbPerCm(2.67e-7)-0.0940099)<1e-6);
+ const neg=R.openLoss(-2.67e-7,LAMBDA);
+ assert.deepEqual(neg,{text:'not resolved (|loss| < 0.095 dB/cm)',title:'The solve gives a small negative Im n_eff within the PML\'s numerical noise; the loss is below about 0.095 dB/cm.',value:-handDbPerCm(2.67e-7),floor:false});
+ // -6.17e-9 is 0.0022 dB/cm: below the floor as before; a positive loss is unchanged
+ assert.equal(R.openLoss(-6.17e-9,LAMBDA).text,'< 0.01 dB/cm');assert.equal(R.openLoss(-6.17e-9,LAMBDA).floor,true);
+ assert.equal(R.openLoss(8.28e-5,LAMBDA).text,'29.15 dB/cm');
+ assert.equal(R.openLoss(-1e-3,LAMBDA).text,'not resolved (|loss| < 360 dB/cm)');
+ // exactly at the floor, negative: not resolved below 0.010; the next double inside: below the floor
+ const at=0.01*LAMBDA*100*Math.log(10)/(40*Math.PI);let im=at;while(R.dbPerCm(im,LAMBDA)<0.01)im=nextUp(im);while(R.dbPerCm(nextDown(im),LAMBDA)>=0.01)im=nextDown(im);
+ assert.equal(R.openLoss(-im,LAMBDA).text,'not resolved (|loss| < 0.010 dB/cm)');assert.equal(R.openLoss(-nextDown(im),LAMBDA).text,'< 0.01 dB/cm');
+ // numerically_unresolved keeps the floor words
+ assert.equal(R.openLoss(-1e-3,LAMBDA,'numerically_unresolved').text,'< 0.01 dB/cm');
+ // X: rounded up to 2 significant digits, exact 2-digit values kept
+ assert.deepEqual([0.094,0.0940099,0.07,0.0999,0.995,9.91,10,12.01,351.9,1234].map(R.lossBoundText),['0.094','0.095','0.070','0.10','1.0','10','10','13','360','1300']);
 });
 
 // -- the PML check ----------------------------------------------------------------------------

@@ -1105,6 +1105,12 @@ page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 �
 - 0.01 dB/cm 미만이면 칸은 **< 0.01 dB/cm**입니다. 음의 Im n_eff와 엔진이 `numerically_unresolved`로
   표시한 값도 여기에 듭니다. 도움말은 “Below what this open boundary resolves for a 3 × 2.4 µm window
   (0.01 dB/cm). The mode does not leak measurably here.”입니다. Im n_eff가 없는 모드는 “—”입니다.
+- 음의 Im n_eff로 |손실|이 0.01 dB/cm 이상이면 **not resolved (|loss| < X dB/cm)**로 읽히며, X는 |손실|을
+  유효숫자 2자리로 올림한 값입니다(1550 nm에서 Im n_eff −2.67e-7, 0.094 dB/cm는 *not resolved (|loss| <
+  0.095 dB/cm)*). 도움말은 “The solve gives a small negative Im n_eff within the PML's numerical noise; the
+  loss is below about X dB/cm.”입니다. 음의 Im을 모두 *< 0.01 dB/cm*로 쓰던 P2의 규칙(V14)을 바꾼 것으로,
+  엔진이 이런 모드를 PML의 한계 안에서 손실 없는 모드로 받아들일 수 있기 때문입니다. 0.01 dB/cm 미만의
+  음의 Im은 *< 0.01 dB/cm*를 유지합니다.
 - n_eff는 닫힌 실행처럼 Re를 보이고 Im을 유효숫자 3자리로 덧붙입니다: *2.44126325 + 8.28e-5i*.
 - Polarization과 A_eff는 PML을 뺀 3 × 2.4 µm 물리 창에서 계산합니다. n_g는 Re n_g를 보입니다.
   [모드 식별](#열린-경계의-모드-식별)을 보세요.
