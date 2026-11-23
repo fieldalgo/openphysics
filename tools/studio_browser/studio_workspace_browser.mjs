@@ -1238,12 +1238,15 @@ try {
   assert.deepEqual(m5off, {label: 'Also compute group index (3 solves)', checked: false});
   // round 12 (N2–N4; pre-registered): the box's plain note; the same box in Physics › Optical modes,
   // synced with Study both ways and through Undo; a message each way; the next run naming the option
-  const GROUP_NOTE = 'Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.';
+  const GROUP_NOTE = 'Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g. n_g includes the dispersion of the materials (evaluated at λ ± 1 nm).';
   const groupOn = 'Group index on: the next run also solves at λ ± 1 nm and gives n_g (about 3× slower).', groupOff = 'Group index off: the next run is one solve, without n_g.';
   const m5note = () => page.eval("document.getElementById('group-index-check').closest('label').nextElementSibling.textContent");
   const message = () => page.eval("document.getElementById('file-status').textContent");
   assert.equal(await m5note(), GROUP_NOTE);
   await toNode('Optical modes'); assert.deepEqual(await m5box(), m5off, 'the box in Optical modes'); assert.equal(await m5note(), GROUP_NOTE);
+  // round 15 (R4): the materials come from physmat and are evaluated at each wavelength solved
+  {const pairs = await page.eval("[...document.querySelectorAll('#inspector .pair')].map(e=>e.textContent)"); stage('R4 Optical modes material data', {pairs});
+   assert.ok(pairs.includes('Material dataphysmat materials, evaluated at each wavelength solved'), JSON.stringify(pairs));}
   await page.click('#group-index-check'); await sleep(200); assert.equal(await message(), groupOn);
   await toNode('Study'); assert.equal((await m5box()).checked, true, 'Study shows the box ticked in Optical modes');
   assert.match(await text('#next-run-inputs'), / · Modes to find 2 · group index on$/);

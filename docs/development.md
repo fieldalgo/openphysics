@@ -445,6 +445,8 @@ view keep their boxes with it and without it. With no input the complete banner 
 after it appears (1440 × 900, measured in the page); a real mouse press leaves it within 300 ms
 (390 × 844).
 Since round 15 it also checks the hybrid Polarization words (*hybrid · x % TE / y % TM*).
+Since round 15 it also checks the group index note on material dispersion and *Material data* in
+Optical modes.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs

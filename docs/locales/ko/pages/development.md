@@ -374,6 +374,7 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 확인합니다. 입력이 없으면 완료 배너는 나타난 뒤 5.9–6.6초에 사라지고(1440 × 900, 페이지 안에서 측정), 실제 마우스
 누름이 있으면 300 ms 안에 사라집니다(390 × 844).
 15차부터 hybrid Polarization 문구(*hybrid · x % TE / y % TM*)도 확인합니다.
+15차부터 재료 분산에 대한 군굴절률 설명과 Optical modes의 *Material data*도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.

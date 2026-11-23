@@ -306,7 +306,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    or recovered), file link or save time differ. The newest is shown, naming the file if any of
    the merged records named one, and the session open in this tab is not offered. The start page uses
    one word, model: the **Library** tab, *Choose a starting model*, *Model library ·
-   Choose a model*.
+   Choose a model*. A card's tag names the solver it runs, *Optical mode solver*, *Heat conduction
+   solver*, *Electric current and heat solver*, and the heated silicon waveguide *Heat → optical
+   modes · coupled*; nothing computes until you press **Run study**.
 
 Use **Add runs from file (inputs unchanged)** to add results to the current notebook while keeping
 the model. Use **File › Open…** to replace both model and notebook. *Result for the current
@@ -367,10 +369,14 @@ effective area are unchanged.
 
 **Also compute group index (3 solves)** in **Study** and in **Physics › Optical modes** (one box
 shown in both, off by default; its note reads “Also solves at λ ± 1 nm and takes n_g from the
-change (about 3× slower). Off: one solve, no n_g.”, and ticking or clearing it says in Messages
+change (about 3× slower). Off: one solve, no n_g. n_g includes the dispersion of the materials
+(evaluated at λ ± 1 nm).”, and ticking or clearing it says in Messages
 what the next run does, *Group index on: the next run also solves at λ ± 1 nm and gives n_g (about
 3× slower).* or *Group index off: the next run is one solve, without n_g.*) adds
-`results.group_index = {"wavelength_step": "1 nm"}` to the run's document. The engine then also
+`results.group_index = {"wavelength_step": "1 nm"}` to the run's document. Every material of
+the optical model is a physmat record, and the engine evaluates each one at every wavelength it
+solves (λ, and λ ± 1 nm for n_g), so n_g includes the material dispersion; **Physics › Optical
+modes** says so under **Material data**: *physmat materials, evaluated at each wavelength solved*. The engine then also
 solves the same mesh at λ0 − 1 nm and λ0 + 1 nm, with each material evaluated at each
 wavelength, and returns n_g = n_eff − λ0 dn_eff/dλ0 by a central difference. The run takes about
 three times as long ([group index of a single study](group_index.md)). With the box off, the
