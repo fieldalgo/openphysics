@@ -721,7 +721,8 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
   보입니다. 열 도움말은 “n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± 1 nm (3 solves),
   materials evaluated at each wavelength”입니다. 칸은 두 경우에 **—**입니다.
   - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study”이고, n_g
-    머리글 이름 아래에 *Off · turn on in Study or Optical modes*가 보입니다(Compare에서는 두 실행 모두 n_g가 없을 때).
+    머리글 이름 아래에 *Off · turn on in Study or Optical modes*가 보입니다(Compare에서는 두 실행 모두 n_g가 없을 때 n_g 열이 좁게
+    유지되도록 대신 표 위 줄에 *n_g: Off · turn on in Study or Optical modes*가 나옵니다).
   - 엔진이 옆 파장에서 그 모드를 대응시키지 못했을 때(`null`, 예: 축퇴 쌍의 한 모드). 그 실행을
     한 탭에서는 도움말이 엔진의 이유 *Not matched: vacuum_wavelength 1.549 um: …*를 보입니다. 세션
     파일은 이유를 보관하지 않으므로, 파일을 연 뒤에는 “Not matched at λ0 ± 1 nm; the reason is not
@@ -876,7 +877,10 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   두 모드 값의 *mean*, 실행에 값이 없으면 모드 표의 도움말과 함께 **—**). 머리글은 짧게 묶입니다:
   *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*, *n_g*는 각각 **A** 열과 **B** 열 위에,
   *Modes*, *Overlap*, *Δn_eff (B − A)*, *Δ % (of A)*는 한 열 위에 있고, 표 위 줄이 실행 A와 B를 밝힙니다.
-  첫 열은 그대로 보이고 나머지 열은 표 상자 안에서 옆으로 스크롤되며 페이지는 옆으로 넘치지 않습니다. 짝이 없는
+  Polarization 칸은 두 줄로, 종류 다음에 비율이 나옵니다(*TE-like* / *98.2 % TE*). 1440 × 900에서는 모든 열이
+  표 상자에 들어갑니다. 상자가 더 좁으면(휴대폰) 첫 열은 그대로 보이고 나머지 열은 상자 안에서 옆으로 스크롤되며,
+  상자 오른쪽 가장자리의 그림자와 *Scroll sideways for all 14 columns ›* 줄이 숨은 열이 있음을 알립니다.
+  페이지는 옆으로 넘치지 않습니다. 짝이 없는
   모드는 *1 ↔ —* 또는 *— ↔ 2*로 시작하고 제목과 접근 가능한 이름이 전체 *A mode 2: no match in B
   (best overlap 0.43, with B mode 2)*이며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape

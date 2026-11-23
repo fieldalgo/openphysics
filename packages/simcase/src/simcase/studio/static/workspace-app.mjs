@@ -1255,14 +1255,26 @@ function groupIndexHeader(th,shown){
 // per matched mode (or degenerate pair), then each mode of A and of B without a match. The columns
 // (Modes, Polarization A B, Overlap, n_eff A B, Δn_eff, Δ %, A_eff A B, absorption loss A B, n_g A B)
 // have short headers grouped as A | B; each leaf header keeps its full label in data-column. The
-// row header reads "1 ↔ 1" with the full pairing as its accessible name and title. The first column
-// stays in view while the others scroll inside the table box.
+// row header reads "1 ↔ 1" with the full pairing as its accessible name and title. Round 13: at
+// 1440 × 900 every column fits the box (a Polarization cell on two lines, the class then the
+// share, its " · " kept in the text but not shown; the n_g hint on the line above the table, not
+// in its header). Where the box is narrower (a phone) the first column stays in view while the
+// others scroll, with a shadow at the right edge and a line saying so while columns are hidden.
 function compareTable(a,b,match){
  const box=document.createElement('div');box.className='compare-table';
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
+ // "TE-like · 98.2 % TE" on two lines: the class, then the share; textContent stays the same
+ const polarizationCell=text=>{const td=document.createElement('td');td.className='pol';const at=text.indexOf(' · ');
+  if(at<0){td.textContent=text;return td;}
+  const kind=document.createElement('span'),sep=document.createElement('span'),share=document.createElement('span');
+  kind.className='pol-kind';kind.textContent=text.slice(0,at);sep.className='pol-sep';sep.textContent=' · ';share.className='pol-share';share.textContent=text.slice(at+3);td.append(kind,sep,share);return td;};
  if(match.error){box.append(cell('p','Modes not matched: '+match.error,{class:'table-note',id:'compare-match-error'}));return box;}
  const runs=document.createElement('p');runs.id='compare-table-runs';runs.className='table-runs';
  for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run));runs.append(line);}
+ // the n_g hint, when neither run computed n_g: on this line, so the n_g columns stay narrow
+ if(![a,b].some(hasGroupIndex)){const line=document.createElement('span');line.className='table-hint';const hint=document.createElement('small');hint.dataset.groupIndexHint='';hint.textContent=GROUP_INDEX_HINT;hint.title=GROUP_INDEX_OFF_HELP;line.append('n_g: ',hint);runs.append(line);}
+ const frame=document.createElement('div');frame.className='compare-table-frame';
+ const more=cell('p','Scroll sideways for all 14 columns ›',{class:'table-note scroll-hint','data-scroll-hint':''});more.hidden=true;
  const scroll=document.createElement('div');scroll.className='compare-table-scroll';scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-labelledby','compare-neff-caption');
  const table=document.createElement('table');table.id='compare-neff';
  const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent='Modes of A and B matched by field overlap';table.append(caption);
@@ -1272,8 +1284,7 @@ function compareTable(a,b,match){
  for(const [short,full,help,paired,unit=''] of columns){
   if(!paired){top.append(cell('th',short,{scope:'col',rowspan:'2','data-column':full,...(help?{title:help}:{})}));continue;}
   const group=cell('th',short,{scope:'colgroup',colspan:'2',...(help?{title:help}:{})});top.append(group);
-  if(full==='n_g')groupIndexHeader(group,[a,b]);
-  for(const side of ['A','B'])sides.append(cell('th',side,{scope:'col','data-column':`${full} ${side}${unit}`,title:`${full} ${side}${unit}`+(help?': '+help:'')}));
+  for(const side of ['A','B'])sides.append(cell('th',side,{scope:'col','data-column':`${full} ${side}${unit}`,title:`${full} ${side}${unit}`+(help?': '+help:''),...(full==='Polarization'?{class:'pol'}:{})}));
  }
  // one column group per header of the first row, so its scope=colgroup headers name their two columns
  for(const [,,,paired] of columns){const group=document.createElement('colgroup');if(paired)group.span=2;table.append(group);}
@@ -1294,17 +1305,20 @@ function compareTable(a,b,match){
   const tr=document.createElement('tr');
   if(r.kind==='match'){
    const mean=index(a,r.unitA);tr.dataset.match=`${r.unitA.join('-')}:${r.unitB.join('-')}`;
-   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`}),cell('td',unitPolarization(a,r.unitA)),cell('td',unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta),class:'num'}),
+   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`}),polarizationCell(unitPolarization(a,r.unitA)),polarizationCell(unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta),class:'num'}),
     cell('td',indexText(a,r.unitA),{class:'num'}),cell('td',indexText(b,r.unitB),{class:'num'}),cell('td',formatDelta(r.pair.delta),{class:'num','data-delta':''}),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100),{class:'num','data-delta-percent':''}),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }else{
    tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
-   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':r.text}),cell('td',r.unitA?unitPolarization(a,r.unitA):'—'),cell('td',r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
+   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':r.text}),polarizationCell(r.unitA?unitPolarization(a,r.unitA):'—'),polarizationCell(r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }
   body.append(tr);
  }
- table.append(body);scroll.append(table);
+ table.append(body);scroll.append(table);frame.append(scroll);
+ // the scroll cue: the line and the right-edge shadow while columns are hidden on the right
+ const cue=()=>{const over=scroll.scrollWidth>scroll.clientWidth+1;more.hidden=!over;frame.classList.toggle('more-right',over&&scroll.scrollLeft+scroll.clientWidth<scroll.scrollWidth-1);};
+ scroll.addEventListener('scroll',cue,{passive:true});new ResizeObserver(cue).observe(scroll);
  const note=cell('p',MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
- box.append(runs,scroll,note);return box;
+ box.append(runs,more,frame,note);return box;
 }
 // The matched modes shown in the Compare plots (in memory only: session files keep the Results mode)
 let compareChoice=null;
