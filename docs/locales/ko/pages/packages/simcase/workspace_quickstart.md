@@ -91,18 +91,21 @@ py -3.12 -m venv "$HOME\op-studio"
 
 ## 5. 작업 남기기
 
-- 리본 Project 묶음의 **Save session**은 입력, 완료한 실행 전부, 이름과 고정, 비교를
-  파일 하나에 씁니다. 끄기 전에 쓰세요. 파일 이름은 응용과 현지 시각으로 정해지며(예:
-  `optical-waveguide-session-2026-11-21-1305.json`) 브라우저 다운로드로 넘어갑니다(브라우저가
-  저장 위치를 묻거나, 같은 이름이 있으면 번호를 붙일 수 있습니다). Messages에 *Session file …
-  sent to the browser's downloads (check your Downloads folder)*가 나오고, 다음 편집이나 실행
-  전까지 제목에 *Session file … sent to your browser's Downloads · 시각*이 표시됩니다. 하단은 제목의 저장 표시를 그대로
+- **File › Save**(Ctrl+S, 또는 리본 Project 묶음의 **Save**)는 입력, 완료한 실행 전부, 이름과
+  고정, 비교를 세션 파일 하나에 씁니다. 끄기 전에 쓰세요. 파일 이름은 응용과 현지 시각으로 정해집니다(예:
+  `optical-waveguide-session-2026-11-21-1305.json`). Chrome과 Edge에서는 브라우저의 저장 대화상자가
+  저장 위치를 묻고, Messages에 *Saved to …*가 나오며, 다음 Save는 묻지 않고 같은 파일에 씁니다.
+  Firefox와 Safari에서는 Studio가 파일 이름을 묻고 파일을 브라우저 Downloads로 넘깁니다(브라우저가 저장
+  위치를 묻거나, 같은 이름이 있으면 “ (1)”을 붙일 수 있습니다). Messages에 *Session file … sent to your
+  browser's Downloads*가 나오고, 다음 편집이나 실행 전까지 제목에 *Session file … sent to your
+  browser's Downloads · 시각*이 표시됩니다. 다른 이름은 **File › Save As…**(Shift+Ctrl+S)로 고르며,
+  파일마다 담는 것은 [File 메뉴와 파일 종류](workspace.md#file-메뉴와-파일-종류)에 있습니다. 하단은 제목의 저장 표시를 그대로
   보여 주며, 세션 파일 저장 전에는 *Not saved to a file · kept for recovery in this browser*입니다.
-  **More › Save inputs only**는 결과 없이 모델만 저장하고, Runs 목록의 **Export this run**은
+  **File › Export › Model file…**은 결과 없이 모델만 저장하고(`optical-waveguide.json`), Runs 목록의 **Export this run**은
   실행 하나를 자체 파일로 씁니다.
 - 새로고침하거나 다시 켜면 시작 화면에 **Continue where you left off**가 나옵니다. 마지막
   세션이나 이전 세션은 **Recover (this browser only)**로 이 브라우저에서 복구하고, 세션 파일은
-  **Open session file (portable)…**로 엽니다. 컴퓨터 사이를 옮길 수 있는 사본은 세션 파일입니다. 새 페이지(기본 입력, 실행 없음)에서는
+  Library 맨 위의 **Open session file…**이나 **File › Open…**(Ctrl+O)으로 엽니다. 컴퓨터 사이를 옮길 수 있는 사본은 세션 파일입니다. 새 페이지(기본 입력, 실행 없음)에서는
   바로 열립니다. 그렇지 않으면 **Open saved session?** 창이 돌아올 실행과 비교, 바뀌는 것을
   보여 줍니다. Messages에 무엇을 열었는지 나옵니다. 그다음 변경 전까지 제목에 파일 이름과 함께
   *Opened …*, 또는 *Recovered from this browser*가 나옵니다. 세션 파일을 저장한 적이 있으면 지난
