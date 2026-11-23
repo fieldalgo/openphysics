@@ -1495,7 +1495,7 @@ try {
         const name='chosen.json';return {kind:'file',name,createWritable:async()=>{let buffer='';return {write:async t=>{if(p.failWrite)throw new DOMException('Disk full','QuotaExceededError');buffer+=t;},close:async()=>{p.files[name]=buffer;p.writes++;},abort:async()=>{p.aborts++;}};}};};})()`);
     const picker = () => page.eval("JSON.parse(JSON.stringify({calls:window.__picker.calls,writes:window.__picker.writes,aborts:window.__picker.aborts,content:window.__picker.files['chosen.json']}))");
     before = await listDownloads();
-    await key('s', ['Control', 'Shift']); await page.until("/^Saved my runx to /.test(document.getElementById('file-status').textContent)", 'F3 Save As');
+    await key('s', ['Control', 'Shift']); await page.until("/^Saved chosen to /.test(document.getElementById('file-status').textContent)", 'F3 Save As');
     let p3 = await picker(); const saveAsMessage = await status();
     stage('F3 Save As', {calls: p3.calls, writes: p3.writes, message: saveAsMessage});
     assert.equal(p3.calls.length, 1); assert.equal(p3.writes, 1);
@@ -1505,16 +1505,20 @@ try {
     assert.equal('startIn' in p3.calls[0], false); assert.equal(p3.calls[0].suggestedName, 'my runx.json');
     // the save time is for display only and in no digest: every other byte is the download's
     const withoutTime = t => String(t).replace(/"savedAt":"[^"]*"/, '"savedAt":""');
-    assert.equal(withoutTime(p3.content), withoutTime(fallbackText), 'the picker file has the bytes of the download of the same state');
-    assert.match(saveAsMessage, /^Saved my runx to chosen\.json: Optical waveguide \(\d+ runs, the comparison\)/);
+    // round 16 (S6): the name my runx came from a file name, so it follows Save As to chosen.json;
+    // every other byte is the download's
+    const withoutName = t => withoutTime(t).replace(/"name":"[^"]*"/, '"name":""');
+    assert.equal(JSON.parse(p3.content).name, 'chosen');
+    assert.equal(withoutName(p3.content), withoutName(fallbackText), 'the picker file has the bytes of the download of the same state');
+    assert.match(saveAsMessage, /^Saved chosen to chosen\.json: Optical waveguide \(\d+ runs, the comparison\)/);
     assert.deepEqual(await listDownloads(), before, 'a picker save downloads nothing');
-    assert.match(await page.eval("document.getElementById('project').textContent"), /^my runx · chosen\.json · saved [^(]+$/, 'the header names the file written, not as a download');
+    assert.match(await page.eval("document.getElementById('project').textContent"), /^chosen · chosen\.json · saved [^(]+$/, 'the header names the file written, not as a download');
     assert.equal(await page.eval("document.getElementById('project').hasAttribute('title')"), false, 'no (1) title text on the picker path');
     // Save: the same file again, no dialog
     await page.eval("document.getElementById('file-status').textContent=''");
-    await page.click('#menu-save'); await page.until("/^Saved my runx to chosen\\.json/.test(document.getElementById('file-status').textContent)", 'F3 Save');
+    await page.click('#menu-save'); await page.until("/^Saved chosen to chosen\\.json/.test(document.getElementById('file-status').textContent)", 'F3 Save');
     p3 = await picker(); stage('F3 Save again', {calls: p3.calls.length, writes: p3.writes});
-    assert.equal(p3.calls.length, 1, 'Save asks nothing'); assert.equal(p3.writes, 2); assert.equal(withoutTime(p3.content), withoutTime(fallbackText));
+    assert.equal(p3.calls.length, 1, 'Save asks nothing'); assert.equal(p3.writes, 2); assert.equal(withoutName(p3.content), withoutName(fallbackText));
     // a cancel writes nothing and says so
     await page.eval("window.__picker.mode='abort'"); await key('s', ['Control', 'Shift']); await sleep(400);
     p3 = await picker(); stage('F3 cancel', {calls: p3.calls.length, writes: p3.writes, message: await status()});
@@ -1548,11 +1552,11 @@ try {
     await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='';i.focus();})()"); await page.call('Input.insertText', {text: 'design-a-ng'});
     await page.click('#save-name-download'); const o1First = await newDownload(before), o1FirstMessage = await status();
     assert.equal(o1First, 'design-a-ng.json'); assert.match(o1FirstMessage, /^Project file design-a-ng\.json sent to your browser's Downloads: /, 'the first download says where it went');
-    // Save As does not rename a named project (P3)
-    assert.match(await header(), /^my runx · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
+    // round 16 (S6): a name from a file name follows Save As (P3 kept it)
+    assert.match(await header(), /^design-a-ng · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.');
     await toGeometry(); await page.type('#shape-w', 650); await sleep(300);
-    const o1Edited = await header(); assert.match(o1Edited, /^my runx · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
+    const o1Edited = await header(); assert.match(o1Edited, /^design-a-ng · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.');
     before = await listDownloads(); await page.click('nav [data-page=Model]'); await page.click('#menu-save');
     await noDialog('O1 Save'); const o1Second = await newDownload(before), o1SecondMessage = await status(), o1SecondHeader = await header();
@@ -1560,7 +1564,7 @@ try {
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
     assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
-    assert.match(o1SecondHeader, /^my runx · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
+    assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
     // Ctrl+S after another edit: the same, no dialog
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
     await page.eval("document.activeElement?.blur()"); await key('s', ['Control']); await noDialog('O1 Ctrl+S');
@@ -1572,17 +1576,17 @@ try {
     await page.eval("document.getElementById('autosave-status').textContent=''");
     await setFile('#session-file', join(downloads, o1First));
     await answerDialogs("/^Opened design-a-ng\\.json/.test(document.getElementById('autosave-status').textContent)", 'O1 open');
-    await page.click('nav [data-page=Model]'); await sleep(200); const o1Opened = await header(); assert.equal(o1Opened, 'my runx · design-a-ng.json · opened');
+    await page.click('nav [data-page=Model]'); await sleep(200); const o1Opened = await header(); assert.equal(o1Opened, 'design-a-ng · design-a-ng.json · opened');
     assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Opened design-a-ng.json');
     await toGeometry(); await page.type('#shape-w', 640); await sleep(300);
-    const o1OpenedEdited = await header(); assert.match(o1OpenedEdited, /^my runx · design-a-ng\.json · changed since opened · /);
+    const o1OpenedEdited = await header(); assert.match(o1OpenedEdited, /^design-a-ng · design-a-ng\.json · changed since opened · /);
     before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after Open');
     const o1Fourth = await newDownload(before); assert.match(o1Fourth, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Fourth), 640);
     assert.match(await status(), /^Project file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
     // P3 (intended change): Reset design edits a model of the project, so the project file is
     // kept: the header still names it, changed, and Save downloads under it with no dialog
     await page.click('#reset'); await sleep(300); const o1Reset = await header();
-    assert.match(o1Reset, /^my runx · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
+    assert.match(o1Reset, /^design-a-ng · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
     before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after reset');
     assert.match(await newDownload(before), /^design-a-ng(?: \(\d\))?\.json$/);
     stage('O1 open and reset', {opened: o1Opened, openedEdited: o1OpenedEdited, fourth: o1Fourth, reset: o1Reset});
