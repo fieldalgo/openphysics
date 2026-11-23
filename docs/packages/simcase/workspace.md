@@ -894,7 +894,11 @@ Limits of the open boundary, from its validation:
   returned TE mode is 4.76e-3 from the pole at the default mesh, the discretization error the slab
   convergence check measures (it gates n_eff within 1e-3 only at 1/4 of the element lengths). After
   that result the mode is identified as the one nearest the pole and must meet the slab check's
-  default-mesh gate (loss within 3.5 %; it is +2.96 %).
+  default-mesh gate (loss within 3.5 %; it is +2.96 %). Its first rule for known misses also
+  failed for the slab: it counted the slab's lateral harmonics that a search near 1.95 finds
+  (Re 2.38 to 1.90, ranked 5th and beyond), modes outside the asked count. After that result a
+  known miss is a physical mode of the two searches that ranks within the asked count and is not
+  returned; the only one is the strip-over-substrate mode near 1.486 when 8 modes are asked.
 
 ### Optical session files (version 9)
 
