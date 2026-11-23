@@ -72,3 +72,62 @@ test('U14: the status line names several shapes as the run list does (round 16 S
  const r=run(job(6),{number:6});r.input.model.shapes=[core,sub];r.signature='other';
  const f=W.opticalFreshness(input(),[r],r,2);assert.equal(f.geometry,'Core 500 × 220 + Substrate 3000 × 700 nm');
 });
+
+// A 100 nm grid over the closed window (two triangles per cell, metres), and one mode per
+// intensity function of the centroid in nm (|E|² = f, all in E_x).
+function gridRun(shapes,intensities){
+ const X=[],T=[],nx=30,ny=24;for(let j=0;j<=ny;j++)for(let i=0;i<=nx;i++)X.push([(-1500+100*i)*1e-9,(-1200+100*j)*1e-9]);
+ const id=(i,j)=>j*(nx+1)+i;for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){T.push([id(i,j),id(i+1,j),id(i+1,j+1)]);T.push([id(i,j),id(i+1,j+1),id(i,j+1)]);}
+ const c=t=>[(X[t[0]][0]+X[t[1]][0]+X[t[2]][0])/3*1e9,(X[t[0]][1]+X[t[1]][1]+X[t[2]][1])/3*1e9];
+ const real=intensities.map(f=>T.map(t=>[Math.sqrt(f(...c(t))),0,0])),imag=intensities.map(()=>T.map(()=>[0,0,0]));
+ return {effective_index:intensities.map((_,k)=>3-k*0.1),field:{node_coordinates:X,triangles:T,real,imag},input:{model:{shapes}},settings:{adapter:'simcase-optical-waveguide-v1'}};
+}
+const core={name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220};
+const substrate={name:'Substrate',type:'rect',material:'Silicon',x:-1500,y:-1200,w:3000,h:700};
+test('U1: a mode mostly in a shape touching the window edge, with |E|² near those edges, is named',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ // mode 1 fills the substrate; mode 2 the core; mode 3 the substrate's middle only (|x| < 600 nm)
+ const run=gridRun([core,substrate],[(x,y)=>y<-500?1:0,(x,y)=>x>-250&&x<250&&y>0&&y<220?1:0,(x,y)=>y<-500&&Math.abs(x)<600?1:0]);
+ const p=M.edgePlacement(run);
+ // 210 substrate cells; within 300 nm of its left, right or bottom edge: 3 columns each side (7 rows) and
+ // 3 rows of 30, the corners once: 21 + 21 + 90 - 18 = 114
+ assert.equal(p[0].shape,'Substrate');assert.ok(Math.abs(p[0].share-1)<1e-12);assert.ok(Math.abs(p[0].near-114/210)<1e-12,String(p[0].near));assert.equal(p[0].named,true);
+ assert.equal(p[1].share,0);assert.equal(p[1].named,false);
+ assert.ok(Math.abs(p[2].share-1)<1e-12);assert.ok(Math.abs(p[2].near-3/7)<1e-12,String(p[2].near));assert.equal(p[2].named,true);
+ assert.deepEqual(M.edgeNotes(run).map(n=>n.mode),[0,2]);
+ assert.equal(M.edgeNotes(run)[0].text,'Mode 1 is mostly in Substrate (100 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.');
+ assert.equal(M.edgeNoteText(0,{shape:'Substrate',share:0.934}),'Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.');
+});
+test('U1: the bounds: more than half in the shape, and at least 1 % of |E|² within 300 nm of its touched edges',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ assert.deepEqual([M.EDGE_SHARE,M.EDGE_NEAR,M.EDGE_BAND_NM],[0.5,0.01,300]);
+ // half in the substrate (not more): not named; a slab mode of a rib whose field stays 400 nm from the walls: not named
+ const slab={name:'Slab',type:'rect',material:'Silicon',x:-1500,y:0,w:3000,h:200},rib={name:'Rib',type:'rect',material:'Silicon',x:-200,y:200,w:400,h:100};
+ // a core on the grid: 4 cells in the substrate's top row and 4 in the core
+ const box={name:'Box',type:'rect',material:'Silicon',x:-200,y:0,w:400,h:200};
+ const half=gridRun([box,substrate],[(x,y)=>Math.abs(x)<200&&((y<-500&&y>-600)||(y>0&&y<100))?1:0]);
+ const h=M.edgePlacement(half)[0];assert.ok(Math.abs(h.share-0.5)<1e-12,String(h.share));assert.equal(h.named,false);
+ const ribRun=gridRun([slab,rib],[(x,y)=>y>0&&y<200&&Math.abs(x)<1100?1:0,(x,y)=>y>0&&y<200?1:0]);
+ const r=M.edgePlacement(ribRun);assert.equal(r[0].shape,'Slab');assert.ok(Math.abs(r[0].share-1)<1e-12);assert.equal(r[0].near,0);assert.equal(r[0].named,false);
+ // 3 columns on each side of 30
+ assert.ok(Math.abs(r[1].near-0.2)<1e-12,String(r[1].near));assert.equal(r[1].named,true);
+ // the template (one core, touching nothing): every mode null, no note
+ assert.deepEqual(M.edgePlacement(gridRun([core],[(x,y)=>1])),[null]);assert.deepEqual(M.edgeNotes(gridRun([core],[(x,y)=>1])),[]);
+});
+test('U1: shapes layer as the geometry contract does; circles, polygons and edges; open runs and runs without fields',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ // the core drawn after a substrate that covers it wins there
+ const big={name:'Big',type:'rect',material:'Silicon',x:-1500,y:-1200,w:3000,h:1500};
+ const run=gridRun([big,{...core,y:-300}],[(x,y)=>x>-250&&x<250&&y>-300&&y<-80?1:0]);
+ assert.equal(M.edgePlacement(run)[0].share,0);
+ assert.deepEqual(M.touchedEdges(substrate),['left','right','bottom']);assert.deepEqual(M.touchedEdges(core),[]);
+ assert.deepEqual(M.touchedEdges({name:'Top',type:'circle',cx:0,cy:1100,r:100}),['top']);
+ assert.deepEqual(M.touchedEdges({name:'P',type:'polygon',points:[[1400,0],[1500,0],[1450,100]]}),['right']);
+ assert.equal(M.insideShape({type:'circle',cx:0,cy:0,r:100},60,79),true);assert.equal(M.insideShape({type:'circle',cx:0,cy:0,r:100},60,81),false);
+ const tri={type:'polygon',points:[[0,0],[100,0],[0,100]]};assert.equal(M.insideShape(tri,20,20),true);assert.equal(M.insideShape(tri,70,70),false);
+ const noField={...gridRun([substrate],[()=>1]),field:undefined};assert.deepEqual(M.edgePlacement(noField),[]);
+ const open={...gridRun([substrate],[()=>1]),settings:{boundary:'PML'}};
+ const OR=await import(STATIC+'workspace-open-run.mjs');assert.equal(OR.isOpenRun(open),true,'the open fixture is an open run');assert.deepEqual(M.edgePlacement(open),[]);
+ // the Results note row and the Compare note are drawn from edgeNotes
+ const app=read('workspace-app.mjs');assert.ok(app.includes("id:'edge-note-'+m"));assert.ok(app.includes("id:'compare-edge-note'"));
+});

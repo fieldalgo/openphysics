@@ -28,7 +28,7 @@ import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.
 import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
 import {sessionFileName,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -1361,13 +1361,18 @@ function modesTable(run){
  // the n_g hint, when the run has no n_g: on a line above the table (as Compare has it), the header just "n_g"
  if(!hasGroupIndex(run))box.append(groupIndexHintLine('modes-table-hint'));
  const body=document.createElement('tbody');
- for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row'}),cell('td',r.neff,{'data-neff':String(r.mode)}));
+ // round 17 (U1): a closed-window mode mostly in a shape touching the window edge gets a note row,
+ // after its row (after the last row of a degenerate group, whose polarization cell spans the group)
+ const edge=new Map(edgeNotes(run).map(n=>[n.mode,n.text])),pending=[];let spanEnd=-1;
+ for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row',...(edge.has(r.mode-1)?{'aria-describedby':'edge-note-'+r.mode}:{})}),cell('td',r.neff,{'data-neff':String(r.mode)}));
+  if(r.polarization?.rowspan>1)spanEnd=r.mode-1+r.polarization.rowspan-1;if(edge.has(r.mode-1))pending.push(r.mode);
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
   {const lossCell=cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle,...(r.depends?{'data-pml-dependent':'',class:'pml-dependent'}:{})});if(r.depends){lossCell.textContent='';const em=document.createElement('em');em.textContent=r.loss;lossCell.append(em);}tr.append(lossCell);}
   tr.append(cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
   {const g=groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
   if(checks){const c=checks[r.mode-1],td=cell('td','',{'data-pml-check':String(r.mode),'data-pml-check-status':c.status,title:c.title});if(c.status==='depends'){const strong=document.createElement('strong');strong.textContent='Depends on the PML';td.append(strong,c.text.slice('Depends on the PML'.length));}else td.textContent=c.text;tr.append(td);}
-  body.append(tr);}
+  body.append(tr);
+  if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}
  table.append(body);box.append(table);
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${open?OPEN_AREA_HELP:AREA_HELP+'.'}`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0
@@ -1541,6 +1546,10 @@ function compareTable(a,b,match){
  // an open run without physical bounds is not matched (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
  const note=cell('p',match.disabled?match.disabled+'. Every mode of A and of B is listed, not matched.':MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
  box.append(runs,more,frame,note);
+ // round 17 (U1): a closed run whose modes lie mostly in a shape touching the window edge says so,
+ // which also says why such a run matches none of an open run's modes
+ {const lines=[['A',a],['B',b]].flatMap(([side,run])=>edgeNotes(run).map(n=>`${side} · ${runTitle(runNumber(run),run.label)}: ${n.text}`));
+  if(lines.length){const p=cell('p','',{class:'table-note',id:'compare-edge-note'});lines.forEach((t,i)=>{if(i)p.append(document.createElement('br'));p.append(t);});box.append(p);}}
  // the two loss columns count different things: say so
  if(isOpenRun(a)!==isOpenRun(b))box.append(cell('p',isOpenRun(b)?COMPARE_LOSS_NOTE:COMPARE_LOSS_NOTE_BA,{class:'table-note',id:'compare-loss-note'}));
  return box;
