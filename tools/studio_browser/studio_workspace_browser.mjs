@@ -1733,13 +1733,24 @@ try {
     assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls], ['Other candidates (30) — not shown as modes', 30, 0]);
     await obOverflow('Results, open run');
 
-    // 5. Save: a session of version 10 with the run's open boundary and PML check
+    // 5. Save: the project file (P3) holds the workspace model as a session of version 10 with the
+    // run's open boundary and PML check
     const obFiles = async () => (await readdir(obDownloads)).filter(n => n.endsWith('.json'));
-    const beforeSave = await obFiles(); await ob.click('#save-session');
-    await ob.until("document.getElementById('save-name-dialog')?.open", 'OB name dialog'); await ob.click('#save-name-download');
-    let saved = null; for (let i = 0; i < 300 && !saved; i++) { saved = (await obFiles()).find(n => !beforeSave.includes(n)) ?? null; if (!saved) await sleep(100); }
-    assert.ok(saved, 'OB session downloaded'); await sleep(500);
-    const v10 = JSON.parse(await readFile(join(obDownloads, saved), 'utf8'));
+    // File › Save: the name dialog the first time, then the remembered name; the new download's name and text
+    // (a download under a name already there may replace it: a new file or a new modification time)
+    const obStamps = async () => Object.fromEntries(await Promise.all((await obFiles()).map(async n => [n, (await stat(join(obDownloads, n))).mtimeMs])));
+    const obSave = async label => {
+      const before = await obStamps(); await ob.click('#save-session'); let saved = null;
+      for (let i = 0; i < 600 && !saved; i++) {
+        if (await ob.eval("!!document.getElementById('save-name-dialog')?.open")) await ob.click('#save-name-download');
+        const now = await obStamps(); saved = Object.keys(now).find(n => before[n] !== now[n]) ?? null; if (!saved) await sleep(100);
+      }
+      assert.ok(saved, label + ': downloaded; ' + await obText('#file-status') + ' · ' + JSON.stringify(await obFiles())); await sleep(500);
+      return {name: saved, text: await readFile(join(obDownloads, saved), 'utf8')};
+    };
+    const workspaceSession = text => JSON.parse(text).models.find(m => m.kind === 'workspace').session;
+    const saved = (await obSave('OB first save')).name;
+    const v10 = workspaceSession(await readFile(join(obDownloads, saved), 'utf8'));
     stage('OB version 10 saved', {file: saved, version: v10.version, settings: v10.runs[0].settings.pml, check: v10.runs[0].pml_check, candidates: v10.runs[0].open_boundary.candidates.length});
     assert.deepEqual([v10.version, v10.runs[0].settings.adapter, v10.runs[0].settings.boundary], [10, 'optical-shapes-v9', 'PML']);
     assert.deepEqual(v10.runs[0].settings.pml, {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'});
@@ -1806,6 +1817,48 @@ try {
     assert.deepEqual(leak.loss, ['29.15 dB/cm', '1006 dB/cm']);
     assert.ok(leak.neff[0].startsWith('2.441263') && leak.neff[1].startsWith('1.772790'), JSON.stringify(leak.neff));
     assert.ok(leak.lossTitles.every(t => t.endsWith('At the default mesh this loss is about 3 % above the converged value (TE-like +2.8 %, TM-like +1.8 % on a strip over a substrate).')));
+
+    // V15 with P3 (pre-registered by the coordinator): the project file with the open leakage run and
+    // its PML check, saved, opened and saved again, follows V-P1: (a) save 1 -> open -> save 2 differ
+    // only in savedAt, the workspace entry's bytes and digest and each run's origin and digest; (b)
+    // save 2 -> open -> save 3 are byte-identical but for savedAt; and the run's n_eff, loss and check
+    // strings read the same after the open
+    const obOpen = async (path, label) => {
+      await ob.eval("document.getElementById('file-status').textContent=''");
+      const {root} = await ob.call('DOM.getDocument'); const {nodeId} = await ob.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#session-file'});
+      await ob.call('DOM.setFileInputFiles', {nodeId, files: [path]});
+      const end = Date.now() + 60000;
+      while (!(await ob.eval("/^Opened project /.test(document.getElementById('file-status').textContent)"))) {
+        assert.ok(Date.now() < end, label + ': ' + await obText('#file-status'));
+        if (await ob.eval("!!document.getElementById('leave-confirm')?.open")) await ob.click('#leave-go');
+        else if (await ob.eval("!!document.getElementById('load-confirm')?.open")) await ob.click('#confirm-load');
+        await sleep(150);
+      }
+    };
+    const differing = (x, y, path = '') => {
+      if (Object.is(x, y)) return [];
+      if (x && y && typeof x === 'object' && typeof y === 'object' && Array.isArray(x) === Array.isArray(y)) {
+        const keys = Array.isArray(x) ? (x.length === y.length ? [...x.keys()] : null) : [...new Set([...Object.keys(x), ...Object.keys(y)])];
+        if (keys) return keys.flatMap(k => differing(x[k], y[k], Array.isArray(x) ? `${path}[${k}]` : `${path}.${k}`));
+      }
+      return [path];
+    };
+    const withoutTime = text => String(text).replace(/"savedAt":"[^"]*"/, '"savedAt":""');
+    const first = await obSave('OB V15 save 1');
+    await obOpen(join(obDownloads, first.name), 'OB V15 open 1');
+    const second = await obSave('OB V15 save 2');
+    const w = JSON.parse(first.text).models.findIndex(m => m.kind === 'workspace'), runCount = workspaceSession(first.text).runs.length;
+    const paths = differing(JSON.parse(first.text), JSON.parse(second.text));
+    const expectedPaths = ['.savedAt', `.models[${w}].bytes`, `.models[${w}].digest`, ...Array.from({length: runCount}, (_, i) => [`.models[${w}].session.runs[${i}].origin`, `.models[${w}].session.runs[${i}].digest`]).flat()];
+    await obOpen(join(obDownloads, second.name), 'OB V15 open 2');
+    const third = await obSave('OB V15 save 3');
+    await ob.click('nav [data-page=Results]'); await ob.until("!!document.getElementById('modes-table')", 'OB V15 Results');
+    const reopened = await resultsView();
+    stage('OB V15 project round trip', {paths, runs: runCount, versions: [workspaceSession(first.text).version, workspaceSession(third.text).version], neff: reopened.neff, loss: reopened.loss, check: reopened.check});
+    assert.deepEqual([...paths].sort(), [...expectedPaths].sort(), 'V-P1 (a) with the open run');
+    assert.equal(withoutTime(third.text), withoutTime(second.text), 'V-P1 (b): byte-identical but for savedAt');
+    assert.deepEqual(workspaceSession(third.text).runs.map(r => r.origin), Array(runCount).fill('imported'));
+    assert.deepEqual([reopened.neff, reopened.loss, reopened.check], [leak.neff, leak.loss, leak.check], 'the open run reads the same after the open');
     assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
 
     // 8. Search near n_eff lowered to 1.600 with 4 modes finds the mode near the cladding index

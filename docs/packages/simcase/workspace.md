@@ -227,7 +227,7 @@ not set the project file.
 (shown on several lines here; the file has none). `name` is the project's name (1 to 80 characters,
 not the file name). `savedAt` and `studio` are for display only. `active` is the id of the model shown
 on open. Each model has an `id` (`m` and 1 to 3 digits, kept across saves), a `kind` (`workspace`:
-an optical session of version 6, 7 or 9, the versions the session reader reads; `multiphysics`: a
+an optical session of version 6, 7, 9 or 10 (an open boundary), the versions the session reader reads; `multiphysics`: a
 session of version 8, one per tab in this Studio, up to 7 in a version 1 file), a `title` and a
 `card` (`optical`, `heat`, `joule`, `heated-waveguide` or `null`) for display, and its `session`,
 unchanged: written alone by its writer it is byte for byte the session file Studio writes (version 7
@@ -1335,6 +1335,8 @@ leakage out of the window.
   The digest covers both.
 - Its field implies the normalization above. It has no TE fractions, effective areas or group
   index.
+- A [project file](#project-files) holds such a session as its workspace entry: its reader takes
+  optical sessions of version 6, 7, 9 and 10.
 - A version 9 session does not hold inputs of version 9. Studio 4b58fb7 refuses a version 10
   file with *This session file is version 10, newer than this Studio reads (versions 6–9). Open
   it in a newer Studio.* Multiphysics sessions stay version 8.

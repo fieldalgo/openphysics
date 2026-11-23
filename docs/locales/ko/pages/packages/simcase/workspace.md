@@ -201,7 +201,7 @@ file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open
 
 (여기서는 여러 줄로 보였지만 파일에는 줄바꿈이 없습니다.) `name`은 프로젝트 이름(1–80자, 파일 이름 아님)입니다.
 `savedAt`과 `studio`는 표시용입니다. `active`는 열 때 보일 모델의 id입니다. 모델마다 `id`(`m`과 숫자 1–3개, 저장해도
-유지), `kind`(`workspace`: 세션 reader가 읽는 버전 6, 7, 9의 광학 세션, `multiphysics`: 버전 8 세션, 이 Studio는
+유지), `kind`(`workspace`: 세션 reader가 읽는 버전 6, 7, 9, 10(열린 경계)의 광학 세션, `multiphysics`: 버전 8 세션, 이 Studio는
 탭에 하나, 버전 1 파일에는 7개까지), 표시용 `title`과 `card`(`optical`, `heat`, `joule`, `heated-waveguide`
 또는 `null`), 그리고 바뀌지 않은 `session`이 있습니다. 그 세션을 writer로 따로 쓰면 Studio가 쓰는 세션 파일과
 바이트까지 같습니다(버전 7은 `JSON.stringify`, 버전 8과 9는 음의 0을 `-0.0`으로 유지). `bytes`와 `digest`는 그
@@ -1122,6 +1122,7 @@ order 2, physical fraction 0.5 and a search of 32 candidates.*로 거부합니�
   {"pml_strength": 6, "paired": [모드마다 {"re", "im"} 또는 null]}`도 보존합니다. 다이제스트는 둘 다
   포함합니다.
 - 그 장은 위의 정규화를 따른다고 봅니다. TE 비율, 유효 면적, 군굴절률은 없습니다.
+- [프로젝트 파일](#프로젝트-파일)은 이런 세션을 작업 공간 항목으로 담습니다: 그 reader는 버전 6, 7, 9, 10의 광학 세션을 받습니다.
 - 버전 9 세션은 버전 9 입력을 담지 않습니다. Studio 4b58fb7은 버전 10 파일을 *This session file is version
   10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.*로 거부합니다. 다중물리
   세션은 버전 8 그대로입니다.
