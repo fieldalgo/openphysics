@@ -425,6 +425,11 @@ then *· changed since opened*, and Save keeping the name), **Reset design** dro
 with the model-based name, and a model file over 64 KiB opened through **File › Open…** refused
 with *Model file exceeds 64 KiB*. Saves after an opened file keep its name in the other flows too. The real save
 dialog of desktop Chrome is not driven by any check.
+Since round 14 it checks the dock heading and the status bar naming both geometries (*Run 1 · design A
+600 × 300 nm · current inputs 700 × 300 nm*), the change list of **Use this run's inputs** staying in
+the run panel where the button was (the same text as Messages, still there after a page change, gone
+after the next input edit), and the save notice saying *Current inputs (650 × 400 nm) have no run
+yet.* when no run has them (and not when one does).
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff

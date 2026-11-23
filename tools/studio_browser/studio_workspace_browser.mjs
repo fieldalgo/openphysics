@@ -427,13 +427,13 @@ try {
   assert.match(await text('#file-status'), /^Width set to 700 nm\. Left x moved to −350 nm to keep the centre\. /);
   // an input edit takes the Study step back from Run complete to Ready to run
   const edited = await text('#workflow .workflow-step:nth-child(4)'); stage('input edited after run', {study: edited}); assert.match(edited, /Ready to run/);
-  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · press Run to compute them'});
+  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm', status: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm · press Run to compute them'});
   // while an input error holds Run, the heading repeats the footer instead of asking for a Run
   await page.type('#shape-w', 99999);
   const held = await opticalSequence(); stage('input error holds Run', held);
   assert.deepEqual(held, {heading: 'Input errors · correct or restore the last valid values', status: 'Input errors · correct or restore the last valid values'});
   await page.type('#shape-w', 700);
-  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · press Run to compute them'});
+  assert.deepEqual(await opticalSequence(), {heading: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm', status: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm · press Run to compute them'});
   await runAndWait();
   await page.click('nav [data-page=Compare]'); await sleep(500);
   const before = await delta(); assert.ok(before, 'comparison shows a delta n_eff');
@@ -522,7 +522,7 @@ try {
   };
   const look = await cardLook(); stage('K6 one card selected', look); assert.deepEqual(look, {pressed: 1, looks: 1, hovered: 1});
   await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Open in Results');
-  assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A · /);
+  assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/);
   // round 10 (K6): on Results the tree marks no optical node (the optical tree has no Results node), not Study
   assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), []);
   assert.deepEqual(await cardLook(), {pressed: 1, looks: 1, hovered: 1});
@@ -543,6 +543,7 @@ try {
   assert.equal(session.runs?.length, 2);
   assert.match(sessionFile, /^optical-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
   assert.ok(savedMessage.startsWith(`Session file ${sessionFile} sent to your browser's Downloads: `), savedMessage);
+  assert.doesNotMatch(savedMessage, /have no run yet/, 'Q2: Run 2 has the current inputs');
   // round 14 (Q1): a download reads "<name> · downloaded <time>", with the " (1)" note as title text
   assert.match(savedHeader, new RegExp(`^Optical waveguide / ${sessionFile.replace(/\./g, '\\.')} · downloaded \\d{1,2}:\\d\\d(?: [AP]M)?$`), savedHeader);
   assert.deepEqual(await page.eval("[document.getElementById('project').title,document.getElementById('autosave-status').title]"), ['Your browser may have added “ (1)” to the file name.', 'Your browser may have added “ (1)” to the file name.']);
@@ -627,7 +628,7 @@ try {
   for (const t of Object.values(viewed)) assert.doesNotMatch(t, /edits are kept/);
   // round 9 (J5): the dock, the footer, the title and the step bar describe the viewed run, run 1
   const viewedNames = await opticalSequence(); stage('older run named', {...viewedNames, header: viewed.header});
-  assert.deepEqual(viewedNames, {heading: 'Run 1 · design A · current inputs differ from this run', status: 'Run 1 · design A · current inputs differ from this run · Run 2 has them'});
+  assert.deepEqual(viewedNames, {heading: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm', status: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm · Run 2 has them'});
   // round 11 (L3): a short suffix on Results
   assert.match(viewed.header, / · viewing Run 1 · design A \(other inputs\)$/); assert.doesNotMatch(viewed.header, /Unsaved inputs/);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), viewed.header.replace(/^Optical waveguide \/ /, ''));
@@ -643,17 +644,27 @@ try {
   // stay), the title and the step bar agree, and Undo takes them back
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 Use this run\'s inputs');
   assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes them back\.$/);
+  const useSlot = await page.eval("document.getElementById('restore-run-input').parentElement.id||document.getElementById('restore-run-input').parentElement.className");
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')&&/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'L3 inputs used');
   const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
   // round 13 (O5): only the settings that change, from → to (Width 700 → 600 nm keeps the centre, so Left x moves too)
   assert.equal(used.message, 'Current inputs set from Run 1 · design A: Width 700 → 600 nm · Left x −350 → −300 nm. The next run uses them; Undo takes them back.');
+  // round 14 (Q4): the same change list stays where the button was, until the next input edit
+  const usedNote = () => page.eval("(()=>{const e=document.getElementById('restore-run-input-done');return e&&{text:e.textContent,slot:e.parentElement.id||e.parentElement.className,inPanel:document.getElementById('inspector').contains(e)}})()");
+  const q4 = await usedNote(); stage('Q4 change list by the button', {q4, useSlot});
+  assert.deepEqual(q4, {text: used.message, slot: useSlot, inPanel: true});
   await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'L3 study after use');
   assert.match(await text('#next-run-inputs'), /^Next run uses 600 × 300 nm · Silicon · /);
+  // a page change is not an edit: the change list is still there on Results
+  await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input-done')", 'Q4 change list after a page change');
+  assert.equal((await usedNote()).text, used.message);
+  await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'Q4 study again');
   await page.click('#undo-edit'); await sleep(200);
   assert.match(await text('#next-run-inputs'), /^Next run uses 700 × 300 nm · Silicon · /, 'Undo takes the run\'s inputs back');
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 back on Results');
+  assert.equal(await usedNote(), null, 'Q4: the next input edit (Undo) ends the change list');
   assert.match(await page.eval("document.getElementById('project').textContent"), / · viewing Run 1 · design A \(other inputs\)$/);
   assert.match(await text('.run-item[aria-pressed=true]'), /^Pinned · Run 1 · design A · /);
   // a name applied on leaving the field (change, no redraw) reaches the dock, the footer and the title too
@@ -663,7 +674,7 @@ try {
   const blurNamed = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,header:document.getElementById('project').textContent})");
   stage('renamed on blur', blurNamed);
   for (const t of Object.values(blurNamed)) assert.match(t, /Run 1 · design A2\b/);
-  await renameOnBlur('design A'); await sleep(200); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A · /);
+  await renameOnBlur('design A'); await sleep(200); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/);
   // round 9 (J1): the dock note on Results says Compare matches modes by field overlap
   assert.match(await text('#sequence'), /Compare matches modes by field overlap/); assert.doesNotMatch(await text('#sequence'), /not matched between runs/);
   // round 9 (J4): the Inputs label of Selected run is one line at 1440 × 900 and 390 × 844
@@ -682,7 +693,7 @@ try {
   await page.click('#resume-optical'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
   const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('project').textContent})");
   stage('K6 restored on Results', restored);
-  assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A · /); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
+  assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
   assert.ok(restored.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), restored.header);
   // round 10 (K3): a change of the model or a run ends "same as file". Since round 14 (Q3) the
   // file the record matched is the current file, so an input edit and a run renamed both read
@@ -1392,7 +1403,8 @@ try {
     await noDialog('O1 Save'); const o1Second = await newDownload(before), o1SecondMessage = await status(), o1SecondHeader = await header();
     stage('O1 Save under the Save As name', {first: o1First, edited: o1Edited, second: o1Second, message: o1SecondMessage, header: o1SecondHeader});
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
-    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: current inputs, \d+ runs? and the comparison\.(?: Fields not kept for [^.]+\.)? A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
+    // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
+    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: current inputs, \d+ runs? and the comparison\.(?: Fields not kept for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
     assert.match(o1SecondHeader, /^Optical waveguide \/ design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
     // Ctrl+S after another edit: the same, no dialog
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();

@@ -170,8 +170,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    The dock heading, the status bar, the title and the step bar describe the run being viewed
    (the selected run), named by its number with its name: after a run *Run 1 · solved from
    the current inputs* (the status bar adds *press Run to solve again*); when the viewed run has
-   other inputs, after an edit or with an older run selected, *Run 1 · design A · current inputs
-   differ from this run* (the status bar adds *Run 2 has them* when another run has the current
+   other inputs, after an edit or with an older run selected, both geometries, *Run 1 · design A
+   600 × 300 nm · current inputs 700 × 300 nm* (with the same geometry, at most two of the
+   settings that differ: *· current inputs differ: Wavelength 1550 → 1310 nm*) (the status bar adds *Run 2 has them* when another run has the current
    inputs, else *press Run to compute them*), and when no input was edited the title adds
    *viewing Run 1 · design A (other inputs)* on Results and Compare, so the difference does not
    read as unsaved edits (on the Model tab the title describes the current inputs only). Under
@@ -179,7 +180,8 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    Modes to find and group index option) as the current inputs at once, without a question,
    since the runs stay as they are. Messages lists only the settings that change, from → to
    (*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find 4 → 2. The next
-   run uses them; Undo takes them back.*). It is one input edit, so **Undo** takes all of it back, Modes
+   run uses them; Undo takes them back.*), and the same words stay in the run panel where the
+   button was until the next input edit. It is one input edit, so **Undo** takes all of it back, Modes
    to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run's number is its place in the run list, the oldest first. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
@@ -218,6 +220,8 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    ([where Save As saves](#file-menu-and-file-kinds)). Studio hands a download to the browser and
    cannot know that it was kept (a download can be cancelled), so Messages reports *Session file
    … sent to your browser's Downloads*; after the save dialog's write it reports *Saved to …*.
+   When no run has the current inputs, the notice says so: *Current inputs (650 × 300 nm) have no
+   run yet.*
    The header holds the one save indicator, and the footer repeats it word for word: the
    current file's name and its state, *design-a.json · downloaded 03:42* (or *design-a.json
    · saved 03:42* after the save dialog's write) until the next edit or run, then *design-a.json ·

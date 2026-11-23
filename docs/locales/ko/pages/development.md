@@ -358,6 +358,10 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 묻는 것, 그리고 **File › Open…**으로 연 64 KiB 넘는 모델 파일이 *Model file exceeds 64 KiB*로 거부되는
 것입니다. 다른 흐름에서도 연 파일 뒤의 저장은 그 이름을 유지합니다. 데스크톱 Chrome의 실제 저장 대화상자는 어떤 점검도
 조작하지 않습니다.
+14차부터는 도크 제목과 상태 표시줄이 두 기하를 모두 밝히는지(*Run 1 · design A 600 × 300 nm · current inputs
+700 × 300 nm*), **Use this run's inputs**의 변경 목록이 실행 패널의 버튼 자리에 남는지(Messages와 같은 문구,
+페이지를 바꿔도 남고 다음 입력 편집에서 사라짐), 현재 입력의 실행이 없을 때 저장 알림이 *Current inputs
+(650 × 400 nm) have no run yet.*이라고 하는지(실행이 있으면 말하지 않음)도 확인합니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
 조작합니다. Heated silicon waveguide 템플릿, 포트 선택기로 결합을 지웠다 다시 추가하기, 재료 문제와
 한 번에 고치기, 결합된 n_eff가 같은 문서의 엔진 실행과 정확히 같아야 하는 Run, 결합 검사, 실행과 함께 푼 히터 없는
