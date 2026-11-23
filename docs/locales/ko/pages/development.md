@@ -65,7 +65,7 @@ NumPy·JAX).
   Scientific Data **11**, 94 (2024), https://doi.org/10.1038/s41597-023-02898-2.
 - **Chrome 또는 Chromium**: 설치 Studio 브라우저 검사는 이미 설치된 브라우저를
   사용합니다. 찾지 못하면 검사가 실패하며, 건너뛰지 않습니다. workspace, multiphysics,
-  multiphysics session 스크립트는 `tools/studio_browser/browser_launch.mjs`로 브라우저를 띄웁니다. DevTools
+  multiphysics session, project 스크립트는 `tools/studio_browser/browser_launch.mjs`로 브라우저를 띄웁니다. DevTools
   엔드포인트가 페이지를 나열하기까지 최대 60초 기다리고, 응답이 없으면 그 브라우저를 멈추고 새 포트와 새
   프로필 디렉터리로 한 번 더 띄웁니다. 실패한 시도는 모두 `report.json`(`browserLaunch`: 명령줄, 종료 코드나
   신호, stderr 마지막 4000자)에 기록되며, 두 번째 실패는 검사를 실패시킵니다. 다시 시도하는 것은 실행
@@ -394,6 +394,15 @@ waveguide 카드가 자기 가장 새 기록을 복원하고(위 상자는 그 �
 유지하는지도 확인합니다. 14차부터 두 스크립트는 제목이 *same as file X*인 복원이 X를 현재 파일로 삼는지(Save As가
 X를 제안함) 확인하고, workspace 스크립트는 입력 편집 뒤와 실행 이름을 바꾼 뒤 *X · changed since restored*를 확인하며, session 스크립트는 파일에서 연 실행이 *Loaded from file, not
 recomputed. Results match the file's checksum.*으로 표시되고 출처 주의 문구가 그 문장의 title 텍스트인지 확인합니다.
+네 번째 스크립트(`tools/studio_browser/studio_project_browser.mjs`)는 [프로젝트
+파일](packages/simcase/workspace.md#프로젝트-파일)을 확인합니다. 1440 × 900과 390 × 844에서, 역할과 접근 가능한
+이름으로, 어느 단계에서도 가로 넘침 없이: 광학 실행 두 번(하나는 Modes to find 4)과 히터 없는 결과가 있는 가열
+실행, 프로젝트 이름 *Heater study*와 제안 이름 `heater-study.json`으로 Save As, 기억한 이름으로 다시 Save, 그다음 서버 재시작과 새 브라우저 프로필, File ›
+Open, 두 모델이 실행 없이 같은 값 문자열을 다시 읽음. 저장, 열기, 다시 저장(저장 시각과 광학 실행의 출처 말고는
+같고, 그다음은 저장 시각 말고는 바이트까지 같음), 손상되거나 더 새로운 파일을 탭 그대로 거부, 경계에서 바꾼
+`window.showSaveFilePicker`로 Save As, Save, 취소, 실패한 쓰기. `--old-python <python>`을 주면 이전 Studio에서
+파일을 여는 것도 봅니다(손으로만, CI는 주지 않음). P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
+session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
