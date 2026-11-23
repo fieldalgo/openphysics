@@ -106,12 +106,12 @@ export const CHOOSER_NOTES=Object.freeze([
  'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. File › Save keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
-const PORTABLE_NOTE='A session file is the copy that moves between computers; browser recovery stays in this browser.';
-// "Open session file…" has one place, at the top of the Library: it opens a session file or a
-// model file (File › Open), whatever the cards below offer.
+const PORTABLE_NOTE='A project file is the copy that moves between computers; browser recovery stays in this browser.';
+// "Open file…" has one place, at the top of the Library: it opens a project file, a session file or
+// a model file (File › Open), whatever the cards below offer.
 function libraryFiles(onOpenFile){
  const bar=document.createElement('div');bar.className='library-files';
- const open=document.createElement('button');open.type='button';open.id='library-open-file';open.textContent='Open session file…';open.setAttribute('aria-keyshortcuts','Control+O Meta+O');open.onclick=()=>onOpenFile();
+ const open=document.createElement('button');open.type='button';open.id='library-open-file';open.textContent='Open file…';open.setAttribute('aria-keyshortcuts','Control+O Meta+O');open.onclick=()=>onOpenFile();
  const portable=document.createElement('p');portable.className='library-portable';portable.textContent=PORTABLE_NOTE;
  bar.append(open,portable);return bar;
 }
@@ -125,11 +125,32 @@ function cardSlot(button,offer,key){
  actions.append(go,fresh);slot.append(button,actions);
  return slot;
 }
+// The Library's head (P3): the project line (the title bar's words) and the project name, set
+// inline: Rename takes 1 to 80 characters with no control characters; an empty name is refused by
+// name, and the field shows the name kept. project: {line, name, onRename(value) -> accepted}.
+export const RENAME_NOTE='The name is written to the project file on the next File › Save. Save As does not rename a named project.';
+function projectHead(project){
+ const head=document.createElement('section');head.className='library-project';head.setAttribute('aria-labelledby','library-project-heading');
+ // a label, not a heading: the page's first heading stays "Choose a starting model"
+ const title=document.createElement('strong');title.id='library-project-heading';title.className='library-project-title';title.textContent='Project';
+ const line=document.createElement('span');line.id='library-project-line';line.className='library-project-line';line.textContent=project.line;
+ const form=document.createElement('form');form.id='project-name-form';form.className='project-name';
+ const label=document.createElement('label');label.htmlFor='project-name-input';label.textContent='Project name';
+ const input=document.createElement('input');input.id='project-name-input';input.type='text';input.maxLength=80;input.autocomplete='off';input.spellcheck=false;input.placeholder='Untitled project';input.value=project.name||'';input.setAttribute('aria-describedby','project-name-note');
+ const button=document.createElement('button');button.type='submit';button.id='project-rename';button.textContent='Rename';
+ const note=document.createElement('span');note.id='project-name-note';note.className='visually-hidden';note.textContent=RENAME_NOTE;form.title=RENAME_NOTE;
+ form.onsubmit=event=>{event.preventDefault();if(!project.onRename(input.value))input.value=project.name||'';};
+ form.append(label,input,button,note);head.append(title,line,form);return head;
+}
 // offers: each model card's resume offer by card id ({optical, 'heated-waveguide'}), each
 // {label, record, onResume(button), onStartNew()}; a card without one has none. onOpenFile:
 // the Library's one "Open session file…", at the top of the page.
-export function renderApplications(host,resume=null,offers={},{onOpenFile=null}={}){
+// inProject: the cards whose model is in the project but not shown, with its run count; the card
+// reads "In this project · N runs", and choosing it shows that model (P3).
+export const inProjectText=runs=>`In this project · ${runs} ${runs===1?'run':'runs'}`;
+export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={}}={}){
  host.replaceChildren();offers={...(offers||{})};
+ if(project)host.append(projectHead(project));
  if(onOpenFile)host.append(libraryFiles(onOpenFile));
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
@@ -141,7 +162,9 @@ export function renderApplications(host,resume=null,offers={},{onOpenFile=null}=
   const status=document.createElement('span');status.className='application-status'+(app.available?' available':'');status.textContent=app.status;
   const description=document.createElement('p');description.textContent=app.description;
   const scope=document.createElement('span');scope.textContent=app.scope;
-  button.append(title,status,description,scope);cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
+  button.append(title,status,description,scope);
+  if(inProject[app.id]!==undefined){const here=document.createElement('span');here.className='card-project';here.textContent=inProjectText(inProject[app.id]);button.append(here);}
+  cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
  const contractTitle=document.createElement('h3');contractTitle.textContent='What this workspace supports';

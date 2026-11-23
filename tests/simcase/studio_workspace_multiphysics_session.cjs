@@ -210,8 +210,8 @@ test('the open question and the save notice use the optical words',()=>{
  assert.equal(M.savedNotice('heater.json',{runs:3,baseline:true,via:'picker'}),'Saved to heater.json: the model, 3 runs and the without-heater result.');
  // round 10: the optical runs of the tab are not in a multiphysics session file, and the message says where they are kept
  const base=M.savedNotice('h.json',{runs:1});assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:0}),base);
- assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:2}),base+' The 2 Optical waveguide runs of this tab are not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.');
- assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:1}),base+' The Optical waveguide run of this tab is not in this file; Library › Optical waveguide, then File › Save, keeps it in its own file.');
+ assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:2}),base+' The 2 Optical waveguide runs of this tab are not in this file; File › Save keeps them with this model in one project file.');
+ assert.equal(M.savedNotice('h.json',{runs:1,opticalRuns:1}),base+' The Optical waveguide run of this tab is not in this file; File › Save keeps it with this model in one project file.');
  assert.ok(session.runs.every(r=>r.origin==='imported'));
 });
 
