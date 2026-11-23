@@ -1297,6 +1297,12 @@ leakage out of the window.
   the engine labels `numerically_unresolved`. The help reads “Below what this open boundary
   resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.” A mode
   without Im n_eff reads “—”.
+- A negative Im n_eff whose |loss| is 0.01 dB/cm or more reads **not resolved (|loss| < X dB/cm)**,
+  X being |loss| rounded up to 2 significant digits (Im n_eff −2.67e-7 at 1550 nm, 0.094 dB/cm,
+  reads *not resolved (|loss| < 0.095 dB/cm)*). The help reads “The solve gives a small negative Im
+  n_eff within the PML's numerical noise; the loss is below about X dB/cm.” This changes P2's rule
+  (V14), which wrote *< 0.01 dB/cm* for any negative Im; the engine may accept such modes as lossless
+  within the PML's bound. A negative Im below 0.01 dB/cm keeps *< 0.01 dB/cm*.
 - n_eff shows Re as a closed run does, with Im to 3 significant digits: *2.44126325 +
   8.28e-5i*.
 - Polarization and A_eff are computed over the 3 × 2.4 µm physical window, with the PML
