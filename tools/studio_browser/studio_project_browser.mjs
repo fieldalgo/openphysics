@@ -410,6 +410,87 @@ try {
   assert.deepEqual(await listDownloads(), before, 'nothing downloaded on the picker path');
   await stopBrowser(page);
 
+  // Round 16 (pre-registered), at 1440 × 900 in a new profile: Library › Open returns to a model's
+  // page and run (S9); a pair of two named runs stays on Compare when a third run comes, and the
+  // project file keeps it (S3); a project save relinks the record of the model not shown (S5); a
+  // restore of a record that matched its project file names that file again (S4)
+  {
+    page = await startBrowser(); await size(1440, 900, false);
+    await page.call('Page.navigate', {url: base + '/workspace'});
+    await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R16 start page');
+    // a model's browser recovery record is written 0.7 s after a change: each model shown waits for it
+    const recorded = async label => { await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 20000); await sleep(500); };
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await openFile(saved); await page.until("/^Opened project Heater study/.test(document.getElementById('file-status').textContent)", 'R16 open', 60000);
+    await recorded('R16 heated record');
+    const shownPage = () => page.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page??null");
+    const pressedRun = () => page.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null");
+    // the heated model is shown (active in the file): to its Results; then the optical model's Run 1 in Results
+    await page.press('tab', 'Results'); await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'R16 heated results');
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", 'R16 Library');
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await page.press('button', 'Optical waveguide', 'start'); await page.until("document.querySelectorAll('.run-item').length===2", 'R16 optical runs');
+    await recorded('R16 optical record');
+    await page.press('tab', 'Results'); await showRun(1);
+    // S9: Library › Heated silicon waveguide lands on its Results; Library › Optical waveguide on Results with Run 1
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'R16 Library 2');
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'R16 heated back on Results');
+    await recorded('R16 heated record again');
+    const heatedBack = await shownPage();
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", 'R16 Library 3');
+    await page.press('button', 'Optical waveguide', 'start'); await page.until("!!document.getElementById('modes-table')", 'R16 optical back on Results');
+    const opticalBack = {page: await shownPage(), run: await pressedRun()};
+    stage('R16 S9 return', {heated: heatedBack, optical: opticalBack});
+    assert.equal(heatedBack, 'Results'); assert.equal(opticalBack.page, 'Results'); assert.ok(opticalBack.run.includes('Run 1 · '), opticalBack.run);
+    // S3: Run 1 named Design A, Run 2 Design B; a third run keeps them on Compare
+    await page.fill('textbox', 'Run name', 'Design A'); await showRun(2); await page.fill('textbox', 'Run name', 'Design B');
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Geometry'); await page.until("!!document.getElementById('shape-w')", 'R16 geometry');
+    await page.fill('spinbutton', 'Width [nm]', 650); await runOptical('R16 run 3');
+    await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R16 Compare');
+    const pair = () => page.eval("['compare-a','compare-b'].map(id=>document.getElementById(id).selectedOptions[0].textContent)");
+    const kept = {pair: await pair(), newer: await page.eval("document.getElementById('compare-newer')?.textContent??null")};
+    stage('R16 S3 kept pair', kept);
+    assert.ok(kept.pair[0].startsWith('Run 1 · Design A · ') && kept.pair[1].startsWith('Run 2 · Design B · '), JSON.stringify(kept.pair));
+    assert.equal(kept.newer, 'Run 3 is newer than this pair · Compare Run 3 with B');
+    await noOverflow('R16 Compare with the newer line');
+    // S5 and S6: Save As design-ab.json with the optical model shown; the name set in the file
+    // (Heater study, not the file's stem) stays
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    let before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R16 Save As');
+    await page.fill('textbox', 'File name', 'design-ab'); await page.press('button', 'Download');
+    const abName = await newDownload(before), ab = JSON.parse(await readFile(join(downloads, abName), 'utf8'));
+    assert.equal(abName, 'design-ab.json'); assert.equal(ab.name, 'Heater study');
+    assert.match(await title(), /^Heater study · design-ab\.json · downloaded /);
+    const abSession = ab.models.find(m => m.kind === 'workspace').session, jobs = abSession.runs.map(r => r.job);
+    assert.deepEqual(abSession.comparison, [jobs[0], jobs[1]], 'the project file keeps the pair Design A, Design B');
+    await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R16 recovery updated', 20000); await sleep(1500);
+    // S5: after a reload the heated card names the newest project file, although the heated model was not shown when it was saved
+    await page.call('Page.reload');
+    try { await page.until("!!document.getElementById('resume-optical')&&!!document.getElementById('resume-heated-waveguide')", 'R16 card offers', 30000); }
+    catch (error) { stage('R16 card offers missing', {buttons: await page.eval("[...document.querySelectorAll('button')].map(b=>(b.id||'')+': '+b.textContent.slice(0,120))"), page: await page.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page??null")}); throw error; }
+    const offers = await page.eval("['resume-optical','resume-heated-waveguide'].map(id=>document.getElementById(id).textContent)");
+    stage('R16 S5 cards', {offers});
+    assert.ok(offers[1].includes(' · same as file design-ab.json'), offers[1]); assert.ok(offers[0].includes(' · same as file design-ab.json'), offers[0]);
+    // S4: restore the optical session; the header names the project file and Save suggests it
+    await page.press('button', offers[0]);
+    if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
+    await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R16 restored', 30000);
+    const restoredTitle = await title();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R16 Save As after restore');
+    const prefill = await page.eval("document.getElementById('save-name-input').value"); await page.press('button', 'Cancel');
+    stage('R16 S4 restore', {title: restoredTitle, prefill});
+    assert.match(restoredTitle, /^Heater study · design-ab\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(prefill, 'design-ab.json');
+    // S3: the project file opened again shows that pair
+    await openFile(join(downloads, abName)); await sleep(500); if (await page.eval("document.getElementById('leave-confirm').open")) await page.eval("document.getElementById('leave-go').click()");
+    await page.until("/^Opened project Heater study \\(design-ab\\.json\\)/.test(document.getElementById('file-status').textContent)", 'R16 reopen', 60000);
+    await page.press('tab', 'Library'); await page.press('button', 'Optical waveguide', 'start'); await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R16 Compare reopened');
+    const reopened = await pair(); stage('R16 S3 reopened', {pair: reopened});
+    assert.ok(reopened[0].startsWith('Run 1 · Design A · ') && reopened[1].startsWith('Run 2 · Design B · '), JSON.stringify(reopened));
+    await stopBrowser(page);
+  }
+
   // V-P9: an older Studio given the project file: its existing refusal, its workspace unchanged
   if (args['old-python']) {
     await stopProcess(server); server = await startServer('server-old', args['old-python']);
