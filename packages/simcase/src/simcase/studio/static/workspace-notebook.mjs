@@ -8,6 +8,11 @@ import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=6;
+// The run limit in words, from RUN_LIMIT itself, so the run list's note and the model tree's
+// "Runs · N of M" never disagree (round 14).
+const NUMBER_WORDS=Object.freeze(['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve']);
+export const RUNS_KEPT_TEXT=`Up to ${NUMBER_WORDS[RUN_LIMIT]} runs are kept.`;
+export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 // Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
 // unchanged, and a version 6 session is read with its input as a version 6 project. Format 6
 // (units and naming batch): run records under the section 5.3.4 names (effective_index,

@@ -1,6 +1,6 @@
 import {renderConnectionGraph,installConnectionGraph} from './workspace-graph.mjs';
 import {LatestWorkspaceLoad} from './workspace-load.mjs';
-import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
+import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus,resultsGroup} from './workspace-tree.mjs';
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
@@ -22,7 +22,7 @@ import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
@@ -304,15 +304,17 @@ function renderHeat(){
 // These views describe the existing model; they do not add solver capabilities.
 const modelTree=treeState();
 // the tree drawn again with the focus kept on its item (a group opened or closed, a node chosen)
-function drawModelTree(){const had=treeFocus($('tree'),modelTree);$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>select(b.dataset.node));bindTree($('tree'),modelTree,drawModelTree);restoreTreeFocus($('tree'),modelTree,had);}
+function drawModelTree(){const had=treeFocus($('tree'),modelTree);$('tree').innerHTML=renderModelTree();$('tree').querySelectorAll('[data-node]').forEach(b=>b.onclick=()=>b.dataset.node.startsWith('results:')?openResultsNode(b.dataset.node):select(b.dataset.node));bindTree($('tree'),modelTree,drawModelTree);restoreTreeFocus($('tree'),modelTree,had);}
+// The Results group's nodes open their page, as the page tabs do; the shown run stays.
+function openResultsNode(node){ui.page=node==='results:compare'?'Compare':'Results';render();}
 function renderModelTree(){
  const model=isHeat()?'Heat conduction':isJoule()?'Joule heating':isOptical()?'Optical waveguide':'Heated waveguide';
  const groups=[['Component 1',['Geometry','Materials']],['Physics',isHeat()?['Heat transfer']:isJoule()?['Electric currents','Heat transfer']:isOptical()?['Optical modes']:names.slice(2,6)],['Analysis',['Couplings','Mesh','Study'].filter(n=>n!=='Couplings'||(!isHeat()&&!isJoule()&&!isOptical()))]];
  const marks={'Geometry':'◇','Materials':'▱','Electric currents':'ϟ','Heat transfer':'∿','Solid mechanics':'↔','Optical modes':'λ','Couplings':'⇄','Mesh':'▦','Study':'▷'};
  // an ARIA tree (workspace-tree.mjs): a node is selected only while its settings are shown; on
- // Results and Compare no node is (the optical tree has no Results node)
+ // Results and Compare no model node is, and the optical tree's Results group marks that page (round 14)
  const shown=n=>(ui.page==='Model'||ui.page==='Connections')&&ui.selection===n;
- return '<div class="pane-title"><span>Model builder</span><span class="pane-detail">Model 1</span></div><div class="model-root"><span aria-hidden="true">▾ ◇</span><strong>'+model+'</strong></div>'+treeOpen()+groups.map(([title,nodes])=>'<section class="tree-group" role="none">'+groupHeading(title,!modelTree.collapsed.has(title))+nodes.map(n=>`<button type="button" data-node="${n}" ${itemAttributes(2,shown(n))}><span class="tree-node-mark" aria-hidden="true">${marks[n]}</span>${n}</button>`).join('')+'</section>').join('')+'</div><div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>'+(isHeat()||isOptical()||isJoule()?'Solver available':'Setup only')+'</strong><p>'+(isHeat()?'Steady heat conduction':isJoule()?'Joule heating on named regions':isOptical()?'Optical mode analysis':'Coupled calculation unavailable')+'</p></div>';
+ return '<div class="pane-title"><span>Model builder</span><span class="pane-detail">Model 1</span></div><div class="model-root"><span aria-hidden="true">▾ ◇</span><strong>'+model+'</strong></div>'+treeOpen()+groups.map(([title,nodes])=>'<section class="tree-group" role="none">'+groupHeading(title,!modelTree.collapsed.has(title))+nodes.map(n=>`<button type="button" data-node="${n}" ${itemAttributes(2,shown(n))}><span class="tree-node-mark" aria-hidden="true">${marks[n]}</span>${n}</button>`).join('')+'</section>').join('')+(isOptical()?resultsGroup({runs:runs.length,shownRun:runNumber(solverRun),page:ui.page,expanded:!modelTree.collapsed.has('Results'),runsLabel:runsNodeLabel(runs.length)}):'')+'</div><div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>'+(isHeat()||isOptical()||isJoule()?'Solver available':'Setup only')+'</strong><p>'+(isHeat()?'Steady heat conduction':isJoule()?'Joule heating on named regions':isOptical()?'Optical mode analysis':'Coupled calculation unavailable')+'</p></div>';
 }
 let disposeConnectionGraph=()=>{};
 function renderConnectionOverview(){return renderConnectionGraph(state,ui.selection,active(),ui.graphOptionsOpen);}
@@ -1259,7 +1261,7 @@ function renderRunList(){
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent=ui.page==='Compare'?'Field images export from Results: Open in Results shows the selected run there.':'Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent='Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
 }
 // The n_g header with the visible hint (#…-hint) when none of the runs shown computed n_g.
 function groupIndexHeader(th,shown){

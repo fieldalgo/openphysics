@@ -217,10 +217,12 @@ try {
     }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
-  // round 11 (L6): on Results and Compare no tree node is marked, and a node under the pointer does not look selected
+  // round 11 (L6): on Results and Compare no model node is marked, and a node under the pointer does
+  // not look selected; since round 14 (Q9) the Results group's node of that page is: Runs on
+  // Results, Compare on Compare (where the tree is hidden)
   const treeMarks = async tag => {
-    const marks = await page.eval("(()=>{const items=[...document.querySelectorAll('#tree [role=treeitem]:not(.tree-heading)')];const mesh=items.find(b=>b.dataset.node==='Mesh'),geo=items.find(b=>b.dataset.node==='Geometry');const r=mesh.getBoundingClientRect();return {selected:items.filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.textContent.trim()),shown:r.width>0,x:r.left+r.width/2,y:r.top+r.height/2,plain:getComputedStyle(geo).backgroundColor}})()");
-    stage('L6 tree on ' + tag, marks); assert.deepEqual(marks.selected, [], `no tree node is selected on ${tag}`);
+    const marks = await page.eval("(()=>{const items=[...document.querySelectorAll('#tree [role=treeitem]:not(.tree-heading)')];const mesh=items.find(b=>b.dataset.node==='Mesh'),geo=items.find(b=>b.dataset.node==='Geometry');const r=mesh.getBoundingClientRect();return {selected:items.filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.node),shown:r.width>0,x:r.left+r.width/2,y:r.top+r.height/2,plain:getComputedStyle(geo).backgroundColor}})()");
+    stage('L6 tree on ' + tag, marks); assert.deepEqual(marks.selected, [tag.startsWith('Compare') ? 'results:compare' : 'results:runs'], `only the Results node of the page is selected on ${tag}`);
     if (!marks.shown) return; // Compare hides the tree
     await page.call('Input.dispatchMouseEvent', {type: 'mouseMoved', x: marks.x, y: marks.y}); await sleep(150);
     const hovered = await page.eval("(()=>{const m=document.querySelector('#tree [data-node=Mesh]');return {hover:m.matches(':hover'),background:getComputedStyle(m).backgroundColor,weight:getComputedStyle(m).fontWeight}})()");
@@ -531,8 +533,8 @@ try {
   const look = await cardLook(); stage('K6 one card selected', look); assert.deepEqual(look, {pressed: 1, looks: 1, hovered: 1});
   await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Open in Results');
   assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/);
-  // round 10 (K6): on Results the tree marks no optical node (the optical tree has no Results node), not Study
-  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), []);
+  // round 10 (K6): on Results the tree marks no model node, not Study; since round 14 (Q9) it marks Results › Runs
+  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), ['Runs · 2 of 6']);
   assert.deepEqual(await cardLook(), {pressed: 1, looks: 1, hovered: 1});
   // round 10 (K10): a run with other inputs than the current ones is information: the step bar is neutral
   const tone = await page.eval("(()=>{const b=[...document.querySelectorAll('#workflow .workflow-step')][4];return {tone:b.dataset.tone,state:b.dataset.state,color:getComputedStyle(b.querySelector('span')).color,muted:getComputedStyle(document.querySelector('.muted')||document.body).color}})()");
@@ -643,6 +645,20 @@ try {
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), viewed.header.replace(/^Optical waveguide \/ /, ''));
   // round 11 (L6): on Results no tree node is marked, and a node under the pointer does not look selected
   await treeMarks('Results');
+  // round 14 (Q9; pre-registered): the optical tree has a Results group, as the multiphysics tree:
+  // Runs · N of 6 (the run limit) and, with two runs, Compare, in the same ARIA tree and keys
+  const q9Items = await checkTree('optical with runs', [...opticalNodes, 'Results · run 1', 'Runs · 2 of 6', 'Compare']);
+  assert.deepEqual(q9Items.slice(-3).map(i => [i.name, i.level, i.selected === true]), [['Results · run 1', 1, false], ['Runs · 2 of 6', 2, true], ['Compare', 2, false]]);
+  assert.equal(await page.eval("document.querySelector('#tree [role=treeitem][tabindex=\"0\"]').dataset.node"), 'results:runs', 'the tab stop is the selected Runs node');
+  await page.onElement('function(s){this.querySelector(s).focus();return true}', '#tree [data-node="results:runs"]');
+  await press('ArrowUp'); assert.deepEqual([(await focused()).name, (await focused()).expanded], ['Results · run 1', 'true']);
+  await press('End'); assert.equal((await focused()).name, 'Compare'); await press('Enter'); await page.until("!!document.getElementById('compare-neff')", 'Q9 Compare from the tree');
+  assert.deepEqual(await pressedPage(), ['Compare']);
+  await page.click('nav [data-page=Model]'); await sleep(200);
+  await page.onElement('function(s){this.querySelector(s).focus();return true}', '#tree [data-node="results:runs"]'); await press('Enter');
+  await page.until("!!document.getElementById('optical-field')", 'Q9 Results from the tree');
+  assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · /, 'the shown run is kept');
+  stage('Q9 Results group', {items: q9Items.slice(-3)});
   // round 11 (L3): on the Model tab the title describes the current inputs only, and the Study
   // settings say which geometry the next run uses
   await page.click('nav [data-page=Model]'); await sleep(200);
