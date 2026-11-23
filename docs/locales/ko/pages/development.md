@@ -64,7 +64,13 @@ NumPy·JAX).
   M. N. Polyanskiy, *Refractiveindex.info database of optical constants*,
   Scientific Data **11**, 94 (2024), https://doi.org/10.1038/s41597-023-02898-2.
 - **Chrome 또는 Chromium**: 설치 Studio 브라우저 검사는 이미 설치된 브라우저를
-  사용합니다. 찾지 못하면 검사가 실패하며, 건너뛰지 않습니다.
+  사용합니다. 찾지 못하면 검사가 실패하며, 건너뛰지 않습니다. workspace, multiphysics,
+  multiphysics session 스크립트는 `tools/studio_browser/browser_launch.mjs`로 브라우저를 띄웁니다. DevTools
+  엔드포인트가 페이지를 나열하기까지 최대 60초 기다리고, 응답이 없으면 그 브라우저를 멈추고 새 포트와 새
+  프로필 디렉터리로 한 번 더 띄웁니다. 실패한 시도는 모두 `report.json`(`browserLaunch`: 명령줄, 종료 코드나
+  신호, stderr 마지막 4000자)에 기록되며, 두 번째 실패는 검사를 실패시킵니다. 다시 시도하는 것은 실행
+  단계뿐이고 Studio 단계는 다시 하지 않습니다. `tests/simcase/studio_browser_launch.cjs`가 가짜 브라우저로
+  이를 확인합니다.
 
 소스 Studio Node 단계는 실험적 작업공간을 포함한 `tests/simcase/*.cjs` 계약을
 모두 실행합니다. 배포 검증은 `studio_workspace_*.cjs` 시험도 복사하여 검증된
