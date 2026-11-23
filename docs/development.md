@@ -447,6 +447,10 @@ after it appears (1440 × 900, measured in the page); a real mouse press leaves 
 Since round 15 it also checks the hybrid Polarization words (*hybrid · x % TE / y % TM*).
 Since round 15 it also checks the group index note on material dispersion and *Material data* in
 Optical modes.
+Since round 15 it also checks the step bar's wavelength as a button named *Wavelength 1550 nm,
+edit* in the accessibility tree; the multiphysics check names the tree's warning badge as an image
+*Modes 1: Temperature input has no source: …*, and the session check reads each Library card's
+*Open (runs stay in this tab)* and the card offer's *Start new (no runs)*.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs

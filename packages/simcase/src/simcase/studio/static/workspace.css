@@ -172,7 +172,8 @@ main.choosing .workspace>.note{display:none}
 .cards button[data-template=multi]::before,.cards button[data-template=heated-waveguide]::before{content:'⇄';background:#ecedf6;color:#7973ac}
 .cards strong{display:block;font-size:16px;font-weight:600;margin-bottom:10px}
 .cards p{font-size:12px;margin:12px 0}
-.cards span:last-child{font-size:11px;color:#718197;display:block}
+.cards .card-scope{font-size:11px;color:#718197;display:block}
+.cards .card-action{display:block;margin-top:auto;padding-top:14px;font-size:12px;font-weight:600;color:#2f5f9e}
 .application-status{display:inline-block;font-size:10px;padding:3px 7px;background:#f4eee3;color:#906629;border-radius:2px}
 .application-status.available{background:#eaf3ef;color:#42715d}
 .application-contract{max-width:1100px;margin:28px auto 0;border-top:1px solid #d8e0eb;padding-top:8px;font-size:11px}

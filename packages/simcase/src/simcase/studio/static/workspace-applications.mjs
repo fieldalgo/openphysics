@@ -35,6 +35,12 @@ export function sessionLine(item){
 export const fileWords=item=>!item.file?'':item.fileCurrent===true?' · same as file '+item.file:item.fileCurrent===false?' · file '+item.file+', changed since':' · file '+item.file;
 // One phrase for browser recovery on the Library page; "Open session file…" is for files.
 export const RESTORE_TEXT='Restore from this browser';
+// What each Library choice does (round 15). A card opens its model with the runs this tab holds kept;
+// its offer restores a browser session's runs; the card's Start new opens the model without those runs
+// (the inputs are the model's, not emptied); the top box's choice only closes the box.
+export const CARD_OPEN_TEXT='Open (runs stay in this tab)';
+export const CARD_START_NEW_TEXT='Start new (no runs)';
+export const RESUME_NOT_NOW_TEXT='Not now (choose a model below)';
 // The time an offer names: the time of day for a session saved today, else the date and time.
 export function offerTime(savedAt,now=new Date()){
  const t=new Date(savedAt),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
@@ -93,7 +99,7 @@ function resumeCard(resume){
   else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);
  }
- const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent='Start new';fresh.onclick=()=>resume.onStartNew();
+ const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;fresh.onclick=()=>resume.onStartNew();
  actions.append(fresh);card.append(heading,note,actions);return card;
 }
 // The Library page notes: what each model supports and what File › Save keeps of it. A session
@@ -121,7 +127,7 @@ function cardSlot(button,offer,key){
  const slot=document.createElement('div');slot.className='card-slot';
  const actions=document.createElement('div');actions.className='card-resume';
  const go=document.createElement('button');go.type='button';go.id='resume-'+key;go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
- const fresh=document.createElement('button');fresh.type='button';fresh.id=key+'-start-new';fresh.textContent='Start new';fresh.onclick=()=>offer.onStartNew();
+ const fresh=document.createElement('button');fresh.type='button';fresh.id=key+'-start-new';fresh.textContent=CARD_START_NEW_TEXT;fresh.onclick=()=>offer.onStartNew();
  actions.append(go,fresh);slot.append(button,actions);
  return slot;
 }
@@ -140,8 +146,10 @@ export function renderApplications(host,resume=null,offers={},{onOpenFile=null}=
   const title=document.createElement('strong');title.textContent=app.title;
   const status=document.createElement('span');status.className='application-status'+(app.available?' available':'');status.textContent=app.status;
   const description=document.createElement('p');description.textContent=app.description;
-  const scope=document.createElement('span');scope.textContent=app.scope;
-  button.append(title,status,description,scope);cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
+  const scope=document.createElement('span');scope.className='card-scope';scope.textContent=app.scope;
+  // what the card does (round 15): it opens the model, and the runs this tab holds stay
+  const action=document.createElement('span');action.className='card-action';action.textContent=CARD_OPEN_TEXT;
+  button.append(title,status,description,scope,action);cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
  const contractTitle=document.createElement('h3');contractTitle.textContent='What this workspace supports';

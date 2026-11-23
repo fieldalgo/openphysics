@@ -67,3 +67,25 @@ test('R7: the Library statuses say what the model is, not "Live"',()=>{
  assert.deepEqual(A.APPLICATIONS.map(a=>a.status),['Optical mode solver','Heat conduction solver','Electric current and heat solver']);
  for(const app of [...A.APPLICATIONS,...A.COUPLED_TEMPLATES])assert.ok(!app.status.includes('Live'),app.status);
 });
+
+test('R8: the wavelength chip is a button named "Wavelength 1550 nm, edit"',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("chip=document.createElement('button');chip.type='button';chip.id='workflow-wavelength';"));
+ assert.ok(app.includes("chip.setAttribute('aria-label',`Wavelength ${step.wavelength?step.wavelength.slice(2):''}, edit`);"));
+});
+
+test('R9: the tree warning badge names the physics and the problem as an image',()=>{
+ const view=read('workspace-multiphysics-view.mjs');
+ assert.ok(view.includes("const words=esc(`${physicsLabel(n)}: ${warned.get(n)}`);return `<span class=\"warn-badge\" role=\"img\" title=\"${words}\" aria-label=\"${words}\">!</span>`;"));
+});
+
+test('R10: each Library choice says what it does',()=>{
+ assert.equal(A.CARD_OPEN_TEXT,'Open (runs stay in this tab)');
+ assert.equal(A.CARD_START_NEW_TEXT,'Start new (no runs)');
+ assert.equal(A.RESUME_NOT_NOW_TEXT,'Not now (choose a model below)');
+ assert.equal(A.RESTORE_TEXT,'Restore from this browser');
+ const src=read('workspace-applications.mjs');
+ assert.ok(src.includes("action.className='card-action';action.textContent=CARD_OPEN_TEXT;"));
+ assert.ok(src.includes("fresh.id=key+'-start-new';fresh.textContent=CARD_START_NEW_TEXT;"));
+ assert.ok(src.includes("fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;"));
+});
