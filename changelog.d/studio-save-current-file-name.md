@@ -1,0 +1,9 @@
+# Changed
+
+## English
+
+- Studio: **Save remembers the file name.** Without the browser's save dialog (Firefox, Safari, automated browsers), the name typed in Save As or Save, or the name of a file opened with **File › Open…**, becomes the model's current file: **Save** and Ctrl+S download under it again without asking (*Downloaded design-a.json again: … A download cannot replace the earlier file, so your browser may name it design-a (1).json.*), and Save As starts with it. Opening another file or model, switching the model or **Reset design** drops it. The header names the current file and its state (*design-a.json · saved 03:42 (download)*, *· saved 03:42* after the save dialog wrote it, *· changed since saved*, *· changed since opened*) and reads *Unsaved inputs* only when there is no name. The save dialog opens in the folder last used for Studio (`startIn` is passed only once a file was chosen). A model file over 64 KiB opened with **File › Open…** is refused with *Model file exceeds 64 KiB*. [File menu and file kinds](docs/packages/simcase/workspace.md#file-menu-and-file-kinds).
+
+## 한국어
+
+- Studio: **Save가 파일 이름을 기억합니다.** 브라우저 저장 대화상자가 없을 때(Firefox, Safari, 자동화된 브라우저) Save As나 Save에서 입력한 이름, 또는 **File › Open…**으로 연 파일의 이름이 모델의 현재 파일이 됩니다. **Save**와 Ctrl+S는 묻지 않고 그 이름으로 다시 내려받고(*Downloaded design-a.json again: … A download cannot replace the earlier file, so your browser may name it design-a (1).json.*), Save As는 그 이름으로 시작합니다. 다른 파일이나 모델을 열거나, 모델을 바꾸거나, **Reset design**을 하면 이름을 버립니다. 헤더는 현재 파일과 그 상태를 밝히며(*design-a.json · saved 03:42 (download)*, 저장 대화상자로 쓴 뒤에는 *· saved 03:42*, *· changed since saved*, *· changed since opened*), 이름이 없을 때만 *Unsaved inputs*라고 합니다. 저장 대화상자는 Studio에 마지막으로 쓴 폴더에서 열립니다(`startIn`은 파일을 고른 뒤에만 넘김). **File › Open…**으로 연 64 KiB 넘는 모델 파일은 *Model file exceeds 64 KiB*로 거부됩니다. [File 메뉴와 파일 종류](packages/simcase/workspace.md#file-메뉴와-파일-종류).

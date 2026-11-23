@@ -66,8 +66,8 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 | 항목 | 단축키 | 하는 일 |
 |---|---|---|
 | **Open…** | Ctrl+O (⌘O) | 어느 모델의 세션 파일이든 모델 파일이든 엽니다. 리본의 **Open…**과 같습니다. |
-| **Save** | Ctrl+S (⌘S) | 세션 파일을 저장합니다. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 쓰고, 아니면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
-| **Save As…** | Shift+Ctrl+S (⇧⌘S) | 고른 이름으로 세션 파일을 저장합니다. |
+| **Save** | Ctrl+S (⌘S) | 세션 파일을 저장합니다. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 씁니다. Studio가 대신 내려받는 경우에는 모델의 현재 파일 이름(Save As나 Save에서 고른 이름, 또는 연 파일)으로 묻지 않고 다시 내려받습니다. 현재 파일이 없으면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
+| **Save As…** | Shift+Ctrl+S (⇧⌘S) | 고른 이름으로 세션 파일을 저장합니다. 현재 파일 이름으로 시작합니다. |
 | **Export › Model file…** | | 모델 이름을 딴 모델 파일(입력만)을 내려받습니다. 예: `optical-waveguide.json`. |
 | **Export › Model with runs (session file)…** | | Save As와 같습니다. |
 | **Browser copy › Save browser draft**, **Restore browser draft** | | 광학 입력을 이 브라우저에만 보관하거나 되돌립니다. |
@@ -88,8 +88,9 @@ Messages는 입력만 담은 파일을 *model file*, 실행을 담은 파일을 
 
 **Save As가 저장하는 곳.** 브라우저에 웹 페이지용 저장 대화상자(`showSaveFilePicker`, 보안
 컨텍스트에서만: `http://127.0.0.1`과 `http://localhost` 포함)가 있으면 Save As는 사용자의 클릭이나 키
-입력에서 바로 그 대화상자를 열고, 제안 이름, JSON 파일 형식 하나, 시작 폴더 Documents(또는 현재 파일의
-폴더)를 넘긴 뒤 고른 파일에 씁니다. Studio는 쓴 파일을 기억하므로 다른 모델이나 파일을 열거나, 모델을
+입력에서 바로 그 대화상자를 열고, 제안 이름(현재 파일이 있으면 그 이름)과 JSON 파일 형식 하나를 넘긴 뒤
+고른 파일에 씁니다. 대화상자는 브라우저가 Studio에 마지막으로 쓴 폴더(대화상자 `id` `openphysics-project`)에서,
+파일을 고른 뒤에는 현재 파일의 폴더에서 열립니다(`startIn`은 그때만 넘김). Studio는 쓴 파일을 기억하므로 다른 모델이나 파일을 열거나, 모델을
 바꾸거나, 설계를 초기화할 때까지 **Save**는 대화상자 없이 그 파일에 다시 씁니다. Chromium은 기억한 파일을
 쓰기가 끝나야 바꾸므로 Save의 쓰기가 실패하면 파일은 그대로이고 *Session not saved: … could not be written
 (…); the file is unchanged.*가 나옵니다. 대화상자에서 방금 고른 파일은 브라우저가 이미 만들거나 비웠을 수
@@ -101,7 +102,11 @@ cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), �
 브라우저가 Downloads 폴더에 저장하거나, 그렇게 설정했다면 위치를 묻는다고 안내하며, **Download**는 파일을
 브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
-Studio는 다운로드가 보관됐는지 알 수 없습니다. **Export › Model file…**은 늘 내려받습니다.
+Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 이름을 **File › Open…**으로 연 파일의 이름처럼
+모델의 **현재 파일**로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 묻지 않고 그 이름으로 다시 내려받으며
+(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name it
+<name> (1).json.*), Save As도 그 이름으로 시작합니다. 다른 파일이나 모델을 열거나, 모델을 바꾸거나,
+**Reset design**을 하면 저장 대화상자에서 기억한 파일처럼 이 이름도 버립니다. **Export › Model file…**은 늘 내려받습니다.
 
 저장 대화상자(`window.showSaveFilePicker`)의 브라우저 지원. 2026-11-23에
 [MDN browser-compat-data](https://github.com/mdn/browser-compat-data) 8.1.10(2026-11-19 데이터,
@@ -184,22 +189,23 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. **Export › Mod
    ([Save As가 저장하는 곳](#file-메뉴와-파일-종류)). Studio는 다운로드를 브라우저에 넘길 뿐 실제로
    보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음) Messages에 *Session file … sent to your
    browser's Downloads*가 나오고, 저장 대화상자로 쓰기를 마치면 *Saved to …*가 나옵니다. 저장 표시는
-   헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 다음 편집이나 실행 전까지
-   *Session file … sent to your browser's Downloads · 시각*(또는 *Saved to … · 시각*)이 표시되며,
-   다운로드 뒤에는 파일이 저장됐다고 하지 않습니다. **File › Export › Model file…**은 결과 없이
+   헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 현재 파일 이름과 상태가 나오며,
+   다음 편집이나 실행 전까지 *design-a.json · saved 03:42 (download)*(저장 대화상자로 쓴 뒤에는
+   *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since saved*(**File › Open…** 뒤에는
+   *· changed since opened*)입니다. 다음 **Save**는 묻지 않고 같은 이름으로 내려받습니다. **File › Export › Model file…**은 결과 없이
    모델만 저장합니다. 완료한 실행이 세션 파일에 없으면 *Not saved to a file · kept for recovery in
    this browser*(기록 중에는 *· updating browser recovery*, 쓸 수 없으면 *· browser recovery
-   unavailable*), 세션 파일 저장 뒤 바뀌었으면 *Changed since session file … (시각) · kept for
+   unavailable*), 세션 파일 저장 뒤 바뀌었으면 *design-a.json · changed since saved · kept for
    recovery in this browser*가 표시됩니다. **File › Open…** 뒤에는 헤더에 파일 이름과 함께 *Opened …*가, 복구
    뒤에는 *Recovered from this browser*가 나옵니다. 브라우저 복구는 노트북을 마지막으로 보낸 세션 파일이나
    연 세션 파일과, 노트북이 그 파일과 아직 같았는지를 함께 보관하므로 복구한 세션은 그 파일을 밝힙니다:
    같았으면 *Recovered from this browser · same as file …json*, 바뀌었으면 *Recovered from this browser
    (last sent to a file: … at 13:05; changed since)* 또는 *(opened from …json; changed since)*, 저장하거나 연
-   파일이 없으면 *· not saved to a file*. 이 제목과 저장 뒤의 *Session file … sent to your browser's
-   Downloads*는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
+   파일이 없으면 *· not saved to a file*. 이 제목과 저장 뒤의 *… · saved … (download)*는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
    때까지 유지됩니다. 탭 클릭(**Library**, **Model**, **Connections**, **Results**, **Compare**), 고른 실행,
    Compare 선택, 장 보기는 변경이 아닙니다. 변경 뒤에는 제목이 무엇이 바뀌었는지 말합니다: 입력 편집이면
-   *Unsaved inputs*, 실행이면 *Changed since session file … · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
+   *design-a.json · changed since saved*(모델에 현재 파일이 없으면 *Unsaved inputs*), 실행이면
+   *design-a.json · changed since saved · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
@@ -534,7 +540,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   not in this file; Library › Optical waveguide, then File › Save, keeps them in their own file.” **File › Open…**은 이런
   파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
   runs.”). **File › Export › Model file…**은 문서만 모델 이름을 딴 모델 파일로 씁니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
-  browser”, “Session file … sent to your browser's Downloads · 10:15”, “Opened …”, “Recovered from
+  browser”, “heated-silicon-waveguide-session-….json · saved 10:15 (download)”, “Opened …”, “Recovered from
   this browser”. 세션 파일에 없는 실행을 가진 모델을 떠나기 전(다른 모델 카드, 템플릿 다시 열기,
   파일이나 입력 열기) Studio가 먼저 묻습니다: “Leave this model? 3 runs are only in this tab and in
   browser recovery. Save session first to keep them in a file.” 버튼은 **Cancel**, **Save session**,

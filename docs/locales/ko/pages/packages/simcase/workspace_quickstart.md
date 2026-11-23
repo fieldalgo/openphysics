@@ -97,8 +97,9 @@ py -3.12 -m venv "$HOME\op-studio"
   저장 위치를 묻고, Messages에 *Saved to …*가 나오며, 다음 Save는 묻지 않고 같은 파일에 씁니다.
   Firefox와 Safari에서는 Studio가 파일 이름을 묻고 파일을 브라우저 Downloads로 넘깁니다(브라우저가 저장
   위치를 묻거나, 같은 이름이 있으면 “ (1)”을 붙일 수 있습니다). Messages에 *Session file … sent to your
-  browser's Downloads*가 나오고, 다음 편집이나 실행 전까지 제목에 *Session file … sent to your
-  browser's Downloads · 시각*이 표시됩니다. 다른 이름은 **File › Save As…**(Shift+Ctrl+S)로 고르며,
+  browser's Downloads*가 나오고, 다음 편집이나 실행 전까지 제목에 *<name> · saved 시각 (download)*이
+  표시됩니다. Studio는 그 이름을 기억하므로 다음 **Save**는 묻지 않고 같은 이름으로 다시 내려받으며(브라우저가
+  “ (1)”을 붙일 수 있음), 편집 뒤 제목은 *<name> · changed since saved*입니다. 다른 이름은 **File › Save As…**(Shift+Ctrl+S)로 고르며,
   파일마다 담는 것은 [File 메뉴와 파일 종류](workspace.md#file-메뉴와-파일-종류)에 있습니다. 하단은 제목의 저장 표시를 그대로
   보여 주며, 세션 파일 저장 전에는 *Not saved to a file · kept for recovery in this browser*입니다.
   **File › Export › Model file…**은 결과 없이 모델만 저장하고(`optical-waveguide.json`), Runs 목록의 **Export this run**은
