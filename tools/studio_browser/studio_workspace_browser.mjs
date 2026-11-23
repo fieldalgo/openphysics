@@ -1976,6 +1976,143 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // R17 (round 17, pre-registered), in a browser context of its own: stable run numbers over the
+  // six-run limit and the dropped-run message (U2), the slow options beside Run study (U3), the
+  // boundary words (U5), the Compare pickers' names (U9), the closed-window modes in the substrate
+  // (U1), the status line's shape names (U14) and the best overlap of unmatched rows with O2's 24 px (U4).
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1280, 800);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R17 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1280, 800);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R17 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R17 run', 300000);
+    };
+    const pressEnter = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined}); await sleep(150); };
+    const nameRun = async name => { await r.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', '#run-name-input'); await r.call('Input.insertText', {text: name}); await pressEnter(); };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R17 connected start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.querySelector('#shape-w')", 'R17 optical template');
+    // U5: the workspace note and the closed Study panel
+    const u5 = {note: await rText('.workspace > .note')};
+    await rTree('Study', "!!document.querySelector('#inspector h2')"); u5.study = await r.eval("document.getElementById('inspector').textContent");
+    stage('R17 U5 boundary words', {note: u5.note});
+    assert.equal(u5.note, 'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window fixed; outer boundary chosen in Physics › Optical modes.');
+    assert.ok(u5.study.includes('The window is fixed; the outer boundary is chosen in Physics › Optical modes.'), u5.study); assert.ok(!u5.study.includes('Window and boundaries are fixed.'));
+    // U3: the group index option, ticked, is named beside Run study; cleared, the line goes
+    await rTree('Optical modes', "!!document.getElementById('group-index-check')"); await r.click('#group-index-check');
+    const u3 = {on: await r.eval("({text:document.getElementById('run-options').textContent,hidden:document.getElementById('run-options').hidden})")};
+    await rOverflow('U3 slow options');
+    await r.click('#group-index-check'); u3.off = await r.eval("({text:document.getElementById('run-options').textContent,hidden:document.getElementById('run-options').hidden})");
+    stage('R17 U3 slow options', u3); assert.deepEqual(u3, {on: {text: 'group index on · 3 solves', hidden: false}, off: {text: '', hidden: true}});
+    // U2: seven runs of the template (core mesh 30, 32, …, 42 nm): the seventh drops Run 1 and
+    // renumbers nothing; Messages names it
+    for (let i = 0; i < 7; i++) {
+      if (i) { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', 30 + 2 * i); }
+      await rRun();
+    }
+    const u2 = {items: await runItems(), message: await rText('#file-status'), status: await rText('#status')};
+    stage('R17 U2 seven runs', u2);
+    assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+    assert.ok(u2.message.endsWith(' Run 1 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), u2.message);
+    assert.ok(u2.status.startsWith('Run 7 · '), u2.status);
+    // Run 5 and Run 6 named (pinned) on Compare; an eighth run drops Run 2, keeps the pair and says Run 8 is newer
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results');
+    const showRun = async n => { await r.onElement('function(n){const b=[...this.querySelectorAll(".run-item")].find(b=>b.textContent.split(" · ").includes(n));b.click();return true}', 'Run ' + n); await sleep(200); };
+    await showRun(5); await nameRun('Design A'); await showRun(6); await nameRun('Design B');
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'R17 Compare');
+    await r.choose('#compare-a', await r.eval("[...document.getElementById('compare-a').options].find(o=>o.textContent.startsWith('Run 5 · Design A · ')).value"));
+    await r.choose('#compare-b', await r.eval("[...document.getElementById('compare-b').options].find(o=>o.textContent.startsWith('Run 6 · Design B · ')).value"));
+    await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', 44); await rRun();
+    const dropped2 = await rText('#file-status');
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-newer')", 'R17 Compare newer');
+    const u2b = {items: await runItems(), dropped: dropped2, newer: await rText('#compare-newer'),
+      options: await r.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent.split(' · ').slice(0,2).join(' · '))"),
+      headings: await r.eval("[...document.querySelectorAll('#compare-table-runs [data-side]')].map(s=>s.textContent.split(' · ').slice(0,3).join(' · '))")};
+    stage('R17 U2 eighth run', u2b);
+    assert.deepEqual(u2b.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
+    assert.ok(u2b.dropped.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), u2b.dropped);
+    assert.equal(u2b.newer, 'Run 8 is newer than this pair · Compare Run 8 with B');
+    assert.deepEqual(u2b.headings, ['A · Run 5 · Design A', 'B · Run 6 · Design B']);
+    // U9: the pickers are named Run A and Run B; the run number and name fit their visible width
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await rSize(width, height, mobile);
+      const pick = await r.eval(`(()=>{const c=document.createElement('canvas').getContext('2d');return ['compare-a','compare-b'].map(id=>{const s=document.getElementById(id),cs=getComputedStyle(s);c.font=cs.font;
+        const prefix=s.selectedOptions[0].textContent.split(' · ').slice(0,2).join(' · ');const room=s.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-20;
+        return {label:s.getAttribute('aria-label'),title:s.title===s.selectedOptions[0].textContent,prefix,fits:c.measureText(prefix).width<=room,room:Math.round(room)};});})()`);
+      stage('R17 U9 Compare pickers', {width, pick});
+      assert.deepEqual(pick.map(p => [p.label, p.title, p.fits]), [['Run A', true, true], ['Run B', true, true]], JSON.stringify(pick));
+      assert.equal((await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth')) <= 0, true);
+    }
+    await rSize(1280, 800);
+    for (const name of ['Run A', 'Run B']) {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role: 'combobox'});
+      assert.equal(nodes.filter(n => !n.ignored).length, 1, name);
+    }
+    // U1 and U14: the T18 structure in a closed window, a silicon substrate x −1500, y −1200, 3000 × 700 nm
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R17 substrate added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    assert.deepEqual(await r.eval("['shape-x','shape-y','shape-w','shape-h'].map(id=>document.getElementById(id).value)"), ['-1500', '-1200', '3000', '700']);
+    await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', 30);
+    await rRun();
+    const u1 = await r.eval(`(()=>{const notes=[...document.querySelectorAll('#modes-table td[data-edge-note]')];return {notes:notes.map(n=>[n.dataset.edgeNote,n.textContent]),
+      described:[...document.querySelectorAll('#modes-table tbody th[aria-describedby]')].map(th=>th.textContent),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(c=>c.textContent)};})()`);
+    stage('R17 U1 closed window, substrate', u1);
+    assert.deepEqual(u1.notes.map(n => n[0]), ['1', '2']); assert.deepEqual(u1.described, ['Mode 1', 'Mode 2']);
+    for (const [mode, text] of u1.notes) {
+      const m = /^Mode (\d) is mostly in Substrate \((\d+) % of \|E\|²\), which touches the window edge; its n_eff depends on the closed window\. Use Open boundary, or ask for more modes to reach the core mode\.$/.exec(text);
+      assert.ok(m && m[1] === mode && Number(m[2]) > 50, text);
+    }
+    await rOverflow('U1 Results notes');
+    // U14: after an edit the status line names the viewed run's shapes
+    await rTree('Optical modes', "!!document.getElementById('wavelength-number')"); await r.type('#wavelength-number', 1540);
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results after edit');
+    const u14 = await rText('#status'); stage('R17 U14 status line', {status: u14});
+    assert.ok(u14.startsWith('Run 9 · Core 500 × 220 + Substrate 3000 × 700 nm'), u14);
+    await rTree('Optical modes', "!!document.getElementById('wavelength-number')"); await r.type('#wavelength-number', 1550);
+    // the template core alone (Run 8) against the substrate run (Run 9): the note for B, the best overlap of each unmatched row
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'R17 Compare U1');
+    await r.choose('#compare-a', await r.eval("[...document.getElementById('compare-a').options].find(o=>o.textContent.startsWith('Run 8 · ')).value"));
+    await r.choose('#compare-b', await r.eval("[...document.getElementById('compare-b').options].find(o=>o.textContent.startsWith('Run 9 · ')).value"));
+    await r.until("!!document.getElementById('compare-neff')", 'R17 Compare table');
+    await rSize(1440, 900);
+    const u4 = await r.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll');
+      return {note:document.getElementById('compare-edge-note')?.textContent??null,unmatched:[...t.querySelectorAll('tr[data-no-match]')].map(tr=>[tr.dataset.noMatch,tr.cells[3].textContent,tr.cells[3].dataset.bestOverlap??null]),
+       slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width)};})()`);
+    stage('R17 U1 U4 Compare', u4);
+    assert.ok(u4.note && u4.note.startsWith('B · Run 9: Mode 1 is mostly in Substrate ('), u4.note);
+    assert.ok(u4.unmatched.length > 0, 'the substrate modes match none of the template core');
+    for (const [, text, eta] of u4.unmatched) {
+      if (eta === null) { assert.equal(text, '—'); continue; }
+      const m = /^best (\d\.\d{2,3}) \((?:< 0\.8|margin < 0\.1), not matched\)$/.exec(text); assert.ok(m, text);
+    }
+    assert.ok(u4.unmatched.some(([, , eta]) => eta !== null), 'an unmatched row shows its best overlap');
+    assert.ok(u4.slack >= 24, `R17 Compare: ${u4.slack} px to spare at 1440 (O2, 24 px)`);
+    await rOverflow('U4 Compare');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);

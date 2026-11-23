@@ -488,6 +488,52 @@ try {
     await page.press('tab', 'Library'); await page.press('button', 'Optical waveguide', 'start'); await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R16 Compare reopened');
     const reopened = await pair(); stage('R16 S3 reopened', {pair: reopened});
     assert.ok(reopened[0].startsWith('Run 1 · Design A · ') && reopened[1].startsWith('Run 2 · Design B · '), JSON.stringify(reopened));
+    // round 17 (U7, pre-registered): the optical model left on Compare comes back on Results with the
+    // run last viewed, and each model switched to starts at the top of its page
+    const viewed = await page.eval("document.querySelector('.compare-selection')?document.getElementById('compare-b').selectedOptions[0].textContent.split(' · ').slice(0,2).join(' · '):null");
+    await page.eval("document.getElementById('canvas').scrollTop=400");
+    await page.press('tab', 'Library'); await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'R17 heated on Results');
+    const heated = {page: await shownPage(), top: await page.eval("document.getElementById('canvas').scrollTop")};
+    await page.eval("document.getElementById('canvas').scrollTop=400");
+    await page.press('tab', 'Library'); await page.press('button', 'Optical waveguide', 'start'); await page.until("!!document.getElementById('modes-table')", 'R17 optical back on Results');
+    const optical = {page: await shownPage(), run: await pressedRun(), top: await page.eval("document.getElementById('canvas').scrollTop")};
+    stage('R17 U7 Library › Open', {viewed, heated, optical});
+    assert.equal(heated.page, 'Results'); assert.equal(heated.top, 0);
+    assert.equal(optical.page, 'Results'); assert.equal(optical.top, 0); assert.ok(optical.run && optical.run.replace('Pinned · ', '').startsWith('Run '), optical.run);
+    await stopBrowser(page);
+  }
+
+  // Round 17 (U8, pre-registered), a new profile at 1440 × 900: a project file saved by download with
+  // the optical model alone; after the heated model joins, Save asks (Save As, prefilled, saying why);
+  // Cancel writes nothing; saved under that name, the next Save downloads at once
+  {
+    page = await startBrowser(); await size(1440, 900, false);
+    await page.call('Page.navigate', {url: base + '/workspace'});
+    await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R17 start page');
+    await page.click('[data-template=optical]'); await page.until("!!document.getElementById('shape-w')", 'R17 optical model');
+    let before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save As');
+    await page.fill('textbox', 'File name', 'u8-optical'); await page.press('button', 'Download');
+    assert.equal(await newDownload(before), 'u8-optical.json');
+    await page.press('tab', 'Library'); await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!document.querySelector('[data-template=optical]')", 'R17 heated added');
+    before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save asks');
+    const asked = await page.eval("({title:document.getElementById('save-name-title').textContent,prefill:document.getElementById('save-name-input').value,why:document.getElementById('save-name-unavailable').hidden?null:document.getElementById('save-name-unavailable').textContent})");
+    await page.press('button', 'Cancel'); await sleep(500);
+    const cancelled = {downloads: await listDownloads(), status: await status()};
+    stage('R17 U8 Save asks', {asked, cancelled: cancelled.status});
+    assert.deepEqual(asked, {title: 'Save As', prefill: 'u8-optical.json', why: 'This project now holds Optical waveguide and Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.'});
+    assert.deepEqual(cancelled.downloads, before, 'Cancel downloads nothing'); assert.equal(cancelled.status, 'Save As cancelled; nothing was written.');
+    await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save asks again');
+    await page.press('button', 'Download'); const both = await newDownload(before);
+    before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save'); const again = await newDownload(before);
+    const dialogAgain = await page.eval("document.getElementById('save-name-dialog').open");
+    stage('R17 U8 saved with both models', {both, again, dialogAgain});
+    // a download cannot replace the earlier file: a browser may add " (1)" (headless Chromium here writes the name again)
+    assert.equal(dialogAgain, false); assert.ok(both.startsWith('u8-optical') && again.startsWith('u8-optical'), JSON.stringify({both, again}));
+    const file = JSON.parse(await readFile(join(downloads, both), 'utf8')); assert.deepEqual(file.models.map(m => m.kind).sort(), ['multiphysics', 'workspace']);
+    await noOverflow('R17 U8');
     await stopBrowser(page);
   }
 
