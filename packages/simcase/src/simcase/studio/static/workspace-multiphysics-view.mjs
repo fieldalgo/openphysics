@@ -491,7 +491,9 @@ export function createMultiphysicsView(ctx){
  }
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
- const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed; integrity check passed (it does not show who made the file).';
+ // round 14 (Q5): the plain words, with what the checksum does not show as the title text
+ const CHECKSUM_HELP='The checksum detects a damaged or hand-edited file; it does not show who made the file: whoever edits a file can recompute it.';
+ const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed. <span data-mp-checksum title="'+CHECKSUM_HELP+'">Results match the file\'s checksum.</span>';
  const runItem=run=>`${run.pinned?'Pinned · ':''}${runTitle(run)} · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}${run.maps==='not kept'?' · values only':''}`;
  // Results › Runs: the run list, in the optical words; selecting a run shows it, the model stays
  function runList(host){

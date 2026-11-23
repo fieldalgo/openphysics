@@ -731,9 +731,10 @@ opening there. This section is the public statement of the format.
 - **Digest.** Each run and each baseline carries `"digest": "sha256:<hex>"`, the SHA-256 of
   the record without its `digest`, written as JSON with the keys of every object sorted and
   the same number rules. It detects a truncated, damaged or hand-edited file. It is not an
-  authentication: whoever edits a file can recompute it, so opened results still read
-  “Loaded from file, not recomputed; integrity check passed (it does not show who made the
-  file).”
+  authentication: whoever edits a file can recompute it, so opened results read
+  “Loaded from file, not recomputed. Results match the file's checksum.”, and that sentence's
+  title text says *The checksum detects a damaged or hand-edited file; it does not show who
+  made the file: whoever edits a file can recompute it.*
   Recovered results read “Recovered from this browser, not recomputed.” An optical session
   file carries no digest; its opened results read “Loaded from file, not recomputed. Studio
   checks that the file is well formed, not who made it.”

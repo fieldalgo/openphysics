@@ -384,7 +384,8 @@ waveguide 카드가 자기 가장 새 기록을 복원하고(위 상자는 그 �
 뒤의 Save가 대화상자 없이 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
 “ (1)” title 텍스트와 함께 *heated-design.json · downloaded …*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
 유지하는지도 확인합니다. 14차부터 두 스크립트는 제목이 *same as file X*인 복원이 X를 현재 파일로 삼는지(Save As가
-X를 제안함) 확인하고, workspace 스크립트는 입력 편집 뒤와 실행 이름을 바꾼 뒤 *X · changed since restored*를 확인합니다.
+X를 제안함) 확인하고, workspace 스크립트는 입력 편집 뒤와 실행 이름을 바꾼 뒤 *X · changed since restored*를 확인하며, session 스크립트는 파일에서 연 실행이 *Loaded from file, not
+recomputed. Results match the file's checksum.*으로 표시되고 출처 주의 문구가 그 문장의 title 텍스트인지 확인합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
