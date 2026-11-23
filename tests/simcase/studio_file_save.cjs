@@ -51,12 +51,14 @@ test('an automated browser (navigator.webdriver) never calls the picker and asks
  assert.deepEqual(await F.saveToFile('x',{suggestedName:'a.json',win}),{status:'unavailable',error:null});
  assert.equal(called,0);
 });
-test('Save As calls the picker with one JSON type, the id and Documents, and writes the bytes',async()=>{
+test('Save As calls the picker with one JSON type and the id (no startIn before a file is chosen), and writes the bytes',async()=>{
  const file=fakeFile('chosen.json','old'),win=fakeWindow(async()=>file.handle);
  const r=await F.saveToFile('{"a":1}\n',{suggestedName:'optical-waveguide-session-2026-11-23-0105.json',win});
  assert.equal(r.status,'saved');assert.equal(r.name,'chosen.json');assert.equal(file.content,'{"a":1}\n');
  assert.equal(win.calls.length,1);
- assert.deepEqual(win.calls[0],{suggestedName:'optical-waveguide-session-2026-11-23-0105.json',types:[{description:'OpenPhysics session file (JSON)',accept:{'application/json':['.json']}}],id:'openphysics-project',startIn:'documents'});
+ assert.deepEqual(win.calls[0],{suggestedName:'optical-waveguide-session-2026-11-23-0105.json',types:[{description:'OpenPhysics session file (JSON)',accept:{'application/json':['.json']}}],id:'openphysics-project'});
+ // round 13 (F3): no startIn key at all, so the id alone restores the folder last picked under it
+ assert.equal('startIn' in win.calls[0],false);
  // Save: the same handle again, no dialog
  const again=await F.saveToFile('{"a":2}\n',{suggestedName:'x.json',target:{handle:r.handle,name:r.name},win});
  assert.equal(again.status,'saved');assert.equal(win.calls.length,1);assert.equal(file.content,'{"a":2}\n');assert.equal(file.writes,2);
@@ -88,15 +90,71 @@ test('the picker is called before anything is awaited (inside the click)',()=>{
  const file=fakeFile('a.json');let called=false;const win=fakeWindow(async()=>{called=true;return file.handle;});
  F.saveToFile('x',{suggestedName:'a.json',win});assert.equal(called,true);
 });
-test('the save indicator says "Saved to" only after the save dialog wrote the file',async()=>{
+test('the save indicator names the file, and says "(download)" unless the save dialog wrote it',async()=>{
  const P=await import(STATIC+'workspace-persistence.mjs');
  const when=()=>'10:15',saved={name:'chosen.json',savedAt:'2026-11-23T10:15:00Z',current:true};
- assert.equal(P.persistenceTitle({saved:{...saved,written:true}},when),'Saved to chosen.json · 10:15');
- assert.equal(P.persistenceTitle({saved},when),"Session file chosen.json sent to your browser's Downloads · 10:15");
+ assert.equal(P.persistenceTitle({saved:{...saved,written:true}},when),'chosen.json · saved 10:15');
+ assert.equal(P.persistenceTitle({saved},when),'chosen.json · saved 10:15 (download)');
 });
 test('a failed write to a file just chosen does not claim the file is unchanged',async()=>{
  const file=fakeFile('picked.json','OLD');file.failNext=new DOMException('Disk full','QuotaExceededError');
  const r=await F.saveToFile('NEW',{suggestedName:'picked.json',win:fakeWindow(async()=>file.handle)});
  assert.equal(r.status,'failed');assert.equal(r.fresh,true);
  assert.equal(F.notWrittenNotice(r,{saveAs:true}),'Session not saved: picked.json could not be written (Disk full); the browser may have left it empty.');
+});
+
+// round 13 (O1): one current file name per model, set by Save As, the Save name dialog or File ›
+// Open, dropped when the scope (the open model, and every open, switch and reset) moves on
+test('the current file is remembered for its model and dropped on another scope',()=>{
+ const a=F.rememberFile({name:'design-a-ng.json',how:'download',scope:'optical-waveguide:3'});
+ assert.deepEqual(a,{name:'design-a-ng.json',handle:null,how:'download',scope:'optical-waveguide:3'});
+ assert.equal(F.currentFileFor(a,'optical-waveguide:3'),a);
+ // an open, a model switch or Reset design moves the scope on: no name any more
+ assert.equal(F.currentFileFor(a,'optical-waveguide:4'),null);
+ assert.equal(F.currentFileFor(a,'multiphysics:3'),null);
+ assert.equal(F.currentFileFor(null,'optical-waveguide:3'),null);
+ // a name the name dialog would not accept is not remembered; a handle is kept for the picker only
+ assert.equal(F.rememberFile({name:'a/b.json',how:'download',scope:'s'}),null);
+ assert.equal(F.rememberFile({name:'a.json',how:'other',scope:'s'}),null);
+ assert.equal(F.rememberFile({name:'a.json',how:'opened',handle:{},scope:'s'}).handle,null);
+ const h={};assert.equal(F.rememberFile({name:'a.json',how:'picker',handle:h,scope:'s'}).handle,h);
+ // the name a save suggests: the current file's, else the model-based one
+ assert.equal(F.suggestedSaveName(a,'optical-waveguide-session-2026-11-23-0342.json'),'design-a-ng.json');
+ assert.equal(F.suggestedSaveName(null,'optical-waveguide-session-2026-11-23-0342.json'),'optical-waveguide-session-2026-11-23-0342.json');
+});
+test('Save downloads under a known name without asking; Save As and no name ask; a handle is written',()=>{
+ const known=F.rememberFile({name:'design-a-ng.json',how:'download',scope:'s'}),opened=F.rememberFile({name:'o.json',how:'opened',scope:'s'}),picked=F.rememberFile({name:'p.json',how:'picker',handle:{},scope:'s'});
+ assert.equal(F.saveRoute(known,{saveAs:false}),'download');
+ assert.equal(F.saveRoute(opened,{saveAs:false}),'download');
+ assert.equal(F.saveRoute(known,{saveAs:true}),'ask');
+ assert.equal(F.saveRoute(null,{saveAs:false}),'ask');
+ assert.equal(F.saveRoute(picked,{saveAs:false}),'write');
+ // where the picker works, it is used as before (with the current name suggested)
+ assert.equal(F.saveRoute(known,{saveAs:false,picker:true}),'picker');
+ assert.equal(F.saveRoute(null,{saveAs:true,picker:true}),'picker');
+ assert.equal(F.saveRoute(picked,{saveAs:true,picker:true}),'picker');
+ assert.equal(F.downloadAgainNote('design-a-ng.json'),'A download cannot replace the earlier file, so your browser may name it design-a-ng (1).json.');
+});
+test('saveToFile: a known name without a picker is downloaded as is; the picker is offered it as the name',async()=>{
+ const known={name:'design-a-ng.json',handle:null};
+ assert.deepEqual(await F.saveToFile('x',{suggestedName:'design-a-ng.json',target:known,win:{isSecureContext:true}}),{status:'known',name:'design-a-ng.json'});
+ assert.deepEqual(await F.saveToFile('x',{suggestedName:'design-a-ng.json',target:known,saveAs:true,win:{isSecureContext:true}}),{status:'unavailable',error:null});
+ const file=fakeFile('design-a-ng.json'),win=fakeWindow(async()=>file.handle);
+ await F.saveToFile('x',{suggestedName:'design-a-ng.json',target:known,win});
+ assert.equal(win.calls.length,1);assert.equal(win.calls[0].suggestedName,'design-a-ng.json');assert.equal('startIn' in win.calls[0],false);
+ assert.deepEqual(F.pickerOptions('a.json',file.handle).startIn,file.handle);
+});
+test('the header names the current file and its state; "Unsaved inputs" only without a name',async()=>{
+ const P=await import(STATIC+'workspace-persistence.mjs'),when=()=>'03:42';
+ const saved={name:'design-a-ng.json',savedAt:'2026-11-23T03:42:00Z',current:true};
+ assert.equal(P.persistenceTitle({saved,file:'design-a-ng.json'},when),'design-a-ng.json · saved 03:42 (download)');
+ assert.equal(P.persistenceTitle({saved:{...saved,written:true},file:'design-a-ng.json'},when),'design-a-ng.json · saved 03:42');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},clean:false,file:'design-a-ng.json'},when),'design-a-ng.json · changed since saved');
+ assert.equal(P.persistenceTitle({saved:{...saved,current:false},runsUnsaved:true,recovery:'kept',file:'design-a-ng.json'},when),'design-a-ng.json · changed since saved · kept for recovery in this browser');
+ const opened={kind:'opened',name:'design-a-ng.json',current:true,file:'design-a-ng.json',fileCurrent:true};
+ assert.equal(P.persistenceTitle({loaded:opened,file:'design-a-ng.json'},when),'Opened design-a-ng.json');
+ assert.equal(P.persistenceTitle({loaded:{...opened,current:false},clean:false,file:'design-a-ng.json'},when),'design-a-ng.json · changed since opened');
+ // no name (never saved, or dropped by a reset or another model): the words as before
+ assert.equal(P.persistenceTitle({clean:false},when),'Unsaved inputs');
+ assert.equal(P.persistenceTitle({fresh:true},when),'New model · not saved');
 });

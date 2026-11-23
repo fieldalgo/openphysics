@@ -75,8 +75,8 @@ opens the previous menu), Escape closes one level and returns focus, and Tab clo
 | Item | Shortcut | What it does |
 |---|---|---|
 | **Open…** | Ctrl+O (⌘O) | Opens a session file or a model file of any model. The ribbon's **Open…** is the same. |
-| **Save** | Ctrl+S (⌘S) | Saves the session file. After a Save As through the browser's save dialog it writes that file again without asking; otherwise it asks, as Save As does. The ribbon's **Save** is the same. |
-| **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the session file under a name you choose. |
+| **Save** | Ctrl+S (⌘S) | Saves the session file. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads again under the model's current file name (the name chosen in Save As or Save, or the file opened) without asking. With no current file it asks, as Save As does. The ribbon's **Save** is the same. |
+| **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the session file under a name you choose; it starts with the current file name. |
 | **Export › Model file…** | | Downloads the model file (inputs only), named after the model, for example `optical-waveguide.json`. |
 | **Export › Model with runs (session file)…** | | The same as Save As. |
 | **Browser copy › Save browser draft**, **Restore browser draft** | | Keep or restore the optical inputs in this browser only. |
@@ -97,8 +97,10 @@ file with runs a *session file*, never a project.
 
 **Where Save As saves.** Where the browser has a save dialog for web pages
 (`showSaveFilePicker`, in a secure context: `http://127.0.0.1` and `http://localhost` qualify),
-Save As opens it from your click or key press with the suggested name, one JSON file type and the
-Documents folder (or the current file's folder) to start in, and writes the chosen file. Studio
+Save As opens it from your click or key press with the suggested name (the current file's, if
+any) and one JSON file type, and writes the chosen file. It opens in the folder the browser last
+used for Studio (the picker `id` `openphysics-project`), or in the current file's folder once a
+file was chosen there (`startIn` is passed only then). Studio
 keeps the file it wrote, so **Save** writes it again without a dialog until another model or file
 is opened, the model is switched or the design is reset. Chromium replaces a kept file only when
 the write is finished, so a Save whose write fails leaves it as it was: *Session not saved: …
@@ -113,7 +115,12 @@ with `.json` added if missing. It notes
 that your browser saves to its Downloads folder, or asks where if you set it to, and **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
-Downloads folder already has a file of that name. Studio cannot know that a download was kept. **Export › Model file…**
+Downloads folder already has a file of that name. Studio cannot know that a download was kept.
+Studio remembers the name as the model's **current file**, as it does the name of a file opened
+with **File › Open…**: **Save** (and Ctrl+S) then downloads under it again without asking
+(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name
+it <name> (1).json.*), and Save As starts with it. Opening another file or model, switching the
+model or **Reset design** drops it, as it drops a file kept from the save dialog. **Export › Model file…**
 always downloads.
 
 Browser support for the save dialog (`window.showSaveFilePicker`), checked on 2026-11-23 in
@@ -208,25 +215,28 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    ([where Save As saves](#file-menu-and-file-kinds)). Studio hands a download to the browser and
    cannot know that it was kept (a download can be cancelled), so Messages reports *Session file
    … sent to your browser's Downloads*; after the save dialog's write it reports *Saved to …*.
-   The header holds the one save indicator, and the footer repeats it word for word: *Session
-   file … sent to your browser's Downloads · time* (or *Saved to … · time*) until the next edit
-   or run; after a download it never says the file was saved. **File › Export › Model file…**
+   The header holds the one save indicator, and the footer repeats it word for word: the
+   current file's name and its state, *design-a.json · saved 03:42 (download)* (or *design-a.json
+   · saved 03:42* after the save dialog's write) until the next edit or run, then *design-a.json ·
+   changed since saved* (*· changed since opened* after **File › Open…**). The next **Save**
+   downloads under the same name without asking. **File › Export › Model file…**
    keeps the model without results; while completed runs are not in a session file, the indicator says *Not saved
    to a file · kept for recovery in this browser* (*· updating browser recovery* while it
-   writes, *· browser recovery unavailable* if it cannot), or *Changed since session
-   file … (time) · kept for recovery in this browser* after a file save.
+   writes, *· browser recovery unavailable* if it cannot), or *design-a.json · changed
+   since saved · kept for recovery in this browser* after a file save.
    After **File › Open…** the header says *Opened …* with the file name, and after a
    recovery *Recovered from this browser*. Browser recovery keeps the session file the notebook
    was last sent to or opened from, and whether the notebook still matched it, so a recovered
    session names it: *Recovered from this browser · same as file …json* when it still matched,
    *Recovered from this browser (last sent to a file: … at 13:05; changed since)* or *(opened
    from …json; changed since)* when it had changed, *· not saved to a file* when no file was
-   saved or opened. These titles, and *Session file … sent to your browser's Downloads* after a
+   saved or opened. These titles, and *… · saved … (download)* after a
    save, last until the model or a run changes (an input edit, a run added, renamed, pinned or
    unpinned) or another open: a tab click (**Library**, **Model**, **Connections**, **Results**,
    **Compare**), a selected run, a Compare choice or a field view is not a change. After a
-   change the title says what changed: *Unsaved inputs* for an input edit, *Changed since
-   session file … · kept for recovery in this browser* for a run. The header has no revision counter. A Width edit by an odd
+   change the title says what changed: *design-a.json · changed since saved* for an input edit
+   (*Unsaved inputs* when the model has no current file), *design-a.json · changed since saved ·
+   kept for recovery in this browser* for a run. The header has no revision counter. A Width edit by an odd
    number of nanometres gives a half-nanometre Left x: the centre is kept exactly, Messages says
    where Left x moved (*Width set to 600 nm. Left x moved to −300 nm to keep the centre.*), and
    typed values are not snapped to the drag step (**More about width and height** under
@@ -626,8 +636,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   **File › Open…** opens such a file, an optical session, or a model file alone (“Opened model
   file …: it holds the model but no runs.”). **File › Export › Model file…** writes the document
   alone, as a model file named after the model. The title uses the optical
-  words: “Not saved to a file · kept for recovery in this browser”, “Session file … sent to your
-  browser's Downloads · 10:15”, “Opened …”, “Recovered from this browser”. Before leaving a model
+  words: “Not saved to a file · kept for recovery in this browser”, “heated-silicon-waveguide-session-….json · saved 10:15 (download)”, “Opened …”, “Recovered from this browser”. Before leaving a model
   whose runs no session file holds (another model card, the template again, an opened file or
   inputs), Studio asks first: “Leave this model? 3 runs are only in this tab and in browser
   recovery. Save session first to keep them in a file.”, with **Cancel**, **Save session** and

@@ -390,14 +390,22 @@ The browser's real save dialog cannot be answered in a headless run, so the scri
 `window.showSaveFilePicker` at document start and Save goes through Studio's name dialog (Download
 keeps the suggested name, so file names and bytes are checked as before); then a stub at that
 boundary, whose file changes only on close as in Chromium, checks Save As (the picker options:
-the suggested name, one JSON type, `id` `openphysics-project` and `startIn` `documents`, then the
-current file), the written bytes equal to the download of the same state, Save writing the same
+the suggested name, one JSON type and `id` `openphysics-project`, with no `startIn` until a file
+is chosen and then the current file), the written bytes equal to the download of the same state, Save writing the same
 file with no second picker call, a cancel writing nothing, a failed write aborted with the old
 content whole, and a picker that throws `NotAllowedError` falling back to the name dialog. The
 headless browser reports `navigator.webdriver`, where Studio never calls the picker (a stub that
 would throw is not called and Save As downloads under the typed name); the picker checks set
 `navigator.webdriver` to false at that boundary. The
-name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`). The real save
+name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`). Since round 13
+it checks the model's current file name on the download path: Save As *design-a-ng*, a Width edit,
+then Save and Ctrl+S downloading under `design-a-ng.json` again with no name dialog (the bytes
+holding the new width, Messages saying *Downloaded design-a-ng.json again* with the “ (1)” note),
+the header naming the file (*design-a-ng.json · changed since saved*, *· saved … (download)*),
+Save As prefilled with it, **File › Open…** of that file setting it (*Opened design-a-ng.json*,
+then *· changed since opened*, and Save keeping the name), **Reset design** dropping it so Save asks
+with the model-based name, and a model file over 64 KiB opened through **File › Open…** refused
+with *Model file exceeds 64 KiB*. Saves after an opened file keep its name in the other flows too. The real save
 dialog of desktop Chrome is not driven by any check.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
@@ -424,7 +432,10 @@ named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the hea
 message naming the optical runs that are not in its file. Since round 11 the Heated silicon
 waveguide card restores its own newest record after a reload (the box above not listing it),
 naming the session file's save time, the restored title reads *same as file …*, and the
-Workspace tools say *Restore earlier session from this browser*.
+Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
+name downloading under it again with no dialog (*Downloaded heated-design.json again*, the footer
+*heated-design.json · saved … (download)*), and Save after an opened model or session file keeping
+that file's name.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with
