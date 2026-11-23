@@ -982,6 +982,77 @@ version.* A run keeps its inputs as version 7: its `settings.mode_count` and its
 its study. A session with no runs takes its settings from its input alone (2 and off for a
 version 7 input).
 
+### Open boundary document (optical-shapes-v9)
+
+`/api/workspace/capabilities/v9` is version 8 with adapter `optical-shapes-v9` and an
+`open_boundary` block. The page still checks version 8 and has no control for it yet. The
+adapter's document builder (`opticalDocument` with `openBoundary: {edges, thickness, target}`)
+can open any edge of the window:
+
+- a perfectly matched layer (PML) of thickness *t* = 1 µm (1000 nm, the one value offered)
+  lies **outside** the 3 × 2.4 µm window on each open edge: the domain grows by *t* there and
+  the outer wall stays PEC. Closed edges stay PEC walls;
+- a polygon edge along an open edge continues straight through the layer, and where two open
+  edges meet at a shape's corner the corner square is filled too (a substrate that fills the
+  bottom of the window reaches the outer wall). A circle meets an edge only at a point and is
+  written as before;
+- the PML settings are fixed: `pml_strength` 3, `pml_order` 2,
+  `pml_minimum_physical_fraction` 0.5 and `pml_search_mode_count` 32;
+- **Search near n_eff** (`target_effective_index`) is above 1.45 and below the largest
+  index of the design. By default it is (n_max + n_SiO2) / 2 to two decimals, from the
+  materials' indices at 1550 nm (2.46 for a silicon core);
+- the group index is not computed with an open boundary.
+
+With every edge closed, or without `openBoundary`, the document is the `optical-shapes-v8`
+document byte for byte, and its results are those of that document. A workspace request whose
+`em.modes2d` physics has any other `pml` (another thickness, unequal thicknesses or another fixed
+value), a target of 1.45 or below, or a domain other than the window grown by the thickness on
+exactly the open edges (in nm) is refused with *The open boundary of a workspace run has a PML of 1 µm on each open edge
+with strength 3, order 2, physical fraction 0.5 and a search of 32 candidates.* The PML results
+are candidates under the [PML mode rules](pml_modes.md).
+
+Limits of the open boundary, from its validation:
+
+- **One search target.** The candidates are the eigenvalues nearest **Search near n_eff**, and the
+  PML's own modes crowd the region around it. A mode far from the target can be missed even when
+  fewer modes are found than asked: a strip over a silicon substrate has a third mode near the
+  cladding index (n ≈ 1.486 + 0.008i, about 2800 dB/cm) that the default target 2.46 does not
+  reach with 32 candidates. To find modes near the cladding index
+  (Re n_eff below about 1.6), lower Search near n_eff (for example to 1.95).
+- **Why 1 µm and 32.** With the mesh held fixed, a 1.5 or 2 µm layer changes the loss by at
+  most 0.02 % and n_eff by about 1e-8, so it adds no accuracy; it adds PML modes near the target,
+  which pushed the TM-like mode of the strip over a substrate out of a search of 16. 32 keeps
+  it at every thickness tested.
+- **Mesh error at the default mesh.** The default mesh overestimates the strip-over-substrate
+  loss by about 3 % (TE-like +2.8 %, TM-like +1.8 %, against the value extrapolated from 0.7, 0.5
+  and 0.35 × the element lengths: 28.35 and 988.7 dB/cm). The leaky slab against its analytic
+  pole is an independent check of the same size: +2.96 % (TE) and −1.41 % (TM) at the default
+  mesh. As first registered, the convergence check (× 1, 0.7, 0.5) failed: the TE-like loss
+  changes were 0.096 then 0.301 dB/cm, so it was registered again, after that result, at 0.7, 0.5
+  and 0.35 ×. The values it was planned from (28.72 and 28.55 dB/cm at 0.7 and 0.5 ×) were
+  reproduced neither with the refinement distance fixed nor with it scaled.
+- **The PML settings are part of the search.** Changing the PML thickness, strength or order
+  changes the spectrum of the PML's own modes and can make a fixed search miss modes: with a search
+  of 32 near 2.46, the TM-like mode of the strip over a substrate is missing at strength 1.5. The
+  page does not let these settings change.
+- As first validated, the thickness check (V4: the window meshed again for each thickness,
+  search of 16) failed four times: at 1.5 µm the TE-like loss moved by +1.28 % and n_eff by 8.7e-4
+  (a remeshing difference: −0.31 % and 4.3e-4 at 0.7 × the element lengths), and the TM-like mode
+  was missing at 2 µm and at strength 1.5 and 6. Registered again on one mesh with the search of
+  32, it failed a fifth time: the TM-like mode was missing at strength 1.5. PML independence is
+  now checked with a search that reaches every reference mode, and the shipped search separately
+  for completeness.
+- The filter check (V8) first asked that the analytic slab mode come back within 1e-3 of its pole,
+  a tolerance chosen when the test was written, not registered. It failed for 1 to 4 modes: the
+  returned TE mode is 4.76e-3 from the pole at the default mesh, the discretization error the slab
+  convergence check measures (it gates n_eff within 1e-3 only at 1/4 of the element lengths). After
+  that result the mode is identified as the one nearest the pole and must meet the slab check's
+  default-mesh gate (loss within 3.5 %; it is +2.96 %). Its first rule for known misses also
+  failed for the slab: it counted the slab's lateral harmonics that a search near 1.95 finds
+  (Re 2.38 to 1.90, ranked 5th and beyond), modes outside the asked count. After that result a
+  known miss is a physical mode of the two searches that ranks within the asked count and is not
+  returned; the only one is the strip-over-substrate mode near 1.486 when 8 modes are asked.
+
 ### Optical session files (version 9)
 
 A session in which every run has two real modes and its fields is written as version 7, byte

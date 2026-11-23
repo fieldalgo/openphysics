@@ -1,5 +1,5 @@
 {
- "source": "Validate packages run 44930354737 (PR #284 head 7326bd8a, 2026-11-21), linux-py312 source-tests-1..8.xml; tests/meshloom/test_quality.py split by test case into test_quality_v10.py, test_quality_v8.py, test_quality_sphere.py (V9, V6, V21) and test_quality_v24.py",
+ "source": "Validate packages run 44930354737 (PR #284 head 7326bd8a, 2026-11-21), linux-py312 source-tests-1..8.xml; tests/meshloom/test_quality.py split by test case into test_quality_v10.py, test_quality_v8.py, test_quality_sphere.py (V9, V6, V21) and test_quality_v24.py; tests/simcase/test_open_boundary_*.py and test_studio_open_boundary.py measured locally (Linux, one BLAS thread, 2026-11-23) until a CI run replaces them",
  "seconds": {
   "tests/galerkin/test_api_units_scan_galerkin.py": 2.7,
   "tests/galerkin/test_cavity3d_mesh_validation.py": 0.3,
@@ -203,6 +203,10 @@
   "tests/simcase/test_modes_postprocessing.py": 5.7,
   "tests/simcase/test_multiphysics_document.py": 1.0,
   "tests/simcase/test_multiphysics_heat_optics.py": 25.9,
+  "tests/simcase/test_open_boundary_convergence.py": 1190.5,
+  "tests/simcase/test_open_boundary_filter.py": 354.0,
+  "tests/simcase/test_open_boundary_pml_independence.py": 915.2,
+  "tests/simcase/test_open_boundary_slab.py": 1051.5,
   "tests/simcase/test_package_import.py": 0.6,
   "tests/simcase/test_pml_contract.py": 4.6,
   "tests/simcase/test_pml_static_roots.py": 0.0,
@@ -227,6 +231,7 @@
   "tests/simcase/test_studio.py": 5.1,
   "tests/simcase/test_studio_geometry_lab.py": 1.7,
   "tests/simcase/test_studio_joule_regions.py": 8.4,
+  "tests/simcase/test_studio_open_boundary.py": 3.2,
   "tests/simcase/test_studio_providers.py": 0.0,
   "tests/simcase/test_studio_rectangle_invariants.py": 0.3,
   "tests/simcase/test_studio_region_acceptance.py": 1.4,
