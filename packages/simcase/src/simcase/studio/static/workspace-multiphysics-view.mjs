@@ -101,10 +101,21 @@ export function createMultiphysicsView(ctx){
   validate();ctx.onHistory();ctx.render();
   let text=editNotice(message,freshness(),lastRun?.number,lastRun?.label||'');
   if(!before&&isMultiphysics(doc)&&!announcedMultiphysics){announcedMultiphysics=true;text+=' This model is now saved as a multiphysics model (format 0.3/multiphysics.1).';}
-  notice(text+baselineReturnText(prior,doc,baselineOption));
+  notice(text+baselineReturnText(prior,doc,baselineOption),'',againAction());
+ }
+ // The model equals the last run again: Messages offers that run (round 13, O6).
+ function againAction(){
+  if(freshness()!=='again'||!lastRun)return null;const run=lastRun;
+  return {label:`Show Run ${run.number}`,data:{showRun:String(run.number)},run:()=>showRun(run)};
+ }
+ // A run under Results, as a click in the run list shows it; the model is unchanged.
+ function showRun(run){
+  if(!runs.includes(run))return;lastRun=run;
+  resultPage=resultPages(run.result).find(p=>p.id.startsWith('results:')&&run.result.physics[p.id.slice(8)]?.coupled)?.id||resultPages(run.result)[0].id;
+  selection=resultPage;ctx.ui.page='Results';ctx.onHistory();ctx.render();notice(`${runTitle(run)} shown under Results; the model is unchanged.`);
  }
  // Undo and Redo compute nothing; back at the last run's model they say its results are current.
- const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.number,lastRun.label||'').trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption));};
+ const historyNotice=(done,prior)=>{const f=freshness();notice((f==='again'?`${done} · ${editNotice('',f,lastRun.number,lastRun.label||'').trim()}`:`${done}; nothing was computed.`)+baselineReturnText(prior,doc,baselineOption),'',againAction());};
  function undo(){if(!undoStack.length)return;lastRemoval=null;const prior=doc;redoStack.push(doc);doc=undoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Undo · model edit undone',prior);}
  function redo(){if(!redoStack.length)return;lastRemoval=null;const prior=doc;undoStack.push(doc);doc=redoStack.pop();validate();ctx.onHistory();ctx.render();selection=storedSelection();historyNotice('Redo · model edit redone',prior);}
  // A removed coupling is named in Messages with Undo until the next edit.

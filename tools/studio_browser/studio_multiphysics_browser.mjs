@@ -420,8 +420,14 @@ try {
   await runReady();
   // one sentence in Messages, the dock heading and the status bar; the notice asks for no Run
   // round 11 (L8): says that no run is needed, then what Run would still do
-  const again = 'No need to run: Run 1 already has these results. Run again to make a copy';
-  assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again.');
+  // round 13 (O6): what Run study would do, and Messages offers the run that has these results
+  const again = 'No need to run: Run 1 already has these results. Run study adds a copy with the same values';
+  assert.equal(await page.text('#file-status'), 'Coupling Heat 1 temperature → Modes 1 temperature added. ' + again + '. “Also solve without heater” is ticked again. Show Run 1');
+  assert.equal(await page.text('#file-status [data-show-run="1"]'), 'Show Run 1');
+  await page.click('#file-status [data-show-run="1"]');
+  await page.until("/^Run 1 /.test(document.querySelector('[data-mp-run-line]')?.textContent||'')&&document.querySelector('nav [data-page=Results]').getAttribute('aria-selected')==='true'", 'O6 Show Run 1');
+  assert.equal(await page.text('#file-status'), 'Run 1 shown under Results; the model is unchanged.');
+  stage('O6 Show Run 1', {line: await page.text('[data-mp-run-line]')});
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater (about 1 s more)');

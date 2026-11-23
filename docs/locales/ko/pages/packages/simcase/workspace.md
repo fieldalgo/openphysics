@@ -154,7 +154,9 @@ Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 �
    덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
    (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
    입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
-   군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. 입력
+   군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. Messages는 바뀌는
+   설정만 이전 → 이후로 밝힙니다(*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find
+   4 → 2. The next run uses them; Undo takes them back.*). 입력
    편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
@@ -498,9 +500,10 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   그대로이고 *Modes 1 · Out of date (last run: Done in 1.2 s)*가 됩니다. 이때 도크 제목은 “Run 1 · the model changed since; press Run to update”, 하단은 “Model edited
   since run 1 · press Run to update”입니다. 실행이 현재 모델의 것인지는 내용으로 정하므로, 손으로
   되돌린 편집(결합을 지웠다가 다시 추가, 또는 Undo)은 다시 현재가 됩니다. 그때 Messages, 도크
-  제목, 하단은 같은 문장 “No need to run: Run 1 already has these results. Run again to make a copy”를
+  제목, 하단은 같은 문장 “No need to run: Run 1 already has these results. Run study adds a copy with the same values”를
   보여 주어 실행할 필요가 없다는 것을 먼저 밝힙니다(Undo가 선택을 되살렸으면 Messages가 “Also solve
-  without heater” is ticked again을 덧붙임). 세션 파일에서 읽었거나 이 브라우저에서
+  without heater” is ticked again을 덧붙임). Messages는 **Show Run 1**도 내놓으며, 이 버튼은 모델을 바꾸지
+  않고 그 실행을 Results에 보여 줍니다. 세션 파일에서 읽었거나 이 브라우저에서
   복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**(반복 단계는 *Settled in 7 iterations · from file*처럼
   반복 횟수를 유지), 도크 제목은
   “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고

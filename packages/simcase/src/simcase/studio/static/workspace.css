@@ -199,6 +199,7 @@ main.choosing .workspace>.note{display:none}
 .sequence b{font-size:9px;color:#285db1;background:#e8eff9;padding:1px 5px;margin-right:7px;border-radius:2px}
 .message-line{display:flex;align-items:baseline;gap:18px;padding:6px 16px;border-top:1px solid #e4e9ef;font-size:10px;max-height:56px;overflow:auto}
 .message-label{font-weight:600;flex:none;color:#59708d}
+.message-action{font:inherit;font-size:inherit;padding:0 6px;margin-left:2px;border:1px solid #c9d3e0;border-radius:4px;background:#fff;color:var(--accent,#2d6da3);cursor:pointer}
 .message-more{display:inline}.message-more>summary{display:inline;cursor:pointer;color:var(--accent,#2d6da3)}.message-more[open]>.message-more-text{display:block}
 #file-status{color:#7b8798}
 footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;padding:3px 12px;background:#e2e8f1;border-top:1px solid #c2cddb;font-size:10px;color:#586c87;z-index:10}
