@@ -1,8 +1,9 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-import {validateProject,withoutStudy,projectStudy,STUDY_PROJECT_VERSION} from './workspace-project.mjs';
-import {readOpticalField,fieldScalars,FIELD_METADATA} from './workspace-field.mjs';
+import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
+import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
+import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
@@ -21,8 +22,13 @@ export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 // fractions and effective areas, runs without fields and a digest per run. A session that
 // version 7 can hold (every run has two real modes, its fields, nothing else) is still written
 // as version 7, byte for byte; version 9 is written once a run needs it.
+// Format 10 (open boundary, slice P2): format 9 with runs of optical-shapes-v9, whose settings
+// hold boundary "PML" and pml {thickness, open_edges, target}, the engine's candidate record
+// (open_boundary) and, when it ran, the PML check (pml_check). Written only when a run has an open
+// boundary or the inputs choose Open (inputs version 9); otherwise version 9 or 7, byte for byte.
 export const SESSION_VERSION=7;
 export const OPTICAL_SESSION_VERSION=9;
+export const OPEN_SESSION_VERSION=10;
 // The adapter of this Studio: optical-shapes-v8 builds the document of optical-shapes-v7 with the
 // mode count asked for (1 to 8). A version 7 run is a v8 run of two modes: its document is the same.
 export const OPTICAL_ADAPTER='optical-shapes-v8';
@@ -52,6 +58,7 @@ export function v7Settings(settings){return {...settings,adapter:V7_ADAPTER,mode
 function expectedSettings(settings,model,number){
  const adapter=settings?.adapter;
  if(adapter===V7_ADAPTER){studyRange(model.wavelength,model.coreMesh);return v7Settings(opticalSettings(model.wavelength,model.coreMesh));}
+ if(adapter===OPEN_ADAPTER){const closed=expectedSettings({...settings,adapter:OPTICAL_ADAPTER},model,number);return checkOpenSettings(settings,closed,model.shapes,number?'Run '+number:'This run');}
  if(adapter!==OPTICAL_ADAPTER)throw new Error('Unsupported run settings or input mismatch.');
  const n=settings.mode_count;
  if(!Number.isInteger(n)||n<MODE_COUNT_RANGE[0]||n>MODE_COUNT_RANGE[1])throw new Error(`${number?'Run '+number:'This run'} asks for ${typeof n==='number'&&Number.isFinite(n)?n:'an unknown number of'} modes; this Studio reads 1 to 8.`);
@@ -61,7 +68,7 @@ function expectedSettings(settings,model,number){
 export const runModeCount=run=>run.settings.mode_count;
 /** The signature of a run's study: its input text, and its mode count when it is not 2 (a run of
  * two modes keeps the signature of the input alone, as before mode counts could change). */
-export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT,groupIndex=false)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`)+(groupIndex===true?'\ngroup index':'');
+export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT,groupIndex=false,pml=null)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`)+(groupIndex===true?'\ngroup index':'')+(pml?`\nopen boundary ${pml.open_edges.join(' ')} near ${pml.target}`:'');
 /** A length written with its unit ("0.15 um", "150 nm", "1.5e-7 m") in micrometres, the page's display
  * unit, and its value in metres; a bare number is refused. */
 const LENGTH=/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?) (nm|um|m)$/i;
@@ -100,8 +107,9 @@ const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const valueList=(v,k,ok)=>Array.isArray(v)&&v.length===k&&v.every(x=>x===null||(Number.isFinite(x)&&ok(x)));
 const METHOD=/^[^\u0000-\u001f\u007f-\u009f]{1,64}$/;
 /** A run record, checked. format: 7 for a run of a version 6 or 7 file (two real modes, its
- * fields, nothing else read), 9 for a run of a version 9 file (all its keys checked), absent for
- * a run of this tab (a new result, or one read before). number: the run's place in a file. */
+ * fields, nothing else read), 9 or 10 for a run of a version 9 or 10 file (all its keys checked),
+ * absent for a run of this tab (a new result, or one read before). number: the run's place in a
+ * file. A run of optical-shapes-v9 (an open boundary) is read from version 10 files only. */
 export function validateRun(record,imported=false,{format=null,number=null}={}){
  const which=number?`Run ${number}`:'This run';
  if(!record||typeof record.job!=='string'||!/^[a-f0-9]{8}$/.test(record.job))throw new Error('Invalid run identifier.');
@@ -114,6 +122,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  if(record.input?.version===STUDY_PROJECT_VERSION)throw new Error('Unsupported run settings or input mismatch.');
  const input=validateProject(record.input);
  if(format===7&&record.settings?.adapter!==V7_ADAPTER)throw new Error('Unsupported run settings or input mismatch.');
+ if(format===10&&![OPTICAL_ADAPTER,OPEN_ADAPTER].includes(record.settings?.adapter))throw new Error(`${which}: unsupported run settings (a version 10 file writes ${OPTICAL_ADAPTER} or ${OPEN_ADAPTER}).`);
  if(format===9&&record.settings?.adapter!==OPTICAL_ADAPTER)throw new Error(`${which}: unsupported run settings (a version 9 file writes ${OPTICAL_ADAPTER}).`);
  const settings=expectedSettings(record.settings,input.model,number);
  if(!record.settings||Object.keys(record.settings).length!==Object.keys(settings).length||Object.keys(settings).some(k=>JSON.stringify(record.settings[k])!==JSON.stringify(settings[k])))throw new Error('Unsupported run settings or input mismatch.');
@@ -125,7 +134,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  else throw new Error('Invalid effective indices.');
  const k=re.length;
  if(format===7||settings.adapter===V7_ADAPTER?!finiteList(re,2):(k<1||k>asked||!finiteList(re,k)||(im!==null&&!finiteList(im,k))))throw new Error('Invalid effective indices.');
- if(format===9){
+ if(format===9||format===10){
   if(re.some((x,i)=>i>0&&x>re[i-1]))throw new Error(`${which}: its effective indices are not ranked by Re n_eff.`);
   if(re.some(x=>!(x>GUIDED_THRESHOLD)))throw new Error(`${which}: an effective index is not above n = ${GUIDED_THRESHOLD}.`);
  }
@@ -142,16 +151,26 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
    extra.group_index_method=record.group_index_method;
   }
  }
+ // an open run: the engine's candidate record (each mode one of its selected candidates), no
+ // group index, and the PML check when it ran; a closed run has neither
+ if(settings.adapter===OPEN_ADAPTER){
+  if(extra.group_index!==undefined)throw new Error(`${which}: a run with an open boundary has no group index.`);
+  if(im===null)throw new Error(`${which}: a run with an open boundary has complex effective indices.`);
+  const ob=checkCandidateRecord(record.open_boundary,which);
+  if(modeCandidates(ob,re,im).some(c=>c===null))throw new Error(`${which}: its modes are not the selected candidates of its open boundary record.`);
+  extra.open_boundary=ob;
+  if(record.pml_check!==undefined)extra.pml_check=checkPmlCheck(record.pml_check,k,which);
+ }else if(record.open_boundary!==undefined||record.pml_check!==undefined)throw new Error(`${which}: a closed window has no open boundary record.`);
  const f=record.field;let field=null;
  if(f==null){
   // only a version 9 file leaves fields out (absent there; null on a run read from one)
   if(format===7||settings.adapter===V7_ADAPTER||(format===null&&f===undefined))throw new Error('Missing run fields.');
   if(extra.te_polarization_fraction===undefined||extra.effective_area===undefined)throw new Error(`${which} has no fields and no saved TE fractions and effective areas.`);
  }else{
-  field=readOpticalField({node_coordinates:f.node_coordinates,field_units:{node_coordinates:'m'},triangles:f.triangles,vector_fields:[{...FIELD_METADATA,real:f.real,imag:f.imag}]},format===7?2:k);
+  field=readOpticalField({node_coordinates:f.node_coordinates,field_units:{node_coordinates:'m'},triangles:f.triangles,vector_fields:[{...(settings.adapter===OPEN_ADAPTER?PML_FIELD_METADATA:FIELD_METADATA),real:f.real,imag:f.imag}]},format===7?2:k,{open:settings.adapter===OPEN_ADAPTER});
   for(let mode=0;mode<k;mode++)fieldScalars(field,mode);
  }
- const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
+ const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined,settings.pml??null),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
  if(im!==null)run.effective_index_im=[...im];
  return Object.assign(run,extra);
 }
@@ -181,6 +200,7 @@ export function engineGroupIndexReasons(summary,k){
  return Array.isArray(r)&&r.length===k&&r.every(x=>x===null||typeof x==='string')?[...r]:null;
 }
 const RUN_KEYS_9=['job','completedAt','label','pinned','origin','serverVersion','settings','input','effective_index','field','te_polarization_fraction','effective_area','group_index','group_index_method','digest'];
+const RUN_KEYS_10=[...RUN_KEYS_9.slice(0,-1),'open_boundary','pml_check','digest'];
 /** Whether a version 7 file holds a run: two real modes with their fields and nothing else. */
 export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.mode_count===2&&run.effective_index.length===2&&!run.effective_index_im&&run.field!==null&&run.group_index===undefined);
 /** The record a file writes of a run. version 7: as before mode counts (the settings of
@@ -188,7 +208,7 @@ export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.
  * left out when keepField is false (the TE fractions and areas the run shows are then written),
  * and the digest of the record. */
 function sessionRun(run,version=SESSION_VERSION,keepField=true){
- const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_method,...record}=validateRun(run);
+ const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_method,open_boundary,pml_check,...record}=validateRun(run);
  const fields=field&&{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag};
  if(version===SESSION_VERSION)return {...record,settings:v7Settings(record.settings),field:fields};
  const settings=record.settings.adapter===V7_ADAPTER?{...record.settings,adapter:OPTICAL_ADAPTER}:record.settings;
@@ -200,10 +220,31 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true){
  if(effective_area||shown)out.effective_area=shown?shown.area:effective_area;
  if(group_index)out.group_index=group_index;
  if(group_index_method!==undefined)out.group_index_method=group_index_method;
+ if(open_boundary)out.open_boundary=open_boundary;
+ if(pml_check)out.pml_check=pml_check;
  return {...out,digest:recordDigest(out)};
 }
 // The TE fractions and effective areas a run shows (opticalModes keeps them on the run).
 const modeValues=run=>{const modes=opticalModes(run);return {te:modes.map(m=>m.fte),area:modes.map(m=>m.area)};};
+/** A run's part of the save and recovery stamps: what makes a saved file stale. The PML check
+ * arrives after its run, so it is part of it. */
+export const runStampEntry=r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])];
+/** The inputs a session opens with: its own when they hold study settings or an outer boundary
+ * (version 8 or 9), or when no run is selected; for an input of version 6 or 7, Modes to find and
+ * the group index option of the selected run, as before. The outer boundary is never taken from a
+ * run: only a version 10 file holds an open run, and it records the choice in its inputs. */
+export function sessionStudyInput(input,selected){
+ if([STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(input.version)||!selected)return input;
+ return withStudy(input,{modeCount:runModeCount(selected),groupIndex:selected.group_index_method!==undefined});
+}
+/** The runs with the PML check of run `job` stored, and the selected run (the same object unless
+ * it is that run). A run no longer kept cannot take its check: an error that says to detach. */
+export function withPmlCheck(runs,selected,job,check){
+ const run=runs.find(r=>r.job===job);
+ if(!run)throw Object.assign(new Error('The run of this PML check is no longer kept; the check is not stored. Detach this job.'),{code:'solver-failed'});
+ const checked=validateRun({...run,pml_check:check});if(Number.isInteger(run.inputRevision))checked.inputRevision=run.inputRevision;
+ return {runs:runs.map(r=>r===run?checked:r),selected:selected===run?checked:selected};
+}
 export function appendRun(runs,run){
  const previous=runs.find(r=>r.job===run.job);
  const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];
@@ -235,10 +276,12 @@ function readView(view){
   if(!inWindow(c.m,p?.axis==='x'?WINDOW_UM.ymax:WINDOW_UM.xmax))throw new Error('Invalid saved profile line.');out.profile={axis:p.axis,coordinate:c.um,open:p.open};}
  return validateView(out);
 }
-/** The version a session of these runs is written as: 7 when every run fits version 7 (and
- * every field is kept) and the input is of version 6 or 7, else 9 (an input of version 8, with
- * study settings, is held by version 9 only). */
+/** The version a session of these runs is written as: 10 when a run has an open boundary or the
+ * input chooses Open (version 9); else 7 when every run fits version 7 (and every field is kept)
+ * and the input is of version 6 or 7, else 9 (an input of version 8, with study settings, is
+ * held by version 9 only). */
 export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ if(input?.version===OPEN_PROJECT_VERSION||runs.some(isOpenRun))return OPEN_SESSION_VERSION;
  if(input?.version===STUDY_PROJECT_VERSION)return OPTICAL_SESSION_VERSION;
  return runs.every(run=>fitsVersion7(run)&&(!keep||keep.has(run.job)))&&validateView(view).mode<2?SESSION_VERSION:OPTICAL_SESSION_VERSION;
 }
@@ -293,7 +336,7 @@ export function captureSession(input,runs,selected,comparison,view){
  const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true});
  const make=()=>{make.note='';let out;
   try{out=write(capturedInput);}catch(error){
-   if(capturedInput.version!==STUDY_PROJECT_VERSION)throw error;
+   if(![STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(capturedInput.version))throw error;
    let plain;try{plain=write(withoutStudy(capturedInput));}catch{throw error;}
    out=plain;make.note=recoveryStudyNote(capturedInput);}
   if(!out.ok)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');return out.text;};
@@ -301,7 +344,7 @@ export function captureSession(input,runs,selected,comparison,view){
 }
 /** The note of a recovery kept without the study settings of these inputs (version 8). */
 export function recoveryStudyNote(input){
- const {modeCount,groupIndex}=projectStudy(input),parts=[...(modeCount===2?[]:[`Modes to find ${modeCount}`]),...(groupIndex?['the group index option']:[])];
+ const {modeCount,groupIndex}=projectStudy(input),openBoundary=projectBoundary(input),parts=[...(modeCount===2?[]:[`Modes to find ${modeCount}`]),...(groupIndex?['the group index option']:[]),...(openBoundary?['the outer boundary choice']:[])];
  return `Browser recovery kept this notebook without ${parts.join(' and ')}: a run read from an earlier file cannot be saved with ${parts.length>1?'them':'it'}. Set 2 modes and the option off, or remove that run, to keep them.`;
 }
 /** The refusal of a session file newer than a Studio reads (versions 6 to highest). */
@@ -309,7 +352,7 @@ export const newerVersionText=(version,highest)=>`This session file is version $
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
 /** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
  * accepts these, so a later version is added here only (workspace-project-file.mjs). */
-export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION]);
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION]);
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
@@ -321,24 +364,26 @@ export function parseSession(text,{recovered=false}={}){
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
   if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>OPTICAL_SESSION_VERSION)throw new Error(newerVersionText(doc.version,OPTICAL_SESSION_VERSION));
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>OPEN_SESSION_VERSION)throw new Error(newerVersionText(doc.version,OPEN_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
- const nine=doc?.version===OPTICAL_SESSION_VERSION;
+ const nine=doc?.version===OPTICAL_SESSION_VERSION||doc?.version===OPEN_SESSION_VERSION,ten=doc?.version===OPEN_SESSION_VERSION;
  if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
-  if(doc.application!=='optical')throw new Error('A version 9 session file holds an optical model (application "optical").');
+  if(doc.application!=='optical')throw new Error(`A version ${doc.version} session file holds an optical model (application "optical").`);
   const missing=TOP_KEYS_9.find(k=>!Object.hasOwn(doc,k));if(missing!==undefined)throw new Error(`The session file has no ${JSON.stringify(missing)}.`);
  }
  if(doc.input?.units?.width!=='nm'||doc.input?.units?.temperature!=='K'||doc.input?.units?.voltage!=='V')throw new Error('Invalid session input units.');
  // the input of a version 6 or 7 session is an input file of version 6 or 7; version 9 also
  // holds one of version 8 (with study settings)
- if(!nine&&doc.input?.version===STUDY_PROJECT_VERSION)throw new Error(`A version ${doc.version} session holds an input file of version 6 or 7.`);
+ // holds one of version 8 (with study settings), and version 10 one of version 9 (outer boundary)
+ if(!nine&&[STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(doc.input?.version))throw new Error(`A version ${doc.version} session holds an input file of version 6 or 7.`);
+ if(nine&&!ten&&doc.input?.version===OPEN_PROJECT_VERSION)throw new Error('A version 9 session holds an input file of version 6 to 8.');
  const input=validateProject(doc.input),runs=doc.runs.map((r,i)=>{
   let record=r;
   if(nine){
    if(!isObject(r))throw new Error(`Run ${i+1} is not a run record.`);
-   const unknown=Object.keys(r).find(k=>!RUN_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Run ${i+1}: unknown key ${JSON.stringify(unknown)}.`);
+   const unknown=Object.keys(r).find(k=>!(ten?RUN_KEYS_10:RUN_KEYS_9).includes(k));if(unknown!==undefined)throw new Error(`Run ${i+1}: unknown key ${JSON.stringify(unknown)}.`);
    for(const key of ['label','pinned','origin','serverVersion','settings','input','effective_index','digest'])if(!Object.hasOwn(r,key))throw new Error(`Run ${i+1}: missing ${key}.`);
    if(typeof r.label!=='string'||typeof r.pinned!=='boolean'||!['local','imported','recovered'].includes(r.origin))throw new Error(`Run ${i+1}: invalid name, pin state or origin.`);
    if(typeof r.digest!=='string'||r.digest!==recordDigest(r))throw new Error(`Run ${i+1} changed after it was saved (its check value does not match).`);
@@ -346,7 +391,7 @@ export function parseSession(text,{recovered=false}={}){
    // a version 6 or 7 run: its keys of version 7 only (any other key is not read, as before)
    record={job:r?.job,completedAt:r?.completedAt,label:r?.label,pinned:r?.pinned,origin:r?.origin,serverVersion:r?.serverVersion,settings:r?.settings,input:r?.input,effective_index:r?.effective_index,field:r?.field};
   }
-  const run=validateRun(record,true,{format:nine?9:7,number:i+1});if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
+  const run=validateRun(record,true,{format:ten?10:nine?9:7,number:i+1});if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');
  if(doc.selected!==null&&!ids.includes(doc.selected))throw new Error('Selected run is missing.');
  if(!Array.isArray(doc.comparison)||doc.comparison.length!==2||!doc.comparison.every(id=>id===null||ids.includes(id)))throw new Error('Invalid comparison selection.');

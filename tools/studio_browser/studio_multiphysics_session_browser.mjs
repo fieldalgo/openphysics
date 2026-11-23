@@ -552,7 +552,8 @@ print(n)`;
     ['S6 a baseline document changed', d => { d.baselines.modes1.document.physics.modes1.vacuum_wavelength = '1551 nm'; }, /The without-heater result of Modes 1 belongs to no run in this file and not to its model\./],
     // version 9 is an optical session since the number of modes: a newer file is version 10, and a
     // multiphysics layout under version 9 is refused by its first key
-    ['S7 version 10', d => { d.version = 10; }, /This session file is version 10, newer than this Studio reads \(versions 6–9\)\. Open it in a newer Studio\./],
+    // version 10 is the optical open boundary (slice P2): version 11 is the newer one
+    ['S7 version 11', d => { d.version = 11; }, /This session file is version 11, newer than this Studio reads \(versions 6–10\)\. Open it in a newer Studio\./],
     ['S7 a version 8 layout under version 9', d => { d.version = 9; }, /Unknown key "document" in the session file\./],
     ['S7 another application', d => { d.application = 'other'; }, /This session file holds a “other” model, which this Studio does not read\./],
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
