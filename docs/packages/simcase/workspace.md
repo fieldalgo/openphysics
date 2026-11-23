@@ -75,11 +75,11 @@ opens the previous menu), Escape closes one level and returns focus, and Tab clo
 
 | Item | Shortcut | What it does |
 |---|---|---|
-| **Open…** | Ctrl+O (⌘O) | Opens a session file or a model file of any model. The ribbon's **Open…** is the same. |
-| **Save** | Ctrl+S (⌘S) | Saves the session file. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads again under the model's current file name (the name chosen in Save As or Save, or the file opened) without asking. With no current file it asks, as Save As does. The ribbon's **Save** is the same. |
-| **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the session file under a name you choose; it starts with the current file name. |
-| **Export › Model file…** | | Downloads the model file (inputs only), named after the model, for example `optical-waveguide.json`. |
-| **Export › Model with runs (session file)…** | | The same as Save As. |
+| **Open…** | Ctrl+O (⌘O) | Opens a project file, a session file or a model file of any model. The ribbon's **Open…** and the Library's **Open file…** are the same. |
+| **Save** | Ctrl+S (⌘S) | Saves the [project file](#project-files): every model of the tab with its runs. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads again under the project file's name (the name chosen in Save As or Save, or the project file opened) without asking. With no project file it asks, as Save As does. The ribbon's **Save** is the same. |
+| **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the project file under a name you choose; it starts with the project file's name, else the project name's (`untitled-project.json` for an untitled project). |
+| **Export › Model file…** | | Downloads the model file of the model shown (inputs only), named after the model, for example `optical-waveguide.json`. |
+| **Export › Model with runs (session file)…** | | Saves the model shown with its runs to a session file, which older Studios open; it always asks for the name. |
 | **Browser copy › Save browser draft**, **Restore browser draft** | | Keep or restore the optical inputs in this browser only. |
 | **Edit › Reset design** | | Returns the model to its default design. |
 
@@ -87,14 +87,16 @@ What each kind of file holds:
 
 | Kind | Holds | Named | Made by |
 |---|---|---|---|
-| Session file | The model's inputs with its completed runs, their names and pins and the comparison (optical, version 9); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen in Save As | **File › Save**, **Save As…**, **Export › Model with runs (session file)…** |
+| Project file | Every model of the tab, each as its session file, in one file (version 1, [Project files](#project-files)). | The name chosen in Save As, `untitled-project.json` suggested for an untitled project | **File › Save**, **Save As…** |
+| Session file | One model's inputs with its completed runs, their names and pins and the comparison (optical, version 9); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | Model file | The model's inputs only: no runs and no computed results (optical, steady heat and Joule heating inputs, version 7 or 8; or a multiphysics document). | After the model, for example `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | Browser draft | The optical inputs, in this browser only (not a file). | — | **File › Browser copy › Save browser draft** |
 | Browser recovery | The newest sessions with completed runs, in this browser only (not a file). | — | Automatic ([notebook recovery](#automatic-notebook-recovery)) |
 
-The contents of both files are the same as before the File menu for the same model and runs; only
-their names and how they are saved changed. Messages calls an inputs-only file a *model file* and a
-file with runs a *session file*, never a project.
+Session files and model files are byte for byte what Studio wrote before project files for the same
+model and runs. Messages calls an inputs-only file a *model file*, one model with its runs a
+*session file* and the file of the whole tab a *project file*; "project" on screen means only that
+file.
 
 **Where Save As saves.** Where the browser has a save dialog for web pages
 (`showSaveFilePicker`, in a secure context: `http://127.0.0.1` and `http://localhost` qualify),
@@ -102,9 +104,9 @@ Save As opens it from your click or key press with the suggested name (the curre
 any) and one JSON file type, and writes the chosen file. It opens in the folder the browser last
 used for Studio (the picker `id` `openphysics-project`), or in the current file's folder once a
 file was chosen there (`startIn` is passed only then). Studio
-keeps the file it wrote, so **Save** writes it again without a dialog until another model or file
-is opened, the model is switched or the design is reset. Chromium replaces a kept file only when
-the write is finished, so a Save whose write fails leaves it as it was: *Session not saved: …
+keeps the file it wrote, so **Save** writes it again without a dialog until a file replaces the
+project. Chromium replaces a kept file only when
+the write is finished, so a Save whose write fails leaves it as it was: *Project not saved: …
 could not be written (…); the file is unchanged.* A file just chosen in the dialog may already
 have been created or emptied by the browser, so a failed first write says *…; the browser may
 have left it empty.* Closing the dialog says *Save As cancelled; nothing was written.* (*Save
@@ -120,12 +122,14 @@ download. **Download**
 hands the file to the browser: Messages then says *Session file <name> sent to your browser's
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
 Downloads folder already has a file of that name. Studio cannot know that a download was kept.
-Studio remembers the name as the model's **current file**, as it does the name of a file opened
+Studio remembers the name as the project's file, as it does the name of a project file opened
 with **File › Open…**: **Save** (and Ctrl+S) then downloads under it again without asking
 (*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name
-it <name> (1).json.*), and Save As starts with it. Opening another file or model, switching the
-model or **Reset design** drops it, as it drops a file kept from the save dialog. **Export › Model file…**
-always downloads.
+it <name> (1).json.*), and Save As starts with it. A file that replaces the project drops it, as it
+drops a file kept from the save dialog; switching models and **Reset design** keep it, since the
+project is the same. **Export › Model with runs (session file)…** keeps the same rules for each
+model's own session file name (the session file opened, or the name chosen there), and always asks.
+**Export › Model file…** always downloads.
 
 Browser support for the save dialog (`window.showSaveFilePicker`), checked on 2026-11-23 in
 [MDN browser-compat-data](https://github.com/mdn/browser-compat-data) 8.1.10 (data of 2026-11-19;
@@ -144,6 +148,111 @@ Automated or headless browsers (`navigator.webdriver`) cannot show the save dial
 the file under the name you give. The API is marked experimental in the data. The real dialog of desktop Chrome is not driven by the
 automated checks: they replace `showSaveFilePicker` at its boundary (see the
 [development guide](../../development.md)).
+
+## Project files
+
+A **project file** holds every model of a Studio tab, so one file brings back the optical waveguide
+and the heated silicon waveguide with their runs. **File › Save** and **Save As…** write it, and
+**File › Open…** reads it. A project holds the workspace model (the optical, steady heat or Joule
+heating inputs, with the optical runs) once one of its cards was chosen or a workspace file opened,
+and the multiphysics model once one was opened.
+
+**The project in the tab.** The title bar names the project and its file in the words of the
+indicator:
+
+- *Heater study · heater-study.json · saved 13:15* after the browser's save dialog wrote it;
+- *Heater study · heater-study.json · downloaded 13:15* after a download, with *Your browser may
+  have added “ (1)” to the file name.* as its title text;
+- *Heater study · heater-study.json · opened* after File › Open;
+- *Heater study · heater-study.json · changed since saved 13:15 · kept for recovery in this browser*
+  once a model changed;
+- *Untitled project · not saved to a file · kept for recovery in this browser* before the first save.
+
+"Changed" counts the inputs, study settings, runs, names, pins and comparisons of every model and
+the project name; a page, the view or the selected run is not a change. The footer keeps the
+indicator of the model shown, as before. The Library is headed by the same line, in its title row, and
+the **Project name** field with **Rename** sits at the right of its **Open file…** row (one row, so
+the cards and their restore offers stay in the first screen): 1 to 80 characters, no control characters, trimmed; an empty name is
+refused by name and the field shows the name kept. A rename is written on the next File › Save. An
+untitled project takes the chosen file's name without `.json` when it is first saved (`design-a-ng.json`
+names it *design-a-ng*); Save As does not rename a named project.
+
+**Switching models.** Choosing another card keeps every model in the tab: the card of a model in the
+project but not shown reads *In this project · N runs*, and choosing it shows that model as it was
+left, with its runs and its own Undo. Nothing is asked. The leave question guards only a file that
+replaces the project: *Replace Heater study? Optical waveguide (2 runs) and Heated silicon waveguide
+(1 run) have runs in no file. Save project first to keep them.*, with **Cancel**, **Save project,
+then open** and **Open without saving**.
+
+**Save.** Each model's session is written by its own writer, so it is the session file Studio writes
+for that model. The 16 MiB question of a session file is asked for each model and names it (for
+example *Heated silicon waveguide: Session is 22 MB; the limit is 16 MiB. Keep the maps…*). The whole
+file is at most 64 MiB; a save over it is refused and names the models to export, for example *The
+project is 71 MB, over the 64 MiB limit. Export Heated silicon waveguide (22 MB) to its own file, or
+remove runs.* (Two models of at most 16 MiB each cannot reach it today.) One notice names every model:
+*Saved Heater study to heater-study.json: Optical waveguide (2 runs, the comparison) and Heated
+silicon waveguide (1 run, the without-heater result).*, or *Project file heater-study.json sent to
+your browser's Downloads: …*, then any runs left without fields or maps. Only **Export › Model with
+runs (session file)…** says that the other model's runs are not in its file.
+
+**Open.** File › Open reads a project file only after every check has passed, before anything in the
+tab changes; one failure refuses the whole file with *Project not opened: <reason> The current project
+is unchanged.*, and the workspace, its runs and Undo stay as they were. The checks, in order:
+
+1. the size, at most 64 MiB, before the text is parsed; valid JSON, a leading byte order mark removed;
+2. the envelope: `format`, `version` (a newer one is refused by name: *This project file is version 2,
+   newer than this Studio reads (version 1). Open it in a newer Studio.*), no unknown key, the types,
+   1 to 8 models with unique ids, at most one workspace model, and `active` naming one of them;
+3. for each model, its kind against its session's version, then the session's text rebuilt from the
+   file and its size and SHA-256 compared with the entry's (*Heated silicon waveguide changed after it
+   was saved (its check value does not match).*), then the session read as a session file is, every
+   message after the model's title;
+4. the server's check of each multiphysics model, as Open session does; without the server nothing opens.
+
+Results read from a project are marked as from a file (*Loaded from file, not recomputed. Results match
+the file's checksum.*), and opening never starts a run. A session file or a model file opened with File ›
+Open opens as before and becomes an untitled project holding that one model; Save then asks for a name
+and never writes a project file over the session file's name. A restore from this browser (the
+Library's per-card **Restore from this browser**) replaces that one model inside the project and does
+not set the project file.
+
+**The file.** One compact JSON object, its keys in this order:
+
+```json
+{"format":"openphysics-studio-project","version":1,"name":"Heater study","savedAt":"2026-11-23T13:15:00.000Z","studio":"0.0.2","active":"m2","models":[
+ {"id":"m1","kind":"workspace","title":"Optical waveguide","card":"optical","bytes":7422,"digest":"sha256:…","session":{…}},
+ {"id":"m2","kind":"multiphysics","title":"Heated silicon waveguide","card":"heated-waveguide","bytes":396949,"digest":"sha256:…","session":{…}}]}
+```
+
+(shown on several lines here; the file has none). `name` is the project's name (1 to 80 characters,
+not the file name). `savedAt` and `studio` are for display only. `active` is the id of the model shown
+on open. Each model has an `id` (`m` and 1 to 3 digits, kept across saves), a `kind` (`workspace`:
+an optical session of version 6, 7 or 9, the versions the session reader reads; `multiphysics`: a
+session of version 8, one per tab in this Studio, up to 7 in a version 1 file), a `title` and a
+`card` (`optical`, `heat`, `joule`, `heated-waveguide` or `null`) for display, and its `session`,
+unchanged: written alone by its writer it is byte for byte the session file Studio writes (version 7
+through `JSON.stringify`, versions 8 and 9 with negative zero kept as `-0.0`). `bytes` and `digest`
+are the UTF-8 length and `sha256:` of that text. They detect a damaged or edited file; they do not
+authenticate it, as the per-run digests inside versions 8 and 9 do not. Each model is at most 16 MiB,
+so every model still exports as a session file older Studios open. Not in version 1: comparisons
+across models, heat and Joule heating results (their inputs are in the workspace model), undo
+history, the provider list, failed or stopped runs. Browser recovery keeps its records per model, as
+before; it does not restore a whole project.
+
+**Older Studios.** A project file needs this Studio or a newer one. An older Studio refuses it with its
+own message (*Session open failed: Unsupported session format or run count. …*) and keeps its
+workspace. **File › Export › Model with runs (session file)…** writes a file older Studios open.
+
+**Checks.** `tests/simcase/studio_project_file.cjs` checks the format: a save, open and save again
+byte-identical with −0.0, a subnormal, 1e308 and integers above 2^31 (V-P1); each entry's size and
+SHA-256 equal to node:crypto's, and to Python's hashlib in `tests/simcase/test_studio_project_file.py`
+(V-P2); each reading check refused by its message (V-P3); and the 16 and 64 MiB limits at ±1 byte,
+the 64 MiB one before parsing (V-P6). `tools/studio_browser/studio_project_browser.mjs` runs the
+browser steps at 1440 × 900 and 390 × 844 by role and accessible name: the two models run, the project
+named *Heater study* and saved under its suggested name `heater-study.json`, the server restarted and a new browser profile, File › Open, and both models read
+back the same values with no run started (V-P7, V-P13); Save again under the remembered name (V-P11);
+the save dialog stubbed at `window.showSaveFilePicker` (V-P10); three damaged files refused with the
+tab unchanged (V-P3). With `--old-python`, it also opens the file in an older Studio (V-P9).
 
 ## First optical study
 
@@ -220,8 +329,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    B mode 1), with both polarizations, the overlap, n_eff of A and B, Δn_eff (B − A), Δ % of A,
    A_eff, absorption loss and n_g of A and B; the line above it names each run (name, size, λ).
    n_eff has 8 decimals everywhere (results, mode list, Compare).
-6. **Save** (**File › Save**, Ctrl+S), the first save button, creates a portable session file with the model,
-   retained results and view settings, named from the application and the local
+6. **Save** (**File › Save**, Ctrl+S), the first save button, creates a portable [project file](#project-files)
+   with every model of the tab, its retained results and view settings; **File › Export › Model with runs
+   (session file)…** writes this model alone, named from the application and the local
    date-time (for example `optical-waveguide-session-2026-11-21-1305.json`) in the
    browser's Downloads (Studio's name dialog lets you change the name), or written to the file
    you choose in the browser's save dialog where it has one
@@ -266,11 +376,11 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    Studio restart, the start page shows **Continue where you left off** with
    **Restore from this browser: Last session in this browser …** and any earlier ones
    (**Restore earlier from this browser: …**) and **Not now (choose a model below)**, which only
-   closes the box. **Open session file…** has one
-   fixed place, at the top of the Library above the box and the cards, whatever they offer,
-   with the note that a session file is the copy that moves between computers; browser
+   closes the box. **Open file…** has one
+   fixed place, at the top of the Library (the project name at the right of its row) and above the box and the cards,
+   whatever they offer, with the note that a project file is the copy that moves between computers; browser
    recovery stays in this browser. It does what **File › Open…** does. The Library page has one phrase for browser recovery,
-   *Restore from this browser*; **Open session file…** is for files. A restore opens the page
+   *Restore from this browser*; **Open file…** is for files. A restore opens the page
    shown when the record was written (Model, Results or Compare) with the run that was
    selected; a record written before Studio kept the page, and an opened session file (which
    names no page), open Compare for two runs or more, else Results. Over a workspace with default
@@ -659,23 +769,25 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   when a new run arrives the oldest unpinned run is replaced. Selecting a run shows its result
   and its freshness line; it does not change the model. With six pinned runs, Run says to unpin
   one first.
-- **Files.** **File › Save** writes the model with its runs, their names and pins and the
-  without-heater results to one file, `<model-name>-session-YYYY-MM-DD-HHMM.json` (the model
+- **Files.** **File › Save** writes the [project file](#project-files), every model of the tab.
+  **File › Export › Model with runs (session file)…** writes this model with its runs, their names
+  and pins and the without-heater results to one file, `<model-name>-session-YYYY-MM-DD-HHMM.json` (the model
   name lowercased, other characters as hyphens, at most 40 characters, else `multiphysics`),
   described in [Session files of multiphysics models](#session-files-of-multiphysics-models-version-8).
-  When the tab also holds Optical waveguide runs, the save message says they are not in this
-  file: “The 2 Optical waveguide runs of this tab are not in this file; Library › Optical
-  waveguide, then File › Save, keeps them in their own file.”
+  When the tab also holds Optical waveguide runs, that message says they are not in this
+  file: “The 2 Optical waveguide runs of this tab are not in this file; File › Save keeps them
+  with this model in one project file.”
   **File › Open…** opens such a file, an optical session, or a model file alone (“Opened model
   file …: it holds the model but no runs.”). **File › Export › Model file…** writes the document
-  alone, as a model file named after the model. The title uses the optical
-  words: “Not saved to a file · kept for recovery in this browser”, “heated-silicon-waveguide-session-….json · downloaded 10:15”, “Opened …”, “Recovered from this browser”. Before leaving a model
-  whose runs no session file holds (another model card, the template again, an opened file or
-  inputs), Studio asks first: “Leave this model? 3 runs are only in this tab and in browser
-  recovery. Save session first to keep them in a file.”, with **Cancel**, **Save session** and
-  **Leave**. Opening a multiphysics model over optical runs that are in no session file names
-  them the same way and offers **Save session, then continue**; those runs stay in the tab and
-  come back with the optical model. The graphics footer names the geometry's length unit
+  alone, as a model file named after the model. The footer uses the optical
+  words: “Not saved to a file · kept for recovery in this browser”, “heated-silicon-waveguide-session-….json · downloaded 10:15”, “Opened …”, “Recovered from this browser”;
+  the title bar names the [project](#project-files). Another model card keeps this model in the
+  project: its card then reads “In this project · N runs” and shows it again, runs and Undo
+  included, and nothing is asked. A file that replaces the project asks first when runs are in no
+  file (“Replace … ? Heated silicon waveguide (3 runs) has runs in no file. Save project first to
+  keep them.”). A browser restore of this model over runs in no file asks “Leave this model? 3
+  runs are only in this tab and in browser recovery. Save session first to keep them in a file.”,
+  with **Cancel**, **Save session** and **Leave**. The graphics footer names the geometry's length unit
   (“Lengths in µm; …”). An
   opened file is read by the server first, so a duplicate key or text that is not JSON is
   refused by name; a saved file writes each number in its shortest form. A sweep is checked,
