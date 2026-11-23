@@ -28,6 +28,72 @@ def search_count(pml, num_modes):
     return int(pml['search_count']) if 'search_count' in pml else max(2*num_modes,6)
 
 
+#: the rule that makes a candidate of a later search a duplicate of an earlier one (pml.additional_searches)
+DUPLICATE_RULE = {"effective_index_distance": 1e-9, "field_overlap": 0.99,
+                  "overlap_metric": "computational_transverse_electric_l2", "degenerate_span": 0.99}
+
+
+def transverse_gram(mesh, edges, et):
+    """The Hermitian Gram matrix <a, b> of the candidates' transverse edge coefficients ``et`` (m, E)
+    with the edge mass matrix of the whole computational ``mesh``: the transverse part of
+    subspace_tracking's electric L2 product (its longitudinal part is left out)."""
+    from .subspace_tracking import ElectricMetric
+    field = VectorField(edges, et.T, np.zeros((mesh.num_nodes, len(et)), complex),
+                        np.zeros((0, len(et), 3), complex))
+    return ElectricMetric(mesh).product(field, field)
+
+
+def _merge(records, acceptable, n, gram, origin, num_modes):
+    """Mark the duplicates of a merged search and select the eligible ones by descending Re n_eff.
+
+    Candidate b of a later search is a duplicate of an earlier kept candidate a (one of an earlier
+    search, itself no duplicate, eligible or not) when |n_b - n_a| <= 1e-9 max(1, |n_a|) and
+    eta_w(a, b) = |<a, b>| / (||a|| ||b||) >= 0.99, the inner product of the transverse edge
+    coefficients with the edge mass matrix of the whole computational mesh. When several earlier
+    candidates lie within the index tolerance, b is a duplicate when its projection on their span
+    holds at least 0.99 of its squared norm, h^H G^-1 h = ||L^-1 h||^2 with G = L L^H (``gram`` is
+    ``transverse_gram``); when their Gram matrix is not positive definite the single overlap decides.
+    Returns the selected indices (descending Re n_eff)."""
+    from scipy.linalg import cholesky, solve_triangular
+    norms=np.sqrt(np.maximum(np.diag(gram).real,0.))
+    duplicate=np.zeros(len(n),bool)
+    for j in range(len(n)):
+        if origin[j]==1: continue
+        near=[i for i in range(j) if origin[i]<origin[j] and not duplicate[i]
+              and abs(n[j]-n[i])<=DUPLICATE_RULE['effective_index_distance']*max(1.,abs(n[i]))]
+        if not near or norms[j]==0: continue
+        overlap=np.array([abs(gram[i,j])/(norms[i]*norms[j]) if norms[i]>0 else 0. for i in near])
+        best=int(np.argmax(overlap))
+        span=len(near)>1
+        if span:
+            try:
+                projected=solve_triangular(cholesky(gram[np.ix_(near,near)],lower=True),gram[near,j],lower=True)
+            except np.linalg.LinAlgError:
+                span=False              # earlier candidates not independent: the single overlap decides
+        if span:
+            fraction=float(np.sum(abs(projected)**2)/gram[j,j].real)
+            found=fraction>=DUPLICATE_RULE['degenerate_span']
+            measure=float(np.sqrt(max(fraction,0.)))
+        else:
+            found=overlap[best]>=DUPLICATE_RULE['field_overlap']
+            measure=float(overlap[best])
+        if not found: continue
+        duplicate[j]=True
+        a=near[best]
+        records[j].update(duplicate_of=a+1,duplicate_effective_index_distance=float(abs(n[j]-n[a])),
+                          duplicate_field_overlap=measure)
+        if span: records[j]['duplicate_span']=[i+1 for i in near]
+        records[j]['reasons']=records[j]['reasons']+['duplicate_candidate']
+    eligible=[i for i in acceptable if not duplicate[i]]
+    keep=np.array(sorted(eligible,key=lambda i:(-n[i].real,i))[:num_modes],dtype=int)
+    for i in eligible:
+        records[i]['selected']=bool(i in keep)
+        records[i]['reasons']=['selected_descending_real_index' if i in keep else 'outside_requested_count']
+    for i,record in enumerate(records):
+        records[i]=dict(candidate=record.pop('candidate'),search=int(origin[i]),**record)
+    return keep
+
+
 def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion=None):
     """With ``motion`` (a galerkin MeshMotion of the nodes in the mesh's unit; internal:
     simcase.shape_derivative), the modes are chosen from the numbers on the moved mesh exactly as
@@ -40,7 +106,7 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         raise ValueError('PML modes require explicit positive n_target')
     from .pml_contract import validate
     lo, hi = mesh.nodes.min(axis=0), mesh.nodes.max(axis=0)
-    settings = dict(pml=pml, n_target=n_target, boundary=boundary, num_modes=num_modes)
+    settings = dict(pml=pml, n_target=n_target, boundary=boundary, num_modes=num_modes, formulation=formulation)
     if bend is not None: settings["bend"] = bend
     validate(settings, dict(xmin=lo[0], xmax=hi[0], ymin=lo[1], ymax=hi[1]), "modes", ValueError)
     c=coordinates(mesh,pml,bend)
@@ -53,6 +119,7 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
             raise ValueError('PML outer faces must use PEC truncation')
     fixed=np.unique(np.concatenate([mesh.boundary[s] for s in sides])) if sides else np.zeros(0,int)
     search=search_count(pml,num_modes)
+    extra=pml.get('additional_searches') or []
     if formulation=='vector':
         space=EdgeSpace(scaled)
         ids={tuple(e):i for i,e in enumerate(space.edges)}
@@ -61,6 +128,16 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         search=min(search,len(free)-2)
         if search<1: raise ValueError('mesh has too few free degrees of freedom')
         n,space,et,ez=solve_modes(scaled,eps,k0,n_target,search,pec_nodes=fixed,pec_edges=edges,coordinate_factors=c.factors)
+        searches=[dict(search=1,n_target=float(n_target),search_count=int(search),candidate_count=len(n))]
+        origin=np.ones(len(n),int)
+        for k,further in enumerate(extra,start=2):
+            # the same mesh and pencil, one factorization per target; candidates numbered in order
+            count=min(int(further['search_count']),len(free)-2)
+            nk,_,etk,ezk=solve_modes(scaled,eps,k0,further['n_target'],count,pec_nodes=fixed,pec_edges=edges,
+                                     coordinate_factors=c.factors)
+            searches.append(dict(search=k,n_target=float(further['n_target']),search_count=count,candidate_count=len(nk)))
+            n,et,ez=np.concatenate([n,nk]),np.concatenate([et,etk]),np.concatenate([ez,ezk])
+            origin=np.concatenate([origin,np.full(len(nk),k)])
         a,b,_=assemble_mode_system(scaled,eps,k0,space=space,coordinate_factors=c.factors)
         x=np.concatenate([et*(k0*n[:,None]),ez],axis=1).T
         # Computational components in PML are artificial; the real-window
@@ -110,16 +187,21 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
                             pencil_residual=float(residual[i]),physical_l2_fraction=float(fraction[i]),
                             pml_l2_fraction=float(1-fraction[i]),reasons=reasons,selected=False,
                             attenuation_status='numerically_unresolved' if abs(value.imag)<=1e-10*max(1.,abs(value.real)) else 'resolved_sign'))
-    keep=np.array(sorted(acceptable,key=lambda i:abs(n[i]-n_target))[:num_modes],dtype=int)
-    keep=keep[np.argsort(-n[keep].real)]
-    for i in acceptable:
-        records[i]['selected']=bool(i in keep)
-        records[i]['reasons']=['selected_near_target' if i in keep else 'outside_requested_count']
+    if extra:
+        keep=_merge(records,acceptable,n,transverse_gram(scaled,space.edges,et),origin,num_modes)
+    else:
+        keep=np.array(sorted(acceptable,key=lambda i:abs(n[i]-n_target))[:num_modes],dtype=int)
+        keep=keep[np.argsort(-n[keep].real)]
+        for i in acceptable:
+            records[i]['selected']=bool(i in keep)
+            records[i]['reasons']=['selected_near_target' if i in keep else 'outside_requested_count']
     diagnostics=dict(schema='openphysics.pml-candidates/1',candidates=records,
                      selected_candidates=(keep+1).tolist(),min_physical_fraction=float(threshold),
                      residual_limit=1e-8,stability='not_checked',classification='heuristic_candidates',
                      physical_bounds=c.physical_bounds.tolist(),normalization_region='physical',
                      fraction_metric='positive_computational_transverse_and_interpolated_physical_longitudinal_l2')
+    if extra:
+        diagnostics.update(searches=searches,selection='descending_real_index',duplicate_rule=dict(DUPLICATE_RULE))
     diagnostics.update(requested_modes=num_modes, returned_modes=len(keep))
     if not len(keep):
         raise ModeSelectionError(f'PML search accepted {len(keep)} of {num_modes} requested modes; inspect diagnostics, target and physical fraction threshold',diagnostics)
@@ -146,6 +228,8 @@ def _solve_moving(mesh, eps, wavelength, boundary, num_modes, formulation, n_tar
     from galerkin.shape import MeshMotion, motion_step
 
     from .physics_em_modes2d import _numbers
+    if pml.get('additional_searches'):
+        raise ValueError("a mesh motion is refused with pml additional_searches: one target is searched")
     if bend is not None:
         raise ValueError("a mesh motion is refused with a bend: its coordinate factor depends on every node position")
     if formulation != "vector":

@@ -13,8 +13,9 @@ def validate(p, domain, where, error):
     if 'pml' not in p: return
     if 'n_target' not in p: fail('pml requires explicit positive n_target')
     c=p['pml']
-    if not isinstance(c,dict) or set(c)-{'thickness','strength','order','min_physical_fraction','search_count'}:
-        fail('pml accepts thickness, strength, order, min_physical_fraction and search_count')
+    if not isinstance(c,dict) or set(c)-{'thickness','strength','order','min_physical_fraction','search_count',
+                                         'additional_searches'}:
+        fail('pml accepts thickness, strength, order, min_physical_fraction, search_count and additional_searches')
     widths=c.get('thickness')
     if not isinstance(widths,dict) or not widths or set(widths)-{'left','right','bottom','top'}:
         fail('pml.thickness must map domain faces to lengths')
@@ -36,6 +37,23 @@ def validate(p, domain, where, error):
         if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=64:
             fail('pml.search_count must be an integer from 1 to 64')
         if 'num_modes' in p and count<p['num_modes']: fail('pml.search_count must be at least num_modes')
+    if 'additional_searches' in c:
+        searches=c['additional_searches']
+        if not isinstance(searches,list) or not 1<=len(searches)<=3:
+            fail('pml.additional_searches must list 1 to 3 further searches')
+        if p.get('formulation','vector')!='vector':
+            fail('pml.additional_searches is read with the vector formulation only')
+        targets=[p['n_target']]
+        for i,s in enumerate(searches):
+            label=f'pml.additional_searches[{i}]'
+            if not isinstance(s,dict) or set(s)!={'n_target','search_count'}:
+                fail(f'{label} gives n_target and search_count')
+            number(s['n_target'],label+'.n_target',True)
+            if s['n_target'] in targets: fail(f'{label}.n_target is already searched')
+            targets.append(s['n_target'])
+            count=s['search_count']
+            if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=64:
+                fail(f'{label}.search_count must be an integer from 1 to 64')
     if 'bend' in p:
         b=p['bend']
         if not isinstance(b,dict) or set(b)-{'radius','axis','origin'}: fail('bend accepts radius, axis, origin')
