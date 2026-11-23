@@ -179,9 +179,16 @@ test('review: a check whose selected modes are all at or below 1.45 still pairs 
  const rec=R.checkResultRecord(result);
  assert.deepEqual(R.pairCheck([1.77],[1.36e-8],[rec]).paired,[{re:1.77,im:1.4e-8}]);
 });
-test('review: the group index box is locked only with an open edge',()=>{
- assert.equal(R.groupIndexLocked(R.openChoice()),true);assert.equal(R.groupIndexLocked(null),false);
- assert.equal(R.groupIndexLocked({edges:{left:'closed',right:'closed',bottom:'closed',top:'closed'}}),false);
+test('slice P3: the group index is no longer locked with an open edge; the PML check documents leave it out',()=>{
+ assert.equal(R.groupIndexLocked,undefined);assert.equal(R.GROUP_INDEX_OPEN_NOTE,undefined);
+ const doc={physics:{em1:{pml:{pml_strength:3,pml_search_mode_count:32},target_effective_index:2.46}},results:{plots:false,group_index:{wavelength_step:'1 nm'}}};
+ const docs=R.checkDocuments(doc,[2.4429,1.77]);
+ assert.deepEqual(docs.map(d=>d.results),[{plots:false},{plots:false}]);assert.deepEqual(doc.results.group_index,{wavelength_step:'1 nm'});
+ assert.deepEqual(docs.map(d=>[d.physics.em1.pml.pml_strength,d.physics.em1.target_effective_index]),[[6,2.4429],[6,1.77]]);
+});
+test('slice P3: the engine values of a new open result follow the modes Studio keeps',()=>{
+ assert.deepEqual(R.keptValues({te_polarization_fraction:[0.98,0.5,0.04],group_index:[4.19,null,3.73],group_index_im:[1e-10,null,1e-8],group_index_method:'central_difference 1 nm electric-l2-assignment-v1'},[0,2]),
+  {te_polarization_fraction:[0.98,0.04],group_index:[4.19,3.73],group_index_im:[1e-10,1e-8],group_index_method:'central_difference 1 nm electric-l2-assignment-v1'});
 });
 
 // -- Compare ----------------------------------------------------------------------------------
@@ -190,15 +197,49 @@ test('Compare: run names say (closed) or (open, PML 1 µm); the loss note when t
  assert.equal(R.boundaryName({settings:{boundary:'PML'}}),'(open, PML 1 µm)');
  assert.equal(R.COMPARE_LOSS_NOTE,'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
 });
-test('matching with an open run is off (V13 failed): every mode of A and of B is listed, not matched',()=>{
- // V13, run blind on the template (closed A, open B): overlaps 0.9903 and 0.9875 on the physical window, below 0.99
- const open={settings:{boundary:'PML'},effective_index:[2.44,1.77]},closed={settings:N.opticalSettings(),effective_index:[2.44,1.77]};
+// Slice P3: matching with an open run is on, on its physical window. Replaces P2's "matching is off"
+// test (V13 failed blind at 0.99; the criteria registered after that result, V13a-c, pass:
+// tests/simcase/test_open_boundary_mode_identity.py).
+// A square mesh of n x n cells over [-h, h]^2 (metres), two modes: E_x = 1 and E_y = 1 per triangle.
+function squareRun(n,h,open=null){
+ const X=[],T=[];for(let j=0;j<=n;j++)for(let i=0;i<=n;i++)X.push([-h+2*h*i/n,-h+2*h*j/n]);
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const p=j*(n+1)+i;T.push([p,p+1,p+n+2],[p,p+n+2,p+n+1]);}
+ const mode=c=>T.map(()=>c===0?[1,0,0]:[0,1,0]),zero=()=>T.map(()=>[0,0,0]);
+ const run={settings:open?{boundary:'PML'}:N.opticalSettings(),input:{model:{coreMesh:30}},effective_index:[2.44,1.77],field:{node_coordinates:X,triangles:T,real:[mode(0),mode(1)],imag:[zero(),zero()]}};
+ if(open)run.open_boundary={physical_bounds:{unit:'m',values:open}};
+ return run;
+}
+test('slice P3: an open run is matched on its physical window (the triangles inside physical_bounds)',()=>{
+ const closed=squareRun(10,1e-6),open=squareRun(20,2e-6,[[-1e-6,-1e-6],[1e-6,1e-6]]);
+ const side=X.matchSide(open);
+ // the 10 x 10 inner cells of the 20 x 20 mesh: 200 triangles, and the window is the physical one
+ assert.equal(side.field.triangles.length,200);assert.deepEqual(side.window,{x0:-1e-6,x1:1e-6,y0:-1e-6,y1:1e-6});
+ assert.equal(side.field.real[0].length,200);assert.equal(X.matchSide(closed).window,undefined);
  for(const [a,b] of [[closed,open],[open,closed],[open,open]]){
-  const m=X.opticalMatch(a,b);assert.equal(m.disabled,'Matching with an open boundary comes in a later version');assert.deepEqual(m.pairs,[]);
-  assert.deepEqual(X.compareMatchRows(m).map(r=>r.text),['A mode 1: not matched (matching with an open boundary comes in a later version)','A mode 2: not matched (matching with an open boundary comes in a later version)',
-   'B mode 1: not matched (matching with an open boundary comes in a later version)','B mode 2: not matched (matching with an open boundary comes in a later version)']);
-  assert.deepEqual(X.fieldChoices(m),[]);
+  const m=X.opticalMatch(a,b);assert.equal(m.disabled,undefined);
+  assert.deepEqual([m.grid.x0,m.grid.x1,m.grid.y0,m.grid.y1],[-1e-6,1e-6,-1e-6,1e-6]);
+  assert.deepEqual(m.pairs.map(p=>[p.unitA,p.unitB,p.accepted,Number(p.eta.toFixed(12))]),[[[0],[0],true,1],[[1],[1],true,1]]);
+  assert.deepEqual(X.compareMatchRows(m).map(r=>r.kind),['match','match']);
  }
+});
+test('slice P3: an open run without physical bounds is listed unmatched, with the reason',()=>{
+ const closed=squareRun(4,1e-6),open=squareRun(4,1e-6,[[-1e-6,-1e-6],[1e-6,1e-6]]);delete open.open_boundary;
+ const m=X.opticalMatch(closed,open);assert.equal(m.disabled,'An open run without its physical window is not matched');assert.deepEqual(m.pairs,[]);
+ assert.deepEqual(X.compareMatchRows(m).map(r=>r.text),['A mode 1: not matched (an open run without its physical window is not matched)','A mode 2: not matched (an open run without its physical window is not matched)',
+  'B mode 1: not matched (an open run without its physical window is not matched)','B mode 2: not matched (an open run without its physical window is not matched)']);
+});
+test('slice P3: Studio computes an open run\'s TE fraction and effective area on its physical window',()=>{
+ const open=squareRun(20,2e-6,[[-1e-6,-1e-6],[1e-6,1e-6]]);
+ // TE outside the window, so a whole-mesh sum would differ
+ open.field.real[1]=open.field.real[1].map((v,k)=>M.physicalWindow(open.field,[[-1e-6,-1e-6],[1e-6,1e-6]])[k]?v:[1,0,0]);
+ const modes=M.opticalModes(open);
+ assert.deepEqual(modes.map(m=>m.fte),[1,0]);assert.ok(Math.abs(modes[0].area/4e-12-1)<1e-12);
+ assert.equal(open.te.source,'studioWindow');assert.equal(M.SOURCE_TEXT.studioWindow,'computed by Studio from the saved field on the physical window (PML excluded)');
+ const none=squareRun(4,1e-6,[[-1e-6,-1e-6],[1e-6,1e-6]]);delete none.open_boundary;
+ assert.deepEqual(M.opticalModes(none).map(m=>[m.fte,m.area]),[[null,null],[null,null]]);assert.equal(none.te.source,'noWindow');
+ // the engine's values, when the run has them
+ const engine=squareRun(4,1e-6,[[-1e-6,-1e-6],[1e-6,1e-6]]);engine.te_polarization_fraction=[0.98,0.05];engine.effective_area=[1.9e-13,3.4e-13];
+ assert.deepEqual(M.opticalModes(engine).map(m=>[m.fte,m.area]),[[0.98,1.9e-13],[0.05,3.4e-13]]);assert.equal(engine.te.source,'engineWindow');
 });
 
 // -- V15 Files --------------------------------------------------------------------------------
@@ -212,9 +253,12 @@ test('inputs version 9: written only when Open is chosen, round-trips bit for bi
  const edited=P.withStudy(base,{openBoundary:{edges:ALL,target:2.3}});assert.equal(edited.model.openBoundary.target,2.3);assert.equal(JSON.stringify(P.parseProject(JSON.stringify(edited))),JSON.stringify(edited));
  assert.deepEqual(P.projectBoundary(edited),{edges:ALL,target:2.3});assert.equal(P.projectBoundary(base),null);
  assert.equal(JSON.stringify(P.withoutStudy(edited)),JSON.stringify(base));
+ // slice P3: the group index with an open boundary (was refused by name); it round-trips
+ const both=P.withStudy(base,{groupIndex:true,openBoundary:{edges:ALL,target:null}});
+ assert.deepEqual([both.version,both.model.groupIndex],[9,true]);assert.equal(JSON.stringify(P.parseProject(JSON.stringify(both))),JSON.stringify(both));
  const doc=JSON.parse(JSON.stringify(edited));
  for(const [f,message] of [[d=>{delete d.model.openBoundary;},/holds an outer boundary/],[d=>{d.model.openBoundary.target=2.3456;},/Invalid Search near n_eff/],[d=>{d.model.openBoundary.target=1.45;},/Invalid Search near n_eff/],
-  [d=>{d.model.openBoundary.edges.left='pml';},/Invalid left edge/],[d=>{delete d.model.openBoundary.edges.top;},/Invalid outer boundary/],[d=>{d.model.groupIndex=true;},/Group index is not computed with an open boundary/]]){
+  [d=>{d.model.openBoundary.edges.left='pml';},/Invalid left edge/],[d=>{delete d.model.openBoundary.edges.top;},/Invalid outer boundary/]]){
   const c=JSON.parse(JSON.stringify(doc));f(c);assert.throws(()=>P.parseProject(JSON.stringify(c)),message);
  }
 });
@@ -240,12 +284,45 @@ test('V15: a session with an open run is version 10 and round-trips bit for bit,
  const back=N.parseSession(text);
  assert.equal(N.sessionText(back.input,back.runs,back.selected,back.comparison,back.view),text);
  assert.deepEqual(back.runs[1].pml_check,check);assert.equal(R.isOpenRun(back.runs[1]),true);
- // an open run has no TE fraction or A_eff until P3: "—"
+ // this test's record has no physical_bounds: no physical window, so no TE fraction or A_eff ("—")
  assert.deepEqual(M.opticalModes(back.runs[1]).map(m=>[m.fte,m.area]),[[null,null],[null,null]]);
  // a v10 file without fields keeps the nulls
  const small=N.sessionText(input(),runs,'0000000b',['0000000a','0000000b'],view,{keep:new Set(['0000000b'])});
  assert.deepEqual(JSON.parse(small).runs.map(r=>r.field===undefined),[true,false]);
  const backSmall=N.parseSession(small);assert.equal(N.sessionText(backSmall.input,backSmall.runs,backSmall.selected,backSmall.comparison,backSmall.view,{keep:new Set(['0000000b'])}),small);
+});
+test('slice P3: an open run keeps the engine values and a complex group index; a P2 run is written as it was',()=>{
+ const bounds={unit:'m',values:[[-1.5e-6,-1.2e-6],[1.5e-6,1.2e-6]]};
+ const p2=openRun('0000000b',{open_boundary:{...record(),physical_bounds:bounds}});
+ const p3=openRun('0000000c',{open_boundary:{...record(),physical_bounds:bounds},te_polarization_fraction:[0.98149,0.04635],effective_area:[1.9234e-13,3.4396e-13],
+  group_index:{re:[4.19003092,null],im:[-1.69e-10,null]},group_index_method:'central_difference 1 nm electric-l2-assignment-v1'});
+ const text=N.sessionText(input(),[p2,p3],'0000000c',['0000000b','0000000c'],view),doc=JSON.parse(text);
+ assert.equal(doc.version,10);
+ // the P2 run: no new key
+ assert.deepEqual(['te_polarization_fraction','effective_area','group_index'].map(k=>k in doc.runs[0]),[false,false,false]);
+ assert.deepEqual(Object.keys(doc.runs[1]),['job','completedAt','label','pinned','origin','serverVersion','settings','input','effective_index','field','te_polarization_fraction','effective_area','group_index','group_index_method','open_boundary','digest']);
+ assert.deepEqual(doc.runs[1].group_index,{re:[4.19003092,null],im:[-1.69e-10,null]});
+ const back=N.parseSession(text);assert.equal(N.sessionText(back.input,back.runs,back.selected,back.comparison,back.view),text);
+ const run=back.runs[1];assert.deepEqual([run.group_index,run.group_index_im],[[4.19003092,null],[-1.69e-10,null]]);
+ assert.deepEqual(M.opticalModes(run).map(m=>[m.fte,m.area]),[[0.98149,1.9234e-13],[0.04635,3.4396e-13]]);
+ // the P2 run: Studio computes them on the window of its physical_bounds (the whole 3 x 2.4 um field here)
+ const modes=M.opticalModes(back.runs[0]);assert.equal(back.runs[0].te.source,'studioWindow');
+ assert.ok(modes.every(m=>Number.isFinite(m.fte)&&m.area>0));
+ // n_g: Re shown, Im in the help
+ const cell=M.groupIndexCell(run,0);assert.equal(cell.text,'4.1900');assert.ok(cell.title.endsWith(': Re n_g is shown; Im n_g -1.69e-10. At the default mesh n_g is about 5e-3 low in the slab check; the error comes from n_eff and shrinks when the core mesh is refined.'),cell.title);
+ assert.equal(M.groupIndexCell(run,1).text,'—');
+ // refusals: an open run's n_g must be complex, a closed run's real; null in both parts or neither
+ const redigest=d=>{for(const r of d.runs){delete r.digest;r.digest=S.recordDigest(r);}return d;};
+ const edit=f=>{const d=JSON.parse(text);f(d);return S.sessionJson(redigest(d));};
+ for(const [f,message] of [
+  [d=>{d.runs[1].group_index=d.runs[1].group_index.re;},'Run 2: a run with an open boundary has a complex group index.'],
+  [d=>{d.runs[1].group_index.im[1]=0;},'Run 2: invalid saved group indices.'],
+  [d=>{d.runs[1].group_index={im:[0,null],re:[4.19,null]};},'Run 2: invalid saved group indices.'],
+ ])assert.throws(()=>N.parseSession(edit(f)),{message},message);
+ const closed=JSON.parse(N.sessionText(P.withStudy(input(),{modeCount:2,groupIndex:true}),[{...closedRun('0000000a'),group_index:[4.2,3.7],group_index_method:'central_difference 1 nm electric-l2-assignment-v1'}],'0000000a',['0000000a','0000000a'],view));
+ assert.deepEqual(closed.runs[0].group_index,[4.2,3.7]);
+ closed.runs[0].group_index={re:[4.2,3.7],im:[0,0]};
+ assert.throws(()=>N.parseSession(S.sessionJson(redigest(closed))),{message:'Run 1: a closed window has a real group index.'});
 });
 test('V15: the inputs choosing Open need version 10 too; without either, version 9 and 7 are written as before',()=>{
  const v9=P.withStudy(input(),{openBoundary:R.openChoice()});

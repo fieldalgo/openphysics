@@ -95,7 +95,6 @@ export function validateProject(doc) {
   if (doc.version === OPEN_PROJECT_VERSION) {
     if (s.openBoundary === undefined) throw new Error('A version 9 model file holds an outer boundary (model.openBoundary).');
     model.openBoundary = validateOpenChoice(s.openBoundary, model.shapes);
-    if (model.groupIndex === true && hasOpenEdge(model.openBoundary)) throw new Error('Group index is not computed with an open boundary.');
     version = OPEN_PROJECT_VERSION;
   }
   return {format: 'openphysics-studio-workspace', version, units: {height:'nm',width: 'nm',wavelength:'nm',core_mesh:'nm',shapes:'nm',thermal_length:'mm',joule_length:'mm', voltage: 'V', temperature: 'K'}, model, setup};
