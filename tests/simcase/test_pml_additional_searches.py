@@ -24,7 +24,9 @@ P = "physics.em1."
 KEY = P + "pml.pml_additional_searches"
 DEFAULT = [{"target_effective_index": 1.95, "pml_search_mode_count": 16}]
 #: P1's union reference of the strip over a substrate (fixtures ``reference_modes``, 2.46/32 and 1.95/32),
-#: as rounded in the record; the tests compare with the reference solves themselves
+#: as rounded in the record. They only identify the modes (P1's V4 bound |dRe| <= 5e-4): the mesh, and
+#: so the values, differ between machines (CI: TE-like 2.4412866; the container that recorded them:
+#: 2.4412633). The gates compare with the reference solves on the same machine.
 TE_LIKE, TM_LIKE, NEAR_CLADDING = 2.441263, 1.772790, 1.486427 + 7.92e-3j
 
 
@@ -255,8 +257,7 @@ def test_w1_strip_over_substrate_returns_the_mode_near_the_cladding():
     union = _union(text)
     assert len(union) == 3
     for z, rounded in zip(union, (TE_LIKE, TM_LIKE, NEAR_CLADDING)):
-        assert abs(z.real - rounded.real) <= 5e-7, (z, rounded)              # the record gives Re of the first two
-    assert abs(union[2].imag - NEAR_CLADDING.imag) <= 5e-6, union
+        assert abs(z.real - rounded.real) <= 5e-4, (z, rounded)              # identification only
     n, _, block = _run(json.loads(text))
     _check_merge(block, n)
     for z in union:                                    # every mode, no known miss
@@ -375,7 +376,7 @@ def test_w8_strip_over_substrate_at_three_strengths():
     runs = {s: _run(base, pml_strength=s) for s in (3, 1.5, 6)}
     n3, loss3, _ = runs[3]
     reference = [n3[np.argmin(abs(n3 - z))] for z in (TE_LIKE, TM_LIKE, NEAR_CLADDING)]
-    assert all(abs(r.real - z.real) <= 1e-6 for r, z in zip(reference, (TE_LIKE, TM_LIKE, NEAR_CLADDING))), reference
+    assert all(abs(r.real - z.real) <= 5e-4 for r, z in zip(reference, (TE_LIKE, TM_LIKE, NEAR_CLADDING))), reference
     for strength, (n, loss, block) in runs.items():
         _check_merge(block, n)
         for m, z in enumerate(reference):
