@@ -5,6 +5,7 @@
 // drawn from the document's couplings, Messages from the live check, the run with progress per
 // physics and loop, and Results per physics with the coupling check. The model is its document
 // (workspace-multiphysics.mjs); the server checks and runs it (/api/multiphysics/*).
+import {markPageTabs} from './workspace-tabs.mjs';
 import {POLARIZATION_HELP,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
@@ -507,7 +508,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const viewState=()=>({page:VIEW_PAGES.includes(ctx.ui.page)?ctx.ui.page:'Model',selection:storedSelection(),index_map:indexView==='dn'?'change':'index',baseline_option:baselineOption});
  const savedBaselines=()=>Object.fromEntries(Object.entries(uncoupled).filter(([,b])=>b.document&&b.job).map(([n,b])=>[n,{job:b.job,completedAt:b.completedAt,document:b.document,result:b.result}]));
  const sessionState=()=>({document:doc,runs,baselines:savedBaselines(),selected:lastRun?.job||null,view:viewState()});
- // everything a session file holds, as a comparable text, but the page: a tab click (Models,
+ // everything a session file holds, as a comparable text, but the page: a tab click (Library,
  // Model, Connections, Results) is not an edit, so an opened or saved file stays current through
  // it. Save session still writes the page shown when it is pressed.
  function stamp(){const {page,...view}=viewState();return JSON.stringify({doc,runs:runs.map(r=>[r.job,r.label,r.pinned,r.maps]),selected:lastRun?.job||null,baselines:Object.entries(uncoupled).map(([n,b])=>[n,b.job||null]),view});}
@@ -578,7 +579,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   $('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[page];
   const count=physicsNames(doc).length;
   $('view-detail').textContent=page==='Connections'?(couplingNames(doc).length?'Drawn from the couplings':count===1?'One physics':`${count} physics · no couplings`):page==='Model'?'Interactive model view':page==='Applications'?'Choose a model':'';
-  document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.page===page));
+  markPageTabs(document.querySelector('.page-tabs'),page);
   document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode]);});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
   const toolbar=document.querySelector('.workspace > .toolbar');if(toolbar)toolbar.style.display=page==='Model'?'flex':'none';

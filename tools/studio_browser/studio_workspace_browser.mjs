@@ -136,12 +136,12 @@ class Page {
     if (result.exceptionDetails) throw new Error('page: ' + result.exceptionDetails.text);
   }
   // Every tree item and the tree itself in the accessibility tree: [{role, name, level, selected, expanded}]
-  async axTree() {
+  async axTree(roles = ['tree', 'treeitem']) {
     const {result: document} = await this.call('Runtime.evaluate', {expression: 'document'});
     const prop = (n, key) => n.properties?.find(p => p.name === key)?.value?.value;
     const read = async role => (await this.call('Accessibility.queryAXTree', {objectId: document.objectId, role})).nodes.filter(n => !n.ignored)
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
-    return [...await read('tree'), ...await read('treeitem')];
+    return (await Promise.all(roles.map(read))).flat();
   }
   click(selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); }
   // Typing as a user does: focus, select, insert text, leave the field.
@@ -231,7 +231,7 @@ try {
     for (const name of names) await page.treeItem(name);
     return items;
   };
-  const compareTableRows = () => page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.innerText.replace(/\\s+/g,' ')),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.textContent)),matched:[...t.tBodies[0].rows].map(r=>r.dataset.match||null),overlap:[...t.querySelectorAll('[data-overlap]')].map(c=>Number(c.dataset.overlap)),note:document.getElementById('compare-match-note')?.textContent,picker:[...document.querySelectorAll('#compare-mode option')].map(o=>o.textContent)}})()");
+  const compareTableRows = () => page.eval("(()=>{const t=document.getElementById('compare-neff');return t&&{caption:t.caption?.textContent,head:(()=>{const leaf=[...t.tHead.rows[1].cells],h=[];for(const c of t.tHead.rows[0].cells)h.push(...(c.colSpan>1?leaf.splice(0,c.colSpan):[c]).map(x=>x.dataset.column));return h})(),runs:[...document.querySelectorAll('#compare-table-runs [data-side]')].map(e=>e.textContent),rows:[...t.tBodies[0].rows].map(r=>[...r.cells].map((c,i)=>i?c.textContent:c.getAttribute('aria-label'))),short:[...t.tBodies[0].rows].map(r=>r.cells[0].textContent),matched:[...t.tBodies[0].rows].map(r=>r.dataset.match||null),overlap:[...t.querySelectorAll('[data-overlap]')].map(c=>Number(c.dataset.overlap)),note:document.getElementById('compare-match-note')?.textContent,picker:[...document.querySelectorAll('#compare-mode option')].map(o=>o.textContent)}})()");
 
   await page.call('Page.navigate', {url: base + '/workspace'});
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
@@ -240,7 +240,7 @@ try {
   // before an application is chosen: a neutral status and no study steps
   assert.equal(startPage.status, 'Choose a model to start'); assert.equal(startPage.steps, 0);
   // one word for one thing on the start page: model
-  assert.equal(startPage.tab, 'Models'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Choose a model');
+  assert.equal(startPage.tab, 'Library'); assert.equal(startPage.heading, 'Choose a starting model'); assert.equal(startPage.view, 'Model library · Choose a model');
   assert.doesNotMatch(await text('#canvas'), /template|application/i, 'the start page says model');
   assert.equal(startPage.footer, 'No model chosen · nothing to save yet');
   // the chooser: a plain sentence about choosing, and Joule heating with its own card icon
@@ -259,6 +259,21 @@ try {
   const opticalSequence = () => page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent})");
   assert.equal(await page.eval("document.getElementById('project').textContent"), 'Optical waveguide / New model · not saved');
   assert.deepEqual(await opticalSequence(), {heading: 'Nothing is computed until you press Run', status: 'Optical adapter ready · explicit Run required'});
+  // round 12 (N7; pre-registered): the page tabs are a tablist named Pages, Library first, the shown
+  // page's tab selected and the one tab stop; Left, Right, Home and End move between them and open the page
+  const tabState = async () => ({ax: (await page.axTree(['tablist', 'tab'])).map(n => [n.role, n.name, n.selected === true]),
+    stops: await page.eval("[...document.querySelectorAll('nav [role=tab]')].filter(b=>b.tabIndex===0).map(b=>b.textContent)"), focus: (await focused()).name,
+    page: await page.eval("document.querySelector('main').dataset.page")});
+  let tabs = await tabState(); stage('N7 page tabs', tabs);
+  assert.deepEqual(tabs.ax, [['tablist', 'Pages', false], ['tab', 'Library', false], ['tab', 'Model', true], ['tab', 'Connections', false], ['tab', 'Results', false], ['tab', 'Compare', false]]);
+  assert.deepEqual(tabs.stops, ['Model']);
+  await page.eval("document.querySelector('nav [data-page=Model]').focus()");
+  for (const [key, name, shown] of [['ArrowRight', 'Connections', 'Connections'], ['ArrowLeft', 'Model', 'Model'], ['End', 'Compare', 'Compare'], ['ArrowRight', 'Library', 'Applications'], ['Home', 'Library', 'Applications'], ['ArrowLeft', 'Compare', 'Compare'], ['Home', 'Library', 'Applications'], ['ArrowRight', 'Model', 'Model']]) {
+    await press(key); tabs = await tabState(); stage('N7 ' + key, tabs);
+    assert.deepEqual([tabs.focus, tabs.stops, tabs.page], [name, [name], shown], key);
+    assert.deepEqual(tabs.ax.filter(n => n[2]).map(n => n[1]), [name], key + ': one tab selected');
+  }
+  await page.clickTreeItem('Geometry'); await page.until("!!document.querySelector('#shape-w')", 'N7 back on Geometry');
   // round 10 (K9): the optical model builder is an ARIA tree, used with the keyboard alone
   const opticalNodes = ['Component 1', 'Geometry', 'Materials', 'Physics', 'Optical modes', 'Analysis', 'Mesh', 'Study'];
   const opticalItems = await checkTree('optical', opticalNodes);
@@ -337,10 +352,11 @@ try {
   await page.until("document.getElementById('project').textContent==='Optical waveguide / Not saved to a file · kept for recovery in this browser'", 'save indicator after a run', 20000);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), 'Not saved to a file · kept for recovery in this browser');
   // n_eff with 8 decimals in the mode list as in the modes table; plot axes and the inspector in nm
-  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
+  const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:document.querySelector('#modes-table [data-group-index-hint]')?.textContent??null,lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
   assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
+  assert.equal(resultsView.hint, 'Off · turn on in Study or Optical modes', 'round 12 (N4): the n_g header says how to turn it on');
   // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
   assert.equal(resultsView.area.length, 2);
   assert.equal(resultsView.areaSource, 'Effective areacomputed by the engine from the saved field');
@@ -400,11 +416,12 @@ try {
   assert.ok(neffTable, 'Compare shows the n_eff table'); assert.equal(neffTable.rows.length, 2);
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
-  assert.match(neffTable.head[4], /^n_eff A Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm$/); assert.match(neffTable.head[5], /^n_eff B Run 2 · 700 × 300 nm · Silicon · λ 1550 nm$/);
+  // round 12 (N1): the run names are in the line above the table, the headers short and grouped A | B
+  assert.deepEqual(neffTable.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.deepEqual(neffTable.runs, ['A · Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · 700 × 300 nm · Silicon · λ 1550 nm']);
   assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)', 'n_g A', 'n_g B']);
   // both sides of a matched row give their A_eff in µm²
   for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
-  assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1');
+  assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1'); assert.equal(neffTable.short[0], '1 ↔ 1');
   assert.equal(neffTable.rows[0][6], before, 'the table and the sentence give the same Δn_eff');
   // the field panels do not repeat the name, and come before the n_eff table
   const panels = await page.eval("({headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>h.textContent),plotsFirst:!!(document.querySelector('.compare-grid').compareDocumentPosition(document.getElementById('compare-neff'))&Node.DOCUMENT_POSITION_FOLLOWING),plotTop:Math.round(document.getElementById('compare-field-a').getBoundingClientRect().top+scrollY),viewport:innerHeight})");
@@ -417,7 +434,7 @@ try {
   stage('K1 Compare loss', lossCells); assert.equal(lossCells.length, neffTable.rows.length);
   for (const row of lossCells) assert.deepEqual(row, ['0 dB/cm', '0 dB/cm', absorptionHelp, absorptionHelp]);
   // the two Absorption loss headers (n_g A and n_g B follow them since M5)
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].filter(t=>/^Absorption loss [AB] /.test(t.textContent)).map(t=>t.title)"), [absorptionHelp, absorptionHelp]);
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].filter(t=>/^Absorption loss /.test(t.dataset.column||t.textContent)).map(t=>t.title)"), [absorptionHelp, 'Absorption loss A (dB/cm): ' + absorptionHelp, 'Absorption loss B (dB/cm): ' + absorptionHelp]);
   await noOverflow('Compare with loss columns');
   // round 10 (K5): the plots are framed on the core as Results frames it, and the probe line sits under each plot
   // Compare opened afresh (from Results) at 1440 × 900 and at 1280 × 800
@@ -465,7 +482,7 @@ try {
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   }
   // round 10 (K4): a run clicked on Compare is selected and Compare stays; Open in Results shows it there
-  const pressedPage = () => page.eval("[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page)");
+  const pressedPage = () => page.eval("[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page)");
   await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/Run 1 · design A/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
   const k4 = await page.eval("({pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),table:!!document.getElementById('compare-neff'),open:document.getElementById('open-in-results')?.textContent})");
   stage('K4 run clicked on Compare', {...k4, page: await pressedPage()});
@@ -543,7 +560,7 @@ try {
   // round 11 (L9): the record is the same as the file, so the offer names the file's save time, not the record's
   assert.ok(routes.latest.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · same as file ' + sessionFile + ', saved '), routes.latest);
   assert.match(routes.latest, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
-  assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Models page says Restore from this browser'); assert.equal(routes.open, 'Open session file (portable)…');
+  assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open session file (portable)…');
   assert.deepEqual(routes.listed, [], 'the record the card resumes is not listed again above it'); assert.equal(routes.box, false);
   assert.ok(routes.beside, 'Open session file is beside the card\'s Resume');
   assert.equal(routes.note, 'A session file is the copy that moves between computers; browser recovery stays in this browser.');
@@ -592,7 +609,7 @@ try {
   await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('restore-run-input')", 'L3 Use this run\'s inputs');
   assert.equal(await text('#restore-run-input'), 'Use this run’s inputs'); assert.match(await text('#restore-run-input-hint'), /^The next run uses the current inputs \(700 × 300 nm · Silicon\)\. This loads Run 1 · design A’s inputs instead; Undo takes them back\.$/);
   await page.click('#restore-run-input'); await page.until("!document.getElementById('restore-run-input')&&/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'L3 inputs used');
-  const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
+  const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
   assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm · Modes to find 2\. The next run uses them; Undo takes them back\.$/);
@@ -627,7 +644,7 @@ try {
   await page.until("import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();const d=JSON.parse(r.session);return r.page==='Results'&&d.selected===d.runs[0].job;})", 'recovery of the Results page', 20000);
   await page.call('Page.reload'); await page.until("!!document.querySelector('#resume-optical')", 'resume offer after Results');
   await page.click('#resume-optical'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
-  const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-pressed')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('project').textContent})");
+  const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('project').textContent})");
   stage('K6 restored on Results', restored);
   assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A · /); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
   assert.ok(restored.header.startsWith(`Optical waveguide / Recovered from this browser · same as file ${sessionFile}`), restored.header);
@@ -655,9 +672,9 @@ try {
   // round 9 (J7): one short line, the rest behind More
   const switchedParts = await page.eval("({line:[...document.getElementById('file-status').childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim(),summary:document.querySelector('#file-status details.message-more>summary')?.textContent,more:document.querySelector('#file-status .message-more-text')?.textContent})");
   stage('switch message parts', switchedParts);
-  assert.equal(switchedParts.line, 'Heated silicon waveguide ready. Edit settings and couplings, then press Run. Optical waveguide runs stay in this tab · Models › Optical waveguide returns to them');
+  assert.equal(switchedParts.line, 'Heated silicon waveguide ready. Edit settings and couplings, then press Run. Optical waveguide runs stay in this tab · Library › Optical waveguide returns to them');
   assert.equal(switchedParts.summary, 'More');
-  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Models › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
+  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Library › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
   await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
@@ -669,8 +686,8 @@ try {
   const resultsNote = await text('#canvas'); assert.match(resultsNote, /Modes are ranked by effective index\. Compare matches them between runs by field overlap\./);
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare 500 → 450 nm');
   const matched = await compareTableRows(); stage('V17-M2 Compare 500 → 450 nm', matched);
-  assert.match(matched.head[4], /^n_eff A Run 3 · 500 × 300 nm/); assert.match(matched.head[5], /^n_eff B Run 4 · 450 × 300 nm/);
-  assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']);
+  assert.deepEqual(matched.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.match(matched.runs[0], /^A · Run 3 · 500 × 300 nm/); assert.match(matched.runs[1], /^B · Run 4 · 450 × 300 nm/);
+  assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']); assert.deepEqual(matched.short, ['1 ↔ 1', '2 ↔ 2']);
   assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
   // the polarization cells use the modes table's words: a TM-like cell names its TM share first
   const polarizationCell = /^(?:(?:TE-like|hybrid) · \d+\.\d % TE|TM-like · \d+\.\d % TM \(\d+\.\d % TE\))$/;
@@ -695,6 +712,33 @@ try {
     assert.ok(picker.need <= picker.width, `the closed picker needs ${picker.need} px, has ${picker.width} px at ${width}`);
     assert.deepEqual(picker.cells, [], `number cells wrap at ${width} px`); assert.ok(picker.percent.length === 2 && picker.percent.every(t => / %$/.test(t)), JSON.stringify(picker.percent));
   }
+  // round 12 (N1; pre-registered): the Compare table fits at 1440 × 900 and 390 × 844: two header
+  // rows (short labels, then A | B), the first column frozen while the others scroll inside the
+  // table box, every column reachable there, headers and row headers on one line, and the n_g
+  // hint visible while neither run computed n_g
+  const compareFit = () => page.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll'),rows=[...t.tBodies[0].rows];
+    const linesOf=r=>new Set([...r.getClientRects()].map(x=>Math.round(x.top))).size,range=n=>{const r=document.createRange();r.selectNodeContents(n);return r};
+    box.scrollIntoView({block:'start'});box.scrollLeft=0;const b0=box.getBoundingClientRect(),f0=rows[0].cells[0].getBoundingClientRect();
+    box.scrollLeft=box.scrollWidth;const b1=box.getBoundingClientRect(),f1=rows[0].cells[0].getBoundingClientRect(),side=[...t.tHead.rows[1].cells],m=t.tHead.rows[0].cells[0].getBoundingClientRect(),hit=document.elementFromPoint(m.left+m.width/2,m.bottom-4);
+    const out={top:[...t.tHead.rows[0].cells].map(c=>c.firstChild.textContent),sides:side.map(c=>c.textContent),sticky:[t.tHead.rows[0].cells[0],...rows.map(r=>r.cells[0])].map(c=>getComputedStyle(c).position).filter(p=>p!=='sticky'),unpinned:side.map(c=>getComputedStyle(c).position).filter(p=>p==='sticky').length,
+      firstLeft:[f0.left-b0.left,f1.left-b1.left,m.left-b1.left],modesOnTop:hit===t.tHead.rows[0].cells[0]||t.tHead.rows[0].cells[0].contains(hit),lastRight:Math.max(side.at(-1).getBoundingClientRect().right,...rows.map(r=>r.cells[r.cells.length-1].getBoundingClientRect().right))-b1.right,scroll:[box.scrollWidth,box.clientWidth,box.scrollLeft],
+      wrapped:[...[...t.tHead.rows[0].cells].map(c=>[c.firstChild.textContent,linesOf(range(c.firstChild))]),...[...side,...rows.map(r=>r.cells[0])].map(c=>[c.textContent,linesOf(range(c))])].filter(x=>x[1]!==1),
+      hint:(()=>{const h=t.querySelector('thead [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})()};
+    box.scrollLeft=0;return out})()`);
+  for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+    await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+    const fit = await compareFit(); stage('N1 Compare table fit', {width, ...fit});
+    assert.deepEqual(fit.top, ['Modes', 'Polarization', 'Overlap', 'n_eff', 'Δn_eff (B − A)', 'Δ % (of A)', 'A_eff (µm²)', 'Absorption loss (dB/cm)', 'n_g']);
+    assert.deepEqual(fit.sides, ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']);
+    assert.deepEqual(fit.sticky, [], `the first column is sticky at ${width}`); assert.equal(fit.unpinned, 0, 'the A | B headers scroll');
+    assert.ok(fit.modesOnTop, `the Modes header is not covered when the box is scrolled at ${width}`);
+    assert.ok(fit.firstLeft.every(x => Math.abs(x) <= 1), `the first column stays at the box's left edge at ${width}: ${fit.firstLeft}`);
+    assert.ok(fit.lastRight <= 1, `the last column is reachable inside the box at ${width}: ${fit.lastRight}`);
+    assert.deepEqual(fit.wrapped, [], `headers and row headers on one line at ${width}`);
+    assert.deepEqual(fit.hint?.text, 'Off · turn on in Study or Optical modes'); assert.ok(fit.hint.height > 0 && fit.hint.height <= 32, `the n_g hint is visible, on at most two lines: ${fit.hint.height}px`);
+    await page.screenshot('compare-table-' + width);
+  }
+  await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   await noOverflow('compare matched');
   await page.screenshot('compare-matched');
   // Results: the line profile follows the Mode picker (it read the mode once before this check)
@@ -805,7 +849,7 @@ try {
   await page.screenshot('joule-steady');
 
   // Round 9 (J2, J3): the same two runs opened from their session file, recovered, and opened again
-  // on new pages are one session: the Models page offers them once, on the Optical waveguide card
+  // on new pages are one session: the Library page offers them once, on the Optical waveguide card
   // (which names the file), and the box above lists only other sessions. Before round 9 each open
   // or recovery re-marked the runs' origin, so the store kept the earlier copy as another session.
   const setFile = async (selector, path) => {
@@ -835,7 +879,7 @@ try {
   await page.eval("document.getElementById('notebook-recovery-detail').textContent=''"); await page.click('#resume-optical');
   await answerDialogs(`/^Recovered from this browser/.test(document.getElementById('autosave-status').textContent)&&${recoveryUpdated}`, 'J2 resumed');
   await freshPage('J2 page 3'); await openFile('J2 open 2');
-  await freshPage('J2 page 4'); await page.until("!!document.getElementById('resume-optical')", 'J2 Models page');
+  await freshPage('J2 page 4'); await page.until("!!document.getElementById('resume-optical')", 'J2 Library page');
   await sleep(500);
   const offers = await page.eval(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const s=m.indexedNotebookStore();const latest=await s.load(),earlier=await s.loadEarlier();
     const record=i=>Number(i)<0?latest:earlier[Number(i)],card=document.getElementById('resume-optical');
@@ -848,7 +892,7 @@ try {
   // compared by the stored inputs and runs themselves, not by the sessionKey under test
   assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');
   assert.ok(!offers.top.some(t => t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')), JSON.stringify(offers.top));
-  await noOverflow('J2 Models page');
+  await noOverflow('J2 Library page');
 
   // M4 (number of modes; pre-registered, blind except the template's count of guided modes, which
   // the engine run before this check showed to be 3 of 8): Modes to find in Optical modes and in
@@ -977,17 +1021,36 @@ try {
   const m5box = () => page.eval("(()=>{const e=document.getElementById('group-index-check');return e?{label:e.closest('label').textContent.trim(),checked:e.checked}:null})()");
   const m5off = await m5box(); stage('M5 Study checkbox', m5off);
   assert.deepEqual(m5off, {label: 'Also compute group index (3 solves)', checked: false});
+  // round 12 (N2–N4; pre-registered): the box's plain note; the same box in Physics › Optical modes,
+  // synced with Study both ways and through Undo; a message each way; the next run naming the option
+  const GROUP_NOTE = 'Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.';
+  const groupOn = 'Group index on: the next run also solves at λ ± 1 nm and gives n_g (about 3× slower).', groupOff = 'Group index off: the next run is one solve, without n_g.';
+  const m5note = () => page.eval("document.getElementById('group-index-check').closest('label').nextElementSibling.textContent");
+  const message = () => page.eval("document.getElementById('file-status').textContent");
+  assert.equal(await m5note(), GROUP_NOTE);
+  await toNode('Optical modes'); assert.deepEqual(await m5box(), m5off, 'the box in Optical modes'); assert.equal(await m5note(), GROUP_NOTE);
+  await page.click('#group-index-check'); await sleep(200); assert.equal(await message(), groupOn);
+  await toNode('Study'); assert.equal((await m5box()).checked, true, 'Study shows the box ticked in Optical modes');
+  assert.match(await text('#next-run-inputs'), / · Modes to find 2 · group index on$/);
+  await page.click('#group-index-check'); await sleep(200); assert.equal(await message(), groupOff);
+  assert.doesNotMatch(await text('#next-run-inputs'), /group index/);
+  await toNode('Optical modes'); assert.equal((await m5box()).checked, false, 'Optical modes shows the box cleared in Study');
+  await page.click('#undo-edit'); await sleep(200); assert.equal((await m5box()).checked, true, 'Undo ticks it again in Optical modes');
+  await page.click('#group-index-check'); await sleep(200); assert.equal((await m5box()).checked, false);
+  await noOverflow('N3 Optical modes with the group index box');
+  await toNode('Study'); assert.deepEqual(await m5box(), m5off);
   await runAndWait(); await page.until("!!document.getElementById('modes-table')", 'M5 results off');
-  const ngCells = () => page.eval("({head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),cells:[...document.querySelectorAll('#modes-table [data-group-index]')].map(e=>({text:e.textContent,title:e.title,value:e.dataset.groupIndexValue??null})),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)})");
+  const ngCells = () => page.eval("({head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:(()=>{const h=document.querySelector('#modes-table [data-group-index-hint]');return h?{text:h.textContent,height:h.getBoundingClientRect().height}:null})(),cells:[...document.querySelectorAll('#modes-table [data-group-index]')].map(e=>({text:e.textContent,title:e.title,value:e.dataset.groupIndexValue??null})),neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent)})");
   const offView = await ngCells(); stage('M5 results off', offView);
   assert.equal(offView.head.at(-1), 'n_g');
+  assert.equal(offView.hint?.text, 'Off · turn on in Study or Optical modes'); assert.ok(offView.hint.height > 0, 'the hint is visible');
   assert.ok(offView.cells.length >= 1 && offView.cells.every(c => c.text === '—' && c.title === 'Turn on Also compute group index in Study'), JSON.stringify(offView.cells));
   await toNode('Study'); await page.click('#group-index-check'); await page.until("document.getElementById('group-index-check')?.checked===true", 'M5 checkbox on');
   // the document the page submits, read from its /api/run request
   await page.eval("(()=>{const f=window.fetch;window.__m5Runs=[];window.fetch=(u,o)=>{if(String(u).includes('/api/run'))window.__m5Runs.push(o.body);return f(u,o);};})()");
   const t0 = Date.now(); await runAndWait(); const onSeconds = (Date.now() - t0) / 1000;
   await page.until("!!document.querySelector('#modes-table [data-group-index-value]')", 'M5 results on');
-  const onView = await ngCells(); stage('M5 results on', {...onView, seconds: onSeconds});
+  const onView = await ngCells(); stage('M5 results on', {...onView, seconds: onSeconds}); assert.equal(onView.hint, null, 'no hint on a run with n_g');
   // the submitted document run directly by the engine
   const doc = JSON.stringify(JSON.parse(await page.eval('window.__m5Runs.at(-1)')).doc);
   const engine = spawnSync(args.python, ['-c', 'import json,sys\nfrom simcase import Document, run\nr=run(Document.from_dict(json.loads(sys.stdin.read())),False)\ns=r.summary()\nprint(json.dumps({"ng":s["group_index"]["values"][0],"neff":s["effective_index"]["values"][0],"method":s["group_index_method"]}))'], {input: doc, encoding: 'utf8'});
@@ -1004,9 +1067,9 @@ try {
   await noOverflow('M5 results with n_g');
   // Compare: the off run as A, the on run as B
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'M5 Compare');
-  const m5compare = await page.eval("({head:[...document.querySelectorAll('#compare-neff thead th')].map(e=>e.firstChild.textContent),a:[...document.querySelectorAll('#compare-neff [data-group-index-a]')].map(e=>e.textContent),b:[...document.querySelectorAll('#compare-neff [data-group-index-b]')].map(e=>e.textContent)})");
+  const m5compare = await page.eval("({head:[...document.querySelectorAll('#compare-neff thead [data-column]')].map(e=>e.dataset.column),hint:!!document.querySelector('#compare-neff [data-group-index-hint]'),a:[...document.querySelectorAll('#compare-neff [data-group-index-a]')].map(e=>e.textContent),b:[...document.querySelectorAll('#compare-neff [data-group-index-b]')].map(e=>e.textContent)})");
   stage('M5 Compare', m5compare);
-  assert.deepEqual(m5compare.head.slice(-2), ['n_g A', 'n_g B']);
+  assert.deepEqual(m5compare.head.slice(-2), ['n_g A', 'n_g B']); assert.equal(m5compare.hint, false, 'no hint when run B computed n_g');
   assert.ok(m5compare.a.length && m5compare.a.every(t => t === '—'), JSON.stringify(m5compare.a));
   assert.ok(m5compare.b.some(t => /^\d\.\d{4}$/.test(t)), JSON.stringify(m5compare.b));
   await noOverflow('M5 Compare with n_g');

@@ -116,8 +116,8 @@ export function leaveConfirmText({from,runs=0,saved=false,target='the other mode
 export function opticalRunsStayText({runs=0,file=null,recovery=false}){
  if(!runs)return {text:'',more:''};
  const one=runs===1,them=one?'it':'them';
- const text=`Optical waveguide ${one?'run stays':'runs stay'} in this tab · Models › Optical waveguide returns to ${them}`;
- const back=[...(recovery?['Models › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions)']:[]),...(file?[`Open session with ${file}`]:[])];
+ const text=`Optical waveguide ${one?'run stays':'runs stay'} in this tab · Library › Optical waveguide returns to ${them}`;
+ const back=[...(recovery?['Library › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions)']:[]),...(file?[`Open session with ${file}`]:[])];
  const more=`This tab holds ${plural(runs,'run')} until it is closed or reloaded.`+(back.length?` After that, ${back.join(' or ')} brings ${them} back.`:` After that, no file or browser recovery holds ${them}.`);
  return {text,more};
 }

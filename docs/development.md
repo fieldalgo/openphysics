@@ -372,7 +372,15 @@ and box; **Save inputs only** writing version 7 with 2 modes and the box off (th
 version 8 file without its settings key; `tests/simcase/studio_project_study.cjs` checks the
 template's file against `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
 `modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
-inputs saved as version 9.
+inputs saved as version 9. Since round 12 it also checks the page tabs as a tab list named
+*Pages* (Library first, one selected tab and one Tab stop, Left, Right, Home and End opening the
+next, previous, first and last page); the Compare table at 1440 × 900 and 390 × 844 with two
+header rows (short labels, then A | B), the run names in the line above it, *1 ↔ 1* row headers
+whose accessible names are the full pairs, the first column frozen while the others scroll inside
+the table's box, every column reachable there and headers and row headers on one line; the group
+index box's plain note, the same box in Physics › Optical modes, synced with Study both ways and
+through Undo, a Messages line each way, *· group index on* in the next run's inputs, and the
+*Off · turn on in Study or Optical modes* hint under an n_g header when no run shown computed n_g.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff

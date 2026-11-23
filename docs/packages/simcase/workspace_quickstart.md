@@ -73,7 +73,7 @@ Keep the terminal open while you work; press **Ctrl+C** in it to stop Studio.
 
 1. On **Choose a starting model**, select **Optical waveguide**. Until you choose one,
    the title reads *No model chosen*, the status bar *Choose a model to start*
-   and the Study sequence is empty. The page's tab is **Models**.
+   and the Study sequence is empty. The page's tab is **Library**.
 2. In **Geometry**, set the core width to 600 nm and the height to 300 nm. A Width edit
    keeps the core centred (Left x becomes −300 nm) and a Height edit keeps its bottom
    on y = 0, so no **Centre on x = 0** is needed. The material is silicon and the

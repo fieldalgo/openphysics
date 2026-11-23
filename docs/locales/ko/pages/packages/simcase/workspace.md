@@ -13,6 +13,8 @@
 
 ## 작업 공간 배치와 시각 기반
 
+맨 위 페이지 탭 **Library**, **Model**, **Connections**, **Results**, **Compare**는 탭 목록입니다. 보이는
+페이지의 탭이 선택되어 Tab 정지점 하나가 되고, 왼쪽·오른쪽 화살표와 Home, End는 다른 탭으로 옮겨 그 페이지를 엽니다.
 작업대는 상단 명령 리본, 왼쪽 모델 트리와 인접한 Settings, 오른쪽의 넓은
 Graphics, 하단 Study/Messages 영역으로 구성됩니다. 리본은 Project, Edit,
 Model setup, Physics, Compute로 묶습니다. **Geometry**, **Materials**, **Mesh**, **Study**는
@@ -27,7 +29,7 @@ Compute에는 고른 애플리케이션의 실행 명령이 있으며, 모든 �
 다중물리)에서 "Save session" 한 이름으로 부릅니다. **More**에
 입력 전용 파일(**More › Save inputs only**, **Open inputs file**), 브라우저 초안, Reset design이 있습니다. 하단 상태줄의
 **Workspace tools**에서 연결, 복구, Reset layout에 접근하고, 그 옆에 **Installed physics**가 있습니다.
-둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Models를
+둘 다 상태줄 위로 열리며 한 번에 하나만 열리고, Escape로 열린 것을 닫습니다. Library를
 포함한 모든 페이지에서 쓸 수 있습니다. 1000 px보다 좁으면 Compute 명령이 보이도록 리본에서
 Physics 묶음을 뺍니다. Installed physics는 상태줄에 그대로 있습니다. 열 결과와 Joule 가열 결과는 현재 탭에만 남습니다.
 
@@ -56,7 +58,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
 
 ## 첫 광학 해석
 
-1. **Models → Optical waveguide**를 선택합니다(시작 화면이며 탭 이름은 **Models**). (Heated silicon waveguide 카드는
+1. **Library → Optical waveguide**를 선택합니다(시작 화면이며 탭 이름은 **Library**). (Heated silicon waveguide 카드는
    대신 열과 광을 결합한 모델을 엽니다. [다중물리 모델](#다중물리-모델-열--광-모드)을 보십시오.)
 2. **Geometry**에서 코어를 숫자로 편집하거나 코어·가장자리를 드래그합니다.
    슬랩·슬롯·클래딩·구멍은 사각형·원·다각형을 추가해 만들고 형상마다 재료를 고릅니다.
@@ -69,7 +71,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    설정에서 파장을 바꿉니다. **Modes to find**처럼 두 곳은 같은 입력란이며, **Study → Edit wavelength**와
    단계 표시줄의 파장은 Optical modes의 그 입력란에 포커스를 둔 채 엽니다. Study 설정은 Results가 어느
    실행을 보여 주든 다음 실행이 쓸 입력도 밝힙니다: *Next run uses 700 × 300 nm · Silicon · λ 1550 nm ·
-   core mesh 30 nm · Modes to find 2*. 코어 메시 크기는 **Mesh**에서 바꿉니다.
+   core mesh 30 nm · Modes to find 2*. **Also compute group index**를 켜면 *· group index on*이 붙습니다.
+   코어 메시 크기는 **Mesh**에서 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.
 4. **Run study**를 누릅니다. 기다리는 동안 모델을 바꿔도 결과는 실행 당시
@@ -107,8 +110,8 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    높이로 그리며, Compare를 열면 창(pane)이 스크롤되어 그림의 가운데가 보이고 짝지어진 모드 선택은 그 위에
    남습니다. probe 줄(*No point selected.*)은 각 그림 아래에 있고, A와 B의 형상, 파장, 코어 메시를 밝히는
    문장은 그림 뒤에 옵니다. 그 아래 표는 A와 B의 모드를 장 겹침으로 짝짓습니다([모드 짝짓기](#compare의-모드-짝짓기)).
-   짝지어진 모드마다 행 하나 *A mode 1 ↔ B mode 1*에 양쪽 편광, 겹침, A와 B의 n_eff, Δn_eff (B − A),
-   A 대비 Δ %, A와 B의 A_eff와 흡수 손실이 나오고, 열 머리글에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
+   짝지어진 모드마다 행 하나 *1 ↔ 1*(A mode 1 ↔ B mode 1)에 양쪽 편광, 겹침, A와 B의 n_eff, Δn_eff (B − A),
+   A 대비 Δ %, A와 B의 A_eff, 흡수 손실, n_g가 나오고, 표 위 줄에 각 실행(이름, 크기, λ)이 표시됩니다. n_eff는 어디서나(결과, 모드 목록,
    Compare) 소수 8자리입니다.
 6. 첫 번째 저장 버튼인 **Save session**으로 모델·보관 결과·보기 설정의 파일을 저장합니다.
    파일 이름은 응용과 현지 날짜·시각으로 정해지며(예:
@@ -128,7 +131,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    (last sent to a file: … at 13:05; changed since)* 또는 *(opened from …json; changed since)*, 저장하거나 연
    파일이 없으면 *· not saved to a file*. 이 제목과 저장 뒤의 *Session file … sent to your browser's
    Downloads*는 모델이나 실행이 바뀌거나(입력 편집, 실행 추가, 이름 바꾸기, 고정이나 해제) 다른 파일을 열
-   때까지 유지됩니다. 탭 클릭(**Models**, **Model**, **Connections**, **Results**, **Compare**), 고른 실행,
+   때까지 유지됩니다. 탭 클릭(**Library**, **Model**, **Connections**, **Results**, **Compare**), 고른 실행,
    Compare 선택, 장 보기는 변경이 아닙니다. 변경 뒤에는 제목이 무엇이 바뀌었는지 말합니다: 입력 편집이면
    *Unsaved inputs*, 실행이면 *Changed since session file … · kept for recovery in this browser*. 헤더에는 revision 번호가 없습니다. Width를 홀수 nm만큼 바꾸면 Left x가
    0.5 nm 단위가 됩니다. 중심은 정확히 유지되고 Messages가 Left x가 옮겨진 곳을 알려 주며(*Width set
@@ -138,7 +141,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    켜면 시작 화면의 **Continue where you left off** 카드에 **Restore from this browser: Last
    session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), **Open session file
    (portable)…**, **Start new**가 나오고, 세션 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이
-   브라우저에만 남는다고 알려 줍니다. Models 페이지는 브라우저 복구를 한 문구 *Restore from this browser*로
+   브라우저에만 남는다고 알려 줍니다. Library 페이지는 브라우저 복구를 한 문구 *Restore from this browser*로
    부르고, **Open session file…**은 파일에 씁니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
    그때 고른 실행과 함께 엽니다. Studio가 페이지를 보관하기 전에 쓴 기록과, 페이지를 담지 않는 세션 파일을 열
    때는 실행이 둘 이상이면 Compare, 아니면 Results를 엽니다.
@@ -153,9 +156,9 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    고르면 빠져나옵니다. 모델마다 Save session이 무엇을 남기는지 적혀 있습니다: 광학 모델은 입력과
    실행, 정상 열과 줄 가열은 입력(결과는 탭에만 남음), 가열 실리콘 도파로는 모델과 그 실행입니다.
    광학 실행이 있는 채로 가열 모델을 열면 Messages가 한 줄로 *Optical waveguide runs stay in this tab ·
-   Models › Optical waveguide returns to them*이라고 알립니다. 그 뒤의 **More**는 이 탭이 닫거나
+   Library › Optical waveguide returns to them*이라고 알립니다. 그 뒤의 **More**는 이 탭이 닫거나
    새로고침할 때까지 그 실행을 가진다는 것과, 그 뒤에 무엇이 그 실행을 가지는지를 밝힙니다:
-   **Models › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
+   **Library › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
    다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
    waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 **Start new**. 탭에 다중물리 실행이 없으면 Heated
@@ -171,7 +174,7 @@ Graphics 위로 이동하고 휴대전화에서는 세로로 쌓입니다. 위�
    보관하기 전에 쓴 기록이면 *· file …json*. 저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
    보기(페이지, 장 보기), 고른 실행, Compare 선택, 실행의 출처(여기서 계산, 파일에서 엶, 복구), 파일
    연결이나 저장 시각이 달라도 한 세션입니다. 가장 새 기록을 보여 주고, 합친 기록 중 하나라도 파일을
-   가리키면 그 파일 이름을 붙이며, 이 탭에 열려 있는 세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Models** 탭, *Choose a starting model*,
+   가리키면 그 파일 이름을 붙이며, 이 탭에 열려 있는 세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Library** 탭, *Choose a starting model*,
    *Model library · Choose a model*.
 
 현재 모델을 유지하고 결과만 추가하려면 **Add runs from file (inputs unchanged)**을, 모델과 노트북을
@@ -222,7 +225,11 @@ Modes to find는 모델과 함께 저장됩니다. 입력(프로젝트) 파일, 
 모드 4개 실행을 고른 채 모드 2로 저장한 세션(입력은 버전 7)은 이전 파일처럼 4로 열립니다. 새 모델은 2로 시작합니다. 모드 2개일 때 솔버 문서는 이전 Studio가
 보낸 문서와 바이트 단위로 같으므로 n_eff, TE 비율, 유효 면적이 바뀌지 않습니다.
 
-**Study**의 **Also compute group index (3 solves)**(기본값 꺼짐)는 실행 문서에
+**Study**와 **Physics › Optical modes**의 **Also compute group index (3 solves)**(두 곳에 같은 상자 하나,
+기본값 꺼짐. 설명은 “Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one
+solve, no n_g.”이고, 켜거나 끄면 Messages가 다음 실행이 하는 일을 *Group index on: the next run also
+solves at λ ± 1 nm and gives n_g (about 3× slower).* 또는 *Group index off: the next run is one solve,
+without n_g.*로 알립니다)는 실행 문서에
 `results.group_index = {"wavelength_step": "1 nm"}`를 더합니다. 그러면 엔진은 같은 메시를
 λ0 − 1 nm와 λ0 + 1 nm에서도 풀고(재료는 파장마다 값을 구함), 중앙 차분으로
 n_g = n_eff − λ0 dn_eff/dλ0를 돌려줍니다. 실행 시간은 약 세 배입니다([단일 study의 군굴절률](group_index.md)).
@@ -288,7 +295,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 
 ## 정상 열전도 판
 
-**Models → Steady heat conduction**을 고르면 JSON 없이 정상 열전도 문제를 편집합니다.
+**Library → Steady heat conduction**을 고르면 JSON 없이 정상 열전도 문제를 편집합니다.
 판은 왼쪽 아래 모서리가 (0, 0)인 균질 직사각형 하나이며 크기는 mm, 열전도도 k [W/(m·K)]와
 균일 열원 Q [W/m³]는 상수입니다. 그림에서 변을 선택하거나 **Heat transfer**를 열어 변마다
 조건 하나를 줍니다. 단열(열유속 0), 고정 온도 [K], 안쪽 방향 열유속 [W/m²](양수는 판 안으로
@@ -312,7 +319,7 @@ Escape·포인터 취소·창 크기 변경·포커스 상실·페이지 숨김�
 
 ## 이름 붙은 영역의 Joule 가열
 
-**Models → Joule heating**을 고르면 JSON 없이 이름 붙은 재료 영역의 정상 Joule 가열을
+**Library → Joule heating**을 고르면 JSON 없이 이름 붙은 재료 영역의 정상 Joule 가열을
 설정합니다. 계산 영역은 왼쪽 아래 모서리가 (0, 0)인 mm 단위 직사각형과 바탕 재료입니다.
 **Geometry**에서 사각형·원·다각형을 최대 여덟 개 더하며(겹치는 곳은 나중 형상이 이김), 각
 형상은 재료 하나의 이름 붙은 영역입니다. **Materials**에는 이름 붙은 재료를 최대 여섯 개 두고,
@@ -353,7 +360,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
 
 ## 다중물리 모델: 열 → 광 모드
 
-**Models → Heated silicon waveguide**(“Heat → optical modes · coupled”)를 고르면
+**Library → Heated silicon waveguide**(“Heat → optical modes · coupled”)를 고르면
 [다중물리 문서](multiphysics_document.md)가 열립니다. 한 형상, 한 메시 위의 두 물리를 결합 하나로
 잇고 **Run** 한 번으로 풉니다. 템플릿은 6 × 4.5 µm 창 안의 `physmat:SiO2` 위에 놓인
 500 × 220 nm `physmat:Si` 코어와, 코어 1.1 µm 위의 2 µm × 100 nm 히터입니다. **Heat 1**은 아래
@@ -430,7 +437,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   붙은 실행은 광학 애플리케이션처럼 도크 제목과 하단에서 “Run N · 이름”으로 불립니다: “Run 1 · Heater 2e14 ·
   solved from the current model”, “Run 1 · Heater 2e14 matches the model · press Run to solve again”,
   “Model edited since Run 1 · Heater 2e14 · press Run to update”.
-- **Also solve without heater**(Run 옆, 약 1초)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
+- **Also solve without heater**(Run 옆, *(about 1 s more)*)는 광 모드가 결합된 온도를 받는 모델을 열 때 켜져
   있습니다. 결합 실행 뒤 Studio가 같은 실행 경로로 광 모델을 온도 입력 없이 따로 풀어 히터 없는
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
   이 옵션은 그 자리에 남아 꺼진 채 “needs a temperature coupling”이라고 이유를 밝힙니다.
@@ -459,7 +466,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   최대 40자, 아니면 `multiphysics`). 형식은
   [다중물리 모델의 세션 파일](#다중물리-모델의-세션-파일버전-8)에 있습니다. 탭에 Optical waveguide 실행도
   있으면 저장 메시지가 그 실행은 이 파일에 없다고 밝힙니다: “The 2 Optical waveguide runs of this tab are
-  not in this file; Models › Optical waveguide › Save session keeps them in their own file.” **Open session**은 이런
+  not in this file; Library › Optical waveguide › Save session keeps them in their own file.” **Open session**은 이런
   파일, 광학 세션, 또는 모델 파일 하나만도 엽니다(“Opened model file …: it holds the model but no
   runs.”). **More › Save inputs only**는 문서만 모델 파일로 쓰고, **More › Open inputs file**은 모델
   파일을 엽니다. 제목은 광학과 같은 문구를 씁니다: “Not saved to a file · kept for recovery in this
@@ -643,7 +650,8 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
 - **n_g**(광 애플리케이션만)는 **Also compute group index**를 켠 실행의 엔진 군굴절률이며 소수 4자리로
   보입니다. 열 도움말은 “n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± 1 nm (3 solves),
   materials evaluated at each wavelength”입니다. 칸은 두 경우에 **—**입니다.
-  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study”입니다.
+  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study”이고, n_g
+    머리글 이름 아래에 *Off · turn on in Study or Optical modes*가 보입니다(Compare에서는 두 실행 모두 n_g가 없을 때).
   - 엔진이 옆 파장에서 그 모드를 대응시키지 못했을 때(`null`, 예: 축퇴 쌍의 한 모드). 그 실행을
     한 탭에서는 도움말이 엔진의 이유 *Not matched: vacuum_wavelength 1.549 um: …*를 보입니다. 세션
     파일은 이유를 보관하지 않으므로, 파일을 연 뒤에는 “Not matched at λ0 ± 1 nm; the reason is not
@@ -788,15 +796,19 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
 - **배정.** Studio는 모든 모드 쌍의 η를 계산하고 η 합이 가장 큰 일대일 배정을 고릅니다(모든 배정을
   시도하며, 실행마다 모드는 많아야 8개). η ≥ 0.8이고 η가 그 행과 그 열의 다음으로 큰 값보다 0.1 이상 클
   때 짝을 받아들입니다. 추적기의 기본값 `mode_tracking_threshold`와 `mode_tracking_margin_threshold`입니다.
-- **표.** 짝지어진 모드마다 행 하나 *A mode 1 ↔ B mode 1*에 양쪽의 편광(낱말과 TE 백분율), 소수 2자리
+- **표.** 짝지어진 모드마다 행 하나가 *1 ↔ 1*(쌍은 *1–2 ↔ 1–2*. 접근 가능한 이름은 전체 *A mode 1 ↔ B mode 1*이고
+  제목은 겹침과 Δn_eff를 덧붙임)로 시작하고, 양쪽의 편광(낱말과 TE 백분율), 소수 2자리
   겹침, A와 B의 n_eff, Δn_eff (B − A), A 대비 Δ %, 그리고 A와 B의 A_eff(µm²)가 나옵니다(짝지어진 축퇴 쌍은
   두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다), 그 뒤에 A와 B의
   흡수 손실(*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*)이 짝지어진 행과 짝이 없는 행 모두에 나옵니다:
   저장된 지수에서 얻은 모드 표의 값이며, 짝지어진 쌍은 두 모드 dB/cm의 *mean*이고, 광 어댑터의 재료는
   무손실이라 광학 실행은 *0 dB/cm*입니다. 그 뒤에 *n_g A*와 *n_g B*가 나옵니다(모드 표의 값, 짝지어진 쌍은
-  두 모드 값의 *mean*, 실행에 값이 없으면 모드 표의 도움말과 함께 **—**). 좁은 화면에서는 표가 자기 상자 안에서 옆으로 스크롤되고 페이지는
-  넘치지 않습니다. 짝이 없는 모드는 *A mode 2: no match in B
-  (best overlap 0.43, with B mode 2)*로 읽히며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
+  두 모드 값의 *mean*, 실행에 값이 없으면 모드 표의 도움말과 함께 **—**). 머리글은 짧게 묶입니다:
+  *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*, *n_g*는 각각 **A** 열과 **B** 열 위에,
+  *Modes*, *Overlap*, *Δn_eff (B − A)*, *Δ % (of A)*는 한 열 위에 있고, 표 위 줄이 실행 A와 B를 밝힙니다.
+  첫 열은 그대로 보이고 나머지 열은 표 상자 안에서 옆으로 스크롤되며 페이지는 옆으로 넘치지 않습니다. 짝이 없는
+  모드는 *1 ↔ —* 또는 *— ↔ 2*로 시작하고 제목과 접근 가능한 이름이 전체 *A mode 2: no match in B
+  (best overlap 0.43, with B mode 2)*이며 Δn_eff를 보이지 않고, 그 뒤에 짝이 없는 B 모드가 이어집니다.
   표 아래: “Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape
   between designs.”
 - **장 선택.** *Matched modes*는 짝지어진 쌍을 나열하고(*A mode 1 ↔ B mode 1 · overlap 0.99 · TE-like*,

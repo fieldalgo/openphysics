@@ -31,7 +31,7 @@ python tools/check_markdown_links.py
 
 사용하지 않는 로컬 포트에서 `simcase-studio --workspace`를 실행합니다. 첫 사용자
 검사는 별도 브라우저 프로필이나 시험 origin에서 하며 기존 세션을 먼저 보존합니다.
-시작 Models 화면(처음부터 끝까지 model이라는 한 단어)은 결합 모델인 Heated silicon waveguide를 포함해 카드마다 무엇을 실행하는지 밝혀야 합니다.
+시작 Library 화면(처음부터 끝까지 model이라는 한 단어)은 결합 모델인 Heated silicon waveguide를 포함해 카드마다 무엇을 실행하는지 밝혀야 합니다.
 
 | 작업 | 예상 관찰 |
 |---|---|
