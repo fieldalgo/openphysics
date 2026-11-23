@@ -22,6 +22,9 @@ optical modes), whose coupled n_eff must equal the installed engine's exactly. A
 (tools/studio_browser/studio_multiphysics_session_browser.mjs) saves multiphysics models with
 their runs as session files of version 8 and opens them again: every stored array equal to the
 server's reply bit for bit, browser recovery, the 16 MiB limit and the refusals of damaged files.
+Since P3 a fourth (tools/studio_browser/studio_project_browser.mjs) saves both models of a tab in one
+project file and opens it after a server restart in a new browser profile: the same values, no
+run started, the refusals of damaged files and the save dialog stubbed at its boundary.
 """
 import argparse
 from email.parser import BytesParser
@@ -298,6 +301,10 @@ def main():
         # every array equal to the server's reply, recovery, the 16 MiB limit and the refusals.
         run("node", ROOT / "tools" / "studio_browser" / "studio_multiphysics_session_browser.mjs",
             "--python", python, "--output", output / "studio-multiphysics-session-browser", cwd=work)
+        # Project files (P3): both models of a tab in one file, saved, then opened after a server
+        # restart in a new browser profile with the same values and no run started.
+        run("node", ROOT / "tools" / "studio_browser" / "studio_project_browser.mjs",
+            "--python", python, "--output", output / "studio-project-browser", cwd=work)
 
 
 if __name__ == "__main__":
