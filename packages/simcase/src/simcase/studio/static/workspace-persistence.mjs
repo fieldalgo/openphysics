@@ -31,7 +31,7 @@ export function validateSavedFile(value){
 // overLimit and kept:N are a multiphysics session's (version 8): over 16 MiB, recovery keeps the
 // maps of the selected and pinned runs only, and writes nothing when even that is over the limit.
 const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab',overLimit:'browser recovery unavailable: session over 16 MiB'});
-const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · Save session to keep them`:RECOVERY[recovery];};
+const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;

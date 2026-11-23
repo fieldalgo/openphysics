@@ -78,7 +78,7 @@ test('S-c: a version 9 session with n_g (one null) round-trips bit for bit and k
 });
 test('S-d: "—" with its help when the run did not compute n_g, live with the engine reason, and after a reload',()=>{
  const off=N.validateRun(run('00000005',2));
- assert.deepEqual(M.groupIndexCell(off,0),{text:'—',value:null,title:'Turn on Also compute group index in Study'});
+ assert.deepEqual(M.groupIndexCell(off,0),{text:'—',value:null,title:'Turn on Also compute group index in Study or Optical modes'});
  const on=N.validateRun(run('00000006',3,N.engineGroupIndex(summary([4.21234,null,3.9]),3)));
  assert.deepEqual(M.groupIndexCell(on,0),{text:'4.2123',value:4.21234,title:M.groupIndexHelp('1 nm')});
  assert.match(M.groupIndexCell(on,0).title,/central difference over λ0 ± 1 nm \(3 solves\)/);
@@ -93,7 +93,7 @@ test('S-e: Compare n_g of a unit: the mode\'s, the mean of a pair, "—" when a 
  assert.deepEqual(H.unitGroupIndex(on,[0]),M.groupIndexCell(on,0));
  const pair=H.unitGroupIndex(on,[0,1]);assert.equal(pair.text,'mean 4.3000');assert.ok(Math.abs(pair.value-4.3)<1e-12);
  assert.equal(H.unitGroupIndex(on,[1,2]).text,'—');assert.equal(H.unitGroupIndex(on,null).text,'—');
- assert.equal(H.unitGroupIndex(N.validateRun(run('00000008',2)),[0]).title,'Turn on Also compute group index in Study');
+ assert.equal(H.unitGroupIndex(N.validateRun(run('00000008',2)),[0]).title,'Turn on Also compute group index in Study or Optical modes');
 });
 test('S-f: the multiphysics modes table has no n_g column',()=>{
  const src=fs.readFileSync(path.join(__dirname,STATIC,'workspace-multiphysics-view.mjs'),'utf8');

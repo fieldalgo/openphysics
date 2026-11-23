@@ -139,7 +139,7 @@ export function modeOptionLabel(i,modes){
 // The n_g column: the engine's group index of a run run with Also compute group index (Study),
 // n_g = n_eff - λ0 dn_eff/dλ0 by a central difference over λ0 ± the step; "—" otherwise.
 export const groupIndexHelp=(step='1 nm')=>`n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± ${step} (3 solves), materials evaluated at each wavelength`;
-export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study';
+export const GROUP_INDEX_OFF_HELP='Turn on Also compute group index in Study or Optical modes';
 // The box's note in Study and Optical modes, the message when it is ticked or cleared, and the
 // visible hint under an n_g header when no run shown computed n_g.
 export const GROUP_INDEX_NOTE='Also solves at λ ± 1 nm and takes n_g from the change (about 3× slower). Off: one solve, no n_g.';

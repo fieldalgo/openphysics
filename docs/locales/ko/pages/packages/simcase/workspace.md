@@ -15,6 +15,7 @@
 
 맨 위 페이지 탭 **Library**, **Model**, **Connections**, **Results**, **Compare**는 탭 목록입니다. 보이는
 페이지의 탭이 선택되어 Tab 정지점 하나가 되고, 왼쪽·오른쪽 화살표와 Home, End는 다른 탭으로 옮겨 그 페이지를 엽니다.
+그 아래 페이지는 모든 탭이 제어하는 탭 패널(`role=tabpanel`)이며 고른 탭의 이름을 따릅니다.
 작업대는 상단 명령 리본, 왼쪽 모델 트리와 인접한 Settings, 오른쪽의 넓은
 Graphics, 하단 Study/Messages 영역으로 구성됩니다. 리본은 Project, Edit,
 Model setup, Physics, Compute로 묶습니다. **Geometry**, **Materials**, **Mesh**, **Study**는
@@ -660,8 +661,8 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 **브라우저 복구**는 다중물리 모델을 광학 세션과 같은 저장소에 같은 한도로 보관합니다(최신 하나와 이전
 세 개, 각각 최대 16 MiB, 변경 0.7초 뒤 기록, 탭 사이 충돌 규칙). 모델에 실행이 있거나 연 뒤 편집했을
 때부터 Save session이 쓸 버전 8 글로 기록합니다. 16 MiB를 넘으면 대화 상자 없이 고른 실행과 고정한
-실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · Save session to
-keep them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
+실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · File › Save
+keeps them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
 MiB”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
 waveguide 카드의 **Restore from this browser**는 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
@@ -723,7 +724,7 @@ waveguide 카드의 **Restore from this browser**는 Open session과 같은 검�
 - **n_g**(광 애플리케이션만)는 **Also compute group index**를 켠 실행의 엔진 군굴절률이며 소수 4자리로
   보입니다. 열 도움말은 “n_g = n_eff − λ0 dn_eff/dλ0: central difference over λ0 ± 1 nm (3 solves),
   materials evaluated at each wavelength”입니다. 칸은 두 경우에 **—**입니다.
-  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study”이고, n_g
+  - 실행이 n_g를 계산하지 않았을 때. 도움말은 “Turn on Also compute group index in Study or Optical modes”이고, n_g
     머리글 이름 아래에 *Off · turn on in Study or Optical modes*가 보입니다(Compare에서는 두 실행 모두 n_g가 없을 때 n_g 열이 좁게
     유지되도록 대신 표 위 줄에 *n_g: Off · turn on in Study or Optical modes*가 나옵니다).
   - 엔진이 옆 파장에서 그 모드를 대응시키지 못했을 때(`null`, 예: 축퇴 쌍의 한 모드). 그 실행을
