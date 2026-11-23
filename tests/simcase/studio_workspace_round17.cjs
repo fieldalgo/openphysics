@@ -181,3 +181,12 @@ test('U7: a model of the tab with runs lands on Results, else Model, at the top 
  assert.ok(mp.includes("function returnPage(){return lastRun&&resultPage?'Results':'Model';}"));
  assert.ok(app.includes("function topOfPage(){for(const id of ['canvas','inspector'])"));
 });
+test('U8: on the download path Save asks (Save As, prefilled) when the project models changed',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("if(result.status==='known'&&modelsChanged(target)){"));
+ assert.ok(app.includes("const name=await askFileName(result.name,{saveAs:true,why:modelsChangedText(target,result.name)});"));
+ // the file's models are recorded where it is written, opened or recovered
+ assert.equal(app.split('project.file.models=models').length,2);assert.ok(app.includes("if(project.file)project.file.models=modelList();"));assert.ok(app.includes('savedAt:file.savedAt,models:modelList()'));
+ // the picker path is unchanged: saveToFile writes a kept handle before any of this
+ const files=read('workspace-files.mjs');assert.ok(files.includes("if (!saveAs && file?.handle) return 'write';"));
+});

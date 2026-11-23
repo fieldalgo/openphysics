@@ -227,6 +227,14 @@ function resetProject({name=null,ids=null,nameFrom=null}={}){
  Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,stamp:null,scope:project.scope+1});
  if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
 }
+// The models a project file holds, as Save compares them (round 17, U8): [{key, title}], keyed by the
+// model's id in the project (m1, m2, …), which an edit or Reset design does not change
+const modelList=()=>projectModels().map(m=>({key:m.id,title:m.title}));
+const modelsChanged=file=>Array.isArray(file?.models)&&JSON.stringify(file.models.map(m=>m.key))!==JSON.stringify(modelList().map(m=>m.key));
+function modelsChangedText(file,name){
+ const titles=list=>list.length?list.map(m=>m.title).join(' and '):'no model';
+ return `This project now holds ${titles(modelList())}; ${name} holds ${titles(file.models)}. Save under this name or another.`;
+}
 // The models of the project, in Library order: {id, kind, title, card}
 function projectModels(){
  const list=[];
@@ -314,7 +322,7 @@ function restoreProjectFile(file){
  if(file?.current!==true||!file.projectName)return;
  project.name=file.projectName;project.nameFrom=nameSource(file.projectName,file.name);
  const kept=rememberFile({name:file.name,how:'recovered',scope:project.scope});if(!kept)return;
- project.file={...kept,savedAt:file.savedAt};project.stamp=projectModels().length===1?projectStamp():null;
+ project.file={...kept,savedAt:file.savedAt,models:modelList()};project.stamp=projectModels().length===1?projectStamp():null;
 }
 function renameProject(value){
  let name;try{name=validateProjectName(value);}catch(e){notice(e.message+' The project name is unchanged.');return false;}
@@ -1303,12 +1311,13 @@ document.body.append(nameDialog);
 const DOWNLOAD_SAVE_AS_NOTE='This browser cannot write to the file, so later saves download again under this name and may add “ (1)”.';
 let nameAnswer=null;
 // Resolves the sanitised name, or null on Cancel or Escape.
-function askFileName(suggested,{saveAs,unavailable=null}){
+function askFileName(suggested,{saveAs,unavailable=null,why=null}){
  return new Promise(resolve=>{
   const opener=document.activeElement;
   nameAnswer=value=>{nameAnswer=null;if(nameDialog.open)nameDialog.close();restoreDialogFocus(opener);resolve(value);};
   $('save-name-title').textContent=saveAs?'Save As':'Save';
-  $('save-name-unavailable').hidden=!unavailable;$('save-name-unavailable').textContent=unavailable?`The browser's save dialog was not available (${unavailable}), so the file is downloaded instead.`:'';
+  // why: the reason Save asks (round 17, U8), in the same line as an unavailable picker's
+  $('save-name-unavailable').hidden=!unavailable&&!why;$('save-name-unavailable').textContent=[why,unavailable?`The browser's save dialog was not available (${unavailable}), so the file is downloaded instead.`:''].filter(Boolean).join(' ');
   $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+DOWNLOAD_SAVE_AS_NOTE:' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
   const input=$('save-name-input');input.value=suggested;nameDialog.showModal();input.focus();input.select();
  });
@@ -1741,9 +1750,17 @@ function askProjectOverflow(model,question,multi,{saveAs,keep}){
 function deliverProject(makeText,{saveAs}){
  savingFile=true;const scope=project.scope,target=project.file&&project.file.scope===scope?project.file:null;
  const prefill=target?target.name:projectFileName(project.name);
- const keep=(name,how,handle=null)=>{if(project.scope===scope)project.file=rememberFile({name,how,handle,scope});};
+ const models=modelList(),keep=(name,how,handle=null)=>{if(project.scope===scope){project.file=rememberFile({name,how,handle,scope});if(project.file)project.file.models=models;}};
  return saveToFile(makeText,{suggestedName:prefill,target,saveAs,description:PROJECT_PICKER_DESCRIPTION}).then(async result=>{
   if(result.status==='saved'){keep(result.name,'picker',result.handle);return {written:true,name:result.name,via:'picker',after:''};}
+  // round 17 (U8): on the download path, Save asks first (the Save As name dialog, prefilled with the
+  // file's name) when the project's models changed since that file was written or opened
+  if(result.status==='known'&&modelsChanged(target)){
+   $('save-name-input').defaultValue=result.name;const name=await askFileName(result.name,{saveAs:true,why:modelsChangedText(target,result.name)});
+   if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:true})};
+   downloadFile(new Blob([makeText(name)],{type:'application/json'}),name);keep(name,'download');
+   return {written:true,name,via:'download',again:name===target.name&&target.how==='download',known:name===target.name,after:name===target.name?' '+downloadAgainNote(name):''};
+  }
   if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');
    return {written:true,name:result.name,via:'download',again:target.how==='download',known:true,after:' '+downloadAgainNote(result.name)};}
   if(result.status!=='unavailable')return {written:false,message:notWrittenNotice(result,{saveAs,kind:'Project'})};
@@ -1813,7 +1830,7 @@ async function applyOpenedProject(read,fileName){
    await multiView.openSession(mp.session,{label:fileName,source:'file',card:mp.card});
    if(read.active!==mp.id){leaveMultiphysics();ui.page=page;render();}
   }
-  project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});project.stamp=projectStamp();
+  project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
   const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
   notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);

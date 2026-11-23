@@ -126,7 +126,12 @@ Downloads folder already has a file of that name. Studio cannot know that a down
 Studio remembers the name as the project's file, as it does the name of a project file opened
 with **File › Open…**: **Save** (and Ctrl+S) then downloads under it again without asking
 (*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name
-it <name> (1).json.*), and Save As starts with it. A file that replaces the project drops it, as it
+it <name> (1).json.*), and Save As starts with it. When the project's models changed since that file
+was written or opened (a model added, such as the heated model after the optical one was saved),
+**Save** opens the Save As name dialog instead, prefilled with that name and saying why: *This
+project now holds Optical waveguide and Heated silicon waveguide; study.json holds Optical
+waveguide. Save under this name or another.* (round 17). A file kept from the save picker is
+written as before. A file that replaces the project drops it, as it
 drops a file kept from the save dialog; switching models and **Reset design** keep it, since the
 project is the same. **Export › Model with runs (session file)…** keeps the same rules for each
 model's own session file name (the session file opened, or the name chosen there), and always asks.
