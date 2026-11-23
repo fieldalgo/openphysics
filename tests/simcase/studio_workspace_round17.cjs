@@ -157,3 +157,8 @@ test('U5: the outer boundary is a choice: the workspace note and the closed Stud
  assert.ok(!app.includes('window/PEC fixed'));assert.ok(!app.includes('Window and boundaries are fixed.'));
  assert.equal(app.split('<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes.').length,3);
 });
+test('U9: the Compare pickers are named Run A and Run B, with the full run label as their title',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("select.setAttribute('aria-label',side?'Run B':'Run A')"));
+ assert.ok(app.includes("select.title=select.selectedOptions[0]?.textContent||''"));
+});
