@@ -1491,8 +1491,15 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
 
 let pendingJob=null;
 let jobPhase='idle',jobOperation=0,jobResumeBlocked=false;
+// Round 15: the "Optical run complete…" banner leaves after DONE_BANNER_MS or at the next pointer
+// or key press or click (assistive technology may send a click alone), whichever comes first (Messages
+// keeps the words); the other phases stay until they change.
+const DONE_BANNER_MS=6000;let doneBannerTimer=0;
+function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}
+for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
+ clearTimeout(doneBannerTimer);doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
  $('job-message').textContent=state.message;
  if(state.phase==='done')setPending(null);
  if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();

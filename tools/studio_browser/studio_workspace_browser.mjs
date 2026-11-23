@@ -777,30 +777,67 @@ try {
     const controls=[...document.querySelectorAll('button,select,input,a[href],summary,[role=treeitem],[role=tab],[tabindex]:not([tabindex="-1"])')].filter(e=>!banner.contains(e)&&shown(e));
     const under=controls.filter(e=>{const c=clip(e);return c.l<b.right&&c.r>b.left&&c.t<b.bottom&&c.b>b.top;}).map(name);
     const own=[...banner.querySelectorAll('button')].filter(shown);
-    return {banner:!banner.hidden&&b.width>0,inView:b.left>=0&&b.right<=innerWidth&&b.top>=0,message:document.getElementById('job-message').textContent,named:named.length,covered:named.filter(e=>!hit(e)).map(name),under,own:own.map(name),ownBlocked:own.filter(e=>!hit(e)).map(name)}})()`);
+    // round 15 (R2): the panel headings (the view title row, the pane titles, the headings and captions of the view and the settings)
+    const headings=[document.getElementById('view-title'),document.getElementById('view-detail'),...document.querySelectorAll('.pane-title,#canvas h2,#canvas h3,#canvas caption,#inspector h2,#inspector h3')].filter(e=>e&&shown(e));
+    const overlaps=e=>{const c=clip(e);return c.l<b.right&&c.r>b.left&&c.t<b.bottom&&c.b>b.top;};
+    const title=document.getElementById('view-title'),detail=document.getElementById('view-detail'),d=detail.getBoundingClientRect();
+    return {banner:!banner.hidden&&b.width>0,inView:b.left>=0&&b.right<=innerWidth&&b.top>=0,message:document.getElementById('job-message').textContent,named:named.length,covered:named.filter(e=>!hit(e)).map(name),under,own:own.map(name),ownBlocked:own.filter(e=>!hit(e)).map(name),
+      headings:headings.map(name),headingsUnder:headings.filter(overlaps).map(name),headingsBlocked:headings.filter(e=>!hit(e)).map(name),title:{text:title.textContent,shown:shown(title),hit:shown(title)&&hit(title)},detail:{text:detail.textContent,width:d.width,scrollWidth:detail.scrollWidth},bannerBox:[b.left,b.top,b.width,b.height],viewport:[innerWidth,innerHeight]}})()`);
+  // the document-tab row, the view title and the view below it, with the banner as it is and hidden by the check
+  const rowOwn = () => page.eval("(()=>{const b=document.getElementById('job-panel'),boxes=()=>JSON.stringify(['.document-tab','#view-title','#canvas'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [r.left,r.top+scrollY,r.width,r.height]}));const shown=boxes();b.hidden=true;const hidden=boxes();b.hidden=false;return {shown,hidden}})()");
+  // when the banner shows and leaves, and when a pointer was last pressed (performance.now() in the page)
+  const watchBanner = () => page.eval("(()=>{window.__r2=[];window.__r2press=null;if(!window.__r2watch){window.__r2watch=true;const p=document.getElementById('job-panel'),m=document.getElementById('job-message'),log=()=>window.__r2.push({t:performance.now(),hidden:p.hidden,text:m.textContent});new MutationObserver(log).observe(p,{attributes:true,attributeFilter:['hidden']});new MutationObserver(log).observe(m,{childList:true,characterData:true,subtree:true});document.addEventListener('pointerdown',()=>{window.__r2press=performance.now();},true);}return true})()");
+  const bannerTimes = () => page.eval("(()=>{const log=window.__r2,done=log.find(e=>e.text.startsWith('Optical run complete')),gone=done?log.find(e=>e.t>=done.t&&e.hidden):null;return {done:done?.t??null,gone:gone?.t??null,press:window.__r2press,shownUntilGone:!!done&&!log.some(e=>e.t>=done.t&&e.hidden&&e!==gone&&e.t<(gone?.t??Infinity))}})()");
   const checkCover = (seen, tag) => {
     assert.ok(seen.banner && seen.inView, tag + ': the banner shows inside the page');
     assert.ok(seen.named >= 10, tag + ': the tabs, ribbon buttons, File and the tree are checked');
     assert.deepEqual([seen.covered, seen.under, seen.ownBlocked], [[], [], []], tag + ': the banner covers no control and its own buttons are clickable');
   };
+  // round 15 (R2): with the banner scrolled into the middle of the view, it covers no control and no
+  // panel heading, and the view title is visible and on top
+  const checkHeadings = (seen, tag) => {
+    assert.ok(seen.banner && seen.inView, tag + ': the banner shows inside the page');
+    assert.deepEqual([seen.covered, seen.under, seen.ownBlocked], [[], [], []], tag + ': the banner covers no control and its own buttons are clickable');
+    assert.ok(seen.bannerBox[1] >= 0 && seen.bannerBox[1] + seen.bannerBox[3] <= seen.viewport[1], tag + ': the banner is in the viewport');
+    assert.ok(seen.headings.length >= 3 && seen.headings.includes('view-title'), tag + ': the headings are checked: ' + seen.headings);
+    assert.deepEqual([seen.headingsUnder, seen.headingsBlocked], [[], []], tag + ': the banner covers no panel heading');
+    assert.deepEqual(seen.title, {text: seen.title.text, shown: true, hit: true}, tag + ': the view title is visible');
+  };
+  const centredCover = async () => { await page.eval("document.getElementById('job-panel').scrollIntoView({block:'center'})"); const seen = await bannerCover(); await page.eval('scrollTo(0,0)'); return seen; };
   for (const [width, w, h, mobile] of [[500, 1440, 900, false], [450, 390, 844, true]]) {
     await page.call('Emulation.setDeviceMetricsOverride', {width: w, height: h, deviceScaleFactor: 1, mobile}); await sleep(300);
     await toGeometry(); await page.type('#shape-w', width); await sleep(300);
-    const before = await layoutBoxes();
+    const before = await layoutBoxes(); await watchBanner();
     await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical');
     await page.until("!document.getElementById('job-panel').hidden", 'Q6 banner shown');
     await page.eval('scrollTo(0,0)');
-    const running = await layoutBoxes(), runningCover = await bannerCover(), runningOwn = await withoutBanner();
+    const running = await layoutBoxes(), runningCover = await bannerCover(), runningOwn = await withoutBanner(), runningRow = await rowOwn(), runningHeadings = await centredCover();
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'Q6 optical run', 120000);
-    await sleep(200); await page.eval('scrollTo(0,0)'); const done = await layoutBoxes(), doneCover = await bannerCover(), doneOwn = await withoutBanner();
+    await sleep(200); await page.eval('scrollTo(0,0)'); const done = await layoutBoxes(), doneCover = await bannerCover(), doneOwn = await withoutBanner(), doneRow = await rowOwn(), doneHeadings = await centredCover();
+    // round 15 (R2): with no input the complete banner leaves 6 s after it appears (wide); a pointer
+    // press leaves it at once (phone): a real mouse press on the Results tab, where the page already is
+    let leaves;
+    if (!mobile) { await page.until("document.getElementById('job-panel').hidden", 'R2 banner leaves by itself', 10000); leaves = await bannerTimes(); }
+    else {
+      const at = await page.eval("(()=>{const r=document.querySelector('nav [data-page=Results]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
+      for (const type of ['mousePressed', 'mouseReleased']) await page.call('Input.dispatchMouseEvent', {type, x: at.x, y: at.y, button: 'left', clickCount: 1});
+      await page.until("document.getElementById('job-panel').hidden", 'R2 banner leaves at a pointer press', 2000); leaves = await bannerTimes();
+    }
+    const gone = await layoutBoxes();
     await toGeometry(); await page.type('#shape-w', width + 2); await page.until("document.getElementById('job-panel').hidden", 'Q6 banner gone after an edit');
     const after = await layoutBoxes(); await page.type('#shape-w', width); await sleep(200);
     await page.click('nav [data-page=Results]'); await page.until("!!document.getElementById('optical-field')", 'Q6 back on Results');
-    stage('Q6 banner ' + w, {before, running, done, after, runningCover, doneCover, runningOwn, doneOwn});
+    stage('Q6 banner ' + w, {before, running, done, after, gone, runningCover, doneCover, runningOwn, doneOwn, runningRow, doneRow, runningHeadings, doneHeadings, leaves});
+    assert.deepEqual([runningRow.hidden, doneRow.hidden], [runningRow.shown, doneRow.shown], `R2 at ${w} × ${h}: the title row, the view title and the view keep their boxes with the banner`);
+    assert.ok(leaves.done !== null && leaves.gone !== null && leaves.shownUntilGone, `R2 at ${w}: the complete banner was seen and left: ${JSON.stringify(leaves)}`);
+    if (!mobile) assert.ok(leaves.gone - leaves.done >= 5900 && leaves.gone - leaves.done <= 6600, `R2 at ${w}: the banner leaves 6 s after it appears, by itself: ${leaves.gone - leaves.done} ms`);
+    else assert.ok(leaves.press !== null && leaves.press > leaves.done && leaves.gone - leaves.press <= 300 && leaves.gone - leaves.done < 5900, `R2 at ${w}: a pointer press removes the banner at once: ${JSON.stringify(leaves)}`);
+    assert.deepEqual(place(gone), place(before), `R2 at ${w} × ${h}: no layout shift when the banner leaves`);
     assert.deepEqual([running, done, after].map(place), [before, before, before].map(place), `Q6 at ${w} × ${h}: no layout shift`);
     if (!mobile) assert.deepEqual([running, done, after], [before, before, before], `Q6 at ${w} × ${h}: the same boxes`);
     assert.deepEqual([runningOwn.hidden, doneOwn.hidden], [runningOwn.shown, doneOwn.shown], `Q6 at ${w} × ${h}: the banner itself moves and resizes nothing`);
     checkCover(runningCover, `Q6 ${w} running`); checkCover(doneCover, `Q6 ${w} complete`);
+    checkHeadings(runningHeadings, `R2 ${w} running`); checkHeadings(doneHeadings, `R2 ${w} complete`);
     assert.match(doneCover.message, /^Optical run complete\./);
     assert.ok(await page.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth') <= 0, `Q6 at ${w}: no horizontal overflow`);
   }

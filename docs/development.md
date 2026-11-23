@@ -436,6 +436,13 @@ an edit removes it; while it shows, every tab, ribbon button, the File menu butt
 first item is the element at its centre, no visible control outside it intersects it and its own
 buttons are clickable. On Compare the run list's *Compare A* and *Compare B* are bordered badges
 after the label, and the buttons' accessible names still end in *· Compare A* and *· Compare B*.
+Since round 15 (pre-registered) the banner is part of the view's title row: with it scrolled into
+view while running and complete, at both sizes, it intersects no panel heading (the view title and
+detail, the pane titles, and the headings and captions of the view and the settings), each of them
+is the element at its centre, the view title is visible, and the title row, the view title and the
+view keep their boxes with it and without it. With no input the complete banner leaves 5.9 to 6.6 s
+after it appears (1440 × 900, measured in the page); a real mouse press leaves it within 300 ms
+(390 × 844).
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
