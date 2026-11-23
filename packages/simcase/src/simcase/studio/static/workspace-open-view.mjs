@@ -5,23 +5,25 @@
 // modes, the edge switch of Geometry › Boundaries, the Study summary and PML check option, and the
 // Results parts of an open run (found line, PML check column, other candidates). HTML text or DOM
 // nodes only; the page binds them.
-import {BOUNDARY_CHOICES,OPEN_HELP,TARGET_HELP,PML_DETAILS,PML_WORDS,checkLabel,CHECK_NOTE,targetText,effectiveTarget,studySummary,openEdges,otherCandidates,otherCandidatesTitle,OTHER_CANDIDATES_NOTE,openFoundText,MOVE_TARGET_TEXT} from './workspace-open-run.mjs';
-import {maxIndex,TARGET_FLOOR,hasOpenEdge} from './workspace-open-boundary.mjs';
+import {BOUNDARY_CHOICES,OPEN_HELP,TARGET_HELP,PML_DETAILS,PML_DETAILS_SEARCHES,PML_WORDS,checkLabel,CHECK_NOTE,targetText,effectiveTarget,studySummary,openEdges,otherCandidates,otherCandidatesTitle,OTHER_CANDIDATES_NOTE,runFoundText,lowerTargetText,searchesHelp,hasSearches,duplicateCount} from './workspace-open-run.mjs';
+import {maxIndex,TARGET_FLOOR,hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
 
 const escape=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const pair=(a,b,id='')=>`<div class="pair"${id?` id="${id}"`:''}><span>${escape(a)}</span><strong>${escape(b)}</strong></div>`;
 export const ALL_CLOSED_NOTE='Every edge is closed: a run is a closed window. Open an edge in Geometry › Boundaries.';
 
 /** Physics › Optical modes: Outer boundary (Closed window / Open boundary), and with Open the
- * fixed PML, Search near n_eff and the fixed settings under Details. */
+ * fixed PML, Search near n_eff with the second search's target as text (slice T2; none below
+ * t = 1.466) and the fixed settings under Details. */
 export function boundaryFieldHtml(ob,shapes){
  const open=!!ob,radio=(value)=>`<label class="radio-field"><input type="radio" name="outer-boundary" value="${value}"${(value==='open')===open?' checked':''}> ${escape(BOUNDARY_CHOICES[value])}</label>`;
  let html=`<fieldset class="boundary-choice" id="outer-boundary"><legend>Outer boundary</legend>${radio('closed')}${radio('open')}</fieldset><p class="input-note" id="open-boundary-help">${escape(OPEN_HELP)}</p>`;
  if(!open)return html;
- const nmax=maxIndex(shapes),t=effectiveTarget(ob,shapes);
- html+=pair('PML thickness',PML_WORDS,'pml-thickness')+`<label>Search near n_eff<input id="target-number" type="number" min="${TARGET_FLOOR}" max="${nmax}" step="0.001" value="${targetText(t)}" aria-describedby="target-help"></label><p class="input-note" id="target-help">${escape(TARGET_HELP)}</p>`;
+ const nmax=maxIndex(shapes),t=effectiveTarget(ob,shapes),low=lowerTarget(t);
+ html+=pair('PML thickness',PML_WORDS,'pml-thickness')+`<label>Search near n_eff<input id="target-number" type="number" min="${TARGET_FLOOR}" max="${nmax}" step="0.001" value="${targetText(t)}" aria-describedby="${low===null?'':'lower-target '}target-help"></label>`
+  +(low===null?'':`<p class="input-note" id="lower-target">${escape(lowerTargetText(low))}</p>`)+`<p class="input-note" id="target-help">${escape(low===null?TARGET_HELP:searchesHelp(low))}</p>`;
  if(!hasOpenEdge(ob))html+=`<p class="input-note" id="all-edges-closed">${escape(ALL_CLOSED_NOTE)}</p>`;
- return html+`<details class="pml-details" id="pml-details"><summary>Details</summary><p>${escape(PML_DETAILS)}</p></details>`;
+ return html+`<details class="pml-details" id="pml-details"><summary>Details</summary><p>${escape(low===null?PML_DETAILS:PML_DETAILS_SEARCHES)}</p></details>`;
 }
 /** Study: the summary line and the PML check option (an open boundary only), else ''. */
 export function studyOpenHtml(ob,shapes,checkOn,modeCount){
@@ -40,27 +42,29 @@ export function edgePanel(side,ob){
  label.append(input,' Close this edge');box.append(heading,note,label);
  return box;
 }
-/** The found line of an open run: "Found 2 of 2 modes near n_eff 2.460." and the hint. */
+/** The found line of an open run: "Found 2 of 2 modes near n_eff 2.46 and 1.95." and the hint
+ * (a run of one search, as P2 wrote it: "… near n_eff 2.460."). */
 export function foundLine(run){
  const p=document.createElement('p');p.id='modes-found';p.className='modes-found';
- p.textContent=openFoundText(run.effective_index.length,run.settings.mode_count,run.settings.pml.target)+'. '+MOVE_TARGET_TEXT;
+ p.textContent=runFoundText(run.effective_index.length,run.settings.mode_count,run.settings.pml.target,run.open_boundary);
  return p;
 }
 /** Other candidates (n) — not shown as modes: a disclosure with a table of n_eff, physical share
- * and reason; no field view. */
+ * and reason; no field view. With two searches the table also names each candidate's search and
+ * the title counts the candidates both searches found (not listed again). */
 export function candidatesDisclosure(run){
- const rows=otherCandidates(run.open_boundary,run.effective_index,run.effective_index_im);
+ const rows=otherCandidates(run.open_boundary,run.effective_index,run.effective_index_im),two=hasSearches(run.open_boundary);
  const details=document.createElement('details');details.className='other-candidates';details.id='other-candidates';
- const summary=document.createElement('summary');summary.textContent=otherCandidatesTitle(rows.length);details.append(summary);
+ const summary=document.createElement('summary');summary.textContent=otherCandidatesTitle(rows.length,duplicateCount(run.open_boundary));details.append(summary);
  const note=document.createElement('p');note.className='table-note';note.textContent=OTHER_CANDIDATES_NOTE;details.append(note);
  if(rows.length){
   const wrap=document.createElement('div');wrap.className='table-scroll';
   const table=document.createElement('table');table.id='other-candidates-table';
   const caption=document.createElement('caption');caption.textContent='Searched candidates not shown as modes';table.append(caption);
-  const head=document.createElement('tr');for(const h of ['Candidate','n_eff','Physical share','Reason']){const th=document.createElement('th');th.scope='col';th.textContent=h;head.append(th);}
+  const head=document.createElement('tr');for(const h of two?['Candidate','Search','n_eff','Physical share','Reason']:['Candidate','n_eff','Physical share','Reason']){const th=document.createElement('th');th.scope='col';th.textContent=h;head.append(th);}
   const thead=document.createElement('thead');thead.append(head);table.append(thead);
   const body=document.createElement('tbody');
-  for(const r of rows){const tr=document.createElement('tr');for(const [v,cls] of [[String(r.candidate),''],[r.neff,'num'],[r.share,'num'],[r.reason,'']]){const td=document.createElement('td');td.textContent=v;if(cls)td.className=cls;tr.append(td);}tr.dataset.candidate=String(r.candidate);body.append(tr);}
+  for(const r of rows){const tr=document.createElement('tr');for(const [v,cls] of [[String(r.candidate),''],...(two?[[r.search,'']]:[]),[r.neff,'num'],[r.share,'num'],[r.reason,'']]){const td=document.createElement('td');td.textContent=v;if(cls)td.className=cls;tr.append(td);}tr.dataset.candidate=String(r.candidate);body.append(tr);}
   table.append(body);wrap.append(table);details.append(wrap);
  }
  return details;

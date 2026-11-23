@@ -34,7 +34,10 @@ test('the template opened on all four edges: the domain grows by t, the fixed PM
  assert.deepEqual(doc.physics.em1.boundary,{left:'pec',right:'pec',top:'pec',bottom:'pec'});
  assert.equal(doc.physics.em1.target_effective_index,2.46);
  assert.deepEqual(doc.physics.em1.pml,{pml_thickness:{left:'1000 nm',right:'1000 nm',bottom:'1000 nm',top:'1000 nm'},
-  pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:32});
+  pml_strength:3,pml_order:2,pml_minimum_physical_fraction:0.5,pml_search_mode_count:32,
+  // slice T2: the second search, 16 near (2.46 + 1.444) / 2 = 1.952 -> 1.95, after the fixed keys
+  pml_additional_searches:[{target_effective_index:1.95,pml_search_mode_count:16}]});
+ assert.deepEqual(Object.keys(doc.physics.em1.pml).at(-1),'pml_additional_searches');
  // everything else is the v8 document
  const rest=d=>({...d,geometry:{...d.geometry,domain:null},physics:{em1:{...d.physics.em1,target_effective_index:null,pml:null}}});
  assert.deepEqual(rest(doc),rest({...v8,physics:{em1:{...v8.physics.em1,target_effective_index:2.46,pml:{}}}}));

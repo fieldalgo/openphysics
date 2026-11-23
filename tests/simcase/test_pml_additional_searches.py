@@ -210,6 +210,11 @@ def test_the_record_with_and_without_the_key():
 def _run(d, searches=DEFAULT, **pml):
     d = copy.deepcopy(d)
     d["results"] = {"plots": False}
+    # slice T2: the builder writes the second search of the default target 2.46, DEFAULT itself;
+    # searches=None is the primary search alone (the key removed)
+    built = d["physics"]["em1"]["pml"].pop("pml_additional_searches", None)
+    if d["physics"]["em1"]["target_effective_index"] == 2.46 and d["physics"]["em1"]["pml"]["pml_strength"] == 3:
+        assert built == DEFAULT, built
     if searches is not None:
         d["physics"]["em1"]["pml"]["pml_additional_searches"] = searches
     d["physics"]["em1"]["pml"].update(pml)

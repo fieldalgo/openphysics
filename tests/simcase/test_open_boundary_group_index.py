@@ -61,7 +61,7 @@ def slab_group_index(step=1e-9):
 def test_v11_group_index_of_the_leaky_film():
     reference = slab_group_index()
     dn_reference = slab_dn_dlambda()
-    text = build("slab", 1, target=2.85, edges=TOP_BOTTOM)
+    text = build("slab", 1, target=2.85, edges=TOP_BOTTOM, single=True)
     re_errors, im_errors, slope_errors = [], [], []
     for factor in (1, 0.5, 0.25):
         d = scaled(text, factor)
@@ -94,7 +94,7 @@ def test_v11_group_index_of_the_leaky_film():
 
 
 def test_v11_the_open_template_gets_a_complex_group_index_with_its_method():
-    d = json.loads(build("template", 2, edges=ALL))
+    d = json.loads(build("template", 2, edges=ALL, single=True))
     d["results"] = {"group_index": {"wavelength_step": "1 nm"}}
     result = solve(d)
     summary = result.summary()
