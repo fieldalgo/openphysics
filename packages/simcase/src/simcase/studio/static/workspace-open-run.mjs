@@ -117,11 +117,25 @@ export const OPEN_NOTE_EXTRA='Leakage depends on what lies outside the window: s
 export const CLOSED_POINTER='For leakage, choose Open boundary in Physics › Optical modes.';
 /** dB/cm of Im n_eff at lambda0 (m): 20 log10(e) k0 Im n_eff / 100. */
 export const dbPerCm=(im,lambda0)=>40*Math.PI/Math.LN10*im/lambda0/100;
+/** X of "|loss| < X": a positive dB/cm rounded up to 2 significant digits, as text ("0.095",
+ * "12", "1200"). */
+export function lossBoundText(loss){
+ // a quotient within 1e-9 of a whole number is that number (0.07 / 0.001 = 70.00000000000001)
+ const e=Math.floor(Math.log10(loss)),step=10**(e-1),x=Math.ceil(loss/step-1e-9)*step,digits=Math.floor(Math.log10(x)+1e-12);
+ return digits>=1?String(Math.round(x)):x.toFixed(1-digits);
+}
+/** The words of a small negative Im n_eff whose |loss| reaches the floor (a change of P2's V14 rule:
+ * the engine may accept such modes as lossless within the PML's noise). */
+export const negativeLossText=bound=>`not resolved (|loss| < ${bound} dB/cm)`;
+export const negativeLossHelp=bound=>`The solve gives a small negative Im n_eff within the PML's numerical noise; the loss is below about ${bound} dB/cm.`;
 /** The loss cell of an open run: {text, title, value (dB/cm or null), floor}. status: the
- * candidate's attenuation_status ("numerically_unresolved" reads as below the floor). */
+ * candidate's attenuation_status ("numerically_unresolved" reads as below the floor). A negative
+ * Im n_eff whose |loss| is 0.01 dB/cm or more reads "not resolved (|loss| < X dB/cm)"; below that
+ * it reads "< 0.01 dB/cm" as any loss under the floor does. */
 export function openLoss(im,lambda0,status=null){
  if(im===null||im===undefined||!Number.isFinite(im))return {text:'—',title:'No Im n_eff',value:null,floor:false};
  const value=dbPerCm(im,lambda0);
+ if(status!=='numerically_unresolved'&&value<0&&-value>=LOSS_FLOOR){const bound=lossBoundText(-value);return {text:negativeLossText(bound),title:negativeLossHelp(bound),value,floor:false};}
  if(status==='numerically_unresolved'||!(value>=LOSS_FLOOR))return {text:FLOOR_TEXT,title:FLOOR_HELP,value,floor:true};
  return {text:(value>=1e4?value.toFixed(0):value.toPrecision(4))+' dB/cm',title:OPEN_LOSS_HELP+'. '+MESH_ERROR_NOTE,value,floor:false};
 }
