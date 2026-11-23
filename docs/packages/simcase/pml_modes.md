@@ -96,7 +96,8 @@ DOFs. A wider search finds physical modes that a narrow one misses near the targ
 key is never recorded in `defaults_applied`, so documents without it give the results they
 gave before it existed. Eligible candidates have positive real index, residual <=1e-8 (`relative_residual_threshold`), physical
 fraction >= `pml_minimum_physical_fraction` (default 0.1, in (0, 1]), and imaginary
-index >= -1e-10 max(1,|Re n|) (a gain-like candidate is rejected as `negative_imaginary_index`). The nearest eligible candidates to the target are
+index >= −b (a gain-like candidate is rejected as `negative_imaginary_index`; the
+[gain bound](#the-gain-bound) b is below). The nearest eligible candidates to the target are
 returned, ordered by descending real index at the seed point. Rejected and
 unselected candidates remain in diagnostics. A nonfinite propagation root
 stops the low-level solve; it is not silently discarded. Roots of the vector
@@ -157,6 +158,40 @@ mode near the cladding index (n ≈ 1.486 + 7.9e-3i) that a search of 32 near 2.
   2.0555 + 6.82e-4i; the TM candidate (2.054060 + 6.724e-4i) is the 8th by Re and returned with
   `mode_count` 8.
 
+### The gain bound
+
+A lossless guided mode has Im n_eff = 0. On a PML mesh its computed Im n_eff is noise of either
+sign, and the noise grows with the part of the mode's field inside the PML. A candidate is
+gain-like, and rejected as `negative_imaginary_index`, only when
+
+    Im n_eff < −b,   b = max(1e-10, K f_pml) max(1, |Re n_eff|),   K = 1e-2,
+
+with f_pml its recorded `pml_l2_fraction`. A lossless mode's noise is |Im n_eff| ≤ b; on the
+gain side within b, it is eligible.
+
+- **Measured** (Linux, 27 solves: the template, the strip over a substrate, the leaky slab, a
+  700 × 300 nm core and P1's V5 template at 1.5 and 2 µm PML, at element length × 1, ½, ¼, and
+  ten wider searches including PML strength 1.5 and 6, order 3 and the bent slab, vector and
+  scalar). Ratio r = |Im n_eff| / (f_pml max(1, |Re n_eff|)):
+  - lossless guided modes with Im < 0: r from 7.6e-6 to 2.57e-3 (the largest: the template's bound
+    1.4924 mode at PML strength 1.5, Im −5.4e-5, about 19 dB/cm of noise);
+  - gain-like candidates (PML modes of the bend, f_pml ≥ 0.956): r from 5.67e-2 to 0.68;
+  - real leaky modes (Im > 0), for scale: r ≥ 8.6e-2 (the slab's 1.87e-5 at f_pml 7.6e-5).
+- **K** is chosen from those 27 solves: 3.9 × above the largest lossless ratio and 5.7 × below
+  the smallest gain-like one. It is empirical, not a proof: a gain-like candidate with r below K
+  would be accepted, and a lossless mode with r above K rejected; neither was seen.
+- **Record.** A candidate with −b ≤ Im n_eff < −1e-10 max(1, |Re n_eff|) is labelled
+  `attenuation_status: "negative_within_pml_bound"`; `numerically_unresolved` and `resolved_sign`
+  keep their meaning, and no key or schema name changed. Before the bound, the limit was
+  −1e-10 max(1, |Re n|), 1e2 to 1e5 below the measured noise: on refined meshes the Studio
+  template's TM-like mode (Re 1.7712, Im −2.4e-9 at × ½) was rejected, and at × 1 its bound
+  1.4923 mode (Im −2.67e-7) was. Both are returned now; with 2 modes the × 1 selection is
+  unchanged, with 4 or 8 the × 1 template returns the 1.4923 mode as a third
+  (`tests/simcase/test_pml_gain_bound.py`).
+- **Noise size.** The noise of a returned lossless mode is |Im n_eff| ≤ b, in either sign: the
+  template's 1.4923 mode at PML strength 3 carries Im −2.67e-7, about 0.094 dB/cm, and a positive
+  Im of that size is reported as loss. A loss below b is not resolved.
+
 `abs(Im n)<=1e-10 max(1,|Re n|)` is labelled `numerically_unresolved`; its signed
 value and attenuation are preserved, never clamped to zero. This threshold is
 a numerical sign diagnostic, not an accuracy claim. Fewer eligible candidates
@@ -210,10 +245,8 @@ Results show all candidate reasons and residuals; artificial PML fields are
 grey. Scalar is exact for the invariant-axis TE slab polarization, an
 approximation for general 2D high-contrast guides. Variable curvature, 3D open
 modes, automatic PML convergence certification and non-Hermitian degenerate
-subspace tracking are outside this contract. Known issue: on refined open meshes a lossless
-TM-like mode can be dropped. Its tiny Im n_eff comes out with the wrong sign, beyond
-−1e-10 max(1, |Re n|), and it is rejected as `negative_imaginary_index`. The Studio template's
-TM-like mode (Re 1.7712, physical fraction 1.0) is missing at every element length × ½ and × ¼.
+subspace tracking are outside this contract. The [gain bound](#the-gain-bound) that separates
+PML noise from gain is empirical.
 
 Validation uses independent outgoing slab transfer roots, complex-order
 cylindrical J/Y/Hankel matching, three meshes, independent PML/window variation,

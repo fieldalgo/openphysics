@@ -1,0 +1,9 @@
+# Fixed
+
+## English
+
+- `simcase`: **an open-boundary (PML) run no longer drops a lossless guided mode as gain-like on a refined mesh.** A candidate is rejected as `negative_imaginary_index` only when Im n_eff < −b, b = max(1e-10, K f_pml) max(1, |Re n_eff|), K = 1e-2, with f_pml its recorded PML L2 fraction; the former limit −1e-10 max(1, |Re n|) lay 1e2 to 1e5 below the PML noise of lossless modes, so the Studio template's TM-like mode (Re 1.7712, Im −2.4e-9) was rejected at element length × ½ and × ¼, and its bound 1.4923 mode (Im −2.67e-7) at × 1. K is empirical, chosen from 27 measured solves: 3.9 × above the largest lossless ratio |Im| / (f_pml max(1, |Re|)) (2.57e-3) and 5.7 × below the smallest gain-like one (5.67e-2, PML modes of a bend), which stay rejected. An accepted candidate with a negative Im beyond 1e-10 max(1, |Re|) is labelled `attenuation_status: "negative_within_pml_bound"`; no key or schema name changes. At × 1 a two-mode template run returns the same modes (one rejected candidate's record changes); with 4 or 8 modes it also returns the 1.4923 mode. [PML modes](docs/packages/simcase/pml_modes.md#the-gain-bound).
+
+## 한국어
+
+- `simcase`: **열린 경계(PML) 실행이 세밀한 메시에서 무손실 도파 모드를 이득형으로 버리지 않습니다.** 후보는 Im n_eff < −b일 때만 `negative_imaginary_index`로 거절합니다. b = max(1e-10, K f_pml) max(1, |Re n_eff|), K = 1e-2이고 f_pml은 기록된 PML L2 비율입니다. 이전 한계 −1e-10 max(1, |Re n|)는 무손실 모드의 PML 잡음보다 1e2~1e5배 아래여서, Studio 템플릿의 TM-like 모드(Re 1.7712, Im −2.4e-9)가 요소 길이 × ½와 × ¼에서, 속박 1.4923 모드(Im −2.67e-7)가 × 1에서 거절되었습니다. K는 27회 측정 계산에서 고른 경험값으로, 가장 큰 무손실 비 |Im| / (f_pml max(1, |Re|))(2.57e-3)보다 3.9배 위, 가장 작은 이득형 비(5.67e-2, 굽힘의 PML 모드)보다 5.7배 아래이며 이득형 후보는 계속 거절됩니다. 1e-10 max(1, |Re|)를 넘는 음의 Im으로 받아들여진 후보는 `attenuation_status: "negative_within_pml_bound"`로 표시하며 키나 스키마 이름은 바뀌지 않습니다. × 1에서 모드 2개 템플릿 실행은 같은 모드를 반환하고(거절된 후보 하나의 기록만 바뀜), 4개나 8개면 1.4923 모드도 반환합니다. [PML 모드](packages/simcase/pml_modes.md#이득-경계).

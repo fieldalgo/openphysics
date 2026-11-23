@@ -1491,9 +1491,10 @@ window, so every closed formula and value is unchanged.
 
   V13a–c replaced the check after that result.
 - **Limitations.**
-  - On refined open meshes a lossless TM-like mode can be dropped. Its tiny Im n_eff comes out
-    with the wrong sign and the engine rejects it as `negative_imaginary_index`. The template's
-    TM-like mode is missing at × ½ and × ¼.
+  - Until the [gain bound](pml_modes.md#the-gain-bound), a lossless TM-like mode was dropped on
+    refined open meshes: its tiny Im n_eff came out with the wrong sign and the engine rejected
+    it as `negative_imaginary_index` (the template's TM-like mode at × ½ and × ¼). The bound
+    returns it, labelled `negative_within_pml_bound`.
   - A bent guide and the scalar formulation get none of these values.
   - The effective area of a strongly leaking mode depends on the window.
 
