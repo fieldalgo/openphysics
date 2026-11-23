@@ -115,7 +115,8 @@ test('Compare formats: n_eff to 8 decimals, the difference as a percentage of A,
 test('browser recovery of a multiphysics session over 16 MiB says which maps it left out, or that it wrote nothing',()=>{
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept:2'}),'Not saved to a file · kept for recovery in this browser without the maps of 2 runs · File › Save keeps them');
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept:1'}),'Not saved to a file · kept for recovery in this browser without the maps of 1 run · File › Save keeps them');
- assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'overLimit'}),'Not saved to a file · browser recovery unavailable: session over 16 MiB');
+ // round 17 (U6): the words add what to do (was '… · browser recovery unavailable: session over 16 MiB')
+ assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'overLimit'}),'Not saved to a file · browser recovery unavailable: session over 16 MiB · File › Save keeps your work');
  assert.equal(P.persistenceTitle({runsUnsaved:true,recovery:'kept'}),'Not saved to a file · kept for recovery in this browser');
 });
 test('the title names the session file a download went to and says it was a download',()=>{

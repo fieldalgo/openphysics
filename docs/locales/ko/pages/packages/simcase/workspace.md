@@ -814,7 +814,7 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 때부터 Save session이 쓸 버전 8 글로 기록합니다. 16 MiB를 넘으면 대화 상자 없이 고른 실행과 고정한
 실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · File › Save
 keeps them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
-MiB”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
+MiB · File › Save keeps your work”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
 waveguide 카드의 **Restore from this browser**는 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
 연 세션 파일과 같았던 기록을 복구하면 광학 기록처럼 *Recovered from this browser · same as file …json*으로
@@ -1574,7 +1574,11 @@ Results와 Compare의 Line profile and CSV를 펼쳐 가로(y 고정) 또는 세
 IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름, 비교 및 장 보기
 설정을 포함합니다. 연속 변경은 묶고 저장은 순서대로 수행하며, 세션 파일에 실행이 없는 동안 저장 표시는
 브라우저 사본의 상태(*updating browser recovery*, *kept for recovery in this browser*,
-*browser recovery unavailable*)를, 세션 파일이 생기면 그 파일을 보여 줍니다. 빈 새 탭은 기존 노트북을
+*browser recovery unavailable*)를, 세션 파일이 생기면 그 파일을 보여 줍니다. round 17부터 복구를 할 수 없으면
+까닭을 알 때 까닭과 할 일을 밝힙니다: 고른 실행과 고정한 실행이 장과 함께 16 MiB를 넘으면(기판 위 스트립의 고정한 열린 실행 둘은
+각각 약 7.5 MB로 넘습니다) *browser recovery unavailable: session over 16 MiB · File › Save keeps your work*,
+브라우저가 공간 부족으로 쓰기를 거부하면 *browser recovery unavailable: this browser’s storage is full · File ›
+Save keeps your work*입니다. 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
 새로고침 후 모델 카드(Optical waveguide 또는 Heated silicon waveguide 아래 **Restore from this browser**),

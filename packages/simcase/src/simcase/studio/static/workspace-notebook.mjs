@@ -355,7 +355,8 @@ export function captureSession(input,runs,selected,comparison,view){
    if(![STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(capturedInput.version))throw error;
    let plain;try{plain=write(withoutStudy(capturedInput));}catch{throw error;}
    out=plain;make.note=recoveryStudyNote(capturedInput);}
-  if(!out.ok)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');return out.text;};
+  // the code says why the header reads unavailable (round 17, U6: it read a bare "browser recovery unavailable")
+  if(!out.ok)throw Object.assign(new Error('Recovery snapshot exceeds 16 MiB: the selected and pinned runs are over 16 MiB with their fields. Unpin some of them, or use File › Save.'),{code:'recovery-over-limit'});return out.text;};
  make.note='';return make;
 }
 /** The note of a recovery kept without the study settings of these inputs (version 8). */
