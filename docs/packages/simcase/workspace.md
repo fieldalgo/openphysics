@@ -1421,9 +1421,9 @@ BLAS thread):
 | V13a | open template against the same mesh with PEC at the outer edge, η ≥ 0.9999 | 1 − 4e-14, 1 − 2e-11: passed |
 | V13b | template closed against open at × 1, both modes paired with their own counterpart (η ≥ 0.8, margin ≥ 0.1) | 0.99033, 0.98754: passed |
 | V13c | TE-like 1 − η(closed, open) decreasing at × 1, ½, ¼ | V13CTE |
-| V11a | dn_eff/dλ0 of the V1 film against refsol, ≤ 1e-3 relative at × 1 and not growing | V11A |
-| V11b | Re and Im n_g errors against refsol decreasing at × 1, ½, ¼ | V11B |
-| V11c | single-point n_g against the tracked sweep, ≤ 1e-12 relative | V11C |
+| V11a | dn_eff/dλ0 of the V1 film against refsol, ≤ 1e-3 relative at × 1 and not growing | 5.61e-4, 7.29e-4, 7.29e-4: within 1e-3, but the error grows from × 1 to × ½, so the “not growing” clause FAILED. The slope converges to a value 7.3e-4 from refsol’s; its cause is being diagnosed |
+| V11b | Re and Im n_g errors against refsol decreasing at × 1, ½, ¼ | Re 5.24e-3, 2.81e-3, 1.50e-3; Im 2.69 %, 1.06 %, 0.40 %: passed |
+| V11c | single-point n_g against the tracked sweep, ≤ 1e-12 relative | equal (relative difference 0): passed |
 
 - **V11 as first registered failed.** The gates were |ΔRe n_g| ≤ 1e-3 and Im within 2 % at
   × 1, against refsol's central difference at 1549 and 1551 nm with physmat's dispersion,
