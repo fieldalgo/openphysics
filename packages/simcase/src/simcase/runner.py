@@ -63,6 +63,9 @@ MODE_RESULT_SCHEMA = "openphysics.modes2d/3"
 VECTOR_REPRESENTATION = "vector-edge-nodal-v2"
 PML_REPRESENTATIONS = {"vector": "pml-vector-edge-nodal-v2", "scalar": "pml-scalar-nodal-v2"}
 PML_CANDIDATES_SCHEMA = "openphysics.pml-candidates/2"
+#: the candidate record of a merged search (``pml.pml_additional_searches``): /2 plus the searches,
+#: the selection by descending Re n_eff and the duplicate rule
+PML_SEARCHES_SCHEMA = "openphysics.pml-candidates/3"
 #: the modal phasor's propagation factor beside ``time_convention`` (exp(-i omega t))
 PROPAGATION = "exp(+i beta z)"
 #: the kernel's micrometre in metres: every kernel length comes back as ``x_um * 1e-6`` (H11)
@@ -473,7 +476,9 @@ class RunResult:
             out.update(open_boundary=copy.deepcopy(self.open_boundary),
                        normalization="physical_max_centroid_magnitude" if self.vector_fields is not None
                        else "physical_nodal_peak", field_representation=self._representation(),
-                       selection="pml_heuristic_near_target", attenuation="total_absorption_and_radiation")
+                       selection="pml_heuristic_descending_real_index"
+                       if any("searches" in d for d in self.open_boundary) else "pml_heuristic_near_target",
+                       attenuation="total_absorption_and_radiation")
             loss = self.bend_loss()
             if loss is not None:
                 out["bend_loss"] = _series(loss, "bend_loss")
@@ -892,7 +897,11 @@ def _public_open_boundary(diagnostic: dict) -> dict:
     out = {}
     for key, value in diagnostic.items():
         if key == "schema":
-            out[key] = PML_CANDIDATES_SCHEMA
+            out[key] = PML_SEARCHES_SCHEMA if "searches" in diagnostic else PML_CANDIDATES_SCHEMA
+        elif key == "searches":
+            out[key] = [{"search": s["search"], "target_effective_index": s["n_target"],
+                         "search_mode_count": s["search_count"], "candidate_count": s["candidate_count"]}
+                        for s in value]
         elif key == "physical_bounds":
             out[key] = {"unit": "m", "values": (np.asarray(value, dtype=float) * KERNEL_LENGTH).tolist()}
         elif key == "candidates":

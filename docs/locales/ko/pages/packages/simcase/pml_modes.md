@@ -81,6 +81,49 @@ exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
 나온 탐색은 적격 후보가 없는 탐색과 똑같이 거부합니다
 ([도파관 정식화](../galerkin/waveguide_formulation.md#3-full-vector-혼합-nédélec절점-정식화)).
 
+### 추가 검색
+
+목표 하나 근처의 검색 하나는 목표에서 먼 물리 모드를 놓칠 수 있습니다. 기판 위 스트립에는
+클래딩 굴절률 근처의 모드(n ≈ 1.486 + 7.9e-3i)가 있는데, 2.46 근처 32개 검색은 이를 찾지 못합니다.
+`pml.pml_additional_searches`는 주 검색(`target_effective_index`와 `pml_search_mode_count`) 외에
+추가 검색 1~3개를 나열합니다.
+
+```json
+"pml": {"pml_thickness": {"bottom": "1 um", "top": "1 um"}, "pml_search_mode_count": 32,
+        "pml_additional_searches": [{"target_effective_index": 1.95, "pml_search_mode_count": 16}]}
+```
+
+- 항목마다 두 키를 모두 씁니다. 각 목표는 유한한 양수이고, 쓴 그대로의 값(정확한 십진수:
+  `1.95`와 `1.950`은 같은 목표)이 주 목표와도 다른 모든 항목과도 달라야 합니다. 각 개수는
+  1부터 64까지의 정수이며 주 개수처럼 자유 DOF에 제한되고, `mode_count` 이상일 필요는 없습니다.
+  오류는 키 경로의 `E-CONTRACT` 또는 `E-DOMAIN`입니다.
+- 이 키는 벡터 정식화와 단일 study에서 읽습니다(굽힘은 허용). 스윕은 거부합니다(`E-CONTRACT`):
+  "pml_additional_searches is not read with a study sweep in this release; give one target".
+- 검색은 같은 메시와 pencil에서 순서대로 돌고 목표마다 분해를 한 번 합니다(검색마다 pencil을
+  다시 조립합니다). 후보는 그 순서로 번호를 매기고 각각 위의 기준으로 적격 여부를 정합니다.
+- 뒤 검색의 후보 b는 앞 후보 a(앞 검색의 후보이고 그 자신은 중복이 아니며, 적격 여부와 무관)와
+  |n_b − n_a| ≤ 1e-9 max(1, |n_a|)이고 η_w(a, b) = |⟨a, b⟩| / (‖a‖ ‖b‖) ≥ 0.99이면
+  **중복**입니다. 내적은 횡방향 모서리 계수와 전체 계산 메시의 모서리 질량 행렬로 계산합니다.
+  굴절률 허용치 안에 앞 후보가 여럿이면 b를 그 생성 공간에 사영한 것이 제곱 노름의 0.99 이상을
+  담을 때 중복입니다. 중복 후보도 기록은 남지만 선택되지 않습니다. 이유에 자신의 이유와 함께
+  `duplicate_candidate`가 붙고, `duplicate_of`, `duplicate_effective_index_distance`,
+  `duplicate_field_overlap`(겹침 경우에는 사영 비율의 제곱근), 그 경우에만 `duplicate_span`을
+  기록합니다.
+- 목표와의 거리 대신 **Re n_eff가 큰** 적격 비중복 후보 `mode_count`개를 Re 내림차순으로
+  반환합니다(`selected_descending_real_index`, 나머지는 `outside_requested_count`). 적격 후보가
+  없으면 합친 진단과 함께 `ModeSelectionError`를 냅니다.
+- 기록은 `openphysics.pml-candidates/3`입니다. /2의 모든 키에 `searches`(`search`,
+  `target_effective_index`, `search_mode_count`, `candidate_count`), `selection:
+  "descending_real_index"`, `duplicate_rule`, 후보마다 `search`(1부터)가 더해집니다. 요약의
+  `selection`은 `pml_heuristic_descending_real_index`이고, `mode_result_schema`와 모드장 배치는
+  바뀌지 않으며, `resolved_inputs`가 검색들을 그대로 보여 줍니다. 키가 없으면 아무것도 바뀌지
+  않습니다(스키마 /2, `selected_near_target`). 이 키보다 오래된 simcase는 키 이름으로
+  거부합니다(`E-KEY-UNKNOWN`).
+- Re 내림차순은 물리 비율 필터에만 기댑니다. 기본값 0.1처럼 낮은 비율에서는 물리 모드보다
+  Re가 큰 손실 있는 상자·PML 후보가 필터를 통과해 먼저 반환될 수 있습니다(누설 슬래브 예제에
+  2.0 근처 추가 검색을 넣으면 2.8521 대신 3.4396 + 0.0513i를 반환). Studio 문서는 0.5를
+  씁니다. 첫 모드를 믿기 전에 후보의 비율을 읽으십시오.
+
 `abs(Im n)<=1e-10 max(1,|Re n|)`이면 `numerically_unresolved`로 표시하고
 부호 있는 값과 감쇠를 보존합니다. 0으로 고치지 않습니다. 이 문턱은 수치적
 부호 진단이지 정확도 보증이 아닙니다. 요청보다 적게 찾으면 개수를 명시하며
