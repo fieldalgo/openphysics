@@ -20,6 +20,9 @@ class TwoGroundRectangleResult:
     current_gram[k] is integral(j_i*j_j ds), in 1/metre, for unit integrated
     signal currents. current_integrals[k,i] is that surface's signed return.
     These homogeneous static factors contain no frequency or material law.
+    smooth_interpolation_boxes is 1 when one bounding box met the matrix check;
+    otherwise the check was repeated on plane-scaled boxes, and
+    single_box_matrix_error keeps the failed one-box value.
     """
     capacitance_per_permittivity: np.ndarray
     current_gram: np.ndarray
@@ -32,6 +35,8 @@ class TwoGroundRectangleResult:
     matrix_refinement_error: float
     ground_refinement_error: float
     minimum_scaled_eigenvalue: float
+    smooth_interpolation_boxes: int = 1
+    single_box_matrix_error: float | None = None
 
     def __post_init__(self):
         for name in ('capacitance_per_permittivity', 'current_gram', 'current_integrals'):
@@ -117,19 +122,64 @@ def _point_green(targets, sources, width, height, images=8):
     half = 0.5 * np.log1p(4 * targets[:, None, 1] * sources[None, :, 1] / distance)
     return half + _smooth(targets, sources, width, height, images)
 
-def _matrix(a, b, width, height, *, degree, order, images):
-    points = np.concatenate((a, b))
-    lower = points.min(axis=0)
-    upper = points.max(axis=0)
-    if np.any(upper <= lower) or lower[1] <= 0 or upper[1] >= height or (lower[0] <= 0) or (upper[0] >= width):
-        raise ValueError('panels must be strictly inside the two-plane rectangle')
+def _projection(a, b, lower, upper, degree):
     grid, _ = kernel.tensor_basis((a + b) / 2, lower, upper, degree)
     projection = np.zeros((len(a), degree ** 2))
     nodes, weights = leggauss(degree)
     for node, weight in zip(nodes, weights / 2):
         _, values = kernel.tensor_basis(a + (node + 1) / 2 * (b - a), lower, upper, degree)
         projection += weight * values
-    result = kernel.half_matrix(a, b, order=order) + projection @ _smooth(grid, grid, width, height, images) @ projection.T
+    return grid, projection
+
+def _clusters(a, b, owners, height):
+    """Panel groups of each conductor no wider than its distance to the nearer plane.
+
+    The smooth kernel holds the images of the planes. Interpolating it over one
+    box much wider than a conductor's distance from a plane converges slowly
+    (coupled, layered and broadside striplines), so each conductor is split
+    into equal x intervals of at most that distance. Labels follow conductor
+    order, then x.
+    """
+    mids = (a + b) / 2
+    labels = np.empty(len(a), dtype=int)
+    start = 0
+    for owner in np.unique(owners):
+        group = np.flatnonzero(owners == owner)
+        points = np.concatenate((a[group], b[group]))
+        lower, upper = (points.min(axis=0), points.max(axis=0))
+        gap = min(lower[1], height - upper[1])
+        count = max(1, int(np.ceil((upper[0] - lower[0]) / gap)))
+        bins = np.minimum(((mids[group, 0] - lower[0]) / (upper[0] - lower[0]) * count).astype(int), count - 1)
+        labels[group] = start + bins
+        start += count
+    return labels
+
+def _matrix(a, b, width, height, *, degree, order, images, labels=None):
+    points = np.concatenate((a, b))
+    lower = points.min(axis=0)
+    upper = points.max(axis=0)
+    if np.any(upper <= lower) or lower[1] <= 0 or upper[1] >= height or (lower[0] <= 0) or (upper[0] >= width):
+        raise ValueError('panels must be strictly inside the two-plane rectangle')
+    if labels is None:
+        grid, _ = kernel.tensor_basis((a + b) / 2, lower, upper, degree)
+        projection = np.zeros((len(a), degree ** 2))
+        nodes, weights = leggauss(degree)
+        for node, weight in zip(nodes, weights / 2):
+            _, values = kernel.tensor_basis(a + (node + 1) / 2 * (b - a), lower, upper, degree)
+            projection += weight * values
+        result = kernel.half_matrix(a, b, order=order) + projection @ _smooth(grid, grid, width, height, images) @ projection.T
+    else:
+        groups = [np.flatnonzero(labels == label) for label in np.unique(labels)]
+        boxes = []
+        for group in groups:
+            box = np.concatenate((a[group], b[group]))
+            if np.any(box.max(axis=0) <= box.min(axis=0)):
+                raise ValueError('plane-scaled interpolation box has zero extent')
+            boxes.append(_projection(a[group], b[group], box.min(axis=0), box.max(axis=0), degree))
+        result = kernel.half_matrix(a, b, order=order)
+        for i, rows in enumerate(groups):
+            for j, columns in enumerate(groups):
+                result[np.ix_(rows, columns)] += boxes[i][1] @ _smooth(boxes[i][0], boxes[j][0], width, height, images) @ boxes[j][1].T
     reciprocity = _relative(result, result.T)
     if not np.isfinite(reciprocity) or reciprocity > 1e-10:
         raise ValueError('raw matrix reciprocity failed')
@@ -151,6 +201,15 @@ def _solve(polygons, *, width, height, panels_per_edge=32, interpolation_degree=
     coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images)
     fine, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2)
     error = _relative(coarse, fine)
+    clustered = {}
+    if not np.isfinite(error) or error > 1e-10:
+        # One bounding box failed the unchanged check; repeat it on plane-scaled boxes.
+        labels = _clusters(a, b, owners, h)
+        if labels.max() > 0:
+            coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images, labels=labels)
+            fine, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2, labels=labels)
+            clustered = dict(single_box_matrix_error=error, smooth_interpolation_boxes=int(labels.max() + 1))
+            error = _relative(coarse, fine)
     if not np.isfinite(error) or error > 1e-10:
         raise ValueError(f'matrix quadrature/interpolation failed: {error}')
     factor = cho_factor(fine)
@@ -168,7 +227,7 @@ def _solve(polygons, *, width, height, panels_per_edge=32, interpolation_degree=
     if max(residual, symmetry, energy_error) > 1e-10:
         raise ValueError('capacitance solve consistency failed')
     np.linalg.cholesky((capacitance + capacitance.T) / 2)
-    return dict(capacitance_per_permittivity=capacitance, panel_charge_per_permittivity=charges, normalized_panel_starts=a, normalized_panel_ends=b, owners=owners, length_unit_m=unit, checks=dict(matrix_error=error, raw_matrix_reciprocity=reciprocity, residual=residual, capacitance_reciprocity=symmetry, charge_energy=energy_error, condition=condition), panels=len(a))
+    return dict(capacitance_per_permittivity=capacitance, panel_charge_per_permittivity=charges, normalized_panel_starts=a, normalized_panel_ends=b, owners=owners, length_unit_m=unit, checks=dict(matrix_error=error, raw_matrix_reciprocity=reciprocity, residual=residual, capacitance_reciprocity=symmetry, charge_energy=energy_error, condition=condition, **clustered), panels=len(a))
 
 def _ground_coefficients(a, b, charges, width, height, *, modes, order):
     """Cosine coefficients of the two grounded-plane charge densities.
@@ -258,7 +317,7 @@ def _rectangle_result(polygons, *, width, height, panels_per_edge, ground_modes,
     if minimum < -1e-10:
         raise ValueError('boundary current Gram must be positive semidefinite')
     checks = raw['checks']
-    return TwoGroundRectangleResult(raw['capacitance_per_permittivity'], parts, integrated, raw['panels'], checks['condition'], max(checks['raw_matrix_reciprocity'], checks['capacitance_reciprocity']), checks['residual'], current_error, checks['matrix_error'], ground_error, minimum), raw
+    return TwoGroundRectangleResult(raw['capacitance_per_permittivity'], parts, integrated, raw['panels'], checks['condition'], max(checks['raw_matrix_reciprocity'], checks['capacitance_reciprocity']), checks['residual'], current_error, checks['matrix_error'], ground_error, minimum, checks.get('smooth_interpolation_boxes', 1), checks.get('single_box_matrix_error')), raw
 
 @dataclass(frozen=True)
 class TwoGroundRectangleEdgesResult:

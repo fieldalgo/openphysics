@@ -97,6 +97,38 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - 시험: 저장 레퍼런스 값의 payload·배열 데이터 한도가 1 MiB입니다(이전 512 KiB, 2026-10-28에 정한 한도). 기록(1 MiB)·저장소(10 MiB) 한도는 그대로입니다. [저장 레퍼런스 값](stored-reference-values.md).
 - `simcase`: **`shape_derivative.shape_problem`이 정상 열 밖에 과도 열·전기 전도·탄성·열탄성도 다룹니다**(버전 1 `2d` 성분의 재료 영역). `thermal.transient2d`(`solve_transient_heat`), `electric.steady2d`(`solve_steady_electric`), `mechanics.elasticity2d`(`solve_elasticity`), `mechanics.thermoelastic2d`(`solve_steady_thermoelasticity`, 움직이는 메시에서 열 단계를 다시 풂)입니다. `ShapeProblem.physics`가 종류를 밝히고 `solve(t)`는 그 풀이기의 결과를 돌려줍니다. 내향 열유속·convection·traction이 있는 열탄성 문서(워크플로가 받지 않음; 열원은 받음), 두 역학 종류의 `gauge_pressure`(simcase가 움직이는 법선의 traction으로 적용), Joule 가열은 이름을 밝혀 거부합니다(도파관 모드도 위 항목 전까지 거부). 두 재료 띠에서 검사했습니다(P1–P6): 전기 전류와 탄성 끝 변위, 그 미분이 약 1e-14로 정확; 열탄성의 열 단계는 정상 열 문제와 같고 끝 변위는 같은 메시 중앙 차분과 맞음(2.2e-9); 과도 열은 1000 s에서 정상 미분에 닿음(2.9e-9); 모든 종류가 t = 0에서 `run`과 같음. [문서의 형상 미분](packages/simcase/geometry_engine.md#문서의-형상-미분).
 - `simcase`: **다중물리 문서(D2)와 첫 결합 열 → n(T) → 광 모드.** `couplings`가 있거나 물리가 둘 이상의 종류에 속하는 문서는 형식 0.3 위에 `"openphysics": "0.3/multiphysics.1"`을 밝힙니다. 이런 모양의 `"0.3"` 문서는 `E-FORMAT`이고, 단일 물리 문서와 결과는 그대로입니다(배포한 예제 33개 모두 validate 출력, 필드, summary, model.json, results.png의 해시가 같음). 물리 항목마다 그 종류가 검증하고, `simcase validate`는 결합(포트, 물리량, 단위, `combine`, `same_mesh`), 유도한 풀이 순서와 그 순환을 `study.loops`에 비춰, 결합된 온도 아래 광학 재료의 열광학 모델을 검사합니다. `em.modes2d`에 입력 포트 `temperature`(K, 요소, `single`)가 생깁니다. 삼각형마다 P1 평균을 구하고 n = n₀(λ) + (dn/dT)(T − T_ref)를 쓰며, 모델은 로컬 기록(`thermo_optic_coefficient`, `reference_temperature`)이나 `physmat:Si`/`physmat:SiO2`(T_ref 300 K)에서 옵니다. 열은 여전히 라이브러리 재료를 읽지 않으므로 열 → 모드 문서는 로컬 기록을 씁니다. 받아들인 반복은 완화 고정점 반복으로 실행하고, `max_iterations`에 닿으면 새 코드 `E-LOOP-DIVERGED`와 잔차 이력으로 실패합니다. 다중물리 sweep은 검증하고 실행하지 않습니다. 결과는 물리마다 폴더가 있는 `multiphysics-run-v1`입니다. 독립 기준으로 검사했습니다. 균일 10 K 상승의 n_eff 변화는 PEC로 둘러싼 슬랩의 정확한 변화와 5.9e-4 이내(h = 0.02 µm), 선형 열 분포는 2.6e-10 K까지 정확, 결합 n_eff는 1D 기준으로 차수 1.86으로 수렴(Richardson 외삽 4.1e-7 이내), dn/dT = 0과 균일한 T_ref는 결합하지 않은 결과와 비트 단위로 같습니다. 결합 훅은 simcase 내부용이라 다른 공급자의 종류는 아직 결합하지 않습니다. [다중물리 문서](packages/simcase/multiphysics_document.md).
+- `galerkin`: 두 접지 경계 해법이 실패한 단일 상자 매끄러운 핵 보간 검사를 평면 거리 기준 상자(각 도체를 가까운 평면까지 거리보다 넓지 않은 x 구간으로 나눔)에서 같은 차수·패널·구적·1e-10 한도로 한 번 다시 한다. 전에 통과하던 결과는 비트 단위로 같고, `TwoGroundRectangleResult`가 `smooth_interpolation_boxes`와 `single_box_matrix_error`를 보고한다. "matrix quadrature/interpolation failed"로 실패하던 결합·적층·broadside stripline이 계산된다. [두 접지 해법](packages/galerkin/two-ground.md).
+
+- 활성 도체 한두 개의 명시적 두 모드 모서리 장 계산을 추가하고 물리 전류 모멘트 및 수치·패널·외곽·해석식 검사를 구분해 유지했습니다.
+
+- 명시적 분할 혼합 상호작용으로 두 모드 모서리 half-space Green 행렬을 조립하고 원행렬 거절 및 P0·에너지·참조 검사를 유지했습니다.
+
+- 혼합 선형 power 로그 블록에 유한 물리 밀도 분할과 adaptive 참조 출처를 추가하고 기존 비분할 동작을 유지했습니다.
+
+- 자기 로그·제곱 밀도 참조에 재현 가능한 출처를 추가하고 원래의 엄격한 상대·해석적 영값 검사를 유지했습니다.
+
+- 해석적 소스 모멘트·기존 고정 구적 거부·저장 adaptive 참조를 갖춘 명시적 두 모드 power/constant 끝점 상호작용을 추가했습니다.
+
+- 기존 구적 기준·독립 평행 폐형식·고정밀 직접적분 출처를 갖춘 명시적 분리 선형 power 로그 블록을 추가했습니다.
+
+- 기존 선형 로그 참조의 수치값과 판정 기준을 유지하면서 재현 가능한 출처 기록을 추가했습니다.
+
+- `galerkin`: 모든 도체가 활성 기저인 볼록 도체 1~2개의 명시 two-ground corner-power 장 계산을 추가했습니다. 불변 edge/whole current factor·독립 P3 참조·별도 panel/outer/반사 검사를 제공하며 기존 솔버는 그대로입니다. 고정접지 trace 축약은 이 방법의 범위 밖입니다.
+
+- `galerkin`: 정규 power 패널의 두 모드 current Gram·self-log 폐형식을 추가했습니다. 정확한 모드 mass·독립 직접적분 참조·uniform Legendre 한계를 검사하며 장 솔버를 대체하지 않습니다.
+
+- `galerkin`: 정규 power/constant 바닥접지 Green 평균에 해석 상수 moment·고정 구적·위상/해상도/양수성 거부를 추가했습니다. 독립 직접2D 참조와 물리 불변식으로 원시요소를 검증하며 기존 장 솔버는 바꾸지 않습니다.
+
+- `galerkin`: 정규화된 모서리 power-panel 구적, 해석적 self 항, 공통 꼭짓점·분리 패널·power-to-constant 로그 적분을 추가했습니다. 불변 캐시 규칙은 구적 산술과 가중치를 그대로 보존합니다. 독립 고정밀 참조와 기하 불변식으로 명시한 길이·분리 범위를 검사했습니다.
+- `galerkin`: 허용된 볼록 도체의 불변 매개변수 모서리 패널 기하와 보정 상대좌표를 사용하는 바닥 접지 반공간 행렬을 추가했습니다. 적분 원시요소이며 위쪽·옆쪽 경계 보정이나 완전한 장 해를 제공하지 않습니다.
+- `galerkin`: `bounded_dense_residual`은 보정 곱·합으로 범위가 제한된 binary64 밀집 잔차를 계산하며 정확한 이진 유리수 참조로 검사했습니다. 기존 솔버 기본값은 바꾸지 않습니다. 모서리 원시요소와 잔차 계산기는 Linux 소스·설치 각각 관련 검사 517개를 통과했으며 완전한 장 모델이나 다른 플랫폼을 수락한 것은 아닙니다. [계약과 한계](packages/galerkin/laplace_boundary.md).
+
+- 평면 작은 각도 격자의 스칼라 길이에 `math.hypot`을 사용해 CPU별 BLAS 축약 차이를 피합니다. 메시 설정과 선택 계약은 유지합니다.
+
+- `galerkin`: 접지 직사각형 경계 패널에서 보간 차수 10/12/14/16을 명시할 수 있다. 기본 10과 기존 거부 동작을 유지하며 높은 차수에서도 같은 세분 허용값과 외곽 기하를 사용한다.
+
+- `galerkin`: 바닥 접지 직사각형의 균질 Laplace 경계 패널 API 추가. 상호적인 에너지 조립·단위 전류 표면 Gram 인자·명시적 기하/자원/세분 검사. [계약과 검증](packages/galerkin/laplace_boundary.md).
+
 - CI: Ubuntu, macOS, Windows의 설치 플랫폼 검사를 차례로가 아니라 동시에 돌립니다. run 44870205876에서 셋을 차례로 돌리는 데 19.6분이 걸려 검증 실행 전체의 길이를 정했습니다. 검사 내용은 그대로입니다. [개발 안내](development.md#ci가-돌리는-것).
 - `simcase`: **에이전트 사용성 라운드에서 나온 Studio 작업 공간 수정**(참가자 다섯 명 모두가 겪은 문제): (1) 사각형의 **Width**를 바꾸면 가로 중심이 유지되고(Left x = 중심 − W/2) **Height**를 바꾸면 아래 변이 유지되므로, 600 → 700 nm 코어가 x = 0에서 벗어나 Δn_eff가 달라지지 않습니다(**Centre on x = 0**을 누르지 않으면 0.06911675, 누르면 0.06879796이었고 이제 기본이 후자). 범위, 계산창 거부, Undo는 그대로이고 저장된 프로젝트는 저장된 좌표를 유지합니다. (2) **Compare**에 캡션이 있는 표가 생겨 후보 순위마다 n_eff A, n_eff B, Δ (B − A), A 대비 Δ %를 보여 주고 머리글에 각 실행(이름, W × H, λ)을 표시합니다. 모드가 짝지어지지 않았다는 주의는 메모로 남습니다. (3) **Save session**은 응용과 현지 날짜·시각으로 파일 이름을 정하고(`optical-waveguide-session-2026-11-21-1305.json`), Messages에 *Session file … sent to the browser's downloads (check your Downloads folder)*를 알리고(Studio는 다운로드가 보관됐는지 알 수 없음), 다음 편집이나 실행 전까지 제목에 *Session file … · 시각*을 표시합니다. 브라우저 복구는 마지막 세션 파일 이름과 시각을 보관해 복구 뒤 *Results not saved* 대신 *Last session file … (시각)*을 보여 줍니다. Width를 홀수 nm만큼 바꾸면 Left x가 0.5 nm 단위가 되며 중심은 정확히 유지됩니다. (4) 기본 입력이고 결과가 없으면 열기·복구가 확인 없이 진행되고(Messages에 무엇을 열었는지 나옴), 그 밖에는 창이 **Open saved session?**(**Recover saved session?**)으로 돌아올 실행·이름·고정·비교와 바뀌는 것을 보여 주며, 버튼 이름은 **Open session**(**Recover session**)이고 실제로 있는 물리만 나열합니다. (5) 응용을 고르기 전에는 상태 표시줄에 *Choose an application to start*가 나오고 Study sequence에 단계가 없습니다. (6) 단계 표시줄의 Study 단계에 파장이 나옵니다(*λ 1550 nm · Ready to run*). 솔버, 문서 형식, 저장 결과, 수치는 바뀌지 않습니다.
 - `simcase`: **두 번째 에이전트 사용성 라운드에서 나온 Studio 작업 공간 수정**(괄호 안은 참가자 다섯 명 중 겪은 수): (1, 5/5) 세션 전체 저장을 한 이름으로 부릅니다. 리본 버튼은 **Save session**, 헤더는 *Results not saved · Save session to keep them*이며, 실행 패널은 **More › Save inputs only**가 결과를 담지 않는다고 알리고 *Save selected run*은 **Export this run**이 됩니다. (2, 4/5와 3/5) 제목이 무엇이 열려 있는지 알립니다. Open session 뒤에는 *Opened …*, 복구 뒤에는 *Recovered from this browser*(세션 파일을 저장한 적이 있으면 *last session file …* 포함), 시작 화면에서는 *No model chosen*이며 revision 번호는 없습니다. (3, 3/5) 낡은 상태 표시가 없습니다. 입력을 바꾸면 완료 메시지가 바뀌고 끝난 작업 패널이 숨겨지며, 현재 입력의 실행이 끝나면 Study 단계가 *Run complete*, Compare에서는 Results 단계를 강조하지 않고, 하단은 *Browser recovery pending* 대신 *Updating browser recovery…*, *Earlier inputs only*는 *Inputs changed since this result*입니다. (4, 4/5) Study에 **Edit wavelength**가 생겨 파장 입력란에 포커스를 둔 채 Optical modes를 엽니다. (5, 4/5) 실행 이름은 Enter를 누르거나 입력란을 벗어나면 적용되고, 안내 문구대로 실행을 고정합니다. (6, 4/5) 실행 목록 이름을 **Runs** 하나로 정했습니다. 실행 표시는 작업 id 대신 이름·크기·λ·시각을 보여 주고, 작업 id는 출처·simcase 버전·입력 변경 번호와 함께 **Run details**로 옮겼습니다. *pinned against automatic notebook eviction*, *physmat indices*, *input snapshot* 같은 내부 용어는 쉬운 말로 바꿨습니다. (7) Study sequence 줄은 일반 텍스트이고, Width 도움말은 한 문장과 **More about width and height**로 줄였으며, 다시 그려도 Settings 스크롤 위치와 포커스된 입력란이 보이게 유지하고, Compare의 Export field PNG는 Results에서 실행을 열라고 안내합니다. 솔버, 문서 형식, 세션 파일 형식, 저장 결과, 수치는 바뀌지 않습니다.
