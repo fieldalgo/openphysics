@@ -32,6 +32,8 @@ test('V14: the loss of an open run to 4 significant digits, by the hand formula'
  assert.equal(handDbPerCm(8.2797609e-5).toFixed(3),'29.153');
  assert.equal(R.openLoss(8.2797609e-5,LAMBDA).text,'29.15 dB/cm');
  assert.equal(R.openLoss(2.857064e-3,LAMBDA).text,'1006 dB/cm');
+ // 10^4 dB/cm and more: whole dB/cm, never an exponent
+ assert.equal(R.openLoss(3.5e-2,LAMBDA).text,R.dbPerCm(3.5e-2,LAMBDA).toFixed(0)+' dB/cm');assert.doesNotMatch(R.openLoss(3.5e-2,LAMBDA).text,/e/);
  for(const im of [1e-6,3.3e-5,8.2797609e-5,2.857064e-3,7.92e-3])assert.equal(R.dbPerCm(im,LAMBDA),handDbPerCm(im));
  const cell=R.openLoss(8.2797609e-5,LAMBDA);
  assert.equal(cell.floor,false);
@@ -135,7 +137,7 @@ test('PML check: each mode paired with the nearest eligible candidate; a mode no
  assert.deepEqual(R.eligibleCandidates(check).length,2);
  // nothing within 2e-3: not found
  assert.deepEqual(R.pairCheck([2.0],[1e-4],check).paired,[null]);
- assert.deepEqual(R.checkVerdict(2.0,1e-4,null,LAMBDA),{status:'not_found',text:'Not found in the check solve',title:R.CHECK_HELP});
+ assert.deepEqual(R.checkVerdict(2.0,1e-4,null,LAMBDA),{status:'not_found',text:'Not found in the check solve',title:'The check solve did not find this mode near the search value; this does not by itself mean the mode depends on the PML.'});
  // independent: below the floor on both solves, and a 0.1 % change
  assert.equal(R.checkVerdict(RE[0],IM[0],paired.paired[0],LAMBDA).text,'PML check: loss changes less than 0.01 dB/cm');
  const l=8.2797609e-5;

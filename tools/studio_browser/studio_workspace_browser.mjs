@@ -1616,7 +1616,16 @@ try {
     const editedDoc = await solverDocument(); stage('OB Search near n_eff 2.3', {target: editedDoc.physics.em1.target_effective_index});
     assert.equal(editedDoc.physics.em1.target_effective_index, 2.3);
     assert.deepEqual({...editedDoc, physics: {em1: {...editedDoc.physics.em1, target_effective_index: 2.46}}}, defaultDoc);
-    await toTree('Optical modes', "!!document.getElementById('target-number')"); await ob.type('#target-number', '2.46');
+    // an edited target that a material edit puts out of range (silicon nitride: n_max 1.9963) goes back
+    // to the new design's default, with a message, and every input write keeps working
+    await toTree('Geometry', "!!document.querySelector('#shape-w')"); await ob.choose('#shape-material', 'Silicon nitride');
+    const stale = await obText('#file-status');
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); const reset = await obValue('#target-number');
+    stage('OB stale target', {message: stale, value: reset});
+    assert.equal(stale, 'Search near n_eff 2.300 is outside this design\'s range: back to the default 1.720.'); assert.equal(reset, '1.720');
+    await toTree('Geometry', "!!document.querySelector('#shape-w')"); await ob.choose('#shape-material', 'Silicon');
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); assert.equal(await obValue('#target-number'), '2.460');
+    await ob.type('#target-number', '2.46');
     assert.equal(await obValue('#target-number'), '2.460');
 
     // 4. Study: the summary line and the PML check option; the template run, all edges open, with the check

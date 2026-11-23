@@ -103,7 +103,7 @@ export function openLoss(im,lambda0,status=null){
  if(im===null||im===undefined||!Number.isFinite(im))return {text:'—',title:'No Im n_eff',value:null,floor:false};
  const value=dbPerCm(im,lambda0);
  if(status==='numerically_unresolved'||!(value>=LOSS_FLOOR))return {text:FLOOR_TEXT,title:FLOOR_HELP,value,floor:true};
- return {text:value.toPrecision(4)+' dB/cm',title:OPEN_LOSS_HELP+'. '+MESH_ERROR_NOTE,value,floor:false};
+ return {text:(value>=1e4?value.toFixed(0):value.toPrecision(4))+' dB/cm',title:OPEN_LOSS_HELP+'. '+MESH_ERROR_NOTE,value,floor:false};
 }
 /** "2.44227500 + 8.28e-5i": Re as a closed run shows it, Im to 3 significant digits. */
 export function openIndexText(re,im){
@@ -182,12 +182,13 @@ export function checkPmlCheck(check,k,which='This run'){
  return {pml_strength:CHECK_STRENGTH,paired:check.paired.map(p=>p&&{re:p.re,im:p.im})};
 }
 const percent=x=>(x<10?x.toFixed(1):x.toFixed(0))+' %';
+export const NOT_FOUND_HELP='The check solve did not find this mode near the search value; this does not by itself mean the mode depends on the PML.';
 export const DEPENDS_HELP='This loss changes with the PML; it is not a converged leakage loss.';
 export const CHECK_HEADER='PML check';
 export const CHECK_HELP='The same mesh solved again with PML strength 6. PML-independent: Re n_eff within 5e-4 and the loss within max(2 %, 0.01 dB/cm).';
 /** The verdict of one mode: {status: independent | depends | not_found, text, title}. */
 export function checkVerdict(re,im,paired,lambda0){
- if(!paired)return {status:'not_found',text:'Not found in the check solve',title:CHECK_HELP};
+ if(!paired)return {status:'not_found',text:'Not found in the check solve',title:NOT_FOUND_HELP};
  const l1=dbPerCm(im,lambda0),l2=dbPerCm(paired.im,lambda0),dRe=paired.re-re,lossOk=lossIndependent(l1,l2),reOk=reIndependent(dRe);
  const change=l1>=LOSS_FLOOR?percent(Math.abs(l2-l1)/Math.abs(l1)*100):null;
  if(lossOk&&reOk)return {status:'independent',text:change?`PML check: loss changes ${change}`:`PML check: loss changes less than ${LOSS_FLOOR} dB/cm`,title:CHECK_HELP};
