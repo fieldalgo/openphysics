@@ -41,7 +41,7 @@ import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
-import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
+import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
 import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,LATER_SAVES_NOTE,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
@@ -216,11 +216,13 @@ const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduct
 // joined, kept from an opened project); file: the project file (workspace-files.mjs rememberFile,
 // with savedAt); stamp: what the project held when it was saved or opened (projectStamp); scope:
 // moves on when a file replaces the project, so a save under way never names the new one
-const project={name:null,ids:{},next:1,file:null,stamp:null,scope:0};
+// nameFrom: 'file' for a name taken from a file name, which follows Save As; 'user' for a name
+// set with Rename, which stays (round 16); null for an untitled project
+const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0};
 function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
 // a file replaced the project: an untitled project of the models now in the tab
-function resetProject({name=null,ids=null}={}){
- Object.assign(project,{name,ids:{},next:1,file:null,stamp:null,scope:project.scope+1});
+function resetProject({name=null,ids=null,nameFrom=null}={}){
+ Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,stamp:null,scope:project.scope+1});
  if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
 }
 // The models of the project, in Library order: {id, kind, title, card}
@@ -306,7 +308,7 @@ function libraryOptions(){
 function renameProject(value){
  let name;try{name=validateProjectName(value);}catch(e){notice(e.message+' The project name is unchanged.');return false;}
  if(name===project.name)return true;
- project.name=name;refreshPersistence();notice(`Project renamed to “${name}”. File › Save writes the new name.`);return true;
+ project.name=name;project.nameFrom='user';refreshPersistence();notice(`Project renamed to “${name}”. File › Save writes the new name.`);return true;
 }
 // The start page's cards: the coupled template opens the multiphysics model, the others the
 // application of their physics selection.
@@ -1651,11 +1653,11 @@ function saveProject({saveAs,keep}){
  // the size before anything is asked (the name changes it by a few bytes at most)
  const first=writeProject({name:project.name||'Untitled project',savedAt:new Date().toISOString(),studio:connection.version||'unknown',active,entries});
  if(!first.ok)throw new Error(first.refusal);
- const nameFor=fileName=>project.name||nameFromFile(fileName);
+ const nameFor=fileName=>savedProjectName({name:project.name,from:project.nameFrom},fileName);
  return deliverProject(fileName=>fileText(nameFor(fileName)),{saveAs}).then(result=>{
   if(!result.written){notice(result.message);return;}
   const savedAt=new Date().toISOString(),name=nameFor(result.name);
-  project.name=name;if(project.file)project.file.savedAt=savedAt;project.stamp=projectStamp(name,content);
+  project.name=name;if(project.nameFrom!=='user')project.nameFrom='file';if(project.file)project.file.savedAt=savedAt;project.stamp=projectStamp(name,content);
   for(const p of parts)p.mark(result.name,savedAt,result.via==='picker');
   refreshPersistence();
   notice(projectSavedNotice({name,file:result.name,via:result.via,known:result.known===true,again:result.again===true,after:noRun+result.after,
@@ -1738,7 +1740,7 @@ async function applyOpenedProject(read,fileName){
  try{
   if(!leaveMultiphysics())return;
   multiView.discard();
-  resetProject({name:read.name,ids:Object.fromEntries(read.models.map(m=>[m.kind,m.id]))});
+  resetProject({name:read.name,nameFrom:nameSource(read.name,fileName),ids:Object.fromEntries(read.models.map(m=>[m.kind,m.id]))});
   if(ws)completeLoad({input:ws.session.input,saved:true,session:ws.session,source:'file',label:fileName,page:null,opener:$('open-session'),context:loadContext()});
   else clearWorkspace();
   if(mp){
