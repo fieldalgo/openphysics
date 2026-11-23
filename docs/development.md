@@ -67,7 +67,14 @@ Optional tools and data:
   M. N. Polyanskiy, *Refractiveindex.info database of optical constants*,
   Scientific Data **11**, 94 (2024), https://doi.org/10.1038/s41597-023-02898-2.
 - **Chrome or Chromium**: the installed Studio browser check uses an already
-  installed browser. If none is found, the check fails; it is never skipped.
+  installed browser. If none is found, the check fails; it is never skipped. The workspace,
+  multiphysics and multiphysics session scripts start it through
+  `tools/studio_browser/browser_launch.mjs`: they wait up to 60 s for its DevTools endpoint to list
+  a page and, when it does not, stop it and start it once more on a new port with a new profile
+  directory. Every failed attempt is recorded in `report.json` (`browserLaunch`: the command line,
+  the exit code or signal and the last 4000 characters of stderr), and a second failure fails the
+  check. Only the launch is retried, never a Studio stage; `tests/simcase/studio_browser_launch.cjs`
+  checks this with a fake browser.
 
 The source Studio Node step runs every `tests/simcase/*.cjs` contract, including
 the experimental workspace. Distribution validation additionally copies the

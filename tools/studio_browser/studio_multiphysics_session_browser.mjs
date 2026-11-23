@@ -20,6 +20,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
+import {launchBrowser} from './browser_launch.mjs';
 import {fileURLToPath} from 'node:url';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
@@ -169,17 +170,16 @@ try {
   const chrome = findChrome();
   report.chrome = chrome || null;
   if (!chrome) throw new Error('No preinstalled Chrome, Chromium or Edge found; set --chrome or CHROME_PATH. No browser is downloaded.');
-  const apiPort = await freePort(), debugPort = await freePort(), base = `http://127.0.0.1:${apiPort}`;
+  const apiPort = await freePort(), base = `http://127.0.0.1:${apiPort}`;
   launch(args.python, ['-I', '-m', 'simcase.studio', '--workspace', '--no-browser', '--port', String(apiPort)], 'server');
   let up = false;
   for (let i = 0; i < 240 && !up; i++) { try { up = (await fetch(base + '/workspace')).ok; } catch {} if (!up) await sleep(250); }
   if (!up) throw new Error('Studio did not start');
   const sandbox = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
-  launch(chrome, ['--headless=new', '--disable-gpu', ...sandbox, '--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1',
-    '--remote-debugging-port=' + debugPort, '--user-data-dir=' + profile, '--window-size=1440,900', 'about:blank'], 'browser');
-  let target;
-  for (let i = 0; i < 120 && !target; i++) { try { target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json()).find(t => t.type === 'page'); } catch {} if (!target) await sleep(250); }
-  if (!target) throw new Error('Browser DevTools endpoint unavailable');
+  // the launch alone is retried once when the DevTools endpoint does not answer (browser_launch.mjs)
+  const {target, port: debugPort} = await launchBrowser({launch: (command, argv, attempt) => launch(command, argv, attempt === 1 ? 'browser' : 'browser-' + attempt), command: chrome, freePort, report,
+    argv: (port, attempt) => ['--headless=new', '--disable-gpu', ...sandbox, '--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1',
+      '--remote-debugging-port=' + port, '--user-data-dir=' + join(profile, 'attempt-' + attempt), '--window-size=1440,900', 'about:blank']});
   const page = new Page(target.webSocketDebuggerUrl); await page.ready;
   await page.call('Runtime.enable'); await page.call('Page.enable'); await page.call('DOM.enable'); await page.call('Accessibility.enable');
   const size = (width, height, mobile = false) => page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
