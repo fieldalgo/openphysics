@@ -1564,6 +1564,248 @@ try {
     await noOverflow('P2 File menu');
   }
 
+  // OB (optical open boundary, slice P2; pre-registered): in a browser context of its own (a fresh
+  // start page, its own storage and downloads): the Outer boundary choice and Search near n_eff in
+  // Physics › Optical modes, an edge closed again in Geometry › Boundaries, the Study summary and
+  // the PML check, the template run all open (found line, loss cells, other candidates, the check
+  // column), a session of version 10, Compare with a closed run of the template (matching off since
+  // V13 failed; per-side loss headers, the note, O2's 24 px), and the leakage case built here: a
+  // silicon substrate under a 500 nm BOX.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const ob = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await ob.ready;
+    await ob.call('Runtime.enable'); await ob.call('Page.enable'); await ob.call('DOM.enable'); await ob.call('Accessibility.enable');
+    const obSize = async (width, height, mobile = false) => { await ob.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await obSize(1280, 800);
+    const obDownloads = join(out, 'downloads-open-boundary'); await mkdir(obDownloads, {recursive: true});
+    await browserPage.call('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: obDownloads, browserContextId});
+    await ob.call('Page.addScriptToEvaluateOnNewDocument', {source: 'delete window.showSaveFilePicker;delete Window.prototype.showSaveFilePicker;'});
+    const obText = selector => ob.onElement('function(selector){const e=this.querySelector(selector);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector);
+    const obValue = selector => ob.onElement('function(selector){const e=this.querySelector(selector);return e?e.value:null}', selector);
+    // a control by role and accessible name in the accessibility tree: how many there are, and whether checked
+    const control = async (role, name) => {
+      const {result: document} = await ob.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await ob.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role});
+      const found = nodes.filter(n => !n.ignored);
+      return {count: found.length, checked: found[0]?.properties?.find(p => p.name === 'checked')?.value?.value ?? null, disabled: found[0]?.properties?.find(p => p.name === 'disabled')?.value?.value ?? false};
+    };
+    const obOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await obSize(width, height, mobile);
+        const over = await ob.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('OB overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await obSize(1280, 800);
+    };
+    const toTree = async (name, ready) => { await ob.click('nav [data-page=Model]'); await sleep(200); await ob.clickTreeItem(name); await ob.until(ready, name); };
+    const solverDocument = async () => { await toTree('Study', "!!document.querySelector('details.solver-document pre')"); return JSON.parse(await ob.eval("document.querySelector('details.solver-document pre').textContent")); };
+    const obRun = async () => {
+      await ob.until("!document.getElementById('run-optical').disabled", 'OB Run enabled');
+      const before = await ob.eval("document.querySelectorAll('.run-item').length");
+      const started = Date.now(); await ob.click('#run-optical');
+      await ob.until(`document.querySelectorAll('.run-item').length>${before}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'OB run', 300000);
+      return Math.round((Date.now() - started) / 1000);
+    };
+    const resultsView = () => ob.eval(`(()=>{const t=document.getElementById('modes-table');const rows=[...t.tBodies[0].rows];
+      return {caption:t.caption.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.textContent),lossTitle:t.tHead.rows[0].cells[3].title,
+       neff:rows.map(r=>r.querySelector('[data-neff]').textContent),loss:rows.map(r=>r.querySelector('[data-loss]').textContent),lossTitles:rows.map(r=>r.querySelector('[data-loss]').title),
+       pol:rows.map(r=>[r.querySelector('[data-polarization]')?.textContent,r.querySelector('[data-polarization]')?.title]),area:rows.map(r=>r.querySelector('[data-area]').textContent),
+       check:rows.map(r=>{const c=r.querySelector('[data-pml-check]');return c?[c.dataset.pmlCheckStatus,c.textContent]:null}),italic:rows.map(r=>!!r.querySelector('[data-loss] em')),
+       found:document.getElementById('modes-found')?.textContent??null,note:document.getElementById('loss-note')?.textContent??document.getElementById('lossless-note')?.textContent??null,
+       candidates:(()=>{const d=document.getElementById('other-candidates');return d&&{summary:d.querySelector('summary').textContent,rows:d.querySelectorAll('tbody tr').length,reasons:[...new Set([...d.querySelectorAll('tbody tr')].map(r=>r.cells[3].textContent))],controls:d.querySelectorAll('button,canvas,a').length}})()};})()`);
+
+    await ob.call('Page.navigate', {url: base + '/workspace'});
+    await ob.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'OB connected start page');
+    await ob.click('[data-template=optical]'); await ob.until("!!document.querySelector('#shape-w')", 'OB optical template');
+
+    // 1. Physics › Optical modes: Closed window by default; Open shows PML 1 µm and Search near n_eff 2.460
+    await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
+    const closedChoice = {closed: await control('radio', 'Closed window (PEC)'), open: await control('radio', 'Open boundary (PML)'), help: await obText('#open-boundary-help')};
+    stage('OB choice, closed', closedChoice);
+    assert.deepEqual([closedChoice.closed.count, closedChoice.closed.checked, closedChoice.open.count, closedChoice.open.checked], [1, 'true', 1, 'false']);
+    assert.equal(closedChoice.help, 'Open boundary adds an absorbing layer (PML) outside the window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge continue through the layer.');
+    await ob.click('input[name="outer-boundary"][value="open"]'); await ob.until("!!document.getElementById('target-number')", 'OB Open chosen');
+    const openChoice = {open: await control('radio', 'Open boundary (PML)'), target: await control('spinbutton', 'Search near n_eff'), value: await obValue('#target-number'),
+      thickness: await obText('#pml-thickness'), groupIndex: await control('checkbox', 'Also compute group index (3 solves)'), groupNote: await obText('#group-index-open-note'),
+      details: await ob.eval("document.querySelector('#pml-details p').textContent"), targetHelp: await obText('#target-help')};
+    stage('OB choice, open', openChoice);
+    assert.deepEqual([openChoice.open.checked, openChoice.target.count, openChoice.value, openChoice.thickness], ['true', 1, '2.460', 'PML thickness PML 1 µm']);
+    assert.deepEqual([openChoice.groupIndex.count, openChoice.groupIndex.disabled], [1, true]);
+    assert.equal(openChoice.groupNote, 'Group index with an open boundary comes in a later version.');
+    assert.equal(openChoice.details, 'PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched');
+    assert.match(openChoice.targetHelp, /rounded to 0\.01\. .*lowering Search near n_eff finds them\.$/);
+    await obOverflow('Physics › Optical modes, Open');
+
+    // 2. the drawing: a grey band outside each open edge; Geometry › Boundaries closes the bottom edge
+    const drawing = () => ob.eval("({bands:[...document.querySelectorAll('[data-pml]')].map(b=>b.dataset.pml),labels:[...document.querySelectorAll('[data-pml] text')].map(t=>t.textContent),section:[...document.querySelectorAll('svg[data-geometry-view=physical] text')].map(t=>t.textContent).find(t=>t.startsWith('x: '))})");
+    await toTree('Geometry', "!!document.querySelector('#shape-w')");
+    const four = await drawing(); stage('OB drawing, four edges', four);
+    assert.deepEqual(four.bands, ['left', 'right', 'bottom', 'top']); assert.deepEqual(four.labels, ['PML 1 µm', 'PML 1 µm', 'PML 1 µm', 'PML 1 µm']);
+    assert.equal(four.section, 'x: −1500 … +1500 nm · y: −1200 … +1200 nm · silica background · open boundary (PML 1 µm) on 4 edges');
+    const bottomEdge = async () => { await ob.click('[data-pick-mode=Boundaries]'); await sleep(200); await ob.onElement('function(selector){this.querySelector(selector).dispatchEvent(new MouseEvent("click",{bubbles:true}));return true}', '[data-pick-edge=optical-bottom]'); await ob.until("!!document.getElementById('close-edge')", 'OB bottom edge'); };
+    await bottomEdge();
+    const edgeOpen = {heading: await obText('.boundary-selection h3'), toggle: await control('switch', 'Close this edge')};
+    stage('OB bottom edge open', edgeOpen);
+    assert.deepEqual([edgeOpen.heading, edgeOpen.toggle.count, edgeOpen.toggle.checked], ['Optical bottom boundary · Open (PML)', 1, 'false']);
+    await ob.click('#close-edge'); await ob.until("document.querySelectorAll('[data-pml]').length===3", 'OB bottom closed');
+    const three = await drawing(), closedEdge = {heading: await obText('.boundary-selection h3'), toggle: await control('switch', 'Close this edge')};
+    stage('OB bottom edge closed', {three, closedEdge});
+    assert.deepEqual(three.bands, ['left', 'right', 'top']); assert.match(three.section, / · open boundary \(PML 1 µm\) on 3 edges$/);
+    assert.deepEqual([closedEdge.heading, closedEdge.toggle.checked], ['Optical bottom boundary', 'true']);
+    const threeDoc = await solverDocument(); stage('OB document, bottom closed', {pml: threeDoc.physics.em1.pml.pml_thickness, domain: threeDoc.geometry.domain});
+    assert.deepEqual(Object.keys(threeDoc.physics.em1.pml.pml_thickness), ['left', 'right', 'top']); assert.deepEqual(threeDoc.geometry.domain, {xmin: -2500, xmax: 2500, ymin: -1200, ymax: 2200});
+    await toTree('Geometry', "!!document.querySelector('svg[data-geometry-view=physical]')"); await bottomEdge(); await ob.click('#close-edge');
+    await ob.until("document.querySelectorAll('[data-pml]').length===4", 'OB bottom open again');
+    await ob.click('[data-pick-mode=Bodies]'); await sleep(200);
+    await obOverflow('Geometry with PML bands');
+
+    // 3. Search near n_eff: an edit changes target_effective_index; the default document is P1's
+    const defaultDoc = await solverDocument(); assert.equal(defaultDoc.physics.em1.target_effective_index, 2.46);
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); await ob.type('#target-number', '2.3');
+    const editedDoc = await solverDocument(); stage('OB Search near n_eff 2.3', {target: editedDoc.physics.em1.target_effective_index});
+    assert.equal(editedDoc.physics.em1.target_effective_index, 2.3);
+    assert.deepEqual({...editedDoc, physics: {em1: {...editedDoc.physics.em1, target_effective_index: 2.46}}}, defaultDoc);
+    // an edited target that a material edit puts out of range (silicon nitride: n_max 1.9963) goes back
+    // to the new design's default, with a message, and every input write keeps working
+    await toTree('Geometry', "!!document.querySelector('#shape-w')"); await ob.choose('#shape-material', 'Silicon nitride');
+    const stale = await obText('#file-status');
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); const reset = await obValue('#target-number');
+    stage('OB stale target', {message: stale, value: reset});
+    assert.equal(stale, 'Search near n_eff 2.300 is outside this design\'s range: back to the default 1.720.'); assert.equal(reset, '1.720');
+    await toTree('Geometry', "!!document.querySelector('#shape-w')"); await ob.choose('#shape-material', 'Silicon');
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); assert.equal(await obValue('#target-number'), '2.460');
+    await ob.type('#target-number', '2.46');
+    assert.equal(await obValue('#target-number'), '2.460');
+
+    // 4. Study: the summary line and the PML check option; the template run, all edges open, with the check
+    await toTree('Study', "!!document.getElementById('open-boundary-summary')");
+    const studyView = {summary: await obText('#open-boundary-summary'), check: await control('checkbox', 'Also check the PML (2 more solves)')};
+    stage('OB Study', studyView);
+    assert.deepEqual([studyView.summary, studyView.check.count, studyView.check.checked], ['Open boundary · PML 1 µm · search near 2.460', 1, 'false']);
+    await ob.click('#pml-check'); assert.equal((await control('checkbox', 'Also check the PML (2 more solves)')).checked, 'true');
+    await obOverflow('Study with the PML check');
+    const templateSeconds = await obRun();
+    await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
+    const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
+    assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
+    assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm)', 'A_eff (µm²)', 'n_g', 'PML check']);
+    assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
+    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+    // pre-registered: both modes below what the open boundary resolves
+    assert.deepEqual(template.loss, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
+    template.lossTitles.forEach((t, i) => assert.equal(t, template.check[i][0] === 'depends' ? 'This loss changes with the PML; it is not a converged leakage loss.' : 'Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.'));
+    assert.deepEqual(template.italic, template.check.map(([status]) => status === 'depends'));
+    assert.deepEqual(template.pol, [['—', 'Computed on the physical window in a later version'], ['—', 'Computed on the physical window in a later version']]); assert.deepEqual(template.area, ['—', '—']);
+    assert.ok(template.neff.every(t => /^\d\.\d{8} [+−] \d\.\d{2}e-\d+i$/.test(t)), 'n_eff with its Im part');
+    // both modes found again by the per-mode check. Below the display floor with check losses under
+    // 0.05 dB/cm: no verdict (decided after the TM-like result 0.00480 -> 0.01706 dB/cm, registered as
+    // independent; the engine gives 0.0048 and below for both, and 0.017 at most on the check)
+    assert.deepEqual(template.check, [['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)'], ['unresolved', 'PML check: no leakage resolved (both solves below 0.05 dB/cm)']]);
+    assert.equal(template.note, 'Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.');
+    // pre-registered: 32 searched, 2 shown, 30 other candidates, none with a field view
+    assert.deepEqual([template.candidates.summary, template.candidates.rows, template.candidates.controls], ['Other candidates (30) — not shown as modes', 30, 0]);
+    await obOverflow('Results, open run');
+
+    // 5. Save: a session of version 10 with the run's open boundary and PML check
+    const obFiles = async () => (await readdir(obDownloads)).filter(n => n.endsWith('.json'));
+    const beforeSave = await obFiles(); await ob.click('#save-session');
+    await ob.until("document.getElementById('save-name-dialog')?.open", 'OB name dialog'); await ob.click('#save-name-download');
+    let saved = null; for (let i = 0; i < 300 && !saved; i++) { saved = (await obFiles()).find(n => !beforeSave.includes(n)) ?? null; if (!saved) await sleep(100); }
+    assert.ok(saved, 'OB session downloaded'); await sleep(500);
+    const v10 = JSON.parse(await readFile(join(obDownloads, saved), 'utf8'));
+    stage('OB version 10 saved', {file: saved, version: v10.version, settings: v10.runs[0].settings.pml, check: v10.runs[0].pml_check, candidates: v10.runs[0].open_boundary.candidates.length});
+    assert.deepEqual([v10.version, v10.runs[0].settings.adapter, v10.runs[0].settings.boundary], [10, 'optical-shapes-v9', 'PML']);
+    assert.deepEqual(v10.runs[0].settings.pml, {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'});
+    assert.equal(v10.runs[0].pml_check.pml_strength, 6); assert.equal(v10.runs[0].pml_check.paired.length, 2); assert.equal(v10.runs[0].open_boundary.candidates.length, 32);
+
+    // 6. the closed template run, and Compare: matching off (V13) and the per-side words
+    await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
+    await ob.click('input[name="outer-boundary"][value="closed"]'); await ob.until("!document.getElementById('target-number')", 'OB Closed chosen');
+    await obRun();
+    const closedView = await resultsView(); stage('OB template, closed', closedView);
+    assert.equal(closedView.caption, 'Computed modes'); assert.equal(closedView.head[3], 'Absorption loss (dB/cm)');
+    assert.match(closedView.note, / For leakage, choose Open boundary in Physics › Optical modes\.$/);
+    // Run 1 is the open run, Run 2 the closed one: A closed, B open
+    const jobs = await ob.eval("Object.fromEntries([...document.querySelectorAll('.run-item')].map(e=>[Number(/Run (\\d+)/.exec(e.textContent)?.[1]),e.dataset.run]))");
+    await ob.click('nav [data-page=Compare]'); await ob.until("!!document.getElementById('compare-a')", 'OB Compare');
+    await ob.choose('#compare-a', jobs[2]); await ob.choose('#compare-b', jobs[1]); await ob.until("!!document.getElementById('compare-neff')", 'OB Compare table');
+    await obSize(1440, 900); await sleep(300);
+    const compared = await ob.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll');return {
+      sides:[...t.tHead.rows[1].cells].map(c=>c.dataset.column),top:[...t.tHead.rows[0].cells].map(c=>c.textContent),matched:[...t.tBodies[0].rows].filter(r=>r.dataset.match).map(r=>[r.dataset.match,Number(r.querySelector('[data-overlap]').dataset.overlap)]),
+      unmatched:[...t.tBodies[0].rows].filter(r=>!r.dataset.match).length,runs:[...document.querySelectorAll('#compare-table-runs [data-side]')].map(e=>e.textContent),
+      lossNote:document.getElementById('compare-loss-note')?.textContent,matchNote:document.getElementById('compare-match-note')?.textContent,
+      lossA:[...t.querySelectorAll('[data-loss-a]')].map(c=>c.textContent),lossB:[...t.querySelectorAll('[data-loss-b]')].map(c=>c.textContent),
+      slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),comparing:document.getElementById('tree').parentElement.classList.contains('comparing')}})()`);
+    stage('OB Compare closed vs open', compared);
+    // V13 (pre-registered, blind) failed: on the physical window the template's closed and open runs
+    // matched with overlaps 0.9903 (TE-like) and 0.9875 (TM-like), below 0.99. As registered, matching
+    // is off with an open run: every mode of A and of B is listed, not matched
+    assert.deepEqual([compared.matched.length, compared.unmatched], [0, 4]);
+    assert.equal(compared.matchNote, 'Matching with an open boundary comes in a later version. Every mode of A and of B is listed, not matched.');
+    assert.ok(compared.sides.includes('Absorption loss A (dB/cm)') && compared.sides.includes('Loss B (dB/cm)'), JSON.stringify(compared.sides));
+    assert.equal(compared.lossNote, 'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
+    assert.ok(compared.runs[0].endsWith(' (closed)') && compared.runs[1].endsWith(' (open, PML 1 µm)'), JSON.stringify(compared.runs));
+    assert.deepEqual(compared.lossA, ['0 dB/cm', '0 dB/cm', '—', '—']); assert.deepEqual(compared.lossB, ['—', '—', '< 0.01 dB/cm', '< 0.01 dB/cm']);
+    // O2 (round 13): at 1440 × 900 the Compare table keeps at least 24 px to spare
+    assert.equal(compared.comparing, true); assert.ok(compared.slack >= 24, `OB Compare: ${compared.slack} px to spare at 1440`);
+    await ob.screenshot('open-boundary-compare-1440');
+    await obOverflow('Compare closed vs open');
+
+    // 7. the leakage case built in Geometry: a silicon substrate x −1500, y −1200, 3000 × 700 nm under the core (BOX 500 nm)
+    await toTree('Geometry', "!!document.querySelector('#shape-w')");
+    await ob.click('[data-add-shape=rect]'); await ob.until("document.querySelectorAll('.shape-item').length===2", 'OB substrate added');
+    await ob.type('#shape-name', 'Substrate'); await ob.choose('#shape-material', 'Silicon');
+    // a width or height edit keeps the shape centred: the size first, then the position
+    await ob.type('#shape-w', 3000); await ob.type('#shape-h', 700); await ob.type('#shape-x', -1500); await ob.type('#shape-y', -1200);
+    const substrate = await ob.eval("['shape-x','shape-y','shape-w','shape-h'].map(id=>document.getElementById(id).value)");
+    stage('OB substrate', {substrate}); assert.deepEqual(substrate, ['-1500', '-1200', '3000', '700']);
+    await toTree('Optical modes', "!!document.getElementById('outer-boundary')");
+    await ob.click('input[name="outer-boundary"][value="open"]'); await ob.until("!!document.getElementById('target-number')", 'OB leakage Open');
+    // the document the browser sends is P1's build("strip_substrate", 2) (tests/simcase/open_boundary_fixtures.py), byte for byte
+    const leakDoc = await solverDocument();
+    const p1Leak = await readFile(new URL('../../tests/simcase/studio_session_fixtures/optical-document-strip-substrate-open.json', import.meta.url), 'utf8');
+    stage('OB leakage document', {domain: leakDoc.geometry.domain, shapes: leakDoc.geometry.shapes.length, same: JSON.stringify(leakDoc) === p1Leak});
+    assert.equal(JSON.stringify(leakDoc), p1Leak, 'the UI-built leakage document is P1\'s strip over a substrate');
+    // the PML check on (one solve per mode): pre-registered, both modes found again and PML-independent,
+    // the loss changing by less than 2 %
+    await toTree('Study', "!!document.getElementById('pml-check')");
+    if (!(await ob.eval("document.getElementById('pml-check').checked"))) await ob.click('#pml-check');
+    const leakSeconds = await obRun();
+    await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB leakage PML check', 600000);
+    const leak = await resultsView(); stage('OB leakage case', {...leak, seconds: leakSeconds});
+    assert.deepEqual(leak.check.map(([status]) => status), ['independent', 'independent']);
+    for (const [, words] of leak.check) { const m = /^PML check: loss changes (\d+(?:\.\d+)?) %$/.exec(words); assert.ok(m && Number(m[1]) < 2, words); }
+    // pre-registered: P1's default-mesh values, TE-like 2.441263 / 29.15 dB/cm and TM-like 1.772790 / 1006 dB/cm
+    assert.deepEqual(leak.loss, ['29.15 dB/cm', '1006 dB/cm']);
+    assert.ok(leak.neff[0].startsWith('2.441263') && leak.neff[1].startsWith('1.772790'), JSON.stringify(leak.neff));
+    assert.ok(leak.lossTitles.every(t => t.endsWith('At the default mesh this loss is about 3 % above the converged value (TE-like +2.8 %, TM-like +1.8 % on a strip over a substrate).')));
+    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+
+    // 8. Search near n_eff lowered to 1.600 with 4 modes finds the mode near the cladding index
+    // (pre-registered: within 5e-4 of Re 1.4864 and 5 % of Im 7.92e-3, about 2789 dB/cm)
+    await toTree('Optical modes', "!!document.getElementById('target-number')"); await ob.type('#target-number', '1.6'); await ob.type('#mode-count-number', 4);
+    await toTree('Study', "!!document.getElementById('pml-check')"); if (await ob.eval("document.getElementById('pml-check').checked")) await ob.click('#pml-check');
+    const lowSeconds = await obRun();
+    const low = await resultsView(); stage('OB leakage case, search near 1.600', {...low, seconds: lowSeconds});
+    const near = low.neff.map((t, i) => [t, low.loss[i]]).map(([t, loss]) => { const m = /^(\d\.\d{8}) ([+−]) (\d\.\d{2}e-\d+)i$/.exec(t); return {re: Number(m[1]), im: (m[2] === '−' ? -1 : 1) * Number(m[3]), loss}; })
+      .find(m => Math.abs(m.re - 1.4864) <= 5e-4);
+    assert.ok(near, 'the near-cladding mode is shown: ' + JSON.stringify(low.neff));
+    assert.ok(Math.abs(near.im / 7.92e-3 - 1) <= 0.05, JSON.stringify(near)); assert.ok(Math.abs(Number(near.loss.split(' ')[0]) / 2789 - 1) <= 0.05, JSON.stringify(near));
+    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.600\. /);
+    // review: choosing the optical model again clears the PML check option with the open boundary
+    await toTree('Study', "!!document.getElementById('pml-check')"); await ob.click('#pml-check'); assert.equal(await ob.eval("document.getElementById('pml-check').checked"), true);
+    await ob.click('nav [data-page=Applications]'); await ob.until("!!document.querySelector('[data-template=optical]')", 'OB Library');
+    await ob.click('[data-template=optical]'); await ob.until("!!document.querySelector('#shape-w')", 'OB optical template again');
+    await toTree('Optical modes', "!!document.getElementById('outer-boundary')"); assert.equal((await control('radio', 'Closed window (PEC)')).checked, 'true');
+    await ob.click('input[name="outer-boundary"][value="open"]'); await toTree('Study', "!!document.getElementById('pml-check')");
+    const afterReset = await ob.eval("document.getElementById('pml-check').checked"); stage('OB the template clears the PML check option', {afterReset});
+    assert.equal(afterReset, false);
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);

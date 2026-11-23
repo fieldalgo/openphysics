@@ -87,8 +87,8 @@ What each kind of file holds:
 
 | Kind | Holds | Named | Made by |
 |---|---|---|---|
-| Session file | The model's inputs with its completed runs, their names and pins and the comparison (optical, version 9); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen in Save As | **File › Save**, **Save As…**, **Export › Model with runs (session file)…** |
-| Model file | The model's inputs only: no runs and no computed results (optical, steady heat and Joule heating inputs, version 7 or 8; or a multiphysics document). | After the model, for example `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
+| Session file | The model's inputs with its completed runs, their names and pins and the comparison (optical, version 9, or 10 with an [open boundary](#open-boundary-in-the-optical-workspace)); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen in Save As | **File › Save**, **Save As…**, **Export › Model with runs (session file)…** |
+| Model file | The model's inputs only: no runs and no computed results (optical, steady heat and Joule heating inputs, version 7 or 8, or 9 with an open boundary; or a multiphysics document). | After the model, for example `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | Browser draft | The optical inputs, in this browser only (not a file). | — | **File › Browser copy › Save browser draft** |
 | Browser recovery | The newest sessions with completed runs, in this browser only (not a file). | — | Automatic ([notebook recovery](#automatic-notebook-recovery)) |
 
@@ -791,9 +791,9 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 9 is refused by name (“This session file is version 10, newer than this Studio
-reads (versions 6–9). Open it in a newer Studio.”; version 9 is an
-[optical session](#optical-session-files-version-9), and a version 8 layout under version 9 is
+A version above 10 is refused by name (“This session file is version 11, newer than this Studio
+reads (versions 6–10). Open it in a newer Studio.”; versions 9 and 10 are
+[optical sessions](#optical-session-files-version-9), and a version 8 layout under version 9 is
 refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
 result “multiphysics-run-v2”, which this Studio does not read.”) and another document envelope
@@ -867,10 +867,13 @@ engine and older session files give the same number from the same samples:
   Im n_eff is exactly 0 each row reads *0 dB/cm*, a lossless run rather than a computed
   zero, and the note reads “Absorption loss counts material absorption (k) only: all materials
   have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a
-  closed window.” A multiphysics result with an open boundary (PML) has an Im n_eff that includes
+  closed window.” The optical application adds “For leakage, choose Open boundary in Physics ›
+  Optical modes.” to the note of a closed run. A run with an
+  [open boundary](#open-boundary-in-the-optical-workspace) has its own cells. A multiphysics result with an open boundary (PML) has an Im n_eff that includes
   leakage into the PML, so its column reads **Loss (dB/cm)**, with the help “Material absorption
   (k) and leakage into the PML of the open boundary” and the note “Loss includes material
-  absorption (k) and leakage into the PML of the open boundary.”; every other table reads
+  absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies
+  outside the window: shapes touching an open edge continue through the PML.”; every other table reads
   **Absorption loss (dB/cm)**. Compare shows the same value as *Absorption loss A (dB/cm)* and
   *Absorption loss B (dB/cm)*. There is no threshold: a nonzero Im n_eff,
   however small, is shown as it is. The engine returns a complex n_eff only for a material with
@@ -1004,7 +1007,8 @@ version 7 input).
 ### Open boundary document (optical-shapes-v9)
 
 `/api/workspace/capabilities/v9` is version 8 with adapter `optical-shapes-v9` and an
-`open_boundary` block. The page still checks version 8 and has no control for it yet. The
+`open_boundary` block. The page checks version 8; since slice P2 it offers the choice
+([open boundary in the optical workspace](#open-boundary-in-the-optical-workspace)). The
 adapter's document builder (`opticalDocument` with `openBoundary: {edges, thickness, target}`)
 can open any edge of the window:
 
@@ -1072,6 +1076,177 @@ Limits of the open boundary, from its validation:
   known miss is a physical mode of the two searches that ranks within the asked count and is not
   returned; the only one is the strip-over-substrate mode near 1.486 when 8 modes are asked.
 
+### Open boundary in the optical workspace
+
+Since slice P2 the page offers the open boundary of
+[optical-shapes-v9](#open-boundary-document-optical-shapes-v9). With it, a run's loss includes
+leakage out of the window.
+
+**The choice.**
+
+- **Physics › Optical modes** has *Outer boundary: Closed window (PEC) / Open boundary (PML)*.
+  Closed is the default. The help reads “Open boundary adds an absorbing layer (PML) outside the
+  window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an
+  open edge continue through the layer.”
+- The choice is a physics setting kept with each run, like Modes to find.
+- With Open, every edge is open. **Geometry › Boundaries** lets each edge be closed again: an
+  open edge reads *Optical left boundary · Open (PML)*, and a **Close this edge** switch closes or
+  reopens it. A closed edge reads as before (PEC). With every edge closed, a run is a closed
+  window.
+- Open turns **Also compute group index** off and disables it, with the note “Group index with
+  an open boundary comes in a later version”. The engine refuses it too.
+
+**Parameters.**
+
+- The PML is 1 µm thick, shown read-only as *PML 1 µm*; there is no thickness field.
+- Strength 3, order 2 and a minimum physical fraction of 0.5 are fixed and listed under
+  *Details*; the search takes 32 candidates.
+- **Search near n_eff** can be edited. Its default is (n_max + n_SiO2)/2 at 1550 nm rounded to
+  0.01 (2.46 for silicon, shown *2.460*). Edits are kept to 3 decimals, and the value shown is
+  the value sent. It must lie strictly between 1.45 and n_max.
+- A single target can miss modes far from it, notably near the cladding index (Re ≲ 1.6). The
+  help says that lowering Search near n_eff finds them.
+
+**Study and drawing.**
+
+- Study shows *Open boundary · PML 1 µm · search near 2.460* and the option **Also check the
+  PML (N more solves)**, off by default, with N = Modes to find.
+- The drawing shows a grey band labelled *PML 1 µm* outside each open edge. The band is drawn
+  narrower than 1 µm so the window stays in view. The section line ends “… · open boundary
+  (PML 1 µm) on N edges”.
+
+**Results of an open run.**
+
+- The table is titled *Modes (open boundary, PML 1 µm)*. Its loss column is **Loss (dB/cm)**,
+  with the help “Material absorption (k) and leakage into the PML of the open boundary”.
+- The loss uses the same formula (dB/cm = 20 · log10(e) · k0 · Im n_eff / 100), to 4
+  significant digits (*29.15 dB/cm*). A number's help adds the measured mesh error: “At the
+  default mesh this loss is about 3 % above the converged value (TE-like +2.8 %, TM-like +1.8 %
+  on a strip over a substrate).”
+- Below 0.01 dB/cm the cell reads **< 0.01 dB/cm**. This includes a negative Im n_eff and one
+  the engine labels `numerically_unresolved`. The help reads “Below what this open boundary
+  resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.” A mode
+  without Im n_eff reads “—”.
+- n_eff shows Re as a closed run does, with Im to 3 significant digits: *2.44126325 +
+  8.28e-5i*.
+- Polarization, A_eff and n_g read “—”, titled “Computed on the physical window in a later
+  version”: the field extends into the PML, where it is not physical.
+- The note under the table adds “Leakage depends on what lies outside the window: shapes
+  touching an open edge continue through the PML.” A closed run's note adds “For leakage, choose
+  Open boundary in Physics › Optical modes.”
+- The found line is always shown: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff
+  (Physics › Optical modes) to find other modes.*
+- Studio keeps the engine's modes with Re n_eff above 1.45.
+- **Other candidates (n) — not shown as modes** lists every searched candidate that is not shown,
+  with its n_eff, physical share and reason. The reasons read *Mostly in the PML (a PML mode)*,
+  *Gains power (not a passive mode)*, *Not converged (residual above 1e-8)*, *Beyond the modes
+  asked for* and *Below the silica index (cladding radiation)*. These rows have no field view.
+- The field view, its colour scale and the line profile use the physical window only. The
+  engine normalizes an open run's field to its largest |E| there (`physical_max_centroid_magnitude`).
+
+**PML check.**
+
+- With the option on, Studio solves the run's document again once per mode found: PML strength 6,
+  a search of 16 candidates and Search near n_eff at that mode's Re n_eff (to 6 decimals). The
+  mesh is the same, node for node.
+- The candidates of these solves are pooled. Each mode is paired with the nearest eligible
+  candidate: one that passed the engine's filter (selected, or set aside only as beyond the
+  count) and has Re > 1.45. A pair is accepted when |Δn_eff| ≤ 2e-3.
+- A mode is PML-independent when |ΔRe| ≤ 5e-4 and the loss changes by at most
+  max(2 %, 0.01 dB/cm).
+- Below the display floor the check solve leaves a larger residue than the run's solve on tiny
+  losses. When a mode's cell reads *< 0.01 dB/cm* and its check loss is below 0.05 dB/cm, the
+  check gives no verdict. It says only that no leakage is resolved; it does not certify
+  independence.
+- The **PML check** column then reads one of:
+  - *PML check: loss changes 0.016 %* (two significant digits below 0.1 %);
+  - **Depends on the PML**: *loss changes 12 %* (or *Re n_eff changes 7.0e-4*), with the loss
+    cell in italics and the help “This loss changes with the PML; it is not a converged leakage
+    loss.”;
+  - *PML check: no leakage resolved (both solves below 0.05 dB/cm)*, without italics;
+  - *Not found in the check solve*, with the help “The check solve did not find this mode near
+    the search value; this does not by itself mean the mode depends on the PML.”
+- A mode below the floor whose check loss is 0.05 dB/cm or more keeps *Depends on the PML*: the
+  floor moves with the PML.
+- The engine's `stability: "not_checked"` stays true of each solve; the run records the check
+  (`pml_check`). A check is stored when all its solves are in. Solves finished before a page
+  reload are not kept: that check is incomplete and is not stored.
+- **How the check was chosen.** A single check solve (strength 6, search 32 near the run's
+  target) missed the TM-like mode of the template and of the leakage case. A search of 64 missed
+  it too: the target, not the count, decides. Measured one thread, engine level, with the
+  non-slow test suite running alongside (times relative):
+
+  | Check | Template | Leakage case | Every mode found again |
+  |---|---|---|---|
+  | one solve, search 32 near the target | 2.8 s | 35.4 s | no (TM-like missed) |
+  | one solve, search 64 | 5.2 s | 91.8 s | no |
+  | one solve per mode at its Re, search 32 | 5.0 s | 64.5 s | yes |
+  | one solve per mode at its Re, search 16 (shipped) | 2.6 s | 43.8 s | yes |
+
+  The first solves took 3.5 s and 36.3 s.
+- **A registered result that failed.** With the per-mode check, the template's TM-like mode was
+  registered as PML-independent. It went from 0.00480 to 0.01706 dB/cm, so it read “Depends on
+  the PML: loss changes 256 %”. The rule for losses below the floor was added after that result.
+  It was confirmed, as registered before measuring, on the template core at 700 × 300 nm with 4
+  modes: every mode is below the floor, with check losses of at most 0.00026 dB/cm.
+- Results with the check on:
+  - the template: both modes *no leakage resolved*;
+  - the leakage case: TE-like 29.1528 → 29.1517 dB/cm (*loss changes 0.0038 %*), TM-like
+    1005.96 → 1005.80 dB/cm (*0.016 %*), both PML-independent.
+
+**Compare.**
+
+- Each side's loss header follows its own run (*Absorption loss A (dB/cm)*, *Loss B (dB/cm)*).
+- When the two differ, a note reads “A counts material absorption only; B also counts leakage.
+  Their difference is not a leakage loss.”
+- With an open run, the line above the table names each run *(closed)* or *(open, PML 1 µm)*.
+- **Matching is off** when either run is open. The table lists every mode of A and of B, not
+  matched, with “Matching with an open boundary comes in a later version.”, and the plots show
+  mode 1 of each run. The registered check (V13: the template, closed against open, both modes
+  matched with η ≥ 0.99 on the physical window) failed: η = 0.9903 for the TE-like mode and
+  0.9875 for the TM-like mode.
+
+**Files.**
+
+- A model file chooses Open as inputs version 9: version 8 with `model.openBoundary {edges:
+  {left, right, bottom, top}: "open" | "closed", target}`. `target` (Search near n_eff, 3
+  decimals) is written only when it was edited.
+- Without Open the file is version 7 or 8 byte for byte, as before. Studio 4b58fb7 (before
+  slice P2) refuses an inputs file of version 9 with *Unsupported model file format or version.*
+- A session is written as **version 10** when a run has an open boundary or the inputs choose
+  Open (inputs version 9). Otherwise it is version 9 or 7, byte for byte as before.
+- Version 10 is version 9 plus runs of `optical-shapes-v9`. Their `settings` hold `adapter
+  "optical-shapes-v9"`, `boundary "PML"` and `pml {"thickness": "1000 nm", "open_edges": [...],
+  "target": "2.460"}`.
+- Such a run also keeps `open_boundary`, the engine's candidate record of its search, and
+  `pml_check {"pml_strength": 6, "paired": [{"re", "im"} or null per mode]}` when the check ran.
+  The digest covers both.
+- Its field implies the normalization above. It has no TE fractions, effective areas or group
+  index.
+- A version 9 session does not hold inputs of version 9. Studio 4b58fb7 refuses a version 10
+  file with *This session file is version 10, newer than this Studio reads (versions 6–9). Open
+  it in a newer Studio.* Multiphysics sessions stay version 8.
+
+**Server.** A workspace request carries `pml_strength` 3 with a search of 32 (a run), or 6 with
+a search of 16 (a check solve). Its target may be any value above 1.45, since a check solve aims
+at a mode. Anything else is refused by name: “A PML check request (strength 6) searches 16
+candidates, and a run (strength 3) searches 32.” or the open boundary's message.
+`/api/workspace/capabilities/v9` lists `pml_check_strength` 6 and `pml_check_search_mode_count`
+16. This changes P1's contract: P1 refused strength 6 and a search other than 32.
+
+**Validation** (Linux, Python 3.12, Node 22, in the browser check
+`tools/studio_browser/studio_workspace_browser.mjs`, stage OB):
+
+- the template, all edges open: both loss cells *< 0.01 dB/cm*, as registered (the engine gives
+  TE-like Im n_eff −5.1e-12, `numerically_unresolved`, and TM-like 1.36e-8, 0.0048 dB/cm); 30
+  other candidates;
+- the leakage case built in Geometry (a silicon substrate x −1500, y −1200, 3000 × 700 nm under
+  the core, BOX 500 nm, all edges open): its document is P1's strip over a substrate byte for
+  byte. It shows *2.44126325 + 8.28e-5i* / *29.15 dB/cm* and *1.77279036 + 2.86e-3i* / *1006
+  dB/cm*, P1's values;
+- Search near n_eff 1.600 with 4 modes on that case finds the mode near the cladding index,
+  *1.48642654 + 7.92e-3i* / *2789 dB/cm*, as registered.
+
 ### Optical session files (version 9)
 
 A session in which every run has two real modes and its fields is written as version 7, byte
@@ -1132,7 +1307,8 @@ cannot match its modes by overlap.
 
 Compare matches the modes of runs A and B by their fields, so a row pairs the same mode even
 when the ranks change between designs (for example a wider core whose second TE-like mode
-overtakes the TM-like one). Matching is always on, and the ranks stay in every row.
+overtakes the TM-like one). Matching is on for two closed runs (with an open run it is off:
+[open boundary](#open-boundary-in-the-optical-workspace)), and the ranks stay in every row.
 
 - **Common grid.** The runs can have different meshes, and each keeps only its own centroid
   samples, so Studio samples both on one grid: uniform cell centres over the intersection of the

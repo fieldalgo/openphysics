@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {parseProject} from './workspace-project.mjs';
+import {parseProject,validateOpenChoice} from './workspace-project.mjs';
+import {hasOpenEdge} from './workspace-open-boundary.mjs';
 import {opticalBlock} from './workspace-optical.mjs';
 import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
 export const PENDING_JOB_KEY='openphysics.studio.pending-optical.v1';
@@ -13,7 +14,17 @@ export function validatePending(record){
  const input=parseProject(JSON.stringify(record.input));const block=opticalBlock(input.model,input.setup);if(block)throw new Error(block);
  // the mode count the job asked for (a record written before mode counts could change asked for 2)
  let modeCount=DEFAULT_MODE_COUNT;if(record.modeCount!==undefined){try{modeCount=checkModeCount(record.modeCount);}catch{throw new Error('Invalid pending mode count.');}}
- return {version:1,job:record.job,serverInstance:record.serverInstance,serverVersion:record.serverVersion,startedAt:record.startedAt,revision:record.revision,input,...(modeCount===DEFAULT_MODE_COUNT?{}:{modeCount})};
+ // an open boundary (slice P2): the choice the job was run with ({edges, target}, the target as
+ // sent); pmlCheck: the PML check follows the job; checkOf: this job is the PML check of that run
+ const extra={};
+ if(record.openBoundary!==undefined){let ob;try{ob=validateOpenChoice(record.openBoundary,input.model.shapes);}catch{throw new Error('Invalid pending open boundary.');}if(!hasOpenEdge(ob)||ob.target===undefined)throw new Error('Invalid pending open boundary.');extra.openBoundary=ob;}
+ if(record.pmlCheck!==undefined){if(record.pmlCheck!==true||!extra.openBoundary)throw new Error('Invalid pending PML check.');extra.pmlCheck=true;}
+ if(record.checkOf!==undefined){
+  const n=record.checkCount,i=record.checkIndex;
+  if(typeof record.checkOf!=='string'||!/^[a-f0-9]{8}$/.test(record.checkOf)||!extra.openBoundary||extra.pmlCheck||!Number.isInteger(n)||n<1||n>8||!Number.isInteger(i)||i<0||i>=n)throw new Error('Invalid pending PML check.');
+  Object.assign(extra,{checkOf:record.checkOf,checkIndex:i,checkCount:n});
+ }else if(record.checkIndex!==undefined||record.checkCount!==undefined)throw new Error('Invalid pending PML check.');
+ return {version:1,job:record.job,serverInstance:record.serverInstance,serverVersion:record.serverVersion,startedAt:record.startedAt,revision:record.revision,input,...(modeCount===DEFAULT_MODE_COUNT?{}:{modeCount}),...extra};
 }
 export function readPending(storage){const raw=storage.getItem(PENDING_JOB_KEY);if(!raw)return null;if(new TextEncoder().encode(raw).length>70000)throw new Error('Pending record is too large.');return validatePending(JSON.parse(raw));}
 export function storePending(storage,record){if(record===null)storage.removeItem(PENDING_JOB_KEY);else storage.setItem(PENDING_JOB_KEY,JSON.stringify(validatePending(record)));}

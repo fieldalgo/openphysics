@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {degenerateGroups,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {isOpenRun,openLoss,LOSS_FLOOR,FLOOR_TEXT,FLOOR_HELP} from './workspace-open-run.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
 // runs). Each run keeps its own centroid samples, so the overlap is taken on a common grid:
@@ -164,10 +165,20 @@ export function noMatchText(side,unit,best){
 
 // ---- Optical runs -----------------------------------------------------------------------
 const cache=new WeakMap();
+// Matching with an open run on either side is off (slice P2, V13): on the template, a closed and an
+// open run gave overlaps of 0.9903 (TE-like) and 0.9875 (TM-like) on the physical window, below the
+// 0.99 registered. Every mode is then listed unmatched, each run with its own columns.
+export const MATCH_OPEN_TEXT='Matching with an open boundary comes in a later version';
+/** The rows of two runs that are not matched: every unit of A, then every unit of B. */
+export function unmatchedModes(neffA,neffB){
+ return {pairs:[],disabled:MATCH_OPEN_TEXT,rows:modeUnits(neffA).map(unit=>({unit,match:null,best:null})),unmatchedB:modeUnits(neffB).map(unit=>({unit,best:null}))};
+}
 /** The match of two optical runs (two-mode Studio runs, core mesh in nm, samples in metres),
- * kept per pair of run objects: a run's samples never change. */
+ * kept per pair of run objects: a run's samples never change. With an open run on either side,
+ * unmatchedModes. */
 export function opticalMatch(a,b){
  let byB=cache.get(a);if(!byB){byB=new WeakMap();cache.set(a,byB);}
+ if(!byB.has(b)&&(isOpenRun(a)||isOpenRun(b)))byB.set(b,unmatchedModes(a.effective_index,b.effective_index));
  if(!byB.has(b))byB.set(b,matchModes({field:a.field,neff:a.effective_index,coreSize:a.input.model.coreMesh*1e-9},{field:b.field,neff:b.effective_index,coreSize:b.input.model.coreMesh*1e-9}));
  return byB.get(b);
 }
@@ -191,10 +202,15 @@ export function unitArea(run,unit){
  * members' dB/cm ("0 dB/cm" when every member is lossless); "—" without a unit or a value. The
  * values come from the saved indices, so a run without fields has them too. */
 export function unitLoss(run,unit){
- // optical runs only: the optical adapter has no open boundary (PML), so Compare's loss is absorption
- // only; a run with a PML would need lossColumn({open:true}) here and in Compare's headers
- const help=lossColumn().help;
+ // each side's own column: absorption only for a closed window, with leakage for an open boundary
+ const help=lossColumn({open:isOpenRun(run)}).help;
  if(!unit)return {text:'—',value:null,title:help};
+ if(isOpenRun(run)){
+  const lambda0=run.input.model.wavelength*1e-9,im=run.effective_index_im;
+  if(unit.length===1){const i=unit[0],c=run.open_boundary.candidates.find(x=>x.selected&&x.effective_index.re===run.effective_index[i]&&x.effective_index.im===im[i]),cell=openLoss(im[i],lambda0,c?.attenuation_status??null);return {text:cell.text,value:cell.value,title:cell.title};}
+  const cells=unit.map(i=>openLoss(im[i],lambda0)),mean=cells.reduce((t,c)=>t+c.value,0)/cells.length;
+  return mean>=LOSS_FLOOR?{text:'mean '+mean.toPrecision(4)+' dB/cm',value:mean,title:help}:{text:'mean '+FLOOR_TEXT,value:mean,title:FLOOR_HELP};
+ }
  const modes=opticalModes(run),members=unit.map(i=>modes[i]);
  if(members.every(m=>m.im===0))return {text:'0 dB/cm',value:0,title:help};
  if(unit.length===1){const m=members[0],text=lossText(m.im,m.loss);return {text,value:text==='—'?null:m.loss/100,title:help};}
@@ -216,6 +232,12 @@ export function unitGroupIndex(run,unit){
  * then the unmatched B units. kind: 'match' | 'a' | 'b'. */
 export function compareMatchRows(match){
  const out=[];
+ // matching off (an open run): each mode is listed with the reason, never "no match"
+ if(match.disabled){
+  for(const row of match.rows)out.push({kind:'a',text:`A ${unitName(row.unit)}: not matched (${match.disabled.toLowerCase()})`,unitA:row.unit,unitB:null,best:null});
+  for(const u of match.unmatchedB)out.push({kind:'b',text:`B ${unitName(u.unit)}: not matched (${match.disabled.toLowerCase()})`,unitA:null,unitB:u.unit,best:null});
+  return out;
+ }
  for(const row of match.rows){
   if(row.match)out.push({kind:'match',text:matchText(row.match),pair:row.match,unitA:row.unit,unitB:row.match.unitB});
   else out.push({kind:'a',text:noMatchText('A',row.unit,row.best),unitA:row.unit,unitB:null,best:row.best});
