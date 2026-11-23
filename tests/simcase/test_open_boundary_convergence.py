@@ -28,7 +28,7 @@ from open_boundary_fixtures import build, richardson, scaled, solve
 
 @pytest.mark.slow
 def test_v6_strip_over_substrate_mesh_convergence():
-    text = build("strip_substrate", 2)
+    text = build("strip_substrate", 2, single=True)
     h = (0.7, 0.5, 0.35)
     runs = [solve(scaled(text, factor))[1] for factor in h]   # x 0.35: 321,772 triangles, under the default limit
     for m in range(2):

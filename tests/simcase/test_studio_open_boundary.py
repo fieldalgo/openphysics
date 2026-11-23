@@ -38,6 +38,7 @@ def test_capabilities_v9_is_v8_with_the_open_boundary(client):
         "pml_thickness_range": ["1 um", "1 um"], "pml_thickness_default": "1 um", "pml_strength": 3, "pml_order": 2,
         "pml_minimum_physical_fraction": 0.5, "pml_search_mode_count": 32, "pml_check_strength": 6,
         "pml_check_search_mode_count": 16,
+        "additional_search_count": 16, "additional_search_target": "(target + n_SiO2) / 2, two decimals",
         "target_effective_index_default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
         "target_effective_index_bounds": "above 1.45 and below n_max"}
     assert (v9.pop("schema_version"), v9.pop("adapter")) == (9, "optical-shapes-v9")
@@ -99,8 +100,10 @@ def test_the_server_takes_the_v9_document(client):
 
 
 def test_the_server_takes_the_pml_check_document(client):
-    # the PML check (slice P2): the same document with strength 6, a search of 16 and a mode's target
+    # the PML check (slice P2): the same document with strength 6, a search of 16 and a mode's target;
+    # slice T2: one search, without the run's second search (checkDocuments)
     doc = json.loads(build("template", 2, edges=ALL))
+    del doc["physics"]["em1"]["pml"]["pml_additional_searches"]
     doc["physics"]["em1"]["pml"].update(pml_strength=6, pml_search_mode_count=16)
     doc["physics"]["em1"]["target_effective_index"] = 1.769996
     response = client.post("/api/validate", params=_instance(client), json={"doc": doc})
@@ -145,3 +148,87 @@ def test_v7_every_edge_closed_is_the_v8_document_and_result(tmp_path, modes, fix
     if modes == 2:
         # the same document gives the same result (wall-clock timings aside)
         assert _saved(text, tmp_path / "v9") == _saved(expected, tmp_path / "v8")
+
+
+# -- W9 (slice T2): the second search of a run, and nothing else --------------------------------
+RELOAD = "This page was loaded before Studio was updated; reload the page to run again."
+
+
+def _post(client, doc):
+    return [client.post(route, params=_instance(client), json={"doc": doc}) for route in ("/api/validate", "/api/run")]
+
+
+def _with_target(doc, target, low):
+    """The builder's document with Search near n_eff ``target`` and t_low ``low`` written by hand."""
+    em = doc["physics"]["em1"]
+    em["target_effective_index"] = target
+    em["pml"].pop("pml_additional_searches", None)
+    if low is not None:
+        em["pml"]["pml_additional_searches"] = [{"target_effective_index": low, "pml_search_mode_count": 16}]
+    return doc
+
+
+@pytest.mark.parametrize("target,low", [(2.46, 1.95), (2.2, 1.82), (1.6, 1.52), (1.72, 1.58), (2.466, 1.96),
+                                        (1.466, 1.46), (1.465, None), (1.451, None)])
+def test_w9_the_server_takes_the_second_search_of_t_low(client, target, low):
+    doc = _with_target(json.loads(build("template", 2, edges=ALL)), target, low)
+    response = client.post("/api/validate", params=_instance(client), json={"doc": doc})
+    assert response.status_code == 200 and response.json()["ok"], response.text
+    # the same target written as an exact decimal with a trailing zero
+    if low is not None:
+        text = json.dumps(doc).replace(f'"target_effective_index": {low}, "pml_search_mode_count"',
+                                       f'"target_effective_index": {low:.3f}, "pml_search_mode_count"')
+        assert f"{low:.3f}" in text
+        response = client.post("/api/validate", params=_instance(client), content='{"doc": ' + text + "}",
+                               headers={"content-type": "application/json"})
+        assert response.status_code == 200 and response.json()["ok"], response.text
+
+
+@pytest.mark.parametrize("change", [
+    {"target_effective_index": 1.94}, {"target_effective_index": 1.96}, {"target_effective_index": 1.952},
+    {"pml_search_mode_count": 15}, {"pml_search_mode_count": 17}, {"pml_search_mode_count": 16.0},
+    {"pml_search_mode_count": True}, {"target_effective_index": True}, {"target_effective_index": "1.95"},
+    {"extra": 1}, "second entry", "not a list", "empty",
+])
+def test_w9_the_server_refuses_another_second_search(client, change):
+    doc = json.loads(build("template", 2, edges=ALL))
+    searches = doc["physics"]["em1"]["pml"]["pml_additional_searches"]
+    assert searches == [{"target_effective_index": 1.95, "pml_search_mode_count": 16}]
+    if change == "second entry":
+        searches.append({"target_effective_index": 1.7, "pml_search_mode_count": 16})
+    elif change == "not a list":
+        doc["physics"]["em1"]["pml"]["pml_additional_searches"] = searches[0]
+    elif change == "empty":
+        searches.clear()
+    else:
+        searches[0].update(change)
+    for response in _post(client, doc):
+        assert response.status_code == 400 and "open boundary of a workspace run" in response.text, response.text
+
+
+def test_w9_a_target_below_1_466_has_no_second_search(client):
+    doc = _with_target(json.loads(build("template", 2, edges=ALL)), 1.465, 1.45)
+    for response in _post(client, doc):
+        assert response.status_code == 400 and "open boundary of a workspace run" in response.text, response.text
+
+
+def test_w9_the_pml_check_has_no_second_search(client):
+    doc = json.loads(build("template", 2, edges=ALL))
+    doc["physics"]["em1"]["pml"].update(pml_strength=6, pml_search_mode_count=16)
+    doc["physics"]["em1"]["target_effective_index"] = 1.769996
+    for response in _post(client, doc):
+        assert response.status_code == 400 and "open boundary of a workspace run" in response.text, response.text
+
+
+@pytest.mark.parametrize("target", [2.46, 1.466])
+def test_w9_a_single_search_run_asks_for_a_reload(client, target):
+    """A run of P2's page (one search) whose target now has a second search: the page's modules were
+    loaded before Studio was updated. Below 1.466 the same document is taken (above)."""
+    doc = _with_target(json.loads(build("template", 2, edges=ALL)), target, None)
+    for response in _post(client, doc):
+        assert response.status_code == 400 and response.json()["detail"] == RELOAD, response.text
+    # the reload words are for this case only
+    doc = json.loads(build("template", 2, edges=ALL))
+    doc["physics"]["em1"]["pml"]["pml_order"] = 3
+    for response in _post(client, doc):
+        assert response.status_code == 400 and RELOAD not in response.text, response.text

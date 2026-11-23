@@ -31,7 +31,7 @@ from open_boundary_fixtures import build, independent, mode_near, solve
 
 @pytest.mark.slow
 def test_v4a_strip_over_substrate_does_not_depend_on_the_pml():
-    base = json.loads(build("strip_substrate", 2))
+    base = json.loads(build("strip_substrate", 2, single=True))
     n, loss, fraction, _ = solve(base)
     reference = (n[fraction >= 0.97], loss[fraction >= 0.97])
     assert len(reference[0]) == 2                                 # TE-like and TM-like
@@ -39,7 +39,7 @@ def test_v4a_strip_over_substrate_does_not_depend_on_the_pml():
         d = copy.deepcopy(base)
         d["physics"]["em1"]["pml"][key] = value
         independent(reference, d, key)
-    box = json.loads(build("strip_substrate", 2, thickness=2000))
+    box = json.loads(build("strip_substrate", 2, thickness=2000, single=True))
     variants = {}
     for t in (1000, 1500, 2000):
         d = copy.deepcopy(box)
@@ -58,7 +58,7 @@ def test_v4a_strip_over_substrate_does_not_depend_on_the_pml():
 def test_v5_the_template_strip_in_silica_does_not_leak():
     losses, resolved = [], []
     for t in (1000, 1500, 2000):
-        n, loss, fraction, _ = solve(json.loads(build("template", 2, thickness=t)))
+        n, loss, fraction, _ = solve(json.loads(build("template", 2, thickness=t, single=True)))
         assert len(n) == 2 and np.all(fraction >= 0.5)
         assert np.all(loss < 0.01), loss
         losses.append(loss)

@@ -4,21 +4,35 @@
 // A run with an open boundary (optical-shapes-v9, slice P2): its settings, the words of its
 // results (loss, found line, the other candidates of the search) and the optional PML check, a
 // second solve of the same document with PML strength 6. Pure functions: the page draws them.
-import {EDGES,hasOpenEdge,defaultTarget,maxIndex,TARGET_FLOOR,PML_THICKNESS_DEFAULT_NM,checkOpenBoundary,OPEN_BOUNDARY_ADAPTER} from './workspace-open-boundary.mjs';
+import {EDGES,hasOpenEdge,defaultTarget,maxIndex,TARGET_FLOOR,PML_THICKNESS_DEFAULT_NM,checkOpenBoundary,OPEN_BOUNDARY_ADAPTER,lowerTarget,PML_FIXED,ADDITIONAL_SEARCH_COUNT} from './workspace-open-boundary.mjs';
 import {formatIndex} from './workspace-compare.mjs';
 
 export const OPEN_ADAPTER=OPEN_BOUNDARY_ADAPTER;
 export const PML_WORDS='PML 1 µm';
 export const PML_THICKNESS_TEXT=PML_THICKNESS_DEFAULT_NM+' nm';
 export const CANDIDATE_SCHEMA='openphysics.pml-candidates/2';
+// slice T2: a run with the second search keeps the engine's record /3 (searches, per-candidate
+// search, duplicates); a run of a single search, and every run made before T2, keeps /2.
+export const CANDIDATE_SCHEMA_SEARCHES='openphysics.pml-candidates/3';
 // Studio keeps the modes with Re n_eff above the silica threshold (the closed window's rule).
 export const SILICA_THRESHOLD=1.45;
 
 // -- the choice (Physics › Optical modes, Geometry › Boundaries) ------------------------------
 export const BOUNDARY_CHOICES=Object.freeze({closed:'Closed window (PEC)',open:'Open boundary (PML)'});
 export const OPEN_HELP='Open boundary adds an absorbing layer (PML) outside the window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge continue through the layer.';
+// The words of a single search: a target below 1.466, where t_low would be the 1.45 floor.
 export const TARGET_HELP='Search near n_eff: the solver returns the modes nearest this effective index. Default (n_max + n_SiO2)/2, rounded to 0.01. A single search can miss modes far from it, notably near the cladding index (Re below about 1.6): lowering Search near n_eff finds them.';
 export const PML_DETAILS='PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched';
+// slice T2: the words of two searches, near t and near t_low (lowerTarget)
+/** "2.46", "2.455": a target to 3 decimals with one trailing zero dropped (the words of two searches). */
+export const shortTarget=t=>{const text=Number(t).toFixed(3);return text.endsWith('0')?text.slice(0,-1):text;};
+/** "Also searches near 1.95, for modes close to the silica index." */
+export const lowerTargetText=low=>`Also searches near ${shortTarget(low)}, for modes close to the silica index.`;
+/** The help of Search near n_eff with a second search. */
+export const searchesHelp=low=>`Studio searches for modes near this index and near a second index halfway to the silica index (${shortTarget(low)}). Modes are listed by n_eff, highest first.`;
+export const PML_DETAILS_SEARCHES=`PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · ${PML_FIXED.pml_search_mode_count} candidates searched near n_eff, ${ADDITIONAL_SEARCH_COUNT} near the second index`;
+/** "2.46 and 1.95": the targets of two searches. */
+export const searchesText=(t,low)=>`${shortTarget(t)} and ${shortTarget(low)}`;
 // Slice P3: the TE fraction, the effective area and n_g of an open run are defined on its physical
 // window, the triangles whose centroid lies inside the engine's physical_bounds (the PML excluded).
 export const OPEN_POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded';
@@ -55,10 +69,12 @@ export function builderBoundary(ob,shapes){
 export function signaturePml(ob,shapes){
  try{const b=builderBoundary(ob,shapes);return b?{open_edges:openEdges(b),target:targetText(b.target)}:null;}catch{return null;}
 }
-/** "Open boundary · PML 1 µm · search near 2.460" (Study), or "" for a closed window. */
+/** "Open boundary · PML 1 µm · searches near 2.46 and 1.95" (Study; "search near 2.460" below
+ * t = 1.466), or "" for a closed window. */
 export function studySummary(ob,shapes){
  if(!ob||!hasOpenEdge(ob))return '';
- return `Open boundary · ${PML_WORDS} · search near ${targetText(effectiveTarget(ob,shapes))}`;
+ const t=effectiveTarget(ob,shapes),low=lowerTarget(t);
+ return `Open boundary · ${PML_WORDS} · `+(low===null?`search near ${targetText(t)}`:`searches near ${searchesText(t,low)}`);
 }
 /** The section text of the drawing: "… · open boundary (PML 1 µm) on N edges" or "". */
 export function sectionWords(ob){const n=openEdges(ob).length;return n?`open boundary (${PML_WORDS}) on ${n} edge${n===1?'':'s'}`:'';}
@@ -120,18 +136,29 @@ export const REASON_WORDS=Object.freeze({low_physical_l2_fraction:'Mostly in the
 export const BELOW_SILICA='Below the silica index (cladding radiation)';
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const REASON=/^[a-z0-9_]{1,48}$/;
-/** The engine's candidate record of one study point, checked (the keys Studio reads); a copy. */
-export function checkCandidateRecord(record,which='This run'){
+/** The engine's candidate record of one study point, checked (the keys Studio reads); a copy.
+ * Schema /2 (one search) or /3 (two searches: each candidate names its search, 1 or 2, and a
+ * duplicate names an earlier candidate). With `target` (the run's Search near n_eff) a /3 record
+ * must hold exactly the searches Studio sends: 32 near the target, then 16 near lowerTarget. */
+export function checkCandidateRecord(record,which='This run',target=null){
  const bad=()=>{throw new Error(`${which}: invalid open boundary record.`);};
- if(!isObject(record)||record.schema!==CANDIDATE_SCHEMA||!Array.isArray(record.candidates)||record.candidates.length<1||record.candidates.length>64)bad();
+ const three=isObject(record)&&record.schema===CANDIDATE_SCHEMA_SEARCHES;
+ if(!isObject(record)||(record.schema!==CANDIDATE_SCHEMA&&!three)||!Array.isArray(record.candidates)||record.candidates.length<1||record.candidates.length>64)bad();
  const numbers=new Set();
  for(const c of record.candidates){
   if(!isObject(c)||!Number.isInteger(c.candidate)||c.candidate<1||numbers.has(c.candidate))bad();numbers.add(c.candidate);
   const e=c.effective_index;if(!isObject(e)||!Number.isFinite(e.re)||!Number.isFinite(e.im))bad();
   if(!Number.isFinite(c.physical_l2_fraction)||!Array.isArray(c.reasons)||c.reasons.length>8||!c.reasons.every(r=>typeof r==='string'&&REASON.test(r))||typeof c.selected!=='boolean')bad();
   if(c.attenuation_status!==undefined&&typeof c.attenuation_status!=='string')bad();
+  if(three&&(c.search!==1&&c.search!==2||(c.duplicate_of!==undefined&&(!numbers.has(c.duplicate_of)||c.duplicate_of===c.candidate))))bad();
  }
  if(!Array.isArray(record.selected_candidates)||!record.selected_candidates.every(n=>numbers.has(n)))bad();
+ if(three){
+  const s=record.searches,low=target===null?null:lowerTarget(Number(target));
+  if(!Array.isArray(s)||s.length!==2||!s.every((x,i)=>isObject(x)&&x.search===i+1&&Number.isInteger(x.candidate_count)&&x.candidate_count>=0))bad();
+  if(s[0].search_mode_count!==PML_FIXED.pml_search_mode_count||s[1].search_mode_count!==ADDITIONAL_SEARCH_COUNT)bad();
+  if(target!==null&&(low===null||s[0].target_effective_index!==Number(target)||s[1].target_effective_index!==low))bad();
+ }
  return JSON.parse(JSON.stringify(record));
 }
 const sameIndex=(c,re,im)=>c.effective_index.re===re&&c.effective_index.im===im;
@@ -142,19 +169,35 @@ export const shownIndices=re=>re.map((x,i)=>x>SILICA_THRESHOLD?i:-1).filter(i=>i
 export function modeCandidates(record,re,im){
  return re.map((r,i)=>record.candidates.find(c=>c.selected&&sameIndex(c,r,im[i]))??null);
 }
-/** The searched candidates a run does not show, with their n_eff, physical share and reason. */
+/** True for a record of two searches (/3). */
+export const hasSearches=record=>record?.schema===CANDIDATE_SCHEMA_SEARCHES;
+const SELECTED_REASONS=new Set(['selected_near_target','selected_descending_real_index']);
+/** The candidates of a later search that repeat an earlier one (/3: duplicate_of), hidden from the list. */
+export const duplicateCount=record=>hasSearches(record)?record.candidates.filter(c=>c.duplicate_of!==undefined).length:0;
+/** The searched candidates a run does not show, with their n_eff, physical share and reason; with
+ * two searches (/3) also the search ("near 2.46"), duplicates left out. */
 export function otherCandidates(record,re,im){
- const shown=new Set(modeCandidates(record,re,im).filter(Boolean).map(c=>c.candidate));
- return record.candidates.filter(c=>!shown.has(c.candidate)).map(c=>{
-  const words=c.selected?[BELOW_SILICA]:c.reasons.filter(r=>r!=='selected_near_target').map(r=>REASON_WORDS[r]??r);
-  return {candidate:c.candidate,neff:openIndexText(c.effective_index.re,c.effective_index.im),share:(c.physical_l2_fraction*100).toFixed(1)+' %',reason:words.join('; ')||BELOW_SILICA};
+ const shown=new Set(modeCandidates(record,re,im).filter(Boolean).map(c=>c.candidate)),two=hasSearches(record);
+ return record.candidates.filter(c=>!shown.has(c.candidate)&&!(two&&c.duplicate_of!==undefined)).map(c=>{
+  const words=c.selected?[BELOW_SILICA]:c.reasons.filter(r=>!SELECTED_REASONS.has(r)).map(r=>REASON_WORDS[r]??r);
+  const row={candidate:c.candidate,neff:openIndexText(c.effective_index.re,c.effective_index.im),share:(c.physical_l2_fraction*100).toFixed(1)+' %',reason:words.join('; ')||BELOW_SILICA};
+  return two?{...row,search:'near '+shortTarget(record.searches[c.search-1].target_effective_index)}:row;
  });
 }
-export const otherCandidatesTitle=n=>`Other candidates (${n}) — not shown as modes`;
+/** "Other candidates (41) — not shown as modes", with " · 3 found by both searches" when a later
+ * search repeated candidates of an earlier one. */
+export const otherCandidatesTitle=(n,duplicates=0)=>`Other candidates (${n}) — not shown as modes`+(duplicates>0?` · ${duplicates} found by both searches`:'');
 export const OTHER_CANDIDATES_NOTE='Each was searched and set aside for the reason given; no field view is offered for them. Physical share: the part of the mode in the window, not in the PML.';
 /** "Found 2 of 2 modes near n_eff 2.460" (shown for every open run: the target matters). */
 export const openFoundText=(found,asked,target)=>`Found ${found} of ${asked} modes near n_eff ${target}`;
 export const MOVE_TARGET_TEXT='Move Search near n_eff (Physics › Optical modes) to find other modes.';
+export const MOVE_TARGET_TEXT_SEARCHES='Move Search near n_eff to find other modes.';
+/** The found line of an open run: "Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near
+ * n_eff to find other modes." with two searches (/3), the words of P2 for a /2 run. */
+export function runFoundText(found,asked,targetString,record){
+ if(!hasSearches(record))return openFoundText(found,asked,targetString)+'. '+MOVE_TARGET_TEXT;
+ return openFoundText(found,asked,searchesText(Number(targetString),lowerTarget(Number(targetString))))+'. '+MOVE_TARGET_TEXT_SEARCHES;
+}
 export const openTableTitle=()=>`Modes (open boundary, ${PML_WORDS})`;
 
 // -- the PML check -----------------------------------------------------------------------------
@@ -163,7 +206,8 @@ export const CHECK_STRENGTH=6,CHECK_SEARCH=16;
  * of 16 and the target at that mode's Re n_eff to 6 decimals; everything else (the mesh) is doc's,
  * without results.group_index (the check compares n_eff only). */
 export function checkDocuments(doc,re){
- return re.map(r=>{const d=JSON.parse(JSON.stringify(doc)),em=d.physics.em1;em.pml.pml_strength=CHECK_STRENGTH;em.pml.pml_search_mode_count=CHECK_SEARCH;em.target_effective_index=Math.round(r*1e6)/1e6;if(d.results)delete d.results.group_index;return d;});
+ // one search near each mode (slice T2: the run's second search is not repeated)
+ return re.map(r=>{const d=JSON.parse(JSON.stringify(doc)),em=d.physics.em1;delete em.pml.pml_additional_searches;em.pml.pml_strength=CHECK_STRENGTH;em.pml.pml_search_mode_count=CHECK_SEARCH;em.target_effective_index=Math.round(r*1e6)/1e6;if(d.results)delete d.results.group_index;return d;});
 }
 export const PAIR_LIMIT=2e-3,RE_LIMIT=5e-4,LOSS_SHARE=0.02;
 /** Within the pairing distance |Δn_eff| <= 2e-3. */
@@ -175,7 +219,7 @@ export const lossIndependent=(l1,l2)=>Math.abs(l2-l1)<=Math.max(LOSS_SHARE*Math.
 /** The second solve's eligible candidates: passed the engine's filter (selected, or set aside only
  * as beyond the count asked for) and Re n_eff above 1.45. */
 export function eligibleCandidates(record){
- return record.candidates.filter(c=>c.reasons.length>0&&c.reasons.every(r=>r==='selected_near_target'||r==='outside_requested_count')&&c.effective_index.re>SILICA_THRESHOLD).map(c=>({re:c.effective_index.re,im:c.effective_index.im}));
+ return record.candidates.filter(c=>c.reasons.length>0&&c.reasons.every(r=>SELECTED_REASONS.has(r)||r==='outside_requested_count')&&c.effective_index.re>SILICA_THRESHOLD).map(c=>({re:c.effective_index.re,im:c.effective_index.im}));
 }
 /** Each first-solve mode paired with the nearest eligible candidate of the check solves (their
  * candidate records pooled), or null when none lies within 2e-3: the pml_check a run keeps. */
@@ -217,8 +261,12 @@ export function checkVerdict(re,im,paired,lambda0,status=null){
 }
 
 /** The candidate record of a check solve's result (its own record: the check keeps every
- * candidate, whatever Studio would show). */
-export const checkResultRecord=result=>checkCandidateRecord(result?.summary?.open_boundary?.[0],'The PML check');
+ * candidate, whatever Studio would show). A check solve searches once: schema /2. */
+export function checkResultRecord(result){
+ const record=checkCandidateRecord(result?.summary?.open_boundary?.[0],'The PML check');
+ if(hasSearches(record))throw new Error('The PML check: invalid open boundary record.');
+ return record;
+}
 
 // -- Compare -----------------------------------------------------------------------------------
 export const boundaryName=run=>isOpenRun(run)?`(open, ${PML_WORDS})`:'(closed)';
@@ -229,13 +277,17 @@ export const COMPARE_LOSS_NOTE_BA='B counts material absorption only; A also cou
 /** The engine's per-mode values of a new open result (engineRunValues, engineGroupIndex) reduced to
  * the modes Studio keeps (`keep`, openResultValues); other values (group_index_method) as they are. */
 export const keptValues=(values,keep)=>Object.fromEntries(Object.entries(values).map(([key,v])=>[key,Array.isArray(v)?keep.map(i=>v[i]):v]));
-/** The modes of a new open result that Studio keeps: Re n_eff above 1.45, in the engine's order.
+/** The modes of a new open result that Studio keeps: Re n_eff above 1.45, in the engine's order
+ * (with two searches, descending Re). target: the run's Search near n_eff (a number).
  * {re, im, keep (the engine's indices), record (the candidate record of the first point), data
  * (the result with the vector samples of the kept modes only)}. Throws when no mode is kept. */
-export function openResultValues(result,re,im,target){
- const record=checkCandidateRecord(result?.summary?.open_boundary?.[0],'This result');
+export function openResultValues(result,re,im,targetValue){
+ const target=Number(targetValue),record=checkCandidateRecord(result?.summary?.open_boundary?.[0],'This result',target);
  const keep=shownIndices(re);
- if(!keep.length)throw new Error(`No mode above n = ${SILICA_THRESHOLD} was found near n_eff ${target}. ${MOVE_TARGET_TEXT}`);
+ if(!keep.length){
+  const where=hasSearches(record)?`${searchesText(target,lowerTarget(target))}. ${MOVE_TARGET_TEXT_SEARCHES}`:`${targetText(target)}. ${MOVE_TARGET_TEXT}`;
+  throw new Error(`No mode above n = ${SILICA_THRESHOLD} was found near n_eff ${where}`);
+ }
  const vf=result.vector_fields?.[0],pick=a=>Array.isArray(a)?keep.map(i=>a[i]):a;
  const data=vf?{...result,vector_fields:[{...vf,real:pick(vf.real),imag:pick(vf.imag)},...result.vector_fields.slice(1)]}:result;
  return {re:keep.map(i=>re[i]),im:keep.map(i=>im[i]),keep,record,data};

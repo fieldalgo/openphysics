@@ -32,7 +32,8 @@ export {groupIndexStep} from './workspace-modes.mjs';
  * optical-shapes-v9: with state.openBoundary (workspace-open-boundary.mjs) and an open edge, the
  * window gets a PML outside it on each open edge; with every edge closed, or without it, the
  * document is the optical-shapes-v8 one byte for byte. With state.groupIndex an open document also
- * has results.group_index (the engine's complex n_g, slice P3). */
+ * has results.group_index (the engine's complex n_g, slice P3). Slice T2: from a target of 1.466
+ * an open document also searches near (target + 1.444) / 2 (pml.pml_additional_searches). */
 export function opticalDocument(state,setup){
  const block=opticalBlock(state,setup);if(block)throw new Error(block);
  const coreMesh=state.coreMesh??30,modeCount=checkModeCount(state.modeCount??DEFAULT_MODE_COUNT),shapes=designShapes(state,setup),study=opticalStudy(state.wavelength??1550,coreMesh),[cx,cy]=gradingCentre(shapes);
