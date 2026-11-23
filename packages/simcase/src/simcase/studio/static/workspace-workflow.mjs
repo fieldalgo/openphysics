@@ -53,9 +53,25 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
   :{id:'Results',state:currentRun?'ready':runs.length?'attention':'empty',detail:currentRun?'Result for these inputs':runs.length?'Current inputs differ from this run':'No run yet',...(!currentRun&&runs.length?{tone:'info'}:{})}
  ];
 }
-// A run as the dock, the footer and the title name it: its number (its place in the run list,
-// oldest = 1) with its name, "Run 1 · design A", or "Run 2" when it has none.
+// A run as the dock, the footer and the title name it: its number with its name, "Run 1 · design
+// A", or "Run 2" when it has none.
 export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
+// Run numbers (round 17, U2): within a tab a run keeps its number; a new run takes the largest
+// number used so far + 1, so dropping the oldest unpinned run renumbers nothing. The number lives
+// on the run object only (session and project files do not hold it): a file opened or a session
+// restored numbers its runs from 1 in file order. used: the largest number used so far in the tab.
+// Returns the largest number used after numbering the runs of `list` that have none, in order.
+export function numberRuns(list,used=0){
+ let top=Math.max(used,...list.map(r=>Number.isInteger(r.number)?r.number:0));
+ for(const run of list)if(!Number.isInteger(run.number))run.number=++top;
+ return top;
+}
+/** The message when the run limit dropped a run: "Run 3 (700 × 300 nm · 4 modes) was dropped: up
+ * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
+export function droppedRunText(run){
+ const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
+ return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count}) was dropped: up to six runs are kept; pin a run to keep it.`;
+}
 // The run state the dock heading and the footer describe, in the words of the multiphysics model.
 // viewed: the run Results shows (the selected run), which both then describe, so they agree with
 // the step bar and the title. 'current': that run (without one, the newest run) solved these exact
@@ -67,10 +83,12 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // current inputs (inputChanges), which names them when the geometry is the same (round 14).
 export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false,pml=null){
  const signature=studySignature(input,modeCount,groupIndex,pml),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
+ // a run's number in the tab (round 17, U2), else its place in the list
+ const number=i=>Number.isInteger(runs[i]?.number)?runs[i].number:i+1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
- if(seen>=0&&run.signature!==signature)return {state:'other',run:index+1,...name,...from,...(own>=0?{has:own+1}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
- if(index>=0)return {state:'current',run:index+1,...name,...from};
- return runs.length?{state:'stale',run:runs.length}:{state:'none',run:null};
+ if(seen>=0&&run.signature!==signature)return {state:'other',run:number(index),...name,...from,...(own>=0?{has:number(own)}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
+ if(index>=0)return {state:'current',run:number(index),...name,...from};
+ return runs.length?{state:'stale',run:number(runs.length-1)}:{state:'none',run:null};
 }
 // The viewed run and the current inputs, both named (round 14): "Run 1 · Design A 600 × 300 nm ·
 // current inputs 700 × 300 nm"; with the same geometry, at most two changes ("· current inputs

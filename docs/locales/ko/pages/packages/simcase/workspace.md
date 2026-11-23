@@ -278,7 +278,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    4 → 2. The next run uses them; Undo takes them back.*). 같은 문구는 다음 입력 편집까지 실행 패널의 버튼이
    있던 자리에도 남습니다. 입력
    편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
-   computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 실행 목록에서의 자리이며 가장 오래된 것이 1입니다.
+   computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 탭이 열려 있는 동안 바뀌지 않습니다(round 17). 새 실행은 지금까지 쓴 가장 큰 번호 + 1을 받으므로,
+   실행 여섯 개 한도가 가장 오래된 고정되지 않은 실행을 내보내도 나머지는 번호를 유지하고, Messages가 내보낸 실행을
+   밝힙니다(*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.*;
+   Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). 파일은 번호를 담지 않습니다: 파일을 열거나 이
+   브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
