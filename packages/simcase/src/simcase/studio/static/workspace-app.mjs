@@ -1223,7 +1223,7 @@ function renderRunList(){
  for(const run of [...runs].reverse()){
   const b=document.createElement('button');b.className='run-item';b.setAttribute('aria-pressed',String(solverRun?.job===run.job));b.dataset.run=run.job;b.textContent=runItemText(run);
   // on Compare the two compared runs say which side they are, so the newest-first list and A/B agree
-  const side=ui.page==='Compare'&&runs.length>1?compareSide(run.job,compareIds):'';if(side){const tag=document.createElement('span');tag.className='compare-side';tag.textContent=` · Compare ${side}`;b.append(tag);}
+  const side=ui.page==='Compare'&&runs.length>1?compareSide(run.job,compareIds):'';if(side){const sep=document.createElement('span');sep.className='compare-side-sep';sep.textContent=' · ';const tag=document.createElement('span');tag.className='compare-side';tag.textContent=`Compare ${side}`;b.append(sep,tag);}
   // on Compare a run click selects the run and stays on Compare (the A and B pickers choose what
   // is compared); Open in Results below shows it there. Elsewhere it opens Results on that run.
   b.onclick=()=>{solverRun=run;if(ui.page!=='Compare')ui.page='Results';render();if(ui.page==='Compare')document.querySelector(`.run-item[data-run="${CSS.escape(run.job)}"]`)?.focus();};panel.append(b);

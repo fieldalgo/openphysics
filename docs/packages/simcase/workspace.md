@@ -166,7 +166,9 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    do not calculate optical fields. Inspect or export the solver JSON if needed.
 4. Select **Run study**. Results keep the inputs used by that run,
    even if you edit the model while waiting. Stop waiting pauses observation only.
-   An input edit replaces the completion message, so it never describes edited inputs.
+   An input edit replaces the completion message, so it never describes edited inputs. The run
+   banner (*Optical run complete…*, and **Stop waiting** while a run goes) sits on the right of the
+   view's title row, over no control, so it never moves the panels when it appears or leaves.
    The dock heading, the status bar, the title and the step bar describe the run being viewed
    (the selected run), named by its number with its name: after a run *Run 1 · solved from
    the current inputs* (the status bar adds *press Run to solve again*); when the viewed run has
@@ -190,8 +192,8 @@ automated checks: they replace `showSaveFilePicker` at its boundary (see the
    name, *Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*, and give the time
    with seconds; the Compare pickers and headings name runs the same way. Compare opens with
    the two newest runs, the older as A and the newer as B (a run just computed is B); the run
-   list shows the newest first, so on Compare the two cards end with *· Compare A* and *· Compare
-   B*. A pick whose run is gone sets both back to that pair. Exactly one run card
+   list shows the newest first, so on Compare the two cards end with a *Compare A* and a *Compare
+   B* badge (read out as *· Compare A* and *· Compare B*). A pick whose run is gone sets both back to that pair. Exactly one run card
    reads as selected (the pointer over another card changes only its border). On Compare a click on
    a run in the run list selects it (Run name and the run commands act on it) and Compare stays
    as it is: A and B are chosen with the pickers above the plots, and **Open Run 1 · design A in

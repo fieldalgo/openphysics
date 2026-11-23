@@ -429,7 +429,13 @@ Since round 14 it checks the dock heading and the status bar naming both geometr
 600 × 300 nm · current inputs 700 × 300 nm*), the change list of **Use this run's inputs** staying in
 the run panel where the button was (the same text as Messages, still there after a page change, gone
 after the next input edit), and the save notice saying *Current inputs (650 × 400 nm) have no run
-yet.* when no run has them (and not when one does).
+yet.* when no run has them (and not when one does). It checks the run banner on the 500 and 450 nm
+runs (pre-registered): at 1440 × 900 and 390 × 844 the tree, the settings pane and the workspace keep
+their boxes exactly before the banner, while it shows (running and *Optical run complete…*) and after
+an edit removes it; while it shows, every tab, ribbon button, the File menu button and the tree's
+first item is the element at its centre, no visible control outside it intersects it and its own
+buttons are clickable. On Compare the run list's *Compare A* and *Compare B* are bordered badges
+after the label, and the buttons' accessible names still end in *· Compare A* and *· Compare B*.
 A second script (`tools/studio_browser/studio_multiphysics_browser.mjs`) then drives the
 multiphysics model: the Heated silicon waveguide template, a coupling removed and added back
 through the port pickers, a material problem and its one-click fix, a Run whose coupled n_eff
