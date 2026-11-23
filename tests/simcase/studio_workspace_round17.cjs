@@ -6,8 +6,8 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');
 const STATIC='../../packages/simcase/src/simcase/studio/static/';
 const read=name=>fs.readFileSync(path.join(__dirname,STATIC,name),'utf8');
-let W,N,P;
-test.before(async()=>{W=await import(STATIC+'workspace-workflow.mjs');N=await import(STATIC+'workspace-notebook.mjs');P=await import(STATIC+'workspace-project.mjs');});
+let W,N,P,S;
+test.before(async()=>{W=await import(STATIC+'workspace-workflow.mjs');N=await import(STATIC+'workspace-notebook.mjs');P=await import(STATIC+'workspace-project.mjs');S=await import(STATIC+'workspace-shapes.mjs');});
 
 const input=()=>P.snapshot({width:700,voltage:1,electric:false,heat:false,structure:false,optics:true},{materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''});
 const run=(job,extra={})=>({job,completedAt:'2026-11-23T00:00:00.000Z',settings:N.opticalSettings(),input:input(),effective_index:[2.4,1.7],
@@ -58,4 +58,17 @@ test('U2: the status line and the freshness words use the run number, not the li
  assert.equal(W.opticalFreshness(input(),runs,null,2).run,5);
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("function runNumber(run){return runs.includes(run)&&Number.isInteger(run.number)?run.number:null;}"));
+});
+test('U14: the status line names several shapes as the run list does (round 16 S8), without materials',()=>{
+ const core={name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220},sub={name:'Substrate',type:'rect',material:'Silicon',x:-1500,y:-1200,w:3000,h:700};
+ assert.equal(S.geometryWords({shapes:[core,sub]}),'Core 500 × 220 + Substrate 3000 × 700 nm');
+ assert.equal(S.designSummary({shapes:[core,sub]}),'Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ const tooth={name:'Tooth',type:'polygon',material:'Silica',points:[[0,300],[100,300],[50,400]]};
+ assert.equal(S.geometryWords({shapes:[core,tooth]}),'Core 500 × 220 nm + Tooth 3-vertex polygon');
+ const many=[core,sub,{...core,name:'A',x:600},{...core,name:'B',x:-900}];
+ assert.equal(S.geometryWords({shapes:many}),'Core 500 × 220 + Substrate 3000 × 700 + A 500 × 220 nm +1 more');
+ assert.equal(S.geometryWords({shapes:[core]}),'500 × 220 nm');
+ // the viewed-run status line: "Run 6 · Core 500 × 220 + Substrate 3000 × 700 nm" (was "Run 6 · 2 shapes")
+ const r=run(job(6),{number:6});r.input.model.shapes=[core,sub];r.signature='other';
+ const f=W.opticalFreshness(input(),[r],r,2);assert.equal(f.geometry,'Core 500 × 220 + Substrate 3000 × 700 nm');
 });

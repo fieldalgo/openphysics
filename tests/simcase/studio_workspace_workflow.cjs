@@ -155,5 +155,6 @@ test('round 14 (Q2, Q7): the geometry alone, in words',async()=>{
  assert.equal(S.geometryWords(m([{type:'rect',w:600.5,h:300}])),'600.5 × 300 nm');
  assert.equal(S.geometryWords(m([{type:'circle',r:300}])),'r 300 nm circle');
  assert.equal(S.geometryWords(m([{type:'polygon',points:[[0,0],[1,0],[1,1],[0,1],[0,2]]}])),'5-vertex polygon');
- assert.equal(S.geometryWords(m([{type:'rect',w:1,h:1},{type:'circle',r:1}])),'2 shapes');
+ // round 17 (U14, pre-registered; was '2 shapes'): several shapes by name and size, as the run list names them
+ assert.equal(S.geometryWords(m([{name:'Core',type:'rect',w:1,h:1},{name:'Rod',type:'circle',r:1}])),'Core 1 × 1 + Rod r 1 nm');
 });

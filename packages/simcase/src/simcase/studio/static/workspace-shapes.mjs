@@ -118,13 +118,19 @@ export function designSummary(model){
  // several shapes (round 16): each shape's name and size, the first three, then "+N more":
  // "Core 500 × 220 + Substrate 3000 × 700 nm · Silicon". The unit is said once at the end when
  // every shape listed has a size in nm, else after each size ("Core 500 × 220 nm + Tooth 5-vertex polygon").
+ return `${shapeList(shapes)} · ${[...new Set(shapes.map(s=>s.material||'unassigned'))].join(', ')}`;
+}
+// The names and sizes of several shapes (round 16 S8), without their materials: "Core 500 × 220 +
+// Substrate 3000 × 700 nm", the first three, then "+N more".
+function shapeList(shapes){
  const listed=shapes.slice(0,3),once=listed.every(s=>s.type!=='polygon'),unit=once?'':' nm';
  const part=s=>s.type==='rect'?`${s.name} ${nm(s.w)} × ${nm(s.h)}${unit}`:s.type==='circle'?`${s.name} r ${nm(s.r)}${unit}`:`${s.name} ${s.points.length}-vertex polygon`;
  const more=shapes.length>3?` +${shapes.length-3} more`:'';
- return `${listed.map(part).join(' + ')}${once?' nm':''}${more} · ${[...new Set(shapes.map(s=>s.material||'unassigned'))].join(', ')}`;
+ return `${listed.map(part).join(' + ')}${once?' nm':''}${more}`;
 }
 // The geometry alone, as the status line and the save notice name it (round 14): "650 × 300 nm",
-// "r 300 nm circle", "5-vertex polygon", or "2 shapes".
+// "r 300 nm circle", "5-vertex polygon"; several shapes by name and size as the run list names
+// them (round 17 U14, the S8 list without materials): "Core 500 × 220 + Substrate 3000 × 700 nm".
 export function geometryWords(model){
  const shapes=model.shapes;
  if(shapes.length===1){const s=shapes[0];
@@ -132,7 +138,7 @@ export function geometryWords(model){
   if(s.type==='circle')return `r ${nm(s.r)} nm circle`;
   return `${s.points.length}-vertex polygon`;
  }
- return `${shapes.length} shapes`;
+ return shapeList(shapes);
 }
 function uniqueName(base,shapes){const used=new Set(shapes.map(s=>s.name.toLowerCase()));for(let i=1;;i++){const name=`${base} ${i}`;if(!used.has(name.toLowerCase()))return name;}}
 export function newShape(type,shapes){
