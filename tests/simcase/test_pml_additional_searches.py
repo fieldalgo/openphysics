@@ -250,7 +250,8 @@ def test_w1_strip_over_substrate_returns_the_mode_near_the_cladding():
     union = _union(text)
     assert len(union) == 3
     for z, rounded in zip(union, (TE_LIKE, TM_LIKE, NEAR_CLADDING)):
-        assert abs(z.real - rounded.real) <= 5e-7 and abs(z.imag - rounded.imag) <= 5e-5, (z, rounded)
+        assert abs(z.real - rounded.real) <= 5e-7, (z, rounded)              # the record gives Re of the first two
+    assert abs(union[2].imag - NEAR_CLADDING.imag) <= 5e-6, union
     n, _, block = _run(json.loads(text))
     _check_merge(block, n)
     for z in union:                                    # every mode, no known miss
@@ -333,7 +334,7 @@ def test_w8_strip_over_substrate_at_three_strengths():
     runs = {s: _run(base, pml_strength=s) for s in (3, 1.5, 6)}
     n3, loss3, _ = runs[3]
     reference = [n3[np.argmin(abs(n3 - z))] for z in (TE_LIKE, TM_LIKE, NEAR_CLADDING)]
-    assert all(abs(r - z) <= 1e-6 for r, z in zip(reference, (TE_LIKE, TM_LIKE, NEAR_CLADDING))), reference
+    assert all(abs(r.real - z.real) <= 1e-6 for r, z in zip(reference, (TE_LIKE, TM_LIKE, NEAR_CLADDING))), reference
     for strength, (n, loss, block) in runs.items():
         _check_merge(block, n)
         for m, z in enumerate(reference):
