@@ -31,16 +31,16 @@ export {groupIndexStep} from './workspace-modes.mjs';
  * the run has a group_index_method.
  * optical-shapes-v9: with state.openBoundary (workspace-open-boundary.mjs) and an open edge, the
  * window gets a PML outside it on each open edge; with every edge closed, or without it, the
- * document is the optical-shapes-v8 one byte for byte. The group index is not offered with an
- * open boundary. */
+ * document is the optical-shapes-v8 one byte for byte. With state.groupIndex an open document also
+ * has results.group_index (the engine's complex n_g, slice P3). */
 export function opticalDocument(state,setup){
  const block=opticalBlock(state,setup);if(block)throw new Error(block);
  const coreMesh=state.coreMesh??30,modeCount=checkModeCount(state.modeCount??DEFAULT_MODE_COUNT),shapes=designShapes(state,setup),study=opticalStudy(state.wavelength??1550,coreMesh),[cx,cy]=gradingCentre(shapes);
  const doc={openphysics:'0.3',name:'Workspace optical study',geometry:{length_unit:'nm',depth:null,domain:{xmin:-1500,xmax:1500,ymin:-1200,ymax:1200},background:{material:'physmat:SiO2'},shapes:solverShapes(shapes,coreMesh)},physics:{em1:{type:'em.modes2d',formulation:'vector',vacuum_wavelength:study.vacuumWavelength,mode_count:modeCount,effective_index_threshold:1.45,boundary:{left:'pec',right:'pec',top:'pec',bottom:'pec'}}},mesh:{element_size:'250 nm',grading:{position:[cx+' nm',cy+' nm'],near:study.coreElementSize,far:'160 nm',refinement_distance:'1000 nm'}},study:{type:'single'},results:{save_fields:true,plots:false}};
  const open=state.openBoundary==null?null:checkOpenBoundary(state.openBoundary,shapes);
  if(open&&hasOpenEdge(open)){
-  if(state.groupIndex===true)throw new Error('Group index is not computed with an open boundary; close every edge to compute it.');
-  return applyOpenBoundary(doc,open);
+  const opened=applyOpenBoundary(doc,open);
+  return state.groupIndex===true?withGroupIndex(opened):opened;
  }
  return state.groupIndex===true?withGroupIndex(doc):doc;
 }

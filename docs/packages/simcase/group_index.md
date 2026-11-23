@@ -93,7 +93,7 @@ TE, a 1 nm step. The reference is the central difference of
   of n_eff itself: Re n_eff is −4.76e-3 off. The error decreases on each halving of the mesh.
 - dn_eff/dλ0 is within 1e-3 relative.
 - The registered 1e-3 / 2 % gate at the default mesh therefore failed and was replaced after the
-  result ([`test_open_boundary_group_index.py`](../../../tests/simcase/test_open_boundary_group_index.py)).
+  result ([open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary)).
 - **Limitation.** Against the 1D leaky-slab reference, dn_eff/dλ0 differs by 5.6e-4 to 7.3e-4
   relative on the shipped mesh recipe. It differs by up to 1.2e-3 when only the mesh away from the
   core is refined. That is about 1e-3 in Re n_g, smaller than the default mesh's n_eff error

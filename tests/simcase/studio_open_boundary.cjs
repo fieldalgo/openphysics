@@ -93,12 +93,15 @@ test('the default target and its bounds',()=>{
   assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:edges('bottom'),target}}),setup()),/Search near n_eff must lie between 1.45 and 3.4777/);
 });
 
-test('refusals: thickness, edge words, group index with an open boundary',()=>{
+test('refusals: thickness, edge words; the group index with an open boundary (slice P3)',()=>{
  for(const thickness of [999,1001,1500,2000,1000.5,'1000',NaN])
   assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:edges('top'),thickness}}),setup()),/PML thickness must be 1000 nm \(1 µm\)/);
  assert.throws(()=>O.opticalDocument(state({openBoundary:{edges:{...edges(),top:'pml'}}}),setup()),/top edge must be open or closed/);
  assert.throws(()=>O.opticalDocument(state({openBoundary:'open'}),setup()),/Invalid open boundary/);
- assert.throws(()=>O.opticalDocument(state({groupIndex:true,openBoundary:{edges:edges('top')}}),setup()),/Group index is not computed with an open boundary/);
+ // slice P3: an open document with Also compute group index is the open document with results.group_index
+ const open=O.opticalDocument(state({openBoundary:{edges:edges('top')}}),setup()),withG=O.opticalDocument(state({groupIndex:true,openBoundary:{edges:edges('top')}}),setup());
+ assert.deepEqual(withG,{...open,results:{...open.results,group_index:{wavelength_step:'1 nm'}}});
+ assert.deepEqual(Object.keys(withG.results).at(-1),'group_index');
  // closed edges keep the group index document
  assert.ok(O.opticalDocument(state({groupIndex:true,openBoundary:{edges:edges()}}),setup()).results.group_index);
 });

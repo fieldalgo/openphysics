@@ -205,6 +205,8 @@
   "tests/simcase/test_multiphysics_heat_optics.py": 25.9,
   "tests/simcase/test_open_boundary_convergence.py": 1190.5,
   "tests/simcase/test_open_boundary_filter.py": 354.0,
+  "tests/simcase/test_open_boundary_group_index.py": 1250.0,
+  "tests/simcase/test_open_boundary_mode_identity.py": 655.0,
   "tests/simcase/test_open_boundary_pml_independence.py": 915.2,
   "tests/simcase/test_open_boundary_slab.py": 1051.5,
   "tests/simcase/test_package_import.py": 0.6,
