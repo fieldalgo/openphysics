@@ -460,7 +460,9 @@ name downloading under it again with no dialog (*Downloaded heated-design.json a
 *heated-design.json · downloaded …* with the “ (1)” title text), and Save after an opened model or
 session file keeping that file's name. Since round 14 both scripts check that a restore whose title
 reads *same as file X* makes X the current file: Save As suggests X (the workspace script then
-reads *X · changed since restored* after an input edit and after a run is renamed).
+reads *X · changed since restored* after an input edit and after a run is renamed), and the session
+script checks a run opened from a file reading *Loaded from file, not recomputed. Results match the
+file's checksum.* with the provenance caveat as that sentence's title text.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with

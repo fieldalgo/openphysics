@@ -624,9 +624,9 @@ Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, s
 - **다이제스트.** 실행과 기준 결과마다 `"digest": "sha256:<hex>"`가 있습니다. `digest`를 뺀 기록을
   모든 객체의 키를 정렬하고 같은 숫자 규칙으로 쓴 JSON의 SHA-256입니다. 잘리거나 손상되거나 손으로
   고친 파일을 알아냅니다. 인증은 아닙니다: 파일을 고치는 사람은 다시 계산할 수 있으므로, 연 결과는
-  계속 “Loaded from file, not recomputed; integrity check passed (it does not show who made the
-  file).”으로
-  표시합니다. 복구한 결과는 “Recovered from this browser, not recomputed.”입니다. 광학 세션 파일에는
+  “Loaded from file, not recomputed. Results match the file's checksum.”으로 표시하고, 그 문장의 title
+  텍스트가 *The checksum detects a damaged or hand-edited file; it does not show who made the file:
+  whoever edits a file can recompute it.*이라고 알려 줍니다. 복구한 결과는 “Recovered from this browser, not recomputed.”입니다. 광학 세션 파일에는
   다이제스트가 없으므로 연 결과는 “Loaded from file, not recomputed. Studio checks that the file is
   well formed, not who made it.”으로 표시합니다.
 - **크기.** 파일은 최대 16 MiB이며 읽기 전에 검사하고, 그 안의 문서는 각각 최대 1 MiB입니다. Save
