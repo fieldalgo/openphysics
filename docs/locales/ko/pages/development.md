@@ -321,7 +321,12 @@ inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Fil
 표 상자 안에서 스크롤되는 동안 고정된 첫 열, 그 안에서 닿는 모든 열과 한 줄인 머리글·행 머리글, 그리고 군굴절률 상자의
 쉬운 설명, Physics › Optical modes에도 있어 Study와 양쪽으로, Undo로도 맞춰지는 같은 상자, 켜고 끌 때마다의
 Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n_g를 계산하지 않았을 때 n_g 머리글 아래의
-*Off · turn on in Study or Optical modes*도 확인합니다.
+*Off · turn on in Study or Optical modes*도 확인합니다. 13차부터는 Compare 표가 1440 × 900에 들어가는지
+확인합니다(사전 등록): 500 → 450 nm 표와 8모드 표 두 개에서, Settings 창이 열린 채로(Compare는 모델 트리를
+숨김) 상자의 clientWidth가 표 너비보다 24 px 이상 크고(Linux에서 42–44 px 측정) scrollWidth를 넘지 않으며,
+잘리거나 칸 밖으로 나간 머리글·칸 글자가 없고, 모든 칸이 상자 안에 있으며, Polarization 칸은 두 줄이고 n_g
+안내는 표 위 줄에 있습니다. 390 × 844에서는 표가 상자 안에서 스크롤되며 *Scroll sideways for all 14 columns ›*
+줄과 오른쪽 끝에 닿으면 사라지는 오른쪽 가장자리 그림자가 나옵니다.
 File 메뉴가 생긴 뒤로는 접근성 트리에서 역할과 이름으로, 그리고 키보드로(Export와 Browser copy 하위
 메뉴와 Edit 메뉴를 지나는 Enter, Up, Down, Home, End, Right, Left, 한 단계씩 닫고 초점을 돌려주는
 Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440 × 900과 390 × 844에서 페이지 안에

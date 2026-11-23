@@ -381,6 +381,13 @@ the table's box, every column reachable there and headers and row headers on one
 index box's plain note, the same box in Physics › Optical modes, synced with Study both ways and
 through Undo, a Messages line each way, *· group index on* in the next run's inputs, and the
 *Off · turn on in Study or Optical modes* hint under an n_g header when no run shown computed n_g.
+Since round 13 the Compare table fits at 1440 × 900 (pre-registered): on the 500 → 450 nm table and
+the two 8-mode tables, with the Settings pane open (Compare hides the model tree), the box's
+clientWidth exceeds the table's width by at least 24 px (42 to 44 px measured on Linux) and its
+scrollWidth by none, no header or cell text is clipped or outside its cell, every cell is inside
+the box, the Polarization cells have two lines and the n_g hint is on the line above the table; at
+390 × 844 the table scrolls in its box with the line *Scroll sideways for all 14 columns ›* and a
+right-edge shadow that goes at the right end.
 Since the File menu it checks the menus by role and name in the accessibility tree and by keyboard
 (Enter, Up, Down, Home, End, Right and Left through the Export and Browser copy submenus and the
 Edit menu, Escape closing one level and returning focus), the shortcuts shown and in

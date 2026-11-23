@@ -855,7 +855,8 @@ engine and older session files give the same number from the same samples:
   **—** in two cases:
   - The run did not compute n_g. The help reads “Turn on Also compute group index in Study”,
     and the n_g header shows *Off · turn on in Study or Optical modes* under its name (in
-    Compare when neither run computed n_g).
+    Compare, when neither run computed n_g, the line above the table reads *n_g: Off · turn on in
+    Study or Optical modes* instead, so the n_g columns stay narrow).
   - The engine could not match that mode at a side wavelength (`null`, for example one member
     of a degenerate pair). In the tab that ran it, the help gives the engine's reason,
     *Not matched: vacuum_wavelength 1.549 um: …*. A session file does not keep the reasons, so
@@ -1054,8 +1055,11 @@ overtakes the TM-like one). Matching is always on, and the ranks stay in every r
   members' values for a matched pair, **—** with the modes table's help when a run has none). The
   headers are short and grouped: *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*
   and *n_g* each over an **A** and a **B** column, *Modes*, *Overlap*, *Δn_eff (B − A)* and *Δ % (of
-  A)* over one; a line above the table names run A and run B. The first column stays in view while
-  the others scroll sideways inside the table's box; the page does not scroll sideways. A mode
+  A)* over one; a line above the table names run A and run B. Each Polarization cell has two lines,
+  the class and then the share (*TE-like* / *98.2 % TE*). At 1440 × 900 every column fits the table's
+  box. Where the box is narrower (a phone), the first column stays in view while the others scroll
+  sideways inside the box: a shadow at its right edge and the line *Scroll sideways for all 14
+  columns ›* show that more columns are hidden. The page does not scroll sideways. A mode
   without a match is headed *1 ↔ —* or *— ↔ 2*, with the full *A mode 2: no match in B (best
   overlap 0.43, with B mode 2)* as its title and accessible name, and
   shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
