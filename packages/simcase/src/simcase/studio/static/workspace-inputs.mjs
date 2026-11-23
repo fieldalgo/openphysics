@@ -50,3 +50,24 @@ export class NumericDrafts {
  clear(key){if(key===undefined)this.#pending.clear();else this.#pending.delete(key);}
  assertValid(){if(this.invalid)throw new Error('Correct the highlighted inputs or restore their last valid values before saving or running.');}
 }
+// The settings that differ between two inputs files (optical, version 7 or 8), from → to in the
+// inspector's words, for "Use this run's inputs": "Width 700 → 600 nm · Modes to find 4 → 2".
+// A shape's own fields are named alone when both inputs have one shape ("Width"), else after the
+// shape ("Core width"); a different shape count reads "Shapes 1 → 2" and its own fields are not
+// listed. Returns the list (empty when nothing listed differs).
+const SHAPE_FIELDS=Object.freeze([['type','Shape type',''],['material','Material',''],['w','Width','nm'],['h','Height','nm'],['r','Radius','nm'],['x','Left x','nm'],['y','Bottom y','nm'],['cx','Centre x','nm'],['cy','Centre y','nm']]);
+export function inputChanges(before,after){
+ const out=[],show=v=>typeof v==='number'?signed(v):String(v);
+ const add=(label,from,to,unit='')=>{if(from!==to)out.push(`${label} ${show(from)} → ${show(to)}${unit?' '+unit:''}`);};
+ const a=before.model,b=after.model;
+ add('Wavelength',a.wavelength,b.wavelength,'nm');add('Core mesh size',a.coreMesh,b.coreMesh,'nm');
+ const sa=a.shapes||[],sb=b.shapes||[];
+ if(sa.length!==sb.length)out.push(`Shapes ${sa.length} → ${sb.length}`);
+ else{const one=sa.length===1;sa.forEach((s,i)=>{const t=sb[i],named=label=>one?label:`${t.name||'Shape '+(i+1)} ${label.charAt(0).toLowerCase()+label.slice(1)}`;
+  for(const [key,label,unit] of SHAPE_FIELDS)if(key in s||key in t)add(named(label),s[key]??'—',t[key]??'—',unit);
+  if((s.points||t.points)&&JSON.stringify(s.points)!==JSON.stringify(t.points))out.push(named('Vertices')+' changed');});}
+ for(const body of Object.keys({...before.setup?.materials,...after.setup?.materials}))add(`${body} material`,before.setup?.materials?.[body]||'none',after.setup?.materials?.[body]||'none');
+ add('Modes to find',a.modeCount??2,b.modeCount??2);
+ add('Group index',a.groupIndex===true?'on':'off',b.groupIndex===true?'on':'off');
+ return out;
+}

@@ -635,7 +635,8 @@ try {
   const used = await page.eval("({dialog:!!document.querySelector('dialog[open]'),header:document.getElementById('project').textContent,step:[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' '),runs:document.querySelectorAll('.run-item').length,page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),message:document.getElementById('file-status').textContent})");
   stage('L3 run inputs used', used);
   assert.equal(used.dialog, false); assert.doesNotMatch(used.header, /viewing/); assert.equal(used.step, '5. Results Result for these inputs'); assert.equal(used.runs, 2); assert.deepEqual(used.page, ['Results']);
-  assert.match(used.message, /^Current inputs set from Run 1 · design A: 600 × 300 nm · Silicon · λ 1550 nm · Modes to find 2\. The next run uses them; Undo takes them back\.$/);
+  // round 13 (O5): only the settings that change, from → to (Width 700 → 600 nm keeps the centre, so Left x moves too)
+  assert.equal(used.message, 'Current inputs set from Run 1 · design A: Width 700 → 600 nm · Left x −350 → −300 nm. The next run uses them; Undo takes them back.');
   await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Study'); await page.until("!!document.getElementById('next-run-inputs')", 'L3 study after use');
   assert.match(await text('#next-run-inputs'), /^Next run uses 600 × 300 nm · Silicon · /);
   await page.click('#undo-edit'); await sleep(200);
@@ -1200,7 +1201,8 @@ try {
   stage('P1 U3 Use this run\'s inputs', {message: usedMessage, used: used3, undo: u3, redo: r3});
   // the run's count, from the message (the M5 runs have the box off on one of them; the run list
   // order is not assumed): another count and box than the current 5 and on
-  const runModes = /Modes to find (\d)\. The next run uses them; Undo takes them back\.$/.exec(usedMessage)?.[1];
+  // round 13 (O5): the message lists Modes to find 5 → N and Group index on → off, from → to
+  const runModes = /(?:: | · )Modes to find 5 → (\d)(?: · |\.)/.exec(usedMessage)?.[1]; assert.match(usedMessage, / · Group index on → off\. The next run uses them; Undo takes them back\.$/);
   assert.ok(runModes && runModes !== '5', usedMessage);
   assert.deepEqual(used3, {modes: runModes, box: false}); assert.deepEqual(u3, {modes: '5', box: true}); assert.deepEqual(r3, used3);
   await noOverflow('P1 study settings');
