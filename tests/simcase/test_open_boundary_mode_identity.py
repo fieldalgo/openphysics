@@ -15,12 +15,18 @@ there (simcase.mode_postprocessing), and n_g is the complex central difference o
   against closed: |delta f_TE| <= 1e-3 for both modes (measured before, 1.7e-4).
 - V10: effective area, the template open against closed: relative difference <= 1e-2 for both
   modes (measured before, 7e-4).
-- V11: n_g under the PML, the V1 film (TE) with results.group_index (step 1 nm) at x 1, against
-  the central difference of ``refsol.lossy_slab.substrate_leaky_mode`` at 1549 and 1551 nm with
-  physmat's dispersion (computed here): |delta Re n_g| <= 1e-3 and Im n_g within 2 % relative.
-  The draft's reference 3.579316 - 0.019376i was withdrawn as not reproducible (an Im n_g of
-  -0.019 cannot come from Im n_eff 1.86e-5) and replaced by this one before the run; blind
-  against it. x 1/2 is reported, not gated.
+- V11: n_g under the PML, the V1 film (TE) with results.group_index (step 1 nm), against the
+  central difference of ``refsol.lossy_slab.substrate_leaky_mode`` at 1549 and 1551 nm with
+  physmat's dispersion (computed here; 3.706654 - 2.688e-4i). The draft's reference 3.579316 -
+  0.019376i was withdrawn as not reproducible before the run. As registered (blind against the new
+  reference): |delta Re n_g| <= 1e-3 and Im n_g within 2 % at x 1. It FAILED: 5.24e-3 and 2.69 %
+  (x 1/2: 2.81e-3, 1.06 %). The cause is the default mesh's own n_eff error (Re -4.76e-3, which V1
+  gates only at x 1/4); the tracked sweep gives the same n_g. Replaced after that result (decision
+  pml-p3-v11-after-result), not blind:
+  - V11a: dn_eff/dlambda0 against refsol's central difference, relative error <= 1e-3 at x 1 and
+    not growing at x 1/2 and 1/4;
+  - V11b: the Re n_g and Im n_g errors against refsol decrease on each halving x 1, 1/2, 1/4;
+  - V11c: the single-point n_g equals the tracked sweep's at x 1 to 1e-12 relative.
 - V12 (blind): Studio's teFraction and effectiveArea (workspace-modes.mjs, in Node) on the
   physical window of the saved samples equal the engine's values to 1e-12 relative, on the
   template and the strip over a substrate, all edges open; the window equals galerkin's own
@@ -169,31 +175,56 @@ def test_v9_film_te_fraction_converges_to_one():
 
 # -- V11: n_g under the PML ------------------------------------------------------------------------
 
+def _slab_neff(wavelength):
+    si, sio2 = (complex(physmat.material(name).refractive_index(vacuum_wavelength=wavelength))
+                for name in ("Si", "SiO2"))
+    return refsol.lossy_slab.substrate_leaky_mode(refractive_index=(sio2, si, sio2, si), thickness=(0.22e-6, 0.5e-6),
+                                                  vacuum_wavelength=wavelength, pol="TE")
+
+
+def slab_dn_dlambda(step=1e-9):
+    """refsol's central difference dn_eff/dlambda0 (1/m) at 1550 nm, physmat's dispersion."""
+    return (_slab_neff(WAVELENGTH + step) - _slab_neff(WAVELENGTH - step)) / (2 * step)
+
+
 def slab_group_index(step=1e-9):
-    def neff(wavelength):
-        si, sio2 = (complex(physmat.material(name).refractive_index(vacuum_wavelength=wavelength))
-                    for name in ("Si", "SiO2"))
-        return refsol.lossy_slab.substrate_leaky_mode(refractive_index=(sio2, si, sio2, si),
-                                                      thickness=(0.22e-6, 0.5e-6), vacuum_wavelength=wavelength,
-                                                      pol="TE")
-    return neff(WAVELENGTH) - WAVELENGTH * (neff(WAVELENGTH + step) - neff(WAVELENGTH - step)) / (2 * step)
+    return _slab_neff(WAVELENGTH) - WAVELENGTH * slab_dn_dlambda(step)
 
 
 @pytest.mark.slow
 def test_v11_group_index_of_the_leaky_film():
     reference = slab_group_index()
+    dn_reference = slab_dn_dlambda()
     text = build("slab", 1, target=2.85, edges=TOP_BOTTOM)
-    errors = []
-    for factor in (1, 0.5):
+    re_errors, im_errors, slope_errors = [], [], []
+    for factor in (1, 0.5, 0.25):
         d = scaled(text, factor)
         d["results"] = {"group_index": {"wavelength_step": "1 nm"}}
         result = solve(d)
-        ng = complex(result.group_index()[0, 0])
         assert result.group_index_method["reasons"] == [None]
-        errors.append((abs(ng.real - reference.real), abs(ng.imag / reference.imag - 1), ng))
-    print(f"\nV11 reference {reference}; x 1, x 1/2 (|delta Re|, Im relative, n_g): {errors}")
-    assert errors[0][0] <= 1e-3, errors
-    assert errors[0][1] <= 0.02, errors
+        ng, n = complex(result.group_index()[0, 0]), complex(result.effective_index[0, 0])
+        if factor == 1:
+            # V11c: the same computation as a tracked sweep of the three wavelengths
+            sweep = copy.deepcopy(d)
+            del sweep["results"]["group_index"]
+            sweep["study"] = {"type": "sweep", "parameter": "physics.em1.vacuum_wavelength",
+                              "values": {"unit": "nm", "values": [1549, 1550, 1551]}}
+            swept = complex(solve(sweep).group_index()[1, 0])
+            print(f"\nV11c single point {ng}, tracked sweep {swept}, relative {abs(ng / swept - 1):.2e}")
+            assert abs(ng / swept - 1) <= 1e-12, (ng, swept)
+        slope = (n - ng) / WAVELENGTH          # n_g = n_eff - lambda0 dn_eff/dlambda0
+        slope_errors.append(abs(slope / dn_reference - 1))
+        re_errors.append(abs(ng.real - reference.real))
+        im_errors.append(abs(ng.imag / reference.imag - 1))
+    print(f"V11 reference n_g {reference}, dn/dlambda {dn_reference} 1/m")
+    print(f"V11a dn/dlambda relative errors x 1, 1/2, 1/4: {slope_errors}")
+    print(f"V11b Re n_g errors {re_errors}; Im n_g relative errors {im_errors}")
+    # V11a: the part of n_g that is new
+    assert slope_errors[0] <= 1e-3 and slope_errors[1] <= slope_errors[0] and slope_errors[2] <= slope_errors[1], \
+        slope_errors
+    # V11b: convergence against refsol
+    assert re_errors[0] > re_errors[1] > re_errors[2], re_errors
+    assert im_errors[0] > im_errors[1] > im_errors[2], im_errors
 
 
 def test_v11_the_open_template_gets_a_complex_group_index_with_its_method():

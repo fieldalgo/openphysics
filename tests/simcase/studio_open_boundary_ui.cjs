@@ -306,7 +306,7 @@ test('slice P3: an open run keeps the engine values and a complex group index; a
  const modes=M.opticalModes(back.runs[0]);assert.equal(back.runs[0].te.source,'studioWindow');
  assert.ok(modes.every(m=>Number.isFinite(m.fte)&&m.area>0));
  // n_g: Re shown, Im in the help
- const cell=M.groupIndexCell(run,0);assert.equal(cell.text,'4.1900');assert.match(cell.title,/: Re n_g is shown; Im n_g -1\.69e-10$/);
+ const cell=M.groupIndexCell(run,0);assert.equal(cell.text,'4.1900');assert.ok(cell.title.endsWith(': Re n_g is shown; Im n_g -1.69e-10. At the default mesh n_g is about 5e-3 low in the slab check; the error comes from n_eff and shrinks when the core mesh is refined.'),cell.title);
  assert.equal(M.groupIndexCell(run,1).text,'—');
  // refusals: an open run's n_g must be complex, a closed run's real; null in both parts or neither
  const redigest=d=>{for(const r of d.runs){delete r.digest;r.digest=S.recordDigest(r);}return d;};

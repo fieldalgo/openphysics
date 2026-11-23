@@ -175,6 +175,9 @@ export const GROUP_INDEX_HINT='Off · turn on in Study or Optical modes';
 export const hasGroupIndex=run=>Array.isArray(run?.group_index);
 // An open run's n_g is complex (its n_eff is): the cell shows Re n_g, its help Im n_g.
 export const OPEN_GROUP_INDEX_NOTE='With an open boundary n_eff and n_g are complex: Re n_g is shown';
+// The measured mesh error of n_g (slice P3, V11: the leaky slab, Re n_g error 5.24e-3 at the default
+// mesh, 2.81e-3 and 1.50e-3 on halving; almost all of it the error of n_eff itself).
+export const OPEN_GROUP_INDEX_MESH_NOTE='At the default mesh n_g is about 5e-3 low in the slab check; the error comes from n_eff and shrinks when the core mesh is refined.';
 export const groupIndexKeptHelp=(step='1 nm')=>`Not matched at λ0 ± ${step}; the reason is not kept in session files`;
 /** The step of a run's group_index_method ("central_difference 1 nm electric-l2-assignment-v1"), or null. */
 export function groupIndexStep(method){const m=/^central_difference (\S+ (?:pm|nm|um|m)) \S+$/.exec(method??'');return m?m[1]:null;}
@@ -186,7 +189,7 @@ export function groupIndexCell(run,i){
  if(!Array.isArray(run.group_index))return {text:'—',value:null,title:GROUP_INDEX_OFF_HELP};
  const v=run.group_index[i],step=methodStep(run.group_index_method);
  const im=Array.isArray(run.group_index_im)?run.group_index_im[i]:null;
- if(Number.isFinite(v))return {text:v.toFixed(4),value:v,title:groupIndexHelp(step)+(Number.isFinite(im)?`. ${OPEN_GROUP_INDEX_NOTE}; Im n_g ${im.toExponential(2)}`:'')};
+ if(Number.isFinite(v))return {text:v.toFixed(4),value:v,title:groupIndexHelp(step)+(Number.isFinite(im)?`. ${OPEN_GROUP_INDEX_NOTE}; Im n_g ${im.toExponential(2)}. ${OPEN_GROUP_INDEX_MESH_NOTE}`:'')};
  const reason=run.groupIndexReasons?.[i];
  return {text:'—',value:null,title:typeof reason==='string'&&reason?'Not matched: '+reason:groupIndexKeptHelp(step)};
 }

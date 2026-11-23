@@ -84,11 +84,16 @@ results.group_index: unknown key "group_index" in results. … (E-KEY-UNKNOWN)
 the entry's PML and target. The matching uses the tracker's physical weights, so the overlaps are
 taken on the physical window. The first match is near the target, and the edge of the search is
 the candidate farthest from the target, as in a tracked PML sweep. The null rules are the same.
-A complex n_g is a spectral derivative, not an energy velocity. Validation (slice P3, V11): the
-leaky slab of the open-boundary checks (220 nm Si over 500 nm silica on Si, PEC side walls, TE)
-with a 1 nm step against the central difference of `refsol.lossy_slab.substrate_leaky_mode` at
-1549 and 1551 nm with physmat's dispersion, 3.706654 − 2.688e-4i
-([open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary)).
+A complex n_g is a spectral derivative, not an energy velocity. Validation (slice P3, V11) uses
+the leaky slab of the open-boundary checks: 220 nm Si over 500 nm silica on Si, PEC side walls,
+TE, a 1 nm step. The reference is the central difference of
+`refsol.lossy_slab.substrate_leaky_mode` at 1549 and 1551 nm with physmat's dispersion,
+3.706654 − 2.688e-4i.
+- At the default mesh n_g is 5.24e-3 low in Re and 2.7 % off in Im. Almost all of it is the error
+  of n_eff itself: Re n_eff is −4.76e-3 off. The error decreases on each halving of the mesh.
+- dn_eff/dλ0 is within 1e-3 relative.
+- The registered 1e-3 / 2 % gate at the default mesh therefore failed and was replaced after the
+  result ([open-boundary mode identity](workspace.md#mode-identity-with-an-open-boundary)).
 
 `field_layout` and every other key are unchanged. Results without the option are those of
 earlier releases. The log lists the side wavelengths, each null mode with its reason, and

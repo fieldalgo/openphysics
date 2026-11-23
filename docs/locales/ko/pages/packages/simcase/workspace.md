@@ -1165,6 +1165,68 @@ OB 단계):
 - 같은 사례에서 Search near n_eff 1.600, 모드 4개는 등록한 대로 클래딩 굴절률 근처 모드 *1.48642654 +
   7.92e-3i* / *2789 dB/cm*를 찾습니다.
 
+### 열린 경계의 모드 식별
+
+slice P3는 열린 실행에 TE 비율, 유효 면적, 군굴절률, Compare의 짝짓기를 줍니다. 모두 **물리 창**에서
+정의합니다. 물리 창은 중심이 엔진의 `physical_bounds` 안에 있는 삼각형들, 즉 PML을 뺀 3 × 2.4 µm
+창입니다. 그곳에서 저장된 중심 장은 물리적인 E입니다. 닫힌 실행의 물리 창은 창 전체이므로 닫힌 식과
+값은 모두 그대로입니다.
+
+- **Polarization**(f_TE)은 닫힌 식을 물리 창에서 합한 것입니다. 도움말은 “TE = share of |E_x|² in
+  |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded”입니다.
+- **A_eff**는 같은 삼각형들에서 구한 (Σ A_T |E|²)² / Σ A_T |E|⁴입니다. 도움말은 “Effective area over
+  the 3 × 2.4 µm window, PML excluded. For a strongly leaking mode it depends on the window.”입니다.
+- 엔진이 두 값을 씁니다(`mode_postprocessing`, `integration_region: "physical_window"`). Studio는
+  엔진의 값을 쓰고, slice P2가 저장한 실행은 저장된 장으로 같은 수를 계산합니다. *Run details*가
+  출처를 밝힙니다: “computed by the engine (or by Studio) from the saved field on the physical window
+  (PML excluded)”.
+- 열린 경계에서 **n_g**는 복소수이며 열은 Re n_g를 보입니다. 도움말에는 “With an open boundary n_eff
+  and n_g are complex: Re n_g is shown; Im n_g …. At the default mesh n_g is about 5e-3 low in the
+  slab check; the error comes from n_eff and shrinks when the core mesh is refined.”가 붙습니다. PML
+  점검의 풀이에는 군굴절률을 넣지 않습니다.
+- **Compare**는 열린 실행을 두 물리 창이 겹치는 영역에서 짝짓습니다. 열린 실행의 표본은 물리 창의
+  삼각형에서만 씁니다.
+
+**검증**(`tests/simcase/test_open_boundary_mode_identity.py`, Linux, Python 3.12, BLAS 스레드 1개):
+
+| 점검 | 경우와 기준 | 결과 |
+|---|---|---|
+| V9 | 템플릿 열린 실행 대 닫힌 실행, \|Δf_TE\| ≤ 1e-3 | 1.70e-4(TE-like 0.98166 → 0.98149), 1.5e-5(TM-like): 통과 |
+| V9 | V1 막(TE, PEC 옆벽) × 1, ½, ¼: 1 − f_TE ≤ 1e-3이고 감소; 반으로 나눈 단계는 블라인드 | V9FILM |
+| V10 | 템플릿 열린 실행 대 닫힌 실행, 상대 ΔA_eff ≤ 1e-2 | 7.2e-4, 9.9e-5: 통과 |
+| V12 | 같은 표본에서 Node의 Studio 식 대 엔진 식, 상대 ≤ 1e-12; 블라인드 | 템플릿(창 안 삼각형 4,557개 중 2,283개)과 기판 위 스트립(40,658개 중 11,591개)에서 ≤ 3.4e-15: 통과. 창은 풀이기 자신의 물리 마스크와 같음 |
+| V13a | 열린 템플릿 대 바깥 변이 PEC인 같은 메시, η ≥ 0.9999 | 1 − 4e-14, 1 − 2e-11: 통과 |
+| V13b | × 1의 템플릿 닫힌 실행 대 열린 실행, 두 모드가 각자의 짝과 짝지어짐(η ≥ 0.8, 여유 ≥ 0.1) | 0.99033, 0.98754: 통과 |
+| V13c | TE-like 1 − η(닫힘, 열림)가 × 1, ½, ¼에서 감소 | V13CTE |
+| V11a | V1 막의 dn_eff/dλ0 대 refsol, × 1에서 상대 ≤ 1e-3이고 커지지 않음 | V11A |
+| V11b | refsol 대비 Re·Im n_g 오차가 × 1, ½, ¼에서 감소 | V11B |
+| V11c | 단일 지점 n_g 대 추적 sweep, 상대 ≤ 1e-12 | V11C |
+
+- **처음 등록한 V11은 실패했습니다.** 기준은 × 1에서 \|ΔRe n_g\| ≤ 1e-3, Im 2 % 이내였고, 기준값은
+  physmat 분산을 넣어 1549 nm와 1551 nm에서 구한 refsol 중앙 차분 3.706654 − 2.688e-4i였습니다.
+  이 기준은 기본 메시 자신의 n_eff 오차보다 작았습니다. V1은 그 오차를 × ¼에서만 판정합니다. 결과를
+  본 뒤 V11a–c로 바꾸었습니다.
+
+  | 메시 | Re n_eff 오차 | Re n_g 오차 | Im n_g 오차 |
+  |---|---|---|---|
+  | × 1 | 4.76e-3 | 5.24e-3 | 2.69 % |
+  | × ½ | 2.18e-3 | 2.81e-3 | 1.06 % |
+  | × ¼ | 0.87e-3 | 1.50e-3 | 0.40 % |
+
+  추적 sweep도 같은 n_g를 줍니다. 오차는 거의 모두 n_eff의 것입니다.
+- **처음 등록한 V13**(slice P2, η ≥ 0.99, 블라인드)은 0.9903과 0.9875로 실패했습니다. 원인은 PML이
+  아니라 기본 메시의 이산화 오차입니다.
+  - 닫힌 설계 하나의 서로 다른 두 메시도 그만큼 다릅니다(× 1 대 × ½: 0.9933, 0.9920).
+  - 공통 격자는 η를 최대 6e-4만 움직입니다(간격 15에서 3.75 nm).
+  
+  결과를 본 뒤 V13a–c로 바꾸었습니다.
+- **한계.**
+  - 세밀한 열린 메시에서는 무손실 TM-like 모드가 빠질 수 있습니다. 아주 작은 Im n_eff가 반대 부호로
+    나와 엔진이 `negative_imaginary_index`로 거절하기 때문입니다. 템플릿의 TM-like 모드는 × ½와
+    × ¼에서 빠집니다.
+  - 굽힌 도파로와 스칼라 정식화는 이 값들을 얻지 않습니다.
+  - 누설이 강한 모드의 유효 면적은 창에 따라 달라집니다.
+
 ### 광학 세션 파일(버전 9)
 
 모든 실행이 실수 모드 두 개와 장을 가진 세션은 이전과 바이트 단위로 같은 버전 7로 씁니다. 버전 7이 담을 수

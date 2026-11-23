@@ -1748,7 +1748,7 @@ try {
     assert.deepEqual(template.pol.map(([, title]) => title), ['TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded', 'TE = share of |E_x|² in |E_x|² + |E_y|², x horizontal, over the 3 × 2.4 µm window, PML excluded']);
     assert.deepEqual(template.pol.map(([text]) => text.split(' · ')[0]), ['TE-like', 'TM-like']);
     assert.ok(template.areaTitles.every(t => t === 'Effective area over the 3 × 2.4 µm window, PML excluded. For a strongly leaking mode it depends on the window.'), JSON.stringify(template.areaTitles));
-    assert.ok(template.ngTitles.every(t => /: Re n_g is shown; Im n_g -?\d\.\d{2}e[-+]\d+$/.test(t)), JSON.stringify(template.ngTitles));
+    assert.ok(template.ngTitles.every(t => /: Re n_g is shown; Im n_g -?\d\.\d{2}e[-+]\d+\. At the default mesh n_g is about 5e-3 low in the slab check; the error comes from n_eff and shrinks when the core mesh is refined\.$/.test(t)), JSON.stringify(template.ngTitles));
     assert.ok(template.neff.every(t => /^\d\.\d{8} [+−] \d\.\d{2}e-\d+i$/.test(t)), 'n_eff with its Im part');
     // both modes found again by the per-mode check. Below the display floor with check losses under
     // 0.05 dB/cm: no verdict (decided after the TM-like result 0.00480 -> 0.01706 dB/cm, registered as
