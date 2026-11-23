@@ -80,7 +80,8 @@ test('R9: the tree warning badge names the physics and the problem as an image',
 });
 
 test('R10: each Library choice says what it does',()=>{
- assert.equal(A.CARD_OPEN_TEXT,'Open (runs stay in this tab)');
+ // round 16 (S10): the button reads Open model; the description line says the runs stay
+ assert.equal(A.CARD_OPEN_TEXT,'Open model');assert.equal(A.CARD_STAY_TEXT,'Runs stay in this tab until you close it.');
  assert.equal(A.CARD_START_NEW_TEXT,'Start new (no runs)');
  assert.equal(A.RESUME_NOT_NOW_TEXT,'Not now (choose a model below)');
  assert.equal(A.RESTORE_TEXT,'Restore from this browser');
@@ -90,7 +91,9 @@ test('R10: each Library choice says what it does',()=>{
  assert.ok(src.includes("fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;"));
 });
 
-test('R1: the Save As name dialog says Chrome and Edge save to the same file',()=>{
+test('R1: the Save As name dialog says where later saves go (round 16 S11: this browser cannot write to the file)',()=>{
  const app=read('workspace-app.mjs');
- assert.ok(app.includes("(saveAs?' '+LATER_SAVES_NOTE+' Chrome and Edge save to the same file.':"));
+ assert.ok(app.includes("(saveAs?' '+DOWNLOAD_SAVE_AS_NOTE:"));
+ assert.ok(app.includes("const DOWNLOAD_SAVE_AS_NOTE='This browser cannot write to the file, so later saves download again under this name and may add “ (1)”.';"));
+ assert.ok(!app.includes('Chrome and Edge save to the same file'));
 });
