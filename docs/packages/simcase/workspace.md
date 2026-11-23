@@ -289,7 +289,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    (**Study → Edit wavelength** and the step bar's wavelength open it under Optical modes,
    focused). The Study settings also say which inputs the next run uses, *Next run uses 700 ×
    300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, with *· group index on* when
-   **Also compute group index** is ticked, whatever run Results shows.
+   **Also compute group index** is ticked, whatever run Results shows. Beside **Run study** the
+   ribbon names the options that make the next run slower (round 17): *group index on · 3 solves*,
+   with an open boundary's PML check *PML check on · 3 solves* (one more solve per mode at most),
+   both *group index on · PML check on · 5 solves*. The options keep their state between tasks;
+   the line only says they are on.
    Set the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.

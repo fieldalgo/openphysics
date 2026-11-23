@@ -30,6 +30,16 @@ export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.mo
 // " · group index on" when the group index option is on.
 // pml: the open boundary of the page (settings.pml form, workspace-open-run.mjs), or null.
 export const nextRunText=(input,modeCount,groupIndex=false,pml=null)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[]),...(groupIndex===true?['group index on']:[]),...(pml?[`open boundary (PML 1 µm) on ${pml.open_edges.length} edge${pml.open_edges.length===1?'':'s'}`,`search near ${pml.target}`]:[])].join(' · ')}`;
+// The slow options of the next run, beside Run study (round 17, U3): "group index on · 3 solves",
+// in the words the Study panel's "Next run uses …" line has; with the PML check of an open boundary
+// "PML check on · 3 solves" (one more solve per mode, at most), both "group index on · PML check on
+// · 5 solves". '' when the next run is one solve.
+export function slowOptionsText({groupIndex=false,pmlCheck=false,modeCount=2}={}){
+ const parts=[...(groupIndex===true?['group index on']:[]),...(pmlCheck===true?['PML check on']:[])];
+ if(!parts.length)return '';
+ const solves=(groupIndex===true?3:1)+(pmlCheck===true&&Number.isInteger(modeCount)?modeCount:0);
+ return `${parts.join(' · ')} · ${solves} solves`;
+}
 // Readiness describes the current editor and retained artifacts, not accuracy.
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.

@@ -254,6 +254,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    단계 표시줄의 파장은 Optical modes의 그 입력란에 포커스를 둔 채 엽니다. Study 설정은 Results가 어느
    실행을 보여 주든 다음 실행이 쓸 입력도 밝힙니다: *Next run uses 700 × 300 nm · Silicon · λ 1550 nm ·
    core mesh 30 nm · Modes to find 2*. **Also compute group index**를 켜면 *· group index on*이 붙습니다.
+   리본은 **Run study** 옆에 다음 실행을 느리게 하는 선택을 밝힙니다(round 17): *group index on · 3 solves*, 열린
+   경계의 PML 검사는 *PML check on · 3 solves*(모드마다 많아야 한 번 더 풂), 둘 다면 *group index on · PML check on ·
+   5 solves*. 선택은 작업 사이에도 그 상태를 유지하며, 이 줄은 켜져 있다는 것만 알립니다.
    코어 메시 크기는 **Mesh**에서 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.

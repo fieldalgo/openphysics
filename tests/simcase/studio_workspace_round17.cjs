@@ -142,3 +142,12 @@ test('U4: an unmatched row shows its best overlap below the threshold; the match
  assert.equal(M.bestOverlapText(null),'—');
  const app=read('workspace-app.mjs');assert.ok(app.includes("bestCell(r.best,r.kind==='a'?'B':'A')"));
 });
+test('U3: the slow options of the next run, beside Run study',async()=>{
+ assert.equal(W.slowOptionsText({groupIndex:true,modeCount:2}),'group index on · 3 solves');
+ assert.equal(W.slowOptionsText({pmlCheck:true,modeCount:2}),'PML check on · 3 solves');
+ assert.equal(W.slowOptionsText({groupIndex:true,pmlCheck:true,modeCount:2}),'group index on · PML check on · 5 solves');
+ assert.equal(W.slowOptionsText({modeCount:2}),'');
+ // the words of the Study line
+ assert.ok(W.nextRunText(input(),2,true).includes(' · group index on'));
+ assert.ok(read('workspace.html').includes('<button id="run-optical" disabled>Run study</button><span id="run-options" class="run-options" hidden></span>'));
+});
