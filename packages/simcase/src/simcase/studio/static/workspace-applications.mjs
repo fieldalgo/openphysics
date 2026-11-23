@@ -38,7 +38,9 @@ export const RESTORE_TEXT='Restore from this browser';
 // What each Library choice does (round 15). A card opens its model with the runs this tab holds kept;
 // its offer restores a browser session's runs; the card's Start new opens the model without those runs
 // (the inputs are the model's, not emptied); the top box's choice only closes the box.
-export const CARD_OPEN_TEXT='Open (runs stay in this tab)';
+// Round 16: the button reads "Open model" and the card's description line says the runs stay.
+export const CARD_OPEN_TEXT='Open model';
+export const CARD_STAY_TEXT='Runs stay in this tab until you close it.';
 export const CARD_START_NEW_TEXT='Start new (no runs)';
 export const RESUME_NOT_NOW_TEXT='Not now (choose a model below)';
 // The time an offer names: the time of day for a session saved today, else the date and time.
@@ -163,9 +165,9 @@ export function renderApplications(host,resume=null,offers={},{onOpenFile=null,p
   const button=document.createElement('button');button.dataset.template=app.id;
   const title=document.createElement('strong');title.textContent=app.title;
   const status=document.createElement('span');status.className='application-status'+(app.available?' available':'');status.textContent=app.status;
-  const description=document.createElement('p');description.textContent=app.description;
+  const description=document.createElement('p');description.textContent=app.description+' '+CARD_STAY_TEXT;
   const scope=document.createElement('span');scope.className='card-scope';scope.textContent=app.scope;
-  // what the card does (round 15): it opens the model, and the runs this tab holds stay
+  // what the card does (round 15; words of round 16): it opens the model; the description says the runs stay
   const action=document.createElement('span');action.className='card-action';action.textContent=CARD_OPEN_TEXT;
   button.append(title,status,description,scope,action);
   // a model of the project not shown (P3): "In this project · N runs"

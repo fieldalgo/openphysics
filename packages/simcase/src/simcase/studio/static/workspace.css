@@ -166,12 +166,13 @@ main.choosing .canvas>p{margin-top:8px;margin-bottom:28px}
 main.choosing .workspace>.note{display:none}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;max-width:1100px;margin:20px auto}
 .cards button[data-template]{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;text-align:left;padding:0 22px 22px;background:#fff;border:1px solid #ccd6e2;border-radius:4px;overflow:hidden;box-shadow:0 2px 5px #35517408}
-.cards button[data-template]::before{content:'◇';display:flex;align-items:center;justify-content:center;height:112px;margin:0 -22px 20px;background:#e8eef8;color:#4678ba;font:64px/1 Georgia,serif;border-bottom:1px solid #d6dfec}
+.cards button[data-template]::before{content:'◇';display:flex;align-items:center;justify-content:center;height:112px;margin:0 -22px 12px;background:#e8eef8;color:#4678ba;font:64px/1 Georgia,serif;border-bottom:1px solid #d6dfec}
 .cards button[data-template=heat]::before{content:'∿';background:#f6eee2;color:#ac7941}
 .cards button[data-template=joule]::before{content:'ϟ';background:#f8ebe6;color:#b0603f}
 .cards button[data-template=multi]::before,.cards button[data-template=heated-waveguide]::before{content:'⇄';background:#ecedf6;color:#7973ac}
 .cards strong{display:block;font-size:16px;font-weight:600;margin-bottom:10px}
-.cards p{font-size:12px;margin:12px 0}
+/* round 16: the description line also says the runs stay; tighter spacing keeps the card height */
+.cards p{font-size:12px;margin:8px 0}
 .cards .card-scope{font-size:11px;color:#718197;display:block}
 .cards .card-action{display:block;margin-top:auto;padding-top:14px;font-size:12px;font-weight:600;color:#2f5f9e}
 .application-status{display:inline-block;font-size:10px;padding:3px 7px;background:#f4eee3;color:#906629;border-radius:2px}
