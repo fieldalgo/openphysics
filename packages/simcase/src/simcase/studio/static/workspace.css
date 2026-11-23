@@ -40,8 +40,8 @@ p{margin:8px 0 14px;color:var(--muted)}
 .ribbon-group{display:flex;flex-direction:column;padding:0 12px;border-right:1px solid var(--line)}
 .ribbon-commands{display:flex;gap:4px;align-items:stretch;flex:1}
 .ribbon-label{font-size:10px;line-height:18px;color:#788497;text-align:center}
-.ribbon-commands>button,.file-menu>summary{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;min-height:50px;border-color:transparent;background:transparent;font-size:11px;padding:4px 8px;border-radius:2px}
-.ribbon-commands>button:hover,.file-menu>summary:hover{border-color:#b5c7e0;background:#edf3fc}
+.ribbon-commands>button,.menu-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;min-height:50px;border-color:transparent;background:transparent;font-size:11px;padding:4px 8px;border-radius:2px}
+.ribbon-commands>button:hover,.menu-button:hover,.menu-button[aria-expanded=true]{border-color:#b5c7e0;background:#edf3fc}
 .ui-icon{width:23px;height:23px;fill:none;stroke:#557394;stroke-width:1.45;stroke-linejoin:round;stroke-linecap:round}
 .ribbon-commands>button:disabled .ui-icon{stroke:#758397}
 .solve-commands{border:0;padding-left:18px}
@@ -49,12 +49,17 @@ p{margin:8px 0 14px;color:var(--muted)}
 /* the glyph is decoration: an empty alternative text keeps it out of the button's name */
 #run-optical::before,#run-heat::before,#run-joule::before,#run-multiphysics::before{content:'▶';content:'▶' / '';font-size:21px;line-height:23px;font-weight:400;color:#28755e}
 #save-session.unsaved-session{box-shadow:inset 0 -2px #b77b28}
-.file-menu{position:relative}
-.file-menu>summary{cursor:pointer;list-style:none}
-.file-menu>summary::-webkit-details-marker{display:none}
-.more-icon{font-size:26px;line-height:23px;letter-spacing:2px}
-.file-menu-items{position:absolute;z-index:20;top:100%;left:0;width:210px;border:1px solid #b9c5d6;background:white;box-shadow:0 8px 24px #20375322;padding:6px}
-.file-menu-items button{display:block;width:100%;text-align:left;border:0;font-size:12px;margin:2px 0}
+/* File and Edit menus: role=menu lists under their buttons; submenus open to the right */
+.menu-wrap{position:relative;display:flex}
+.menu-list{position:absolute;z-index:20;top:100%;left:0;width:250px;border:1px solid #b9c5d6;background:white;box-shadow:0 8px 24px #20375322;padding:6px}
+.menu-list[hidden]{display:none}
+.menu-list [role=menuitem]{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;font-size:12px;margin:2px 0;background:transparent}
+.menu-list [role=menuitem]:hover,.menu-list [role=menuitem]:focus-visible,.menu-list [role=menuitem][aria-expanded=true]{background:#edf3fc}
+.menu-list [aria-haspopup=menu]::after{content:'›';content:'›' / '';color:#788497}
+.menu-keys{font:inherit;font-size:11px;color:#6b7789;white-space:nowrap}
+.menu-list [role=separator]{border-top:1px solid var(--line);margin:4px 0}
+.menu-sub{position:relative}
+.submenu{top:-7px;left:100%;width:270px}
 #workflow{display:flex;flex:none;padding:0 16px;background:#f6f8fb;border-bottom:1px solid var(--line);gap:0;min-height:45px}
 .workflow-step{display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding:6px 14px;border:0;border-right:1px solid #dfe5ed;border-radius:0;background:transparent;text-align:left}
 .workflow-step strong{font-size:12px;font-weight:600;white-space:nowrap}
@@ -173,6 +178,8 @@ main.choosing .workspace>.note{display:none}
 .application-contract h3{margin:10px 0}
 .application-contract ul{padding-left:18px;color:#748196}
 .application-contract li{margin:5px 0}
+.library-files{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;max-width:1100px;margin:0 auto 16px}
+.library-files p{margin:0;font-size:12px;color:var(--muted,#5c6b80)}
 .resume-card{max-width:1100px;margin:0 auto 24px;padding:16px 20px;background:#fff;border:1px solid #c4d5ec}
 .resume-card h3{margin:0 0 5px}
 .resume-actions{display:flex;flex-wrap:wrap;gap:8px}
@@ -324,7 +331,8 @@ dialog::backdrop{background:#162a4b66}
  main.choosing>.workspace{min-height:660px}.choosing .canvas{overflow:visible}
  main.comparing{display:flex;flex-direction:column}.comparing .settings-pane{max-height:260px}.comparing>.workspace{min-height:620px}
  .canvas{flex:1 0 auto;overflow:visible}.canvas>svg[role=group]{height:350px}
- .project-actions{overflow-x:auto;min-height:82px}.ribbon-group{flex:none}.file-menu-items{position:fixed;top:150px;left:20px}
+ .project-actions{overflow-x:auto;min-height:82px}.ribbon-group{flex:none}.menu-wrap>.menu-list{position:fixed;top:150px;left:20px}
+ .submenu{position:static;width:auto;box-shadow:none;border:0;border-left:2px solid var(--line);margin-left:8px;padding:0 0 0 6px}
  #autosave-status{white-space:normal;font-size:9px}footer{flex-wrap:wrap;gap:6px 16px}
  .cards{gap:12px}.cards button[data-template]{padding:0 16px 16px}.cards button[data-template]::before{margin-inline:-16px}
 }
@@ -340,7 +348,7 @@ dialog::backdrop{background:#162a4b66}
  .graph-summary{grid-template-columns:1fr}.graph-heading{gap:6px}.graph-heading h2{font-size:13px}
  .dock-title>span{display:none}.sequence{gap:5px 0}.message-line{max-height:70px}.toolbar>span:first-child{flex-basis:100%}
  .viewport-tools output{flex-basis:100%;padding:4px 0}.note{font-size:9px}#autosave-status{margin-left:0}
- .document-tab{font-size:11px}#view-detail{font-size:9px}.file-menu-items{top:180px}
+ .document-tab{font-size:11px}#view-detail{font-size:9px}.menu-wrap>.menu-list{top:180px;left:12px;width:min(300px,calc(100vw - 24px))}
 }
 /* Joule heating connections: two interfaces solved by one study. */
 .joule-stage{height:320px;min-width:600px}.joule-stage .graph-key{left:auto;right:20px}.joule-stage .node-electric{left:56px}.joule-stage .node-heat{top:120px;left:auto;right:calc(50% - 250px)}

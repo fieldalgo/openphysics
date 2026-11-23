@@ -347,10 +347,11 @@ export function multiphysicsLoadText(session,{runs=0,unsaved=false,model='the cu
 /** The Save session notice (§6). */
 // opticalRuns: the Optical waveguide runs this tab also holds; they are not in a multiphysics
 // session file, and the message says where they are kept.
-export function savedNotice(name,{runs,notKept=[],baseline=false,opticalRuns=0}){
+// via: 'picker' (written to the file chosen in the browser's save dialog) or 'download'.
+export function savedNotice(name,{runs,notKept=[],baseline=false,opticalRuns=0,via='download'}){
  const one=opticalRuns===1;
- return `Session file ${name} sent to the browser's downloads (check your Downloads folder): the model, ${plural(runs,'run')}${baseline?' and the without-heater result':''}.`+(notKept.length?` ${plural(notKept.length,'run')} (${notKept.map(n=>'Run '+n).join(', ')}) ${notKept.length===1?'keeps':'keep'} values only, without maps.`:'')
-  +(opticalRuns>0?` The ${one?'Optical waveguide run':opticalRuns+' Optical waveguide runs'} of this tab ${one?'is':'are'} not in this file; Library › Optical waveguide › Save session keeps ${one?'it in its':'them in their'} own file.`:'');
+ return `${via==='picker'?`Saved to ${name}`:`Session file ${name} sent to your browser's Downloads`}: the model, ${plural(runs,'run')}${baseline?' and the without-heater result':''}.`+(notKept.length?` ${plural(notKept.length,'run')} (${notKept.map(n=>'Run '+n).join(', ')}) ${notKept.length===1?'keeps':'keep'} values only, without maps.`:'')
+  +(opticalRuns>0?` The ${one?'Optical waveguide run':opticalRuns+' Optical waveguide runs'} of this tab ${one?'is':'are'} not in this file; Library › Optical waveguide, then File › Save, keeps ${one?'it in its':'them in their'} own file.`:'');
 }
 /** The session file name's prefix: the model name lowercased, every run of other characters
  * (digits too: the file names of sessions have letters and hyphens) one hyphen, at most 40
