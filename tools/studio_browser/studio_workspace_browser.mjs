@@ -1232,9 +1232,12 @@ try {
     assert.equal(typed, 'my runx'); assert.equal(fallbackName, 'my runx.json');
     assert.match(fallbackMessage, /^Session file my runx\.json sent to your browser's Downloads: current inputs, \d+ runs and the comparison\./);
     assert.doesNotMatch(fallbackMessage, /^Saved to/);
-    // F5 (C1(f)): this headless browser reports navigator.webdriver; with a picker stub that throws
-    // if called, Save As asks for a name and downloads, and the stub is never called
-    assert.equal(await page.eval("navigator.webdriver"), true, 'the harness browser is automated');
+    // F5 (C1(f)): an automated browser (navigator.webdriver true, as Playwright and WebDriver set it;
+    // this harness's Chrome, started with --headless=new over DevTools, reports false, so the value
+    // is set at that boundary): with a picker stub that throws if called, Save As asks for a name
+    // and downloads, and the stub is never called
+    report.harnessWebdriver = await page.eval("navigator.webdriver");
+    await page.eval("Object.defineProperty(navigator,'webdriver',{get:()=>true,configurable:true})");
     await page.eval("window.__pickerCalls=0;window.showSaveFilePicker=()=>{window.__pickerCalls++;throw new Error('the picker must not be called');}");
     before = await listDownloads();
     await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'F5 automated name dialog');
