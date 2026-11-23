@@ -296,6 +296,9 @@ main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .canvas>.toolbar.compare-options label.compare-mode-label{flex:1 1 100%;max-width:100%;flex-direction:column;align-items:stretch;gap:4px}.canvas>.toolbar.compare-options label.compare-mode-label select{width:100%;max-width:100%}
 /* a number keeps its unit ("0.1234 %") and its sign on one line */
 .compare-table td.num{white-space:nowrap}.compare-table td.loss-split .loss-value,.compare-table td.loss-split .loss-unit{display:block}
+/* round 17 (U4): the best overlap of an unmatched row, the value then the reason; the reason wraps
+   inside the column and does not widen it (contain: inline-size), so O2's 24 px of slack hold */
+.compare-table td.best-split .best-value,.compare-table td.best-split .best-why{display:block}.compare-table td.best-split .best-why{font-size:11px;color:#586c87;white-space:normal;contain:inline-size}
 /* round 13: a Polarization cell on two lines (class, then share); the separator stays in the text */
 .compare-table td.pol{text-align:left;font-size:11px}.compare-table thead th.pol{text-align:left}.compare-table .pol-kind,.compare-table .pol-share{display:block}
 .compare-table .pol-sep{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

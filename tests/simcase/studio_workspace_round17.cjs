@@ -131,3 +131,14 @@ test('U1: shapes layer as the geometry contract does; circles, polygons and edge
  // the Results note row and the Compare note are drawn from edgeNotes
  const app=read('workspace-app.mjs');assert.ok(app.includes("id:'edge-note-'+m"));assert.ok(app.includes("id:'compare-edge-note'"));
 });
+test('U4: an unmatched row shows its best overlap below the threshold; the matching rule is unchanged',async()=>{
+ const M=await import(STATIC+'workspace-match.mjs');
+ assert.deepEqual([M.MATCH_THRESHOLD,M.MATCH_MARGIN],[0.8,0.1]);
+ assert.equal(M.bestOverlapText({eta:0.0512,unit:[1]}),'best 0.05 (< 0.8, not matched)');
+ // never printed as 0.80 below the threshold
+ assert.equal(M.bestOverlapText({eta:0.7996,unit:[0]}),'best 0.799 (< 0.8, not matched)');
+ // at or above the threshold an unmatched best was not clear of the next best
+ assert.equal(M.bestOverlapText({eta:0.86,unit:[0]}),'best 0.86 (margin < 0.1, not matched)');
+ assert.equal(M.bestOverlapText(null),'—');
+ const app=read('workspace-app.mjs');assert.ok(app.includes("bestCell(r.best,r.kind==='a'?'B':'A')"));
+});

@@ -29,7 +29,7 @@ import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_CO
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
-import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta} from './workspace-match.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
 import {sessionFileName,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -1522,6 +1522,11 @@ function compareTable(a,b,match){
   const at=v.text.lastIndexOf(' dB/cm');if(isOpenRun(run)&&at>0){td.textContent='';td.classList.add('loss-split');const value=document.createElement('span'),sep=document.createElement('span'),u=document.createElement('span');
    value.className='loss-value';value.textContent=v.text.slice(0,at);sep.className='pol-sep';sep.textContent=' ';u.className='loss-unit';u.textContent='dB/cm';td.append(value,sep,u);}
   return td;};
+ // round 17 (U4): an unmatched row's Overlap is the best overlap found, on two lines ("best 0.05" /
+ // "(< 0.8, not matched)", textContent unchanged), so the column stays narrow
+ const bestCell=(best,other)=>{const text=bestOverlapText(best),td=cell('td',text,{class:'num',...(best?{'data-best-overlap':String(best.eta),title:`Best overlap, with ${other} ${unitName(best.unit)}. Modes are matched at an overlap of ${MATCH_THRESHOLD} or more, at least ${MATCH_MARGIN} above the next best.`}:{})});
+  const at=text.indexOf(' (');if(at>0){td.textContent='';td.classList.add('best-split');const v=document.createElement('span'),sep=document.createElement('span'),why=document.createElement('span');v.className='best-value';v.textContent=text.slice(0,at);sep.className='pol-sep';sep.textContent=' ';why.className='best-why';why.textContent=text.slice(at+1);td.append(v,sep,why);}
+  return td;};
  // n_g of a unit: the mode's, or the mean of a pair; "—" with its help when the run has none
  const ngCell=(run,unit,side)=>{const v=unitGroupIndex(run,unit);return cell('td',v.text,{class:'num',title:v.title,['data-group-index-'+side]:v.value===null?'':String(v.value)});};
  // "1", or "1–2" for a pair or group; "—" for no unit
@@ -1535,7 +1540,7 @@ function compareTable(a,b,match){
     cell('td',indexText(a,r.unitA),{class:'num'}),cell('td',indexText(b,r.unitB),{class:'num'}),cell('td',formatDelta(r.pair.delta),{class:'num','data-delta':''}),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100),{class:'num','data-delta-percent':''}),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }else{
    tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
-   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':r.text}),polarizationCell(r.unitA?unitPolarization(a,r.unitA):'—'),polarizationCell(r.unitB?unitPolarization(b,r.unitB):'—'),cell('td','—'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
+   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':r.text}),polarizationCell(r.unitA?unitPolarization(a,r.unitA):'—'),polarizationCell(r.unitB?unitPolarization(b,r.unitB):'—'),bestCell(r.best,r.kind==='a'?'B':'A'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }
   body.append(tr);
  }

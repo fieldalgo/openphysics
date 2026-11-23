@@ -1617,8 +1617,10 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   sideways inside the box: a shadow at its right edge and the line *Scroll sideways for all 14
   columns ›* show that more columns are hidden. The page does not scroll sideways. A mode
   without a match is headed *1 ↔ —* or *— ↔ 2*, with the full *A mode 2: no match in B (best
-  overlap 0.43, with B mode 2)* as its title and accessible name, and
-  shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
+  overlap 0.43, with B mode 2)* as its title and accessible name, shows its best overlap in the
+  Overlap column on two lines, *best 0.43 (< 0.8, not matched)* (round 17; *(margin < 0.1, not
+  matched)* when the best was at least 0.8 but not 0.1 above the next best; the rule itself is
+  unchanged), and shows no Δn_eff; the unmatched modes of B follow. Below the table: “Matched by field overlap ≥
   0.8 on a common grid. A low overlap means the mode changed shape between designs.”
 - **Field picker.** *Matched modes* lists the matched pairs (*A mode 1 ↔ B mode 1 · overlap
   0.99 · TE-like*, the polarization word once when A and B agree, else *A TE-like, B

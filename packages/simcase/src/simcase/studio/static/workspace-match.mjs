@@ -159,6 +159,13 @@ export const formatDelta=d=>(d>=0||Math.abs(d).toFixed(8)===(0).toFixed(8)?'+':'
 export function matchText(pair){
  return `A ${unitName(pair.unitA)} ↔ B ${unitName(pair.unitB)} · overlap ${formatOverlap(pair.eta)} · Δn_eff ${formatDelta(pair.delta)}`;
 }
+/** The Overlap cell of an unmatched row (round 17, U4): "best 0.05 (< 0.8, not matched)", the best
+ * overlap with any mode of the other run, which is below the threshold or not clear of the next
+ * best by the margin; "—" without one. */
+export function bestOverlapText(best){
+ if(!best||!Number.isFinite(best.eta))return '—';
+ return `best ${formatOverlap(best.eta)} (${best.eta<MATCH_THRESHOLD?'< '+MATCH_THRESHOLD:'margin < '+MATCH_MARGIN}, not matched)`;
+}
 /** "A mode 2: no match in B (best overlap 0.43, with B mode 2)"; side is the unmatched side. */
 export function noMatchText(side,unit,best){
  const other=side==='A'?'B':'A';
