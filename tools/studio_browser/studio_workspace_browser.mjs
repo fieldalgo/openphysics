@@ -767,7 +767,10 @@ try {
   assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Library › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
-  await page.click('[data-template=optical]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
+  // round 16 (S9): the optical model returns to the page it was left on, Results with Run 2
+  await page.click('[data-template=optical]'); await page.until("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page==='Results'&&!!document.getElementById('modes-table')", 'optical model again, on its Results');
+  assert.ok((await page.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??''")).includes('Run 2 · '), 'the run last viewed');
+  await page.click('nav [data-page=Model]'); await page.until("!!document.querySelector('#shape-w')", 'optical model again');
   assert.equal((await opticalSequence()).heading, 'Run 2 · recovered from this browser, not recomputed', 'the optical runs came back');
   // V17-M2: Compare matches the modes of two runs by field overlap, 500 → 450 nm (both modes
   // matched with overlap >= 0.95, as V15 (a) on the engine); the picker lists matched pairs and
