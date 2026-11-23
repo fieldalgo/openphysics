@@ -1123,7 +1123,7 @@ function askFileName(suggested,{saveAs,unavailable=null}){
   nameAnswer=value=>{nameAnswer=null;if(nameDialog.open)nameDialog.close();restoreDialogFocus(opener);resolve(value);};
   $('save-name-title').textContent=saveAs?'Save As':'Save';
   $('save-name-unavailable').hidden=!unavailable;$('save-name-unavailable').textContent=unavailable?`The browser's save dialog was not available (${unavailable}), so the file is downloaded instead.`:'';
-  $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+LATER_SAVES_NOTE:' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
+  $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+LATER_SAVES_NOTE+' Chrome and Edge save to the same file.':' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
   const input=$('save-name-input');input.value=suggested;nameDialog.showModal();input.focus();input.select();
  });
 }

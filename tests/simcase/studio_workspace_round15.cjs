@@ -89,3 +89,8 @@ test('R10: each Library choice says what it does',()=>{
  assert.ok(src.includes("fresh.id=key+'-start-new';fresh.textContent=CARD_START_NEW_TEXT;"));
  assert.ok(src.includes("fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;"));
 });
+
+test('R1: the Save As name dialog says Chrome and Edge save to the same file',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("(saveAs?' '+LATER_SAVES_NOTE+' Chrome and Edge save to the same file.':"));
+});

@@ -378,6 +378,7 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 15차부터 단계 막대의 파장이 접근성 트리에서 *Wavelength 1550 nm, edit*라는 이름의 버튼인지도 확인하고, 다중물리
 검사는 트리 경고 배지가 *Modes 1: Temperature input has no source: …*라는 이름의 이미지인지, 세션 검사는 Library
 카드마다의 *Open (runs stay in this tab)*과 카드 제안의 *Start new (no runs)*를 읽습니다.
+15차부터 Save As 안내 *Chrome and Edge save to the same file.*도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.

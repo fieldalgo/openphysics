@@ -1515,8 +1515,9 @@ try {
     const savedWidth = name => readFile(join(downloads, name), 'utf8').then(t => JSON.parse(t).input.model.shapes[0].w);
     before = await listDownloads();
     await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'O1 Save As');
-    // round 14 (Q1): the Save As name dialog says later saves download again under this name
-    assert.equal(await page.eval("document.getElementById('save-name-note').textContent"), 'Your browser saves to its Downloads folder, or asks where if you set it to. Later saves download again under this name; your browser may add “ (1)”.');
+    // round 14 (Q1): the Save As name dialog says later saves download again under this name; round 15 (R1):
+    // and that Chrome and Edge (the save dialog) save to the same file
+    assert.equal(await page.eval("document.getElementById('save-name-note').textContent"), 'Your browser saves to its Downloads folder, or asks where if you set it to. Later saves download again under this name; your browser may add “ (1)”. Chrome and Edge save to the same file.');
     await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='';i.focus();})()"); await page.call('Input.insertText', {text: 'design-a-ng'});
     await page.click('#save-name-download'); const o1First = await newDownload(before), o1FirstMessage = await status();
     assert.equal(o1First, 'design-a-ng.json'); assert.match(o1FirstMessage, /^Session file design-a-ng\.json sent to your browser's Downloads: /, 'the first download says where it went');
