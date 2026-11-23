@@ -420,7 +420,9 @@ print(n)`;
   await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", 'opened results');
   const after = await shown();
   assert.deepEqual(after, before, 'S2: the same strings after the open');
-  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed; integrity check passed \(it does not show who made the file\)\.$/);
+  // round 14 (Q5): the checksum words, with the provenance caveat as the span's title text
+  assert.match(await page.text('[data-mp-run-line]'), /Loaded from file, not recomputed\. Results match the file's checksum\.$/);
+  assert.equal(await page.eval("document.querySelector('[data-mp-run-line] [data-mp-checksum]')?.title"), "The checksum detects a damaged or hand-edited file; it does not show who made the file: whoever edits a file can recompute it.");
   // the dock, the footer and the step rows say the result was read from the file, with no solve times
   const openedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,sequence:document.getElementById('sequence').textContent})");
   stage('opened run status', openedDock);
