@@ -517,7 +517,9 @@ convergence not certified*.
 ## Working with a model
 
 Choose a model, select a body or boundary in the model tree or drawing,
-and edit its properties in the inspector. The optical application runs a real
+and edit its properties in the inspector. A selected shape's **Name** and **Material** fields each
+have their own label (`for`), so a screen reader and a test name them by that word alone (round 19;
+the Material label used to wrap the list and read its choice too). The optical application runs a real
 2D mode calculation. The Heated silicon waveguide application runs steady heat and
 optical modes as one coupled model ([Multiphysics models](#multiphysics-models-heat--optical-modes)). An older input
 file with all four interfaces on opens the earlier conceptual preview, whose diagram,
