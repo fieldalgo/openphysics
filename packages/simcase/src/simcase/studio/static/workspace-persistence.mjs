@@ -37,6 +37,10 @@ export function validateSavedFile(value){
 // in the optical model its selected and pinned runs with their fields) or the browser's storage full
 const RECOVERY=Object.freeze({kept:'kept for recovery in this browser',updating:'updating browser recovery',unavailable:'browser recovery unavailable',conflict:'browser recovery changed in another tab',overLimit:'browser recovery unavailable: session over 16 MiB · File › Save keeps your work',quota:'browser recovery unavailable: this browser’s storage is full · File › Save keeps your work'});
 const PROBLEMS=['unavailable','conflict','overLimit','quota'];
+// Round 18 (X4): the Messages line when browser recovery turns off, beside the header's words; null
+// for a state that is not one of the two.
+export const RECOVERY_OFF=Object.freeze({overLimit:'Browser recovery is off: this session is over 16 MiB. File › Save keeps your work.',quota:'Browser recovery is off: this browser’s storage is full. File › Save keeps your work.'});
+export const recoveryOffText=state=>RECOVERY_OFF[state]||null;
 const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.

@@ -30,7 +30,7 @@ import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,comp
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
-import {sessionFileName,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
+import {sessionFileName,recoveryOffText,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
@@ -908,12 +908,19 @@ const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurren
 const notebookStore=indexedNotebookStore();
 // the note of the last recovery snapshot kept without the study settings (shown once in the message line)
 let recoveryNote='';
+// round 18 (X4): the off state Messages last named, posted once until recovery works again; after a
+// run's result message the line is added to it, so the result stays in view
+let recoveryOffPosted=null;
+function postRecoveryOff(){
+ const text=recoveryOffText(recoveryState);if(!text||recoveryOffPosted===recoveryState)return;recoveryOffPosted=recoveryState;
+ const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);
+}
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
- if(state.phase==='current')recoveryState='kept';
- if(state.phase==='saved'){recoveryState='kept';notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
- if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':state.code==='recovery-quota'?'quota':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';}
+ if(state.phase==='current'){recoveryState='kept';recoveryOffPosted=null;}
+ if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
+ if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':state.code==='recovery-quota'?'quota':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';postRecoveryOff();}
  refreshSaveIndicator();
 }});
 async function loadNotebookRecovery(){
