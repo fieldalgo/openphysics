@@ -309,7 +309,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
    **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*(round 20;
    전에는 실행이 진행 중인 듯 *Running drops …*였음)와
-   **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
+   **Pin Run 3**. 그 버튼은 그 실행을 고정하고 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다. round 22(V4)부터
+   Messages는 그 대신 다음 결과가 내보낼 실행을 밝힙니다: *Run 3 pinned. If you run: drops Run 4 (700 × 300 nm · 4 modes) ·
+   pin it to keep it*(실행이 계산 중이면 *Run 3 pinned. When this run finishes, Run 4 (…) is dropped*). 내보낼 실행이 없을
+   때만 평소의 고정 메시지입니다.
    round 21부터 현재 입력이 어떤 실행의 입력과 같아 Messages가 *No need to run: Run 6 already has these results*라고 적는
    동안 이 줄은 숨고, 입력이 모든 실행과 달라지면 돌아옵니다(아래 가열 모델의 줄도 그 모델에 같은 규칙을 따름).
    round 21부터 **Run study**는 바로 시작합니다: round 19와 20이 그런 실행 전에 보이던 대화 상자(*Running drops Run 3 …*와
@@ -321,7 +324,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    Messages는 실행 자신의 메시지 뒤에 *Run 3 (700 × 300 nm · 4 modes) was dropped*를 덧붙이고, 새 결과 말고도 고정되지 않은
    실행이 있으면 **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes) instead** 버튼을 둡니다(Run 4는 그런 실행 중 가장 오래된
    것). 버튼은 Run 3를 제자리로 되돌리고 Run 4를 내보냅니다: *Run 3 (…) is back; Run 4 (…) was dropped instead.*, 그 뒤 버튼은
-   더 없습니다. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
+   더 없습니다. 앞선 다른 실행이 모두 고정되어 있으면 바꿀 실행이 없고, round 22(V4)부터 문구가 그 까닭을 말합니다: *Run 3 (…)
+   was dropped; every other earlier run is pinned, so no other run can be dropped instead*. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
    세션 복원, 파일에서 실행 추가, Start new)까지 동작하고, 지난 버튼은 아무것도 하지 않고 사라집니다. 메모리에만 있습니다.
    Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
    브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
@@ -769,7 +773,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   밝힙니다: 실행 전 *If you run: drops Run 3 (run at 05:31 AM) · pin it to keep it*, 계산 중 *When this run finishes, Run 3
   (run at 05:31 AM) is dropped*, 그리고 **Pin Run 3**. 그 뒤 Messages는 *Run 7 complete. …*에 *Run 3 (run at 05:31 AM)
   was dropped*를 덧붙이고, 광학 규칙대로 **Keep Run 3, drop Run 4 (run at 05:40 AM) instead**를 둡니다(가열기 없는 풀이가
-  끝나면 다시 밝힘). 가열기 없는 풀이는 실행이 아니므로 아무것도 내보내지 않습니다.
+  끝나면 다시 밝힘). round 22(V4)부터 광학 모델처럼 Pin Run 3는 *Run 3 pinned. If you run: drops Run 4 (run at 05:40 AM) ·
+  pin it to keep it*라고 말하고, 앞선 다른 실행이 모두 고정된 채 내보내면 *… was dropped; every other earlier run is pinned,
+  so no other run can be dropped instead*로 읽힙니다. 가열기 없는 풀이는 실행이 아니므로 아무것도 내보내지 않습니다.
 - **파일.** **File › Save**는 탭의 모든 모델을 [프로젝트 파일](#프로젝트-파일)에 씁니다.
   **File › Export › Model with runs (session file)…**은 이 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
   `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,

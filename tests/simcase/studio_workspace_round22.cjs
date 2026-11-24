@@ -122,3 +122,40 @@ test('P3 (V3): Compare without a matched mode says why when a run\'s mode 1 is a
  assert.ok(part.includes('link.textContent=`Open Run ${runNumber(run)} in Results`;'));
  assert.ok(part.includes("link.onclick=e=>{e.preventDefault();if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();"));
 });
+
+const shape700={type:'rect',name:'Core',material:'Silicon',x:-350,y:0,w:700,h:300};
+const listRun=(n,extra={})=>({job:String(n).padStart(8,'0'),number:n,label:'',pinned:false,settings:{mode_count:4},input:{model:{shapes:[shape700]}},...extra});
+test('P4 (V4): Pin Run N names the run the next result drops instead (optical and heated words)',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ const six=[1,2,3,4,5,6].map(n=>listRun(n));
+ // the line names Run 1; pinning it moves the drop to Run 2
+ assert.deepEqual(W.droppedBy(six).map(r=>r.number),[1]);six[0].pinned=true;
+ const next=W.droppedBy(six);assert.deepEqual(next.map(r=>r.number),[2]);
+ assert.equal(W.pinnedDropText(six[0],next),'Run 1 pinned. If you run: drops Run 2 (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.pinnedDropText({number:4},[listRun(5)]),'Run 4 pinned. If you run: drops Run 5 (700 × 300 nm · 4 modes) · pin it to keep it');
+ // while the run computes, the line's words; the heated model's names
+ assert.equal(W.pinnedDropText(six[0],next,true),'Run 1 pinned. When this run finishes, Run 2 (700 × 300 nm · 4 modes) is dropped');
+ const heated=r=>`Run ${r.number} (run at 05:31 AM)`;
+ assert.equal(W.pinnedDropText({number:4},[listRun(5)],false,heated),'Run 4 pinned. If you run: drops Run 5 (run at 05:31 AM) · pin it to keep it');
+ assert.equal(W.pinnedDropText({number:4},[listRun(5)],true,heated),'Run 4 pinned. When this run finishes, Run 5 (run at 05:31 AM) is dropped');
+ // the pages call it after the pin, with droppedBy of the runs as pinned
+ assert.ok(read('workspace-app.mjs').includes('const next=droppedBy(runs,RUN_LIMIT);notice(next.length?pinnedDropText(run,next,solverBusy||!!pendingJob):pinNotice(run));};'));
+ assert.ok(read('workspace-multiphysics-view.mjs').includes("const next=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT);notice(next.length?pinnedDropText(r,next,!!job&&!job.alone||starting&&!job,dropName):'Run pinned: new runs will not replace it. File › Save keeps it in a file.');};"));
+});
+
+test('P4 (V4): a result that drops a run with every other earlier run pinned says why there is no swap',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs'),N=await import(STATIC+'workspace-notebook.mjs'),M=await import(STATIC+'workspace-multiphysics-session.mjs');
+ const six=[listRun(1,{pinned:true}),listRun(2,{pinned:true}),listRun(3),listRun(4,{pinned:true}),listRun(5,{pinned:true}),listRun(6,{pinned:true})],seventh=listRun(7);
+ for(const append of [N.appendRun,M.appendMultiphysicsRun]){
+  const next=append(six,seventh),dropped=six.filter(r=>!next.includes(r));
+  assert.deepEqual(dropped.map(r=>r.number),[3]);assert.equal(W.swapCandidate(next,seventh),null);
+ }
+ assert.equal(W.droppedNoSwapText([listRun(3)]),'Run 3 (700 × 300 nm · 4 modes) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
+ assert.equal(W.droppedNoSwapText([listRun(3)],r=>`Run ${r.number} (run at 05:31 AM)`),'Run 3 (run at 05:31 AM) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
+ // the pages: the no-swap words exactly when no swap candidate exists (optical and heated)
+ assert.ok(read('workspace-app.mjs').includes("droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);"));
+ assert.ok(read('workspace-multiphysics-view.mjs').includes("const droppedWords=!dropped.length?'':swapCandidate(runs,completed)?droppedAfterText(dropped,dropName):droppedNoSwapText(dropped,dropName);"));
+ // the heated model says them again when the without-heater solves finish, as it does the swap's
+ assert.ok(read('workspace-multiphysics-view.mjs').includes("noSwapNote=dropped.length&&!swapCandidate(runs,completed)?droppedWords:'';"));
+ assert.ok(read('workspace-multiphysics-view.mjs').includes("(dropSwap?' '+dropSwap.note:noSwapNote?' '+noSwapNote:''),swapAction());return;}"));
+});

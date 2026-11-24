@@ -71,7 +71,8 @@ test('W2: Run study starts at once; the swap is offered, checked when pressed an
  // the heated model: the same, with its own names
  assert.ok(view.includes("const dropName=r=>`${runTitle(r)} (run at ${runTime(r)})`;"));
  assert.ok(view.includes("starting=true;if(!alone){stopAsked=false;dropSwap=null;}refreshRun();"));
- assert.ok(view.includes("(dropped.length?' '+droppedAfterText(dropped,dropName):''),swapAction());"));
+ // round 22 (V4): the dropped words say why no swap is offered when every other earlier run is pinned
+ assert.ok(view.includes("(droppedWords?' '+droppedWords:''),swapAction());"));
  assert.ok(view.includes("const fresh=offer===dropSwap&&runs===offer.list&&runs.includes(offer.newest)&&!runs.includes(offer.kept)&&swapCandidate(runs,offer.newest)===offer.other&&!job&&!starting;"));
  assert.ok(read('workspace.html').includes('<span id="mp-run-drop" class="run-drop mp-run-drop" hidden><span id="mp-run-drop-text" class="run-drop-text"></span><button type="button" id="mp-run-drop-pin" class="message-action"></button></span>'));
 });

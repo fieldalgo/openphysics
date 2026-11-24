@@ -362,8 +362,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    18 the box beside **Run study** says it before the run, while six runs are kept and one is not
    pinned: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it* (round 20; it read
    *Running drops …* before, as if a run were under way), with **Pin Run 3**,
-   which pins that run (the usual pin message) and moves the line to the next unpinned run, or
-   removes it. Since round 21 the line is hidden while the current inputs equal a run's, when
+   which pins that run and moves the line to the next unpinned run, or removes it. Since round 22
+   (V4) Messages then names the run the next result drops instead: *Run 3 pinned. If you run: drops
+   Run 4 (700 × 300 nm · 4 modes) · pin it to keep it* (while a run computes, *Run 3 pinned. When
+   this run finishes, Run 4 (…) is dropped*); the usual pin message only when nothing would be
+   dropped. Since round 21 the line is hidden while the current inputs equal a run's, when
    Messages says *No need to run: Run 6 already has these results*, and returns once they differ
    from every run (the heated model's line, below, follows the same rule for its model). Since round 21 **Run study** starts at once: the dialog that rounds 19 and 20 showed
    before such a run (*Running drops Run 3 …* with Pin Run 3 and run, Run and Cancel, and its
@@ -376,7 +379,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    (700 × 300 nm · 4 modes) was dropped* after the run's own message and, when another unpinned run
    exists besides the new result, a button **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes)
    instead**, Run 4 being the oldest such run. It brings Run 3 back at its place and drops Run 4:
-   *Run 3 (…) is back; Run 4 (…) was dropped instead.*, with no further button. The tab never holds
+   *Run 3 (…) is back; Run 4 (…) was dropped instead.*, with no further button. When every other
+   earlier run is pinned no swap can be offered, and since round 22 (V4) the words say why: *Run 3
+   (…) was dropped; every other earlier run is pinned, so no other run can be dropped instead*. The tab never holds
    more than six runs. The button works until the next Run study starts or the run list is replaced
    (a file opened, a session restored, runs added from a file, Start new); a stale one does nothing
    and is removed. It is kept in memory only. Add runs from file still names its dropped runs with
@@ -926,7 +931,10 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   Run 3 (run at 05:31 AM) · pin it to keep it*, while it computes *When this run finishes, Run 3
   (run at 05:31 AM) is dropped*, with **Pin Run 3**. Messages then adds *Run 3 (run at 05:31 AM)
   was dropped* to *Run 7 complete. …*, with **Keep Run 3, drop Run 4 (run at 05:40 AM) instead**
-  under the optical rules (said again when the without-heater solves finish). Without-heater solves
+  under the optical rules (said again when the without-heater solves finish). Since round 22 (V4)
+  Pin Run 3 says *Run 3 pinned. If you run: drops Run 4 (run at 05:40 AM) · pin it to keep it*,
+  and a drop with every other earlier run pinned reads *… was dropped; every other earlier run is
+  pinned, so no other run can be dropped instead*, as in the optical model. Without-heater solves
   are not runs and drop nothing.
 - **Files.** **File › Save** writes the [project file](#project-files), every model of the tab.
   **File › Export › Model with runs (session file)…** writes this model with its runs, their names
