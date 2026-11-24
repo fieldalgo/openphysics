@@ -101,9 +101,10 @@ const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger
 // The run the next run would drop (round 18, X3): with six runs kept, the oldest unpinned one (the
 // one appendRun drops); null below the limit or with every run pinned.
 export function nextDropped(runs,limit=6){return runs.length>=limit?runs.find(r=>!r.pinned)||null:null;}
-// Its words beside Run study, before the run: "Running drops Run 3 (700 × 300 nm · 4 modes) · pin it
+// Its words beside Run study, before the run.
+// Round 20 (Z1): the line is about running, not a run in progress: "If you run: drops Run 3 (…) · pin it
 // to keep it".
-export const dropWarningText=run=>`Running drops ${dropName(run)} · pin it to keep it`;
+export const dropWarningText=run=>`If you run: drops ${dropName(run)} · pin it to keep it`;
 // Round 19 (Y4): Run study asks before the limit drops a run (the line beside Run study stays): the
 // dialog's heading "Running drops Run 3 (700 × 300 nm · 4 modes).", its note, and the answers
 // [Pin Run 3 and run] [Run] [Cancel]. name: the run as the heading names it; canPin: false when
@@ -156,9 +157,21 @@ export function opticalSequenceHeading({state,run,name='',origin,...other}){
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Nothing is computed until you press Run';
 }
+export const HAS_RESULTS_INPUTS='has the results of the current inputs';
+// Round 20 (Z1): an edit that leaves the inputs equal to a run's says only that no run is needed:
+// the edit's own sentence stays and its request to run ("Run explicitly to compute new results.",
+// or the line that the inputs changed since the last result) is taken off before the "No need to
+// run" sentence is added. A message without such a request is returned as it is.
+export const RUN_REQUESTS=Object.freeze(['Run explicitly to compute new results.','Inputs changed since the last result. Run again to compute the new inputs.']);
+export function matchingRunMessage(message){
+ let text=String(message||'');
+ for(const request of RUN_REQUESTS)if(text.endsWith(request)){text=text.slice(0,text.length-request.length).trimEnd();break;}
+ return text;
+}
 export function opticalReadyStatus({state,run,name='',origin,has,hasName='',...other}){
  const title=runTitle(run,name);
- if(state==='current'&&originText(origin))return `${title} · ${originText(origin)} · press Run to compute it here`;
+ // round 20 (Z1): a run read from file or recovered that has these results says so, without asking for a run
+ if(state==='current'&&originText(origin))return `${title} · ${originText(origin)} · ${HAS_RESULTS_INPUTS}`;
  if(state==='current')return `${title} · solved from the current inputs · press Run to solve again`;
  if(state==='other')return otherInputsText({run,name,...other})+' · '+(has?`current inputs from ${runTitle(has,hasName)}`:'press Run to compute them');
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;

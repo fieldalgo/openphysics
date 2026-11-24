@@ -66,7 +66,7 @@ test('a current optical run read from a file or recovered says so, not that it w
  let f=W.opticalFreshness(doc,[{signature:sig,origin:'imported'}]);
  assert.deepEqual(f,{state:'current',run:1,origin:'imported'});
  assert.equal(W.opticalSequenceHeading(f),'Run 1 · read from file, not recomputed');
- assert.equal(W.opticalReadyStatus(f),'Run 1 · read from file, not recomputed · press Run to compute it here');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · read from file, not recomputed · has the results of the current inputs');
  f=W.opticalFreshness(doc,[{signature:sig,origin:'recovered'}]);
  assert.equal(W.opticalSequenceHeading(f),'Run 1 · recovered from this browser, not recomputed');
  // a later run made in this tab with the same inputs keeps today's words
@@ -120,7 +120,7 @@ test('round 9 (J5): the dock heading and the footer describe the run being viewe
  // Design B viewed: it is the current inputs' run, recovered
  f=W.opticalFreshness(newer,runs,runs[1]);
  assert.equal(W.opticalSequenceHeading(f),'Run 2 · Design B · recovered from this browser, not recomputed');
- assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B · recovered from this browser, not recomputed · press Run to compute it here');
+ assert.equal(W.opticalReadyStatus(f),'Run 2 · Design B · recovered from this browser, not recomputed · has the results of the current inputs');
  // an edit no run has: the viewed run differs and Run computes the inputs
  const edited=input();edited.model.shapes=[{...edited.model.shapes[0],w:800}];
  f=W.opticalFreshness(edited,runs,runs[1]);

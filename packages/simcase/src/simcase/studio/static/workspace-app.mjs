@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -856,8 +856,9 @@ function offerMatchingRun(){
  const offer=document.createElement('span');offer.id='match-offer';
  const show=document.createElement('button');show.type='button';show.className='message-action';show.textContent=`Show Run ${runNumber(run)}`;show.dataset.showRun=String(runNumber(run));
  show.onclick=()=>{if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();notice(`${runNumberTitle(run)} shown under Results; the inputs are unchanged.`);};
- // the generic "run again" line would contradict it: the offer then stands alone
- if(host.textContent===INPUTS_CHANGED_TEXT)host.textContent='';
+ // round 20 (Z1): the edit's request to run would contradict it: it is taken off, the edit's own
+ // sentence stays (the generic "run again" line, which has none, leaves the offer alone)
+ host.textContent=matchingRunMessage(host.textContent);
  offer.append((host.textContent?' ':'')+matchesAgainText(runNumber(run),run.label||'')+'. ',show);host.append(offer);
 }
 const INPUTS_CHANGED_TEXT='Inputs changed since the last result. Run again to compute the new inputs.';

@@ -491,10 +491,12 @@ export function sequenceHeading(freshness,runId,origin='local',label=''){
  if(freshness==='stale')return `${run} · the model changed since; press Run to update`;
  return 'Nothing is computed until you press Run';
 }
+export const HAS_RESULTS_MODEL='has the results of the current model';
 export function readyStatus(freshness,runId,origin='local',label=''){
  const run=runWords(runId,label);
  if(freshness==='again')return matchesAgainText(runId,label);
- if(freshness==='current'&&originText(origin))return `${run} · ${originText(origin)} · press Run to compute it here`;
+ // round 20 (Z1): a run read from file or recovered with the model's results says so, without asking for a run
+ if(freshness==='current'&&originText(origin))return `${run} · ${originText(origin)} · ${HAS_RESULTS_MODEL}`;
  if(freshness==='current')return `${run} matches the model · press Run to solve again`;
  if(freshness==='stale')return `Model edited since ${runWords(runId,label,true)} · press Run to update`;
  return 'Model checked · press Run';

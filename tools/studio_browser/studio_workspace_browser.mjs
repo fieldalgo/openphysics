@@ -646,7 +646,7 @@ try {
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), `Recovered from this browser · same as file ${sessionFile}`, 'a cancelled Save As changes nothing');
   // the recovered run is current, and the dock and footer say where it came from
   const recoveredSequence = await opticalSequence(); stage('recovered sequence', recoveredSequence);
-  assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · press Run to compute it here'});
+  assert.deepEqual(recoveredSequence, {heading: 'Run 2 · recovered from this browser, not recomputed', status: 'Run 2 · recovered from this browser, not recomputed · has the results of the current inputs'});
   // the older run viewed: the step bar, the result and its settings all say the current inputs
   // differ from this run, naming both, and none speaks of edits (there were none)
   await page.click('nav [data-page=Results]'); await page.until("!!document.querySelector('.run-item')", 'run list');
@@ -2302,8 +2302,8 @@ try {
     await r.click('#run-drop-pin'); await sleep(300);
     x3.afterPin = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), message: await rText('#file-status'), items: await runItems()};
     stage('R18 X3 drop warning', x3);
-    assert.equal(x3.drop, 'Running drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
-    assert.equal(x3.afterPin.drop, 'Running drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
+    assert.equal(x3.drop, 'If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
+    assert.equal(x3.afterPin.drop, 'If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
     assert.equal(x3.afterPin.message, 'Run pinned: new runs will not replace it. File › Save keeps it in a file.');
     assert.ok(x3.afterPin.items.some(t => t.startsWith('Pinned · Run 1 · closed · ')), JSON.stringify(x3.afterPin.items));
     // X9: the strip over a substrate in a closed window (run 7, which drops Run 2): the note's shortcuts
@@ -2406,7 +2406,7 @@ try {
     assert.deepEqual(y4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
     assert.ok(y4.after.message.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), y4.after.message);
     // the line beside Run study stays
-    assert.equal(y4.after.drop, 'Running drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
+    assert.equal(y4.after.drop, 'If you run: drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
     // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
     await recorded('R19 seven runs kept');
     await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');

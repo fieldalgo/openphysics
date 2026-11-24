@@ -343,7 +343,7 @@ test('a run read from a file or recovered says where it came from in the heading
  const m=await mp;
  assert.equal(m.sequenceHeading('current',2,'imported'),'Run 2 · read from file, not recomputed');
  assert.equal(m.sequenceHeading('current',2,'recovered'),'Run 2 · recovered from this browser, not recomputed');
- assert.equal(m.readyStatus('current',2,'imported'),'Run 2 · read from file, not recomputed · press Run to compute it here');
+ assert.equal(m.readyStatus('current',2,'imported'),'Run 2 · read from file, not recomputed · has the results of the current model');
  assert.equal(m.sequenceHeading('current',2,'local'),'Run 2 · solved from the current model');
  assert.equal(m.sequenceHeading('stale',2,'imported'),'Run 2 · the model changed since; press Run to update');
  assert.equal(m.sequenceHeading('again',2,'imported'),m.matchesAgainText(2));
