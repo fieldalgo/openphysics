@@ -2133,7 +2133,7 @@ try {
     stage('R17 U2 seven runs', u2);
     assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
     // round 21 (W2): the drop words, then the swap Messages offers
-    assert.ok(u2.message.endsWith(' Run 1 (500 × 220 nm · 2 modes) was dropped Keep Run 1, drop Run 2 (500 × 220 nm · 2 modes) instead'), u2.message);
+    assert.ok(u2.message.endsWith(' Run 1 (closed · 500 × 220 nm) was dropped Keep Run 1, drop Run 2 (closed · 500 × 220 nm) instead'), u2.message);
     assert.ok(u2.status.startsWith('Run 7 · '), u2.status);
     // Run 5 and Run 6 named (pinned) on Compare; an eighth run drops Run 2, keeps the pair and says Run 8 is newer
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results');
@@ -2150,7 +2150,7 @@ try {
       headings: await r.eval("[...document.querySelectorAll('#compare-table-runs [data-side]')].map(s=>s.textContent.split(' · ').slice(0,3).join(' · '))")};
     stage('R17 U2 eighth run', u2b);
     assert.deepEqual(u2b.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
-    assert.ok(u2b.dropped.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead'), u2b.dropped);
+    assert.ok(u2b.dropped.endsWith(' Run 2 (closed · 500 × 220 nm) was dropped Keep Run 2, drop Run 3 (closed · 500 × 220 nm) instead'), u2b.dropped);
     assert.equal(u2b.newer, 'Run 8 is newer than this pair · Compare Run 8 with B');
     assert.deepEqual(u2b.headings, ['A · Run 5 · Design A', 'B · Run 6 · Design B']);
     // U9: the pickers are named Run A and Run B; the run number and name fit their visible width
@@ -2310,10 +2310,10 @@ try {
     await r.click('#run-drop-pin'); await sleep(300);
     x3.afterPin = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), message: await rText('#file-status'), items: await runItems()};
     stage('R18 X3 drop warning', x3);
-    assert.equal(x3.drop, 'If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
-    assert.equal(x3.afterPin.drop, 'If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
+    assert.equal(x3.drop, 'If you run: drops Run 1 (closed · 500 × 220 nm) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
+    assert.equal(x3.afterPin.drop, 'If you run: drops Run 2 (closed · 500 × 220 nm) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
     // round 22 (V4): Messages names the run the next result drops instead
-    assert.equal(x3.afterPin.message, 'Run 1 pinned. If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it');
+    assert.equal(x3.afterPin.message, 'Run 1 pinned. If you run: drops Run 2 (closed · 500 × 220 nm) · pin it to keep it');
     assert.ok(x3.afterPin.items.some(t => t.startsWith('Pinned · Run 1 · closed · ')), JSON.stringify(x3.afterPin.items));
     // X9: the strip over a substrate in a closed window (run 7, which drops Run 2): the note's shortcuts
     await rTree('Geometry', "!!document.querySelector('#shape-w')");
@@ -2401,7 +2401,7 @@ try {
     stage('R21 W5 drop line beside No need to run', w5);
     assert.equal(w5.matched.hidden, true);
     assert.equal(w5.again.hidden, true); assert.ok(w5.again.message.includes('No need to run: Run 6 already has these results.'), w5.again.message);
-    for (const state of [w5.differ, w5.back]) assert.deepEqual(state, {hidden: false, text: 'If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it', pin: 'Pin Run 1'});
+    for (const state of [w5.differ, w5.back]) assert.deepEqual(state, {hidden: false, text: 'If you run: drops Run 1 (closed · 500 × 220 nm) · pin it to keep it', pin: 'Pin Run 1'});
     await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 run list');
     // W2: the job's status replies are held in the page until released, so the line during the run is read deterministically
     await r.eval("(()=>{const f=window.fetch;window.__held=[];window.__hold=true;window.fetch=(u,o)=>{const s=String(u);if(window.__hold&&s.includes('/api/jobs/'))return new Promise(go=>window.__held.push(()=>go(f(u,o))));return f(u,o);};window.__release=()=>{window.__hold=false;const h=window.__held;window.__held=[];h.forEach(x=>x());};})()");
@@ -2429,20 +2429,20 @@ try {
     w2.stale = {before: beforeStale, after: await runItems(), connected: await r.eval("window.__stale.isConnected")};
     stage('R21 W2 run at once, drop at the result, swap', w2);
     assert.equal(w2.during.dialog, false);
-    assert.deepEqual({hidden: w2.during.hidden, text: w2.during.text, pin: w2.during.pin}, {hidden: false, text: 'When this run finishes, Run 1 (500 × 220 nm · 2 modes) is dropped', pin: 'Pin Run 1'});
+    assert.deepEqual({hidden: w2.during.hidden, text: w2.during.text, pin: w2.during.pin}, {hidden: false, text: 'When this run finishes, Run 1 (closed · 500 × 220 nm) is dropped', pin: 'Pin Run 1'});
     assert.equal(w2.during.run.disabled, true); assert.doesNotMatch(w2.during.status, /waiting for your answer/);
     // Pin during the run keeps Run 1; the line names the next unpinned run
-    assert.equal(w2.pinned.text, 'When this run finishes, Run 2 (500 × 220 nm · 2 modes) is dropped'); assert.equal(w2.pinned.pin, 'Pin Run 2');
+    assert.equal(w2.pinned.text, 'When this run finishes, Run 2 (closed · 500 × 220 nm) is dropped'); assert.equal(w2.pinned.pin, 'Pin Run 2');
     assert.ok(w2.pinned.items.some(t => t.startsWith('Pinned · Run 1 · ')), JSON.stringify(w2.pinned.items));
     assert.deepEqual(w2.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
-    assert.ok(w2.after.message.includes(' Run 2 (500 × 220 nm · 2 modes) was dropped '), w2.after.message);
-    assert.equal(w2.after.keep, 'Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead');
+    assert.ok(w2.after.message.includes(' Run 2 (closed · 500 × 220 nm) was dropped '), w2.after.message);
+    assert.equal(w2.after.keep, 'Keep Run 2, drop Run 3 (closed · 500 × 220 nm) instead');
     // W5: the inputs are Run 7's now, so the line before the next run is hidden
     assert.equal(w2.after.drop.hidden, true);
     assert.deepEqual(w2.swapped.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
-    assert.equal(w2.swapped.message, 'Run 2 (500 × 220 nm · 2 modes) is back; Run 3 (500 × 220 nm · 2 modes) was dropped instead.');
+    assert.equal(w2.swapped.message, 'Run 2 (closed · 500 × 220 nm) is back; Run 3 (closed · 500 × 220 nm) was dropped instead.');
     assert.equal(w2.swapped.keep, null); assert.equal(w2.swapped.heading, 'Runs · 6 of 6 · 1 pinned');
-    assert.equal(w2.next.keep, 'Keep Run 2, drop Run 4 (500 × 220 nm · 2 modes) instead');
+    assert.equal(w2.next.keep, 'Keep Run 2, drop Run 4 (closed · 500 × 220 nm) instead');
     assert.deepEqual(w2.stale.after, w2.stale.before); assert.equal(w2.stale.connected, false);
     assert.equal(w2.stale.after.length, 6);
     // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
@@ -2870,11 +2870,11 @@ try {
     await rRun();
     p4.after = {message: await rText('#file-status'), keep: await r.eval("!!document.querySelector('#file-status [data-keep-run]')"), items: await runItems()};
     stage('R22 P4 pin and no swap', p4);
-    assert.match(p4.line, /^If you run: drops Run 1 \(Core 500 × 220 \+ Substrate 3000 × 700 nm · 2 modes\) · pin it to keep it$/);
-    assert.match(p4.pins[0].message, /^Run 1 pinned\. If you run: drops Run 2 \(Core 500 × 220 \+ Substrate 3000 × 700 nm · 2 modes\) · pin it to keep it$/);
-    for (let n = 2; n <= 5; n++) assert.equal(p4.pins[n - 1].message, `Run ${n} pinned. If you run: drops Run ${n + 1} (500 × 220 nm · 2 modes) · pin it to keep it`);
-    assert.equal(p4.pins[4].line, 'If you run: drops Run 6 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(p4.pins[4].pin, null);
-    assert.ok(p4.after.message.endsWith(' Run 6 (500 × 220 nm · 2 modes) was dropped; every other earlier run is pinned, so no other run can be dropped instead'), p4.after.message);
+    assert.match(p4.line, /^If you run: drops Run 1 \(closed · Core 500 × 220 \+ Substrate 3000 × 700 nm\) · pin it to keep it$/);
+    assert.match(p4.pins[0].message, /^Run 1 pinned\. If you run: drops Run 2 \(open \(PML 1 µm\) · Core 500 × 220 \+ Substrate 3000 × 700 nm\) · pin it to keep it$/);
+    for (let n = 2; n <= 5; n++) assert.equal(p4.pins[n - 1].message, `Run ${n} pinned. If you run: drops Run ${n + 1} (closed · 500 × 220 nm) · pin it to keep it`);
+    assert.equal(p4.pins[4].line, 'If you run: drops Run 6 (closed · 500 × 220 nm) · pin it to keep it'); assert.equal(p4.pins[4].pin, null);
+    assert.ok(p4.after.message.endsWith(' Run 6 (closed · 500 × 220 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead'), p4.after.message);
     assert.equal(p4.after.keep, false);
     assert.deepEqual(p4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 5', 'Run 4', 'Run 3', 'Run 2', 'Run 1']);
     await rOverflow('P4 no swap');

@@ -20,13 +20,13 @@ test('W2: the runs the next result drops, and the words before, during and after
  const next=N.appendRun(six,run(7));assert.deepEqual(six.filter(r=>!next.includes(r)).map(r=>r.number),[2]);
  assert.deepEqual(W.droppedBy(six.map(r=>({...r,pinned:true}))),[]);
  // before the run (unchanged), while it computes, after the result
- assert.equal(W.dropWarningText(W.droppedBy(six)[0]),'If you run: drops Run 2 (700 × 300 nm · 4 modes) · pin it to keep it');
- assert.equal(W.dropWhileRunningText(W.droppedBy(six)),'When this run finishes, Run 2 (700 × 300 nm · 4 modes) is dropped');
- assert.equal(W.droppedAfterText([run(2)]),'Run 2 (700 × 300 nm · 4 modes) was dropped');
- assert.equal(W.dropWhileRunningText([run(2,{label:'Design A'})]),'When this run finishes, Run 2 · Design A (700 × 300 nm · 4 modes) is dropped');
+ assert.equal(W.dropWarningText(W.droppedBy(six)[0]),'If you run: drops Run 2 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
+ assert.equal(W.dropWhileRunningText(W.droppedBy(six)),'When this run finishes, Run 2 (closed · 4 modes · 700 × 300 nm) is dropped');
+ assert.equal(W.droppedAfterText([run(2)]),'Run 2 (closed · 4 modes · 700 × 300 nm) was dropped');
+ assert.equal(W.dropWhileRunningText([run(2,{label:'Design A'})]),'When this run finishes, Run 2 · Design A (closed · 4 modes · 700 × 300 nm) is dropped');
  // two runs (a list the words also take), and the heated model's names
- assert.equal(W.dropWhileRunningText([run(1),run(3)]),'When this run finishes, Run 1 (700 × 300 nm · 4 modes) and Run 3 (700 × 300 nm · 4 modes) are dropped');
- assert.equal(W.droppedAfterText([run(1),run(3)]),'Run 1 (700 × 300 nm · 4 modes) and Run 3 (700 × 300 nm · 4 modes) were dropped');
+ assert.equal(W.dropWhileRunningText([run(1),run(3)]),'When this run finishes, Run 1 (closed · 4 modes · 700 × 300 nm) and Run 3 (closed · 4 modes · 700 × 300 nm) are dropped');
+ assert.equal(W.droppedAfterText([run(1),run(3)]),'Run 1 (closed · 4 modes · 700 × 300 nm) and Run 3 (closed · 4 modes · 700 × 300 nm) were dropped');
  const heated=r=>`Run ${r.number} (run at 05:31 AM)`;
  assert.equal(W.dropWarningText(run(3),heated),'If you run: drops Run 3 (run at 05:31 AM) · pin it to keep it');
  assert.equal(W.dropWhileRunningText([run(3)],heated),'When this run finishes, Run 3 (run at 05:31 AM) is dropped');
@@ -39,11 +39,11 @@ test('W2: Keep Run N swaps with the oldest other unpinned run; none, no button; 
  const next=N.appendRun(six,seventh),dropped=six.filter(r=>!next.includes(r));
  assert.deepEqual(dropped.map(r=>r.number),[2]);
  const other=W.swapCandidate(next,seventh);assert.equal(other.number,4);
- assert.equal(W.keepInsteadLabel(dropped[0],other),'Keep Run 2, drop Run 4 (700 × 300 nm · 4 modes) instead');
- assert.equal(W.keepInsteadLabel({...dropped[0],label:'Design A'},other),'Keep Run 2 · Design A, drop Run 4 (700 × 300 nm · 4 modes) instead');
+ assert.equal(W.keepInsteadLabel(dropped[0],other),'Keep Run 2, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead');
+ assert.equal(W.keepInsteadLabel({...dropped[0],label:'Design A'},other),'Keep Run 2 · Design A, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead');
  const swapped=W.swapDropped(next,dropped[0],other);
  assert.deepEqual(swapped.map(r=>r.number),[1,2,3,5,6,7]);assert.equal(swapped.length,6);
- assert.equal(W.keptInsteadText(dropped[0],other),'Run 2 (700 × 300 nm · 4 modes) is back; Run 4 (700 × 300 nm · 4 modes) was dropped instead.');
+ assert.equal(W.keptInsteadText(dropped[0],other),'Run 2 (closed · 4 modes · 700 × 300 nm) is back; Run 4 (closed · 4 modes · 700 × 300 nm) was dropped instead.');
  const heated=r=>`Run ${r.number} (run at 05:31 AM)`;
  assert.equal(W.keepInsteadLabel(dropped[0],other,heated),'Keep Run 2, drop Run 4 (run at 05:31 AM) instead');
  assert.equal(W.keptInsteadText(dropped[0],other,heated),'Run 2 (run at 05:31 AM) is back; Run 4 (run at 05:31 AM) was dropped instead.');

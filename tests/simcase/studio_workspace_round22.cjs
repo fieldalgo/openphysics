@@ -131,10 +131,10 @@ test('P4 (V4): Pin Run N names the run the next result drops instead (optical an
  // the line names Run 1; pinning it moves the drop to Run 2
  assert.deepEqual(W.droppedBy(six).map(r=>r.number),[1]);six[0].pinned=true;
  const next=W.droppedBy(six);assert.deepEqual(next.map(r=>r.number),[2]);
- assert.equal(W.pinnedDropText(six[0],next),'Run 1 pinned. If you run: drops Run 2 (700 × 300 nm · 4 modes) · pin it to keep it');
- assert.equal(W.pinnedDropText({number:4},[listRun(5)]),'Run 4 pinned. If you run: drops Run 5 (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.pinnedDropText(six[0],next),'Run 1 pinned. If you run: drops Run 2 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
+ assert.equal(W.pinnedDropText({number:4},[listRun(5)]),'Run 4 pinned. If you run: drops Run 5 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
  // while the run computes, the line's words; the heated model's names
- assert.equal(W.pinnedDropText(six[0],next,true),'Run 1 pinned. When this run finishes, Run 2 (700 × 300 nm · 4 modes) is dropped');
+ assert.equal(W.pinnedDropText(six[0],next,true),'Run 1 pinned. When this run finishes, Run 2 (closed · 4 modes · 700 × 300 nm) is dropped');
  const heated=r=>`Run ${r.number} (run at 05:31 AM)`;
  assert.equal(W.pinnedDropText({number:4},[listRun(5)],false,heated),'Run 4 pinned. If you run: drops Run 5 (run at 05:31 AM) · pin it to keep it');
  assert.equal(W.pinnedDropText({number:4},[listRun(5)],true,heated),'Run 4 pinned. When this run finishes, Run 5 (run at 05:31 AM) is dropped');
@@ -150,7 +150,7 @@ test('P4 (V4): a result that drops a run with every other earlier run pinned say
   const next=append(six,seventh),dropped=six.filter(r=>!next.includes(r));
   assert.deepEqual(dropped.map(r=>r.number),[3]);assert.equal(W.swapCandidate(next,seventh),null);
  }
- assert.equal(W.droppedNoSwapText([listRun(3)]),'Run 3 (700 × 300 nm · 4 modes) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
+ assert.equal(W.droppedNoSwapText([listRun(3)]),'Run 3 (closed · 4 modes · 700 × 300 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
  assert.equal(W.droppedNoSwapText([listRun(3)],r=>`Run ${r.number} (run at 05:31 AM)`),'Run 3 (run at 05:31 AM) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
  // the pages: the no-swap words exactly when no swap candidate exists (optical and heated)
  assert.ok(read('workspace-app.mjs').includes("droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);"));

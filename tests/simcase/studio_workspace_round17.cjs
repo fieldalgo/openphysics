@@ -36,8 +36,8 @@ test('U2: a file opened numbers its runs from 1; runs added from a file continue
 });
 test('U2: the message of a dropped run names its number, name, geometry and modes',()=>{
  const r=run(job(3),{number:3});
- assert.equal(W.droppedRunText(r),'Run 3 (700 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.');
- assert.equal(W.droppedRunText({...r,label:'Design A'}),'Run 3 · Design A (700 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText(r),'Run 3 (closed · 700 × 220 nm) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText({...r,label:'Design A'}),'Run 3 · Design A (closed · 700 × 220 nm) was dropped: up to six runs are kept; pin a run to keep it.');
 });
 test('U2: the number is written to files once it is not the run\'s place (version 12); the save names a run by its number',()=>{
  const a=run(job(1),{number:4,field:bigField()}),b=run(job(2),{number:7,field:bigField()}),view={mode:0,component:'magnitude',window:'Core region'};

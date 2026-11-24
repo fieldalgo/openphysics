@@ -32,7 +32,7 @@ test('Z1: one state, one message: no request to run beside "No need to run"',asy
  assert.equal(M.readyStatus('current',2,'local'),'Run 2 matches the model · press Run to solve again');
  // the drop line is about running (round 21: the dialog is gone)
  const run={number:3,settings:{mode_count:2},input:{model:doc.model}};
- assert.equal(W.dropWarningText(run),'If you run: drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
+ assert.equal(W.dropWarningText(run),'If you run: drops Run 3 (closed · 500 × 220 nm) · pin it to keep it');
  for(const name of ['workspace-workflow.mjs','workspace-multiphysics.mjs'])assert.ok(!read(name).includes('press Run to compute it here'),name);
  assert.ok(read('workspace-app.mjs').includes('host.textContent=matchingRunMessage(host.textContent);'));
 });

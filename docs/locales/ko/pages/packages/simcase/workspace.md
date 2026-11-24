@@ -314,12 +314,16 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 탭이 열려 있는 동안 바뀌지 않습니다(round 17). 새 실행은 지금까지 쓴 가장 큰 번호 + 1을 받으므로,
    실행 여섯 개 한도가 가장 오래된 고정되지 않은 실행을 내보내도 나머지는 번호를 유지하고, Messages가 내보낸 실행을
-   밝힙니다(*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.*;
-   Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
-   **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*(round 20;
+   밝힙니다(*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to six runs are kept; pin a run to keep it.*;
+   Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 23(E4)부터 내보내기 문구는 모두 실행 목록 라벨과 같은
+   부분으로 실행을 부릅니다: 경계(*closed*, *closed near 2.46*, *open (PML 1 µm)*), 2가 아닐 때의 Modes to find, *n_g*, 그리고
+   형상. 그래서 *Run 4 (closed · n_g · 600 × 300 nm)*는 목록의 *Run 4 · closed · n_g · 600 × 300 nm · Silicon*입니다(그 전에는
+   *Run 4 (600 × 300 nm · 2 modes)*). Run study 옆 줄, 내보낸 문구, 바꾸기 버튼, Pin 알림 모두 그렇고, 가열 모델은 자기 이름을
+   그대로 씁니다. round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
+   **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it*(round 20;
    전에는 실행이 진행 중인 듯 *Running drops …*였음)와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다. round 22(V4)부터
-   Messages는 그 대신 다음 결과가 내보낼 실행을 밝힙니다: *Run 3 pinned. If you run: drops Run 4 (700 × 300 nm · 4 modes) ·
+   Messages는 그 대신 다음 결과가 내보낼 실행을 밝힙니다: *Run 3 pinned. If you run: drops Run 4 (closed · 4 modes · 700 × 300 nm) ·
    pin it to keep it*(실행이 계산 중이면 *Run 3 pinned. When this run finishes, Run 4 (…) is dropped*). 내보낼 실행이 없을
    때만 평소의 고정 메시지입니다.
    round 21부터 현재 입력이 어떤 실행의 입력과 같아 Messages가 *No need to run: Run 6 already has these results*라고 적는
@@ -327,11 +331,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    round 21부터 **Run study**는 바로 시작합니다: round 19와 20이 그런 실행 전에 보이던 대화 상자(*Running drops Run 3 …*와
    Pin Run 3 and run, Run, Cancel, 그리고 *Waiting for your answer* 문구)는 없어졌습니다. 답을 기다리던 실행은 사용자가
    다른 곳을 보는 동안 아무것도 계산하지 않았기 때문입니다. 실행이 계산하는 동안 줄은 *When this run finishes, Run 3
-   (700 × 300 nm · 4 modes) is dropped*로 읽히고, 그때도 **Pin Run 3**가 동작합니다: Run 3를 남기고, 줄은 다음 고정되지 않은
+   (closed · 4 modes · 700 × 300 nm) is dropped*로 읽히고, 그때도 **Pin Run 3**가 동작합니다: Run 3를 남기고, 줄은 다음 고정되지 않은
    실행이 있으면 그것을 밝힙니다. 고정하면 결과가 내보내야 할 수보다 고정되지 않은 실행이 적어질 때(마지막 고정되지 않은 실행:
    결과에 그 자리가 필요함)는 Pin이 없습니다. 내보내기는 결과가 도착할 때만, 그때의 가장 오래된 고정되지 않은 실행에 일어납니다.
-   Messages는 실행 자신의 메시지 뒤에 *Run 3 (700 × 300 nm · 4 modes) was dropped*를 덧붙이고, 새 결과 말고도 고정되지 않은
-   실행이 있으면 **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes) instead** 버튼을 둡니다(Run 4는 그런 실행 중 가장 오래된
+   Messages는 실행 자신의 메시지 뒤에 *Run 3 (closed · 4 modes · 700 × 300 nm) was dropped*를 덧붙이고, 새 결과 말고도 고정되지 않은
+   실행이 있으면 **Keep Run 3, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead** 버튼을 둡니다(Run 4는 그런 실행 중 가장 오래된
    것). 버튼은 Run 3를 제자리로 되돌리고 Run 4를 내보냅니다: *Run 3 (…) is back; Run 4 (…) was dropped instead.*, 그 뒤 버튼은
    더 없습니다. 앞선 다른 실행이 모두 고정되어 있으면 바꿀 실행이 없고, round 22(V4)부터 문구가 그 까닭을 말합니다: *Run 3 (…)
    was dropped; every other earlier run is pinned, so no other run can be dropped instead*. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
