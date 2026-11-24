@@ -77,3 +77,43 @@ test('P2 (E2): recovery over the limit leaves fields out, and the header and Mes
  // the message wraps
  assert.ok(read('workspace.css').includes('#file-status{color:#7b8798;min-width:0;overflow-wrap:anywhere}'));
 });
+
+// E3: the estimate beside Run study with group index on, and Turn off group index
+test('P3 (E3): an estimate from the last run with the same boundary: as is with n_g, × 3 without, none without such a run',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ const kinds={isOpen:r=>r.open===true,hasGroup:r=>r.ng===true};
+ const openNg={open:true,ng:true,duration:200000},open={open:true,ng:false,duration:68000},closed={open:false,ng:false,duration:8000},opened={open:true,ng:true};
+ // a comparable run with n_g: its time
+ assert.equal(W.groupIndexEstimate([closed,open,openNg],{open:true},kinds),200000);
+ // the newest comparable run had no n_g: 3 times its time (68 s → 204 s; 199 s measured)
+ assert.equal(W.groupIndexEstimate([openNg,closed,open],{open:true},kinds),204000);
+ assert.equal(W.groupIndexEstimate([open,openNg,closed],{open:false},kinds),24000);
+ // none: no run of the same boundary kind with a time measured in this tab (an opened run has none)
+ assert.equal(W.groupIndexEstimate([closed,opened],{open:true},kinds),null);
+ assert.equal(W.groupIndexEstimate([],{open:false},kinds),null);
+ // the words
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:204000}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:200000}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:false,groupIndex:true,estimate:24000}),'Closed window · group index on (3 solves) · about 20 s');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:null}),'Open boundary · 2 searches · group index on (3 solves)');
+ // with group index off: the round-18 words, unchanged
+ assert.equal(W.runPlanText({open:true,searches:2,last:68000}),'Open boundary · 2 searches · last such run 1:08');
+ assert.deepEqual([5000,24000,85000,95000,204000,239000].map(W.aboutText),['10 s','20 s','90 s','2 min','3 min','4 min']);
+});
+
+test('P3 (E3): Turn off group index beside the plan line turns the option off; the option stays an input',()=>{
+ const app=read('workspace-app.mjs'),plan=body(app,'function refreshRunOptions(){','\n}');
+ assert.ok(plan.includes('estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?.duration??null,estimate});'));
+ assert.ok(plan.includes('refreshGroupIndexOff(plan.groupIndex);'));
+ const off=body(app,'function refreshGroupIndexOff(on){','\n}');
+ assert.ok(off.includes("button.textContent='Turn off group index';button.onclick=turnOffGroupIndex;"));
+ // shown while the option is on, removed while it is off
+ assert.ok(off.includes("let button=$('run-plan-group-off');if(!on){button?.remove();return;}"));
+ // the option's own edit, as its check box makes it, with its notice; render() refreshes the plan line
+ assert.ok(app.includes('function turnOffGroupIndex(){if(state.groupIndex!==true)return;state.groupIndex=false;render();notice(groupIndexNotice(false));}'));
+ assert.ok(app.includes("box.onchange=e=>{state.groupIndex=e.target.checked;render();notice(groupIndexNotice(state.groupIndex));};"));
+ // no run resets it: the result handler does not touch the option
+ const result=body(app,'},onResult:(result,pending)=>{','\n}});');assert.ok(!result.includes('state.groupIndex'));
+ // the heated model has no group index: its line is unchanged
+ assert.ok(!read('workspace-multiphysics-view.mjs').includes('groupIndexEstimate'));
+});

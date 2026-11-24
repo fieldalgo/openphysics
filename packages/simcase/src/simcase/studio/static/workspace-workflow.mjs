@@ -41,11 +41,28 @@ export const nextRunText=(input,modeCount,groupIndex=false,pml=null,searchTarget
 //   "Open boundary · 2 searches · group index on (3 solves) · last such run 3:40"
 //   "Closed window"
 //   "Closed window · near n_eff 2.46" (slice C2: searchTarget, a closed window's Search near n_eff)
-export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null,searchTarget=null}={}){
+// Round 23 (E3): with group index on, the time part is an estimate instead (estimate: ms, from
+// groupIndexEstimate, or null for none; the page then passes no last): "Open boundary · 2 searches ·
+// group index on (3 solves) · about 3 min".
+export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null,searchTarget=null,estimate=null}={}){
  const options=[...(groupIndex===true?['group index on']:[]),...(open&&pmlCheck===true?['PML check on']:[])];
  const solves=(groupIndex===true?3:1)+(open&&pmlCheck===true&&Number.isInteger(modeCount)?modeCount:0);
- const parts=[open?'Open boundary':searchTarget!=null?closedPlanText(searchTarget):'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...(Number.isFinite(last)?[`last such run ${durationText(last)}`]:[])];
+ const time=groupIndex===true&&Number.isFinite(estimate)?[`about ${aboutText(estimate)}`]:Number.isFinite(last)?[`last such run ${durationText(last)}`]:[];
+ const parts=[open?'Open boundary':searchTarget!=null?closedPlanText(searchTarget):'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...time];
  return parts.join(' · ');
+}
+// Round 23 (E3): the time a run with group index on is likely to take, from the newest run of the tab
+// with the same boundary kind (open: a run with a PML) and a wall time measured in this tab: its time
+// when it computed the group index too, else 3 times its time (the group index adds the solves at
+// λ0 − 1 nm and λ0 + 1 nm). null with no such run (round 20, Z5: no estimate without a measured run).
+// On 2026-11-24 the T18 open run took 68 s without and 199 s with group index (2.9 ×).
+export function groupIndexEstimate(runs,{open},{isOpen,hasGroup}){
+ const last=runs.findLast(r=>Number.isFinite(r.duration)&&isOpen(r)===!!open);
+ return last?(hasGroup(last)?last.duration:3*last.duration):null;
+}
+// "about 40 s" under a minute and a half (to 10 s, at least 10 s), else "about 3 min" (to the minute)
+export function aboutText(ms){
+ const s=ms/1000;return s<90?`${Math.max(10,Math.round(s/10)*10)} s`:`${Math.round(s/60)} min`;
 }
 // m:ss of a duration in ms ("3:40"), h:mm:ss from an hour
 export function durationText(ms){

@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -1340,10 +1340,19 @@ function refreshDropWarning(){
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};
- const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
- refreshDropWarning();refreshEdgeWarning();
- const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
+ const kinds={isOpen:isOpenRun,hasGroup:hasGroupIndex},last=lastComparableRun(runs,plan,kinds),estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?.duration??null,estimate});
+ refreshDropWarning();refreshEdgeWarning();refreshGroupIndexOff(plan.groupIndex);
+ const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title=plan.groupIndex?'What the next run does; change it in Study or Physics › Optical modes. The estimate is the wall time of the last run in this tab with the same boundary, 3 times it when that run had no group index.':'What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
+// round 23 (E3): Turn off group index, beside the plan line while the option is on, removed while it
+// is off (a row made here around the plan line, so the page's markup is unchanged). It is the
+// option's own input edit (Undo takes it back); the option stays an input and no run turns it off.
+function refreshGroupIndexOff(on){
+ let button=$('run-plan-group-off');if(!on){button?.remove();return;}if(button)return;
+ if(!$('run-plan').parentElement.classList.contains('run-plan-row')){const row=document.createElement('span');row.className='run-plan-row';$('run-plan').before(row);row.append($('run-plan'));}
+ button=document.createElement('button');button.type='button';button.id='run-plan-group-off';button.className='message-action';button.textContent='Turn off group index';button.onclick=turnOffGroupIndex;$('run-plan').after(button);
+}
+function turnOffGroupIndex(){if(state.groupIndex!==true)return;state.groupIndex=false;render();notice(groupIndexNotice(false));}
 // round 22 (V2): the slab warning in the plan line, a row under it (made here, so the page's markup is
 // unchanged) with the two buttons. Round 23 (E1): its short words (edgeSlabShortText), never cut:
 // the row wraps, the buttons on a line of their own when the words and the buttons do not fit, and
