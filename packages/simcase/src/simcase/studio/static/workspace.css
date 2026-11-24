@@ -427,6 +427,8 @@ dialog::backdrop{background:#162a4b66}
 .run-options[hidden],#run-optical[hidden]+.run-options{display:none}
 .run-plan{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .run-options.dropping .run-plan{-webkit-line-clamp:1}
+/* round 23 (E3): Turn off group index beside the plan line */
+.run-plan-row{display:flex;align-items:center;gap:4px;min-width:0}.run-plan-row .run-plan{flex:1 1 auto;min-width:0}.run-plan-row .message-action{flex:none;font-size:11px;line-height:16px}
 .run-drop{display:flex;align-items:center;gap:4px;min-width:0;color:#7a3d00}.run-drop[hidden]{display:none}.run-drop-text{flex:1 1 auto;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.run-drop .message-action{flex:none;font-size:11px;line-height:16px}
 .mp-row{display:inline-flex;align-items:center;gap:4px}.mp-row b{color:#fff}.mp-row.ready b,.mp-row.waiting b{color:inherit}.mp-row.done b{background:#2f7a3d}.mp-row.solving b{background:#285db1}.mp-row.did-not-settle b,.mp-row.failed b{background:#b3261e}.mp-row.not-run b{background:#9aa8ba}
 .mp-dialog{max-width:min(640px,calc(100vw - 32px));width:100%;border:1px solid var(--line);border-radius:4px;padding:16px}

@@ -273,8 +273,15 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    늘리는 선택과 그 마지막 뒤의 풀이 수(*group index on*, 열린 경계의 *PML check on*: 모드마다 많아야 한 번 더 풂; 둘 다면
    *group index on · PML check on (5 solves)*), 탭에 시간이 있는 비교 가능한 실행이 있으면 그다음 *last such run m:ss*입니다. round 20부터 그런 실행이 없으면 시간 부분이 없습니다(*Closed window*): round 19의 *no timed run in this tab yet*(그 전에는 *no earlier run*)은 시간을 잰 실행이 무엇이냐는 물음을 낳았고, 탭에서 다른 경계나 군굴절률 상태로 계산한 실행 옆에서 맞지 않았습니다. 비교 가능한
    실행은 경계 종류와 군굴절률 상태가 같은 실행이며, 그 시간은 이 탭에서 작업 시작부터 결과까지의 실제 시간으로 이 탭의
-   실행에만 보존됩니다: 연 실행과 복원한 실행에는 없고 어떤 파일에도 담기지 않습니다. 이 줄은 크기가 고정된 상자에 있어
-   바뀌어도 리본이 움직이지 않습니다. 군굴절률이 켜진 채 **Open boundary**를 고르면 Messages에 경고가 붙습니다: *Group index
+   실행에만 보존됩니다: 연 실행과 복원한 실행에는 없고 어떤 파일에도 담기지 않습니다. round 23(E3)부터 군굴절률이 켜져 있으면
+   시간 부분은 이 탭에서 경계 종류가 같은 가장 새 실행(군굴절률 상태와 무관)으로 낸 어림값입니다: 그 실행도 군굴절률을 계산했으면
+   그 시간, 아니면 그 시간의 세 배(군굴절률은 풀이 두 번을 더함), *Open boundary · 2 searches · group index on (3 solves) ·
+   about 3 min*(1분 30초 미만이면 *about 20 s*). 그런 실행이 없으면 어림값도 없습니다(round 20 규칙). 선택이 켜져 있는 동안 줄
+   옆에 **Turn off group index** 버튼이 있습니다. 선택 자신의 편집이라(Undo로 되돌리고, Messages는 확인란과 같은 말을 함) 그
+   뒤 줄은 선택이 꺼진 때처럼 읽힙니다. 군굴절률은 계속 입력입니다: 어떤 실행도 그것을 끄지 않습니다. round 23 테스터들은
+   실행마다 그것을 켜 둔 채 열린 실행을 3:20–4:00 동안 *Computing job … 2:00*만 보며 기다렸습니다. 2026-11-24에 T18 열린 실행은
+   군굴절률 없이 68 s, 함께 199 s 걸렸습니다. 가열 모델에는 군굴절률이 없어 그 줄은 그대로입니다. 이 줄은 크기가 고정된 상자에 있어
+   바뀌어도 리본이 움직이지 않습니다(round 23: 아래 슬래브 경고에 자리가 더 필요할 때는 예외). 군굴절률이 켜진 채 **Open boundary**를 고르면 Messages에 경고가 붙습니다: *Group index
    is on: open-boundary runs with it take about three times as long.* 선택은 작업 사이에도 그 상태를 유지합니다.
    코어 메시 크기는 **Mesh**에서 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.

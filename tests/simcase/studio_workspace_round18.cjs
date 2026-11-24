@@ -86,7 +86,7 @@ test('X2: beside Run study, what the next run does and how long the last compara
  assert.equal(out.ok,true);assert.equal(out.text.includes('duration'),false);assert.equal(out.text.includes('220000'),false);
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}"));
- assert.ok(app.includes("const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});"));
+ assert.ok(app.includes("const kinds={isOpen:isOpenRun,hasGroup:hasGroupIndex},last=lastComparableRun(runs,plan,kinds),estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?.duration??null,estimate});"));
  // Open boundary chosen while the group index is on: one warning in Messages
  assert.ok(app.includes("const GROUP_INDEX_OPEN_WARNING='Group index is on: open-boundary runs with it take about three times as long.';"));
  assert.ok(app.includes("if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';"));

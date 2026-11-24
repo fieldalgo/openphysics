@@ -2120,7 +2120,8 @@ try {
     stage('R17 U3 slow options', u3);
     // round 18 (X2): the line is always there and names the whole run; the group index with its solves
     // round 20 (Z5): before any run there is no timing part
-    assert.equal(u3.on.hidden, false); assert.equal(u3.on.text, 'Closed window · group index on (3 solves)');
+    // round 23 (E3): with the Turn off group index button beside it
+    assert.equal(u3.on.hidden, false); assert.equal(u3.on.text, 'Closed window · group index on (3 solves)Turn off group index');
     assert.equal(u3.off.hidden, false); assert.equal(u3.off.text, 'Closed window');
     // U2: seven runs of the template (core mesh 30, 32, …, 42 nm): the seventh drops Run 1 and
     // renumbers nothing; Messages names it

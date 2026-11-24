@@ -319,8 +319,20 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    run*) raised the question what a timed run is and read wrong beside runs computed in the tab with
    another boundary or group-index state. A comparable run has the same boundary kind and group-index state; its
    time is the wall time from the job's start to its result in this tab, kept with the run in this
-   tab only: opened and recovered runs have none, and no file holds it. The line sits in a box of
-   fixed size, so the ribbon does not move when it changes. Choosing **Open boundary** while the
+   tab only: opened and recovered runs have none, and no file holds it. Since round 23 (E3), with
+   the group index on, the time part is an estimate from the newest run of this tab with the same
+   boundary kind, whatever its group-index state: its time when it computed the group index too,
+   three times its time when it did not (the group index adds two solves), *Open boundary · 2
+   searches · group index on (3 solves) · about 3 min* (*about 20 s* under a minute and a half). With
+   no such run there is no estimate (the round-20 rule). A **Turn off group index** button sits beside
+   the line while the option is on; it is the option's own edit (Undo takes it back, Messages says
+   what the check box says), and the line then reads as for the option off. The group index stays an
+   input: no run turns it off. Testers of round 23 kept it on from one run to the next and waited
+   3:20 to 4:00 for open runs with *Computing job … 2:00* alone in view; on 2026-11-24 the T18 open
+   run took 68 s without and 199 s with it. The heated model has no group index and its line is
+   unchanged. The line sits in a box of
+   fixed size, so the ribbon does not move when it changes (round 23: except while the slab warning
+   below needs more room). Choosing **Open boundary** while the
    group index is on adds a warning to Messages: *Group index is on: open-boundary runs with it take
    about three times as long.* The options keep their state between tasks.
    Set the core mesh size in **Mesh**.
