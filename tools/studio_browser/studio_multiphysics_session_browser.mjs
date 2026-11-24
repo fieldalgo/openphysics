@@ -858,7 +858,9 @@ print(n)`;
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'reload for R19');
   await openTemplate(); await runReady();
   const mouseClick = async (selector, dx = null) => {
-    const at = await page.eval(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.left+(${dx === null ? 'r.width/2' : dx}),y:r.top+r.height/2}})()`);
+    // the selector is passed as an argument, not built into code
+    const box = await page.on('function(s){const r=this.querySelector(s).getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}}', selector);
+    const at = {x: box.left + (dx === null ? box.width / 2 : dx), y: box.top + box.height / 2};
     for (const type of ['mousePressed', 'mouseReleased']) await page.call('Input.dispatchMouseEvent', {type, x: at.x, y: at.y, button: 'left', clickCount: 1});
     await sleep(300);
   };
