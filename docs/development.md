@@ -471,7 +471,8 @@ same file.*, now in the user guide only), a project name taken from a file name 
 window.*
 Since round 17 (pre-registered) it ends with a stage in a browser context of its own: the workspace
 note and the closed Study panel saying the outer boundary is chosen in *Physics › Optical modes*;
-*group index on · 3 solves* beside Run study while the option is ticked, none once cleared; seven
+the group index named beside Run study while the option is ticked (*Closed window · group index on
+(3 solves) · …*, round 18 words), not once cleared; seven
 template runs (core mesh 30 to 42 nm) listed as Run 7 to Run 2 with *Run 1 (500 × 220 nm · 2 modes)
 was dropped: up to six runs are kept; pin a run to keep it.* and the status line on Run 7; Run 5
 and Run 6 named and compared, an eighth run dropping Run 2 and reading *Run 8 is newer than this
@@ -482,6 +483,20 @@ row under modes 1 and 2 (*Mode 1 is mostly in Substrate (… % of |E|²), which 
 edge; …*, more than 50 %); after a wavelength edit the status line *Run 9 · Core 500 × 220 +
 Substrate 3000 × 700 nm …*; and the template core against the substrate run on Compare with the
 note for B, each unmatched row's *best x (< 0.8, not matched)* and O2's 24 px at 1440 × 900.
+Since round 18 (pre-registered) a further stage in its own browser context checks the box beside
+Run study: *Closed window · no earlier run* before any run, *… · group index on (3 solves) · …* and
+*Open boundary · 2 searches · group index on (3 solves) · no earlier run*, with the warning *Group
+index is on: open-boundary runs with it take about three times as long.* in Messages in its own
+colours, and *last such run m:ss* after a run; the Compute group's height, Run study's box and the
+box's size equal within 0.5 px at 1440 × 900 and 390 × 844 with every text and with the drop line;
+the Search near n_eff help ending in *(n_core + 1.444)/2.*; Run 1's inputs restored by edits giving
+*No need to run: Run 1 already has these results. …* with **Show Run 1** (Run study still enabled)
+and the run list's *Run 1 · closed · 500 × 220 nm …*; Run 1 viewed after Run 2 giving the status line
+*… · current inputs from Run 2*; six runs giving *Running drops Run 1 (500 × 220 nm · 2 modes) · pin
+it to keep it* and **Pin Run 1**, which pins it and moves the line to Run 2; the substrate run's note
+with **Use Open boundary** and **Find 4 modes**, each setting its input and running nothing; and on
+Compare the pickers and headings carrying *closed*, with O2's 24 px; no horizontal overflow at
+either size.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -544,6 +559,12 @@ download with the optical model alone, then given the heated model, makes **Save
 As dialog prefilled with `u8-optical.json` and *This project now holds Optical waveguide and Heated
 silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*;
 Cancel downloads nothing; saved with both models, the next Save downloads at once.
+Since round 18 (pre-registered) the same profile checks the Save As line *The file will hold Optical
+waveguide (no runs).* and, when Save asks, *… and Heated silicon waveguide (no runs).*; the heated
+model's status bar *Heated silicon waveguide · in project u8-optical.json · not saved since it joined
+· …* after it joined and *… · downloaded …* once saved with both, beside the header's words; and
+both cards reading *Return to model*. In the round-16 reload stage both cards' offers also name the other model,
+*· also in this project: … (restored separately)*.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
 (session file)…**, as **File › Save** writes the project file.
 
