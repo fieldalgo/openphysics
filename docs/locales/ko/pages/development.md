@@ -417,18 +417,18 @@ Messages에 자기 색으로 나오는 경고 *Group index is on: open-boundary 
 옮겨 가는지; 기판 실행의 안내 아래 **Use Open boundary**와 **Find 4 modes**가 각각 입력을 정하고 아무것도 실행하지 않는지;
 Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오는지; 두 크기 모두 가로 넘침이 없는지 봅니다.
 19차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 확인합니다: 형상 속성의 *Name*과 *Material* 칸이 그 낱말 하나뿐인
-레이블을 하나씩 가지는지(감싸지 않고 `for`로); 실행 여섯 개 뒤 Run study가 *Running drops Run 1 (500 × 220 nm · 2 modes).*와
-*Up to six runs are kept; a pinned run is never dropped.*, **Pin Run 1 and run**, **Run**, **Cancel**(첫째에 포커스)을 담은 대화
-상자를 열고 1440 × 900과 390 × 844에서 가로 넘침이 없는지; Escape가 아무것도 실행하지 않고 닫으며 포커스가 Run study로 가는지;
-Pin Run 1 and run이 Run 1을 고정하고 Run 2에 대해 다시 묻는지; Cancel이 아무것도 실행하지 않는지; 그다음 Run이 Run 7을 만들고
-Run 2를 내보내며 Run study 옆 줄은 남는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
+레이블을 하나씩 가지는지(감싸지 않고 `for`로); 실행 여섯 개 뒤(21차부터, 사전 등록; 19차와 20차는 이것이 대신한 내보내기 질문을
+확인함) 입력이 Run 6과 같은 동안 내보내기 줄이 숨고(Messages *No need to run: Run 6 already has these results.*) 입력이 다르면
+*If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*로 돌아오는지; Run study가 대화 상자 없이 바로 시작하고,
+작업 상태 응답을 페이지 안에서 풀어 줄 때까지 붙잡은 채 *When this run finishes, Run 1 (500 × 220 nm · 2 modes) is dropped*와
+**Pin Run 1**을 보이며 1440 × 900과 390 × 844에서 가로 넘침이 없는지; 실행 중 Pin이 줄을 Run 2로 옮기는지; 결과 Run 7이 Run 2를
+내보내고 Messages가 *… Run 2 (500 × 220 nm · 2 modes) was dropped*와 **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes)
+instead**를 보이며, 그 버튼이 Run 2를 되돌리고 Run 3를 내보내는지(*Run 2 (…) is back; Run 3 (…) was dropped instead.*, 버튼은
+더 없음, *Runs · 6 of 6 · 1 pinned*); 이전 결과의 교환 버튼을 다음 실행 뒤에 눌러도 아무것도 바뀌지 않는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
 Optical waveguide · 1 run · Run 1 · saved …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · saved …*인지;
 그 오래된 세션을 복원하면 상자가 숨고, 더 새 세션은 곧바로 마지막 세션으로, 이 탭의 기록이 쓰인 뒤에는 Workspace tools의
-이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. 실행 여섯 개를 넘기는 단계는 대화 상자에 Run으로 답하고, Library의
-첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 봅니다. 20차부터(사전 등록) 대화 상자 단계는 질문이 열려 있는 동안 Run study
-옆의 *Waiting for your answer: pin, run or cancel*(내보냄 줄은 숨음), 상태 표시줄의 *Run study is waiting for your answer*,
-그대로 *Run study*인 버튼, 비어 있는 숨은 작업 메시지, 대화 상자 안의 포커스를, Escape 뒤에는 전의 계획 줄과 상태를 읽습니다.
-자체 브라우저 컨텍스트의 단계가 하나 더 실행 전 *Closed window*, 어느 경계에서든 범위 안내의 *3 × 2.4 µm window, closed (PEC
+이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. Library의 첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 보며,
+21차부터 실행 여섯 개를 넘기는 단계는 더는 대화 상자에 답하지 않습니다. 20차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 실행 전 *Closed window*, 어느 경계에서든 범위 안내의 *3 × 2.4 µm window, closed (PEC
 edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)*를 확인하고, 실행 둘(Modes to find
 2와 3), 새로고침, 복원 뒤 Modes to find를 2로, 그다음 3으로 바꾸면 **Show Run 2**와 함께 *Modes to find set to 3. No need to
 run: Run 2 already has these results. Run study adds a copy with the same values.*, 상태 표시줄 *Run 2 · recovered from this
@@ -487,18 +487,21 @@ Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under th
 copy of heater-study.json · not saved to a file · …*이고 상태 표시줄은 *Recovered from this browser (opened from heater-study.json;
 changed since)*인지, `r19-saved.json`으로 저장하고 다시 실행해 복원하면 *r19-saved · r19-saved.json · changed since saved …*인지
 봅니다. session 스크립트는 히터 없는 풀이 레이블을 마우스 이벤트로(글자에, 그다음 *(about 1 s more)*에) 눌러 상자가 꺼졌다
-켜지는지 보고, 가열 실행 여섯 개 뒤 Run study가 세 답과 함께 *Running drops Run 1 (run at …).*라고 묻고 Cancel은 아무것도
-실행하지 않으며 Run은 Run 1을 내보내고 Run 7을 만드는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
+켜지는지 보고 가열 실행 여섯 개를 만듭니다. 21차부터(사전 등록) 모델이 실행과 같은 동안 Run study 옆 가열 줄이 숨고 편집 뒤에는
+*If you run: drops Run 1 (run at …) · pin it to keep it*로 읽히는지; Run study가 바로 시작하고 작업 응답을 붙잡은 채 *When this
+run finishes, Run 1 (run at …) is dropped*와 **Pin Run 1**을 보이는지(두 크기 모두 넘침 없음); Pin이 줄을 Run 2로 옮기는지;
+Run 7이 Run 2를 내보내고 Messages가 **Keep Run 2, drop Run 3 (run at …) instead**를 두며, 그 버튼 뒤 Run 7, 6, 5, 4, 2, 1이
+남는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
 스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
 새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run) · same
-as file r20-both.json · saved …*로 시작하고, 가열 기록은 상자와 카드에서 같은 시각(파일의 저장 시각)을 밝히는지; 한 번의
+as file r20-both.json · saved …*로 시작하고, 가열 기록은 카드에서 같은 시각(파일의 저장 시각; 20차에는 상자에서도)을 밝히는지; 한 번의
 클릭이 둘 다 복원하여 *Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not
 recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모델의 Results가 나오고, Library에는 복원 제안이 남지 않으며
 *Return to Optical waveguide (2 runs)*와 *Return to Heated silicon waveguide (1 run)*로 읽히는지; 1440 × 900과 390 × 844에서
-가로 넘침이 없는지 봅니다. session 스크립트의 가열 모델 내보내기 질문은 열려 있는 동안 Run study 아래에 *Waiting for your
-answer: pin, run or cancel*, 상태 표시줄에 *Run study is waiting for your answer*를 보이고 Cancel 뒤에는 둘 다 없으며, 파일에서
-연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
+가로 넘침이 없는지 봅니다. 21차부터(사전 등록) 그 제안 옆에 상자가 가열 항목을 나열하지 않고 가열 카드는 여전히 그 기록을(파일의
+저장 시각과 함께) 제안하는지, 복원 뒤 Modes to find 4의 실행이 실행 목록과 Compare 선택 목록에서 *· closed · 4 modes ·*로 읽히고
+그 태그가 1440과 390 px에서 선택 목록 안에 들어가는지 봅니다. session 스크립트의 파일에서 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

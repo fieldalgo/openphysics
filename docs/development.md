@@ -505,22 +505,23 @@ Compare the pickers and headings carrying *closed*, with O2's 24 px; no horizont
 either size.
 Since round 19 (pre-registered) a further stage in its own browser context checks the shape
 inspector's *Name* and *Material* fields, each with one label of that word (`for`, not wrapping);
-six runs, then Run study giving the dialog *Running drops Run 1 (500 × 220 nm · 2 modes).* with
-*Up to six runs are kept; a pinned run is never dropped.* and **Pin Run 1 and run**, **Run** and
-**Cancel**, the first focused, with no horizontal overflow at 1440 × 900 or 390 × 844; Escape
-closing it with nothing run and the focus on Run study; Pin Run 1 and run pinning Run 1 and asking
-again for Run 2; Cancel running nothing; Run then making Run 7, dropping Run 2, with the line beside
-Run study kept; and, after a second session of one run, the Library's box leading with *Restore
+six runs, then (since round 21, pre-registered; rounds 19 and 20 checked the drop question it
+replaced) the drop line hidden while the inputs equal Run 6's (Messages *No need to run: Run 6 already
+has these results.*) and back as *If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*
+when they differ; Run study starting at once (no dialog) and, with the job's status replies held in
+the page until released, the line *When this run finishes, Run 1 (500 × 220 nm · 2 modes) is dropped*
+with **Pin Run 1**, no horizontal overflow at 1440 × 900 or 390 × 844; Pin during the run moving the
+line to Run 2; the result Run 7 dropping Run 2, Messages *… Run 2 (500 × 220 nm · 2 modes) was dropped*
+with **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead**, which brings Run 2 back and drops
+Run 3 (*Run 2 (…) is back; Run 3 (…) was dropped instead.*, no further button, *Runs · 6 of 6 · 1
+pinned*); a swap button kept from an earlier result and pressed after the next run changing nothing;
+and, after a second session of one run, the Library's box leading with *Restore
 newest from this browser: Optical waveguide · 1 run · Run 1 · saved …* (the record the card offers)
 and the six-run session reading *… · older · saved …*; restoring that older one hides the box, the
 newer session stays offered as the last session at once and in Workspace tools' earlier sessions
-once this tab's record is written, and the restored one is not listed again. The stages that make
-runs past six answer the dialog with Run, and the Library check of the first viewport now reads
-the box's newest offer, which sits above the cards. Since round 20 (pre-registered) the dialog
-stage also reads, while the question is open, *Waiting for your answer: pin, run or cancel* beside
-Run study (the drop line hidden), the status bar *Run study is waiting for your answer*, Run study
-still *Run study*, an empty hidden job message and the focus in the dialog, and after Escape the
-earlier plan line and status; and a further stage in its own browser context checks *Closed window*
+once this tab's record is written, and the restored one is not listed again. The Library check of
+the first viewport now reads the box's newest offer, which sits above the cards; since round 21 the
+stages that make runs past six no longer answer a dialog. Since round 20 (pre-registered) a further stage in its own browser context checks *Closed window*
 before any run, the scope note's *3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML
 1 µm outside the open edges, PEC on the closed ones)* with either boundary, and, after two runs
 (Modes to find 2 and 3), a reload and the restore, Modes to find set to 2 and then 3 reading *Modes to
@@ -603,19 +604,25 @@ heater-study.json · not saved to a file · …* beside *Recovered from this bro
 heater-study.json; changed since)*; saved as `r19-saved.json`, run again and restored, it reads
 *r19-saved · r19-saved.json · changed since saved …*. The session script then clicks the heater-off
 label with mouse events (on its text, then on *(about 1 s more)*), unticking and ticking the box, and
-makes six heated runs: Run study asks *Running drops Run 1 (run at …).* with the three answers,
-Cancel runs nothing and Run makes Run 7, dropping Run 1.
+makes six heated runs. Since round 21 (pre-registered) the heated line beside Run study is hidden while
+the model equals the runs' and reads *If you run: drops Run 1 (run at …) · pin it to keep it* after an
+edit; Run study starts at once and, with the job's replies held, reads *When this run finishes, Run 1
+(run at …) is dropped* with **Pin Run 1** (no overflow at either size); Pin moves it to Run 2; Run 7
+drops Run 2 and Messages offers **Keep Run 2, drop Run 3 (run at …) instead**, which leaves Run 7, 6,
+5, 4, 2 and 1.
 Since round 20 (pre-registered) the project script opens `heater-study.json` in a new profile,
 shows both models, saves `r20-both.json` a minute after the heated record was written, and reloads:
 the box leads with *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon
 waveguide (1 run) · same as file r20-both.json · saved …*, and the heated record names the same time
-in the box and on its card (the file's save time); one click restores both, with *Restored Optical
+on its card (the file's save time; in round 20 also in the box); one click restores both, with *Restored Optical
 waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. …*, the
 header *Heater study · r20-both.json · saved …* and the optical model's Results, and the Library
 then offers no restore and reads *Return to Optical waveguide (2 runs)* and *Return to Heated silicon
-waveguide (1 run)*; no horizontal overflow at 1440 × 900 or 390 × 844. The session script's heated
-drop question reads *Waiting for your answer: pin, run or cancel* under Run study and *Run study is
-waiting for your answer* in the status bar while it is open, and neither after Cancel; its opened
+waveguide (1 run)*; no horizontal overflow at 1440 × 900 or 390 × 844. Since round 21 (pre-registered)
+the box lists no heated entry beside that offer while the heated card still offers its record (with
+the file's save time), and after the restore the run of Modes to find 4 reads *· closed · 4 modes ·*
+in the run list and in the Compare pickers, whose tags fit the picker at 1440 and 390 px. The
+session script's opened
 run's status bar reads *… · has the results of the current model* and its card *Return to Heated
 silicon waveguide (2 runs)*.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
