@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded interleaved linear-power Green matrices above one grounded line."""
+"""Bounded interleaved linear-power Green matrices above one grounded line.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import math
 
@@ -11,13 +15,12 @@ from .laplace_corner import (
     power_panel_linear_separated_log,
     power_panel_linear_shared_vertex_log,
 )
-from .laplace_corner_assembly import _offsets
+from .laplace_corner_assembly import offsets as _offsets
 from .laplace_corner_partitioned import power_panel_linear_constant_log_partitioned
 from .laplace_corner_geometry import (
     CornerPanelGeometry,
-    _immutable,
-    prepare_two_ground_corner_panels,
-)
+    immutable as _immutable,
+    prepare_two_ground_corner_panels)
 
 
 def _block(geometry, i, j, p, q, image=False):

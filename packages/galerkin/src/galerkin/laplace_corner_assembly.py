@@ -1,8 +1,15 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Normalized corner-density Green matrices above one grounded line."""
+"""Normalized corner-density Green matrices above one grounded line.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
-from .laplace_corner_geometry import CornerPanelGeometry, prepare_two_ground_corner_panels, _immutable
+from .laplace_corner_geometry import (
+    CornerPanelGeometry,
+    prepare_two_ground_corner_panels,
+    immutable as _immutable)
 
 import math
 import numpy as np
@@ -132,3 +139,9 @@ def assemble_corner_half_space(polygons, *, width, height, panels_per_edge=32):
 
 
 __all__=['CornerHalfSpaceMatrix','assemble_corner_half_space']
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+constant_half = _constant_half
+offsets = _offsets
+weighted_pair = _weighted_pair

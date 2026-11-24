@@ -3,6 +3,9 @@
 
 """Homogeneous 2D Laplace panels between two grounded planes.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 This explicit API does not change the bottom-ground or volume solvers.
 Coordinates are metres; capacitance divided by permittivity is dimensionless.
 """
@@ -57,11 +60,11 @@ def _smooth(targets, sources, width, height, images):
     dx = targets[:, None, 0] - sources[None, :, 0]
     yt = targets[:, None, 1]
     ys = sources[None, :, 1]
-    out = kernel._dd_minus_half(dx, yt, ys, height / 2)
+    out = kernel.dd_minus_half(dx, yt, ys, height / 2)
     for n in range(-images, images + 1):
         if n:
-            out += kernel._dd(dx - 2 * n * width, yt, ys, height / 2)
-        out += kernel._dd(targets[:, None, 0] + sources[None, :, 0] - 2 * n * width, yt, ys, height / 2)
+            out += kernel.dd(dx - 2 * n * width, yt, ys, height / 2)
+        out += kernel.dd(targets[:, None, 0] + sources[None, :, 0] - 2 * n * width, yt, ys, height / 2)
     return out
 
 def _point_green(targets, sources, width, height, images=8):
@@ -385,3 +388,11 @@ def solve_two_ground_corner_rectangle_edges(polygons, *, width, height,
             interpolation_degree=interpolation_degree)
     except np.linalg.LinAlgError as exc:
         raise ValueError('corner boundary system must be positive definite and nonsingular') from exc
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+admit = _admit
+entrywise_relative = _entrywise_relative
+integer = _integer
+positive = _positive
+smooth = _smooth

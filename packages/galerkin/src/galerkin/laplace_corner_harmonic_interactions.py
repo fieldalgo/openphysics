@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Explicit static wedge-harmonic logarithmic interaction blocks."""
+"""Explicit static wedge-harmonic logarithmic interaction blocks.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 from functools import lru_cache
 import math
@@ -8,11 +12,16 @@ import math
 import numpy as np
 
 from .laplace_corner import (
-    _cached_power_rule, _cached_graded_rule, _constant_segment_log,
-    _constant_linear_segment_log, _frozen, _power, _order,
-    _separated_distance, _require_disjoint_or_endpoint,
-)
-from .laplace_corner_partitioned import _partition
+    cached_power_rule as _cached_power_rule,
+    cached_graded_rule as _cached_graded_rule,
+    constant_segment_log as _constant_segment_log,
+    constant_linear_segment_log as _constant_linear_segment_log,
+    frozen as _frozen,
+    power as _power,
+    order as _order,
+    separated_distance as _separated_distance,
+    require_disjoint_or_endpoint as _require_disjoint_or_endpoint)
+from .laplace_corner_partitioned import partition as _partition
 
 __all__ = [
     'HarmonicPanelLogResult', 'power_panel_harmonic_far_log',
@@ -255,3 +264,9 @@ def power_panel_harmonic_constant_log_partitioned(first, second, offset, exponen
     coarse, mass0 = _mixed_block(a, b, o, p, cuts, 64, lb)
     fine, mass1 = _mixed_block(a, b, o, p, cuts, 128, lb)
     return _finish(coarse, fine, 64, len(cuts)-1, max(mass0, mass1))
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+real_log1p = _real_log1p
+rule = _rule
+vectors = _vectors

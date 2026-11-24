@@ -1,13 +1,19 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Checked density-averaged Laplace Green integrals above a grounded line."""
+"""Checked density-averaged Laplace Green integrals above a grounded line.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import math
 import numpy as np
 from .laplace_corner import (
-    _power, _scalar, _graded_power_rule, _constant_segment_log,
-    _require_disjoint_or_endpoint,
-)
+    power as _power,
+    scalar as _scalar,
+    graded_power_rule as _graded_power_rule,
+    constant_segment_log as _constant_segment_log,
+    require_disjoint_or_endpoint as _require_disjoint_or_endpoint)
 
 
 @dataclass(frozen=True)

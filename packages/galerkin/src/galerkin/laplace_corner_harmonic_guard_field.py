@@ -1,17 +1,25 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded two-ground fields with interleaved physical corner-density modes."""
+"""Bounded two-ground fields with interleaved physical corner-density modes.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 import math
 
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
 
 from galerkin import laplace_two_ground as two
-from galerkin._laplace_corner_field import _gram_checks, _require
-from galerkin._laplace_corner_harmonic_moments import _ground_integrated, _projection, _smooth
+from galerkin._laplace_corner_field import gram_checks as _gram_checks, require as _require
+from galerkin._laplace_corner_harmonic_moments import (
+    ground_integrated as _ground_integrated,
+    projection as _projection,
+    smooth as _smooth)
 from galerkin.dense_residual import bounded_dense_residual
 from galerkin.laplace_corner_harmonic import power_panel_harmonic_gram
-from ._laplace_corner_compact_harmonic_assembly import _assemble_compact_harmonic_corner_half_space as assemble_harmonic_half_space
+from ._laplace_corner_compact_harmonic_assembly import (
+    assemble_compact_harmonic_corner_half_space as assemble_harmonic_half_space)
 
 
 def solve_two_ground_harmonic_corner_guard_edges(
@@ -38,13 +46,13 @@ def solve_two_ground_harmonic_corner_guard_edges(
         raise ValueError("harmonic guard field requires exactly three conductors")
     if not isinstance(signals, (list, tuple)) or len(signals) != 2:
         raise ValueError("signals must select exactly two ordered conductor indices")
-    signals = tuple(two._integer(value, "signal index", 0, 2) for value in signals)
+    signals = tuple(two.integer(value, "signal index", 0, 2) for value in signals)
     if len(set(signals)) != 2:
         raise ValueError("signal indices must be distinct")
-    width, height = two._positive(width, "width"), two._positive(height, "height")
-    count = two._integer(panels_per_edge, "panels_per_edge", 10, 512)
-    modes = two._integer(ground_modes, "ground_modes", 64, 4096)
-    degree = two._integer(interpolation_degree, "interpolation_degree", 24, 24)
+    width, height = two.positive(width, "width"), two.positive(height, "height")
+    count = two.integer(panels_per_edge, "panels_per_edge", 10, 512)
+    modes = two.integer(ground_modes, "ground_modes", 64, 4096)
+    degree = two.integer(interpolation_degree, "interpolation_degree", 24, 24)
     if count % 2 or modes % 2:
         raise ValueError("panel subdivisions and ground modes must be even")
     half = assemble_harmonic_half_space(
@@ -84,8 +92,8 @@ def solve_two_ground_harmonic_corner_guard_edges(
     residual = float(np.max(abs(bounded_dense_residual(matrix, charges, rhs))) / (2 * np.pi))
     direct = float(np.max(abs(matrix @ charges - rhs)) / (2 * np.pi))
     capacitance = values.T @ charges
-    energy = two._entrywise_relative(charges.T @ matrix @ charges / (2 * np.pi), capacitance)
-    cap_reciprocity = two._entrywise_relative(capacitance, capacitance.T)
+    energy = two.entrywise_relative(charges.T @ matrix @ charges / (2 * np.pi), capacitance)
+    cap_reciprocity = two.entrywise_relative(capacitance, capacitance.T)
     _require(max(residual, direct, energy, cap_reciprocity), "harmonic capacitance consistency failed")
     np.linalg.cholesky((capacitance + capacitance.T) / 2)
     currents = charges @ np.linalg.inv(capacitance)
@@ -115,8 +123,8 @@ def solve_two_ground_harmonic_corner_guard_edges(
         )
 
     planes = ground_parts(coefficients[1])
-    ground_error = two._entrywise_relative(ground_parts(coefficients[0]), planes)
-    mode_error = two._entrywise_relative(ground_parts(coefficients[1][:, :modes // 2 + 1]), planes)
+    ground_error = two.entrywise_relative(ground_parts(coefficients[0]), planes)
+    mode_error = two.entrywise_relative(ground_parts(coefficients[1][:, :modes // 2 + 1]), planes)
     ground_integrals = w * coefficients[1][:, 0]
     current_error = max(float(np.max(abs(integrals[list(signals)] - np.eye(conductors)))),
                         float(np.max(abs(ground_integrals.sum(axis=0) + integrals.sum(axis=0)))))
@@ -125,7 +133,7 @@ def solve_two_ground_harmonic_corner_guard_edges(
     last = np.r_[first[1:] - 1, len(faces) - 1]
     edge_owners = owners[first]
     combined = np.array([face_parts[edge_owners == owner].sum(axis=0) for owner in range(boundaries)])
-    partition = two._entrywise_relative(combined, whole_parts)
+    partition = two.entrywise_relative(combined, whole_parts)
     summed_integrals = np.array([face_integrals[edge_owners == owner].sum(axis=0)
                                  for owner in range(boundaries)])
     partition_current = float(np.max(abs(summed_integrals - integrals)))
