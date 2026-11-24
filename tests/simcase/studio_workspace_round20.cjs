@@ -73,3 +73,10 @@ test('Z5: without a comparable timed run the Run study box has no timing part',a
  assert.equal(W.runPlanText({open:true,modeCount:2,last:220000}),'Open boundary · 1 search · last such run 3:40');
  const src=read('workspace-workflow.mjs');assert.ok(!src.includes("'no timed run in this tab yet'"));assert.ok(!src.includes("'no earlier run'"));
 });
+
+test('Z6: the optical scope note names the closed window and the open boundary, whichever is chosen',()=>{
+ const src=read('workspace-app.mjs');
+ assert.ok(src.includes("const OPTICAL_SCOPE_BOUNDARY='3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)';"));
+ assert.ok(src.includes("'+OPTICAL_SCOPE_BOUNDARY+'; 1 to 8 modes"));
+ assert.ok(!src.includes("'PEC outer edges'"));
+});
