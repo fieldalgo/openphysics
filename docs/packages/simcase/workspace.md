@@ -1367,7 +1367,10 @@ leakage out of the window.
 - **Physics › Optical modes** has *Outer boundary: Closed window (PEC) / Open boundary (PML)*.
   Closed is the default. The help reads “Open boundary adds an absorbing layer (PML) outside the
   window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an
-  open edge continue through the layer.”
+  open edge continue through the layer.” Since round 20 the *Optical adapter scope* note beside it
+  names both boundaries, whichever is chosen: *3 × 2.4 µm window, closed (PEC edges) or with an open
+  boundary (PML 1 µm outside the open edges, PEC on the closed ones)* (with a closed window it read
+  *PEC outer edges* next to the Open boundary choice).
 - The choice is a physics setting kept with each run, like Modes to find.
 - With Open, every edge is open. **Geometry › Boundaries** lets each edge be closed again: an
   open edge reads *Optical left boundary · Open (PML)*, and a **Close this edge** switch closes or

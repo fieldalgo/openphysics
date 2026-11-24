@@ -1126,7 +1126,9 @@ page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 �
 - **Physics › Optical modes**에 *Outer boundary: Closed window (PEC) / Open boundary (PML)*가 있습니다.
   기본값은 Closed입니다. 도움말은 “Open boundary adds an absorbing layer (PML) outside the window, so
   light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge
-  continue through the layer.”입니다.
+  continue through the layer.”입니다. round 20부터 그 옆의 *Optical adapter scope* 안내는 어느 쪽을 골랐든 두 경계를
+  모두 밝힙니다: *3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC
+  on the closed ones)*(닫힌 창일 때는 Open boundary 선택 옆에서 *PEC outer edges*라고 적었음).
 - 이 선택은 Modes to find처럼 각 실행에 함께 보존되는 물리 설정입니다.
 - Open이면 모든 변이 열립니다. **Geometry › Boundaries**에서 각 변을 다시 닫을 수 있습니다. 열린 변은
   *Optical left boundary · Open (PML)*로 읽히고, **Close this edge** 스위치로 닫거나 다시 엽니다. 닫힌
