@@ -39,6 +39,11 @@ CASES = 60
 # meshes, 42 RoundingError). Of 400 seeds, 285 valid, 114 RoundingError and one mesh over
 # the V3(a) area bound (seed 227: 1.2e-12 relative on a facet of area 8e-7, from rounding
 # points on that facet); the bound is not lowered.
+# Since repair keeps the oriented boundary of what it replaces (2026-11-24): the first 60
+# seeds give 47 valid meshes and 13 RoundingError; of 400, 308 valid, 91 RoundingError and
+# seed 227 as above. These inputs now make no 2-3 flip: one of an inverted tetrahedron and
+# a positive neighbour cannot occur (their other vertices lie on one side of the shared
+# face), and one of two inverted tetrahedra would fold. The floor stays as measured before.
 MIN_MESHED = 42
 
 
