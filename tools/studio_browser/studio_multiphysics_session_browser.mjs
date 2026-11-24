@@ -913,6 +913,33 @@ print(n)`;
   assert.match(w2.after.keep, /^Keep Run 2, drop Run 3 \(run at [^)]+\) instead$/);
   assert.match(w2.swapped.message, /^Run 2 \(run at [^)]+\) is back; Run 3 \(run at [^)]+\) was dropped instead\.$/); assert.equal(w2.swapped.keep, false);
   assert.deepEqual(w2.runs, ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
+  // R22 (round 22 V4, pre-registered P4): Pin Run N names the run the next result drops instead; with
+  // every other earlier run pinned the result drops the last unpinned one and says why there is no swap
+  await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
+  await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'R22 heat settings');
+  await page.type('#mp-f-physics-heat1-heat_source_density-heater', '8e14'); await sleep(600); await runReady();
+  const v4 = {line: await mpDrop(), pins: []};
+  for (const n of [2, 4, 5, 6]) {
+    assert.equal((await mpDrop()).pin, `Pin Run ${n}`);
+    await page.click('#mp-run-drop-pin'); await sleep(300);
+    v4.pins.push({message: await page.text('#file-status'), ...await mpDrop()});
+  }
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R22 heated pinned ' + tag); }
+  await size(1440, 900);
+  await clearNotice(); await page.click('#run-multiphysics');
+  await page.until("/^Run 8 · /.test(document.querySelector('.dock-title>span').textContent)", 'R22 heated run 8', 180000); await runReady();
+  await page.until("document.getElementById('file-status').textContent.includes('every other earlier run is pinned')", 'R22 heated no-swap words', 120000);
+  v4.after = {message: await page.text('#file-status'), keep: await page.eval("!!document.querySelector('#file-status [data-keep-run]')")};
+  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R22 heated run list');
+  v4.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
+  stage('R22 V4 heated pin and no swap', v4);
+  assert.match(v4.line.text, /^If you run: drops Run 2 \(run at [^)]+\) · pin it to keep it$/);
+  const order = [2, 4, 5, 6, 7];
+  v4.pins.forEach((p, i) => assert.match(p.message, new RegExp(`^Run ${order[i]} pinned\\. If you run: drops Run ${order[i + 1]} \\(run at [^)]+\\) · pin it to keep it$`)));
+  assert.equal(v4.pins.at(-1).pin, null);
+  assert.match(v4.after.message, / Run 7 \(run at [^)]+\) was dropped; every other earlier run is pinned, so no other run can be dropped instead$/);
+  assert.equal(v4.after.keep, false);
+  assert.deepEqual(v4.runs, ['Run 8', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
 
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';
