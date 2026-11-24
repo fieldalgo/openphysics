@@ -1693,7 +1693,17 @@ session and browser recovery keep with every field (48.8 MB before, refused). Th
 `tools/studio_open_field_size.mjs`. A session over the limit asks first, as a multiphysics session
 does: *Keep fields for selected and pinned runs* writes the other runs without `field`, with
 their n_eff, TE fractions and effective areas; Cancel writes nothing; when even the selected
-and pinned runs are over the limit, the save is refused, naming them. Browser recovery keeps
+and pinned runs are over the limit, the save is refused, naming the selected run and the pinned
+runs apart: *The selected run (Run 6) and the pinned runs (Run 4, Run 5) are 46 MB with their fields,
+over the 16 MiB session limit. Unpin some of them.* (*Unpin it.* for one pinned run). Without a
+pinned run among them it says *The selected run (Run 6) is 19 MB with its fields, over the 16 MiB
+session limit. Select a different run before saving, so this one is saved without its fields, or run
+it again with fewer modes.* The recovery error says the same after *Recovery snapshot exceeds 16
+MiB:*. When a new run makes the session go over the limit, its result message adds one line:
+*Session is now 18 MB, over the 16 MiB limit: File › Save will ask whether to keep the fields of the
+selected and pinned runs only.*, or, when Save would refuse, *Session is now 49 MB, over the 16 MiB
+limit, and File › Save will refuse:* followed by the refusal and *Browser recovery is off.* (the
+round-18 recovery line is then not repeated). Browser recovery keeps
 the fields of the selected and pinned runs only, without asking, when the full text is over
 the limit. A run without fields shows its modes table, but no field view, and Compare says it
 cannot match its modes by overlap.

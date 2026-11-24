@@ -25,7 +25,7 @@ import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
@@ -940,6 +940,16 @@ let recoveryNote='';
 let recoveryOffPosted=null;
 function postRecoveryOff(){
  const text=recoveryOffText(recoveryState);if(!text||recoveryOffPosted===recoveryState)return;recoveryOffPosted=recoveryState;
+ const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);
+}
+// S2 (field size of open runs): a new run that makes the session go over 16 MiB adds one line after
+// the run's message: the size and what File › Save will ask or refuse. When Save refuses, browser
+// recovery is off too and the line says so, so X4's line for that state is not posted again.
+let sessionSizePending=false;
+function postSessionSize(){
+ sessionSizePending=false;if(!runs.length)return;
+ let text=null;try{text=sessionSizeText(writeOpticalSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()));}catch{return;}
+ if(!text)return;if(text.endsWith(' Browser recovery is off.'))recoveryOffPosted='overLimit';
  const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);
 }
 const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
@@ -1965,7 +1975,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  clearTimeout(doneBannerTimer);doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
  $('job-message').textContent=state.message;$('job-message').title=state.title||''; // round 17 (U11): the job id of a loading result is its title
  if(state.phase==='done')setPending(null);
- if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
+ if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
 },onResult:(result,pending)=>{
  // the modes found (1 to the count asked for), real or {re, im}, ranked by Re n_eff
  const asked=pending.modeCount??DEFAULT_MODE_COUNT,e=result.effective_index,re=Array.isArray(e?.values)?e.values[0]:e?.re?.[0],im=Array.isArray(e?.im)?e.im[0]:null;
@@ -1994,7 +2004,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):reasons;}
  completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
- compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';
+ compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;
 }});
 function refreshJobControls(){
  if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}

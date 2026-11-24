@@ -49,7 +49,7 @@ test('U2: the number is not written to files; the save names a run by its number
  const plain=N.writeOpticalSession(input(),[{...a,number:undefined},{...b,number:undefined}],a.job,[a.job,b.job],view,{keepSelected:true,limit});
  assert.equal(plain.text,out.text);assert.deepEqual(plain.notKept,[2]);
  const refused=N.writeOpticalSession(input(),[{...a,pinned:true},b],a.job,[a.job,b.job],view,{keepSelected:true,limit:100});
- assert.equal(refused.ok,false);assert.ok(refused.refusal.startsWith('The selected and pinned runs (Run 4) are '),refused.refusal);
+ assert.equal(refused.ok,false);assert.ok(refused.refusal.startsWith('The pinned run (Run 4 selected) is '),refused.refusal);
 });
 test('U2: the status line and the freshness words use the run number, not the list place',()=>{
  const runs=[run(job(4),{number:4}),run(job(5),{number:5})];
