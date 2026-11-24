@@ -95,6 +95,10 @@ struct State<'a> {
     /// per chain: whether every input facet with that segment on its boundary is a single
     /// triangle (the input is a triangle surface there)
     tri_chain: Vec<bool>,
+    /// per input vertex: whether every input segment ending there is one of tri_chain (an
+    /// input vertex of a triangle surface, which the polygon path would have as a Steiner
+    /// point on its facet)
+    tri_vertex: Vec<bool>,
     /// per facet: its input vertices, and the input edges of its loops
     fverts: Vec<Vec<u32>>,
     fedges: Vec<Vec<(u32, u32)>>,
@@ -1369,6 +1373,20 @@ impl State<'_> {
         self.chains_at(w).iter().any(|&c| self.sub[f].iter().any(|&fi| self.seg_facet_small(c, fi)))
     }
 
+    /// Whether boundary vertex q lies on a triangle surface: an input vertex of one, or a
+    /// segment or facet point whose input vertices all are.
+    fn on_tri_surface(&self, q: u32) -> bool {
+        let n = self.g.input.len();
+        if (q as usize) < n {
+            return self.tri_vertex[q as usize];
+        }
+        let sp = &self.g.s[q as usize - n];
+        if sp.b == NONE {
+            return false; // a volume point
+        }
+        [sp.a, sp.b, sp.c].iter().filter(|&&x| x != NONE).all(|&x| (x as usize) < n && self.tri_vertex[x as usize])
+    }
+
     /// Whether u and v lie on two different input segments that meet at an input vertex
     /// z at an angle below the SPAN_COS angle (z the apex of a small input angle).
     fn spans_small_angle(&self, u: u32, v: u32) -> bool {
@@ -2606,8 +2624,18 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     for (c, ch) in b.plc.rec.chains.iter().enumerate() {
         chain_of.entry(ekey(ch[0], ch[ch.len() - 1])).or_default().push(c as u32);
     }
+    let tri_vertex: Vec<bool> = {
+        let (mut all, mut tri) = (vec![0u32; xyz.len()], vec![0u32; xyz.len()]);
+        for (c, ch) in b.plc.rec.chains.iter().enumerate() {
+            for z in [ch[0], ch[ch.len() - 1]] {
+                all[z as usize] += 1;
+                tri[z as usize] += tri_chain[c] as u32;
+            }
+        }
+        (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
+    };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
@@ -2695,7 +2723,10 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         // M6 step 1: slivers, once nothing else is left, within the cap
         if let Some((_, std::cmp::Reverse(s), t)) = st.dihq.pop() {
             if sliver_budget.is_none() {
-                sliver_budget = Some(((st.g.s.len() as f64) * SLIVER_CAP).ceil() as u32);
+                // the points refinement inserted, with the input vertices of triangle surfaces (the
+                // polygon path inserts those as facet points)
+                let base = st.g.s.len() + st.tri_vertex.iter().filter(|&&x| x).count();
+                sliver_budget = Some(((base as f64) * SLIVER_CAP).ceil() as u32);
             }
             let mut v = st.cx.tets[t as usize];
             v.sort_unstable();
@@ -2712,7 +2743,10 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             // the filter leaves small slivers to the perturbation, which moves volume vertices
             // only: a sliver with none (its vertices all on the boundary, as across a layer
             // thinner than h) is split whatever its size
-            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q));
+            // ... and so is a sliver at an input vertex of a triangle surface, which the
+            // perturbation cannot move (the polygon path has a facet point there, which slides)
+            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q))
+                || st.cx.tets[t as usize].iter().any(|&q| !st.movable(q) && st.on_tri_surface(q));
             if r < SLIVER_FILTER * st.opt.alpha * hs && !fixed {
                 continue;
             }
