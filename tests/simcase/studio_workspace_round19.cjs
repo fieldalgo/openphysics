@@ -30,13 +30,14 @@ test('Y7: a shape\'s Name and Material fields each have their own label (for=), 
 
 test('Y2: the optical open and recovery messages say the runs are numbered from 1 in this tab',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs');
- assert.equal(W.RENUMBERED_TEXT,'Runs are numbered from 1 in this tab; names and pins are kept.');
- assert.equal(W.renumberedText('Optical waveguide'),'Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+ // since session version 12 (stable run numbers): said only for a file of an earlier Studio, in these words
+ assert.equal(W.RENUMBERED_TEXT,'This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+ assert.equal(W.renumberedText('Optical waveguide'),'This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
  const app=read('workspace-app.mjs');
- // a session file opened, or a session restored from this browser: when it has runs
- assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.'))+(runs.length?' '+RENUMBERED_TEXT:''));"));
- // a project file: when its optical model has runs
- assert.ok(app.includes("nothing was run.`+(ws?.session.runs.length?' '+renumberedText(ws.title):''));"));
+ // a session file opened, or a session restored from this browser: when it numbered its runs from 1
+ assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.'))+(renumberedRuns(session)?' '+RENUMBERED_TEXT:''));"));
+ // a project file: when its optical model numbered its runs from 1
+ assert.ok(app.includes("nothing was run.`+(renumberedRuns(ws?.session)?' '+renumberedText(ws.title):''));"));
  // the heated model keeps its stored numbers: its messages do not say this
  assert.ok(!read('workspace-multiphysics-view.mjs').includes('numbered from 1'));
 });
@@ -64,8 +65,8 @@ test('Y3: a restore brings back the project name and file it was saved to, or na
  assert.ok(!app.includes("if(file?.current!==true||!file.projectName)return;"));
  // both models' restores pass the opened file; a file replacing the project clears the copy
  assert.ok(app.includes("restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});"));assert.ok(app.includes("restoreProjectFile(savedFile,openedFile,{matched:projectMatched===true});"));
- assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null});"));
- assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf});"));
+ assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null,recovered:null});"));
+ assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf,recovered});"));
 });
 
 test('Y1: the newest stored session with runs is the first restore offer; every other says it is older',async()=>{

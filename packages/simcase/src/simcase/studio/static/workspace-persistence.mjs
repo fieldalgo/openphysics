@@ -105,14 +105,30 @@ const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'o
 // Round 19 (Y3): copyOf, the file a browser-restored record was opened from when the record names
 // no project file or name: "Untitled project · recovered from a copy of both-models.json · not
 // saved to a file · kept for recovery in this browser" (the name is not guessed from the file).
-export function projectTitle({name=null,models=0,file=null,current=false,recovery=null,copyOf=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// recovered: the project name came back from a browser-recovery record (no project file), {opened:
+// the file the record still matched, or null}, until the next change: "both-models · recovered
+// from this browser · not saved to a file · kept for recovery in this browser", or "… · as opened
+// from both-models.json · …".
+export function projectTitle({name=null,models=0,file=null,current=false,recovery=null,copyOf=null,recovered=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  const title=name||UNTITLED_PROJECT;
  if(!models)return `${title} · no model chosen`;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
+ if(!file&&name&&recovered)return `${title} · recovered from this browser · ${recovered.opened?`as opened from ${recovered.opened}`:'not saved to a file'} · ${browser}`;
  if(!file)return `${title} · ${copyOf?`recovered from a copy of ${copyOf} · `:''}not saved to a file · ${browser}`;
  const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
  if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');
  return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
+}
+/** The project name a browser restore brings back from its record's `project` ({name, from}), when
+ * no savedFile.projectName names one and the project has no file: {name, nameFrom, recovered:
+ * {opened, savedAt}} (opened: the file the record was opened from while it still matched it), or
+ * null when nothing changes. The second restore of a pair keeps the name of the newer record.
+ * state: the project now ({name, nameFrom, file, recovered}). */
+export function recoveredProjectName(state,record,{savedFile=null,openedFile=null,openedCurrent=null,savedAt=null}={}){
+ if(!record||savedFile?.projectName||state.file)return null;
+ const at=t=>Date.parse(t)||0,earlier=state.recovered&&state.name&&at(state.recovered.savedAt)>at(savedAt);
+ if(earlier)return {name:state.name,nameFrom:state.nameFrom,recovered:{...state.recovered}};
+ return {name:record.name,nameFrom:record.from,recovered:{opened:openedFile&&openedCurrent===true?openedFile:null,savedAt}};
 }
 // Round 18 (X8): the heated model's status bar while the project has a project file speaks about
 // the model within that project, in the header's words, so the two never contradict each other:
