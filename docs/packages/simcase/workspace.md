@@ -820,7 +820,9 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   skipped when the kept column has the same content. While no coupling sets an optical
   temperature the option stays in place, disabled, and says “needs a temperature coupling”.
   When a coupling comes back (added again, Undo or Redo) the option returns as it was chosen,
-  and Messages adds “Also solve without heater” is ticked again.
+  and Messages adds “Also solve without heater” is ticked again. The label is associated with its
+  box (`for`), so a click anywhere on it, the time note included, ticks or unticks it; the box is
+  ticked when the model opens, so the first click unticks it (round 19).
 - **Results** has a page per physics and a **Coupling check**: the solve order used and, per
   coupling, what was sent (“1,726 node temperatures, 300.0–319.0 K”), what was received
   (“3,334 triangle means (mean of 3 nodes)”) and the check (“Passed · max |received − sent| =
