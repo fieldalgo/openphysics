@@ -21,14 +21,15 @@ import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts}
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
-import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
+import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,closedResultValues,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -48,7 +49,7 @@ import {setupMenus} from './workspace-file-menu.mjs';
 (()=>{'use strict';const $=id=>document.getElementById(id);
 // A reload always opens the start page, so a restored scroll position would hide its top.
 if('scrollRestoration' in history)history.scrollRestoration='manual';
-const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,searchTarget:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 // round 20 (Z7): true while the drop question is open (askRunDrop): the Run study box and the status
@@ -377,7 +378,7 @@ function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
  if(!leaveMultiphysics())return;projectId('workspace');
- Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
+ Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;state.searchTarget=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
 // file: the session file that holds these runs (as the leave question decides it), by name;
@@ -500,7 +501,7 @@ function opticalHold(){
 // model sets its own heading, and the other models keep the default words.
 function refreshSequenceHeading(){
  if(multiView.active())return;const heading=document.querySelector('.dock-title>span');if(!heading)return;
- const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow())):opticalSequenceHeading({state:'none'});
+ const text=applicationChosen()&&isOptical()?opticalHold()||opticalSequenceHeading(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow())):opticalSequenceHeading({state:'none'});
  if(heading.textContent!==text)heading.textContent=text;
 }
 function refreshInputIssues(){
@@ -518,10 +519,10 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
- else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));
+ else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
- const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow());if(next.textContent!==text)next.textContent=text;}
+ const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow());if(next.textContent!==text)next.textContent=text;}
 }
 // widthBase: the selected shape when its Width field took focus (round 16); lastKept: what the last
 // Width entry kept ('centre', 'left'); alsoApplied: refused values applied since the field took focus
@@ -665,7 +666,17 @@ const setStudy = doc => Object.assign(state, projectStudy(doc), {openBoundary: p
 const pmlNow = () => {if (!isOptical()) return null; keepTargetInRange(); return signaturePml(state.openBoundary, state.shapes);};
 // The study a run is compared with: the inputs, Modes to find and the group index option
 // (workspace-notebook.mjs studySignature).
-const signature = () => studySignature(current(), state.modeCount, state.groupIndex, pmlNow());
+// The closed window's Search near n_eff (slice C2): the target while the box is on and the Closed
+// window is chosen, else null. A shape or material edit that puts it out of range (1.45 < target <
+// n_max) sets it back to the new design's default, with a message. It is a physics setting of the
+// page and of each run, not saved with the model inputs (this batch).
+function closedTargetNow(){
+ if(!isOptical()||state.openBoundary||state.searchTarget==null)return null;
+ try{checkClosedTarget(state.searchTarget,state.shapes);}catch{const was=state.searchTarget;state.searchTarget=defaultTarget(state.shapes);
+  const text=`Search near n_eff ${was.toFixed(3)} is outside this design's range: back to the default ${state.searchTarget.toFixed(3)}.`;setTimeout(()=>notice(text),0);}
+ return state.searchTarget;
+}
+const signature = () => studySignature(current(), state.modeCount, state.groupIndex, pmlNow(), closedTargetNow());
 const inputSignature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(inputsFile());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
@@ -713,7 +724,7 @@ function refreshSaveIndicator(){
 function downloadHint(hint){const el=$('autosave-status');if(hint)el.title=hint;else el.removeAttribute('title');}
 function refreshWorkflow(){
  const host=$('workflow');host.hidden=!isOptical()||ui.page==='Applications';if(host.hidden)return;
- const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
+ const steps=opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),searchTarget:closedTargetNow(),invalid:numericDrafts.invalid,block:opticalBlock()||retentionBlock(),busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,mesh:meshPreview.record,runs,viewed:viewedRun()});
  steps.forEach((step,index)=>{
   let button=host.querySelectorAll('.workflow-step')[index];if(!button){button=document.createElement('button');button.type='button';button.className='workflow-step';button.append(document.createElement('strong'),document.createElement('span'));button.onclick=()=>{if(step.id==='Results'){ui.page='Results';render();}else select(step.id);};host.append(button);}button.dataset.state=step.state;if(step.tone)button.dataset.tone=step.tone;else delete button.dataset.tone;
   const selected=step.id==='Results'?ui.page==='Results':ui.page==='Model'&&ui.selection===step.id;
@@ -881,12 +892,14 @@ function inputsChangedSinceResult(){
 function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
- const prior=inputsFile(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
+ const prior=inputsFile(),priorTarget=closedTargetNow(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
+ // slice C2: the closed window's Search near n_eff is not in the inputs file; the run's comes back with it (on and its target, or off)
+ const runTarget=runSearchTarget(run),targetChange=priorTarget===runTarget?[]:[`Search near n_eff ${priorTarget==null?'off':shortTarget(priorTarget)} → ${runTarget==null?'off':shortTarget(runTarget)}`];
  // only the settings that change, from → to (round 13); the same words stay where the button was
  // until the next input edit (round 14), so they are kept before the redraw
- const changed=inputChanges(prior,doc),text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`;
+ const changed=[...inputChanges(prior,doc),...targetChange],text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`;
  runInputsNote={text,revision:edits.revision,job:run.job};
- restoreEdit(doc,null);inputsChangedSinceResult();notice(text);
+ restoreEdit(doc,null);state.searchTarget=runTarget;inputsChangedSinceResult();render();notice(text);
 }
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)
@@ -1187,7 +1200,7 @@ function refreshNotebook(){
  const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(workspaceInputs(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
-const opticalDocument=()=>buildOpticalDocument(state,setup);
+const opticalDocument=()=>buildOpticalDocument({...state,searchTarget:closedTargetNow()},setup);
 // The parts the inputs words compare, with Modes to find when the run or the page asks for other
 // than 2 (other: the run's count, so both sides name it together)
 const studyParts=(input,n,other=n,g=false,otherG=g)=>[...opticalInputParts(input),...(n===DEFAULT_MODE_COUNT&&other===DEFAULT_MODE_COUNT&&state.modeCount===DEFAULT_MODE_COUNT?[]:[`Modes to find ${n}`]),...(g||otherG?[g?'group index on':'group index off']:[])];
@@ -1217,6 +1230,20 @@ function setOuterBoundary(open){
   // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
   if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}
 }
+// Search near n_eff in a closed window (slice C2): the box and the field of Physics › Optical modes,
+// and the edge note's shortcut (with Modes to find 4); each sets the inputs with a message and runs nothing.
+// K10: when a kept run has the new inputs, the message offers it (No need to run: Run N …)
+function setClosedSearch(t){state.searchTarget=t;render();notice(closedSearchNotice(t));offerMatchingRun();}
+function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}.`);offerMatchingRun();}
+const closedSearchField=()=>{
+ if(state.openBoundary)return '';const on=state.searchTarget!=null,t=on?state.searchTarget:defaultTarget(state.shapes);
+ return `<label class="check-field"><input id="closed-search-check" type="checkbox"${on?' checked':''}> Search near n_eff</label><label>Search near n_eff (closed window)<input id="closed-target-number" type="number" min="1.45" step="0.001" value="${t.toFixed(3)}"${on?'':' disabled'}></label><p class="input-note" id="closed-search-help">${CLOSED_SEARCH_HELP}</p>`;
+};
+const bindClosedSearchField=()=>{
+ const box=$('closed-search-check'),field=$('closed-target-number');if(!box||!field)return;
+ box.onchange=()=>setClosedSearch(box.checked?defaultTarget(state.shapes):null);
+ field.onchange=()=>{const t=Math.round(Number(field.value)*1000)/1000;try{checkClosedTarget(t,state.shapes);}catch(error){notice(error.message);field.value=(state.searchTarget??defaultTarget(state.shapes)).toFixed(3);return;}setClosedSearch(t);};
+};
 // The group index box in Study or Optical modes (one panel at a time): the option, then Messages says what the next run does.
 const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.onchange=e=>{state.groupIndex=e.target.checked;render();notice(groupIndexNotice(state.groupIndex));};};
 // The wavelength and Modes to find: one field each, the same in Physics › Optical modes and in
@@ -1236,7 +1263,7 @@ function refreshDropWarning(){
 }
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
- const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount};
+ const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};
  const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
  refreshDropWarning();
  // round 20 (Z7): while the drop question is open the box says it waits for the answer
@@ -1248,7 +1275,7 @@ const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.labe
 const OPTICAL_SCOPE_BOUNDARY='3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)';
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; '+OPTICAL_SCOPE_BOUNDARY+'; 1 to 8 modes (Modes to find, 2 by default). Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -1266,13 +1293,14 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
   // an open run: "Found 2 of 2 modes near n_eff 2.460" always (the target decides what is found)
   if(isOpenRun(solverRun))$('canvas').append(foundLine(solverRun));
+  else if(isClosedTargetRun(solverRun)){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=closedFoundText(solverRun.effective_index.length,runModeCount(solverRun),runSearchTarget(solverRun))+'.';$('canvas').append(line);}
   else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
   $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent='This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
- if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+``+wavelengthField()+pair('Material data',OPTICAL_MATERIAL_DATA)+modeCountField()+`<p class="input-note">${MODE_COUNT_NOTE}</p>`+groupIndexField()+boundaryFieldHtml(state.openBoundary,state.shapes)+'<p>Run from Study to compute optical fields for the current cross section.</p>';
- if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical()){bindGroupIndexField();bindBoundaryField();}
+ if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical())$('inspector').innerHTML='<h2>Optical modes</h2>'+pair('Equation','Vector optical eigenproblem')+``+wavelengthField()+pair('Material data',OPTICAL_MATERIAL_DATA)+modeCountField()+`<p class="input-note">${MODE_COUNT_NOTE}</p>`+groupIndexField()+boundaryFieldHtml(state.openBoundary,state.shapes)+closedSearchField()+'<p>Run from Study to compute optical fields for the current cross section.</p>';
+ if(ui.page==='Model'&&ui.selection==='Optical modes'&&isOptical()){bindGroupIndexField();bindBoundaryField();bindClosedSearchField();}
  if(ui.page==='Connections'&&isOptical()){$('inspector').innerHTML='<h2>Active interfaces</h2>'+pair('Optical modes','Enabled')+pair('Couplings','None')+'<p>This application computes optical modes only.</p>';document.querySelector('.workspace > .note').textContent='One optical interface; no thermal or mechanical field transfer is configured.';}
  if(ui.page==='Model'&&ui.selection==='Mesh'&&isOptical())renderMeshPreview();
  if(ui.page==='Model'&&ui.selection==='Study'&&isOptical())renderOpticalStudy();
@@ -1302,7 +1330,7 @@ function renderOpticalStudy(){
  for(const d of record.diagnostics){const line=document.createElement('p');line.textContent=`${d.severity} ${d.code}${d.path?' at '+d.path:''}: ${d.message}`;report.append(line);}host.append(report);
  }else host.insertAdjacentHTML('beforeend','<p>No document check in this tab. Run always validates again before submission.</p>');
  const scope=document.createElement('p');scope.textContent='Document checks validate the schema and settings; they do not generate a mesh, solve fields, verify material accuracy or certify convergence. Run captures current inputs, validates them again, then starts a calculation.';host.append(scope);
- panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true,state.modeCount)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
+ panel.innerHTML='<h2>Execution settings</h2>'+pair('State',opticalWorkflow({input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex,pml:pmlNow(),searchTarget:closedTargetNow(),invalid:numericDrafts.invalid,block,busy:solverBusy,pending:!!pendingJob,resumeBlocked:jobResumeBlocked,runs})[3].summary)+`<p id="next-run-inputs" class="next-run">${escapeHtml(numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()))}</p>`+wavelengthField()+modeCountField()+groupIndexField()+studyOpenHtml(pmlNow()?state.openBoundary:null,state.shapes,ui.pmlCheck===true,state.modeCount)+pair('Core mesh',state.coreMesh+' nm')+pair('Window','3 × 2.4 µm')+(state.openBoundary?pair('Outer edges',openEdges(state.openBoundary).length?`PML 1 µm on ${openEdges(state.openBoundary).join(', ')}; PEC elsewhere`:'PEC (every edge closed)')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>':pair('Outer edges','PEC')+'<p>The window is fixed; the outer boundary is chosen in Physics › Optical modes. Electrical, thermal and mechanical solves are unavailable in this workspace.</p>');
  bindGroupIndexField();{const box=$('pml-check');if(box)box.onchange=()=>{ui.pmlCheck=box.checked;refreshRunOptions();notice(box.checked?`PML check on: the next run solves the same mesh again with strength 6, once per mode (${state.modeCount} more solve${state.modeCount===1?'':'s'} at most).`:'PML check off: the next run is one solve.');};}
  document.querySelector('.workspace > .note').textContent='Checks and runs capture inputs separately. A prior accepted document does not certify the current model.';
  if(!opticalSupport(state,setup)){const details=document.createElement('details');details.className='solver-document';const title=document.createElement('summary');title.textContent=(numericDrafts.invalid?'Last valid solver document':'Solver document')+' · simcase input (engine document) · geometry in nm, other lengths as quantities such as "1550 nm"';const body=document.createElement('pre');body.textContent=JSON.stringify(opticalDocument(),null,2);details.append(title,body);host.append(details);}
@@ -1524,24 +1552,31 @@ function modesTable(run){
  const body=document.createElement('tbody');
  // round 17 (U1): a closed-window mode mostly in a shape touching the window edge gets a note row,
  // after its row (after the last row of a degenerate group, whose polarization cell spans the group)
- const edge=new Map(edgeNotes(run).map(n=>[n.mode,n.text])),pending=[];let spanEnd=-1;
- for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row',...(edge.has(r.mode-1)?{'aria-describedby':'edge-note-'+r.mode}:{})}),cell('td',r.neff,{'data-neff':String(r.mode)}));
-  if(r.polarization?.rowspan>1)spanEnd=r.mode-1+r.polarization.rowspan-1;if(edge.has(r.mode-1))pending.push(r.mode);
+ // slice C2: a closed-window search names its core mode the same way (Mode 2 is the core mode: …)
+ const edge=new Map(edgeNotes(run).map(n=>[n.mode,n.text])),core=new Map(coreNotes(run).map(n=>[n.mode,n.text])),pending=[];let spanEnd=-1;
+ const described=m=>[...(edge.has(m-1)?['edge-note-'+m]:[]),...(core.has(m-1)?['core-note-'+m]:[])].join(' ');
+ for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row',...(described(r.mode)?{'aria-describedby':described(r.mode)}:{})}),cell('td',r.neff,{'data-neff':String(r.mode)}));
+  if(r.polarization?.rowspan>1)spanEnd=r.mode-1+r.polarization.rowspan-1;if(edge.has(r.mode-1)||core.has(r.mode-1))pending.push(r.mode);
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
   {const lossCell=cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle,...(r.depends?{'data-pml-dependent':'',class:'pml-dependent'}:{})});if(r.depends){lossCell.textContent='';const em=document.createElement('em');em.textContent=r.loss;lossCell.append(em);}tr.append(lossCell);}
   tr.append(cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
   {const g=groupIndexCell(run,r.mode-1);tr.append(cell('td',g.text,{title:g.title,class:'num','data-group-index':String(r.mode),...(g.value===null?{}:{'data-group-index-value':String(g.value)})}));}
   if(checks){const c=checks[r.mode-1],td=cell('td','',{'data-pml-check':String(r.mode),'data-pml-check-status':c.status,title:c.title});if(c.status==='depends'){const strong=document.createElement('strong');strong.textContent='Depends on the PML';td.append(strong,c.text.slice('Depends on the PML'.length));}else td.textContent=c.text;tr.append(td);}
   body.append(tr);
-  if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}
+  if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){
+   if(edge.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}
+   if(core.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row core-note-row';const td=cell('td',core.get(m-1),{colspan:String(head.children.length),id:'core-note-'+m,'data-core-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}}
  table.append(body);box.append(table);
- // round 18 (X9): in a row under the last edge note (the note's own text unchanged), the two inputs that find such a mode: Use Open boundary and
- // Set Modes to find to M (the run's Modes to find + 2, at most the maximum; C0 words); each sets the input with its
- // usual message and runs nothing, and is left out when the current inputs already have it
- {const last=[...body.querySelectorAll('[data-edge-note]')].at(-1);if(last){const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1]),actions=document.createElement('span');actions.className='edge-actions';actions.id='edge-actions';
+ // round 18 (X9): in a row under the last edge note (the note's own text unchanged), the inputs that find such a mode: Use Open boundary and,
+ // since slice C2 (Q2, Q5, Q8), Search near 2.46 · 4 modes (the design's default target, the closed window kept), in place of
+ // C0's Set Modes to find to M; each sets the inputs with a message and runs nothing, and is left out when the current inputs
+ // already have it
+ {const last=[...body.querySelectorAll('[data-edge-note]')].at(-1);if(last){const near=defaultTarget(state.shapes),actions=document.createElement('span');actions.className='edge-actions';actions.id='edge-actions';
   if(!state.openBoundary){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-use-open';b.textContent='Use Open boundary';b.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};actions.append(b);}
-  if(state.modeCount<find){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-find-modes';b.textContent=`Set Modes to find to ${find}`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};actions.append(b);}
+  if(!state.openBoundary&&!(state.searchTarget===near&&state.modeCount===SHORTCUT_MODE_COUNT)){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-search-near';b.textContent=shortcutText(near);b.onclick=()=>useClosedSearch(near);actions.append(b);}
   if(actions.children.length){const tr=document.createElement('tr');tr.className='edge-note-row edge-actions-row';const td=cell('td','',{colspan:last.getAttribute('colspan'),class:'edge-note'});td.append(actions);tr.append(td);last.parentElement.after(tr);}}}
+ // slice C2 (A1): a closed-window search lists only modes above n = 1.45 and says how many it left out
+ if(isClosedTargetRun(run)){const out=leftOutText(run.effective_index.length,runModeCount(run));if(out){const note=document.createElement('p');note.className='table-note';note.id='left-out-note';note.textContent=out;box.append(note);}}
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${open?OPEN_AREA_HELP:AREA_HELP+'.'}`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0
  // (a closed window adds where leakage is found: Open boundary in Physics › Optical modes)
@@ -2052,17 +2087,20 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // an open boundary: the modes above n = 1.45 with their candidate record, and the engine's TE
  // fractions, effective areas (physical window) and group index of those modes (slice P3)
  const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target);})():null;
- const kept=open?open.re:re,keptIm=open?open.im:im;
- const settings=open?openSettings(opticalSettings(input.model.wavelength,input.model.coreMesh,asked),pending.openBoundary,input.model.shapes):opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
- const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
-  ...(open?{open_boundary:open.record,...keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},open.keep)}:{
+  // a closed-window search (slice C2, A1): the modes above n = 1.45, with the engine's values of those modes
+ const target=open?null:pending.searchTarget??null,near=target===null?null:closedResultValues(result,re,target);
+ const kept=open?open.re:near?near.re:re,keptIm=open?open.im:im;
+ const closedSettings=opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
+ const settings=open?openSettings(closedSettings,pending.openBoundary,input.model.shapes):near?closedTargetSettings(closedSettings,target):closedSettings;
+ const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:near?near.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
+  ...(open?{open_boundary:open.record,...keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},open.keep)}:near?keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},near.keep):{
   // the engine's TE fractions and effective areas, kept with the run (a version 9 file keeps them)
   ...engineRunValues(result.summary,re.length),
   // the engine's group index with Also compute group index (a version 9 file keeps it)
   ...engineGroupIndex(result.summary,re.length)})});
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
- if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):reasons;}
+ if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):near?near.keep.map(i=>reasons[i]):reasons;}
  completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;
 }});
@@ -2123,12 +2161,14 @@ $('run-optical').onclick=async()=>{
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
-  const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance),{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
+  // a closed-window search names capabilities v10 (slice C1)
+  const em=doc.physics.em1,closedTarget=!em.pml&&em.target_effective_index!==undefined?em.target_effective_index:null,query=closedTarget===null?'':'&'+CLOSED_TARGET_QUERY;
+  const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance)+query,{doc});if(!validation.ok)throw new Error(validation.error||'Solver validation failed.');
   jobPhase='submitting';$('job-message').textContent='Submitting calculation…';
-  const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance),{doc});
+  const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance)+query,{doc});
   // an open boundary: the choice the run was made with, and whether the PML check follows it
   const ob=builderBoundary(state.openBoundary,state.shapes),openRecord=ob?{openBoundary:{edges:ob.edges,target:ob.target},...(ui.pmlCheck===true?{pmlCheck:true}:{})}:{};
-  const record=validatePending({version:1,job:started.job,input:withoutStudy(capture.input),revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count,...openRecord});
+  const record=validatePending({version:1,job:started.job,input:withoutStudy(capture.input),revision:capture.revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:doc.physics.em1.mode_count,...openRecord,...(closedTarget===null?{}:{searchTarget:closedTarget})});
   setPending(record);await jobMonitor.follow(record,serverInstance);
   if(operation===jobOperation)await followPmlCheck(record);
  }catch(error){

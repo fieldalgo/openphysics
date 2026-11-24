@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {studySignature} from './workspace-notebook.mjs';
+import {CLOSED_TARGET_QUERY} from './workspace-closed-target.mjs';
 // A coded diagnostic of /api/validate (units and naming batch: diagnostics replace notes).
 const diagnostic=d=>d!==null&&typeof d==='object'&&['code','severity','path','message'].every(k=>typeof d[k]==='string');
 export class OpticalPreflight {
@@ -11,14 +12,16 @@ export class OpticalPreflight {
   const capture=JSON.parse(JSON.stringify(input)),document=JSON.parse(JSON.stringify(doc));
   this.busy=true;this.error='';this.onChange();
   try{
-   const response=await this.api('/api/validate?workspace_instance='+encodeURIComponent(serverInstance),{doc:document});
+   // a closed-window search names capabilities v10 (slice C1)
+   const em=document.physics?.em1,closedTarget=em&&!em.pml&&em.target_effective_index!==undefined;
+   const response=await this.api('/api/validate?workspace_instance='+encodeURIComponent(serverInstance)+(closedTarget?'&'+CLOSED_TARGET_QUERY:''),{doc:document});
    if(typeof response?.ok!=='boolean')throw new Error('Invalid validation response.');
    if(!response.ok&&typeof response.error!=='string')throw new Error('Validation failed without a description.');
    if(response.ok&&typeof response.summary!=='string')throw new Error('Invalid validation summary.');
    if(response.ok&&(!Array.isArray(response.diagnostics)||!response.diagnostics.every(diagnostic)))throw new Error('Invalid validation diagnostics.');
    const diagnostics=Array.isArray(response.diagnostics)&&response.diagnostics.every(diagnostic)?response.diagnostics.map(({code,severity,path,message})=>({code,severity,path,message})):[];
    // the study checked: the inputs and the mode count of the document
-   this.record={input:capture,signature:studySignature(capture,document.physics?.em1?.mode_count,document.results?.group_index!==undefined),serverInstance,checkedAt:new Date().toISOString(),ok:response.ok,error:response.ok?'':response.error,summary:response.ok?response.summary:'',diagnostics};
+   this.record={input:capture,signature:studySignature(capture,document.physics?.em1?.mode_count,document.results?.group_index!==undefined,null,closedTarget?em.target_effective_index:null),serverInstance,checkedAt:new Date().toISOString(),ok:response.ok,error:response.ok?'':response.error,summary:response.ok?response.summary:'',diagnostics};
   }catch(error){this.error=error.message;}finally{this.busy=false;this.onChange();}
  }
 }

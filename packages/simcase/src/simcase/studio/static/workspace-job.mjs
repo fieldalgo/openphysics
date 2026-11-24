@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {parseProject,validateOpenChoice} from './workspace-project.mjs';
 import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
+import {checkClosedTarget} from './workspace-closed-target.mjs';
 import {searchesText} from './workspace-open-run.mjs';
 import {opticalBlock} from './workspace-optical.mjs';
 import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
@@ -19,6 +20,8 @@ export function validatePending(record){
  // sent); pmlCheck: the PML check follows the job; checkOf: this job is the PML check of that run
  const extra={};
  if(record.openBoundary!==undefined){let ob;try{ob=validateOpenChoice(record.openBoundary,input.model.shapes);}catch{throw new Error('Invalid pending open boundary.');}if(!hasOpenEdge(ob)||ob.target===undefined)throw new Error('Invalid pending open boundary.');extra.openBoundary=ob;}
+ // a closed-window search (slice C2): the job's Search near n_eff, never with an open boundary
+ if(record.searchTarget!==undefined){if(extra.openBoundary)throw new Error('Invalid pending search target.');try{extra.searchTarget=checkClosedTarget(record.searchTarget,input.model.shapes);}catch{throw new Error('Invalid pending search target.');}}
  if(record.pmlCheck!==undefined){if(record.pmlCheck!==true||!extra.openBoundary)throw new Error('Invalid pending PML check.');extra.pmlCheck=true;}
  if(record.checkOf!==undefined){
   const n=record.checkCount,i=record.checkIndex;

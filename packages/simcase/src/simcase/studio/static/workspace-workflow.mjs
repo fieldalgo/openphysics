@@ -4,6 +4,7 @@ import {designSummary,shapesBlock,geometryWords} from './workspace-shapes.mjs';
 import {inputChanges} from './workspace-inputs.mjs';
 import {originText} from './workspace-multiphysics.mjs';
 import {studySignature} from './workspace-notebook.mjs';
+import {shortTarget,closedPlanText} from './workspace-closed-target.mjs';
 
 // The words for a result whose inputs are not the current ones (optical, heat, Joule heating):
 // neutral, since an opened file or another selected run differs without any edit, and naming
@@ -29,7 +30,8 @@ export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.mo
 // "Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2", with
 // " · group index on" when the group index option is on.
 // pml: the open boundary of the page (settings.pml form, workspace-open-run.mjs), or null.
-export const nextRunText=(input,modeCount,groupIndex=false,pml=null)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[]),...(groupIndex===true?['group index on']:[]),...(pml?[`open boundary (PML 1 µm) on ${pml.open_edges.length} edge${pml.open_edges.length===1?'':'s'}`,`search near ${pml.target}`]:[])].join(' · ')}`;
+// searchTarget: the closed window's Search near n_eff (slice C2), or null: " · search near 2.46".
+export const nextRunText=(input,modeCount,groupIndex=false,pml=null,searchTarget=null)=>`Next run uses ${[...opticalInputParts(input),...(Number.isInteger(modeCount)?[`Modes to find ${modeCount}`]:[]),...(groupIndex===true?['group index on']:[]),...(pml?[`open boundary (PML 1 µm) on ${pml.open_edges.length} edge${pml.open_edges.length===1?'':'s'}`,`search near ${pml.target}`]:[]),...(!pml&&searchTarget!=null?[`search near ${shortTarget(searchTarget)}`]:[])].join(' · ')}`;
 // What the next optical run does, beside Run study (round 18, X2; round 17 U3 named the slow options
 // only): the boundary, the searches of an open boundary, the options that add solves with the solve
 // count after the last of them, and how long the last comparable run took (the same boundary kind
@@ -38,10 +40,11 @@ export const nextRunText=(input,modeCount,groupIndex=false,pml=null)=>`Next run 
 // last: that run's wall time in ms, or null.
 //   "Open boundary · 2 searches · group index on (3 solves) · last such run 3:40"
 //   "Closed window"
-export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null}={}){
+//   "Closed window · near n_eff 2.46" (slice C2: searchTarget, a closed window's Search near n_eff)
+export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null,searchTarget=null}={}){
  const options=[...(groupIndex===true?['group index on']:[]),...(open&&pmlCheck===true?['PML check on']:[])];
  const solves=(groupIndex===true?3:1)+(open&&pmlCheck===true&&Number.isInteger(modeCount)?modeCount:0);
- const parts=[open?'Open boundary':'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...(Number.isFinite(last)?[`last such run ${durationText(last)}`]:[])];
+ const parts=[open?'Open boundary':searchTarget!=null?closedPlanText(searchTarget):'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...(Number.isFinite(last)?[`last such run ${durationText(last)}`]:[])];
  return parts.join(' · ');
 }
 // m:ss of a duration in ms ("3:40"), h:mm:ss from an hour
@@ -59,8 +62,8 @@ export function lastComparableRun(runs,{open,groupIndex},{isOpen,hasGroup}){
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.
 // modeCount: Modes to find of the page; a run is of these inputs when it also found that count.
-export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed,modeCount,groupIndex=false,pml=null}){
- const signature=studySignature(input,modeCount,groupIndex,pml),inputs=JSON.stringify(input);
+export function opticalWorkflow({input,invalid=false,block='',busy=false,pending=false,resumeBlocked=false,mesh=null,runs=[],viewed,modeCount,groupIndex=false,pml=null,searchTarget=null}){
+ const signature=studySignature(input,modeCount,groupIndex,pml,searchTarget),inputs=JSON.stringify(input);
  const materialBlock=input.setup.materials.Oxide!=='Silica'?'Background must be silica':shapesBlock(input.model.shapes),materialOK=!materialBlock;
  const currentRun=runs.findLast(run=>run.signature===signature);
  // A run of these exact inputs is done; an edit makes the study ready to run again.
@@ -135,8 +138,8 @@ export function droppedRunText(run){
 // 'recovered'). name: the run's name (absent when it has none). For 'other', geometry and
 // currentGeometry: the two geometries in words, and changes: what differs, from the run to the
 // current inputs (inputChanges), which names them when the geometry is the same (round 14).
-export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false,pml=null){
- const signature=studySignature(input,modeCount,groupIndex,pml),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
+export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=false,pml=null,searchTarget=null){
+ const signature=studySignature(input,modeCount,groupIndex,pml,searchTarget),own=runs.findLastIndex(run=>run.signature===signature),seen=viewed?runs.indexOf(viewed):-1;
  // a run's number in the tab (round 17, U2), else its place in the list
  const number=i=>Number.isInteger(runs[i]?.number)?runs[i].number:i+1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};

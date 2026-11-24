@@ -27,6 +27,9 @@ Pre-registered before the code (references measured on main 13f07f4, Linux):
   run's Re n_g 4.19152 (measured 4.19234).
 - K13 (engine part): the template @2.46, 4 modes returns 1.39191472 as mode 4, below the cladding;
   Studio leaves it out (slice C2, studio_closed_target_page.cjs).
+- K12 (slice C2, on engine fields): Studio's notes of the strip over a substrate closed @2.46 with 2
+  modes name mode 1 as mostly in Substrate (the edge note) and mode 2 as the core mode (its |E|² share
+  in Core > 0.5; measured 0.644).
 
 "Scale" multiplies every element length of the document (open_boundary_fixtures.scaled).
 """
@@ -286,3 +289,44 @@ def test_k8_the_group_index_of_a_closed_targeted_run():
     core = int(np.argmax(opened.effective_index[0].real))
     print(f"\nK8 n_g closed {closed}, open {opened.group_index()[0]}")
     assert np.isfinite(closed) and abs(closed.real - opened.group_index()[0][core].real) <= 2e-3
+
+
+_NOTES = r"""
+import fs from 'node:fs';
+const M = await import(process.argv[1]);
+const N = await import(process.argv[2]);
+const run = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const checked = N.validateRun(run);
+process.stdout.write(JSON.stringify({edge: M.edgeNotes(checked), core: M.coreNotes(checked), placement: M.corePlacement(checked)}));
+"""
+
+
+def test_k12_the_core_mode_note_on_engine_fields(tmp_path):
+    result = solve(json.loads(targeted("strip_substrate", 2, 2.46)))
+    e = result.vector_fields[0].electric.transpose(1, 0, 2)
+    setup = {"materials": {"Core": "Silicon", "Oxide": "Silica", "Heater": ""}, "temperature": 293.15, "cooling": "", "fixed": "", "terminal": ""}
+    shapes = [{"name": "Core", "type": "rect", "material": "Silicon", "x": -250, "y": 0, "w": 500, "h": 220},
+              {"name": "Substrate", "type": "rect", "material": "Silicon", "x": -1500, "y": -1200, "w": 3000, "h": 700}]
+    script = ("const P = await import(process.argv[1]); process.stdout.write(JSON.stringify(P.snapshot({width: 500, voltage: 1, "
+              "electric: false, heat: false, structure: false, optics: true, wavelength: 1550, coreMesh: 30, shapes: JSON.parse(process.argv[2])}, "
+              "JSON.parse(process.argv[3]))));")
+    done = subprocess.run([node(), "--input-type=module", "-e", script, (STATIC / "workspace-project.mjs").as_uri(), json.dumps(shapes), json.dumps(setup)],
+                          capture_output=True, text=True, encoding="utf-8")
+    assert done.returncode == 0, done.stderr
+    settings = {"adapter": "optical-shapes-v10", "domain": {"xmin": "-1.5 um", "xmax": "1.5 um", "ymin": "-1.2 um", "ymax": "1.2 um"},
+                "boundary": "PEC", "mode_count": 2, "search_target": 2.46, "solver_version": "not reported",
+                "vacuum_wavelength": "1550 nm", "core_element_size": "30 nm"}
+    run = {"job": "0000000a", "completedAt": "2026-11-24T01:00:00.000Z", "settings": settings, "input": json.loads(done.stdout),
+           "effective_index": result.effective_index[0].real.tolist(), "origin": "local", "serverVersion": "0.0.0",
+           "field": {"node_coordinates": result.node_coordinates.tolist(), "triangles": result.triangles.tolist(),
+                     "real": e.real.tolist(), "imag": e.imag.tolist()}}
+    path = tmp_path / "run.json"
+    path.write_text(json.dumps(run), encoding="utf-8")
+    done = subprocess.run([node(), "--input-type=module", "-e", _NOTES, (STATIC / "workspace-modes.mjs").as_uri(),
+                           (STATIC / "workspace-notebook.mjs").as_uri(), str(path)], capture_output=True, text=True, encoding="utf-8")
+    assert done.returncode == 0, done.stdout + done.stderr
+    notes = json.loads(done.stdout)
+    print(f"\nK12 edge {notes['edge']}, core {notes['core']}, placement {notes['placement']}")
+    assert [n["mode"] for n in notes["edge"]] == [0] and notes["edge"][0]["text"].startswith("Mode 1 is mostly in Substrate (")
+    assert [n["mode"] for n in notes["core"]] == [1]
+    assert notes["core"][0]["text"] == "Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge."
