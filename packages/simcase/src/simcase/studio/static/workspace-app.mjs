@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,renumberedRuns,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -841,9 +841,10 @@ function completeLoad(pending){
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
   rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});restoreProjectName(pending.recordProject,{savedFile:file,openedFile:pending.openedFile,openedCurrent:pending.openedCurrent,savedAt:pending.recordSavedAt});}refreshPersistence();
-  // the runs keep the numbers the session stored (version 12), else are numbered from 1 in file
-  // order; the message says so for a file of an earlier Studio (renumberedRuns)
-  notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'))+(renumberedRuns(session)?' '+RENUMBERED_TEXT:''));
+  // the runs keep the numbers the session stored (version 12), else are numbered by their place in
+  // the file, which Studio writes only when that numbering is exact: nothing is said about numbering
+  // (HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended)
+  notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.')));
   pending.then?.();
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
@@ -1120,8 +1121,7 @@ function restorePair(index,opener){
   await renderEarlierSessions();
   const again=recoveryList().find(e=>e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file);
   if(!again){notice(`${other.model} was not restored: its browser record is no longer stored.`);return;}
-  const optical=[first.recovered.session,again.recovered.session].find(s=>s.application!=='multiphysics');
-  const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`+(renumberedRuns(optical)?' '+renumberedText('Optical waveguide'):''));};
+  const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`);};
   const options={then:done,failed:message=>notice(`${other.model} was not restored: ${message}`),projectMatched:firstFile?.current===true&&firstFile.name===record.file};
   if(again.kind==='latest')recoverLatest(opener,options);else recoverEarlier(again.index,opener,options);
  };
@@ -2107,7 +2107,7 @@ async function applyOpenedProject(read,fileName){
   project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
   const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
-  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`+(renumberedRuns(ws?.session)?' '+renumberedText(ws.title):''));
+  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);
  }finally{openingModel=false;}
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};

@@ -93,15 +93,9 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // place in the list, and File › Open, Open project and Restore keep it: there is no stored counter,
 // the next run takes the largest number + 1, and the run with the largest number is never dropped
 // (appendRun keeps the new run, swapDropped and mergeRuns drop only other runs). A file of an
-// earlier version numbers its runs from 1 in file order; RENUMBERED_TEXT says so for a file of
-// version 6 or 7 with runs (renumberedRuns).
-export const renumberedText=model=>`This file is from an earlier Studio: ${model} runs are numbered from 1 in this tab; names and pins are kept.`;
-export const RENUMBERED_TEXT=renumberedText('Optical waveguide');
-/** Whether an opened or restored optical session numbered runs whose numbers it did not store, so
- * RENUMBERED_TEXT is said: a session of version 6 or 7 (parseSession's version) that holds runs. A
- * version 12 session holds its numbers; a version 9 to 11 session is written by this Studio only
- * when its runs are 1..n, so neither says anything about numbering. */
-export const renumberedRuns=session=>!!session&&session.application!=='multiphysics'&&[6,7].includes(session.version)&&session.runs?.length>0;
+// earlier version numbers its runs by their place in the file; Studio writes an older version only
+// when that numbering is exact, so no message speaks about numbering (round 19's RENUMBERED_TEXT is
+// gone: HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended).
 /** The import's words when an imported run takes another number in this tab: "Added Run 2 and
  * Run 4 of design-b.json as Run 9 and Run 10."; '' when every added run keeps its number. added:
  * [{from, to}] in list order. */

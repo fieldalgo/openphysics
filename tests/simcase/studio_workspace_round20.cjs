@@ -111,7 +111,7 @@ test('Z2: the newest offer of a project with both models restores both',async()=
  assert.ok(app.includes("notice(`${other.model} was not restored: its browser record is no longer stored.`)"));
  assert.ok(app.includes("failed:message=>notice(`${other.model} was not restored: ${message}`)"));
  // the newest record's model is shown at the end, with one message for both
- assert.ok(app.includes("const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`+(renumberedRuns(optical)?' '+renumberedText('Optical waveguide'):''));};"));
+ assert.ok(app.includes("const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`);};"));
  // with both records the same as the file, the project reads as saved
  assert.ok(app.includes("projectMatched:firstFile?.current===true&&firstFile.name===record.file"));
  // no format change: the recovery record and session writers are untouched by Z2

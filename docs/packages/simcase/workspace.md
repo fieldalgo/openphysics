@@ -394,10 +394,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    project and Restore keep it: after a file whose largest number is 8, the next run is Run 9. A
    file of an earlier version numbers its runs from 1 in file order, and runs added from a file
    continue after the largest number (*Added Run 2 and Run 4 of design-b.json as Run 9 and Run
-   10.*). Only for a version 6 or 7 file with runs does the message of an open or a restore say so:
-   *This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab;
-   names and pins are kept.* (round 19 said *Runs are numbered from 1 in this tab; …* after every
-   open). The heated model's runs keep their numbers, so its messages do not say this. A current run that this tab did not
+   10.*). No message of an open or a restore speaks about numbering (round 19 said *Runs are
+   numbered from 1 in this tab; …* after every open): a session written before version 12 holds no
+   run numbers; its runs are numbered by their place in the file. Studio writes an older version
+   only when that numbering is exact. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery; the status
    bar adds *has the results of the current inputs* (round 20; it asked *press Run to compute it
@@ -561,9 +561,8 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    restore has completed (a load question answered with Replace; Cancel stops both), the other
    model's record, found again by its model, time and file, and shows the newest record's model on
    Results; Messages reads *Restored Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)
-   from this browser, not recomputed.* (followed by the numbering sentence of
-   [version 12](#optical-session-files-version-12) only when the optical record holds a version 6
-   or 7 session). The project name and file come back as each record holds them (when the records
+   from this browser, not recomputed.* (round 19 to 21 added a numbering sentence, gone since
+   [version 12](#optical-session-files-version-12)). The project name and file come back as each record holds them (when the records
    name different projects, the newer record's name); when both
    records still matched the same project file the header reads *… · saved …*. If the second restore
    fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
@@ -1996,11 +1995,10 @@ right after `job` and inside the run's `digest`. The top-level keys are those of
   so it never overwrites that record. The project file stays version 1; the optical documents,
   adapters, requests and results, the multiphysics session (version 8) and the run table CSV are
   unchanged.
-- **The numbering sentence.** Messages says *This file is from an earlier Studio: Optical
-  waveguide runs are numbered from 1 in this tab; names and pins are kept.* only after opening or
-  restoring a session of version 6 or 7 that holds runs (written before run numbers could differ
-  from list places). A version 9 to 11 session is written by this Studio only while its runs are
-  1..n, and a version 12 session holds its numbers, so neither says anything about numbering.
+- **No numbering sentence.** A session written before version 12 holds no run numbers; its runs
+  are numbered by their place in the file. Studio writes an older version only when that
+  numbering is exact. So no open or restore message speaks about numbering (round 19's *Runs are
+  numbered from 1 in this tab; names and pins are kept.* is gone).
 - **Add runs from file** numbers the added runs after the tab's largest number, in file order, and
   says so when a number changes: *Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.* A
   job already in the tab keeps the tab's number.
@@ -2010,7 +2008,7 @@ multiphysics fixture and the project fixture read and written again byte for byt
 12 fixture `optical-v12-numbers.json` of runs 3, 5, 6, 7, 8 and 9 and its refusals; K3 and K9: what
 main fc654fe reads, `refusals-v12-fc654fe.json`), `tests/simcase/studio_session_numbers_page.cjs`
 (K6: a seeded sequence of 2400 results, pins, swaps, imports, saves, opens and restores; K7: the
-header lines; K10: the numbering sentence) and the K4/K5 stages of
+header lines; K10: no numbering sentence for a version 7, 11 or 12 file) and the K4/K5 stages of
 `tools/studio_browser/studio_project_browser.mjs`.
 
 ### Matching modes in Compare
