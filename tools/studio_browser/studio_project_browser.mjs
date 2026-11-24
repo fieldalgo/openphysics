@@ -89,6 +89,7 @@ class Page {
       } else if (message.method === 'Runtime.exceptionThrown') report.exceptions.push(message.params.exceptionDetails?.exception?.description || message.params.exceptionDetails?.text);
       else if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') report.consoleErrors.push(message.params.args.map(a => a.value ?? a.description).join(' '));
       else if (message.method === 'Network.requestWillBeSent' || message.method === 'Page.fileChooserOpened') this.events.push(message);
+      else if (message.method && this.onEvent) this.onEvent(message);
     });
   }
   call(method, params = {}) {
@@ -644,10 +645,15 @@ try {
     const newestTime = offers.newest.split(' · saved ').at(-1); assert.equal(boxTime, newestTime);
     await noOverflow('R20 offers');
     await page.eval("document.getElementById('file-status').textContent=''");
+    // the server's model check answers after 2 s, as on a slower machine: longer than the first
+    // restored model's automatic recovery save (0.7 s), which then writes during the second restore
+    await page.call('Fetch.enable', {patterns: [{urlPattern: '*/api/multiphysics/validate*'}]});
+    page.onEvent = message => { if (message.method === 'Fetch.requestPaused') setTimeout(() => page.call('Fetch.continueRequest', {requestId: message.params.requestId}).catch(() => {}), 2000); };
     await page.click('#resume-newest');
     for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
     await page.until("/^Restored Optical waveguide \\(2 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'R20 both restored', 60000);
     const restored = {message: await status(), title: await title(), page: await shownPage(), optical: await page.eval("document.querySelectorAll('.run-item').length")};
+    await page.call('Fetch.disable'); page.onEvent = null;
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R20 Library after');
     const after = await page.eval("({actions:Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent])),offers:[...document.querySelectorAll('.resume-actions button,.card-resume button')].map(b=>b.textContent),names:[...document.querySelectorAll('.cards [data-template]')].map(b=>b.querySelector('.card-action').textContent)})");
     stage('R20 Z2 restored', {restored, after});
@@ -660,6 +666,26 @@ try {
     assert.equal(new Set(after.names.filter(n => n.startsWith('Return to '))).size, 2);
     await noOverflow('R20 Library 1440');
     await size(390, 844, true); await sleep(400); await noOverflow('R20 Library 390');
+    // round 20 follow-up (pre-registered): after the pair restore browser recovery keeps writing in
+    // this one tab: the restores' own records, then an edit, are written with no "changed in another
+    // tab", and after a reload the newest record holds that edit
+    await size(1440, 900, false);
+    const recoveryNow = () => page.eval("({title:document.getElementById('project').textContent,footer:document.getElementById('autosave-status').textContent,detail:document.getElementById('notebook-recovery-detail').textContent})");
+    await sleep(3000); const settled = await recoveryNow();
+    await page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R20 Optical modes');
+    await page.fill('spinbutton', 'Modes to find', 3);
+    await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)||/another tab/.test(document.getElementById('autosave-status').textContent+document.getElementById('project').textContent)", 'R20 edit recorded', 30000);
+    await sleep(1500); const edited = await recoveryNow();
+    stage('R20 pair restore keeps recovery', {settled, edited});
+    for (const state of [settled, edited]) { assert.ok(!(state.title + state.footer).includes('another tab'), JSON.stringify(state)); }
+    assert.match(edited.detail, /^Browser recovery updated /);
+    await page.call('Page.reload'); await page.until("!!document.getElementById('resume-optical')", 'R20 offers after the edit', 30000);
+    await page.click('#resume-optical'); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
+    await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R20 edited record restored', 30000);
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R20 Optical modes again');
+    const kept = await page.eval("document.getElementById('mode-count-number').value"); stage('R20 edit kept', {kept});
+    assert.equal(kept, '3');
     await stopBrowser(page);
   }
 
