@@ -10,6 +10,48 @@ export const FIELD_METADATA=Object.freeze({name:'unnormalized_electric_field',lo
 // physical): the same metadata with this normalization. A session keeps it implied by the run's
 // boundary "PML".
 export const PML_FIELD_METADATA=Object.freeze({...FIELD_METADATA,normalization:'physical_max_centroid_magnitude'});
+/** The physical bounds [[x0, y0], [x1, y1]] in metres of an open run's candidate record
+ * (physical_bounds, {unit: 'm', values}), or null when it has none that is valid. */
+export function physicalBounds(record){
+ const b=record?.physical_bounds,v=b?.values;
+ if(b?.unit!=='m'||!Array.isArray(v)||v.length!==2||!v.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))return null;
+ return v[0][0]<v[1][0]&&v[0][1]<v[1][1]?[[v[0][0],v[0][1]],[v[1][0],v[1][1]]]:null;
+}
+/** For each triangle, whether it meets the closed window bounds [[x0, y0], [x1, y1]] (metres, the
+ * stored coordinates): its bounding box overlaps the window and none of its three edge normals
+ * separates it from the window's corners (the separating-axis test). A triangle that only touches
+ * the window at a corner or along an edge meets it. */
+export function meetsWindow(field,[[x0,y0],[x1,y1]]){
+ const X=field.node_coordinates,corners=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+ return field.triangles.map(t=>{
+  const p=[X[t[0]],X[t[1]],X[t[2]]];
+  if(Math.max(p[0][0],p[1][0],p[2][0])<x0||Math.min(p[0][0],p[1][0],p[2][0])>x1||Math.max(p[0][1],p[1][1],p[2][1])<y0||Math.min(p[0][1],p[1][1],p[2][1])>y1)return false;
+  for(let e=0;e<3;e++){
+   const a=p[e],c=p[(e+1)%3],o=p[(e+2)%3],nx=c[1]-a[1],ny=a[0]-c[0],side=q=>(q[0]-a[0])*nx+(q[1]-a[1])*ny,s=side(o);
+   if(s>0?corners.every(q=>side(q)<0):s<0?corners.every(q=>side(q)>0):false)return false;
+  }
+  return true;
+ });
+}
+/** The margin of the crop (C5''): 1/150 of the window's longer side, in metres. drawField clips the
+ * field view to the window with antialiasing, so a triangle just outside the window still tints the
+ * edge pixels it partly covers; with the triangles within this margin kept, the pictures at the
+ * window edge are unchanged whenever the plot spends at least 150 device px on that side (Results
+ * always does). For the 3 × 2.4 µm window it is 20 nm. */
+export const windowMargin=([[x0,y0],[x1,y1]])=>Math.max(x1-x0,y1-y0)/150;
+/** The samples of a new open run on its physical window (crop rule C5''): the triangles that meet
+ * the closed bounds grown on each side by windowMargin (meetsWindow), in their order, their nodes
+ * renumbered in first-use order; no coordinate or sample value changes. The PML beyond the margin is
+ * not kept. Every triangle whose centroid lies inside the bounds meets them, so the physical window
+ * of the result is that of the full samples, and cropping again changes nothing. field:
+ * {node_coordinates, triangles, real, imag}, real/imag[mode][triangle]; the result has these four
+ * keys (and regions, per triangle, when the field has them). */
+export function windowField(field,bounds){
+ const d=windowMargin(bounds),[[x0,y0],[x1,y1]]=bounds,keep=meetsWindow(field,[[x0-d,y0-d],[x1+d,y1+d]]),number=new Map(),node_coordinates=[],triangles=[];
+ field.triangles.forEach((t,i)=>{if(keep[i])triangles.push(t.map(n=>{if(!number.has(n)){number.set(n,node_coordinates.length);node_coordinates.push(field.node_coordinates[n]);}return number.get(n);}));});
+ const kept=list=>list.filter((_,i)=>keep[i]);
+ return {node_coordinates,triangles,real:field.real.map(kept),imag:field.imag.map(kept),...(Array.isArray(field.regions)?{regions:kept(field.regions)}:{})};
+}
 /** count: the number of modes the samples hold (two, the count of version 7 runs, by default).
  * open: the samples of a result with an open boundary (PML_FIELD_METADATA). */
 export function readOpticalField(data,count=2,{open=false}={}){

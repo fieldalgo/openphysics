@@ -1241,6 +1241,18 @@ page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 �
   같은 값과 문구로 열리고, **Use this run's inputs** 다음의 실행은 두 검색의 문서를 만듭니다. 연구 서명은
   바뀌지 않으므로 그런 실행은 여전히 현재 입력으로 만든 실행으로 읽힙니다.
 - 그 장은 위의 정규화를 따른다고 봅니다.
+- **물리 창의 장만.** 열린 실행은 물리 창과 만나는 삼각형에 창의 긴 변의 1/150인 얇은 여유를 더해
+  보존하므로 창 가장자리의 그림은 바뀌지 않습니다. 그 밖의 PML은 보존하지 않습니다. (장 보기는 창으로
+  안티앨리어싱하여 자르므로, 창 바로 밖의 삼각형도 일부 덮는 가장자리 픽셀에 색을 더합니다. 3 × 2.4 µm 창에서
+  20 nm인 이 여유는 그림이 그 변에 장치 픽셀 150개 이상을 쓰면 그 픽셀들을 덮으며, Results와 Compare는 늘
+  그렇습니다.) 판정은 저장된 미터 좌표에서 경계를 포함한 분리축 판정이고, 삼각형은 엔진의 순서를 지키며,
+  절점은 처음 쓰인 순서로 번호를 다시 매기고, 좌표와 표본 값은 하나도 바뀌지 않습니다. T16 실행(기판 위
+  스트립, 네 변이 열림)은 삼각형 40,658개 중 12,253개를 보존합니다. 중심이 창 안에 있는 삼각형은 모두 그 안에 있으므로 물리 창, TE 비율,
+  유효 면적, 짝짓기, 장 보기와 탐침은 전체 표본일 때와 같은 값을 읽습니다. **Export this run**의 실행 파일도
+  같은 표본을 담고, 그 메시지가 그렇게 밝힙니다. 파일(세션, 프로젝트, 복구, 실행 파일)에서 읽은 실행은
+  잘라 내지 않습니다: 이 변경 전에 쓴 파일은 전체 표본을 그대로 두고 바이트 단위로 같게 다시 씁니다.
+  올바른 `physical_bounds`가 없는 실행은 표본을 모두 보존합니다. 한 작업의 두 사본(전체 표본과 잘라 낸
+  표본)은 창 위의 표본이 같으면 같은 결과입니다. 파일 버전은 10 그대로이고 키는 더하지 않습니다.
 - slice P3: 새 열린 실행은 엔진의 `te_polarization_fraction`과 `effective_area`(물리 창)도 보존합니다.
   군굴절률을 켜면 `group_index`를 `{"re", "im"}`로, `group_index_method`와 함께 보존합니다. 닫힌 실행의
   `group_index`는 목록 그대로입니다. slice P2가 쓴 실행에는 이 키들이 없습니다. Studio는 그 실행의 TE
@@ -1405,6 +1417,10 @@ Studio는 스스로 거부할 파일을 쓰지 않습니다. 버전 6·7 파일�
 같습니다. digest는 손상되거나 손으로 고친 파일을 찾아낼 뿐 인증이 아닙니다.
 
 템플릿 메시(삼각형 2275개)에서 모드 8개인 실행 여섯 개는 약 9.4 MB, 모드당 약 0.2 MB로 16 MiB 한도 안입니다.
+열린 실행은 물리 창만 보존합니다: T16 실행은 3.9 MB(PML 포함 13.4 MB), 모드 3개와 군굴절률을 더한 T16은
+5.6 MB(19.0 MB)이고, 실행 여섯 개(닫힌 스트립 둘, 닫힌 기판 위 스트립, 그 열린 실행 셋)는 16.5 MB(15.8 MiB)로 Save
+session과 브라우저 복구가 모든 장과 함께 보존합니다(이전에는 48.8 MB로 거부). 측정은
+`tools/studio_open_field_size.mjs`입니다.
 한도를 넘는 세션은 다중물리 세션처럼 먼저 묻습니다. *Keep fields for selected and pinned runs*는 나머지
 실행을 `field` 없이 n_eff·TE 비율·유효 면적과 함께 쓰고, Cancel은 아무것도 쓰지 않으며, 선택·고정 실행만으로도
 한도를 넘으면 그 실행들을 밝혀 저장을 거부합니다. 브라우저 복구는 전체 텍스트가 한도를 넘으면 묻지 않고 선택·고정
@@ -1650,8 +1666,8 @@ IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름
 설정을 포함합니다. 연속 변경은 묶고 저장은 순서대로 수행하며, 세션 파일에 실행이 없는 동안 저장 표시는
 브라우저 사본의 상태(*updating browser recovery*, *kept for recovery in this browser*,
 *browser recovery unavailable*)를, 세션 파일이 생기면 그 파일을 보여 줍니다. round 17부터 복구를 할 수 없으면
-까닭을 알 때 까닭과 할 일을 밝힙니다: 고른 실행과 고정한 실행이 장과 함께 16 MiB를 넘으면(기판 위 스트립의 고정한 열린 실행 둘은
-각각 약 7.5 MB로 넘습니다) *browser recovery unavailable: session over 16 MiB · File › Save keeps your work*,
+까닭을 알 때 까닭과 할 일을 밝힙니다: 고른 실행과 고정한 실행이 장과 함께 16 MiB를 넘으면(열린 실행이 물리 창만 보존하기 전에는 기판 위 스트립의
+고정한 열린 실행 둘이 각각 13.4 MB로 넘었습니다. 지금 그런 실행은 3.9 MB입니다) *browser recovery unavailable: session over 16 MiB · File › Save keeps your work*,
 브라우저가 공간 부족으로 쓰기를 거부하면 *browser recovery unavailable: this browser’s storage is full · File ›
 Save keeps your work*입니다. round 18부터 Messages도 복구가 꺼질 때마다 한 번 알립니다: *Browser recovery is off: this
 session is over 16 MiB. File › Save keeps your work.* 또는 *Browser recovery is off: this browser’s storage is full.

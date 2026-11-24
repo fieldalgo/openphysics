@@ -1488,6 +1488,22 @@ leakage out of the window.
   words, and **Use this run's inputs** followed by a run builds the document of both searches.
   The study signature is unchanged, so such a run still reads as made with the current inputs.
 - Its field implies the normalization above.
+- **Fields on the physical window only.** An open run keeps the triangles that meet its physical
+  window plus a thin margin of 1/150 of the window's longer side, so pictures at the window edge are
+  unchanged; the PML beyond it is not kept. (The field view clips to the window with antialiasing, so
+  a triangle just outside it tints the edge pixels it partly covers; the margin, 20 nm for the 3 × 2.4
+  µm window, covers them whenever the plot spends at least 150 device pixels on that side, as Results
+  and Compare always do.) The test is a separating-axis test on the stored coordinates in metres,
+  bounds included; the triangles keep the engine's order, their nodes are renumbered in order of
+  first use, and no coordinate or sample value changes. For the T16 run (a strip over a substrate,
+  open on four edges) it keeps 12,253 of 40,658 triangles. Every triangle whose centroid lies in the window
+  is among them, so the physical window, the TE fraction, the effective area, matching, the field
+  view and the probe read the same values as with the full samples. The run file of **Export this
+  run** holds the same samples and its message says so. A run read from a file (session, project,
+  recovery or run file) is never cropped: a file written before this change keeps its full samples
+  and is written again byte for byte. A run without valid `physical_bounds` keeps all its samples.
+  Two copies of one job, one with full samples and one cropped, are the same result when their
+  samples agree on the window. The file version stays 10 and no key is added.
 - Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
   `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
   "im"}` with `group_index_method`. A closed run's `group_index` stays a list. A run written by
@@ -1670,7 +1686,11 @@ then `imported`) is written again byte for byte. The digest detects a damaged or
 file; it is not an authentication.
 
 Six runs of 8 modes on the template's mesh (2275 triangles) are about 9.4 MB, about 0.2 MB per
-mode, under the 16 MiB limit. A session over the limit asks first, as a multiphysics session
+mode, under the 16 MiB limit. An open run keeps its physical window only: the T16 run is 3.9 MB
+(13.4 MB with the PML), T16 with 3 modes and the group index 5.6 MB (19.0 MB), and six runs (two
+closed strips, the strip over a substrate closed, and three open runs of it) 16.5 MB (15.8 MiB), which Save
+session and browser recovery keep with every field (48.8 MB before, refused). The measurement is
+`tools/studio_open_field_size.mjs`. A session over the limit asks first, as a multiphysics session
 does: *Keep fields for selected and pinned runs* writes the other runs without `field`, with
 their n_eff, TE fractions and effective areas; Cancel writes nothing; when even the selected
 and pinned runs are over the limit, the save is refused, naming them. Browser recovery keeps
@@ -1958,7 +1978,8 @@ recovery in this browser*, *browser recovery unavailable*) while no session file
 the runs, and the session file once one does. Since round 17 an unavailable recovery says why and
 what to do when the reason is known: *browser recovery unavailable: session over 16 MiB · File ›
 Save keeps your work* when the selected and pinned runs with their fields are over 16 MiB (two
-pinned open runs of a strip over a substrate are, at about 7.5 MB each), and *browser recovery
+pinned open runs of a strip over a substrate were, at 13.4 MB each, before an open run kept its
+physical window only; now such a run is 3.9 MB), and *browser recovery
 unavailable: this browser’s storage is full · File › Save keeps your work* when the browser refuses
 the write for space. Since round 18, Messages says it too, once each time recovery turns off: *Browser
 recovery is off: this session is over 16 MiB. File › Save keeps your work.* or *Browser recovery is

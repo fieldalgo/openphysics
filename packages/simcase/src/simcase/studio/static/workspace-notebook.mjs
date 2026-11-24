@@ -3,7 +3,7 @@
 
 import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
-import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA} from './workspace-field.mjs';
+import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA,physicalBounds,windowField} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
@@ -427,7 +427,11 @@ export function mergeRuns(existing,incoming){
  const identity=run=>JSON.stringify({input:run.input,settings:{...run.settings,adapter:OPTICAL_ADAPTER},effective_index:run.effective_index,effective_index_im:run.effective_index_im??null,serverVersion:run.serverVersion??null});
  // the fields are compared when both runs have them: a file may have left them out (over 16 MiB)
  const fields=run=>JSON.stringify({node_coordinates:run.field.node_coordinates,triangles:run.field.triangles,real:run.field.real,imag:run.field.imag});
- const same=(a,b)=>identity(a)===identity(b)&&(!a.field||!b.field||fields(a)===fields(b));
+ // two open runs with valid physical bounds compare their samples on the window (C3): a file written
+ // before the crop holds the full samples of a job whose new copy holds the window's only
+ const windowed=run=>{const b=isOpenRun(run)?physicalBounds(run.open_boundary):null;return b?JSON.stringify(windowField(run.field,b)):null;};
+ const sameFields=(a,b)=>{const wa=windowed(a),wb=wa===null?null:windowed(b);return wa!==null&&wb!==null?wa===wb:fields(a)===fields(b);};
+ const same=(a,b)=>identity(a)===identity(b)&&(!a.field||!b.field||sameFields(a,b));
  for(const raw of incoming){
   const run=validateRun(raw,true);if(incomingIds.has(run.job))throw new Error('Duplicate imported run identifier.');incomingIds.add(run.job);
   const prior=existing.find(r=>r.job===run.job);

@@ -1546,7 +1546,7 @@ function renderRunList(){
   const exportRun=document.createElement('button');exportRun.id='export-run';exportRun.textContent='Export this run';exportRun.style.marginTop='10px';exportRun.onclick=()=>{try{
    const text=sessionText(solverRun.input,[solverRun],solverRun.job,[solverRun.job,solverRun.job],currentView());
    if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('This run exceeds the session size limit.');
-   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields. Add runs from file adds it to a session. The current design is unchanged.`);
+   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields${isOpenRun(solverRun)?' (on the physical window only, PML excluded)':''}. Add runs from file adds it to a session. The current design is unchanged.`);
   }catch(error){notice(error.message);}};panel.append(exportRun);
   // a viewed run with other inputs than the current ones: its inputs become the current inputs at
   // once (the runs stay as they are, so nothing is asked), and Undo takes them back

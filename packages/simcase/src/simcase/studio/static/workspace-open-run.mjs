@@ -6,6 +6,7 @@
 // second solve of the same document with PML strength 6. Pure functions: the page draws them.
 import {EDGES,hasOpenEdge,defaultTarget,maxIndex,TARGET_FLOOR,PML_THICKNESS_DEFAULT_NM,checkOpenBoundary,OPEN_BOUNDARY_ADAPTER,lowerTarget,PML_FIXED,ADDITIONAL_SEARCH_COUNT} from './workspace-open-boundary.mjs';
 import {formatIndex} from './workspace-compare.mjs';
+import {physicalBounds,windowField} from './workspace-field.mjs';
 
 export const OPEN_ADAPTER=OPEN_BOUNDARY_ADAPTER;
 export const PML_WORDS='PML 1 µm';
@@ -295,7 +296,7 @@ export const keptValues=(values,keep)=>Object.fromEntries(Object.entries(values)
 /** The modes of a new open result that Studio keeps: Re n_eff above 1.45, in the engine's order
  * (with two searches, descending Re). target: the run's Search near n_eff (a number).
  * {re, im, keep (the engine's indices), record (the candidate record of the first point), data
- * (the result with the vector samples of the kept modes only)}. Throws when no mode is kept. */
+ * (the result with the vector samples of the kept modes only, on the physical window: windowField)}. Throws when no mode is kept. */
 export function openResultValues(result,re,im,targetValue){
  const target=Number(targetValue),record=checkCandidateRecord(result?.summary?.open_boundary?.[0],'This result',target);
  const keep=shownIndices(re);
@@ -304,6 +305,13 @@ export function openResultValues(result,re,im,targetValue){
   throw new Error(`No mode above n = ${SILICA_THRESHOLD} was found near n_eff ${where}`);
  }
  const vf=result.vector_fields?.[0],pick=a=>Array.isArray(a)?keep.map(i=>a[i]):a;
- const data=vf?{...result,vector_fields:[{...vf,real:pick(vf.real),imag:pick(vf.imag)},...result.vector_fields.slice(1)]}:result;
+ let data=vf?{...result,vector_fields:[{...vf,real:pick(vf.real),imag:pick(vf.imag)},...result.vector_fields.slice(1)]}:result;
+ // the samples on the physical window only (crop rule C5'', workspace-field.mjs windowField): the
+ // run keeps the triangles that meet its physical_bounds grown by windowMargin; without valid bounds it keeps them all (C6)
+ const bounds=physicalBounds(record),f=data.vector_fields?.[0];
+ if(vf&&bounds&&Array.isArray(data.triangles)&&Array.isArray(data.node_coordinates)&&Array.isArray(f.real)&&Array.isArray(f.imag)){
+  const w=windowField({node_coordinates:data.node_coordinates,triangles:data.triangles,real:f.real,imag:f.imag,regions:data.regions},bounds);
+  data={...data,node_coordinates:w.node_coordinates,triangles:w.triangles,...(w.regions?{regions:w.regions}:{}),vector_fields:[{...f,real:w.real,imag:w.imag},...data.vector_fields.slice(1)]};
+ }
  return {re:keep.map(i=>re[i]),im:keep.map(i=>im[i]),keep,record,data};
 }

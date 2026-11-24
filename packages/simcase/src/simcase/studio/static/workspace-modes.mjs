@@ -3,6 +3,7 @@
 import {formatIndex} from './workspace-compare.mjs';
 import {isOpenRun,NO_WINDOW_TITLE} from './workspace-open-run.mjs';
 import {WINDOW_NM,shapeBounds} from './workspace-shapes.mjs';
+import {physicalBounds} from './workspace-field.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -48,13 +49,8 @@ export function physicalWindow(field,bounds){
  const X=field.node_coordinates,[[x0,y0],[x1,y1]]=bounds;
  return field.triangles.map(t=>{const cx=(X[t[0]][0]+X[t[1]][0]+X[t[2]][0])/3,cy=(X[t[0]][1]+X[t[1]][1]+X[t[2]][1])/3;return cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1;});
 }
-/** The physical bounds [[x0, y0], [x1, y1]] in metres of an open run's candidate record
- * (physical_bounds, {unit: 'm', values}), or null when it has none that is valid. */
-export function physicalBounds(record){
- const b=record?.physical_bounds,v=b?.values;
- if(b?.unit!=='m'||!Array.isArray(v)||v.length!==2||!v.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))return null;
- return v[0][0]<v[1][0]&&v[0][1]<v[1][1]?[[v[0][0],v[0][1]],[v[1][0],v[1][1]]]:null;
-}
+// physicalBounds (an open run's physical_bounds) is in workspace-field.mjs, beside the crop of a new run's samples
+export {physicalBounds};
 /** f_TE of one mode: Σ A_T |E_x|² / Σ A_T (|E_x|² + |E_y|²) over every triangle (or over those of
  * `window`, physicalWindow's list, for an open run), with A_T from the node coordinates (any length
  * unit) and |E|² = re² + im², written as the engine writes it.
