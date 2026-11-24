@@ -26,7 +26,7 @@ import {CLOSED_TARGET_QUERY,checkClosedTarget,closedResultValues,shortcutText,SH
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
@@ -845,6 +845,8 @@ function completeLoad(pending){
   // the file, which Studio writes only when that numbering is exact: nothing is said about numbering
   // (HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended)
   notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.')));
+  // round 23 (E2): a browser restore names the runs that came back without fields
+  if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}
   pending.then?.();
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
@@ -997,11 +999,12 @@ const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurren
 const notebookStore=indexedNotebookStore();
 // the note of the last recovery snapshot kept without the study settings (shown once in the message line)
 let recoveryNote='';
-// round 23 (E2): the runs whose fields the last optical recovery snapshot left out (over 16 MiB it
-// keeps the fields of the selected and pinned runs only): the header and the indicator say
-// "kept for recovery in this browser without the fields of N runs"
-let opticalRecoveryDropped=0;
-const opticalRecoveryShown=()=>recoveryState==='kept'&&!multiView.active()&&opticalRecoveryDropped>0?'keptFields:'+opticalRecoveryDropped:recoveryState;
+// round 23 (E2): the numbers of the runs whose fields the last optical recovery snapshot left out
+// (over 16 MiB it keeps the selected and pinned runs' fields and as many others as fit, newest
+// first): the header and the indicator say "kept for recovery in this browser without the fields of
+// Run 3 and Run 5"
+let opticalRecoveryDropped=[];
+const opticalRecoveryShown=()=>recoveryState==='kept'&&!multiView.active()&&opticalRecoveryDropped.length?'keptFields:'+opticalRecoveryDropped.join(','):recoveryState;
 // round 18 (X4): the off state Messages last named, posted once until recovery works again; after a
 // run's result message the line is added to it, so the result stays in view
 let recoveryOffPosted=null;
@@ -1015,7 +1018,9 @@ function postRecoveryOff(){
 let sessionSizePending=false;
 function postSessionSize(){
  sessionSizePending=false;if(!runs.length)return;
- let text=null;try{text=sessionSizeText(writeOpticalSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()));}catch{return;}
+ // round 23 (E2): the runs whose fields browser recovery leaves out, named as its snapshot names them
+ let text=null;try{const make=captureSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView());let left=null;try{make();left=make.dropped;}catch{}
+  text=sessionSizeText(writeOpticalSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),left);}catch{return;}
  if(!text)return;if(text.endsWith(' Browser recovery is off.'))recoveryOffPosted='overLimit';
  const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);
 }
@@ -1023,7 +1028,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current'){recoveryState='kept';recoveryOffPosted=null;}
- if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;opticalRecoveryDropped=recoveryKind==='optical'&&Number.isInteger(state.dropped)?state.dropped:0;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
+ if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;opticalRecoveryDropped=recoveryKind==='optical'&&Array.isArray(state.dropped)?state.dropped:[];notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':state.code==='recovery-quota'?'quota':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';postRecoveryOff();}
  refreshSaveIndicator();
 }});
@@ -1390,7 +1395,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   if(isOpenRun(solverRun))$('canvas').append(foundLine(solverRun));
   else if(isClosedTargetRun(solverRun)){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=closedFoundText(solverRun.effective_index.length,runModeCount(solverRun),runSearchTarget(solverRun))+'.';$('canvas').append(line);}
   else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
-  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent='This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
+  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent=solverRun.origin==='recovered'?'This run’s fields were not kept in browser recovery (over 16 MiB): n_eff, the TE fractions and the effective areas were.':'This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}

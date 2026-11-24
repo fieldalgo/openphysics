@@ -163,14 +163,14 @@ test('A3: the refusal names the selected and the pinned runs apart; Unpin only w
 test('S2: a run that makes the session go over 16 MiB says the size and what File › Save will do',()=>{
  assert.equal(N.sessionSizeText({ok:true,bytes:1e6}),null);assert.equal(N.sessionSizeText(null),null);
  assert.equal(N.sessionSizeText({ok:false,bytes:18.9e6,reduced:{bytes:9e6,notKept:[1]},refusal:null}),
-  'Session is now 19 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only; the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.');
+  'Session is now 19 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only; the other runs keep n_eff, the TE fractions and the effective areas.');
  const refusal=N.keptOverText([{name:'Run 6',selected:true,pinned:false}],18.9e6);
  assert.equal(N.sessionSizeText({ok:false,bytes:48.8e6,reduced:null,refusal}),
   'Session is now 49 MB, over the 16 MiB (16.8 MB) limit, and File › Save will refuse: The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes. Browser recovery is off.');
  // the same answer Save session gets: a run's session over the limit, its selected run alone fitting
  const full=N.parseSession(fixture(FULL)),run={...full.runs[0],pinned:false},other={...run,job:'0000000f',pinned:false};
  const out=N.writeOpticalSession(full.input,[run,other],run.job,[run.job,null],full.view,{limit:400000});
- assert.equal(out.ok,false);assert.ok(N.sessionSizeText(out).endsWith(', over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Run 1); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.'),N.sessionSizeText(out));
+ assert.equal(out.ok,false);assert.ok(N.sessionSizeText(out).endsWith(', over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Run 1); the other runs keep n_eff, the TE fractions and the effective areas.'),N.sessionSizeText(out));
  const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
  // posted once after the run's result message, with X4's line not repeated when it says recovery is off
  assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();"));

@@ -104,45 +104,104 @@ test('P6 (E6): Current inputs differ names the boundary, the search, n_g and Mod
  assert.ok(app.includes('const [runParts,nowParts]=studyParts(solverRun);'));
 });
 
-// E2: a session over the limit; browser recovery keeps the fields of the selected and pinned runs only
+// E2: a session over the limit. Browser recovery keeps the selected and pinned runs' fields, then as
+// many others as fit, newest first (coordinator decision of round 23); the header and Messages name
+// the runs whose fields it left out
 const FIXTURES=path.join(__dirname,'studio_session_fixtures');
 const OPEN_FULL='optical-v10-open-full-083e151.json';
-test('P2 (E2): recovery over the limit leaves fields out, and the header and Messages now say so',async()=>{
+const e2=async()=>{
  const N=await import(STATIC+'workspace-notebook.mjs'),R=await import(STATIC+'workspace-notebook-recovery.mjs'),PS=await import(STATIC+'workspace-persistence.mjs');
  const full=N.parseSession(fs.readFileSync(path.join(FIXTURES,OPEN_FULL),'utf8')),base=full.runs[0];
  const runs=[1,2,3].map(n=>({...base,job:'0000000'+n,number:n,pinned:false}));
- // a limit between one run with its field and three: the stand-in for 16 MiB of the measured 22 MB session
- const one=N.writeOpticalSession(full.input,runs.slice(0,1),'00000003',[null,null],full.view).bytes,three=N.writeOpticalSession(full.input,runs,'00000003',[null,null],full.view).bytes;
- const limit=Math.floor((one+three)/2),all=N.writeOpticalSession(full.input,runs,'00000003',[null,null],full.view,{limit});
- assert.equal(all.ok,false);assert.deepEqual(all.reduced.kept,[3]);assert.deepEqual(all.reduced.notKept,[1,2]);
- // the record recovery writes: every run, the field of the selected run only, with no question
- const make=N.captureSession(full.input,runs,'00000003',[null,null],full.view,{limit});
- const record=JSON.parse(make());assert.deepEqual(record.runs.map(r=>!!r.field),[false,false,true]);
- // before round 23 nothing said so: the snapshot reported no dropped fields and the header read "kept"
- assert.equal(make.dropped,2);
- const states=[];const store={save:async r=>r};
- const saver=new R.NotebookAutosave(store,{onState:s=>states.push(s),delay:0,setTimer:fn=>{fn();return 1;},clearTimer:()=>{}});
- saver.schedule('over',make);await saver.settle();
- assert.equal(states.find(s=>s.phase==='saved').dropped,2);
- // within the limit: none dropped
- const fits=N.captureSession(full.input,runs.slice(0,1),'00000001',[null,null],full.view,{limit});fits();assert.equal(fits.dropped,0);
- // the header and the save indicator words
- assert.equal(PS.projectTitle({models:1,recovery:'keptFields:5'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of 5 runs');
- assert.equal(PS.projectTitle({models:1,recovery:'keptFields:1'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of 1 run');
+ const size=k=>N.writeOpticalSession(full.input,runs.slice(0,k),'00000001',[null,null],full.view).bytes;
+ return {N,R,PS,full,runs,one:size(1),two:N.writeOpticalSession(full.input,runs.slice(0,2),'00000001',[null,null],full.view).bytes,three:N.writeOpticalSession(full.input,runs,'00000001',[null,null],full.view).bytes};
+};
+const fieldsOf=text=>JSON.parse(text).runs.map(r=>!!r.field);
+test('P2 (a) (E2): before the decision recovery dropped every field but the selected run\'s, though another fitted, and said nothing',async()=>{
+ const {N,full,runs,two,three}=await e2();
+ // a limit with room for two runs' fields of three (the stand-in for 16 MiB of a 22 MB session)
+ const limit=Math.floor((two+three)/2);
+ // round 22's recovery write: keepSelected alone, the selected run's field only
+ const old=N.writeOpticalSession(full.input,runs,'00000003',[null,null],full.view,{keepSelected:true,limit});
+ assert.equal(old.ok,true);assert.deepEqual(fieldsOf(old.text),[false,false,true]);assert.deepEqual(old.notKept,[1,2]);
+ // Run 2's field would have fitted beside it
+ const withTwo=N.writeOpticalSession(full.input,runs.slice(1),'00000003',[null,null],full.view).bytes;assert.ok(withTwo<=limit,`${withTwo} <= ${limit}`);
+ // and the header had no words for it: "kept" alone
+ const PS=await import(STATIC+'workspace-persistence.mjs');
  assert.equal(PS.projectTitle({models:1,recovery:'kept'}),'Untitled project · not saved to a file · kept for recovery in this browser');
- // the Messages line: what Save will offer, what the other runs keep, what recovery keeps
- assert.equal(N.sessionSizeText({ok:false,bytes:22.0e6,reduced:{bytes:4e6,notKept:[1,2,3,4,5],kept:[6]},refusal:null}),
-  'Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.');
- assert.equal(N.sessionSizeText({ok:false,bytes:18.0e6,reduced:{bytes:8e6,notKept:[1,2,3],kept:[4,5,6]},refusal:null}),
-  'Session is now 18 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Runs 4, 5 and 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.');
- // the page: the optical snapshot's count, shown while recovery is kept, in the header and the indicator
+});
+
+test('P2 (b) (E2): over the limit recovery keeps the selected and pinned fields, then the newest others that fit, and names the rest',async()=>{
+ const {N,R,PS,full,runs,two,three}=await e2();
+ const limit=Math.floor((two+three)/2);
+ // Run 3 selected: its field, then Run 2's (newest other) fits, Run 1's does not
+ const make=N.captureSession(full.input,runs,'00000003',[null,null],full.view,{limit});
+ const text=make();assert.ok(new TextEncoder().encode(text).length<=limit);
+ assert.deepEqual(fieldsOf(text),[false,true,true]);assert.deepEqual(make.dropped,[1]);
+ // Run 1 pinned, Run 3 selected: both kept first; Run 2 newest of the rest does not fit
+ const pinned=runs.map(r=>r.number===1?{...r,pinned:true}:r);
+ const make2=N.captureSession(full.input,pinned,'00000003',[null,null],full.view,{limit});
+ assert.deepEqual(fieldsOf(make2()),[true,false,true]);assert.deepEqual(make2.dropped,[2]);
+ // a larger limit keeps every field it can, newest first: all three at the full size
+ const all=N.captureSession(full.input,runs,'00000001',[null,null],full.view,{limit:three});all();assert.deepEqual(all.dropped,[]);
+ // the saved state carries the numbers; the header names them
+ const states=[];const saver=new R.NotebookAutosave({save:async r=>r},{onState:s=>states.push(s),delay:0,setTimer:fn=>{fn();return 1;},clearTimer:()=>{}});
+ saver.schedule('over',make);await saver.settle();
+ assert.deepEqual(states.find(s=>s.phase==='saved').dropped,[1]);
+ assert.equal(PS.projectTitle({models:1,recovery:'keptFields:3,5'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of Run 3 and Run 5');
+ assert.equal(PS.projectTitle({models:1,recovery:'keptFields:1'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of Run 1');
+ assert.equal(PS.projectTitle({models:1,recovery:'keptFields:1,2,4'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of Run 1, Run 2 and Run 4');
+ // File › Save still asks about the selected and pinned runs only (no fill)
+ const save=N.writeOpticalSession(full.input,runs,'00000003',[null,null],full.view,{limit});
+ assert.equal(save.ok,false);assert.deepEqual(save.reduced.kept,[3]);
+ // the Messages line: what Save will offer, what the other runs keep, what recovery leaves out
+ assert.equal(N.sessionSizeText({ok:false,bytes:22.0e6,reduced:{bytes:4e6,notKept:[1,2,3,4,5],kept:[6]},refusal:null},[1,2]),
+  'Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.');
+ assert.equal(N.sessionSizeText({ok:false,bytes:18.0e6,reduced:{bytes:8e6,notKept:[1,2,3],kept:[4,5,6]},refusal:null},[]),
+  'Session is now 18 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Runs 4, 5 and 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery keeps every field.');
+ // the page: the snapshot's numbers, shown while recovery is kept, in the header and the indicator;
+ // the line names recovery's runs from the same snapshot
  const app=read('workspace-app.mjs');
- assert.ok(app.includes("const opticalRecoveryShown=()=>recoveryState==='kept'&&!multiView.active()&&opticalRecoveryDropped>0?'keptFields:'+opticalRecoveryDropped:recoveryState;"));
- assert.ok(app.includes("opticalRecoveryDropped=recoveryKind==='optical'&&Number.isInteger(state.dropped)?state.dropped:0;"));
+ assert.ok(app.includes("const opticalRecoveryShown=()=>recoveryState==='kept'&&!multiView.active()&&opticalRecoveryDropped.length?'keptFields:'+opticalRecoveryDropped.join(','):recoveryState;"));
+ assert.ok(app.includes("opticalRecoveryDropped=recoveryKind==='optical'&&Array.isArray(state.dropped)?state.dropped:[];"));
  assert.ok(app.includes('recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});'));
  assert.ok(app.includes('persistenceTitle({...saveIndicator,recovery:opticalRecoveryShown()})'));
+ assert.ok(app.includes('text=sessionSizeText(writeOpticalSession(inputsFile(),runs,solverRun?.job||null,compareIds,currentView()),left);'));
  // the message wraps
  assert.ok(read('workspace.css').includes('#file-status{color:#7b8798;min-width:0;overflow-wrap:anywhere}'));
+});
+
+test('P2 (c) (E2): the record round-trips; a restore keeps the kept fields and names the runs without',async()=>{
+ const {N,R,full,runs,two,three}=await e2();
+ const limit=Math.floor((two+three)/2),make=N.captureSession(full.input,runs,'00000003',[null,null],full.view,{limit});
+ const record={version:1,savedAt:'2026-11-24T21:00:00.000Z',session:make()};
+ const back=R.readNotebookRecovery(record).session;
+ assert.deepEqual(back.runs.map(r=>[r.number,!!r.field]),[[1,false],[2,true],[3,true]]);
+ // the kept fields are the runs' own, value for value
+ for(const n of [2,3])assert.deepEqual(JSON.parse(JSON.stringify(back.runs[n-1].field)),JSON.parse(JSON.stringify(runs[n-1].field)));
+ // every run keeps its n_eff
+ assert.deepEqual(back.runs.map(r=>JSON.stringify(r.effective_index)),runs.map(r=>JSON.stringify(r.effective_index)));
+ assert.equal(N.fieldsNotKeptText(back.runs),' Fields not kept for Run 1; their n_eff, TE fractions and effective areas were.');
+ assert.equal(N.fieldsNotKeptText(runs),'');
+ // written again, the restored session keeps the same fields within the limit
+ const again=N.captureSession(back.input,back.runs,back.selected,back.comparison,back.view,{limit});const text=again();
+ assert.deepEqual(fieldsOf(text),[false,true,true]);assert.ok(new TextEncoder().encode(text).length<=limit);assert.deepEqual(again.dropped,[]);
+ // the page: a browser restore appends it after its message; the Results line says where
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}"));
+ assert.ok(app.includes("solverRun.origin==='recovered'?'This run’s fields were not kept in browser recovery (over 16 MiB): n_eff, the TE fractions and the effective areas were.'"));
+});
+
+test('P2 (d) (E2): below the limit recovery writes the same bytes as before',async()=>{
+ const {N,full,runs}=await e2();
+ // the limit exactly the full text's size, and the real 16 MiB
+ const exact=N.writeOpticalSession(full.input,runs,'00000002',['00000001','00000003'],full.view).bytes;
+ for(const limit of [exact,undefined]){
+  const make=N.captureSession(full.input,runs,'00000002',['00000001','00000003'],full.view,limit===undefined?{}:{limit});
+  const text=make();assert.deepEqual(make.dropped,[]);assert.deepEqual(fieldsOf(text),[true,true,true]);
+  // the round-22 write (keepSelected, no fill) of the same runs gives the same text
+  assert.equal(text,N.writeOpticalSession(full.input,runs,'00000002',['00000001','00000003'],full.view,{keepSelected:true,...(limit===undefined?{}:{limit})}).text);
+ }
 });
 
 // E3: the estimate beside Run study with group index on, and Turn off group index
