@@ -41,7 +41,10 @@ const PROBLEMS=['unavailable','conflict','overLimit','quota'];
 // for a state that is not one of the two.
 export const RECOVERY_OFF=Object.freeze({overLimit:'Browser recovery is off: this session is over 16 MiB. File › Save keeps your work.',quota:'Browser recovery is off: this browser’s storage is full. File › Save keeps your work.'});
 export const recoveryOffText=state=>RECOVERY_OFF[state]||null;
-const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:RECOVERY[recovery];};
+// Round 23 (E2): keptFields:N is an optical session's: over 16 MiB, recovery keeps the fields of the
+// selected and pinned runs only, so N runs' fields are not in it: "kept for recovery in this browser
+// without the fields of 5 runs" (no "File › Save keeps them": over the limit Save asks the same).
+const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||''),f=/^keptFields:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:f?`${RECOVERY.kept} without the fields of ${plural(+f[1],'run')}`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
