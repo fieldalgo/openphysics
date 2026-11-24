@@ -874,10 +874,17 @@ print(n)`;
   for (let n = 1; n <= 6; n++) await runAndWait(n);
   await clearNotice(); await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question');
   const y4 = {asked: await page.eval("({title:document.getElementById('run-drop-confirm-title').textContent,buttons:[...document.querySelectorAll('#run-drop-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent),focus:document.activeElement?.id})")};
+  // round 20 (Z7, pre-registered): while the question is open the heated model says Run study waits
+  const heatedWaiting = () => page.eval("({reason:document.getElementById('run-multiphysics-reason').textContent,status:document.getElementById('status').textContent,run:document.getElementById('run-multiphysics').textContent,inDialog:document.getElementById('run-drop-confirm').contains(document.activeElement)})");
+  const z7 = {open: await heatedWaiting()};
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R19 drop question ' + tag); }
   await size(1440, 900);
   await page.click('#run-drop-confirm-cancel'); await sleep(300);
   y4.cancel = await page.eval("({open:document.getElementById('run-drop-confirm').open,focus:document.activeElement?.id,runs:document.querySelector('.dock-title>span').textContent})");
+  z7.cancelled = await heatedWaiting(); stage('R20 Z7 heated waiting words', z7);
+  assert.deepEqual(z7.open, {reason: 'Waiting for your answer: pin, run or cancel', status: 'Run study is waiting for your answer', run: 'Run study', inDialog: true});
+  for (const text of [z7.open.status, z7.open.run, z7.open.reason]) assert.doesNotMatch(text, /Computing|running|in progress/);
+  assert.equal(z7.cancelled.reason, ''); assert.notEqual(z7.cancelled.status, z7.open.status); assert.equal(z7.cancelled.inDialog, false);
   await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question again');
   await page.click('#run-drop-confirm-run');
   await page.until("/^Run 7 · /.test(document.querySelector('.dock-title>span').textContent)", 'R19 heated run 7', 180000); await runReady();
