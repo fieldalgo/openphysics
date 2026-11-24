@@ -430,7 +430,7 @@ try {
   await page.call('Input.insertText', {text: 'design A'});
   for (const type of ['keyDown', 'keyUp']) await page.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
   await sleep(150);
-  const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · Run 1 · design A · 600 × 300 nm/);
+  const named = await text('.run-item'); stage('run named', {item: named}); assert.match(named, /^Pinned · Run 1 · design A · closed · 600 × 300 nm/);
   // the run list gives the time with seconds, so runs of the same minute read apart
   assert.match(named, / · \d{1,2}:\d\d:\d\d(?: [AP]M)?$/);
   // a pinned run offers Unpin; after it, Enter in Run name pins it again
@@ -467,7 +467,7 @@ try {
   assert.equal(neffTable.caption, 'Modes of A and B matched by field overlap');
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
   // round 12 (N1): the run names are in the line above the table, the headers short and grouped A | B
-  assert.deepEqual(neffTable.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.deepEqual(neffTable.runs, ['A · Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · 700 × 300 nm · Silicon · λ 1550 nm']);
+  assert.deepEqual(neffTable.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.deepEqual(neffTable.runs, ['A · Run 1 · design A · closed · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · closed · 700 × 300 nm · Silicon · λ 1550 nm']);
   assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)', 'n_g A', 'n_g B']);
   // both sides of a matched row give their A_eff in µm²
   for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
@@ -476,7 +476,7 @@ try {
   // the field panels do not repeat the name, and come before the n_eff table
   const panels = await page.eval("({headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>h.textContent),plotsFirst:!!(document.querySelector('.compare-grid').compareDocumentPosition(document.getElementById('compare-neff'))&Node.DOCUMENT_POSITION_FOLLOWING),plotTop:Math.round(document.getElementById('compare-field-a').getBoundingClientRect().top+scrollY),viewport:innerHeight})");
   stage('compare panels', panels);
-  assert.deepEqual(panels.headings, ['A · Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · 700 × 300 nm · Silicon · λ 1550 nm']);
+  assert.deepEqual(panels.headings, ['A · Run 1 · design A · closed · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · closed · 700 × 300 nm · Silicon · λ 1550 nm']);
   assert.ok(panels.plotsFirst, 'field plots before the n_eff table');
   await page.screenshot('compare');
   // round 10 (K1): absorption loss A and B on every row, from the saved indices, with the absorption-only help
@@ -518,7 +518,7 @@ try {
     // Run 1 is 600 × 300 nm centred on x = 0, with its bottom at y = 0 (y from 0 to 300 nm)
     assert.ok(x0 <= -0.3 && x1 >= 0.3 && y0 <= 0 && y1 >= 0.3, `the core is inside the drawn window at ${tag}: ${compareBounds}`);
     await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again ' + tag);
-    await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
+    await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · closed · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(200);
   };
   assert.equal(compareFrame[0].bounds, (await page.eval("document.getElementById('compare-field-a').dataset.viewBounds")));
   await sameWindowAsResults('1280 × 800');
@@ -555,8 +555,8 @@ try {
   stage('K10 neutral step', tone); assert.deepEqual([tone.state, tone.tone], ['attention', 'info']); assert.equal(tone.color, 'rgb(97, 112, 134)', 'the muted colour, not the warning colour');
   // back to Compare with Run 2 selected, as before this stage
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare again');
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
-  assert.deepEqual(await pressedPage(), ['Compare']); assert.match(await text('.run-item[aria-pressed=true]'), /^Run 2 · 700/);
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · closed · 700/.test(b.textContent)).click();return true}', '.run-item'); await sleep(300);
+  assert.deepEqual(await pressedPage(), ['Compare']); assert.match(await text('.run-item[aria-pressed=true]'), /^Run 2 · closed · 700/);
   // P3: File › Save writes the project file; the session file of this model is File › Export ›
   // Model with runs, which this stage and the recovery stages after it check
   await page.click('#menu-export-session'); await confirmName('first save');
@@ -751,7 +751,7 @@ try {
   assert.ok(renamedHeader.startsWith(`${sessionFile} · changed since restored · `), renamedHeader);
   await renameOnBlur('design A'); await sleep(300); assert.ok((await header()).startsWith(`Recovered from this browser · same as file ${sessionFile}`), await header());
   // the newer run viewed: every place says it is the result of the current inputs
-  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · 700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
+  await page.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 2 · closed · 700 × 300 nm/.test(b.textContent)).click();return true}', '.run-item');
   await page.until("/^Result for the current inputs/.test(document.querySelector('#canvas p')?.textContent||'')", 'newer run shown');
   assert.equal(await page.eval("[...document.querySelectorAll('#workflow .workflow-step')][4]?.innerText.replace(/\\s+/g,' ')"), '5. Results Result for these inputs');
   // switching to the heated model says where the optical runs stay, and they come back
@@ -866,7 +866,7 @@ try {
   const resultsNote = await text('#canvas'); assert.match(resultsNote, /Modes are ranked by effective index\. Compare matches them between runs by field overlap\./);
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare 500 → 450 nm');
   const matched = await compareTableRows(); stage('V17-M2 Compare 500 → 450 nm', matched);
-  assert.deepEqual(matched.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.match(matched.runs[0], /^A · Run 3 · 500 × 300 nm/); assert.match(matched.runs[1], /^B · Run 4 · 450 × 300 nm/);
+  assert.deepEqual(matched.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.match(matched.runs[0], /^A · Run 3 · closed · 500 × 300 nm/); assert.match(matched.runs[1], /^B · Run 4 · closed · 450 × 300 nm/);
   assert.deepEqual(matched.matched, ['0:0', '1:1']); assert.deepEqual(matched.rows.map(r => r[0]), ['A mode 1 ↔ B mode 1', 'A mode 2 ↔ B mode 2']); assert.deepEqual(matched.short, ['1 ↔ 1', '2 ↔ 2']);
   assert.ok(matched.overlap.length === 2 && matched.overlap.every(v => v >= 0.95), 'overlap >= 0.95: ' + matched.overlap);
   // the polarization cells use the modes table's words: a TM-like cell names its TM share first
@@ -1850,7 +1850,7 @@ try {
     assert.equal(compared.matchNote, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
     assert.ok(compared.sides.includes('Absorption loss A (dB/cm)') && compared.sides.includes('Loss B (dB/cm)'), JSON.stringify(compared.sides));
     assert.equal(compared.lossNote, 'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
-    assert.ok(compared.runs[0].endsWith(' (closed)') && compared.runs[1].endsWith(' (open, PML 1 µm)'), JSON.stringify(compared.runs));
+    assert.ok(compared.runs[0].includes(' · closed · ') && compared.runs[1].includes(' · open (PML 1 µm) · '), JSON.stringify(compared.runs));
     assert.deepEqual(compared.lossA, ['0 dB/cm', '0 dB/cm']); assert.deepEqual(compared.lossB, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     // O2 (round 13): at 1440 × 900 the Compare table keeps at least 24 px to spare
     assert.equal(compared.comparing, true); assert.ok(compared.slack >= 24, `OB Compare: ${compared.slack} px to spare at 1440`);
@@ -1934,9 +1934,9 @@ try {
       await ob.until("!!document.querySelector('.compare-grid article h3')", 'S8 Compare headings');
       const compare = {headings: await ob.eval("[...document.querySelectorAll('.compare-grid article h3, #compare-table-runs [data-side]')].map(e=>e.textContent)"), picker: await ob.eval("document.getElementById('compare-b').selectedOptions[0].textContent"), over: await over()};
       stage('S8 multi-shape label at 390 × 844', {results, compare});
-      assert.ok(results.item.includes('Run ') && results.item.includes(' · ' + label + ' · open (PML 1 µm) · '), results.item);
+      assert.ok(results.item.includes('Run ') && results.item.includes(' · open (PML 1 µm) · ' + label + ' · '), results.item);
       assert.equal(results.over <= 0, true, `Results overflows by ${results.over}px`);
-      assert.ok(compare.headings.some(h => h.includes(label)), JSON.stringify(compare.headings)); assert.ok(compare.picker.includes(label + ' · open (PML 1 µm)'), compare.picker);
+      assert.ok(compare.headings.some(h => h.includes(label)), JSON.stringify(compare.headings)); assert.ok(compare.picker.includes('open (PML 1 µm) · ' + label), compare.picker);
       assert.equal(compare.over <= 0, true, `Compare overflows by ${compare.over}px`);
       await ob.click('nav [data-page=Results]'); await ob.until("!!document.getElementById('modes-table')", 'S8 back to Results'); await obSize(1280, 800);
     }

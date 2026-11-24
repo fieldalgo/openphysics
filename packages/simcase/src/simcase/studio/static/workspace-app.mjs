@@ -20,7 +20,7 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
-import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,boundaryName,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
+import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
@@ -1504,9 +1504,8 @@ function compareTable(a,b,match){
   kind.className='pol-kind';kind.textContent=text.slice(0,at);sep.className='pol-sep';sep.textContent=' · ';share.className='pol-share';share.textContent=text.slice(at+3);td.append(kind,sep,share);return td;};
  if(match.error){box.append(cell('p','Modes not matched: '+match.error,{class:'table-note',id:'compare-match-error'}));return box;}
  const runs=document.createElement('p');runs.id='compare-table-runs';runs.className='table-runs';
- // with an open run on either side, each run names its boundary: "(closed)" or "(open, PML 1 µm)"
- const anyOpen=isOpenRun(a)||isOpenRun(b);
- for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run))+(anyOpen?' '+boundaryName(run):'');runs.append(line);}
+ // each run names its boundary after its number and name (round 18, X6): "closed" or "open (PML 1 µm)"
+ for(const [side,run] of [['A',a],['B',b]]){const line=document.createElement('span');line.dataset.side=side;line.textContent=side+' · '+runHeading(run,runNumber(run));runs.append(line);}
  // the n_g hint, when neither run computed n_g: on this line, so the n_g columns stay narrow
  if(![a,b].some(hasGroupIndex)){const line=document.createElement('span');line.className='table-hint';line.append('n_g: ',groupIndexHint());runs.append(line);}
  const frame=document.createElement('div');frame.className='compare-table-frame';

@@ -2,17 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 import {designSummary} from './workspace-shapes.mjs';
 
+// A run's boundary as every run label names it (round 18, X6): "open (PML 1 µm)" for a run with an
+// open boundary (its PML thickness as the run kept it), else "closed" (a PEC window).
+export function boundaryTag(run){
+ const pml=run.settings?.boundary==='PML'?run.settings.pml?.thickness:null,t=typeof pml==='string'?Number.parseFloat(pml):NaN;
+ return run.settings?.boundary==='PML'?`open (PML ${Number.isFinite(t)?t/1000:1} µm)`:'closed';
+}
 // A run as a table header names it: its number (its place in the run list) when given, its name
-// (if any), size and wavelength: "Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm".
+// (if any), its boundary, size and wavelength: "Run 1 · design A · closed · 600 × 300 nm · Silicon ·
+// λ 1550 nm".
 export function runHeading(run,number=null){
  const name=Number.isInteger(number)?`Run ${number}${run.label?' · '+run.label:''} · `:run.label?run.label+' · ':'';
- return `${name}${designSummary(run.input.model)} · λ ${run.input.model.wavelength} nm`;
+ return `${name}${runDesign(run)} · λ ${run.input.model.wavelength} nm`;
 }
-// A run's design as the run list and the Compare pickers name it (round 16): designSummary, and
-// "open (PML 1 µm)" for a run with an open boundary (its PML thickness as the run kept it).
+// A run's design as the run list and the Compare pickers name it: the boundary first, right after
+// the run number and name (round 18, X6), then designSummary, so a label cut short in a picker
+// still shows it: "open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon".
 export function runDesign(run){
- const pml=run.settings?.boundary==='PML'?run.settings.pml?.thickness:null,t=typeof pml==='string'?Number.parseFloat(pml):NaN;
- return designSummary(run.input.model)+(Number.isFinite(t)?` · open (PML ${t/1000} µm)`:'');
+ return boundaryTag(run)+' · '+designSummary(run.input.model);
 }
 // A Compare field panel heading: the side, then the run without repeating the side as its name
 // (a run named "A" on side A reads "A · 600 × 300 nm · …", not "A · A · 600 × 300 nm · …").

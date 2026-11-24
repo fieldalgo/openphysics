@@ -102,13 +102,13 @@ test('Compare formats: n_eff to 8 decimals, the difference as a percentage of A,
  assert.equal(C.formatIndex(2.65-2.6),'0.05000000');
  assert.equal(C.formatPercent(0.05/2.6*100),'1.9231 %');assert.equal(C.formatPercent(-0.1/2.1*100),'-4.7619 %');
  assert.equal(C.formatPercent(null),'—');
- assert.equal(C.runHeading(run('aaaaaaaa',600,'design A')),'design A · 600 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.runHeading(run('aaaaaaaa',700)),'700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.runHeading(run('aaaaaaaa',600,'design A')),'design A · closed · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.runHeading(run('aaaaaaaa',700)),'closed · 700 × 300 nm · Silicon · λ 1550 nm');
  // a Compare field heading never repeats the side as the run's name (round 3, N6)
- assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A')),'A · 600 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,' b ')),'B · 700 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'design A')),'A · design A · 600 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.fieldHeading('B',run('aaaaaaaa',700)),'B · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A')),'A · closed · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,' b ')),'B · closed · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'design A')),'A · design A · closed · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700)),'B · closed · 700 × 300 nm · Silicon · λ 1550 nm');
  // one n_eff precision everywhere: 8 decimals
  assert.equal(C.formatIndex(2.785604861),'2.78560486');
 });
@@ -169,10 +169,10 @@ test('round 9 (J5), round 11: the title says in a few words that the viewed run 
  assert.equal(P.persistenceTitle({invalid:true,viewed},when),'Invalid input draft · last valid inputs unchanged');
 });
 test('round 9 (J5): Compare headings name a run by its number with its name',()=>{
- assert.equal(C.runHeading(run('aaaaaaaa',600,'design A'),1),'Run 1 · design A · 600 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.runHeading(run('aaaaaaaa',700),2),'Run 2 · 700 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A'),1),'A · Run 1 · 600 × 300 nm · Silicon · λ 1550 nm');
- assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,'design B'),2),'B · Run 2 · design B · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.runHeading(run('aaaaaaaa',600,'design A'),1),'Run 1 · design A · closed · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.runHeading(run('aaaaaaaa',700),2),'Run 2 · closed · 700 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('A',run('aaaaaaaa',600,'A'),1),'A · Run 1 · closed · 600 × 300 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',run('aaaaaaaa',700,'design B'),2),'B · Run 2 · design B · closed · 700 × 300 nm · Silicon · λ 1550 nm');
 });
 
 test('round 10: a recovered notebook whose record still matched its file says "same as file", not "not saved to a file"',()=>{
