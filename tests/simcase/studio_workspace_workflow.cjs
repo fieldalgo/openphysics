@@ -112,9 +112,9 @@ test('round 9 (J5): the dock heading and the footer describe the run being viewe
  const runs=[{signature:JSON.stringify(older),input:older,label:'Design A',origin:'recovered'},{signature:JSON.stringify(newer),input:newer,label:'Design B',origin:'recovered'}];
  // Design A (run 1) viewed, the inputs are Design B's (run 2); since round 14 (Q7) both geometries are named
  let f=W.opticalFreshness(newer,runs,runs[0]);
- assert.deepEqual(f,{state:'other',run:1,name:'Design A',origin:'recovered',has:2,geometry:'500 × 220 nm',currentGeometry:'700 × 220 nm',changes:['Width 500 → 700 nm']});
+ assert.deepEqual(f,{state:'other',run:1,name:'Design A',origin:'recovered',has:2,hasName:'Design B',geometry:'500 × 220 nm',currentGeometry:'700 × 220 nm',changes:['Width 500 → 700 nm']});
  assert.equal(W.opticalSequenceHeading(f),'Run 1 · Design A 500 × 220 nm · current inputs 700 × 220 nm');
- assert.equal(W.opticalReadyStatus(f),'Run 1 · Design A 500 × 220 nm · current inputs 700 × 220 nm · Run 2 has them');
+ assert.equal(W.opticalReadyStatus(f),'Run 1 · Design A 500 × 220 nm · current inputs 700 × 220 nm · current inputs from Run 2 · Design B');
  // the step bar says the same of the same run
  assert.equal(W.opticalWorkflow({input:newer,runs,viewed:runs[0]})[4].detail,'Current inputs differ from this run');
  // Design B viewed: it is the current inputs' run, recovered

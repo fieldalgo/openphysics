@@ -275,8 +275,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    다르면(편집 뒤나 이전 실행을 골랐을 때) 두 기하를 모두 밝혀 *Run 1 · design A 600 × 300 nm · current
    inputs 700 × 300 nm*. 형상이 여럿이면 실행 목록처럼 이름과 크기로 밝힙니다: *Run 6 · Core 500 × 220 + Substrate 3000 × 700 nm*(round 17; 전에는 *2 shapes*)(기하가 같으면 다른 설정을 두 개까지: *· current inputs differ: Wavelength 1550 →
    1310 nm*)(상태
-   표시줄은 다른 실행이 현재 입력을 가지면 *Run 2 has them*, 아니면 *press Run to compute them*을
-   덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
+   표시줄은 다른 실행이 현재 입력을 가지면 현재 입력의 출처를 *current inputs from Run 2 · Design B*로 밝히고(round 18;
+   전에는 *Run 2 has them*), 아니면 *press Run to compute them*을 덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
    (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
    입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
    군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. Messages는 바뀌는

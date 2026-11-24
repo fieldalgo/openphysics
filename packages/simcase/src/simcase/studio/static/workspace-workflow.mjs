@@ -86,7 +86,8 @@ export function droppedRunText(run){
 // viewed: the run Results shows (the selected run), which both then describe, so they agree with
 // the step bar and the title. 'current': that run (without one, the newest run) solved these exact
 // inputs; 'other': the viewed run has other inputs, and has: the number of a run of these inputs,
-// if any; 'stale': runs exist but none is viewed and none has these inputs; 'none' before any
+// if any, with hasName its name (the status line names that run as the source of the current inputs,
+// round 18 X11); 'stale': runs exist but none is viewed and none has these inputs; 'none' before any
 // run. origin: where the run came from when it was not computed in this tab ('imported' or
 // 'recovered'). name: the run's name (absent when it has none). For 'other', geometry and
 // currentGeometry: the two geometries in words, and changes: what differs, from the run to the
@@ -96,7 +97,7 @@ export function opticalFreshness(input,runs=[],viewed=null,modeCount,groupIndex=
  // a run's number in the tab (round 17, U2), else its place in the list
  const number=i=>Number.isInteger(runs[i]?.number)?runs[i].number:i+1;
  const index=seen>=0?seen:own,run=runs[index],origin=run?.origin,from=origin==='imported'||origin==='recovered'?{origin}:{},name=run?.label?{name:run.label}:{};
- if(seen>=0&&run.signature!==signature)return {state:'other',run:number(index),...name,...from,...(own>=0?{has:number(own)}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
+ if(seen>=0&&run.signature!==signature)return {state:'other',run:number(index),...name,...from,...(own>=0?{has:number(own),...(runs[own].label?{hasName:runs[own].label}:{})}:{}),geometry:geometryWords(run.input.model),currentGeometry:geometryWords(input.model),changes:inputChanges(run.input,input)};
  if(index>=0)return {state:'current',run:number(index),...name,...from};
  return runs.length?{state:'stale',run:number(runs.length-1)}:{state:'none',run:null};
 }
@@ -118,11 +119,11 @@ export function opticalSequenceHeading({state,run,name='',origin,...other}){
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Nothing is computed until you press Run';
 }
-export function opticalReadyStatus({state,run,name='',origin,has,...other}){
+export function opticalReadyStatus({state,run,name='',origin,has,hasName='',...other}){
  const title=runTitle(run,name);
  if(state==='current'&&originText(origin))return `${title} · ${originText(origin)} · press Run to compute it here`;
  if(state==='current')return `${title} · solved from the current inputs · press Run to solve again`;
- if(state==='other')return otherInputsText({run,name,...other})+' · '+(has?`Run ${has} has them`:'press Run to compute them');
+ if(state==='other')return otherInputsText({run,name,...other})+' · '+(has?`current inputs from ${runTitle(has,hasName)}`:'press Run to compute them');
  if(state==='stale')return `Inputs changed since run ${run} · press Run to update`;
  return 'Optical adapter ready · explicit Run required';
 }
