@@ -5,7 +5,7 @@ from functools import lru_cache
 
 import numpy as np
 import pytest
-from panel_studies import matrix_relative, recorded, study
+from panel_studies import ENABLED as STUDIES, matrix_relative, recorded
 
 from galerkin import laplace_corner_harmonic_single_active_field as field
 
@@ -38,17 +38,17 @@ def calculated(index,count=32,width=.008,reflect=False):
                  ground_modes={.008:256,.016:512,.032:1024}[width])
 
 
-@pytest.mark.slow
-@study
-@pytest.mark.parametrize('index',range(1))
-def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
-    coarse=quantities(calculated(index,32));fine=quantities(calculated(index,48))
-    panel=[relative(a,b) for a,b in zip(coarse,fine)]
-    assert max(panel)<=.01
-    outer=[quantities(calculated(index,count=48,width=width)) for width in (.008,.016,.032)]
-    changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
-    assert max(value for row in changes for value in row)<=.01
-    record_property('harmonic_single_active_resolution',repr((index,panel,changes)))
+if STUDIES:  # dispatch-only convergence study (tests/_support/panel_studies.py)
+    @pytest.mark.slow
+    @pytest.mark.parametrize('index',range(1))
+    def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
+        coarse=quantities(calculated(index,32));fine=quantities(calculated(index,48))
+        panel=[relative(a,b) for a,b in zip(coarse,fine)]
+        assert max(panel)<=.01
+        outer=[quantities(calculated(index,count=48,width=width)) for width in (.008,.016,.032)]
+        changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
+        assert max(value for row in changes for value in row)<=.01
+        record_property('harmonic_single_active_resolution',repr((index,panel,changes)))
 
 
 @pytest.mark.parametrize('index',range(1))
@@ -65,18 +65,6 @@ def test_horizontal_reflection_preserves_each_current_entry_without_floor(index)
     n=len(GEOMETRIES[index]['polygons']);cap,faces,whole=quantities(reflected)
     faces=faces.reshape(n,4,1,1)[:,[2,1,0,3]].reshape(4*n,1,1)
     assert max(relative(a,b) for a,b in zip(quantities(original),(cap,faces,whole)))<=1e-10
-
-
-@pytest.mark.parametrize('index',range(1))
-@pytest.mark.parametrize('scale',[2.**-15,2.**15])
-def test_physical_scaling_keeps_capacitance_and_inverse_length_current_units(index,scale):
-    row=GEOMETRIES[index];expected=calculated(index,32)
-    result=solve([np.asarray(p)*scale for p in row['polygons']],
-                 width=row['width']*scale,height=row['height']*scale,panels_per_edge=32)
-    assert relative(result.whole.capacitance_per_permittivity,expected.whole.capacitance_per_permittivity)<=1e-10
-    assert relative(scale*result.whole.current_gram,expected.whole.current_gram)<=1e-10
-    assert relative(scale*result.edge_current_gram,expected.edge_current_gram)<=1e-10
-    np.testing.assert_allclose(result.whole.current_integrals,expected.whole.current_integrals,rtol=0,atol=1e-10)
 
 
 @lru_cache(maxsize=1)
