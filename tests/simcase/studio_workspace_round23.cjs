@@ -72,6 +72,38 @@ test('P4 (E4): the drop line, the dropped words, the swap button and the Pin not
  assert.ok(read('workspace-multiphysics-view.mjs').includes("const dropName=r=>`${runTitle(r)} (run at ${runTime(r)})`;"));
 });
 
+// E6: the line under a result names every input that enters studySignature when it differs
+test('P6 (E6): Current inputs differ names the boundary, the search, n_g and Modes to find; "unchanged:" keeps the rest',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ const strip={model:model(STRIP)},t18={model:model([CORE,SUBSTRATE])};
+ const closed={input:strip,modeCount:2,groupIndex:false,pml:null,searchTarget:null};
+ const line=(run,now)=>W.runInputsLine(...W.studyInputParts(run,now));
+ // the default study on both sides: the line of round 16, unchanged
+ assert.equal(line(closed,{...closed,input:t18}),'Current inputs differ from this run: this run 600 × 300 nm · Silicon, current Core 500 × 220 + Substrate 3000 × 700 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm');
+ assert.equal(line(closed,closed),'Result for the current inputs · 600 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ // a closed n_g run against the current open boundary, Highest, 4 modes (round 23's T22 state)
+ const open={input:t18,modeCount:4,groupIndex:false,pml:{open_edges:['left','right','bottom'],target:'2.460'},searchTarget:null};
+ assert.equal(line({...closed,groupIndex:true},open),'Current inputs differ from this run: this run 600 × 300 nm · Silicon · closed window · highest n_eff · Modes to find 2 · group index on, current Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · open boundary (PML 1 µm) on left, right and bottom · search near 2.46 · Modes to find 4 · group index off; unchanged: λ 1550 nm · core mesh 30 nm');
+ // the PML thickness as the run kept it; the open edges named
+ assert.equal(W.boundaryWords({open_edges:['bottom'],target:'2.460',thickness:'1000 nm'}),'open boundary (PML 1 µm) on bottom');
+ assert.equal(W.boundaryWords({open_edges:['left','right'],target:'2.460',thickness:'500 nm'}),'open boundary (PML 0.5 µm) on left and right');
+ // the closed-window search alone differs: named, the rest unchanged
+ assert.equal(line({...closed,input:t18},{...closed,input:t18,searchTarget:2.46}),'Current inputs differ from this run: this run highest n_eff, current nearest to n_eff 2.46; unchanged: Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm · core mesh 30 nm · closed window');
+ // n_g alone, Modes to find alone
+ assert.equal(line(closed,{...closed,groupIndex:true}),'Current inputs differ from this run: this run group index off, current group index on; unchanged: 600 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ assert.equal(line({...closed,modeCount:4},closed),'Current inputs differ from this run: this run Modes to find 4, current Modes to find 2; unchanged: 600 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ // the open target alone
+ assert.equal(line(open,{...open,pml:{...open.pml,target:'2.300'}}),'Current inputs differ from this run: this run search near 2.46, current search near 2.3; unchanged: Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm · core mesh 30 nm · open boundary (PML 1 µm) on left, right and bottom · Modes to find 4');
+ // a moved shape (the geometry words the same): its position named
+ const moved={model:model([{...STRIP[0],x:-200}])};
+ assert.equal(line(closed,{...closed,input:moved}),'Current inputs differ from this run: this run at Core (-300, 0) nm, current at Core (-200, 0) nm; unchanged: 600 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm');
+ // the page builds both sides from the run's settings and the page's study
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes('const runStudy=run=>({input:run.input,modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,pml:isOpenRun(run)?run.settings.pml:null,searchTarget:runSearchTarget(run)});'));
+ assert.ok(app.includes('const studyParts=run=>studyInputParts(runStudy(run),{input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex===true,pml:pmlNow(),searchTarget:closedTargetNow()});'));
+ assert.ok(app.includes('const [runParts,nowParts]=studyParts(solverRun);'));
+});
+
 // E2: a session over the limit; browser recovery keeps the fields of the selected and pinned runs only
 const FIXTURES=path.join(__dirname,'studio_session_fixtures');
 const OPEN_FULL='optical-v10-open-full-083e151.json';

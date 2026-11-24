@@ -610,7 +610,16 @@ inputs* and *Current inputs differ from this run: this run 600 × 300 nm · Sili
 300 nm · Silicon* (only the parts that differ: geometry, wavelength, core mesh) say which design a
 result belongs to, in Results and in the selected run's settings. The line under the Results
 heading names each part once: the parts that differ with both values, then the others,
-*…, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm*; the step bar's Results step
+*…, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm · core mesh 30 nm*. Since round 23 (E6) the
+optical line names every input a run is compared by (its study signature) when either side is not
+the default: the shape positions when only they differ (*at Core (-300, 0) nm*), the boundary with
+its PML thickness and open edges (*closed window*, *open boundary (PML 1 µm) on left, right and
+bottom*), the search (*highest n_eff*, *nearest to n_eff 2.46*, an open boundary's *search near
+2.46*), *Modes to find 4* and *group index on* or *off*: *this run 600 × 300 nm · Silicon · closed
+window · highest n_eff · Modes to find 2 · group index on, current Core 500 × 220 + Substrate 3000 ×
+700 nm · Silicon · open boundary (PML 1 µm) on left, right and bottom · search near 2.46 · Modes to
+find 4 · group index off; unchanged: λ 1550 nm · core mesh 30 nm* (until then the boundary, the search
+and an unchanged n_g were left out). Runs and inputs of the default study read as before; the step bar's Results step
 describes the run shown (*Result for these inputs* or *Current inputs differ from this run*), and
 clicking it shows that run. Steady heat and Joule heating results use the same words. In optical
 Results the modes table comes first, then the field plot with its sample and line profile. Between

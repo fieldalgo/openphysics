@@ -501,7 +501,13 @@ differ from this run: this run 600 × 300 nm · Silicon, current 700 × 300 nm �
 막대의 Results 단계는 보고 있는 실행을 설명하고(*Result for these inputs* 또는 *Current inputs differ
 from this run*), 누르면 그 실행을 보여 줍니다. Results 제목 아래 줄은 각 부분을 한 번만 씁니다: 다른
 부분은 두 값을, 나머지는 그 뒤에 씁니다(*…, current 700 × 300 nm · Silicon; unchanged: λ 1550 nm ·
-core mesh 30 nm*). 정상 열과 줄 가열 결과도 같은 말을 씁니다. 광 Results는
+core mesh 30 nm*). round 23(E6)부터 광학 줄은 어느 한쪽이 기본값이 아니면 실행을 비교하는 모든 입력(스터디 서명)을
+씁니다: 위치만 다를 때 형상 위치(*at Core (-300, 0) nm*), PML 두께와 열린 가장자리를 포함한 경계(*closed window*, *open
+boundary (PML 1 µm) on left, right and bottom*), 탐색(*highest n_eff*, *nearest to n_eff 2.46*, 열린 경계의 *search near
+2.46*), *Modes to find 4*, *group index on* 또는 *off*: *this run 600 × 300 nm · Silicon · closed window · highest n_eff ·
+Modes to find 2 · group index on, current Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · open boundary (PML 1 µm) on
+left, right and bottom · search near 2.46 · Modes to find 4 · group index off; unchanged: λ 1550 nm · core mesh 30 nm*(전에는
+경계, 탐색, 바뀌지 않은 n_g가 빠졌음). 기본 스터디의 실행과 입력은 전과 같이 읽힙니다. 정상 열과 줄 가열 결과도 같은 말을 씁니다. 광 Results는
 모드 표를 먼저, 그 아래에 표본과 선 프로파일이 있는 장 그림을 보여 줍니다. 설계 사이의 모드는
 Compare가 순위가 아니라 장 겹침으로 짝짓고, Results와 Compare의 도크 안내는 *Each result keeps the
 inputs it was run with · Compare matches modes by field overlap · convergence not certified*입니다.

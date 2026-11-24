@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -1238,9 +1238,10 @@ function refreshNotebook(){
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
 const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
 const opticalDocument=()=>buildOpticalDocument({...state,searchTarget:closedTargetNow()},setup);
-// The parts the inputs words compare, with Modes to find when the run or the page asks for other
-// than 2 (other: the run's count, so both sides name it together)
-const studyParts=(input,n,other=n,g=false,otherG=g)=>[...opticalInputParts(input),...(n===DEFAULT_MODE_COUNT&&other===DEFAULT_MODE_COUNT&&state.modeCount===DEFAULT_MODE_COUNT?[]:[`Modes to find ${n}`]),...(g||otherG?[g?'group index on':'group index off']:[])];
+// The parts the inputs words compare for a run and the current inputs (round 23, E6: every part of
+// studySignature, workspace-workflow.mjs studyInputParts): [runParts, currentParts]
+const runStudy=run=>({input:run.input,modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,pml:isOpenRun(run)?run.settings.pml:null,searchTarget:runSearchTarget(run)});
+const studyParts=run=>studyInputParts(runStudy(run),{input:current(),modeCount:state.modeCount,groupIndex:state.groupIndex===true,pml:pmlNow(),searchTarget:closedTargetNow()});
 // Modes to find (1 to 8): the number of modes a run asks for, saved with the inputs (version 8
 // when not 2) and kept with each run.
 const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept with each run of a session.';
@@ -1381,7 +1382,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
  const controls=document.querySelector('.workspace > .toolbar');controls.style.display=['Applications','Connections','Results','Compare'].includes(ui.page)?'none':'flex';document.querySelector('.workspace > .note').textContent=['Results','Compare'].includes(ui.page)?'Field data belongs to a captured run. Imported results are labeled; no automatic computation.':isOptical()?'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window fixed; outer boundary chosen in Physics › Optical modes.':'Conceptual geometry only · no CAD kernel or computed deformation';
  if(ui.page==='Compare'){renderComparison();renderRunList();return;}
  if(ui.page==='Results'&&solverRun){
-  const runG=solverRun.group_index_method!==undefined,runParts=studyParts(solverRun.input,runModeCount(solverRun),runModeCount(solverRun),runG,state.groupIndex),nowParts=studyParts(current(),state.modeCount,runModeCount(solverRun),state.groupIndex,runG);
+  const [runParts,nowParts]=studyParts(solverRun);
   const same=solverRun.signature===signature();$('inspector').innerHTML='<h2>Selected run</h2>'+`<div class="pair"><span>Name</span><strong id="run-name-value">${escapeHtml(solverRun.label||'Not named')}</strong></div>`+pair('Inputs',same?'Same as the current inputs':escapeHtml(inputsDifferText(runParts,nowParts)))+(same&&!runInputsNoteFor(solverRun)?'':'<div id="use-run-slot"></div>')+runDetails(solverRun)+'<p>File › Save keeps this run with its fields in the session file. File › Export › Model file keeps the inputs without results.</p>'; $('canvas').innerHTML='<h2>Computed optical modes</h2>';$('run-details').ontoggle=()=>{ui.runDetailsOpen=$('run-details')?.open===true;};
   const desc=document.createElement('p');desc.textContent=runInputsLine(runParts,nowParts);$('canvas').append(desc);
   // fewer modes than asked: "Found 3 of 8 modes above n = 1.45"
