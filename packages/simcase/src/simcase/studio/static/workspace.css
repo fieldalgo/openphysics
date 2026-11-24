@@ -480,3 +480,6 @@ dialog::backdrop{background:#162a4b66}
 .other-candidates{margin:8px 0}.other-candidates>summary{cursor:pointer;color:var(--accent);padding:6px 0}
 .other-candidates .table-scroll{max-width:100%;overflow-x:auto}
 .other-candidates td.num{white-space:nowrap}
+/* round 22 (V1): Modes to return in a closed window: Nearest to n_eff with its field on one line */
+.closed-search-near{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.closed-search-near input[type=number]{width:7em;margin:0}

@@ -1466,23 +1466,30 @@ Limits of a closed search:
 
 Since slice C2 the page offers the [closed-window search](#closed-window-search-document-optical-shapes-v10).
 
-- **The box.** With *Closed window (PEC)* chosen, **Physics › Optical modes** has a check box
-  **Search near n_eff**, off by default, and the field *Search near n_eff (closed window)* (3
-  decimals, the default (n_max + 1.444)/2 to 0.01: 2.460 for silicon), enabled while the box is on.
-  The help reads “Off: the modes of highest n_eff above 1.45. On: the modes nearest this index,
-  listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values
-  differ: refine the mesh before a close comparison.” Messages say *Search near n_eff 2.460 in the
-  closed window: the next run returns the modes nearest it.* or *Search near n_eff off: the next
-  run returns the modes of highest n_eff.*, followed by *No need to run: Run N already has these
-  results.* when a kept run has the new inputs. The box is not on by default when a shape touches
-  the window edge.
+- **Modes to return.** With *Closed window (PEC)* chosen, **Physics › Optical modes** has one choice,
+  **Modes to return**: the radio **Highest n_eff above 1.45** (the default) and the radio **Nearest to
+  n_eff** followed by the field **n_eff to search near** (3 decimals, the default (n_max + 1.444)/2
+  to 0.01: 2.460 for silicon). Since round 22 (V1) the field is always enabled and typing an index in
+  it selects Nearest to n_eff; until then a check box *Search near n_eff* enabled a separate field
+  *Search near n_eff (closed window)*, which four of five testers tried first. The meanings are the
+  box's: Highest is the box off, Nearest the box on, and the document, the capabilities and the
+  session are unchanged. The help reads “Highest n_eff above 1.45: the modes of highest n_eff.
+  Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest first; modes
+  at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values
+  differ: refine the mesh before a close comparison.” Messages say *Modes to return: nearest to n_eff
+  2.460 in the closed window. The next run returns the modes nearest it.* or *Modes to return:
+  highest n_eff above 1.45. The next run returns the modes of highest n_eff.*, followed by *No need
+  to run: Run N already has these results.* when a kept run has the new inputs. An index outside the
+  design's range is refused with its message and the choice stays as it was. The index typed while
+  Highest is chosen is kept in memory only. Highest stays the default when a shape touches the
+  window edge.
 - **The shortcut.** Under a closed run's edge note the round-18 row has **Use Open boundary** and,
   since C2, **Search near 2.46 · 4 modes** in place of C0's *Set Modes to find to 4*: it turns the
   box on with the design's default target and sets Modes to find to 4, says *… Modes to find set to
   4.* and runs nothing; it is left out when the inputs already have both. Four modes reach the core
   mode of the strip over a substrate in every registered variant
   ([K7](#closed-window-search-document-optical-shapes-v10)).
-- **The run.** A run with the box on writes `target_effective_index` and names capabilities v10.
+- **The run.** A run with Nearest to n_eff writes `target_effective_index` and names capabilities v10.
   Studio keeps only the modes with Re n_eff above 1.45 (decision A1): the line above the table always
   reads *Found k of M modes near n_eff 2.46, above n = 1.45.* (M: Modes to find), and a note under
   the table says *1 mode at or below n = 1.45 was left out.* when the engine returned some below
