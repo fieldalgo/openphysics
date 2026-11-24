@@ -15,3 +15,8 @@ test('Y5: with no run timed in this tab, the Run study box says "no timed run in
  assert.equal(W.runPlanText({modeCount:2,last:12400}),'Closed window · last such run 0:12');
  assert.ok(!read('workspace-workflow.mjs').includes(":'no earlier run'"));
 });
+
+test('Y6: the heater-off label is associated with its box by for=, as well as by wrapping it',()=>{
+ const html=read('workspace.html');
+ assert.ok(html.includes('<label id="run-baseline-option" for="run-baseline" class="run-option" hidden><input type="checkbox" id="run-baseline">'));
+});

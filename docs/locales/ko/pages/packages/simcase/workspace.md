@@ -688,7 +688,9 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   열을 채웁니다. 내용이 같은 열이 이미 있으면 건너뜁니다. 광 온도를 정하는 결합이 없는 동안에도
   이 옵션은 그 자리에 남아 꺼진 채 “needs a temperature coupling”이라고 이유를 밝힙니다.
   결합이 돌아오면(다시 추가, Undo 또는 Redo) 옵션은 고른 대로 돌아오고, Messages에
-  “Also solve without heater” is ticked again이 덧붙습니다.
+  “Also solve without heater” is ticked again이 덧붙습니다. 레이블은 상자와 연결되어 있어(`for`)
+  시간 메모를 포함해 레이블 어디를 눌러도 상자가 켜지거나 꺼집니다. 모델을 열면 상자가 켜져 있으므로 첫
+  클릭은 상자를 끕니다(round 19).
 - **Results**는 물리마다 한 쪽과 **Coupling check**를 둡니다. 쓰인 풀이 순서와, 결합마다 보낸
   것(“1,726 node temperatures, 300.0–319.0 K”), 받은 것(“3,334 triangle means (mean of 3
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
