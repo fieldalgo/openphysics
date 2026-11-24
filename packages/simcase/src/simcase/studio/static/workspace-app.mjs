@@ -313,7 +313,9 @@ function libraryOptions(){
  const inProject={};
  if(workspaceInProject()&&multiView.active()&&workspaceCard())inProject[workspaceCard()]=runs.length;
  if(multiView.inProject()&&!multiView.active())inProject['heated-waveguide']=multiView.projectRuns();
- return {onOpenFile:()=>$('open-session').click(),inProject,project:{line:projectLine(),name:project.name,onRename:renameProject}};
+ // round 18 (X10): every model of the project, shown or not, with its runs: its card reads "Return to model"
+ const returnTo={};if(workspaceInProject()&&workspaceCard())returnTo[workspaceCard()]=workspaceCard()==='optical'?runs.length:0;if(multiView.inProject())returnTo['heated-waveguide']=multiView.projectRuns();
+ return {onOpenFile:()=>$('open-session').click(),inProject,returnTo,project:{line:projectLine(),name:project.name,onRename:renameProject}};
 }
 // A browser restore of a record that still matched its project file (S4, round 16): the project
 // names that file and its name again, so the header and Save name it. The project reads as saved
