@@ -999,7 +999,14 @@ browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · time** (
 the Heated silicon waveguide card's **Restore from this browser** run the same checks as Open
 session. A restored record that was the same as the session file it was saved to, or opened
 from, reads *Recovered from this browser · same as file …json*, as an optical one does. A
-template just opened reads *New model · not saved* until its first edit, run or save.
+template just opened reads *New model · not saved* until its first edit, run or save. When the project
+has a project file and holds another model too, the heated model's status bar speaks about the
+model within the project, in the header's words, so the two never contradict each other (round
+18; the header said *waveguide-AB · waveguide-AB.json · changed since opened* while the status bar
+said *New model · not saved*): *Heated silicon waveguide · in project waveguide-AB.json · not saved
+since it joined* while the file's model list does not hold it, else *… · in project
+heater-study.json · saved 13:15* or *… · changed since saved 13:15*, with the header's browser
+recovery words.
 
 The module checks are in `tests/simcase/studio_workspace_multiphysics_session.cjs` (the optical
 files of versions 6 and 7 written by the Studio before version 8, in

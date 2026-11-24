@@ -111,6 +111,20 @@ export function projectTitle({name=null,models=0,file=null,current=false,recover
  if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');
  return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
 }
+// Round 18 (X8): the heated model's status bar while the project has a project file speaks about
+// the model within that project, in the header's words, so the two never contradict each other:
+//   "Heated silicon waveguide · in project waveguide-AB.json · not saved since it joined" (the
+//   model is not in the file's model list), "… · in project heater-study.json · saved 13:15", or
+//   "… · in project heater-study.json · changed since saved 13:15 · kept for recovery in this
+//   browser". inFile: the file's model list holds this model (null when the file does not say);
+//   current: the project equals the file; recovery: browser recovery's state, said as the header
+//   says it (only a problem when current).
+export function modelInProjectTitle({title,file,inFile=null,current=false,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+ const head=`${title} · in project ${file.name}`,browser=recoveryWords(recovery)||'not in browser recovery yet';
+ if(inFile===false)return `${head} · not saved since it joined · ${browser}`;
+ const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
+ return current?`${head} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:''):`${head} · changed since ${word}${at} · ${browser}`;
+}
 /** The project line's title text: the "(1)" note on the download path, '' elsewhere. */
 export const projectHint=file=>file?.how==='download'?DOWNLOAD_NAME_HINT:'';
 const PHYSICS=[['electric','Electric'],['heat','Heat'],['structure','Mechanics'],['optics','Optical']];
