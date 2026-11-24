@@ -330,7 +330,7 @@ inputs**에 대한 Undo와 Redo, 모드 2개에 상자가 꺼져 있으면 **Fil
 뺀 버전 8 파일과 같은 바이트. 템플릿의 파일은 `tests/simcase/studio_project_study.cjs`가
 `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`과 비교) `modeCount` 4나
 `groupIndex` true이면 버전 8을 쓰며 각 파일을 다시 열면 그 설정이 되는지, 버전 8 입력의 세션이 버전 9로
-저장되는지 확인합니다. 12차부터는 *Pages*라는 탭 목록인 페이지 탭(Library가 처음, 선택된 탭과 Tab 정지점은
+저장되는지(안정된 실행 번호부터는 그 앞에서 한도가 실행을 내보내 탭의 실행 번호가 자리와 달라졌으므로 버전 12) 확인합니다. 12차부터는 *Pages*라는 탭 목록인 페이지 탭(Library가 처음, 선택된 탭과 Tab 정지점은
 하나, 오른쪽·왼쪽 화살표와 Home, End가 다음·이전·처음·마지막 페이지를 엶. 13차부터는 모든 탭이 제어하고 키마다 고른 탭의
 이름을 따르는 `role=tabpanel` 페이지 패널 하나), 1440 × 900과 390 × 844에서 Compare 표의
 두 머리글 줄(짧은 이름, 이어서 A | B), 표 위 줄의 실행 이름, 접근 가능한 이름이 전체 짝인 *1 ↔ 1* 행 머리글, 나머지 열이
@@ -512,10 +512,11 @@ Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under th
 모델이 합류한 뒤 상태 표시줄 *Heated silicon waveguide · in project u8-optical.json · not saved since it joined · …*와 두
 모델로 저장한 뒤의 *… · downloaded …*(제목 표시줄의 말과 함께), 두 카드의 *Return to Optical waveguide*와 *Return to Heated silicon waveguide*(20차 문구)를 확인합니다. 16차의 다시 불러오기
 단계에서도 두 카드의 제안이 다른 모델을 *· also in this project: … (restored separately)*로 밝힙니다. 19차부터(사전 등록)
-새 프로필이 `heater-study.json`을 열고 광 모델을 다시 실행한 뒤 새로고침하여 복원하면 헤더가 *Untitled project · recovered from a
-copy of heater-study.json · not saved to a file · …*이고 상태 표시줄은 *Recovered from this browser (opened from heater-study.json;
-changed since)*인지, `r19-saved.json`으로 저장하고 다시 실행해 복원하면 *r19-saved · r19-saved.json · changed since saved …*인지
-봅니다. session 스크립트는 히터 없는 풀이 레이블을 마우스 이벤트로(글자에, 그다음 *(about 1 s more)*에) 눌러 상자가 꺼졌다
+새 프로필이 `heater-study.json`을 열고 광 모델을 다시 실행한 뒤 새로고침하여 복원하면 헤더가 *Heater study · recovered from this
+browser · not saved to a file · …*(세션 버전 12부터 기록이 프로젝트 이름을 담음; 19차는 *Untitled project · recovered from a copy of
+heater-study.json · …*였고, 이름 없는 기록은 지금도 그렇게 읽힘)이고 상태 표시줄은 *Recovered from this browser (opened from
+heater-study.json; changed since)*인지, `r19-saved.json`으로 저장하고 다시 실행해 복원하면 *Heater study · r19-saved.json · changed
+since saved …*(복원한 이름은 사용자가 정한 것이라 저장이 유지함; 19차는 *r19-saved · …*)인지 봅니다. session 스크립트는 히터 없는 풀이 레이블을 마우스 이벤트로(글자에, 그다음 *(about 1 s more)*에) 눌러 상자가 꺼졌다
 켜지는지 보고 가열 실행 여섯 개를 만듭니다. 21차부터(사전 등록) 모델이 실행과 같은 동안 Run study 옆 가열 줄이 숨고 편집 뒤에는
 *If you run: drops Run 1 (run at …) · pin it to keep it*로 읽히는지; Run study가 바로 시작하고 작업 응답을 붙잡은 채 *When this
 run finishes, Run 1 (run at …) is dropped*와 **Pin Run 1**을 보이는지(두 크기 모두 넘침 없음); Pin이 줄을 Run 2로 옮기는지;
@@ -535,7 +536,20 @@ recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모�
 find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시줄에 *changed in another tab*이 없으며 새로고침 뒤에도 돌아오는지
 봅니다. 21차부터(사전 등록) 그 제안 옆에 상자가 가열 항목을 나열하지 않고 가열 카드는 여전히 그 기록을(파일의
 저장 시각과 함께) 제안하는지, 복원과 그 편집 뒤 Modes to find 4의 실행이 실행 목록과 Compare 선택 목록에서 *· closed · 4 modes ·*로 읽히고
-그 태그가 1440과 390 px에서 선택 목록 안에 들어가는지 봅니다. session 스크립트의 파일에서 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
+그 태그가 1440과 390 px에서 선택 목록 안에 들어가는지 봅니다.
+[세션 버전 12](packages/simcase/workspace.md#광학-세션-파일버전-12)(안정된 실행 번호, 사전 등록 K4·K5)부터 새
+프로필 하나가 `heater-study.json`을 열고 프로젝트 이름을 *both-models*로 바꾼 뒤 광학 모델을 다섯 번 더 실행하고
+(실행 일곱 개이므로 Run 1이 빠짐) `both-models.json`으로 저장합니다. 브라우저를 닫고 같은 프로필로 다시 시작해
+Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No need to run: Run 5*, Compare 선택 목록이 전과 같은
+번호를 읽고, 번호 문장은 없으며, 다음 실행은 Run 8입니다. 브라우저를 다시 닫고 **Restore newest from this browser**로
+두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run)
+from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · not saved to a file · …*,
+다음 변경 뒤에는 보통 헤더입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
+프로젝트 이름을 밝히고(*Heater study · recovered from this browser · …*), workspace 스크립트에서 실행이 빠진 뒤의
+여섯 실행 축소 세션은 버전 12이며, 그 round 19 복원은 실행 번호를 유지하고 번호에 대해 말하지 않습니다. 형식
+fixture는 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json`(이 Studio가 `numbered_sessions.mjs
+write`로 씀)과 `refusals-v12-fc654fe.json`(main fc654fe가 읽는 결과, 그 커밋의 static 폴더로 임시 worktree에서
+`numbered_sessions.mjs read`로 씀)입니다. session 스크립트의 파일에서 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과

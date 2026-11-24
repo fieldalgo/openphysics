@@ -203,11 +203,13 @@ file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open
 이름을 다시 가리킵니다: 헤더는 *untitled-project · untitled-project.json · saved 2:24 PM*이 되고 File › Save는 그
 파일에 쓰거나 그 이름을 제안합니다. 탭에 다른 모델이 함께 있으면 헤더는 *changed since*로 읽힙니다. round 19부터
 저장했던 프로젝트 파일 이후로 바뀐 기록도 이름과 파일을 되살립니다: *y3-saved · y3-saved.json · changed since saved
-06:15 AM · kept for recovery in this browser*. 저장하지 않고 연 파일의 기록은 파일 이름만 담고 프로젝트 이름은 담지
-않으므로 이름을 짐작하지 않습니다: 헤더가 출처를 밝힙니다, *Untitled project · recovered from a copy of both-models.json ·
-not saved to a file · kept for recovery in this browser*. 상태 표시줄(*Recovered from this browser (opened from
-both-models.json; changed since)*)과 같은 말입니다. 연 프로젝트의 이름을 기록에 담는 일은 복구 기록 형식의 변경이라
-다음 버전으로 남깁니다. 프로젝트를
+06:15 AM · kept for recovery in this browser*. [세션 버전 12](#광학-세션-파일버전-12)부터 기록은 프로젝트 이름(`project`)도 담으므로, 저장하지 않고 연 파일의
+기록도 프로젝트 파일 없이 이름을 되살립니다: *both-models · recovered from this browser · not saved to a file · kept for
+recovery in this browser*(기록이 아직 그 파일과 같으면 *· as opened from both-models.json ·*), File › Save는
+`both-models.json`을 제안하고 묻습니다. 이전 기록은 파일 이름만 담고 프로젝트 이름은 담지 않으므로 이름을 짐작하지
+않습니다: 헤더가 출처를 밝힙니다, *Untitled project · recovered from a copy of both-models.json · not saved to a file ·
+kept for recovery in this browser*. 상태 표시줄(*Recovered from this browser (opened from both-models.json; changed
+since)*)과 같은 말입니다. 프로젝트를
 File › Save하면 저장한 모든 모델의 브라우저 복구 기록이, 보이는 모델이든 아니든, 그 프로젝트 파일을 가리키므로
 카드마다 가장 새 프로젝트 파일을 말합니다.
 
@@ -327,11 +329,13 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    더 없습니다. 앞선 다른 실행이 모두 고정되어 있으면 바꿀 실행이 없고, round 22(V4)부터 문구가 그 까닭을 말합니다: *Run 3 (…)
    was dropped; every other earlier run is pinned, so no other run can be dropped instead*. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
    세션 복원, 파일에서 실행 추가, Start new)까지 동작하고, 지난 버튼은 아무것도 하지 않고 사라집니다. 메모리에만 있습니다.
-   Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
-   브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
-   round 19부터 광 모델을 열거나 복원할 때 메시지가 그렇게 밝힙니다: *Runs are numbered from 1 in this tab; names and pins
-   are kept.*(Open project 뒤에는 *Optical waveguide runs are numbered from 1 in this tab; …*). 가열 모델의 실행은 번호를
-   그대로 가지므로 그 메시지에는 이 문장이 없습니다.
+   Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 한도 자체는 그대로입니다. [세션 버전 12](#광학-세션-파일버전-12)부터
+   파일과 브라우저 복구는 번호가 목록 안 자리와 다를 때 번호를 담고, File › Open, Open project, Restore는 그 번호를
+   유지합니다: 가장 큰 번호가 8인 파일 뒤의 다음 실행은 Run 9입니다. 이전 버전 파일은 파일 순서대로 1부터 번호를 매기고,
+   파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다(*Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.*).
+   실행을 담은 버전 6 또는 7 파일에서만 열기나 복원의 메시지가 그렇게 밝힙니다: *This file is from an earlier Studio:
+   Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.*(round 19는 열 때마다 *Runs are
+   numbered from 1 in this tab; …*라고 했음). 가열 모델의 실행은 번호를 그대로 가지므로 그 메시지에는 이 문장이 없습니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *has the results of the current inputs*를 덧붙입니다(round 20; 전에는 이미 결과가 있는 실행 옆에서
@@ -459,9 +463,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 8:44 AM*.
    가장 새 기록을 그 버튼처럼 복원하고, 그 복원이 끝나면(불러오기 질문에 Replace로 답한 뒤; Cancel은 둘 다 멈춤) 모델,
    시각, 파일로 다시 찾은 다른 모델의 기록을 복원한 다음 가장 새 기록의 모델을 Results에 보입니다. Messages는 *Restored
-   Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) from this browser, not recomputed. Optical waveguide
-   runs are numbered from 1 in this tab; names and pins are kept.*입니다. 프로젝트 이름과 파일은 각 기록이 가진 대로
-   돌아오며, 두 기록이 모두 같은 프로젝트 파일과 아직 같았으면 헤더가 *… · saved …*로 읽힙니다. 두 번째 복원이 실패하면
+   Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) from this browser, not recomputed.*입니다(광학 기록이
+   버전 6 또는 7 세션을 담을 때만 [버전 12](#광학-세션-파일버전-12)의 번호 문장이 이어짐). 프로젝트 이름과 파일은 각 기록이
+   가진 대로 돌아오며(두 기록의 프로젝트 이름이 다르면 더 새 기록의 이름), 두 기록이 모두 같은 프로젝트 파일과 아직 같았으면 헤더가 *… · saved …*로 읽힙니다. 두 번째 복원이 실패하면
    첫 번째는 남고, Messages가 복원하지 못한 모델을 밝히며(*Heated silicon waveguide was not restored: …*) 그 모델의 카드
    제안은 그대로 남습니다. 탭이 한 모델의 실행을 가지고 있으면 제안은 전처럼 자기 모델만 복원하고 다른 모델을 *(already in
    this tab)*로 밝힙니다. 두 카드의 제안은 그대로입니다. round 21부터 가장 새 제안이 둘 다 복원하는 동안 상자는 다른 모델
@@ -891,8 +895,8 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-10보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 11, newer than this Studio reads
-(versions 6–10). Open it in a newer Studio.”. 버전 9와 10은 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
+12보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 13, newer than this Studio reads
+(versions 6–12). Open it in a newer Studio.”. 버전 9~12는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
@@ -1620,6 +1624,49 @@ limit, and File › Save will refuse:* 뒤에 거부 문구와 *Browser recovery
 실행의 장만 보존합니다. 장이 없는 실행은 모드 표를 보이지만 장 보기는 없고, Compare는 그 모드를 겹침으로 짝지을
 수 없다고 알립니다.
 
+### 광학 세션 파일(버전 12)
+
+세션 버전 12(설계 *Stable run numbers and the project name after recovery*)부터 광학 실행은 파일과 브라우저
+복구에서도 번호를 유지합니다. 버전 12는 버전 10의 열린 경계와 버전 11의 닫힌 창 탐색을 담은
+[버전 9](#광학-세션-파일버전-9)에 실행마다 키 하나를 더한 것입니다: `number`, 탭 안의 실행 번호로 `job` 바로
+다음에 오고 실행의 `digest` 안에 들어갑니다. 최상위 키는 버전 9와 같습니다. 버전 12는 버전 9~11이 담는 모든 실행을
+담습니다.
+
+- **언제 쓰는가.** 어떤 실행의 번호가 목록 안 자리와 다를 때만 씁니다. 예를 들어 한도가 Run 1을 내보낸 뒤나
+  파일에서 실행을 추가한 뒤에는 Run 2~7을 버전 12로 씁니다. 목록 순서대로 1, 2, 3 … 으로 번호가 매겨진 세션은
+  전처럼 버전 11, 10, 9, 7로 바이트 그대로 씁니다. File › Save(세션 파일 또는 프로젝트 파일의 광학 항목)와 브라우저
+  복구는 같은 텍스트를 씁니다.
+- **읽기.** File › Open, Open project, Restore는 저장된 번호를 유지하므로 실행 목록, 내보내기 줄과 그
+  **Pin Run N** 버튼, Compare 선택 상자, *No need to run: Run N*, 복구 목록이 전과 같은 실행을 가리킵니다. 버전
+  6, 7, 9~11 파일은 전처럼 파일 순서대로 1부터 번호를 매깁니다. 저장된 카운터는 없습니다: 다음 실행은 가장 큰
+  번호 + 1을 받고(가장 큰 번호가 8인 파일 뒤의 다음 실행은 Run 9), 가장 큰 번호의 실행은 결코 내보내지 않습니다
+  (한도는 새 실행을 남기고, **Keep Run N, drop … instead**와 Add runs from file은 다른 실행만 내보냄). 작업이
+  다시 돌아온 실행은 번호와 자리를 유지합니다.
+- **검사.** 실행을 읽기 전에 각 `number`는 있어야 하고(*Run 3: missing number.*, 자리로 밝힘), 안전한 정수
+  범위 안의 1 이상 정수이며(*Run 3: invalid run number.*), 한 번만 쓰이고(*Two runs have the same number 7.*),
+  목록 순서대로 엄격히 커져야 합니다(*Run 3 is numbered 5, not after Run 2's 7.*). 다른 상한은 없습니다. 저장 뒤
+  고친 번호는 실행의 digest에 걸립니다(*Run 2 changed after it was saved (its check value does not match).*).
+  그다음 실행 자체의 검사는 저장된 번호로 실행을 밝힙니다(*Run 6: invalid search target. …*). 버전 9~11은 여전히
+  `number` 키를 거부합니다(*Run 1: unknown key "number".*).
+- **이전 Studio.** 버전 11까지 읽는 Studio(main fc654fe)는 버전 12 파일을 이름을 밝혀 거부합니다: *This session
+  file is version 12, newer than this Studio reads (versions 6–11). Open it in a newer Studio.*, 프로젝트 파일
+  항목이면 앞에 *Optical waveguide: *가 붙습니다. 그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않으므로(기록을
+  넘겨받기 전에 읽음) 그 기록을 덮어쓰지 않습니다. 프로젝트 파일은 버전 1 그대로이고, 광학 문서·어댑터·요청·결과,
+  다중물리 세션(버전 8), 실행 표 CSV도 바뀌지 않습니다.
+- **번호 문장.** Messages는 실행을 담은 버전 6 또는 7 세션(실행 번호가 목록 자리와 다를 수 있기 전에 쓰인 파일)을
+  열거나 복원한 뒤에만 *This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab;
+  names and pins are kept.*라고 합니다. 버전 9~11 세션은 실행이 1..n일 때만 이 Studio가 쓰고, 버전 12 세션은 번호를
+  담으므로 둘 다 번호에 대해 아무 말도 하지 않습니다.
+- **Add runs from file**은 추가한 실행을 파일 순서대로 탭의 가장 큰 번호 다음부터 번호를 매기고, 번호가 바뀌면
+  그렇게 밝힙니다: *Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.* 이미 탭에 있는 작업은 탭의 번호를
+  유지합니다.
+
+검사는 `tests/simcase/studio_session_numbers.cjs`(K1: 이전 광학 fixture, 다중물리 fixture, 프로젝트 fixture를
+모두 읽고 다시 써서 바이트 그대로; K2: 실행 3, 5, 6, 7, 8, 9의 버전 12 fixture `optical-v12-numbers.json`과 그
+거부; K3·K9: main fc654fe가 읽는 결과 `refusals-v12-fc654fe.json`), `tests/simcase/studio_session_numbers_page.cjs`
+(K6: 결과·고정·교환·가져오기·저장·열기·복원 2400 단계의 시드 고정 무작위 순서; K7: 헤더 줄; K10: 번호 문장),
+`tools/studio_browser/studio_project_browser.mjs`의 K4/K5 단계입니다.
+
 ### Compare의 모드 짝짓기
 
 Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이에 순위가 바뀌어도(예: 코어를 넓혀 두
@@ -1883,6 +1930,18 @@ Compare 선택과 실행의 출처를 빼고 비교해 세션을 한 번만 둡�
 session from this browser**가 각 세션의 모델, 실행 수, 실행 이름과 시각을 보여 주고, 같은 교체 확인창을 거쳐 복구합니다. 이전
 세션을 복구하면 다음 저장 때 지금 세션이 이전 세션으로 남습니다.
 
+[세션 버전 12](#광학-세션-파일버전-12)부터 두 모델의 기록은 탭의 프로젝트에 이름이 있으면 그 이름도 브라우저 전용
+선택 키 `project: {name, from}`으로 담습니다(`name`은 프로젝트 이름 규칙을 따르고, `from`은 파일 이름에서 온 이름이면
+`file`, Rename으로 정한 이름이면 `user`). 이름 없는 프로젝트에는 쓰지 않고, 잘못된 값은 무시하며, 기록은 버전 1
+그대로입니다(이전 Studio는 이 키를 무시). 복원은 기록이 프로젝트 파일(`savedFile.projectName`, 둘 다 있으면 이쪽이
+우선)을 밝히지 않을 때 이를 씁니다: 프로젝트는 프로젝트 파일 없이 그 이름을 받으므로 File › Save는 그 이름의 파일
+(`both-models.json`)을 제안하고 묻습니다. 다음 변경까지 헤더는 *both-models · recovered from this browser · not saved
+to a file · kept for recovery in this browser*이고, 기록이 연 프로젝트 파일과 아직 같았으면 *both-models · recovered
+from this browser · as opened from both-models.json · kept for recovery in this browser*입니다. 프로젝트 파일을 밝힌
+기록은 전과 같고(*… · both-models.json · saved …*), 이름 없는 이전 기록도 전과 같습니다(*Untitled project · …*).
+다음 변경 뒤 헤더는 보통 헤더입니다(*both-models · not saved to a file · …*). 두 기록의 프로젝트 이름이 다른 쌍 복원은
+추가 메시지 없이 더 새 기록의 이름을 씁니다.
+
 최신 스냅샷은 같은 브라우저 origin의 한 건이며 탭 간 공유됩니다. 저장할 때 같은 데이터베이스
 트랜잭션 안에서 이전에 읽은 revision을 확인합니다. 이 탭을 열거나 복구한 뒤 다른
 탭이 저장했다면 해당 기록을 덮지 않고 자동 저장을 중단합니다. Save session으로
@@ -1926,7 +1985,9 @@ Studio 업데이트
 ## 모델을 교체하지 않고 실행 가져오기
 
 Results/Compare → **Add runs from file (inputs unchanged)**에서 세션 파일 또는 **Export this run**으로 내보낸 개별 실행 파일을 읽습니다.
-추가·일치·교체될 비고정 실행 수를 검토한 뒤 적용합니다. 현재 모델 입력과 입력 Undo는
+추가·일치·교체될 비고정 실행 수를 검토한 뒤 적용합니다. 추가한 실행은 파일 순서대로 탭의 가장 큰 실행 번호 다음부터
+번호를 받고, 번호가 바뀌면 메시지가 밝히며(*Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.*), 이미 탭에
+있는 작업은 탭의 번호를 유지합니다([버전 12](#광학-세션-파일버전-12)). 현재 모델 입력과 입력 Undo는
 보존하고 가져온 선택 결과를 보관 결과와 비교합니다. 새 결과는 `imported`로 표시합니다.
 입력과 노트북을 모두 교체하려면 Open session을 사용합니다.
 
