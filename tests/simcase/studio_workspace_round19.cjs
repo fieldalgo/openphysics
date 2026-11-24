@@ -70,3 +70,20 @@ test('Y4: before the six-run limit drops a run, Run study asks: Pin Run N and ru
  // the limit and the line beside Run study stay
  assert.ok(app.includes("const host=$('run-drop'),run=nextDropped(runs,RUN_LIMIT);"));
 });
+
+test('Y3: a restore brings back the project name and file it was saved to, or names the file it was a copy of',async()=>{
+ const P=await import(STATIC+'workspace-persistence.mjs');const when=()=>'06:15 AM';
+ assert.equal(P.projectTitle({models:1,recovery:'kept',copyOf:'both-models.json'},when),'Untitled project · recovered from a copy of both-models.json · not saved to a file · kept for recovery in this browser');
+ assert.equal(P.projectTitle({models:1,recovery:'kept'},when),'Untitled project · not saved to a file · kept for recovery in this browser');
+ // a file of the project wins over the copy
+ assert.equal(P.projectTitle({name:'y3-saved',models:1,file:{name:'y3-saved.json',how:'recovered',savedAt:'T'},current:false,recovery:'kept',copyOf:'both-models.json'},when),'y3-saved · y3-saved.json · changed since saved 06:15 AM · kept for recovery in this browser');
+ const app=read('workspace-app.mjs');
+ // a saved project file: the name and file, also when the record changed since (saved only when current)
+ assert.ok(app.includes(" if(!file?.projectName){if(!file&&opened&&!project.file&&!project.name)project.copyOf=opened;return;}"));
+ assert.ok(app.includes("project.stamp=file.current===true&&projectModels().length===1?projectStamp():null;"));
+ assert.ok(!app.includes("if(file?.current!==true||!file.projectName)return;"));
+ // both models' restores pass the opened file; a file replacing the project clears the copy
+ assert.ok(app.includes("restoreProjectFile(file,pending.openedFile);"));assert.ok(app.includes("restoreProjectFile(savedFile,openedFile);"));
+ assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null});"));
+ assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf});"));
+});

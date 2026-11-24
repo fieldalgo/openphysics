@@ -220,13 +220,15 @@ const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduct
 // moves on when a file replaces the project, so a save under way never names the new one
 // nameFrom: 'file' for a name taken from a file name, which follows Save As; 'user' for a name
 // set with Rename, which stays (round 16); null for an untitled project
-const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0};
+// copyOf (round 19, Y3): the file a browser-restored record was opened from, when the record names
+// no project file; the header names it instead of a guessed project name
+const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null};
 // the page and run the workspace was last shown on (round 16, S9; rememberReturn)
 let workspaceReturn=null;
 function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
 // a file replaced the project: an untitled project of the models now in the tab
 function resetProject({name=null,ids=null,nameFrom=null}={}){
- Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,stamp:null,scope:project.scope+1});
+ Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,stamp:null,scope:project.scope+1,copyOf:null});
  if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
 }
 // The models a project file holds, as Save compares them (round 17, U8): [{key, title}], keyed by the
@@ -261,7 +263,7 @@ function unsavedModels(){
 }
 function projectLine(){
  const file=project.file&&project.file.scope===project.scope?project.file:null;
- return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:recoveryState});
+ return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:recoveryState,copyOf:project.copyOf});
 }
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
@@ -322,14 +324,17 @@ function libraryOptions(){
  const returnTo={};if(workspaceInProject()&&workspaceCard())returnTo[workspaceCard()]=workspaceCard()==='optical'?runs.length:0;if(multiView.inProject())returnTo['heated-waveguide']=multiView.projectRuns();
  return {onOpenFile:()=>$('open-session').click(),inProject,returnTo,project:{line:projectLine(),name:project.name,onRename:renameProject}};
 }
-// A browser restore of a record that still matched its project file (S4, round 16): the project
-// names that file and its name again, so the header and Save name it. The project reads as saved
-// when the restored model is its only model; with another model in the tab it reads as changed since.
-function restoreProjectFile(file){
- if(file?.current!==true||!file.projectName)return;
+// A browser restore of a record saved to a project file (S4, round 16): the project names that file
+// and its name again, so the header and Save name it. The project reads as saved when the record
+// still matched the file and the restored model is its only model; else as changed since (round 19,
+// Y3: a record changed since its file brings back the name and file too).
+// opened: the file the record was opened from, when it names no project file (Y3): the header says
+// the project was recovered from a copy of it; the record holds no project name, so none is guessed.
+function restoreProjectFile(file,opened=null){
+ if(!file?.projectName){if(!file&&opened&&!project.file&&!project.name)project.copyOf=opened;return;}
  project.name=file.projectName;project.nameFrom=nameSource(file.projectName,file.name);
  const kept=rememberFile({name:file.name,how:'recovered',scope:project.scope});if(!kept)return;
- project.file={...kept,savedAt:file.savedAt,models:modelList()};project.stamp=projectModels().length===1?projectStamp():null;
+ project.copyOf=null;project.file={...kept,savedAt:file.savedAt,models:modelList()};project.stamp=file.current===true&&projectModels().length===1?projectStamp():null;
 }
 function renameProject(value){
  let name;try{name=validateProjectName(value);}catch(e){notice(e.message+' The project name is unchanged.');return false;}
@@ -795,7 +800,7 @@ function completeLoad(pending){
   // whether the record said it still matched it
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
-  rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file);}refreshPersistence();
+  rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file,pending.openedFile);}refreshPersistence();
   // round 19 (Y2): the runs were numbered from 1 here (numberRuns); the message says so
   notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'))+(runs.length?' '+RENUMBERED_TEXT:''));
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
@@ -1743,7 +1748,7 @@ function requestMultiphysicsSession(session,{label,source,opener=document.active
  // a file replaces the project (P3); a browser restore replaces the multiphysics model only
  const model=source==='file'?false:'multiphysics',asked=!!leaveText(label,model);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile);refreshPersistence();}}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile,openedFile);refreshPersistence();}}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.projectRuns(),unsaved:multiView.projectUnsavedRuns()>0,model:'the current model'},source);
