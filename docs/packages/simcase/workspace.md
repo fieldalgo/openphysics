@@ -1048,7 +1048,10 @@ engine and older session files give the same number from the same samples:
   *f*, a note row under the mode's row reads *Mode 1 is mostly in Substrate (99 % of |E|²), which
   touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more
   modes to reach the core mode.*, and Compare repeats it for that run (*A · Run 3: Mode 1 is …*),
-  which also says why such a run matches none of an open run's modes. The 0.01 bound on *g* is a
+  which also says why such a run matches none of an open run's modes. Since round 18 a row under the
+  last such note on Results has **Use Open boundary** and **Find 4 modes** (the run's Modes to find
+  + 2, at most 8): each sets that input with its usual message and runs nothing, and is left out
+  when the current inputs already have it. The 0.01 bound on *g* is a
   heuristic chosen after measurement (engine fields, Linux): on the strip over a substrate (Core
   500 × 220 + Substrate 3000 × 700 nm) both modes have *f* 0.994 and *g* 0.72; on a rib drawn over
   a slab that spans the window, the rib mode has *f* 0.60 to 0.71 but *g* 1.4e-4 to 2.5e-3 and is

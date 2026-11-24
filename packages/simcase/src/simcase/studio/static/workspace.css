@@ -213,6 +213,8 @@ main.choosing .workspace>.note{display:none}
 .message-action{font:inherit;font-size:inherit;padding:0 6px;margin-left:2px;border:1px solid #c9d3e0;border-radius:4px;background:#fff;color:var(--accent,#2d6da3);cursor:pointer}
 .message-more{display:inline}.message-more>summary{display:inline;cursor:pointer;color:var(--accent,#2d6da3)}.message-more[open]>.message-more-text{display:block}
 #file-status{color:#7b8798}
+/* round 18 (X9): the inputs that find a mode the closed window hid, under its note */
+.edge-actions{display:inline-flex;flex-wrap:wrap;gap:6px}
 /* round 18 (X2): a warning in Messages stands out from the line around it */
 .message-warning{color:#7a3d00;background:#fff1d6;border:1px solid #e3b25f;border-radius:3px;padding:0 4px;font-weight:600}
 footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;padding:3px 12px;background:#e2e8f1;border-top:1px solid #c2cddb;font-size:10px;color:#586c87;z-index:10}
