@@ -462,6 +462,21 @@ Run 1 in Results.*로 읽히고 링크가 Run 1을 Results에 보이는지; 짝�
 내보내기 줄의 **Pin Run 1**부터 **Pin Run 5**가 각각 *Run N pinned. If you run: drops Run N+1 (…) · pin it to keep it*로
 읽히고 마지막 고정되지 않은 실행에는 Pin이 없는지; 다음 결과가 Run 6을 내보내며 *… Run 6 (500 × 220 nm · 2 modes) was
 dropped; every other earlier run is pinned, so no other run can be dropped instead*를 보이고 교환 버튼이 없는지;
+1440 × 900과 390 × 844에서 가로 넘침이 없는지. 23차부터 R22 단계는 슬랩 경고의 짧은 행(*Substrate touches the window edge:
+in a closed window its slab modes come first.*, Optical modes에는 전체 문장)과 실행 목록의 부분을 쓰는 내보내기 문구(*Run 6
+(closed · 500 × 220 nm) was dropped; …*)를 기대합니다.
+23차부터(사전 등록 P1–P4와 P6; P5는 프로젝트 스크립트의 K5 단계) 브라우저 컨텍스트 하나를 더 쓰는 단계(R23)가 T18 형상에서
+확인합니다: 계획 줄의 행이 짧은 문장 전체를 두 버튼과 함께 Run study 옆 상자 안과 화면 안에 보이고, 말줄임표·줄 제한·잘림이
+없는지, 1440 × 900과 390 × 844에서, 그리고 Optical modes에는 전체 문장이 있는지(P1); 실행 전 군굴절률을 켜면 *Closed window ·
+group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모드 4개 닫힌 실행 뒤에는 *… · about N s*(그 시간의 3배),
+버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
+시간인지(P3); 모드 4개 또는 2개 실행 다섯(약 19 MB)이 *… Session is now N MB, over the 16 MiB (16.8 MB) limit. File › Save will
+ask whether to keep the fields of the selected and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and
+the effective areas. Browser recovery already keeps only those fields.*를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가 *… ·
+kept for recovery in this browser without the fields of 4 runs*인지(P2); 실행 여섯 개에서 내보내기 줄, **Pin Run 1**–**Pin Run
+3**, 내보낸 문구, 교환 버튼이 n_g 닫힌 실행(*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), 열린
+실행(*Run 3 (open (PML 1 µm) · …)*), closed-near 실행(*Run 4 (closed near 2.46 · 4 modes · …)*)을 각각 재료 앞까지의 실행 목록
+라벨과 같게 부르는지(P4); 열린 실행과 n_g 실행 아래 줄이 경계, 탐색, Modes to find, n_g를 밝히고 나머지는 *unchanged:*에 두는지(P6);
 1440 × 900과 390 × 844에서 가로 넘침이 없는지.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
@@ -543,9 +558,11 @@ find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시�
 Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No need to run: Run 5*, Compare 선택 목록이 전과 같은
 번호를 읽고, 번호 문장은 없으며, 다음 실행은 Run 8입니다. 브라우저를 다시 닫고 **Restore newest from this browser**로
 두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run)
-from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · not saved to a file · …*,
-다음 변경 뒤에는 보통 헤더입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
-프로젝트 이름을 밝히고(*Heater study · recovered from this browser · …*), workspace 스크립트에서 실행이 빠진 뒤의
+from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · changed since both-models.json, not
+saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
+읽음), 다음 변경 뒤에는 보통 헤더입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
+프로젝트 이름을 밝히고(23차부터 *Heater study · recovered from this browser · changed since heater-study.json, not saved ·
+…*), workspace 스크립트에서 실행이 빠진 뒤의
 여섯 실행 축소 세션은 버전 12이며, 그 round 19 복원은 실행 번호를 유지하고 번호에 대해 말하지 않습니다. 형식
 fixture는 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json`(이 Studio가 `numbered_sessions.mjs
 write`로 씀)과 `refusals-v12-fc654fe.json`(main fc654fe가 읽는 결과, 그 커밋의 static 폴더로 임시 worktree에서
