@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RUN_QUESTION_PLAN,RUN_QUESTION_STATUS,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -52,9 +52,6 @@ if('scrollRestoration' in history)history.scrollRestoration='manual';
 const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,searchTarget:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
-// round 20 (Z7): true while the drop question is open (askRunDrop): the Run study box and the status
-// bar say Run study waits for the answer (render reads it); every answer, Cancel included, renders them back
-let runQuestion=false;
 const numericDrafts=new NumericDrafts();
 const connection={ready:false,message:'Checking Studio compatibility…',version:null,instance:null};
 const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div>`;
@@ -177,7 +174,7 @@ const jouleView=createJouleView({$,pair,ui,escapeHtml:text=>escapeHtml(text),not
  request:studioRequest,active:()=>isJoule(),otherBusy:()=>heatState.busy,onIdle:()=>refreshHeatControls(),beforeRun:()=>edits.record(inputsFile())});
 // A multiphysics model (contract D2) keeps its document in its own view; the other applications
 // do not see it. Names used before their declaration are wrapped.
-const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(text,more,action),announceResult:text=>announceResult(text),request:studioRequest,render:()=>render(),
+const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(text,more,action),announceResult:(text,action)=>announceResult(text,action),request:studioRequest,render:()=>render(),
  // a raw body: the server's reader sees a file's text as written (duplicate keys, digits)
  requestRaw:async(url,body)=>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body});try{return await response.json();}catch{throw new Error('Use the Studio server to open model files. Response is not JSON.');}},
  // physics selections no application claims, so no single-physics view acts while it is open
@@ -187,11 +184,6 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),deliverSession:(text,name,options)=>deliverSession(text,name,options),serverVersion:()=>connection.version,validateRunLabel,
  // the optical runs this tab holds beside the multiphysics model (the save message names them)
  opticalRunCount:()=>runs.length,
- // round 19 (Y4): the heated model's Run study asks with the same dialog
- confirmDrop:(question,opener)=>askRunDrop(question,opener),
- // round 20 (Z7): the question is open; its Run study box and status bar say so
- runQuestionOpen:()=>runQuestion,
- runQuestionWords:{plan:RUN_QUESTION_PLAN,status:RUN_QUESTION_STATUS},
  // the Library's view title row names the project (P3)
  projectLine:()=>projectLine(),
  // the model's current file name (File › Save downloads under it again), which the header names
@@ -519,7 +511,7 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
- else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));
+ else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
  const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow());if(next.textContent!==text)next.textContent=text;}
@@ -647,7 +639,21 @@ let resultNotice=false;
 const notice = (text,more='',action=null) => {resultNotice=false;const host=$('file-status');host.textContent = text;
  if(action){const button=document.createElement('button');button.type='button';button.className='message-action';button.textContent=action.label;for(const [k,v] of Object.entries(action.data||{}))button.dataset[k]=v;button.onclick=()=>action.run();host.append(' ',button);}
  if(more){const details=document.createElement('details');details.className='message-more';const summary=document.createElement('summary');summary.textContent='More';const body=document.createElement('span');body.className='message-more-text';body.textContent=more;details.append(summary,body);host.append(' ',details);}};
-function announceResult(text){notice(text);resultNotice=true;}
+function announceResult(text,action=null){notice(text,'',action);resultNotice=true;}
+// Round 21 (W2): after a result dropped Run N, Messages offers [Keep Run N, drop Run M (…) instead]
+// when another unpinned run exists besides the new result (M: the oldest such run). The button works
+// until the next run starts or the run list is replaced; a stale one does nothing and is removed.
+function swapAction(){
+ const offer=dropSwap;if(!offer)return null;
+ return {label:keepInsteadLabel(offer.kept,offer.other),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)};
+}
+function keepDroppedRun(offer){
+ const button=$('file-status').querySelector('[data-keep-run]');
+ const fresh=offer===dropSwap&&runs===offer.list&&runs.includes(offer.newest)&&!runs.includes(offer.kept)&&swapCandidate(runs,offer.newest)===offer.other&&!solverBusy&&!pendingJob;
+ dropSwap=null;if(!fresh){button?.remove();return;}
+ runs=swapDropped(runs,offer.kept,offer.other);if(solverRun===offer.other)solverRun=offer.newest;
+ render();notice(keptInsteadText(offer.kept,offer.other));
+}
 // current(): the model inputs (version 7), as a run keeps them; inputsFile(): those inputs with
 // Modes to find and the group index option (version 8 when they are not the defaults), as the
 // inputs file, a session, a draft, recovery and the edit history keep them.
@@ -936,7 +942,9 @@ let solverBusy=false,solverRun=null,runs=[],compareIds=[null,null],comparePicked
 // the largest run number used in this tab (round 17, U2: workspace-workflow.mjs numberRuns)
 let runNumbersUsed=0;
 // the message of the runs a new run dropped (the run limit), said after the run's own message
-let droppedNote='';const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
+// round 21 (W2): the drop the last result made, for its Messages line; dropSwap: the swap that line
+// offers (Keep Run N, drop Run M instead), in memory only, until the next run starts or the run list is replaced
+let droppedNote='',dropSwap=null;const fieldView={mode:0,component:'magnitude',window:'Core region'};const fieldProbe={x:0,y:.15,active:false};let savedNotebookState=null,savedRunsState=null;
 let notebookRecoveryRecord=null,notebookLoadVersion=0;
 // The last session file saved (or recovered as saved): {name, savedAt, stamp}; stamp is the
 // inputs and runs it held, so the title shows it as saved until the next edit or run.
@@ -1254,29 +1262,32 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 // study, with how long the last comparable run of this tab took; the options keep their state (a
 // task does not reset them), so a run that is slower than one solve says why first
 // round 18 (X3): before the run, the run the six-run limit would drop, with Pin Run N (the limit is unchanged)
+// Round 21 (W2): Run study starts at once; while the run computes (or waits as a pending job) the line
+// says what its result drops, "When this run finishes, Run 3 (…) is dropped", and Pin Run N keeps it
+// (the line then names the next unpinned run). Pin is hidden when pinning would leave the result no
+// slot.
 function refreshDropWarning(){
- const host=$('run-drop'),run=runQuestion?null:nextDropped(runs,RUN_LIMIT);host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
- const text=dropWarningText(run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
+ const running=solverBusy||!!pendingJob,list=droppedBy(runs,RUN_LIMIT);
+ const host=$('run-drop'),run=list[0]||null;host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
+ const text=running?dropWhileRunningText(list):dropWarningText(list.length>1?list:run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
  const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
- // as Run name does, no pin while a calculation runs: the finishing result needs a free slot
- pin.disabled=solverBusy||!!pendingJob;
- pin.onclick=()=>{if(!runs.includes(run)||run.pinned)return;run.pinned=true;render();notice(pinNotice(run));};
+ // the finishing result needs a free slot: no pin that would leave fewer unpinned runs than it drops
+ pin.hidden=runs.filter(r=>!r.pinned).length<=list.length;pin.disabled=false;
+ pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();notice(pinNotice(run));};
 }
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};
  const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
  refreshDropWarning();
- // round 20 (Z7): while the drop question is open the box says it waits for the answer
- const shownText=runQuestion?RUN_QUESTION_PLAN:text;
- const line=$('run-plan');if(line.textContent!==shownText)line.textContent=shownText;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
+ const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 // round 20 (Z6): the scope names both boundaries, as the Open boundary choice sits beside it
 const OPTICAL_SCOPE_BOUNDARY='3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)';
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; '+OPTICAL_SCOPE_BOUNDARY+'; 1 to 8 modes (Modes to find, 2 by default). Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -2066,12 +2077,12 @@ function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(
 for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // the runs this result dropped (the run limit) are named after the run's own message (round 17, U2)
- if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}
+ if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}else if(state.phase==='done')dropSwap=null;
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  clearTimeout(doneBannerTimer);doneBannerTimer=0;
  $('job-message').textContent=state.message;$('job-message').title=state.title||''; // round 17 (U11): the job id of a loading result is its title
  if(state.phase==='done')setPending(null);
- if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
+ if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
  // the 6 s start once the banner is written and the page rendered: started before the render, the
  // banner was shown for 6 s minus the render of the result page (5.87 s on a macOS runner)
  doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
@@ -2105,7 +2116,8 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):near?near.keep.map(i=>reasons[i]):reasons;}
- completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed),dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);droppedNote=dropped.length?droppedAfterText(dropped):'';runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ {const other=dropped.length===1?swapCandidate(runs,solverRun):null;dropSwap=other?{kept:dropped[0],other,newest:solverRun,list:runs}:null;}
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;
 }});
 function refreshJobControls(){
@@ -2129,40 +2141,11 @@ $('resume-job').onclick=async()=>{
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
-// Round 19 (Y4): before a run the six-run limit would make drop a run, Run study asks: Pin Run N and
-// run (asked again for the next run that would then drop), Run, or Cancel (Escape). Studio's dialog
-// conventions: modal, the first answer focused, focus back to the opener. Resolves 'pin', 'run' or null.
-const dropDialog=document.createElement('dialog');dropDialog.id='run-drop-confirm';dropDialog.setAttribute('aria-labelledby','run-drop-confirm-title');dropDialog.setAttribute('aria-describedby','run-drop-confirm-description');
-dropDialog.innerHTML='<h2 id="run-drop-confirm-title"></h2><p id="run-drop-confirm-description"></p><div class="leave-actions"><button type="button" id="run-drop-confirm-pin" class="primary"></button> <button type="button" id="run-drop-confirm-run"></button> <button type="button" id="run-drop-confirm-cancel"></button></div>';
-document.body.append(dropDialog);
-let dropAnswer=null;
-function askRunDrop(question,opener=document.activeElement){
- return new Promise(resolve=>{
-  dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};
-  if(!runQuestion){runQuestion=true;render();}
-  $('run-drop-confirm-title').textContent=question.title;$('run-drop-confirm-description').textContent=question.note;
-  const pin=$('run-drop-confirm-pin');pin.hidden=!question.pin;pin.textContent=question.pin||'';$('run-drop-confirm-run').textContent=question.run;$('run-drop-confirm-cancel').textContent=question.cancel;
-  if(!dropDialog.open)dropDialog.showModal();(question.pin?pin:$('run-drop-confirm-run')).focus();
- });
-}
-$('run-drop-confirm-pin').onclick=()=>dropAnswer?.('pin');$('run-drop-confirm-run').onclick=()=>dropAnswer?.('run');$('run-drop-confirm-cancel').onclick=()=>dropAnswer?.(null);
-dropDialog.oncancel=event=>{event.preventDefault();dropAnswer?.(null);};
-// true when the run may go ahead: no run would be dropped, or the question was answered with Run
-async function confirmOpticalDrops(){
- for(let run=nextDropped(runs,RUN_LIMIT);run;run=nextDropped(runs,RUN_LIMIT)){
-  const answer=await askRunDrop(opticalDropQuestion(run,runs),$('run-optical'));
-  if(answer!=='pin')return answer==='run';
-  run.pinned=true;render();notice(pinNotice(run));
- }
- return true;
-}
 $('run-optical').onclick=async()=>{
  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
- if(!await confirmOpticalDrops())return;
- // the question waited for an answer: the state is checked again
- if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
- try{rejectInvalidInput();}catch(e){notice(e.message);return;}
+ // round 21 (W2): no question before the run; a swap offered after the last drop ends here
+ dropSwap=null;
  const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
   // a closed-window search names capabilities v10 (slice C1)

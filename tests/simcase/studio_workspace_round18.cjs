@@ -112,8 +112,9 @@ test('X3: before the run, the run the six-run limit would drop, with Pin Run N; 
  // the words after the drop are unchanged
  assert.equal(W.droppedRunText(run(3)),'Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.');
  const app=read('workspace-app.mjs');
- assert.ok(app.includes("pin.onclick=()=>{if(!runs.includes(run)||run.pinned)return;run.pinned=true;render();notice(pinNotice(run));};"));
- assert.ok(app.includes("pin.disabled=solverBusy||!!pendingJob;"));
+ assert.ok(app.includes("pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();notice(pinNotice(run));};"));
+ // round 21 (W2): Pin works during the run too, hidden when pinning would leave the result no slot
+ assert.ok(app.includes("pin.hidden=runs.filter(r=>!r.pinned).length<=list.length;pin.disabled=false;"));
  assert.ok(read('workspace.html').includes('<span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span>'));
 });
 

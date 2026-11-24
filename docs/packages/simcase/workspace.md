@@ -363,17 +363,22 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    pinned: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it* (round 20; it read
    *Running drops …* before, as if a run were under way), with **Pin Run 3**,
    which pins that run (the usual pin message) and moves the line to the next unpinned run, or
-   removes it. Pin is unavailable while a calculation runs, as in Run name. Since round 19
-   **Run study** also asks before such a run: a dialog reads *Running drops Run 3 (700 × 300 nm · 4
-   modes).* and *Up to six runs are kept; a pinned run is never dropped.*, with **Pin Run 3 and run**
-   (first, focused), **Run** and **Cancel** (Escape); focus returns to Run study. Pin Run 3 and run
-   pins that run and asks again when the run would then drop the next unpinned run; it is not
-   offered for the last unpinned run, which leaves no slot. Since round 20, while the question is
-   open, the box beside Run study reads *Waiting for your answer: pin, run or cancel* (the drop line
-   is hidden) and the status bar *Run study is waiting for your answer*; nothing says a run is
-   computing (the hidden job panel keeps no message), and every answer, Cancel included, brings the
-   earlier words back. The heated model's question does the same, in the line under its Run study
-   and the status bar. The limit itself is
+   removes it. Since round 21 **Run study** starts at once: the dialog that rounds 19 and 20 showed
+   before such a run (*Running drops Run 3 …* with Pin Run 3 and run, Run and Cancel, and its
+   *Waiting for your answer* words) is gone, because a run left waiting for an answer computed nothing
+   while its user looked away. While the run computes the line reads *When this run finishes, Run 3
+   (700 × 300 nm · 4 modes) is dropped*, and **Pin Run 3** works then too: it keeps Run 3, and the
+   line names the next unpinned run, if any. Pin is not offered when pinning would leave fewer
+   unpinned runs than the result must drop (the last unpinned run: the result needs its slot). The
+   drop happens only when the result arrives, the oldest unpinned run then; Messages adds *Run 3
+   (700 × 300 nm · 4 modes) was dropped* after the run's own message and, when another unpinned run
+   exists besides the new result, a button **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes)
+   instead**, Run 4 being the oldest such run. It brings Run 3 back at its place and drops Run 4:
+   *Run 3 (…) is back; Run 4 (…) was dropped instead.*, with no further button. The tab never holds
+   more than six runs. The button works until the next Run study starts or the run list is replaced
+   (a file opened, a session restored, runs added from a file, Start new); a stale one does nothing
+   and is removed. It is kept in memory only. Add runs from file still names its dropped runs with
+   the sentence above. The limit itself is
    unchanged. Files do
    not hold the number: opening a file or restoring a session from this browser numbers its runs
    from 1 in file order, and runs added from a file continue after the largest number. Since round
@@ -906,8 +911,13 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   “Run N · name · time”, **Run name** (Enter pins) and **Unpin this run**; pinned runs stay, and
   when a new run arrives the oldest unpinned run is replaced. Selecting a run shows its result
   and its freshness line; it does not change the model. With six pinned runs, Run says to unpin
-  one first. Since round 19, Run study asks before a run that drops one, as the optical model
-  does: *Running drops Run 3 (run at 05:31 AM).*, with Pin Run 3 and run, Run and Cancel.
+  one first. Since round 21 Run study starts at once, as in the optical model (round 19's question
+  is gone). The line beside it names the run the limit drops: before the run *If you run: drops
+  Run 3 (run at 05:31 AM) · pin it to keep it*, while it computes *When this run finishes, Run 3
+  (run at 05:31 AM) is dropped*, with **Pin Run 3**. Messages then adds *Run 3 (run at 05:31 AM)
+  was dropped* to *Run 7 complete. …*, with **Keep Run 3, drop Run 4 (run at 05:40 AM) instead**
+  under the optical rules (said again when the without-heater solves finish). Without-heater solves
+  are not runs and drop nothing.
 - **Files.** **File › Save** writes the [project file](#project-files), every model of the tab.
   **File › Export › Model with runs (session file)…** writes this model with its runs, their names
   and pins and the without-heater results to one file, `<model-name>-session-YYYY-MM-DD-HHMM.json` (the model

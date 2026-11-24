@@ -30,10 +30,9 @@ test('Z1: one state, one message: no request to run beside "No need to run"',asy
  assert.equal(M.readyStatus('current',2,'imported'),'Run 2 · read from file, not recomputed · has the results of the current model');
  // a run computed here keeps its words
  assert.equal(M.readyStatus('current',2,'local'),'Run 2 matches the model · press Run to solve again');
- // the drop line is about running; the dialog heading stays the question
+ // the drop line is about running (round 21: the dialog is gone)
  const run={number:3,settings:{mode_count:2},input:{model:doc.model}};
  assert.equal(W.dropWarningText(run),'If you run: drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
- assert.equal(W.opticalDropQuestion(run,[run,{...run,number:4}]).title,'Running drops Run 3 (500 × 220 nm · 2 modes).');
  for(const name of ['workspace-workflow.mjs','workspace-multiphysics.mjs'])assert.ok(!read(name).includes('press Run to compute it here'),name);
  assert.ok(read('workspace-app.mjs').includes('host.textContent=matchingRunMessage(host.textContent);'));
 });
@@ -81,21 +80,14 @@ test('Z6: the optical scope note names the closed window and the open boundary, 
  assert.ok(!src.includes("'PEC outer edges'"));
 });
 
-test('Z7: while the drop question is open, the Run study box and the status bar say it waits',async()=>{
+test('Z7 (round 21 W2): the drop question and its waiting words are gone',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs');
- assert.equal(W.RUN_QUESTION_PLAN,'Waiting for your answer: pin, run or cancel');
- assert.equal(W.RUN_QUESTION_STATUS,'Run study is waiting for your answer');
+ assert.equal(W.RUN_QUESTION_PLAN,undefined);assert.equal(W.RUN_QUESTION_STATUS,undefined);
  const app=read('workspace-app.mjs'),view=read('workspace-multiphysics-view.mjs');
- // set before the dialog shows, cleared by every answer (Cancel and Escape included), each time rendered
- assert.ok(app.includes("dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};"));
- assert.ok(app.includes("if(!runQuestion){runQuestion=true;render();}"));
- assert.ok(app.includes("const shownText=runQuestion?RUN_QUESTION_PLAN:text;"));
- assert.ok(app.includes("run=runQuestion?null:nextDropped(runs,RUN_LIMIT)"));
- assert.ok(app.includes("solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:"));
- assert.ok(app.includes(" else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus("));
+ for(const text of ['runQuestion','RUN_QUESTION','run-drop-confirm'])assert.ok(!app.includes(text),text);
+ for(const text of ['runQuestionOpen','runQuestionWords','confirmDrop'])assert.ok(!view.includes(text)&&!app.includes(text),text);
+ // the hidden job panel still keeps no message
  assert.ok(app.includes("if($('job-panel').hidden){$('job-message').textContent='';$('job-message').title='';}"));
- assert.ok(view.includes("const asking=!job&&ctx.runQuestionOpen?.()===true;if(asking)reason.textContent=ctx.runQuestionWords.plan;"));
- assert.ok(view.includes("$('status').textContent=asking?ctx.runQuestionWords.status:job?"));
 });
 
 test('Z2: the newest offer of a project with both models restores both',async()=>{
