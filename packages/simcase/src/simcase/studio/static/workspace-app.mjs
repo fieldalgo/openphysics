@@ -25,7 +25,7 @@ import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
@@ -1121,15 +1121,19 @@ const groupIndexField=()=>`<label class="check-field"><input id="group-index-che
 // Search near n_eff, kept to 3 decimals. The group index option is kept either way.
 const bindBoundaryField=()=>{
  document.querySelectorAll('input[name="outer-boundary"]').forEach(radio=>radio.onchange=()=>{
-  const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;
-  state.openBoundary=open?openChoice():null;
-  render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');
-  // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
-  if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}});
+  const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;setOuterBoundary(open);});
  const target=$('target-number');if(target)target.onchange=()=>{
   let t;try{t=parseTarget(target.value,state.shapes);}catch(error){notice(error.message);target.value=(state.openBoundary.target??Number(target.defaultValue)).toFixed(3);return;}
   state.openBoundary={...state.openBoundary,target:t};render();notice(`Search near n_eff ${t.toFixed(3)}: the next run returns the modes nearest it.`);};
 };
+// The outer boundary chosen (the radio in Physics › Optical modes, or Use Open boundary under a
+// closed run's edge note, round 18 X9), with its message; nothing runs.
+function setOuterBoundary(open){
+  state.openBoundary=open?openChoice():null;
+  render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');
+  // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
+  if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}
+}
 // The group index box in Study or Optical modes (one panel at a time): the option, then Messages says what the next run does.
 const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.onchange=e=>{state.groupIndex=e.target.checked;render();notice(groupIndexNotice(state.groupIndex));};};
 // The wavelength and Modes to find: one field each, the same in Physics › Optical modes and in
@@ -1444,6 +1448,13 @@ function modesTable(run){
   body.append(tr);
   if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}
  table.append(body);box.append(table);
+ // round 18 (X9): in a row under the last edge note (the note's own text unchanged), the two inputs that find such a mode: Use Open boundary and
+ // Find M modes (the run's Modes to find + 2, at most the maximum); each sets the input with its
+ // usual message and runs nothing, and is left out when the current inputs already have it
+ {const last=[...body.querySelectorAll('[data-edge-note]')].at(-1);if(last){const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1]),actions=document.createElement('span');actions.className='edge-actions';actions.id='edge-actions';
+  if(!state.openBoundary){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-use-open';b.textContent='Use Open boundary';b.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};actions.append(b);}
+  if(state.modeCount<find){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-find-modes';b.textContent=`Find ${find} modes`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};actions.append(b);}
+  if(actions.children.length){const tr=document.createElement('tr');tr.className='edge-note-row edge-actions-row';const td=cell('td','',{colspan:last.getAttribute('colspan'),class:'edge-note'});td.append(actions);tr.append(td);last.parentElement.after(tr);}}}
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${open?OPEN_AREA_HELP:AREA_HELP+'.'}`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0
  // (a closed window adds where leakage is found: Open boundary in Physics › Optical modes)

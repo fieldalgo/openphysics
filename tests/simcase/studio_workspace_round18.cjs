@@ -116,3 +116,19 @@ test('X3: before the run, the run the six-run limit would drop, with Pin Run N; 
  assert.ok(app.includes("pin.disabled=solverBusy||!!pendingJob;"));
  assert.ok(read('workspace.html').includes('<span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span>'));
 });
+
+test('X9: under a closed run\'s edge note, Use Open boundary and Find M modes set the input and run nothing',()=>{
+ const app=read('workspace-app.mjs');
+ // M = the run's Modes to find + 2, at most the maximum (8)
+ assert.ok(app.includes("const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1])"));
+ assert.ok(app.includes("b.textContent='Use Open boundary';b.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};"));
+ assert.ok(app.includes("b.textContent=`Find ${find} modes`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};"));
+ // each is left out when the current inputs already have it; the note's own text is unchanged
+ assert.ok(app.includes("if(!state.openBoundary){const b=document.createElement('button')")&&app.includes("if(state.modeCount<find){const b=document.createElement('button')"));
+ assert.ok(app.includes("tr.className='edge-note-row edge-actions-row'"));
+ // the radio and the button share one route, with the boundary message (and the X2 warning)
+ assert.ok(app.includes("const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;setOuterBoundary(open);});"));
+ // neither runs anything
+ const body=app.slice(app.indexOf('// round 18 (X9): in a row under the last edge note'),app.indexOf("const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization:"));
+ assert.ok(!body.includes('runOptical')&&!body.includes("$('run-optical').click"),body);
+});
