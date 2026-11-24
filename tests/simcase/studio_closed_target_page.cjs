@@ -49,7 +49,7 @@ test('K13 (A1): a closed targeted result keeps the modes above 1.45, with their 
 });
 
 test('K12: the words: the shortcut, the edge note (C0), the plan, the run tag and the help',()=>{
- assert.equal(C.shortcutText(2.46),'Search near 2.46 · 4 modes');assert.equal(C.SHORTCUT_MODE_COUNT,4);
+ assert.equal(C.shortcutText(2.46),'Set search near 2.46 · 4 modes');assert.equal(C.SHORTCUT_MODE_COUNT,4);
  assert.equal(M.edgeNoteText(0,{shape:'Substrate',share:0.934}),'Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge open.');
  assert.equal(M.coreNoteText(1,{shape:'Core',share:0.644}),'Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge.');
  // no text promises that more modes reach the core mode (Q8)

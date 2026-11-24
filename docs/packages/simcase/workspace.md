@@ -1484,9 +1484,11 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   Highest is chosen is kept in memory only. Highest stays the default when a shape touches the
   window edge.
 - **The shortcut.** Under a closed run's edge note the round-18 row has **Use Open boundary** and,
-  since C2, **Search near 2.46 · 4 modes** in place of C0's *Set Modes to find to 4*: it turns the
-  box on with the design's default target and sets Modes to find to 4, says *… Modes to find set to
-  4.* and runs nothing; it is left out when the inputs already have both. Four modes reach the core
+  since C2, **Set search near 2.46 · 4 modes** (*Search near 2.46 · 4 modes* until round 22, V5) in
+  place of C0's *Set Modes to find to 4*: it selects Nearest to n_eff with the design's default
+  target and sets Modes to find to 4, says *… Modes to find set to 4. Press Run study to compute.*
+  and runs nothing; it is left out when the inputs already have both. When a kept run has these
+  inputs, *No need to run: Run N already has these results.* replaces the last sentence. Four modes reach the core
   mode of the strip over a substrate in every registered variant
   ([K7](#closed-window-search-document-optical-shapes-v10)).
 - **The run.** A run with Nearest to n_eff writes `target_effective_index` and names capabilities v10.

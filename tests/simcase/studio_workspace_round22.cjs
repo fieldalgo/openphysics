@@ -46,3 +46,15 @@ test('P1 (V1): Highest writes the K1 documents byte for byte; Nearest 2.46 the t
   assert.equal(JSON.stringify(O.opticalDocument({...state,searchTarget:nearest},F.SETUP)),JSON.stringify(plain),label);
  }
 });
+
+test('P5 (V5): Set search near 2.46 · 4 modes; its message ends "Press Run study to compute."; it runs nothing',async()=>{
+ const C=await import(STATIC+'workspace-closed-target.mjs'),W=await import(STATIC+'workspace-workflow.mjs');
+ assert.equal(C.shortcutText(2.46),'Set search near 2.46 · 4 modes');assert.equal(C.SHORTCUT_RUN_TEXT,'Press Run study to compute.');
+ const use=body(read('workspace-app.mjs'),'function useClosedSearch(t){','\n');
+ assert.ok(use.includes('notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}. ${SHORTCUT_RUN_TEXT}`);offerMatchingRun();}'));
+ // nothing is submitted: no job, no run
+ for(const call of ['runOptical','submit','jobMonitor','api('])assert.ok(!use.includes(call),call);
+ assert.equal(`${C.closedSearchNotice(2.46)} Modes to find set to 4. ${C.SHORTCUT_RUN_TEXT}`,'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
+ // when a kept run has these inputs, "No need to run" replaces the request (round 20, Z1)
+ assert.equal(W.matchingRunMessage('Modes to find set to 4. Press Run study to compute.'),'Modes to find set to 4.');
+});

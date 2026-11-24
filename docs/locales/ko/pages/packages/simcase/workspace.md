@@ -1215,8 +1215,10 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   이어집니다. 설계 범위 밖 굴절률은 그 메시지와 함께 거절되고 선택은 그대로입니다. Highest가 선택된 동안 입력한 굴절률은
   메모리에만 남습니다. 형상이 창 가장자리에 닿아도 기본값은 Highest입니다.
 - **바로 가기.** 닫힌 실행의 가장자리 안내 아래 round 18 행에는 **Use Open boundary**와, C2부터 C0의 *Set Modes to find to 4*
-  대신 **Search near 2.46 · 4 modes**가 있습니다: 설계의 기본 목표로 상자를 켜고 Modes to find를 4로 정하며 *… Modes to find set
-  to 4.*라고 알리고 아무것도 실행하지 않습니다. 입력이 이미 둘 다 그렇다면 나오지 않습니다. 등록된 모든 변형에서 모드 4개로 기판
+  대신 **Set search near 2.46 · 4 modes**(round 22 V5 전에는 *Search near 2.46 · 4 modes*)가 있습니다: 설계의 기본 목표로
+  Nearest to n_eff를 고르고 Modes to find를 4로 정하며 *… Modes to find set to 4. Press Run study to compute.*라고 알리고
+  아무것도 실행하지 않습니다. 입력이 이미 둘 다 그렇다면 나오지 않습니다. 보관된 실행이 이 입력을 가지면 마지막 문장 자리에 *No
+  need to run: Run N already has these results.*가 옵니다. 등록된 모든 변형에서 모드 4개로 기판
   위 스트립의 코어 모드에 닿습니다([K7](#닫힌-창-탐색-문서optical-shapes-v10)).
 - **실행.** Nearest to n_eff를 고른 실행은 `target_effective_index`를 쓰고 capabilities v10을 적습니다. Studio는 Re n_eff가 1.45보다 큰
   모드만 보관합니다(결정 A1): 표 위 줄은 늘 *Found k of M modes near n_eff 2.46, above n = 1.45.*(M: Modes to find)이고, 엔진이
