@@ -40,13 +40,14 @@ export function restorePage(page,runCount){
 export const openedFileName=name=>typeof name==='string'&&/^[^\u0000-\u001f\u007f/\\]{1,200}\.json$/u.test(name)&&!/^\.\.?$/.test(name)?name:null;
 // What makes two stored sessions the same: the model or inputs and the runs. The view (the page,
 // the field view), the selected run, the Compare choice and each run's origin (computed here,
-// opened from a file or recovered) are left out: a tab click, a selected run, an open or a
+// opened from a file or recovered) and digest (it covers the origin) are left out: a tab click, a selected run, an open or a
 // recovery changes them, but not the session. A text that does not parse is compared as it is.
 export function sessionKey(text){
  if(typeof text!=='string')return null;
  try{const doc=JSON.parse(text.replace(/^\uFEFF/,''));if(doc&&typeof doc==='object'&&!Array.isArray(doc)){
   delete doc.view;delete doc.selected;delete doc.comparison;
-  if(Array.isArray(doc.runs))doc.runs=doc.runs.map(run=>{if(run&&typeof run==='object'&&!Array.isArray(run)){const {origin,...rest}=run;return rest;}return run;});
+  // each run's digest too (versions 9 to 12): it covers the origin, and the rest of the run is compared
+  if(Array.isArray(doc.runs))doc.runs=doc.runs.map(run=>{if(run&&typeof run==='object'&&!Array.isArray(run)){const {origin,digest,...rest}=run;return rest;}return run;});
   return JSON.stringify(doc);}}catch{}
  return text;
 }

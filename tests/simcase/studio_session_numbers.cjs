@@ -153,3 +153,10 @@ test('the recovery record keeps the project name, browser-only; a malformed one 
  assert.deepEqual(written.map(r=>r.project??null),[{name:'both-models',from:'file'},null,null]);
  assert.deepEqual(written.map(r=>r.version),[1,1,1]);assert.equal(Object.keys(written[0]).at(-1),'project');
 });
+
+test('a version 12 session is the same session in browser recovery whatever its runs\' origin (sessionKey leaves out origin and digest)',()=>{
+ const text=fixture(V12),recovered=edit(text,d=>{for(const r of d.runs)r.origin='recovered';});
+ assert.notEqual(recovered,text);assert.equal(R.sessionKey(recovered),R.sessionKey(text));
+ // another run name is another session
+ assert.notEqual(R.sessionKey(edit(text,d=>{d.runs[0].label='Other';})),R.sessionKey(text));
+});
