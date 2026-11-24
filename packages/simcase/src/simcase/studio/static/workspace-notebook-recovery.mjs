@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {MAX_SESSION_BYTES,parseSession} from './workspace-notebook.mjs';
 import {validateSavedFile} from './workspace-persistence.mjs';
+import {validateProjectName} from './workspace-project-file.mjs';
 
 export function readNotebookRecovery(record){
  if(record==null)return null;
@@ -11,9 +12,18 @@ export function readNotebookRecovery(record){
  // lists; a malformed one is ignored. Neither is part of the session.
  // openedCurrent (optional; optical and multiphysics records): true when the inputs and runs were still those of openedFile.
  // page (optional, optical): the page the notebook showed, which a restore opens again.
- // Both are browser-only, beside the session; a record without them (or with another value) reads as before.
+ // project (optional; optical and multiphysics records): {name, from} of the tab's project when it
+ // has a name, so a restore names the project when no savedFile.projectName does; a malformed one is ignored.
+ // All are browser-only, beside the session; a record without them (or with another value) reads as before.
  return {savedAt:record.savedAt,session:parseSession(record.session,{recovered:true}),savedFile:validateSavedFile(record.savedFile),openedFile:openedFileName(record.openedFile),
-  openedCurrent:openedFileName(record.openedFile)&&typeof record.openedCurrent==='boolean'?record.openedCurrent:null,page:recordPage(record.page)};
+  openedCurrent:openedFileName(record.openedFile)&&typeof record.openedCurrent==='boolean'?record.openedCurrent:null,page:recordPage(record.page),project:recordProject(record.project)};
+}
+/** The project of a recovery record: {name, from} with a name a project may have (validateProjectName,
+ * stored trimmed) and from 'file' or 'user' (where the name came from), else null. */
+export function recordProject(value){
+ if(value==null||typeof value!=='object'||Array.isArray(value)||!['file','user'].includes(value.from)||typeof value.name!=='string')return null;
+ try{if(validateProjectName(value.name)!==value.name)return null;}catch{return null;}
+ return {name:value.name,from:value.from};
 }
 // The pages a recovery record may name; any other value is ignored.
 export const RECORD_PAGES=Object.freeze(['Model','Results','Compare']);
@@ -147,7 +157,7 @@ export class NotebookAutosave {
  constructor(store,{onState=()=>{},delay=700,setTimer=(fn,ms)=>setTimeout(fn,ms),clearTimer=id=>clearTimeout(id)}={}){
   this.store=store;this.onState=onState;this.delay=delay;this.setTimer=setTimer;this.clearTimer=clearTimer;this.timer=null;this.desired=null;this.writing=false;this.savedStamp=null;this.failedStamp=null;
  }
- // extra: optional {savedFile, openedFile, openedCurrent, page} written beside the session in the record.
+ // extra: optional {savedFile, openedFile, openedCurrent, page, project} written beside the session in the record.
  schedule(stamp,makeText,extra={}){
   if(this.desired?.stamp===stamp)return;
   this.desired={stamp,makeText,extra};this.failedStamp=null;
@@ -163,7 +173,7 @@ export class NotebookAutosave {
   const capture=this.desired;this.writing=true;this.onState({phase:'saving'});
   try{
    const session=capture.makeText();if(typeof session!=='string'||new TextEncoder().encode(session).length>MAX_SESSION_BYTES)throw new Error('Recovery snapshot exceeds 16 MiB. Save selected runs to files.');
-   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile,...(typeof capture.extra.openedCurrent==='boolean'?{openedCurrent:capture.extra.openedCurrent}:{})}:{}),...(recordPage(capture.extra?.page)?{page:capture.extra.page}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record,note:typeof capture.makeText.note==='string'?capture.makeText.note:''});
+   const record={version:1,savedAt:new Date().toISOString(),session,...(capture.extra?.savedFile?{savedFile:capture.extra.savedFile}:{}),...(openedFileName(capture.extra?.openedFile)?{openedFile:capture.extra.openedFile,...(typeof capture.extra.openedCurrent==='boolean'?{openedCurrent:capture.extra.openedCurrent}:{})}:{}),...(recordPage(capture.extra?.page)?{page:capture.extra.page}:{}),...(recordProject(capture.extra?.project)?{project:recordProject(capture.extra.project)}:{})};const committed=await this.store.save(record);this.savedStamp=capture.stamp;this.failedStamp=null;this.onState({phase:'saved',record:committed||record,note:typeof capture.makeText.note==='string'?capture.makeText.note:''});
   // a write refused for space (QuotaExceededError) is named, so the page can say why (round 17, U6)
   }catch(error){this.failedStamp=capture.stamp;this.onState({phase:'error',code:error?.code??(error?.name==='QuotaExceededError'?'recovery-quota':undefined),message:error?.name==='QuotaExceededError'?'This browser’s storage is full, so the session cannot be kept for recovery. File › Save keeps it in a file.':error.message});}
   finally{this.writing=false;if(this.desired?.stamp!==capture.stamp)await this.flush();}
