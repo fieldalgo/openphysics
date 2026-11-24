@@ -292,10 +292,12 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
-   가리키고(*Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
+   가리키고(*Pinned · Run 1 · design A · closed · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
    Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. 형상이 여럿인 실행은 처음 세 형상의 이름과
-   크기를, 그 뒤는 *+N more*로 적습니다: *Run 5 · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon*. 열린 경계
-   실행은 실행 목록과 Compare 선택 목록에 *· open (PML 1 µm)*을 덧붙입니다. Compare는 가장 새 실행 두 개로 열리며,
+   크기를, 그 뒤는 *+N more*로 적습니다. 모든 실행 이름은 실행 번호와 이름 바로 뒤에 경계 태그 *closed* 또는
+   *open (PML 1 µm)*을 둡니다(실행 목록, Compare 선택 목록, Compare 제목, n_eff 표의 실행 줄). 선택 목록에서
+   이름이 잘려도 경계가 보입니다: *Run 7 · open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon ·
+   λ 1550 nm*. Compare는 가장 새 실행 두 개로 열리며,
    오래된 쪽이 A, 새 쪽이 B입니다(방금 계산한 실행이 B). Compare에서 고른 쌍이나 두 실행 모두 이름이 있는 쌍은 새
    실행이 생겨도 유지되며, Compare에 *Run 5 is newer than this pair · Compare Run 5 with B*가 나오고 그 버튼은 가장 새
    실행(B)을 그 쌍의 B(A로)와 비교합니다. 프로젝트 파일은 그 쌍을 저장하고 열면 그 쌍을 다시 보여 줍니다. 파일에서

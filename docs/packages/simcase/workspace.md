@@ -335,11 +335,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
    bar adds *press Run to compute it here*). Run list entries name a run by its number with its
-   name, *Pinned · Run 1 · design A · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*, and give the time
-   with seconds; the Compare pickers and headings name runs the same way. A run of several
-   shapes names each shape and its size, the first three, then *+N more*: *Run 5 · Core 500 ×
-   220 + Substrate 3000 × 700 nm · Silicon*; a run with an open boundary adds *· open (PML
-   1 µm)* in the run list and the Compare pickers. Compare opens with
+   name, then its boundary, *Pinned · Run 1 · design A · closed · 600 × 300 nm · λ 1550 nm ·
+   3:50:12 PM*, and give the time with seconds; the Compare pickers, the Compare headings and the
+   n_eff table's run lines name runs the same way. The boundary tag, *closed* or *open (PML 1 µm)*,
+   comes right after the run number and name, so a label cut short in a picker still shows it. A
+   run of several shapes names each shape and its size, the first three, then *+N more*: *Run 7 ·
+   open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm*. Compare opens with
    the two newest runs, the older as A and the newer as B (a run just computed is B). A pair
    picked on Compare, or a pair of two named runs, stays when new runs come: Compare then
    reads *Run 5 is newer than this pair · Compare Run 5 with B*, and the button compares the

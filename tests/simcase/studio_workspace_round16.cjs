@@ -78,8 +78,8 @@ test('S8: a multi-shape run names each shape and size; an open run its PML; one 
  // one shape: exactly as before round 16
  assert.equal(S.designSummary({shapes:[core]}),'500 × 220 nm · Silicon');
  const model={shapes:[core,sub],wavelength:1550};
- assert.equal(C.runDesign({input:{model},settings:{boundary:'PML',pml:{thickness:'1000 nm'}}}),'Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · open (PML 1 µm)');
- assert.equal(C.runDesign({input:{model:{shapes:[core]}},settings:{}}),'500 × 220 nm · Silicon');
+ assert.equal(C.runDesign({input:{model},settings:{boundary:'PML',pml:{thickness:'1000 nm'}}}),'open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ assert.equal(C.runDesign({input:{model:{shapes:[core]}},settings:{}}),'closed · 500 × 220 nm · Silicon');
  assert.ok(read('workspace-app.mjs').includes('${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}'));
 });
 
