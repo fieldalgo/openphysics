@@ -613,7 +613,10 @@ in the box and on its card (the file's save time); one click restores both, with
 waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. …*, the
 header *Heater study · r20-both.json · saved …* and the optical model's Results, and the Library
 then offers no restore and reads *Return to Optical waveguide (2 runs)* and *Return to Heated silicon
-waveguide (1 run)*; no horizontal overflow at 1440 × 900 or 390 × 844. The session script's heated
+waveguide (1 run)*; no horizontal overflow at 1440 × 900 or 390 × 844. The server's model check
+answers that restore after 2 s (DevTools Fetch interception, as on a slower machine), and an edit
+after it (Modes to find 3) is written, *Browser recovery updated …*, with no *changed in another
+tab* in the header or footer, and comes back after a reload. The session script's heated
 drop question reads *Waiting for your answer: pin, run or cancel* under Run study and *Run study is
 waiting for your answer* in the status bar while it is open, and neither after Cancel; its opened
 run's status bar reads *… · has the results of the current model* and its card *Return to Heated
