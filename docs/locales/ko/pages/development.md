@@ -496,7 +496,9 @@ as file r20-both.json · saved …*로 시작하고, 가열 기록은 상자와 
 클릭이 둘 다 복원하여 *Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not
 recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모델의 Results가 나오고, Library에는 복원 제안이 남지 않으며
 *Return to Optical waveguide (2 runs)*와 *Return to Heated silicon waveguide (1 run)*로 읽히는지; 1440 × 900과 390 × 844에서
-가로 넘침이 없는지 봅니다. session 스크립트의 가열 모델 내보내기 질문은 열려 있는 동안 Run study 아래에 *Waiting for your
+가로 넘침이 없는지 봅니다. 그 복원에서 서버의 모델 확인은 2초 뒤에 답하고(DevTools Fetch 가로채기, 느린 컴퓨터처럼), 그 뒤의 편집(Modes to
+find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시줄에 *changed in another tab*이 없으며 새로고침 뒤에도 돌아오는지
+봅니다. session 스크립트의 가열 모델 내보내기 질문은 열려 있는 동안 Run study 아래에 *Waiting for your
 answer: pin, run or cancel*, 상태 표시줄에 *Run study is waiting for your answer*를 보이고 Cancel 뒤에는 둘 다 없으며, 파일에서
 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
 
