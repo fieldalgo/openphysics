@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -1138,10 +1138,20 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 // round 18 (X2; round 17 U3 named the slow options only): what the next optical run does, beside Run
 // study, with how long the last comparable run of this tab took; the options keep their state (a
 // task does not reset them), so a run that is slower than one solve says why first
+// round 18 (X3): before the run, the run the six-run limit would drop, with Pin Run N (the limit is unchanged)
+function refreshDropWarning(){
+ const host=$('run-drop'),run=nextDropped(runs,RUN_LIMIT);host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
+ const text=dropWarningText(run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
+ const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
+ // as Run name does, no pin while a calculation runs: the finishing result needs a free slot
+ pin.disabled=solverBusy||!!pendingJob;
+ pin.onclick=()=>{if(!runs.includes(run)||run.pinned)return;run.pinned=true;render();notice(pinNotice(run));};
+}
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount};
  const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
+ refreshDropWarning();
  const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};

@@ -345,7 +345,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    ready · explicit Run required*. A run keeps its number while the tab is open (round 17): a new run takes the largest number used
    so far + 1, so when the six-run limit drops the oldest unpinned run the others keep theirs, and
    Messages names the dropped run (*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are
-   kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Files do
+   kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Since round
+   18 the box beside **Run study** says it before the run, while six runs are kept and one is not
+   pinned: *Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*, with **Pin Run 3**,
+   which pins that run (the usual pin message) and moves the line to the next unpinned run, or
+   removes it. Pin is unavailable while a calculation runs, as in Run name. The limit itself is
+   unchanged. Files do
    not hold the number: opening a file or restoring a session from this browser numbers its runs
    from 1 in file order, and runs added from a file continue after the largest number. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open

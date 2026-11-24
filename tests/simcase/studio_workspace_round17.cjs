@@ -150,7 +150,7 @@ test('U3: the slow options of the next run, beside Run study',async()=>{
  assert.equal(W.runPlanText({modeCount:2}),'Closed window · no earlier run');
  // the words of the Study line
  assert.ok(W.nextRunText(input(),2,true).includes(' · group index on'));
- assert.ok(read('workspace.html').includes('<button id="run-optical" disabled>Run study</button><div id="run-options" class="run-options" hidden><span id="run-plan" class="run-plan"></span></div>'));
+ assert.ok(read('workspace.html').includes('<button id="run-optical" disabled>Run study</button><div id="run-options" class="run-options" hidden><span id="run-plan" class="run-plan"></span><span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span></div>'));
 });
 test('U5: the outer boundary is a choice: the workspace note and the closed Study panel say where',()=>{
  const app=read('workspace-app.mjs');
