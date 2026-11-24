@@ -580,8 +580,11 @@ option off (*Closed window · last such run m:ss*, the box unchecked, *Group ind
 a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB) giving *… Session is now
 N MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected
 and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and the effective areas.
-Browser recovery already keeps only those fields.*, wrapped in Messages with no overflow, and the
-header *… · kept for recovery in this browser without the fields of 4 runs* (P2); with six runs the
+Browser recovery keeps every field but those of Run 1.*, wrapped in Messages with no overflow, the
+header *… · kept for recovery in this browser without the fields of Run 1*, and the record in
+IndexedDB within 16 MiB holding Run 5's field and the newest others, exactly the runs not named; after
+a sixth run (about 24 MB) the record again within 16 MiB with Run 6's field and the header naming
+exactly the runs without (P2); with six runs the
 drop line, **Pin Run 1** to **Pin Run 3**, the dropped words and the swap button naming a closed n_g
 run (*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), an open run
 (*Run 3 (open (PML 1 µm) · …)*) and a closed-near run (*Run 4 (closed near 2.46 · 4 modes · …)*), each
