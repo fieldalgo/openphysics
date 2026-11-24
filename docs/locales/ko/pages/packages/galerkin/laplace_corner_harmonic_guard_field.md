@@ -54,6 +54,13 @@ T=C[:,S] inv(C_SS)입니다.
 기존 세 활성 도체 API는 세 도체가 모두 활성인 계약을 유지합니다. 다른
 플랫폼·제품 소비자 연결·UI는 별도 검증이 필요합니다.
 
+이 문서의 시험 모듈에 있는 패널(변당 32→48)·바깥 폭(8·16·32 mm) 수렴 연구는 CPU 하나로
+수십 분에서 몇 시간이 걸려 validate.yml 시험 분할 하나보다 길다. 그래서 `slow`로 표시하고
+`OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(`panel_studies=true`)에서
+돌리며, 1% 기준은 그대로다. 일반 시험은 다른 시험이 푸는 패널 32·8 mm 해상도가 연구와 함께 기록한 값
+(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비
+1e-9 이내)을 재현하는지 확인한다(`tests/_support/panel_studies.py`).
+
 [세 활성 도체](laplace_corner_harmonic_field.md) ·
 [English](../../../../../packages/galerkin/laplace_corner_harmonic_guard_field.md)
 

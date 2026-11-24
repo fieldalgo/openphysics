@@ -5,6 +5,7 @@ from functools import lru_cache
 
 import numpy as np
 import pytest
+from panel_studies import matrix_relative, recorded, study
 
 from galerkin.laplace_corner_linear_field import solve_two_ground_linear_corner_rectangle_edges as solve
 from galerkin import laplace_corner_linear_field as field
@@ -33,6 +34,8 @@ def calculated(index,count=64,width=.008,reflect=False):
                  ground_modes={.008:256,.016:512,.032:1024}[width])
 
 
+@pytest.mark.slow
+@study
 @pytest.mark.parametrize('index',range(2))
 def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
     coarse=quantities(calculated(index,32));fine=quantities(calculated(index,64))
@@ -42,6 +45,14 @@ def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
     changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
     assert max(value for row in changes for value in row)<=.01
     record_property('linear_corner_resolution',repr((index,panel,changes)))
+
+
+@pytest.mark.parametrize('index',range(2))
+def test_cheapest_study_resolution_reproduces_the_recorded_values(index):
+    """The study above runs only on dispatch (tests/_support/panel_studies.py); the resolution
+    the tests below solve (64 panels, 8 mm) must keep the values recorded with it."""
+    for value,reference in zip(quantities(calculated(index)),recorded('test_laplace_corner_linear_field',index)):
+        assert matrix_relative(value,reference)<=1e-9
 
 
 @pytest.mark.parametrize('index',range(2))

@@ -43,6 +43,13 @@ Fourier 차수·구적 수렴을 먼저 검사한 뒤 유한21각형 결과를 �
 기존 공개 기하·솔버와 최소 분할 조건은 바뀌지 않는다. 미해결 고정 접지 가드
 사례는 이 API의 수락 범위가 아니다. 다른 플랫폼·제품 통합·배포 수락도 뜻하지 않는다.
 
+이 문서의 시험 모듈에 있는 패널(변당 32→48)·바깥 폭(8·16·32 mm) 수렴 연구는 CPU 하나로
+수십 분에서 몇 시간이 걸려 validate.yml 시험 분할 하나보다 길다. 그래서 `slow`로 표시하고
+`OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(`panel_studies=true`)에서
+돌리며, 1% 기준은 그대로다. 일반 시험은 다른 시험이 푸는 패널 32·8 mm 해상도가 연구와 함께 기록한 값
+(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비
+1e-9 이내)을 재현하는지 확인한다(`tests/_support/panel_studies.py`).
+
 [두 접지 전계](two-ground.md) ·
 [Compact 기하](laplace_corner_compact_geometry.md) ·
 [English](../../../../../packages/galerkin/laplace_corner_harmonic_field.md)
