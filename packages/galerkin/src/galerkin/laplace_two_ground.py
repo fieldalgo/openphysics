@@ -44,13 +44,13 @@ class TwoGroundRectangleResult:
             frozen = np.frombuffer(value.tobytes(), dtype=float).reshape(value.shape)
             object.__setattr__(self, name, frozen)
 
-def _admit(polygons, width, height, count, side_walls=True):
+def _admit(polygons, width, height, count, side_walls=True, max_aspect=16):
     if not isinstance(polygons, (list, tuple)) or not 1 <= len(polygons) <= 16:
         raise ValueError('polygons must be a list or tuple of 1..16 convex conductor boundaries')
     unit = max(width, height)
     w, h = (width / unit, height / unit)
-    if not 0.25 <= w / h <= 16:
-        raise ValueError('width/height must lie in [0.25, 16]')
+    if not 0.25 <= w / h <= max_aspect:
+        raise ValueError(f'width/height must lie in [0.25, {max_aspect}]')
     accepted = []
     vertices = 0
     tolerance = 128 * np.finfo(float).eps
@@ -179,7 +179,7 @@ def _solve(polygons, *, width, height, panels_per_edge=32, interpolation_degree=
     degree = _integer(interpolation_degree, 'interpolation_degree', 10, 16)
     if degree % 2:
         raise ValueError('even interpolation degree required')
-    polygons, unit, w, h = _admit(polygons, width, height, count, side_walls=False)
+    polygons, unit, w, h = _admit(polygons, width, height, count, side_walls=False, max_aspect=64)
     points = np.concatenate(polygons)
     lower, upper = (points.min(axis=0), points.max(axis=0))
     clear = bool(min(lower[0], w - upper[0]) >= np.max(upper - lower))
@@ -272,7 +272,7 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
     """Solve convex closed conductors with grounded bottom and top planes.
 
     Side normal flux is zero. Accept 1..16 disjoint convex polygons, strictly
-    inside a rectangle of width/height in [0.25,16], separated from side walls
+    inside a rectangle of width/height in [0.25,64], separated from side walls
     by at least the cluster extent. At most 2048 cubic-graded panels are used.
     Interpolation degree explicitly selects 10,12,14,16; ground_modes selects
     64..4096 cosine modes, compared with twice that number. No fallback occurs.
