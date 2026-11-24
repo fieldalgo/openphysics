@@ -1,0 +1,18 @@
+{
+ "session": "This session file is version 12, newer than this Studio reads (versions 6–11). Open it in a newer Studio.",
+ "project": "Optical waveguide: This session file is version 12, newer than this Studio reads (versions 6–11). Open it in a newer Studio.",
+ "recovery": "This session file is version 12, newer than this Studio reads (versions 6–11). Open it in a newer Studio.",
+ "adopted": false,
+ "version 11 record": {
+  "version": 11,
+  "equal with and without project": true,
+  "keys": [
+   "savedAt",
+   "session",
+   "savedFile",
+   "openedFile",
+   "openedCurrent",
+   "page"
+  ]
+ }
+}

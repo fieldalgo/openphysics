@@ -151,9 +151,9 @@ test('V17: the digest covers every key of a version 9 run; unknown keys and mode
  assert.throws(()=>N.parseSession(edit(text,d=>{d.view.mode=2;d.selected=d.runs[1].job;})),{message:'Unsupported saved field view.'});
  // a newer file is refused by name; a Studio before version 9 refused this one with the same template
  // (version 10, the open boundary, is read since slice P2, and version 11, the closed-window search,
- // since slice C2: version 12 is the newer one; the refusal Studio 4b58fb7 gave a version 10 file is
+ // since slice C2, and version 12, the run numbers, since then: version 13 is the newer one; the refusal Studio 4b58fb7 gave a version 10 file is
  // newerVersionText(10, 9), and the one Studio 13f07f4 gives a version 11 file newerVersionText(11, 10))
- assert.throws(()=>N.parseSession(edit(text,d=>{d.version=12;})),{message:'This session file is version 12, newer than this Studio reads (versions 6–11). Open it in a newer Studio.'});
+ assert.throws(()=>N.parseSession(edit(text,d=>{d.version=13;})),{message:'This session file is version 13, newer than this Studio reads (versions 6–12). Open it in a newer Studio.'});
  assert.equal(N.newerVersionText(11,10),'This session file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.');
  assert.equal(N.newerVersionText(10,9),'This session file is version 10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.');
  assert.equal(N.newerVersionText(9,8),'This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.');
