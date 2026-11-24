@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- `meshloom`: **`builder.triangle_surface(points, triangles, tags=..., region_points=...)` turns a closed triangle surface into `generate3d` input.** Neighbouring triangles of one tag that lie exactly in one plane (exact `orient3d` = 0 on the doubles, no tolerance) and share an edge no other triangle uses are joined into polygon facets, holes included; degenerate triangles and patches that cannot form simple loops stay triangles, and unused points are dropped. Given one facet per triangle, every triangle edge is a segment and small in-plane angles cascade; through the builder, meshloom's own boundaries of the plan's cases C2–C6 mesh in 0.82–1.11 times the time of their builder or polygon input (one facet per triangle: 1.9–7.1 times, or no mesh). C7's slanted face is not exactly planar and still runs past 10 minutes. The output does not keep every input vertex or tile each input triangle, so it is not for the C14 runs of the 3D plan (V20, V36, V37). New tests in `tests/meshloom/test_triangle_surface.py`. [meshloom](docs/packages/meshloom/overview.md#limits).
+
+## 한국어
+
+- `meshloom`: **`builder.triangle_surface(points, triangles, tags=..., region_points=...)`가 닫힌 삼각형 표면을 `generate3d` 입력으로 바꿉니다.** 태그가 같고, 정확히 한 평면 위에 있고(double 값에 대한 정확 `orient3d` = 0, 허용오차 없음), 다른 삼각형이 쓰지 않는 변을 공유하는 이웃 삼각형을 다각형 facet으로 합칩니다. 구멍도 다룹니다. 퇴화한 삼각형과 단순한 고리를 만들 수 없는 조각은 삼각형으로 남기고, 쓰이지 않는 점은 뺍니다. 삼각형마다 facet으로 주면 삼각형 변이 모두 선분이 되고 평면 안의 작은 각에서 연쇄가 일어납니다. builder를 거치면 계획의 C2–C6을 meshloom이 만든 경계가 builder나 다각형 입력의 0.82–1.11배 시간에 메시가 됩니다(삼각형마다 facet: 1.9–7.1배이거나 메시가 되지 않음). C7의 비스듬한 면은 정확히 평면이 아니라 여전히 10분이 넘게 걸립니다. 출력은 모든 입력 꼭짓점을 유지하지도, 입력 삼각형을 각각 덮지도 않으므로 3D 계획의 C14 실행(V20, V36, V37)에는 쓰지 않습니다. 새 시험은 `tests/meshloom/test_triangle_surface.py`에 있습니다. [meshloom](packages/meshloom/overview.md#한계).

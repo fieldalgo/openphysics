@@ -53,6 +53,31 @@ mesh["region_names"]           # ['via', 'slab']
   `RecoveryError` and never returns a node off the surface.
 - **Planar facets.** The box faces and the via's end disks are refined as usual.
 
+A closed triangle surface (an STL-like input: points and triangles, with a tag per
+triangle) goes through `builder.triangle_surface(points, triangles, tags=...,
+region_points=...)`.
+- **What it joins.** Two triangles are joined into one polygon facet when they:
+  - share an edge that no other triangle uses;
+  - carry the same tag;
+  - lie exactly in one plane (exact `orient3d` = 0 on the doubles, with no tolerance).
+
+  A joined patch becomes one facet: its outer loop first, then its holes.
+- **What it leaves.** These stay triangles:
+  - degenerate triangles;
+  - a patch whose boundary passes through a vertex twice;
+  - a patch with a vertex inside it that a triangle outside it uses.
+
+  Points that no facet uses any more are dropped.
+- **Why.** Given one facet per triangle, every triangle edge becomes a segment that
+  refinement keeps and splits, and small angles between triangles of one plane cascade
+  (see the limits).
+- **Not for checks that keep the input triangles.** The output drops the vertices
+  inside a patch, and its boundary faces cross the input triangles' edges. So it does
+  not keep every input vertex, nor tile each input triangle with its own boundary faces.
+  Do not use it for the C14 runs of the 3D plan (V20, V36, V37).
+- **Float32 files.** A float32 STL's slanted faces are rarely exactly planar in doubles
+  and stay triangles. Axis-aligned faces join.
+
 Errors are typed `ValueError` subclasses exported by the package (`InvalidPLC` with a
 witness, `NotClosed`, `RecoveryError`, `RefineError`, `RoundingError`, `RegionError`,
 `MeshError`). `meshloom.kernel_available()` and `meshloom.kernel_version()` report the
@@ -332,6 +357,14 @@ See [third-party software](../../third-party.md).
     Subfacets split towards a vertex where coplanar triangles meet at a small angle.
   - The same unit cube as six polygons meshes in 0.06–3.4 s at h = 0.5–0.12, and as
     triangles in 0.03–23 s.
+  - Through `builder.triangle_surface` (measured 2026-11-24, median of 3 runs), 18 of 21
+    mesh and pass the same volume and area checks. On C2–C6 they take 0.82–1.11 times as
+    long as from the builder or polygon input. 13 of the 15 rows with a V10 gate reach it.
+    The two that miss are C2 at h = 0.06 (smallest dihedral angle 13.5°) and C5 at
+    h = 0.12 (mean q 0.811, against 0.8185). C1, a sphere, has no coplanar triangles and is
+    unchanged. C7's slanted face is not exactly planar in doubles, so its triangles stay
+    and all three sizes still run past 10 minutes. The cube from its triangles takes
+    0.07–3.6 s, and as six polygons 0.06–3.6 s.
   - Locking those triangles (`locked_facets`) raises `RecoveryError` on C2–C7: recovery
     would need a point on a locked facet.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet

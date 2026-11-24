@@ -1,7 +1,8 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""Curved primitives for ``meshloom.generate3d``: spheres and z-axis cylinder vias.
+"""Inputs for ``meshloom.generate3d``: curved primitives (spheres and z-axis cylinder vias)
+and closed triangle surfaces (``triangle_surface``, at the end of this module).
 
 Each builder returns a dict of keyword arguments for ``generate3d``: ``points``,
 ``facets``, ``facet_tags``, ``region_points`` and ``locked_facets``. The curved surfaces
@@ -261,3 +262,155 @@ def sphere_in_box(h, *, box=((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)), center=(0.0, 
     seeds = [(corner, names[0]), (tuple(center), names[1])]
     return {"points": np.array(pts.xyz), "facets": facets, "facet_tags": tags, "region_points": seeds,
             "locked_facets": locked}
+
+
+def triangle_surface(points, triangles, *, tags=None, region_points=None):
+    """A closed triangle surface (an STL-like input) with its planar parts as polygons.
+
+    ``points`` (n x 3) and ``triangles`` (m x 3 point indices) give the surface; ``tags``
+    names each triangle (default ``"surface"`` for all), and ``region_points`` is passed
+    through to ``generate3d``. Two triangles that share an edge, carry the same tag, lie
+    exactly in one plane (exact ``orient3d`` = 0 on the doubles, no tolerance) and are
+    the only two triangles on that edge are joined, and every joined patch becomes one
+    facet: its outer boundary loop first, then its holes. A patch is left as triangles
+    when its boundary passes through a vertex twice, or when a vertex inside it belongs
+    to a triangle outside it. Degenerate (collinear) triangles are never joined. Points
+    that no facet uses any more (vertices inside a patch) are dropped and the rest
+    renumbered in order. Returns ``points``, ``facets`` and ``facet_tags`` (plus
+    ``region_points`` when given), the keyword arguments of ``generate3d``, unlocked.
+
+    Every triangle edge given as a facet edge is a segment that refinement must keep;
+    joining a plane's triangles removes those inside it, with the small in-plane angles
+    between them. The output therefore no longer keeps every input vertex or tiles each
+    input triangle by its own boundary faces: do not use it where a check needs those
+    (the C14 runs of the 3D plan, V20, V36 and V37). A float32 STL's slanted faces are
+    rarely exactly planar in doubles and stay triangles; axis-aligned faces join.
+    """
+    from . import _core
+
+    pts = np.ascontiguousarray(points, dtype=float)
+    tri = np.asarray(triangles)
+    if pts.ndim != 2 or pts.shape[1] != 3 or not np.isfinite(pts).all():
+        raise ValueError("points must be a finite (n, 3) array")
+    if tri.ndim != 2 or tri.shape[1] != 3 or (len(tri) and not np.issubdtype(tri.dtype, np.integer)):
+        raise ValueError("triangles must be an (m, 3) array of point indices")
+    tri = tri.astype(np.int64)
+    if len(tri) == 0:
+        raise ValueError("triangles is empty")
+    if tri.min() < 0 or tri.max() >= len(pts):
+        raise ValueError(f"triangles holds point indices in [0, {len(pts)})")
+    if np.any((tri[:, 0] == tri[:, 1]) | (tri[:, 1] == tri[:, 2]) | (tri[:, 0] == tri[:, 2])):
+        raise ValueError("a triangle repeats a point index")
+    m = len(tri)
+    if tags is None:
+        tag = ["surface"] * m
+    else:
+        tag = list(tags)
+        if len(tag) != m or not all(isinstance(t, str) and t for t in tag):
+            raise ValueError(f"tags must be {m} non-empty strings, one per triangle")
+
+    # collinear triangles: every projection of the normal is exactly zero
+    x = pts[tri]
+    flat = np.ones(m, dtype=bool)
+    for axis in range(3):
+        flat &= _core.predicate_signs("orient2d_proj", x, axis=axis) == 0
+
+    edges: dict[tuple[int, int], list[int]] = {}
+    for f, (a, b, c) in enumerate(tri.tolist()):
+        for u, v in ((a, b), (b, c), (c, a)):
+            edges.setdefault((u, v) if u < v else (v, u), []).append(f)
+
+    parent = list(range(m))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    pairs = [(fs[0], fs[1], e) for e, fs in edges.items()
+             if len(fs) == 2 and tag[fs[0]] == tag[fs[1]] and not flat[fs[0]] and not flat[fs[1]]]
+    if pairs:
+        quad = np.empty((len(pairs), 4, 3))
+        for k, (f, g, e) in enumerate(pairs):
+            far = next(v for v in tri[g].tolist() if v not in e)
+            quad[k, :3] = pts[tri[f]]
+            quad[k, 3] = pts[far]
+        same = _core.predicate_signs("orient3d", quad) == 0
+        for (f, g, _), s in zip(pairs, same):
+            if s:
+                parent[find(f)] = find(g)
+
+    groups: dict[int, list[int]] = {}
+    for f in range(m):
+        groups.setdefault(find(f), []).append(f)
+
+    facets, facet_tags = [], []
+    for members in sorted(groups.values()):
+        loops = _patch_loops(tri, members, edges, pts) if len(members) > 1 else None
+        if loops is None:
+            for f in members:
+                facets.append([tri[f].tolist()])
+                facet_tags.append(tag[f])
+        else:
+            facets.append(loops)
+            facet_tags.append(tag[members[0]])
+
+    used = sorted({v for fc in facets for loop in fc for v in loop})
+    new = {v: i for i, v in enumerate(used)}
+    out = {"points": pts[used], "facets": [[[new[v] for v in loop] for loop in fc] for fc in facets],
+           "facet_tags": facet_tags}
+    if region_points is not None:
+        out["region_points"] = region_points
+    return out
+
+
+def _patch_loops(tri, members, edges, pts):
+    """The boundary loops of a planar patch of triangles, outer first; None when the
+    boundary passes through a vertex twice or a vertex inside the patch is used outside."""
+    inside = set(members)
+    count: dict[tuple[int, int], int] = {}
+    for f in members:
+        a, b, c = tri[f].tolist()
+        for u, v in ((a, b), (b, c), (c, a)):
+            e = (u, v) if u < v else (v, u)
+            count[e] = count.get(e, 0) + 1
+    nbr: dict[int, list[int]] = {}
+    for (u, v), n in count.items():
+        if n == 1:
+            nbr.setdefault(u, []).append(v)
+            nbr.setdefault(v, []).append(u)
+    if any(len(w) != 2 for w in nbr.values()):
+        return None
+    verts = {v for f in members for v in tri[f].tolist()}
+    interior = verts - nbr.keys()
+    if interior:
+        for e, fs in edges.items():
+            if (e[0] in interior or e[1] in interior) and any(f not in inside for f in fs):
+                return None
+    loops, seen = [], set()
+    for start in sorted(nbr):
+        if start in seen:
+            continue
+        loop, prev, cur = [start], None, start
+        seen.add(start)
+        while True:
+            a, b = nbr[cur]
+            nxt = a if a != prev else b
+            if nxt == start:
+                break
+            loop.append(nxt)
+            seen.add(nxt)
+            prev, cur = cur, nxt
+        loops.append(loop)
+    # outer loop: the largest area, projected along the plane normal's largest component
+    p = pts[tri[members[0]]]
+    axis = int(np.argmax(np.abs(np.cross(p[1] - p[0], p[2] - p[0]))))
+    keep = [i for i in range(3) if i != axis]
+
+    def area(loop):
+        q = pts[loop][:, keep]
+        return abs(np.dot(q[:, 0], np.roll(q[:, 1], -1)) - np.dot(q[:, 1], np.roll(q[:, 0], -1))) / 2
+
+    loops.sort(key=area, reverse=True)
+    return loops
