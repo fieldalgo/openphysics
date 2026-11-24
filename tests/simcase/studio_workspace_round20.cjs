@@ -93,20 +93,19 @@ test('Z7 (round 21 W2): the drop question and its waiting words are gone',async(
 test('Z2: the newest offer of a project with both models restores both',async()=>{
  const A=await import(STATIC+'workspace-applications.mjs');
  const t=x=>x;
- const optical={runs:6,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T08:44:00Z',file:'both-models.json',fileCurrent:false,pair:{model:'Heated silicon waveguide',runs:2}};
+ const optical={runs:6,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T08:44:00Z',file:'both-models.json',fileCurrent:false,pair:{model:'Heated silicon waveguide',runs:2,savedAt:'2026-11-24T08:30:00Z'}};
  const heated={runs:2,model:'Heated silicon waveguide',names:['Run 1','Run 2'],savedAt:'2026-11-24T08:30:00Z',file:'both-models.json',fileCurrent:false,index:0};
  const choices=A.resumeChoices(optical,[heated],t);
  assert.deepEqual(choices[0],{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T08:44:00Z'});
- // the other model's own entry stays, as before
- assert.equal(choices[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T08:30:00Z');
- assert.equal(choices[1].pair,undefined);
+ // round 21 (W4): the other model's own entry is not listed again (its card still offers it)
+ assert.equal(choices.length,1);
  // a pair on an entry that is not the newest is not offered; one run reads "1 run"
  assert.equal(A.resumeChoices({...heated,kind:'latest',pair:{model:'Optical waveguide',runs:1}},[{...optical,pair:null,index:0}],t)[1].pair,undefined);
  assert.equal(A.pairLine({model:'Heated silicon waveguide',runs:1},{model:'Optical waveguide',runs:1}),'Heated silicon waveguide (1 run) and Optical waveguide (1 run)');
  // the caller: a pair only while the tab holds runs of neither model, and not "(already in this tab)"
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("const pairable=!runs.length&&!multiView.projectRuns();"));
- assert.ok(app.includes("return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs}}:entry;"));
+ assert.ok(app.includes("return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}}:entry;"));
  // the second record is found again by its model, time and file; a failure names that model
  assert.ok(app.includes("e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file"));
  assert.ok(app.includes("notice(`${other.model} was not restored: its browser record is no longer stored.`)"));

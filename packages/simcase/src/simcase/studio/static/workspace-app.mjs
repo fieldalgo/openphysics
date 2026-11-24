@@ -1065,7 +1065,7 @@ function resumeOffer(){
  const list=recoveryList(),latest=list.find(e=>e.kind==='latest');
  // round 20 (Z2): the pair only while the tab holds runs of neither model
  const pairable=!runs.length&&!multiView.projectRuns();
- const withPair=entry=>{const o=pairable?entry.also?.[0]:null;return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs}}:entry;};
+ const withPair=entry=>{const o=pairable?entry.also?.[0]:null;return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}}:entry;};
  return {latest:latest?withPair(recoveredEntry(latest.recovered,latest.file)):null,earlier:list.filter(e=>e.kind==='earlier').map(e=>withPair({...recoveredEntry(e.recovered,e.file),index:e.index})),
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),onPair:(index,button)=>restorePair(index,button),
   onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};

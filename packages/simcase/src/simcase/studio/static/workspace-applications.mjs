@@ -117,12 +117,17 @@ export function resumeChoices(latest,earlier=[],when=offerTime){
  const all=[...(latest?[{item:latest,kind:'latest'}]:[]),...earlier.map((item,position)=>({item,kind:'earlier',index:item.index??position}))];
  const time=e=>Date.parse(e.item.savedAt)||0;all.sort((a,b)=>time(b)-time(a));
  const lead=all.findIndex(e=>e.item.runs>0),newest=lead>=0?all.splice(lead,1)[0]:null;
- return [...(newest?[{...newest,newest:true}]:[]),...all].map(e=>{
+ // Round 21 (W4): when the newest offer restores the pair, the box does not list the other model's
+ // own record again (its card still offers it): the entry of that model, file and save time
+ const paired=newest?.item.pair,pairedOut=e=>!!paired&&e.item.model===paired.model&&e.item.file===newest.item.file&&e.item.savedAt===paired.savedAt;
+ return [...(newest?[{...newest,newest:true}]:[]),...all.filter(e=>!pairedOut(e))].map(e=>{
   const older=!!newest&&!e.newest&&!(time(e)>time(newest));
   const pair=e.newest&&e.item.pair?e.item.pair:null;
+  // round 21 (W4): an older entry leaves "also in this project" out: it named the other model's
+  // newest record, whose runs may be newer than this entry
   return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),...(pair?{pair:true}:{}),
    label:pair?`${RESTORE_NEWEST_TEXT}: ${pairLine(e.item,pair)}${fileWords(e.item)} · saved ${when(offerSavedAt(e.item))}`
-   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
+   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(older?{...e.item,also:undefined}:e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
  });
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),

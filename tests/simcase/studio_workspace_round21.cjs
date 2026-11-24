@@ -96,3 +96,31 @@ test('W3: run labels name the mode count when not 2 and n_g when the group index
  assert.ok(app.includes('${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}'));
  assert.ok(app.includes("o.textContent=runLabel(r);o.title=o.textContent;"));
 });
+
+test('W4: the pair offer does not list the other model again; an older entry names no other runs',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');const t=x=>x;
+ const file='both-models.json';
+ // P03/P04: the newest offer restores the pair; the heated record of the same file and time is not listed again
+ const optical={runs:6,model:'Optical waveguide',names:[],savedAt:'2026-11-24T11:40:00Z',file,fileCurrent:false,
+  pair:{model:'Heated silicon waveguide',runs:2,savedAt:'2026-11-24T11:33:00Z'},also:[{model:'Heated silicon waveguide',names:['Run 1','Run 2'],runs:2,inTab:false}]};
+ const heated={runs:2,model:'Heated silicon waveguide',names:['Run 1','Run 2'],savedAt:'2026-11-24T11:33:00Z',file,fileCurrent:false,index:0,
+  also:[{model:'Optical waveguide',names:['Run 1','Run 2','Run 3','Run 4','Run 5','Run 6'],runs:6,inTab:false}]};
+ const older={runs:1,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T11:20:00Z',file,fileCurrent:false,index:1,
+  also:[{model:'Heated silicon waveguide',names:['Run 1','Run 2'],runs:2,inTab:false}]};
+ const choices=A.resumeChoices(optical,[heated,older],t);
+ assert.deepEqual(choices.map(c=>c.label),[
+  'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T11:40:00Z',
+  'Restore from this browser: Optical waveguide · 1 run · Run 1 · file both-models.json, changed since · older · saved 2026-11-24T11:20:00Z']);
+ // a heated record of another time or file is a different record: it stays, without "also in this project"
+ const other={...heated,savedAt:'2026-11-24T11:10:00Z'};
+ assert.equal(A.resumeChoices(optical,[other],t)[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T11:10:00Z');
+ // without the pair (the tab holds runs of one model) the other entry stays, and an older one drops "also"
+ const {pair,...single}=optical;
+ assert.equal(A.resumeChoices(single,[heated],t)[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T11:33:00Z');
+ // the newest entry keeps it
+ assert.ok(A.resumeChoices(single,[heated],t)[0].label.includes(' · also in this project: Heated silicon waveguide · Run 1, Run 2 (restored separately)'));
+ // cards are unchanged: an older card still names the project's other model
+ assert.ok(A.cardResumeChoice(heated,'Heated silicon waveguide',t,{older:true}).label.includes(' · also in this project: Optical waveguide · '));
+ // the caller carries the other record's save time with the pair
+ assert.ok(read('workspace-app.mjs').includes("pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}"));
+});

@@ -553,8 +553,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    records still matched the same project file the header reads *… · saved …*. If the second restore
    fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
    restored: …*) and that model's card offer stays. While the tab holds runs of one of the models the
-   offer restores its own model only, as before, and names the other *(already in this tab)*; the
-   other model's own entry and both cards' offers are unchanged.
+   offer restores its own model only, as before, and names the other *(already in this tab)*; both
+   cards' offers are unchanged. Since round 21 the box does not list the other model's own record
+   again while the newest offer restores the pair (that model's card still offers it), and an older
+   entry leaves *also in this project* out: it named the other model's newest record, whose runs
+   may have been made after the older entry was saved.
    Each stored session is listed once, newest first:
    records with the same inputs (or model) and runs are one session even when their view (page,
    field view), selected run, Compare choice, the runs' origin (computed here, opened from a file
