@@ -1983,22 +1983,31 @@ it again with fewer modes.* The recovery error says the same after *Recovery sna
 MiB:*. When a new run makes the session go over the limit, its result message adds one line:
 *Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the
 fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions
-and the effective areas. Browser recovery already keeps only those fields.* (round 23, E2; it read
+and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.* (round 23,
+E2; it read
 *Session is now 18 MB, over the 16 MiB limit: File › Save will ask whether to keep the fields of the
 selected and pinned runs only.*, and testers could not tell what would be lost or whether browser
 recovery still kept everything), or, when Save would refuse, *Session is now 49 MB, over the 16 MiB
 (16.8 MB) limit, and File › Save will refuse:* followed by the refusal and *Browser recovery is off.*
-(the round-18 recovery line is then not repeated). The line wraps in Messages. Browser recovery keeps
-the fields of the selected and pinned runs only, without asking, when the full text is over
-the limit; since round 23 the header and the save indicator then say so: *… · kept for recovery in
-this browser without the fields of 5 runs* (before, they read *kept for recovery in this browser*
-while those fields were left out). Limitation: recovery cannot keep every field above 16 MiB, since
-that needs a larger record or a record of several parts (a format change); File › Save of fewer runs,
-or pinning the runs to keep, keeps the fields. Measured on 2026-11-24 with the T18 strip over a
+(the round-18 recovery line is then not repeated). The line wraps in Messages. When the full text
+is over the limit, browser recovery keeps, without asking, the fields of the selected and pinned
+runs, then (since round 23, a coordinator decision) the fields of the other runs newest first (the
+largest run number first) while the record stays within 16 MiB; a field that does not fit is left
+out and the next older one tried. The record format is unchanged: a run without its field is
+written as before, and below the limit the record is byte for byte the one round 22 wrote. Since
+round 23 the header and the save indicator name the runs left out: *… · kept for recovery in this
+browser without the fields of Run 1 and Run 2* (before, they read *kept for recovery in this
+browser* while every field but the selected run's was left out). A restore of such a record adds
+*Fields not kept for Run 1 and Run 2; their n_eff, TE fractions and effective areas were.* to its
+message, and the Results of such a run say its fields were not kept in browser recovery. File ›
+Save still asks about the selected and pinned runs only. Limitation: recovery cannot keep every
+field above 16 MiB, since that needs a larger record or a record of several parts (a format change);
+File › Save of fewer runs, or pinning the runs to keep, keeps the fields. Measured on 2026-11-24 with the T18 strip over a
 silicon substrate (core mesh 30 nm): a closed run with 2 modes is 2.10 MB, with 4 modes 3.78 MB,
 closed near 2.46 with 4 modes 3.75 MB, an open run with 2 modes 3.94 MB with or without n_g (the field
 is 99 % of each; a run without its field is 3 to 21 kB), so the sixth run of T22 brought the session
-to 22 MB and recovery to 4.0 MB, the field of the selected run only. A run without fields shows its
+to 22 MB and recovery, before the newest-first rule, to 4.0 MB with the field of the selected run
+only. A run without fields shows its
 modes table, but no field view, and Compare says it cannot match its modes by overlap.
 
 ### Optical session files (version 12)

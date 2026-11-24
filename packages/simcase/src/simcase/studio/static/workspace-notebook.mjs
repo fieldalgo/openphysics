@@ -363,7 +363,11 @@ export const keptRuns=(runs,selected)=>new Set(runs.filter(run=>run.pinned||run.
 /** Save session: {ok, text, bytes, notKept} when it fits (keepSelected: with the fields of the
  * selected and pinned runs only); else {ok: false, bytes, reduced: {bytes, notKept} or null,
  * refusal}. notKept: the numbers of the runs written without fields. */
-export function writeOpticalSession(input,runs,selected,comparison,view,{keepSelected=false,limit=MAX_SESSION_BYTES}={}){
+// fill (browser recovery, round 23 E2 decision): with keepSelected, once the selected and pinned
+// runs' fields fit, the fields of the other runs are added newest first (the largest run number
+// first) while the text stays within the limit; a field that does not fit is left out and the next
+// older one tried. The record format is unchanged: a run written without its field is as before.
+export function writeOpticalSession(input,runs,selected,comparison,view,{keepSelected=false,limit=MAX_SESSION_BYTES,fill=false}={}){
  const size=text=>new TextEncoder().encode(text).length;
  const fullText=sessionText(input,runs,selected,comparison,view),full=size(fullText);
  // a run's number in this tab (round 17, U2), else its place in the list
@@ -373,6 +377,12 @@ export function writeOpticalSession(input,runs,selected,comparison,view,{keepSel
  const keep=keptRuns(runs,selected),reducedText=sessionText(input,runs,selected,comparison,view,{keep}),reduced=size(reducedText),notKept=without(keep);
  // round 23 (E2): kept, the numbers of the runs written with their fields
  const kept=runs.map((run,i)=>keep.has(run.job)&&run.field?number(run,i):0).filter(Boolean);
+ if(reduced<=limit&&keepSelected&&fill){
+  let chosen=new Set(keep),text=reducedText,bytes=reduced;
+  const others=runs.map((run,i)=>({run,n:number(run,i)})).filter(({run})=>run.field&&!keep.has(run.job)).sort((a,b)=>b.n-a.n);
+  for(const {run} of others){const trial=new Set([...chosen,run.job]),t=sessionText(input,runs,selected,comparison,view,{keep:trial}),b=size(t);if(b<=limit){chosen=trial;text=t;bytes=b;}}
+  return {ok:true,text,bytes,notKept:without(chosen),kept:runs.map((run,i)=>chosen.has(run.job)&&run.field?number(run,i):0).filter(Boolean),reduced:true};
+ }
  if(reduced<=limit)return keepSelected?{ok:true,text:reducedText,bytes:reduced,notKept,kept,reduced:true}:{ok:false,bytes:full,reduced:{bytes:reduced,notKept,kept},refusal:null};
  return {ok:false,bytes:full,reduced:null,refusal:keptOverText(runs.map((run,i)=>({name:'Run '+number(run,i),selected:run.job===selected,pinned:!!run.pinned})).filter((_,i)=>keep.has(runs[i].job)),reduced)};
 }
@@ -394,26 +404,34 @@ export function keptOverText(kept,bytes){
  * browser recovery is off too, so the line says both (round 18 X4's line is then not posted).
  * Round 23 (E2): the limit also in MB, as the size is (16 MiB is 16.8 MB), the runs whose fields
  * Save offers to keep, what the other runs keep, and that browser recovery already keeps only those
- * fields (captureSession: it writes the same reduced session, with no question):
+ * fields, and the runs whose fields browser recovery leaves out (recoveryLeftOut: captureSession's
+ * make.dropped; it keeps the selected and pinned fields and as many others as fit, newest first):
  *   "Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the
  *   fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions
- *   and the effective areas. Browser recovery already keeps only those fields." */
+ *   and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2." */
 export const LIMIT_WORDS='16 MiB (16.8 MB)';
+/** "Run 3 and Run 5", "Run 1, Run 2 and Run 4": runs named one by one (round 23, E2). */
+export const runNames=numbers=>{const w=numbers.map(n=>'Run '+n);return w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1);};
+/** The restore's sentence when runs came back without fields (round 23, E2): " Fields not kept for
+ * Run 1 and Run 2; their n_eff, TE fractions and effective areas were." or ''. */
+export const fieldsNotKeptText=runs=>{const n=runs.filter(r=>!r.field&&Number.isInteger(r.number)).map(r=>r.number);return n.length?` Fields not kept for ${runNames(n)}; their n_eff, TE fractions and effective areas were.`:'';};
 const runsWords=numbers=>{const w=numbers.map(String);return (numbers.length>1?'Runs ':'Run ')+(w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1));};
-export function sessionSizeText(out){
+export function sessionSizeText(out,recoveryLeftOut=null){
  if(!out||out.ok)return null;
  const over=`Session is now ${sizeText(out.bytes)}, over the ${LIMIT_WORDS} limit`;
  if(out.reduced){const kept=out.reduced.kept?.length?` (${runsWords(out.reduced.kept)})`:'';
-  return `${over}. File › Save will ask whether to keep the fields of the selected and pinned runs only${kept}; the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.`;}
+  const left=recoveryLeftOut,browser=!Array.isArray(left)?'':left.length?` Browser recovery keeps every field but those of ${runNames(left)}.`:' Browser recovery keeps every field.';
+  return `${over}. File › Save will ask whether to keep the fields of the selected and pinned runs only${kept}; the other runs keep n_eff, the TE fractions and the effective areas.${browser}`;}
  return `${over}, and File › Save will refuse: ${out.refusal} Browser recovery is off.`;
 }
 export function opticalOverflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the fields of the selected and pinned runs only? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields.`;}
 // Capture editable metadata now; serialize large, read-only field arrays after debounce.
 // UI operations replace results rather than modifying their field samples in place.
 // Browser recovery keeps the file text, or the fields of the selected and pinned runs only when
-// the file is over the limit (no dialog), as version 8 recovery does. Round 23 (E2): make.dropped
-// is then the number of runs whose fields this tab has and the snapshot left out (0 otherwise), so
-// the header says so (it read "kept for recovery in this browser" alone while 5 runs' fields, about
+// the file is over the limit (no dialog), as version 8 recovery does. Round 23 (E2): then the fields
+// of the other runs too, newest first, as many as fit (writeOpticalSession's fill); make.dropped is
+// the numbers of the runs whose fields this tab has and the snapshot left out ([] otherwise), so the
+// header names them (it read "kept for recovery in this browser" alone while 5 runs' fields, about
 // 17 MB, were left out of a 22 MB session). limit: the session limit (a test sets a smaller one).
 export function captureSession(input,runs,selected,comparison,view,{limit=MAX_SESSION_BYTES}={}){
  const capturedInput=validateProject(input),capturedView=validateView(view);
@@ -426,17 +444,17 @@ export function captureSession(input,runs,selected,comparison,view,{limit=MAX_SE
  // When the study settings of the input (version 8) need version 9 but a run cannot be held by it
  // (read from a version 6 or 7 file), recovery keeps the notebook as version 7 without those
  // settings, and the snapshot's note says what was not kept; Save session still refuses.
- const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true,limit});
- const make=()=>{make.note='';make.dropped=0;let out;
+ const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true,limit,fill:true});
+ const make=()=>{make.note='';make.dropped=[];let out;
   try{out=write(capturedInput);}catch(error){
    if(![STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(capturedInput.version))throw error;
    let plain;try{plain=write(withoutStudy(capturedInput));}catch{throw error;}
    out=plain;make.note=recoveryStudyNote(capturedInput);}
   // the code says why the header reads unavailable (round 17, U6: it read a bare "browser recovery unavailable")
   // the same words as Save session's refusal (A3), after what failed
-  if(out.reduced===true){const had=new Set(capturedRuns.map((r,i)=>r.field?(Number.isInteger(r.number)?r.number:i+1):0).filter(Boolean));make.dropped=out.notKept.filter(n=>had.has(n)).length;}
+  if(out.reduced===true){const had=new Set(capturedRuns.map((r,i)=>r.field?(Number.isInteger(r.number)?r.number:i+1):0).filter(Boolean));make.dropped=out.notKept.filter(n=>had.has(n));}
   if(!out.ok)throw Object.assign(new Error('Recovery snapshot exceeds 16 MiB: '+out.refusal[0].toLowerCase()+out.refusal.slice(1)),{code:'recovery-over-limit'});return out.text;};
- make.note='';make.dropped=0;return make;
+ make.note='';make.dropped=[];return make;
 }
 /** The note of a recovery kept without the study settings of these inputs (version 8). */
 export function recoveryStudyNote(input){

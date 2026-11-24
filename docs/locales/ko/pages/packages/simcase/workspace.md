@@ -1640,17 +1640,22 @@ limit. Select a different run before saving, so this one is saved without its fi
 modes.*라고 합니다. 복구 오류도 *Recovery snapshot exceeds 16 MiB:* 뒤에 같은 말을 합니다. 새 실행으로 세션이 한도를
 넘으면 그 결과 메시지에 한 줄이 붙습니다: *Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask
 whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery already keeps only those fields.*(round 23, E2; 전에는 *Session is now 18 MB, over the
+the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.*(round 23, E2; 전에는 *Session is now 18 MB, over the
 16 MiB limit: File › Save will ask whether to keep the fields of the selected and pinned runs only.*여서 테스터가 무엇을 잃는지,
 브라우저 복구가 여전히 모두 보존하는지 알 수 없었습니다), 저장이 거부될 때는 *Session is now 49 MB, over the 16 MiB (16.8 MB)
 limit, and File › Save will refuse:* 뒤에 거부 문구와 *Browser recovery is off.*(이때 round 18의 복구 줄은 되풀이하지
-않습니다). 이 줄은 Messages에서 줄바꿈됩니다. 브라우저 복구는 전체 텍스트가 한도를 넘으면 묻지 않고 선택·고정
-실행의 장만 보존하고, round 23부터는 헤더와 저장 표시가 그것을 말합니다: *… · kept for recovery in this browser without the
-fields of 5 runs*(전에는 그 장들을 빼고도 *kept for recovery in this browser*였습니다). 한계: 16 MiB를 넘으면 복구가 모든 장을
+않습니다). 이 줄은 Messages에서 줄바꿈됩니다. 전체 텍스트가 한도를 넘으면 브라우저 복구는 묻지 않고 선택·고정 실행의
+장을 보존하고, 그다음(round 23부터, 코디네이터 결정) 나머지 실행의 장을 새것부터(실행 번호가 큰 것부터) 기록이 16 MiB 안에
+머무는 동안 더합니다. 들어가지 않는 장은 빼고 그다음 오래된 것을 시도합니다. 기록 형식은 그대로입니다: 장 없는 실행은 전처럼
+쓰이고, 한도 아래의 기록은 round 22가 쓴 것과 바이트 단위로 같습니다. round 23부터 헤더와 저장 표시가 뺀 실행을 밝힙니다: *… ·
+kept for recovery in this browser without the fields of Run 1 and Run 2*(전에는 선택 실행 말고 모든 장을 빼고도 *kept for
+recovery in this browser*였습니다). 그런 기록을 복원하면 메시지에 *Fields not kept for Run 1 and Run 2; their n_eff, TE
+fractions and effective areas were.*가 붙고, 그 실행의 Results는 장이 브라우저 복구에 보존되지 않았다고 말합니다. File › Save는
+여전히 선택·고정 실행에 대해서만 묻습니다. 한계: 16 MiB를 넘으면 복구가 모든 장을
 보존할 수 없습니다. 더 큰 기록이나 여러 부분으로 된 기록(형식 변경)이 필요하기 때문입니다. 더 적은 실행을 File › Save로 저장하거나
 남길 실행을 고정하면 장이 보존됩니다. 2026-11-24에 T18(실리콘 기판 위 스트립, 코어 메시 30 nm)로 잰 크기: 모드 2개 닫힌 실행
 2.10 MB, 모드 4개 3.78 MB, 모드 4개 closed near 2.46 3.75 MB, 모드 2개 열린 실행은 n_g와 상관없이 3.94 MB(장이 각각의 99 %,
-장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로, 복구를 선택 실행의 장만 있는 4.0 MB로 만들었습니다.
+장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로, 복구를 새것부터 규칙 전에는 선택 실행의 장만 있는 4.0 MB로 만들었습니다.
 장이 없는 실행은 모드 표를 보이지만 장 보기는 없고, Compare는 그 모드를 겹침으로 짝지을 수 없다고 알립니다.
 
 ### 광학 세션 파일(버전 12)

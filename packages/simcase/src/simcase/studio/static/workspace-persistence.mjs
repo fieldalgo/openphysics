@@ -41,10 +41,12 @@ const PROBLEMS=['unavailable','conflict','overLimit','quota'];
 // for a state that is not one of the two.
 export const RECOVERY_OFF=Object.freeze({overLimit:'Browser recovery is off: this session is over 16 MiB. File › Save keeps your work.',quota:'Browser recovery is off: this browser’s storage is full. File › Save keeps your work.'});
 export const recoveryOffText=state=>RECOVERY_OFF[state]||null;
-// Round 23 (E2): keptFields:N is an optical session's: over 16 MiB, recovery keeps the fields of the
-// selected and pinned runs only, so N runs' fields are not in it: "kept for recovery in this browser
-// without the fields of 5 runs" (no "File › Save keeps them": over the limit Save asks the same).
-const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||''),f=/^keptFields:(\d+)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:f?`${RECOVERY.kept} without the fields of ${plural(+f[1],'run')}`:RECOVERY[recovery];};
+// Round 23 (E2): keptFields:3,5 is an optical session's: over 16 MiB, recovery keeps the fields of the
+// selected and pinned runs and as many others as fit, newest first, so the fields of the runs named
+// are not in it: "kept for recovery in this browser without the fields of Run 3 and Run 5" (no "File
+// › Save keeps them": over the limit Save asks which fields to keep).
+const runList=numbers=>{const w=numbers.map(n=>'Run '+n);return w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1);};
+const recoveryWords=recovery=>{const m=/^kept:(\d+)$/.exec(recovery||''),f=/^keptFields:(\d+(?:,\d+)*)$/.exec(recovery||'');return m?`${RECOVERY.kept} without the maps of ${plural(+m[1],'run')} · File › Save keeps them`:f?`${RECOVERY.kept} without the fields of ${runList(f[1].split(','))}`:RECOVERY[recovery];};
 // A file Studio handed to the browser: it went to the browser's Downloads; whether it reached
 // the disk is the browser's to say, so no title claims it was saved.
 export const sentToDownloads=(kind,name)=>`${kind} file ${name} sent to your browser's Downloads`;
