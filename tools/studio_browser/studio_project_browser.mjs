@@ -746,7 +746,7 @@ try {
     };
     const heatedItems = async label => {
       await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
-      await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-neff-shift=\\"1\\"]')", label + ': heated model');
+      await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-neff-shift=\"1\"]')", label + ': heated model');
       await page.press('tab', 'Results'); await page.until("!!document.querySelector('[data-mp-run]')", label + ': heated runs');
       return page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
     };
