@@ -441,7 +441,17 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    보관하기 전에 쓴 기록이면 *· file …json*. 기록은 모델 하나를 담지만 프로젝트 파일은 둘 다 담을 수 있습니다: round
    18부터 브라우저 복구가 같은 파일에 다른 모델의 기록도 가지고 있으면 항목이 그 모델과 실행을 밝히고 이 버튼이 그것을
    복원하지 않는다고 적습니다(*· also in this project: Heated silicon waveguide · Run 1 (restored separately)*, 탭이 그
-   모델의 실행을 가지고 있으면 *(already in this tab)*). 버튼은 자기 모델만 복원하며, 둘을 한 번에 되살리는 복원은 없습니다.
+   모델의 실행을 가지고 있으면 *(already in this tab)*). 버튼은 자기 모델만 복원합니다. round 20부터 탭이 두 모델 어느
+   쪽의 실행도 가지고 있지 않으면 카드 위 상자의 가장 새 제안이 둘 다 복원합니다: *Restore newest from this browser: Optical
+   waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 8:44 AM*.
+   가장 새 기록을 그 버튼처럼 복원하고, 그 복원이 끝나면(불러오기 질문에 Replace로 답한 뒤; Cancel은 둘 다 멈춤) 모델,
+   시각, 파일로 다시 찾은 다른 모델의 기록을 복원한 다음 가장 새 기록의 모델을 Results에 보입니다. Messages는 *Restored
+   Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) from this browser, not recomputed. Optical waveguide
+   runs are numbered from 1 in this tab; names and pins are kept.*입니다. 프로젝트 이름과 파일은 각 기록이 가진 대로
+   돌아오며, 두 기록이 모두 같은 프로젝트 파일과 아직 같았으면 헤더가 *… · saved …*로 읽힙니다. 두 번째 복원이 실패하면
+   첫 번째는 남고, Messages가 복원하지 못한 모델을 밝히며(*Heated silicon waveguide was not restored: …*) 그 모델의 카드
+   제안은 그대로 남습니다. 탭이 한 모델의 실행을 가지고 있으면 제안은 전처럼 자기 모델만 복원하고 다른 모델을 *(already in
+   this tab)*로 밝힙니다. 다른 모델 자신의 항목과 두 카드의 제안은 그대로입니다.
    저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
    보기(페이지, 장 보기), 고른 실행, Compare 선택, 실행의 출처(여기서 계산, 파일에서 엶, 복구), 파일
    연결이나 저장 시각이 달라도 한 세션입니다. 가장 새 기록을 보여 주고, 합친 기록 중 하나라도 파일을

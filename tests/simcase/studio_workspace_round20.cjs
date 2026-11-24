@@ -97,3 +97,32 @@ test('Z7: while the drop question is open, the Run study box and the status bar 
  assert.ok(view.includes("const asking=!job&&ctx.runQuestionOpen?.()===true;if(asking)reason.textContent=ctx.runQuestionWords.plan;"));
  assert.ok(view.includes("$('status').textContent=asking?ctx.runQuestionWords.status:job?"));
 });
+
+test('Z2: the newest offer of a project with both models restores both',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ const t=x=>x;
+ const optical={runs:6,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T08:44:00Z',file:'both-models.json',fileCurrent:false,pair:{model:'Heated silicon waveguide',runs:2}};
+ const heated={runs:2,model:'Heated silicon waveguide',names:['Run 1','Run 2'],savedAt:'2026-11-24T08:30:00Z',file:'both-models.json',fileCurrent:false,index:0};
+ const choices=A.resumeChoices(optical,[heated],t);
+ assert.deepEqual(choices[0],{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T08:44:00Z'});
+ // the other model's own entry stays, as before
+ assert.equal(choices[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T08:30:00Z');
+ assert.equal(choices[1].pair,undefined);
+ // a pair on an entry that is not the newest is not offered; one run reads "1 run"
+ assert.equal(A.resumeChoices({...heated,kind:'latest',pair:{model:'Optical waveguide',runs:1}},[{...optical,pair:null,index:0}],t)[1].pair,undefined);
+ assert.equal(A.pairLine({model:'Heated silicon waveguide',runs:1},{model:'Optical waveguide',runs:1}),'Heated silicon waveguide (1 run) and Optical waveguide (1 run)');
+ // the caller: a pair only while the tab holds runs of neither model, and not "(already in this tab)"
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("const pairable=!runs.length&&!multiView.projectRuns();"));
+ assert.ok(app.includes("return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs}}:entry;"));
+ // the second record is found again by its model, time and file; a failure names that model
+ assert.ok(app.includes("e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file"));
+ assert.ok(app.includes("notice(`${other.model} was not restored: its browser record is no longer stored.`)"));
+ assert.ok(app.includes("failed:message=>notice(`${other.model} was not restored: ${message}`)"));
+ // the newest record's model is shown at the end, with one message for both
+ assert.ok(app.includes("const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed. `+renumberedText('Optical waveguide'));};"));
+ // with both records the same as the file, the project reads as saved
+ assert.ok(app.includes("projectMatched:firstFile?.current===true&&firstFile.name===record.file"));
+ // no format change: the recovery record and session writers are untouched by Z2
+ assert.ok(!read('workspace-notebook-recovery.mjs').includes('pair'));
+});

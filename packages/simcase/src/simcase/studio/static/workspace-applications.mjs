@@ -105,6 +105,13 @@ export function cardRecords(entries,busy=new Set()){
 // each other one "Restore from this browser: … · older · saved 5:38 AM" ("older" left out for a
 // session without runs saved after it).
 export const RESTORE_NEWEST_TEXT='Restore newest from this browser';
+// Round 20 (Z2): when the newest record's project file also holds the other model and browser
+// recovery has that model's record (item.pair: {model, runs}; offered by the caller only while the
+// tab holds runs of neither model), its button restores both: "Restore newest from this browser:
+// Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file x.json, changed since ·
+// saved 8:44 AM" (pair: true on the choice).
+const runCount=n=>`${n} ${n===1?'run':'runs'}`;
+export const pairLine=(item,pair)=>`${item.model||'Optical waveguide'} (${runCount(item.runs)}) and ${pair.model} (${runCount(pair.runs)})`;
 export function resumeChoices(latest,earlier=[],when=offerTime){
  // index: the record's place in storage, which recovery reads (given by the caller, else the position)
  const all=[...(latest?[{item:latest,kind:'latest'}]:[]),...earlier.map((item,position)=>({item,kind:'earlier',index:item.index??position}))];
@@ -112,8 +119,10 @@ export function resumeChoices(latest,earlier=[],when=offerTime){
  const lead=all.findIndex(e=>e.item.runs>0),newest=lead>=0?all.splice(lead,1)[0]:null;
  return [...(newest?[{...newest,newest:true}]:[]),...all].map(e=>{
   const older=!!newest&&!e.newest&&!(time(e)>time(newest));
-  return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),
-   label:`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
+  const pair=e.newest&&e.item.pair?e.item.pair:null;
+  return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),...(pair?{pair:true}:{}),
+   label:pair?`${RESTORE_NEWEST_TEXT}: ${pairLine(e.item,pair)}${fileWords(e.item)} · saved ${when(offerSavedAt(e.item))}`
+   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
  });
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
@@ -130,6 +139,8 @@ function resumeCard(resume){
   if(choice.newest){button.className='primary';button.id='resume-newest';}
   if(choice.kind==='latest'){button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
   else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
+  // round 20 (Z2): the newest offer of a project with both models restores both
+  if(choice.pair&&resume.onPair){button.dataset.resumePair='true';button.onclick=()=>resume.onPair(choice.kind==='latest'?-1:choice.index,button);}
   actions.append(button);
  }
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;fresh.onclick=()=>resume.onStartNew();

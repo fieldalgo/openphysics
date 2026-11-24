@@ -80,10 +80,10 @@ test('Y3: a restore brings back the project name and file it was saved to, or na
  const app=read('workspace-app.mjs');
  // a saved project file: the name and file, also when the record changed since (saved only when current)
  assert.ok(app.includes(" if(!file?.projectName){if(!file&&opened&&!project.file&&!project.name)project.copyOf=opened;return;}"));
- assert.ok(app.includes("project.stamp=file.current===true&&projectModels().length===1?projectStamp():null;"));
+ assert.ok(app.includes("project.stamp=file.current===true&&(projectModels().length===1||matched)?projectStamp():null;"));
  assert.ok(!app.includes("if(file?.current!==true||!file.projectName)return;"));
  // both models' restores pass the opened file; a file replacing the project clears the copy
- assert.ok(app.includes("restoreProjectFile(file,pending.openedFile);"));assert.ok(app.includes("restoreProjectFile(savedFile,openedFile);"));
+ assert.ok(app.includes("restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});"));assert.ok(app.includes("restoreProjectFile(savedFile,openedFile,{matched:projectMatched===true});"));
  assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null});"));
  assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf});"));
 });

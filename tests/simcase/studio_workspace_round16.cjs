@@ -143,5 +143,5 @@ test('S4/S5: a record names its project file; a project save relinks every recor
  assert.deepEqual(P.validateSavedFile({...file,projectName:'Heater study',project:true}),{...file,projectName:'Heater study'});
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("relinkRecovery(parts.flatMap(p=>[p.text,p.recovery].filter(t=>typeof t==='string')),{name:result.name,savedAt,current:true,projectName:name});"));
- assert.ok(app.includes("restoreProjectFile(file,pending.openedFile);"));
+ assert.ok(app.includes("restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});"));
 });
