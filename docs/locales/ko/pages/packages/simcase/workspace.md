@@ -948,7 +948,11 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
   삼각형의 몫 *g*를 구합니다. *f*가 가장 큰 형상에서 *f* > 0.5이고 *g* ≥ 0.01이면 그 모드 행 아래에 안내 행이 *Mode 1 is
   mostly in Substrate (99 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use
   Open boundary to leave that edge open.*로 나오고, Compare도 그 실행에 대해 같은 말을
-  되풀이합니다(*A · Run 3: Mode 1 is …*). 그런 실행이 열린 실행의 어떤 모드와도 짝지어지지 않는 까닭도 이것입니다. round 18부터 Results에서
+  되풀이합니다(*A · Run 3: Mode 1 is …*). 그런 실행이 열린 실행의 어떤 모드와도 짝지어지지 않는 까닭도 이것입니다. round 22(V3)부터 Compare가 짝지은 모드가
+  없고 한 실행의 모드 1에 그 안내가 있으면, 빈 짝 줄(*No mode of A matches a mode of B; the plots show mode 1 of each run, not
+  matched.*)에 그 실행에 대해 *A · Run 6: its modes are mostly in Substrate, which touches the window edge; the core mode was not
+  found.*와 링크 **Open Run 6 in Results**가 붙습니다. 링크는 입력을 바꾸지 않고 그 실행을 Results에 보여 줍니다. 짝지은 모드가
+  있으면 이 줄은 없습니다. round 18부터 Results에서
   마지막 그런 안내 아래 행에 **Use Open boundary**와 **Set Modes to find to 4**(실행의 Modes to find + 2, 많아야 8; C0 전에는 *Find 4 modes*)가
   있습니다: 각각 평소의 메시지와 함께 그 입력을 정하고 아무것도 실행하지 않으며, 현재 입력이 이미 그렇다면 나오지 않습니다.
   C0부터 모드를 더 찾으면 코어 모드에 닿는다고 말하는 문구는 없습니다: 기판 위 닫힌 창에는 코어 모드보다 위에 기판 모드가

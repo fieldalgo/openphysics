@@ -100,3 +100,25 @@ test('P2 (V2): shown in the plan line and Optical modes, with both buttons, only
  assert.ok(!body(app,'const edgeWarning=','\n').includes('runs'));
  assert.ok(app.includes("b.id='edge-search-near';b.textContent=shortcutText(near);b.onclick=()=>useClosedSearch(near);"));
 });
+
+test('P3 (V3): Compare without a matched mode says why when a run\'s mode 1 is an edge mode, with a link to that run',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs'),N=await import(STATIC+'workspace-notebook.mjs'),P=await import(STATIC+'workspace-project.mjs');
+ const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},temperature:293.15,cooling:'',fixed:'',terminal:''};
+ const input=shapes=>P.snapshot({width:500,voltage:1,electric:false,heat:false,structure:false,optics:true,wavelength:1550,coreMesh:30,shapes},setup);
+ // one triangle in the core, one in the substrate near its edge; mode 1 in the substrate, mode 2 in the core
+ const f={node_coordinates:[[-2e-7,1e-8],[2e-7,1e-8],[0,2e-7],[-1.4e-6,-1.1e-6],[1.4e-6,-1.1e-6],[0,-6e-7]],triangles:[[0,1,2],[3,4,5]],
+  real:[[[0,0,0],[1,0,0]],[[1,0,0],[0.1,0,0]]],imag:[[[0,0,0],[0,0,0]],[[0,0,0],[0,0,0]]]};
+ const run=(extra={})=>N.validateRun({job:'0000000a',completedAt:'2026-11-24T01:00:00.000Z',settings:N.opticalSettings(1550,30,2),input:input([CORE,SUBSTRATE]),effective_index:[2.6,2.44],field:f,origin:'local',serverVersion:'0.0.0',...extra});
+ assert.equal(M.firstModeEdgeShape(run()),'Substrate');
+ assert.equal(M.noMatchEdgeText('A','Run 6','Substrate'),'A · Run 6: its modes are mostly in Substrate, which touches the window edge; the core mode was not found.');
+ // mode 1 in the core: no reason; the core-only template: none
+ const swapped={...f,real:[f.real[1],f.real[0]],imag:f.imag};
+ assert.equal(M.firstModeEdgeShape(run({field:swapped})),null);
+ assert.equal(M.firstModeEdgeShape(N.validateRun({...run(),input:input([CORE])})),null);
+ // the page: only with no matched mode (not disabled, no error); the link opens the run in Results
+ const app=read('workspace-app.mjs'),part=body(app,' // round 22 (V3): no matched mode,',' // the plots first, right under the pickers');
+ assert.ok(part.includes("if(!chosen&&!match.disabled&&!match.error)[['A',a],['B',b]].forEach("));
+ assert.ok(part.includes('reason.textContent=noMatchEdgeText(side,runNumberTitle(run),shape);'));
+ assert.ok(part.includes('link.textContent=`Open Run ${runNumber(run)} in Results`;'));
+ assert.ok(part.includes("link.onclick=e=>{e.preventDefault();if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();"));
+});

@@ -1146,7 +1146,12 @@ engine and older session files give the same number from the same samples:
   *f*, a note row under the mode's row reads *Mode 1 is mostly in Substrate (99 % of |E|²), which
   touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge
   open.*, and Compare repeats it for that run (*A · Run 3: Mode 1 is …*),
-  which also says why such a run matches none of an open run's modes. Since round 18 a row under the
+  which also says why such a run matches none of an open run's modes. Since round 22 (V3), when
+  Compare matches no mode and a run's mode 1 has that note, the empty-match line (*No mode of A
+  matches a mode of B; the plots show mode 1 of each run, not matched.*) adds, for that run, *A · Run
+  6: its modes are mostly in Substrate, which touches the window edge; the core mode was not found.*
+  and a link **Open Run 6 in Results** that shows the run under Results with the inputs unchanged.
+  With matched modes there is no such line. Since round 18 a row under the
   last such note on Results has **Use Open boundary** and **Set Modes to find to 4** (the run's Modes to
   find + 2, at most 8; *Find 4 modes* before C0): each sets that input with its usual message and
   runs nothing, and is left out when the current inputs already have it. Since C0 no text says that
