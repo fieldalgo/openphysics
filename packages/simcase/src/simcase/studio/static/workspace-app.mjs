@@ -30,7 +30,7 @@ import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,comp
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
-import {sessionFileName,recoveryOffText,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
+import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
@@ -678,9 +678,17 @@ function refreshProjectLine(){
  // the Library is headed by the same line, in its view title row
  if(ui.page==='Applications'&&$('view-detail').textContent!==line)$('view-detail').textContent=line;
 }
+// round 18 (X8): with a project file and another model in the project, the heated model's status bar
+// names the model within the project in the header's words (the header names the project), so the
+// two never contradict each other; otherwise (no file, or the heated model alone) it keeps its words
+function heatedProjectState(){
+ const file=project.file&&project.file.scope===project.scope?project.file:null;if(!file||!multiView.inProject()||projectModels().length<2)return null;
+ const key=project.ids.multiphysics,inFile=Array.isArray(file.models)&&key?file.models.some(m=>m.key===key):null;
+ return modelInProjectTitle({title:multiView.projectTitle(),file,inFile,current:project.stamp===projectStamp(),recovery:recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState});
+}
 function refreshSaveIndicator(){
  refreshProjectLine();
- if(multiView.active()){const state=multiView.saveState();if($('autosave-status').textContent!==state)$('autosave-status').textContent=state;downloadHint(multiView.saveHint());return;}
+ if(multiView.active()){const state=heatedProjectState()||multiView.saveState();if($('autosave-status').textContent!==state)$('autosave-status').textContent=state;downloadHint(multiView.saveHint());return;}
  const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});downloadHint(applicationChosen()&&saveIndicator?persistenceHint({...saveIndicator,recovery:recoveryState}):'');
  // Rewritten only on a change: the footer is a status region read out by screen readers.
  const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.model?latestOffer.model+' · ':''}${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';

@@ -840,7 +840,12 @@ MiB · File › Save keeps your work”) 이전 기록이 남습니다. **Restor
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
 waveguide 카드의 **Restore from this browser**는 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
 연 세션 파일과 같았던 기록을 복구하면 광학 기록처럼 *Recovered from this browser · same as file …json*으로
-읽힙니다. 방금 연 템플릿은 첫 편집, 실행, 저장 전까지 *New model · not saved*로 읽힙니다.
+읽힙니다. 방금 연 템플릿은 첫 편집, 실행, 저장 전까지 *New model · not saved*로 읽힙니다. 프로젝트에 프로젝트 파일이
+있고 다른 모델도 있으면 가열 모델의 상태 표시줄은 제목 표시줄의 말로 프로젝트 안의 모델에 대해 말하므로 둘이 서로 어긋나지
+않습니다(round 18; 제목은 *waveguide-AB · waveguide-AB.json · changed since opened*인데 상태 표시줄은 *New model · not
+saved*였음): 파일의 모델 목록에 없으면 *Heated silicon waveguide · in project waveguide-AB.json · not saved since it
+joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *… · changed since saved 13:15*이며 제목 표시줄의
+브라우저 복구 말이 붙습니다.
 
 모듈 검사는 `tests/simcase/studio_workspace_multiphysics_session.cjs`에 있습니다(버전 8 이전 Studio가
 쓴 버전 6, 7 광학 파일이 `tests/simcase/studio_session_fixtures/`에 있고, 이전처럼 열리며 바이트

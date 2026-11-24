@@ -146,3 +146,18 @@ test('X7: a restore offer whose project file holds the other model too lists it 
  assert.ok(app.includes("const also=name?projectAlso(recovered,name):[];"));
  assert.ok(app.includes("(e.file||e.recovered.savedFile?.name||e.recovered.openedFile)===name"));
 });
+
+test('X8: the heated status bar speaks about the model within the project, in the header\'s words',async()=>{
+ const P=await import(STATIC+'workspace-persistence.mjs'),when=()=>'13:15';
+ const file={name:'waveguide-AB.json',how:'opened'},t='Heated silicon waveguide';
+ assert.equal(P.modelInProjectTitle({title:t,file,inFile:false,current:false,recovery:'kept'},when),'Heated silicon waveguide · in project waveguide-AB.json · not saved since it joined · kept for recovery in this browser');
+ assert.equal(P.modelInProjectTitle({title:t,file:{name:'heater-study.json',how:'picker',savedAt:'S'},inFile:true,current:true,recovery:'kept'},when),'Heated silicon waveguide · in project heater-study.json · saved 13:15');
+ assert.equal(P.modelInProjectTitle({title:t,file:{name:'heater-study.json',how:'download',savedAt:'S'},inFile:true,current:false,recovery:'kept'},when),'Heated silicon waveguide · in project heater-study.json · changed since downloaded 13:15 · kept for recovery in this browser');
+ // the header's words for the same project agree
+ assert.equal(P.projectTitle({name:'waveguide-AB',models:2,file,current:false,recovery:'kept'},when),'waveguide-AB · waveguide-AB.json · changed since opened · kept for recovery in this browser');
+ assert.equal(P.modelInProjectTitle({title:t,file,inFile:true,current:false,recovery:'kept'},when),'Heated silicon waveguide · in project waveguide-AB.json · changed since opened · kept for recovery in this browser');
+ const app=read('workspace-app.mjs');
+ // only with a project file and another model in the project; otherwise the words are as before
+ assert.ok(app.includes("if(!file||!multiView.inProject()||projectModels().length<2)return null;"));
+ assert.ok(app.includes("const state=heatedProjectState()||multiView.saveState();"));
+});

@@ -293,7 +293,9 @@ try {
     await page.until("/^Opened project Heater study \\(heater-study\\.json\\)/.test(document.getElementById('file-status').textContent)", 'project opened ' + tag, 60000);
     const opened = {message: await status(), title: await title(), footer: await footer()};
     assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run.');
-    assert.equal(opened.title, 'Heater study · heater-study.json · opened'); assert.equal(opened.footer, 'Opened heater-study.json');
+    assert.equal(opened.title, 'Heater study · heater-study.json · opened');
+    // round 18 (X8): the heated model is shown, with the other model in the project: its status bar speaks about it in the project
+    assert.equal(opened.footer, 'Heated silicon waveguide · in project heater-study.json · opened');
     await noOverflow(tag + ' opened');
     if (tag === 'wide') {
       // V-P1 (a): the opened project saved again at once differs from the first save only in its
