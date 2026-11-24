@@ -24,9 +24,11 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     # Windows took 20.6 min in run 44990962558 (Ubuntu 16.5, macOS 14.4); the multiphysics
-    # session browser check adds about 3 min on Linux (six runs of a 0.08 um mesh). The limit
-    # only stops hung jobs.
-    timeout-minutes: 40
+    # session browser check adds about 3 min on Linux (six runs of a 0.08 um mesh). On
+    # 2026-11-24 main run 45343712559 took 28.2 (Ubuntu), 29.8 (macOS) and 30.2 min (Windows),
+    # and a Windows runner about 1.5 times slower ran past the former 40-minute limit on
+    # PR #343. The limit only stops hung jobs, since hosted runner speed varies.
+    timeout-minutes: 60
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"

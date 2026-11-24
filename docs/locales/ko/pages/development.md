@@ -296,6 +296,8 @@ CI에서는 이 job을 `--shard K/8`로 여덟 부분, `installed-tests (1/8)`~`
 나머지 `test_*_wheel.py` 소비자는 배포 검사에서 Linux에서만 돕니다. 2026-11-02에 추가한
 소비자 세 개는 Linux에서 확인했으며, macOS와 Windows의 첫 실행은 CI 작업 자체입니다.
 설치 수용 검사이며 macOS나 Windows 전체 회귀 시험은 아닙니다.
+2026-11-24 main에서 플랫폼마다 28–30분이 걸렸습니다. 60분 제한은 멈춘 실행을 끊기 위한 것이며,
+호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
 Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스와 같은 버전)도 설치하고,
 러너의 브라우저에서 설치된 작업 공간을 점검합니다(`tools/studio_browser/studio_workspace_browser.mjs`):
 설계 두 개, Compare, Save session, 페이지를 연 채 서버 재시작, 시작 화면에서 복구, 설계 두 개를 더 만든
