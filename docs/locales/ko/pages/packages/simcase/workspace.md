@@ -1134,6 +1134,50 @@ page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 �
   들면서 돌아오지 않은 모드로 정했습니다. 그런 모드는 모드 8개를 요청한 기판 위 스트립의 1.486 근처 모드
   하나뿐입니다.
 
+### 닫힌 창 탐색 문서(optical-shapes-v10)
+
+`/api/workspace/capabilities/v10`은 버전 9에 adapter `optical-shapes-v10`과 `closed_target` 블록(`default`
+*(n_max + n_SiO2) / 2 at 1550 nm, two decimals*, `bounds` *above 1.45 and below n_max*)을 더한 것입니다. adapter의 빌더
+(`opticalDocument`에 `searchTarget`)는 닫힌 창에 **Search near n_eff**를 더합니다: 모든 가장자리가 닫혀 있으면
+`physics.em1`의 다른 키 뒤에 `"target_effective_index": t`가 붙고, 엔진은 *t*에 가장 가까운 고윳값 `mode_count`개를
+(Re > 0, 1.45 문턱 없이) Re n_eff가 큰 순서로 돌려줍니다. 엔진은 바뀌지 않습니다: `simcase.modes_document`가 이미 그 키를
+커널의 목표로 옮깁니다. `searchTarget`이 없으면 문서는 `optical-shapes-v8`(열린 가장자리가 있으면 `-v9`) 문서와 바이트까지
+같습니다. `tests/simcase/studio_closed_target.cjs`가 닫힌 문서 24개(템플릿과 기판 위 스트립, 모드 1·2·8개, 군굴절률
+있음/없음, 모든 가장자리를 닫은 경우)를 main 13f07f4가 쓴 것과 비교합니다. 열린 가장자리가 있으면 열린 경계가 자기 목표를
+쓰고 `searchTarget`은 읽지 않습니다.
+
+닫힌 목표가 있는 작업 공간 요청은 쿼리에 capabilities v10을 적습니다(`workspace_instance` 옆에
+`workspace_capabilities=10`). 다른 닫힌 목표는 각각 이유와 함께 거절됩니다: 숫자가 아닌 목표(*Search near n_eff must be
+a number (got "2.46").*), 1.45 이하이거나 설계의 1550 nm 최대 굴절률 이상인 목표(정확한 십진수로 비교; *Search near n_eff in
+a closed window must lie above 1.45 and below 3.4777 (the design's largest index) (got 1.45).*), `pml_additional_searches`가
+있는 목표(*A closed-window search has one target; pml_additional_searches belongs to an open boundary.*), capabilities v10이
+없는 요청의 목표(*Search near n_eff in a closed window needs workspace capabilities v10; reload the page.*). 목표가 없는 같은
+문서는 전처럼 받습니다.
+
+검증(`tests/simcase/test_studio_closed_target.py`, 사전 등록; 기준값은 main 13f07f4, Linux에서 측정):
+
+| 검사 | 경우 | 결과 |
+|---|---|---|
+| K2 | 기판 위 스트립(Core 500 × 220 nm, Substrate 3000 × 700 nm), 닫힌 창 @2.46 | 모드 1개: 2.43931663(코어 가둠 0.912, TE 0.981); 모드 2개: 2.48623178(기판)과 2.43931663. 기본 닫힌 실행의 두 모드는 기판 모드(3.42534929, 3.39599656)이고 코어 TE 모드는 그 실행의 32번째 모드 |
+| K3 | 닫힌 창 @2.46과 열린 기본값(Compare의 짝짓기) | 코어 모드끼리 짝, 겹침 0.988, Δn_eff −1.95e-3 |
+| K4 | 창 전체 폭의 220 nm Si 막, @2.85, 요소 길이 × 1, 2/3, 1/2, 1/3, ±1.2 µm PEC 사이 1D TE 전달 행렬 2.84948947과 비교 | 오차 −4.80e-3, −2.46e-3, −1.99e-3, −1.02e-3(음수, 줄어듦; × 1에서 \|오차\| ≤ 5e-3) |
+| K5 | 기판 위 막, 2.84916936과 비교 | 막 같은 모드(가둠 0.94)는 모드 2개 중 2번째; 오차가 각 수준에서 K4의 오차와 4.4e-4 안(기준 5e-4) |
+| K6 | 템플릿 @2.46, 모드 2개 | 기본 닫힌 실행의 n_eff와 5e-15 안 |
+| K7 | 기판 위 스트립 @2.46, 모드 4개, 폭 3, 4, 5, 6 µm 창, 500·1000 nm 두꺼운 기판, BOX 800·300 nm | 8개 중 8개에서 코어 모드가 3, 3, 3, 4, 4, 3, 3, 4번째로 나옴 |
+| K8 | n_g, 닫힌 창 @2.46, 모드 1개 | 4.19234, 열린 실행의 Re n_g 4.19152와 비교(기준 2e-3) |
+| K13 | 템플릿 @2.46, 모드 4개 | 4번째 모드는 클래딩보다 낮은 1.39191472: Studio는 이를 목록에서 뺍니다(C2) |
+
+닫힌 탐색의 한계:
+
+- **고정된 목표는 코어 모드의 n_eff가 목표에 가장 가까운 기판 모드들 사이에 있을 때만 코어 모드에 닿습니다.** 실리콘 기판
+  위 닫힌 창에는 코어 모드 주위에 기판 모드(PEC 벽 사이 슬랩의 가로 고조파)가 많습니다. 2.46 근처 모드 4개로 500 × 220 nm
+  스트립의 코어 모드는 나오지만, 다른 코어에서는(등록 뒤 측정, 기준 아님) 8개 중 3개에서만 나왔습니다: 폭 400, 450, 600,
+  700 nm와 높이 250 nm에서는 나오지 않았습니다(550 nm 코어 모드 2.511은 닫힌 실행의 31번째, 450 nm의 2.348은 34번째). 작은
+  변화(폭 480·520 nm, 높이 230 nm, 1500·1600 nm, 코어 메시 25·40 nm)에서는 8개 중 7개에서 나왔고, 높이 210 nm에서는 기판 모드와
+  섞여(가둠 0.37과 0.46) 어느 쪽도 코어 모드가 아닙니다. 다른 코어에서는 Search near n_eff를 코어 n_eff의 어림값으로 정하십시오.
+- **닫힌 값과 열린 값은 다릅니다.** 닫힌 창의 PEC 벽은 n_eff를 옮기고(기판 위 스트립에서 열린 기본값 대비 −1.95e-3), 기본
+  메시의 이산화 오차도 같은 크기입니다(K4: −4.8e-3). 가까운 비교 전에는 메시를 세분하십시오.
+
 ### 광학 작업 공간의 열린 경계
 
 슬라이스 P2부터 페이지는 [optical-shapes-v9](#열린-경계-문서optical-shapes-v9)의 열린 경계를 제공합니다.

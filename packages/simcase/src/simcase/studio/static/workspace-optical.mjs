@@ -3,6 +3,7 @@
 import {validateShapes,legacyCoreShape,shapesBlock,solverShapes,gradingCentre} from './workspace-shapes.mjs';
 import {DEFAULT_MODE_COUNT,checkModeCount} from './workspace-notebook.mjs';
 import {checkOpenBoundary,hasOpenEdge,applyOpenBoundary} from './workspace-open-boundary.mjs';
+import {checkClosedTarget,applyClosedTarget} from './workspace-closed-target.mjs';
 
 /** The study's quantity strings: the vacuum wavelength and the core element size in nm. */
 export function opticalStudy(wavelengthNm=1550,coreMeshNm=30){
@@ -33,7 +34,9 @@ export {groupIndexStep} from './workspace-modes.mjs';
  * window gets a PML outside it on each open edge; with every edge closed, or without it, the
  * document is the optical-shapes-v8 one byte for byte. With state.groupIndex an open document also
  * has results.group_index (the engine's complex n_g, slice P3). Slice T2: from a target of 1.466
- * an open document also searches near (target + 1.444) / 2 (pml.pml_additional_searches). */
+ * an open document also searches near (target + 1.444) / 2 (pml.pml_additional_searches).
+ * optical-shapes-v10: with state.searchTarget and every edge closed, em1 also has
+ * target_effective_index (workspace-closed-target.mjs); an open boundary keeps its own target. */
 export function opticalDocument(state,setup){
  const block=opticalBlock(state,setup);if(block)throw new Error(block);
  const coreMesh=state.coreMesh??30,modeCount=checkModeCount(state.modeCount??DEFAULT_MODE_COUNT),shapes=designShapes(state,setup),study=opticalStudy(state.wavelength??1550,coreMesh),[cx,cy]=gradingCentre(shapes);
@@ -43,5 +46,8 @@ export function opticalDocument(state,setup){
   const opened=applyOpenBoundary(doc,open);
   return state.groupIndex===true?withGroupIndex(opened):opened;
  }
- return state.groupIndex===true?withGroupIndex(doc):doc;
+ // optical-shapes-v10 (slice C1): Search near n_eff in a closed window; without state.searchTarget
+ // the closed document is the optical-shapes-v8 one, byte for byte
+ const closed=state.searchTarget==null?doc:applyClosedTarget(doc,checkClosedTarget(state.searchTarget,shapes));
+ return state.groupIndex===true?withGroupIndex(closed):closed;
 }
