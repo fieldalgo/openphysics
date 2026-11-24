@@ -364,6 +364,76 @@ def workspace_open_boundary_refusal(tree) -> str | None:
     return None
 
 
+# Version 10 (Search near n_eff for closed-window runs, slice C1): everything of version 9 stands; the
+# adapter is optical-shapes-v10, which writes the optical-shapes-v8 or -v9 document without a closed
+# target. With one, a closed window's em.modes2d physics has target_effective_index: the engine then
+# returns the mode_count eigenvalues nearest it, listed by descending Re n_eff. A workspace request
+# with a closed target names capabilities v10 in its query (workspace_capabilities=10).
+# Versions 1 to 9 stay as they were.
+_CLOSED_TARGET_FLOOR = Decimal("1.45")
+_CLOSED_TARGET_CAPABILITIES = "10"
+
+
+@app.get("/api/workspace/capabilities/v10")
+def workspace_capabilities_v10():
+    caps = json.loads(workspace_capabilities_v9().body)
+    caps.update(schema_version=10, adapter="optical-shapes-v10", closed_target={
+        "default": "(n_max + n_SiO2) / 2 at 1550 nm, two decimals",
+        "bounds": "above 1.45 and below n_max"})
+    return JSONResponse(caps, headers={"Cache-Control": "no-store"})
+
+
+def _largest_index(doc) -> Decimal:
+    """n_max of a workspace document: the largest real index at 1550 nm, to 4 decimals (the page's
+    INDEX_1550), of its background and its shapes' physmat materials."""
+    geometry = doc.get("geometry") if isinstance(doc, dict) else None
+    names = []
+    if isinstance(geometry, dict):
+        names.append((geometry.get("background") or {}).get("material") if isinstance(geometry.get("background"), dict) else None)
+        names += [s.get("material") for s in geometry.get("shapes") or [] if isinstance(s, dict)]
+    found = [Decimal("1.444")]
+    for name in names:
+        if isinstance(name, str) and name.startswith("physmat:"):
+            try:
+                n = complex(physmat.material(name.removeprefix("physmat:")).refractive_index(vacuum_wavelength=1.55e-6))
+            except Exception:  # an unknown material is refused by the reader with its own reason
+                continue
+            found.append(Decimal(repr(round(n.real, 4))))
+    return max(found)
+
+
+def workspace_closed_target_refusal(tree, query) -> str | None:
+    """The refusal of a workspace request whose closed-window em.modes2d physics (no pml thickness)
+    has a target_effective_index that optical-shapes-v10 does not write, else None: a target that is
+    not a number, one at or below 1.45 or at or above the design's n_max (exact decimals), one with
+    pml_additional_searches (they belong to an open boundary), and one in a request that does not
+    name capabilities v10 (workspace_capabilities=10). Documents without a closed target pass."""
+    doc = tree.get("doc") if isinstance(tree, dict) else None
+    physics = doc.get("physics") if isinstance(doc, dict) else None
+    if not isinstance(physics, dict):
+        return None
+    for entry in physics.values():
+        if not isinstance(entry, dict) or entry.get("type") != "em.modes2d" or "target_effective_index" not in entry:
+            continue
+        pml = entry.get("pml")
+        if isinstance(pml, dict) and "pml_thickness" in pml:
+            continue                      # an open boundary: workspace_open_boundary_refusal
+        target = entry["target_effective_index"]
+        if isinstance(target, bool) or not isinstance(target, (int, float, Decimal)):
+            shown = json.dumps(target) if isinstance(target, (str, bool)) or target is None else type(target).__name__
+            return f"Search near n_eff must be a number (got {shown})."
+        nmax = _largest_index(doc)
+        exact = Decimal(str(target))
+        if not _CLOSED_TARGET_FLOOR < exact < nmax:
+            return (f"Search near n_eff in a closed window must lie above 1.45 and below {nmax} "
+                    f"(the design's largest index) (got {exact}).")
+        if "pml_additional_searches" in entry or pml is not None:
+            return "A closed-window search has one target; pml_additional_searches belongs to an open boundary."
+        if query.get("workspace_capabilities") != _CLOSED_TARGET_CAPABILITIES:
+            return "Search near n_eff in a closed window needs workspace capabilities v10; reload the page."
+    return None
+
+
 def workspace_mode_count_refusal(tree) -> str | None:
     """The refusal of a workspace request (one that names its workspace_instance) whose em.modes2d
     physics asks for a mode count outside 1 to 8 or not a whole number, else None. The JSON
@@ -497,6 +567,7 @@ async def validate(request: Request):
     except RequestRefused as exc:
         return exc.reply()
     if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)
+                                                         or workspace_closed_target_refusal(tree, request.query_params)
                                                          or workspace_open_boundary_refusal(tree)):
         raise HTTPException(400, refusal)
     return exact_json(await run_in_threadpool(validation_payload, tree["doc"], found))
@@ -626,6 +697,7 @@ async def start_run(request: Request):
     except RequestRefused as exc:
         return exc.reply()
     if "workspace_instance" in request.query_params and (refusal := workspace_mode_count_refusal(tree)
+                                                         or workspace_closed_target_refusal(tree, request.query_params)
                                                          or workspace_open_boundary_refusal(tree)):
         raise HTTPException(400, refusal)
     return await run_in_threadpool(_start_job, tree, found)

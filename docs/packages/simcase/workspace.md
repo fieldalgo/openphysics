@@ -1376,6 +1376,60 @@ Limits of the open boundary, from its validation:
   known miss is a physical mode of the two searches that ranks within the asked count and is not
   returned; the only one is the strip-over-substrate mode near 1.486 when 8 modes are asked.
 
+### Closed-window search document (optical-shapes-v10)
+
+`/api/workspace/capabilities/v10` is version 9 with adapter `optical-shapes-v10` and a
+`closed_target` block (`default` *(n_max + n_SiO2) / 2 at 1550 nm, two decimals*, `bounds` *above
+1.45 and below n_max*). The adapter's builder (`opticalDocument` with `searchTarget`) adds **Search
+near n_eff** to a closed window: with every edge closed, `physics.em1` gets
+`"target_effective_index": t` after its other keys, and the engine then returns the `mode_count`
+eigenvalues nearest *t* (Re > 0, without the 1.45 threshold), listed by descending Re n_eff. No
+engine change: `simcase.modes_document` already maps the key to the kernel's target. Without
+`searchTarget` the document is the `optical-shapes-v8` (or, with an open edge, `-v9`) document byte
+for byte; `tests/simcase/studio_closed_target.cjs` checks 24 closed documents (the template and the
+strip over a substrate, 1, 2 and 8 modes, with and without the group index and with every edge
+closed) against the ones main 13f07f4 wrote. With an open edge the open boundary keeps its own
+target and `searchTarget` is not read.
+
+A workspace request with a closed target names capabilities v10 in its query
+(`workspace_capabilities=10`, beside `workspace_instance`). Each other closed target is refused
+with its reason: a target that is not a number (*Search near n_eff must be a number (got "2.46").*),
+one at or below 1.45 or at or above the design's largest index at 1550 nm (exact decimals; *Search
+near n_eff in a closed window must lie above 1.45 and below 3.4777 (the design's largest index)
+(got 1.45).*), one with `pml_additional_searches` (*A closed-window search has one target;
+pml_additional_searches belongs to an open boundary.*) and one in a request without capabilities v10
+(*Search near n_eff in a closed window needs workspace capabilities v10; reload the page.*). The same
+documents without a target are taken as before.
+
+Validation (`tests/simcase/test_studio_closed_target.py`, pre-registered; references measured on
+main 13f07f4, Linux):
+
+| Check | Case | Result |
+|---|---|---|
+| K2 | Strip over a substrate (Core 500 × 220 nm, Substrate 3000 × 700 nm), closed @2.46 | 1 mode: 2.43931663 (core confinement 0.912, TE 0.981); 2 modes: 2.48623178 (substrate) and 2.43931663. The default closed run's two modes are substrate modes (3.42534929, 3.39599656); the core TE mode is its mode 32 |
+| K3 | Closed @2.46 against the open default (Compare's matching) | the core modes paired, overlap 0.988, Δn_eff −1.95e-3 |
+| K4 | 220 nm Si film over the full width, @2.85, element lengths × 1, 2/3, 1/2, 1/3, against the 1D TE transfer matrix with PEC at ±1.2 µm, 2.84948947 | error −4.80e-3, −2.46e-3, −1.99e-3, −1.02e-3 (negative, shrinking; gate \|error\| ≤ 5e-3 at × 1) |
+| K5 | The film over the substrate, against 2.84916936 | the film-like mode (confinement 0.94) is mode 2 of 2; its error is within 4.4e-4 of K4's at each level (gate 5e-4) |
+| K6 | Template @2.46, 2 modes | the default closed run's n_eff within 5e-15 |
+| K7 | Strip over a substrate @2.46, 4 modes, in a window 3, 4, 5 and 6 µm wide, a substrate 500 and 1000 nm thicker and a BOX of 800 and 300 nm | the core mode returned in 8 of 8, as mode 3, 3, 3, 4, 4, 3, 3, 4 |
+| K8 | n_g, closed @2.46, 1 mode | 4.19234, against the open run's Re n_g 4.19152 (gate 2e-3) |
+| K13 | Template @2.46, 4 modes | mode 4 is 1.39191472, below the cladding: Studio leaves it out (slice C2) |
+
+Limits of a closed search:
+
+- **A fixed target reaches the core mode only when its n_eff lies among the substrate modes nearest
+  the target.** A closed window over a silicon substrate has many substrate modes (lateral harmonics
+  of the slab between the PEC walls) around the core mode. With 4 modes near 2.46 the core mode of
+  the 500 × 220 nm strip is returned, but for other cores (measured after registration, not gated)
+  it was returned in 3 of 8: 400, 450, 600 and 700 nm wide and 250 nm tall it was not (the 550 nm
+  core mode, 2.511, is mode 31 of a closed run; the 450 nm one, 2.348, mode 34). Small changes
+  (480 and 520 nm wide, 230 nm tall, 1500 and 1600 nm, core mesh 25 and 40 nm) kept it in 7 of 8; at
+  210 nm tall it mixes with a substrate mode (confinement 0.37 and 0.46) and neither is the core
+  mode. For other cores, set Search near n_eff to an estimate of the core's n_eff.
+- **Closed and open values differ.** The closed window's PEC walls shift n_eff (−1.95e-3 for the
+  strip over a substrate against the open default), and at the default mesh the discretization
+  error is of the same size (K4: −4.8e-3). Refine the mesh before a close comparison.
+
 ### Open boundary in the optical workspace
 
 Since slice P2 the page offers the open boundary of
