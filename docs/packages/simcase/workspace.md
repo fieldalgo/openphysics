@@ -298,10 +298,18 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    focused). The Study settings also say which inputs the next run uses, *Next run uses 700 ×
    300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, with *· group index on* when
    **Also compute group index** is ticked, whatever run Results shows. Beside **Run study** the
-   ribbon names the options that make the next run slower (round 17): *group index on · 3 solves*,
-   with an open boundary's PML check *PML check on · 3 solves* (one more solve per mode at most),
-   both *group index on · PML check on · 5 solves*. The options keep their state between tasks;
-   the line only says they are on.
+   ribbon says what the next run does and, when this tab has one, how long the last comparable run
+   took (round 18; round 17 named the slow options only): *Open boundary · 2 searches · group index
+   on (3 solves) · last such run 3:40*. It names the boundary (*Closed window* or *Open boundary*),
+   an open boundary's searches (*1 search* or *2 searches*), the options that add solves with the
+   solve count after the last of them (*group index on*, an open boundary's *PML check on*: one more
+   solve per mode at most; both *group index on · PML check on (5 solves)*), then *last such run
+   m:ss* or *no earlier run*. A comparable run has the same boundary kind and group-index state; its
+   time is the wall time from the job's start to its result in this tab, kept with the run in this
+   tab only: opened and recovered runs have none, and no file holds it. The line sits in a box of
+   fixed size, so the ribbon does not move when it changes. Choosing **Open boundary** while the
+   group index is on adds a warning to Messages: *Group index is on: open-boundary runs with it take
+   about three times as long.* The options keep their state between tasks.
    Set the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.

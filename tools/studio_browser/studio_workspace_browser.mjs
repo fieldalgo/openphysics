@@ -2101,12 +2101,15 @@ try {
     stage('R17 U5 boundary words', {note: u5.note});
     assert.equal(u5.note, 'Optical cross section uses the submitted geometry, in nm. Shapes, materials, wavelength and core mesh editable; window fixed; outer boundary chosen in Physics › Optical modes.');
     assert.ok(u5.study.includes('The window is fixed; the outer boundary is chosen in Physics › Optical modes.'), u5.study); assert.ok(!u5.study.includes('Window and boundaries are fixed.'));
-    // U3: the group index option, ticked, is named beside Run study; cleared, the line goes
+    // U3: the group index option, ticked, is named beside Run study; cleared, the line no longer names it
     await rTree('Optical modes', "!!document.getElementById('group-index-check')"); await r.click('#group-index-check');
     const u3 = {on: await r.eval("({text:document.getElementById('run-options').textContent,hidden:document.getElementById('run-options').hidden})")};
     await rOverflow('U3 slow options');
     await r.click('#group-index-check'); u3.off = await r.eval("({text:document.getElementById('run-options').textContent,hidden:document.getElementById('run-options').hidden})");
-    stage('R17 U3 slow options', u3); assert.deepEqual(u3, {on: {text: 'group index on · 3 solves', hidden: false}, off: {text: '', hidden: true}});
+    stage('R17 U3 slow options', u3);
+    // round 18 (X2): the line is always there and names the whole run; the group index with its solves
+    assert.equal(u3.on.hidden, false); assert.ok(u3.on.text.startsWith('Closed window · group index on (3 solves) · '), u3.on.text);
+    assert.equal(u3.off.hidden, false); assert.ok(u3.off.text.startsWith('Closed window · ') && !u3.off.text.includes('group index'), u3.off.text);
     // U2: seven runs of the template (core mesh 30, 32, …, 42 nm): the seventh drops Run 1 and
     // renumbers nothing; Messages names it
     for (let i = 0; i < 7; i++) {

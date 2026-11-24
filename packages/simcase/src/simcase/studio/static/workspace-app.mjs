@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,slowOptionsText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -21,7 +21,7 @@ import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts}
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
-import {hasOpenEdge} from './workspace-open-boundary.mjs';
+import {hasOpenEdge,lowerTarget} from './workspace-open-boundary.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
@@ -1114,6 +1114,7 @@ const MODE_COUNT_NOTE='Modes to find is saved with the model inputs and kept wit
 // Also compute group index (off by default, saved with the inputs): the run's document gains
 // results.group_index and the engine solves λ0 − 1 nm and λ0 + 1 nm as well (workspace-optical.mjs)
 const GROUP_INDEX_LABEL='Also compute group index (3 solves)';
+const GROUP_INDEX_OPEN_WARNING='Group index is on: open-boundary runs with it take about three times as long.';
 // With an open boundary too (slice P3): the engine's n_g is then complex, and Re n_g is shown.
 const groupIndexField=()=>`<label class="check-field"><input id="group-index-check" type="checkbox"${state.groupIndex?' checked':''}> ${GROUP_INDEX_LABEL}</label><p class="input-note">${GROUP_INDEX_NOTE}</p>`;
 // Outer boundary (Physics › Optical modes): Closed window (PEC) or Open boundary (PML), and
@@ -1122,7 +1123,9 @@ const bindBoundaryField=()=>{
  document.querySelectorAll('input[name="outer-boundary"]').forEach(radio=>radio.onchange=()=>{
   const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;
   state.openBoundary=open?openChoice():null;
-  render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');});
+  render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');
+  // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
+  if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}});
  const target=$('target-number');if(target)target.onchange=()=>{
   let t;try{t=parseTarget(target.value,state.shapes);}catch(error){notice(error.message);target.value=(state.openBoundary.target??Number(target.defaultValue)).toFixed(3);return;}
   state.openBoundary={...state.openBoundary,target:t};render();notice(`Search near n_eff ${t.toFixed(3)}: the next run returns the modes nearest it.`);};
@@ -1132,9 +1135,15 @@ const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.oncha
 // The wavelength and Modes to find: one field each, the same in Physics › Optical modes and in
 // Study (only one of the two panels is shown at a time, so the ids stay unique).
 const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" type="number" min="1400" max="1700" step="any" value="${state.wavelength}"></label>`;
-// round 17 (U3): the slow options the next optical run uses, beside Run study; the options keep
-// their state (a task does not reset them), so a run that is slower than one solve says why first
-function refreshRunOptions(){const host=$('run-options');if(!host)return;const text=isOptical()&&!multiView.active()?slowOptionsText({groupIndex:state.groupIndex,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount}):'';host.textContent=text;host.hidden=!text;host.title=text?'Options of the next run that make it slower; change them in Study or Physics › Optical modes':'';}
+// round 18 (X2; round 17 U3 named the slow options only): what the next optical run does, beside Run
+// study, with how long the last comparable run of this tab took; the options keep their state (a
+// task does not reset them), so a run that is slower than one solve says why first
+function refreshRunOptions(){
+ const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
+ const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount};
+ const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
+ const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
+}
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
@@ -1946,7 +1955,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):reasons;}
- completed.inputRevision=pending.revision;const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed);droppedNote=runs.filter(r=>!next.includes(r)&&r.job!==completed.job).map(droppedRunText).join(' ');runs=next;solverRun=runs.find(run=>run.job===completed.job);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';
 }});
 function refreshJobControls(){
