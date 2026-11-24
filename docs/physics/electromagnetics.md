@@ -64,3 +64,5 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 - [Homogeneous Laplace boundary panels: contract and validation](../packages/galerkin/laplace_boundary.md)
 
 - [Two-ground homogeneous Laplace panels](../packages/galerkin/two-ground.md)
+
+- [Homogeneous Laplace panels with no grounded wall (unbacked lines)](../packages/galerkin/open-box.md)
