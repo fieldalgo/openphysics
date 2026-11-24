@@ -484,7 +484,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
    opened from or last sent to: *· same as file …json* when the record still matched it, *· file
    …json, changed since* when it did not, *· file …json* for a record written before Studio kept
-   that. Each stored session is listed once, newest first:
+   that. A record names one model, but a project file may hold both: since round 18, when browser
+   recovery also holds a record of the other model under the same file, the entry lists it with its
+   runs and says the button does not restore it, *· also in this project: Heated silicon waveguide ·
+   Run 1 (restored separately)*, or *(already in this tab)* when the tab holds that model's runs.
+   The button restores its own model; one restore that brings back both is not offered.
+   Each stored session is listed once, newest first:
    records with the same inputs (or model) and runs are one session even when their view (page,
    field view), selected run, Compare choice, the runs' origin (computed here, opened from a file
    or recovered), file link or save time differ. The newest is shown, naming the file if any of

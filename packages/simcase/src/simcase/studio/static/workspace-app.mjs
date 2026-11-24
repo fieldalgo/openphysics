@@ -963,7 +963,16 @@ const recoveredModel=recovered=>recovered.session.application==='multiphysics'?S
 const recoveredEntry=(recovered,file)=>{const own=recovered.savedFile?.name||recovered.openedFile||null,name=file||own,
  fileCurrent=name&&name===own?(recovered.savedFile?recovered.savedFile.current:recovered.openedCurrent):null,
  fileSavedAt=name&&recovered.savedFile?.name===name?recovered.savedFile.savedAt:null;
- return {runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session),file:name,fileCurrent,...(fileSavedAt?{fileSavedAt}:{})};};
+ const also=name?projectAlso(recovered,name):[];
+ return {runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered)||'Optical waveguide',names:sessionRunNames(recovered.session),file:name,fileCurrent,...(fileSavedAt?{fileSavedAt}:{}),...(also.length?{also}:{})};};
+// round 18 (X7): the other model of the same project file, when browser recovery holds a record of
+// it under that file name (the newest), with its runs; inTab when this tab already holds that model's runs
+function projectAlso(recovered,name){
+ const kind=recovered.session.application==='multiphysics'?'multiphysics':'optical';
+ const other=recoveryList().find(e=>(e.recovered.session.application==='multiphysics'?'multiphysics':'optical')!==kind&&(e.file||e.recovered.savedFile?.name||e.recovered.openedFile)===name);
+ if(!other)return [];const o=other.recovered;
+ return [{model:recoveredModel(o)||'Optical waveguide',names:sessionRunNames(o.session),runs:o.session.runs.length,inTab:kind==='optical'?multiView.projectRuns()>0:runs.length>0}];
+}
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 // earlierRecords: the stored records as read, for the list's de-duplication (distinctRecords).
 let earlierSessions=[],earlierRecords=[];

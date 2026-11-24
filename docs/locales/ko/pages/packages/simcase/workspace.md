@@ -408,7 +408,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
    design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
    그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가 그것을
-   보관하기 전에 쓴 기록이면 *· file …json*. 저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
+   보관하기 전에 쓴 기록이면 *· file …json*. 기록은 모델 하나를 담지만 프로젝트 파일은 둘 다 담을 수 있습니다: round
+   18부터 브라우저 복구가 같은 파일에 다른 모델의 기록도 가지고 있으면 항목이 그 모델과 실행을 밝히고 이 버튼이 그것을
+   복원하지 않는다고 적습니다(*· also in this project: Heated silicon waveguide · Run 1 (restored separately)*, 탭이 그
+   모델의 실행을 가지고 있으면 *(already in this tab)*). 버튼은 자기 모델만 복원하며, 둘을 한 번에 되살리는 복원은 없습니다.
+   저장된 세션은 최신순으로 한 번씩만 나옵니다. 입력(또는 모델)과 실행이 같은 기록은
    보기(페이지, 장 보기), 고른 실행, Compare 선택, 실행의 출처(여기서 계산, 파일에서 엶, 복구), 파일
    연결이나 저장 시각이 달라도 한 세션입니다. 가장 새 기록을 보여 주고, 합친 기록 중 하나라도 파일을
    가리키면 그 파일 이름을 붙이며, 이 탭에 열려 있는 세션은 제안하지 않습니다. 시작 화면은 한 단어, model을 씁니다: **Library** 탭, *Choose a starting model*,
