@@ -742,7 +742,10 @@ try {
       await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", label + ': Compare');
       const compare = await page.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent)");
       await noOverflow(label + ' 1440'); await size(390, 844, true); await sleep(400); await noOverflow(label + ' 390'); await size(1440, 900, false);
-      return {items, drop, need, compare};
+      // a run read from a file or recovered ends with its origin (· from file, · recovered): left out,
+      // since the numbers and the runs are what is compared
+      const plain = list => list.map(t => t.replace(/ · (?:from file|recovered)$/, ''));
+      return {items: plain(items), drop, need, compare: plain(compare)};
     };
     const heatedItems = async label => {
       await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
