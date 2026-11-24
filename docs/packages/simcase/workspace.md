@@ -544,7 +544,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
    restored: …*) and that model's card offer stays. While the tab holds runs of one of the models the
    offer restores its own model only, as before, and names the other *(already in this tab)*; the
-   other model's own entry and both cards' offers are unchanged.
+   other model's own entry and both cards' offers are unchanged. Every restore from this browser
+   first writes this tab's pending recovery save (at once, not after its 0.7 s timer), so the record
+   it continues is the one stored: before, the second restore of a pair could continue a record
+   this tab replaced while the server checked the model, and every later save then read as another
+   tab's change (*browser recovery changed in another tab*) and automatic recovery stopped. A
+   change another tab made is still detected as before.
    Each stored session is listed once, newest first:
    records with the same inputs (or model) and runs are one session even when their view (page,
    field view), selected run, Compare choice, the runs' origin (computed here, opened from a file

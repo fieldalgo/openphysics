@@ -1117,7 +1117,8 @@ async function recoverEarlier(index,opener,{then=null,failed=null,projectMatched
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  try{
   rejectInvalidInput();
-  const loaded=await workspaceLoads.read(async()=>{const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();const recovered=readNotebookRecovery(list[index]??null);
+  // round 20 follow-up: this tab's pending recovery save is written first, so the record read and adopted is the stored one
+  const loaded=await workspaceLoads.read(async()=>{await notebookAutosave.settle();const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();const recovered=readNotebookRecovery(list[index]??null);
    if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {latest,recovered};});
   if(!loaded)return;const {latest,recovered}=loaded.value;if(!recovered)throw new Error('That earlier session is no longer stored.');
   if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
@@ -1131,7 +1132,7 @@ $('recover-notebook').onclick=()=>recoverLatest($('recover-notebook'));
 async function recoverLatest(opener,{then=null,failed=null,projectMatched=false}={}){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
- try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
+ try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{await notebookAutosave.settle();const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
   if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,recoveryIndex:-1,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,then,projectMatched});return;}
   requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,recoveryIndex:-1,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),then,projectMatched});}
  catch(error){if(failed)failed(error.message);else notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}

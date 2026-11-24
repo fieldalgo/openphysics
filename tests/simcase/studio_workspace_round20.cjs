@@ -126,3 +126,11 @@ test('Z2: the newest offer of a project with both models restores both',async()=
  // no format change: the recovery record and session writers are untouched by Z2
  assert.ok(!read('workspace-notebook-recovery.mjs').includes('pair'));
 });
+
+test('Z2 follow-up: both restores write this tab\'s pending recovery save before they read the stored record',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("const loaded=await workspaceLoads.read(async()=>{await notebookAutosave.settle();const latest=await notebookStore.load();const list=await notebookStore.loadEarlier();"));
+ assert.ok(app.includes("const loaded=await workspaceLoads.read(async()=>{await notebookAutosave.settle();const record=await notebookStore.load();"));
+ // the store's conflict rule is unchanged
+ assert.ok(read('workspace-notebook-recovery.mjs').includes("if(recoveryRevision(request.result)!==baseline){"));
+});

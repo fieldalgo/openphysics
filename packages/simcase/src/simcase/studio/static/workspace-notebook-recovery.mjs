@@ -173,6 +173,19 @@ export class NotebookAutosave {
   this.store.adopt(record);this.savedStamp=null;this.desired=null;
   this.schedule(stamp,makeText,extra);await this.flush();
  }
+ // Round 20 follow-up: settle before a restore reads the stored record, so the record it adopts is
+ // the one in storage, not one this tab's own save replaces a moment later (restoring both models read the
+ // latest record, waited for the server's model check, and this tab's pending save committed
+ // meanwhile: every later save then read as another tab's change). A save waiting for its timer is
+ // written now (the state the timer would have written); a write in flight is waited for. Resolves
+ // once no write is in flight and none is pending, or the pending one failed (the failure stays).
+ async settle(){
+  for(;;){
+   if(this.writing){await new Promise(resolve=>this.setTimer(resolve,25));continue;}
+   if(this.timer!==null||(this.desired&&this.desired.stamp!==this.savedStamp&&this.desired.stamp!==this.failedStamp)){await this.flush();continue;}
+   return;
+  }
+ }
  retry(){this.failedStamp=null;return this.flush();}
  get pending(){return this.writing||!!this.desired&&this.desired.stamp!==this.savedStamp;}
 }
