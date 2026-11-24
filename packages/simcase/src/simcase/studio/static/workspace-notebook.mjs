@@ -3,6 +3,7 @@
 
 import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
+import {CLOSED_TARGET_ADAPTER,checkClosedTarget} from './workspace-closed-target.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA,physicalBounds,windowField} from './workspace-field.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
@@ -29,6 +30,11 @@ export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 export const SESSION_VERSION=7;
 export const OPTICAL_SESSION_VERSION=9;
 export const OPEN_SESSION_VERSION=10;
+// Format 11 (Search near n_eff for closed-window runs, slice C2): format 10 with runs of
+// optical-shapes-v10, whose settings hold search_target (the closed window's Search near n_eff) after
+// mode_count, and whose modes are all above n = 1.45 (Studio leaves the others out). Written only
+// when such a run is kept; otherwise version 10, 9 or 7, byte for byte.
+export const CLOSED_TARGET_SESSION_VERSION=11;
 // The adapter of this Studio: optical-shapes-v8 builds the document of optical-shapes-v7 with the
 // mode count asked for (1 to 8). A version 7 run is a v8 run of two modes: its document is the same.
 export const OPTICAL_ADAPTER='optical-shapes-v8';
@@ -52,12 +58,26 @@ export function opticalSettings(wavelength=1550,coreMesh=30,modeCount=DEFAULT_MO
  studyRange(wavelength,coreMesh);checkModeCount(modeCount);const s=OPTICAL_SETTINGS;
  return {adapter:s.adapter,domain:s.domain,boundary:s.boundary,mode_count:modeCount,solver_version:s.solver_version,vacuum_wavelength:wavelength+' nm',core_element_size:coreMesh+' nm'};
 }
+/** The settings of a closed-window run with Search near n_eff t (optical-shapes-v10): the closed
+ * settings with that adapter and search_target after mode_count. */
+export function closedTargetSettings(settings,t){
+ return {adapter:CLOSED_TARGET_ADAPTER,domain:settings.domain,boundary:settings.boundary,mode_count:settings.mode_count,search_target:t,solver_version:settings.solver_version,vacuum_wavelength:settings.vacuum_wavelength,core_element_size:settings.core_element_size};
+}
+/** Whether a run is a closed-window run with Search near n_eff (optical-shapes-v10). */
+export const isClosedTargetRun=run=>run?.settings?.adapter===CLOSED_TARGET_ADAPTER;
+/** The closed-window Search near n_eff of a run, or null. */
+export const runSearchTarget=run=>isClosedTargetRun(run)?run.settings.search_target:null;
 /** The settings a version 7 file writes for a run of two modes: those of optical-shapes-v7. */
 export function v7Settings(settings){return {...settings,adapter:V7_ADAPTER,mode_count:2};}
 // Runs of earlier adapters came in sessions of versions 1-5, which are refused by name.
 function expectedSettings(settings,model,number){
  const adapter=settings?.adapter;
  if(adapter===V7_ADAPTER){studyRange(model.wavelength,model.coreMesh);return v7Settings(opticalSettings(model.wavelength,model.coreMesh));}
+ if(adapter===CLOSED_TARGET_ADAPTER){
+  const {search_target,...rest}=settings,closed=expectedSettings({...rest,adapter:OPTICAL_ADAPTER},model,number);
+  try{checkClosedTarget(search_target,model.shapes);}catch(error){throw new Error(`${number?'Run '+number:'This run'}: invalid search target. ${error.message}`);}
+  return closedTargetSettings(closed,search_target);
+ }
  if(adapter===OPEN_ADAPTER){const closed=expectedSettings({...settings,adapter:OPTICAL_ADAPTER},model,number);return checkOpenSettings(settings,closed,model.shapes,number?'Run '+number:'This run');}
  if(adapter!==OPTICAL_ADAPTER)throw new Error('Unsupported run settings or input mismatch.');
  const n=settings.mode_count;
@@ -68,7 +88,7 @@ function expectedSettings(settings,model,number){
 export const runModeCount=run=>run.settings.mode_count;
 /** The signature of a run's study: its input text, and its mode count when it is not 2 (a run of
  * two modes keeps the signature of the input alone, as before mode counts could change). */
-export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT,groupIndex=false,pml=null)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`)+(groupIndex===true?'\ngroup index':'')+(pml?`\nopen boundary ${pml.open_edges.join(' ')} near ${pml.target}`:'');
+export const studySignature=(input,modeCount=DEFAULT_MODE_COUNT,groupIndex=false,pml=null,searchTarget=null)=>JSON.stringify(input)+(modeCount===DEFAULT_MODE_COUNT?'':`\n${modeCount} modes`)+(groupIndex===true?'\ngroup index':'')+(pml?`\nopen boundary ${pml.open_edges.join(' ')} near ${pml.target}`:'')+(!pml&&searchTarget!=null?`\nnear ${searchTarget}`:'');
 /** A length written with its unit ("0.15 um", "150 nm", "1.5e-7 m") in micrometres, the page's display
  * unit, and its value in metres; a bare number is refused. */
 const LENGTH=/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?) (nm|um|m)$/i;
@@ -122,6 +142,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  if(record.input?.version===STUDY_PROJECT_VERSION)throw new Error('Unsupported run settings or input mismatch.');
  const input=validateProject(record.input);
  if(format===7&&record.settings?.adapter!==V7_ADAPTER)throw new Error('Unsupported run settings or input mismatch.');
+ if(format===11&&![OPTICAL_ADAPTER,OPEN_ADAPTER,CLOSED_TARGET_ADAPTER].includes(record.settings?.adapter))throw new Error(`${which}: unsupported run settings (a version 11 file writes ${OPTICAL_ADAPTER}, ${OPEN_ADAPTER} or ${CLOSED_TARGET_ADAPTER}).`);
  if(format===10&&![OPTICAL_ADAPTER,OPEN_ADAPTER].includes(record.settings?.adapter))throw new Error(`${which}: unsupported run settings (a version 10 file writes ${OPTICAL_ADAPTER} or ${OPEN_ADAPTER}).`);
  if(format===9&&record.settings?.adapter!==OPTICAL_ADAPTER)throw new Error(`${which}: unsupported run settings (a version 9 file writes ${OPTICAL_ADAPTER}).`);
  const settings=expectedSettings(record.settings,input.model,number);
@@ -134,7 +155,9 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  else throw new Error('Invalid effective indices.');
  const k=re.length;
  if(format===7||settings.adapter===V7_ADAPTER?!finiteList(re,2):(k<1||k>asked||!finiteList(re,k)||(im!==null&&!finiteList(im,k))))throw new Error('Invalid effective indices.');
- if(format===9||format===10){
+ // a closed-window search run lists only modes above n = 1.45 (the others are left out, A1)
+ if(settings.adapter===CLOSED_TARGET_ADAPTER&&re.some(x=>!(x>GUIDED_THRESHOLD)))throw new Error(`${which}: a closed-window search lists only modes above n = ${GUIDED_THRESHOLD}.`);
+ if(format===9||format===10||format===11){
   if(re.some((x,i)=>i>0&&x>re[i-1]))throw new Error(`${which}: its effective indices are not ranked by Re n_eff.`);
   if(re.some(x=>!(x>GUIDED_THRESHOLD)))throw new Error(`${which}: an effective index is not above n = ${GUIDED_THRESHOLD}.`);
  }
@@ -182,7 +205,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
   field=readOpticalField({node_coordinates:f.node_coordinates,field_units:{node_coordinates:'m'},triangles:f.triangles,vector_fields:[{...(settings.adapter===OPEN_ADAPTER?PML_FIELD_METADATA:FIELD_METADATA),real:f.real,imag:f.imag}]},format===7?2:k,{open:settings.adapter===OPEN_ADAPTER});
   for(let mode=0;mode<k;mode++)fieldScalars(field,mode);
  }
- const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined,settings.pml??null),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
+ const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined,settings.pml??null,settings.search_target??null),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
  if(im!==null)run.effective_index_im=[...im];
  return Object.assign(run,extra);
 }
@@ -296,6 +319,7 @@ function readView(view){
  * and the input is of version 6 or 7, else 9 (an input of version 8, with study settings, is
  * held by version 9 only). */
 export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ if(runs.some(isClosedTargetRun))return CLOSED_TARGET_SESSION_VERSION;
  if(input?.version===OPEN_PROJECT_VERSION||runs.some(isOpenRun))return OPEN_SESSION_VERSION;
  if(input?.version===STUDY_PROJECT_VERSION)return OPTICAL_SESSION_VERSION;
  return runs.every(run=>fitsVersion7(run)&&(!keep||keep.has(run.job)))&&validateView(view).mode<2?SESSION_VERSION:OPTICAL_SESSION_VERSION;
@@ -392,7 +416,7 @@ export const newerVersionText=(version,highest)=>`This session file is version $
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
 /** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
  * accepts these, so a later version is added here only (workspace-project-file.mjs). */
-export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION]);
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION]);
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
@@ -404,9 +428,9 @@ export function parseSession(text,{recovered=false}={}){
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
   if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>OPEN_SESSION_VERSION)throw new Error(newerVersionText(doc.version,OPEN_SESSION_VERSION));
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>CLOSED_TARGET_SESSION_VERSION)throw new Error(newerVersionText(doc.version,CLOSED_TARGET_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
- const nine=doc?.version===OPTICAL_SESSION_VERSION||doc?.version===OPEN_SESSION_VERSION,ten=doc?.version===OPEN_SESSION_VERSION;
+ const eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
  if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
@@ -431,7 +455,7 @@ export function parseSession(text,{recovered=false}={}){
    // a version 6 or 7 run: its keys of version 7 only (any other key is not read, as before)
    record={job:r?.job,completedAt:r?.completedAt,label:r?.label,pinned:r?.pinned,origin:r?.origin,serverVersion:r?.serverVersion,settings:r?.settings,input:r?.input,effective_index:r?.effective_index,field:r?.field};
   }
-  const run=validateRun(record,true,{format:ten?10:nine?9:7,number:i+1});if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
+  const run=validateRun(record,true,{format:eleven?11:ten?10:nine?9:7,number:i+1});if(recovered)run.origin='recovered';return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');
  if(doc.selected!==null&&!ids.includes(doc.selected))throw new Error('Selected run is missing.');
  if(!Array.isArray(doc.comparison)||doc.comparison.length!==2||!doc.comparison.every(id=>id===null||ids.includes(id)))throw new Error('Invalid comparison selection.');

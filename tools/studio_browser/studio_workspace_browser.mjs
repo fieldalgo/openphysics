@@ -2314,13 +2314,14 @@ try {
     for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
     await mesh(30); await rRun();
     const x9 = {buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
-    await r.click('#edge-find-modes'); await sleep(300);
+    // slice C2: Search near 2.46 · 4 modes replaces Set Modes to find to 4 (C0) and Find 4 modes (round 18)
+    await r.click('#edge-search-near'); await sleep(300);
     x9.find = {message: await rText('#file-status'), buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
     await r.click('#edge-use-open'); await sleep(400);
     x9.open = {message: await rText('#file-status'), actions: await r.eval("!!document.getElementById('edge-actions')"), plan: await plan(), items: (await runItems()).length, busy: await r.eval("document.getElementById('run-optical').textContent")};
     stage('R18 X9 note shortcuts', x9);
-    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Set Modes to find to 4']);
-    assert.ok(x9.find.message.startsWith('Modes to find set to 4.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
+    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Search near 2.46 · 4 modes']);
+    assert.ok(x9.find.message.startsWith('Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. Modes to find set to 4.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
     assert.ok(x9.open.message.startsWith('Open boundary: a PML of 1 µm outside every edge;'), x9.open.message); assert.equal(x9.open.actions, false);
     assert.ok(x9.open.plan.startsWith('Open boundary · '), x9.open.plan); assert.equal(x9.open.items, x9.items); assert.equal(x9.open.busy, 'Run study');
     await rOverflow('X9 Results');

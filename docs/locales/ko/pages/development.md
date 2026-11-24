@@ -414,7 +414,7 @@ Messages에 자기 색으로 나오는 경고 *Group index is on: open-boundary 
 **Show Run 1**과 함께 *No need to run: Run 1 already has these results. …*가 나오고(Run study는 그대로 켜짐) 실행 목록이
 *Run 1 · closed · 500 × 220 nm …*인지; Run 2 뒤 Run 1을 보면 상태 표시줄이 *… · current inputs from Run 2*인지; 실행 여섯 개에서
 *If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*(20차 문구)와 **Pin Run 1**이 나오고 누르면 고정되며 줄이 Run 2로
-옮겨 가는지; 기판 실행의 안내 아래 **Use Open boundary**와 **Set Modes to find to 4**(C0 문구; 그 전에는 *Find 4 modes*)가 각각 입력을 정하고 아무것도 실행하지 않는지;
+옮겨 가는지; 기판 실행의 안내 아래 **Use Open boundary**와 **Search near 2.46 · 4 modes**(C2; C0에서는 *Set Modes to find to 4*, 그 전에는 *Find 4 modes*)가 각각 입력을 정하고 아무것도 실행하지 않는지;
 Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오는지; 두 크기 모두 가로 넘침이 없는지 봅니다.
 19차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 확인합니다: 형상 속성의 *Name*과 *Material* 칸이 그 낱말 하나뿐인
 레이블을 하나씩 가지는지(감싸지 않고 `for`로); 실행 여섯 개 뒤 Run study가 *Running drops Run 1 (500 × 220 nm · 2 modes).*와

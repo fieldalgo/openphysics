@@ -1165,7 +1165,7 @@ a closed window must lie above 1.45 and below 3.4777 (the design's largest index
 | K6 | 템플릿 @2.46, 모드 2개 | 기본 닫힌 실행의 n_eff와 5e-15 안 |
 | K7 | 기판 위 스트립 @2.46, 모드 4개, 폭 3, 4, 5, 6 µm 창, 500·1000 nm 두꺼운 기판, BOX 800·300 nm | 8개 중 8개에서 코어 모드가 3, 3, 3, 4, 4, 3, 3, 4번째로 나옴 |
 | K8 | n_g, 닫힌 창 @2.46, 모드 1개 | 4.19234, 열린 실행의 Re n_g 4.19152와 비교(기준 2e-3) |
-| K13 | 템플릿 @2.46, 모드 4개 | 4번째 모드는 클래딩보다 낮은 1.39191472: Studio는 이를 목록에서 뺍니다(C2) |
+| K13 | 템플릿 @2.46, 모드 4개 | 4번째 모드는 클래딩보다 낮은 1.39191472: Studio는 이를 목록에서 뺍니다([닫힌 창의 탐색](#닫힌-창의-search-near-n_eff)) |
 
 닫힌 탐색의 한계:
 
@@ -1177,6 +1177,43 @@ a closed window must lie above 1.45 and below 3.4777 (the design's largest index
   섞여(가둠 0.37과 0.46) 어느 쪽도 코어 모드가 아닙니다. 다른 코어에서는 Search near n_eff를 코어 n_eff의 어림값으로 정하십시오.
 - **닫힌 값과 열린 값은 다릅니다.** 닫힌 창의 PEC 벽은 n_eff를 옮기고(기판 위 스트립에서 열린 기본값 대비 −1.95e-3), 기본
   메시의 이산화 오차도 같은 크기입니다(K4: −4.8e-3). 가까운 비교 전에는 메시를 세분하십시오.
+
+### 닫힌 창의 Search near n_eff
+
+C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shapes-v10)을 제공합니다.
+
+- **체크 상자.** *Closed window (PEC)*를 고르면 **Physics › Optical modes**에 기본으로 꺼진 체크 상자 **Search near
+  n_eff**와 필드 *Search near n_eff (closed window)*(소수 3자리, 기본값은 (n_max + 1.444)/2를 0.01로 반올림한 값: 실리콘이면
+  2.460)가 있고, 필드는 상자가 켜져 있을 때만 쓸 수 있습니다. 도움말은 “Off: the modes of highest n_eff above 1.45. On: the
+  modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values
+  differ: refine the mesh before a close comparison.”입니다. Messages에는 *Search near n_eff 2.460 in the closed window: the
+  next run returns the modes nearest it.* 또는 *Search near n_eff off: the next run returns the modes of highest n_eff.*가
+  나오고, 보관된 실행이 새 입력을 가지면 *No need to run: Run N already has these results.*가 이어집니다. 형상이 창 가장자리에
+  닿아도 상자는 기본으로 켜지지 않습니다.
+- **바로 가기.** 닫힌 실행의 가장자리 안내 아래 round 18 행에는 **Use Open boundary**와, C2부터 C0의 *Set Modes to find to 4*
+  대신 **Search near 2.46 · 4 modes**가 있습니다: 설계의 기본 목표로 상자를 켜고 Modes to find를 4로 정하며 *… Modes to find set
+  to 4.*라고 알리고 아무것도 실행하지 않습니다. 입력이 이미 둘 다 그렇다면 나오지 않습니다. 등록된 모든 변형에서 모드 4개로 기판
+  위 스트립의 코어 모드에 닿습니다([K7](#닫힌-창-탐색-문서optical-shapes-v10)).
+- **실행.** 상자를 켠 실행은 `target_effective_index`를 쓰고 capabilities v10을 적습니다. Studio는 Re n_eff가 1.45보다 큰
+  모드만 보관합니다(결정 A1): 표 위 줄은 늘 *Found k of M modes near n_eff 2.46, above n = 1.45.*(M: Modes to find)이고, 엔진이
+  그 아래 모드를 돌려주었으면 표 아래 안내가 *1 mode at or below n = 1.45 was left out.*라고 말합니다(템플릿 @2.46, 모드 4개:
+  2.44257822, 1.76989777, 1.49297336을 싣고 1.39191472를 뺌). 모드는 엔진의 순서(Re n_eff 내림차순)를 지킵니다.
+- **코어 모드.** 형상이 창 가장자리에 닿는, Search near n_eff를 쓴 닫힌 실행에서 가장자리에 닿지 않는 한 형상 안 |E|² 몫(가장자리
+  안내의 몫)이 0.5보다 큰 모드에는 안내 행 *Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window
+  edge.*가 붙습니다(기판 위 스트립 @2.46, 모드 2개; 모드 4개면 3번째). 이 몫은 Studio의 가중치 없는 |E|² 몫이고, 같은 모드의
+  엔진 에너지 비율(가둠 인자)은 0.91입니다.
+- **문구.** Run study 옆 계획 줄은 *Closed window · near n_eff 2.46*, 다음 실행 입력은 *· search near 2.46*으로 끝나며, 실행
+  목록, Compare 선택 목록과 제목, 상태 표시줄은 목표 없는 닫힌 실행의 *closed* 자리에 *closed near 2.46*을 씁니다.
+- **실행과 파일.** 실행 설정에 목표가 남습니다: adapter `optical-shapes-v10`, `mode_count` 뒤의 `search_target`. 세션(그리고
+  프로젝트 파일의 작업 공간 항목)은 그런 실행이 보관되어 있을 때만 **버전 11**로, 아니면 버전 10, 9, 7로 바이트까지 같게
+  씁니다(main 13f07f4와 비교). 버전 11은 1.45 이하 모드가 있는 목표 실행을 거절하고, 버전 10까지 읽는 Studio는 *This session
+  file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.*로 거절합니다. study 서명에
+  목표가 들어가므로 목표를 바꾸거나 끄면 실행이 필요하고, 같은 목표일 때만 *No need to run*이 나옵니다.
+- **이번 묶음의 한계.** 상자와 목표는 모델 파일, 프로젝트 입력, 브라우저 초안에 저장되지 않고(입력은 버전 7, 8, 9 그대로),
+  Undo와 Redo도 이를 바꾸지 않습니다. 다시 연 세션의 실행은 목표를 지킵니다: 닫힌 목표 실행에서 **Use this run's inputs**를
+  누르면 실행의 목표로 상자가 켜지고(*… Search near n_eff off → 2.46 …*) *No need to run*이 다시 성립합니다.
+- 검사: `tests/simcase/studio_closed_target_page.cjs`(K9, K10, K12, K13과 대기 작업), `tests/simcase/test_studio_closed_target.py`
+  (엔진 장의 K12), 작업 공간 브라우저 검사의 CW 단계.
 
 ### 광학 작업 공간의 열린 경계
 

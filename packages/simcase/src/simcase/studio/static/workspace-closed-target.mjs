@@ -27,3 +27,37 @@ export function applyClosedTarget(doc,t){
  const em=doc.physics.em1;
  return {...doc,physics:{em1:{...em,target_effective_index:t}}};
 }
+
+// ---- The page's words and a new result (slice C2) ----------------------------------------------
+// The guided threshold of a closed run: a closed search lists only the modes above it (A1).
+export const CLOSED_FLOOR=TARGET_FLOOR;
+// The edge note's shortcut (Q2, Q5): Search near the default target with 4 modes.
+export const SHORTCUT_MODE_COUNT=4;
+/** A target as the page's words write it: its shortest decimal (2.46, 2.85, 1.995). */
+export const shortTarget=t=>String(Number(t));
+/** "Search near 2.46 · 4 modes": the edge note's shortcut. */
+export const shortcutText=t=>`Search near ${shortTarget(t)} · ${SHORTCUT_MODE_COUNT} modes`;
+/** "Found 3 of 4 modes near n_eff 2.46, above n = 1.45": the run line of every closed targeted run. */
+export const closedFoundText=(found,asked,t)=>`Found ${found} of ${asked} modes near n_eff ${shortTarget(t)}, above n = ${CLOSED_FLOOR}`;
+/** The table note of a closed targeted run that left modes out ('' when none): the engine returns
+ * the mode_count modes nearest the target, so asked - found of them are at or below 1.45. */
+export const leftOutText=(found,asked)=>{const n=asked-found;return n<=0?'':n===1?'1 mode at or below n = 1.45 was left out.':`${n} modes at or below n = 1.45 were left out.`;};
+/** "closed near 2.46": the tag of a closed targeted run in the run list, the pickers and the status line. */
+export const closedTargetTag=t=>`closed near ${shortTarget(t)}`;
+/** The run plan's boundary words: "Closed window · near n_eff 2.46". */
+export const closedPlanText=t=>`Closed window · near n_eff ${shortTarget(t)}`;
+/** The help of the box in Physics › Optical modes (Q9: closed and open values differ). */
+export const CLOSED_SEARCH_HELP='Off: the modes of highest n_eff above 1.45. On: the modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values differ: refine the mesh before a close comparison.';
+/** The message of the box or the field. */
+export const closedSearchNotice=t=>t==null?'Search near n_eff off: the next run returns the modes of highest n_eff.':`Search near n_eff ${Number(t).toFixed(3)} in the closed window: the next run returns the modes nearest it.`;
+
+/** The modes of a new closed targeted result that Studio keeps: Re n_eff above 1.45, in the engine's
+ * order. {keep (the engine's indices), re, data (the result with the vector samples of the kept
+ * modes only)}. Throws when no mode is kept. */
+export function closedResultValues(result,re,t){
+ const keep=re.map((x,i)=>x>CLOSED_FLOOR?i:-1).filter(i=>i>=0);
+ if(!keep.length)throw new Error(`No mode above n = ${CLOSED_FLOOR} was found near n_eff ${shortTarget(t)}. Move Search near n_eff.`);
+ const vf=result.vector_fields?.[0],pick=a=>Array.isArray(a)?keep.map(i=>a[i]):a;
+ const data=vf?{...result,vector_fields:[{...vf,real:pick(vf.real),imag:pick(vf.imag)},...result.vector_fields.slice(1)]}:result;
+ return {keep,re:keep.map(i=>re[i]),data};
+}
