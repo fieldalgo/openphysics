@@ -657,7 +657,7 @@ try {
   for (const t of Object.values(viewed)) assert.doesNotMatch(t, /edits are kept/);
   // round 9 (J5): the dock, the footer, the title and the step bar describe the viewed run, run 1
   const viewedNames = await opticalSequence(); stage('older run named', {...viewedNames, header: viewed.header});
-  assert.deepEqual(viewedNames, {heading: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm', status: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm · Run 2 has them'});
+  assert.deepEqual(viewedNames, {heading: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm', status: 'Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm · current inputs from Run 2'});
   // round 11 (L3): a short suffix on Results
   assert.match(viewed.header, / · viewing Run 1 · design A \(other inputs\)$/); assert.doesNotMatch(viewed.header, /Unsaved inputs/);
   assert.equal(await page.eval("document.getElementById('autosave-status').textContent"), viewed.header.replace(/^Optical waveguide \/ /, ''));
