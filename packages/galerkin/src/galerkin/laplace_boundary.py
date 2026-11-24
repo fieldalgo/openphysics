@@ -8,7 +8,6 @@ volume electrostatics API. Coordinates are metres. The returned capacitance
 is divided by homogeneous absolute permittivity, and is dimensionless.
 """
 from dataclasses import dataclass
-from numbers import Integral, Real
 
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
@@ -48,25 +47,13 @@ class RectangleBoundaryResult:
             object.__setattr__(self, name, frozen)
 
 
-def _positive(value, name):
-    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
-        raise ValueError(f"{name} must be a finite positive real number")
-    value = float(value)
-    if not np.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} must be a finite positive real number")
-    return value
+_positive = kernel.positive
 
 
-def _integer(value, name, low, high):
-    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral):
-        raise ValueError(f"{name} must be an integer in [{low}, {high}]")
-    if not low <= value <= high:
-        raise ValueError(f"{name} must be an integer in [{low}, {high}]")
-    return int(value)
+_integer = kernel.integer
 
 
-def _cross(a, b):
-    return a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
+_cross = kernel.cross
 
 
 def _admit(polygons, width, height, count):
@@ -129,8 +116,7 @@ def _admit(polygons, width, height, count):
     return accepted, unit, w, h, clear
 
 
-def _relative(a, b):
-    return float(np.max(abs(a - b)) / np.max(abs(b)))
+_relative = kernel.relative
 
 
 def solve_grounded_rectangle(polygons, *, width, height, panels_per_edge=32, ground_modes=512,

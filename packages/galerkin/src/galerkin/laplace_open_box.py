@@ -16,8 +16,6 @@ from numpy.polynomial.legendre import leggauss
 from scipy.linalg import cho_factor, cho_solve
 
 from . import _laplace_panels as kernel
-from .laplace_boundary import _integer, _positive, _relative
-from .laplace_two_ground import _admit as _admit_polygons
 
 __all__ = ['OpenRectangleResult', 'solve_open_rectangle']
 
@@ -146,10 +144,10 @@ def _free_matrix(a, b, *, order):
 
 
 def _matrix(a, b, width, height, *, degree, order, images, labels):
-    smooth = kernel._blockwise(a, b, labels, width, height, degree,
+    smooth = kernel.blockwise(a, b, labels, width, height, degree,
                                lambda t, s: smooth_neumann(t, s, width, height, images))
     result = _free_matrix(a, b, order=order) + smooth
-    reciprocity = _relative(result, result.T)
+    reciprocity = kernel.relative(result, result.T)
     if not np.isfinite(reciprocity) or reciprocity > 1e-10:
         raise ValueError('raw matrix reciprocity failed')
     return (result + result.T) / 2, reciprocity
@@ -195,12 +193,12 @@ def solve_open_rectangle(polygons, *, width, height, grounds, panels_per_edge=32
     reduced matrix condition bound must be below 1e10. These checks do not
     establish panel or outer-domain convergence. No fallback occurs.
     """
-    width, height = _positive(width, 'width'), _positive(height, 'height')
-    count = _integer(panels_per_edge, 'panels_per_edge', 1, 256)
-    degree = _integer(interpolation_degree, 'interpolation_degree', 10, 16)
+    width, height = kernel.positive(width, 'width'), kernel.positive(height, 'height')
+    count = kernel.integer(panels_per_edge, 'panels_per_edge', 1, 256)
+    degree = kernel.integer(interpolation_degree, 'interpolation_degree', 10, 16)
     if degree % 2:
         raise ValueError('interpolation_degree must be one of 10, 12, 14, 16')
-    polygons, unit, w, h = _admit_polygons(polygons, width, height, count, side_walls=False, max_aspect=MAX_ASPECT)
+    polygons, unit, w, h = kernel.admit_polygons(polygons, width, height, count, max_aspect=MAX_ASPECT)
     grounded = _grounds(grounds, len(polygons))
     signals = tuple(i for i in range(len(polygons)) if i not in grounded)
     points = np.concatenate(polygons)
@@ -216,7 +214,7 @@ def solve_open_rectangle(polygons, *, width, height, grounds, panels_per_edge=32
     images = _images(w, h)
     coarse, _ = _matrix(a, b, w, h, degree=degree - 2, order=6, images=images, labels=labels)
     matrix, reciprocity = _matrix(a, b, w, h, degree=degree, order=8, images=images + 2, labels=labels)
-    matrix_error = _relative(coarse, matrix)
+    matrix_error = kernel.relative(coarse, matrix)
     if not np.isfinite(matrix_error) or matrix_error > 1e-10:
         raise ValueError('boundary matrix quadrature/interpolation did not converge')
     basis = _null_basis(len(a))
@@ -232,12 +230,12 @@ def solve_open_rectangle(polygons, *, width, height, grounds, panels_per_edge=32
             raise ValueError('boundary matrix condition bound exceeded')
         charges = basis @ cho_solve(factor, basis.T @ rhs)
         constant = (rhs - matrix @ charges).mean(axis=0)
-        residual = _relative(matrix @ charges + constant, rhs)
+        residual = kernel.relative(matrix @ charges + constant, rhs)
         selection = (owners[:, None] == np.asarray(signals)[None]).astype(float)
         capacitance = selection.T @ charges
         charge_sum = float(np.max(abs(charges.sum(axis=0))) / np.max(abs(capacitance)))
-        symmetry = _relative(capacitance, capacitance.T)
-        energy = _relative(charges.T @ matrix @ charges / (2 * np.pi), capacitance)
+        symmetry = kernel.relative(capacitance, capacitance.T)
+        energy = kernel.relative(charges.T @ matrix @ charges / (2 * np.pi), capacitance)
         if max(residual, charge_sum, symmetry, energy) > 1e-10:
             raise ValueError('boundary solve residual, charge sum or capacitance reciprocity exceeded')
         capacitance = (capacitance + capacitance.T) / 2
