@@ -295,10 +295,53 @@ export function edgePlacement(run){
  });
 }
 /** "Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff is set by
- * the closed window. Use Open boundary to leave that edge open." (C0: no text promises that more
- * modes reach the core mode.) */
+ * the closed window. Use Open boundary to leave that edge open." (C0: the note no longer says that
+ * more modes find the core mode.) */
 export function edgeNoteText(mode,p){
  return `Mode ${mode+1} is mostly in ${p.shape} (${Math.round(p.share*100)} % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge open.`;
+}
+// ---- The core mode of a closed-window search (slice C2, option (c)) ------------------------------
+// In a closed run with Search near n_eff (optical-shapes-v10) and a shape that touches the window
+// edge, a mode whose largest |E|² share among the shapes that do not touch the edge is above
+// CORE_SHARE is named as the core mode (the same share as edgePlacement: Σ A_T |E_T|² over the
+// triangles whose centroid lies in the shape, the later shape winning, over Σ of every triangle).
+// Studio only names it: the modes keep the engine's order (Q6).
+export const CORE_SHARE=0.5;
+const CLOSED_TARGET='optical-shapes-v10';
+/** Per mode of a closed targeted run with fields and an edge-touching shape: {shape, share} of the
+ * shape not touching the window edge that holds the largest share of the mode's |E|², named when
+ * share > CORE_SHARE; null for a mode without such a shape. [] for any other run. */
+export function corePlacement(run){
+ if(run?.settings?.adapter!==CLOSED_TARGET||!run.field)return [];
+ const shapes=run.input.model.shapes,edges=shapes.map(touchedEdges);
+ if(!edges.some(e=>e.length)||edges.every(e=>e.length))return [];
+ const X=run.field.node_coordinates;
+ const tri=run.field.triangles.map(t=>{
+  const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]],area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
+  const x=(p0[0]+p1[0]+p2[0])/3*1e9,y=(p0[1]+p1[1]+p2[1])/3*1e9;
+  let owner=-1;for(let k=shapes.length-1;k>=0;k--)if(insideShape(shapes[k],x,y)){owner=k;break;}
+  return {area,owner};
+ });
+ return run.effective_index.map((_,mode)=>{
+  const re=run.field.real[mode],im=run.field.imag[mode],inShape=shapes.map(()=>0);let total=0;
+  tri.forEach((t,i)=>{const r=re[i],m=im[i],e=t.area*((r[0]*r[0]+m[0]*m[0])+(r[1]*r[1]+m[1]*m[1])+(r[2]*r[2]+m[2]*m[2]));total+=e;if(t.owner>=0)inShape[t.owner]+=e;});
+  if(!(total>0))return null;
+  let best=-1;edges.forEach((list,k)=>{if(!list.length&&(best<0||inShape[k]>inShape[best]))best=k;});
+  if(best<0)return null;
+  const share=inShape[best]/total;
+  return {shape:shapes[best].name,share,named:share>CORE_SHARE};
+ });
+}
+/** "Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge." */
+export function coreNoteText(mode,p){
+ return `Mode ${mode+1} is the core mode: ${Math.round(p.share*100)} % of |E|² is in ${p.shape}, which does not touch the window edge.`;
+}
+const coreCache=new WeakMap();
+/** The core-mode notes of a run: [{mode, text}] for each mode named by corePlacement. */
+export function coreNotes(run){
+ if(coreCache.has(run))return coreCache.get(run);
+ const notes=corePlacement(run).map((p,mode)=>p?.named?{mode,text:coreNoteText(mode,p)}:null).filter(Boolean);
+ coreCache.set(run,notes);return notes;
 }
 /** The notes of a run: [{mode, text}] for each mode named by edgePlacement. */
 const edgeCache=new WeakMap();

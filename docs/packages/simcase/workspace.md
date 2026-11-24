@@ -1413,7 +1413,7 @@ main 13f07f4, Linux):
 | K6 | Template @2.46, 2 modes | the default closed run's n_eff within 5e-15 |
 | K7 | Strip over a substrate @2.46, 4 modes, in a window 3, 4, 5 and 6 µm wide, a substrate 500 and 1000 nm thicker and a BOX of 800 and 300 nm | the core mode returned in 8 of 8, as mode 3, 3, 3, 4, 4, 3, 3, 4 |
 | K8 | n_g, closed @2.46, 1 mode | 4.19234, against the open run's Re n_g 4.19152 (gate 2e-3) |
-| K13 | Template @2.46, 4 modes | mode 4 is 1.39191472, below the cladding: Studio leaves it out (slice C2) |
+| K13 | Template @2.46, 4 modes | mode 4 is 1.39191472, below the cladding: Studio leaves it out ([search in the closed window](#search-near-n_eff-in-a-closed-window)) |
 
 Limits of a closed search:
 
@@ -1429,6 +1429,57 @@ Limits of a closed search:
 - **Closed and open values differ.** The closed window's PEC walls shift n_eff (−1.95e-3 for the
   strip over a substrate against the open default), and at the default mesh the discretization
   error is of the same size (K4: −4.8e-3). Refine the mesh before a close comparison.
+
+### Search near n_eff in a closed window
+
+Since slice C2 the page offers the [closed-window search](#closed-window-search-document-optical-shapes-v10).
+
+- **The box.** With *Closed window (PEC)* chosen, **Physics › Optical modes** has a check box
+  **Search near n_eff**, off by default, and the field *Search near n_eff (closed window)* (3
+  decimals, the default (n_max + 1.444)/2 to 0.01: 2.460 for silicon), enabled while the box is on.
+  The help reads “Off: the modes of highest n_eff above 1.45. On: the modes nearest this index,
+  listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values
+  differ: refine the mesh before a close comparison.” Messages say *Search near n_eff 2.460 in the
+  closed window: the next run returns the modes nearest it.* or *Search near n_eff off: the next
+  run returns the modes of highest n_eff.*, followed by *No need to run: Run N already has these
+  results.* when a kept run has the new inputs. The box is not on by default when a shape touches
+  the window edge.
+- **The shortcut.** Under a closed run's edge note the round-18 row has **Use Open boundary** and,
+  since C2, **Search near 2.46 · 4 modes** in place of C0's *Set Modes to find to 4*: it turns the
+  box on with the design's default target and sets Modes to find to 4, says *… Modes to find set to
+  4.* and runs nothing; it is left out when the inputs already have both. Four modes reach the core
+  mode of the strip over a substrate in every registered variant
+  ([K7](#closed-window-search-document-optical-shapes-v10)).
+- **The run.** A run with the box on writes `target_effective_index` and names capabilities v10.
+  Studio keeps only the modes with Re n_eff above 1.45 (decision A1): the line above the table always
+  reads *Found k of M modes near n_eff 2.46, above n = 1.45.* (M: Modes to find), and a note under
+  the table says *1 mode at or below n = 1.45 was left out.* when the engine returned some below
+  (the template @2.46 with 4 modes: 2.44257822, 1.76989777, 1.49297336 listed, 1.39191472 left
+  out). The modes keep the engine's order, by descending Re n_eff.
+- **The core mode.** In a closed run with Search near n_eff where a shape touches the window edge, a
+  mode whose |E|² share (the edge note's share) in one shape that does not touch the edge is above
+  0.5 gets a note row: *Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the
+  window edge.* (the strip over a substrate @2.46 with 2 modes; with 4 modes it is mode 3). The
+  share is Studio's unweighted |E|² share; the engine's energy fraction (confinement factor) of the
+  same mode is 0.91.
+- **Words.** The plan line beside Run study reads *Closed window · near n_eff 2.46*; the next-run
+  inputs end *· search near 2.46*; the run list, the Compare pickers and headings and the status line
+  tag the run *closed near 2.46* where an untargeted closed run reads *closed*.
+- **Runs and files.** A run's settings keep the target: adapter `optical-shapes-v10`, with
+  `search_target` after `mode_count`. A session (and a project file's workspace entry) is written
+  as **version 11** only when such a run is kept, otherwise as version 10, 9 or 7 byte for byte
+  (checked against main 13f07f4); version 11 refuses a targeted run with a mode at or below 1.45, and
+  a Studio that reads up to version 10 refuses it with *This session file is version 11, newer than
+  this Studio reads (versions 6–10). Open it in a newer Studio.* The study signature includes the
+  target, so a changed or removed target needs a run and only an equal one gives *No need to run*.
+- **Limitation of this batch.** The box and the target are not saved in model files, project inputs
+  or the browser draft (the inputs stay version 7, 8 or 9), and Undo and Redo do not change them. A
+  reopened session's runs keep their targets: **Use this run's inputs** on a closed targeted run
+  turns the box on with the run's target (*… Search near n_eff off → 2.46 …*), so *No need to run*
+  holds again.
+- Checks: `tests/simcase/studio_closed_target_page.cjs` (K9, K10, K12, K13 and the pending job),
+  `tests/simcase/test_studio_closed_target.py` (K12 on engine fields) and the workspace browser
+  check's stage CW.
 
 ### Open boundary in the optical workspace
 

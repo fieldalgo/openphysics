@@ -3,9 +3,12 @@
 import {designSummary} from './workspace-shapes.mjs';
 
 // A run's boundary as every run label names it (round 18, X6): "open (PML 1 µm)" for a run with an
-// open boundary (its PML thickness as the run kept it), else "closed" (a PEC window).
+// open boundary (its PML thickness as the run kept it), "closed near 2.46" for a closed window with
+// Search near n_eff (slice C2), else "closed" (a PEC window).
 export function boundaryTag(run){
  const pml=run.settings?.boundary==='PML'?run.settings.pml?.thickness:null,t=typeof pml==='string'?Number.parseFloat(pml):NaN;
+ // a closed window with Search near n_eff (slice C2): "closed near 2.46"
+ if(run.settings?.boundary!=='PML'&&typeof run.settings?.search_target==='number')return `closed near ${String(run.settings.search_target)}`;
  return run.settings?.boundary==='PML'?`open (PML ${Number.isFinite(t)?t/1000:1} µm)`:'closed';
 }
 // A run as a table header names it: its number (its place in the run list) when given, its name

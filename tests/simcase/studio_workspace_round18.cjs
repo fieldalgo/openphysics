@@ -117,14 +117,16 @@ test('X3: before the run, the run the six-run limit would drop, with Pin Run N; 
  assert.ok(read('workspace.html').includes('<span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span>'));
 });
 
-test('X9: under a closed run\'s edge note, Use Open boundary and Set Modes to find to M set the input and run nothing',()=>{
+test('X9: under a closed run\'s edge note, Use Open boundary and Search near 2.46 · 4 modes set the inputs and run nothing',()=>{
  const app=read('workspace-app.mjs');
- // M = the run's Modes to find + 2, at most the maximum (8)
- assert.ok(app.includes("const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1])"));
+ // slice C2 (Q2, Q5, Q8): the shortcut replaces Set Modes to find to M (C0) and Find M modes (round 18):
+ // the design's default target, 4 modes, the closed window kept
+ assert.ok(!app.includes("const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1])")&&!app.includes('edge-find-modes'));
  assert.ok(app.includes("b.textContent='Use Open boundary';b.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};"));
- assert.ok(app.includes("b.textContent=`Set Modes to find to ${find}`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};"));
+ assert.ok(app.includes("b.id='edge-search-near';b.textContent=shortcutText(near);b.onclick=()=>useClosedSearch(near);"));
+ assert.ok(app.includes("const near=defaultTarget(state.shapes),actions=document.createElement('span')"));
  // each is left out when the current inputs already have it; the note's own text is unchanged
- assert.ok(app.includes("if(!state.openBoundary){const b=document.createElement('button')")&&app.includes("if(state.modeCount<find){const b=document.createElement('button')"));
+ assert.ok(app.includes("if(!state.openBoundary){const b=document.createElement('button')")&&app.includes("if(!state.openBoundary&&!(state.searchTarget===near&&state.modeCount===SHORTCUT_MODE_COUNT)){const b=document.createElement('button')"));
  assert.ok(app.includes("tr.className='edge-note-row edge-actions-row'"));
  // the radio and the button share one route, with the boundary message (and the X2 warning)
  assert.ok(app.includes("const open=radio.value==='open'&&radio.checked;if(open===!!state.openBoundary)return;setOuterBoundary(open);});"));
