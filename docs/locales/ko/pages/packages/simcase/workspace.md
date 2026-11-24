@@ -282,7 +282,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    바뀌므로, 완료 메시지가 바뀐 입력을 설명하는 일은 없습니다. 실행 배너(*Optical run complete…*, 실행
    중에는 **Stop waiting**)는 보기 제목 줄의 일부로 보기 제목(*Results*, *Comparison*) 뒤에 놓여 어떤 제목이나
    컨트롤도 가리지 않고, 그 줄의 높이가 그대로이므로 나타나거나 사라질 때 패널을 움직이지 않습니다.
-   *Optical run complete…* 배너는 6초 뒤에, 또는 그보다 먼저 클릭, 탭이나 키 입력이 있으면 그때 사라지며,
+   *Optical run complete…* 배너는 보인 뒤(결과 페이지를 그린 뒤) 6초 뒤에, 또는 그보다 먼저 클릭, 탭이나 키 입력이 있으면 그때 사라지며,
    Messages에는 같은 말이 남습니다. 도크 제목, 상태 표시줄, 제목 표시줄과
    단계 막대는 보고 있는 실행(고른 실행)을 번호와 이름으로 가리킵니다: 실행 뒤에는 *Run 1 · solved
    from the current inputs*(상태 표시줄은 *press Run to solve again*을 덧붙임), 보고 있는 실행의 입력이

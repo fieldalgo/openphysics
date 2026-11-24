@@ -2032,10 +2032,13 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // the runs this result dropped (the run limit) are named after the run's own message (round 17, U2)
  if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
- clearTimeout(doneBannerTimer);doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
+ clearTimeout(doneBannerTimer);doneBannerTimer=0;
  $('job-message').textContent=state.message;$('job-message').title=state.title||''; // round 17 (U11): the job id of a loading result is its title
  if(state.phase==='done')setPending(null);
  if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
+ // the 6 s start once the banner is written and the page rendered: started before the render, the
+ // banner was shown for 6 s minus the render of the result page (5.87 s on a macOS runner)
+ doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
 },onResult:(result,pending)=>{
  // the modes found (1 to the count asked for), real or {re, im}, ranked by Re n_eff
  const asked=pending.modeCount??DEFAULT_MODE_COUNT,e=result.effective_index,re=Array.isArray(e?.values)?e.values[0]:e?.re?.[0],im=Array.isArray(e?.im)?e.im[0]:null;
