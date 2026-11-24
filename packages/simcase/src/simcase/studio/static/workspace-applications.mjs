@@ -40,6 +40,9 @@ export const RESTORE_TEXT='Restore from this browser';
 // (the inputs are the model's, not emptied); the top box's choice only closes the box.
 // Round 16: the button reads "Open model" and the card's description line says the runs stay.
 export const CARD_OPEN_TEXT='Open model';
+// Round 18 (X10): on the card of a model already in the project (shown or not), "Open model" read as
+// if it might reset that model; the card reads "Return to model (2 runs)" there instead.
+export const returnToModelText=runs=>Number.isInteger(runs)&&runs>0?`Return to model (${runs} ${runs===1?'run':'runs'})`:'Return to model';
 export const CARD_STAY_TEXT='Runs stay in this tab until you close it.';
 export const CARD_START_NEW_TEXT='Start new (no runs)';
 export const RESUME_NOT_NOW_TEXT='Not now (choose a model below)';
@@ -154,7 +157,8 @@ function projectNameForm(project){
 // inProject: the cards whose model is in the project but not shown, with its run count; the card
 // reads "In this project · N runs", and choosing it shows that model (P3).
 export const inProjectText=runs=>`In this project · ${runs} ${runs===1?'run':'runs'}`;
-export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={}}={}){
+// returnTo: the cards whose model is in the project, shown or not, with its run count (round 18).
+export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={},returnTo={}}={}){
  host.replaceChildren();offers={...(offers||{})};
  if(onOpenFile)host.append(libraryFiles(onOpenFile,project?projectNameForm(project):null));
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
@@ -168,7 +172,7 @@ export function renderApplications(host,resume=null,offers={},{onOpenFile=null,p
   const description=document.createElement('p');description.textContent=app.description+' '+CARD_STAY_TEXT;
   const scope=document.createElement('span');scope.className='card-scope';scope.textContent=app.scope;
   // what the card does (round 15; words of round 16): it opens the model; the description says the runs stay
-  const action=document.createElement('span');action.className='card-action';action.textContent=CARD_OPEN_TEXT;
+  const action=document.createElement('span');action.className='card-action';action.textContent=CARD_OPEN_TEXT;if(returnTo[app.id]!==undefined)action.textContent=returnToModelText(returnTo[app.id]);
   button.append(title,status,description,scope,action);
   // a model of the project not shown (P3): "In this project · N runs"
   if(inProject[app.id]!==undefined){const here=document.createElement('span');here.className='card-project';here.textContent=inProjectText(inProject[app.id]);button.append(here);}

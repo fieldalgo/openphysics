@@ -380,7 +380,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
    다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
    waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 그 실행 없이 모델을 여는(카드 자체와 같음) **Start new (no
-   runs)**. 카드마다 끝에 **Open model**이 있고 설명 끝에 *Runs stay in this tab until you close it.*이 있습니다:
+   runs)**. 카드마다 끝에 **Open model**이 있습니다. 이미 프로젝트에 있는 모델의 카드는 보이든 아니든 대신
+   **Return to model (2 runs)**로 끝나며(round 18; *Open model*이 모델을 초기화할 것처럼 읽혔음), 실행이 없는 모델은
+   **Return to model**입니다. 설명 끝에 *Runs stay in this tab until you close it.*이 있습니다:
    모델을 골라도 이 탭의 실행은 남고, 복원 제안은 브라우저의 실행을 되살립니다. 실행이 있는 탭의 모델을 열면 떠날
    때의 페이지와 상관없이 그 Results로 갑니다(round 17; round 16은 Compare로도 돌아갔습니다): 광학 모델은 마지막으로 본 실행과
    함께, 가열 모델은 마지막 결과 페이지와 함께. 실행이 없는 모델은 Model로 엽니다. 페이지는 맨 위에서 시작합니다. 탭에 다중물리 실행이 없으면 Heated
