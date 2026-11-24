@@ -484,8 +484,8 @@ edge; …*, more than 50 %); after a wavelength edit the status line *Run 9 · C
 Substrate 3000 × 700 nm …*; and the template core against the substrate run on Compare with the
 note for B, each unmatched row's *best x (< 0.8, not matched)* and O2's 24 px at 1440 × 900.
 Since round 18 (pre-registered) a further stage in its own browser context checks the box beside
-Run study: *Closed window · no earlier run* before any run, *… · group index on (3 solves) · …* and
-*Open boundary · 2 searches · group index on (3 solves) · no earlier run*, with the warning *Group
+Run study: *Closed window · no timed run in this tab yet* (round 19 words; *no earlier run* before) before any run, *… · group index on (3 solves) · …* and
+*Open boundary · 2 searches · group index on (3 solves) · no timed run in this tab yet*, with the warning *Group
 index is on: open-boundary runs with it take about three times as long.* in Messages in its own
 colours, and *last such run m:ss* after a run; the Compute group's height, Run study's box and the
 box's size equal within 0.5 px at 1440 × 900 and 390 × 844 with every text and with the drop line;
@@ -497,6 +497,20 @@ it to keep it* and **Pin Run 1**, which pins it and moves the line to Run 2; the
 with **Use Open boundary** and **Find 4 modes**, each setting its input and running nothing; and on
 Compare the pickers and headings carrying *closed*, with O2's 24 px; no horizontal overflow at
 either size.
+Since round 19 (pre-registered) a further stage in its own browser context checks the shape
+inspector's *Name* and *Material* fields, each with one label of that word (`for`, not wrapping);
+six runs, then Run study giving the dialog *Running drops Run 1 (500 × 220 nm · 2 modes).* with
+*Up to six runs are kept; a pinned run is never dropped.* and **Pin Run 1 and run**, **Run** and
+**Cancel**, the first focused, with no horizontal overflow at 1440 × 900 or 390 × 844; Escape
+closing it with nothing run and the focus on Run study; Pin Run 1 and run pinning Run 1 and asking
+again for Run 2; Cancel running nothing; Run then making Run 7, dropping Run 2, with the line beside
+Run study kept; and, after a second session of one run, the Library's box leading with *Restore
+newest from this browser: Optical waveguide · 1 run · Run 1 · saved …* (the record the card offers)
+and the six-run session reading *… · older · saved …*; restoring that older one hides the box, the
+newer session stays offered as the last session at once and in Workspace tools' earlier sessions
+once this tab's record is written, and the restored one is not listed again. The stages that make
+runs past six answer the dialog with Run, and the Library check of the first viewport now reads
+the box's newest offer, which sits above the cards.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -525,7 +539,8 @@ file opened over them, a reload and the same file opened again. After it, the ti
 waveguide card offers the optical runs, which come back with the same n_eff. It also checks a
 named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the heated session's save
 message naming the optical runs that are not in its file. Since round 11 the Heated silicon
-waveguide card restores its own newest record after a reload (the box above not listing it),
+waveguide card restores its own newest record after a reload (since round 19 the box above leads
+with that record, the newest),
 naming the session file's save time, the restored title reads *same as file …*, and the
 Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
 name downloading under it again with no dialog (*Downloaded heated-design.json again*, the footer
@@ -565,6 +580,14 @@ model's status bar *Heated silicon waveguide · in project u8-optical.json · no
 · …* after it joined and *… · downloaded …* once saved with both, beside the header's words; and
 both cards reading *Return to model*. In the round-16 reload stage both cards' offers also name the other model,
 *· also in this project: … (restored separately)*.
+Since round 19 (pre-registered) a further profile opens `heater-study.json`, runs the optical model
+again and restores it after a reload: the header reads *Untitled project · recovered from a copy of
+heater-study.json · not saved to a file · …* beside *Recovered from this browser (opened from
+heater-study.json; changed since)*; saved as `r19-saved.json`, run again and restored, it reads
+*r19-saved · r19-saved.json · changed since saved …*. The session script then clicks the heater-off
+label with mouse events (on its text, then on *(about 1 s more)*), unticking and ticking the box, and
+makes six heated runs: Run study asks *Running drops Run 1 (run at …).* with the three answers,
+Cancel runs nothing and Run makes Run 7, dropping Run 1.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
 (session file)…**, as **File › Save** writes the project file.
 
