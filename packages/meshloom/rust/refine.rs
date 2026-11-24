@@ -137,6 +137,9 @@ const LARGE_EDGE: f64 = 1.5;
 const PROJECT_GAP: f64 = 0.5;
 /// Lawson flips after one insertion, at most (they end on their own; this is a guard).
 const LAWSON_CAP: u32 = 10_000;
+/// A facet's frame triple is kept when the squared sine of its angle exceeds this (in
+/// doubles); below it the s, r system of a facet point is ill-conditioned.
+const FRAME_SIN2: f64 = 1e-8;
 /// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
 /// sqrt(2) with a margin).
 const SUB_RATIO: f64 = 1.5;
@@ -2261,7 +2264,27 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
                 }
             }
         }
-        let f = f.ok_or_else(|| format!("facet {fi} has no three non-collinear points"))?;
+        let mut f = f.ok_or_else(|| format!("facet {fi} has no three non-collinear points"))?;
+        // the facet points are a + s (b - a) + r (c - a), with s and r solved in doubles: three
+        // points that are collinear in doubles to rounding only (points along one long edge of
+        // a polygon) leave that system singular. Such a triple is replaced by a well-spread
+        // one: the loop point farthest from the first, then the one farthest from their line
+        let sin2 = |t: [u32; 3]| -> f64 {
+            let (e1, e2) = (sub3(&xyz[t[1] as usize], &xyz[t[0] as usize]), sub3(&xyz[t[2] as usize], &xyz[t[0] as usize]));
+            let c = cross(&e1, &e2);
+            dot(&c, &c) / (dot(&e1, &e1) * dot(&e2, &e2))
+        };
+        if !(sin2(f) > FRAME_SIN2) {
+            let a = lp[0];
+            let d2 = |u: u32, v: u32| { let d = sub3(&xyz[u as usize], &xyz[v as usize]); dot(&d, &d) };
+            let b = *lp.iter().max_by(|&&u, &&v| d2(u, a).total_cmp(&d2(v, a))).unwrap();
+            let ab = sub3(&xyz[b as usize], &xyz[a as usize]);
+            let off = |u: u32| { let c = cross(&ab, &sub3(&xyz[u as usize], &xyz[a as usize])); dot(&c, &c) };
+            let c = *lp.iter().max_by(|&&u, &&v| off(u).total_cmp(&off(v))).unwrap();
+            if a != b && b != c && a != c && !g.collinear(a, b, c) && sin2([a, b, c]) > sin2(f) {
+                f = [a, b, c];
+            }
+        }
         let mut n = MixedCounters::default();
         let axis = (0..3).find(|&a| m.orient2d_proj(a, f.map(|i| m.from_id(i)), &mut n) != 0).unwrap();
         frame.push((f, axis));
