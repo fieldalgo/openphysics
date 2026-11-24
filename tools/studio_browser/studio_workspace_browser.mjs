@@ -2979,20 +2979,49 @@ try {
     await rRun();
     await modes(); await r.click('#closed-search-highest'); await sleep(300); await mesh(32);
     await rRun();
-    // P2 (E2): the line names the runs Save keeps, what the others keep and what recovery keeps; it wraps
-    await r.until("/without the fields of \\d runs?$/.test(document.getElementById('project').textContent)", 'R23 header names the fields left out', 30000);
-    const p2 = {message: await rText('#file-status'), header: await rText('#project')};
+    // P2 (E2): the line names the runs Save keeps, what the others keep and the runs whose fields
+    // browser recovery leaves out (the record's runs by number, or by place where a file written
+    // before version 12 has no numbers) (it keeps the selected and pinned runs' fields, then the newest
+    // others that fit); it wraps. The record in this browser holds exactly the fields not named.
+    const LEFT = /without the fields of (Run \d+(?:(?:, | and )Run \d+)*)$/;
+    const record = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>{const s=g.result.session,d=JSON.parse(s);resolve({bytes:new TextEncoder().encode(s).length,fields:d.runs.map((x,i)=>[Number.isInteger(x.number)?x.number:i+1,!!x.field])});};};})`);
+    const left = list => list.filter(([, f]) => !f).map(([n]) => 'Run ' + n);
+    const names = text => { const w = text.split(/, | and /); return w; };
+    await r.until(`/without the fields of Run \\d+/.test(document.getElementById('project').textContent)`, 'R23 header names the fields left out', 30000);
+    const p2 = {message: await rText('#file-status'), header: await rText('#project'), record: await record()};
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 session over 16 MiB', p2);
-    assert.match(p2.message, / Session is now (?:1[7-9]|2\d) MB, over the 16 MiB \(16\.8 MB\) limit\. File › Save will ask whether to keep the fields of the selected and pinned runs only \(Run 5\); the other runs keep n_eff, the TE fractions and the effective areas\. Browser recovery already keeps only those fields\.$/);
-    assert.match(p2.header, /^Untitled project · not saved to a file · kept for recovery in this browser without the fields of 4 runs$/);
+    const [, msgLeft] = /^.* Session is now (?:1[7-9]|2\d) MB, over the 16 MiB \(16\.8 MB\) limit\. File › Save will ask whether to keep the fields of the selected and pinned runs only \(Run 5\); the other runs keep n_eff, the TE fractions and the effective areas\. Browser recovery keeps every field but those of (Run \d+(?:(?:, | and )Run \d+)*)\.$/.exec(p2.message) || [];
+    assert.ok(msgLeft, p2.message);
+    const [, headLeft] = LEFT.exec(p2.header) || []; assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser without the fields of /.test(p2.header) && headLeft, p2.header);
+    // the record: within 16 MiB, Run 5 (selected) with its field, the runs named are those without
+    assert.ok(p2.record.bytes <= 16 * 1024 * 1024, JSON.stringify(p2.record));
+    assert.deepEqual(names(msgLeft), left(p2.record.fields)); assert.deepEqual(names(headLeft), left(p2.record.fields));
+    assert.equal(p2.record.fields.find(([n]) => n === 5)[1], true);
+    // newest first: every run with a field is newer than every run without one, the selected run apart
+    const kept = p2.record.fields.filter(([n, f]) => f && n !== 5).map(([n]) => n), gone = p2.record.fields.filter(([, f]) => !f).map(([n]) => n);
+    assert.ok(gone.length >= 1 && kept.every(k => gone.every(g => k > g)), JSON.stringify(p2.record.fields));
     for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
     assert.ok(p2.phone.lines > 1, JSON.stringify(p2.phone));
     await rOverflow('P2 session size');
     // P4 (E4): Run 6, then an edit: the drop line, Pin twice, a run and its swap; each run named with
     // the run list's parts (its label up to the material: "Run 2 · closed · 4 modes · n_g · …")
-    await mesh(34); await rRun(); await mesh(36);
+    await mesh(34); await rRun();
+    // P2 (b): six runs of the T18 window (about 24 MB): the record within 16 MiB holds Run 6's field
+    // and the newest others that fit; the header names the rest
+    // the header and the record settle once recovery has written the six-run snapshot
+    let p2b = null;
+    for (let i = 0; i < 60; i++) {
+      const now = {header: await rText('#project'), record: await record()};
+      if (now.record.fields.length === 6 && now.record.fields.find(([n]) => n === 6)?.[1] && names((LEFT.exec(now.header) || [])[1] || '').join() === left(now.record.fields).join()) { p2b = now; break; }
+      await sleep(500);
+    }
+    stage('R23 P2 six runs', p2b); assert.ok(p2b, 'R23 six-run record and header');
+    const [, sixLeft] = LEFT.exec(p2b.header) || []; assert.ok(sixLeft, p2b.header);
+    assert.ok(p2b.record.bytes <= 16 * 1024 * 1024, JSON.stringify(p2b.record)); assert.deepEqual(names(sixLeft), left(p2b.record.fields));
+    assert.equal(p2b.record.fields.find(([n]) => n === 6)[1], true);
+    await mesh(36);
     await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R23 six runs');
     const listed = async () => Object.fromEntries((await runItems()).map(t => t.replace(/^Pinned · /, '').split(' · λ ')[0].replace(/ · Silicon$/, '')).map(t => [t.split(' · ')[0], t]));
     const named = words => words.replace(/^(Run \d+) \((.*)\)$/, '$1 · $2');

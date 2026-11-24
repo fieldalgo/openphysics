@@ -472,8 +472,10 @@ group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모�
 버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
 시간인지(P3); 모드 4개 또는 2개 실행 다섯(약 19 MB)이 *… Session is now N MB, over the 16 MiB (16.8 MB) limit. File › Save will
 ask whether to keep the fields of the selected and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery already keeps only those fields.*를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가 *… ·
-kept for recovery in this browser without the fields of 4 runs*인지(P2); 실행 여섯 개에서 내보내기 줄, **Pin Run 1**–**Pin Run
+the effective areas. Browser recovery keeps every field but those of Run 1.*를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가
+*… · kept for recovery in this browser without the fields of Run 1*이며, IndexedDB 기록이 16 MiB 안에서 Run 5의 장과 새 실행들의
+장을 담고 밝힌 실행만 빠졌는지, 여섯 번째 실행(약 24 MB) 뒤에도 기록이 16 MiB 안에서 Run 6의 장을 담고 헤더가 장 없는 실행을
+정확히 밝히는지(P2); 실행 여섯 개에서 내보내기 줄, **Pin Run 1**–**Pin Run
 3**, 내보낸 문구, 교환 버튼이 n_g 닫힌 실행(*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), 열린
 실행(*Run 3 (open (PML 1 µm) · …)*), closed-near 실행(*Run 4 (closed near 2.46 · 4 modes · …)*)을 각각 재료 앞까지의 실행 목록
 라벨과 같게 부르는지(P4); 열린 실행과 n_g 실행 아래 줄이 경계, 탐색, Modes to find, n_g를 밝히고 나머지는 *unchanged:*에 두는지(P6);
