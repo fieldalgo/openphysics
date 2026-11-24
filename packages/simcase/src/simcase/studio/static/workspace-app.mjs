@@ -39,7 +39,7 @@ import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocume
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
-import {ENVELOPE} from './workspace-multiphysics.mjs';
+import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
 import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
@@ -825,9 +825,28 @@ try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recov
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
 
 function updateHistory(){ $('undo-edit').disabled=multiView.active()?!multiView.canUndo():!edits.canUndo;$('redo-edit').disabled=multiView.active()?!multiView.canRedo():!edits.canRedo; }
-function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(inputsFile(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();}updateHistory();refreshPersistence();}
+function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(inputsFile(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();offerDue=true;}updateHistory();refreshPersistence();}
+// Round 18 (X1): an edit, Undo or Redo that leaves the current inputs and study settings equal to a
+// run's (its signature: geometry, materials, wavelength, mesh, Modes to find, group index, boundary
+// and search targets) says so after the edit's own message, in the heated model's words, with Show
+// Run N. Run study still runs if pressed. Called after the edit's message, which it follows: an edit
+// sets offerDue, and the change or click that commits it (after the field's own message) asks; an
+// earlier offer on the line is replaced, so typing never repeats it.
+let offerDue=false;
+function offerMatchingRun(){
+ offerDue=false;const host=$('file-status');host.querySelector('#match-offer')?.remove();
+ if(multiView.active()||!applicationChosen()||!isOptical()||numericDrafts.invalid||solverBusy)return;
+ const sig=signature(),run=runs.findLast(r=>r.signature===sig);if(!run)return;
+ const offer=document.createElement('span');offer.id='match-offer';
+ const show=document.createElement('button');show.type='button';show.className='message-action';show.textContent=`Show Run ${runNumber(run)}`;show.dataset.showRun=String(runNumber(run));
+ show.onclick=()=>{if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();notice(`${runNumberTitle(run)} shown under Results; the inputs are unchanged.`);};
+ // the generic "run again" line would contradict it: the offer then stands alone
+ if(host.textContent===INPUTS_CHANGED_TEXT)host.textContent='';
+ offer.append((host.textContent?' ':'')+matchesAgainText(runNumber(run),run.label||'')+'. ',show);host.append(offer);
+}
+const INPUTS_CHANGED_TEXT='Inputs changed since the last result. Run again to compute the new inputs.';
 function inputsChangedSinceResult(){
- if(resultNotice)notice('Inputs changed since the last result. Run again to compute the new inputs.');
+ if(resultNotice)notice(INPUTS_CHANGED_TEXT);
  if(jobPhase==='done'){jobPhase='idle';$('job-message').textContent='';refreshJobControls();}
 }
 // A run's inputs as the current inputs (Use this run's inputs), with its Modes to find and group
@@ -850,11 +869,11 @@ function restoreEdit(doc,label){
  Object.assign(state,doc.model);setStudy(doc);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();if(label!==null)notice(label+' · input changes only; no solver executed.');
 }
-$('undo-edit').onclick=()=>multiView.active()?multiView.undo():restoreEdit(edits.undo(),'Undo');
-$('redo-edit').onclick=()=>multiView.active()?multiView.redo():restoreEdit(edits.redo(),'Redo');
+$('undo-edit').onclick=()=>{if(multiView.active())multiView.undo();else{restoreEdit(edits.undo(),'Undo');offerMatchingRun();}};
+$('redo-edit').onclick=()=>{if(multiView.active())multiView.redo();else{restoreEdit(edits.redo(),'Redo');offerMatchingRun();}};
 document.addEventListener('input',event=>trackEdit(event.target));
-document.addEventListener('change',()=>{trackEdit();edits.endGroup();});
-document.addEventListener('click',()=>{trackEdit();edits.endGroup();});
+document.addEventListener('change',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});
+document.addEventListener('click',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});
 document.addEventListener('focusout',()=>edits.endGroup());
 document.addEventListener('keydown',event=>{
  if(!(event.ctrlKey||event.metaKey)||event.altKey||document.querySelector('dialog[open]'))return;

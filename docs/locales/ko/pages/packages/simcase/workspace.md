@@ -280,7 +280,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    표시줄은 다른 실행이 현재 입력을 가지면 현재 입력의 출처를 *current inputs from Run 2 · Design B*로 밝히고(round 18;
    전에는 *Run 2 has them*), 아니면 *press Run to compute them*을 덧붙임)이며, 입력을 편집하지 않았으면 Results와 Compare에서 제목 표시줄이 *viewing Run 1 · design A
    (other inputs)*를 덧붙여 그 차이가 저장하지 않은 편집으로 읽히지 않게 합니다(Model 탭의 제목은 현재
-   입력만 설명함). 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
+   입력만 설명함). 편집, Undo나 Redo 뒤에 현재 입력과 스터디 설정(기하, 재료, 파장, 메시, Modes to find, 군굴절률,
+   경계와 검색 목표)이 어떤 실행과 같으면 Messages가 편집 메시지 뒤에 가열 모델의 문장 *No need to run: Run 5 already
+   has these results. Run study adds a copy with the same values.*와 **Show Run 5**를 붙입니다. 그 버튼은 입력을
+   바꾸지 않고 그 실행을 Results에 보입니다(round 18). Run study는 눌리면 그래도 실행합니다. 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
    군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. Messages는 바뀌는
    설정만 이전 → 이후로 밝힙니다(*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find
    4 → 2. The next run uses them; Undo takes them back.*). 같은 문구는 다음 입력 편집까지 실행 패널의 버튼이

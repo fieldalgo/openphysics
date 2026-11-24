@@ -44,3 +44,23 @@ test('X4: browser recovery turning off posts one Messages line, once until it wo
  assert.ok(app.includes("if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;"));
  assert.ok(app.includes("Previous completed snapshot is retained if the database transaction failed.';postRecoveryOff();}"));
 });
+
+test('X1: an edit back to a run\'s inputs says "No need to run" with Show Run N; Run study is not blocked',async()=>{
+ const M=await import(STATIC+'workspace-multiphysics.mjs');
+ assert.equal(M.matchesAgainText(5,''),'No need to run: Run 5 already has these results. Run study adds a copy with the same values');
+ const app=read('workspace-app.mjs');
+ // after every input edit that changed the inputs, once the change or click that commits it has said
+ // its own message (typing fires input before change), and after Undo and Redo
+ assert.ok(app.includes("if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();offerDue=true;}"));
+ assert.ok(app.includes("document.addEventListener('change',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});"));
+ assert.ok(app.includes("document.addEventListener('click',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});"));
+ assert.ok(app.includes("restoreEdit(edits.undo(),'Undo');offerMatchingRun();")&&app.includes("restoreEdit(edits.redo(),'Redo');offerMatchingRun();"));
+ // the run's whole study signature, the newest such run; one offer on the line
+ assert.ok(app.includes("const sig=signature(),run=runs.findLast(r=>r.signature===sig);if(!run)return;"));
+ assert.ok(app.includes("host.querySelector('#match-offer')?.remove();"));
+ assert.ok(app.includes("show.textContent=`Show Run ${runNumber(run)}`;show.dataset.showRun=String(runNumber(run));"));
+ assert.ok(app.includes("notice(`${runNumberTitle(run)} shown under Results; the inputs are unchanged.`)"));
+ // Run study's disabled state does not look at a matching run
+ const line=app.split('\n').find(l=>l.includes("$('run-optical').disabled="));
+ assert.ok(line&&!line.includes('signature'),line);
+});
