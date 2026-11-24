@@ -371,7 +371,9 @@ export function writeOpticalSession(input,runs,selected,comparison,view,{keepSel
  const without=keep=>runs.map((run,i)=>!keep.has(run.job)||!run.field?number(run,i):0).filter(Boolean);
  if(full<=limit)return {ok:true,text:fullText,bytes:full,notKept:without(new Set(runs.filter(r=>r.field).map(r=>r.job)))};
  const keep=keptRuns(runs,selected),reducedText=sessionText(input,runs,selected,comparison,view,{keep}),reduced=size(reducedText),notKept=without(keep);
- if(reduced<=limit)return keepSelected?{ok:true,text:reducedText,bytes:reduced,notKept}:{ok:false,bytes:full,reduced:{bytes:reduced,notKept},refusal:null};
+ // round 23 (E2): kept, the numbers of the runs written with their fields
+ const kept=runs.map((run,i)=>keep.has(run.job)&&run.field?number(run,i):0).filter(Boolean);
+ if(reduced<=limit)return keepSelected?{ok:true,text:reducedText,bytes:reduced,notKept,kept,reduced:true}:{ok:false,bytes:full,reduced:{bytes:reduced,notKept,kept},refusal:null};
  return {ok:false,bytes:full,reduced:null,refusal:keptOverText(runs.map((run,i)=>({name:'Run '+number(run,i),selected:run.job===selected,pinned:!!run.pinned})).filter((_,i)=>keep.has(runs[i].job)),reduced)};
 }
 /** The refusal of a session whose selected and pinned runs are over the limit with their fields
@@ -389,19 +391,31 @@ export function keptOverText(kept,bytes){
 /** S2: the Messages line when a new run makes the session go over the limit, from
  * writeOpticalSession's answer (null when it fits): the size and what File › Save will do. When
  * even the selected and pinned runs are over the limit, Save refuses with keptOverText's words and
- * browser recovery is off too, so the line says both (round 18 X4's line is then not posted). */
+ * browser recovery is off too, so the line says both (round 18 X4's line is then not posted).
+ * Round 23 (E2): the limit also in MB, as the size is (16 MiB is 16.8 MB), the runs whose fields
+ * Save offers to keep, what the other runs keep, and that browser recovery already keeps only those
+ * fields (captureSession: it writes the same reduced session, with no question):
+ *   "Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the
+ *   fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions
+ *   and the effective areas. Browser recovery already keeps only those fields." */
+export const LIMIT_WORDS='16 MiB (16.8 MB)';
+const runsWords=numbers=>{const w=numbers.map(String);return (numbers.length>1?'Runs ':'Run ')+(w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1));};
 export function sessionSizeText(out){
  if(!out||out.ok)return null;
- const over=`Session is now ${sizeText(out.bytes)}, over the 16 MiB limit`;
- if(out.reduced)return `${over}: File › Save will ask whether to keep the fields of the selected and pinned runs only.`;
+ const over=`Session is now ${sizeText(out.bytes)}, over the ${LIMIT_WORDS} limit`;
+ if(out.reduced){const kept=out.reduced.kept?.length?` (${runsWords(out.reduced.kept)})`:'';
+  return `${over}. File › Save will ask whether to keep the fields of the selected and pinned runs only${kept}; the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery already keeps only those fields.`;}
  return `${over}, and File › Save will refuse: ${out.refusal} Browser recovery is off.`;
 }
 export function opticalOverflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the fields of the selected and pinned runs only? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields.`;}
 // Capture editable metadata now; serialize large, read-only field arrays after debounce.
 // UI operations replace results rather than modifying their field samples in place.
 // Browser recovery keeps the file text, or the fields of the selected and pinned runs only when
-// the file is over the limit (no dialog), as version 8 recovery does.
-export function captureSession(input,runs,selected,comparison,view){
+// the file is over the limit (no dialog), as version 8 recovery does. Round 23 (E2): make.dropped
+// is then the number of runs whose fields this tab has and the snapshot left out (0 otherwise), so
+// the header says so (it read "kept for recovery in this browser" alone while 5 runs' fields, about
+// 17 MB, were left out of a 22 MB session). limit: the session limit (a test sets a smaller one).
+export function captureSession(input,runs,selected,comparison,view,{limit=MAX_SESSION_BYTES}={}){
  const capturedInput=validateProject(input),capturedView=validateView(view);
  const capturedRuns=runs.map(run=>{const copy={...run,input:validateProject(run.input),
   settings:JSON.parse(JSON.stringify(run.settings)),effective_index:[...run.effective_index]};
@@ -412,16 +426,17 @@ export function captureSession(input,runs,selected,comparison,view){
  // When the study settings of the input (version 8) need version 9 but a run cannot be held by it
  // (read from a version 6 or 7 file), recovery keeps the notebook as version 7 without those
  // settings, and the snapshot's note says what was not kept; Save session still refuses.
- const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true});
- const make=()=>{make.note='';let out;
+ const write=input=>writeOpticalSession(input,capturedRuns,selected,capturedComparison,capturedView,{keepSelected:true,limit});
+ const make=()=>{make.note='';make.dropped=0;let out;
   try{out=write(capturedInput);}catch(error){
    if(![STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION].includes(capturedInput.version))throw error;
    let plain;try{plain=write(withoutStudy(capturedInput));}catch{throw error;}
    out=plain;make.note=recoveryStudyNote(capturedInput);}
   // the code says why the header reads unavailable (round 17, U6: it read a bare "browser recovery unavailable")
   // the same words as Save session's refusal (A3), after what failed
+  if(out.reduced===true){const had=new Set(capturedRuns.map((r,i)=>r.field?(Number.isInteger(r.number)?r.number:i+1):0).filter(Boolean));make.dropped=out.notKept.filter(n=>had.has(n)).length;}
   if(!out.ok)throw Object.assign(new Error('Recovery snapshot exceeds 16 MiB: '+out.refusal[0].toLowerCase()+out.refusal.slice(1)),{code:'recovery-over-limit'});return out.text;};
- make.note='';return make;
+ make.note='';make.dropped=0;return make;
 }
 /** The note of a recovery kept without the study settings of these inputs (version 8). */
 export function recoveryStudyNote(input){

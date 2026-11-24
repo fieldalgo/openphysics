@@ -212,7 +212,7 @@ main.choosing .workspace>.note{display:none}
 .message-label{font-weight:600;flex:none;color:#59708d}
 .message-action{font:inherit;font-size:inherit;padding:0 6px;margin-left:2px;border:1px solid #c9d3e0;border-radius:4px;background:#fff;color:var(--accent,#2d6da3);cursor:pointer}
 .message-more{display:inline}.message-more>summary{display:inline;cursor:pointer;color:var(--accent,#2d6da3)}.message-more[open]>.message-more-text{display:block}
-#file-status{color:#7b8798}
+#file-status{color:#7b8798;min-width:0;overflow-wrap:anywhere}
 /* round 18 (X9): the inputs that find a mode the closed window hid, under its note */
 .edge-actions{display:inline-flex;flex-wrap:wrap;gap:6px}
 /* round 18 (X2): a warning in Messages stands out from the line around it */

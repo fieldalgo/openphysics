@@ -68,7 +68,7 @@ test('Y3: a restore brings back the project name and file it was saved to, or na
  // both models' restores pass the opened file; a file replacing the project clears the copy
  assert.ok(app.includes("restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});"));assert.ok(app.includes("restoreProjectFile(savedFile,openedFile,{matched:projectMatched===true});"));
  assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null,recovered:null});"));
- assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf,recovered});"));
+ assert.ok(app.includes("recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});"));
 });
 
 test('Y1: the newest stored session with runs is the first restore offer; every other says it is older',async()=>{

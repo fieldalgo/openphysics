@@ -266,7 +266,7 @@ function unsavedModels(){
 function projectLine(){
  const file=project.file&&project.file.scope===project.scope?project.file:null;
  const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened}:null;
- return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:recoveryState,copyOf:project.copyOf,recovered});
+ return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
 }
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
@@ -736,7 +736,7 @@ function heatedProjectState(){
 function refreshSaveIndicator(){
  refreshProjectLine();
  if(multiView.active()){const state=heatedProjectState()||multiView.saveState();if($('autosave-status').textContent!==state)$('autosave-status').textContent=state;downloadHint(multiView.saveHint());return;}
- const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:recoveryState});downloadHint(applicationChosen()&&saveIndicator?persistenceHint({...saveIndicator,recovery:recoveryState}):'');
+ const text=saveIndicator&&persistenceTitle({...saveIndicator,recovery:opticalRecoveryShown()});downloadHint(applicationChosen()&&saveIndicator?persistenceHint({...saveIndicator,recovery:recoveryState}):'');
  // Rewritten only on a change: the footer is a status region read out by screen readers.
  const footer=applicationChosen()&&text?text:latestOffer?`Last session kept in this browser · ${latestOffer.model?latestOffer.model+' · ':''}${latestOffer.runs} ${latestOffer.runs===1?'run':'runs'}`:recoveryState==='unavailable'?'No model chosen · browser recovery unavailable':'No model chosen · nothing to save yet';
  if($('autosave-status').textContent!==footer)$('autosave-status').textContent=footer;
@@ -997,6 +997,11 @@ const autosaveStamp=()=>notebookStamp()+JSON.stringify([savedFile(),openedCurren
 const notebookStore=indexedNotebookStore();
 // the note of the last recovery snapshot kept without the study settings (shown once in the message line)
 let recoveryNote='';
+// round 23 (E2): the runs whose fields the last optical recovery snapshot left out (over 16 MiB it
+// keeps the fields of the selected and pinned runs only): the header and the indicator say
+// "kept for recovery in this browser without the fields of N runs"
+let opticalRecoveryDropped=0;
+const opticalRecoveryShown=()=>recoveryState==='kept'&&!multiView.active()&&opticalRecoveryDropped>0?'keptFields:'+opticalRecoveryDropped:recoveryState;
 // round 18 (X4): the off state Messages last named, posted once until recovery works again; after a
 // run's result message the line is added to it, so the result stays in view
 let recoveryOffPosted=null;
@@ -1018,7 +1023,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current'){recoveryState='kept';recoveryOffPosted=null;}
- if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
+ if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;opticalRecoveryDropped=recoveryKind==='optical'&&Number.isInteger(state.dropped)?state.dropped:0;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':state.code==='recovery-quota'?'quota':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';postRecoveryOff();}
  refreshSaveIndicator();
 }});
