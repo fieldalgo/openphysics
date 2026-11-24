@@ -1239,7 +1239,8 @@ try {
     assert.ok(reducedFile === v9File || (reducedFile.startsWith(stem + ' (') && /^ \(\d+\)\.json$/.test(reducedFile.slice(stem.length))), 'the reduced session keeps the opened file name: ' + reducedFile); }
   const keptFields = reduced.runs.map(r => [r.job === reduced.selected, r.pinned, 'field' in r]);
   stage('M4-e reduced session', {file: reducedFile, bytes: (await readFile(join(downloads, reducedFile))).length, keptFields, message: await text('#file-status')});
-  assert.equal(reduced.version, 9); assert.ok(keptFields.every(([selected, pinned, field]) => field === (selected || pinned)), JSON.stringify(keptFields));
+  // the limit dropped the oldest runs, so the runs are not numbered 1..6: version 12 keeps their numbers
+  assert.equal(reduced.version, 12); assert.ok(keptFields.every(([selected, pinned, field]) => field === (selected || pinned)), JSON.stringify(keptFields));
   assert.ok(keptFields.some(([, , field]) => !field), 'some runs were written without fields');
   assert.match(await text('#file-status'), /Fields not kept for Run \d/);
   // the reduced file opened: a run without fields shows its modes, no field view, and Compare says why
@@ -1367,7 +1368,9 @@ try {
   const p1Name = await newDownload(p1Before), p1Session = JSON.parse(await readFile(join(downloads, p1Name), 'utf8'));
   assert.match(p1Name, /^p1-four(?: \(\d\))?\.json$/); assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false);
   stage('P1 session input', {version: p1Session.version, input: p1Session.input.version, modeCount: p1Session.input.model.modeCount});
-  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [9, 8, 4]);
+  // the tab's runs were numbered past their places by the drops above (M4-e), so the session is version 12;
+  // its input is still the version 8 file with Modes to find 4
+  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [12, 8, 4]);
   // U3: Use this run's inputs with a run of other Modes to find and box (the M5 run with the box off)
   await page.type('#mode-count-number', 5); await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '5', box: true});
   await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length>=2", 'P1 run list');
@@ -2443,6 +2446,8 @@ try {
     assert.equal(w2.stale.after.length, 6);
     // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
     await recorded('R19 seven runs kept');
+    // session version 12: the six runs kept (Run 1 among them, pinned) come back with these numbers
+    await r.click('nav [data-page=Results]'); const keptNumbers = (await runItems()).map(t => t.replace('Pinned · ', '').split(' · ')[0]);
     await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');
     await r.click('#optical-start-new'); await r.until("!!document.getElementById('shape-w')", 'R19 new model');
     await clearRecorded(); await rRun(); await recorded('R19 one run kept');
@@ -2455,7 +2460,8 @@ try {
     await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R19 older restored');
     const restoredMessage = await rText('#file-status');
     await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 restored runs');
-    y1.restored = {message: restoredMessage, items: (await runItems()).length, ...await offers()};
+    const restoredItems = await runItems();
+    y1.restored = {message: restoredMessage, items: restoredItems.length, numbers: restoredItems.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ...await offers()};
     await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R19 restored kept', 30000); await sleep(1200);
     y1.kept = await offers();
     stage('R19 Y1 restore offers', y1);
@@ -2464,7 +2470,9 @@ try {
     assert.ok(older > 0, JSON.stringify(y1.before.box));
     assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 6 runs · .* · older · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.match(y1.before.card.text, /^Restore from this browser · Optical waveguide · Run 1 · \d{1,2}:\d\d(?: [AP]M)?$/);
-    assert.ok(y1.restored.message.endsWith(' Runs are numbered from 1 in this tab; names and pins are kept.'), y1.restored.message); assert.equal(y1.restored.items, 6);
+    // stable run numbers (session version 12): the restore keeps them and says nothing about numbering
+    assert.ok(!y1.restored.message.includes('numbered from 1'), y1.restored.message); assert.equal(y1.restored.items, 6);
+    assert.deepEqual(y1.restored.numbers, keptNumbers);
     // the box hides while the tab holds runs; the restored session is not listed again. The newer one
     // stays offered without a reload: at once as the last session (Workspace tools › Restore last
     // session from this browser), and in the earlier sessions once this tab's own record is written
