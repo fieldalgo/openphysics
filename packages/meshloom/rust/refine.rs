@@ -90,6 +90,8 @@ struct State<'a> {
     chain_of: HashMap<(u32, u32), Vec<u32>>,
     /// per input vertex: whether two segments meet there at less than 60 degrees
     small_apex: Vec<bool>,
+    /// per input vertex: the other end points of the input segments that end there
+    seg_ends: Vec<Vec<u32>>,
     /// facets the caller locked (curved surfaces sampled on the surface): no point is
     /// inserted on them or on their edges
     locked_facet: Vec<bool>,
@@ -140,6 +142,10 @@ const LAWSON_CAP: u32 = 10_000;
 /// A facet's frame triple is kept when the squared sine of its angle exceeds this (in
 /// doubles); below it the s, r system of a facet point is ill-conditioned.
 const FRAME_SIN2: f64 = 1e-8;
+/// Small-angle rules of the (C) study, iteration 1: two input segments meeting below
+/// this angle's cosine span a small angle. Measured at 60 degrees (0.5, the bound of
+/// small_apex) and 30 degrees (0.8660254037844387, half of Ruppert's 60; a choice).
+const SPAN_COS: f64 = 0.5;
 /// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
 /// sqrt(2) with a margin).
 const SUB_RATIO: f64 = 1.5;
@@ -225,7 +231,7 @@ impl State<'_> {
             // radius-edge ratio is exempt when its circumcentre's insertion radius (its
             // circumradius) would be smaller than its parent's, the newer end of its shortest edge
             let parent = t[short.0].max(t[short.1]) as usize;
-            if r >= self.rins[parent] && !self.seditious(t[short.0], t[short.1]) {
+            if r >= self.rins[parent] && !self.seditious(t[short.0], t[short.1]) && !self.spans_small_angle(t[short.0], t[short.1]) {
                 bad = bad.max(r / lmin / self.opt.ratio);
             }
         }
@@ -1224,7 +1230,16 @@ impl State<'_> {
         let n = cross(&a, &b);
         let nn = dot(&n, &n);
         let cc = sub3(&a, &b);
-        nn > 0.0 && (dot(&a, &a) * dot(&b, &b) * dot(&cc, &cc)).sqrt() / (2.0 * nn.sqrt()) > FAC_C * self.opt.alpha * h
+        let (la, lb, lc) = (dot(&a, &a), dot(&b, &b), dot(&cc, &cc));
+        let (u, v) = if la <= lb && la <= lc { (f[0], f[1]) } else if lb <= lc { (f[0], f[2]) } else { (f[1], f[2]) };
+        // inside a small input angle the circumradius of a skinny subfacet is not its size:
+        // half its longest edge is (the smallest circumradius a triangle with that edge has)
+        let size = if self.spans_small_angle(u, v) { la.max(lb).max(lc).sqrt() / 2.0 } else if nn > 0.0 {
+            (la * lb * lc).sqrt() / (2.0 * nn.sqrt())
+        } else {
+            0.0
+        };
+        nn > 0.0 && size > FAC_C * self.opt.alpha * h
     }
 
     /// Facet quality: a subfacet whose radius-edge ratio (circumradius over its shortest
@@ -1249,7 +1264,44 @@ impl State<'_> {
             return false;
         }
         let rc = (la * lb * lc).sqrt() / (2.0 * nn.sqrt());
-        rc > SUB_RATIO * la.min(lb).min(lc).sqrt()
+        if !(rc > SUB_RATIO * la.min(lb).min(lc).sqrt()) {
+            return false;
+        }
+        // small-angle rule (Miller, Pav and Walkington 2003): a skinny subfacet whose shortest
+        // edge spans a small input angle (its end points on two segments that meet at an input
+        // vertex below the SPAN_COS angle) is left: inside such an angle no triangle is well shaped
+        let (u, v) = if la <= lb && la <= lc { (f[0], f[1]) } else if lb <= lc { (f[0], f[2]) } else { (f[1], f[2]) };
+        !self.spans_small_angle(u, v)
+    }
+
+    /// The input segments a vertex lies on, as (end, end): a segment point's own, or every
+    /// segment that ends at an input vertex.
+    fn segments_at(&self, v: u32) -> Vec<(u32, u32)> {
+        let n = self.g.input.len();
+        if (v as usize) < n {
+            return self.seg_ends[v as usize].iter().map(|&w| (v, w)).collect();
+        }
+        let sp = &self.g.s[v as usize - n];
+        if sp.c == NONE && sp.b != NONE { vec![(sp.a, sp.b)] } else { Vec::new() }
+    }
+
+    /// Whether u and v lie on two different input segments that meet at an input vertex
+    /// z at an angle below the SPAN_COS angle (z the apex of a small input angle).
+    fn spans_small_angle(&self, u: u32, v: u32) -> bool {
+        let (su, sv) = (self.segments_at(u), self.segments_at(v));
+        su.iter().any(|&(p, q)| sv.iter().any(|&(r, s)| {
+            if ekey(p, q) == ekey(r, s) {
+                return false;
+            }
+            [p, q].iter().any(|&z| {
+                if !(z == r || z == s) || !self.small_apex[z as usize] {
+                    return false;
+                }
+                let (a, b) = (if p == z { q } else { p }, if r == z { s } else { r });
+                let (da, db) = (sub3(&self.xyz[a as usize], &self.xyz[z as usize]), sub3(&self.xyz[b as usize], &self.xyz[z as usize]));
+                dot(&da, &db) > SPAN_COS * dot(&da, &da).sqrt() * dot(&db, &db).sqrt()
+            })
+        }))
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -2388,6 +2440,14 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     // input vertices where two segments meet at less than 60 degrees: the apexes of the
     // concentric shells of split_segment
     let mut small_apex = vec![false; xyz.len()];
+    let mut seg_ends: Vec<Vec<u32>> = vec![Vec::new(); xyz.len()];
+    for ch in &b.plc.rec.chains {
+        let (a, z) = (ch[0], ch[ch.len() - 1]);
+        if a != z {
+            seg_ends[a as usize].push(z);
+            seg_ends[z as usize].push(a);
+        }
+    }
     {
         let mut dirs: HashMap<u32, Vec<P3>> = HashMap::new();
         for ch in &b.plc.rec.chains {
@@ -2422,7 +2482,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         chain_of.entry(ekey(ch[0], ch[ch.len() - 1])).or_default().push(c as u32);
     }
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
@@ -2450,7 +2510,17 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
-                if st.segment_encroacher(e).is_some() || st.segment_too_long(e) {
+                let mut enc = st.segment_encroacher(e);
+                if let Some(w) = enc {
+                    // small-angle rule for subsegments: a vertex on another segment that meets
+                    // e's segment at a small input angle encroaches e only because of that angle
+                    // (the boundary is already recovered, so e needs no conforming split)
+                    if st.spans_small_angle(w, e.0) && st.spans_small_angle(w, e.1) {
+                        st.stats.exempt += 1;
+                        enc = None;
+                    }
+                }
+                if enc.is_some() || st.segment_too_long(e) {
                     st.split_segment(e)?;
                 }
             }
