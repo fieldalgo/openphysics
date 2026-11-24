@@ -795,6 +795,11 @@ small sums. Original1e-10 matrix/refinement, residual, energy, reciprocity,
 current, edge-partition and scaled-PSD checks and condition<1e10 remain; failure
 raises without retries, geometry snapping, weight normalization or diagonal
 floors. Internal consistency does not estimate panel or outer-domain errors.
+Its test module's panel (32 to 64) and outer-width (8, 16, 32 mm) study is longer
+than a CI test partition: like the harmonic-corner studies it is marked `slow`,
+needs `OPENPHYSICS_PANEL_STUDIES=1` and runs in the dispatch-only job
+`panel-studies` of validate.yml with its 1% criteria, while the regular suite
+checks the recorded 64-panel, 8 mm values (`tests/_support/panel_studies.py`).
 
 Independent Fraction polynomial moments through degree3 and closed horizontal
 Fourier moments check the projection and ground operators. Tests separately
