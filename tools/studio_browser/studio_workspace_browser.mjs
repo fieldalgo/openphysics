@@ -2757,6 +2757,8 @@ try {
         plan: await rText('#run-plan')};
     };
     const WARNING = "Substrate touches the window edge and its index is as high as Core's: in a closed window its slab modes come first.";
+    // round 23 (E1): the plan line's row says the short form; the panel keeps the full sentence
+    const SHORT = 'Substrate touches the window edge: in a closed window its slab modes come first.';
     const BUTTONS = ['Set search near 2.46 · 4 modes', 'Use Open boundary'];
     const none = {row: null, rowButtons: [], panel: null, panelButtons: []};
     const noWarning = (w, tag) => assert.deepEqual({row: w.row, rowButtons: w.rowButtons, panel: w.panel, panelButtons: w.panelButtons}, none, tag);
@@ -2802,7 +2804,7 @@ try {
     stage('R22 P2 slab warning before the run', p2);
     noWarning(p2.template, 'core-only template'); noWarning(p2.silica, 'silica slab');
     for (const [tag, w] of [['T18', p2.t18], ['back to Highest', p2.back], ['closed again', p2.closed]]) {
-      assert.equal(w.row, WARNING, tag); assert.equal(w.panel, WARNING, tag);
+      assert.equal(w.row, SHORT, tag); assert.equal(w.panel, WARNING, tag);
       assert.deepEqual(w.rowButtons, BUTTONS, tag); assert.deepEqual(w.panelButtons, BUTTONS, tag);
     }
     assert.equal(p2.t18.plan, 'Closed window');
