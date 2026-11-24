@@ -57,7 +57,7 @@ test('Y4: before the six-run limit drops a run, Run study asks: Pin Run N and ru
  // the dialog: modal, labelled, Escape cancels, the first answer focused, focus back to the opener
  assert.ok(app.includes("dropDialog.id='run-drop-confirm';dropDialog.setAttribute('aria-labelledby','run-drop-confirm-title');dropDialog.setAttribute('aria-describedby','run-drop-confirm-description');"));
  assert.ok(app.includes("dropDialog.oncancel=event=>{event.preventDefault();dropAnswer?.(null);};"));
- assert.ok(app.includes("dropAnswer=answer=>{dropAnswer=null;dropDialog.close();restoreDialogFocus(opener);resolve(answer);};"));
+ assert.ok(app.includes("dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};"));
  assert.ok(app.includes("if(!dropDialog.open)dropDialog.showModal();(question.pin?pin:$('run-drop-confirm-run')).focus();"));
  // the optical Run study asks first, and checks the state again after the answer
  assert.ok(app.includes(" if(!await confirmOpticalDrops())return;\n // the question waited for an answer: the state is checked again\n"));
@@ -68,7 +68,7 @@ test('Y4: before the six-run limit drops a run, Run study asks: Pin Run N and ru
  assert.ok(view.includes("run:()=>askedRun(),"));
  assert.ok(view.includes("dropQuestion(`${runTitle(r)} (run at ${runTime(r)})`,r.number,{canPin:runs.filter(x=>!x.pinned).length>1})"));
  // the limit and the line beside Run study stay
- assert.ok(app.includes("const host=$('run-drop'),run=nextDropped(runs,RUN_LIMIT);"));
+ assert.ok(app.includes("const host=$('run-drop'),run=runQuestion?null:nextDropped(runs,RUN_LIMIT);"));
 });
 
 test('Y3: a restore brings back the project name and file it was saved to, or names the file it was a copy of',async()=>{

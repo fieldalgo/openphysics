@@ -170,7 +170,9 @@ export function createMultiphysicsView(ctx){
   const button=$('run-multiphysics'),reason=$('run-multiphysics-reason');if(!button)return;
   button.hidden=!active;reason.hidden=!active;if(!active)return;
   const block=runBlock(),fresh=freshness();button.disabled=!!block;button.textContent=job?'Running… (stop it under Study)':'Run study';reason.textContent=job?'':block;
-  $('status').textContent=job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
+  // round 20 (Z7): while the drop question is open, the reason and the status bar say Run study waits
+  const asking=!job&&ctx.runQuestionOpen?.()===true;if(asking)reason.textContent=ctx.runQuestionWords.plan;
+  $('status').textContent=asking?ctx.runQuestionWords.status:job?(job.alone?`Solving ${physicsLabel(job.alone)} without heater`:'Multiphysics run in progress'):block?'Model not ready · '+block:readyStatus(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
   const heading=document.querySelector('.dock-title>span');if(heading)heading.textContent=sequenceHeading(fresh,lastRun?.number,lastRun?.origin,lastRun?.label||'');
   const option=$('run-baseline-option'),box=$('run-baseline');
   if(option){const o=baselineOptionState(doc,{on:baselineOption,busy:!!job});option.hidden=false;option.classList.toggle('unavailable',!o.available);box.checked=o.checked;box.disabled=o.disabled;option.title=o.title;}

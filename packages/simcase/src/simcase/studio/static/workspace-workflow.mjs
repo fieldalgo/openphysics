@@ -110,6 +110,10 @@ export const dropWarningText=run=>`If you run: drops ${dropName(run)} · pin it 
 // dialog's heading "Running drops Run 3 (700 × 300 nm · 4 modes).", its note, and the answers
 // [Pin Run 3 and run] [Run] [Cancel]. name: the run as the heading names it; canPin: false when
 // that run is the last unpinned one (pinning it would leave no slot for the new run).
+// Round 20 (Z7): while the question is open the page says Run study waits for it (P04 waited about
+// seven minutes before seeing the dialog): the box beside Run study and the status bar.
+export const RUN_QUESTION_PLAN='Waiting for your answer: pin, run or cancel';
+export const RUN_QUESTION_STATUS='Run study is waiting for your answer';
 export const DROP_QUESTION_NOTE='Up to six runs are kept; a pinned run is never dropped.';
 export function dropQuestion(name,number,{canPin=true}={}){
  return {title:`Running drops ${name}.`,note:DROP_QUESTION_NOTE,pin:canPin?`Pin Run ${number} and run`:null,run:'Run',cancel:'Cancel'};

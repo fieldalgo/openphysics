@@ -368,7 +368,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    modes).* and *Up to six runs are kept; a pinned run is never dropped.*, with **Pin Run 3 and run**
    (first, focused), **Run** and **Cancel** (Escape); focus returns to Run study. Pin Run 3 and run
    pins that run and asks again when the run would then drop the next unpinned run; it is not
-   offered for the last unpinned run, which leaves no slot. The limit itself is
+   offered for the last unpinned run, which leaves no slot. Since round 20, while the question is
+   open, the box beside Run study reads *Waiting for your answer: pin, run or cancel* (the drop line
+   is hidden) and the status bar *Run study is waiting for your answer*; nothing says a run is
+   computing (the hidden job panel keeps no message), and every answer, Cancel included, brings the
+   earlier words back. The heated model's question does the same, in the line under its Run study
+   and the status bar. The limit itself is
    unchanged. Files do
    not hold the number: opening a file or restoring a session from this browser numbers its runs
    from 1 in file order, and runs added from a file continue after the largest number. Since round
