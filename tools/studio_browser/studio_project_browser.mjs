@@ -560,6 +560,46 @@ try {
     await stopBrowser(page);
   }
 
+  // R19 Y3 (round 19, pre-registered): a browser restore keeps the project's name and file, or names
+  // its source. Opened: the record holds the file it was opened from, not the project's name.
+  {
+    page = await startBrowser(); await size(1440, 900, false);
+    await page.call('Page.navigate', {url: base + '/workspace'});
+    await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R19 start page');
+    const recorded = async label => { await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(800); };
+    const clearRecorded = () => page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    const restoreOptical = async label => {
+      await page.call('Page.reload'); await page.until("!!document.getElementById('resume-optical')", label + ': card offer', 30000);
+      await page.eval("document.getElementById('file-status').textContent=''"); await page.click('#resume-optical');
+      await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", label + ': restored', 30000);
+      await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
+      return {title: await title(), footer: await footer(), message: await status()};
+    };
+    await openFile(saved); await page.until("/^Opened project Heater study/.test(document.getElementById('file-status').textContent)", 'R19 open', 60000);
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", 'R19 Library');
+    await page.press('button', 'Optical waveguide', 'start'); await page.until("document.querySelectorAll('.run-item').length===2", 'R19 optical runs');
+    await clearRecorded();
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Geometry'); await page.until("!!document.getElementById('shape-w')", 'R19 geometry');
+    await page.fill('spinbutton', 'Width [nm]', 640); await runOptical('R19 run 3'); await recorded('R19 opened record');
+    const opened = await restoreOptical('R19 opened');
+    // Saved: Save As r19-saved.json, run again, restore: the name and file come back, changed since
+    let before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R19 Save As');
+    await page.fill('textbox', 'File name', 'r19-saved'); await page.press('button', 'Download');
+    const savedName = await newDownload(before); assert.equal(savedName, 'r19-saved.json');
+    await clearRecorded();
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Geometry'); await page.until("!!document.getElementById('shape-w')", 'R19 geometry 2');
+    await page.fill('spinbutton', 'Width [nm]', 660); await runOptical('R19 run after save'); await recorded('R19 saved record');
+    const savedCase = await restoreOptical('R19 saved');
+    stage('R19 Y3 restore names', {opened, saved: savedCase});
+    assert.match(opened.title, /^Untitled project · recovered from a copy of heater-study\.json · not saved to a file · /);
+    assert.equal(opened.footer, 'Recovered from this browser (opened from heater-study.json; changed since)');
+    assert.match(savedCase.title, /^r19-saved · r19-saved\.json · changed since saved \d\d:\d\d(?: [AP]M)? · /);
+    assert.match(savedCase.footer, /^Recovered from this browser \(last sent to a file: r19-saved\.json at \d\d:\d\d(?: [AP]M)?; changed since\)$/);
+    await noOverflow('R19 Y3 Library');
+    await stopBrowser(page);
+  }
+
   // V-P9: an older Studio given the project file: its existing refusal, its workspace unchanged
   if (args['old-python']) {
     await stopProcess(server); server = await startServer('server-old', args['old-python']);

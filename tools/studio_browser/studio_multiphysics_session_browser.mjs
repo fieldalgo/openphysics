@@ -852,6 +852,41 @@ print(n)`;
   await page.screenshot('s5-values-only');
   stage('S5', {question, bigNotice, bytes: Buffer.byteLength(big.text), recoveryPartial, recoveryOver, refusal, recovered: recoveredBig, list: bigList, ...s5Arrays});
 
+  // R19 (round 19, pre-registered): a real mouse click on the heater-off label ticks and unticks
+  // its box (Y6), and the heated model's Run study asks before the six-run limit drops a run (Y4).
+  await page.call('Page.reload');
+  await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'reload for R19');
+  await openTemplate(); await runReady();
+  const mouseClick = async (selector, dx = null) => {
+    const at = await page.eval(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.left+(${dx === null ? 'r.width/2' : dx}),y:r.top+r.height/2}})()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await page.call('Input.dispatchMouseEvent', {type, x: at.x, y: at.y, button: 'left', clickCount: 1});
+    await sleep(300);
+  };
+  const baseline = () => page.eval("({checked:document.getElementById('run-baseline').checked,for:document.getElementById('run-baseline-option').htmlFor})");
+  const y6 = {start: await baseline()};
+  await mouseClick('#run-baseline-option', 40); y6.text = await baseline();   // on "Also solve without heater"
+  await mouseClick('#run-baseline-time'); y6.note = await baseline();          // on "(about 1 s more)"
+  stage('R19 Y6 heater-off label', y6);
+  assert.deepEqual(y6, {start: {checked: true, for: 'run-baseline'}, text: {checked: false, for: 'run-baseline'}, note: {checked: true, for: 'run-baseline'}});
+  // Y4: six runs, then Run study asks; Cancel runs nothing, Run makes Run 7 and drops Run 1
+  for (let n = 1; n <= 6; n++) await runAndWait(n);
+  await clearNotice(); await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question');
+  const y4 = {asked: await page.eval("({title:document.getElementById('run-drop-confirm-title').textContent,buttons:[...document.querySelectorAll('#run-drop-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent),focus:document.activeElement?.id})")};
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R19 drop question ' + tag); }
+  await size(1440, 900);
+  await page.click('#run-drop-confirm-cancel'); await sleep(300);
+  y4.cancel = await page.eval("({open:document.getElementById('run-drop-confirm').open,focus:document.activeElement?.id,runs:document.querySelector('.dock-title>span').textContent})");
+  await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question again');
+  await page.click('#run-drop-confirm-run');
+  await page.until("/^Run 7 · /.test(document.querySelector('.dock-title>span').textContent)", 'R19 heated run 7', 180000); await runReady();
+  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R19 heated run list');
+  y4.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
+  stage('R19 Y4 heated drop question', y4);
+  assert.match(y4.asked.title, /^Running drops Run 1 \(run at \d{1,2}:\d\d(?: [AP]M)?\)\.$/);
+  assert.deepEqual(y4.asked.buttons, ['Pin Run 1 and run', 'Run', 'Cancel']); assert.equal(y4.asked.focus, 'run-drop-confirm-pin');
+  assert.equal(y4.cancel.open, false); assert.equal(y4.cancel.focus, 'run-multiphysics'); assert.ok(y4.cancel.runs.startsWith('Run 6 · '), y4.cancel.runs);
+  assert.deepEqual(y4.runs, ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';
 } catch (error) {
