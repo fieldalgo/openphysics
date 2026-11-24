@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded binary64 residuals with exact-product expansions."""
+"""Bounded binary64 residuals with exact-product expansions.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 import math
 import numpy as np
 

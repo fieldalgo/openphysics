@@ -1,11 +1,15 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Self integrals for three static radial-density modes."""
+"""Self integrals for three static radial-density modes.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from functools import lru_cache
 import math
 import numpy as np
 from scipy.special import zeta
-from galerkin.laplace_corner import _length, _power, _frozen
+from galerkin.laplace_corner import length as _length, power as _power, frozen as _frozen
 from galerkin.laplace_corner_harmonic import power_panel_harmonic_gram, power_panel_harmonic_self_log
 
 

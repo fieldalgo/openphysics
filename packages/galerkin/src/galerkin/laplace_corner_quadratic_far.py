@@ -1,14 +1,23 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Far logarithmic blocks for three physical radial-density modes."""
+"""Far logarithmic blocks for three physical radial-density modes.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from functools import lru_cache
 from dataclasses import dataclass
 import math
 import numpy as np
-from galerkin.laplace_corner import _cached_power_rule, _frozen, _power, _order
+from galerkin.laplace_corner import (
+    cached_power_rule as _cached_power_rule,
+    frozen as _frozen,
+    power as _power,
+    order as _order)
 from galerkin.laplace_corner_harmonic_interactions import (
-    power_panel_harmonic_far_log, _vectors, _real_log1p,
-)
+    power_panel_harmonic_far_log,
+    vectors as _vectors,
+    real_log1p as _real_log1p)
 
 
 __all__ = ['QuadraticPanelLogResult', 'power_panel_quadratic_far_log']

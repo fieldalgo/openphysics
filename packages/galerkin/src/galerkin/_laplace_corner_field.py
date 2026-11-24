@@ -13,9 +13,14 @@ from scipy.linalg import cho_factor, cho_solve
 from . import _laplace_panels as kernel
 from . import laplace_two_ground as two
 from .laplace_corner import power_panel_quadrature, power_panel_gram
-from .laplace_corner import _graded_power_rule, _constant_segment_log
+from .laplace_corner import (
+    graded_power_rule as _graded_power_rule,
+    constant_segment_log as _constant_segment_log)
 from .laplace_corner_geometry import prepare_two_ground_corner_panels
-from .laplace_corner_assembly import _constant_half, _offsets, _weighted_pair
+from .laplace_corner_assembly import (
+    constant_half as _constant_half,
+    offsets as _offsets,
+    weighted_pair as _weighted_pair)
 from .dense_residual import bounded_dense_residual
 
 __all__ = []
@@ -179,10 +184,10 @@ def _smooth(a, b, grid, _projection, width, height, images):
     from galerkin import laplace_two_ground as two
     points = np.concatenate((a, b))
     center = (points.min(axis=0) + points.max(axis=0)) / 2
-    matrix = two._smooth(grid, grid, width, height, images)
-    left = two._smooth(grid, center[None], width, height, images)[:, 0]
-    right = two._smooth(center[None], grid, width, height, images)[0]
-    anchor = float(two._smooth(center[None], center[None], width, height, images)[0, 0])
+    matrix = two.smooth(grid, grid, width, height, images)
+    left = two.smooth(grid, center[None], width, height, images)[:, 0]
+    right = two.smooth(center[None], grid, width, height, images)[0]
+    anchor = float(two.smooth(center[None], center[None], width, height, images)[0, 0])
     return _centered_projection(_projection, matrix, left, right, anchor)
 
 @lru_cache(maxsize=128)
@@ -229,7 +234,7 @@ def _require(error, message, limit=1e-10):
 def _gram_checks(parts):
     if not np.isfinite(parts).all():
         raise ValueError('current Gram must be finite')
-    symmetry = two._entrywise_relative(parts, parts.swapaxes(-1, -2))
+    symmetry = two.entrywise_relative(parts, parts.swapaxes(-1, -2))
     _require(symmetry, 'current Gram reciprocity failed')
     scale = np.max(abs(parts), axis=(-1, -2))
     eigenvalues = np.linalg.eigvalsh(parts)
@@ -246,10 +251,10 @@ def solve(polygons, *, width, height, panels_per_edge, ground_modes,
     """Internal implementation of the explicitly bounded all-active solve."""
     if not isinstance(polygons, (list, tuple)) or not 1 <= len(polygons) <= 2:
         raise ValueError('corner field requires one or two all-active conductors')
-    width, height = two._positive(width, 'width'), two._positive(height, 'height')
-    count = two._integer(panels_per_edge, 'panels_per_edge', 16, 512)
-    modes = two._integer(ground_modes, 'ground_modes', 64, 4096)
-    degree = two._integer(interpolation_degree, 'interpolation_degree', 24, 24)
+    width, height = two.positive(width, 'width'), two.positive(height, 'height')
+    count = two.integer(panels_per_edge, 'panels_per_edge', 16, 512)
+    modes = two.integer(ground_modes, 'ground_modes', 64, 4096)
+    degree = two.integer(interpolation_degree, 'interpolation_degree', 24, 24)
     if count % 2 or modes % 2:
         raise ValueError('panel subdivisions and ground modes must be even')
     geometry = prepare_two_ground_corner_panels(polygons, width=width,
@@ -293,8 +298,8 @@ def solve(polygons, *, width, height, panels_per_edge, ground_modes,
     compensated = float(np.max(abs(bounded_dense_residual(matrix, q, 2*np.pi*values)))/(2*np.pi))
     capacitance = values.T @ q
     direct = float(np.max(abs(matrix@q-2*np.pi*values))/(2*np.pi))
-    energy = two._entrywise_relative(q.T@matrix@q/(2*np.pi), capacitance)
-    cap_reciprocity = two._entrywise_relative(capacitance, capacitance.T)
+    energy = two.entrywise_relative(q.T@matrix@q/(2*np.pi), capacitance)
+    cap_reciprocity = two.entrywise_relative(capacitance, capacitance.T)
     _require(max(compensated, direct, energy, cap_reciprocity), 'corner capacitance consistency failed')
     np.linalg.cholesky((capacitance+capacitance.T)/2)
     # Normalize charges before the Gram products; no fixed-ground reduction.
@@ -312,8 +317,8 @@ def solve(polygons, *, width, height, panels_per_edge, ground_modes,
         return w/unit*(np.einsum('bi,bj->bij', c[:, 0], c[:, 0])
             + .5*np.einsum('bni,bnj->bij', c[:, 1:], c[:, 1:]))
     planes = ground_parts(coefficients[1])
-    ground_error = two._entrywise_relative(ground_parts(coefficients[0]), planes)
-    mode_error = two._entrywise_relative(ground_parts(coefficients[1][:, :modes//2+1]), planes)
+    ground_error = two.entrywise_relative(ground_parts(coefficients[0]), planes)
+    mode_error = two.entrywise_relative(ground_parts(coefficients[1][:, :modes//2+1]), planes)
     ground_integrals = w*coefficients[1][:, 0]
     current_error = max(float(np.max(abs(integrals-np.eye(n)))),
         float(np.max(abs(w*coefficients[1][:, 0].sum(axis=0)+integrals.sum(axis=0)))))
@@ -323,7 +328,7 @@ def solve(polygons, *, width, height, panels_per_edge, ground_modes,
     edge_owners = owners[first]
     combined = np.array([face_parts[edge_owners == j].sum(axis=0) for j in range(n)])
     integrated = np.array([face_integrals[edge_owners == j].sum(axis=0) for j in range(n)])
-    partition = two._entrywise_relative(combined, whole_parts)
+    partition = two.entrywise_relative(combined, whole_parts)
     partition_current = float(np.max(abs(integrated-integrals)))
     _require(max(partition, partition_current), 'corner edge partition failed')
     all_parts = np.concatenate((whole_parts, planes))
@@ -336,3 +341,9 @@ def solve(polygons, *, width, height, panels_per_edge, ground_modes,
     return two.TwoGroundRectangleEdgesResult(whole, edge_owners,
         g['anchor'][first]*unit, g['anchor'][last]*unit,
         face_parts, face_integrals, partition)
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+gram_checks = _gram_checks
+mixed_difference = _mixed_difference
+require = _require

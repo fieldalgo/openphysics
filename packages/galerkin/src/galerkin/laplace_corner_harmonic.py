@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Self integrals for the first two static wedge radial current branches.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 These explicit primitives do not change an existing panel basis or solver.
 """
 from functools import lru_cache
@@ -9,7 +12,7 @@ import math
 
 from scipy.special import zeta
 
-from .laplace_corner import _length, _power, _frozen
+from .laplace_corner import length as _length, power as _power, frozen as _frozen
 from .laplace_corner import power_panel_gram, power_panel_self_log
 
 __all__ = ["power_panel_harmonic_gram", "power_panel_harmonic_self_log"]

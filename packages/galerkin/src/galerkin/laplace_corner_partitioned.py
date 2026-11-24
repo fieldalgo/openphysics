@@ -1,19 +1,22 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Explicitly partitioned mixed linear-power logarithmic panel blocks."""
+"""Explicitly partitioned mixed linear-power logarithmic panel blocks.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import math
 
 import numpy as np
 
 from .laplace_corner import (
-    _constant_linear_segment_log,
-    _constant_segment_log,
-    _frozen,
-    _graded_power_rule,
-    _power,
-    _require_disjoint_or_endpoint,
-)
+    constant_linear_segment_log as _constant_linear_segment_log,
+    constant_segment_log as _constant_segment_log,
+    frozen as _frozen,
+    graded_power_rule as _graded_power_rule,
+    power as _power,
+    require_disjoint_or_endpoint as _require_disjoint_or_endpoint)
 
 
 def _partition(first, second, offset):
@@ -161,3 +164,7 @@ def power_panel_linear_constant_log_partitioned(first, second, offset, exponent)
 
 
 __all__ = ["PartitionedPowerPanelLinearLogResult", "power_panel_linear_constant_log_partitioned"]
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+partition = _partition

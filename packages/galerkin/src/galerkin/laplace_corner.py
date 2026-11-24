@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Normalized power-panel integrals for homogeneous two-dimensional Laplace.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 For arc length s in (0,h), phi(s) = p/h * (s/h)**(p-1) integrates to one.
 The singular endpoint is s=0. These explicit numerical primitives do not
 alter any constant-panel solver or establish field/mesh convergence.
@@ -555,3 +558,18 @@ def power_panel_linear_constant_log(a,b,offset,exponent):
     coarse,fine=evaluate(n),evaluate(2*n)
     if not np.isfinite(coarse).all() or not np.isfinite(fine).all() or np.any(abs(fine-coarse)>1e-12*np.maximum(1,abs(fine))):raise ValueError('linear power-constant quadrature did not converge')
     return PowerPanelLinearLogResult(_frozen(fine).reshape(2,2),_frozen(coarse).reshape(2,2),n)
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+cached_graded_rule = _cached_graded_rule
+cached_power_rule = _cached_power_rule
+constant_linear_segment_log = _constant_linear_segment_log
+constant_segment_log = _constant_segment_log
+frozen = _frozen
+graded_power_rule = _graded_power_rule
+length = _length
+order = _order
+power = _power
+require_disjoint_or_endpoint = _require_disjoint_or_endpoint
+scalar = _scalar
+separated_distance = _separated_distance

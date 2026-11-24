@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Private compact partitions; existing public geometry and solver controls stay unchanged."""
 import numpy as np
-from .laplace_two_ground import _admit, _positive, _integer
+from .laplace_two_ground import admit as _admit, positive as _positive, integer as _integer
 from .laplace_corner_geometry import CornerPanelGeometry
 
 __all__ = []
@@ -63,3 +63,7 @@ def _prepare_compact_corner_panels(polygons, *, width, height, panels_per_edge=3
         raise ValueError('corner panel length is unresolved at domain scale')
     return CornerPanelGeometry(unit,w,h,g['anchor'],g['local'],g['direction'],p,
         owner,face,np.column_stack((g['starts'],g['ends'])))
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+prepare_compact_corner_panels = _prepare_compact_corner_panels
