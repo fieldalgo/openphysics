@@ -329,7 +329,7 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    banner (*Optical run complete…*, and **Stop waiting** while a run goes) is part of the view's
    title row, after the view title (*Results*, *Comparison*): it covers no heading and no control,
    and the row keeps its height, so it never moves the panels when it appears or leaves. The
-   *Optical run complete…* banner leaves after 6 seconds, or at your next click, tap or key press if
+   *Optical run complete…* banner leaves 6 seconds after it is shown (the result page drawn), or at your next click, tap or key press if
    that comes first; Messages keeps the words.
    The dock heading, the status bar, the title and the step bar describe the run being viewed
    (the selected run), named by its number with its name: after a run *Run 1 · solved from
