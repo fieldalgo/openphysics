@@ -95,8 +95,8 @@ test('U1: a mode mostly in a shape touching the window edge, with |E|² near tho
  assert.equal(p[1].share,0);assert.equal(p[1].named,false);
  assert.ok(Math.abs(p[2].share-1)<1e-12);assert.ok(Math.abs(p[2].near-3/7)<1e-12,String(p[2].near));assert.equal(p[2].named,true);
  assert.deepEqual(M.edgeNotes(run).map(n=>n.mode),[0,2]);
- assert.equal(M.edgeNotes(run)[0].text,'Mode 1 is mostly in Substrate (100 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.');
- assert.equal(M.edgeNoteText(0,{shape:'Substrate',share:0.934}),'Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.');
+ assert.equal(M.edgeNotes(run)[0].text,'Mode 1 is mostly in Substrate (100 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge open.');
+ assert.equal(M.edgeNoteText(0,{shape:'Substrate',share:0.934}),'Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge open.');
 });
 test('U1: the bounds: more than half in the shape, and at least 1 % of |E|² within 300 nm of its touched edges',async()=>{
  const M=await import(STATIC+'workspace-modes.mjs');

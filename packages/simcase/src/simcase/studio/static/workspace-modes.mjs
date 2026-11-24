@@ -295,9 +295,10 @@ export function edgePlacement(run){
  });
 }
 /** "Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff is set by
- * the closed window. Use Open boundary, or ask for more modes to reach the core mode." */
+ * the closed window. Use Open boundary to leave that edge open." (C0: no text promises that more
+ * modes reach the core mode.) */
 export function edgeNoteText(mode,p){
- return `Mode ${mode+1} is mostly in ${p.shape} (${Math.round(p.share*100)} % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary, or ask for more modes to reach the core mode.`;
+ return `Mode ${mode+1} is mostly in ${p.shape} (${Math.round(p.share*100)} % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use Open boundary to leave that edge open.`;
 }
 /** The notes of a run: [{mode, text}] for each mode named by edgePlacement. */
 const edgeCache=new WeakMap();
