@@ -194,7 +194,7 @@ try {
     await page.until("!document.getElementById('run-optical').disabled", 'Run enabled');
     await page.click('#run-optical');
     // round 19 (Y4): with six runs kept, Run study asks before dropping one; these stages answer Run
-    if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+   
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical run', 120000);
   };
   const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Geometry'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
@@ -598,7 +598,7 @@ try {
   // a server still running would answer the restart check and hide a failed restart
   if (stopped.exit === null && stopped.signal === null) throw new Error('Studio did not stop within 15 s');
   server = await startServer('server-2');
-  await toGeometry(); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+  await toGeometry(); await page.click('#run-optical');
   await page.until("/Studio was restarted/.test(document.getElementById('job-message').textContent)&&/^Connected/.test(document.getElementById('connection-status').textContent)", 'reconnect after restart', 20000);
   stage('reconnected after restart', {message: await page.eval("document.getElementById('job-message').textContent")});
 
@@ -834,7 +834,7 @@ try {
     await page.call('Emulation.setDeviceMetricsOverride', {width: w, height: h, deviceScaleFactor: 1, mobile}); await sleep(300);
     await toGeometry(); await page.type('#shape-w', width); await sleep(300);
     const before = await layoutBoxes(); await watchBanner();
-    await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+    await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical');
     await page.until("!document.getElementById('job-panel').hidden", 'Q6 banner shown');
     await page.eval('scrollTo(0,0)');
     const running = await layoutBoxes(), runningCover = await bannerCover(), runningOwn = await withoutBanner(), runningRow = await rowOwn(), runningHeadings = await centredCover();
@@ -1649,7 +1649,7 @@ try {
     const obRun = async () => {
       await ob.until("!document.getElementById('run-optical').disabled", 'OB Run enabled');
       const before = await ob.eval("document.querySelectorAll('.run-item').length");
-      const started = Date.now(); await ob.click('#run-optical'); if (await ob.eval("!!document.getElementById('run-drop-confirm')?.open")) await ob.click('#run-drop-confirm-run');
+      const started = Date.now(); await ob.click('#run-optical');
       await ob.until(`document.querySelectorAll('.run-item').length>${before}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'OB run', 300000);
       return Math.round((Date.now() - started) / 1000);
     };
@@ -2094,7 +2094,7 @@ try {
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
       await r.click('#run-optical');
       // round 19 (Y4): with six runs kept, Run study asks before dropping one; these stages answer Run
-      if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+     
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R17 run', 300000);
     };
     const pressEnter = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined}); await sleep(150); };
@@ -2128,7 +2128,8 @@ try {
     const u2 = {items: await runItems(), message: await rText('#file-status'), status: await rText('#status')};
     stage('R17 U2 seven runs', u2);
     assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
-    assert.ok(u2.message.endsWith(' Run 1 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), u2.message);
+    // round 21 (W2): the drop words, then the swap Messages offers
+    assert.ok(u2.message.endsWith(' Run 1 (500 × 220 nm · 2 modes) was dropped Keep Run 1, drop Run 2 (500 × 220 nm · 2 modes) instead'), u2.message);
     assert.ok(u2.status.startsWith('Run 7 · '), u2.status);
     // Run 5 and Run 6 named (pinned) on Compare; an eighth run drops Run 2, keeps the pair and says Run 8 is newer
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results');
@@ -2145,7 +2146,7 @@ try {
       headings: await r.eval("[...document.querySelectorAll('#compare-table-runs [data-side]')].map(s=>s.textContent.split(' · ').slice(0,3).join(' · '))")};
     stage('R17 U2 eighth run', u2b);
     assert.deepEqual(u2b.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
-    assert.ok(u2b.dropped.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), u2b.dropped);
+    assert.ok(u2b.dropped.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead'), u2b.dropped);
     assert.equal(u2b.newer, 'Run 8 is newer than this pair · Compare Run 8 with B');
     assert.deepEqual(u2b.headings, ['A · Run 5 · Design A', 'B · Run 6 · Design B']);
     // U9: the pickers are named Run A and Run B; the run number and name fit their visible width
@@ -2245,7 +2246,7 @@ try {
     const rRun = async () => {
       await r.until("!document.getElementById('run-optical').disabled", 'R18 Run enabled');
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
-      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.click('#run-optical');
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R18 run done', 600000);
     };
     const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
@@ -2297,6 +2298,8 @@ try {
     // X3: runs 3 to 6: the box names the run the next one drops, with Pin Run 1; the ribbon does not move
     const ribbonBefore = await ribbon();
     for (const nm of [34, 36, 38, 40]) { await mesh(nm); await rRun(); }
+    // round 21 (W5): the line is hidden while the inputs equal Run 6's; an edit makes them differ
+    await mesh(42); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R21 X3 run list');
     const x3 = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), plan: await plan()};
     sameRibbon(ribbonBefore, await ribbon(), 'X3 drop line');
     await rOverflow('X3 drop line');
@@ -2365,12 +2368,10 @@ try {
     const rRun = async () => {
       await r.until("!document.getElementById('run-optical').disabled", 'R19 Run enabled');
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
-      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.click('#run-optical');
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&${idle}`, 'R19 run', 300000);
     };
     const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
-    const dialog = () => r.eval("(()=>{const d=document.getElementById('run-drop-confirm');return {open:d.open,title:document.getElementById('run-drop-confirm-title').textContent,note:document.getElementById('run-drop-confirm-description').textContent,buttons:[...d.querySelectorAll('button')].filter(b=>!b.hidden).map(b=>b.textContent),focus:document.activeElement?.id||null,labelledby:d.getAttribute('aria-labelledby')}})()");
-    const escape = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27}); await sleep(300); };
     const recorded = async label => { await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(1200); };
     const clearRecorded = () => r.eval("document.getElementById('notebook-recovery-detail').textContent=''");
     await r.call('Page.navigate', {url: base + '/workspace'});
@@ -2380,43 +2381,65 @@ try {
     const y7 = await r.eval("['shape-name','shape-material'].map(id=>{const e=document.getElementById(id);return [id,[...e.labels].map(l=>l.textContent),e.closest('label')===null]})");
     stage('R19 Y7 labels', {y7});
     assert.deepEqual(y7, [['shape-name', ['Name'], true], ['shape-material', ['Material'], true]]);
-    // Y4: six runs, then Run study asks before dropping Run 1
+    // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): six runs,
+    // then W5 the drop line beside "No need to run", W2 Run study starting at once with the line during
+    // the run, Pin during the run, the drop when the result arrives and the swap offered in Messages
     await clearRecorded();
     for (const nm of [30, 32, 34, 36, 38, 40]) { await mesh(nm); await rRun(); }
     await recorded('R19 six runs kept');
-    await mesh(42); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 run list');
-    const six = await runItems();
-    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question');
-    const y4 = {asked: await dialog()};
-    // round 20 (Z7, pre-registered): while the question is open the page says Run study waits for it
-    const waitingWords = () => r.eval("({plan:document.getElementById('run-plan').textContent,dropHidden:document.getElementById('run-drop').hidden,status:document.getElementById('status').textContent,run:document.getElementById('run-optical').textContent,job:document.getElementById('job-message').textContent,jobHidden:document.getElementById('job-panel').hidden,inDialog:document.getElementById('run-drop-confirm').contains(document.activeElement)})");
-    const z7 = {open: await waitingWords()};
-    await rOverflow('Y4 drop question');
-    await escape(); y4.escape = {...await dialog(), items: await runItems(), busy: await rText('#run-optical')};
-    z7.cancelled = await waitingWords(); stage('R20 Z7 waiting words', z7);
-    assert.deepEqual(z7.open, {plan: 'Waiting for your answer: pin, run or cancel', dropHidden: true, status: 'Run study is waiting for your answer', run: 'Run study', job: '', jobHidden: true, inDialog: true});
-    for (const text of [z7.open.status, z7.open.run, z7.open.plan]) assert.doesNotMatch(text, /Computing|running|in progress/);
-    assert.match(z7.cancelled.plan, /^Closed window · last such run \d+:\d\d$/); assert.equal(z7.cancelled.dropHidden, false);
-    assert.ok(z7.cancelled.status.endsWith(' · press Run to compute them'), z7.cancelled.status); assert.equal(z7.cancelled.inDialog, false);
-    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question again');
-    await r.click('#run-drop-confirm-pin'); await sleep(300); y4.pinned = {...await dialog(), items: await runItems()};
-    await r.click('#run-drop-confirm-cancel'); await sleep(300); y4.cancel = {...await dialog(), items: await runItems()};
-    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question third');
-    y4.third = await dialog(); await clearRecorded(); await r.click('#run-drop-confirm-run');
-    await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.split(' · ').includes('Run 7'))&&${idle}`, 'R19 run 7', 300000);
-    y4.after = {items: await runItems(), message: await rText('#file-status'), drop: await rText('#run-drop-text')};
-    stage('R19 Y4 drop question', y4);
-    assert.deepEqual(y4.asked, {open: true, title: 'Running drops Run 1 (500 × 220 nm · 2 modes).', note: 'Up to six runs are kept; a pinned run is never dropped.', buttons: ['Pin Run 1 and run', 'Run', 'Cancel'], focus: 'run-drop-confirm-pin', labelledby: 'run-drop-confirm-title'});
-    assert.equal(y4.escape.open, false); assert.equal(y4.escape.focus, 'run-optical'); assert.deepEqual(y4.escape.items, six); assert.equal(y4.escape.busy, 'Run study');
-    // Pin Run 1 and run pins it and asks again for the run that would then be dropped
-    assert.equal(y4.pinned.open, true); assert.equal(y4.pinned.title, 'Running drops Run 2 (500 × 220 nm · 2 modes).'); assert.deepEqual(y4.pinned.buttons, ['Pin Run 2 and run', 'Run', 'Cancel']);
-    assert.ok(y4.pinned.items.some(t => t.startsWith('Pinned · Run 1 · ')), JSON.stringify(y4.pinned.items));
-    assert.equal(y4.cancel.open, false); assert.equal(y4.cancel.focus, 'run-optical'); assert.equal(y4.cancel.items.length, 6);
-    assert.equal(y4.third.title, 'Running drops Run 2 (500 × 220 nm · 2 modes).');
-    assert.deepEqual(y4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
-    assert.ok(y4.after.message.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), y4.after.message);
-    // the line beside Run study stays
-    assert.equal(y4.after.drop, 'If you run: drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
+    const dropLine = () => r.eval("({hidden:document.getElementById('run-drop').hidden,text:document.getElementById('run-drop-text').textContent,pin:document.getElementById('run-drop-pin').hidden?null:document.getElementById('run-drop-pin').textContent})");
+    // W5: the inputs of Run 6 (mesh 40): no drop line beside "No need to run"; mesh 42: the line is back
+    const w5 = {matched: {...await dropLine(), message: await rText('#file-status')}};
+    await mesh(42); w5.differ = await dropLine();
+    await mesh(40); w5.again = {...await dropLine(), message: await rText('#file-status')};
+    await mesh(42); w5.back = await dropLine();
+    stage('R21 W5 drop line beside No need to run', w5);
+    assert.equal(w5.matched.hidden, true);
+    assert.equal(w5.again.hidden, true); assert.ok(w5.again.message.includes('No need to run: Run 6 already has these results.'), w5.again.message);
+    for (const state of [w5.differ, w5.back]) assert.deepEqual(state, {hidden: false, text: 'If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it', pin: 'Pin Run 1'});
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 run list');
+    // W2: the job's status replies are held in the page until released, so the line during the run is read deterministically
+    await r.eval("(()=>{const f=window.fetch;window.__held=[];window.__hold=true;window.fetch=(u,o)=>{const s=String(u);if(window.__hold&&s.includes('/api/jobs/'))return new Promise(go=>window.__held.push(()=>go(f(u,o))));return f(u,o);};window.__release=()=>{window.__hold=false;const h=window.__held;window.__held=[];h.forEach(x=>x());};})()");
+    await r.click('#run-optical');
+    await r.until("window.__held.length>0", 'R21 run started');
+    const w2 = {during: {...await dropLine(), dialog: await r.eval("!!document.getElementById('run-drop-confirm')"), run: await r.eval("({text:document.getElementById('run-optical').textContent,disabled:document.getElementById('run-optical').disabled})"), status: await rText('#status')}};
+    await rOverflow('W2 line during the run');
+    await r.click('#run-drop-pin'); await sleep(300);
+    w2.pinned = {...await dropLine(), items: await runItems()};
+    await clearRecorded(); await r.eval('window.__release()');
+    await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.split(' · ').includes('Run 7'))&&${idle}`, 'R21 run 7', 300000);
+    const keepButton = () => r.eval("(()=>{const b=document.querySelector('#file-status [data-keep-run]');return b?b.textContent:null})()");
+    w2.after = {items: await runItems(), message: await rText('#file-status'), keep: await keepButton(), drop: await dropLine()};
+    await rOverflow('W2 drop with the swap button');
+    // the swap: Run 2 back at its place, Run 3 dropped instead, no further button; six runs
+    await r.click('#file-status [data-keep-run]'); await sleep(300);
+    w2.swapped = {items: await runItems(), message: await rText('#file-status'), keep: await keepButton(), heading: await rText('#run-list-heading')};
+    // a stale button does nothing: the next run (mesh 44) offers a swap; the run after it starts, then the old button is pressed
+    await mesh(44); await r.click('nav [data-page=Results]'); await rRun();
+    w2.next = {message: await rText('#file-status'), keep: await keepButton()};
+    await r.eval("window.__stale=document.querySelector('#file-status [data-keep-run]')");
+    await mesh(46); await r.click('nav [data-page=Results]'); await rRun();
+    const beforeStale = await runItems();
+    await r.eval("window.__stale.click()"); await sleep(300);
+    w2.stale = {before: beforeStale, after: await runItems(), connected: await r.eval("window.__stale.isConnected")};
+    stage('R21 W2 run at once, drop at the result, swap', w2);
+    assert.equal(w2.during.dialog, false);
+    assert.deepEqual({hidden: w2.during.hidden, text: w2.during.text, pin: w2.during.pin}, {hidden: false, text: 'When this run finishes, Run 1 (500 × 220 nm · 2 modes) is dropped', pin: 'Pin Run 1'});
+    assert.equal(w2.during.run.disabled, true); assert.doesNotMatch(w2.during.status, /waiting for your answer/);
+    // Pin during the run keeps Run 1; the line names the next unpinned run
+    assert.equal(w2.pinned.text, 'When this run finishes, Run 2 (500 × 220 nm · 2 modes) is dropped'); assert.equal(w2.pinned.pin, 'Pin Run 2');
+    assert.ok(w2.pinned.items.some(t => t.startsWith('Pinned · Run 1 · ')), JSON.stringify(w2.pinned.items));
+    assert.deepEqual(w2.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
+    assert.ok(w2.after.message.includes(' Run 2 (500 × 220 nm · 2 modes) was dropped '), w2.after.message);
+    assert.equal(w2.after.keep, 'Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead');
+    // W5: the inputs are Run 7's now, so the line before the next run is hidden
+    assert.equal(w2.after.drop.hidden, true);
+    assert.deepEqual(w2.swapped.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
+    assert.equal(w2.swapped.message, 'Run 2 (500 × 220 nm · 2 modes) is back; Run 3 (500 × 220 nm · 2 modes) was dropped instead.');
+    assert.equal(w2.swapped.keep, null); assert.equal(w2.swapped.heading, 'Runs · 6 of 6 · 1 pinned');
+    assert.equal(w2.next.keep, 'Keep Run 2, drop Run 4 (500 × 220 nm · 2 modes) instead');
+    assert.deepEqual(w2.stale.after, w2.stale.before); assert.equal(w2.stale.connected, false);
+    assert.equal(w2.stale.after.length, 6);
     // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
     await recorded('R19 seven runs kept');
     await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');
@@ -2479,7 +2502,7 @@ try {
     const rRun = async () => {
       await r.until("!document.getElementById('run-optical').disabled", 'R20 Run enabled');
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
-      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.click('#run-optical');
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&${idle}`, 'R20 run', 300000);
     };
     const recorded = async label => { await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(1200); };
