@@ -28,7 +28,8 @@ vertical placements. Arrays own immutable bytes; their write flags cannot be
 re-enabled.
 
 The API admits 1–16 strictly convex, disjoint, closed, finite-thickness polygons
-strictly inside a rectangle with width/height in [0.25,16]. A conductor cluster
+strictly inside a rectangle with width/height in [0.25,64] (the corner solvers that reuse this
+admission keep [0.25,16]). A conductor cluster
 closer to a side wall than its extent is interpolated on boxes scaled to each
 conductor's distance from the planes and side walls (at most 256, else refused
 before a field solve). It uses at most 2048 total panels,
