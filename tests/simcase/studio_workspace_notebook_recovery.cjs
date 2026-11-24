@@ -281,3 +281,39 @@ test('round 10: a record keeps the page shown and whether the notebook still mat
  assert.deepEqual([restorePage('Compare',1),restorePage('Results',0)],['Results','Model']);
  assert.equal(recordPage('Results'),'Results');assert.equal(recordPage('Connections'),null);
 });
+// Round 20 follow-up: a pair restore read the latest record, waited for the server's model check,
+// and adopted that read after this tab's own pending save had replaced it: every later save then
+// failed as another tab's change. settle() before the read writes the pending save first.
+test('a restore that settles the pending save first adopts the stored record; the stale read conflicted',async()=>{
+ const record=session=>({version:1,savedAt:'2026-11-24T08:44:00Z',session});
+ // the old order: read latest, this tab's queued save commits, then adopt what was read
+ {const db=database(record('optical')),store=indexedNotebookStore(db),states=[],saver=new NotebookAutosave(store,{delay:5,onState:s=>states.push(s)});
+  store.adopt(await store.load(),{kept:true});saver.schedule('restored',()=> 'optical restored');
+  const stale=await store.load();await saver.flush();assert.equal(states.at(-1).phase,'saved');
+  store.adopt(stale);await assert.rejects(store.save(record('heated')),{code:'recovery-conflict'});}
+ // the new order: settle, then read and adopt: the next saves go through
+ {const db=database(record('optical')),store=indexedNotebookStore(db),states=[],saver=new NotebookAutosave(store,{delay:5,onState:s=>states.push(s)});
+  store.adopt(await store.load(),{kept:true});saver.schedule('restored',()=> 'optical restored');
+  await saver.settle();assert.equal(saver.pending,false);assert.equal(saver.writing,false);
+  const fresh=await store.load();assert.equal(fresh.session,'optical restored');
+  store.adopt(fresh);saver.schedule('heated',()=> 'heated restored');await saver.flush();
+  assert.equal(states.at(-1).phase,'saved');assert.equal((await store.load()).session,'heated restored');
+  saver.schedule('edit',()=> 'heated edited');await saver.flush();assert.equal(states.at(-1).phase,'saved');}
+ // a write already in flight is waited for, and nothing pending returns at once
+ {const db=database(null),store=indexedNotebookStore(db),saver=new NotebookAutosave(store,{delay:5});
+  store.adopt(await store.load());saver.schedule('a',()=> 'A');const writing=saver.flush();
+  await saver.settle();assert.equal(saver.writing,false);assert.equal((await store.load()).session,'A');await writing;
+  await saver.settle();assert.equal(saver.pending,false);}
+});
+test('settle does not hide another tab\'s write: the pending save still ends in recovery-conflict',async()=>{
+ const record=session=>({version:1,savedAt:'2026-11-24T08:44:00Z',session});
+ const db=database(record('optical')),a=indexedNotebookStore(db),b=indexedNotebookStore(db),states=[],saver=new NotebookAutosave(a,{delay:5,onState:s=>states.push(s)});
+ a.adopt(await a.load(),{kept:true});saver.schedule('restored',()=> 'tab A');
+ // a real second tab writes the latest record while tab A's save waits for its timer
+ b.adopt(await b.load(),{kept:true});await b.save(record('tab B'));
+ await saver.settle();
+ assert.equal(states.at(-1).phase,'error');assert.equal(states.at(-1).code,'recovery-conflict');
+ assert.equal((await a.load()).session,'tab B');assert.equal(saver.writing,false);
+ // and tab A's next save is refused too, until a recovery is reviewed
+ await assert.rejects(a.save(record('tab A again')),{code:'recovery-conflict'});
+});
