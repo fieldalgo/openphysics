@@ -5,7 +5,7 @@ from functools import lru_cache
 
 import numpy as np
 import pytest
-from panel_studies import matrix_relative, recorded, study
+from panel_studies import ENABLED as STUDIES, matrix_relative, recorded
 
 from galerkin.laplace_corner_linear_field import solve_two_ground_linear_corner_rectangle_edges as solve
 from galerkin import laplace_corner_linear_field as field
@@ -34,17 +34,17 @@ def calculated(index,count=64,width=.008,reflect=False):
                  ground_modes={.008:256,.016:512,.032:1024}[width])
 
 
-@pytest.mark.slow
-@study
-@pytest.mark.parametrize('index',range(2))
-def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
-    coarse=quantities(calculated(index,32));fine=quantities(calculated(index,64))
-    panel=[relative(a,b) for a,b in zip(coarse,fine)]
-    assert max(panel)<=.01
-    outer=[quantities(calculated(index,width=width)) for width in (.008,.016,.032)]
-    changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
-    assert max(value for row in changes for value in row)<=.01
-    record_property('linear_corner_resolution',repr((index,panel,changes)))
+if STUDIES:  # dispatch-only convergence study (tests/_support/panel_studies.py)
+    @pytest.mark.slow
+    @pytest.mark.parametrize('index',range(2))
+    def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
+        coarse=quantities(calculated(index,32));fine=quantities(calculated(index,64))
+        panel=[relative(a,b) for a,b in zip(coarse,fine)]
+        assert max(panel)<=.01
+        outer=[quantities(calculated(index,width=width)) for width in (.008,.016,.032)]
+        changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
+        assert max(value for row in changes for value in row)<=.01
+        record_property('linear_corner_resolution',repr((index,panel,changes)))
 
 
 @pytest.mark.parametrize('index',range(2))
@@ -53,26 +53,6 @@ def test_cheapest_study_resolution_reproduces_the_recorded_values(index):
     the tests below solve (64 panels, 8 mm) must keep the values recorded with it."""
     for value,reference in zip(quantities(calculated(index)),recorded('test_laplace_corner_linear_field',index)):
         assert matrix_relative(value,reference)<=1e-9
-
-
-@pytest.mark.parametrize('index',range(2))
-def test_horizontal_reflection_preserves_each_current_entry_without_floor(index):
-    original,reflected=calculated(index),calculated(index,reflect=True)
-    n=len(GEOMETRIES[index]['polygons']);cap,faces,whole=quantities(reflected)
-    faces=faces.reshape(n,4,n,n)[:,[2,1,0,3]].reshape(4*n,n,n)
-    assert max(relative(a,b) for a,b in zip(quantities(original),(cap,faces,whole)))<=1e-10
-
-
-@pytest.mark.parametrize('index',range(2))
-@pytest.mark.parametrize('scale',[2.**-15,2.**15])
-def test_physical_scaling_keeps_capacitance_and_inverse_length_current_units(index,scale):
-    row=GEOMETRIES[index];expected=calculated(index,32)
-    result=solve([np.asarray(p)*scale for p in row['polygons']],
-                 width=row['width']*scale,height=row['height']*scale,panels_per_edge=32)
-    assert relative(result.whole.capacitance_per_permittivity,expected.whole.capacitance_per_permittivity)<=1e-10
-    assert relative(scale*result.whole.current_gram,expected.whole.current_gram)<=1e-10
-    assert relative(scale*result.edge_current_gram,expected.edge_current_gram)<=1e-10
-    np.testing.assert_allclose(result.whole.current_integrals,expected.whole.current_integrals,rtol=0,atol=1e-10)
 
 
 def test_active_conductor_basis_permutation():

@@ -92,7 +92,7 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
-- 시험: 코너 장 패널 수렴 연구(harmonic 코너 장 3모듈과 linear 코너 장; 패널 32→48/64, 바깥 폭 8→16→32 mm, 1% 기준 불변)는 하나하나가 45분 CI 시험 분할보다 길다. `slow`로 표시하고 `OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(입력 `panel_studies=true`)에서 돌린다. 일반 시험은 다른 시험이 푸는 해상도가 기록값(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비 1e-9)을 재현하는지 확인한다. 분할 시간표에 panel 시험 파일을 넣었다. [개발 안내](development.md).
+- 시험: 코너 장 패널 수렴 연구(harmonic 코너 장 3모듈과 linear 코너 장; 패널 32→48/64, 바깥 폭 8→16→32 mm, 1% 기준 불변)는 하나하나가 45분 CI 시험 분할보다 길다. `slow`로 표시하고 `OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(입력 `panel_studies=true`)에서 돌린다. 일반 시험은 다른 시험이 푸는 해상도가 기록값(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비 1e-9)을 재현하는지 확인한다. 분할 시간표는 panel 시험 파일을 포함한 완료된 CI 실행으로 다시 만들었고, 전체의 1/8보다 긴 두 파일은 나눴다(반사·크기 변환 시험을 별도 파일로). 설치 wheel 실행은 skip을 실패로 보므로 변수가 없으면 연구 시험을 정의하지 않는다. [개발 안내](development.md).
 
 - `galerkin`: 경계·코너 panel 모듈(`laplace_boundary`, `laplace_two_ground`, `laplace_open_box`, `laplace_half_space`, `laplace_corner*`, `dense_residual`)을 일관 단위의 내부 모듈(galerkin 공개 API 밖)로 등록하고, 모듈 사이 공유 도우미는 공개 이름으로만 쓴다. 평면 기하 conjugation 3곳(2D 방향을 복소수로 표현)을 이유와 함께 conventions 허용 목록에 올렸다. 결과는 바뀌지 않는다. [개발 안내](development.md).
 

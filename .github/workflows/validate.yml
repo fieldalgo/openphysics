@@ -369,7 +369,7 @@ jobs:
     # The corner-field panel convergence studies (tests/_support/panel_studies.py): panels
     # 32 -> 48 or 64 and outer widths 8 -> 16 -> 32 mm, five or more dense solves each, from
     # tens of minutes to hours on one CPU, longer than a 45-minute test partition, where they
-    # skip. The partitions instead check that the resolution each module's other tests solve reproduces the
+    # are not defined. The partitions instead check that the resolution each module's other tests solve reproduces the
     # values recorded with it (tests/galerkin/two_ground/evidence/corner-field-studies.json).
     # Manual dispatch with panel_studies=true only (gh workflow run validate.yml --ref <branch>
     # -f panel_studies=true): never on pushes or pull requests, outside the tests gate. Run it
