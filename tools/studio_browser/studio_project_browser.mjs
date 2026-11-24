@@ -763,8 +763,8 @@ try {
     await recorded('K4 optical record'); const before = await listDownloads();
     await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'K4 Save As');
     await clearRecorded();
-    assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'both-models.json');
-    await page.press('button', 'Download'); assert.equal(await newDownload(before), 'both-models.json');
+    // the project opened from heater-study.json offers that file; the new name is typed
+    await page.fill('textbox', 'File name', 'both-models'); await page.press('button', 'Download'); assert.equal(await newDownload(before), 'both-models.json');
     await recorded('K4 saved');
     await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K4 start page again');
     await openFile(join(downloads, 'both-models.json')); await page.until("/^Opened project both-models/.test(document.getElementById('file-status').textContent)", 'K4 open both-models', 60000);
