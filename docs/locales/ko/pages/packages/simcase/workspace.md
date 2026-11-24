@@ -204,8 +204,9 @@ file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open
 파일에 쓰거나 그 이름을 제안합니다. 탭에 다른 모델이 함께 있으면 헤더는 *changed since*로 읽힙니다. round 19부터
 저장했던 프로젝트 파일 이후로 바뀐 기록도 이름과 파일을 되살립니다: *y3-saved · y3-saved.json · changed since saved
 06:15 AM · kept for recovery in this browser*. [세션 버전 12](#광학-세션-파일버전-12)부터 기록은 프로젝트 이름(`project`)도 담으므로, 저장하지 않고 연 파일의
-기록도 프로젝트 파일 없이 이름을 되살립니다: *both-models · recovered from this browser · not saved to a file · kept for
-recovery in this browser*(기록이 아직 그 파일과 같으면 *· as opened from both-models.json ·*), File › Save는
+기록도 프로젝트 파일 없이 이름을 되살립니다: *both-models · recovered from this browser · changed since both-models.json, not
+saved · kept for recovery in this browser*(round 23, E5; 기록이 아직 그 파일과 같으면 *· as opened from both-models.json ·*, 파일
+없는 기록이면 *· not saved to a file ·*), File › Save는
 `both-models.json`을 제안하고 묻습니다. 이전 기록은 파일 이름만 담고 프로젝트 이름은 담지 않으므로 이름을 짐작하지
 않습니다: 헤더가 출처를 밝힙니다, *Untitled project · recovered from a copy of both-models.json · not saved to a file ·
 kept for recovery in this browser*. 상태 표시줄(*Recovered from this browser (opened from both-models.json; changed
@@ -1956,8 +1957,11 @@ session from this browser**가 각 세션의 모델, 실행 수, 실행 이름�
 `file`, Rename으로 정한 이름이면 `user`). 이름 없는 프로젝트에는 쓰지 않고, 잘못된 값은 무시하며, 기록은 버전 1
 그대로입니다(이전 Studio는 이 키를 무시). 복원은 기록이 프로젝트 파일(`savedFile.projectName`, 둘 다 있으면 이쪽이
 우선)을 밝히지 않을 때 이를 씁니다: 프로젝트는 프로젝트 파일 없이 그 이름을 받으므로 File › Save는 그 이름의 파일
-(`both-models.json`)을 제안하고 묻습니다. 다음 변경까지 헤더는 *both-models · recovered from this browser · not saved
-to a file · kept for recovery in this browser*이고, 기록이 연 프로젝트 파일과 아직 같았으면 *both-models · recovered
+(`both-models.json`)을 제안하고 묻습니다. 다음 변경까지 헤더는 파일 없이 연 기록이면 *both-models · recovered from this
+browser · not saved to a file · kept for recovery in this browser*, 연 프로젝트 파일과 더는 같지 않은 기록이면 *both-models ·
+recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser*(round 23, E5, HQ
+결정 2026-11-24-openphysics-studio-round23-choices: 전에는 여기서도 파일이 없었던 것처럼 *not saved to a file*였음)이고,
+기록이 연 프로젝트 파일과 아직 같았으면 *both-models · recovered
 from this browser · as opened from both-models.json · kept for recovery in this browser*입니다. 프로젝트 파일을 밝힌
 기록은 전과 같고(*… · both-models.json · saved …*), 이름 없는 이전 기록도 전과 같습니다(*Untitled project · …*).
 다음 변경 뒤 헤더는 보통 헤더입니다(*both-models · not saved to a file · …*). 두 기록의 프로젝트 이름이 다른 쌍 복원은

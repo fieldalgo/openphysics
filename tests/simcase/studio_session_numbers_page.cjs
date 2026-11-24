@@ -85,8 +85,11 @@ test('K6: a seeded random sequence of 2400 steps keeps the numbers increasing, n
 
 test('K7: the header after a restore names the recovered project; a pair restore keeps the newer name',()=>{
  const when=()=>'10:15';
- // a name, the record no longer matching the file it was opened from
- assert.equal(PS.projectTitle({name:'both-models',models:2,recovery:'kept',recovered:{opened:null}},when),'both-models · recovered from this browser · not saved to a file · kept for recovery in this browser');
+ // a name, the record no longer matching the file it was opened from (round 23, E5: HQ decision
+ // 2026-11-24-openphysics-studio-round23-choices; it read "… · not saved to a file · …")
+ assert.equal(PS.projectTitle({name:'both-models',models:2,recovery:'kept',recovered:{opened:null,changed:'both-models.json'}},when),'both-models · recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser');
+ // a name, the record opened from no file
+ assert.equal(PS.projectTitle({name:'both-models',models:2,recovery:'kept',recovered:{opened:null,changed:null}},when),'both-models · recovered from this browser · not saved to a file · kept for recovery in this browser');
  // a name, the record still matching the project file it was opened from (Q4)
  assert.equal(PS.projectTitle({name:'both-models',models:2,recovery:'kept',recovered:{opened:'both-models.json'}},when),'both-models · recovered from this browser · as opened from both-models.json · kept for recovery in this browser');
  // savedFile.projectName: as before (the project file, saved at its time)
@@ -98,8 +101,10 @@ test('K7: the header after a restore names the recovered project; a pair restore
  assert.equal(PS.projectTitle({name:'both-models',models:2,recovery:'kept'},when),'both-models · not saved to a file · kept for recovery in this browser');
  // the name of a record, unless savedFile.projectName names one or the project has a file
  const empty={name:null,nameFrom:null,file:null,recovered:null};
- assert.deepEqual(PS.recoveredProjectName(empty,{name:'both-models',from:'file'},{openedFile:'both-models.json',openedCurrent:true,savedAt:'2026-11-24T10:00:00.000Z'}),{name:'both-models',nameFrom:'file',recovered:{opened:'both-models.json',savedAt:'2026-11-24T10:00:00.000Z'}});
+ assert.deepEqual(PS.recoveredProjectName(empty,{name:'both-models',from:'file'},{openedFile:'both-models.json',openedCurrent:true,savedAt:'2026-11-24T10:00:00.000Z'}),{name:'both-models',nameFrom:'file',recovered:{opened:'both-models.json',changed:null,savedAt:'2026-11-24T10:00:00.000Z'}});
  assert.deepEqual(PS.recoveredProjectName(empty,{name:'both-models',from:'file'},{openedFile:'both-models.json',openedCurrent:false,savedAt:'2026-11-24T10:00:00.000Z'}).recovered.opened,null);
+ assert.equal(PS.recoveredProjectName(empty,{name:'both-models',from:'file'},{openedFile:'both-models.json',openedCurrent:false,savedAt:'2026-11-24T10:00:00.000Z'}).recovered.changed,'both-models.json');
+ assert.equal(PS.recoveredProjectName(empty,{name:'both-models',from:'file'},{savedAt:'2026-11-24T10:00:00.000Z'}).recovered.changed,null);
  assert.equal(PS.recoveredProjectName(empty,{name:'a',from:'user'},{savedFile:{name:'a.json',savedAt:'T',current:true,projectName:'a'}}),null);
  assert.equal(PS.recoveredProjectName({...empty,file:{name:'x.json'}},{name:'a',from:'user'}),null);
  assert.equal(PS.recoveredProjectName(empty,null),null);
@@ -113,7 +118,7 @@ test('K7: the header after a restore names the recovered project; a pair restore
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("restoreProjectName(pending.recordProject,{savedFile:file,openedFile:pending.openedFile,openedCurrent:pending.openedCurrent,savedAt:pending.recordSavedAt});"));
  assert.ok(app.includes("restoreProjectName(recordProject,{savedFile,openedFile,openedCurrent,savedAt:recordSavedAt});"));
- assert.ok(app.includes("const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened}:null;"));
+ assert.ok(app.includes("const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened,changed:project.recovered.changed??null}:null;"));
  // both models' records write the project's name
  assert.ok(app.includes("page:pageForRecord(),project:recordProjectNow()});const changed"));
  assert.ok(app.includes("openedCurrent:rec.openedCurrent,project:recordProjectNow()});"));

@@ -234,9 +234,9 @@ model of the tab beside it, the header reads *changed since*. Since round 19 a r
 the project file it was saved to brings back the name and file too: *y3-saved · y3-saved.json ·
 changed since saved 06:15 AM · kept for recovery in this browser*. Since [session version 12](#optical-session-files-version-12) a record also keeps the
 project's name (`project`), so a record of a file that was opened, not saved, brings the name back
-with no project file: *both-models · recovered from this browser · not saved to a file · kept for
-recovery in this browser* (*· as opened from both-models.json ·* while the record still matched
-it), and File › Save suggests `both-models.json` and asks. An older record holds the file's name
+with no project file: *both-models · recovered from this browser · changed since both-models.json,
+not saved · kept for recovery in this browser* (round 23, E5; *· as opened from both-models.json ·*
+while the record still matched it, *· not saved to a file ·* for a record of no file), and File › Save suggests `both-models.json` and asks. An older record holds the file's name
 but not the project's, so no name is guessed: the header names the source, *Untitled project ·
 recovered from a copy of both-models.json · not saved to a file · kept for recovery in this
 browser*, as the status bar does (*Recovered from this browser (opened from both-models.json;
@@ -2362,7 +2362,11 @@ one is ignored, and the record stays version 1 (earlier Studios ignore the key).
 when the record names no project file (`savedFile.projectName`, which wins when both are present):
 the project takes the name, with no project file, so File › Save suggests the name's file
 (`both-models.json`) and asks. Until the next change the header reads *both-models · recovered from
-this browser · not saved to a file · kept for recovery in this browser*, or *both-models ·
+this browser · not saved to a file · kept for recovery in this browser* when the record was opened
+from no file, *both-models · recovered from this browser · changed since both-models.json, not saved ·
+kept for recovery in this browser* when it no longer matched the project file it was opened from
+(round 23, E5, HQ decision 2026-11-24-openphysics-studio-round23-choices: it read *not saved to a
+file* there, as if no file had held the project), or *both-models ·
 recovered from this browser · as opened from both-models.json · kept for recovery in this browser*
 when the record still matched the project file it was opened from; a record that names its
 project file reads as before (*… · both-models.json · saved …*), and an older record without a name

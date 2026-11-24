@@ -596,7 +596,8 @@ try {
     stage('R19 Y3 restore names', {opened, saved: savedCase});
     // since session version 12 the record keeps the project's name (Heater study, from the file
     // opened), so the header names it; a record without a name still reads "recovered from a copy of"
-    assert.match(opened.title, /^Heater study · recovered from this browser · not saved to a file · /);
+    // round 23 (E5): the record no longer matched the file it was opened from (it read "not saved to a file")
+    assert.match(opened.title, /^Heater study · recovered from this browser · changed since heater-study\.json, not saved · /);
     assert.equal(opened.footer, 'Recovered from this browser (opened from heater-study.json; changed since)');
     // the restored name Heater study is the user's (set with Rename), so Save As r19-saved.json keeps it
     assert.match(savedCase.title, /^Heater study · r19-saved\.json · changed since saved \d\d:\d\d(?: [AP]M)? · /);
@@ -796,6 +797,9 @@ try {
     await page.click('#resume-newest');
     for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
     await page.until("/^Restored Optical waveguide \\(6 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'K5 both restored', 60000);
+    // round 23 (E5): the record no longer matched both-models.json, opened from disk: the header says so,
+    // read once browser recovery has kept the restored session
+    await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'K5 header kept', 30000);
     k5.message = await status(); k5.title = await title();
     await noOverflow('K5 restored 1440'); await size(390, 844, true); await sleep(400); await noOverflow('K5 restored 390'); await size(1440, 900, false);
     k5.heated = await heatedItems('K5'); await toOptical('K5 optical');
@@ -803,7 +807,7 @@ try {
     stage('K5 numbers after Restore newest', k5);
     assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
     assert.equal(k5.message, 'Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
-    assert.match(k5.title, /^both-models · recovered from this browser · not saved to a file · /);
+    assert.equal(k5.title, 'both-models · recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser');
     assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
     // after a change the header is the ordinary one (the drop-line check above ends on the restored

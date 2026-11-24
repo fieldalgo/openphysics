@@ -629,7 +629,8 @@ print(n)`;
   assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
   // a per-card restore never makes a session file the project file (P3 D6); since session version 12
   // the record keeps the project's name (heated-design, from the project saved above), which comes back
-  assert.match(await page.text('#project'), /^heated-design · recovered from this browser · not saved to a file · /);
+  // round 23 (E5): the record no longer matched the session file it was opened from (it read "not saved to a file")
+  assert.match(await page.text('#project'), /^heated-design · recovered from this browser · changed since 06-heated-silicon-waveguide-session-\d{4}-\d{2}-\d{2}-\d{4}\.json, not saved · /);
 
   // S8: three earlier sessions, from four pages that each edited the model
   for (const power of ['3e14', '4e14', '5e14', '6e14']) {
