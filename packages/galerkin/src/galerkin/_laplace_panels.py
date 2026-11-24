@@ -7,6 +7,8 @@ The side and top walls have zero normal flux. The singular half-space
 contribution is integrated on both source and target panels; only the smooth
 image correction is interpolated. See the public laplace_boundary contract.
 """
+from numbers import Integral, Real
+
 import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import xlogy
@@ -259,7 +261,7 @@ def wall_labels(a, b, owners, W, H, *, bottom):
     return labels
 
 
-def _blockwise(a, b, labels, W, H, degree, smooth):
+def blockwise(a, b, labels, W, H, degree, smooth):
     """Sum of the smooth kernel on separate interpolation boxes per label."""
     groups = [np.flatnonzero(labels == label) for label in np.unique(labels)]
     boxes = []
@@ -291,7 +293,7 @@ def matrix(a, b, W, H, *, degree=10, order=8, images=8, labels=None):
     if np.any(span <= 0) or lower[1] <= 0:
         raise ValueError('positive-height two-dimensional panel cluster required')
     if labels is not None:
-        result = half_matrix(a, b, order=order) + _blockwise(
+        result = half_matrix(a, b, order=order) + blockwise(
             a, b, labels, W, H, degree, lambda t, u: smooth_correction(t, u, W, H, images))
         symmetry = float(np.max(abs(result - result.T)) / np.max(abs(result)))
         if symmetry > 1e-10:
@@ -329,3 +331,86 @@ def panels(polygons, count, grading):
             bb.extend(points[1:])
             owners.extend([owner] * count)
     return (np.asarray(aa), np.asarray(bb), np.asarray(owners))
+
+
+def positive(value, name):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+        raise ValueError(f"{name} must be a finite positive real number")
+    value = float(value)
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a finite positive real number")
+    return value
+
+
+def integer(value, name, low, high):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral):
+        raise ValueError(f"{name} must be an integer in [{low}, {high}]")
+    if not low <= value <= high:
+        raise ValueError(f"{name} must be an integer in [{low}, {high}]")
+    return int(value)
+
+
+def cross(a, b):
+    return a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
+
+
+def relative(a, b):
+    return float(np.max(abs(a - b)) / np.max(abs(b)))
+
+
+def admit_polygons(polygons, width, height, count, *, max_aspect):
+    """1..16 strictly convex, disjoint, separated polygons strictly inside the rectangle.
+
+    Return them normalized by unit=max(width, height), counter-clockwise,
+    with unit and the normalized width and height. No wall-clearance rule.
+    """
+    if not isinstance(polygons, (list, tuple)) or not 1 <= len(polygons) <= 16:
+        raise ValueError('polygons must be a list or tuple of 1..16 convex conductor boundaries')
+    unit = max(width, height)
+    w, h = (width / unit, height / unit)
+    if not 0.25 <= w / h <= max_aspect:
+        raise ValueError(f'width/height must lie in [0.25, {max_aspect}]')
+    accepted = []
+    vertices = 0
+    tolerance = 128 * np.finfo(float).eps
+    for polygon in polygons:
+        raw = np.asarray(polygon)
+        if raw.ndim != 2 or raw.shape[1] != 2 or raw.shape[0] < 3:
+            raise ValueError('each polygon needs at least three 2D vertices without a closing duplicate')
+        vertices += len(raw)
+        if vertices * count > 2048:
+            raise ValueError('total boundary panel count exceeds 2048')
+        if raw.dtype.kind not in 'fiu' or not np.all(np.isfinite(raw)):
+            raise ValueError('polygon coordinates must be finite real numbers')
+        points = np.asarray(raw, dtype=float) / unit
+        if np.any(points <= 0) or np.any(points[:, 0] >= w) or np.any(points[:, 1] >= h):
+            raise ValueError('conductors must lie strictly inside the rectangle')
+        edges = np.roll(points, -1, axis=0) - points
+        lengths = np.linalg.norm(edges, axis=1)
+        if np.any(lengths <= tolerance):
+            raise ValueError('polygon edge is unresolved at the domain scale')
+        turns = cross(edges, np.roll(edges, -1, axis=0))
+        turn_scale = lengths * np.roll(lengths, -1)
+        if np.all(turns < -tolerance * turn_scale):
+            points = points[::-1].copy()
+            edges = np.roll(points, -1, axis=0) - points
+            lengths = np.linalg.norm(edges, axis=1)
+        elif not np.all(turns > tolerance * turn_scale):
+            raise ValueError('polygons must be strictly convex, without collinear edges')
+        distances = cross(edges[:, None], points[None] - points[:, None]) / lengths[:, None]
+        if np.any(distances < -tolerance):
+            raise ValueError('polygon boundary must be simple and convex')
+        accepted.append(points.copy())
+    for i, first in enumerate(accepted):
+        for second in accepted[i + 1:]:
+            separated = False
+            for polygon in (first, second):
+                edge = np.roll(polygon, -1, axis=0) - polygon
+                normals = np.column_stack((-edge[:, 1], edge[:, 0]))
+                normals /= np.linalg.norm(normals, axis=1)[:, None]
+                p, q = (first @ normals.T, second @ normals.T)
+                if np.any(p.max(axis=0) < q.min(axis=0) - tolerance) or np.any(q.max(axis=0) < p.min(axis=0) - tolerance):
+                    separated = True
+            if not separated:
+                raise ValueError('conductor boundaries must be disjoint and separated')
+    return (accepted, unit, w, h)

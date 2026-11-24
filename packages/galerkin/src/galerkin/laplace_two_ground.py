@@ -11,7 +11,8 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.linalg import cho_factor, cho_solve
 from . import _laplace_panels as kernel
-from .laplace_boundary import _positive, _integer, _relative, _cross
+
+_positive, _integer, _relative, _cross = kernel.positive, kernel.integer, kernel.relative, kernel.cross
 
 @dataclass(frozen=True)
 class TwoGroundRectangleResult:
@@ -45,55 +46,7 @@ class TwoGroundRectangleResult:
             object.__setattr__(self, name, frozen)
 
 def _admit(polygons, width, height, count, side_walls=True, max_aspect=16):
-    if not isinstance(polygons, (list, tuple)) or not 1 <= len(polygons) <= 16:
-        raise ValueError('polygons must be a list or tuple of 1..16 convex conductor boundaries')
-    unit = max(width, height)
-    w, h = (width / unit, height / unit)
-    if not 0.25 <= w / h <= max_aspect:
-        raise ValueError(f'width/height must lie in [0.25, {max_aspect}]')
-    accepted = []
-    vertices = 0
-    tolerance = 128 * np.finfo(float).eps
-    for polygon in polygons:
-        raw = np.asarray(polygon)
-        if raw.ndim != 2 or raw.shape[1] != 2 or raw.shape[0] < 3:
-            raise ValueError('each polygon needs at least three 2D vertices without a closing duplicate')
-        vertices += len(raw)
-        if vertices * count > 2048:
-            raise ValueError('total boundary panel count exceeds 2048')
-        if raw.dtype.kind not in 'fiu' or not np.all(np.isfinite(raw)):
-            raise ValueError('polygon coordinates must be finite real numbers')
-        points = np.asarray(raw, dtype=float) / unit
-        if np.any(points <= 0) or np.any(points[:, 0] >= w) or np.any(points[:, 1] >= h):
-            raise ValueError('conductors must lie strictly inside the rectangle')
-        edges = np.roll(points, -1, axis=0) - points
-        lengths = np.linalg.norm(edges, axis=1)
-        if np.any(lengths <= tolerance):
-            raise ValueError('polygon edge is unresolved at the domain scale')
-        turns = _cross(edges, np.roll(edges, -1, axis=0))
-        turn_scale = lengths * np.roll(lengths, -1)
-        if np.all(turns < -tolerance * turn_scale):
-            points = points[::-1].copy()
-            edges = np.roll(points, -1, axis=0) - points
-            lengths = np.linalg.norm(edges, axis=1)
-        elif not np.all(turns > tolerance * turn_scale):
-            raise ValueError('polygons must be strictly convex, without collinear edges')
-        distances = _cross(edges[:, None], points[None] - points[:, None]) / lengths[:, None]
-        if np.any(distances < -tolerance):
-            raise ValueError('polygon boundary must be simple and convex')
-        accepted.append(points.copy())
-    for i, first in enumerate(accepted):
-        for second in accepted[i + 1:]:
-            separated = False
-            for polygon in (first, second):
-                edge = np.roll(polygon, -1, axis=0) - polygon
-                normals = np.column_stack((-edge[:, 1], edge[:, 0]))
-                normals /= np.linalg.norm(normals, axis=1)[:, None]
-                p, q = (first @ normals.T, second @ normals.T)
-                if np.any(p.max(axis=0) < q.min(axis=0) - tolerance) or np.any(q.max(axis=0) < p.min(axis=0) - tolerance):
-                    separated = True
-            if not separated:
-                raise ValueError('conductor boundaries must be disjoint and separated')
+    accepted, unit, w, h = kernel.admit_polygons(polygons, width, height, count, max_aspect=max_aspect)
     points = np.concatenate(accepted)
     lower, upper = (points.min(axis=0), points.max(axis=0))
     if side_walls and min(lower[0], w - upper[0]) < np.max(upper - lower):
