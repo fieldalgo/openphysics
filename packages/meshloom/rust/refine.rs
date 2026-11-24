@@ -90,6 +90,18 @@ struct State<'a> {
     chain_of: HashMap<(u32, u32), Vec<u32>>,
     /// per input vertex: whether two segments meet there at less than 60 degrees
     small_apex: Vec<bool>,
+    /// per input vertex: the other end points of the input segments that end there
+    seg_ends: Vec<Vec<u32>>,
+    /// per chain: whether every input facet with that segment on its boundary is a single,
+    /// unlocked triangle (the input is a free triangle surface there)
+    tri_chain: Vec<bool>,
+    /// per input vertex: whether every input segment ending there is one of tri_chain (an
+    /// input vertex of a triangle surface, which the polygon path would have as a Steiner
+    /// point on its facet)
+    tri_vertex: Vec<bool>,
+    /// per facet: its input vertices, and the input edges of its loops
+    fverts: Vec<Vec<u32>>,
+    fedges: Vec<Vec<(u32, u32)>>,
     /// facets the caller locked (curved surfaces sampled on the surface): no point is
     /// inserted on them or on their edges
     locked_facet: Vec<bool>,
@@ -140,6 +152,17 @@ const LAWSON_CAP: u32 = 10_000;
 /// A facet's frame triple is kept when the squared sine of its angle exceeds this (in
 /// doubles); below it the s, r system of a facet point is ill-conditioned.
 const FRAME_SIN2: f64 = 1e-8;
+/// Small-angle rule for subsegments (encroachment): two input segments meeting below this
+/// angle's cosine span a small angle. 60 degrees, the bound of small_apex (the 30-degree
+/// variant measured in the (C) study's iteration 1 was slower and no better).
+const SPAN_COS: f64 = 0.5;
+/// Cosine of the smallest angle a triangle can have and still meet the radius-edge bound b
+/// (its ratio is at least 1 / (2 sin theta) for its smallest angle theta; a tetrahedron is
+/// at least as bad as any of its faces): an input angle below it forces a worse element.
+fn ratio_cos(b: f64) -> f64 {
+    let s = 1.0 / (2.0 * b);
+    if s >= 1.0 { 0.0 } else { (1.0 - s * s).sqrt() }
+}
 /// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
 /// sqrt(2) with a margin).
 const SUB_RATIO: f64 = 1.5;
@@ -225,7 +248,7 @@ impl State<'_> {
             // radius-edge ratio is exempt when its circumcentre's insertion radius (its
             // circumradius) would be smaller than its parent's, the newer end of its shortest edge
             let parent = t[short.0].max(t[short.1]) as usize;
-            if r >= self.rins[parent] && !self.seditious(t[short.0], t[short.1]) {
+            if r >= self.rins[parent] && !self.seditious(t[short.0], t[short.1]) && !self.spans_angle_below(t[short.0], t[short.1], ratio_cos(self.opt.ratio)) {
                 bad = bad.max(r / lmin / self.opt.ratio);
             }
         }
@@ -1209,7 +1232,16 @@ impl State<'_> {
             .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&e.1));
         let h = self.local_h(ts);
         let d = sub3(&self.xyz[e.1 as usize], &self.xyz[e.0 as usize]);
-        h > 0.0 && dot(&d, &d).sqrt() > SEG_C * self.opt.alpha * h
+        // an unsplit input segment whose facets are all single triangles is bounded as their
+        // edges are: it is too long when no triangle on it meets the subfacet size bound (half
+        // its length, the smallest circumradius of a triangle on it, above FAC_C alpha h);
+        // once split, its pieces are sized as segments
+        let whole = self.seg.get(&e).is_some_and(|&k| {
+            let ch = &self.chains[k as usize];
+            self.tri_chain[k as usize] && ch.len() == 2
+        });
+        let c = if whole { 2.0 * FAC_C } else { SEG_C };
+        h > 0.0 && dot(&d, &d).sqrt() > c * self.opt.alpha * h
     }
 
     /// Boundary size: a subfacet whose circumradius exceeds FAC_C alpha h of its regions.
@@ -1224,7 +1256,16 @@ impl State<'_> {
         let n = cross(&a, &b);
         let nn = dot(&n, &n);
         let cc = sub3(&a, &b);
-        nn > 0.0 && (dot(&a, &a) * dot(&b, &b) * dot(&cc, &cc)).sqrt() / (2.0 * nn.sqrt()) > FAC_C * self.opt.alpha * h
+        let (la, lb, lc) = (dot(&a, &a), dot(&b, &b), dot(&cc, &cc));
+        let (u, v) = if la <= lb && la <= lc { (f[0], f[1]) } else if lb <= lc { (f[0], f[2]) } else { (f[1], f[2]) };
+        // inside a small input angle the circumradius of a skinny subfacet is not its size:
+        // half its longest edge is (the smallest circumradius a triangle with that edge has)
+        let size = if self.spans_angle_below(u, v, ratio_cos(SUB_RATIO)) { la.max(lb).max(lc).sqrt() / 2.0 } else if nn > 0.0 {
+            (la * lb * lc).sqrt() / (2.0 * nn.sqrt())
+        } else {
+            0.0
+        };
+        nn > 0.0 && size > FAC_C * self.opt.alpha * h
     }
 
     /// Facet quality: a subfacet whose radius-edge ratio (circumradius over its shortest
@@ -1249,7 +1290,126 @@ impl State<'_> {
             return false;
         }
         let rc = (la * lb * lc).sqrt() / (2.0 * nn.sqrt());
-        rc > SUB_RATIO * la.min(lb).min(lc).sqrt()
+        if !(rc > SUB_RATIO * la.min(lb).min(lc).sqrt()) {
+            return false;
+        }
+        // small-angle rule (Miller, Pav and Walkington 2003): a skinny subfacet whose shortest
+        // edge spans an input angle too small for any triangle to meet SUB_RATIO (its end points
+        // on two segments that meet at an input vertex below that angle) is left
+        let (u, v) = if la <= lb && la <= lc { (f[0], f[1]) } else if lb <= lc { (f[0], f[2]) } else { (f[1], f[2]) };
+        !self.spans_angle_below(u, v, ratio_cos(SUB_RATIO))
+    }
+
+    /// The input segments a vertex lies on, as (end, end): a segment point's own, or every
+    /// segment that ends at an input vertex.
+    fn segments_at(&self, v: u32) -> Vec<(u32, u32)> {
+        let n = self.g.input.len();
+        if (v as usize) < n {
+            return self.seg_ends[v as usize].iter().map(|&w| (v, w)).collect();
+        }
+        let sp = &self.g.s[v as usize - n];
+        if sp.c == NONE && sp.b != NONE { vec![(sp.a, sp.b)] } else { Vec::new() }
+    }
+
+    /// Whether input segment chain c meets facet fi at a small angle: one end of c is a
+    /// vertex of fi, c is not an edge of fi, and c leaves that vertex at less than 60 degrees
+    /// to fi's plane (the bound of small_apex and of the facet-facet rule).
+    fn seg_facet_small(&self, c: u32, fi: u32) -> bool {
+        let ch = &self.chains[c as usize];
+        let (a, b) = (ch[0], ch[ch.len() - 1]);
+        let fv = &self.fverts[fi as usize];
+        if self.fedges[fi as usize].binary_search(&ekey(a, b)).is_ok() {
+            return false;
+        }
+        let [p, q, r] = self.frame[fi as usize].0.map(|v| self.xyz[v as usize]);
+        let n = cross(&sub3(&q, &p), &sub3(&r, &p));
+        let nl = dot(&n, &n).sqrt();
+        [(a, b), (b, a)].iter().any(|&(z, o)| {
+            if fv.binary_search(&z).is_err() {
+                return false;
+            }
+            let u = sub3(&self.xyz[o as usize], &self.xyz[z as usize]);
+            let ul = dot(&u, &u).sqrt();
+            // sine of the angle to the plane below sin 60 degrees
+            nl > 0.0 && ul > 0.0 && dot(&u, &n).abs() < 0.8660254037844387 * ul * nl
+        })
+    }
+
+    /// The input segment chains a vertex lies on.
+    fn chains_at(&self, w: u32) -> Vec<u32> {
+        let mut out = Vec::new();
+        for (p, q) in self.segments_at(w) {
+            if let Some(l) = self.chain_of.get(&ekey(p, q)) {
+                out.extend(l.iter().copied());
+            }
+        }
+        out
+    }
+
+    /// The facets a vertex lies on (those of the subfacets around it).
+    fn facets_at(&self, w: u32) -> Vec<u32> {
+        let mut out = Vec::new();
+        for &t in &self.cx.star[w as usize] {
+            if !self.cx.alive[t as usize] {
+                continue;
+            }
+            for i in 0..4 {
+                let k = key(face(&self.cx.tets[t as usize], i));
+                if k.contains(&w) {
+                    if let Some(l) = self.sub.get(&k) {
+                        out.extend(l.iter().copied());
+                    }
+                }
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// Segment-facet small-angle rule for a subfacet f encroached by w: w lies on a segment
+    /// that meets f's facet at a small angle.
+    fn seg_facet_exempt(&self, w: u32, f: &[u32; 3]) -> bool {
+        self.chains_at(w).iter().any(|&c| self.sub[f].iter().any(|&fi| self.seg_facet_small(c, fi)))
+    }
+
+    /// Whether boundary vertex q lies on a triangle surface: an input vertex of one, or a
+    /// segment or facet point whose input vertices all are.
+    fn on_tri_surface(&self, q: u32) -> bool {
+        let n = self.g.input.len();
+        if (q as usize) < n {
+            return self.tri_vertex[q as usize];
+        }
+        let sp = &self.g.s[q as usize - n];
+        if sp.b == NONE {
+            return false; // a volume point
+        }
+        [sp.a, sp.b, sp.c].iter().filter(|&&x| x != NONE).all(|&x| (x as usize) < n && self.tri_vertex[x as usize])
+    }
+
+    /// Whether u and v lie on two different input segments that meet at an input vertex
+    /// z at an angle below the SPAN_COS angle (z the apex of a small input angle).
+    fn spans_small_angle(&self, u: u32, v: u32) -> bool {
+        self.spans_angle_below(u, v, SPAN_COS)
+    }
+
+    /// Whether u and v lie on two different input segments meeting at an input vertex z at
+    /// an angle whose cosine is above cos_bound.
+    fn spans_angle_below(&self, u: u32, v: u32, cos_bound: f64) -> bool {
+        let (su, sv) = (self.segments_at(u), self.segments_at(v));
+        su.iter().any(|&(p, q)| sv.iter().any(|&(r, s)| {
+            if ekey(p, q) == ekey(r, s) {
+                return false;
+            }
+            [p, q].iter().any(|&z| {
+                if !(z == r || z == s) || !self.small_apex[z as usize] {
+                    return false;
+                }
+                let (a, b) = (if p == z { q } else { p }, if r == z { s } else { r });
+                let (da, db) = (sub3(&self.xyz[a as usize], &self.xyz[z as usize]), sub3(&self.xyz[b as usize], &self.xyz[z as usize]));
+                dot(&da, &db) > cos_bound * dot(&da, &da).sqrt() * dot(&db, &db).sqrt()
+            })
+        }))
     }
 
     /// A vertex in the diametral ball of subsegment e, among the vertices of its tetrahedra.
@@ -2090,6 +2250,12 @@ impl State<'_> {
                 self.stats.exempt_faces += 1;
                 return Ok(());
             }
+            if self.seg.get(&e).is_some_and(|&c| self.sub[&f].iter().any(|&fi| self.seg_facet_small(c, fi))) {
+                // a facet point next to a segment that meets the facet at a small angle:
+                // leave both (splitting either would cascade between them)
+                self.stats.exempt_faces += 1;
+                return Ok(());
+            }
             return self.split_segment(e);
         }
         if !self.insert(p, &cav, &plane)? && !self.insert_minimal(p, &seeds)? {
@@ -2388,6 +2554,46 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     // input vertices where two segments meet at less than 60 degrees: the apexes of the
     // concentric shells of split_segment
     let mut small_apex = vec![false; xyz.len()];
+    let mut seg_ends: Vec<Vec<u32>> = vec![Vec::new(); xyz.len()];
+    let fverts: Vec<Vec<u32>> = plc.facets.iter().map(|loops| {
+        let mut v: Vec<u32> = loops.iter().flatten().copied().collect();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }).collect();
+    let fedges: Vec<Vec<(u32, u32)>> = plc.facets.iter().map(|loops| {
+        let mut v: Vec<(u32, u32)> = loops.iter().flat_map(|lp| (0..lp.len()).map(move |i| ekey(lp[i], lp[(i + 1) % lp.len()]))).collect();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }).collect();
+    let tri_chain: Vec<bool> = {
+        // (edge) -> (facets on it, of which triangles)
+        // an unlocked facet of one triangle: locked facets (curved surfaces) get no points and
+        // keep their own rules
+        let is_locked: std::collections::HashSet<u32> = locked.iter().copied().collect();
+        let mut on: HashMap<(u32, u32), (u32, u32)> = HashMap::new();
+        for (fi, loops) in plc.facets.iter().enumerate() {
+            let tri = loops.len() == 1 && loops[0].len() == 3 && !is_locked.contains(&(fi as u32));
+            for lp in loops {
+                for i in 0..lp.len() {
+                    let e = on.entry(ekey(lp[i], lp[(i + 1) % lp.len()])).or_insert((0, 0));
+                    e.0 += 1;
+                    e.1 += tri as u32;
+                }
+            }
+        }
+        b.plc.rec.chains.iter().map(|ch| {
+            on.get(&ekey(ch[0], ch[ch.len() - 1])).is_some_and(|&(n, t)| n > 0 && n == t)
+        }).collect()
+    };
+    for ch in &b.plc.rec.chains {
+        let (a, z) = (ch[0], ch[ch.len() - 1]);
+        if a != z {
+            seg_ends[a as usize].push(z);
+            seg_ends[z as usize].push(a);
+        }
+    }
     {
         let mut dirs: HashMap<u32, Vec<P3>> = HashMap::new();
         for ch in &b.plc.rec.chains {
@@ -2421,8 +2627,18 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     for (c, ch) in b.plc.rec.chains.iter().enumerate() {
         chain_of.entry(ekey(ch[0], ch[ch.len() - 1])).or_default().push(c as u32);
     }
+    let tri_vertex: Vec<bool> = {
+        let (mut all, mut tri) = (vec![0u32; xyz.len()], vec![0u32; xyz.len()]);
+        for (c, ch) in b.plc.rec.chains.iter().enumerate() {
+            for z in [ch[0], ch[ch.len() - 1]] {
+                all[z as usize] += 1;
+                tri[z as usize] += tri_chain[c] as u32;
+            }
+        }
+        (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
+    };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
@@ -2450,7 +2666,23 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     loop {
         if let Some(e) = st.segq.pop_front() {
             if st.seg.contains_key(&e) {
-                if st.segment_encroacher(e).is_some() || st.segment_too_long(e) {
+                let mut enc = st.segment_encroacher(e);
+                if let Some(w) = enc {
+                    // small-angle rule for subsegments: a vertex on another segment that meets
+                    // e's segment at a small input angle encroaches e only because of that angle
+                    // (the boundary is already recovered, so e needs no conforming split)
+                    if st.spans_small_angle(w, e.0) && st.spans_small_angle(w, e.1) {
+                        st.stats.exempt += 1;
+                        enc = None;
+                    }
+                }
+                if let Some(w) = enc {
+                    if st.seg.get(&e).is_some_and(|&c| st.facets_at(w).iter().any(|&fi| st.seg_facet_small(c, fi))) {
+                        st.stats.exempt += 1;
+                        enc = None;
+                    }
+                }
+                if enc.is_some() || st.segment_too_long(e) {
                     st.split_segment(e)?;
                 }
             }
@@ -2459,7 +2691,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         if let Some(f) = st.subq.pop_front() {
             if st.sub.contains_key(&f) {
                 if let Some(w) = st.encroacher(f) {
-                    if st.small_angle(w, &f) || st.subfacet_exempt(f, w) {
+                    if st.small_angle(w, &f) || st.subfacet_exempt(f, w) || st.seg_facet_exempt(w, &f) {
                         st.stats.exempt_faces += 1;
                     } else {
                         st.split_subfacet(f)?;
@@ -2494,7 +2726,10 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         // M6 step 1: slivers, once nothing else is left, within the cap
         if let Some((_, std::cmp::Reverse(s), t)) = st.dihq.pop() {
             if sliver_budget.is_none() {
-                sliver_budget = Some(((st.g.s.len() as f64) * SLIVER_CAP).ceil() as u32);
+                // the points refinement inserted, with the input vertices of triangle surfaces (the
+                // polygon path inserts those as facet points)
+                let base = st.g.s.len() + st.tri_vertex.iter().filter(|&&x| x).count();
+                sliver_budget = Some(((base as f64) * SLIVER_CAP).ceil() as u32);
             }
             let mut v = st.cx.tets[t as usize];
             v.sort_unstable();
@@ -2511,7 +2746,10 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             // the filter leaves small slivers to the perturbation, which moves volume vertices
             // only: a sliver with none (its vertices all on the boundary, as across a layer
             // thinner than h) is split whatever its size
-            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q));
+            // ... and so is a sliver at an input vertex of a triangle surface, which the
+            // perturbation cannot move (the polygon path has a facet point there, which slides)
+            let fixed = st.cx.tets[t as usize].iter().all(|&q| !st.movable(q))
+                || st.cx.tets[t as usize].iter().any(|&q| !st.movable(q) && st.on_tri_surface(q));
             if r < SLIVER_FILTER * st.opt.alpha * hs && !fixed {
                 continue;
             }
