@@ -314,7 +314,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    *Running drops Run 3 (700 × 300 nm · 4 modes).*와 *Up to six runs are kept; a pinned run is never dropped.*를 보이고
    **Pin Run 3 and run**(맨 앞, 포커스), **Run**, **Cancel**(Escape)을 둡니다. 닫히면 포커스는 Run study로 돌아갑니다.
    Pin Run 3 and run은 그 실행을 고정하고, 실행이 그다음 고정되지 않은 실행을 내보내게 되면 다시 묻습니다. 마지막 고정되지 않은
-   실행에는 자리가 남지 않으므로 이 버튼이 없습니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
+   실행에는 자리가 남지 않으므로 이 버튼이 없습니다. round 20부터 질문이 열려 있는 동안 Run study 옆 상자는 *Waiting
+   for your answer: pin, run or cancel*(내보내기 줄은 숨김), 상태 표시줄은 *Run study is waiting for your answer*로
+   읽힙니다. 실행이 계산 중이라고 적는 곳은 없고(숨은 작업 패널에는 메시지가 남지 않음), Cancel을 포함한 모든 답이
+   전의 문구를 되돌립니다. 가열 모델의 질문도 그 Run study 아래 줄과 상태 표시줄에서 같게 합니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
    브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
    round 19부터 광 모델을 열거나 복원할 때 메시지가 그렇게 밝힙니다: *Runs are numbered from 1 in this tab; names and pins
    are kept.*(Open project 뒤에는 *Optical waveguide runs are numbered from 1 in this tab; …*). 가열 모델의 실행은 번호를

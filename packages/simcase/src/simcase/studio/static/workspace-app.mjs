@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RUN_QUESTION_PLAN,RUN_QUESTION_STATUS,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -51,6 +51,9 @@ if('scrollRestoration' in history)history.scrollRestoration='manual';
 const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
+// round 20 (Z7): true while the drop question is open (askRunDrop): the Run study box and the status
+// bar say Run study waits for the answer (render reads it); every answer, Cancel included, renders them back
+let runQuestion=false;
 const numericDrafts=new NumericDrafts();
 const connection={ready:false,message:'Checking Studio compatibility…',version:null,instance:null};
 const pair=(a,b)=>`<div class="pair"><span>${a}</span><strong>${b}</strong></div>`;
@@ -185,6 +188,9 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  opticalRunCount:()=>runs.length,
  // round 19 (Y4): the heated model's Run study asks with the same dialog
  confirmDrop:(question,opener)=>askRunDrop(question,opener),
+ // round 20 (Z7): the question is open; its Run study box and status bar say so
+ runQuestionOpen:()=>runQuestion,
+ runQuestionWords:{plan:RUN_QUESTION_PLAN,status:RUN_QUESTION_STATUS},
  // the Library's view title row names the project (P3)
  projectLine:()=>projectLine(),
  // the model's current file name (File › Save downloads under it again), which the header names
@@ -510,7 +516,7 @@ function refreshInputIssues(){
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
  if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
- else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));
+ else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
  const next=$('next-run-inputs');if(next&&isOptical()){const text=numericDrafts.invalid?'Next run: correct the highlighted inputs first':nextRunText(current(),state.modeCount,state.groupIndex,pmlNow());if(next.textContent!==text)next.textContent=text;}
@@ -1189,7 +1195,7 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 // task does not reset them), so a run that is slower than one solve says why first
 // round 18 (X3): before the run, the run the six-run limit would drop, with Pin Run N (the limit is unchanged)
 function refreshDropWarning(){
- const host=$('run-drop'),run=nextDropped(runs,RUN_LIMIT);host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
+ const host=$('run-drop'),run=runQuestion?null:nextDropped(runs,RUN_LIMIT);host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
  const text=dropWarningText(run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
  const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
  // as Run name does, no pin while a calculation runs: the finishing result needs a free slot
@@ -1201,14 +1207,16 @@ function refreshRunOptions(){
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount};
  const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
  refreshDropWarning();
- const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
+ // round 20 (Z7): while the drop question is open the box says it waits for the answer
+ const shownText=runQuestion?RUN_QUESTION_PLAN:text;
+ const line=$('run-plan');if(line.textContent!==shownText)line.textContent=shownText;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 // round 20 (Z6): the scope names both boundaries, as the Open boundary choice sits beside it
 const OPTICAL_SCOPE_BOUNDARY='3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)';
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
  const block=opticalBlock();// Plain text, not steps: the step bar above and the model tree are what select a node.
- if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
+ if(isOptical())$('sequence').innerHTML='<span class="sequence-note">Optical mode analysis · Run checks the inputs, then computes · mesh and window convergence not certified</span>';if(['Results','Compare'].includes(ui.page))$('sequence').innerHTML='<span class="sequence-note">Each result keeps the inputs it was run with · Compare matches modes by field overlap · convergence not certified</span>';$('status').textContent=solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:block?'Coupled solver unavailable · optical-only template supported':opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow()));$('run-optical').disabled=solverBusy||!!pendingJob||!!block;
  $('run-optical').textContent=solverBusy?'Computing…':'Run study';
  if(ui.page==='Model'&&['Study','Optical modes'].includes(ui.selection)){
   const info=document.createElement('section');info.innerHTML='<h3>Optical adapter scope</h3><p>2D cross section with up to 8 rectangles, circles or polygons of ten lossless materials inside the window; silica background; wavelength 1400–1700 nm; core mesh 20–60 nm; '+OPTICAL_SCOPE_BOUNDARY+'; 1 to 8 modes (Modes to find, 2 by default). Heater, thermal and mechanical settings are excluded. Mesh/window convergence is not certified.</p>';
@@ -2030,6 +2038,8 @@ function refreshJobControls(){
  if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}
  $('job-input').textContent=pendingJob?pendingJob.job+' · '+designSummary(pendingJob.input.model)+' · λ '+pendingJob.input.model.wavelength+' nm · captured inputs':'';
  $('job-panel').hidden=!pendingJob&&!solverBusy&&jobPhase==='idle';
+ // round 20 (Z7): a hidden panel keeps no message ("complete" or "Computing" in the tree while hidden)
+ if($('job-panel').hidden){$('job-message').textContent='';$('job-message').title='';}
  $('stop-waiting').disabled=!pendingJob||!solverBusy||!jobMonitor.busy;
  $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready||jobResumeBlocked;
  $('forget-job').disabled=!pendingJob||solverBusy;
@@ -2054,7 +2064,8 @@ document.body.append(dropDialog);
 let dropAnswer=null;
 function askRunDrop(question,opener=document.activeElement){
  return new Promise(resolve=>{
-  dropAnswer=answer=>{dropAnswer=null;dropDialog.close();restoreDialogFocus(opener);resolve(answer);};
+  dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};
+  if(!runQuestion){runQuestion=true;render();}
   $('run-drop-confirm-title').textContent=question.title;$('run-drop-confirm-description').textContent=question.note;
   const pin=$('run-drop-confirm-pin');pin.hidden=!question.pin;pin.textContent=question.pin||'';$('run-drop-confirm-run').textContent=question.run;$('run-drop-confirm-cancel').textContent=question.cancel;
   if(!dropDialog.open)dropDialog.showModal();(question.pin?pin:$('run-drop-confirm-run')).focus();

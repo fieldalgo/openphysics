@@ -80,3 +80,20 @@ test('Z6: the optical scope note names the closed window and the open boundary, 
  assert.ok(src.includes("'+OPTICAL_SCOPE_BOUNDARY+'; 1 to 8 modes"));
  assert.ok(!src.includes("'PEC outer edges'"));
 });
+
+test('Z7: while the drop question is open, the Run study box and the status bar say it waits',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ assert.equal(W.RUN_QUESTION_PLAN,'Waiting for your answer: pin, run or cancel');
+ assert.equal(W.RUN_QUESTION_STATUS,'Run study is waiting for your answer');
+ const app=read('workspace-app.mjs'),view=read('workspace-multiphysics-view.mjs');
+ // set before the dialog shows, cleared by every answer (Cancel and Escape included), each time rendered
+ assert.ok(app.includes("dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};"));
+ assert.ok(app.includes("if(!runQuestion){runQuestion=true;render();}"));
+ assert.ok(app.includes("const shownText=runQuestion?RUN_QUESTION_PLAN:text;"));
+ assert.ok(app.includes("run=runQuestion?null:nextDropped(runs,RUN_LIMIT)"));
+ assert.ok(app.includes("solverBusy?'Optical computation running':runQuestion?RUN_QUESTION_STATUS:"));
+ assert.ok(app.includes(" else $('status').textContent=runQuestion?RUN_QUESTION_STATUS:opticalHold()||opticalReadyStatus("));
+ assert.ok(app.includes("if($('job-panel').hidden){$('job-message').textContent='';$('job-message').title='';}"));
+ assert.ok(view.includes("const asking=!job&&ctx.runQuestionOpen?.()===true;if(asking)reason.textContent=ctx.runQuestionWords.plan;"));
+ assert.ok(view.includes("$('status').textContent=asking?ctx.runQuestionWords.status:job?"));
+});
