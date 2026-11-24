@@ -1306,9 +1306,11 @@ leakage out of the window.
 - The second target is shown beside it as text, not editable, and follows the shown target:
   *Also searches near 1.95, for modes close to the silica index.* (2.20 → 1.82). The help reads
   “Studio searches for modes near this index and near a second index halfway to the silica index
-  (1.95). Modes are listed by n_eff, highest first.”
+  (1.95). Modes are listed by n_eff, highest first. The default is halfway between the core and
+  silica indices: (n_core + 1.444)/2.” (round 18: where 2.46 comes from).
 - Below 1.466 there is one search: no second target is shown, and the help keeps P2's words (a
-  single target can miss modes far from it, notably near the cladding index).
+  single target can miss modes far from it, notably near the cladding index) and ends with the same
+  sentence on the default, *…: (n_core + 1.444)/2, rounded to 0.01.*
 
 **Study and drawing.**
 

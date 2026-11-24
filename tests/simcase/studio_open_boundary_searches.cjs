@@ -92,7 +92,7 @@ test('a /3 record holds exactly the searches of its target; a /2 record is P2\'s
 test('the words of two searches: field, help, details, Study, found line, the no-mode error',()=>{
  assert.deepEqual(['2.460','2.455','2.500','1.600','3.400'].map(Number).map(R.shortTarget),['2.46','2.455','2.50','1.60','3.40']);
  assert.equal(R.lowerTargetText(1.95),'Also searches near 1.95, for modes close to the silica index.');
- assert.equal(R.searchesHelp(1.95),'Studio searches for modes near this index and near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first.');
+ assert.equal(R.searchesHelp(1.95),'Studio searches for modes near this index and near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first. The default is halfway between the core and silica indices: (n_core + 1.444)/2.');
  const html=V.boundaryFieldHtml(R.openChoice(),[STRIP]);
  assert.ok(html.includes('<p class="input-note" id="lower-target">Also searches near 1.95, for modes close to the silica index.</p>'),html);
  assert.ok(html.includes('aria-describedby="lower-target target-help"'),html);

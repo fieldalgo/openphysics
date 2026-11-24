@@ -1084,7 +1084,9 @@ page to run again.*으로 거부합니다. 페이지에는 저장된 문서를 �
   보내집니다. 1.45와 n_max 사이(양 끝 제외)여야 합니다.
 - 두 번째 목표는 그 옆에 글로 보이며 고칠 수 없고, 보이는 목표를 따릅니다: *Also searches near 1.95, for
   modes close to the silica index.* (2.20 → 1.82). 도움말은 “Studio searches for modes near this index and
-  near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first.”입니다.
+  near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first. The default is
+  halfway between the core and silica indices: (n_core + 1.444)/2.”입니다(round 18: 2.46이 어디서 오는지). 검색이 하나일 때도
+  도움말은 기본값에 관한 같은 문장(*…: (n_core + 1.444)/2, rounded to 0.01.*)으로 끝납니다.
 - 1.466 미만이면 검색은 하나입니다. 두 번째 목표는 보이지 않고 도움말은 P2의 문장(목표 하나로는 그로부터
   먼 모드, 특히 클래딩 굴절률 근처의 모드를 놓칠 수 있음)을 유지합니다.
 
