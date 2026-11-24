@@ -610,9 +610,10 @@ try {
   await page.call('Page.reload');
   // round 9 (J3): the one stored session is the optical one, so the Optical waveguide card resumes
   // it and no box above lists it again; the session file route and its note are at the top of the page (P2)
-  await page.until("!!document.querySelector('#resume-optical')", 'resume offer');
-  const card = await page.eval("(()=>{const r=document.getElementById('resume-optical').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
-  stage('resume card', card); assert.ok(card.inView, 'the Optical waveguide resume offer inside the first viewport');
+  await page.until("!!document.querySelector('#resume-optical')&&!!document.querySelector('#resume-newest')", 'resume offer');
+  // round 19 (Y1): the first offer, in the box above the cards, is the newest session (the card's record too)
+  const card = await page.eval("(()=>{const r=document.getElementById('resume-newest').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
+  stage('resume card', card); assert.ok(card.inView, 'the newest restore offer inside the first viewport');
   // the routes back say which copy is durable
   const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
@@ -2332,6 +2333,113 @@ try {
     assert.ok(x6.heads.length > 0 && x6.heads.every(h => h.includes(' · closed · ')), JSON.stringify(x6.heads));
     assert.ok(x6.slack >= 24, `R18 Compare: ${x6.slack} px to spare at 1440 (O2, 24 px)`);
     await rOverflow('X6 Compare');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // R19 (round 19, pre-registered), in a browser context of its own: the shape's labels (Y7), the
+  // question before the six-run limit drops a run (Y4), and the Library's restore offers, newest first,
+  // with the remaining sessions listed after a restore (Y1); no horizontal overflow.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R19 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const idle = "!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')";
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R19 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&${idle}`, 'R19 run', 300000);
+    };
+    const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
+    const dialog = () => r.eval("(()=>{const d=document.getElementById('run-drop-confirm');return {open:d.open,title:document.getElementById('run-drop-confirm-title').textContent,note:document.getElementById('run-drop-confirm-description').textContent,buttons:[...d.querySelectorAll('button')].filter(b=>!b.hidden).map(b=>b.textContent),focus:document.activeElement?.id||null,labelledby:d.getAttribute('aria-labelledby')}})()");
+    const escape = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27}); await sleep(300); };
+    const recorded = async label => { await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(1200); };
+    const clearRecorded = () => r.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R19 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R19 optical model');
+    // Y7: the shape's Name and Material fields each have one label of that word alone
+    const y7 = await r.eval("['shape-name','shape-material'].map(id=>{const e=document.getElementById(id);return [id,[...e.labels].map(l=>l.textContent),e.closest('label')===null]})");
+    stage('R19 Y7 labels', {y7});
+    assert.deepEqual(y7, [['shape-name', ['Name'], true], ['shape-material', ['Material'], true]]);
+    // Y4: six runs, then Run study asks before dropping Run 1
+    await clearRecorded();
+    for (const nm of [30, 32, 34, 36, 38, 40]) { await mesh(nm); await rRun(); }
+    await recorded('R19 six runs kept');
+    await mesh(42); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 run list');
+    const six = await runItems();
+    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question');
+    const y4 = {asked: await dialog()};
+    await rOverflow('Y4 drop question');
+    await escape(); y4.escape = {...await dialog(), items: await runItems(), busy: await rText('#run-optical')};
+    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question again');
+    await r.click('#run-drop-confirm-pin'); await sleep(300); y4.pinned = {...await dialog(), items: await runItems()};
+    await r.click('#run-drop-confirm-cancel'); await sleep(300); y4.cancel = {...await dialog(), items: await runItems()};
+    await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question third');
+    y4.third = await dialog(); await clearRecorded(); await r.click('#run-drop-confirm-run');
+    await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.split(' · ').includes('Run 7'))&&${idle}`, 'R19 run 7', 300000);
+    y4.after = {items: await runItems(), message: await rText('#file-status'), drop: await rText('#run-drop-text')};
+    stage('R19 Y4 drop question', y4);
+    assert.deepEqual(y4.asked, {open: true, title: 'Running drops Run 1 (500 × 220 nm · 2 modes).', note: 'Up to six runs are kept; a pinned run is never dropped.', buttons: ['Pin Run 1 and run', 'Run', 'Cancel'], focus: 'run-drop-confirm-pin', labelledby: 'run-drop-confirm-title'});
+    assert.equal(y4.escape.open, false); assert.equal(y4.escape.focus, 'run-optical'); assert.deepEqual(y4.escape.items, six); assert.equal(y4.escape.busy, 'Run study');
+    // Pin Run 1 and run pins it and asks again for the run that would then be dropped
+    assert.equal(y4.pinned.open, true); assert.equal(y4.pinned.title, 'Running drops Run 2 (500 × 220 nm · 2 modes).'); assert.deepEqual(y4.pinned.buttons, ['Pin Run 2 and run', 'Run', 'Cancel']);
+    assert.ok(y4.pinned.items.some(t => t.startsWith('Pinned · Run 1 · ')), JSON.stringify(y4.pinned.items));
+    assert.equal(y4.cancel.open, false); assert.equal(y4.cancel.focus, 'run-optical'); assert.equal(y4.cancel.items.length, 6);
+    assert.equal(y4.third.title, 'Running drops Run 2 (500 × 220 nm · 2 modes).');
+    assert.deepEqual(y4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
+    assert.ok(y4.after.message.endsWith(' Run 2 (500 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.'), y4.after.message);
+    // the line beside Run study stays
+    assert.equal(y4.after.drop, 'Running drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
+    // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
+    await recorded('R19 seven runs kept');
+    await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');
+    await r.click('#optical-start-new'); await r.until("!!document.getElementById('shape-w')", 'R19 new model');
+    await clearRecorded(); await rRun(); await recorded('R19 one run kept');
+    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-newest')&&!!document.getElementById('resume-optical')", 'R19 Library offers'); await sleep(800);
+    const offers = () => r.eval("({box:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({id:b.id,record:b.dataset.resumeRecord,text:b.textContent})),card:{record:document.getElementById('resume-optical')?.dataset.resumeRecord??null,text:document.getElementById('resume-optical')?.textContent??null},earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent),boxShown:!!document.querySelector('.resume-card'),lastSession:!document.getElementById('recover-notebook').disabled})");
+    const y1 = {before: await offers()};
+    await rOverflow('Y1 Library');
+    const older = y1.before.box.findIndex(b => b.text.includes('Optical waveguide · 6 runs · '));
+    await clearRecorded(); await r.click(`.resume-card [data-resume-record="${y1.before.box[older]?.record}"]`);
+    await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R19 older restored');
+    const restoredMessage = await rText('#file-status');
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 restored runs');
+    y1.restored = {message: restoredMessage, items: (await runItems()).length, ...await offers()};
+    await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R19 restored kept', 30000); await sleep(1200);
+    y1.kept = await offers();
+    stage('R19 Y1 restore offers', y1);
+    assert.equal(y1.before.box[0].id, 'resume-newest'); assert.equal(y1.before.box[0].record, y1.before.card.record, 'the box leads with the newest, which its card also offers');
+    assert.match(y1.before.box[0].text, /^Restore newest from this browser: Optical waveguide · 1 run · Run 1 · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.ok(older > 0, JSON.stringify(y1.before.box));
+    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 6 runs · .* · older · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.match(y1.before.card.text, /^Restore from this browser · Optical waveguide · Run 1 · \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.ok(y1.restored.message.endsWith(' Runs are numbered from 1 in this tab; names and pins are kept.'), y1.restored.message); assert.equal(y1.restored.items, 6);
+    // the box hides while the tab holds runs; the restored session is not listed again. The newer one
+    // stays offered without a reload: at once as the last session (Workspace tools › Restore last
+    // session from this browser), and in the earlier sessions once this tab's own record is written
+    for (const state of [y1.restored, y1.kept]) {
+      assert.equal(state.boxShown, false);
+      assert.ok(!state.earlier.some(t => t.includes('Optical waveguide · 6 runs · ')), JSON.stringify(state.earlier));
+    }
+    assert.equal(y1.restored.lastSession, true);
+    assert.ok(y1.kept.earlier.some(t => t.startsWith('Restore earlier session from this browser · Optical waveguide · 1 run · Run 1 · ')), JSON.stringify(y1.kept.earlier));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
