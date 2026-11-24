@@ -531,7 +531,20 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    recovery also holds a record of the other model under the same file, the entry lists it with its
    runs and says the button does not restore it, *· also in this project: Heated silicon waveguide ·
    Run 1 (restored separately)*, or *(already in this tab)* when the tab holds that model's runs.
-   The button restores its own model; one restore that brings back both is not offered.
+   The button restores its own model. Since round 20 the newest offer in the box above the cards
+   restores both while the tab holds runs of neither model: *Restore newest from this browser:
+   Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed
+   since · saved 8:44 AM*. It restores the newest record as its own button would, then, once that
+   restore has completed (a load question answered with Replace; Cancel stops both), the other
+   model's record, found again by its model, time and file, and shows the newest record's model on
+   Results; Messages reads *Restored Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)
+   from this browser, not recomputed. Optical waveguide runs are numbered from 1 in this tab; names
+   and pins are kept.* The project name and file come back as each record holds them; when both
+   records still matched the same project file the header reads *… · saved …*. If the second restore
+   fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
+   restored: …*) and that model's card offer stays. While the tab holds runs of one of the models the
+   offer restores its own model only, as before, and names the other *(already in this tab)*; the
+   other model's own entry and both cards' offers are unchanged.
    Each stored session is listed once, newest first:
    records with the same inputs (or model) and runs are one session even when their view (page,
    field view), selected run, Compare choice, the runs' origin (computed here, opened from a file
