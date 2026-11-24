@@ -354,6 +354,13 @@ export function corePlacement(run){
   return {shape:shapes[best].name,share,named:share>CORE_SHARE};
  });
 }
+// Round 22 (V3): when Compare matches no mode and a run's mode 1 is an edge mode (its edge note), the
+// empty-match line says why, run by run: "A · Run 6: its modes are mostly in Substrate, which touches
+// the window edge; the core mode was not found."
+/** The shape of a run's mode-1 edge note, or null. */
+export const firstModeEdgeShape=run=>edgeNotes(run).find(n=>n.mode===0)?.shape??null;
+/** The reason sentence of one side. */
+export const noMatchEdgeText=(side,title,shape)=>`${side} · ${title}: its modes are mostly in ${shape}, which touches the window edge; the core mode was not found.`;
 /** "Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge." */
 export function coreNoteText(mode,p){
  return `Mode ${mode+1} is the core mode: ${Math.round(p.share*100)} % of |E|² is in ${p.shape}, which does not touch the window edge.`;
@@ -365,11 +372,11 @@ export function coreNotes(run){
  const notes=corePlacement(run).map((p,mode)=>p?.named?{mode,text:coreNoteText(mode,p)}:null).filter(Boolean);
  coreCache.set(run,notes);return notes;
 }
-/** The notes of a run: [{mode, text}] for each mode named by edgePlacement. */
+/** The notes of a run: [{mode, text, shape}] for each mode named by edgePlacement. */
 const edgeCache=new WeakMap();
 export function edgeNotes(run){
  if(edgeCache.has(run))return edgeCache.get(run);
- const notes=edgePlacement(run).map((p,mode)=>p?.named?{mode,text:edgeNoteText(mode,p)}:null).filter(Boolean);
+ const notes=edgePlacement(run).map((p,mode)=>p?.named?{mode,text:edgeNoteText(mode,p),shape:p.shape}:null).filter(Boolean);
  // a run's samples never change: its notes are kept per run object
  edgeCache.set(run,notes);return notes;
 }
