@@ -2881,6 +2881,157 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // R23 (round 23, pre-registered P1 to P4 and P6; P5 is the project script's K5 stage), in a browser
+  // context of its own, with the T18 geometry (a 500 × 220 core over a 3000 × 700 silicon substrate
+  // spanning the window): P1 the slab warning's short row, whole, at 1440 × 900 and 390 × 844; P3 the
+  // estimate with group index on and Turn off group index; P2 a session over 16 MiB (five runs of 4
+  // modes, about 19 MB): the Messages line, wrapped, and the header naming the fields recovery left
+  // out; P4 the drop line, the Pin notice, the dropped words and the swap button naming a closed n_g
+  // run, an open run and a closed-near run with the run list's parts; P6 the inputs line naming the
+  // boundary, the search, n_g and Modes to find.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R23 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R23 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R23 run done', 600000);
+    };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
+    const modes = async () => rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    const plan = () => rText('#run-plan');
+    const groupOff = () => r.eval("document.getElementById('run-plan-group-off')?.textContent??null");
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R23 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R23 optical model');
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R23 slab added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silica');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await rTree('Materials', "!!document.querySelector('[data-shape-material=\"1\"]')"); await r.choose('[data-shape-material="1"]', 'Silicon'); await sleep(300);
+    // P1 (E1): T18, closed, Highest: the row's whole short sentence, no ellipsis, no clamp, nothing cut
+    const SHORT = 'Substrate touches the window edge: in a closed window its slab modes come first.';
+    const FULL = "Substrate touches the window edge and its index is as high as Core's: in a closed window its slab modes come first.";
+    const edgeRow = () => r.eval(`(()=>{const o=document.getElementById('run-options');o.scrollIntoView({block:'nearest',inline:'nearest'});
+      const row=document.getElementById('run-edge'),t=document.getElementById('run-edge-text'),s=getComputedStyle(t),b=o.getBoundingClientRect(),inside=q=>q.top>=b.top-1&&q.bottom<=b.bottom+1&&q.left>=b.left-1&&q.right<=b.right+1;
+      return {hidden:row.hidden,text:t.textContent,overflow:s.textOverflow,clamp:s.webkitLineClamp,whiteSpace:s.whiteSpace,cut:t.scrollHeight>t.clientHeight+1||t.scrollWidth>t.clientWidth+1,
+        boxCut:o.scrollHeight>o.clientHeight+1||o.scrollWidth>o.clientWidth+1,inBox:inside(t.getBoundingClientRect()),buttons:[...row.querySelectorAll('button')].map(x=>[x.textContent,inside(x.getBoundingClientRect())]),
+        onScreen:b.left>=0&&b.right<=innerWidth,width:innerWidth}})()`);
+    const p1 = {};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) { await rSize(width, height, mobile); p1[width] = await edgeRow(); }
+    await rSize(1440, 900);
+    await modes(); p1.panel = await rText('#closed-edge-warning-text'); p1.panelButtons = await r.eval("[...document.querySelectorAll('#closed-edge-actions button')].map(b=>b.textContent)");
+    stage('R23 P1 slab warning row', p1);
+    for (const width of [1440, 390]) {
+      const w = p1[width];
+      assert.deepEqual({hidden: w.hidden, text: w.text, overflow: w.overflow, clamp: w.clamp, whiteSpace: w.whiteSpace, cut: w.cut, boxCut: w.boxCut, inBox: w.inBox, onScreen: w.onScreen},
+        {hidden: false, text: SHORT, overflow: 'clip', clamp: 'none', whiteSpace: 'normal', cut: false, boxCut: false, inBox: true, onScreen: true}, `P1 at ${width}`);
+      assert.deepEqual(w.buttons, [['Set search near 2.46 · 4 modes', true], ['Use Open boundary', true]], `P1 buttons at ${width}`);
+    }
+    assert.equal(p1.panel, FULL); assert.deepEqual(p1.panelButtons, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
+    await rOverflow('P1 slab warning');
+    // P3 (E3): group index on with no run: no estimate, the button; Run 1 (closed, 4 modes, no n_g)
+    await r.click('#group-index-check'); await sleep(300);
+    const p3 = {none: await plan(), noneButton: await groupOff()};
+    await r.click('#group-index-check'); await sleep(300); await r.type('#mode-count-number', 4); await sleep(300);
+    await rRun();
+    // n_g on: about 3 × Run 1's time; the button turns it off and the line is the closed one again
+    await modes(); await r.click('#group-index-check'); await sleep(300);
+    p3.scaled = await plan(); p3.button = await groupOff();
+    await r.click('#run-plan-group-off'); await sleep(400);
+    p3.off = {plan: await plan(), button: await groupOff(), checked: await r.eval("document.getElementById('group-index-check')?.checked??null"), message: await rText('#file-status')};
+    await rOverflow('P3 group index off');
+    // Run 2: closed, 4 modes, n_g (3 solves); then the estimate is its own time
+    await r.click('#group-index-check'); await sleep(300);
+    await rRun(); p3.after = await plan();
+    stage('R23 P3 group index estimate', p3);
+    assert.equal(p3.none, 'Closed window · group index on (3 solves)'); assert.equal(p3.noneButton, 'Turn off group index');
+    assert.match(p3.scaled, /^Closed window · group index on \(3 solves\) · about \d+ (?:s|min)$/); assert.equal(p3.button, 'Turn off group index');
+    assert.match(p3.off.plan, /^Closed window · last such run \d+:\d\d$/); assert.equal(p3.off.button, null); assert.equal(p3.off.checked, false);
+    // (Messages then adds that Run 1 has these results: the inputs are Run 1's again)
+    assert.ok(p3.off.message.startsWith('Group index off: the next run is one solve, without n_g.'), p3.off.message);
+    assert.match(p3.after, /^Closed window · group index on \(3 solves\) · about \d+ (?:s|min)$/);
+    // Run 3: open (2 modes, n_g off); Run 4: closed near 2.46 (the row's shortcut, 4 modes); Run 5:
+    // closed, Highest, 4 modes, core mesh 32 nm: the session goes over 16 MiB
+    await modes(); await r.click('#group-index-check'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    await rRun();
+    await modes(); await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400);
+    await r.click('#run-edge-search'); await sleep(400);
+    await rRun();
+    await modes(); await r.click('#closed-search-highest'); await sleep(300); await mesh(32);
+    await rRun();
+    // P2 (E2): the line names the runs Save keeps, what the others keep and what recovery keeps; it wraps
+    await r.until("/without the fields of \\d runs?$/.test(document.getElementById('project').textContent)", 'R23 header names the fields left out', 30000);
+    const p2 = {message: await rText('#file-status'), header: await rText('#project')};
+    const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
+    p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
+    stage('R23 P2 session over 16 MiB', p2);
+    assert.match(p2.message, / Session is now (?:1[7-9]|2\d) MB, over the 16 MiB \(16\.8 MB\) limit\. File › Save will ask whether to keep the fields of the selected and pinned runs only \(Run 5\); the other runs keep n_eff, the TE fractions and the effective areas\. Browser recovery already keeps only those fields\.$/);
+    assert.match(p2.header, /^Untitled project · not saved to a file · kept for recovery in this browser without the fields of 4 runs$/);
+    for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
+    assert.ok(p2.phone.lines > 1, JSON.stringify(p2.phone));
+    await rOverflow('P2 session size');
+    // P4 (E4): Run 6, then an edit: the drop line, Pin twice, a run and its swap; each run named with
+    // the run list's parts (its label up to the material: "Run 2 · closed · 4 modes · n_g · …")
+    await mesh(34); await rRun(); await mesh(36);
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R23 six runs');
+    const listed = async () => Object.fromEntries((await runItems()).map(t => t.replace(/^Pinned · /, '').split(' · λ ')[0].replace(/ · Silicon$/, '')).map(t => [t.split(' · ')[0], t]));
+    const named = words => words.replace(/^(Run \d+) \((.*)\)$/, '$1 · $2');
+    const p4 = {list: await listed(), line: await rText('#run-drop-text'), pins: []};
+    for (const n of [1, 2, 3]) { await r.click('#run-drop-pin'); await sleep(300); p4.pins.push(await rText('#file-status')); }
+    p4.line4 = await rText('#run-drop-text');
+    await rRun();
+    p4.after = {message: await rText('#file-status'), keep: await r.eval("document.querySelector('#file-status [data-keep-run]')?.textContent??null")};
+    stage('R23 P4 drop words', p4);
+    const one = (text, re) => { const m = re.exec(text); assert.ok(m, `${text} ~ ${re}`); return m.slice(1); };
+    const [line1] = one(p4.line, /^If you run: drops (Run 1 \(.*\)) · pin it to keep it$/);
+    const [pin2] = one(p4.pins[0], /^Run 1 pinned\. If you run: drops (Run 2 \(.*\)) · pin it to keep it$/);
+    const [pin3] = one(p4.pins[1], /^Run 2 pinned\. If you run: drops (Run 3 \(.*\)) · pin it to keep it$/);
+    const [pin4] = one(p4.pins[2], /^Run 3 pinned\. If you run: drops (Run 4 \(.*\)) · pin it to keep it$/);
+    // (the session size line follows the swap button: the session is still over 16 MiB)
+    const [dropped4] = one(p4.after.message, / (Run 4 \([^()]*\)) was dropped Keep Run 4, drop Run 5 \([^()]*\) instead Session is now /);
+    const [keep5] = one(p4.after.keep, /^Keep Run 4, drop (Run 5 \(.*\)) instead$/);
+    for (const [n, words] of [['Run 1', line1], ['Run 2', pin2], ['Run 3', pin3], ['Run 4', pin4], ['Run 4', dropped4], ['Run 5', keep5]]) assert.equal(named(words), p4.list[n], `${words} names ${n} as the list does`);
+    // the three kinds: a closed n_g run, an open run, a closed-near run
+    assert.equal(pin2, 'Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)');
+    assert.equal(pin3, 'Run 3 (open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm)');
+    assert.equal(pin4, 'Run 4 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm)');
+    assert.equal(p4.line4, 'If you run: drops Run 4 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) · pin it to keep it');
+    await rOverflow('P4 drop words');
+    // P6 (E6): Run 3 (open, 2 modes, core mesh 30 nm) against the current inputs (closed, Highest,
+    // 4 modes, core mesh 36 nm); Run 2 (n_g) the same
+    const inputsLine = async n => {
+      await r.onElement(`function(selector){[...this.querySelectorAll(selector)].find(b=>/^(Pinned · )?Run ${n} · /.test(b.textContent)).click();return true}`, '.run-item');
+      await r.until(`/^Current inputs differ from this run/.test(document.querySelector('#canvas p')?.textContent||'')&&!!document.querySelector('.run-item[aria-pressed=true]')?.textContent.match(/Run ${n} · /)`, `R23 Run ${n} shown`);
+      return rText('#canvas p');
+    };
+    const p6 = {open: await inputsLine(3), ng: await inputsLine(2)};
+    stage('R23 P6 inputs line', p6);
+    assert.match(p6.open, /^Current inputs differ from this run: this run core mesh 30 nm · open boundary \(PML 1 µm\) on [a-z, ]+ · search near \d\.\d+ · Modes to find 2, current core mesh 36 nm · closed window · highest n_eff · Modes to find 4; unchanged: Core 500 × 220 \+ Substrate 3000 × 700 nm · Silicon · λ 1550 nm$/);
+    assert.equal(p6.ng, 'Current inputs differ from this run: this run core mesh 30 nm · group index on, current core mesh 36 nm · group index off; unchanged: Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm · Modes to find 4');
+    await rOverflow('P6 inputs line');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);
