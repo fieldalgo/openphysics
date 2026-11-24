@@ -3,6 +3,9 @@
 
 """Homogeneous 2D Laplace panels in a rectangle with zero normal flux on every wall.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 There is no grounded plane: the reference is one or more conductors held at
 zero potential (for example the grounds of an unbacked coplanar line). This
 explicit API does not change the grounded-bottom, two-ground or volume solvers.

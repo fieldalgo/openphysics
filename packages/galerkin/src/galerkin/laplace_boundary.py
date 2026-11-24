@@ -3,6 +3,9 @@
 
 """Homogeneous 2D Laplace boundary panels in a grounded rectangle.
 
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+
 Use ``solve_grounded_rectangle`` explicitly; this does not change the P1
 volume electrostatics API. Coordinates are metres. The returned capacitance
 is divided by homogeneous absolute permittivity, and is dimensionless.
