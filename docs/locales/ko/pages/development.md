@@ -406,14 +406,14 @@ six runs are kept; pin a run to keep it.*가 나오며 상태 표시줄이 Run 7
 Substrate (… % of |E|²), which touches the window edge; …*, 50 % 초과)이 나오는지, 파장 편집 뒤 상태 표시줄이 *Run 9 ·
 Core 500 × 220 + Substrate 3000 × 700 nm …*인지, 템플릿 코어와 기판 실행을 Compare에서 비교하면 B의 안내, 짝이 없는 행마다
 *best x (< 0.8, not matched)*, 1440 × 900에서 O2의 24 px가 나오는지 봅니다.
-18차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 Run study 옆 상자를 확인합니다: 실행 전 *Closed window · no earlier
-run*(19차부터 *no timed run in this tab yet*), *… · group index on (3 solves) · …*와 *Open boundary · 2 searches · group index on (3 solves) · no timed run in this tab yet*, 그때
+18차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 Run study 옆 상자를 확인합니다: 실행 전 *Closed window*(20차 문구; 19차에는 *no timed run in this tab yet*, 그 전에는 *no earlier
+run*), *… · group index on (3 solves)*와 *Open boundary · 2 searches · group index on (3 solves)*, 그때
 Messages에 자기 색으로 나오는 경고 *Group index is on: open-boundary runs with it take about three times as long.*, 실행 뒤
 *last such run m:ss*; 모든 문구와 내보냄 줄에서 1440 × 900과 390 × 844의 Compute 그룹 높이, Run study 상자, 상자 크기가
 0.5 px 안에서 같은지; Search near n_eff 도움말이 *(n_core + 1.444)/2.*로 끝나는지; 편집으로 Run 1의 입력에 돌아오면
 **Show Run 1**과 함께 *No need to run: Run 1 already has these results. …*가 나오고(Run study는 그대로 켜짐) 실행 목록이
 *Run 1 · closed · 500 × 220 nm …*인지; Run 2 뒤 Run 1을 보면 상태 표시줄이 *… · current inputs from Run 2*인지; 실행 여섯 개에서
-*Running drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*와 **Pin Run 1**이 나오고 누르면 고정되며 줄이 Run 2로
+*If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*(20차 문구)와 **Pin Run 1**이 나오고 누르면 고정되며 줄이 Run 2로
 옮겨 가는지; 기판 실행의 안내 아래 **Use Open boundary**와 **Find 4 modes**가 각각 입력을 정하고 아무것도 실행하지 않는지;
 Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오는지; 두 크기 모두 가로 넘침이 없는지 봅니다.
 19차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 확인합니다: 형상 속성의 *Name*과 *Material* 칸이 그 낱말 하나뿐인
@@ -425,7 +425,15 @@ Run 2를 내보내며 Run study 옆 줄은 남는지; 실행 하나의 두 번�
 Optical waveguide · 1 run · Run 1 · saved …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · saved …*인지;
 그 오래된 세션을 복원하면 상자가 숨고, 더 새 세션은 곧바로 마지막 세션으로, 이 탭의 기록이 쓰인 뒤에는 Workspace tools의
 이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. 실행 여섯 개를 넘기는 단계는 대화 상자에 Run으로 답하고, Library의
-첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 봅니다.
+첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 봅니다. 20차부터(사전 등록) 대화 상자 단계는 질문이 열려 있는 동안 Run study
+옆의 *Waiting for your answer: pin, run or cancel*(내보냄 줄은 숨음), 상태 표시줄의 *Run study is waiting for your answer*,
+그대로 *Run study*인 버튼, 비어 있는 숨은 작업 메시지, 대화 상자 안의 포커스를, Escape 뒤에는 전의 계획 줄과 상태를 읽습니다.
+자체 브라우저 컨텍스트의 단계가 하나 더 실행 전 *Closed window*, 어느 경계에서든 범위 안내의 *3 × 2.4 µm window, closed (PEC
+edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)*를 확인하고, 실행 둘(Modes to find
+2와 3), 새로고침, 복원 뒤 Modes to find를 2로, 그다음 3으로 바꾸면 **Show Run 2**와 함께 *Modes to find set to 3. No need to
+run: Run 2 already has these results. Run study adds a copy with the same values.*, 상태 표시줄 *Run 2 · recovered from this
+browser, not recomputed · has the results of the current inputs*가 나오고, 어떤 실행에도 없는 4는 *… Run explicitly to
+compute new results.*를 그대로 두는지; 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
@@ -473,7 +481,7 @@ Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under th
 아무것도 내려받지 않으며, 두 모델로 저장한 뒤의 Save는 바로 내려받습니다. 18차부터(사전 등록) 같은 프로필에서 Save As 줄
 *The file will hold Optical waveguide (no runs).*와 Save가 물을 때의 *… and Heated silicon waveguide (no runs).*, 가열
 모델이 합류한 뒤 상태 표시줄 *Heated silicon waveguide · in project u8-optical.json · not saved since it joined · …*와 두
-모델로 저장한 뒤의 *… · downloaded …*(제목 표시줄의 말과 함께), 두 카드의 *Return to model*을 확인합니다. 16차의 다시 불러오기
+모델로 저장한 뒤의 *… · downloaded …*(제목 표시줄의 말과 함께), 두 카드의 *Return to Optical waveguide*와 *Return to Heated silicon waveguide*(20차 문구)를 확인합니다. 16차의 다시 불러오기
 단계에서도 두 카드의 제안이 다른 모델을 *· also in this project: … (restored separately)*로 밝힙니다. 19차부터(사전 등록)
 새 프로필이 `heater-study.json`을 열고 광 모델을 다시 실행한 뒤 새로고침하여 복원하면 헤더가 *Untitled project · recovered from a
 copy of heater-study.json · not saved to a file · …*이고 상태 표시줄은 *Recovered from this browser (opened from heater-study.json;
@@ -481,7 +489,16 @@ changed since)*인지, `r19-saved.json`으로 저장하고 다시 실행해 복�
 봅니다. session 스크립트는 히터 없는 풀이 레이블을 마우스 이벤트로(글자에, 그다음 *(about 1 s more)*에) 눌러 상자가 꺼졌다
 켜지는지 보고, 가열 실행 여섯 개 뒤 Run study가 세 답과 함께 *Running drops Run 1 (run at …).*라고 묻고 Cancel은 아무것도
 실행하지 않으며 Run은 Run 1을 내보내고 Run 7을 만드는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
-session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다.
+session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
+스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
+새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run) · same
+as file r20-both.json · saved …*로 시작하고, 가열 기록은 상자와 카드에서 같은 시각(파일의 저장 시각)을 밝히는지; 한 번의
+클릭이 둘 다 복원하여 *Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not
+recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모델의 Results가 나오고, Library에는 복원 제안이 남지 않으며
+*Return to Optical waveguide (2 runs)*와 *Return to Heated silicon waveguide (1 run)*로 읽히는지; 1440 × 900과 390 × 844에서
+가로 넘침이 없는지 봅니다. session 스크립트의 가열 모델 내보내기 질문은 열려 있는 동안 Run study 아래에 *Waiting for your
+answer: pin, run or cancel*, 상태 표시줄에 *Run study is waiting for your answer*를 보이고 Cancel 뒤에는 둘 다 없으며, 파일에서
+연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
