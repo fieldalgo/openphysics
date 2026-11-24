@@ -2387,8 +2387,16 @@ try {
     const six = await runItems();
     await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question');
     const y4 = {asked: await dialog()};
+    // round 20 (Z7, pre-registered): while the question is open the page says Run study waits for it
+    const waitingWords = () => r.eval("({plan:document.getElementById('run-plan').textContent,dropHidden:document.getElementById('run-drop').hidden,status:document.getElementById('status').textContent,run:document.getElementById('run-optical').textContent,job:document.getElementById('job-message').textContent,jobHidden:document.getElementById('job-panel').hidden,inDialog:document.getElementById('run-drop-confirm').contains(document.activeElement)})");
+    const z7 = {open: await waitingWords()};
     await rOverflow('Y4 drop question');
     await escape(); y4.escape = {...await dialog(), items: await runItems(), busy: await rText('#run-optical')};
+    z7.cancelled = await waitingWords(); stage('R20 Z7 waiting words', z7);
+    assert.deepEqual(z7.open, {plan: 'Waiting for your answer: pin, run or cancel', dropHidden: true, status: 'Run study is waiting for your answer', run: 'Run study', job: '', jobHidden: true, inDialog: true});
+    for (const text of [z7.open.status, z7.open.run, z7.open.plan]) assert.doesNotMatch(text, /Computing|running|in progress/);
+    assert.match(z7.cancelled.plan, /^Closed window · last such run \d+:\d\d$/); assert.equal(z7.cancelled.dropHidden, false);
+    assert.ok(z7.cancelled.status.endsWith(' · press Run to compute them'), z7.cancelled.status); assert.equal(z7.cancelled.inDialog, false);
     await r.click('#run-optical'); await r.until("document.getElementById('run-drop-confirm').open", 'R19 drop question again');
     await r.click('#run-drop-confirm-pin'); await sleep(300); y4.pinned = {...await dialog(), items: await runItems()};
     await r.click('#run-drop-confirm-cancel'); await sleep(300); y4.cancel = {...await dialog(), items: await runItems()};
@@ -2441,6 +2449,78 @@ try {
     }
     assert.equal(y1.restored.lastSession, true);
     assert.ok(y1.kept.earlier.some(t => t.startsWith('Restore earlier session from this browser · Optical waveguide · 1 run · Run 1 · ')), JSON.stringify(y1.kept.earlier));
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // R20 (round 20, pre-registered), in a browser context of its own: Z5 the Run study box without a
+  // comparable run, Z6 the scope note with either boundary, Z1 one message beside a recovered run
+  // whose inputs the edit made equal; no horizontal overflow.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R20 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const idle = "!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')";
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R20 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&${idle}`, 'R20 run', 300000);
+    };
+    const recorded = async label => { await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(1200); };
+    const clearRecorded = () => r.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    const scope = () => r.eval("[...document.querySelectorAll('#canvas section')].find(s=>s.querySelector('h3')?.textContent==='Optical adapter scope')?.querySelector('p')?.textContent??null");
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R20 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R20 optical model');
+    // Z5: no comparable run, no timing part
+    const z5 = {closed: await rText('#run-plan')};
+    // Z6: one scope text, whichever boundary is chosen
+    await rTree('Optical modes', "!!document.querySelector('input[name=outer-boundary][value=open]')");
+    const z6 = {closed: await scope()};
+    await r.click('input[name=outer-boundary][value=open]'); await sleep(500);
+    z6.open = await scope(); z5.open = await rText('#run-plan');
+    await r.click('input[name=outer-boundary][value=closed]'); await sleep(500);
+    stage('R20 Z5 Z6', {z5, z6});
+    assert.equal(z5.closed, 'Closed window'); assert.match(z5.open, /^Open boundary · (?:1 search|2 searches)$/);
+    assert.ok(z6.closed.includes('; 3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones); 1 to 8 modes'), z6.closed);
+    assert.equal(z6.open, z6.closed); assert.ok(!z6.closed.includes('PEC outer edges'));
+    await rOverflow('Z6 scope');
+    // Z1: Run 1 (Modes to find 2) and Run 2 (3), a reload and the restore; then 2 → 3, equal to Run 2
+    await clearRecorded(); await rRun();
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')"); await r.type('#mode-count-number', 3); await sleep(400);
+    await rRun(); await recorded('R20 two runs kept');
+    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-optical')", 'R20 Library offers'); await sleep(800);
+    await r.click('#resume-optical'); await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R20 restored');
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    await r.type('#mode-count-number', 2); await sleep(600);
+    const z1 = {two: await rText('#file-status')};
+    await r.type('#mode-count-number', 3); await sleep(600);
+    z1.three = {message: await rText('#file-status'), show: await r.eval("document.querySelector('#match-offer [data-show-run]')?.textContent??null"), status: await rText('#status')};
+    stage('R20 Z1 one message', z1);
+    assert.equal(z1.two, 'Modes to find set to 2. No need to run: Run 1 already has these results. Run study adds a copy with the same values. Show Run 1');
+    assert.equal(z1.three.message, 'Modes to find set to 3. No need to run: Run 2 already has these results. Run study adds a copy with the same values. Show Run 2');
+    assert.equal(z1.three.show, 'Show Run 2');
+    assert.equal(z1.three.status, 'Run 2 · recovered from this browser, not recomputed · has the results of the current inputs');
+    // an edit no run has keeps its request to run
+    await r.type('#mode-count-number', 4); await sleep(600);
+    const z1four = await rText('#file-status'); stage('R20 Z1 no match', {z1four});
+    assert.equal(z1four, 'Modes to find set to 4. Run explicitly to compute new results.');
+    await rOverflow('Z1 message');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
