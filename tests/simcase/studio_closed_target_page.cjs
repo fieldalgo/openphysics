@@ -62,9 +62,10 @@ test('K12: the words: the shortcut, the edge note (C0), the plan, the run tag an
  const run=N.validateRun(targetedRun('0000000a',[2.48623178,2.43931663],2,2.46));
  assert.equal(X.boundaryTag(run),'closed near 2.46');assert.ok(X.runHeading(run,1).startsWith('Run 1 · closed near 2.46 · '),X.runHeading(run,1));
  assert.equal(X.boundaryTag(N.validateRun(plainRun('0000000b'))),'closed');
- assert.equal(C.CLOSED_SEARCH_HELP,'Off: the modes of highest n_eff above 1.45. On: the modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values differ: refine the mesh before a close comparison.');
- assert.equal(C.closedSearchNotice(2.46),'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it.');
- assert.equal(C.closedSearchNotice(null),'Search near n_eff off: the next run returns the modes of highest n_eff.');
+ // round 22 (V1): the words of Modes to return (the meanings of the box off and on unchanged)
+ assert.equal(C.CLOSED_SEARCH_HELP,'Highest n_eff above 1.45: the modes of highest n_eff. Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest first; modes at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values differ: refine the mesh before a close comparison.');
+ assert.equal(C.closedSearchNotice(2.46),'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it.');
+ assert.equal(C.closedSearchNotice(null),'Modes to return: highest n_eff above 1.45. The next run returns the modes of highest n_eff.');
 });
 
 test('the core-mode note: a closed targeted run with an edge-touching shape names a mode mostly in a shape away from the edge',()=>{

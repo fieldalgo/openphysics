@@ -46,10 +46,15 @@ export const leftOutText=(found,asked)=>{const n=asked-found;return n<=0?'':n===
 export const closedTargetTag=t=>`closed near ${shortTarget(t)}`;
 /** The run plan's boundary words: "Closed window · near n_eff 2.46". */
 export const closedPlanText=t=>`Closed window · near n_eff ${shortTarget(t)}`;
-/** The help of the box in Physics › Optical modes (Q9: closed and open values differ). */
-export const CLOSED_SEARCH_HELP='Off: the modes of highest n_eff above 1.45. On: the modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values differ: refine the mesh before a close comparison.';
-/** The message of the box or the field. */
-export const closedSearchNotice=t=>t==null?'Search near n_eff off: the next run returns the modes of highest n_eff.':`Search near n_eff ${Number(t).toFixed(3)} in the closed window: the next run returns the modes nearest it.`;
+/** The help of Modes to return in Physics › Optical modes (Q9: closed and open values differ; round
+ * 22, V1: one choice of two radios and the field, the meanings of the box off and on unchanged). */
+export const CLOSED_SEARCH_LEGEND='Modes to return';
+export const HIGHEST_LABEL='Highest n_eff above 1.45';
+export const NEAREST_LABEL='Nearest to n_eff';
+export const NEAR_FIELD_LABEL='n_eff to search near';
+export const CLOSED_SEARCH_HELP='Highest n_eff above 1.45: the modes of highest n_eff. Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest first; modes at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values differ: refine the mesh before a close comparison.';
+/** The message of the choice or the field. */
+export const closedSearchNotice=t=>t==null?'Modes to return: highest n_eff above 1.45. The next run returns the modes of highest n_eff.':`Modes to return: nearest to n_eff ${Number(t).toFixed(3)} in the closed window. The next run returns the modes nearest it.`;
 
 /** The modes of a new closed targeted result that Studio keeps: Re n_eff above 1.45, in the engine's
  * order. {keep (the engine's indices), re, data (the result with the vector samples of the kept

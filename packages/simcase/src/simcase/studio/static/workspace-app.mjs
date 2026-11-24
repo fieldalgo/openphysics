@@ -22,7 +22,7 @@ import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
-import {CLOSED_TARGET_QUERY,checkClosedTarget,closedResultValues,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,closedResultValues,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
@@ -370,7 +370,7 @@ function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
  if(!leaveMultiphysics())return;projectId('workspace');
- Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;state.searchTarget=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
+ Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;state.searchTarget=null;ui.closedNear=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
 // file: the session file that holds these runs (as the leave question decides it), by name;
@@ -1239,19 +1239,35 @@ function setOuterBoundary(open){
   // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
   if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}
 }
-// Search near n_eff in a closed window (slice C2): the box and the field of Physics › Optical modes,
-// and the edge note's shortcut (with Modes to find 4); each sets the inputs with a message and runs nothing.
+// Search near n_eff in a closed window (slice C2): Modes to return in Physics › Optical modes (round
+// 22, V1: the radios Highest n_eff above 1.45 and Nearest to n_eff with the field n_eff to search near,
+// always enabled, in place of the box and its disabled field), and the edge note's shortcut (with
+// Modes to find 4); each sets the inputs with a message and runs nothing. state.searchTarget stays the
+// one input: null is Highest (the box off), a number Nearest (the box on), so documents and sessions
+// are unchanged. The field's value while Highest is chosen is kept in memory only (ui.closedNear).
 // K10: when a kept run has the new inputs, the message offers it (No need to run: Run N …)
 function setClosedSearch(t){state.searchTarget=t;render();notice(closedSearchNotice(t));offerMatchingRun();}
 function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}.`);offerMatchingRun();}
+// the field's index while Highest is chosen: the last one typed, if still in this design's range, else the default
+const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(ui.closedNear,state.shapes);}catch{}return defaultTarget(state.shapes);};
 const closedSearchField=()=>{
- if(state.openBoundary)return '';const on=state.searchTarget!=null,t=on?state.searchTarget:defaultTarget(state.shapes);
- return `<label class="check-field"><input id="closed-search-check" type="checkbox"${on?' checked':''}> Search near n_eff</label><label>Search near n_eff (closed window)<input id="closed-target-number" type="number" min="1.45" step="0.001" value="${t.toFixed(3)}"${on?'':' disabled'}></label><p class="input-note" id="closed-search-help">${CLOSED_SEARCH_HELP}</p>`;
+ if(state.openBoundary)return '';const near=state.searchTarget!=null,t=near?state.searchTarget:closedNearDraft();
+ return `<fieldset class="boundary-choice closed-search" id="closed-search"><legend>${CLOSED_SEARCH_LEGEND}</legend><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-highest" value="highest"${near?'':' checked'}> ${HIGHEST_LABEL}</label><span class="closed-search-near"><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-nearest" value="nearest"${near?' checked':''}> ${NEAREST_LABEL}</label><input id="closed-target-number" type="number" min="1.45" step="0.001" value="${t.toFixed(3)}" aria-label="${NEAR_FIELD_LABEL}" aria-describedby="closed-search-help"></span></fieldset><p class="input-note" id="closed-search-help">${CLOSED_SEARCH_HELP}</p>`;
 };
 const bindClosedSearchField=()=>{
- const box=$('closed-search-check'),field=$('closed-target-number');if(!box||!field)return;
- box.onchange=()=>setClosedSearch(box.checked?defaultTarget(state.shapes):null);
- field.onchange=()=>{const t=Math.round(Number(field.value)*1000)/1000;try{checkClosedTarget(t,state.shapes);}catch(error){notice(error.message);field.value=(state.searchTarget??defaultTarget(state.shapes)).toFixed(3);return;}setClosedSearch(t);};
+ const highest=$('closed-search-highest'),nearest=$('closed-search-nearest'),field=$('closed-target-number');if(!highest||!nearest||!field)return;
+ // the field's index, checked, as the target: Nearest to n_eff; an invalid one restores the choice and the field
+ const take=()=>{const t=Math.round(Number(field.value)*1000)/1000;
+  try{checkClosedTarget(t,state.shapes);}
+  catch(error){notice(error.message);field.value=(state.searchTarget??closedNearDraft()).toFixed(3);nearest.checked=state.searchTarget!=null;highest.checked=!nearest.checked;return;}
+  ui.closedNear=t;if(state.searchTarget===t)return;setClosedSearch(t);};
+ highest.onchange=()=>{if(highest.checked&&state.searchTarget!=null)setClosedSearch(null);};
+ nearest.onchange=()=>{if(nearest.checked)take();};
+ // typing an index selects Nearest to n_eff at once; the index is taken when the field changes (or
+ // is left with the choice moved but the value unchanged)
+ field.oninput=()=>{nearest.checked=true;};
+ field.onchange=take;
+ field.onblur=()=>{if(field.isConnected&&nearest.checked&&state.searchTarget==null)take();};
 };
 // The group index box in Study or Optical modes (one panel at a time): the option, then Messages says what the next run does.
 const bindGroupIndexField=()=>{const box=$('group-index-check');if(box)box.onchange=e=>{state.groupIndex=e.target.checked;render();notice(groupIndexNotice(state.groupIndex));};};

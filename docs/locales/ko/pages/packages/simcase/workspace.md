@@ -1201,19 +1201,24 @@ a closed window must lie above 1.45 and below 3.4777 (the design's largest index
 
 C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shapes-v10)을 제공합니다.
 
-- **체크 상자.** *Closed window (PEC)*를 고르면 **Physics › Optical modes**에 기본으로 꺼진 체크 상자 **Search near
-  n_eff**와 필드 *Search near n_eff (closed window)*(소수 3자리, 기본값은 (n_max + 1.444)/2를 0.01로 반올림한 값: 실리콘이면
-  2.460)가 있고, 필드는 상자가 켜져 있을 때만 쓸 수 있습니다. 도움말은 “Off: the modes of highest n_eff above 1.45. On: the
-  modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values
-  differ: refine the mesh before a close comparison.”입니다. Messages에는 *Search near n_eff 2.460 in the closed window: the
-  next run returns the modes nearest it.* 또는 *Search near n_eff off: the next run returns the modes of highest n_eff.*가
-  나오고, 보관된 실행이 새 입력을 가지면 *No need to run: Run N already has these results.*가 이어집니다. 형상이 창 가장자리에
-  닿아도 상자는 기본으로 켜지지 않습니다.
+- **Modes to return.** *Closed window (PEC)*를 고르면 **Physics › Optical modes**에 선택 하나, **Modes to return**이
+  있습니다: 라디오 **Highest n_eff above 1.45**(기본값)와, 필드 **n_eff to search near**(소수 3자리, 기본값은 (n_max +
+  1.444)/2를 0.01로 반올림한 값: 실리콘이면 2.460)가 뒤따르는 라디오 **Nearest to n_eff**입니다. round 22(V1)부터 필드는 늘
+  쓸 수 있고, 필드에 굴절률을 입력하면 Nearest to n_eff가 선택됩니다. 그 전에는 체크 상자 *Search near n_eff*가 따로 있는 필드
+  *Search near n_eff (closed window)*를 켰는데, 시험자 다섯 중 넷이 필드부터 건드렸습니다. 뜻은 상자의 뜻 그대로입니다:
+  Highest는 상자를 끈 것, Nearest는 켠 것이며 문서, capabilities, 세션은 바뀌지 않습니다. 도움말은 “Highest n_eff above
+  1.45: the modes of highest n_eff. Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest
+  first; modes at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values differ:
+  refine the mesh before a close comparison.”입니다. Messages에는 *Modes to return: nearest to n_eff 2.460 in the closed
+  window. The next run returns the modes nearest it.* 또는 *Modes to return: highest n_eff above 1.45. The next run returns
+  the modes of highest n_eff.*가 나오고, 보관된 실행이 새 입력을 가지면 *No need to run: Run N already has these results.*가
+  이어집니다. 설계 범위 밖 굴절률은 그 메시지와 함께 거절되고 선택은 그대로입니다. Highest가 선택된 동안 입력한 굴절률은
+  메모리에만 남습니다. 형상이 창 가장자리에 닿아도 기본값은 Highest입니다.
 - **바로 가기.** 닫힌 실행의 가장자리 안내 아래 round 18 행에는 **Use Open boundary**와, C2부터 C0의 *Set Modes to find to 4*
   대신 **Search near 2.46 · 4 modes**가 있습니다: 설계의 기본 목표로 상자를 켜고 Modes to find를 4로 정하며 *… Modes to find set
   to 4.*라고 알리고 아무것도 실행하지 않습니다. 입력이 이미 둘 다 그렇다면 나오지 않습니다. 등록된 모든 변형에서 모드 4개로 기판
   위 스트립의 코어 모드에 닿습니다([K7](#닫힌-창-탐색-문서optical-shapes-v10)).
-- **실행.** 상자를 켠 실행은 `target_effective_index`를 쓰고 capabilities v10을 적습니다. Studio는 Re n_eff가 1.45보다 큰
+- **실행.** Nearest to n_eff를 고른 실행은 `target_effective_index`를 쓰고 capabilities v10을 적습니다. Studio는 Re n_eff가 1.45보다 큰
   모드만 보관합니다(결정 A1): 표 위 줄은 늘 *Found k of M modes near n_eff 2.46, above n = 1.45.*(M: Modes to find)이고, 엔진이
   그 아래 모드를 돌려주었으면 표 아래 안내가 *1 mode at or below n = 1.45 was left out.*라고 말합니다(템플릿 @2.46, 모드 4개:
   2.44257822, 1.76989777, 1.49297336을 싣고 1.39191472를 뺌). 모드는 엔진의 순서(Re n_eff 내림차순)를 지킵니다.
