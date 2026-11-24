@@ -359,7 +359,7 @@ try {
     return done.stdout.trim();
   };
   const uncoupledOf = tree => page.on('function(t){return import("/workspace-assets/workspace-multiphysics.mjs").then(m=>m.uncoupledDocument(t,"modes1"))}', tree);
-  await page.click('#run-multiphysics'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+  await page.click('#run-multiphysics');
   await page.until("!!document.querySelector('[data-neff=\"1\"]')", 'result', 120000);
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
@@ -440,7 +440,7 @@ try {
   assert.equal(await page.text('#status'), again);
   assert.equal(await page.text('.dock-title>span'), again);
   assert.equal(await page.text('#run-baseline-option'), 'Also solve without heater (about 1 s more)');
-  await page.click('#run-multiphysics'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+  await page.click('#run-multiphysics');
   await page.until("/^Run 2 complete/.test(document.getElementById('file-status').textContent)", 'second run', 120000);
   // the kept column has the same content, so no heater-off solve follows
   assert.equal(await page.text('#file-status'), 'Run 2 complete. Its results belong to that run; editing the model does not change them.');
@@ -473,7 +473,7 @@ try {
   await page.until("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)", 'template opened again');
   await runReady();
   assert.equal(await page.text('.dock-title>span'), 'Nothing is computed until you press Run');
-  await page.click('#run-multiphysics'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+  await page.click('#run-multiphysics');
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'template heater-off column', 120000);
   const template = JSON.parse(await page.eval("fetch('/api/multiphysics/template').then(r=>r.text())"));
   const tCoupled = engineNeff(template), tAlone = engineNeff(await uncoupledOf(template)), td = Number(tCoupled) - Number(tAlone);
@@ -544,7 +544,7 @@ try {
   // optical one stays: its card reads "In this project", choosing it shows it as it was, with no
   // question; the optical card then reads "In this project · 1 run"
   await page.until("!document.getElementById('run-optical').disabled", 'optical Run', 60000);
-  await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+  await page.click('#run-optical');
   await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical run', 120000);
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'Library MB9');
   const heatedCard = await page.text('[data-template=heated-waveguide] .card-project');
