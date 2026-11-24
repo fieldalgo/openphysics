@@ -2254,16 +2254,16 @@ try {
     x2.warningStyle = await r.eval("(()=>{const w=getComputedStyle(document.querySelector('#file-status .message-warning')),m=getComputedStyle(document.getElementById('file-status'));return [w.color!==m.color,w.backgroundColor!==m.backgroundColor,w.fontWeight]})()");
     x2.help = await rText('#target-help'); sameRibbon(ribbonFresh, await ribbon(), 'X2 open boundary');
     stage('R18 X2 Run study box', x2);
-    assert.equal(x2.shown, true); assert.equal(x2.fresh, 'Closed window · no earlier run');
-    assert.equal(x2.group, 'Closed window · group index on (3 solves) · no earlier run');
-    assert.equal(x2.open, 'Open boundary · 2 searches · group index on (3 solves) · no earlier run');
+    assert.equal(x2.shown, true); assert.equal(x2.fresh, 'Closed window · no timed run in this tab yet');
+    assert.equal(x2.group, 'Closed window · group index on (3 solves) · no timed run in this tab yet');
+    assert.equal(x2.open, 'Open boundary · 2 searches · group index on (3 solves) · no timed run in this tab yet');
     assert.equal(x2.warning, 'Group index is on: open-boundary runs with it take about three times as long.');
     assert.deepEqual(x2.warningStyle.slice(0, 2), [true, true]);
     // X12: the help says where 2.46 comes from
     assert.ok(x2.help.endsWith(' The default is halfway between the core and silica indices: (n_core + 1.444)/2.'), x2.help);
     await rOverflow('X2 open boundary');
     await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(200); await r.click('#group-index-check'); await sleep(200);
-    assert.equal(await plan(), 'Closed window · no earlier run');
+    assert.equal(await plan(), 'Closed window · no timed run in this tab yet');
     // runs 1 and 2 (core mesh 30 and 32): the box names the last such run's time; X6 tags
     await mesh(30); await rRun(); x2.afterRun = await plan();
     assert.ok(/^Closed window · last such run \d+:\d\d$/.test(x2.afterRun), x2.afterRun);

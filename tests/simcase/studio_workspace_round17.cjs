@@ -144,10 +144,10 @@ test('U4: an unmatched row shows its best overlap below the threshold; the match
 });
 test('U3: the slow options of the next run, beside Run study',async()=>{
  // round 18 (X2): the line names the whole run; the slow options carry their solve count after the last
- assert.equal(W.runPlanText({groupIndex:true,modeCount:2}),'Closed window · group index on (3 solves) · no earlier run');
- assert.equal(W.runPlanText({open:true,pmlCheck:true,modeCount:2}),'Open boundary · 1 search · PML check on (3 solves) · no earlier run');
- assert.equal(W.runPlanText({open:true,groupIndex:true,pmlCheck:true,modeCount:2}),'Open boundary · 1 search · group index on · PML check on (5 solves) · no earlier run');
- assert.equal(W.runPlanText({modeCount:2}),'Closed window · no earlier run');
+ assert.equal(W.runPlanText({groupIndex:true,modeCount:2}),'Closed window · group index on (3 solves) · no timed run in this tab yet');
+ assert.equal(W.runPlanText({open:true,pmlCheck:true,modeCount:2}),'Open boundary · 1 search · PML check on (3 solves) · no timed run in this tab yet');
+ assert.equal(W.runPlanText({open:true,groupIndex:true,pmlCheck:true,modeCount:2}),'Open boundary · 1 search · group index on · PML check on (5 solves) · no timed run in this tab yet');
+ assert.equal(W.runPlanText({modeCount:2}),'Closed window · no timed run in this tab yet');
  // the words of the Study line
  assert.ok(W.nextRunText(input(),2,true).includes(' · group index on'));
  assert.ok(read('workspace.html').includes('<button id="run-optical" disabled>Run study</button><div id="run-options" class="run-options" hidden><span id="run-plan" class="run-plan"></span><span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span></div>'));
