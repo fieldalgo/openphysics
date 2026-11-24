@@ -265,7 +265,7 @@ function unsavedModels(){
 }
 function projectLine(){
  const file=project.file&&project.file.scope===project.scope?project.file:null;
- const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened}:null;
+ const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened,changed:project.recovered.changed??null}:null;
  return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
 }
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
