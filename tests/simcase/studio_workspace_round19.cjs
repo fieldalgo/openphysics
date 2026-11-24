@@ -30,14 +30,16 @@ test('Y7: a shape\'s Name and Material fields each have their own label (for=), 
 
 test('Y2: the optical open and recovery messages say the runs are numbered from 1 in this tab',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs');
- // since session version 12 (stable run numbers): said only for a file of an earlier Studio, in these words
- assert.equal(W.RENUMBERED_TEXT,'This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
- assert.equal(W.renumberedText('Optical waveguide'),'This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+ // since session version 12 (stable run numbers) no message speaks about numbering: a file stores the
+ // numbers, or Studio wrote it only while they were its places (HQ decision
+ // 2026-11-24-openphysics-studio-session-v12-k10-amended)
+ assert.equal(W.RENUMBERED_TEXT,undefined);assert.equal(W.renumberedText,undefined);
  const app=read('workspace-app.mjs');
- // a session file opened, or a session restored from this browser: when it numbered its runs from 1
- assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.'))+(renumberedRuns(session)?' '+RENUMBERED_TEXT:''));"));
- // a project file: when its optical model numbered its runs from 1
- assert.ok(app.includes("nothing was run.`+(renumberedRuns(ws?.session)?' '+renumberedText(ws.title):''));"));
+ // a session file opened, or a session restored from this browser
+ assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.')));"));
+ // a project file
+ assert.ok(app.includes("Results were read from the file, not recomputed; nothing was run.`);"));
+ assert.ok(!app.includes('numbered from 1'));
  // the heated model keeps its stored numbers: its messages do not say this
  assert.ok(!read('workspace-multiphysics-view.mjs').includes('numbered from 1'));
 });

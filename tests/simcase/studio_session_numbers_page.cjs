@@ -3,8 +3,8 @@
 // Stable run numbers and the project name after recovery, the page's part. Pre-registered: K6 (a
 // seeded random sequence of at least 2000 steps: numbers strictly increasing in list order, no
 // number given to two jobs, next = largest used + 1), K7 (the four header lines, and a pair restore
-// whose records differ in name keeps the newer name) and K10 (the numbering sentence for a version 7
-// file with runs only). The format's part (K1-K3, K9) is in studio_session_numbers.cjs; the browser
+// whose records differ in name keeps the newer name) and K10 as amended (no numbering sentence for a
+// version 7, 11 or 12 file). The format's part (K1-K3, K9) is in studio_session_numbers.cjs; the browser
 // flows (K4, K5) are stages of tools/studio_browser/studio_project_browser.mjs.
 const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');
@@ -18,7 +18,6 @@ test.before(async()=>{
  PS=await import(STATIC+'workspace-persistence.mjs');R=await import(STATIC+'workspace-notebook-recovery.mjs');C=await import('./studio_session_fixtures/closed_sessions.mjs');
 });
 const VIEW={mode:0,component:'magnitude',window:'Core region'};
-const SENTENCE='This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.';
 
 // a deterministic generator (mulberry32)
 const random=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
@@ -35,7 +34,10 @@ function tab(base){
   try{appended=N.appendRun(t.runs,completed);}catch{return 'all pinned';}
   t.used=used;const next=prior?W.inNumberOrder(appended):appended,dropped=t.runs.filter(r=>!next.includes(r)&&r.job!==completed.job);
   t.runs=next;numbered([completed]);
-  const other=dropped.length===1?W.swapCandidate(t.runs,completed):null;t.swap=other?{kept:dropped[0],other}:null;return 'result';
+  const other=dropped.length===1?W.swapCandidate(t.runs,completed):null;t.swap=other?{kept:dropped[0],other}:null;
+  // the same job again: its number and its place (inNumberOrder)
+  if(prior){assert.equal(completed.number,prior.number);assert.equal(t.runs.findIndex(r=>r.job===completed.job),t.runs.findIndex(r=>r.number>=completed.number));return 'result again';}
+  return 'result';
  };
  t.swapBack=()=>{if(!t.swap||!t.runs.includes(t.swap.other))return 'no swap';t.runs=W.swapDropped(t.runs,t.swap.kept,t.swap.other);t.swap=null;return 'swap';};
  t.pin=(k,on)=>{const r=t.runs[k%Math.max(1,t.runs.length)];if(!r)return 'no run';t.runs=t.runs.map(x=>x===r?{...x,pinned:on}:x);t.swap=null;return on?'pin':'unpin';};
@@ -77,7 +79,7 @@ test('K6: a seeded random sequence of 2400 steps keeps the numbers increasing, n
   assert.equal(t.used,Math.max(0,...numbers),`step ${step} (${what}): the largest number is kept, so next = largest + 1`);
  }
  // every kind of step happened
- for(const kind of ['result','pin','unpin','swap','import','open','restore','save v12'])assert.ok(seen[kind]>0,kind+' '+JSON.stringify(seen));
+ for(const kind of ['result','result again','pin','unpin','swap','import','open','restore','save v12'])assert.ok(seen[kind]>0,kind+' '+JSON.stringify(seen));
  assert.ok(Object.keys(seen).some(k=>/^save v(7|9)$/.test(k)),JSON.stringify(seen));
 });
 
@@ -117,24 +119,21 @@ test('K7: the header after a restore names the recovered project; a pair restore
  assert.ok(app.includes("openedCurrent:rec.openedCurrent,project:recordProjectNow()});"));
 });
 
-test('K10: the numbering sentence for a version 7 file with runs only; a version 11 or 12 file says nothing',()=>{
- assert.equal(W.RENUMBERED_TEXT,SENTENCE);assert.equal(W.renumberedText('Optical waveguide'),SENTENCE);
- const seven=N.parseSession(fixture('optical-v7-three.json'));assert.equal(W.renumberedRuns(seven),true);
- assert.equal(W.renumberedRuns(N.parseSession(fixture('optical-v6-one.json'))),true);
- assert.equal(W.renumberedRuns(N.parseSession(fixture('optical-v7-empty.json'))),false);
- // a version 11 file of runs 1..n, and the version 12 file
+test('K10 (amended before implementation, HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended): no numbering sentence for a version 7, 11 or 12 file; each run shows its place or its stored number',()=>{
+ assert.equal(W.RENUMBERED_TEXT,undefined);assert.equal(W.renumberedText,undefined);assert.equal(W.renumberedRuns,undefined);
+ // a version 7 file with runs and a version 11 file of runs 1..n: each run at its place
+ assert.deepEqual(N.parseSession(fixture('optical-v7-three.json')).runs.map(r=>r.number),[1,2,3]);
  const v9=N.parseSession(C.synthetic(N,P)),target=N.validateRun({...v9.runs[0],job:'0000000c',settings:N.closedTargetSettings(v9.runs[0].settings,2.46)});
- const eleven=N.parseSession(N.sessionText(v9.input,[...v9.runs,target],v9.selected,v9.comparison,v9.view));
- assert.equal(eleven.version,11);assert.deepEqual(eleven.runs.map(r=>r.number),[1,2,3]);assert.equal(W.renumberedRuns(eleven),false);
- const twelve=N.parseSession(fixture('optical-v12-numbers.json'));assert.equal(twelve.version,12);assert.equal(W.renumberedRuns(twelve),false);
- assert.equal(W.renumberedRuns(N.parseSession(fixture('multiphysics-v8.json'))),false);
- // the open, project-open, restore and pair-restore messages say it only then
+ const elevenText=N.sessionText(v9.input,[...v9.runs,target],v9.selected,v9.comparison,v9.view);
+ assert.equal(JSON.parse(elevenText).version,11);assert.deepEqual(N.parseSession(elevenText).runs.map(r=>r.number),[1,2,3]);
+ // a version 12 file: the stored numbers
+ assert.deepEqual(N.parseSession(fixture('optical-v12-numbers.json')).runs.map(r=>r.number),[3,5,6,7,8,9]);
+ // the open, project-open, restore and pair-restore messages say nothing about numbering
  const app=read('workspace-app.mjs');
- assert.ok(app.includes("+(renumberedRuns(session)?' '+RENUMBERED_TEXT:''));"));
- assert.ok(app.includes("+(renumberedRuns(ws?.session)?' '+renumberedText(ws.title):''));"));
- assert.ok(app.includes("+(renumberedRuns(optical)?' '+renumberedText('Optical waveguide'):''));"));
- // the import line and these three uses only
- assert.equal((app.match(/RENUMBERED_TEXT|renumberedText\(/g)||[]).length,4);
+ assert.ok(!/numbered from 1|RENUMBERED_TEXT|renumberedText|renumberedRuns/.test(app));
+ assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.')));"));
+ assert.ok(app.includes("Results were read from the file, not recomputed; nothing was run.`);"));
+ assert.ok(app.includes("from this browser, not recomputed.`);};"));
 });
 
 test('the open keeps the stored numbers; an import numbers its runs after the tab\'s largest and says so',()=>{
