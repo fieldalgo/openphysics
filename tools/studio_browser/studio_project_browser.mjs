@@ -806,8 +806,11 @@ try {
     assert.match(k5.title, /^both-models · recovered from this browser · not saved to a file · /);
     assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
-    // after the next change the header is the ordinary one
-    assert.match(await title(), /^both-models · not saved to a file · /);
+    // after a change the header is the ordinary one (the drop-line check above ends on the restored
+    // inputs, 560 nm, so the header still reads as recovered there, as loadedSession does)
+    assert.match(await title(), /^both-models · recovered from this browser · /);
+    await width(600); await sleep(300); k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
+    assert.match(k5.changed, /^both-models · not saved to a file · /);
     await stopBrowser(page);
   }
 
