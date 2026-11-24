@@ -104,8 +104,8 @@ test('X3: before the run, the run the six-run limit would drop, with Pin Run N; 
  assert.equal(W.nextDropped(five),null);
  const six=[run(1,{pinned:true}),run(2,{pinned:true}),run(3),run(4),run(5),run(6)];
  assert.equal(W.nextDropped(six).number,3);
- assert.equal(W.dropWarningText(W.nextDropped(six)),'Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it');
- assert.equal(W.dropWarningText(run(3,{label:'Design A'})),'Running drops Run 3 · Design A (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.dropWarningText(W.nextDropped(six)),'If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.dropWarningText(run(3,{label:'Design A'})),'If you run: drops Run 3 · Design A (700 × 300 nm · 4 modes) · pin it to keep it');
  assert.equal(W.nextDropped(six.map(r=>({...r,pinned:true}))),null);
  // the run it names is the one appendRun drops
  const next=N.appendRun(six,run(7));assert.deepEqual(six.filter(r=>!next.includes(r)).map(r=>r.number),[3]);

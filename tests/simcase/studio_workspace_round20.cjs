@@ -1,0 +1,39 @@
+// Copyright 2026 Yongha Kim (FieldAlgo)
+// SPDX-License-Identifier: Apache-2.0
+// Round 20: usability fixes of the optical and heated models. Plain text comparison only: no
+// RegExp is built from a dynamic string.
+const test=require('node:test');const assert=require('node:assert/strict');
+const fs=require('node:fs');const path=require('node:path');
+const STATIC='../../packages/simcase/src/simcase/studio/static/';
+const read=name=>fs.readFileSync(path.join(__dirname,STATIC,name),'utf8');
+
+test('Z1: one state, one message: no request to run beside "No need to run"',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs'),I=await import(STATIC+'workspace-inputs.mjs'),M=await import(STATIC+'workspace-multiphysics.mjs');
+ // the edit's own sentence stays, its request to run goes
+ assert.equal(W.matchingRunMessage(I.editNoticeText('modeCount',3)),'Modes to find set to 3.');
+ assert.equal(W.matchingRunMessage(I.editNoticeText('shapeW',600,{leftX:-300})),'Width set to 600 nm. Left x moved to −300 nm to keep the centre.');
+ assert.equal(W.matchingRunMessage(I.editNoticeText('shapeH',300,{afterResult:true})),'Height set to 300 nm.');
+ assert.equal(W.matchingRunMessage('Optical left edge closed (PEC). Run explicitly to compute new results.'),'Optical left edge closed (PEC).');
+ assert.equal(W.matchingRunMessage('Inputs changed since the last result. Run again to compute the new inputs.'),'');
+ // a message without a request is kept as it is (Undo, Redo, the group index option)
+ assert.equal(W.matchingRunMessage('Group index off: the next run is one solve, without n_g.'),'Group index off: the next run is one solve, without n_g.');
+ // without a matching run the edit notice keeps today's full sentence
+ assert.equal(I.editNoticeText('modeCount',3),'Modes to find set to 3. Run explicitly to compute new results.');
+ // the offer: the edit's sentence, then the "No need to run" sentence alone
+ assert.equal(W.matchingRunMessage(I.editNoticeText('modeCount',3))+' '+M.matchesAgainText(6)+'.','Modes to find set to 3. No need to run: Run 6 already has these results. Run study adds a copy with the same values.');
+ // status bar: a run read from file or recovered that has these results, without "press Run"
+ const doc={model:{shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],wavelength:1550,coreMesh:30},setup:{materials:{Oxide:'Silica'}}};
+ const sig=JSON.stringify(doc);
+ assert.equal(W.opticalReadyStatus(W.opticalFreshness(doc,[{signature:sig,origin:'recovered',number:6}])),'Run 6 · recovered from this browser, not recomputed · has the results of the current inputs');
+ assert.equal(W.opticalReadyStatus(W.opticalFreshness(doc,[{signature:sig,origin:'imported'}])),'Run 1 · read from file, not recomputed · has the results of the current inputs');
+ assert.equal(M.readyStatus('current',2,'recovered'),'Run 2 · recovered from this browser, not recomputed · has the results of the current model');
+ assert.equal(M.readyStatus('current',2,'imported'),'Run 2 · read from file, not recomputed · has the results of the current model');
+ // a run computed here keeps its words
+ assert.equal(M.readyStatus('current',2,'local'),'Run 2 matches the model · press Run to solve again');
+ // the drop line is about running; the dialog heading stays the question
+ const run={number:3,settings:{mode_count:2},input:{model:doc.model}};
+ assert.equal(W.dropWarningText(run),'If you run: drops Run 3 (500 × 220 nm · 2 modes) · pin it to keep it');
+ assert.equal(W.opticalDropQuestion(run,[run,{...run,number:4}]).title,'Running drops Run 3 (500 × 220 nm · 2 modes).');
+ for(const name of ['workspace-workflow.mjs','workspace-multiphysics.mjs'])assert.ok(!read(name).includes('press Run to compute it here'),name);
+ assert.ok(read('workspace-app.mjs').includes('host.textContent=matchingRunMessage(host.textContent);'));
+});

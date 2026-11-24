@@ -435,7 +435,7 @@ print(n)`;
   const openedDock = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,sequence:document.getElementById('sequence').textContent})");
   stage('opened run status', openedDock);
   assert.equal(openedDock.heading, 'Run 1 · read from file, not recomputed');
-  assert.equal(openedDock.status, 'Run 1 · read from file, not recomputed · press Run to compute it here');
+  assert.equal(openedDock.status, 'Run 1 · read from file, not recomputed · has the results of the current model');
   assert.match(openedDock.sequence, /Heat 1 · From file.*Modes 1 · From file/); assert.doesNotMatch(openedDock.sequence, /Done in/);
   const a2 = await saveSession('template again', {named: true});
   assert.equal(a2.text, a1.text, 'S1: the second file is byte-identical');

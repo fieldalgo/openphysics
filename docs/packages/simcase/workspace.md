@@ -342,7 +342,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    materials, wavelength, mesh, Modes to find, group index, boundary and search targets), Messages
    adds the heated model's sentence after the edit's own message, *No need to run: Run 5 already has
    these results. Run study adds a copy with the same values.*, with **Show Run 5**, which shows
-   that run under Results and changes no input (round 18). Run study still runs if pressed. Under
+   that run under Results and changes no input (round 18). Since round 20 the edit's message then
+   keeps its own sentence and drops its request to run (*Modes to find set to 3. No need to run: Run
+   6 already has these results. …*); an edit no run matches keeps *… Run explicitly to compute new
+   results.* Run study still runs if pressed. Under
    the Inputs row of the selected run, **Use this run's inputs** loads that run's inputs (and its
    Modes to find and group index option) as the current inputs at once, without a question,
    since the runs stay as they are. Messages lists only the settings that change, from → to
@@ -355,7 +358,8 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    Messages names the dropped run (*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are
    kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Since round
    18 the box beside **Run study** says it before the run, while six runs are kept and one is not
-   pinned: *Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*, with **Pin Run 3**,
+   pinned: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it* (round 20; it read
+   *Running drops …* before, as if a run were under way), with **Pin Run 3**,
    which pins that run (the usual pin message) and moves the line to the next unpinned run, or
    removes it. Pin is unavailable while a calculation runs, as in Run name. Since round 19
    **Run study** also asks before such a run: a dialog reads *Running drops Run 3 (700 × 300 nm · 4
@@ -370,8 +374,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    this tab; names and pins are kept.* (after Open project, *Optical waveguide runs are numbered from
    1 in this tab; …*). The heated model's runs keep their numbers, so its messages do not say this. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
-   session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
-   bar adds *press Run to compute it here*). Run list entries name a run by its number with its
+   session, *Run 2 · recovered from this browser, not recomputed* after a recovery; the status
+   bar adds *has the results of the current inputs* (round 20; it asked *press Run to compute it
+   here* before, beside a run that already has them). Run list entries name a run by its number with its
    name, then its boundary, *Pinned · Run 1 · design A · closed · 600 × 300 nm · λ 1550 nm ·
    3:50:12 PM*, and give the time with seconds; the Compare pickers, the Compare headings and the
    n_eff table's run lines name runs the same way. The boundary tag, *closed* or *open (PML 1 µm)*,
@@ -836,8 +841,8 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   from a session file or recovered from this browser has no solve times: its rows read **From
   file** or **From this browser** (an iteration step keeps its count, *Settled in 7 iterations · from
   file*), the dock heading “Run 1 · read from file, not recomputed” (or
-  “recovered from this browser, not recomputed”) and the footer adds “press Run to compute it
-  here”; a run made in the tab keeps the words above. A named run is “Run N · name” in the dock
+  “recovered from this browser, not recomputed”) and the footer adds “has the results of
+  the current model” (round 20; before, “press Run to compute it here”); a run made in the tab keeps the words above. A named run is “Run N · name” in the dock
   heading and the footer, as in the optical application: “Run 1 · Heater 2e14 · solved from the
   current model”, “Run 1 · Heater 2e14 matches the model · press Run to solve again”, “Model
   edited since Run 1 · Heater 2e14 · press Run to update”.

@@ -295,7 +295,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    입력만 설명함). 편집, Undo나 Redo 뒤에 현재 입력과 스터디 설정(기하, 재료, 파장, 메시, Modes to find, 군굴절률,
    경계와 검색 목표)이 어떤 실행과 같으면 Messages가 편집 메시지 뒤에 가열 모델의 문장 *No need to run: Run 5 already
    has these results. Run study adds a copy with the same values.*와 **Show Run 5**를 붙입니다. 그 버튼은 입력을
-   바꾸지 않고 그 실행을 Results에 보입니다(round 18). Run study는 눌리면 그래도 실행합니다. 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
+   바꾸지 않고 그 실행을 Results에 보입니다(round 18). round 20부터 그때 편집 메시지는 자기 문장만 남기고 실행하라는
+   요청을 뺍니다(*Modes to find set to 3. No need to run: Run 6 already has these results. …*). 어떤 실행과도 같지 않은
+   편집은 *… Run explicitly to compute new results.*를 그대로 둡니다. Run study는 눌리면 그래도 실행합니다. 고른 실행의 Inputs 행 아래 **Use this run's inputs**는 그 실행의 입력(Modes to find와
    군굴절률 선택 포함)을 묻지 않고 바로 현재 입력으로 불러옵니다. 실행은 그대로 남기 때문입니다. Messages는 바뀌는
    설정만 이전 → 이후로 밝힙니다(*Current inputs set from Run 1 · design A: Width 700 → 600 nm · Modes to find
    4 → 2. The next run uses them; Undo takes them back.*). 같은 문구는 다음 입력 편집까지 실행 패널의 버튼이
@@ -305,7 +307,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    실행 여섯 개 한도가 가장 오래된 고정되지 않은 실행을 내보내도 나머지는 번호를 유지하고, Messages가 내보낸 실행을
    밝힙니다(*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.*;
    Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
-   **Run study** 옆 상자가 실행 전에 알립니다: *Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*와
+   **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*(round 20;
+   전에는 실행이 진행 중인 듯 *Running drops …*였음)와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
    Run name처럼 계산 중에는 고정할 수 없습니다. round 19부터 **Run study**는 그런 실행 전에 묻기도 합니다: 대화 상자가
    *Running drops Run 3 (700 × 300 nm · 4 modes).*와 *Up to six runs are kept; a pinned run is never dropped.*를 보이고
@@ -318,7 +321,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    그대로 가지므로 그 메시지에는 이 문장이 없습니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
-   상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로
+   상태 표시줄은 *has the results of the current inputs*를 덧붙입니다(round 20; 전에는 이미 결과가 있는 실행 옆에서
+   *press Run to compute it here*라고 요청했음). 실행 목록 항목은 실행을 번호와 이름으로
    가리키고(*Pinned · Run 1 · design A · closed · 600 × 300 nm · λ 1550 nm · 3:50:12 PM*) 시각은 초까지 나옵니다.
    Compare의 선택 목록과 제목도 실행을 같은 방식으로 가리킵니다. 형상이 여럿인 실행은 처음 세 형상의 이름과
    크기를, 그 뒤는 *+N more*로 적습니다. 모든 실행 이름은 실행 번호와 이름 바로 뒤에 경계 태그 *closed* 또는
@@ -700,7 +704,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   복구한 실행에는 풀이 시간이 없습니다: 행은 **From file** 또는 **From this browser**(반복 단계는 *Settled in 7 iterations · from file*처럼
   반복 횟수를 유지), 도크 제목은
   “Run 1 · read from file, not recomputed”(또는 “recovered from this browser, not recomputed”)이고
-  하단은 “press Run to compute it here”를 덧붙입니다. 탭에서 만든 실행은 위 문구를 그대로 씁니다. 이름
+  하단은 “has the results of the current model”을 덧붙입니다(round 20; 전에는 “press Run to compute it here”). 탭에서 만든 실행은 위 문구를 그대로 씁니다. 이름
   붙은 실행은 광학 애플리케이션처럼 도크 제목과 하단에서 “Run N · 이름”으로 불립니다: “Run 1 · Heater 2e14 ·
   solved from the current model”, “Run 1 · Heater 2e14 matches the model · press Run to solve again”,
   “Model edited since Run 1 · Heater 2e14 · press Run to update”.
