@@ -48,7 +48,7 @@ test('Y4 (round 21 W2): Run study no longer asks; the line beside it stays',asyn
  for(const text of ['dropDialog','askRunDrop','confirmOpticalDrops','await confirm'])assert.ok(!app.includes(text),text);
  assert.ok(!view.includes('askedRun'));assert.ok(view.includes("run:()=>run(),"));
  // the limit and the line beside Run study stay
- assert.ok(app.includes("const host=$('run-drop'),run=list[0]||null;"));
+ assert.ok(app.includes("const host=$('run-drop'),run=matched?null:list[0]||null;"));
 });
 
 test('Y3: a restore brings back the project name and file it was saved to, or names the file it was a copy of',async()=>{

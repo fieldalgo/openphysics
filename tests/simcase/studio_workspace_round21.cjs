@@ -126,3 +126,15 @@ test('W4: the pair offer does not list the other model again; an older entry nam
  // the caller carries the other record's save time with the pair
  assert.ok(read('workspace-app.mjs').includes("pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}"));
 });
+
+test('W5: the drop line is hidden beside "No need to run" and returns when the inputs differ from every run',()=>{
+ const app=read('workspace-app.mjs'),view=read('workspace-multiphysics-view.mjs');
+ // the same test as the "No need to run" offer (offerMatchingRun): a run of these exact inputs
+ assert.ok(app.includes("const sig=signature(),run=runs.findLast(r=>r.signature===sig);if(!run)return;"));
+ assert.ok(app.includes("const matched=!running&&!numericDrafts.invalid&&runs.some(r=>r.signature===signature());"));
+ assert.ok(app.includes("const host=$('run-drop'),run=matched?null:list[0]||null;host.hidden=!run;"));
+ // during a run the while-line shows whatever the inputs
+ assert.ok(app.includes("const text=running?dropWhileRunningText(list):"));
+ // the heated model: a kept run of the current model
+ assert.ok(view.includes("const matched=!running&&runs.some(x=>runFreshness(x,doc)==='current'),r=active&&!matched?list[0]||null:null;"));
+});
