@@ -552,7 +552,7 @@ try {
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R18 Library');
     const actions = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent]))");
     stage('R18 X10 cards', actions);
-    assert.deepEqual(actions, {optical: 'Return to model', heat: 'Open model', joule: 'Open model', 'heated-waveguide': 'Return to model'});
+    assert.deepEqual(actions, {optical: 'Return to Optical waveguide', heat: 'Open model', joule: 'Open model', 'heated-waveguide': 'Return to Heated silicon waveguide'});
     // a download cannot replace the earlier file: a browser may add " (1)" (headless Chromium here writes the name again)
     assert.equal(dialogAgain, false); assert.ok(both.startsWith('u8-optical') && again.startsWith('u8-optical'), JSON.stringify({both, again}));
     const file = JSON.parse(await readFile(join(downloads, both), 'utf8')); assert.deepEqual(file.models.map(m => m.kind).sort(), ['multiphysics', 'workspace']);
