@@ -2524,6 +2524,155 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // CW (Search near n_eff for closed-window runs, slice C2, pre-registered), in a browser context of
+  // its own: the box and field of Physics › Optical modes by role and name; K13 the template @2.46 with
+  // 4 modes listing 3 (Found 3 of 4 …, the left-out note, saved as session version 11); the strip over
+  // a substrate's edge note with Use Open boundary and Search near 2.46 · 4 modes (K12), the core-mode
+  // note at @2.46 with 4 and 2 modes; K10 a changed target needing a run and an equal one offering the
+  // run; Use this run's inputs restoring the box; no horizontal overflow at 1440 × 900 and 390 × 844.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const cwDownloads = join(out, 'downloads-closed-search'); await mkdir(cwDownloads, {recursive: true});
+    await browserPage.call('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: cwDownloads, browserContextId});
+    await r.call('Page.addScriptToEvaluateOnNewDocument', {source: 'delete window.showSaveFilePicker;delete Window.prototype.showSaveFilePicker;'});
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('CW overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const control = async (role, name) => {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role});
+      const found = nodes.filter(n => !n.ignored);
+      return {count: found.length, checked: found[0]?.properties?.find(p => p.name === 'checked')?.value?.value ?? null, disabled: found[0]?.properties?.find(p => p.name === 'disabled')?.value?.value ?? false};
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const idle = "!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')";
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'CW Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&${idle}`, 'CW run', 300000);
+    };
+    const results = () => r.eval(`(()=>({found:document.getElementById('modes-found')?.textContent??null,neff:[...document.querySelectorAll('#modes-table [data-neff]')].map(c=>c.textContent),
+      leftOut:document.getElementById('left-out-note')?.textContent??null,edge:[...document.querySelectorAll('#modes-table td[data-edge-note]')].map(n=>[n.dataset.edgeNote,n.textContent]),
+      core:[...document.querySelectorAll('#modes-table td[data-core-note]')].map(n=>[n.dataset.coreNote,n.textContent]),
+      buttons:[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent),item:document.querySelector('.run-item[aria-pressed=true]')?.textContent??null}))()`);
+    const plan = () => rText('#run-plan');
+    const cwFiles = async () => (await readdir(cwDownloads)).filter(n => n.endsWith('.json'));
+    const cwSave = async label => {
+      const before = Object.fromEntries(await Promise.all((await cwFiles()).map(async n => [n, (await stat(join(cwDownloads, n))).mtimeMs])));
+      await r.click('#save-session'); let saved = null;
+      for (let i = 0; i < 600 && !saved; i++) {
+        if (await r.eval("!!document.getElementById('save-name-dialog')?.open")) await r.click('#save-name-download');
+        const now = Object.fromEntries(await Promise.all((await cwFiles()).map(async n => [n, (await stat(join(cwDownloads, n))).mtimeMs])));
+        saved = Object.keys(now).find(n => before[n] !== now[n]) ?? null; if (!saved) await sleep(100);
+      }
+      assert.ok(saved, label + ': downloaded'); await sleep(500);
+      return JSON.parse(await readFile(join(cwDownloads, saved), 'utf8')).models.find(m => m.kind === 'workspace').session;
+    };
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'CW start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'CW optical model');
+    // the box and the field, off by default; the help (Q9)
+    await rTree('Optical modes', "!!document.getElementById('closed-search-check')");
+    const box = {check: await control('checkbox', 'Search near n_eff'), field: await control('spinbutton', 'Search near n_eff (closed window)'), value: await r.eval("document.getElementById('closed-target-number').value"),
+      help: await rText('#closed-search-help'), plan: await plan()};
+    await r.click('#closed-search-check'); await sleep(400);
+    box.on = {message: await rText('#file-status'), field: await control('spinbutton', 'Search near n_eff (closed window)'), plan: await plan()};
+    stage('CW box', box);
+    assert.deepEqual([box.check.count, box.check.checked, box.field.count, box.field.disabled, box.value], [1, 'false', 1, true, '2.460']);
+    assert.equal(box.help, 'Off: the modes of highest n_eff above 1.45. On: the modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values differ: refine the mesh before a close comparison.');
+    assert.equal(box.plan, 'Closed window');
+    assert.equal(box.on.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it.');
+    assert.equal(box.on.field.disabled, false); assert.equal(box.on.plan, 'Closed window · near n_eff 2.46');
+    await rOverflow('box');
+    // K13: the template @2.46 with 4 modes lists 3
+    await r.type('#mode-count-number', 4); await sleep(400);
+    await rRun();
+    const k13 = await results(); stage('CW K13 template @2.46, 4 modes', k13);
+    assert.equal(k13.found, 'Found 3 of 4 modes near n_eff 2.46, above n = 1.45.');
+    assert.equal(k13.neff.length, 3); assert.ok(!k13.neff.some(n => n.startsWith('1.39')), JSON.stringify(k13.neff));
+    assert.equal(k13.leftOut, '1 mode at or below n = 1.45 was left out.');
+    assert.ok(k13.item.includes(' · closed near 2.46 · '), k13.item);
+    await rOverflow('K13 Results');
+    const v11 = await cwSave('CW K13 save'); stage('CW K13 saved', {version: v11.version, settings: v11.runs[0].settings, neff: v11.runs[0].effective_index});
+    assert.equal(v11.version, 11); assert.equal(v11.runs[0].settings.adapter, 'optical-shapes-v10'); assert.equal(v11.runs[0].settings.search_target, 2.46);
+    assert.equal(v11.runs[0].settings.mode_count, 4); assert.equal(v11.runs[0].effective_index.length, 3);
+    // the strip over a substrate (T18) in a closed window: box off, the default run's edge note and shortcuts
+    await rTree('Optical modes', "!!document.getElementById('closed-search-check')"); await r.click('#closed-search-check'); await sleep(300);
+    await r.type('#mode-count-number', 2); await sleep(300);
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'CW substrate added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await rRun();
+    const edge = await results(); const items = (await r.eval("document.querySelectorAll('.run-item').length"));
+    await r.click('#edge-search-near'); await sleep(400);
+    const shortcut = {message: await rText('#file-status'), buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), plan: await plan(),
+      items: await r.eval("document.querySelectorAll('.run-item').length"), busy: await r.eval("document.getElementById('run-optical').textContent")};
+    stage('CW K12 edge note and shortcut', {edge, shortcut});
+    assert.deepEqual(edge.edge.map(n => n[0]), ['1', '2']); assert.deepEqual(edge.core, []);
+    assert.deepEqual(edge.buttons, ['Use Open boundary', 'Search near 2.46 · 4 modes']);
+    assert.ok(edge.item.includes(' · closed · '), edge.item);
+    assert.equal(shortcut.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. Modes to find set to 4.');
+    assert.deepEqual(shortcut.buttons, ['Use Open boundary']); assert.match(shortcut.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
+    assert.equal(shortcut.items, items); assert.equal(shortcut.busy, 'Run study');
+    await rOverflow('edge note shortcut');
+    // @2.46 with 4 modes: the core mode is mode 3 (K7's Studio window); its note
+    await rRun();
+    const four = await results(); stage('CW T18 @2.46, 4 modes', four);
+    assert.equal(four.found, 'Found 4 of 4 modes near n_eff 2.46, above n = 1.45.');
+    assert.deepEqual(four.core, [['3', 'Mode 3 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge.']]);
+    assert.ok(four.item.includes(' · closed near 2.46 · '), four.item);
+    // K12: @2.46 with 2 modes, the core mode is mode 2
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')"); await r.type('#mode-count-number', 2); await sleep(400);
+    await rRun();
+    const two = await results(); stage('CW K12 @2.46, 2 modes', two);
+    assert.deepEqual(two.core, [['2', 'Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge.']]);
+    assert.equal(two.neff.length, 2);
+    await rOverflow('core note');
+    // K10: a changed target needs a run; the equal one offers the run
+    await rTree('Optical modes', "!!document.getElementById('closed-target-number')");
+    await r.type('#closed-target-number', 2.47); await sleep(500);
+    const k10 = {changed: await rText('#file-status'), offer: await r.eval("!!document.getElementById('match-offer')")};
+    await r.type('#closed-target-number', 2.46); await sleep(500);
+    k10.equal = {message: await rText('#file-status'), show: await r.eval("document.querySelector('#match-offer [data-show-run]')?.textContent??null")};
+    await r.click('#closed-search-check'); await sleep(500);
+    k10.off = {message: await rText('#file-status'), offer: await r.eval("!!document.getElementById('match-offer')")};
+    stage('CW K10', k10);
+    assert.equal(k10.changed, 'Search near n_eff 2.470 in the closed window: the next run returns the modes nearest it.'); assert.equal(k10.offer, false);
+    assert.equal(k10.equal.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. No need to run: Run 4 already has these results. Run study adds a copy with the same values. Show Run 4');
+    assert.equal(k10.equal.show, 'Show Run 4');
+    // off: Modes to find 2 without a target is Run 2 (the default closed run of T18)
+    assert.ok(k10.off.message.startsWith('Search near n_eff off: the next run returns the modes of highest n_eff.'), k10.off.message);
+    assert.equal(k10.off.message.includes('No need to run: Run 2 already has these results.'), true, k10.off.message);
+    // Use this run's inputs on Run 4 (closed near 2.46) restores the box and the target
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'CW Results');
+    await r.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 4 · /.test(b.textContent)).click();return true}', '.run-item'); await sleep(400);
+    await r.until("!!document.getElementById('restore-run-input')", 'CW Use this run\'s inputs');
+    await r.click('#restore-run-input'); await sleep(500);
+    const use = {message: await rText('#file-status'), status: await rText('#status')};
+    await rTree('Optical modes', "!!document.getElementById('closed-search-check')");
+    use.box = await control('checkbox', 'Search near n_eff'); use.value = await r.eval("document.getElementById('closed-target-number').value"); use.plan = await plan();
+    stage('CW use run inputs', use);
+    assert.ok(use.message.startsWith('Current inputs set from Run 4: ') && use.message.includes('Search near n_eff off → 2.46'), use.message);
+    assert.equal(use.box.checked, 'true'); assert.equal(use.value, '2.460'); assert.match(use.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
+    await rOverflow('use run inputs');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);

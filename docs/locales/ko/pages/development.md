@@ -434,6 +434,15 @@ edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the cl
 run: Run 2 already has these results. Run study adds a copy with the same values.*, 상태 표시줄 *Run 2 · recovered from this
 browser, not recomputed · has the results of the current inputs*가 나오고, 어떤 실행에도 없는 4는 *… Run explicitly to
 compute new results.*를 그대로 두는지; 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
+C2부터(사전 등록) 브라우저 컨텍스트 하나를 더 쓰는 단계(CW)가 닫힌 창의 Search near n_eff를 봅니다: 상자 *Search near
+n_eff*(꺼짐)와 쓸 수 없는 필드를 역할과 이름으로, 도움말, 상자를 켠 뒤의 *Closed window · near n_eff 2.46*; 모드 4개의 템플릿이
+*Found 3 of 4 modes near n_eff 2.46, above n = 1.45.*와 행 셋, *1 mode at or below n = 1.45 was left out.*, 표시 *closed near
+2.46*을 보이고, 작업 공간 세션이 버전 11(`optical-shapes-v10`, `search_target` 2.46, 모드 4개 중 3개)인 프로젝트로 저장되는지;
+기판 위 스트립의 가장자리 안내에 **Use Open boundary**와 **Search near 2.46 · 4 modes**가 있고 바로 가기가 두 입력을 정하며
+아무것도 실행하지 않는지; 모드 4개에서는 3번째, 2개에서는 2번째 모드의 코어 모드 안내(*Mode 2 is the core mode: 64 % of |E|² is
+in Core, which does not touch the window edge.*); 바꾼 목표(2.47)는 실행을 제안하지 않고 같은 목표는 *No need to run: Run 4
+already has these results.*와 **Show Run 4**를 보이는지; Run 4에서 **Use this run's inputs**가 상자를 2.460으로 켜는지(*Search
+near n_eff off → 2.46*); 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
