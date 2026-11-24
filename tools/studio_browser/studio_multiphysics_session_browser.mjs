@@ -314,7 +314,7 @@ print(n)`;
   }
   const shown = () => page.eval("['[data-neff=\"1\"]','[data-neff-alone=\"1\"]','[data-neff-shift=\"1\"]'].map(s=>document.querySelector(s)?.textContent??null)");
   const runAndWait = async number => {
-    await runReady(); await clearNotice(); await page.click('#run-multiphysics');
+    await runReady(); await clearNotice(); await page.click('#run-multiphysics'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
     await page.until(`/^Run ${number} · /.test(document.querySelector('.dock-title>span').textContent)`, 'run ' + number, 180000);
     await runReady();     // the without-heater solve that may follow is done too
   };
@@ -675,7 +675,7 @@ print(n)`;
   if (await page.eval("document.getElementById('leave-confirm').open")) await page.click('#leave-go');
   await page.until("!!document.getElementById('shape-w')&&!document.getElementById('run-optical').disabled", 'optical model for R1', 60000);
   const runOptical = async label => {
-    await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical');
+    await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical ' + label, 120000);
   };
   await runOptical('run 1');

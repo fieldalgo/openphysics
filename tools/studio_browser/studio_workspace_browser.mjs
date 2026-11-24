@@ -193,6 +193,8 @@ try {
   const runAndWait = async () => {
     await page.until("!document.getElementById('run-optical').disabled", 'Run enabled');
     await page.click('#run-optical');
+    // round 19 (Y4): with six runs kept, Run study asks before dropping one; these stages answer Run
+    if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical run', 120000);
   };
   const toGeometry = async () => { await page.click('nav [data-page=Model]'); await sleep(200); await page.clickTreeItem('Geometry'); await page.until("!!document.querySelector('#shape-w')", 'geometry inspector'); };
@@ -596,7 +598,7 @@ try {
   // a server still running would answer the restart check and hide a failed restart
   if (stopped.exit === null && stopped.signal === null) throw new Error('Studio did not stop within 15 s');
   server = await startServer('server-2');
-  await toGeometry(); await page.click('#run-optical');
+  await toGeometry(); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
   await page.until("/Studio was restarted/.test(document.getElementById('job-message').textContent)&&/^Connected/.test(document.getElementById('connection-status').textContent)", 'reconnect after restart', 20000);
   stage('reconnected after restart', {message: await page.eval("document.getElementById('job-message').textContent")});
 
@@ -829,7 +831,7 @@ try {
     await page.call('Emulation.setDeviceMetricsOverride', {width: w, height: h, deviceScaleFactor: 1, mobile}); await sleep(300);
     await toGeometry(); await page.type('#shape-w', width); await sleep(300);
     const before = await layoutBoxes(); await watchBanner();
-    await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical');
+    await page.until("!document.getElementById('run-optical').disabled", 'Q6 Run enabled'); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
     await page.until("!document.getElementById('job-panel').hidden", 'Q6 banner shown');
     await page.eval('scrollTo(0,0)');
     const running = await layoutBoxes(), runningCover = await bannerCover(), runningOwn = await withoutBanner(), runningRow = await rowOwn(), runningHeadings = await centredCover();
@@ -1643,7 +1645,7 @@ try {
     const obRun = async () => {
       await ob.until("!document.getElementById('run-optical').disabled", 'OB Run enabled');
       const before = await ob.eval("document.querySelectorAll('.run-item').length");
-      const started = Date.now(); await ob.click('#run-optical');
+      const started = Date.now(); await ob.click('#run-optical'); if (await ob.eval("!!document.getElementById('run-drop-confirm')?.open")) await ob.click('#run-drop-confirm-run');
       await ob.until(`document.querySelectorAll('.run-item').length>${before}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'OB run', 300000);
       return Math.round((Date.now() - started) / 1000);
     };
@@ -2087,6 +2089,8 @@ try {
       await r.until("!document.getElementById('run-optical').disabled", 'R17 Run enabled');
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
       await r.click('#run-optical');
+      // round 19 (Y4): with six runs kept, Run study asks before dropping one; these stages answer Run
+      if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R17 run', 300000);
     };
     const pressEnter = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined}); await sleep(150); };
@@ -2236,7 +2240,7 @@ try {
     const rRun = async () => {
       await r.until("!document.getElementById('run-optical').disabled", 'R18 Run enabled');
       const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
-      await r.click('#run-optical');
+      await r.click('#run-optical'); if (await r.eval("!!document.getElementById('run-drop-confirm')?.open")) await r.click('#run-drop-confirm-run');
       await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R18 run done', 600000);
     };
     const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");

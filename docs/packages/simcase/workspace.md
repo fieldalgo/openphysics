@@ -350,7 +350,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    18 the box beside **Run study** says it before the run, while six runs are kept and one is not
    pinned: *Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*, with **Pin Run 3**,
    which pins that run (the usual pin message) and moves the line to the next unpinned run, or
-   removes it. Pin is unavailable while a calculation runs, as in Run name. The limit itself is
+   removes it. Pin is unavailable while a calculation runs, as in Run name. Since round 19
+   **Run study** also asks before such a run: a dialog reads *Running drops Run 3 (700 × 300 nm · 4
+   modes).* and *Up to six runs are kept; a pinned run is never dropped.*, with **Pin Run 3 and run**
+   (first, focused), **Run** and **Cancel** (Escape); focus returns to Run study. Pin Run 3 and run
+   pins that run and asks again when the run would then drop the next unpinned run; it is not
+   offered for the last unpinned run, which leaves no slot. The limit itself is
    unchanged. Files do
    not hold the number: opening a file or restoring a session from this browser numbers its runs
    from 1 in file order, and runs added from a file continue after the largest number. Since round
@@ -849,7 +854,8 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   “Run N · name · time”, **Run name** (Enter pins) and **Unpin this run**; pinned runs stay, and
   when a new run arrives the oldest unpinned run is replaced. Selecting a run shows its result
   and its freshness line; it does not change the model. With six pinned runs, Run says to unpin
-  one first.
+  one first. Since round 19, Run study asks before a run that drops one, as the optical model
+  does: *Running drops Run 3 (run at 05:31 AM).*, with Pin Run 3 and run, Run and Cancel.
 - **Files.** **File › Save** writes the [project file](#project-files), every model of the tab.
   **File › Export › Model with runs (session file)…** writes this model with its runs, their names
   and pins and the without-heater results to one file, `<model-name>-session-YYYY-MM-DD-HHMM.json` (the model

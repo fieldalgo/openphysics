@@ -6,6 +6,7 @@
 // physics and loop, and Results per physics with the coupling check. The model is its document
 // (workspace-multiphysics.mjs); the server checks and runs it (/api/multiphysics/*).
 import {markPageTabs} from './workspace-tabs.mjs';
+import {nextDropped,dropQuestion} from './workspace-workflow.mjs';
 import {POLARIZATION_HELP,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
@@ -222,6 +223,17 @@ export function createMultiphysicsView(ctx){
  }
  // Starts the next heater-off solve of the last run; false when none is left.
  function nextBaseline(){const name=baselineQueue.shift();if(!name||!lastRun)return false;runAlone(name);return true;}
+ // Round 19 (Y4): Run study asks before the six-run limit drops a run, as the optical model does:
+ // "Running drops Run 3 (run at 05:31 PM)." with Pin Run 3 and run, Run, Cancel (ctx.confirmDrop).
+ async function askedRun(){
+  if(job||starting||runBlock())return;
+  for(let r=nextDropped(runs,MULTIPHYSICS_RUN_LIMIT);r&&ctx.confirmDrop;r=nextDropped(runs,MULTIPHYSICS_RUN_LIMIT)){
+   const answer=await ctx.confirmDrop(dropQuestion(`${runTitle(r)} (run at ${runTime(r)})`,r.number,{canPin:runs.filter(x=>!x.pinned).length>1}),$('run-multiphysics'));
+   if(answer!=='pin'){if(answer==='run')break;return;}
+   r.pinned=true;ctx.onHistory();ctx.render();notice('Run pinned: new runs will not replace it. File › Save keeps it in a file.');
+  }
+  return run();
+ }
  function runAlone(name){return run(uncoupledDocument(lastRun.doc,name),{alone:name,key:baselineKey(lastRun.doc,name)});}
  async function stop(){if(!job)return;baselineQueue=[];stopAsked=true;const alone=job.alone;try{await ctx.request('POST',`/api/multiphysics/jobs/${job.id}/stop`);notice(alone?`Stopping ${physicsLabel(alone)} without heater; the coupled run stays under Results.`:'Stopping after the physics being solved finishes; no result will be kept.');}catch(e){notice('Stop failed: '+e.message);}}
  // ---- fixes ----
@@ -683,7 +695,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   cleanSignature=signature();ctx.onHistory();notice(`Model file ${name} sent to your browser's Downloads. It has the model but no runs; Save keeps the runs too, in the session file.`);
  }
  return {active:()=>active,open,openText,openTemplate,openSession,close,leave,show,discard,projectEntry,contentStamp,inProject:()=>doc!==null,card:()=>card,projectRuns:()=>doc?runs.length:0,projectUnsavedRuns:()=>doc?unsavedRuns():0,renderPage,undo,redo,canUndo:()=>active&&undoStack.length>0,canRedo:()=>active&&redoStack.length>0,
-  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>run(),stop,saveInputs,saveSession,recovery,recoveryTextNow,rememberPage,returnPage,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
+  addPhysics:()=>physicsDialog(),addCoupling:()=>couplingDialog(),run:()=>askedRun(),stop,saveInputs,saveSession,recovery,recoveryTextNow,rememberPage,returnPage,recoveryDropped:()=>recoveryDropped,busy:()=>!!job||starting,
   setBaseline:on=>{baselineOption=!!on;refreshRun();ctx.onHistory();notice(on?'The next Run also solves the optical model without heater (about 1 s).':`The next Run solves the coupled model only; Run ${baselinePhysics(doc).map(physicsLabel).join(' or ')||'the optical model'} alone under Results still adds the comparison.`);},
   title:()=>`${isMultiphysics(doc)?'Multiphysics model':'Model'} / ${saveState()}`,saveState,saveHint,
   // what leaving would lose: the runs no session file holds

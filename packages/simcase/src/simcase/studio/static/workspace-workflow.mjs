@@ -104,6 +104,16 @@ export function nextDropped(runs,limit=6){return runs.length>=limit?runs.find(r=
 // Its words beside Run study, before the run: "Running drops Run 3 (700 × 300 nm · 4 modes) · pin it
 // to keep it".
 export const dropWarningText=run=>`Running drops ${dropName(run)} · pin it to keep it`;
+// Round 19 (Y4): Run study asks before the limit drops a run (the line beside Run study stays): the
+// dialog's heading "Running drops Run 3 (700 × 300 nm · 4 modes).", its note, and the answers
+// [Pin Run 3 and run] [Run] [Cancel]. name: the run as the heading names it; canPin: false when
+// that run is the last unpinned one (pinning it would leave no slot for the new run).
+export const DROP_QUESTION_NOTE='Up to six runs are kept; a pinned run is never dropped.';
+export function dropQuestion(name,number,{canPin=true}={}){
+ return {title:`Running drops ${name}.`,note:DROP_QUESTION_NOTE,pin:canPin?`Pin Run ${number} and run`:null,run:'Run',cancel:'Cancel'};
+}
+// The optical model's question for the run nextDropped names.
+export const opticalDropQuestion=(run,runs)=>dropQuestion(dropName(run),run.number,{canPin:runs.filter(r=>!r.pinned).length>1});
 /** The message when the run limit dropped a run: "Run 3 (700 × 300 nm · 4 modes) was dropped: up
  * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
 export function droppedRunText(run){
