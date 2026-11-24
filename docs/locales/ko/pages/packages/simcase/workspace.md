@@ -428,7 +428,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). round 19부터 카드 위 상자는 카드가 제안하는
    세션까지 모든 세션을 나열합니다(전에는 어느 카드도 제안하지 않는 세션만). 실행이 있는 가장 새 세션이 아닌 세션을 제안하는
    카드는 *· older · saved 5:30 AM*이라고 밝힙니다(*· older · same as file …json, saved …*, *· older · browser copy … · same
-   as file …json*). 프로젝트의 다른 모델이 이 탭에 있으면 *(already in this tab)*는 탭이 가진 실행을 밝힙니다. 복구 항목은 모두 모델, 실행 수,
+   as file …json*). round 20부터 상자는 한 기록에 대해 카드와 같은 시각을 밝힙니다: 저장했던 파일과 아직 같은 기록은 둘 다
+   그 파일의 저장 시각을 씁니다(프로젝트를 저장하면 보이지 않는 모델의 기록이 파일과 그 저장 시각에 이어지지만 기록 자체는
+   더 일찍 쓰였으므로, 카드는 8:31 AM, 상자는 8:30 AM이었음). 새것부터의 순서는 그대로 기록 자신의 시각을 따릅니다.
+   프로젝트의 다른 모델이 이 탭에 있으면 *(already in this tab)*는 탭이 가진 실행을 밝힙니다. 복구 항목은 모두 모델, 실행 수,
    실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
    design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
    그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가 그것을

@@ -510,7 +510,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    Since round 19 the box above the cards lists every session, a card's included (it listed only the
    sessions no card offered); a card offering a session that is not the newest with runs says so,
    *· older · saved 5:30 AM* (*· older · same as file …json, saved …*, *· older · browser copy … ·
-   same as file …json*). When the other model of the project is in this tab, *(already in this tab)*
+   same as file …json*). Since round 20 the box names the same time as the card for one record: a
+   record that still matches a file it was saved to gives the file's save time in both (after a
+   project save, the record of the model not shown is linked to the file and its save time, while
+   the record itself was written earlier, so the card read 8:31 AM and the box 8:30 AM); the order,
+   newest first, still follows the records' own times. When the other model of the project is in this tab, *(already in this tab)*
    names the runs the tab holds. Every recovery entry names its
    model, its run count and its runs (*Run N*, with the run's name if it has one), for example
    *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
