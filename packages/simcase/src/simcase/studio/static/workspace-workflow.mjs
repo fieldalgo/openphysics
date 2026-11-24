@@ -33,13 +33,14 @@ export const nextRunText=(input,modeCount,groupIndex=false,pml=null)=>`Next run 
 // What the next optical run does, beside Run study (round 18, X2; round 17 U3 named the slow options
 // only): the boundary, the searches of an open boundary, the options that add solves with the solve
 // count after the last of them, and how long the last comparable run took (the same boundary kind
-// and group-index state), or "no earlier run". last: that run's wall time in ms, or null.
+// and group-index state), or "no timed run in this tab yet" (round 19, Y5: runs opened or recovered
+// have no wall time, so "no earlier run" read wrong beside them). last: that run's wall time in ms, or null.
 //   "Open boundary · 2 searches · group index on (3 solves) · last such run 3:40"
-//   "Closed window · no earlier run"
+//   "Closed window · no timed run in this tab yet"
 export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null}={}){
  const options=[...(groupIndex===true?['group index on']:[]),...(open&&pmlCheck===true?['PML check on']:[])];
  const solves=(groupIndex===true?3:1)+(open&&pmlCheck===true&&Number.isInteger(modeCount)?modeCount:0);
- const parts=[open?'Open boundary':'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),Number.isFinite(last)?`last such run ${durationText(last)}`:'no earlier run'];
+ const parts=[open?'Open boundary':'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),Number.isFinite(last)?`last such run ${durationText(last)}`:'no timed run in this tab yet'];
  return parts.join(' · ');
 }
 // m:ss of a duration in ms ("3:40"), h:mm:ss from an hour
