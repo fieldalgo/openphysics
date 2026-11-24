@@ -169,9 +169,10 @@ try {
   const sandbox = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
   // a browser with a profile of its own; the save picker removed at document start (a headless run
   // cannot answer it), so Save asks for a name in Studio's dialog and the browser downloads the file
+  // reuse: the number of an earlier profile, to start the browser again on it (its browser recovery kept)
   let browsers = 0;
-  const startBrowser = async () => {
-    const n = ++browsers, dir = join(profiles, 'profile-' + n);
+  const startBrowser = async (reuse = null) => {
+    const n = reuse ?? ++browsers, dir = join(profiles, 'profile-' + n);
     const {target} = await launchBrowser({launch: (command, argv, attempt) => launch(command, argv, `browser-${n}-${attempt}`), command: chrome, freePort, report,
       argv: (port, attempt) => ['--headless=new', '--disable-gpu', ...sandbox, '--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1',
         '--remote-debugging-port=' + port, '--user-data-dir=' + join(dir, 'attempt-' + attempt), '--window-size=1440,900', 'about:blank']});
@@ -293,7 +294,7 @@ try {
     await openFile(path);
     await page.until("/^Opened project Heater study \\(heater-study\\.json\\)/.test(document.getElementById('file-status').textContent)", 'project opened ' + tag, 60000);
     const opened = {message: await status(), title: await title(), footer: await footer()};
-    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run. Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run.');
     assert.equal(opened.title, 'Heater study · heater-study.json · opened');
     // round 18 (X8): the heated model is shown, with the other model in the project: its status bar speaks about it in the project
     assert.equal(opened.footer, 'Heated silicon waveguide · in project heater-study.json · opened');
@@ -593,9 +594,12 @@ try {
     await page.fill('spinbutton', 'Width [nm]', 660); await runOptical('R19 run after save'); await recorded('R19 saved record');
     const savedCase = await restoreOptical('R19 saved');
     stage('R19 Y3 restore names', {opened, saved: savedCase});
-    assert.match(opened.title, /^Untitled project · recovered from a copy of heater-study\.json · not saved to a file · /);
+    // since session version 12 the record keeps the project's name (Heater study, from the file
+    // opened), so the header names it; a record without a name still reads "recovered from a copy of"
+    assert.match(opened.title, /^Heater study · recovered from this browser · not saved to a file · /);
     assert.equal(opened.footer, 'Recovered from this browser (opened from heater-study.json; changed since)');
-    assert.match(savedCase.title, /^r19-saved · r19-saved\.json · changed since saved \d\d:\d\d(?: [AP]M)? · /);
+    // the restored name Heater study is the user's (set with Rename), so Save As r19-saved.json keeps it
+    assert.match(savedCase.title, /^Heater study · r19-saved\.json · changed since saved \d\d:\d\d(?: [AP]M)? · /);
     assert.match(savedCase.footer, /^Recovered from this browser \(last sent to a file: r19-saved\.json at \d\d:\d\d(?: [AP]M)?; changed since\)$/);
     await noOverflow('R19 Y3 Library');
     await stopBrowser(page);
@@ -659,7 +663,7 @@ try {
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R20 Library after');
     const after = await page.eval("({actions:Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent])),offers:[...document.querySelectorAll('.resume-actions button,.card-resume button')].map(b=>b.textContent),names:[...document.querySelectorAll('.cards [data-template]')].map(b=>b.querySelector('.card-action').textContent)})");
     stage('R20 Z2 restored', {restored, after});
-    assert.equal(restored.message, 'Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+    assert.equal(restored.message, 'Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
     assert.match(restored.title, /^Heater study · r20-both\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(restored.page, 'Results'); assert.equal(restored.optical, 2);
     // Z3: both return cards, each naming its model; no restore offer is left
@@ -708,6 +712,97 @@ try {
       if (picker.text.includes(' · 4 modes · ')) assert.ok(picker.tagsWidth <= picker.room, `${width}: "${picker.text}" shows ${picker.room} px, its tags need ${picker.tagsWidth}`);
     }
     await size(1440, 900, false);
+    await stopBrowser(page);
+  }
+
+  // Stable run numbers and the project name after recovery (pre-registered K4 and K5, the T17 and
+  // T20 flows): heater-study.json opened, the project renamed both-models, five more optical runs
+  // (seven in all, so Run 1 is dropped) and the project saved as both-models.json; the browser closed
+  // and started again on its profile, File › Open: the run list, the drop line, "Pin Run N", the
+  // Compare picker and "No need to run: Run N" read the same numbers, no numbering sentence is said,
+  // and the next run is Run 8 (K4). Then the browser closed again and Restore newest from this browser
+  // (both models): the same numbers for both models, and the header names the recovered project (K5).
+  {
+    page = await startBrowser(); const profile = browsers; await size(1440, 900, false);
+    const recorded = async label => { await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(800); };
+    const clearRecorded = () => page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    const runItems = () => page.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const startPage = async label => { await page.call('Page.navigate', {url: base + '/workspace'}); await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", label); };
+    const width = async w => { await page.press('tab', 'Model'); await page.press('treeitem', 'Geometry'); await page.until("!!document.getElementById('shape-w')", 'geometry ' + w); await page.fill('spinbutton', 'Width [nm]', w); };
+    // what names the optical runs by number: the run list, the drop line and its pin button (new
+    // inputs, 640 nm), "No need to run: Run 5" (Run 5's inputs, 560 nm) and the Compare picker
+    const numbersNow = async label => {
+      await width(640); await sleep(300);
+      const drop = await page.eval("({hidden:document.getElementById('run-drop').hidden,text:document.getElementById('run-drop-text').textContent,pin:document.getElementById('run-drop-pin').textContent})");
+      await page.eval("document.getElementById('file-status').textContent=''");
+      await width(560); await page.until("!!document.getElementById('match-offer')", label + ': No need to run');
+      const need = await page.eval("({text:document.getElementById('match-offer').textContent,show:document.querySelector('#match-offer button').textContent})");
+      await page.press('tab', 'Results'); await page.until("document.querySelectorAll('.run-item').length===6", label + ': six runs');
+      const items = await runItems();
+      await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", label + ': Compare');
+      const compare = await page.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent)");
+      await noOverflow(label + ' 1440'); await size(390, 844, true); await sleep(400); await noOverflow(label + ' 390'); await size(1440, 900, false);
+      return {items, drop, need, compare};
+    };
+    const heatedItems = async label => {
+      await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
+      await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-mp-run]')", label + ': heated runs');
+      return page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
+    };
+    const toOptical = async label => {
+      await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
+      await page.press('button', 'Optical waveguide', 'start'); await page.until("document.querySelectorAll('.run-item').length>0", label + ': optical runs');
+    };
+    await startPage('K4 start page');
+    await openFile(saved); await page.until("/^Opened project Heater study/.test(document.getElementById('file-status').textContent)", 'K4 open heater-study', 60000);
+    await page.press('tab', 'Library'); await page.until("!!document.getElementById('project-name-input')", 'K4 project name');
+    await page.fill('textbox', 'Project name', 'both-models'); await page.press('button', 'Rename');
+    await toOptical('K4 optical');
+    for (const w of [520, 540, 560, 580, 620]) { await width(w); await runOptical('K4 run at ' + w); }
+    const k4 = {before: await numbersNow('K4 before')};
+    await recorded('K4 optical record'); const before = await listDownloads();
+    await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'K4 Save As');
+    await clearRecorded();
+    assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'both-models.json');
+    await page.press('button', 'Download'); assert.equal(await newDownload(before), 'both-models.json');
+    await recorded('K4 saved');
+    await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K4 start page again');
+    await openFile(join(downloads, 'both-models.json')); await page.until("/^Opened project both-models/.test(document.getElementById('file-status').textContent)", 'K4 open both-models', 60000);
+    k4.opened = await status();
+    // both models write their records from the file opened: the heated one first, then the optical one
+    await clearRecorded(); k4.heated = await heatedItems('K4'); await recorded('K4 heated record');
+    await toOptical('K4 optical again');
+    k4.after = await numbersNow('K4 after');
+    await width(660); await clearRecorded(); await runOptical('K4 next run'); await recorded('K4 next run recorded'); await page.press('tab', 'Results'); k4.next = await runItems();
+    stage('K4 numbers after Open project', k4);
+    assert.deepEqual(k4.after, k4.before);
+    assert.deepEqual(k4.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+    assert.deepEqual(k4.before.drop, {hidden: false, text: k4.before.drop.text, pin: 'Pin Run 2'}); assert.match(k4.before.drop.text, /^If you run: drops Run 2 \(/);
+    assert.match(k4.before.need.text, /No need to run: Run 5 /); assert.equal(k4.before.need.show, 'Show Run 5');
+    assert.deepEqual(k4.before.compare.map(t => t.split(' · ')[0]), ['Run 2', 'Run 3', 'Run 4', 'Run 5', 'Run 6', 'Run 7']);
+    assert.doesNotMatch(k4.opened, /numbered from 1/); assert.match(k4.opened, /^Opened project both-models \(both-models\.json\): /);
+    assert.equal(k4.next[0].split(' · ')[0], 'Run 8'); assert.equal(k4.next.length, 6);
+    // K5: the browser closed and started again; Restore newest restores both models with their numbers
+    await clearRecorded(); const k5 = {before: await numbersNow('K5 before')}; await recorded('K5 record');
+    await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K5 start page');
+    await page.until("!!document.getElementById('resume-newest')", 'K5 offers', 30000);
+    k5.offer = {text: await page.text('#resume-newest'), pair: await page.eval("document.getElementById('resume-newest').dataset.resumePair??null")};
+    await page.eval("document.getElementById('file-status').textContent=''");
+    await page.click('#resume-newest');
+    for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
+    await page.until("/^Restored Optical waveguide \\(6 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'K5 both restored', 60000);
+    k5.message = await status(); k5.title = await title();
+    await noOverflow('K5 restored 1440'); await size(390, 844, true); await sleep(400); await noOverflow('K5 restored 390'); await size(1440, 900, false);
+    k5.heated = await heatedItems('K5'); await toOptical('K5 optical');
+    k5.after = await numbersNow('K5 after');
+    stage('K5 numbers after Restore newest', k5);
+    assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
+    assert.equal(k5.message, 'Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
+    assert.match(k5.title, /^both-models · recovered from this browser · not saved to a file · /);
+    assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated, k4.heated);
+    assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
+    // after the next change the header is the ordinary one
+    assert.match(await title(), /^both-models · not saved to a file · /);
     await stopBrowser(page);
   }
 

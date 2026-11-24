@@ -496,7 +496,9 @@ export function parseSession(text,{recovered=false}={}){
  // a version 6 or 7 view shows mode 1 or 2; a version 9 view one of the selected run's modes
  const shown=doc.selected===null?MODE_COUNT_RANGE[1]:runs.find(r=>r.job===doc.selected).effective_index.length;
  if(view.mode>=(nine?shown:2))throw new Error('Unsupported saved field view.');
- return {input,runs,selected:doc.selected,comparison:[...doc.comparison],view};
+ // the version read, not enumerated (as each run's number): the open and restore messages say
+ // whether runs were numbered from 1 (renumberedRuns, workspace-workflow.mjs)
+ return Object.defineProperty({input,runs,selected:doc.selected,comparison:[...doc.comparison],view},'version',{value:doc.version,enumerable:false});
 }
 
 

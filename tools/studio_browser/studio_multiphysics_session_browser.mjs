@@ -558,7 +558,7 @@ print(n)`;
     // version 9 is an optical session since the number of modes: a newer file is version 10, and a
     // multiphysics layout under version 9 is refused by its first key
     // version 10 is the optical open boundary (slice P2), 11 the closed-window search (slice C2): version 12 is the newer one
-    ['S7 version 12', d => { d.version = 12; }, /This session file is version 12, newer than this Studio reads \(versions 6–11\)\. Open it in a newer Studio\./],
+    ['S7 version 13', d => { d.version = 13; }, /This session file is version 13, newer than this Studio reads \(versions 6–12\)\. Open it in a newer Studio\./],
     ['S7 a version 8 layout under version 9', d => { d.version = 9; }, /Unknown key "document" in the session file\./],
     ['S7 another application', d => { d.application = 'other'; }, /This session file holds a “other” model, which this Studio does not read\./],
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
@@ -627,8 +627,9 @@ print(n)`;
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), r1Name, 'Q3 Save As prefill');
   await page.click('#save-name-cancel'); await page.until("!document.getElementById('save-name-dialog').open", 'Q3 Save As cancelled');
   assert.equal(await page.text('#autosave-status'), `Recovered from this browser · same as file ${r1Name}`);
-  // a per-card restore never makes a session file the project file (P3 D6)
-  assert.match(await page.text('#project'), /^Untitled project · not saved to a file · /);
+  // a per-card restore never makes a session file the project file (P3 D6); since session version 12
+  // the record keeps the project's name (heated-design, from the project saved above), which comes back
+  assert.match(await page.text('#project'), /^heated-design · recovered from this browser · not saved to a file · /);
 
   // S8: three earlier sessions, from four pages that each edited the model
   for (const power of ['3e14', '4e14', '5e14', '6e14']) {

@@ -1,0 +1,9 @@
+# Changed
+
+## English
+
+- Studio: File › Open, Open project and Restore keep the optical run numbers a session stores (version 12), so the run list, the drop line and **Pin Run N**, the Compare pickers and *No need to run: Run N* name the same runs after reopening, and the next run continues after the largest number. *This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.* is said only for a version 6 or 7 file with runs. Add runs from file numbers the added runs after the tab's largest and says so: *Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.* Browser recovery keeps the project's name, so a restore after Open project names the project: *both-models · recovered from this browser · not saved to a file · kept for recovery in this browser* (or *· as opened from both-models.json ·* while the record still matched it) until the next change, and File › Save suggests `both-models.json`. [Workspace](docs/packages/simcase/workspace.md).
+
+## 한국어
+
+- Studio: File › Open, Open project, Restore가 세션이 담은 광학 실행 번호(버전 12)를 유지하므로 다시 연 뒤에도 실행 목록, 내보내기 줄과 **Pin Run N**, Compare 선택 목록, *No need to run: Run N*이 같은 실행을 가리키고 다음 실행은 가장 큰 번호 다음부터 이어집니다. *This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.*는 실행을 담은 버전 6 또는 7 파일에서만 나옵니다. Add runs from file은 추가한 실행을 탭의 가장 큰 번호 다음부터 번호를 매기고 그렇게 밝힙니다: *Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.* 브라우저 복구가 프로젝트 이름을 담으므로 Open project 뒤의 복원은 다음 변경까지 프로젝트 이름을 밝히고(*both-models · recovered from this browser · not saved to a file · kept for recovery in this browser*, 기록이 아직 그 파일과 같으면 *· as opened from both-models.json ·*), File › Save는 `both-models.json`을 제안합니다. [작업 공간](packages/simcase/workspace.md).

@@ -85,20 +85,40 @@ export function opticalWorkflow({input,invalid=false,block='',busy=false,pending
 // A", or "Run 2" when it has none.
 export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // Run numbers (round 17, U2): within a tab a run keeps its number; a new run takes the largest
-// number used so far + 1, so dropping the oldest unpinned run renumbers nothing. The number lives
-// on the run object only (session and project files do not hold it): a file opened or a session
-// restored numbers its runs from 1 in file order. used: the largest number used so far in the tab.
-// Returns the largest number used after numbering the runs of `list` that have none, in order.
-// Round 19 (Y2): the open and recovery messages of the optical model say so, while the run number is
-// not in the file (a session-format change, not made): "Runs are numbered from 1 in this tab; names
-// and pins are kept." The project-open message names the model. Heated-model runs keep their numbers.
-export const RENUMBERED_TEXT='Runs are numbered from 1 in this tab; names and pins are kept.';
-export const renumberedText=model=>`${model} runs are numbered from 1 in this tab; names and pins are kept.`;
+// number used so far + 1, so dropping the oldest unpinned run renumbers nothing. used: the largest
+// number used so far in the tab. Returns the largest number used after numbering the runs of `list`
+// that have none, in order.
+// Since session version 12 (design "Stable run numbers and the project name after recovery") the
+// number is kept in session and project files and in browser recovery whenever it is not the run's
+// place in the list, and File › Open, Open project and Restore keep it: there is no stored counter,
+// the next run takes the largest number + 1, and the run with the largest number is never dropped
+// (appendRun keeps the new run, swapDropped and mergeRuns drop only other runs). A file of an
+// earlier version numbers its runs from 1 in file order; RENUMBERED_TEXT says so for a file of
+// version 6 or 7 with runs (renumberedRuns).
+export const renumberedText=model=>`This file is from an earlier Studio: ${model} runs are numbered from 1 in this tab; names and pins are kept.`;
+export const RENUMBERED_TEXT=renumberedText('Optical waveguide');
+/** Whether an opened or restored optical session numbered runs whose numbers it did not store, so
+ * RENUMBERED_TEXT is said: a session of version 6 or 7 (parseSession's version) that holds runs. A
+ * version 12 session holds its numbers; a version 9 to 11 session is written by this Studio only
+ * when its runs are 1..n, so neither says anything about numbering. */
+export const renumberedRuns=session=>!!session&&session.application!=='multiphysics'&&[6,7].includes(session.version)&&session.runs?.length>0;
+/** The import's words when an imported run takes another number in this tab: "Added Run 2 and
+ * Run 4 of design-b.json as Run 9 and Run 10."; '' when every added run keeps its number. added:
+ * [{from, to}] in list order. */
+export function importNumbersText(added,fileName){
+ if(!added.length||added.every(a=>a.from===a.to))return '';
+ const list=ns=>{const words=ns.map(n=>'Run '+n);return words.length<3?words.join(' and '):words.slice(0,-1).join(', ')+' and '+words.at(-1);};
+ return `Added ${list(added.map(a=>a.from))} of ${fileName} as ${list(added.map(a=>a.to))}.`;
+}
 export function numberRuns(list,used=0){
  let top=Math.max(used,...list.map(r=>Number.isInteger(r.number)?r.number:0));
  for(const run of list)if(!Number.isInteger(run.number))run.number=++top;
  return top;
 }
+// The runs in the order of their numbers (a stable order; every run numbered). A job that comes
+// back (appendRun moves it to the end) keeps its number, so the tab puts it back at its place: a
+// session file holds its runs in increasing number order (version 12).
+export const inNumberOrder=list=>list.every(r=>Number.isInteger(r.number))?[...list].sort((a,b)=>a.number-b.number):list;
 // A run as the drop words name it: "Run 3 (700 × 300 nm · 4 modes)", "Run 3 · Design A (…)" when named.
 export const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
  return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count})`;};
