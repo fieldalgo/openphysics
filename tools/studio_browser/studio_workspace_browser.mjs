@@ -2308,7 +2308,8 @@ try {
     stage('R18 X3 drop warning', x3);
     assert.equal(x3.drop, 'If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
     assert.equal(x3.afterPin.drop, 'If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
-    assert.equal(x3.afterPin.message, 'Run pinned: new runs will not replace it. File › Save keeps it in a file.');
+    // round 22 (V4): Messages names the run the next result drops instead
+    assert.equal(x3.afterPin.message, 'Run 1 pinned. If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it');
     assert.ok(x3.afterPin.items.some(t => t.startsWith('Pinned · Run 1 · closed · ')), JSON.stringify(x3.afterPin.items));
     // X9: the strip over a substrate in a closed window (run 7, which drops Run 2): the note's shortcuts
     await rTree('Geometry', "!!document.querySelector('#shape-w')");
@@ -2317,14 +2318,14 @@ try {
     for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
     await mesh(30); await rRun();
     const x9 = {buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
-    // slice C2: Search near 2.46 · 4 modes replaces Set Modes to find to 4 (C0) and Find 4 modes (round 18)
+    // slice C2: Set search near 2.46 · 4 modes (round 22 V5 words) replaces Set Modes to find to 4 (C0) and Find 4 modes (round 18)
     await r.click('#edge-search-near'); await sleep(300);
     x9.find = {message: await rText('#file-status'), buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
     await r.click('#edge-use-open'); await sleep(400);
     x9.open = {message: await rText('#file-status'), actions: await r.eval("!!document.getElementById('edge-actions')"), plan: await plan(), items: (await runItems()).length, busy: await r.eval("document.getElementById('run-optical').textContent")};
     stage('R18 X9 note shortcuts', x9);
-    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Search near 2.46 · 4 modes']);
-    assert.ok(x9.find.message.startsWith('Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. Modes to find set to 4.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
+    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Set search near 2.46 · 4 modes']);
+    assert.ok(x9.find.message.startsWith('Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
     assert.ok(x9.open.message.startsWith('Open boundary: a PML of 1 µm outside every edge;'), x9.open.message); assert.equal(x9.open.actions, false);
     assert.ok(x9.open.plan.startsWith('Open boundary · '), x9.open.plan); assert.equal(x9.open.items, x9.items); assert.equal(x9.open.busy, 'Run study');
     await rOverflow('X9 Results');
@@ -2549,9 +2550,9 @@ try {
   }
 
   // CW (Search near n_eff for closed-window runs, slice C2, pre-registered), in a browser context of
-  // its own: the box and field of Physics › Optical modes by role and name; K13 the template @2.46 with
+  // its own: Modes to return of Physics › Optical modes by role and name (round 22 V1: the box and its field before); K13 the template @2.46 with
   // 4 modes listing 3 (Found 3 of 4 …, the left-out note, saved as session version 11); the strip over
-  // a substrate's edge note with Use Open boundary and Search near 2.46 · 4 modes (K12), the core-mode
+  // a substrate's edge note with Use Open boundary and Set search near 2.46 · 4 modes (K12), the core-mode
   // note at @2.46 with 4 and 2 modes; K10 a changed target needing a run and an equal one offering the
   // run; Use this run's inputs restoring the box; no horizontal overflow at 1440 × 900 and 390 × 844.
   {
@@ -2609,17 +2610,17 @@ try {
     await r.call('Page.navigate', {url: base + '/workspace'});
     await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'CW start page');
     await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'CW optical model');
-    // the box and the field, off by default; the help (Q9)
-    await rTree('Optical modes', "!!document.getElementById('closed-search-check')");
-    const box = {check: await control('checkbox', 'Search near n_eff'), field: await control('spinbutton', 'Search near n_eff (closed window)'), value: await r.eval("document.getElementById('closed-target-number').value"),
+    // Modes to return, Highest by default, the field enabled; the help (Q9) (round 22 V1: the box and its disabled field before)
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    const box = {check: await control('radio', 'Highest n_eff above 1.45'), near: await control('radio', 'Nearest to n_eff'), field: await control('spinbutton', 'n_eff to search near'), value: await r.eval("document.getElementById('closed-target-number').value"),
       help: await rText('#closed-search-help'), plan: await plan()};
-    await r.click('#closed-search-check'); await sleep(400);
-    box.on = {message: await rText('#file-status'), field: await control('spinbutton', 'Search near n_eff (closed window)'), plan: await plan()};
+    await r.click('#closed-search-nearest'); await sleep(400);
+    box.on = {message: await rText('#file-status'), field: await control('spinbutton', 'n_eff to search near'), plan: await plan()};
     stage('CW box', box);
-    assert.deepEqual([box.check.count, box.check.checked, box.field.count, box.field.disabled, box.value], [1, 'false', 1, true, '2.460']);
-    assert.equal(box.help, 'Off: the modes of highest n_eff above 1.45. On: the modes nearest this index, listed by n_eff, highest first; modes at or below 1.45 are left out. Closed and open values differ: refine the mesh before a close comparison.');
+    assert.deepEqual([box.check.count, box.check.checked, box.near.checked, box.field.count, box.field.disabled, box.value], [1, 'true', 'false', 1, false, '2.460']);
+    assert.equal(box.help, 'Highest n_eff above 1.45: the modes of highest n_eff. Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest first; modes at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values differ: refine the mesh before a close comparison.');
     assert.equal(box.plan, 'Closed window');
-    assert.equal(box.on.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it.');
+    assert.equal(box.on.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it.');
     assert.equal(box.on.field.disabled, false); assert.equal(box.on.plan, 'Closed window · near n_eff 2.46');
     await rOverflow('box');
     // K13: the template @2.46 with 4 modes lists 3
@@ -2634,8 +2635,8 @@ try {
     const v11 = await cwSave('CW K13 save'); stage('CW K13 saved', {version: v11.version, settings: v11.runs[0].settings, neff: v11.runs[0].effective_index});
     assert.equal(v11.version, 11); assert.equal(v11.runs[0].settings.adapter, 'optical-shapes-v10'); assert.equal(v11.runs[0].settings.search_target, 2.46);
     assert.equal(v11.runs[0].settings.mode_count, 4); assert.equal(v11.runs[0].effective_index.length, 3);
-    // the strip over a substrate (T18) in a closed window: box off, the default run's edge note and shortcuts
-    await rTree('Optical modes', "!!document.getElementById('closed-search-check')"); await r.click('#closed-search-check'); await sleep(300);
+    // the strip over a substrate (T18) in a closed window: Highest, the default run's edge note and shortcuts
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')"); await r.click('#closed-search-highest'); await sleep(300);
     await r.type('#mode-count-number', 2); await sleep(300);
     await rTree('Geometry', "!!document.querySelector('#shape-w')");
     await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'CW substrate added');
@@ -2648,9 +2649,9 @@ try {
       items: await r.eval("document.querySelectorAll('.run-item').length"), busy: await r.eval("document.getElementById('run-optical').textContent")};
     stage('CW K12 edge note and shortcut', {edge, shortcut});
     assert.deepEqual(edge.edge.map(n => n[0]), ['1', '2']); assert.deepEqual(edge.core, []);
-    assert.deepEqual(edge.buttons, ['Use Open boundary', 'Search near 2.46 · 4 modes']);
+    assert.deepEqual(edge.buttons, ['Use Open boundary', 'Set search near 2.46 · 4 modes']);
     assert.ok(edge.item.includes(' · closed · '), edge.item);
-    assert.equal(shortcut.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. Modes to find set to 4.');
+    assert.equal(shortcut.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
     assert.deepEqual(shortcut.buttons, ['Use Open boundary']); assert.match(shortcut.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
     assert.equal(shortcut.items, items); assert.equal(shortcut.busy, 'Run study');
     await rOverflow('edge note shortcut');
@@ -2673,14 +2674,14 @@ try {
     const k10 = {changed: await rText('#file-status'), offer: await r.eval("!!document.getElementById('match-offer')")};
     await r.type('#closed-target-number', 2.46); await sleep(500);
     k10.equal = {message: await rText('#file-status'), show: await r.eval("document.querySelector('#match-offer [data-show-run]')?.textContent??null")};
-    await r.click('#closed-search-check'); await sleep(500);
+    await r.click('#closed-search-highest'); await sleep(500);
     k10.off = {message: await rText('#file-status'), offer: await r.eval("!!document.getElementById('match-offer')")};
     stage('CW K10', k10);
-    assert.equal(k10.changed, 'Search near n_eff 2.470 in the closed window: the next run returns the modes nearest it.'); assert.equal(k10.offer, false);
-    assert.equal(k10.equal.message, 'Search near n_eff 2.460 in the closed window: the next run returns the modes nearest it. No need to run: Run 4 already has these results. Run study adds a copy with the same values. Show Run 4');
+    assert.equal(k10.changed, 'Modes to return: nearest to n_eff 2.470 in the closed window. The next run returns the modes nearest it.'); assert.equal(k10.offer, false);
+    assert.equal(k10.equal.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. No need to run: Run 4 already has these results. Run study adds a copy with the same values. Show Run 4');
     assert.equal(k10.equal.show, 'Show Run 4');
     // off: Modes to find 2 without a target is Run 2 (the default closed run of T18)
-    assert.ok(k10.off.message.startsWith('Search near n_eff off: the next run returns the modes of highest n_eff.'), k10.off.message);
+    assert.ok(k10.off.message.startsWith('Modes to return: highest n_eff above 1.45. The next run returns the modes of highest n_eff.'), k10.off.message);
     assert.equal(k10.off.message.includes('No need to run: Run 2 already has these results.'), true, k10.off.message);
     // Use this run's inputs on Run 4 (closed near 2.46) restores the box and the target
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'CW Results');
@@ -2688,12 +2689,184 @@ try {
     await r.until("!!document.getElementById('restore-run-input')", 'CW Use this run\'s inputs');
     await r.click('#restore-run-input'); await sleep(500);
     const use = {message: await rText('#file-status'), status: await rText('#status')};
-    await rTree('Optical modes', "!!document.getElementById('closed-search-check')");
-    use.box = await control('checkbox', 'Search near n_eff'); use.value = await r.eval("document.getElementById('closed-target-number').value"); use.plan = await plan();
+    await rTree('Optical modes', "!!document.getElementById('closed-search-nearest')");
+    use.box = await control('radio', 'Nearest to n_eff'); use.value = await r.eval("document.getElementById('closed-target-number').value"); use.plan = await plan();
     stage('CW use run inputs', use);
-    assert.ok(use.message.startsWith('Current inputs set from Run 4: ') && use.message.includes('Search near n_eff off → 2.46'), use.message);
+    assert.ok(use.message.startsWith('Current inputs set from Run 4: ') && use.message.includes('Modes to return highest n_eff → nearest to 2.46'), use.message);
+    // round 22 (V6): the message does not say that Undo takes the target back
+    assert.ok(use.message.endsWith(' Modes to return is set and is not part of Undo.') && !use.message.includes('Undo takes them back'), use.message);
     assert.equal(use.box.checked, 'true'); assert.equal(use.value, '2.460'); assert.match(use.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
     await rOverflow('use run inputs');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // R22 (round 22, pre-registered P1 to P6), in a browser context of its own: V1 Modes to return by
+  // role and name, typing 2.5 selecting Nearest to n_eff at once; V2 the slab warning before any run in
+  // the plan line and Optical modes with both buttons (T18), none for the core-only template or a
+  // silica slab, gone with Nearest or Open boundary; V5 the shortcut setting the inputs and running
+  // nothing; V3 Compare of T18 closed (Highest) against open saying why nothing matched, with the link
+  // opening that run in Results, and no such line for matched pairs; V4 Pin naming the next drop and
+  // a drop with every other earlier run pinned saying why there is no swap; no horizontal overflow.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R22 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const control = async (role, name) => {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: name, role});
+      const found = nodes.filter(n => !n.ignored);
+      return {count: found.length, checked: found[0]?.properties?.find(p => p.name === 'checked')?.value?.value ?? null, disabled: found[0]?.properties?.find(p => p.name === 'disabled')?.value?.value ?? false};
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R22 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R22 run done', 600000);
+    };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
+    // the warning in both places: the plan line's row and the panel (read on Optical modes)
+    const warning = async () => {
+      await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+      return {row: await r.eval("document.getElementById('run-edge')?.hidden===false?document.getElementById('run-edge-text').textContent:null"),
+        rowButtons: await r.eval("document.getElementById('run-edge')?.hidden===false?[...document.querySelectorAll('#run-edge button')].map(b=>b.textContent):[]"),
+        panel: await rText('#closed-edge-warning-text'), panelButtons: await r.eval("[...document.querySelectorAll('#closed-edge-actions button')].map(b=>b.textContent)"),
+        plan: await rText('#run-plan')};
+    };
+    const WARNING = "Substrate touches the window edge and its index is as high as Core's: in a closed window its slab modes come first.";
+    const BUTTONS = ['Set search near 2.46 · 4 modes', 'Use Open boundary'];
+    const none = {row: null, rowButtons: [], panel: null, panelButtons: []};
+    const noWarning = (w, tag) => assert.deepEqual({row: w.row, rowButtons: w.rowButtons, panel: w.panel, panelButtons: w.panelButtons}, none, tag);
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R22 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R22 optical model');
+    // P1 (V1): two radios and the field, each with its own name; the field enabled
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    const p1 = {highest: await control('radio', 'Highest n_eff above 1.45'), nearest: await control('radio', 'Nearest to n_eff'), field: await control('spinbutton', 'n_eff to search near'),
+      legend: await rText('#closed-search legend'), old: await r.eval("!!document.getElementById('closed-search-check')")};
+    // typing 2.5 selects Nearest to n_eff at once (before the field is left), then the target is taken
+    await r.onElement('function(s){const e=this.querySelector(s);e.focus();e.select();return true}', '#closed-target-number');
+    await r.call('Input.insertText', {text: '2.5'}); await sleep(200);
+    p1.typing = await control('radio', 'Nearest to n_eff');
+    await r.onElement('function(s){this.querySelector(s).blur();return true}', '#closed-target-number'); await sleep(400);
+    p1.taken = {message: await rText('#file-status'), plan: await rText('#run-plan'), nearest: await control('radio', 'Nearest to n_eff'), field: await control('spinbutton', 'n_eff to search near')};
+    await r.click('#closed-search-highest'); await sleep(400);
+    p1.highest2 = {message: await rText('#file-status'), plan: await rText('#run-plan'), value: await r.eval("document.getElementById('closed-target-number').value")};
+    stage('R22 P1 Modes to return', p1);
+    assert.deepEqual([p1.highest.count, p1.highest.checked, p1.nearest.count, p1.nearest.checked, p1.field.count, p1.field.disabled], [1, 'true', 1, 'false', 1, false]);
+    assert.equal(p1.legend, 'Modes to return'); assert.equal(p1.old, false);
+    assert.equal(p1.typing.checked, 'true');
+    assert.equal(p1.taken.message, 'Modes to return: nearest to n_eff 2.500 in the closed window. The next run returns the modes nearest it.');
+    assert.equal(p1.taken.plan, 'Closed window · near n_eff 2.5'); assert.equal(p1.taken.nearest.checked, 'true'); assert.equal(p1.taken.field.disabled, false);
+    assert.equal(p1.highest2.message, 'Modes to return: highest n_eff above 1.45. The next run returns the modes of highest n_eff.');
+    assert.equal(p1.highest2.plan, 'Closed window'); assert.equal(p1.highest2.value, '2.500');
+    await rOverflow('P1 Modes to return');
+    // P2 (V2): the core-only template, then a silica slab across the window: no warning
+    const p2 = {template: await warning()};
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R22 slab added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silica');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    p2.silica = await warning();
+    // T18: the same slab in silicon (500 × 220 core over a 3000 × 700 silicon substrate spanning the window)
+    await rTree('Materials', "!!document.querySelector('[data-shape-material=\"1\"]')"); await r.choose('[data-shape-material="1"]', 'Silicon'); await sleep(300);
+    p2.t18 = await warning();
+    await rOverflow('P2 warning');
+    await r.click('#closed-search-nearest'); await sleep(400); p2.nearest = await warning();
+    await r.click('#closed-search-highest'); await sleep(400); p2.back = await warning();
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); p2.open = await warning();
+    await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400); p2.closed = await warning();
+    stage('R22 P2 slab warning before the run', p2);
+    noWarning(p2.template, 'core-only template'); noWarning(p2.silica, 'silica slab');
+    for (const [tag, w] of [['T18', p2.t18], ['back to Highest', p2.back], ['closed again', p2.closed]]) {
+      assert.equal(w.row, WARNING, tag); assert.equal(w.panel, WARNING, tag);
+      assert.deepEqual(w.rowButtons, BUTTONS, tag); assert.deepEqual(w.panelButtons, BUTTONS, tag);
+    }
+    assert.equal(p2.t18.plan, 'Closed window');
+    noWarning(p2.nearest, 'Nearest to n_eff'); noWarning(p2.open, 'Open boundary');
+    // P5 (V5): the warning's shortcut (the edge note's) sets the inputs and runs nothing
+    const items0 = (await runItems()).length;
+    await r.click('#run-edge-search'); await sleep(400);
+    const p5 = {message: await rText('#file-status'), plan: await rText('#run-plan'), items: (await runItems()).length, run: await r.eval("document.getElementById('run-optical').textContent"),
+      job: await rText('#job-message'), modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), after: await warning()};
+    stage('R22 P5 shortcut', p5);
+    assert.equal(p5.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
+    assert.equal(p5.plan, 'Closed window · near n_eff 2.46'); assert.equal(p5.items, items0); assert.equal(p5.run, 'Run study'); assert.equal(p5.job || '', '');
+    assert.equal(p5.modes, '4'); noWarning(p5.after, 'after the shortcut');
+    // P3 (V3): T18 closed with Highest (2 modes) against T18 open
+    await r.click('#closed-search-highest'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
+    await rRun();
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    await rRun();
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-description')", 'R22 Compare');
+    const p3 = await r.eval(`(()=>({a:document.getElementById('compare-a').selectedOptions[0].textContent,b:document.getElementById('compare-b').selectedOptions[0].textContent,
+      line:document.getElementById('compare-description').textContent,reasonA:document.getElementById('compare-edge-reason-a')?.textContent??null,reasonB:document.getElementById('compare-edge-reason-b')?.textContent??null,
+      links:[...document.querySelectorAll('#compare-description a')].map(a=>[a.id,a.textContent,a.getAttribute('href')]),mode:document.getElementById('compare-mode').selectedOptions[0].textContent}))()`);
+    await rOverflow('P3 Compare reason');
+    await r.click('#compare-edge-open-a'); await sleep(400);
+    p3.opened = {page: await r.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page"), pressed: await rText('.run-item[aria-pressed=true]'), message: await rText('#file-status')};
+    stage('R22 P3 Compare says why', p3);
+    assert.ok(p3.a.startsWith('Run 1 · closed · ') && p3.b.startsWith('Run 2 · open (PML 1 µm) · '), JSON.stringify([p3.a, p3.b]));
+    assert.equal(p3.mode, 'No matched modes');
+    assert.equal(p3.reasonA, 'A · Run 1: its modes are mostly in Substrate, which touches the window edge; the core mode was not found.'); assert.equal(p3.reasonB, null);
+    assert.ok(p3.line.includes('No mode of A matches a mode of B; the plots show mode 1 of each run, not matched. A · Run 1: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open Run 1 in Results.'), p3.line);
+    assert.deepEqual(p3.links, [['compare-edge-open-a', 'Open Run 1 in Results', '#']]);
+    assert.equal(p3.opened.page, 'Results'); assert.ok(p3.opened.pressed.startsWith('Run 1 · closed · '), p3.opened.pressed);
+    assert.equal(p3.opened.message, 'Run 1 shown under Results; the inputs are unchanged.');
+    // runs 3 to 6: the core-only template, closed (core mesh 30 to 36 nm)
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(300);
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.onElement('function(){[...this.querySelectorAll(".shape-item")].find(b=>b.textContent.includes("Substrate")).click();return true}', 'body'); await sleep(300);
+    await r.click('#delete-shape'); await r.until("document.querySelectorAll('.shape-item').length===1", 'R22 substrate deleted');
+    for (const nm of [30, 32, 34, 36]) { await mesh(nm); await rRun(); }
+    // P3: matched pairs (Run 3 against Run 4) give no reason line
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-description')", 'R22 Compare matched');
+    for (const [id, n] of [['#compare-a', 3], ['#compare-b', 4]]) {
+      const job = await r.eval(`[...document.querySelectorAll('${id} option')].find(o=>o.textContent.startsWith('Run ${n} · ')).value`);
+      await r.choose(id, job); await sleep(400);
+    }
+    p3.matched = await r.eval("({line:document.getElementById('compare-description').textContent,reasons:document.querySelectorAll('.compare-edge-reason').length,links:document.querySelectorAll('#compare-description a').length})");
+    stage('R22 P3 matched pair', p3.matched);
+    assert.ok(p3.matched.line.includes(' Shown: A mode 1 ↔ B mode 1, overlap '), p3.matched.line);
+    assert.equal(p3.matched.reasons, 0); assert.equal(p3.matched.links, 0);
+    // P4 (V4): six runs; an edit shows the drop line; Pin names the next drop in Messages
+    await mesh(38); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R22 six runs');
+    const p4 = {line: await rText('#run-drop-text'), pins: []};
+    for (let n = 1; n <= 5; n++) {
+      assert.equal(await rText('#run-drop-pin'), `Pin Run ${n}`);
+      await r.click('#run-drop-pin'); await sleep(300);
+      p4.pins.push({message: await rText('#file-status'), line: await rText('#run-drop-text'), pin: await r.eval("document.getElementById('run-drop-pin').hidden?null:document.getElementById('run-drop-pin').textContent")});
+    }
+    await rOverflow('P4 pinned');
+    // every other earlier run pinned: the result drops Run 6, says why there is no swap, and offers none
+    await rRun();
+    p4.after = {message: await rText('#file-status'), keep: await r.eval("!!document.querySelector('#file-status [data-keep-run]')"), items: await runItems()};
+    stage('R22 P4 pin and no swap', p4);
+    assert.match(p4.line, /^If you run: drops Run 1 \(Core 500 × 220 \+ Substrate 3000 × 700 nm · 2 modes\) · pin it to keep it$/);
+    assert.match(p4.pins[0].message, /^Run 1 pinned\. If you run: drops Run 2 \(Core 500 × 220 \+ Substrate 3000 × 700 nm · 2 modes\) · pin it to keep it$/);
+    for (let n = 2; n <= 5; n++) assert.equal(p4.pins[n - 1].message, `Run ${n} pinned. If you run: drops Run ${n + 1} (500 × 220 nm · 2 modes) · pin it to keep it`);
+    assert.equal(p4.pins[4].line, 'If you run: drops Run 6 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(p4.pins[4].pin, null);
+    assert.ok(p4.after.message.endsWith(' Run 6 (500 × 220 nm · 2 modes) was dropped; every other earlier run is pinned, so no other run can be dropped instead'), p4.after.message);
+    assert.equal(p4.after.keep, false);
+    assert.deepEqual(p4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 5', 'Run 4', 'Run 3', 'Run 2', 'Run 1']);
+    await rOverflow('P4 no swap');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
