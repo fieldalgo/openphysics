@@ -314,7 +314,7 @@ print(n)`;
   }
   const shown = () => page.eval("['[data-neff=\"1\"]','[data-neff-alone=\"1\"]','[data-neff-shift=\"1\"]'].map(s=>document.querySelector(s)?.textContent??null)");
   const runAndWait = async number => {
-    await runReady(); await clearNotice(); await page.click('#run-multiphysics'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+    await runReady(); await clearNotice(); await page.click('#run-multiphysics');
     await page.until(`/^Run ${number} · /.test(document.querySelector('.dock-title>span').textContent)`, 'run ' + number, 180000);
     await runReady();     // the without-heater solve that may follow is done too
   };
@@ -676,7 +676,7 @@ print(n)`;
   if (await page.eval("document.getElementById('leave-confirm').open")) await page.click('#leave-go');
   await page.until("!!document.getElementById('shape-w')&&!document.getElementById('run-optical').disabled", 'optical model for R1', 60000);
   const runOptical = async label => {
-    await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical'); if (await page.eval("!!document.getElementById('run-drop-confirm')?.open")) await page.click('#run-drop-confirm-run');
+    await page.eval("document.getElementById('job-message').textContent=''"); await page.click('#run-optical');
     await page.until("/complete/i.test(document.getElementById('job-message').textContent)&&document.getElementById('run-optical').textContent==='Run study'", 'optical ' + label, 120000);
   };
   await runOptical('run 1');
@@ -870,31 +870,44 @@ print(n)`;
   await mouseClick('#run-baseline-time'); y6.note = await baseline();          // on "(about 1 s more)"
   stage('R19 Y6 heater-off label', y6);
   assert.deepEqual(y6, {start: {checked: true, for: 'run-baseline'}, text: {checked: false, for: 'run-baseline'}, note: {checked: true, for: 'run-baseline'}});
-  // Y4: six runs, then Run study asks; Cancel runs nothing, Run makes Run 7 and drops Run 1
+  // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): six runs,
+  // then W5 no drop line while the model equals a run's, W2 Run study starting at once with the line
+  // during the run, Pin during the run, the drop when the result arrives and the swap in Messages
   for (let n = 1; n <= 6; n++) await runAndWait(n);
-  await clearNotice(); await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question');
-  const y4 = {asked: await page.eval("({title:document.getElementById('run-drop-confirm-title').textContent,buttons:[...document.querySelectorAll('#run-drop-confirm button')].filter(b=>!b.hidden).map(b=>b.textContent),focus:document.activeElement?.id})")};
-  // round 20 (Z7, pre-registered): while the question is open the heated model says Run study waits
-  const heatedWaiting = () => page.eval("({reason:document.getElementById('run-multiphysics-reason').textContent,status:document.getElementById('status').textContent,run:document.getElementById('run-multiphysics').textContent,inDialog:document.getElementById('run-drop-confirm').contains(document.activeElement)})");
-  const z7 = {open: await heatedWaiting()};
-  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R19 drop question ' + tag); }
+  const mpDrop = () => page.eval("({hidden:document.getElementById('mp-run-drop').hidden,text:document.getElementById('mp-run-drop-text').textContent,pin:document.getElementById('mp-run-drop-pin').hidden?null:document.getElementById('mp-run-drop-pin').textContent})");
+  const w5 = {matched: await mpDrop()};
+  await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
+  await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'R21 heat settings');
+  await page.type('#mp-f-physics-heat1-heat_source_density-heater', '9e14'); await sleep(600); await runReady();
+  w5.differ = await mpDrop();
+  stage('R21 W5 heated drop line', w5);
+  assert.equal(w5.matched.hidden, true);
+  assert.equal(w5.differ.hidden, false); assert.match(w5.differ.text, /^If you run: drops Run 1 \(run at \d{1,2}:\d\d(?: [AP]M)?\) · pin it to keep it$/); assert.equal(w5.differ.pin, 'Pin Run 1');
+  // W2: the job's status replies are held in the page until released, so the line during the run is read deterministically
+  await page.eval("(()=>{const f=window.fetch;window.__held=[];window.__hold=true;window.fetch=(u,o)=>{const s=String(u);if(window.__hold&&s.includes('/api/multiphysics/jobs/'))return new Promise(go=>window.__held.push(()=>go(f(u,o))));return f(u,o);};window.__release=()=>{window.__hold=false;const h=window.__held;window.__held=[];h.forEach(x=>x());};})()");
+  await clearNotice(); await page.click('#run-multiphysics'); await page.until("window.__held.length>0", 'R21 heated run started');
+  const w2 = {during: {...await mpDrop(), dialog: await page.eval("!!document.getElementById('run-drop-confirm')"), run: await page.text('#run-multiphysics')}};
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R21 heated line during the run ' + tag); }
   await size(1440, 900);
-  await page.click('#run-drop-confirm-cancel'); await sleep(300);
-  y4.cancel = await page.eval("({open:document.getElementById('run-drop-confirm').open,focus:document.activeElement?.id,runs:document.querySelector('.dock-title>span').textContent})");
-  z7.cancelled = await heatedWaiting(); stage('R20 Z7 heated waiting words', z7);
-  assert.deepEqual(z7.open, {reason: 'Waiting for your answer: pin, run or cancel', status: 'Run study is waiting for your answer', run: 'Run study', inDialog: true});
-  for (const text of [z7.open.status, z7.open.run, z7.open.reason]) assert.doesNotMatch(text, /Computing|running|in progress/);
-  assert.equal(z7.cancelled.reason, ''); assert.notEqual(z7.cancelled.status, z7.open.status); assert.equal(z7.cancelled.inDialog, false);
-  await page.click('#run-multiphysics'); await page.until("document.getElementById('run-drop-confirm').open", 'R19 heated drop question again');
-  await page.click('#run-drop-confirm-run');
-  await page.until("/^Run 7 · /.test(document.querySelector('.dock-title>span').textContent)", 'R19 heated run 7', 180000); await runReady();
-  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R19 heated run list');
-  y4.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
-  stage('R19 Y4 heated drop question', y4);
-  assert.match(y4.asked.title, /^Running drops Run 1 \(run at \d{1,2}:\d\d(?: [AP]M)?\)\.$/);
-  assert.deepEqual(y4.asked.buttons, ['Pin Run 1 and run', 'Run', 'Cancel']); assert.equal(y4.asked.focus, 'run-drop-confirm-pin');
-  assert.equal(y4.cancel.open, false); assert.equal(y4.cancel.focus, 'run-multiphysics'); assert.ok(y4.cancel.runs.startsWith('Run 6 · '), y4.cancel.runs);
-  assert.deepEqual(y4.runs, ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+  await page.click('#mp-run-drop-pin'); await sleep(300); w2.pinned = await mpDrop();
+  await page.eval('window.__release()');
+  await page.until("/^Run 7 · /.test(document.querySelector('.dock-title>span').textContent)", 'R21 heated run 7', 180000); await runReady();
+  await page.until("!!document.querySelector('#file-status [data-keep-run]')", 'R21 heated swap offered', 60000);
+  w2.after = {message: await page.text('#file-status'), keep: await page.eval("document.querySelector('#file-status [data-keep-run]').textContent")};
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R21 heated swap button ' + tag); }
+  await size(1440, 900);
+  await page.click('#file-status [data-keep-run]'); await sleep(300);
+  w2.swapped = {message: await page.text('#file-status'), keep: await page.eval("!!document.querySelector('#file-status [data-keep-run]')")};
+  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R21 heated run list');
+  w2.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
+  stage('R21 W2 heated run at once, drop at the result, swap', w2);
+  assert.equal(w2.during.dialog, false); assert.equal(w2.during.run, 'Running… (stop it under Study)');
+  assert.equal(w2.during.hidden, false); assert.match(w2.during.text, /^When this run finishes, Run 1 \(run at \d{1,2}:\d\d(?: [AP]M)?\) is dropped$/); assert.equal(w2.during.pin, 'Pin Run 1');
+  assert.match(w2.pinned.text, /^When this run finishes, Run 2 \(run at [^)]+\) is dropped$/); assert.equal(w2.pinned.pin, 'Pin Run 2');
+  assert.match(w2.after.message, / Run 2 \(run at [^)]+\) was dropped Keep Run 2, drop Run 3 \(run at [^)]+\) instead$/);
+  assert.match(w2.after.keep, /^Keep Run 2, drop Run 3 \(run at [^)]+\) instead$/);
+  assert.match(w2.swapped.message, /^Run 2 \(run at [^)]+\) is back; Run 3 \(run at [^)]+\) was dropped instead\.$/); assert.equal(w2.swapped.keep, false);
+  assert.deepEqual(w2.runs, ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
 
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';

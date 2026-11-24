@@ -634,15 +634,17 @@ try {
     stage('R20 Z2 Z4 offers', offers);
     assert.match(offers.newest, /^Restore newest from this browser: Optical waveguide \(2 runs\) and Heated silicon waveguide \(1 run\) · same as file r20-both\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(offers.pair, 'true');
-    // Z4: the heated record (relinked by the save) names one time in the box and on its card
+    // round 21 (W4, pre-registered): while the newest offer restores the pair, the box does not list the
+    // heated record again; its card still offers it
+    assert.equal(offers.box.find(t => t.startsWith('Restore from this browser: Heated silicon waveguide · ')), undefined, JSON.stringify(offers.box));
+    assert.ok(offers.heated.startsWith('Restore from this browser · Heated silicon waveguide · '), offers.heated);
+    // Z4: the heated record (relinked by the save) names on its card the time the newest offer names
     const savedTime = text => text.split(', saved ').at(-1).split(' · ')[0];
-    const heatedBox = offers.box.find(t => t.startsWith('Restore from this browser: Heated silicon waveguide · '));
-    assert.ok(heatedBox, JSON.stringify(offers.box));
-    const boxTime = heatedBox.split(' · saved ').at(-1), cardTime = savedTime(offers.heated);
-    stage('R20 Z4 times', {boxTime, cardTime});
-    assert.match(boxTime, /^\d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(boxTime, cardTime);
-    // the time both name is the file's save time, a minute after the heated record was written
-    const newestTime = offers.newest.split(' · saved ').at(-1); assert.equal(boxTime, newestTime);
+    const cardTime = savedTime(offers.heated);
+    stage('R20 Z4 times', {cardTime});
+    assert.match(cardTime, /^\d{1,2}:\d\d(?: [AP]M)?$/);
+    // the file's save time, a minute after the heated record was written
+    const newestTime = offers.newest.split(' · saved ').at(-1); assert.equal(cardTime, newestTime);
     await noOverflow('R20 offers');
     await page.eval("document.getElementById('file-status').textContent=''");
     // the server's model check answers after 2 s, as on a slower machine: longer than the first
@@ -686,6 +688,26 @@ try {
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R20 Optical modes again');
     const kept = await page.eval("document.getElementById('mode-count-number').value"); stage('R20 edit kept', {kept});
     assert.equal(kept, '3');
+    // round 21 (W3, pre-registered): the run of Modes to find 4 says so in the run list and the Compare
+    // pickers, before the geometry, so a picker cut at its end at 390 px still shows it
+    // (the optical model restored by the stage above is shown)
+    await page.press('tab', 'Results'); await page.until("document.querySelectorAll('.run-item').length===2", 'R21 optical runs');
+    const w3items = await page.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R21 Compare');
+    const w3 = {items: w3items};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await size(width, height, mobile); await sleep(400);
+      w3[width] = await page.eval("[...document.querySelectorAll('#compare-a,#compare-b')].map(s=>{const t=s.selectedOptions[0].textContent,c=document.createElement('canvas').getContext('2d');c.font=getComputedStyle(s).font;const i=t.indexOf(' modes'),tags=i>0?t.slice(0,i+6):t;return {text:t,title:s.title,tagsWidth:Math.ceil(c.measureText(tags).width),room:s.clientWidth-28}})");
+      await noOverflow('R21 W3 Compare ' + width);
+    }
+    stage('R21 W3 run labels', w3);
+    assert.equal(w3items.filter(t => t.includes(' · closed · 4 modes · ')).length, 1, JSON.stringify(w3items));
+    assert.equal(w3items.filter(t => t.includes(' · closed · ') && !t.includes(' modes · ')).length, 1, JSON.stringify(w3items));
+    for (const width of [1440, 390]) for (const picker of w3[width]) {
+      assert.equal(picker.title, picker.text);
+      if (picker.text.includes(' · 4 modes · ')) assert.ok(picker.tagsWidth <= picker.room, `${width}: "${picker.text}" shows ${picker.room} px, its tags need ${picker.tagsWidth}`);
+    }
+    await size(1440, 900, false);
     await stopBrowser(page);
   }
 
