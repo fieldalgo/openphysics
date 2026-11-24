@@ -178,7 +178,8 @@ export const HAS_RESULTS_INPUTS='has the results of the current inputs';
 // the edit's own sentence stays and its request to run ("Run explicitly to compute new results.",
 // or the line that the inputs changed since the last result) is taken off before the "No need to
 // run" sentence is added. A message without such a request is returned as it is.
-export const RUN_REQUESTS=Object.freeze(['Run explicitly to compute new results.','Inputs changed since the last result. Run again to compute the new inputs.']);
+// round 22 (V5): the closed-window shortcut's request, Press Run study to compute., too
+export const RUN_REQUESTS=Object.freeze(['Run explicitly to compute new results.','Inputs changed since the last result. Run again to compute the new inputs.','Press Run study to compute.']);
 export function matchingRunMessage(message){
  let text=String(message||'');
  for(const request of RUN_REQUESTS)if(text.endsWith(request)){text=text.slice(0,text.length-request.length).trimEnd();break;}

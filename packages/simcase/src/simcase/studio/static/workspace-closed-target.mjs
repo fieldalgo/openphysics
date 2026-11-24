@@ -35,8 +35,10 @@ export const CLOSED_FLOOR=TARGET_FLOOR;
 export const SHORTCUT_MODE_COUNT=4;
 /** A target as the page's words write it: its shortest decimal (2.46, 2.85, 1.995). */
 export const shortTarget=t=>String(Number(t));
-/** "Search near 2.46 · 4 modes": the edge note's shortcut. */
-export const shortcutText=t=>`Search near ${shortTarget(t)} · ${SHORTCUT_MODE_COUNT} modes`;
+/** "Set search near 2.46 · 4 modes": the edge note's shortcut (round 22, V5: "Set", as it runs nothing). */
+export const shortcutText=t=>`Set search near ${shortTarget(t)} · ${SHORTCUT_MODE_COUNT} modes`;
+/** The end of the shortcut's message (round 22, V5): it sets the inputs; Run study computes. */
+export const SHORTCUT_RUN_TEXT='Press Run study to compute.';
 /** "Found 3 of 4 modes near n_eff 2.46, above n = 1.45": the run line of every closed targeted run. */
 export const closedFoundText=(found,asked,t)=>`Found ${found} of ${asked} modes near n_eff ${shortTarget(t)}, above n = ${CLOSED_FLOOR}`;
 /** The table note of a closed targeted run that left modes out ('' when none): the engine returns
