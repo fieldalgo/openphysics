@@ -60,24 +60,29 @@ export function offerTime(savedAt,now=new Date()){
 // The time a card offer names. The record is written a moment after a save, so a record that is
 // the same as its session file names the file's save time ("same as file x, saved 9:24 PM"), the
 // time people remember; else the browser copy's time, said as such when a file is named beside it.
-function offerTimeWords(item,when){
- if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return ` · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
- if(item.file&&item.fileCurrent===true)return ` · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
- return ` · ${when(item.savedAt)}${fileWords(item)}`;
+// Round 19 (Y1): an offer that is not the newest stored session with runs says so, with its save
+// time: " · older · saved 5:38 AM", " · older · same as file x, saved T", " · older · browser copy T ·
+// same as file x".
+function offerTimeWords(item,when,older=false){
+ const old=older?' · older':'';
+ if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return `${old} · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
+ if(item.file&&item.fileCurrent===true)return `${old} · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
+ return `${old} · ${older?'saved ':''}${when(item.savedAt)}${fileWords(item)}`;
 }
 // A model card's offer when the tab holds none of that model's runs and browser recovery holds a
 // session of it: "Restore from this browser · Optical waveguide · design A, design B · 2:25 PM",
 // then the file it names, shown before Start new. item: a recovery entry {runs, names, savedAt,
 // file, fileCurrent, fileSavedAt}; model: the model the entry names.
-export function cardResumeChoice(item,model,when=offerTime){
+// older (round 19, Y1): the entry is not the newest stored session with runs.
+export function cardResumeChoice(item,model,when=offerTime,{older=false}={}){
  const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when)}${alsoWords(item)}`};
+ return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when,older)}${alsoWords(item)}`};
 }
 export const opticalResumeChoice=(item,when=offerTime)=>cardResumeChoice(item,'Optical waveguide',when);
 // Which stored session each model card offers: the newest of its model (entries newest first, each
 // {kind, index, application}), on the cards whose model this tab does not hold runs of (busy: the
-// set of card ids to leave out). {optical: entry, 'heated-waveguide': entry}; the top box lists the
-// others only, so every session has one route.
+// set of card ids to leave out). {optical: entry, 'heated-waveguide': entry}. Round 19 (Y1): the top
+// box lists every session, newest first, so a card's record is also listed there.
 export function cardRecords(entries,busy=new Set()){
  const out={};
  for(const entry of entries){const card=entry.application==='multiphysics'?'heated-waveguide':'optical';
@@ -87,17 +92,25 @@ export function cardRecords(entries,busy=new Set()){
 // What the landing page offers to resume: the latest browser session and the
 // earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
 // names its runs (sessionLine). Empty when there is nothing.
-export function resumeChoices(latest,earlier=[],when=t=>new Date(t).toLocaleString()){
- const line=(label,item)=>label+' · '+sessionLine(item)+' · saved '+when(item.savedAt);
- const choices=[];
- if(latest)choices.push({kind:'latest',label:line('Last session in this browser',latest)});
+// Round 19 (Y1): newest first, and the newest stored session with runs leads, whatever its kind:
+// "Restore newest from this browser: Optical waveguide · 6 runs · … · saved 5:46 AM" (newest: true);
+// each other one "Restore from this browser: … · older · saved 5:38 AM" ("older" left out for a
+// session without runs saved after it).
+export const RESTORE_NEWEST_TEXT='Restore newest from this browser';
+export function resumeChoices(latest,earlier=[],when=offerTime){
  // index: the record's place in storage, which recovery reads (given by the caller, else the position)
- earlier.forEach((item,position)=>choices.push({kind:'earlier',index:item.index??position,label:line('Earlier session',item)}));
- return choices;
+ const all=[...(latest?[{item:latest,kind:'latest'}]:[]),...earlier.map((item,position)=>({item,kind:'earlier',index:item.index??position}))];
+ const time=e=>Date.parse(e.item.savedAt)||0;all.sort((a,b)=>time(b)-time(a));
+ const lead=all.findIndex(e=>e.item.runs>0),newest=lead>=0?all.splice(lead,1)[0]:null;
+ return [...(newest?[{...newest,newest:true}]:[]),...all].map(e=>{
+  const older=!!newest&&!e.newest&&!(time(e)>time(newest));
+  return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),
+   label:`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(e.item.savedAt)}`};
+ });
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
-// onOpenFile(), onStartNew()}; shown above the templates when there is something. The records the
-// model cards resume are not among them (one route to each session).
+// onOpenFile(), onStartNew()}; shown above the templates when there is something. Round 19 (Y1): every
+// stored session the tab does not hold, newest first; a card repeats its model's newest.
 function resumeCard(resume){
  const choices=resumeChoices(resume.latest,resume.earlier);if(!choices.length)return null;
  const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
@@ -105,8 +118,9 @@ function resumeCard(resume){
  const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
  const actions=document.createElement('div');actions.className='resume-actions';
  for(const choice of choices){
-  const button=document.createElement('button');button.type='button';button.textContent=(choice.kind==='latest'?RESTORE_TEXT+': ':'Restore earlier from this browser: ')+choice.label;
-  if(choice.kind==='latest'){button.className='primary';button.id='resume-latest';button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
+  const button=document.createElement('button');button.type='button';button.textContent=choice.label;
+  if(choice.newest){button.className='primary';button.id='resume-newest';}
+  if(choice.kind==='latest'){button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
   else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
   actions.append(button);
  }

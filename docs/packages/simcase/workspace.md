@@ -452,9 +452,15 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    the size fields). Wait for *kept for recovery in this browser* before relying on local
    recovery (**Workspace tools** shows when it was last updated). After a reload or a
    Studio restart, the start page shows **Continue where you left off** with
-   **Restore from this browser: Last session in this browser …** and any earlier ones
-   (**Restore earlier from this browser: …**) and **Not now (choose a model below)**, which only
-   closes the box. **Open file…** has one
+   every stored session the tab does not hold, newest first, and **Not now (choose a model
+   below)**, which only closes the box. Since round 19 the first and most prominent offer is the
+   newest stored session with runs, whatever its model, *Restore newest from this browser: Optical
+   waveguide · 6 runs · … · saved 5:46 AM*; each other one says it is older, *Restore from this
+   browser: Optical waveguide · 5 runs · … · older · saved 5:38 AM* (it read *Last session in this
+   browser* and *Restore earlier from this browser: Earlier session*, and an older session could
+   come first). The box stays hidden while the tab holds optical runs. After a restore, the record
+   restored is left out of the lists and the remaining ones stay listed under Workspace tools
+   (*Restore earlier session from this browser · …*) without a reload. **Open file…** has one
    fixed place, at the top of the Library (the project name at the right of its row) and above the box and the cards,
    whatever they offer, with the note that a project file is the copy that moves between computers; browser
    recovery stays in this browser. It does what **File › Open…** does. The Library page has one phrase for browser recovery,
@@ -495,7 +501,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    offer whose record is the same as the session file it was saved to names the file's save
    time instead of the record's, *· same as file …json, saved 2:24 PM*; one the same as a file
    it was opened from says which time it shows, *· browser copy 2:25 PM · same as file …json*.
-   The box above the cards then lists only the sessions no card offers. Every recovery entry names its
+   Since round 19 the box above the cards lists every session, a card's included (it listed only the
+   sessions no card offered); a card offering a session that is not the newest with runs says so,
+   *· older · saved 5:30 AM* (*· older · same as file …json, saved …*, *· older · browser copy … ·
+   same as file …json*). When the other model of the project is in this tab, *(already in this tab)*
+   names the runs the tab holds. Every recovery entry names its
    model, its run count and its runs (*Run N*, with the run's name if it has one), for example
    *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
    opened from or last sent to: *· same as file …json* when the record still matched it, *· file
@@ -2019,7 +2029,7 @@ the same line). An empty new tab does not erase the prior notebook.
 
 After reload, choose the last session on its model's card (**Restore from this browser** under
 Optical waveguide or Heated silicon waveguide), on the start page's **Continue where you left
-off** card for the sessions no card offers, or under Workspace tools → **Restore last session
+off** card (every stored session, newest first), or under Workspace tools → **Restore last session
 from this browser**.
 The complete record is validated before the existing replacement dialog; recovered
 fields are labeled `recovered`, not newly computed. Recovery starts a new input
