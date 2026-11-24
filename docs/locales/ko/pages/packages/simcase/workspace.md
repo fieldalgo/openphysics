@@ -303,6 +303,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
    Run name처럼 계산 중에는 고정할 수 없습니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
    브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
+   round 19부터 광 모델을 열거나 복원할 때 메시지가 그렇게 밝힙니다: *Runs are numbered from 1 in this tab; names and pins
+   are kept.*(Open project 뒤에는 *Optical waveguide runs are numbered from 1 in this tab; …*). 가열 모델의 실행은 번호를
+   그대로 가지므로 그 메시지에는 이 문장이 없습니다.
    이 탭이 계산하지 않은 현재 실행은 그 출처를 밝힙니다: Open session 뒤에는 *Run 2 · read from
    file, not recomputed*, 복구 뒤에는 *Run 2 · recovered from this browser, not recomputed*이며
    상태 표시줄은 *press Run to compute it here*를 덧붙입니다. 실행 목록 항목은 실행을 번호와 이름으로

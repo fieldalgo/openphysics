@@ -27,3 +27,16 @@ test('Y7: a shape\'s Name and Material fields each have their own label (for=), 
  assert.ok(app.includes('<div><label for="shape-material">Material</label><select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></div>'));
  assert.ok(!app.includes('<label>Material<select id="shape-material">'));
 });
+
+test('Y2: the optical open and recovery messages say the runs are numbered from 1 in this tab',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ assert.equal(W.RENUMBERED_TEXT,'Runs are numbered from 1 in this tab; names and pins are kept.');
+ assert.equal(W.renumberedText('Optical waveguide'),'Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
+ const app=read('workspace-app.mjs');
+ // a session file opened, or a session restored from this browser: when it has runs
+ assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.'))+(runs.length?' '+RENUMBERED_TEXT:''));"));
+ // a project file: when its optical model has runs
+ assert.ok(app.includes("nothing was run.`+(ws?.session.runs.length?' '+renumberedText(ws.title):''));"));
+ // the heated model keeps its stored numbers: its messages do not say this
+ assert.ok(!read('workspace-multiphysics-view.mjs').includes('numbered from 1'));
+});

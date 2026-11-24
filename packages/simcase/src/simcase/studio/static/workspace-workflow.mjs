@@ -85,6 +85,11 @@ export const runTitle=(number,label)=>`Run ${number}${label?' · '+label:''}`;
 // on the run object only (session and project files do not hold it): a file opened or a session
 // restored numbers its runs from 1 in file order. used: the largest number used so far in the tab.
 // Returns the largest number used after numbering the runs of `list` that have none, in order.
+// Round 19 (Y2): the open and recovery messages of the optical model say so, while the run number is
+// not in the file (a session-format change, not made): "Runs are numbered from 1 in this tab; names
+// and pins are kept." The project-open message names the model. Heated-model runs keep their numbers.
+export const RENUMBERED_TEXT='Runs are numbered from 1 in this tab; names and pins are kept.';
+export const renumberedText=model=>`${model} runs are numbered from 1 in this tab; names and pins are kept.`;
 export function numberRuns(list,used=0){
  let top=Math.max(used,...list.map(r=>Number.isInteger(r.number)?r.number:0));
  for(const run of list)if(!Number.isInteger(run.number))run.number=++top;
