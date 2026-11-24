@@ -2200,6 +2200,134 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // R18 (round 18, pre-registered), in a browser context of its own: the Run study box and its
+  // layout (X2, X3), "No need to run" (X1), the boundary tag (X6), the source of the current inputs
+  // (X11), the closed-window note's shortcuts (X9), the Search near n_eff help (X12), with no
+  // horizontal overflow and O2's 24 px on Compare.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R18 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    // the ribbon's Compute group and Run study, per size: equal (within 0.5 px) whatever the box says
+    const ribbon = async () => {
+      const out = {};
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        out[width] = await r.eval("(()=>{const g=document.querySelector('.solve-commands').getBoundingClientRect(),b=document.getElementById('run-optical').getBoundingClientRect(),o=document.getElementById('run-options').getBoundingClientRect();return {group:[g.height,g.top],run:[b.left,b.top,b.width,b.height],box:[o.width,o.height]}})()");
+      }
+      await rSize(1440, 900); return out;
+    };
+    const sameRibbon = (a, b, tag) => { for (const w of ['1440', '390']) for (const key of ['group', 'run', 'box']) a[w][key].forEach((v, i) => assert.ok(Math.abs(v - b[w][key][i]) <= 0.5, `${tag}: ${key} at ${w} moved (${JSON.stringify(a[w])} → ${JSON.stringify(b[w])})`)); };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R18 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R18 run done', 600000);
+    };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const plan = () => rText('#run-plan');
+    const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R18 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R18 optical model');
+    // X2: the box before any run, then the group index and Open boundary (the warning in Messages)
+    const x2 = {fresh: await plan(), shown: await r.eval("!document.getElementById('run-options').hidden")}; const ribbonFresh = await ribbon();
+    await rTree('Optical modes', "!!document.getElementById('group-index-check')"); await r.click('#group-index-check'); await sleep(200);
+    x2.group = await plan(); sameRibbon(ribbonFresh, await ribbon(), 'X2 group index');
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    x2.open = await plan(); x2.warning = await rText('#file-status .message-warning');
+    x2.warningStyle = await r.eval("(()=>{const w=getComputedStyle(document.querySelector('#file-status .message-warning')),m=getComputedStyle(document.getElementById('file-status'));return [w.color!==m.color,w.backgroundColor!==m.backgroundColor,w.fontWeight]})()");
+    x2.help = await rText('#target-help'); sameRibbon(ribbonFresh, await ribbon(), 'X2 open boundary');
+    stage('R18 X2 Run study box', x2);
+    assert.equal(x2.shown, true); assert.equal(x2.fresh, 'Closed window · no earlier run');
+    assert.equal(x2.group, 'Closed window · group index on (3 solves) · no earlier run');
+    assert.equal(x2.open, 'Open boundary · 2 searches · group index on (3 solves) · no earlier run');
+    assert.equal(x2.warning, 'Group index is on: open-boundary runs with it take about three times as long.');
+    assert.deepEqual(x2.warningStyle.slice(0, 2), [true, true]);
+    // X12: the help says where 2.46 comes from
+    assert.ok(x2.help.endsWith(' The default is halfway between the core and silica indices: (n_core + 1.444)/2.'), x2.help);
+    await rOverflow('X2 open boundary');
+    await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(200); await r.click('#group-index-check'); await sleep(200);
+    assert.equal(await plan(), 'Closed window · no earlier run');
+    // runs 1 and 2 (core mesh 30 and 32): the box names the last such run's time; X6 tags
+    await mesh(30); await rRun(); x2.afterRun = await plan();
+    assert.ok(/^Closed window · last such run \d+:\d\d$/.test(x2.afterRun), x2.afterRun);
+    await mesh(32);
+    // X1: back to Run 1's inputs: No need to run, with Show Run 1; Run study is not blocked
+    await mesh(30);
+    const x1 = {message: await rText('#file-status'), button: await rText('#file-status [data-show-run]'), runEnabled: await r.eval("!document.getElementById('run-optical').disabled")};
+    await r.click('#file-status [data-show-run]'); await sleep(300);
+    x1.shown = {message: await rText('#file-status'), page: await r.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page"), pressed: await rText('.run-item[aria-pressed=true]')};
+    stage('R18 X1 no need to run', x1);
+    assert.ok(x1.message.includes(' No need to run: Run 1 already has these results. Run study adds a copy with the same values. '), x1.message);
+    assert.equal(x1.button, 'Show Run 1'); assert.equal(x1.runEnabled, true);
+    assert.equal(x1.shown.message, 'Run 1 shown under Results; the inputs are unchanged.'); assert.equal(x1.shown.page, 'Results');
+    // X6: a closed run carries "closed" right after its number
+    assert.ok(x1.shown.pressed.startsWith('Run 1 · closed · 500 × 220 nm · Silicon · λ 1550 nm · '), x1.shown.pressed);
+    await mesh(32); await rRun();
+    // X11: Run 1 viewed, the current inputs are Run 2's
+    await r.click('nav [data-page=Results]'); await r.until("!!document.querySelector('.run-item')", 'R18 run list');
+    await r.onElement('function(){[...this.querySelectorAll(".run-item")].find(b=>b.textContent.startsWith("Run 1 · ")).click();return true}', 'body'); await sleep(300);
+    const x11 = await rText('#status'); stage('R18 X11 status', {status: x11});
+    assert.ok(x11.endsWith(' · current inputs from Run 2'), x11);
+    // X3: runs 3 to 6: the box names the run the next one drops, with Pin Run 1; the ribbon does not move
+    const ribbonBefore = await ribbon();
+    for (const nm of [34, 36, 38, 40]) { await mesh(nm); await rRun(); }
+    const x3 = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), plan: await plan()};
+    sameRibbon(ribbonBefore, await ribbon(), 'X3 drop line');
+    await rOverflow('X3 drop line');
+    await r.click('#run-drop-pin'); await sleep(300);
+    x3.afterPin = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), message: await rText('#file-status'), items: await runItems()};
+    stage('R18 X3 drop warning', x3);
+    assert.equal(x3.drop, 'Running drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.pin, 'Pin Run 1');
+    assert.equal(x3.afterPin.drop, 'Running drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it'); assert.equal(x3.afterPin.pin, 'Pin Run 2');
+    assert.equal(x3.afterPin.message, 'Run pinned: new runs will not replace it. File › Save keeps it in a file.');
+    assert.ok(x3.afterPin.items.some(t => t.startsWith('Pinned · Run 1 · closed · ')), JSON.stringify(x3.afterPin.items));
+    // X9: the strip over a substrate in a closed window (run 7, which drops Run 2): the note's shortcuts
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R18 substrate added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await mesh(30); await rRun();
+    const x9 = {buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
+    await r.click('#edge-find-modes'); await sleep(300);
+    x9.find = {message: await rText('#file-status'), buttons: await r.eval("[...document.querySelectorAll('#edge-actions button')].map(b=>b.textContent)"), items: (await runItems()).length};
+    await r.click('#edge-use-open'); await sleep(400);
+    x9.open = {message: await rText('#file-status'), actions: await r.eval("!!document.getElementById('edge-actions')"), plan: await plan(), items: (await runItems()).length, busy: await r.eval("document.getElementById('run-optical').textContent")};
+    stage('R18 X9 note shortcuts', x9);
+    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Find 4 modes']);
+    assert.ok(x9.find.message.startsWith('Modes to find set to 4.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
+    assert.ok(x9.open.message.startsWith('Open boundary: a PML of 1 µm outside every edge;'), x9.open.message); assert.equal(x9.open.actions, false);
+    assert.ok(x9.open.plan.startsWith('Open boundary · '), x9.open.plan); assert.equal(x9.open.items, x9.items); assert.equal(x9.open.busy, 'Run study');
+    await rOverflow('X9 Results');
+    // X6 on Compare: the pickers and headings carry the tag; O2's 24 px
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-neff')||!!document.getElementById('compare-a')", 'R18 Compare');
+    await r.until("!!document.getElementById('compare-neff')", 'R18 Compare table');
+    const x6 = await r.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll');
+      return {picker:document.getElementById('compare-b').selectedOptions[0].textContent,heads:[...document.querySelectorAll('.compare-grid article h3, #compare-table-runs [data-side]')].map(e=>e.textContent),slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width)};})()`);
+    stage('R18 X6 Compare', x6);
+    assert.ok(x6.picker.startsWith('Run 7 · closed · Core 500 × 220 + Substrate 3000 × 700 nm · '), x6.picker);
+    assert.ok(x6.heads.length > 0 && x6.heads.every(h => h.includes(' · closed · ')), JSON.stringify(x6.heads));
+    assert.ok(x6.slack >= 24, `R18 Compare: ${x6.slack} px to spare at 1440 (O2, 24 px)`);
+    await rOverflow('X6 Compare');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);
