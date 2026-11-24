@@ -67,3 +67,5 @@ SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/
 - [균질 Laplace 경계 패널: 계약과 검증](../packages/galerkin/laplace_boundary.md)
 
 - [양면 접지 균질 Laplace 패널](../packages/galerkin/two-ground.md)
+
+- [접지 벽 없는 균질 Laplace 패널(unbacked 선로)](../packages/galerkin/open-box.md)
