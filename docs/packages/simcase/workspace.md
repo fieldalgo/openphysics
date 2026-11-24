@@ -363,7 +363,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    pinned: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it* (round 20; it read
    *Running drops …* before, as if a run were under way), with **Pin Run 3**,
    which pins that run (the usual pin message) and moves the line to the next unpinned run, or
-   removes it. Since round 21 **Run study** starts at once: the dialog that rounds 19 and 20 showed
+   removes it. Since round 21 the line is hidden while the current inputs equal a run's, when
+   Messages says *No need to run: Run 6 already has these results*, and returns once they differ
+   from every run (the heated model's line, below, follows the same rule for its model). Since round 21 **Run study** starts at once: the dialog that rounds 19 and 20 showed
    before such a run (*Running drops Run 3 …* with Pin Run 3 and run, Run and Cancel, and its
    *Waiting for your answer* words) is gone, because a run left waiting for an answer computed nothing
    while its user looked away. While the run computes the line reads *When this run finishes, Run 3

@@ -310,6 +310,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*(round 20;
    전에는 실행이 진행 중인 듯 *Running drops …*였음)와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
+   round 21부터 현재 입력이 어떤 실행의 입력과 같아 Messages가 *No need to run: Run 6 already has these results*라고 적는
+   동안 이 줄은 숨고, 입력이 모든 실행과 달라지면 돌아옵니다(아래 가열 모델의 줄도 그 모델에 같은 규칙을 따름).
    round 21부터 **Run study**는 바로 시작합니다: round 19와 20이 그런 실행 전에 보이던 대화 상자(*Running drops Run 3 …*와
    Pin Run 3 and run, Run, Cancel, 그리고 *Waiting for your answer* 문구)는 없어졌습니다. 답을 기다리던 실행은 사용자가
    다른 곳을 보는 동안 아무것도 계산하지 않았기 때문입니다. 실행이 계산하는 동안 줄은 *When this run finishes, Run 3
