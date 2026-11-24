@@ -54,3 +54,25 @@ export async function launchBrowser({launch, command, argv, freePort, report, wa
   }
   throw new Error(`Browser DevTools endpoint unavailable after ${attempts} launches of ${Math.round(waitMs / 1000)} s each (see report.json browserLaunch)`);
 }
+
+export const END_WAIT_MS = 10000;
+
+/**
+ * Ends a browser script: stops the processes it started that still run, prints its last line and
+ * exits with process.exitCode (0 when unset).
+ *   owned: the script's child processes; line: its last line, as it printed it before;
+ *   waitMs: how long SIGTERM has before SIGKILL.
+ * A browser, or one of its helper processes, can outlive SIGTERM and keep the script's pipes, and
+ * with them the script, open. On 2026-11-24 the project script passed on macOS and then ran until
+ * the CI job's 60-minute limit with a Chrome process left (PR #344). The explicit exit ends the
+ * script even when a process it did not start itself still holds a pipe.
+ */
+export async function endScript(owned, line, waitMs = END_WAIT_MS) {
+  const running = child => child.exitCode === null && child.signalCode === null;
+  const closed = child => running(child) ? new Promise(r => child.once('exit', r)) : Promise.resolve();
+  for (const child of owned) if (running(child)) child.kill();
+  await Promise.race([Promise.all(owned.map(closed)), sleep(waitMs)]);
+  for (const child of owned) if (running(child)) child.kill('SIGKILL');
+  await new Promise(r => process.stdout.write(line + '\n', r));
+  process.exit(process.exitCode ?? 0);
+}

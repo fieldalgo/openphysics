@@ -27,7 +27,7 @@ import {mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile} from 'node:fs/pr
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
-import {launchBrowser} from './browser_launch.mjs';
+import {endScript, launchBrowser} from './browser_launch.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   index % 2 ? pairs : [...pairs, [value.replace(/^--/, ''), all[index + 1]]], []));
@@ -629,5 +629,5 @@ try {
   await Promise.race([Promise.all(owned.map(c => c.done)), sleep(10000)]);
   await rm(profiles, {recursive: true, force: true}).catch(() => {});
   await save();
-  console.log('[project browser]', report.status, report.error || '');
+  await endScript(owned, ['[project browser]', report.status, report.error || ''].join(' '));
 }
