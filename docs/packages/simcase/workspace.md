@@ -353,7 +353,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    removes it. Pin is unavailable while a calculation runs, as in Run name. The limit itself is
    unchanged. Files do
    not hold the number: opening a file or restoring a session from this browser numbers its runs
-   from 1 in file order, and runs added from a file continue after the largest number. A current run that this tab did not
+   from 1 in file order, and runs added from a file continue after the largest number. Since round
+   19 the message of an open or a restore of the optical model says so: *Runs are numbered from 1 in
+   this tab; names and pins are kept.* (after Open project, *Optical waveguide runs are numbered from
+   1 in this tab; …*). The heated model's runs keep their numbers, so its messages do not say this. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery (the status
    bar adds *press Run to compute it here*). Run list entries name a run by its number with its

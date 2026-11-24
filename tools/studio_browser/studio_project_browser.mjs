@@ -292,7 +292,7 @@ try {
     await openFile(path);
     await page.until("/^Opened project Heater study \\(heater-study\\.json\\)/.test(document.getElementById('file-status').textContent)", 'project opened ' + tag, 60000);
     const opened = {message: await status(), title: await title(), footer: await footer()};
-    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run.');
+    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run. Optical waveguide runs are numbered from 1 in this tab; names and pins are kept.');
     assert.equal(opened.title, 'Heater study · heater-study.json · opened');
     // round 18 (X8): the heated model is shown, with the other model in the project: its status bar speaks about it in the project
     assert.equal(opened.footer, 'Heated silicon waveguide · in project heater-study.json · opened');
