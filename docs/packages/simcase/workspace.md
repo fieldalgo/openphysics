@@ -321,7 +321,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    settings that differ: *· current inputs differ: Wavelength 1550 → 1310 nm*) (the status bar names the source of the current inputs when another run has them,
    *current inputs from Run 2 · Design B* (round 18; it read *Run 2 has them*), else *press Run to compute them*), and when no input was edited the title adds
    *viewing Run 1 · design A (other inputs)* on Results and Compare, so the difference does not
-   read as unsaved edits (on the Model tab the title describes the current inputs only). Under
+   read as unsaved edits (on the Model tab the title describes the current inputs only). When an
+   edit, Undo or Redo leaves the current inputs and study settings equal to a run's (geometry,
+   materials, wavelength, mesh, Modes to find, group index, boundary and search targets), Messages
+   adds the heated model's sentence after the edit's own message, *No need to run: Run 5 already has
+   these results. Run study adds a copy with the same values.*, with **Show Run 5**, which shows
+   that run under Results and changes no input (round 18). Run study still runs if pressed. Under
    the Inputs row of the selected run, **Use this run's inputs** loads that run's inputs (and its
    Modes to find and group index option) as the current inputs at once, without a question,
    since the runs stay as they are. Messages lists only the settings that change, from → to
