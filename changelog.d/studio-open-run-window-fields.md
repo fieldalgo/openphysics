@@ -1,0 +1,9 @@
+# Changed
+
+## English
+
+- Studio: **an open-boundary run keeps its fields on the physical window only.** A new open run keeps the triangles that meet its physical window plus a thin margin of 1/150 of the window's longer side, so pictures at the window edge are unchanged; the PML beyond it is not kept. The triangles keep their order, the nodes are renumbered in order of first use, and no value changes. The T16 run (a strip over a substrate, open on four edges) drops from 13.4 MB to 3.9 MB, T16 with 3 modes and the group index from 19.0 MB to 5.6 MB, and a six-run workload with three such runs from 48.8 MB (refused) to 16.5 MB, which Save session, browser recovery and the project file keep with every field. The TE fraction, the effective area, the matching η, the field view (Full window and Core region) and the probe are bit for bit the same as with the full samples. A run read from a file is never cropped, so files written before stay byte for byte; a full and a cropped copy of one job merge. The session version stays 10. **Export this run** says that an open run's fields cover the physical window only. [Open boundary in the optical workspace](docs/packages/simcase/workspace.md#open-boundary-in-the-optical-workspace).
+
+## 한국어
+
+- Studio: **열린 경계 실행이 물리 창의 장만 보존합니다.** 새 열린 실행은 물리 창과 만나는 삼각형에 창의 긴 변의 1/150인 얇은 여유를 더해 보존하므로 창 가장자리의 그림은 바뀌지 않습니다. 그 밖의 PML은 보존하지 않습니다. 삼각형은 순서를 지키고 절점은 처음 쓰인 순서로 번호를 다시 매기며, 값은 바뀌지 않습니다. T16 실행(기판 위 스트립, 네 변이 열림)은 13.4 MB에서 3.9 MB로, 모드 3개와 군굴절률을 더한 T16은 19.0 MB에서 5.6 MB로, 그런 실행 셋을 포함한 실행 여섯 개는 48.8 MB(거부)에서 16.5 MB로 줄어, Save session, 브라우저 복구, 프로젝트 파일이 모든 장과 함께 보존합니다. TE 비율, 유효 면적, 짝짓기 η, 장 보기(Full window와 Core region), 탐침은 전체 표본일 때와 비트 단위로 같습니다. 파일에서 읽은 실행은 잘라 내지 않으므로 이전에 쓴 파일은 바이트 단위로 그대로이고, 한 작업의 전체 사본과 잘라 낸 사본은 합쳐집니다. 세션 버전은 10 그대로입니다. **Export this run**은 열린 실행의 장이 물리 창만 담는다고 밝힙니다. [광학 작업 공간의 열린 경계](packages/simcase/workspace.md#광학-작업-공간의-열린-경계).
