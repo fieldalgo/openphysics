@@ -742,11 +742,16 @@ try {
       await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", label + ': Compare');
       const compare = await page.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent)");
       await noOverflow(label + ' 1440'); await size(390, 844, true); await sleep(400); await noOverflow(label + ' 390'); await size(1440, 900, false);
-      return {items, drop, need, compare};
+      // a run read from a file or recovered ends with its origin (· from file, · recovered): left out,
+      // since the numbers and the runs are what is compared
+      const plain = list => list.map(t => t.replace(/ · (?:from file|recovered)$/, ''));
+      return {items: plain(items), drop, need, compare: plain(compare)};
     };
     const heatedItems = async label => {
       await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
-      await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!!document.querySelector('[data-mp-run]')", label + ': heated runs');
+      await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("/^Heated silicon waveguide shown/.test(document.getElementById('file-status').textContent)||!!document.querySelector('[data-mp-node]')", label + ': heated model');
+      await sleep(400); await page.press('tab', 'Results'); await page.until("!!document.querySelector('[data-mp-node=\"results:runs\"]')", label + ': heated Results');
+      await page.click('[data-mp-node="results:runs"]'); await page.until("!!document.querySelector('[data-mp-run]')", label + ': heated runs');
       return page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
     };
     const toOptical = async label => {
@@ -763,8 +768,8 @@ try {
     await recorded('K4 optical record'); const before = await listDownloads();
     await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'K4 Save As');
     await clearRecorded();
-    assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'both-models.json');
-    await page.press('button', 'Download'); assert.equal(await newDownload(before), 'both-models.json');
+    // the project opened from heater-study.json offers that file; the new name is typed
+    await page.fill('textbox', 'File name', 'both-models'); await page.press('button', 'Download'); assert.equal(await newDownload(before), 'both-models.json');
     await recorded('K4 saved');
     await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K4 start page again');
     await openFile(join(downloads, 'both-models.json')); await page.until("/^Opened project both-models/.test(document.getElementById('file-status').textContent)", 'K4 open both-models', 60000);
@@ -799,10 +804,13 @@ try {
     assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
     assert.equal(k5.message, 'Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
     assert.match(k5.title, /^both-models · recovered from this browser · not saved to a file · /);
-    assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated, k4.heated);
+    assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
-    // after the next change the header is the ordinary one
-    assert.match(await title(), /^both-models · not saved to a file · /);
+    // after a change the header is the ordinary one (the drop-line check above ends on the restored
+    // inputs, 560 nm, so the header still reads as recovered there, as loadedSession does)
+    assert.match(await title(), /^both-models · recovered from this browser · /);
+    await width(600); await sleep(300); k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
+    assert.match(k5.changed, /^both-models · not saved to a file · /);
     await stopBrowser(page);
   }
 
