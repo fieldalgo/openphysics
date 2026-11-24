@@ -6,7 +6,7 @@
 // physics and loop, and Results per physics with the coupling check. The model is its document
 // (workspace-multiphysics.mjs); the server checks and runs it (/api/multiphysics/*).
 import {markPageTabs} from './workspace-tabs.mjs';
-import {droppedBy,dropWarningText,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped} from './workspace-workflow.mjs';
+import {droppedBy,dropWarningText,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {POLARIZATION_HELP,SOURCE_TEXT,modeTableRows,physicsModes} from './workspace-modes.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
@@ -212,19 +212,22 @@ export function createMultiphysicsView(ctx){
   if(done.alone){delete baselineErrors[done.alone];const part=result.physics[done.alone];uncoupled[done.alone]={rows:effectiveIndexRows(part),key:done.key,completedAt:new Date().toISOString(),job:done.id,document:done.doc,
     result:{type:part.type,effective_index:part.effective_index,vacuum_wavelength:part.vacuum_wavelength,summary:part.summary}};refreshRun();ctx.render();ctx.onHistory();
    // the drop of the coupled run is said again, with its swap, once the heater-off solves are done
-   if(!nextBaseline())ctx.announceResult(`${physicsLabel(done.alone)} without heater finished; its n_eff and Δn_eff are shown beside the coupled one.`+(dropSwap?' '+dropSwap.note:''),swapAction());return;}
+   if(!nextBaseline())ctx.announceResult(`${physicsLabel(done.alone)} without heater finished; its n_eff and Δn_eff are shown beside the coupled one.`+(dropSwap?' '+dropSwap.note:noSwapNote?' '+noSwapNote:''),swapAction());return;}
   const completed={job:done.id,number:nextRunNumber(runs),label:'',pinned:false,completedAt:new Date().toISOString(),serverVersion:ctx.serverVersion?.()??null,doc:done.doc,events:done.events,order:result.solve_order,result,maps:'kept',origin:'local'};
   const before=runs;
   try{runs=appendMultiphysicsRun(runs,completed);}catch(e){notice(e.message);refreshRun();ctx.render();return;}
   // round 21 (W2): the run the limit dropped, named after the run's own message, with the swap
   const dropped=before.filter(r=>!runs.includes(r)&&r.job!==completed.job),other=dropped.length===1?swapCandidate(runs,completed):null;
   dropSwap=other?{kept:dropped[0],other,newest:completed,list:runs,note:droppedAfterText(dropped,dropName)}:null;
+  // round 22 (V4): with every other earlier run pinned there is no swap: the dropped words say why
+  const droppedWords=!dropped.length?'':swapCandidate(runs,completed)?droppedAfterText(dropped,dropName):droppedNoSwapText(dropped,dropName);
+  noSwapNote=dropped.length&&!swapCandidate(runs,completed)?droppedWords:'';
   lastRun=completed;runFailure=null;
   resultPage=resultPages(result).find(p=>p.id.startsWith('results:')&&result.physics[p.id.slice(8)]?.coupled)?.id||resultPages(result)[0].id;
   selection=resultPage;ctx.ui.page='Results';
   // the heater-off comparison: solved only when no column of the same content is kept
   baselineQueue=baselineOption&&!stopAsked?baselinePhysics(lastRun.doc).filter(n=>uncoupled[n]?.key!==baselineKey(lastRun.doc,n)):[];
-  refreshRun();ctx.render();ctx.onHistory();ctx.announceResult(`Run ${lastRun.number} complete. Its results belong to that run; editing the model does not change them.`+(baselineQueue.length?' Solving without heater…':'')+(dropped.length?' '+droppedAfterText(dropped,dropName):''),swapAction());
+  refreshRun();ctx.render();ctx.onHistory();ctx.announceResult(`Run ${lastRun.number} complete. Its results belong to that run; editing the model does not change them.`+(baselineQueue.length?' Solving without heater…':'')+(droppedWords?' '+droppedWords:''),swapAction());
   nextBaseline();
  }
  // Starts the next heater-off solve of the last run; false when none is left.
@@ -243,12 +246,16 @@ export function createMultiphysicsView(ctx){
   host.hidden=!r;if(!r)return;
   const text=running?dropWhileRunningText(list,dropName):dropWarningText(list.length>1?list:r,dropName);$('mp-run-drop-text').textContent=text;$('mp-run-drop-text').title=text;
   const pin=$('mp-run-drop-pin');pin.textContent=`Pin Run ${r.number}`;pin.dataset.pinRun=String(r.number);pin.hidden=runs.filter(x=>!x.pinned).length<=list.length;
-  pin.onclick=()=>{if(!runs.includes(r)||r.pinned||runs.filter(x=>!x.pinned).length<=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT).length)return;r.pinned=true;ctx.onHistory();ctx.render();notice('Run pinned: new runs will not replace it. File › Save keeps it in a file.');};
+  pin.onclick=()=>{if(!runs.includes(r)||r.pinned||runs.filter(x=>!x.pinned).length<=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT).length)return;r.pinned=true;ctx.onHistory();ctx.render();
+   // round 22 (V4): the drop moves to the next unpinned run: Messages names it
+   const next=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT);notice(next.length?pinnedDropText(r,next,!!job&&!job.alone||starting&&!job,dropName):'Run pinned: new runs will not replace it. File › Save keeps it in a file.');};
  }
  // After a result dropped Run N: [Keep Run N, drop Run M (…) instead] when another unpinned run exists
  // besides the new result (M the oldest such run); until the next run starts or the run list is
  // replaced (in memory only); a stale button does nothing and is removed.
- let dropSwap=null;
+ // round 22 (V4): the no-swap words of the last result (set at each result), said again when its
+ // without-heater solves finish
+ let dropSwap=null,noSwapNote='';
  function swapAction(){
   const offer=dropSwap;if(!offer)return null;
   return {label:keepInsteadLabel(offer.kept,offer.other,dropName),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)};

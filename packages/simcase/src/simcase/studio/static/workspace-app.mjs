@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,matchingRunMessage,RENUMBERED_TEXT,renumberedText,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -1305,7 +1305,9 @@ function refreshDropWarning(){
  const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
  // the finishing result needs a free slot: no pin that would leave fewer unpinned runs than it drops
  pin.hidden=runs.filter(r=>!r.pinned).length<=list.length;pin.disabled=false;
- pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();notice(pinNotice(run));};
+ pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();
+  // round 22 (V4): the drop moves to the next unpinned run: Messages names it
+  const next=droppedBy(runs,RUN_LIMIT);notice(next.length?pinnedDropText(run,next,solverBusy||!!pendingJob):pinNotice(run));};
 }
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
@@ -2164,8 +2166,10 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
  // the reason of each null n_g, in this tab only (a session file does not keep it)
  if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):near?near.keep.map(i=>reasons[i]):reasons;}
- completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed),dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);droppedNote=dropped.length?droppedAfterText(dropped):'';runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const next=appendRun(runs,completed),dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);
  {const other=dropped.length===1?swapCandidate(runs,solverRun):null;dropSwap=other?{kept:dropped[0],other,newest:solverRun,list:runs}:null;}
+ // round 22 (V4): with every other earlier run pinned there is no swap: the dropped words say why
+ droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;
 }});
 function refreshJobControls(){

@@ -120,6 +120,13 @@ export const dropWarningText=(run,name=dropName)=>{const list=Array.isArray(run)
 export const dropWhileRunningText=(list,name=dropName)=>`When this run finishes, ${dropRunsWords(list,name)} ${list.length>1?'are':'is'} dropped`;
 // After the result: "Run 3 (…) was dropped" (Messages, after the run's own message).
 export const droppedAfterText=(list,name=dropName)=>`${dropRunsWords(list,name)} ${list.length>1?'were':'was'} dropped`;
+// Round 22 (V4): Pin Run N on the drop line moves the drop to the next unpinned run, so Messages names
+// it: "Run 4 pinned. If you run: drops Run 5 (…) · pin it to keep it" (while a run computes, the line's
+// "When this run finishes, Run 5 (…) is dropped"). list: droppedBy after the pin (not empty).
+export const pinnedDropText=(pinned,list,running=false,name=dropName)=>`Run ${pinned.number} pinned. ${running?dropWhileRunningText(list,name):dropWarningText(list.length>1?list:list[0],name)}`;
+// Round 22 (V4): a result dropped a run and every other earlier run is pinned, so no swap can be
+// offered: the dropped words say so.
+export const droppedNoSwapText=(list,name=dropName)=>`${droppedAfterText(list,name)}; every other earlier run is pinned, so no other run can be dropped instead`;
 // The swap Messages offers after a drop (one run dropped, another unpinned run besides the new
 // result): "Keep Run 3 (…), drop Run 4 (…) instead", and what it says once done.
 export const keepInsteadLabel=(kept,other,name=dropName)=>`Keep ${runTitle(kept.number,kept.label||'')}, drop ${name(other)} instead`;
