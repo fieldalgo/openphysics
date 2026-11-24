@@ -21,15 +21,16 @@ export const SILICA_THRESHOLD=1.45;
 export const BOUNDARY_CHOICES=Object.freeze({closed:'Closed window (PEC)',open:'Open boundary (PML)'});
 export const OPEN_HELP='Open boundary adds an absorbing layer (PML) outside the window, so light that leaves the window is lost. Loss then includes leakage. Shapes touching an open edge continue through the layer.';
 // The words of a single search: a target below 1.466, where t_low would be the 1.45 floor.
-export const TARGET_HELP='Search near n_eff: the solver returns the modes nearest this effective index. Default (n_max + n_SiO2)/2, rounded to 0.01. A single search can miss modes far from it, notably near the cladding index (Re below about 1.6): lowering Search near n_eff finds them.';
+export const TARGET_HELP='Search near n_eff: the solver returns the modes nearest this effective index. A single search can miss modes far from it, notably near the cladding index (Re below about 1.6): lowering Search near n_eff finds them. The default is halfway between the core and silica indices: (n_core + 1.444)/2, rounded to 0.01.';
 export const PML_DETAILS='PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched';
 // slice T2: the words of two searches, near t and near t_low (lowerTarget)
 /** "2.46", "2.455": a target to 3 decimals with one trailing zero dropped (the words of two searches). */
 export const shortTarget=t=>{const text=Number(t).toFixed(3);return text.endsWith('0')?text.slice(0,-1):text;};
 /** "Also searches near 1.95, for modes close to the silica index." */
 export const lowerTargetText=low=>`Also searches near ${shortTarget(low)}, for modes close to the silica index.`;
-/** The help of Search near n_eff with a second search. */
-export const searchesHelp=low=>`Studio searches for modes near this index and near a second index halfway to the silica index (${shortTarget(low)}). Modes are listed by n_eff, highest first.`;
+/** The help of Search near n_eff with a second search; both helps say where the default comes from
+ * (round 18, X12). */
+export const searchesHelp=low=>`Studio searches for modes near this index and near a second index halfway to the silica index (${shortTarget(low)}). Modes are listed by n_eff, highest first. The default is halfway between the core and silica indices: (n_core + 1.444)/2.`;
 export const PML_DETAILS_SEARCHES=`PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · ${PML_FIXED.pml_search_mode_count} candidates searched near n_eff, ${ADDITIONAL_SEARCH_COUNT} near the second index`;
 /** "2.46 and 1.95": the targets of two searches. */
 export const searchesText=(t,low)=>`${shortTarget(t)} and ${shortTarget(low)}`;

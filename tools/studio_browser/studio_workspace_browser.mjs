@@ -1679,7 +1679,7 @@ try {
     // slice T2 (pre-registered): the second search near (2.46 + 1.444) / 2 = 1.95, shown as text
     assert.equal(openChoice.details, 'PML 1 µm (fixed) · strength 3, order 2 · minimum physical fraction 0.5 · 32 candidates searched near n_eff, 16 near the second index');
     assert.equal(openChoice.lower, 'Also searches near 1.95, for modes close to the silica index.');
-    assert.equal(openChoice.targetHelp, 'Studio searches for modes near this index and near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first.');
+    assert.equal(openChoice.targetHelp, 'Studio searches for modes near this index and near a second index halfway to the silica index (1.95). Modes are listed by n_eff, highest first. The default is halfway between the core and silica indices: (n_core + 1.444)/2.');
     assert.equal(await ob.eval("document.getElementById('target-number').getAttribute('aria-describedby')"), 'lower-target target-help');
     await obOverflow('Physics › Optical modes, Open');
 
