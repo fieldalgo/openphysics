@@ -1256,9 +1256,13 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   씁니다(main 13f07f4와 비교). 버전 11은 1.45 이하 모드가 있는 목표 실행을 거절하고, 버전 10까지 읽는 Studio는 *This session
   file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.*로 거절합니다. study 서명에
   목표가 들어가므로 목표를 바꾸거나 끄면 실행이 필요하고, 같은 목표일 때만 *No need to run*이 나옵니다.
-- **이번 묶음의 한계.** 상자와 목표는 모델 파일, 프로젝트 입력, 브라우저 초안에 저장되지 않고(입력은 버전 7, 8, 9 그대로),
-  Undo와 Redo도 이를 바꾸지 않습니다. 다시 연 세션의 실행은 목표를 지킵니다: 닫힌 목표 실행에서 **Use this run's inputs**를
-  누르면 실행의 목표로 상자가 켜지고(*… Search near n_eff off → 2.46 …*) *No need to run*이 다시 성립합니다.
+- **이번 묶음의 한계.** Modes to return과 목표는 모델 파일, 프로젝트 입력, 브라우저 초안에 저장되지 않고(입력은 버전 7, 8,
+  9 그대로), Undo와 Redo도 이를 바꾸지 않습니다. 다시 연 세션의 실행은 목표를 지킵니다: 닫힌 목표 실행에서 **Use this run's
+  inputs**를 누르면 실행의 목표로 Nearest to n_eff가 선택되고(*… Modes to return highest n_eff → nearest to 2.46 …*) *No need
+  to run*이 다시 성립합니다. round 22(V6)부터 그 메시지는 Undo가 목표를 되돌린다고 말하지 않습니다: 다른 변경이 있으면 *The
+  next run uses them; Undo takes back the other inputs. Modes to return is set and is not part of Undo.*로, 목표만 바뀌면 *The
+  next run uses it. Modes to return is set and is not part of Undo.*로 끝납니다(그 전에는 *Search near n_eff off → 2.46*와
+  *Undo takes them back*).
 - 검사: `tests/simcase/studio_closed_target_page.cjs`(K9, K10, K12, K13과 대기 작업), `tests/simcase/test_studio_closed_target.py`
   (엔진 장의 K12), 작업 공간 브라우저 검사의 CW 단계.
 

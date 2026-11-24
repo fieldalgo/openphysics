@@ -1541,11 +1541,15 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   a Studio that reads up to version 10 refuses it with *This session file is version 11, newer than
   this Studio reads (versions 6–10). Open it in a newer Studio.* The study signature includes the
   target, so a changed or removed target needs a run and only an equal one gives *No need to run*.
-- **Limitation of this batch.** The box and the target are not saved in model files, project inputs
-  or the browser draft (the inputs stay version 7, 8 or 9), and Undo and Redo do not change them. A
-  reopened session's runs keep their targets: **Use this run's inputs** on a closed targeted run
-  turns the box on with the run's target (*… Search near n_eff off → 2.46 …*), so *No need to run*
-  holds again.
+- **Limitation of this batch.** Modes to return and the target are not saved in model files, project
+  inputs or the browser draft (the inputs stay version 7, 8 or 9), and Undo and Redo do not change
+  them. A reopened session's runs keep their targets: **Use this run's inputs** on a closed targeted
+  run selects Nearest to n_eff with the run's target (*… Modes to return highest n_eff → nearest to
+  2.46 …*), so *No need to run* holds again. Since round 22 (V6) its message no longer says that Undo
+  takes the target back: with other changes it ends *The next run uses them; Undo takes back the
+  other inputs. Modes to return is set and is not part of Undo.*, and with the target alone *The next
+  run uses it. Modes to return is set and is not part of Undo.* (until then *Search near n_eff off →
+  2.46* and *Undo takes them back*).
 - Checks: `tests/simcase/studio_closed_target_page.cjs` (K9, K10, K12, K13 and the pending job),
   `tests/simcase/test_studio_closed_target.py` (K12 on engine fields) and the workspace browser
   check's stage CW.
