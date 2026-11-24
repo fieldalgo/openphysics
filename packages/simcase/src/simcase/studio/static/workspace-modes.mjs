@@ -4,6 +4,7 @@ import {formatIndex} from './workspace-compare.mjs';
 import {isOpenRun,NO_WINDOW_TITLE} from './workspace-open-run.mjs';
 import {WINDOW_NM,shapeBounds} from './workspace-shapes.mjs';
 import {physicalBounds} from './workspace-field.mjs';
+import {INDEX_1550} from './workspace-open-boundary.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -294,6 +295,27 @@ export function edgePlacement(run){
   return {shape:shapes[best].name,share,near,named:share>EDGE_SHARE&&near>=EDGE_NEAR};
  });
 }
+// ---- Before a closed run (round 22, V2) --------------------------------------------------------
+// A geometry and material check, no solve: in a closed window, a shape that touches the window edge
+// with a real index at least the highest index of the shapes that do not touch it (a substrate of the
+// core's material) has slab modes of higher n_eff than the core mode, so "Highest n_eff above 1.45"
+// lists those first (T18). Studio's index table is physmat at 1550 nm (INDEX_1550); the order of its
+// ten materials is the same at every wavelength the workspace allows (1400 to 1700 nm, checked against
+// physmat by tests/simcase/test_studio_round22.py), so the comparison holds at the run's wavelength.
+/** {edge, core} (shape names: the edge-touching shape of highest index and the highest-index shape
+ * away from the edge, the first of equal ones) when the closed window would list slab modes first;
+ * null when no shape touches the edge, every shape does, or the edge shapes' index is lower. */
+export function edgeSlabRisk(shapes,index=INDEX_1550){
+ const n=s=>index[s.material]??0,edge=[],inner=[];
+ for(const s of shapes)(touchedEdges(s).length?edge:inner).push(s);
+ if(!edge.length||!inner.length)return null;
+ const top=list=>list.reduce((a,s)=>n(s)>n(a)?s:a);
+ const e=top(edge),c=top(inner);
+ return n(e)>=n(c)?{edge:e.name,core:c.name}:null;
+}
+/** "Substrate touches the window edge and its index is as high as Core's: in a closed window its
+ * slab modes come first." */
+export const edgeSlabWarningText=r=>`${r.edge} touches the window edge and its index is as high as ${r.core}'s: in a closed window its slab modes come first.`;
 /** "Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff is set by
  * the closed window. Use Open boundary to leave that edge open." (C0: the note no longer says that
  * more modes find the core mode.) */

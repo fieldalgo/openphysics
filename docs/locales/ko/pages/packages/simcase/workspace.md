@@ -1220,6 +1220,17 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   아무것도 실행하지 않습니다. 입력이 이미 둘 다 그렇다면 나오지 않습니다. 보관된 실행이 이 입력을 가지면 마지막 문장 자리에 *No
   need to run: Run N already has these results.*가 옵니다. 등록된 모든 변형에서 모드 4개로 기판
   위 스트립의 코어 모드에 닿습니다([K7](#닫힌-창-탐색-문서optical-shapes-v10)).
+- **실행 전**(round 22, V2). Highest n_eff above 1.45를 고른 닫힌 창에서, 창 가장자리에 닿는 형상의 굴절률이 닿지 않는
+  형상들의 가장 높은 굴절률 이상이면, Run study 옆 계획 줄(계획 아래 한 행, 상자에 맞게 잘리고 전체 문구는 title)과 Physics ›
+  Optical modes(Modes to return 위)가 형상 이름으로 *Substrate touches the window edge and its index is as high as Core's: in a
+  closed window its slab modes come first.*라고 말하고 **Set search near 2.46 · 4 modes**(바로 가기와 같은 목표 어림값,
+  (n_max + 1.444)/2)와 **Use Open boundary**를 둡니다. 둘 다 입력만 정하고 아무것도 실행하지 않습니다. Nearest to n_eff나 Open
+  boundary를 고르면 경고가 사라집니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
+  가장자리에 닿는 형상 중 굴절률이 가장 높은 것과 닿지 않는 형상 중 가장 높은 것(같으면 앞의 것)이며, 가장자리에 닿는 형상이 없거나
+  모든 형상이 닿으면 경고하지 않습니다. 결과 쪽 가장자리 안내는 그대로이고, 닫힌 탐색의 기본값은 계속 Highest입니다. 한계:
+  Studio는 1550 nm 표(physmat)로 비교합니다. 열 가지 재료는 1400–1700 nm의 모든 파장에서 같은 순서이고 같은 값이 없으므로
+  (`tests/simcase/test_studio_round22.py`) 실행 파장에서도 판단이 같습니다. 겹친 형상은 뒤 형상이 가리는 부분을 따지지 않고
+  그려진 대로 비교합니다.
 - **실행.** Nearest to n_eff를 고른 실행은 `target_effective_index`를 쓰고 capabilities v10을 적습니다. Studio는 Re n_eff가 1.45보다 큰
   모드만 보관합니다(결정 A1): 표 위 줄은 늘 *Found k of M modes near n_eff 2.46, above n = 1.45.*(M: Modes to find)이고, 엔진이
   그 아래 모드를 돌려주었으면 표 아래 안내가 *1 mode at or below n = 1.45 was left out.*라고 말합니다(템플릿 @2.46, 모드 4개:

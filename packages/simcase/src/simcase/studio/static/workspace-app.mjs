@@ -29,7 +29,7 @@ import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.
 import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -1250,12 +1250,26 @@ function setClosedSearch(t){state.searchTarget=t;render();notice(closedSearchNot
 function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}. ${SHORTCUT_RUN_TEXT}`);offerMatchingRun();}
 // the field's index while Highest is chosen: the last one typed, if still in this design's range, else the default
 const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(ui.closedNear,state.shapes);}catch{}return defaultTarget(state.shapes);};
+// round 22 (V2): before a run, the closed window's slab warning (a geometry and material check, no
+// solve): with Highest n_eff above 1.45 and an edge-touching shape whose index is as high as the core's;
+// gone with Nearest to n_eff or Open boundary. The result-side edge note stays as it is.
+const edgeWarning=()=>isOptical()&&applicationChosen()&&!state.openBoundary&&state.searchTarget==null?edgeSlabRisk(state.shapes):null;
+// its two buttons, in the plan line and in Physics › Optical modes: the edge note's shortcut (the same
+// target estimate, defaultTarget) and Use Open boundary; each sets the inputs and runs nothing
+function edgeWarningButtons(prefix){
+ const near=defaultTarget(state.shapes),search=document.createElement('button'),open=document.createElement('button');
+ search.type=open.type='button';search.className=open.className='message-action';search.id=prefix+'-search';open.id=prefix+'-open';
+ search.textContent=shortcutText(near);search.onclick=()=>useClosedSearch(near);
+ open.textContent='Use Open boundary';open.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};
+ return [search,open];
+}
 const closedSearchField=()=>{
- if(state.openBoundary)return '';const near=state.searchTarget!=null,t=near?state.searchTarget:closedNearDraft();
- return `<fieldset class="boundary-choice closed-search" id="closed-search"><legend>${CLOSED_SEARCH_LEGEND}</legend><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-highest" value="highest"${near?'':' checked'}> ${HIGHEST_LABEL}</label><span class="closed-search-near"><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-nearest" value="nearest"${near?' checked':''}> ${NEAREST_LABEL}</label><input id="closed-target-number" type="number" min="1.45" step="0.001" value="${t.toFixed(3)}" aria-label="${NEAR_FIELD_LABEL}" aria-describedby="closed-search-help"></span></fieldset><p class="input-note" id="closed-search-help">${CLOSED_SEARCH_HELP}</p>`;
+ if(state.openBoundary)return '';const near=state.searchTarget!=null,t=near?state.searchTarget:closedNearDraft(),risk=edgeWarning();
+ return `${risk?`<div class="closed-edge-warning" id="closed-edge-warning"><p class="validation-warning" id="closed-edge-warning-text">${escapeHtml(edgeSlabWarningText(risk))}</p><p class="closed-edge-actions" id="closed-edge-actions"></p></div>`:''}<fieldset class="boundary-choice closed-search" id="closed-search"><legend>${CLOSED_SEARCH_LEGEND}</legend><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-highest" value="highest"${near?'':' checked'}> ${HIGHEST_LABEL}</label><span class="closed-search-near"><label class="radio-field"><input type="radio" name="closed-search" id="closed-search-nearest" value="nearest"${near?' checked':''}> ${NEAREST_LABEL}</label><input id="closed-target-number" type="number" min="1.45" step="0.001" value="${t.toFixed(3)}" aria-label="${NEAR_FIELD_LABEL}" aria-describedby="closed-search-help"></span></fieldset><p class="input-note" id="closed-search-help">${CLOSED_SEARCH_HELP}</p>`;
 };
 const bindClosedSearchField=()=>{
  const highest=$('closed-search-highest'),nearest=$('closed-search-nearest'),field=$('closed-target-number');if(!highest||!nearest||!field)return;
+ $('closed-edge-actions')?.append(...edgeWarningButtons('closed-edge'));
  // the field's index, checked, as the target: Nearest to n_eff; an invalid one restores the choice and the field
  const take=()=>{const t=Math.round(Number(field.value)*1000)/1000;
   try{checkClosedTarget(t,state.shapes);}
@@ -1297,8 +1311,17 @@ function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};
  const last=lastComparableRun(runs,plan,{isOpen:isOpenRun,hasGroup:hasGroupIndex}),text=runPlanText({...plan,last:last?.duration??null});
- refreshDropWarning();
+ refreshDropWarning();refreshEdgeWarning();
  const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
+}
+// round 22 (V2): the slab warning in the plan line, a row under it (made here, so the page's markup is
+// unchanged): its words, cut to the box with the full text as the title, and the two buttons
+function refreshEdgeWarning(){
+ let host=$('run-edge');const risk=edgeWarning();
+ if(!host){host=document.createElement('span');host.id='run-edge';host.className='run-edge';host.hidden=true;const text=document.createElement('span');text.id='run-edge-text';text.className='run-edge-text';host.append(text);$('run-plan').after(host);}
+ host.hidden=!risk;$('run-options').classList.toggle('edge-warning',!!risk);if(!risk){host.dataset.key='';return;}
+ const text=edgeSlabWarningText(risk),key=text+'\n'+defaultTarget(state.shapes);if(host.dataset.key===key)return;host.dataset.key=key;
+ $('run-edge-text').textContent=text;$('run-edge-text').title=text;host.querySelectorAll('button').forEach(b=>b.remove());host.append(...edgeWarningButtons('run-edge'));
 }
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 // round 20 (Z6): the scope names both boundaries, as the Open boundary choice sits beside it
