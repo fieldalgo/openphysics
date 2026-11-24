@@ -89,11 +89,19 @@ export function numberRuns(list,used=0){
  for(const run of list)if(!Number.isInteger(run.number))run.number=++top;
  return top;
 }
+// A run as the drop words name it: "Run 3 (700 × 300 nm · 4 modes)", "Run 3 · Design A (…)" when named.
+const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
+ return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count})`;};
+// The run the next run would drop (round 18, X3): with six runs kept, the oldest unpinned one (the
+// one appendRun drops); null below the limit or with every run pinned.
+export function nextDropped(runs,limit=6){return runs.length>=limit?runs.find(r=>!r.pinned)||null:null;}
+// Its words beside Run study, before the run: "Running drops Run 3 (700 × 300 nm · 4 modes) · pin it
+// to keep it".
+export const dropWarningText=run=>`Running drops ${dropName(run)} · pin it to keep it`;
 /** The message when the run limit dropped a run: "Run 3 (700 × 300 nm · 4 modes) was dropped: up
  * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
 export function droppedRunText(run){
- const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
- return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count}) was dropped: up to six runs are kept; pin a run to keep it.`;
+ return `${dropName(run)} was dropped: up to six runs are kept; pin a run to keep it.`;
 }
 // The run state the dock heading and the footer describe, in the words of the multiphysics model.
 // viewed: the run Results shows (the selected run), which both then describe, so they agree with

@@ -92,6 +92,27 @@ test('X2: beside Run study, what the next run does and how long the last compara
  assert.ok(app.includes("if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';"));
  // a box of fixed size: the ribbon does not move when the words change
  const css=read('workspace.css');
- assert.ok(css.includes('.run-options{align-self:center;display:flex;flex-direction:column;justify-content:center;gap:2px;flex:none;box-sizing:border-box;width:340px;height:50px;overflow:hidden;'));
+ assert.ok(css.includes('.run-options{align-self:center;display:flex;flex-direction:column;justify-content:center;gap:2px;flex:none;box-sizing:border-box;width:460px;height:50px;overflow:hidden;'));
  assert.ok(css.includes('.message-warning{'));
+});
+
+test('X3: before the run, the run the six-run limit would drop, with Pin Run N; the limit is unchanged',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs'),N=await import(STATIC+'workspace-notebook.mjs');
+ const shape={name:'Core',type:'rect',material:'Silicon',x:-350,y:0,w:700,h:300};
+ const run=(n,extra={})=>({job:String(n).padStart(8,'0'),number:n,settings:{mode_count:4},input:{model:{shapes:[shape]}},...extra});
+ const five=[1,2,3,4,5].map(n=>run(n));
+ assert.equal(W.nextDropped(five),null);
+ const six=[run(1,{pinned:true}),run(2,{pinned:true}),run(3),run(4),run(5),run(6)];
+ assert.equal(W.nextDropped(six).number,3);
+ assert.equal(W.dropWarningText(W.nextDropped(six)),'Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.dropWarningText(run(3,{label:'Design A'})),'Running drops Run 3 · Design A (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.nextDropped(six.map(r=>({...r,pinned:true}))),null);
+ // the run it names is the one appendRun drops
+ const next=N.appendRun(six,run(7));assert.deepEqual(six.filter(r=>!next.includes(r)).map(r=>r.number),[3]);
+ // the words after the drop are unchanged
+ assert.equal(W.droppedRunText(run(3)),'Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.');
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("pin.onclick=()=>{if(!runs.includes(run)||run.pinned)return;run.pinned=true;render();notice(pinNotice(run));};"));
+ assert.ok(app.includes("pin.disabled=solverBusy||!!pendingJob;"));
+ assert.ok(read('workspace.html').includes('<span id="run-drop" class="run-drop" hidden><span id="run-drop-text" class="run-drop-text"></span><button type="button" id="run-drop-pin" class="message-action"></button></span>'));
 });
