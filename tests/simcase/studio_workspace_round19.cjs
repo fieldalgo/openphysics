@@ -87,3 +87,35 @@ test('Y3: a restore brings back the project name and file it was saved to, or na
  assert.ok(app.includes("stamp:null,scope:project.scope+1,copyOf:null});"));
  assert.ok(app.includes("recovery:recoveryState,copyOf:project.copyOf});"));
 });
+
+test('Y1: the newest stored session with runs is the first restore offer; every other says it is older',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ const when=t=>({T546:'5:46 AM',T538:'5:38 AM',T530:'5:30 AM'})[t]??t;
+ // ISO times so the order is by time; the newest with runs leads whatever its kind
+ const at=s=>'2026-11-24T05:'+s+':00Z',w=t=>when({[at('46')]:'T546',[at('38')]:'T538',[at('30')]:'T530'}[t]);
+ const latest={runs:5,savedAt:at('38'),model:'Optical waveguide',names:[],file:'both-models.json',fileCurrent:false};
+ const earlier=[{runs:6,savedAt:at('46'),model:'Optical waveguide',names:[],index:0,file:'both-models.json',fileCurrent:false},{runs:1,savedAt:at('30'),model:'Heated silicon waveguide',names:['Run 1'],index:1}];
+ assert.deepEqual(A.resumeChoices(latest,earlier,w),[
+  {kind:'earlier',index:0,newest:true,label:'Restore newest from this browser: Optical waveguide · 6 runs · file both-models.json, changed since · saved 5:46 AM'},
+  {kind:'latest',label:'Restore from this browser: Optical waveguide · 5 runs · file both-models.json, changed since · older · saved 5:38 AM'},
+  {kind:'earlier',index:1,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · saved 5:30 AM'}]);
+ // a session without runs saved after the newest is not called older
+ assert.equal(A.resumeChoices({runs:0,savedAt:at('50')},[{runs:2,savedAt:at('46'),index:0}],t=>t)[1].label,'Restore from this browser: 0 runs · saved '+at('50'));
+ // a card's offer: the newest keeps its words; another says older with its save time
+ const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
+ assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
+ assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · saved 5:30 AM · file x.json, changed since');
+ assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
+ assert.equal(A.cardResumeChoice({...item,fileCurrent:true},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · browser copy 9:24 PM · same as file x.json');
+ const lib=read('workspace-applications.mjs');
+ assert.ok(lib.includes("if(choice.newest){button.className='primary';button.id='resume-newest';}"));
+ const app=read('workspace-app.mjs');
+ // the box lists every stored session (no longer leaving out the cards' records), still hidden while the tab holds runs
+ assert.ok(app.includes(" if(resumeDismissed||runs.length)return null;\n const list=recoveryList(),latest=list.find(e=>e.kind==='latest');"));
+ assert.ok(app.includes("{older:!!newest&&newest.index!==found.index}"));
+ // the record just restored is left out until this tab's own record is written; the rest stay listed
+ assert.ok(app.includes("distinctRecords(notebookRecoveryRecord,earlierRecords).filter(e=>e.index!==restoredIndex)"));
+ assert.ok(app.includes("const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();"));
+ // X7: "(already in this tab)" names the tab's runs
+ assert.ok(app.includes("const tab=!inTab?null:kind==='optical'?multiView.runs().map(r=>runTitle(r.number,r.label||'')):runs.map(r=>runTitle(r.number,r.label||''));"));
+});

@@ -58,8 +58,8 @@ test('the landing page offers the latest and earlier browser sessions to resume'
  const when=t=>t;
  assert.deepEqual(resumeChoices(null,[],when),[]);
  assert.deepEqual(resumeChoices({runs:2,savedAt:'T1'},[{runs:1,savedAt:'T0'}],when),[
-  {kind:'latest',label:'Last session in this browser · 2 runs · saved T1'},
-  {kind:'earlier',index:0,label:'Earlier session · 1 run · saved T0'}]);
+  {kind:'latest',newest:true,label:'Restore newest from this browser: 2 runs · saved T1'},
+  {kind:'earlier',index:0,label:'Restore from this browser: 1 run · older · saved T0'}]);
  assert.deepEqual(resumeChoices(null,[{runs:3,savedAt:'T0'}],when).map(c=>c.kind),['earlier']);
 });
 test('an earlier session choice keeps its storage index when an unreadable record is skipped',()=>{
@@ -70,8 +70,8 @@ test('every recovery entry names its model and its runs',()=>{
  assert.deepEqual(sessionRunNames({runs:[{label:'design A'},{label:''}]}),['Run 1 · design A','Run 2']);
  assert.deepEqual(sessionRunNames({runs:[{number:3,label:''},{number:4,label:'heater 10 mW'}]}),['Run 3','Run 4 · heater 10 mW']);
  assert.deepEqual(resumeChoices({runs:2,savedAt:'T1',model:'Optical waveguide',names:['design A','Run 2']},[{runs:1,savedAt:'T0',model:'Heated silicon waveguide',names:['Run 1'],index:0}],t=>t),[
-  {kind:'latest',label:'Last session in this browser · Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
-  {kind:'earlier',index:0,label:'Earlier session · Heated silicon waveguide · 1 run · Run 1 · saved T0'}]);
+  {kind:'latest',newest:true,label:'Restore newest from this browser: Optical waveguide · 2 runs · design A, Run 2 · saved T1'},
+  {kind:'earlier',index:0,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · saved T0'}]);
 });
 test('the Library page says what File › Save keeps of each model, and how to leave the coupled one',()=>{
  const [optical,heat,joule,coupled]=CHOOSER_NOTES;

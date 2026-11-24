@@ -738,9 +738,9 @@ function requestLoad(doc,options={}){
   if(options.newProject&&!options.projectChecked){const asked=!!leaveText(options.label||'the opened inputs');guardLeave(options.label||'the opened inputs',false,()=>requestLoad(doc,{...options,projectChecked:true,leaveChecked:asked}));return;}
   loadInputs(doc,options);
 }
-function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,fileName=null,newProject=false}={}){
+function loadInputs(doc,{saved=true,session=null,source='file',label='Saved inputs',recoveryRecord=null,recoveryIndex=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,page=null,opener=document.activeElement,leaveChecked=false,fileName=null,newProject=false}={}){
   workspaceLoads.invalidate();
-  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,fileName,newProject,context:loadContext()};
+  pendingLoad={input:doc,saved,session,source,label,recoveryRecord,recoveryIndex,keepAsLatest,savedFile,openedFile,openedCurrent,page,opener,fileName,newProject,context:loadContext()};
   // Nothing to lose: no runs or other results and the default inputs, so open at once.
   // leaving a multiphysics run was just confirmed: the hidden optical inputs are not asked about again
   if(leaveChecked||untouchedWorkspace(inputsFile(),DEFAULT_INPUTS,{results:runs.length+(heatRun||heatState.busy?1:0)+(jouleView.hasResult()||jouleView.busy()?1:0)})){const pending=pendingLoad;pendingLoad=null;completeLoad(pending);return;}
@@ -775,7 +775,7 @@ function completeLoad(pending){
  if(pending.newProject){multiView.discard();resetProject();}
  projectId('workspace');
  if(pending.session){
-  if(pending.source==='browser')notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});
+  if(pending.source==='browser'){notebookStore.adopt(pending.recoveryRecord,{kept:pending.keepAsLatest});restoredFrom(pending.recoveryIndex);}
   const session=pending.session;runs=session.runs;runNumbersUsed=0;for(const r of runs)delete r.number;runNumbersUsed=numberRuns(runs);solverRun=runs.find(r=>r.job===session.selected)||runs.at(-1)||null;compareIds=[...session.comparison];comparePicked=pairChosen(runs,compareIds);restoreView(session.view);
   // Modes to find and the group index option: those of an input of version 8; for an input of
   // version 6 or 7 (a file that did not store them), those of the selected run, as before
@@ -964,7 +964,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  // The save indicator reads "updating", not "pending": right after Save session it would read as if the save were not done.
  if(state.phase==='pending'||state.phase==='saving')recoveryState='updating';
  if(state.phase==='current'){recoveryState='kept';recoveryOffPosted=null;}
- if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;if(notebookStore.movedEarlier()||first)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
+ if(state.phase==='saved'){recoveryState='kept';recoveryOffPosted=null;notebookRecoveryRecord=state.record;notebookLoadVersion++;const first=!ownLatest;ownLatest=true;const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();$('recover-notebook').disabled=false;$('retry-notebook').disabled=true;$('notebook-recovery-detail').textContent='Browser recovery updated '+new Date(state.record.savedAt).toLocaleTimeString()+'. Latest completed session kept in this browser for this server address; shared across tabs. Use File › Save for a file you can keep.'+(state.note?' '+state.note:'');if(state.note&&state.note!==recoveryNote)notice(state.note);recoveryNote=state.note;}
  if(state.phase==='error'){recoveryState=state.code==='recovery-conflict'?'conflict':state.code==='recovery-over-limit'?'overLimit':state.code==='recovery-quota'?'quota':'unavailable';$('retry-notebook').disabled=false;$('notebook-recovery-detail').textContent=state.message+' Use current notebook for recovery to review an explicit replacement. Previous completed snapshot is retained if the database transaction failed.';postRecoveryOff();}
  refreshSaveIndicator();
 }});
@@ -996,8 +996,10 @@ const recoveredEntry=(recovered,file)=>{const own=recovered.savedFile?.name||rec
 function projectAlso(recovered,name){
  const kind=recovered.session.application==='multiphysics'?'multiphysics':'optical';
  const other=recoveryList().find(e=>(e.recovered.session.application==='multiphysics'?'multiphysics':'optical')!==kind&&(e.file||e.recovered.savedFile?.name||e.recovered.openedFile)===name);
- if(!other)return [];const o=other.recovered;
- return [{model:recoveredModel(o)||'Optical waveguide',names:sessionRunNames(o.session),runs:o.session.runs.length,inTab:kind==='optical'?multiView.projectRuns()>0:runs.length>0}];
+ if(!other)return [];const o=other.recovered,inTab=kind==='optical'?multiView.projectRuns()>0:runs.length>0;
+ // round 19 (Y1): "(already in this tab)" names the runs the tab holds, not the stored record's
+ const tab=!inTab?null:kind==='optical'?multiView.runs().map(r=>runTitle(r.number,r.label||'')):runs.map(r=>runTitle(r.number,r.label||''));
+ return [{model:recoveredModel(o)||'Optical waveguide',names:tab||sessionRunNames(o.session),runs:tab?tab.length:o.session.runs.length,inTab}];
 }
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 // earlierRecords: the stored records as read, for the list's de-duplication (distinctRecords).
@@ -1006,9 +1008,12 @@ let earlierSessions=[],earlierRecords=[];
 // recover; it still hides an earlier copy of the same text.
 let ownLatest=false;
 // The stored sessions the lists offer, each once and newest first: {kind, index, recovered, file}.
+// restoredIndex (round 19, Y1): the record just restored into this tab (-1: the latest), left out of
+// the lists until this tab's own record of it is written (which then hides its copies)
+let restoredIndex=null;
 function recoveryList(){
  const parsed=new Map(earlierSessions.map(e=>[e.index,e.recovered]));
- return distinctRecords(notebookRecoveryRecord,earlierRecords).flatMap(({index,file})=>{
+ return distinctRecords(notebookRecoveryRecord,earlierRecords).filter(e=>e.index!==restoredIndex).flatMap(({index,file})=>{
   if(index<0)return latestOffer&&!ownLatest?[{kind:'latest',index,recovered:latestOffer.recovered,file}]:[];
   return parsed.has(index)?[{kind:'earlier',index,recovered:parsed.get(index),file}]:[];
  });
@@ -1022,22 +1027,26 @@ function cardRecordMap(){
  const list=recoveryList().filter(e=>e.recovered.session.runs.length).map(e=>({...e,application:e.recovered.session.application}));
  return cardRecords(list,busy);
 }
+// the newest stored session with runs (round 19, Y1): a card offering another one says "older"
+const newestRecord=()=>recoveryList().find(e=>e.recovered.session.runs.length)||null;
 function cardResumeOffers(){
- const out={};
+ const out={},newest=newestRecord();
  for(const [card,found] of Object.entries(cardRecordMap())){const entry=recoveredEntry(found.recovered,found.file);
-  out[card]={...cardResumeChoice(entry,entry.model),record:found.index,onResume:button=>found.kind==='latest'?recoverLatest(button):recoverEarlier(found.index,button),onStartNew:()=>chooseTemplate(card)};}
+  out[card]={...cardResumeChoice(entry,entry.model,undefined,{older:!!newest&&newest.index!==found.index}),record:found.index,onResume:button=>found.kind==='latest'?recoverLatest(button):recoverEarlier(found.index,button),onStartNew:()=>chooseTemplate(card)};}
  return out;
 }
 // The landing page offers to resume until the page has runs or the user starts new.
 let resumeDismissed=false;
-// The records the model cards resume are not listed here again: one route to each.
+// Round 19 (Y1): every stored session, newest first, the newest with runs leading (resumeChoices);
+// a card repeats its model's newest. Still hidden while the tab holds optical runs.
 function resumeOffer(){
  if(resumeDismissed||runs.length)return null;
- const onCards=new Set(Object.values(cardRecordMap()).map(e=>e.index)),list=recoveryList().filter(e=>!onCards.has(e.index)),latest=list.find(e=>e.kind==='latest');
+ const list=recoveryList(),latest=list.find(e=>e.kind==='latest');
  return {latest:latest?recoveredEntry(latest.recovered,latest.file):null,earlier:list.filter(e=>e.kind==='earlier').map(e=>({...recoveredEntry(e.recovered,e.file),index:e.index})),
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),
   onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
 }
+function restoredFrom(index){if(!Number.isInteger(index))return;restoredIndex=index;renderEarlierSessions();}
 // A later call supersedes an earlier one still reading storage, so the list is never doubled.
 let earlierGeneration=0;
 async function renderEarlierSessions(){
@@ -1073,9 +1082,9 @@ async function recoverEarlier(index,opener){
    if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {latest,recovered};});
   if(!loaded)return;const {latest,recovered}=loaded.value;if(!recovered)throw new Error('That earlier session is no longer stored.');
   if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
-  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent});return;}
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:latest,recoveryIndex:index,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent});return;}
   // Adopt the latest record: the next save keeps it as an earlier session in turn.
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:latest,recoveryIndex:index,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Earlier browser session · '+new Date(recovered.savedAt).toLocaleString()});
  }catch(error){notice('Earlier session not recovered: '+error.message);}
 }
 $('retry-notebook').onclick=()=>(multiView.active()?multiView.recovery():runs.length)?notebookAutosave.retry():loadNotebookRecovery();
@@ -1084,8 +1093,8 @@ async function recoverLatest(opener){
  if(solverBusy){notice('Wait for the calculation or stop waiting before recovering a session.');return;}
  $('recover-notebook').disabled=true;
  try{rejectInvalidInput();const loaded=await workspaceLoads.read(async()=>{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(recovered?.session.application==='multiphysics')await checkSessionModels(recovered.session,validateModel);return {record,recovered};});if(!loaded)return;const {record,recovered}=loaded.value;if(!recovered)throw new Error('No session is stored for recovery.');if(solverBusy)throw new Error('Calculation started while reading recovery.');rejectInvalidInput();
-  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent});return;}
-  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
+  if(recovered.session.application==='multiphysics'){requestMultiphysicsSession(recovered.session,{label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString(),source:'browser',opener,recoveryRecord:record,recoveryIndex:-1,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent});return;}
+  requestLoad(recovered.session.input,{saved:false,session:recovered.session,source:'browser',recoveryRecord:record,recoveryIndex:-1,keepAsLatest:true,savedFile:recovered.savedFile,openedFile:recovered.openedFile,openedCurrent:recovered.openedCurrent,page:recovered.page,opener,label:'Browser recovery · '+new Date(recovered.savedAt).toLocaleString()});}
  catch(error){notice('Session recovery failed: '+error.message+' Current inputs and results kept.');}
  finally{$('recover-notebook').disabled=!notebookRecoveryRecord;}
 };
@@ -1743,12 +1752,12 @@ $('confirm-run-import').onclick=()=>{
 const validateModel=doc=>studioRequest('POST','/api/multiphysics/validate',{doc});
 // Opening a multiphysics session (a file or browser recovery), checked already: the leave
 // question when runs would be lost, else the open question when a model would be replaced.
-function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null}){
+function requestMultiphysicsSession(session,{label,source,opener=document.activeElement,recoveryRecord=null,keepAsLatest=false,savedFile=null,openedFile=null,openedCurrent=null,recoveryIndex=null}){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  // a file replaces the project (P3); a browser restore replaces the multiphysics model only
  const model=source==='file'?false:'multiphysics',asked=!!leaveText(label,model);
  const go=()=>{
-  const finish=()=>{if(source==='browser')notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile,openedFile);refreshPersistence();}}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser'){notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});restoredFrom(recoveryIndex);}fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile,openedFile);refreshPersistence();}}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.projectRuns(),unsaved:multiView.projectUnsavedRuns()>0,model:'the current model'},source);

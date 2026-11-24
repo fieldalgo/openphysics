@@ -622,7 +622,9 @@ try {
   assert.ok(routes.latest.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · same as file ' + sessionFile + ', saved '), routes.latest);
   assert.match(routes.latest, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
   assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open file…');
-  assert.deepEqual(routes.listed, [], 'the record the card resumes is not listed again above it'); assert.equal(routes.box, false);
+  // round 19 (Y1): the box above leads with the newest stored session, the record the card resumes
+  assert.equal(routes.listed.length, 1, JSON.stringify(routes.listed)); assert.equal(routes.box, true);
+  assert.ok(routes.listed[0].startsWith('Restore newest from this browser: Optical waveguide · 2 runs · Run 1 · design A, Run 2 · '), routes.listed[0]);
   assert.equal(routes.beside, false, 'Open file is not under a card'); assert.equal(routes.top, true, 'Open file is at the top of the Library'); assert.equal(routes.count, 1);
   await libraryOpenFile('with a resume offer');
   assert.equal(routes.note, 'A project file is the copy that moves between computers; browser recovery stays in this browser.');
@@ -1118,10 +1120,11 @@ try {
   stage('J2 one entry per session', offers);
   // the record matched the file it was opened from, which has no save time here: the time is the browser copy's
   assert.ok(offers.card.text.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · browser copy ') && offers.card.text.endsWith(' · same as file ' + sessionFile), offers.card.text);
-  assert.ok(!offers.top.some(t => t.record === offers.card.record), 'the box above does not list the record the card resumes');
-  // compared by the stored inputs and runs themselves, not by the sessionKey under test
-  assert.equal(new Set(offers.keys).size, offers.keys.length, 'every offered entry is another session');
-  assert.ok(!offers.top.some(t => t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')), JSON.stringify(offers.top));
+  // round 19 (Y1): the box leads with the newest stored session, which the card also resumes
+  assert.equal(offers.top[0]?.record, offers.card.record, 'the box leads with the record the card resumes');
+  // compared by the stored inputs and runs themselves, not by the sessionKey under test: the box's entries
+  assert.equal(new Set(offers.keys.slice(1)).size, offers.keys.length - 1, 'every entry of the box is another session');
+  assert.deepEqual(offers.top.map((t, i) => [i, t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')]).filter(([, has]) => has).map(([i]) => i), [0], JSON.stringify(offers.top));
   await noOverflow('J2 Library page');
 
   // M4 (number of modes; pre-registered, blind except the template's count of guided modes, which

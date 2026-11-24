@@ -607,7 +607,8 @@ print(n)`;
   assert.ok(heatedOffer.text.startsWith('Restore from this browser · Heated silicon waveguide · Run '), heatedOffer.text);
   assert.ok(heatedOffer.text.includes(' · same as file ' + r1Name + ', saved '), heatedOffer.text); assert.match(heatedOffer.text, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
   assert.equal(heatedOffer.next, 'Start new (no runs)'); assert.equal(heatedOffer.card, 'heated-waveguide');
-  assert.ok(!heatedOffer.top.includes(heatedOffer.record), 'the box above does not list the record the card restores');
+  // round 19 (Y1): the box leads with the newest stored session, the record the card restores
+  assert.equal(heatedOffer.top[0], heatedOffer.record, 'the box leads with the record the card restores');
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {
     await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'L7 ' + tag);
   }
@@ -730,7 +731,7 @@ print(n)`;
    // round 18 (X10): the heated model is in this tab's project (two runs): its card reads Return to model
    assert.deepEqual(cards, ['optical', 'heat', 'joule', 'heated-waveguide'].map(id => [id, id === 'heated-waveguide' ? 'Return to model (2 runs)' : 'Open model', true, true]));}
   // R2: each stored session once, newest first, the file named where a record came from one
-  const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-latest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
+  const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-newest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});
   // the sessions behind the listed entries, as stored: no two are the same session (compared
   // without their view), and none is the session this tab wrote as the latest record. Their texts
@@ -740,10 +741,9 @@ print(n)`;
     const keys=listed.map(i=>m.sessionKey(earlier[i].session));return {listed,stored:earlier.length,distinct:new Set(keys).size,latestListed:keys.includes(m.sessionKey(latest.session))};})`);
   stage('R2 stored sessions', stored);
   assert.equal(stored.distinct, stored.listed.length, JSON.stringify(stored)); assert.equal(stored.latestListed, false);
-  // the resume card lists the same entries, but for the one the Optical waveguide card resumes (round 9, J3)
-  const onCard = await page.eval("document.getElementById('resume-optical').dataset.resumeRecord");
-  assert.equal(lists.resume.length, stored.listed.length - (stored.listed.includes(Number(onCard)) ? 1 : 0), 'the resume card lists the same entries');
-  assert.ok(!lists.resume.some(t => /Optical waveguide · 2 runs · Run 1, Run 2/.test(t)), 'the optical session is offered once, on its card: ' + JSON.stringify(lists.resume));
+  // the resume card lists the same entries (round 19, Y1: the one the Optical waveguide card resumes too)
+  assert.equal(lists.resume.length, stored.listed.length, 'the resume card lists the same entries');
+  assert.equal(lists.resume.filter(t => /Optical waveguide · 2 runs · Run 1, Run 2/.test(t)).length, 1, 'the optical session is listed once in the box: ' + JSON.stringify(lists.resume));
   // the heated session open in this tab is not offered again, and its earlier copy is gone
   assert.ok(!lists.earlier.some(t => t.includes('Heated silicon waveguide · 2 runs · Run 2, Run 1 · Heater 2e14')), JSON.stringify(lists.earlier));
   assert.ok(lists.earlier.some(t => /^Restore earlier session from this browser · Optical waveguide · 2 runs · Run 1, Run 2 · /.test(t)), JSON.stringify(lists.earlier));

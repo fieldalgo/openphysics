@@ -382,9 +382,13 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
-   켜면 시작 화면의 **Continue where you left off** 카드에 **Restore from this browser: Last
-   session in this browser …**와 이전 세션(**Restore earlier from this browser: …**), 상자만 닫는 **Not now (choose a model
-   below)**가 나옵니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
+   켜면 시작 화면의 **Continue where you left off** 카드에 탭이 가지지 않은 저장된 세션이 모두 최신순으로, 그리고 상자만 닫는
+   **Not now (choose a model below)**가 나옵니다. round 19부터 첫째이자 가장 눈에 띄는 제안은 모델과 상관없이 실행이 있는
+   가장 새 세션입니다: *Restore newest from this browser: Optical waveguide · 6 runs · … · saved 5:46 AM*. 나머지는 더
+   오래되었다고 밝힙니다: *Restore from this browser: Optical waveguide · 5 runs · … · older · saved 5:38 AM*(전에는 *Last
+   session in this browser*와 *Restore earlier from this browser: Earlier session*이었고, 더 오래된 세션이 먼저 나올 수
+   있었습니다). 탭이 광 실행을 가지는 동안 상자는 숨겨집니다. 복원 뒤에는 복원한 기록이 목록에서 빠지고 나머지는 새로고침
+   없이 Workspace tools(*Restore earlier session from this browser · …*)에 남습니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
    있고, 프로젝트 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
    함께 있습니다. 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
    from this browser*로 부릅니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
@@ -416,8 +420,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    silicon waveguide 카드도 가장 새 다중물리 세션을 같은 방식으로 제안합니다: *Restore from this browser ·
    Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. 기록이 저장했던 세션 파일과 같으면
    기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은
-   어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). 이때 카드 위 상자는
-   어느 카드도 제안하지 않는 세션만 나열합니다. 복구 항목은 모두 모델, 실행 수,
+   어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). round 19부터 카드 위 상자는 카드가 제안하는
+   세션까지 모든 세션을 나열합니다(전에는 어느 카드도 제안하지 않는 세션만). 실행이 있는 가장 새 세션이 아닌 세션을 제안하는
+   카드는 *· older · saved 5:30 AM*이라고 밝힙니다(*· older · same as file …json, saved …*, *· older · browser copy … · same
+   as file …json*). 프로젝트의 다른 모델이 이 탭에 있으면 *(already in this tab)*는 탭이 가진 실행을 밝힙니다. 복구 항목은 모두 모델, 실행 수,
    실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
    design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
    그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가 그것을
@@ -1702,7 +1708,7 @@ File › Save keeps your work.*(실행 결과 메시지가 있으면 같은 줄 
 지우지 않습니다.
 
 새로고침 후 모델 카드(Optical waveguide 또는 Heated silicon waveguide 아래 **Restore from this browser**),
-어느 카드도 제안하지 않는 세션은 시작 화면의 **Continue where you left off** 카드, 또는 Workspace tools →
+시작 화면의 **Continue where you left off** 카드(저장된 모든 세션, 최신순), 또는 Workspace tools →
 **Restore last session from this browser**로 마지막 세션을 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
 아닌 `recovered`로 표기합니다. 입력 Undo 이력은 새로 시작하고 파일/세션을 저장할
 때까지 미저장 상태를 유지합니다. 솔버는 실행하지 않습니다. 입력만 복구하는 기능과
