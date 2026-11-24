@@ -483,3 +483,9 @@ dialog::backdrop{background:#162a4b66}
 /* round 22 (V1): Modes to return in a closed window: Nearest to n_eff with its field on one line */
 .closed-search-near{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .closed-search-near input[type=number]{width:7em;margin:0}
+/* round 22 (V2): the closed window's slab warning before a run: a row of the plan line, and Physics › Optical modes */
+.run-edge{display:flex;align-items:center;gap:4px;min-width:0;color:#8a4b00}.run-edge[hidden]{display:none}
+.run-edge-text{flex:1 1 auto;min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.run-edge .message-action{flex:none;font-size:11px;line-height:16px}
+.run-options.edge-warning .run-plan,.run-options.edge-warning.dropping .run-edge-text,.run-options.edge-warning.dropping .run-drop-text{-webkit-line-clamp:1}
+.closed-edge-warning{margin:8px 0}.closed-edge-warning p{margin:4px 0}.closed-edge-actions{display:flex;flex-wrap:wrap;gap:6px}

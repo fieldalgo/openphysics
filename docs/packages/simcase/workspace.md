@@ -1491,6 +1491,21 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   inputs, *No need to run: Run N already has these results.* replaces the last sentence. Four modes reach the core
   mode of the strip over a substrate in every registered variant
   ([K7](#closed-window-search-document-optical-shapes-v10)).
+- **Before the run** (round 22, V2). In a closed window with Highest n_eff above 1.45, when a shape
+  that touches the window edge has an index at least the highest index of the shapes that do not
+  touch it, the plan line beside Run study (a row under the plan, cut to the box with the full text
+  as its title) and Physics › Optical modes (above Modes to return) say *Substrate touches the window
+  edge and its index is as high as Core's: in a closed window its slab modes come first.* with the
+  shape names, and offer **Set search near 2.46 · 4 modes** (the shortcut's target estimate,
+  (n_max + 1.444)/2) and **Use Open boundary**; each sets its inputs and runs nothing. The warning
+  goes with Nearest to n_eff or Open boundary. It is a geometry and material check with no solve: a
+  shape touches the edge when its bounds reach the window, the shape names are those of the
+  highest-index edge shape and the highest-index shape away from it (the first of equal ones), and no
+  warning is given when no shape, or every shape, touches the edge. The result-side edge note is
+  unchanged, and the closed search stays Highest by default. Limitation: Studio compares its 1550 nm
+  table (physmat); the ten materials keep the same order, with no ties, at every wavelength from 1400
+  to 1700 nm (`tests/simcase/test_studio_round22.py`), so the decision is the same at the run's
+  wavelength. Overlapping shapes are compared as drawn, not by what the later shape hides.
 - **The run.** A run with Nearest to n_eff writes `target_effective_index` and names capabilities v10.
   Studio keeps only the modes with Re n_eff above 1.45 (decision A1): the line above the table always
   reads *Found k of M modes near n_eff 2.46, above n = 1.45.* (M: Modes to find), and a note under
