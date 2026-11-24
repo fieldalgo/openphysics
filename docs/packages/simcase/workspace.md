@@ -394,7 +394,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    n_eff table's run lines name runs the same way. The boundary tag, *closed* or *open (PML 1 µm)*,
    comes right after the run number and name, so a label cut short in a picker still shows it. A
    run of several shapes names each shape and its size, the first three, then *+N more*: *Run 7 ·
-   open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm*. Compare opens with
+   open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm*. Since round 21
+   the tag is followed by what the study computed when it is not the default, so two runs of one
+   design read apart: *· 4 modes* (*· 1 mode*) when Modes to find was not 2, and *· n_g* when the
+   group index was computed: *Run 7 · open (PML 1 µm) · 4 modes · n_g · Core 500 × 220 + …*. Both come
+   before the geometry; a picker too narrow for the label cuts it at its end (the full label is its
+   title text), so they stay in view. Compare opens with
    the two newest runs, the older as A and the newer as B (a run just computed is B). A pair
    picked on Compare, or a pair of two named runs, stays when new runs come: Compare then
    reads *Run 5 is newer than this pair · Compare Run 5 with B*, and the button compares the
