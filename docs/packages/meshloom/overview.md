@@ -344,27 +344,49 @@ See [third-party software](../../third-party.md).
   (none so far in the tests) is an error, not yet repaired with extra points. The
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
-- A closed triangle surface given as one facet per triangle (an STL-like input) is slow
-  and not always meshed. Every triangle edge is then a segment, which refinement splits
-  as it does an input edge. Measured 2026-11-23 on meshloom's own boundaries of C1–C7
-  at the plan's three sizes, unlocked:
-  - 15 of 21 mesh, and their volume and surface area match the input to 1e-15. They take
-    1.9–7.1 times as long as the same case from its builder or polygon input. Where V10
-    has a gate, none reaches it: the smallest dihedral angle is 3.9–9.2°, against 15°
-    (13.8° on C3).
-  - C3 at h = 0.2 and C7 at h = 0.03 and 0.015 raise `RefineError` ("subfacet … is
-    degenerate in doubles"). C3 at h = 0.4 and C7 at h = 0.06 run past 10 minutes.
-    Subfacets split towards a vertex where coplanar triangles meet at a small angle.
-  - The same unit cube as six polygons meshes in 0.06–3.4 s at h = 0.5–0.12, and as
-    triangles in 0.03–23 s.
-  - Through `builder.triangle_surface` (measured 2026-11-24, median of 3 runs), 18 of 21
+- A closed triangle surface given as one facet per triangle (an STL-like input) meshes,
+  small angles between its triangles included. Its quality is not guaranteed, and it
+  can be slow. Every triangle edge is then a segment.
+  - Inside an input angle too small for any triangle to meet the quality bound
+    (19.5° for subfacets, 20.9° for tetrahedra at the default bound 1.4), refinement
+    leaves skinny elements instead of splitting them.
+  - Where a segment leaves a facet at less than 60° to its plane, the facet and the
+    segment do not split each other.
+  - Measured 2026-11-24 (median of 3 runs, Linux) on 55 inputs, each mesh checked
+    exactly:
+    - meshloom's own boundaries of C1–C7 at the plan's three sizes;
+    - the unit cube from its triangles;
+    - 30 synthetic small-angle surfaces: fans and needle triangles down to 0.01°,
+      a vertex 1e-8 of the diagonal from a non-incident edge, folds 0.001° from flat,
+      and wedges down to 3°.
+  - All 55 mesh validly:
+    - every input vertex is kept, bit for bit;
+    - each boundary face lies in one input triangle;
+    - the triangles are tiled to the rounding bound;
+    - the volume matches to 1e-12.
+  - All but one take at most twice as long as the same case from its builder or polygon
+    input (for the cube: twice its six-polygon time, plus 1 s). The synthetic surfaces
+    take under 9 s.
+  - C3 at h = 0.8 takes 24 s, against 5.9 s:
+    - its surface edges are shorter than h;
+    - points placed next to them split them again and again;
+    - the result is 32,011 tetrahedra, against 4,848.
+  - Quality is reported, not guaranteed. 5 of the 15 rows with a V10 gate reach it: C4
+    at all three sizes, and C5 and C6 at h = 0.24. The others have smallest dihedral
+    angles of 12.5–17.2°, or a mean q below the gate.
+  - No tetrahedron is well shaped next to a small input angle. Wedges of 10° and 3°,
+    thinner than h, keep tetrahedra of 0.7–7.0° more than h from their edge.
+  - Through `builder.triangle_surface` (measured 2026-11-24 before the rules above, median
+    of 3 runs), 18 of 21
     mesh and pass the same volume and area checks. On C2–C6 they take 0.82–1.11 times as
     long as from the builder or polygon input. 13 of the 15 rows with a V10 gate reach it.
     The two that miss are C2 at h = 0.06 (smallest dihedral angle 13.5°) and C5 at
     h = 0.12 (mean q 0.811, against 0.8185). C1, a sphere, has no coplanar triangles and is
-    unchanged. C7's slanted face is not exactly planar in doubles, so its triangles stay
-    and all three sizes still run past 10 minutes. The cube from its triangles takes
-    0.07–3.6 s, and as six polygons 0.06–3.6 s.
+    unchanged. C7's slanted face is not exactly planar in doubles, so its triangles stay,
+    and all three sizes ran past 10 minutes. With the rules, C7 meshes at all three sizes
+    and passes the volume and area checks: 7.7 s, 33 s and 182 s at h = 0.06, 0.03 and
+    0.015 (one run each, 2026-11-24). The other rows were not measured again. The cube
+    from its triangles takes 0.07–3.6 s, and as six polygons 0.06–3.6 s.
   - Locking those triangles (`locked_facets`) raises `RecoveryError` on C2–C7: recovery
     would need a point on a locked facet.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
