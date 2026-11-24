@@ -496,9 +496,12 @@ fn orient(nodes: &[P3], t: [u32; 4]) -> i8 {
     orient3d_exact(&p[0], &p[1], &p[2], &p[3])
 }
 
-/// True when replacing `gone` by `new` leaves every face in at most two tetrahedra and
-/// adds no face twice (`faces` is the face map before the change).
-fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[usize], new: &[[u32; 4]]) -> bool {
+/// True when replacing `gone` by `new` leaves every face in at most two tetrahedra, adds
+/// no face twice (`faces` is the face map before the change) and keeps the oriented
+/// boundary of what it replaces, except on the faces in `exempt` (the two old and two new
+/// subfacets of a flip inside a facet on the domain's boundary).
+fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[usize], new: &[[u32; 4]],
+            exempt: &[[u32; 3]]) -> bool {
     let mut delta: HashMap<[u32; 3], i32> = HashMap::new();
     for &r in gone {
         for i in 0..4 {
@@ -510,7 +513,32 @@ fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[us
             *delta.entry(key(face(v, i))).or_default() += 1;
         }
     }
-    delta.iter().all(|(k, d)| faces.get(k).map_or(0, |l| l.len() as i32) + d <= 2)
+    if !delta.iter().all(|(k, d)| faces.get(k).map_or(0, |l| l.len() as i32) + d <= 2) {
+        return false;
+    }
+    // the oriented boundary is kept: every face's signed count (+1 wound as its sorted key
+    // up to rotation, -1 reversed) is the same over the new tetrahedra as over the removed
+    // ones, so the signed coverage of space does not change. (Two inverted tetrahedra are
+    // not replaced by positive ones over the same points: their coverage there is -1.)
+    let sign = |f: [u32; 3]| -> ([u32; 3], i32) {
+        let k = key(f);
+        let m = (0..3).min_by_key(|&j| f[j]).unwrap();
+        (k, if [f[m], f[(m + 1) % 3], f[(m + 2) % 3]] == k { 1 } else { -1 })
+    };
+    let mut chain: HashMap<[u32; 3], i32> = HashMap::new();
+    for &r in gone {
+        for i in 0..4 {
+            let (k, s) = sign(face(&tets[r], i));
+            *chain.entry(k).or_default() -= s;
+        }
+    }
+    for v in new {
+        for i in 0..4 {
+            let (k, s) = sign(face(v, i));
+            *chain.entry(k).or_default() += s;
+        }
+    }
+    chain.iter().all(|(k, &c)| c == 0 || exempt.contains(k))
 }
 
 /// The cavity fill of `repair`: the tetrahedron `t` and its neighbours across faces that
@@ -629,7 +657,7 @@ fn lift(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u32; 3
         }
         let kept: HashSet<(u32, u32)> = new.iter()
             .flat_map(|q| (0..4).flat_map(move |k| (k + 1..4).map(move |l| edge(q[k], q[l])))).collect();
-        if cav_fixed.iter().any(|e| !kept.contains(e)) || !local_ok(faces, tets, &cav, &new) {
+        if cav_fixed.iter().any(|e| !kept.contains(e)) || !local_ok(faces, tets, &cav, &new, &[]) {
             continue;
         }
         return Some((cav, new, lab, Some(p)));
@@ -720,7 +748,7 @@ fn fill_from(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u
             if cav_fixed.iter().any(|e| !kept.contains(e)) {
                 continue;
             }
-            if !local_ok(faces, tets, &cav, &new) {
+            if !local_ok(faces, tets, &cav, &new, &[]) {
                 continue;
             }
             return Some((cav.clone(), new, lab, None));
@@ -744,7 +772,7 @@ fn fill_from(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u
             }
             let kept: HashSet<(u32, u32)> = new.iter()
                 .flat_map(|n| (0..4).flat_map(move |k| (k + 1..4).map(move |l| edge(n[k], n[l])))).collect();
-            if cav_fixed.iter().any(|e| !kept.contains(e)) || !local_ok(faces, tets, &cav, &new) {
+            if cav_fixed.iter().any(|e| !kept.contains(e)) || !local_ok(faces, tets, &cav, &new, &[]) {
                 continue;
             }
             return Some((cav.clone(), new, lab, Some(p)));
@@ -1014,7 +1042,12 @@ fn flip_op(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u32
                     lab.extend([l, l]);
                 }
                 let new_edge = |n: &[u32; 4]| (0..4).any(|k| (k + 1..4).any(|l| made.contains(&edge(n[k], n[l]))));
-                if !ok || new.is_empty() || new.iter().any(new_edge) || !local_ok(faces, tets, &ring_tets, &new) {
+                let exempt: Vec<[u32; 3]> = if infacet {
+                    vec![key([d, e, fx[0]]), key([d, e, fx[1]]), key([fx[0], fx[1], d]), key([fx[0], fx[1], e])]
+                } else {
+                    Vec::new()
+                };
+                if !ok || new.is_empty() || new.iter().any(new_edge) || !local_ok(faces, tets, &ring_tets, &new, &exempt) {
                     continue;
                 }
                 let facet = if infacet {
@@ -1048,7 +1081,7 @@ fn flip_op(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u32
         let new: Vec<[u32; 4]> = [(f[0], f[1]), (f[1], f[2]), (f[2], f[0])].iter()
             .map(|&(x, y)| if s[0] > 0 { [x, y, d, e] } else { [y, x, d, e] }).collect();
         if new.iter().any(|n| orient(nodes, *n) <= 0) || edges.contains_key(&edge(d, e)) || made.contains(&edge(d, e))
-            || !local_ok(faces, tets, &[t, u], &new) {
+            || !local_ok(faces, tets, &[t, u], &new, &[]) {
             continue;
         }
         let lab = labels[t];
@@ -1116,6 +1149,52 @@ mod tests {
         assert!(near(volume(&p, 0), 63.0)); // the shell between the boxes
         assert!(p.interfaces.is_empty());
         assert_eq!(p.boundary.len(), 24); // both boxes bound the shell
+    }
+
+    /// Two inverted tetrahedra that share a face crossed by the segment between their other
+    /// vertices: a 2-3 flip would replace them with three positive tetrahedra over the same
+    /// five points, but their signed coverage is -1 there, not +1, so the flip would fold
+    /// the mesh (found on the free triangle-surface path, V14 case C7 at h = 0.03, where
+    /// rounding moved one point past both of its tetrahedra's opposite faces). A ring of
+    /// tetrahedra around the edge p1 p2; the ring vertex v (at 0 degrees) is moved across
+    /// the axis to 180 degrees, so the two tetrahedra with v turn inverted and the segment
+    /// between their other ring vertices (100 and 260 degrees) crosses their shared face.
+    /// Repair must return a mesh without two tetrahedra on one side of a face, or refuse.
+    #[test]
+    fn repair_keeps_oriented_boundary_of_two_inverted_tetrahedra() {
+        let ring_deg = [0.0f64, 100.0, 150.0, 210.0, 260.0];
+        let mut nodes: Vec<P3> = vec![[0.0, 0.0, -1.0], [0.0, 0.0, 1.0]];
+        for d in ring_deg {
+            let a = d.to_radians();
+            nodes.push([a.cos(), a.sin(), 0.0]);
+        }
+        let n = ring_deg.len() as u32;
+        let mut tets: Vec<[u32; 4]> = (0..n).map(|k| [0, 1, 2 + k, 2 + (k + 1) % n]).collect();
+        assert!(tets.iter().all(|t| orient(&nodes, *t) > 0));
+        let hull = crate::facetrec::hull_faces(&tets);
+        nodes[2] = [-0.5, 0.0, 0.0]; // v crosses the axis
+        let bad: Vec<usize> = (0..tets.len()).filter(|&t| orient(&nodes, tets[t]) <= 0).collect();
+        assert_eq!(bad.len(), 2, "exactly the two tetrahedra with v are inverted");
+        let mut labels = vec![0u32; tets.len()];
+        let mut fixed: HashMap<[u32; 3], u32> = hull.iter().enumerate().map(|(i, k)| (*k, i as u32)).collect();
+        // p1 p2 is an input segment: the ring around it cannot be removed
+        let r = repair(&mut nodes, &mut tets, &mut labels, &mut fixed, &HashSet::new(), &HashSet::from([(0, 1)]));
+        if r.is_ok() {
+            assert!(tets.iter().all(|t| orient(&nodes, *t) > 0));
+            let rot = |f: [u32; 3]| {
+                let m = (0..3).min_by_key(|&j| f[j]).unwrap();
+                [f[m], f[(m + 1) % 3], f[(m + 2) % 3]]
+            };
+            let mut seen: HashMap<[u32; 3], [u32; 3]> = HashMap::new();
+            for v in &tets {
+                for i in 0..4 {
+                    let f = rot(face(v, i));
+                    if let Some(g) = seen.insert(key(f), f) {
+                        assert_eq!(g, [f[0], f[2], f[1]], "two tetrahedra on one side of face {:?}", key(f));
+                    }
+                }
+            }
+        }
     }
 
     fn lcg(s: &mut u64) -> f64 {
