@@ -269,7 +269,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    밝힙니다(round 18; round 17은 느리게 하는 선택만 밝힘): *Open boundary · 2 searches · group index on (3 solves) · last
    such run 3:40*. 경계(*Closed window* 또는 *Open boundary*), 열린 경계의 검색 수(*1 search* 또는 *2 searches*), 풀이를
    늘리는 선택과 그 마지막 뒤의 풀이 수(*group index on*, 열린 경계의 *PML check on*: 모드마다 많아야 한 번 더 풂; 둘 다면
-   *group index on · PML check on (5 solves)*), 그다음 *last such run m:ss* 또는, round 19부터, *no timed run in this tab yet*입니다(전에는 *no earlier run*이었는데, 파일에서 열거나 복원한 실행 옆에서는 맞지 않았습니다). 비교 가능한
+   *group index on · PML check on (5 solves)*), 탭에 시간이 있는 비교 가능한 실행이 있으면 그다음 *last such run m:ss*입니다. round 20부터 그런 실행이 없으면 시간 부분이 없습니다(*Closed window*): round 19의 *no timed run in this tab yet*(그 전에는 *no earlier run*)은 시간을 잰 실행이 무엇이냐는 물음을 낳았고, 탭에서 다른 경계나 군굴절률 상태로 계산한 실행 옆에서 맞지 않았습니다. 비교 가능한
    실행은 경계 종류와 군굴절률 상태가 같은 실행이며, 그 시간은 이 탭에서 작업 시작부터 결과까지의 실제 시간으로 이 탭의
    실행에만 보존됩니다: 연 실행과 복원한 실행에는 없고 어떤 파일에도 담기지 않습니다. 이 줄은 크기가 고정된 상자에 있어
    바뀌어도 리본이 움직이지 않습니다. 군굴절률이 켜진 채 **Open boundary**를 고르면 Messages에 경고가 붙습니다: *Group index

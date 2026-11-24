@@ -64,3 +64,12 @@ test('Z4: the box and the card name one time for one record',async()=>{
  // the order still follows the records' own times
  assert.deepEqual(A.resumeChoices({...relinked,savedAt:'2026-11-24T08:30:00Z',fileSavedAt:'2026-11-24T08:31:00Z'},[{...newest,savedAt:'2026-11-24T08:30:30Z',index:0}],t).map(c=>c.kind),['earlier','latest']);
 });
+
+test('Z5: without a comparable timed run the Run study box has no timing part',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs');
+ assert.equal(W.runPlanText({modeCount:2}),'Closed window');
+ assert.equal(W.runPlanText({groupIndex:true,modeCount:2}),'Closed window · group index on (3 solves)');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,pmlCheck:true,modeCount:2}),'Open boundary · 2 searches · group index on · PML check on (5 solves)');
+ assert.equal(W.runPlanText({open:true,modeCount:2,last:220000}),'Open boundary · 1 search · last such run 3:40');
+ const src=read('workspace-workflow.mjs');assert.ok(!src.includes("'no timed run in this tab yet'"));assert.ok(!src.includes("'no earlier run'"));
+});

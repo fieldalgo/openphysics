@@ -311,8 +311,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    an open boundary's searches (*1 search* or *2 searches*), the options that add solves with the
    solve count after the last of them (*group index on*, an open boundary's *PML check on*: one more
    solve per mode at most; both *group index on · PML check on (5 solves)*), then *last such run
-   m:ss* or, since round 19, *no timed run in this tab yet* (it read *no earlier run*, which was wrong
-   beside runs opened from a file or recovered). A comparable run has the same boundary kind and group-index state; its
+   m:ss* when the tab has a comparable run with a time. Since round 20 the line has no timing part
+   without one (*Closed window*): round 19's *no timed run in this tab yet* (before it, *no earlier
+   run*) raised the question what a timed run is and read wrong beside runs computed in the tab with
+   another boundary or group-index state. A comparable run has the same boundary kind and group-index state; its
    time is the wall time from the job's start to its result in this tab, kept with the run in this
    tab only: opened and recovered runs have none, and no file holds it. The line sits in a box of
    fixed size, so the ribbon does not move when it changes. Choosing **Open boundary** while the

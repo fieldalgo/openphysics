@@ -69,9 +69,9 @@ test('X2: beside Run study, what the next run does and how long the last compara
  const W=await import(STATIC+'workspace-workflow.mjs');
  assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,modeCount:2,last:220000}),'Open boundary · 2 searches · group index on (3 solves) · last such run 3:40');
  assert.equal(W.runPlanText({modeCount:2,last:12400}),'Closed window · last such run 0:12');
- assert.equal(W.runPlanText({modeCount:2}),'Closed window · no timed run in this tab yet');
+ assert.equal(W.runPlanText({modeCount:2}),'Closed window');
  // the PML check belongs to an open boundary only
- assert.equal(W.runPlanText({pmlCheck:true,modeCount:4}),'Closed window · no timed run in this tab yet');
+ assert.equal(W.runPlanText({pmlCheck:true,modeCount:4}),'Closed window');
  assert.equal(W.runPlanText({open:true,searches:1,pmlCheck:true,modeCount:4,last:3725000}),'Open boundary · 1 search · PML check on (5 solves) · last such run 1:02:05');
  // comparable: the same boundary kind and group-index state, with a wall time measured in this tab
  const isOpen=r=>r.open,hasGroup=r=>r.g,runs=[{id:1,open:true,g:true,duration:200000},{id:2,open:true,g:false,duration:30000},{id:3,open:true,g:true},{id:4,open:false,g:true,duration:9000}];
