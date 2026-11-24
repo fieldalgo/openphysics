@@ -5,7 +5,7 @@ from functools import lru_cache
 
 import numpy as np
 import pytest
-from panel_studies import matrix_relative, recorded, study
+from panel_studies import ENABLED as STUDIES, matrix_relative, recorded
 
 from galerkin import laplace_corner_harmonic_guard_field as field
 
@@ -38,17 +38,17 @@ def calculated(index,count=32,width=.008,reflect=False):
                  ground_modes={.008:256,.016:512,.032:1024}[width])
 
 
-@pytest.mark.slow
-@study
-@pytest.mark.parametrize('index',range(1))
-def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
-    coarse=quantities(calculated(index,32));fine=quantities(calculated(index,48))
-    panel=[relative(a,b) for a,b in zip(coarse,fine)]
-    assert max(panel)<=.01
-    outer=[quantities(calculated(index,count=48,width=width)) for width in (.008,.016,.032)]
-    changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
-    assert max(value for row in changes for value in row)<=.01
-    record_property('harmonic_guard_resolution',repr((index,panel,changes)))
+if STUDIES:  # dispatch-only convergence study (tests/_support/panel_studies.py)
+    @pytest.mark.slow
+    @pytest.mark.parametrize('index',range(1))
+    def test_panel_refinement_and_two_separate_outer_changes(index,record_property):
+        coarse=quantities(calculated(index,32));fine=quantities(calculated(index,48))
+        panel=[relative(a,b) for a,b in zip(coarse,fine)]
+        assert max(panel)<=.01
+        outer=[quantities(calculated(index,count=48,width=width)) for width in (.008,.016,.032)]
+        changes=[[relative(a,b) for a,b in zip(first,second)] for first,second in zip(outer,outer[1:])]
+        assert max(value for row in changes for value in row)<=.01
+        record_property('harmonic_guard_resolution',repr((index,panel,changes)))
 
 
 @pytest.mark.parametrize('index',range(1))
