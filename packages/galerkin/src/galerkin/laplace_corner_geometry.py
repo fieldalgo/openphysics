@@ -1,9 +1,13 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Immutable parametric corner panels for an explicitly bounded rectangle."""
+"""Immutable parametric corner panels for an explicitly bounded rectangle.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import numpy as np
-from .laplace_two_ground import _admit, _positive, _integer
+from .laplace_two_ground import admit as _admit, positive as _positive, integer as _integer
 
 __all__ = ['CornerPanelGeometry', 'prepare_two_ground_corner_panels']
 
@@ -109,3 +113,7 @@ def prepare_two_ground_corner_panels(polygons, *, width, height, panels_per_edge
         raise ValueError('corner panel length is unresolved at domain scale')
     return CornerPanelGeometry(unit,w,h,g['anchor'],g['local'],g['direction'],p,
         owner,face,np.column_stack((g['starts'],g['ends'])))
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+immutable = _immutable

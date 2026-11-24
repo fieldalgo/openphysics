@@ -201,12 +201,14 @@ def test_the_allowlist_is_closed_and_complete():
     sites = Counter(e["package"] for e in entries for _ in range(e["count"]))
     # map M2 2.3 on f693ae3a: 29 galerkin code lines (31 sites: two lines hold two), 17 simcase code lines (20
     # sites) and refsol's fiber.py:365; plus the two complex-step lines of galerkin.temperature_joule_heating that
-    # the map's search missed (the same text in one function: one entry with count 2). Entries only ever leave.
-    assert sites == {"galerkin": 33, "simcase": 20, "refsol": 1}, sites
-    assert len(entries) == 48
+    # the map's search missed (the same text in one function: one entry with count 2). Entries only ever leave,
+    # except three plane-geometry conjugations of the boundary/corner-panel branch (2D directions as complex
+    # numbers: one rotation, two mirror images in y = 0), listed when that branch met this check.
+    assert sites == {"galerkin": 36, "simcase": 20, "refsol": 1}, sites
+    assert len(entries) == 51
     boundary = simcase_boundary()
     listed = {(s.package, s.file, s.lineno) for s in package_sites() if not allowed_place(s, boundary)}
-    assert Counter(package for package, _, _ in listed) == {"galerkin": 31, "simcase": 17, "refsol": 1}
+    assert Counter(package for package, _, _ in listed) == {"galerkin": 34, "simcase": 17, "refsol": 1}
     conventions = [s for s in package_sites() if s.file == CONVENTIONS]
     # galerkin._conventions (L3 commit 10) and refsol._conventions (L3 commit 11c), each converting in exactly
     # to_kernel and to_public

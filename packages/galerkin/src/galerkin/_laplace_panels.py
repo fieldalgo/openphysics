@@ -414,3 +414,8 @@ def admit_polygons(polygons, width, height, count, *, max_aspect):
             if not separated:
                 raise ValueError('conductor boundaries must be disjoint and separated')
     return (accepted, unit, w, h)
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+dd = _dd
+dd_minus_half = _dd_minus_half

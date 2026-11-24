@@ -1,6 +1,10 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Bounded interleaved static wedge-harmonic Green matrices above one grounded line."""
+"""Bounded interleaved static wedge-harmonic Green matrices above one grounded line.
+
+Internal module, consistent units: not part of galerkin's public API (the ``__all__``
+of its public modules).
+"""
 from dataclasses import dataclass
 import math
 
@@ -13,12 +17,11 @@ from .laplace_corner_harmonic_interactions import (
     power_panel_harmonic_separated_log as separated,
     power_panel_harmonic_constant_log_partitioned as mixed,
 )
-from .laplace_corner_assembly import _offsets
+from .laplace_corner_assembly import offsets as _offsets
 from .laplace_corner_geometry import (
     CornerPanelGeometry,
-    _immutable,
-    prepare_two_ground_corner_panels,
-)
+    immutable as _immutable,
+    prepare_two_ground_corner_panels)
 
 
 def _block(g,i,j,p,q,image=False):
@@ -131,3 +134,7 @@ def assemble_harmonic_corner_half_space(polygons, *, width, height, panels_per_e
 
 
 __all__ = ["HarmonicCornerHalfSpaceMatrix", "assemble_harmonic_corner_half_space"]
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+assemble = _assemble

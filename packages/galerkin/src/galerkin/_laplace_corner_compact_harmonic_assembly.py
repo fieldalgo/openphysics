@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Private bounded compact half-space assembly; original public API is unchanged."""
 import numpy as np
-from ._laplace_corner_compact_geometry import _prepare_compact_corner_panels
-from .laplace_corner_harmonic_assembly import HarmonicCornerHalfSpaceMatrix, _assemble
+from ._laplace_corner_compact_geometry import prepare_compact_corner_panels as _prepare_compact_corner_panels
+from .laplace_corner_harmonic_assembly import HarmonicCornerHalfSpaceMatrix, assemble as _assemble
 
 __all__ = []
 
@@ -37,3 +37,7 @@ def _assemble_compact_harmonic_corner_half_space(polygons, *, width, height, pan
     if max(error, reciprocity) > 1e-10:
         raise ValueError("harmonic half-space quadrature or raw reciprocity failed")
     return HarmonicCornerHalfSpaceMatrix(geometry, coarse, fine, error, reciprocity)
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+assemble_compact_harmonic_corner_half_space = _assemble_compact_harmonic_corner_half_space

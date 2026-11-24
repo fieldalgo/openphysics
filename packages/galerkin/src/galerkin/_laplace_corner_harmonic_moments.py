@@ -7,8 +7,8 @@ import numpy as np
 
 from . import _laplace_panels as kernel
 from . import laplace_two_ground as two
-from ._laplace_corner_field import _mixed_difference
-from .laplace_corner_harmonic_interactions import _rule
+from ._laplace_corner_field import mixed_difference as _mixed_difference
+from .laplace_corner_harmonic_interactions import rule as _rule
 
 __all__ = []
 
@@ -57,10 +57,10 @@ def _centered_projection(project, matrix, left, right, anchor):
 def _smooth(starts, directions, grid, project, width, height, images):
     points = np.concatenate((starts, starts + directions))
     center = (points.min(axis=0) + points.max(axis=0)) / 2
-    matrix = two._smooth(grid, grid, width, height, images)
-    left = two._smooth(grid, center[None], width, height, images)[:, 0]
-    right = two._smooth(center[None], grid, width, height, images)[0]
-    anchor = float(two._smooth(center[None], center[None], width, height, images)[0, 0])
+    matrix = two.smooth(grid, grid, width, height, images)
+    left = two.smooth(grid, center[None], width, height, images)[:, 0]
+    right = two.smooth(center[None], grid, width, height, images)[0]
+    anchor = float(two.smooth(center[None], center[None], width, height, images)[0, 0])
     return _centered_projection(project, matrix, left, right, anchor)
 
 
@@ -98,3 +98,9 @@ def _ground_integrated(starts, directions, powers, width, height, modes, order):
     if not np.isfinite(result).all():
         raise ValueError("harmonic ground moments are nonfinite")
     return result
+
+
+# Public names of helpers shared with other galerkin panel modules (tests/galerkin/test_layers.py).
+ground_integrated = _ground_integrated
+projection = _projection
+smooth = _smooth

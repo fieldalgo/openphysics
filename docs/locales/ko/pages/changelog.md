@@ -92,6 +92,8 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
+- `galerkin`: 경계·코너 panel 모듈(`laplace_boundary`, `laplace_two_ground`, `laplace_open_box`, `laplace_half_space`, `laplace_corner*`, `dense_residual`)을 일관 단위의 내부 모듈(galerkin 공개 API 밖)로 등록하고, 모듈 사이 공유 도우미는 공개 이름으로만 쓴다. 평면 기하 conjugation 3곳(2D 방향을 복소수로 표현)을 이유와 함께 conventions 허용 목록에 올렸다. 결과는 바뀌지 않는다. [개발 안내](development.md).
+
 - `galerkin`: `galerkin.laplace_open_box.solve_open_rectangle` — 네 벽 모두 법선 플럭스가 0인 직사각형의 균질 경계 패널. 접지 평면 없이 0 전위 접지 도체를 명시한다(unbacked 선로). Neumann 직사각형 핵을 총전하 0으로 볼 수 없는 항까지 닫힌 형태로 조립하고 합이 0인 부분공간에서 푼다. 독립 코사인 급수와 1e-12, 두 도선 π/acosh(d/2a)와 상자·다각형 외삽 뒤 1e-6, 벽 근처 영상 전하와 2e-4, unbacked coplanar 선로의 scikit-fem P2 부피 해와 1e-3(가장 고운 메시 5.4e-5) 이내로 일치한다. 기존 해법은 바뀌지 않는다. [열린 상자 패널](packages/galerkin/open-box.md).
 
 - `galerkin`: 두 접지 경계 해법이 폭/높이 64까지 받는다(이전 16). 행렬·접지 급수·보존 검사는 그대로이며 해결되지 않는 넓은 상자는 여전히 거부한다(폭/높이 128의 stripline은 접지 Fourier 검사에서 실패). 가운데 stripline의 정전용량은 폭/높이 16·32·64에서 1e-12 안에서 같고, 그린 함수는 64까지 독립 측면 급수와 일치한다. 이 허용 검사를 재사용하는 코너 해법은 [0.25,16]을 유지한다. [두 접지 해법](packages/galerkin/two-ground.md).
