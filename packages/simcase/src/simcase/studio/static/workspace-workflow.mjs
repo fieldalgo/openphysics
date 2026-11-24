@@ -27,6 +27,33 @@ export function runInputsLine(runParts,currentParts){
 }
 // The parts of an optical input the words above compare.
 export const opticalInputParts=input=>[designSummary(input.model),`λ ${input.model.wavelength} nm`,`core mesh ${input.model.coreMesh} nm`];
+// Round 23 (E6): every part of a study that enters studySignature (workspace-notebook.mjs), so the line
+// under a result names each input that differs. study: {input, modeCount, groupIndex, pml (the
+// settings.pml form {open_edges, target, thickness?}, or null), searchTarget (a closed window's
+// Search near n_eff, or null)}. Returns [runParts, currentParts]: the geometry, λ and the core mesh
+// always; then, when either side has other than the default, the shape positions (when the shapes
+// differ in position only), the boundary with its PML thickness and open edges and its search
+// ("closed window · highest n_eff", "closed window · nearest to n_eff 2.46", "open boundary (PML
+// 1 µm) on left, right and bottom · search near 2.46"), Modes to find and the group index. Both
+// sides always have the same parts, in the same order.
+const DEFAULT_STUDY_MODES=2;
+const edgeWords=list=>list.length<3?list.join(' and '):list.slice(0,-1).join(', ')+' and '+list.at(-1);
+const pmlMicrons=pml=>{const t=typeof pml.thickness==='string'?Number.parseFloat(pml.thickness)/1000:1;return Number.isFinite(t)?t:1;};
+export const boundaryWords=(pml,searchTarget=null)=>pml?`open boundary (PML ${pmlMicrons(pml)} µm) on ${edgeWords(pml.open_edges)}`:'closed window';
+export const searchWords=(pml,searchTarget=null)=>pml?`search near ${shortTarget(pml.target)}`:searchTarget!=null?`nearest to n_eff ${shortTarget(searchTarget)}`:'highest n_eff';
+const where=s=>s.type==='polygon'?s.points.map(p=>`(${p[0]}, ${p[1]})`).join(', '):`(${s.x}, ${s.y})`;
+export const positionWords=model=>'at '+model.shapes.map(s=>`${s.name} ${where(s)}`).join(', ')+' nm';
+export function studyInputParts(run,now){
+ const sides=[run,now],parts=s=>opticalInputParts(s.input);
+ const out=sides.map(parts);
+ const add=(test,words)=>{if(test)sides.forEach((s,i)=>out[i].push(words(s)));};
+ add(out[0][0]===out[1][0]&&positionWords(run.input.model)!==positionWords(now.input.model),s=>positionWords(s.input.model));
+ add(sides.some(s=>s.pml||s.searchTarget!=null),s=>boundaryWords(s.pml,s.searchTarget));
+ add(sides.some(s=>s.pml||s.searchTarget!=null),s=>searchWords(s.pml,s.searchTarget));
+ add(sides.some(s=>s.modeCount!==DEFAULT_STUDY_MODES),s=>`Modes to find ${s.modeCount}`);
+ add(sides.some(s=>s.groupIndex===true),s=>s.groupIndex===true?'group index on':'group index off');
+ return out;
+}
 // What the next run computes, in the Study panel: the current inputs, whatever run Results shows.
 // "Next run uses 700 × 300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2", with
 // " · group index on" when the group index option is on.
