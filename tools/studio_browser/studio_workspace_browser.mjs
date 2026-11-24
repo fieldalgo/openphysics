@@ -2177,7 +2177,7 @@ try {
     stage('R17 U1 closed window, substrate', u1);
     assert.deepEqual(u1.notes.map(n => n[0]), ['1', '2']); assert.deepEqual(u1.described, ['Mode 1', 'Mode 2']);
     for (const [mode, text] of u1.notes) {
-      const m = /^Mode (\d) is mostly in Substrate \((\d+) % of \|E\|²\), which touches the window edge; its n_eff depends on the closed window\. Use Open boundary, or ask for more modes to reach the core mode\.$/.exec(text);
+      const m = /^Mode (\d) is mostly in Substrate \((\d+) % of \|E\|²\), which touches the window edge; its n_eff depends on the closed window\. Use Open boundary to leave that edge open\.$/.exec(text);
       assert.ok(m && m[1] === mode && Number(m[2]) > 50, text);
     }
     await rOverflow('U1 Results notes');
@@ -2319,7 +2319,7 @@ try {
     await r.click('#edge-use-open'); await sleep(400);
     x9.open = {message: await rText('#file-status'), actions: await r.eval("!!document.getElementById('edge-actions')"), plan: await plan(), items: (await runItems()).length, busy: await r.eval("document.getElementById('run-optical').textContent")};
     stage('R18 X9 note shortcuts', x9);
-    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Find 4 modes']);
+    assert.deepEqual(x9.buttons, ['Use Open boundary', 'Set Modes to find to 4']);
     assert.ok(x9.find.message.startsWith('Modes to find set to 4.'), x9.find.message); assert.deepEqual(x9.find.buttons, ['Use Open boundary']); assert.equal(x9.find.items, x9.items);
     assert.ok(x9.open.message.startsWith('Open boundary: a PML of 1 µm outside every edge;'), x9.open.message); assert.equal(x9.open.actions, false);
     assert.ok(x9.open.plan.startsWith('Open boundary · '), x9.open.plan); assert.equal(x9.open.items, x9.items); assert.equal(x9.open.busy, 'Run study');
