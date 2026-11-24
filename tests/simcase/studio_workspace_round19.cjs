@@ -20,3 +20,10 @@ test('Y6: the heater-off label is associated with its box by for=, as well as by
  const html=read('workspace.html');
  assert.ok(html.includes('<label id="run-baseline-option" for="run-baseline" class="run-option" hidden><input type="checkbox" id="run-baseline">'));
 });
+
+test('Y7: a shape\'s Name and Material fields each have their own label (for=), not a wrapping one',()=>{
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes('<div><label for="shape-name">Name</label><input id="shape-name" type="text" maxlength="40" value="${escapeHtml(shape.name)}"></div>'));
+ assert.ok(app.includes('<div><label for="shape-material">Material</label><select id="shape-material">${options(SHAPE_MATERIAL_CHOICES,shape.material)}</select></div>'));
+ assert.ok(!app.includes('<label>Material<select id="shape-material">'));
+});
