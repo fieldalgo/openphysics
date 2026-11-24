@@ -504,8 +504,9 @@ the Search near n_eff help ending in *(n_core + 1.444)/2.*; Run 1's inputs resto
 *No need to run: Run 1 already has these results. …* with **Show Run 1** (Run study still enabled)
 and the run list's *Run 1 · closed · 500 × 220 nm …*; Run 1 viewed after Run 2 giving the status line
 *… · current inputs from Run 2*; six runs giving *If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin
-it to keep it* (round 20 words) and **Pin Run 1**, which pins it and moves the line to Run 2; the substrate run's note
-with **Use Open boundary** and **Search near 2.46 · 4 modes** (slice C2; *Set Modes to find to 4* in C0, *Find 4 modes* before), each setting its input and running nothing; and on
+it to keep it* (round 20 words) and **Pin Run 1**, which pins it and moves the line to Run 2 (since round 22 Messages
+then reads *Run 1 pinned. If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it*); the substrate run's note
+with **Use Open boundary** and **Set search near 2.46 · 4 modes** (round 22; *Search near 2.46 · 4 modes* in slice C2, *Set Modes to find to 4* in C0, *Find 4 modes* before), each setting its input and running nothing; and on
 Compare the pickers and headings carrying *closed*, with O2's 24 px; no horizontal overflow at
 either size.
 Since round 19 (pre-registered) a further stage in its own browser context checks the shape
@@ -535,17 +536,36 @@ values.* with **Show Run 2** and the status bar *Run 2 · recovered from this br
 · has the results of the current inputs*, while 4, which no run has, keeps *… Run explicitly to
 compute new results.*; no horizontal overflow at 1440 × 900 or 390 × 844.
 Since slice C2 (pre-registered) a further stage in its own browser context (CW) checks Search near
-n_eff in a closed window: the box *Search near n_eff* (off) and the disabled field by role and name,
-its help, *Closed window · near n_eff 2.46* once ticked; the template with 4 modes reading *Found 3 of 4
+n_eff in a closed window: since round 22 the radios *Highest n_eff above 1.45* (checked) and *Nearest
+to n_eff* and the enabled field *n_eff to search near* by role and name (the box *Search near n_eff*
+and its disabled field before), its help, *Closed window · near n_eff 2.46* once Nearest is chosen; the template with 4 modes reading *Found 3 of 4
 modes near n_eff 2.46, above n = 1.45.* with three rows, *1 mode at or below n = 1.45 was left out.*
 and the tag *closed near 2.46*, saved as a project whose workspace session is version 11
 (`optical-shapes-v10`, `search_target` 2.46, 3 modes of 4); the strip over a substrate's edge note
-with **Use Open boundary** and **Search near 2.46 · 4 modes**, the shortcut setting both inputs and
-running nothing; the core-mode note on mode 3 with 4 modes and on mode 2 with 2 (*Mode 2 is the core
+with **Use Open boundary** and **Set search near 2.46 · 4 modes**, the shortcut setting both inputs and
+running nothing (*… Press Run study to compute.*); the core-mode note on mode 3 with 4 modes and on mode 2 with 2 (*Mode 2 is the core
 mode: 64 % of |E|² is in Core, which does not touch the window edge.*); a changed target (2.47)
 offering no run and the equal one *No need to run: Run 4 already has these results.* with **Show Run
-4**; and **Use this run's inputs** on Run 4 turning the box on with 2.460 (*Search near n_eff off →
-2.46*); no horizontal overflow at 1440 × 900 or 390 × 844.
+4**; and **Use this run's inputs** on Run 4 selecting Nearest to n_eff with 2.460 (*Modes to return
+highest n_eff → nearest to 2.46*, ending *Modes to return is set and is not part of Undo.* since round
+22); no horizontal overflow at 1440 × 900 or 390 × 844.
+Since round 22 (pre-registered P1 to P6) a further stage in its own browser context (R22) checks:
+Modes to return's two radios and field by role and name, the field enabled, and typing 2.5 checking
+*Nearest to n_eff* before the field is left (*Modes to return: nearest to n_eff 2.500 in the closed
+window. …*, plan *Closed window · near n_eff 2.5*); no slab warning for the core-only template or a
+silica slab across the window; on T18's geometry (Core 500 × 220 nm over a 3000 × 700 nm silicon
+Substrate) before any run, *Substrate touches the window edge and its index is as high as Core's: in
+a closed window its slab modes come first.* in the plan line's row and in Optical modes, each with
+**Set search near 2.46 · 4 modes** and **Use Open boundary**, gone with Nearest to n_eff or Open
+boundary and back with Highest or Closed window; the warning's shortcut setting Nearest 2.46 and
+Modes to find 4 with *… Press Run study to compute.* and starting no run; T18 closed (Highest)
+against T18 open on Compare reading *No matched modes* and *… A · Run 1: its modes are mostly in
+Substrate, which touches the window edge; the core mode was not found. Open Run 1 in Results.*, the
+link showing Run 1 under Results; two template runs matched with no such line; six runs, **Pin Run
+1** to **Pin Run 5** on the drop line each reading *Run N pinned. If you run: drops Run N+1 (…) · pin
+it to keep it* and Pin hidden for the last unpinned run; and the next result dropping Run 6 with *…
+Run 6 (500 × 220 nm · 2 modes) was dropped; every other earlier run is pinned, so no other run can be
+dropped instead* and no swap button; no horizontal overflow at 1440 × 900 or 390 × 844.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -626,6 +646,10 @@ the model equals the runs' and reads *If you run: drops Run 1 (run at …) · pi
 edit; Run study starts at once and, with the job's replies held, reads *When this run finishes, Run 1
 (run at …) is dropped* with **Pin Run 1** (no overflow at either size); Pin moves it to Run 2; Run 7
 drops Run 2 and Messages offers **Keep Run 2, drop Run 3 (run at …) instead**, which leaves Run 7, 6,
+5, 4, 2 and 1. Since round 22 (pre-registered P4) an edit then shows *If you run: drops Run 2 (run at
+…)*; **Pin Run 2**, 4, 5 and 6 each read *Run N pinned. If you run: drops Run M (run at …) · pin it to
+keep it* in Messages, Pin is hidden for Run 7, and Run 8 drops Run 7 with *… was dropped; every other
+earlier run is pinned, so no other run can be dropped instead* and no swap button, leaving Run 8, 6,
 5, 4, 2 and 1.
 Since round 20 (pre-registered) the project script opens `heater-study.json` in a new profile,
 shows both models, saves `r20-both.json` a minute after the heated record was written, and reloads:

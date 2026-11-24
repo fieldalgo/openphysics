@@ -418,7 +418,7 @@ Messages에 자기 색으로 나오는 경고 *Group index is on: open-boundary 
 **Show Run 1**과 함께 *No need to run: Run 1 already has these results. …*가 나오고(Run study는 그대로 켜짐) 실행 목록이
 *Run 1 · closed · 500 × 220 nm …*인지; Run 2 뒤 Run 1을 보면 상태 표시줄이 *… · current inputs from Run 2*인지; 실행 여섯 개에서
 *If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin it to keep it*(20차 문구)와 **Pin Run 1**이 나오고 누르면 고정되며 줄이 Run 2로
-옮겨 가는지; 기판 실행의 안내 아래 **Use Open boundary**와 **Search near 2.46 · 4 modes**(C2; C0에서는 *Set Modes to find to 4*, 그 전에는 *Find 4 modes*)가 각각 입력을 정하고 아무것도 실행하지 않는지;
+옮겨 가는지(22차부터 Messages는 *Run 1 pinned. If you run: drops Run 2 (500 × 220 nm · 2 modes) · pin it to keep it*); 기판 실행의 안내 아래 **Use Open boundary**와 **Set search near 2.46 · 4 modes**(22차; C2에서는 *Search near 2.46 · 4 modes*, C0에서는 *Set Modes to find to 4*, 그 전에는 *Find 4 modes*)가 각각 입력을 정하고 아무것도 실행하지 않는지;
 Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오는지; 두 크기 모두 가로 넘침이 없는지 봅니다.
 19차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 확인합니다: 형상 속성의 *Name*과 *Material* 칸이 그 낱말 하나뿐인
 레이블을 하나씩 가지는지(감싸지 않고 `for`로); 실행 여섯 개 뒤(21차부터, 사전 등록; 19차와 20차는 이것이 대신한 내보내기 질문을
@@ -438,15 +438,31 @@ edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the cl
 run: Run 2 already has these results. Run study adds a copy with the same values.*, 상태 표시줄 *Run 2 · recovered from this
 browser, not recomputed · has the results of the current inputs*가 나오고, 어떤 실행에도 없는 4는 *… Run explicitly to
 compute new results.*를 그대로 두는지; 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
-C2부터(사전 등록) 브라우저 컨텍스트 하나를 더 쓰는 단계(CW)가 닫힌 창의 Search near n_eff를 봅니다: 상자 *Search near
-n_eff*(꺼짐)와 쓸 수 없는 필드를 역할과 이름으로, 도움말, 상자를 켠 뒤의 *Closed window · near n_eff 2.46*; 모드 4개의 템플릿이
+C2부터(사전 등록) 브라우저 컨텍스트 하나를 더 쓰는 단계(CW)가 닫힌 창의 Search near n_eff를 봅니다: 22차부터 라디오 *Highest
+n_eff above 1.45*(선택됨)와 *Nearest to n_eff*, 쓸 수 있는 필드 *n_eff to search near*를 역할과 이름으로(그 전에는 상자 *Search
+near n_eff*와 쓸 수 없는 필드), 도움말, Nearest를 고른 뒤의 *Closed window · near n_eff 2.46*; 모드 4개의 템플릿이
 *Found 3 of 4 modes near n_eff 2.46, above n = 1.45.*와 행 셋, *1 mode at or below n = 1.45 was left out.*, 표시 *closed near
 2.46*을 보이고, 작업 공간 세션이 버전 11(`optical-shapes-v10`, `search_target` 2.46, 모드 4개 중 3개)인 프로젝트로 저장되는지;
-기판 위 스트립의 가장자리 안내에 **Use Open boundary**와 **Search near 2.46 · 4 modes**가 있고 바로 가기가 두 입력을 정하며
-아무것도 실행하지 않는지; 모드 4개에서는 3번째, 2개에서는 2번째 모드의 코어 모드 안내(*Mode 2 is the core mode: 64 % of |E|² is
+기판 위 스트립의 가장자리 안내에 **Use Open boundary**와 **Set search near 2.46 · 4 modes**가 있고 바로 가기가 두 입력을 정하며
+아무것도 실행하지 않는지(*… Press Run study to compute.*); 모드 4개에서는 3번째, 2개에서는 2번째 모드의 코어 모드 안내(*Mode 2 is the core mode: 64 % of |E|² is
 in Core, which does not touch the window edge.*); 바꾼 목표(2.47)는 실행을 제안하지 않고 같은 목표는 *No need to run: Run 4
-already has these results.*와 **Show Run 4**를 보이는지; Run 4에서 **Use this run's inputs**가 상자를 2.460으로 켜는지(*Search
-near n_eff off → 2.46*); 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
+already has these results.*와 **Show Run 4**를 보이는지; Run 4에서 **Use this run's inputs**가 2.460으로 Nearest to n_eff를
+고르는지(*Modes to return highest n_eff → nearest to 2.46*, 22차부터 *Modes to return is set and is not part of Undo.*로
+끝남); 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다.
+22차부터(사전 등록 P1–P6) 브라우저 컨텍스트 하나를 더 쓰는 단계(R22)가 확인합니다: Modes to return의 라디오 둘과 필드를
+역할과 이름으로, 필드가 쓸 수 있는지, 필드를 떠나기 전 2.5를 입력하면 *Nearest to n_eff*가 선택되는지(*Modes to return:
+nearest to n_eff 2.500 in the closed window. …*, 계획 *Closed window · near n_eff 2.5*); 코어만 있는 템플릿과 창을 가로지르는
+실리카 슬랩에는 슬랩 경고가 없는지; T18 형상(3000 × 700 nm 실리콘 Substrate 위 Core 500 × 220 nm)에서 실행 전 계획 줄의 행과
+Optical modes에 *Substrate touches the window edge and its index is as high as Core's: in a closed window its slab modes
+come first.*가 각각 **Set search near 2.46 · 4 modes**, **Use Open boundary**와 함께 나오고, Nearest to n_eff나 Open
+boundary로 사라졌다가 Highest나 Closed window로 돌아오는지; 경고의 바로 가기가 Nearest 2.46과 Modes to find 4를 *… Press Run
+study to compute.*와 함께 정하고 실행을 시작하지 않는지; T18 닫힌(Highest) 실행과 T18 열린 실행의 Compare가 *No matched
+modes*와 *… A · Run 1: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open
+Run 1 in Results.*로 읽히고 링크가 Run 1을 Results에 보이는지; 짝지어지는 템플릿 실행 둘에는 그 줄이 없는지; 실행 여섯 개에서
+내보내기 줄의 **Pin Run 1**부터 **Pin Run 5**가 각각 *Run N pinned. If you run: drops Run N+1 (…) · pin it to keep it*로
+읽히고 마지막 고정되지 않은 실행에는 Pin이 없는지; 다음 결과가 Run 6을 내보내며 *… Run 6 (500 × 220 nm · 2 modes) was
+dropped; every other earlier run is pinned, so no other run can be dropped instead*를 보이고 교환 버튼이 없는지;
+1440 × 900과 390 × 844에서 가로 넘침이 없는지.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
@@ -504,7 +520,10 @@ changed since)*인지, `r19-saved.json`으로 저장하고 다시 실행해 복�
 *If you run: drops Run 1 (run at …) · pin it to keep it*로 읽히는지; Run study가 바로 시작하고 작업 응답을 붙잡은 채 *When this
 run finishes, Run 1 (run at …) is dropped*와 **Pin Run 1**을 보이는지(두 크기 모두 넘침 없음); Pin이 줄을 Run 2로 옮기는지;
 Run 7이 Run 2를 내보내고 Messages가 **Keep Run 2, drop Run 3 (run at …) instead**를 두며, 그 버튼 뒤 Run 7, 6, 5, 4, 2, 1이
-남는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
+남는지 봅니다. 22차부터(사전 등록 P4) 이어서 편집하면 *If you run: drops Run 2 (run at …)*가 나오고, **Pin Run 2**, 4, 5,
+6이 각각 Messages에 *Run N pinned. If you run: drops Run M (run at …) · pin it to keep it*를 보이며 Run 7에는 Pin이 없고,
+Run 8이 Run 7을 내보내며 *… was dropped; every other earlier run is pinned, so no other run can be dropped instead*를 보이고
+교환 버튼 없이 Run 8, 6, 5, 4, 2, 1이 남는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
 스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
 새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run) · same
