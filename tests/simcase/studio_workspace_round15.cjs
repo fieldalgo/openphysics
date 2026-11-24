@@ -18,7 +18,7 @@ test('R2: the complete banner leaves after 6 s or at the next pointer press, key
  assert.ok(app.includes("doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;"));
  // only the complete phase is dismissed; Messages keeps the words (announceResult is unchanged)
  assert.ok(app.includes("function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}"));
- assert.ok(app.includes("if(state.phase==='done')announceResult(state.message);"));
+ assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());"));
 });
 
 test('R3: the modes table header reads n_g; the hint is a line above the table',()=>{

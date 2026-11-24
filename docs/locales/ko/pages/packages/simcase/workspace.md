@@ -310,14 +310,18 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*(round 20;
    전에는 실행이 진행 중인 듯 *Running drops …*였음)와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
-   Run name처럼 계산 중에는 고정할 수 없습니다. round 19부터 **Run study**는 그런 실행 전에 묻기도 합니다: 대화 상자가
-   *Running drops Run 3 (700 × 300 nm · 4 modes).*와 *Up to six runs are kept; a pinned run is never dropped.*를 보이고
-   **Pin Run 3 and run**(맨 앞, 포커스), **Run**, **Cancel**(Escape)을 둡니다. 닫히면 포커스는 Run study로 돌아갑니다.
-   Pin Run 3 and run은 그 실행을 고정하고, 실행이 그다음 고정되지 않은 실행을 내보내게 되면 다시 묻습니다. 마지막 고정되지 않은
-   실행에는 자리가 남지 않으므로 이 버튼이 없습니다. round 20부터 질문이 열려 있는 동안 Run study 옆 상자는 *Waiting
-   for your answer: pin, run or cancel*(내보내기 줄은 숨김), 상태 표시줄은 *Run study is waiting for your answer*로
-   읽힙니다. 실행이 계산 중이라고 적는 곳은 없고(숨은 작업 패널에는 메시지가 남지 않음), Cancel을 포함한 모든 답이
-   전의 문구를 되돌립니다. 가열 모델의 질문도 그 Run study 아래 줄과 상태 표시줄에서 같게 합니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
+   round 21부터 **Run study**는 바로 시작합니다: round 19와 20이 그런 실행 전에 보이던 대화 상자(*Running drops Run 3 …*와
+   Pin Run 3 and run, Run, Cancel, 그리고 *Waiting for your answer* 문구)는 없어졌습니다. 답을 기다리던 실행은 사용자가
+   다른 곳을 보는 동안 아무것도 계산하지 않았기 때문입니다. 실행이 계산하는 동안 줄은 *When this run finishes, Run 3
+   (700 × 300 nm · 4 modes) is dropped*로 읽히고, 그때도 **Pin Run 3**가 동작합니다: Run 3를 남기고, 줄은 다음 고정되지 않은
+   실행이 있으면 그것을 밝힙니다. 고정하면 결과가 내보내야 할 수보다 고정되지 않은 실행이 적어질 때(마지막 고정되지 않은 실행:
+   결과에 그 자리가 필요함)는 Pin이 없습니다. 내보내기는 결과가 도착할 때만, 그때의 가장 오래된 고정되지 않은 실행에 일어납니다.
+   Messages는 실행 자신의 메시지 뒤에 *Run 3 (700 × 300 nm · 4 modes) was dropped*를 덧붙이고, 새 결과 말고도 고정되지 않은
+   실행이 있으면 **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes) instead** 버튼을 둡니다(Run 4는 그런 실행 중 가장 오래된
+   것). 버튼은 Run 3를 제자리로 되돌리고 Run 4를 내보냅니다: *Run 3 (…) is back; Run 4 (…) was dropped instead.*, 그 뒤 버튼은
+   더 없습니다. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
+   세션 복원, 파일에서 실행 추가, Start new)까지 동작하고, 지난 버튼은 아무것도 하지 않고 사라집니다. 메모리에만 있습니다.
+   Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
    브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
    round 19부터 광 모델을 열거나 복원할 때 메시지가 그렇게 밝힙니다: *Runs are numbered from 1 in this tab; names and pins
    are kept.*(Open project 뒤에는 *Optical waveguide runs are numbered from 1 in this tab; …*). 가열 모델의 실행은 번호를
@@ -754,8 +758,11 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   “Run N · 이름 · 시각” 목록, **Run name**(Enter로 고정), **Unpin this run**이 있습니다. 고정한
   실행은 남고, 새 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
   최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 여섯 개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
-  round 19부터 Run study는 광학 모델처럼 실행 하나를 내보내는 실행 전에 묻습니다: *Running drops Run 3 (run at 05:31 AM).*,
-  그리고 Pin Run 3 and run, Run, Cancel.
+  round 21부터 Run study는 광학 모델처럼 바로 시작합니다(round 19의 질문은 없어짐). 그 옆 줄이 한도가 내보낼 실행을
+  밝힙니다: 실행 전 *If you run: drops Run 3 (run at 05:31 AM) · pin it to keep it*, 계산 중 *When this run finishes, Run 3
+  (run at 05:31 AM) is dropped*, 그리고 **Pin Run 3**. 그 뒤 Messages는 *Run 7 complete. …*에 *Run 3 (run at 05:31 AM)
+  was dropped*를 덧붙이고, 광학 규칙대로 **Keep Run 3, drop Run 4 (run at 05:40 AM) instead**를 둡니다(가열기 없는 풀이가
+  끝나면 다시 밝힘). 가열기 없는 풀이는 실행이 아니므로 아무것도 내보내지 않습니다.
 - **파일.** **File › Save**는 탭의 모든 모델을 [프로젝트 파일](#프로젝트-파일)에 씁니다.
   **File › Export › Model with runs (session file)…**은 이 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
   `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,
