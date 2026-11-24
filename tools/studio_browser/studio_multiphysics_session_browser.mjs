@@ -330,7 +330,12 @@ print(n)`;
     const end = Date.now() + 60000;
     while (Date.now() < end) {
       if (await on.eval("document.getElementById('leave-confirm').open")) await on.click('#leave-go');
-      if (await on.eval("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)")) return;
+      // the notice comes as the model's check is sent; a tree item's name ("solve order 1 Heat 1 · …")
+      // has its solve order once the check's reply is in (workspace-multiphysics-view.mjs, check.solve_order)
+      if (await on.eval("/^Heated silicon waveguide ready\\./.test(document.getElementById('file-status').textContent)")) {
+        await on.until("!!document.querySelector('#tree .order-badge')", 'solve order in the tree');
+        return;
+      }
       await sleep(150);
     }
     throw new Error('template not opened');
