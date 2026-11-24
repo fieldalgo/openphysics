@@ -500,7 +500,7 @@ the Search near n_eff help ending in *(n_core + 1.444)/2.*; Run 1's inputs resto
 and the run list's *Run 1 · closed · 500 × 220 nm …*; Run 1 viewed after Run 2 giving the status line
 *… · current inputs from Run 2*; six runs giving *If you run: drops Run 1 (500 × 220 nm · 2 modes) · pin
 it to keep it* (round 20 words) and **Pin Run 1**, which pins it and moves the line to Run 2; the substrate run's note
-with **Use Open boundary** and **Find 4 modes**, each setting its input and running nothing; and on
+with **Use Open boundary** and **Set Modes to find to 4** (C0 words; *Find 4 modes* before), each setting its input and running nothing; and on
 Compare the pickers and headings carrying *closed*, with O2's 24 px; no horizontal overflow at
 either size.
 Since round 19 (pre-registered) a further stage in its own browser context checks the shape

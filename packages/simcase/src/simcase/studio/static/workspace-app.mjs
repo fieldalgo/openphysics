@@ -1536,11 +1536,11 @@ function modesTable(run){
   if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}
  table.append(body);box.append(table);
  // round 18 (X9): in a row under the last edge note (the note's own text unchanged), the two inputs that find such a mode: Use Open boundary and
- // Find M modes (the run's Modes to find + 2, at most the maximum); each sets the input with its
+ // Set Modes to find to M (the run's Modes to find + 2, at most the maximum; C0 words); each sets the input with its
  // usual message and runs nothing, and is left out when the current inputs already have it
  {const last=[...body.querySelectorAll('[data-edge-note]')].at(-1);if(last){const find=Math.min(runModeCount(run)+2,MODE_COUNT_RANGE[1]),actions=document.createElement('span');actions.className='edge-actions';actions.id='edge-actions';
   if(!state.openBoundary){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-use-open';b.textContent='Use Open boundary';b.onclick=()=>{if(!state.openBoundary)setOuterBoundary(true);};actions.append(b);}
-  if(state.modeCount<find){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-find-modes';b.textContent=`Find ${find} modes`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};actions.append(b);}
+  if(state.modeCount<find){const b=document.createElement('button');b.type='button';b.className='message-action';b.id='edge-find-modes';b.textContent=`Set Modes to find to ${find}`;b.onclick=()=>{if(state.modeCount>=find)return;state.modeCount=find;render();notice(editNoticeText('modeCount',find,{afterResult:resultNotice}));};actions.append(b);}
   if(actions.children.length){const tr=document.createElement('tr');tr.className='edge-note-row edge-actions-row';const td=cell('td','',{colspan:last.getAttribute('colspan'),class:'edge-note'});td.append(actions);tr.append(td);last.parentElement.after(tr);}}}
  const help=document.createElement('p');help.className='table-note';help.textContent=`Polarization: ${open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}. TE-like at 90 % TE or more, TM-like at 10 % or less, otherwise hybrid. A_eff: ${open?OPEN_AREA_HELP:AREA_HELP+'.'}`;box.append(help);
  // the loss note: absorption only, with the lossless words when every mode has k = 0

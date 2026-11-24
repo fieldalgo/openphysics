@@ -930,10 +930,12 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
   이김)에서 모드 |E|²(Σ A_T |E_T|², 세 성분 모두)의 몫 *f*와, 무게중심이 그 형상이 닿는 창 가장자리에서 300 nm 안에 있는
   삼각형의 몫 *g*를 구합니다. *f*가 가장 큰 형상에서 *f* > 0.5이고 *g* ≥ 0.01이면 그 모드 행 아래에 안내 행이 *Mode 1 is
   mostly in Substrate (99 % of |E|²), which touches the window edge; its n_eff depends on the closed window. Use
-  Open boundary, or ask for more modes to reach the core mode.*로 나오고, Compare도 그 실행에 대해 같은 말을
+  Open boundary to leave that edge open.*로 나오고, Compare도 그 실행에 대해 같은 말을
   되풀이합니다(*A · Run 3: Mode 1 is …*). 그런 실행이 열린 실행의 어떤 모드와도 짝지어지지 않는 까닭도 이것입니다. round 18부터 Results에서
-  마지막 그런 안내 아래 행에 **Use Open boundary**와 **Find 4 modes**(실행의 Modes to find + 2, 많아야 8)가 있습니다: 각각
-  평소의 메시지와 함께 그 입력을 정하고 아무것도 실행하지 않으며, 현재 입력이 이미 그렇다면 나오지 않습니다. *g*의
+  마지막 그런 안내 아래 행에 **Use Open boundary**와 **Set Modes to find to 4**(실행의 Modes to find + 2, 많아야 8; C0 전에는 *Find 4 modes*)가
+  있습니다: 각각 평소의 메시지와 함께 그 입력을 정하고 아무것도 실행하지 않으며, 현재 입력이 이미 그렇다면 나오지 않습니다.
+  C0부터 모드를 더 찾으면 코어 모드에 닿는다고 말하는 문구는 없습니다: 기판 위 닫힌 창에는 코어 모드보다 위에 기판 모드가
+  많습니다(기판 위 스트립의 코어 TE 모드는 기본 닫힌 실행의 32번째 모드입니다). *g*의
   0.01 경계는 측정 뒤에 고른 경험적 기준입니다(엔진 장, Linux): 기판 위 스트립(Core 500 × 220 + Substrate 3000 × 700 nm)에서
   두 모드 모두 *f* 0.994, *g* 0.72입니다. 창 전체에 걸친 슬랩 위에 그린 리브에서 리브 모드는 *f* 0.60~0.71이지만 *g*가
   1.4e-4~2.5e-3이라 밝히지 않고, 슬랩 같은 모드는 *g*가 0.087 이상입니다. 20 nm만 식각한 리브(*g* 0.024와 0.046, 창을 넓히면
