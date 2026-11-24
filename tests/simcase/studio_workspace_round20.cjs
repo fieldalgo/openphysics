@@ -37,3 +37,14 @@ test('Z1: one state, one message: no request to run beside "No need to run"',asy
  for(const name of ['workspace-workflow.mjs','workspace-multiphysics.mjs'])assert.ok(!read(name).includes('press Run to compute it here'),name);
  assert.ok(read('workspace-app.mjs').includes('host.textContent=matchingRunMessage(host.textContent);'));
 });
+
+test('Z3: each return card names its model, so two never read alike',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ assert.equal(A.returnToModelText(2,'Optical waveguide'),'Return to Optical waveguide (2 runs)');
+ assert.equal(A.returnToModelText(2,'Heated silicon waveguide'),'Return to Heated silicon waveguide (2 runs)');
+ assert.equal(A.returnToModelText(1,'Heated silicon waveguide'),'Return to Heated silicon waveguide (1 run)');
+ assert.equal(A.returnToModelText(0,'Optical waveguide'),'Return to Optical waveguide');
+ const titles=[...A.APPLICATIONS,...A.COUPLED_TEMPLATES].map(a=>A.returnToModelText(2,a.title));
+ assert.equal(new Set(titles).size,titles.length);
+ assert.ok(read('workspace-applications.mjs').includes('returnToModelText(returnTo[app.id],app.title)'));
+});

@@ -729,7 +729,7 @@ print(n)`;
   {const cards = await page.eval("[...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action')?.textContent??null,(()=>{const r=b.querySelector('.card-action')?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0})(),b.querySelector('p')?.textContent.endsWith(' Runs stay in this tab until you close it.')??false])");
    stage('R10 card actions', {cards});
    // round 18 (X10): the heated model is in this tab's project (two runs): its card reads Return to model
-   assert.deepEqual(cards, ['optical', 'heat', 'joule', 'heated-waveguide'].map(id => [id, id === 'heated-waveguide' ? 'Return to model (2 runs)' : 'Open model', true, true]));}
+   assert.deepEqual(cards, ['optical', 'heat', 'joule', 'heated-waveguide'].map(id => [id, id === 'heated-waveguide' ? 'Return to Heated silicon waveguide (2 runs)' : 'Open model', true, true]));}
   // R2: each stored session once, newest first, the file named where a record came from one
   const lists = await page.eval("({resume:[...document.querySelectorAll('.resume-actions [data-resume-earlier], #resume-newest')].map(b=>b.textContent),earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent)})");
   stage('R1 R2 R3 restart', {titles, offer, lists, neffBefore});

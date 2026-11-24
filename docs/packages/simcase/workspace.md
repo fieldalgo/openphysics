@@ -494,8 +494,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    waveguide card offers it first, *Restore from this browser · Optical waveguide · Run 1 ·
    design A, Run 2 · 2:25 PM*, next to **Start new (no runs)**, which opens the model without those
    runs, as the card itself does. Each card ends in **Open model**; the card of a model already in the project, shown or not, ends
-   in **Return to model (2 runs)** instead (round 18; *Open model* read as if it might reset the model),
-   or **Return to model** for a model without runs. Its description ends in
+   in **Return to Optical waveguide (2 runs)** instead (round 18; *Open model* read as if it might reset
+   the model), or **Return to Optical waveguide** for a model without runs; since round 20 the words
+   name the model (*Return to Heated silicon waveguide (1 run)*), so two such cards never read alike. Its description ends in
    *Runs stay in this tab until you close it.*: choosing a model keeps the runs this tab holds,
    and the restore offer brings back the browser's runs. Opening a model of the tab that has
    runs lands on its Results, whatever page it was left on (round 17; round 16 returned to Compare

@@ -10,10 +10,10 @@ let A;
 test.before(async()=>{A=await import(STATIC+'workspace-applications.mjs');});
 
 test('X10: a card of a model in the project reads "Return to model (N runs)"; others keep "Open model"',()=>{
- assert.equal(A.returnToModelText(2),'Return to model (2 runs)');assert.equal(A.returnToModelText(1),'Return to model (1 run)');
- assert.equal(A.returnToModelText(0),'Return to model');assert.equal(A.CARD_OPEN_TEXT,'Open model');
+ assert.equal(A.returnToModelText(2,'Optical waveguide'),'Return to Optical waveguide (2 runs)');assert.equal(A.returnToModelText(1,'Heated silicon waveguide'),'Return to Heated silicon waveguide (1 run)');
+ assert.equal(A.returnToModelText(0,'Optical waveguide'),'Return to Optical waveguide');assert.equal(A.CARD_OPEN_TEXT,'Open model');
  const src=read('workspace-applications.mjs');
- assert.ok(src.includes("action.textContent=CARD_OPEN_TEXT;if(returnTo[app.id]!==undefined)action.textContent=returnToModelText(returnTo[app.id]);"));
+ assert.ok(src.includes("action.textContent=CARD_OPEN_TEXT;if(returnTo[app.id]!==undefined)action.textContent=returnToModelText(returnTo[app.id],app.title);"));
  // every model of the project, shown or not
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("if(workspaceInProject()&&workspaceCard())returnTo[workspaceCard()]=workspaceCard()==='optical'?runs.length:0;if(multiView.inProject())returnTo['heated-waveguide']=multiView.projectRuns();"));
