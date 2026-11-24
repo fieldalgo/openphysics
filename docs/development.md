@@ -390,7 +390,8 @@ and box; **File › Export › Model file…** (`optical-waveguide.json`) writin
 version 8 file without its settings key; `tests/simcase/studio_project_study.cjs` checks the
 template's file against `tests/simcase/studio_session_fixtures/inputs-v7-optical.json`), version 8 with
 `modeCount` 4 or `groupIndex` true, each reopening with its settings; and a session of version 8
-inputs saved as version 9. Since round 12 it also checks the page tabs as a tab list named
+inputs saved as version 9 (version 12 since stable run numbers, as the tab's runs were numbered past
+their places by the drops before it). Since round 12 it also checks the page tabs as a tab list named
 *Pages* (Library first, one selected tab and one Tab stop, Left, Right, Home and End opening the
 next, previous, first and last page; since round 13 one `role=tabpanel` page panel that every tab
 controls, named by the selected tab after each key); the Compare table at 1440 × 900 and 390 × 844 with two
@@ -616,10 +617,13 @@ model's status bar *Heated silicon waveguide · in project u8-optical.json · no
 both cards reading *Return to Optical waveguide* and *Return to Heated silicon waveguide* (round 20 words). In the round-16 reload stage both cards' offers also name the other model,
 *· also in this project: … (restored separately)*.
 Since round 19 (pre-registered) a further profile opens `heater-study.json`, runs the optical model
-again and restores it after a reload: the header reads *Untitled project · recovered from a copy of
-heater-study.json · not saved to a file · …* beside *Recovered from this browser (opened from
-heater-study.json; changed since)*; saved as `r19-saved.json`, run again and restored, it reads
-*r19-saved · r19-saved.json · changed since saved …*. The session script then clicks the heater-off
+again and restores it after a reload: the header reads *Heater study · recovered from this browser
+· not saved to a file · …* (since session version 12 the record keeps the project's name; round 19
+read *Untitled project · recovered from a copy of heater-study.json · …*, which a record without a
+name still gives) beside *Recovered from this browser (opened from heater-study.json; changed
+since)*; saved as `r19-saved.json`, run again and restored, it reads *Heater study · r19-saved.json
+· changed since saved …* (the restored name is the user's, so the save keeps it; round 19 read
+*r19-saved · …*). The session script then clicks the heater-off
 label with mouse events (on its text, then on *(about 1 s more)*), unticking and ticking the box, and
 makes six heated runs. Since round 21 (pre-registered) the heated line beside Run study is hidden while
 the model equals the runs' and reads *If you run: drops Run 1 (run at …) · pin it to keep it* after an
@@ -642,6 +646,23 @@ tab* in the header or footer, and comes back after a reload. Since round 21 (pre
 the box lists no heated entry beside that offer while the heated card still offers its record (with
 the file's save time), and after the restore and that edit the run of Modes to find 4 reads *· closed ·
 4 modes ·* in the run list and in the Compare pickers, whose tags fit the picker at 1440 and 390 px.
+Since [session version 12](packages/simcase/workspace.md#optical-session-files-version-12)
+(stable run numbers, pre-registered K4 and K5) a further profile opens `heater-study.json`, renames
+the project *both-models*, runs the optical model five more times (seven runs, so Run 1 is dropped)
+and saves `both-models.json`; the browser is closed and started again on the same profile, and
+after Open project the run list, the drop line and **Pin Run 2**, *No need to run: Run 5* and the
+Compare picker read the same numbers as before, no numbering sentence is said, and the next run is
+Run 8. The browser is closed again and **Restore newest from this browser** restores both models:
+the same optical and heated numbers, *Restored Optical waveguide (6 runs) and Heated silicon
+waveguide (1 run) from this browser, not recomputed.* and the header *both-models · recovered from
+this browser · not saved to a file · …*, then the ordinary header after the next change; no
+horizontal overflow at 1440 × 900 or 390 × 844. The round-19 restore of the file opened now names the
+project (*Heater study · recovered from this browser · …*), the workspace script's reduced session
+of six runs after a drop is version 12, and its round-19 restore keeps the run numbers and says
+nothing about numbering. The format's fixtures are
+`tests/simcase/studio_session_fixtures/optical-v12-numbers.json` (written by this Studio with
+`numbered_sessions.mjs write`) and `refusals-v12-fc654fe.json` (what main fc654fe reads, written
+with `numbered_sessions.mjs read` from that commit's static folder in a temporary worktree).
 The session script's opened
 run's status bar reads *… · has the results of the current model* and its card *Return to Heated
 silicon waveguide (2 runs)*.

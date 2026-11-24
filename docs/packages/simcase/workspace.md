@@ -232,12 +232,15 @@ the restored record was the same as the project file it was saved to (its card r
 untitled-project.json · saved 2:24 PM* and File › Save writes or suggests that file. With another
 model of the tab beside it, the header reads *changed since*. Since round 19 a record changed since
 the project file it was saved to brings back the name and file too: *y3-saved · y3-saved.json ·
-changed since saved 06:15 AM · kept for recovery in this browser*. A record of a file that was
-opened, not saved, holds the file's name but not the project's, so no name is guessed: the header
-names the source, *Untitled project · recovered from a copy of both-models.json · not saved to a
-file · kept for recovery in this browser*, as the status bar does (*Recovered from this browser
-(opened from both-models.json; changed since)*). Keeping the opened project's name in the record
-is a recovery-record format change, left for a later version. A File › Save of the project relinks
+changed since saved 06:15 AM · kept for recovery in this browser*. Since [session version 12](#optical-session-files-version-12) a record also keeps the
+project's name (`project`), so a record of a file that was opened, not saved, brings the name back
+with no project file: *both-models · recovered from this browser · not saved to a file · kept for
+recovery in this browser* (*· as opened from both-models.json ·* while the record still matched
+it), and File › Save suggests `both-models.json` and asks. An older record holds the file's name
+but not the project's, so no name is guessed: the header names the source, *Untitled project ·
+recovered from a copy of both-models.json · not saved to a file · kept for recovery in this
+browser*, as the status bar does (*Recovered from this browser (opened from both-models.json;
+changed since)*). A File › Save of the project relinks
 the browser recovery record of every model it wrote, shown or not, so each card names the newest
 project file.
 
@@ -381,12 +384,15 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    (a file opened, a session restored, runs added from a file, Start new); a stale one does nothing
    and is removed. It is kept in memory only. Add runs from file still names its dropped runs with
    the sentence above. The limit itself is
-   unchanged. Files do
-   not hold the number: opening a file or restoring a session from this browser numbers its runs
-   from 1 in file order, and runs added from a file continue after the largest number. Since round
-   19 the message of an open or a restore of the optical model says so: *Runs are numbered from 1 in
-   this tab; names and pins are kept.* (after Open project, *Optical waveguide runs are numbered from
-   1 in this tab; …*). The heated model's runs keep their numbers, so its messages do not say this. A current run that this tab did not
+   unchanged. Since [session version 12](#optical-session-files-version-12) files and browser
+   recovery keep the number whenever it is not the run's place in the list, and File › Open, Open
+   project and Restore keep it: after a file whose largest number is 8, the next run is Run 9. A
+   file of an earlier version numbers its runs from 1 in file order, and runs added from a file
+   continue after the largest number (*Added Run 2 and Run 4 of design-b.json as Run 9 and Run
+   10.*). Only for a version 6 or 7 file with runs does the message of an open or a restore say so:
+   *This file is from an earlier Studio: Optical waveguide runs are numbered from 1 in this tab;
+   names and pins are kept.* (round 19 said *Runs are numbered from 1 in this tab; …* after every
+   open). The heated model's runs keep their numbers, so its messages do not say this. A current run that this tab did not
    compute says where it came from instead: *Run 2 · read from file, not recomputed* after Open
    session, *Run 2 · recovered from this browser, not recomputed* after a recovery; the status
    bar adds *has the results of the current inputs* (round 20; it asked *press Run to compute it
@@ -550,8 +556,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    restore has completed (a load question answered with Replace; Cancel stops both), the other
    model's record, found again by its model, time and file, and shows the newest record's model on
    Results; Messages reads *Restored Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)
-   from this browser, not recomputed. Optical waveguide runs are numbered from 1 in this tab; names
-   and pins are kept.* The project name and file come back as each record holds them; when both
+   from this browser, not recomputed.* (followed by the numbering sentence of
+   [version 12](#optical-session-files-version-12) only when the optical record holds a version 6
+   or 7 session). The project name and file come back as each record holds them (when the records
+   name different projects, the newer record's name); when both
    records still matched the same project file the header reads *… · saved …*. If the second restore
    fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
    restored: …*) and that model's card offer stays. While the tab holds runs of one of the models the
@@ -1062,8 +1070,8 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 10 is refused by name (“This session file is version 11, newer than this Studio
-reads (versions 6–10). Open it in a newer Studio.”; versions 9 and 10 are
+A version above 12 is refused by name (“This session file is version 13, newer than this Studio
+reads (versions 6–12). Open it in a newer Studio.”; versions 9 to 12 are
 [optical sessions](#optical-session-files-version-9), and a version 8 layout under version 9 is
 refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
@@ -1911,6 +1919,59 @@ the fields of the selected and pinned runs only, without asking, when the full t
 the limit. A run without fields shows its modes table, but no field view, and Compare says it
 cannot match its modes by overlap.
 
+### Optical session files (version 12)
+
+Since session version 12 (design *Stable run numbers and the project name after recovery*) an
+optical run keeps its number in files and in browser recovery. Version 12 is
+[version 9](#optical-session-files-version-9) with the open boundary of version 10 and the
+closed-window search of version 11, plus one key per run: `number`, the run's number in the tab,
+right after `job` and inside the run's `digest`. The top-level keys are those of version 9. Version
+12 holds every run that versions 9 to 11 hold.
+
+- **When it is written.** Exactly when some run's number is not its place in the list, for
+  example after the limit dropped Run 1, or after runs were added from a file: Runs 2 to 7 are
+  written as version 12. A session whose runs are numbered 1, 2, 3 … in list order is written as
+  version 11, 10, 9 or 7, byte for byte as before. File › Save (a session file or a project file's
+  optical entry) and browser recovery write the same text.
+- **Reading.** File › Open, Open project and Restore keep the stored numbers, so the run list,
+  the drop line and its **Pin Run N** button, the Compare pickers, *No need to run: Run N* and the
+  recovery lists name the same runs as before. A file of version 6, 7 or 9 to 11 numbers its runs
+  from 1 in file order, as before. There is no stored counter: the next run takes the largest
+  number + 1 (after a file whose largest number is 8, the next run is Run 9), and the run with the
+  largest number is never dropped (the limit keeps the new run; **Keep Run N, drop … instead** and
+  Add runs from file drop only other runs). A run whose job comes back keeps its number and its
+  place.
+- **Checks.** Before the runs are read, each `number` must be present (*Run 3: missing number.*,
+  by its place), a whole number of at least 1 within the safe-integer range (*Run 3: invalid run
+  number.*), used once (*Two runs have the same number 7.*) and strictly increasing in list order
+  (*Run 3 is numbered 5, not after Run 2's 7.*); there is no other upper bound. A number edited
+  after the save fails the run's digest (*Run 2 changed after it was saved (its check value does
+  not match).*). The run's own checks then name it by its stored number (*Run 6: invalid search
+  target. …*). Versions 9 to 11 still refuse a `number` key (*Run 1: unknown key "number".*).
+- **Earlier Studios.** A Studio that reads up to version 11 (main fc654fe) refuses a version 12
+  file by name: *This session file is version 12, newer than this Studio reads (versions 6–11).
+  Open it in a newer Studio.*, after *Optical waveguide: * for a project file's entry. It does not
+  take over a browser-recovery record that holds one (it reads the record before it adopts it),
+  so it never overwrites that record. The project file stays version 1; the optical documents,
+  adapters, requests and results, the multiphysics session (version 8) and the run table CSV are
+  unchanged.
+- **The numbering sentence.** Messages says *This file is from an earlier Studio: Optical
+  waveguide runs are numbered from 1 in this tab; names and pins are kept.* only after opening or
+  restoring a session of version 6 or 7 that holds runs (written before run numbers could differ
+  from list places). A version 9 to 11 session is written by this Studio only while its runs are
+  1..n, and a version 12 session holds its numbers, so neither says anything about numbering.
+- **Add runs from file** numbers the added runs after the tab's largest number, in file order, and
+  says so when a number changes: *Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.* A
+  job already in the tab keeps the tab's number.
+
+The checks are `tests/simcase/studio_session_numbers.cjs` (K1: every earlier optical fixture, the
+multiphysics fixture and the project fixture read and written again byte for byte; K2: the version
+12 fixture `optical-v12-numbers.json` of runs 3, 5, 6, 7, 8 and 9 and its refusals; K3 and K9: what
+main fc654fe reads, `refusals-v12-fc654fe.json`), `tests/simcase/studio_session_numbers_page.cjs`
+(K6: a seeded sequence of 2400 results, pins, swaps, imports, saves, opens and restores; K7: the
+header lines; K10: the numbering sentence) and the K4/K5 stages of
+`tools/studio_browser/studio_project_browser.mjs`.
+
 ### Matching modes in Compare
 
 Compare matches the modes of runs A and B by their fields, so a row pairs the same mode even
@@ -2221,6 +2282,22 @@ opened from, for the lists; **Restore earlier session from this browser** lists 
 model, run count, run names and time and recovers it through the same replacement dialog. Recovering
 an earlier session keeps the current one as an earlier session at the next save.
 
+Since [session version 12](#optical-session-files-version-12) the record of either model also
+keeps the project's name when the tab's project has one, as an optional browser-only key
+`project: {name, from}` (`name` by the project-name rules; `from` is `file` for a name taken from
+a file name, `user` for one set with Rename). It is left out for an untitled project, a malformed
+one is ignored, and the record stays version 1 (earlier Studios ignore the key). A restore uses it
+when the record names no project file (`savedFile.projectName`, which wins when both are present):
+the project takes the name, with no project file, so File › Save suggests the name's file
+(`both-models.json`) and asks. Until the next change the header reads *both-models · recovered from
+this browser · not saved to a file · kept for recovery in this browser*, or *both-models ·
+recovered from this browser · as opened from both-models.json · kept for recovery in this browser*
+when the record still matched the project file it was opened from; a record that names its
+project file reads as before (*… · both-models.json · saved …*), and an older record without a name
+as before (*Untitled project · …*). After the next change the header is the ordinary one
+(*both-models · not saved to a file · …*). A pair restore whose records name different projects
+takes the newer record's name, with no extra message.
+
 The latest snapshot is a single record for the browser origin, shared across tabs.
 Each write checks the previously observed revision in the same database transaction.
 If another tab has saved since this tab loaded or recovered the notebook, automatic
@@ -2268,7 +2345,10 @@ Pinning is not a portable backup; export files before discarding browser data.
 ## Import runs without replacing the model
 
 Results/Compare → **Add runs from file (inputs unchanged)** accepts a session file or a single-run file from **Export this run**.
-Review the number of new, matching and replaced unpinned runs before applying.
+Review the number of new, matching and replaced unpinned runs before applying. The added runs are
+numbered after the tab's largest run number, in file order; when a number changes the message
+says so (*Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.*), and a job already in the
+tab keeps the tab's number ([version 12](#optical-session-files-version-12)).
 Current model inputs and input Undo are preserved; the imported selection opens
 beside a retained result for comparison. Imported runs remain labeled `imported`.
 Use Open session when you intend to replace both inputs and the notebook instead.
