@@ -1411,14 +1411,14 @@ main 13f07f4, Linux):
 
 | Check | Case | Result |
 |---|---|---|
-| K2 | Strip over a substrate (Core 500 × 220 nm, Substrate 3000 × 700 nm), closed @2.46 | 1 mode: 2.43931663 (core confinement 0.912, TE 0.981); 2 modes: 2.48623178 (substrate) and 2.43931663. The default closed run's two modes are substrate modes (3.42534929, 3.39599656); the core TE mode is its mode 32 |
+| K2 | Strip over a substrate (Core 500 × 220 nm, Substrate 3000 × 700 nm), closed @2.46 | 1 mode: 2.43931663 (core confinement 0.912, TE 0.981); 2 modes: 2.48623178 (substrate) and 2.43931663. The default closed run's two modes are substrate modes (3.42534929, 3.39599656); the core TE mode is its mode 32. Re-registered after a CI result (2026-11-24, not blind): the targeted modes equal, within 1e-8, the matching modes of an untargeted closed run of 40 modes on the same mesh, and 2.43931663 and 2.48623178 are references within 2e-4, because the mesh differs between CPUs (below); as first registered (±1e-8 absolute) K2 failed with AVX2 dispatch, −1.93e-5 |
 | K3 | Closed @2.46 against the open default (Compare's matching) | the core modes paired, overlap 0.988, Δn_eff −1.95e-3 |
 | K4 | 220 nm Si film over the full width, @2.85, element lengths × 1, 2/3, 1/2, 1/3, against the 1D TE transfer matrix with PEC at ±1.2 µm, 2.84948947 | error −4.80e-3, −2.46e-3, −1.99e-3, −1.02e-3 (negative, shrinking; gate \|error\| ≤ 5e-3 at × 1) |
 | K5 | The film over the substrate, against 2.84916936 | the film-like mode (confinement 0.94) is mode 2 of 2; its error is within 4.4e-4 of K4's at each level (gate 5e-4) |
 | K6 | Template @2.46, 2 modes | the default closed run's n_eff within 5e-15 |
 | K7 | Strip over a substrate @2.46, 4 modes, in a window 3, 4, 5 and 6 µm wide, a substrate 500 and 1000 nm thicker and a BOX of 800 and 300 nm | the core mode returned in 8 of 8, as mode 3, 3, 3, 4, 4, 3, 3, 4 |
 | K8 | n_g, closed @2.46, 1 mode | 4.19234, against the open run's Re n_g 4.19152 (gate 2e-3) |
-| K13 | Template @2.46, 4 modes | mode 4 is 1.39191472, below the cladding: Studio leaves it out ([search in the closed window](#search-near-n_eff-in-a-closed-window)) |
+| K13 | Template @2.46, 4 modes | mode 4 is 1.39191472 (a reference within 2e-4; it equals the untargeted same-mesh value within 1e-8, re-registered with K2 after +3e-8 with AVX2 dispatch), below the cladding: Studio leaves it out ([search in the closed window](#search-near-n_eff-in-a-closed-window)) |
 
 Limits of a closed search:
 
@@ -1434,6 +1434,13 @@ Limits of a closed search:
 - **Closed and open values differ.** The closed window's PEC walls shift n_eff (−1.95e-3 for the
   strip over a substrate against the open default), and at the default mesh the discretization
   error is of the same size (K4: −4.8e-3). Refine the mesh before a close comparison.
+- **The default mesh can differ slightly between computers.** meshine accepts refinement points
+  largest circumradius first, and orders equal radii with NumPy's quicksort, whose order of ties
+  depends on the CPU instructions NumPy uses (AVX-512 or AVX2). The same inputs can then give a
+  mesh with a few nodes moved and n_eff that differs in the 1e-5 to 1e-4 place: K2's core mode is
+  2.43931663 with AVX-512 and 2.43929738 with AVX2 dispatch (−1.93e-5); other tie orders moved it
+  by up to 1.5e-4. Results on one computer are reproducible; compare values from different
+  computers at this level only after refining the mesh.
 
 ### Search near n_eff in a closed window
 

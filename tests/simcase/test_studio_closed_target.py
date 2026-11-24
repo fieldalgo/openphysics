@@ -8,8 +8,18 @@ target) is tests/simcase/studio_closed_target.cjs.
 Pre-registered before the code (references measured on main 13f07f4, Linux):
 
 - K2: the strip over a substrate (Core 500 x 220 nm at (-250, 0), Substrate 3000 x 700 nm at
-  (-1500, -1200), 1550 nm), closed @2.46: 1 mode 2.43931663 +- 1e-8 with the engine's core
-  confinement >= 0.9 and TE >= 0.97; 2 modes 2.48623178 and 2.43931663 +- 1e-8.
+  (-1500, -1200), 1550 nm), closed @2.46. As first registered: 1 mode 2.43931663 +- 1e-8 with the
+  engine's core confinement >= 0.9 and TE >= 0.97; 2 modes 2.48623178 and 2.43931663 +- 1e-8. That
+  failed on CI (PR #350, installed-tests 6/8): 2.4392973771, -1.93e-5. Root cause: meshine orders
+  circumcentre candidates of equal radius with NumPy's quicksort, whose tie order depends on the
+  CPU dispatch (AVX-512 or AVX2), so the default mesh differs between CPUs (reproduced bit for bit
+  with NPY_DISABLE_CPU_FEATURES="X86_V4 AVX512_ICL AVX512_SPR"). Re-registered after that result
+  (coordinator decision 2026-11-24, option A, not blind):
+  (i) same mesh, +- 1e-8: the 1-mode n_eff equals the core mode of an untargeted closed run of the
+  same document in the same process (40 modes; the mode with core confinement >= 0.9 closest to
+  2.46, exactly one), and the 2 modes equal that run's two modes closest to 2.46;
+  (ii) a mesh-dependent reference: |n - 2.43931663| <= 2e-4 with confinement >= 0.9 and TE >= 0.97,
+  and the 2-mode run's 2.48623178 within 2e-4.
 - K3: closed @2.46 against the open default through Studio's matching: the core modes paired with
   overlap >= 0.95 and |delta n_eff| <= 3e-3 (measured 0.9879 and -1.95e-3).
 - K4: a 220 nm silicon film over the full width, closed @2.85, element scales 1, 2/3, 1/2, 1/3,
@@ -26,7 +36,11 @@ Pre-registered before the code (references measured on main 13f07f4, Linux):
 - K8: n_g of the strip over a substrate closed @2.46, 1 mode: finite and within 2e-3 of the open
   run's Re n_g 4.19152 (measured 4.19234).
 - K13 (engine part): the template @2.46, 4 modes returns 1.39191472 as mode 4, below the cladding;
-  Studio leaves it out (slice C2, studio_closed_target_page.cjs).
+  Studio leaves it out (slice C2, studio_closed_target_page.cjs). As first registered the value was
+  +- 1e-8; with AVX2 dispatch it is 1.39191475 (+3e-8, the mesh of K2's root cause). Re-registered
+  with K2: mode 4 is below 1.45 and equals its counterpart of an untargeted closed run of the same
+  document in the same process (threshold lowered to 1.30 so that run keeps it) within 1e-8; the
+  absolute 1.39191472 is a +- 2e-4 reference. K13 is its own test, so K2 cannot mask it.
 - K12 (slice C2, on engine fields): Studio's notes of the strip over a substrate closed @2.46 with 2
   modes name mode 1 as mostly in Substrate (the edge note) and mode 2 as the core mode (its |E|² share
   in Core > 0.5; measured 0.644).
@@ -167,22 +181,57 @@ def test_requests_without_a_workspace_instance_are_not_limited(client):
 
 # -- engine on the builder's documents ------------------------------------------------------------
 
-def test_k2_k6_k13_strip_over_substrate_and_template():
-    one = solve(json.loads(targeted("strip_substrate", 1, 2.46)))
+def untargeted(text, modes, threshold=None):
+    """The same document without the target, asking for more modes (and, for K13, a lower threshold):
+    the same mesh, solved near the core index as an untargeted closed run is."""
+    d = json.loads(text)
+    em = d["physics"]["em1"]
+    del em["target_effective_index"]
+    em["mode_count"] = modes
+    if threshold is not None:
+        em["effective_index_threshold"] = threshold
+    return d
+
+
+def test_k2_strip_over_substrate_same_mesh_and_reference():
+    one_text = targeted("strip_substrate", 1, 2.46)
+    one = solve(json.loads(one_text))
     n = one.effective_index[0]
-    print(f"\nK2 1 mode: {n}, confinement {confinement(one)}, TE {one.postprocessing['te_polarization_fraction'][0]}")
-    assert abs(n[0] - 2.43931663) <= 1e-8 and abs(n[0].imag) == 0
+    wide = solve(untargeted(one_text, 40))
+    assert np.array_equal(wide.triangles, one.triangles) and np.array_equal(wide.node_coordinates, one.node_coordinates)
+    w, share = wide.effective_index[0].real, confinement(wide)
+    core = [i for i in range(len(w)) if share[i] >= 0.9]
+    print(f"\nK2 1 mode: {n}, confinement {confinement(one)}, TE {one.postprocessing['te_polarization_fraction'][0]}; "
+          f"untargeted 40: core-confined modes {[(i + 1, round(w[i], 8)) for i in core]}")
+    # (i) the same mesh, +- 1e-8: exactly one core mode closest to 2.46 in the untargeted run
+    assert len(core) == 1, core
+    assert abs(n[0].real - w[core[0]]) <= 1e-8 and abs(n[0].imag) == 0
+    # (ii) the mesh-dependent reference
+    assert abs(n[0].real - 2.43931663) <= 2e-4
     assert confinement(one)[0] >= 0.9 and one.postprocessing["te_polarization_fraction"][0][0] >= 0.97
     two = solve(json.loads(targeted("strip_substrate", 2, 2.46))).effective_index[0].real
-    print(f"K2 2 modes: {two}")
-    assert np.max(np.abs(two - [2.48623178, 2.43931663])) <= 1e-8
+    nearest = np.sort(w[np.argsort(abs(w - 2.46))[:2]])[::-1]
+    print(f"K2 2 modes: {two}; the untargeted run's two nearest 2.46: {nearest}")
+    assert np.max(np.abs(two - nearest)) <= 1e-8
+    assert abs(two[0] - 2.48623178) <= 2e-4 and abs(two[1] - 2.43931663) <= 2e-4
+
+
+def test_k6_template_targeted_equals_default():
     a = solve(json.loads(targeted("template", 2, 2.46))).effective_index[0]
     b = solve(json.loads(build("template", 2, edges=CLOSED))).effective_index[0]
-    print(f"K6 template @2.46 {a}, default {b}, max |diff| {np.max(np.abs(a - b)):.2e}")
+    print(f"\nK6 template @2.46 {a}, default {b}, max |diff| {np.max(np.abs(a - b)):.2e}")
     assert np.max(np.abs(a - b)) <= 1e-12
-    four = solve(json.loads(targeted("template", 4, 2.46))).effective_index[0].real
-    print(f"K13 template @2.46, 4 modes: {four}")
-    assert len(four) == 4 and abs(four[3] - 1.39191472) <= 1e-8 and np.all(four[:3] > 1.45)
+
+
+def test_k13_template_fourth_mode_below_the_cladding():
+    text = targeted("template", 4, 2.46)
+    four = solve(json.loads(text)).effective_index[0].real
+    low = solve(untargeted(text, 8, threshold=1.30)).effective_index[0].real
+    counterpart = low[np.argmin(abs(low - four[3]))]
+    print(f"\nK13 template @2.46, 4 modes: {four}; untargeted (threshold 1.30): {low}")
+    assert len(four) == 4 and np.all(four[:3] > 1.45) and four[3] < 1.45
+    assert abs(four[3] - counterpart) <= 1e-8
+    assert abs(four[3] - 1.39191472) <= 2e-4
 
 
 def test_k3_closed_targeted_against_the_open_default(tmp_path):
