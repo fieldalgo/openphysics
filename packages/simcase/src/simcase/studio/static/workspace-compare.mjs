@@ -21,8 +21,17 @@ export function runHeading(run,number=null){
 // A run's design as the run list and the Compare pickers name it: the boundary first, right after
 // the run number and name (round 18, X6), then designSummary, so a label cut short in a picker
 // still shows it: "open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon".
+// Round 21 (W3): then what the study computed when it is not the default, so two runs of one design
+// read apart: " · 4 modes" (" · 1 mode") when Modes to find was not 2, " · n_g" when the group index
+// was computed, both before the geometry, so a picker cut at its end still shows them:
+// "open (PML 1 µm) · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon".
+export const STUDY_DEFAULT_MODES=2;
+export function studyTag(run){
+ const modes=run.settings?.mode_count,count=Number.isInteger(modes)&&modes!==STUDY_DEFAULT_MODES?` · ${modes} ${modes===1?'mode':'modes'}`:'';
+ return count+(Array.isArray(run.group_index)?' · n_g':'');
+}
 export function runDesign(run){
- return boundaryTag(run)+' · '+designSummary(run.input.model);
+ return boundaryTag(run)+studyTag(run)+' · '+designSummary(run.input.model);
 }
 // A Compare field panel heading: the side, then the run without repeating the side as its name
 // (a run named "A" on side A reads "A · 600 × 300 nm · …", not "A · A · 600 × 300 nm · …").
