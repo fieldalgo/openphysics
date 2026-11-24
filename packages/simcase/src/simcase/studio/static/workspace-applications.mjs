@@ -28,8 +28,14 @@ export function sessionRunNames(session){
 // Run 2 · file optical-waveguide-session-2026-11-22-1425.json"). The lists show each session text
 // once (distinctRecords), so two entries never read alike.
 export function sessionLine(item){
- return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'')+fileWords(item);
+ return (item.model?item.model+' · ':'')+item.runs+(item.runs===1?' run':' runs')+(item.names?.length?' · '+item.names.join(', '):'')+fileWords(item)+alsoWords(item);
 }
+// Round 18 (X7): a record names one model, but its project file may hold the other one too. When
+// browser recovery holds a record of the other model under the same file, the offer lists it with
+// its runs and says this button does not restore it: " · also in this project: Heated silicon
+// waveguide · Run 1 (restored separately)", or "(already in this tab)". item.also: [{model, names,
+// runs, inTab}].
+export const alsoWords=item=>(item.also||[]).map(o=>` · also in this project: ${o.model} · ${o.names?.length?o.names.join(', '):`${o.runs} ${o.runs===1?'run':'runs'}`} (${o.inTab?'already in this tab':'restored separately'})`).join('');
 // The session file a recovery entry names: " · same as file x" when the record still matched it,
 // " · file x, changed since" when it did not, " · file x" when the record does not say.
 export const fileWords=item=>!item.file?'':item.fileCurrent===true?' · same as file '+item.file:item.fileCurrent===false?' · file '+item.file+', changed since':' · file '+item.file;
@@ -65,7 +71,7 @@ function offerTimeWords(item,when){
 // file, fileCurrent, fileSavedAt}; model: the model the entry names.
 export function cardResumeChoice(item,model,when=offerTime){
  const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when)}`};
+ return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when)}${alsoWords(item)}`};
 }
 export const opticalResumeChoice=(item,when=offerTime)=>cardResumeChoice(item,'Optical waveguide',when);
 // Which stored session each model card offers: the newest of its model (entries newest first, each
