@@ -75,3 +75,26 @@ test('W2: Run study starts at once; the swap is offered, checked when pressed an
  assert.ok(view.includes("const fresh=offer===dropSwap&&runs===offer.list&&runs.includes(offer.newest)&&!runs.includes(offer.kept)&&swapCandidate(runs,offer.newest)===offer.other&&!job&&!starting;"));
  assert.ok(read('workspace.html').includes('<span id="mp-run-drop" class="run-drop mp-run-drop" hidden><span id="mp-run-drop-text" class="run-drop-text"></span><button type="button" id="mp-run-drop-pin" class="message-action"></button></span>'));
 });
+
+test('W3: run labels name the mode count when not 2 and n_g when the group index was computed',async()=>{
+ const C=await import(STATIC+'workspace-compare.mjs'),N=await import(STATIC+'workspace-notebook.mjs');
+ assert.equal(C.STUDY_DEFAULT_MODES,N.DEFAULT_MODE_COUNT);
+ const core={type:'rect',name:'Core',material:'Silicon',x:-250,y:0,w:500,h:220},substrate={type:'rect',name:'Substrate',material:'Silicon',x:-1500,y:-700,w:3000,h:700};
+ const model={shapes:[core,substrate],wavelength:1550},open={boundary:'PML',pml:{thickness:'1000 nm'}};
+ // P05's two runs: the same design, one with the group index
+ assert.equal(C.runDesign({input:{model},settings:{...open,mode_count:2}}),'open (PML 1 µm) · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ assert.equal(C.runDesign({input:{model},settings:{...open,mode_count:2},group_index:[4.1,4.0]}),'open (PML 1 µm) · n_g · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ assert.equal(C.runDesign({input:{model},settings:{...open,mode_count:4},group_index:[4.1,4.0,3.9,3.8]}),'open (PML 1 µm) · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon');
+ assert.equal(C.runDesign({input:{model:{shapes:[core]}},settings:{mode_count:1}}),'closed · 1 mode · 500 × 220 nm · Silicon');
+ // after the boundary tag of a closed-window search (slice C2)
+ assert.equal(C.runDesign({input:{model:{shapes:[core]}},settings:{mode_count:4,search_target:2.46},group_index:[1,1,1,1]}),'closed near 2.46 · 4 modes · n_g · 500 × 220 nm · Silicon');
+ // a run without settings (an earlier file) or without the group index keeps its words
+ assert.equal(C.runDesign({input:{model:{shapes:[core]}}}),'closed · 500 × 220 nm · Silicon');
+ // the headings of Compare carry the same words
+ assert.equal(C.runHeading({label:'',input:{model},settings:{mode_count:4},group_index:[1,1,1,1]},7),'Run 7 · closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm');
+ assert.equal(C.fieldHeading('B',{label:'',input:{model},settings:{mode_count:3}},7),'B · Run 7 · closed · 3 modes · Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm');
+ // the run list and the pickers use runDesign before the wavelength and time; the full label is the picker's title
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes('${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}'));
+ assert.ok(app.includes("o.textContent=runLabel(r);o.title=o.textContent;"));
+});
