@@ -301,7 +301,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
    **Run study** 옆 상자가 실행 전에 알립니다: *Running drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it*와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고(평소의 고정 메시지) 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다.
-   Run name처럼 계산 중에는 고정할 수 없습니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
+   Run name처럼 계산 중에는 고정할 수 없습니다. round 19부터 **Run study**는 그런 실행 전에 묻기도 합니다: 대화 상자가
+   *Running drops Run 3 (700 × 300 nm · 4 modes).*와 *Up to six runs are kept; a pinned run is never dropped.*를 보이고
+   **Pin Run 3 and run**(맨 앞, 포커스), **Run**, **Cancel**(Escape)을 둡니다. 닫히면 포커스는 Run study로 돌아갑니다.
+   Pin Run 3 and run은 그 실행을 고정하고, 실행이 그다음 고정되지 않은 실행을 내보내게 되면 다시 묻습니다. 마지막 고정되지 않은
+   실행에는 자리가 남지 않으므로 이 버튼이 없습니다. 한도 자체는 그대로입니다. 파일은 번호를 담지 않습니다: 파일을 열거나 이
    브라우저에서 세션을 복원하면 파일 순서대로 1부터 번호를 매기고, 파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다.
    round 19부터 광 모델을 열거나 복원할 때 메시지가 그렇게 밝힙니다: *Runs are numbered from 1 in this tab; names and pins
    are kept.*(Open project 뒤에는 *Optical waveguide runs are numbered from 1 in this tab; …*). 가열 모델의 실행은 번호를
@@ -714,6 +718,8 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   “Run N · 이름 · 시각” 목록, **Run name**(Enter로 고정), **Unpin this run**이 있습니다. 고정한
   실행은 남고, 새 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
   최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 여섯 개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
+  round 19부터 Run study는 광학 모델처럼 실행 하나를 내보내는 실행 전에 묻습니다: *Running drops Run 3 (run at 05:31 AM).*,
+  그리고 Pin Run 3 and run, Run, Cancel.
 - **파일.** **File › Save**는 탭의 모든 모델을 [프로젝트 파일](#프로젝트-파일)에 씁니다.
   **File › Export › Model with runs (session file)…**은 이 모델과 실행, 실행 이름과 고정, 히터 없는 결과를 한 파일
   `<model-name>-session-YYYY-MM-DD-HHMM.json`에 씁니다(모델 이름을 소문자로, 다른 문자는 하이픈으로,

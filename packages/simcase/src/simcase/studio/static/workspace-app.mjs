@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,RENUMBERED_TEXT,renumberedText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,nextDropped,dropWarningText,RENUMBERED_TEXT,renumberedText,opticalDropQuestion} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -183,6 +183,8 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  onHistory:()=>{updateHistory();refreshPersistence();},download:(blob,name)=>downloadFile(blob,name),deliverSession:(text,name,options)=>deliverSession(text,name,options),serverVersion:()=>connection.version,validateRunLabel,
  // the optical runs this tab holds beside the multiphysics model (the save message names them)
  opticalRunCount:()=>runs.length,
+ // round 19 (Y4): the heated model's Run study asks with the same dialog
+ confirmDrop:(question,opener)=>askRunDrop(question,opener),
  // the Library's view title row names the project (P3)
  projectLine:()=>projectLine(),
  // the model's current file name (File › Save downloads under it again), which the header names
@@ -2026,7 +2028,37 @@ $('resume-job').onclick=async()=>{
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
+// Round 19 (Y4): before a run the six-run limit would make drop a run, Run study asks: Pin Run N and
+// run (asked again for the next run that would then drop), Run, or Cancel (Escape). Studio's dialog
+// conventions: modal, the first answer focused, focus back to the opener. Resolves 'pin', 'run' or null.
+const dropDialog=document.createElement('dialog');dropDialog.id='run-drop-confirm';dropDialog.setAttribute('aria-labelledby','run-drop-confirm-title');dropDialog.setAttribute('aria-describedby','run-drop-confirm-description');
+dropDialog.innerHTML='<h2 id="run-drop-confirm-title"></h2><p id="run-drop-confirm-description"></p><div class="leave-actions"><button type="button" id="run-drop-confirm-pin" class="primary"></button> <button type="button" id="run-drop-confirm-run"></button> <button type="button" id="run-drop-confirm-cancel"></button></div>';
+document.body.append(dropDialog);
+let dropAnswer=null;
+function askRunDrop(question,opener=document.activeElement){
+ return new Promise(resolve=>{
+  dropAnswer=answer=>{dropAnswer=null;dropDialog.close();restoreDialogFocus(opener);resolve(answer);};
+  $('run-drop-confirm-title').textContent=question.title;$('run-drop-confirm-description').textContent=question.note;
+  const pin=$('run-drop-confirm-pin');pin.hidden=!question.pin;pin.textContent=question.pin||'';$('run-drop-confirm-run').textContent=question.run;$('run-drop-confirm-cancel').textContent=question.cancel;
+  if(!dropDialog.open)dropDialog.showModal();(question.pin?pin:$('run-drop-confirm-run')).focus();
+ });
+}
+$('run-drop-confirm-pin').onclick=()=>dropAnswer?.('pin');$('run-drop-confirm-run').onclick=()=>dropAnswer?.('run');$('run-drop-confirm-cancel').onclick=()=>dropAnswer?.(null);
+dropDialog.oncancel=event=>{event.preventDefault();dropAnswer?.(null);};
+// true when the run may go ahead: no run would be dropped, or the question was answered with Run
+async function confirmOpticalDrops(){
+ for(let run=nextDropped(runs,RUN_LIMIT);run;run=nextDropped(runs,RUN_LIMIT)){
+  const answer=await askRunDrop(opticalDropQuestion(run,runs),$('run-optical'));
+  if(answer!=='pin')return answer==='run';
+  run.pinned=true;render();notice(pinNotice(run));
+ }
+ return true;
+}
 $('run-optical').onclick=async()=>{
+ if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
+ try{rejectInvalidInput();}catch(e){notice(e.message);return;}
+ if(!await confirmOpticalDrops())return;
+ // the question waited for an answer: the state is checked again
  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
