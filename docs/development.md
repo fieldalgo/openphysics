@@ -528,6 +528,18 @@ find set to 3. No need to run: Run 2 already has these results. Run study adds a
 values.* with **Show Run 2** and the status bar *Run 2 · recovered from this browser, not recomputed
 · has the results of the current inputs*, while 4, which no run has, keeps *… Run explicitly to
 compute new results.*; no horizontal overflow at 1440 × 900 or 390 × 844.
+Since slice C2 (pre-registered) a further stage in its own browser context (CW) checks Search near
+n_eff in a closed window: the box *Search near n_eff* (off) and the disabled field by role and name,
+its help, *Closed window · near n_eff 2.46* once ticked; the template with 4 modes reading *Found 3 of 4
+modes near n_eff 2.46, above n = 1.45.* with three rows, *1 mode at or below n = 1.45 was left out.*
+and the tag *closed near 2.46*, saved as a project whose workspace session is version 11
+(`optical-shapes-v10`, `search_target` 2.46, 3 modes of 4); the strip over a substrate's edge note
+with **Use Open boundary** and **Search near 2.46 · 4 modes**, the shortcut setting both inputs and
+running nothing; the core-mode note on mode 3 with 4 modes and on mode 2 with 2 (*Mode 2 is the core
+mode: 64 % of |E|² is in Core, which does not touch the window edge.*); a changed target (2.47)
+offering no run and the equal one *No need to run: Run 4 already has these results.* with **Show Run
+4**; and **Use this run's inputs** on Run 4 turning the box on with 2.460 (*Search near n_eff off →
+2.46*); no horizontal overflow at 1440 × 900 or 390 × 844.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
