@@ -39,15 +39,18 @@ test('U2: the message of a dropped run names its number, name, geometry and mode
  assert.equal(W.droppedRunText(r),'Run 3 (700 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.');
  assert.equal(W.droppedRunText({...r,label:'Design A'}),'Run 3 · Design A (700 × 220 nm · 2 modes) was dropped: up to six runs are kept; pin a run to keep it.');
 });
-test('U2: the number is not written to files; the save names a run by its number',()=>{
+test('U2: the number is written to files once it is not the run\'s place (version 12); the save names a run by its number',()=>{
  const a=run(job(1),{number:4,field:bigField()}),b=run(job(2),{number:7,field:bigField()}),view={mode:0,component:'magnitude',window:'Core region'};
  const full=N.writeOpticalSession(input(),[a,b],a.job,[a.job,b.job],view);
- assert.equal(full.ok,true);assert.equal(JSON.parse(full.text).runs.some(r=>Object.hasOwn(r,'number')),false);
+ assert.equal(full.ok,true);assert.deepEqual(JSON.parse(full.text).runs.map(r=>r.number),[4,7]);assert.equal(JSON.parse(full.text).version,12);
+ // runs numbered 1 and 2 (their places) are written without numbers, as before
+ const placed=N.writeOpticalSession(input(),[{...a,number:1},{...b,number:2}],a.job,[a.job,b.job],view);
+ assert.equal(JSON.parse(placed.text).runs.some(r=>Object.hasOwn(r,'number')),false);assert.notEqual(JSON.parse(placed.text).version,12);
  // over the limit: the fields of the selected run only; the run left without them is named by its number
- const limit=full.bytes-1,out=N.writeOpticalSession(input(),[a,b],a.job,[a.job,b.job],view,{keepSelected:true,limit});
+ const limit=Math.min(full.bytes,placed.bytes)-1,out=N.writeOpticalSession(input(),[a,b],a.job,[a.job,b.job],view,{keepSelected:true,limit});
  assert.equal(out.ok,true);assert.deepEqual(out.notKept,[7]);
  const plain=N.writeOpticalSession(input(),[{...a,number:undefined},{...b,number:undefined}],a.job,[a.job,b.job],view,{keepSelected:true,limit});
- assert.equal(plain.text,out.text);assert.deepEqual(plain.notKept,[2]);
+ assert.equal(plain.text,N.writeOpticalSession(input(),[{...a,number:1},{...b,number:2}],a.job,[a.job,b.job],view,{keepSelected:true,limit}).text);assert.deepEqual(plain.notKept,[2]);
  const refused=N.writeOpticalSession(input(),[{...a,pinned:true},b],a.job,[a.job,b.job],view,{keepSelected:true,limit:100});
  assert.equal(refused.ok,false);assert.ok(refused.refusal.startsWith('The pinned run (Run 4 selected) is '),refused.refusal);
 });
