@@ -1423,7 +1423,15 @@ session과 브라우저 복구가 모든 장과 함께 보존합니다(이전에
 `tools/studio_open_field_size.mjs`입니다.
 한도를 넘는 세션은 다중물리 세션처럼 먼저 묻습니다. *Keep fields for selected and pinned runs*는 나머지
 실행을 `field` 없이 n_eff·TE 비율·유효 면적과 함께 쓰고, Cancel은 아무것도 쓰지 않으며, 선택·고정 실행만으로도
-한도를 넘으면 그 실행들을 밝혀 저장을 거부합니다. 브라우저 복구는 전체 텍스트가 한도를 넘으면 묻지 않고 선택·고정
+한도를 넘으면 선택 실행과 고정 실행을 따로 밝혀 저장을 거부합니다: *The selected run (Run 6) and the pinned runs
+(Run 4, Run 5) are 46 MB with their fields, over the 16 MiB session limit. Unpin some of them.*(고정 실행이 하나면
+*Unpin it.*). 그중 고정 실행이 없으면 *The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session
+limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer
+modes.*라고 합니다. 복구 오류도 *Recovery snapshot exceeds 16 MiB:* 뒤에 같은 말을 합니다. 새 실행으로 세션이 한도를
+넘으면 그 결과 메시지에 한 줄이 붙습니다: *Session is now 18 MB, over the 16 MiB limit: File › Save will ask whether
+to keep the fields of the selected and pinned runs only.*, 저장이 거부될 때는 *Session is now 49 MB, over the 16 MiB
+limit, and File › Save will refuse:* 뒤에 거부 문구와 *Browser recovery is off.*(이때 round 18의 복구 줄은 되풀이하지
+않습니다). 브라우저 복구는 전체 텍스트가 한도를 넘으면 묻지 않고 선택·고정
 실행의 장만 보존합니다. 장이 없는 실행은 모드 표를 보이지만 장 보기는 없고, Compare는 그 모드를 겹침으로 짝지을
 수 없다고 알립니다.
 

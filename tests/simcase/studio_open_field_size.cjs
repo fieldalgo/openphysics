@@ -144,3 +144,37 @@ test('A1: the run file of an open run says its fields cover the physical window 
  const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
  assert.ok(app.includes("with the run's inputs and fields${isOpenRun(solverRun)?' (on the physical window only, PML excluded)':''}. Add runs from file adds it to a session."));
 });
+
+test('A3: the refusal names the selected and the pinned runs apart; Unpin only with a pinned run',()=>{
+ const t=kept=>N.keptOverText(kept,18.9e6);
+ assert.equal(t([{name:'Run 6',selected:true,pinned:false}]),'The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes.');
+ assert.equal(t([{name:'Run 4',pinned:true},{name:'Run 5',pinned:true},{name:'Run 6',selected:true,pinned:false}]),'The selected run (Run 6) and the pinned runs (Run 4, Run 5) are 19 MB with their fields, over the 16 MiB session limit. Unpin some of them.');
+ assert.equal(t([{name:'Run 4',pinned:true},{name:'Run 6',selected:true,pinned:true}]),'The pinned runs (Run 4, Run 6 selected) are 19 MB with their fields, over the 16 MiB session limit. Unpin some of them.');
+ assert.equal(t([{name:'Run 4',pinned:true}]),'The pinned run (Run 4) is 19 MB with its fields, over the 16 MiB session limit. Unpin it.');
+ // Save session and browser recovery: one helper, the same words
+ const full=N.parseSession(fixture(FULL)),run={...full.runs[0],pinned:false},view=full.view;
+ const out=N.writeOpticalSession(full.input,[run],run.job,[run.job,null],view,{limit:1000,keepSelected:true});
+ assert.equal(out.ok,false);assert.equal(out.refusal,N.keptOverText([{name:'Run 1',selected:true,pinned:false}],out.bytes));
+ assert.ok(out.refusal.startsWith('The selected run (Run 1) is ')&&out.refusal.endsWith(' Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes.'),out.refusal);
+ const src=fs.readFileSync(path.join(__dirname,STATIC,'workspace-notebook.mjs'),'utf8');
+ assert.ok(src.includes("new Error('Recovery snapshot exceeds 16 MiB: '+out.refusal[0].toLowerCase()+out.refusal.slice(1))"));
+});
+
+test('S2: a run that makes the session go over 16 MiB says the size and what File › Save will do',()=>{
+ assert.equal(N.sessionSizeText({ok:true,bytes:1e6}),null);assert.equal(N.sessionSizeText(null),null);
+ assert.equal(N.sessionSizeText({ok:false,bytes:18.9e6,reduced:{bytes:9e6,notKept:[1]},refusal:null}),
+  'Session is now 19 MB, over the 16 MiB limit: File › Save will ask whether to keep the fields of the selected and pinned runs only.');
+ const refusal=N.keptOverText([{name:'Run 6',selected:true,pinned:false}],18.9e6);
+ assert.equal(N.sessionSizeText({ok:false,bytes:48.8e6,reduced:null,refusal}),
+  'Session is now 49 MB, over the 16 MiB limit, and File › Save will refuse: The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes. Browser recovery is off.');
+ // the same answer Save session gets: a run's session over the limit, its selected run alone fitting
+ const full=N.parseSession(fixture(FULL)),run={...full.runs[0],pinned:false},other={...run,job:'0000000f',pinned:false};
+ const out=N.writeOpticalSession(full.input,[run,other],run.job,[run.job,null],full.view,{limit:400000});
+ assert.equal(out.ok,false);assert.ok(N.sessionSizeText(out).endsWith(', over the 16 MiB limit: File › Save will ask whether to keep the fields of the selected and pinned runs only.'));
+ const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
+ // posted once after the run's result message, with X4's line not repeated when it says recovery is off
+ assert.ok(app.includes("if(state.phase==='done')announceResult(state.message);else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();"));
+ assert.ok(app.includes("compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;"));
+ assert.ok(app.includes("if(!text)return;if(text.endsWith(' Browser recovery is off.'))recoveryOffPosted='overLimit';"));
+ assert.ok(app.includes("const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);\n}"));
+});
