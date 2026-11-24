@@ -345,6 +345,8 @@ the `simcase` CLI). The other `test_*_wheel.py` consumers run on Linux only, in
 the distribution check. The three consumers added on 2026-11-02 were verified
 on Linux; their first macOS and Windows runs are the CI jobs themselves.
 This is installed acceptance, not a full macOS or Windows regression.
+On 2026-11-24 each platform's job took 28 to 30 minutes on main; its 60-minute limit only stops
+hung runs, since hosted runner speed varies.
 It also installs the Studio extra's pins (`tools/requirements-py312-studio.txt`, the
 Linux versions) and runs the installed workspace in the runner's browser
 (`tools/studio_browser/studio_workspace_browser.mjs`): two designs, Compare, Save
