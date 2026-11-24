@@ -149,7 +149,10 @@ python tools/check_release_version.py      # 배포판 아홉 개의 버전이 �
 
 빠르게 반복할 때는 바꾼 부분과 관련된 시험만 돌리고 전체 시험은 CI에 맡깁니다.
 `slow` 표시 시험(메시 수렴 연구)은 전체 실행에 포함되며, 로컬에서는
-`-m "not slow"`로 뺄 수 있습니다. 일부만 통과한 결과가 CI를 대신하지는 않습니다.
+`-m "not slow"`로 뺄 수 있습니다. 일부만 통과한 결과가 CI를 대신하지는 않습니다. 코너
+장(harmonic·linear) 패널 수렴 연구는 예외입니다. 하나가 CI 시험 분할 하나보다 길어서
+`OPENPHYSICS_PANEL_STUDIES=1`도 필요하고 validate.yml의 수동 실행 전용 작업 `panel-studies`(`panel_studies=true`)에서
+돌며, 일반 시험은 다른 시험이 푸는 해상도의 기록값을 확인합니다(`tests/_support/panel_studies.py`).
 
 CI 스크립트의 출력 디렉터리는 새것이거나 비어 있어야 하므로, 이전 실행의 결과가
 섞이지 않습니다. `--output`으로 다른 디렉터리를 주지 않으면 `check_distributions.py`는

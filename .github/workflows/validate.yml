@@ -7,6 +7,11 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+    inputs:
+      panel_studies:
+        description: Also run the corner-field panel convergence studies (hours; job panel-studies)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -359,6 +364,60 @@ jobs:
           test "$INSTALLED_RESULT" = success
           test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success
+
+  panel-studies:
+    # The corner-field panel convergence studies (tests/_support/panel_studies.py): panels
+    # 32 -> 48 or 64 and outer widths 8 -> 16 -> 32 mm, five or more dense solves each, from
+    # tens of minutes to hours on one CPU, longer than a 45-minute test partition, where they
+    # skip. The partitions instead check that the resolution each module's other tests solve reproduces the
+    # values recorded with it (tests/galerkin/two_ground/evidence/corner-field-studies.json).
+    # Manual dispatch with panel_studies=true only (gh workflow run validate.yml --ref <branch>
+    # -f panel_studies=true): never on pushes or pull requests, outside the tests gate. Run it
+    # when the corner field code changes; regenerate the record from its JUnit XML with
+    # generate_corner_field_studies.py beside the record when a study's numbers change.
+    name: panel-study (${{ matrix.module }})
+    if: github.event_name == 'workflow_dispatch' && inputs.panel_studies
+    runs-on: ubuntu-24.04
+    # GitHub's maximum; the longest local study took over 1.5 h on one CPU.
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - test_laplace_corner_harmonic_field
+          - test_laplace_corner_harmonic_guard_field
+          - test_laplace_corner_harmonic_single_active_field
+          - test_laplace_corner_linear_field
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENPHYSICS_PANEL_STUDIES: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12.14"
+      - name: Install pinned validation environment
+        run: |
+          python -m pip install -r tools/requirements-py312-linux.txt
+          python -m pip install --no-deps --no-build-isolation -e packages/galerkin
+          python -m pip check
+      - name: Record CPU model and BLAS kernel
+        run: |
+          mkdir -p .validation
+          python tools/report_numeric_runtime.py --json .validation/numeric-runtime.json
+      - name: Run the study
+        run: >-
+          python -m pytest -q -ra tests/galerkin/${{ matrix.module }}.py
+          -k test_panel_refinement_and_two_separate_outer_changes
+          --junitxml=.validation/${{ matrix.module }}.xml
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: panel-study-${{ matrix.module }}
+          path: .validation/
+          include-hidden-files: true
+          if-no-files-found: warn
 
   units-batch-equivalence:
     # Check P3-1 of the galerkin step (tools/units_batch/README.md, "Phase 3"): every example

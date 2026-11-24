@@ -166,7 +166,12 @@ python tools/check_release_version.py      # one version across the nine distrib
 
 For a quick loop, run the tests related to your change and leave the full suite
 to CI. Tests marked `slow` (mesh-convergence studies) are included in the full
-run; `-m "not slow"` skips them locally. A subset pass does not replace CI.
+run; `-m "not slow"` skips them locally. A subset pass does not replace CI. The
+corner-field panel convergence studies (harmonic and linear) are the exception: each is longer than a
+CI test partition, so they also need `OPENPHYSICS_PANEL_STUDIES=1` and run in the
+dispatch-only job `panel-studies` of validate.yml (input `panel_studies=true`), while
+the regular suite checks their
+recorded values at the resolution their other tests solve (`tests/_support/panel_studies.py`).
 
 Output directories of the CI scripts must be new or empty, so results from an
 earlier run cannot mix in. `check_distributions.py` writes to `.validation/dist/`

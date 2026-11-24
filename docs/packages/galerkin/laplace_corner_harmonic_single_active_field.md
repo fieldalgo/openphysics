@@ -41,5 +41,14 @@ Metal surface laws, nonuniform dielectric extraction, manufacturing templates,
 SIPI consumers and other platforms require separate integration and validation.
 The existing two-active guard and three-active APIs remain unchanged.
 
+The panel (32 to 48 per edge) and outer-width (8, 16, 32 mm) convergence study of
+this page's test module takes from tens of minutes to hours on one CPU, longer than
+a validate.yml test partition. It is marked `slow`, runs only with
+`OPENPHYSICS_PANEL_STUDIES=1` in the dispatch-only job `panel-studies` of validate.yml (input `panel_studies=true`), and
+keeps its 1% criteria. The regular suite checks that the 32-panel, 8 mm
+resolution its other tests solve reproduces the values recorded with the study
+(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, within 1e-9 of
+each matrix's largest entry); see `tests/_support/panel_studies.py`.
+
 [Two-active guard field](laplace_corner_harmonic_guard_field.md) ·
 [한국어](../../locales/ko/pages/packages/galerkin/laplace_corner_harmonic_single_active_field.md)
