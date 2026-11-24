@@ -475,6 +475,10 @@ try {
     const offers = await page.eval("['resume-optical','resume-heated-waveguide'].map(id=>document.getElementById(id).textContent)");
     stage('R16 S5 cards', {offers});
     assert.ok(offers[1].includes(' · same as file design-ab.json'), offers[1]); assert.ok(offers[0].includes(' · same as file design-ab.json'), offers[0]);
+    // round 18 (X7): each offer also names the project's other model with its runs; its button restores its own model
+    stage('R18 X7 offers', {offers});
+    assert.ok(offers[0].startsWith('Restore from this browser · Optical waveguide · ') && offers[0].includes(' · also in this project: Heated silicon waveguide · Run ') && offers[0].endsWith(' (restored separately)'), offers[0]);
+    assert.ok(offers[1].startsWith('Restore from this browser · Heated silicon waveguide · ') && offers[1].includes(' · also in this project: Optical waveguide · Run ') && offers[1].endsWith(' (restored separately)'), offers[1]);
     // S4: restore the optical session; the header names the project file and Save suggests it
     await page.press('button', offers[0]);
     if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
@@ -515,12 +519,20 @@ try {
     await page.click('[data-template=optical]'); await page.until("!!document.getElementById('shape-w')", 'R17 optical model');
     let before = await listDownloads();
     await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save As');
+    // round 18 (X5): the dialog names what the file will hold, also when the model list did not change
+    const holds1 = await page.eval("document.getElementById('save-name-contents').hidden?null:document.getElementById('save-name-contents').textContent");
+    assert.equal(holds1, 'The file will hold Optical waveguide (no runs).');
     await page.fill('textbox', 'File name', 'u8-optical'); await page.press('button', 'Download');
     assert.equal(await newDownload(before), 'u8-optical.json');
     await page.press('tab', 'Library'); await page.press('button', 'Heated silicon waveguide', 'start'); await page.until("!document.querySelector('[data-template=optical]')", 'R17 heated added');
+    // round 18 (X8): the heated model's status bar speaks about the model within the project, as the header does
+    const joined = {title: await title(), footer: await footer()}; stage('R18 X8 joined', joined);
+    assert.ok(joined.title.includes(' · u8-optical.json · changed since downloaded '), joined.title);
+    assert.ok(joined.footer.startsWith('Heated silicon waveguide · in project u8-optical.json · not saved since it joined · '), joined.footer);
     before = await listDownloads();
     await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save asks');
     const asked = await page.eval("({title:document.getElementById('save-name-title').textContent,prefill:document.getElementById('save-name-input').value,why:document.getElementById('save-name-unavailable').hidden?null:document.getElementById('save-name-unavailable').textContent})");
+    assert.equal(await page.eval("document.getElementById('save-name-contents').textContent"), 'The file will hold Optical waveguide (no runs) and Heated silicon waveguide (no runs).');
     await page.press('button', 'Cancel'); await sleep(500);
     const cancelled = {downloads: await listDownloads(), status: await status()};
     stage('R17 U8 Save asks', {asked, cancelled: cancelled.status});
@@ -532,6 +544,15 @@ try {
     await page.press('button', 'File'); await page.press('menuitem', 'Save'); const again = await newDownload(before);
     const dialogAgain = await page.eval("document.getElementById('save-name-dialog').open");
     stage('R17 U8 saved with both models', {both, again, dialogAgain});
+    // round 18 (X8): saved with both models, the status bar says so in the header's words
+    const savedBoth = {title: await title(), footer: await footer()}; stage('R18 X8 saved', savedBoth);
+    assert.ok(/^Heated silicon waveguide · in project u8-optical\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/.test(savedBoth.footer), savedBoth.footer);
+    assert.ok(savedBoth.title.includes(' · u8-optical.json · downloaded '), savedBoth.title);
+    // round 18 (X10): on the Library, both models of the project read Return to model
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R18 Library');
+    const actions = await page.eval("Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent]))");
+    stage('R18 X10 cards', actions);
+    assert.deepEqual(actions, {optical: 'Return to model', heat: 'Open model', joule: 'Open model', 'heated-waveguide': 'Return to model'});
     // a download cannot replace the earlier file: a browser may add " (1)" (headless Chromium here writes the name again)
     assert.equal(dialogAgain, false); assert.ok(both.startsWith('u8-optical') && again.startsWith('u8-optical'), JSON.stringify({both, again}));
     const file = JSON.parse(await readFile(join(downloads, both), 'utf8')); assert.deepEqual(file.models.map(m => m.kind).sort(), ['multiphysics', 'workspace']);
