@@ -237,7 +237,9 @@ export function createMultiphysicsView(ctx){
  const dropName=r=>`${runTitle(r)} (run at ${runTime(r)})`;
  function refreshDrop(){
   const host=$('mp-run-drop');if(!host)return;
-  const running=!!job&&!job.alone||starting&&!job,list=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT),r=active?list[0]||null:null;
+  const running=!!job&&!job.alone||starting&&!job,list=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT);
+  // round 21 (W5): before a run, hidden while the model equals a kept run's ("No need to run")
+  const matched=!running&&runs.some(x=>runFreshness(x,doc)==='current'),r=active&&!matched?list[0]||null:null;
   host.hidden=!r;if(!r)return;
   const text=running?dropWhileRunningText(list,dropName):dropWarningText(list.length>1?list:r,dropName);$('mp-run-drop-text').textContent=text;$('mp-run-drop-text').title=text;
   const pin=$('mp-run-drop-pin');pin.textContent=`Pin Run ${r.number}`;pin.dataset.pinRun=String(r.number);pin.hidden=runs.filter(x=>!x.pinned).length<=list.length;

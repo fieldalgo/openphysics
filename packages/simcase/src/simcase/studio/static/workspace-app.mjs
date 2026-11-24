@@ -1265,10 +1265,12 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 // Round 21 (W2): Run study starts at once; while the run computes (or waits as a pending job) the line
 // says what its result drops, "When this run finishes, Run 3 (…) is dropped", and Pin Run N keeps it
 // (the line then names the next unpinned run). Pin is hidden when pinning would leave the result no
-// slot.
+// slot. Round 21 (W5): before a run the line is hidden while the inputs equal a run's (Messages then
+// says no run is needed); it returns when they differ from every run.
 function refreshDropWarning(){
  const running=solverBusy||!!pendingJob,list=droppedBy(runs,RUN_LIMIT);
- const host=$('run-drop'),run=list[0]||null;host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
+ const matched=!running&&!numericDrafts.invalid&&runs.some(r=>r.signature===signature());
+ const host=$('run-drop'),run=matched?null:list[0]||null;host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
  const text=running?dropWhileRunningText(list):dropWarningText(list.length>1?list:run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
  const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
  // the finishing result needs a free slot: no pin that would leave fewer unpinned runs than it drops
