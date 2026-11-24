@@ -566,7 +566,28 @@ link showing Run 1 under Results; two template runs matched with no such line; s
 1** to **Pin Run 5** on the drop line each reading *Run N pinned. If you run: drops Run N+1 (…) · pin
 it to keep it* and Pin hidden for the last unpinned run; and the next result dropping Run 6 with *…
 Run 6 (500 × 220 nm · 2 modes) was dropped; every other earlier run is pinned, so no other run can be
-dropped instead* and no swap button; no horizontal overflow at 1440 × 900 or 390 × 844.
+dropped instead* and no swap button; no horizontal overflow at 1440 × 900 or 390 × 844. Since round
+23 the R22 stage expects the slab warning's short row (*Substrate touches the window edge: in a closed
+window its slab modes come first.*, the full sentence in Optical modes) and the drop words with the
+run list's parts (*Run 6 (closed · 500 × 220 nm) was dropped; …*).
+Since round 23 (pre-registered P1 to P4 and P6; P5 is the project script's K5 stage) a further stage
+in its own browser context (R23) checks, on T18's geometry: the plan line's row reading the whole
+short sentence with both buttons inside the box beside Run study and on screen, no ellipsis, no line
+clamp and nothing cut, at 1440 × 900 and 390 × 844, and the full sentence in Optical modes (P1); with
+the group index on before any run *Closed window · group index on (3 solves)* with **Turn off group
+index**, after a closed 4-mode run without it *… · about N s* (3 × its time), the button turning the
+option off (*Closed window · last such run m:ss*, the box unchecked, *Group index off: …*), and after
+a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB) giving *… Session is now
+N MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected
+and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and the effective areas.
+Browser recovery already keeps only those fields.*, wrapped in Messages with no overflow, and the
+header *… · kept for recovery in this browser without the fields of 4 runs* (P2); with six runs the
+drop line, **Pin Run 1** to **Pin Run 3**, the dropped words and the swap button naming a closed n_g
+run (*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), an open run
+(*Run 3 (open (PML 1 µm) · …)*) and a closed-near run (*Run 4 (closed near 2.46 · 4 modes · …)*), each
+equal to its run-list label up to the material (P4); and the line under an open run and an n_g run
+naming the boundary, the search, Modes to find and n_g with *unchanged:* for the rest (P6); no
+horizontal overflow at 1440 × 900 or 390 × 844.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -679,9 +700,12 @@ Compare picker read the same numbers as before, no numbering sentence is said, a
 Run 8. The browser is closed again and **Restore newest from this browser** restores both models:
 the same optical and heated numbers, *Restored Optical waveguide (6 runs) and Heated silicon
 waveguide (1 run) from this browser, not recomputed.* and the header *both-models · recovered from
-this browser · not saved to a file · …*, then the ordinary header after the next change; no
+this browser · changed since both-models.json, not saved · kept for recovery in this browser*
+(round 23, E5; *… · not saved to a file · …* before, read once recovery has kept the restored
+session), then the ordinary header after the next change; no
 horizontal overflow at 1440 × 900 or 390 × 844. The round-19 restore of the file opened now names the
-project (*Heater study · recovered from this browser · …*), the workspace script's reduced session
+project (*Heater study · recovered from this browser · changed since heater-study.json, not saved ·
+…* since round 23), the workspace script's reduced session
 of six runs after a drop is version 12, and its round-19 restore keeps the run numbers and says
 nothing about numbering. The format's fixtures are
 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json` (written by this Studio with
