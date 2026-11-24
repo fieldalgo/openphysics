@@ -110,8 +110,10 @@ cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), �
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
 Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 이름을 **File › Open…**으로 연 프로젝트 파일의
 이름처럼 프로젝트의 파일로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 묻지 않고 그 이름으로 다시 내려받으며
-(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name it
-<name> (1).json.*), Save As도 그 이름으로 시작합니다. 그 파일을 쓰거나 연 뒤로 프로젝트의 모델이 바뀌었으면(광학
+(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may add a number
+such as “ (1)” to its name.*; round 18: 전에는 (1) 사본이 이미 있어도 *<name> (1).json*이라 했음), Save As도 그 이름으로
+시작합니다. 프로젝트를 저장할 때마다 이름 대화상자는 파일에 담길 모델과 각 모델의 실행 수도 밝힙니다: *The file will hold
+Optical waveguide (2 runs) and Heated silicon waveguide (1 run).*(round 18; 열 전도나 Joule 가열 모델은 *(no runs)*). 그 파일을 쓰거나 연 뒤로 프로젝트의 모델이 바뀌었으면(광학
 모델을 저장한 뒤 가열 모델을 더한 경우처럼) **Save**는 대신 그 이름을 채운 Save As 이름 대화상자를 열고 까닭을 밝힙니다: *This
 project now holds Optical waveguide and Heated silicon waveguide; study.json holds Optical waveguide. Save under
 this name or another.*(round 17). 저장 선택 창에서 기억한 파일은 전처럼 씁니다. 파일이 프로젝트를 대신하면 저장 대화상자에서 기억한

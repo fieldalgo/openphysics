@@ -84,9 +84,20 @@ export function saveRoute(file, {saveAs = false, picker = false} = {}) {
 /** The Save As name dialog's line on what later saves do (round 14). */
 export const LATER_SAVES_NOTE = 'Later saves download again under this name; your browser may add “ (1)”.';
 
-/** The sentence after a download under a name already downloaded: the browser cannot replace it. */
-export function downloadAgainNote(name) {
-  return `A download cannot replace the earlier file, so your browser may name it ${String(name).replace(/\.json$/i, '')} (1).json.`;
+/** The sentence after a download under a name already downloaded: the browser cannot replace it.
+ * Round 18 (X5): "a number such as (1)", since a browser that already has a (1) copy adds (2). */
+export function downloadAgainNote() {
+  return 'A download cannot replace the earlier file, so your browser may add a number such as “ (1)” to its name.';
+}
+
+/** The Save and Save As name dialog's line on what a project file will hold (round 18, X5): every
+ * model with its run count, "The file will hold Optical waveguide (2 runs) and Heated silicon
+ * waveguide (1 run)." models: [{title, runs}]; a model without runs reads "(no runs)". */
+export function fileHoldsText(models) {
+  const one = m => `${m.title} (${m.runs > 0 ? `${m.runs} ${m.runs === 1 ? 'run' : 'runs'}` : 'no runs'})`;
+  const list = models.map(one);
+  const words = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0] || 'no model';
+  return `The file will hold ${words}.`;
 }
 
 /** Writes text to a file handle. Chromium writes to a temporary file and replaces the file only

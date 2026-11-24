@@ -42,7 +42,7 @@ import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -231,6 +231,9 @@ function resetProject({name=null,ids=null,nameFrom=null}={}){
 // model's id in the project (m1, m2, …), which an edit or Reset design does not change
 const modelList=()=>projectModels().map(m=>({key:m.id,title:m.title}));
 const modelsChanged=file=>Array.isArray(file?.models)&&JSON.stringify(file.models.map(m=>m.key))!==JSON.stringify(modelList().map(m=>m.key));
+// The models a project file will hold, each with its runs (round 18, X5): optical and multiphysics
+// runs are written; heat and Joule heating results are not, so those models read "(no runs)".
+const projectHoldsText=()=>fileHoldsText(projectModels().map(m=>({title:m.title,runs:m.kind==='multiphysics'?multiView.projectRuns():workspaceCard()==='optical'?runs.length:0})));
 function modelsChangedText(file,name){
  const titles=list=>list.length?list.map(m=>m.title).join(' and '):'no model';
  return `This project now holds ${titles(modelList())}; ${name} holds ${titles(file.models)}. Save under this name or another.`;
@@ -1307,17 +1310,21 @@ const recoveredFileName=(savedFile,openedFile,openedCurrent)=>savedFile?.current
 // The name dialog, where the browser has no save picker or the picker could not be used: the
 // file name (letters, digits, spaces, . _ - ( ) only; .json added), then a download.
 const nameDialog=document.createElement('dialog');nameDialog.id='save-name-dialog';nameDialog.setAttribute('aria-labelledby','save-name-title');nameDialog.setAttribute('aria-describedby','save-name-note');
-nameDialog.innerHTML='<form method="dialog"><h2 id="save-name-title">Save As</h2><p id="save-name-unavailable" hidden></p><label for="save-name-input">File name</label><input id="save-name-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" aria-describedby="save-name-hint"><small id="save-name-hint">Letters, digits, spaces and . _ - ( ) only; .json is added if missing.</small><p id="save-name-note">Your browser saves to its Downloads folder, or asks where if you set it to.</p><div class="leave-actions"><button type="button" id="save-name-cancel">Cancel</button> <button type="submit" id="save-name-download" class="primary">Download</button></div></form>';
+nameDialog.innerHTML='<form method="dialog"><h2 id="save-name-title">Save As</h2><p id="save-name-contents" hidden></p><p id="save-name-unavailable" hidden></p><label for="save-name-input">File name</label><input id="save-name-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" aria-describedby="save-name-hint"><small id="save-name-hint">Letters, digits, spaces and . _ - ( ) only; .json is added if missing.</small><p id="save-name-note">Your browser saves to its Downloads folder, or asks where if you set it to.</p><div class="leave-actions"><button type="button" id="save-name-cancel">Cancel</button> <button type="submit" id="save-name-download" class="primary">Download</button></div></form>';
 document.body.append(nameDialog);
 // Round 16: the Save As note on the download path (the Chrome and Edge sentence is in the docs only)
 const DOWNLOAD_SAVE_AS_NOTE='This browser cannot write to the file, so later saves download again under this name and may add “ (1)”.';
 let nameAnswer=null;
 // Resolves the sanitised name, or null on Cancel or Escape.
+// nameDialogContents: what a project file will hold (round 18, X5), set for the time of a project save
+// (deliverProject), so the dialog says it on every project save; null for other files
+let nameDialogContents=null;
 function askFileName(suggested,{saveAs,unavailable=null,why=null}){
  return new Promise(resolve=>{
   const opener=document.activeElement;
   nameAnswer=value=>{nameAnswer=null;if(nameDialog.open)nameDialog.close();restoreDialogFocus(opener);resolve(value);};
   $('save-name-title').textContent=saveAs?'Save As':'Save';
+  const contents=nameDialogContents;$('save-name-contents').hidden=!contents;$('save-name-contents').textContent=contents||'';
   // why: the reason Save asks (round 17, U8), in the same line as an unavailable picker's
   $('save-name-unavailable').hidden=!unavailable&&!why;$('save-name-unavailable').textContent=[why,unavailable?`The browser's save dialog was not available (${unavailable}), so the file is downloaded instead.`:''].filter(Boolean).join(' ');
   $('save-name-note').textContent='Your browser saves to its Downloads folder, or asks where if you set it to.'+(saveAs?' '+DOWNLOAD_SAVE_AS_NOTE:' If that folder already has a file of this name, the browser may add “ (1)” to the new one.');
@@ -1749,7 +1756,7 @@ function askProjectOverflow(model,question,multi,{saveAs,keep}){
 // else the name dialog and a download; the name suggested is the project file's, else the project
 // name's (untitled-project.json), never a model file's name. Resolves {written, name, via, ...}.
 function deliverProject(makeText,{saveAs}){
- savingFile=true;const scope=project.scope,target=project.file&&project.file.scope===scope?project.file:null;
+ savingFile=true;nameDialogContents=projectHoldsText();const scope=project.scope,target=project.file&&project.file.scope===scope?project.file:null;
  const prefill=target?target.name:projectFileName(project.name);
  const models=modelList(),keep=(name,how,handle=null)=>{if(project.scope===scope){project.file=rememberFile({name,how,handle,scope});if(project.file)project.file.models=models;}};
  return saveToFile(makeText,{suggestedName:prefill,target,saveAs,description:PROJECT_PICKER_DESCRIPTION}).then(async result=>{
@@ -1770,7 +1777,7 @@ function deliverProject(makeText,{saveAs}){
   if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs})};
   downloadFile(new Blob([makeText(name)],{type:'application/json'}),name);keep(name,'download');
   return {written:true,name,via:'download',after:''};
- }).finally(()=>{savingFile=false;});
+ }).finally(()=>{savingFile=false;nameDialogContents=null;});
 }
 $('save-session').onclick=()=>{saveProjectFile({saveAs:false});};
 $('menu-save').onclick=()=>{saveProjectFile({saveAs:false});};

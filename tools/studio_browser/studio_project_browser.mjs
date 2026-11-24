@@ -280,7 +280,7 @@ try {
       const again = await newDownload(before), againMessage = await status();
       stage('V-P11 Save again', {again, message: againMessage, title: await title()});
       assert.match(again, /^heater-study(?: \(\d\))?\.json$/);
-      assert.equal(againMessage, "Downloaded heater-study.json again: Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). A download cannot replace the earlier file, so your browser may name it heater-study (1).json.");
+      assert.equal(againMessage, "Downloaded heater-study.json again: Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). A download cannot replace the earlier file, so your browser may add a number such as “ (1)” to its name.");
       assert.equal(withoutTime(await readFile(join(downloads, again), 'utf8')), withoutTime(text), 'the same project but for its save time');
     }
     // V-P7: the server restarted, a new browser with a new profile, then File › Open

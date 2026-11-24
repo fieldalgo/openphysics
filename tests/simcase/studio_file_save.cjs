@@ -140,7 +140,7 @@ test('Save downloads under a known name without asking; Save As and no name ask;
  assert.equal(F.saveRoute(known,{saveAs:false,picker:true}),'picker');
  assert.equal(F.saveRoute(null,{saveAs:true,picker:true}),'picker');
  assert.equal(F.saveRoute(picked,{saveAs:true,picker:true}),'picker');
- assert.equal(F.downloadAgainNote('design-a-ng.json'),'A download cannot replace the earlier file, so your browser may name it design-a-ng (1).json.');
+ assert.equal(F.downloadAgainNote('design-a-ng.json'),'A download cannot replace the earlier file, so your browser may add a number such as “ (1)” to its name.');
 });
 test('saveToFile: a known name without a picker is downloaded as is; the picker is offered it as the name',async()=>{
  const known={name:'design-a-ng.json',handle:null};
