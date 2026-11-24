@@ -18,3 +18,16 @@ test('X10: a card of a model in the project reads "Return to model (N runs)"; ot
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("if(workspaceInProject()&&workspaceCard())returnTo[workspaceCard()]=workspaceCard()==='optical'?runs.length:0;if(multiView.inProject())returnTo['heated-waveguide']=multiView.projectRuns();"));
 });
+
+test('X5: the project name dialog always says what the file holds; the after-save note says "a number such as (1)"',async()=>{
+ const F=await import(STATIC+'workspace-files.mjs');
+ assert.equal(F.fileHoldsText([{title:'Optical waveguide',runs:2},{title:'Heated silicon waveguide',runs:1}]),'The file will hold Optical waveguide (2 runs) and Heated silicon waveguide (1 run).');
+ assert.equal(F.fileHoldsText([{title:'Steady heat conduction',runs:0}]),'The file will hold Steady heat conduction (no runs).');
+ assert.equal(F.downloadAgainNote('x.json'),'A download cannot replace the earlier file, so your browser may add a number such as “ (1)” to its name.');
+ const app=read('workspace-app.mjs');
+ // set for the time of a project save, so both of its routes through the dialog show it
+ assert.ok(app.includes("function deliverProject(makeText,{saveAs}){\n savingFile=true;nameDialogContents=projectHoldsText();"));
+ assert.ok(app.includes("}).finally(()=>{savingFile=false;nameDialogContents=null;});"));
+ assert.ok(app.includes('<h2 id="save-name-title">Save As</h2><p id="save-name-contents" hidden></p><p id="save-name-unavailable" hidden></p>'));
+ assert.ok(app.includes("const contents=nameDialogContents;$('save-name-contents').hidden=!contents;$('save-name-contents').textContent=contents||'';"));
+});

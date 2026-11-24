@@ -125,8 +125,11 @@ Downloads*. Opened by **Save**, the dialog also says that the browser may add �
 Downloads folder already has a file of that name. Studio cannot know that a download was kept.
 Studio remembers the name as the project's file, as it does the name of a project file opened
 with **File › Open…**: **Save** (and Ctrl+S) then downloads under it again without asking
-(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may name
-it <name> (1).json.*), and Save As starts with it. When the project's models changed since that file
+(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may add a
+number such as “ (1)” to its name.*; round 18: it named *<name> (1).json* even when a (1) copy already
+existed), and Save As starts with it. On every project save the name dialog also says what the file
+will hold, each model with its runs: *The file will hold Optical waveguide (2 runs) and Heated
+silicon waveguide (1 run).* (round 18; a heat or Joule heating model reads *(no runs)*). When the project's models changed since that file
 was written or opened (a model added, such as the heated model after the optical one was saved),
 **Save** opens the Save As name dialog instead, prefilled with that name and saying why: *This
 project now holds Optical waveguide and Heated silicon waveguide; study.json holds Optical

@@ -1567,7 +1567,7 @@ try {
     stage('O1 Save under the Save As name', {first: o1First, edited: o1Edited, second: o1Second, message: o1SecondMessage, header: o1SecondHeader});
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
-    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
+    assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
     // Ctrl+S after another edit: the same, no dialog
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
@@ -1586,7 +1586,7 @@ try {
     const o1OpenedEdited = await header(); assert.match(o1OpenedEdited, /^design-a-ng · design-a-ng\.json · changed since opened · /);
     before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after Open');
     const o1Fourth = await newDownload(before); assert.match(o1Fourth, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Fourth), 640);
-    assert.match(await status(), /^Project file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may name it design-a-ng \(1\)\.json\.$/);
+    assert.match(await status(), /^Project file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     // P3 (intended change): Reset design edits a model of the project, so the project file is
     // kept: the header still names it, changed, and Save downloads under it with no dialog
     await page.click('#reset'); await sleep(300); const o1Reset = await header();

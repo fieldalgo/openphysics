@@ -525,7 +525,7 @@ print(n)`;
     const sessionOf = text => JSON.parse(text).models.find(m => m.kind === 'multiphysics').session;
     assert.match(second.name, /^heated-design(?: \(\d\))?\.json$/); assert.deepEqual(sessionOf(second.text).runs.map(r => r.job), sessionOf(first.text).runs.map(r => r.job), 'the same runs');
     assert.equal(JSON.stringify(sessionOf(first.text)), JSON.stringify(JSON.parse(c2.text)), 'the project entry is the session file of the same state');
-    assert.match(message, /^Downloaded heated-design\.json again: Heated silicon waveguide \(2 runs, the without-heater result\)\. A download cannot replace the earlier file, so your browser may name it heated-design \(1\)\.json\.$/);
+    assert.match(message, /^Downloaded heated-design\.json again: Heated silicon waveguide \(2 runs, the without-heater result\)\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     assert.match(footer, /^heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.match(title, /^heated-design · heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.'); }
