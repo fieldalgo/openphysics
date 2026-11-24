@@ -238,8 +238,13 @@ so together the eight run every collected test exactly once; no test is
 selected by name. The end of each log names the part's files, tests and
 estimated time. On one job the suite took 44 to 70 minutes on 2026-11-20,
 depending on the runner CPU, and its four parts 10 to 21 minutes on 2026-11-21;
-a part of eight is about 5.5 minutes of tests by the table plus about 3 minutes
-of setup, and its 45-minute limit only stops hung runs. Since files are
+by the table of PR #349's run 45409971229 (2026-11-24, every collected file listed)
+a part of eight is about 21.5 minutes of tests plus about 3 minutes of setup, and its
+45-minute limit only stops hung runs. A file missing from the table is counted as the
+median, a few seconds, however long it runs: rebuild the table from a complete run's
+`source-tests-*.xml` when files are added (part 5 of main's run 45415835896 reached the
+limit after the 3-minute `test_studio_closed_target.py` was added, unlisted, on a slow
+runner). Since files are
 assigned whole, the largest file is a part's floor
 (`tools/tests/test_examples_smoke.py`, 5.7 minutes, whose examples run in an
 order that the file keeps); the 5.5-minute M3 slab refinement study has its own
