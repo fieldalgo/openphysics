@@ -159,3 +159,18 @@ test('P4 (V4): a result that drops a run with every other earlier run pinned say
  assert.ok(read('workspace-multiphysics-view.mjs').includes("noSwapNote=dropped.length&&!swapCandidate(runs,completed)?droppedWords:'';"));
  assert.ok(read('workspace-multiphysics-view.mjs').includes("(dropSwap?' '+dropSwap.note:noSwapNote?' '+noSwapNote:''),swapAction());return;}"));
 });
+
+test('P6 (V6): Use this run\'s inputs does not say that Undo returns the search target',()=>{
+ const app=read('workspace-app.mjs'),use=body(app,'function useRunInputs(run){','const runNumberTitle=');
+ assert.ok(app.includes("const TARGET_NOT_UNDONE='Modes to return is set and is not part of Undo.';"));
+ assert.ok(use.includes("const undo=!targetChange.length?'The next run uses them; Undo takes them back.':inputs.length?`The next run uses them; Undo takes back the other inputs. ${TARGET_NOT_UNDONE}`:`The next run uses it. ${TARGET_NOT_UNDONE}`;"));
+ assert.ok(use.includes("returned=t=>t==null?'highest n_eff':'nearest to '+shortTarget(t)"));
+ // the words of the three cases
+ const text=(changes,target)=>{const returned=t=>t==null?'highest n_eff':'nearest to '+t,tc=target?[`Modes to return ${returned(target[0])} → ${returned(target[1])}`]:[];
+  const undo=!tc.length?'The next run uses them; Undo takes them back.':changes.length?'The next run uses them; Undo takes back the other inputs. Modes to return is set and is not part of Undo.':'The next run uses it. Modes to return is set and is not part of Undo.';
+  return `Current inputs set from Run 4: ${[...changes,...tc].join(' · ')}. ${undo}`;};
+ assert.equal(text([],[null,'2.46']),'Current inputs set from Run 4: Modes to return highest n_eff → nearest to 2.46. The next run uses it. Modes to return is set and is not part of Undo.');
+ assert.equal(text(['Modes to find 2 → 4'],[null,'2.46']),'Current inputs set from Run 4: Modes to find 2 → 4 · Modes to return highest n_eff → nearest to 2.46. The next run uses them; Undo takes back the other inputs. Modes to return is set and is not part of Undo.');
+ // no message of the page says that Undo takes back the search target
+ for(const name of ['workspace-app.mjs','workspace-closed-target.mjs'])assert.ok(!/Undo (takes|returns)[^.\n]*(search|Search near|target|Modes to return)/.test(read(name)),name);
+});

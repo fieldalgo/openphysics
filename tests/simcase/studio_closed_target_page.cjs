@@ -147,7 +147,8 @@ test('Use this run\'s inputs restores the box and the target of a closed targete
  // the run's target (or off) after the inputs file is restored, named in the change list
  assert.ok(body.includes('const runTarget=runSearchTarget(run)'),body);
  assert.ok(body.includes('restoreEdit(doc,null);state.searchTarget=runTarget;'),body);
- assert.ok(body.includes("`Search near n_eff ${priorTarget==null?'off':shortTarget(priorTarget)} → ${runTarget==null?'off':shortTarget(runTarget)}`"),body);
+ // round 22 (V1, V6): named as Modes to return
+ assert.ok(body.includes("`Modes to return ${returned(priorTarget)} → ${returned(runTarget)}`"),body);
  // the page's signature and document read the same target
  assert.ok(app.includes('const signature = () => studySignature(current(), state.modeCount, state.groupIndex, pmlNow(), closedTargetNow());'));
  assert.ok(app.includes('const opticalDocument=()=>buildOpticalDocument({...state,searchTarget:closedTargetNow()},setup);'));

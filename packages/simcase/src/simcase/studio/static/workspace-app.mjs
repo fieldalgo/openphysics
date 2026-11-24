@@ -900,13 +900,19 @@ function useRunInputs(run){
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
  const prior=inputsFile(),priorTarget=closedTargetNow(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
  // slice C2: the closed window's Search near n_eff is not in the inputs file; the run's comes back with it (on and its target, or off)
- const runTarget=runSearchTarget(run),targetChange=priorTarget===runTarget?[]:[`Search near n_eff ${priorTarget==null?'off':shortTarget(priorTarget)} → ${runTarget==null?'off':shortTarget(runTarget)}`];
+ // round 22 (V1, V6): named as Modes to return; the target is set here and is not part of Undo, so
+ // the message does not say that Undo takes it back
+ const runTarget=runSearchTarget(run),returned=t=>t==null?'highest n_eff':'nearest to '+shortTarget(t),targetChange=priorTarget===runTarget?[]:[`Modes to return ${returned(priorTarget)} → ${returned(runTarget)}`];
  // only the settings that change, from → to (round 13); the same words stay where the button was
  // until the next input edit (round 14), so they are kept before the redraw
- const changed=[...inputChanges(prior,doc),...targetChange],text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. The next run uses them; Undo takes them back.`;
+ const inputs=inputChanges(prior,doc),changed=[...inputs,...targetChange];
+ const undo=!targetChange.length?'The next run uses them; Undo takes them back.':inputs.length?`The next run uses them; Undo takes back the other inputs. ${TARGET_NOT_UNDONE}`:`The next run uses it. ${TARGET_NOT_UNDONE}`;
+ const text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. ${undo}`;
  runInputsNote={text,revision:edits.revision,job:run.job};
  restoreEdit(doc,null);state.searchTarget=runTarget;inputsChangedSinceResult();render();notice(text);
 }
+// round 22 (V6): Use this run's inputs sets the closed window's Modes to return, which Undo does not change
+const TARGET_NOT_UNDONE='Modes to return is set and is not part of Undo.';
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)
 function restoreEdit(doc,label){
