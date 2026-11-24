@@ -48,3 +48,19 @@ test('Z3: each return card names its model, so two never read alike',async()=>{
  assert.equal(new Set(titles).size,titles.length);
  assert.ok(read('workspace-applications.mjs').includes('returnToModelText(returnTo[app.id],app.title)'));
 });
+
+test('Z4: the box and the card name one time for one record',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ // a record relinked to the project file after a project save: savedAt 8:30, the file saved 8:31
+ const relinked={runs:2,model:'Optical waveguide',names:['Run 1','Run 2'],savedAt:'8:30',file:'both-models.json',fileCurrent:true,fileSavedAt:'8:31'};
+ const newest={runs:1,model:'Heated silicon waveguide',names:['Run 1'],savedAt:'8:32'};
+ const t=x=>x;
+ assert.equal(A.offerSavedAt(relinked),'8:31');
+ const box=A.resumeChoices(newest,[{...relinked,index:0}],t)[1].label,card=A.cardResumeChoice(relinked,'Optical waveguide',t,{older:true}).label;
+ assert.equal(box,'Restore from this browser: Optical waveguide · 2 runs · Run 1, Run 2 · same as file both-models.json · older · saved 8:31');
+ assert.equal(card,'Restore from this browser · Optical waveguide · Run 1, Run 2 · older · same as file both-models.json, saved 8:31');
+ // a record changed since its file, or with no file save time, names its own time in both
+ for(const item of [{...relinked,fileCurrent:false},{...relinked,fileSavedAt:undefined},{...relinked,file:null}])assert.equal(A.offerSavedAt(item),'8:30');
+ // the order still follows the records' own times
+ assert.deepEqual(A.resumeChoices({...relinked,savedAt:'2026-11-24T08:30:00Z',fileSavedAt:'2026-11-24T08:31:00Z'},[{...newest,savedAt:'2026-11-24T08:30:30Z',index:0}],t).map(c=>c.kind),['earlier','latest']);
+});

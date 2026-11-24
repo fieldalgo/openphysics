@@ -65,6 +65,12 @@ export function offerTime(savedAt,now=new Date()){
 // Round 19 (Y1): an offer that is not the newest stored session with runs says so, with its save
 // time: " · older · saved 5:38 AM", " · older · same as file x, saved T", " · older · browser copy T ·
 // same as file x".
+// Round 20 (Z4): one time for one record, in the card and in the top box alike. After a project
+// save the stored record of the model not shown is relinked to the file (relinkRecords): it then
+// names the file and its save time while its own savedAt stays older, so the card said the file's
+// time and the box the record's. Both now say offerSavedAt: the file's save time for a record that
+// still matches a file it was saved to, else the record's own time.
+export const offerSavedAt=item=>item.file&&item.fileCurrent===true&&item.fileSavedAt?item.fileSavedAt:item.savedAt;
 function offerTimeWords(item,when,older=false){
  const old=older?' · older':'';
  if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return `${old} · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
@@ -107,7 +113,7 @@ export function resumeChoices(latest,earlier=[],when=offerTime){
  return [...(newest?[{...newest,newest:true}]:[]),...all].map(e=>{
   const older=!!newest&&!e.newest&&!(time(e)>time(newest));
   return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),
-   label:`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(e.item.savedAt)}`};
+   label:`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
  });
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
