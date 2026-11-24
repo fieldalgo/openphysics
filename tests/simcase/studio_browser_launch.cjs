@@ -51,3 +51,47 @@ test('a browser that never answers is stopped before the relaunch, and its signa
   assert.ok(owned.every(c=>c.exitCode!==null||c.signalCode!==null),'each attempt was stopped');
  }finally{for(const c of owned)c.kill();}
 });
+// endScript: a browser script ends even when a process it started ignores SIGTERM, or a process it
+// did not start itself (a browser's helper) keeps its stdout pipe open. On 2026-11-24 the project
+// script passed on macOS and then ran until the CI job's limit with a Chrome process left.
+// The "script" is a child Node process, since endScript exits the process it runs in.
+// stubborn: ignores SIGTERM. holder: starts a grandchild that inherits the stub's stdout, prints
+// the grandchild's pid and exits, so the stub's stdout pipe stays open after the stub is gone.
+const STUB=`const mode=process.argv[1];
+if(mode==='stubborn'){process.on('SIGTERM',()=>{});setInterval(()=>{},1000);}
+else{const g=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:['ignore','inherit','inherit'],detached:true});g.unref();process.stderr.write('grandchild '+g.pid+'\\n');setTimeout(()=>process.exit(0),200);}`;
+function script(mode,exitCode){
+ const body=`import {spawn} from 'node:child_process';import {endScript} from ${JSON.stringify(HELPER)};
+const owned=[];const c=spawn(process.execPath,['-e',${JSON.stringify(STUB)},${JSON.stringify(mode)}],{stdio:['ignore','pipe','pipe']});owned.push(c);
+let err='';c.stderr.on('data',x=>{err+=x;process.stderr.write(x);});c.stdout.on('data',()=>{});
+await new Promise(r=>setTimeout(r,800));
+${exitCode===null?'':`process.exitCode=${exitCode};`}
+await endScript(owned,'[fake browser] '+(${JSON.stringify(mode)})+' done',500);`;
+ const started=Date.now();
+ const p=spawn(process.execPath,['--input-type=module','-e',body],{stdio:['ignore','pipe','pipe']});
+ let out='',err='';p.stdout.on('data',x=>{out+=x;});p.stderr.on('data',x=>{err+=x;});
+ return new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>{p.kill('SIGKILL');reject(new Error('script did not exit within 20 s: '+err));},20000);
+  p.on('exit',(code,signal)=>{clearTimeout(timer);resolve({code,signal,out,err,ms:Date.now()-started});});
+ });
+}
+test('endScript stops a child that ignores SIGTERM and exits with process.exitCode',async()=>{
+ const {END_WAIT_MS}=await import(HELPER);
+ assert.equal(END_WAIT_MS,10000);
+ const r=await script('stubborn',null);
+ assert.equal(r.code,0,r.err);assert.equal(r.signal,null);
+ assert.equal(r.out,'[fake browser] stubborn done\n');
+ const failed=await script('stubborn',1);
+ assert.equal(failed.code,1,failed.err);assert.equal(failed.out,'[fake browser] stubborn done\n');
+});
+test('endScript exits while a process it did not start still holds its stdout pipe',async()=>{
+ const r=await script('holder',null);
+ const found=r.err.split('\n').find(l=>l.startsWith('grandchild '));
+ try{
+  assert.equal(r.code,0,r.err);assert.equal(r.out,'[fake browser] holder done\n');
+  assert.ok(found,'the stub reported its grandchild: '+r.err);
+ }finally{
+  const pid=found?Number(found.slice('grandchild '.length)):NaN;
+  if(Number.isInteger(pid)){try{process.kill(pid,'SIGKILL');}catch{}}
+ }
+});

@@ -74,7 +74,11 @@ Optional tools and data:
   directory. Every failed attempt is recorded in `report.json` (`browserLaunch`: the command line,
   the exit code or signal and the last 4000 characters of stderr), and a second failure fails the
   check. Only the launch is retried, never a Studio stage; `tests/simcase/studio_browser_launch.cjs`
-  checks this with a fake browser.
+  checks this with a fake browser. At the end, each of the four scripts stops the processes it
+  started (SIGTERM, then SIGKILL after 10 s), prints its last line and exits with its status, so a
+  browser process that outlives it, or holds its output pipe, cannot keep a finished check running
+  (on 2026-11-24 the project script passed on macOS and then ran until the job's limit); the same
+  test checks this with a child that ignores SIGTERM and one that leaves a pipe open.
 
 The source Studio Node step runs every `tests/simcase/*.cjs` contract, including
 the experimental workspace. Distribution validation additionally copies the

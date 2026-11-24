@@ -21,7 +21,7 @@ import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {launchBrowser} from './browser_launch.mjs';
+import {endScript, launchBrowser} from './browser_launch.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   index % 2 ? pairs : [...pairs, [value.replace(/^--/, ''), all[index + 1]]], []));
@@ -2455,5 +2455,5 @@ try {
   await Promise.race([Promise.all(owned.map(c => c.done)), sleep(10000)]);
   await rm(profile, {recursive: true, force: true}).catch(() => {});
   await save();
-  console.log('[workspace browser]', report.status, report.error || '');
+  await endScript(owned, ['[workspace browser]', report.status, report.error || ''].join(' '));
 }

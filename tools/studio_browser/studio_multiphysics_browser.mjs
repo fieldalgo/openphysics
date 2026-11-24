@@ -24,7 +24,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
-import {launchBrowser} from './browser_launch.mjs';
+import {endScript, launchBrowser} from './browser_launch.mjs';
 import {fileURLToPath} from 'node:url';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
@@ -566,5 +566,5 @@ try {
   for (const child of owned) child.kill();
   await save();
   await rm(profile, {recursive: true, force: true}).catch(() => {});
-  console.log('[multiphysics browser]', report.status, report.error || '');
+  await endScript(owned, ['[multiphysics browser]', report.status, report.error || ''].join(' '));
 }
