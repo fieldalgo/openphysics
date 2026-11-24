@@ -41,34 +41,14 @@ test('Y2: the optical open and recovery messages say the runs are numbered from 
  assert.ok(!read('workspace-multiphysics-view.mjs').includes('numbered from 1'));
 });
 
-test('Y4: before the six-run limit drops a run, Run study asks: Pin Run N and run, Run, Cancel',async()=>{
+test('Y4 (round 21 W2): Run study no longer asks; the line beside it stays',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs');
- const shape={type:'rect',name:'Core',material:'Silicon',x:-350,y:0,w:700,h:300};
- const run=n=>({number:n,label:'',pinned:false,input:{model:{shapes:[shape]}},settings:{mode_count:4}});
- const runs=[1,2,3,4,5,6].map(run);
- assert.deepEqual(W.opticalDropQuestion(runs[2],runs),{title:'Running drops Run 3 (700 × 300 nm · 4 modes).',note:'Up to six runs are kept; a pinned run is never dropped.',pin:'Pin Run 3 and run',run:'Run',cancel:'Cancel'});
- // the last unpinned run cannot be pinned: the new run would have no slot
- const pinned=runs.map((r,i)=>({...r,pinned:i!==5}));
- assert.equal(W.opticalDropQuestion(pinned[5],pinned).pin,null);
- // a named run, and the heated model's words
- assert.equal(W.opticalDropQuestion({...runs[0],label:'Design A'},runs).title,'Running drops Run 1 · Design A (700 × 300 nm · 4 modes).');
- assert.deepEqual(W.dropQuestion('Run 3 (run at 05:31 AM)',3),{title:'Running drops Run 3 (run at 05:31 AM).',note:'Up to six runs are kept; a pinned run is never dropped.',pin:'Pin Run 3 and run',run:'Run',cancel:'Cancel'});
- const app=read('workspace-app.mjs');
- // the dialog: modal, labelled, Escape cancels, the first answer focused, focus back to the opener
- assert.ok(app.includes("dropDialog.id='run-drop-confirm';dropDialog.setAttribute('aria-labelledby','run-drop-confirm-title');dropDialog.setAttribute('aria-describedby','run-drop-confirm-description');"));
- assert.ok(app.includes("dropDialog.oncancel=event=>{event.preventDefault();dropAnswer?.(null);};"));
- assert.ok(app.includes("dropAnswer=answer=>{dropAnswer=null;runQuestion=false;dropDialog.close();render();restoreDialogFocus(opener);resolve(answer);};"));
- assert.ok(app.includes("if(!dropDialog.open)dropDialog.showModal();(question.pin?pin:$('run-drop-confirm-run')).focus();"));
- // the optical Run study asks first, and checks the state again after the answer
- assert.ok(app.includes(" if(!await confirmOpticalDrops())return;\n // the question waited for an answer: the state is checked again\n"));
- // Pin Run N and run pins it and asks again for the run that would then be dropped
- assert.ok(app.includes("for(let run=nextDropped(runs,RUN_LIMIT);run;run=nextDropped(runs,RUN_LIMIT)){"));
- // the heated model asks with the same dialog
- const view=read('workspace-multiphysics-view.mjs');
- assert.ok(view.includes("run:()=>askedRun(),"));
- assert.ok(view.includes("dropQuestion(`${runTitle(r)} (run at ${runTime(r)})`,r.number,{canPin:runs.filter(x=>!x.pinned).length>1})"));
+ assert.equal(W.dropQuestion,undefined);assert.equal(W.opticalDropQuestion,undefined);assert.equal(W.DROP_QUESTION_NOTE,undefined);
+ const app=read('workspace-app.mjs'),view=read('workspace-multiphysics-view.mjs');
+ for(const text of ['dropDialog','askRunDrop','confirmOpticalDrops','await confirm'])assert.ok(!app.includes(text),text);
+ assert.ok(!view.includes('askedRun'));assert.ok(view.includes("run:()=>run(),"));
  // the limit and the line beside Run study stay
- assert.ok(app.includes("const host=$('run-drop'),run=runQuestion?null:nextDropped(runs,RUN_LIMIT);"));
+ assert.ok(app.includes("const host=$('run-drop'),run=list[0]||null;"));
 });
 
 test('Y3: a restore brings back the project name and file it was saved to, or names the file it was a copy of',async()=>{

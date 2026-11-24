@@ -97,29 +97,37 @@ export function numberRuns(list,used=0){
  return top;
 }
 // A run as the drop words name it: "Run 3 (700 × 300 nm · 4 modes)", "Run 3 · Design A (…)" when named.
-const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
+export const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
  return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count})`;};
 // The run the next run would drop (round 18, X3): with six runs kept, the oldest unpinned one (the
 // one appendRun drops); null below the limit or with every run pinned.
 export function nextDropped(runs,limit=6){return runs.length>=limit?runs.find(r=>!r.pinned)||null:null;}
+// Round 21 (W2): the unpinned runs the next result drops, oldest first (appendRun's order): as many
+// as the result puts over the limit, at most one while the tab holds six or fewer.
+export function droppedBy(runs,limit=6){return runs.filter(r=>!r.pinned).slice(0,Math.max(0,runs.length+1-limit));}
+// Runs in the drop words: "Run 3 (…)", "Run 1 (…) and Run 3 (…)". name: how the model names a run.
+export const dropRunsWords=(list,name=dropName)=>{const words=list.map(name);return words.length<3?words.join(' and '):words.slice(0,-1).join(', ')+' and '+words.at(-1);};
 // Its words beside Run study, before the run.
 // Round 20 (Z1): the line is about running, not a run in progress: "If you run: drops Run 3 (…) · pin it
-// to keep it".
-export const dropWarningText=run=>`If you run: drops ${dropName(run)} · pin it to keep it`;
-// Round 19 (Y4): Run study asks before the limit drops a run (the line beside Run study stays): the
-// dialog's heading "Running drops Run 3 (700 × 300 nm · 4 modes).", its note, and the answers
-// [Pin Run 3 and run] [Run] [Cancel]. name: the run as the heading names it; canPin: false when
-// that run is the last unpinned one (pinning it would leave no slot for the new run).
-// Round 20 (Z7): while the question is open the page says Run study waits for it (P04 waited about
-// seven minutes before seeing the dialog): the box beside Run study and the status bar.
-export const RUN_QUESTION_PLAN='Waiting for your answer: pin, run or cancel';
-export const RUN_QUESTION_STATUS='Run study is waiting for your answer';
-export const DROP_QUESTION_NOTE='Up to six runs are kept; a pinned run is never dropped.';
-export function dropQuestion(name,number,{canPin=true}={}){
- return {title:`Running drops ${name}.`,note:DROP_QUESTION_NOTE,pin:canPin?`Pin Run ${number} and run`:null,run:'Run',cancel:'Cancel'};
+// to keep it". A list of runs (round 21): "If you run: drops Run 1 (…) and Run 3 (…) · pin them to keep them".
+export const dropWarningText=(run,name=dropName)=>{const list=Array.isArray(run)?run:[run];
+ return `If you run: drops ${dropRunsWords(list,name)} · ${list.length>1?'pin them to keep them':'pin it to keep it'}`;};
+// Round 21 (W2): Run study starts at once (round 19's question is gone); while the run computes the
+// line says what its result drops: "When this run finishes, Run 3 (…) is dropped".
+export const dropWhileRunningText=(list,name=dropName)=>`When this run finishes, ${dropRunsWords(list,name)} ${list.length>1?'are':'is'} dropped`;
+// After the result: "Run 3 (…) was dropped" (Messages, after the run's own message).
+export const droppedAfterText=(list,name=dropName)=>`${dropRunsWords(list,name)} ${list.length>1?'were':'was'} dropped`;
+// The swap Messages offers after a drop (one run dropped, another unpinned run besides the new
+// result): "Keep Run 3 (…), drop Run 4 (…) instead", and what it says once done.
+export const keepInsteadLabel=(kept,other,name=dropName)=>`Keep ${runTitle(kept.number,kept.label||'')}, drop ${name(other)} instead`;
+export const keptInsteadText=(kept,other,name=dropName)=>`${name(kept)} is back; ${name(other)} was dropped instead.`;
+// The run the swap drops instead: the oldest unpinned run other than the new result, or null.
+export const swapCandidate=(runs,newest)=>runs.find(r=>!r.pinned&&r!==newest&&r.job!==newest?.job)||null;
+// The list after the swap: the kept run back at its place (by run number) and the other run out.
+export function swapDropped(runs,kept,other){
+ const next=runs.filter(r=>r!==other),at=next.findIndex(r=>Number.isInteger(r.number)&&r.number>kept.number);
+ next.splice(at<0?next.length:at,0,kept);return next;
 }
-// The optical model's question for the run nextDropped names.
-export const opticalDropQuestion=(run,runs)=>dropQuestion(dropName(run),run.number,{canPin:runs.filter(r=>!r.pinned).length>1});
 /** The message when the run limit dropped a run: "Run 3 (700 × 300 nm · 4 modes) was dropped: up
  * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
 export function droppedRunText(run){
