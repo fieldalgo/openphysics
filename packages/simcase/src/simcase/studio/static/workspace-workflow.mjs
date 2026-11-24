@@ -5,6 +5,7 @@ import {inputChanges} from './workspace-inputs.mjs';
 import {originText} from './workspace-multiphysics.mjs';
 import {studySignature} from './workspace-notebook.mjs';
 import {shortTarget,closedPlanText} from './workspace-closed-target.mjs';
+import {boundaryTag,studyTag} from './workspace-compare.mjs';
 
 // The words for a result whose inputs are not the current ones (optical, heat, Joule heating):
 // neutral, since an opened file or another selected run differs without any edit, and naming
@@ -130,9 +131,14 @@ export function numberRuns(list,used=0){
 // back (appendRun moves it to the end) keeps its number, so the tab puts it back at its place: a
 // session file holds its runs in increasing number order (version 12).
 export const inNumberOrder=list=>list.every(r=>Number.isInteger(r.number))?[...list].sort((a,b)=>a.number-b.number):list;
-// A run as the drop words name it: "Run 3 (700 × 300 nm · 4 modes)", "Run 3 · Design A (…)" when named.
-export const dropName=run=>{const modes=run.settings?.mode_count,count=Number.isInteger(modes)?` · ${modes} ${modes===1?'mode':'modes'}`:'';
- return `${runTitle(run.number,run.label||'')} (${geometryWords(run.input.model)}${count})`;};
+// A run as the drop words name it: "Run 3 · Design A (…)" when named. Round 23 (E4): with the parts the
+// run list's label names (runDesign of workspace-compare.mjs): the boundary (with a closed window's
+// search target), Modes to find when not 2, n_g, then the geometry, so the drop line, the dropped
+// words, the swap button and the Pin notice name the run as the list does:
+//   "Run 4 (closed · n_g · 600 × 300 nm)", "Run 2 (open (PML 1 µm) · 600 × 300 nm)",
+//   "Run 3 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm)".
+export const dropParts=run=>`${boundaryTag(run)}${studyTag(run)} · ${geometryWords(run.input.model)}`;
+export const dropName=run=>`${runTitle(run.number,run.label||'')} (${dropParts(run)})`;
 // The run the next run would drop (round 18, X3): with six runs kept, the oldest unpinned one (the
 // one appendRun drops); null below the limit or with every run pinned.
 export function nextDropped(runs,limit=6){return runs.length>=limit?runs.find(r=>!r.pinned)||null:null;}
@@ -169,7 +175,7 @@ export function swapDropped(runs,kept,other){
  const next=runs.filter(r=>r!==other),at=next.findIndex(r=>Number.isInteger(r.number)&&r.number>kept.number);
  next.splice(at<0?next.length:at,0,kept);return next;
 }
-/** The message when the run limit dropped a run: "Run 3 (700 × 300 nm · 4 modes) was dropped: up
+/** The message when the run limit dropped a run: "Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up
  * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
 export function droppedRunText(run){
  return `${dropName(run)} was dropped: up to six runs are kept; pin a run to keep it.`;

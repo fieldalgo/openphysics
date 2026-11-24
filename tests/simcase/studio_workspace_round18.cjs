@@ -104,13 +104,13 @@ test('X3: before the run, the run the six-run limit would drop, with Pin Run N; 
  assert.equal(W.nextDropped(five),null);
  const six=[run(1,{pinned:true}),run(2,{pinned:true}),run(3),run(4),run(5),run(6)];
  assert.equal(W.nextDropped(six).number,3);
- assert.equal(W.dropWarningText(W.nextDropped(six)),'If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it');
- assert.equal(W.dropWarningText(run(3,{label:'Design A'})),'If you run: drops Run 3 · Design A (700 × 300 nm · 4 modes) · pin it to keep it');
+ assert.equal(W.dropWarningText(W.nextDropped(six)),'If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
+ assert.equal(W.dropWarningText(run(3,{label:'Design A'})),'If you run: drops Run 3 · Design A (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
  assert.equal(W.nextDropped(six.map(r=>({...r,pinned:true}))),null);
  // the run it names is the one appendRun drops
  const next=N.appendRun(six,run(7));assert.deepEqual(six.filter(r=>!next.includes(r)).map(r=>r.number),[3]);
  // the words after the drop are unchanged
- assert.equal(W.droppedRunText(run(3)),'Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText(run(3)),'Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to six runs are kept; pin a run to keep it.');
  const app=read('workspace-app.mjs');
  // round 22 (V4): Messages then names the run the next result drops
  assert.ok(app.includes("pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();\n  // round 22 (V4): the drop moves to the next unpinned run: Messages names it\n  const next=droppedBy(runs,RUN_LIMIT);notice(next.length?pinnedDropText(run,next,solverBusy||!!pendingJob):pinNotice(run));};"));

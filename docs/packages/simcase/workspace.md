@@ -372,14 +372,19 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run keeps its number while the tab is open (round 17): a new run takes the largest number used
    so far + 1, so when the six-run limit drops the oldest unpinned run the others keep theirs, and
-   Messages names the dropped run (*Run 3 (700 × 300 nm · 4 modes) was dropped: up to six runs are
-   kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Since round
+   Messages names the dropped run (*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to six runs are
+   kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Since round 23
+   (E4) every drop word names a run with the parts of its run-list label: the boundary (*closed*,
+   *closed near 2.46*, *open (PML 1 µm)*), Modes to find when not 2, *n_g*, then the geometry, so
+   *Run 4 (closed · n_g · 600 × 300 nm)* is the run listed as *Run 4 · closed · n_g · 600 × 300 nm ·
+   Silicon*; until then it read *Run 4 (600 × 300 nm · 2 modes)*. This holds for the line beside Run
+   study, the dropped words, the swap button and the Pin notice; the heated model keeps its own names. Since round
    18 the box beside **Run study** says it before the run, while six runs are kept and one is not
-   pinned: *If you run: drops Run 3 (700 × 300 nm · 4 modes) · pin it to keep it* (round 20; it read
+   pinned: *If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it* (round 20; it read
    *Running drops …* before, as if a run were under way), with **Pin Run 3**,
    which pins that run and moves the line to the next unpinned run, or removes it. Since round 22
    (V4) Messages then names the run the next result drops instead: *Run 3 pinned. If you run: drops
-   Run 4 (700 × 300 nm · 4 modes) · pin it to keep it* (while a run computes, *Run 3 pinned. When
+   Run 4 (closed · 4 modes · 700 × 300 nm) · pin it to keep it* (while a run computes, *Run 3 pinned. When
    this run finishes, Run 4 (…) is dropped*); the usual pin message only when nothing would be
    dropped. Since round 21 the line is hidden while the current inputs equal a run's, when
    Messages says *No need to run: Run 6 already has these results*, and returns once they differ
@@ -387,12 +392,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    before such a run (*Running drops Run 3 …* with Pin Run 3 and run, Run and Cancel, and its
    *Waiting for your answer* words) is gone, because a run left waiting for an answer computed nothing
    while its user looked away. While the run computes the line reads *When this run finishes, Run 3
-   (700 × 300 nm · 4 modes) is dropped*, and **Pin Run 3** works then too: it keeps Run 3, and the
+   (closed · 4 modes · 700 × 300 nm) is dropped*, and **Pin Run 3** works then too: it keeps Run 3, and the
    line names the next unpinned run, if any. Pin is not offered when pinning would leave fewer
    unpinned runs than the result must drop (the last unpinned run: the result needs its slot). The
    drop happens only when the result arrives, the oldest unpinned run then; Messages adds *Run 3
-   (700 × 300 nm · 4 modes) was dropped* after the run's own message and, when another unpinned run
-   exists besides the new result, a button **Keep Run 3, drop Run 4 (700 × 300 nm · 4 modes)
+   (closed · 4 modes · 700 × 300 nm) was dropped* after the run's own message and, when another unpinned run
+   exists besides the new result, a button **Keep Run 3, drop Run 4 (closed · 4 modes · 700 × 300 nm)
    instead**, Run 4 being the oldest such run. It brings Run 3 back at its place and drops Run 4:
    *Run 3 (…) is back; Run 4 (…) was dropped instead.*, with no further button. When every other
    earlier run is pinned no swap can be offered, and since round 22 (V4) the words say why: *Run 3

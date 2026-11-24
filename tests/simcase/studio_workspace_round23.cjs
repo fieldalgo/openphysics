@@ -37,6 +37,41 @@ test('P1 (E1): the row wraps and is never cut: no line clamp, no ellipsis, the b
  assert.ok(!css.includes('.run-edge-text{-webkit-line-clamp')&&!css.includes('.dropping .run-edge-text'));
 });
 
+// E4: three runs as the run list names them (runDesign) and as the drop words name them
+const model=shapes=>({wavelength:1550,coreMesh:30,shapes});
+const STRIP=[{name:'Core',type:'rect',material:'Silicon',x:-300,y:0,w:600,h:300}];
+const E4_RUNS=[
+ {number:4,input:{model:model(STRIP)},settings:{boundary:'PEC',mode_count:2},group_index:[4.2,4.1]},
+ {number:5,input:{model:model(STRIP)},settings:{boundary:'PML',pml:{thickness:'1000 nm'},mode_count:2}},
+ {number:6,input:{model:model([CORE,SUBSTRATE])},settings:{boundary:'PEC',mode_count:4,search_target:2.46}}];
+test('P4 (E4): the drop line, the dropped words, the swap button and the Pin notice name a run with the run list\'s parts',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs'),C=await import(STATIC+'workspace-compare.mjs');
+ const [ng,open,near]=E4_RUNS;
+ assert.equal(W.dropName(ng),'Run 4 (closed · n_g · 600 × 300 nm)');
+ assert.equal(W.dropName(open),'Run 5 (open (PML 1 µm) · 600 × 300 nm)');
+ assert.equal(W.dropName(near),'Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm)');
+ assert.equal(W.dropName({...ng,label:'Design A'}),'Run 4 · Design A (closed · n_g · 600 × 300 nm)');
+ // the same parts, in the same order, as the run list's label (runDesign), without the material
+ for(const run of E4_RUNS){const label=C.runDesign(run),parts=W.dropParts(run);
+  assert.ok(label.startsWith(parts.slice(0,parts.lastIndexOf(' · '))+' · '),label);
+  assert.ok(label.includes(' · '+parts.slice(parts.lastIndexOf(' · ')+3)),label);}
+ // each of the four places
+ assert.equal(W.dropWarningText(ng),'If you run: drops Run 4 (closed · n_g · 600 × 300 nm) · pin it to keep it');
+ assert.equal(W.dropWhileRunningText([open]),'When this run finishes, Run 5 (open (PML 1 µm) · 600 × 300 nm) is dropped');
+ assert.equal(W.droppedAfterText([ng]),'Run 4 (closed · n_g · 600 × 300 nm) was dropped');
+ assert.equal(W.droppedRunText(near),'Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedNoSwapText([open]),'Run 5 (open (PML 1 µm) · 600 × 300 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
+ assert.equal(W.keepInsteadLabel(ng,open),'Keep Run 4, drop Run 5 (open (PML 1 µm) · 600 × 300 nm) instead');
+ assert.equal(W.keptInsteadText(ng,near),'Run 4 (closed · n_g · 600 × 300 nm) is back; Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) was dropped instead.');
+ assert.equal(W.pinnedDropText({number:3},[ng]),'Run 3 pinned. If you run: drops Run 4 (closed · n_g · 600 × 300 nm) · pin it to keep it');
+ assert.equal(W.pinnedDropText({number:3},[open,near],true),'Run 3 pinned. When this run finishes, Run 5 (open (PML 1 µm) · 600 × 300 nm) and Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) are dropped');
+ // the optical page uses the default name everywhere; the heated model keeps its own
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);"));
+ assert.ok(app.includes('const next=droppedBy(runs,RUN_LIMIT);notice(next.length?pinnedDropText(run,next,solverBusy||!!pendingJob):pinNotice(run));};'));
+ assert.ok(read('workspace-multiphysics-view.mjs').includes("const dropName=r=>`${runTitle(r)} (run at ${runTime(r)})`;"));
+});
+
 // E2: a session over the limit; browser recovery keeps the fields of the selected and pinned runs only
 const FIXTURES=path.join(__dirname,'studio_session_fixtures');
 const OPEN_FULL='optical-v10-open-full-083e151.json';
