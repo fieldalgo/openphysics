@@ -2930,20 +2930,29 @@ try {
     // P1 (E1): T18, closed, Highest: the row's whole short sentence, no ellipsis, no clamp, nothing cut
     const SHORT = 'Substrate touches the window edge: in a closed window its slab modes come first.';
     const FULL = "Substrate touches the window edge and its index is as high as Core's: in a closed window its slab modes come first.";
-    const edgeRow = () => r.eval(`(()=>{const o=document.getElementById('run-options');o.scrollIntoView({block:'nearest',inline:'nearest'});
+    const edgeRow = () => r.eval(`(()=>{const o=document.getElementById('run-options');o.scrollIntoView({block:'nearest',inline:'center'});
       const row=document.getElementById('run-edge'),t=document.getElementById('run-edge-text'),s=getComputedStyle(t),b=o.getBoundingClientRect(),inside=q=>q.top>=b.top-1&&q.bottom<=b.bottom+1&&q.left>=b.left-1&&q.right<=b.right+1;
       return {hidden:row.hidden,text:t.textContent,overflow:s.textOverflow,clamp:s.webkitLineClamp,whiteSpace:s.whiteSpace,cut:t.scrollHeight>t.clientHeight+1||t.scrollWidth>t.clientWidth+1,
         boxCut:o.scrollHeight>o.clientHeight+1||o.scrollWidth>o.clientWidth+1,inBox:inside(t.getBoundingClientRect()),buttons:[...row.querySelectorAll('button')].map(x=>[x.textContent,inside(x.getBoundingClientRect())]),
-        onScreen:b.left>=0&&b.right<=innerWidth,width:innerWidth}})()`);
+        onScreen:b.left>=0&&b.right<=innerWidth,width:innerWidth,
+        geometry:{box:[Math.round(b.left),Math.round(b.right)],client:document.documentElement.clientWidth,scrollers:(()=>{const out=[];for(let e=o.parentElement;e;e=e.parentElement)if(e.scrollWidth>e.clientWidth){const q=e.getBoundingClientRect();out.push([e.className||e.tagName,e.scrollLeft,e.scrollWidth,e.clientWidth,Math.round(q.left),Math.round(q.right)]);}return out;})()}}})()`);
     const p1 = {};
-    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) { await rSize(width, height, mobile); p1[width] = await edgeRow(); }
+    // the box is scrolled to the middle of the ribbon (which scrolls sideways on a phone): scrolled to
+    // the nearest edge it sat flush with the screen's edge, and a fractional layout (macOS and Windows
+    // CI, 2026-11-24) put its right edge a fraction of a pixel past it. A resized viewport can take a
+    // moment to settle on a slower runner, so it is read again until it is on screen, for up to 5 s,
+    // and its geometry is kept in the report
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await rSize(width, height, mobile);
+      for (let i = 0; i < 20; i++) { p1[width] = await edgeRow(); if (p1[width].onScreen) break; await sleep(250); }
+    }
     await rSize(1440, 900);
     await modes(); p1.panel = await rText('#closed-edge-warning-text'); p1.panelButtons = await r.eval("[...document.querySelectorAll('#closed-edge-actions button')].map(b=>b.textContent)");
     stage('R23 P1 slab warning row', p1);
     for (const width of [1440, 390]) {
       const w = p1[width];
       assert.deepEqual({hidden: w.hidden, text: w.text, overflow: w.overflow, clamp: w.clamp, whiteSpace: w.whiteSpace, cut: w.cut, boxCut: w.boxCut, inBox: w.inBox, onScreen: w.onScreen},
-        {hidden: false, text: SHORT, overflow: 'clip', clamp: 'none', whiteSpace: 'normal', cut: false, boxCut: false, inBox: true, onScreen: true}, `P1 at ${width}`);
+        {hidden: false, text: SHORT, overflow: 'clip', clamp: 'none', whiteSpace: 'normal', cut: false, boxCut: false, inBox: true, onScreen: true}, `P1 at ${width}: ${JSON.stringify(w.geometry)}`);
       assert.deepEqual(w.buttons, [['Set search near 2.46 · 4 modes', true], ['Use Open boundary', true]], `P1 buttons at ${width}`);
     }
     assert.equal(p1.panel, FULL); assert.deepEqual(p1.panelButtons, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
