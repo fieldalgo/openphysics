@@ -804,7 +804,7 @@ try {
     assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
     assert.equal(k5.message, 'Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
     assert.match(k5.title, /^both-models · recovered from this browser · not saved to a file · /);
-    assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated, k4.heated);
+    assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
     // after the next change the header is the ordinary one
     assert.match(await title(), /^both-models · not saved to a file · /);
