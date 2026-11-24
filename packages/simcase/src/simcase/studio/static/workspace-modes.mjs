@@ -316,6 +316,10 @@ export function edgeSlabRisk(shapes,index=INDEX_1550){
 /** "Substrate touches the window edge and its index is as high as Core's: in a closed window its
  * slab modes come first." */
 export const edgeSlabWarningText=r=>`${r.edge} touches the window edge and its index is as high as ${r.core}'s: in a closed window its slab modes come first.`;
+/** Round 23 (E1): the short form of the plan line's row, which wraps and is never cut: "Substrate
+ * touches the window edge: in a closed window its slab modes come first." The full sentence stays
+ * in Physics › Optical modes. */
+export const edgeSlabShortText=r=>`${r.edge} touches the window edge: in a closed window its slab modes come first.`;
 /** "Mode 1 is mostly in Substrate (93 % of |E|²), which touches the window edge; its n_eff is set by
  * the closed window. Use Open boundary to leave that edge open." (C0: the note no longer says that
  * more modes find the core mode.) */

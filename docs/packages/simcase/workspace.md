@@ -1513,10 +1513,14 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   ([K7](#closed-window-search-document-optical-shapes-v10)).
 - **Before the run** (round 22, V2). In a closed window with Highest n_eff above 1.45, when a shape
   that touches the window edge has an index at least the highest index of the shapes that do not
-  touch it, the plan line beside Run study (a row under the plan, cut to the box with the full text
-  as its title) and Physics › Optical modes (above Modes to return) say *Substrate touches the window
+  touch it, Physics › Optical modes (above Modes to return) says *Substrate touches the window
   edge and its index is as high as Core's: in a closed window its slab modes come first.* with the
-  shape names, and offer **Set search near 2.46 · 4 modes** (the shortcut's target estimate,
+  shape names, and the plan line beside Run study a row under the plan with the short form *Substrate
+  touches the window edge: in a closed window its slab modes come first.* (round 23, E1; the full
+  sentence is its title). The row is never cut: its words wrap, the buttons move to a line of their
+  own when they do not fit beside them, and the box beside Run study grows to hold it (until round 23
+  the row was cut to the box, and four of five testers needed the title or the panel to read it;
+  checked at 1440 × 900 and 390 × 844). Both places offer **Set search near 2.46 · 4 modes** (the shortcut's target estimate,
   (n_max + 1.444)/2) and **Use Open boundary**; each sets its inputs and runs nothing. The warning
   goes with Nearest to n_eff or Open boundary. It is a geometry and material check with no solve: a
   shape touches the edge when its bounds reach the window, the shape names are those of the

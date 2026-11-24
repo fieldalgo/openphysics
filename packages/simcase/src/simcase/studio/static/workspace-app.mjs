@@ -29,7 +29,7 @@ import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.
 import {MAX_SESSION_BYTES,sessionSizeText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -1340,13 +1340,15 @@ function refreshRunOptions(){
  const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title='What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
 // round 22 (V2): the slab warning in the plan line, a row under it (made here, so the page's markup is
-// unchanged): its words, cut to the box with the full text as the title, and the two buttons
+// unchanged) with the two buttons. Round 23 (E1): its short words (edgeSlabShortText), never cut:
+// the row wraps, the buttons on a line of their own when the words and the buttons do not fit, and
+// the box grows for it; the full sentence is the title and stays in Physics › Optical modes.
 function refreshEdgeWarning(){
  let host=$('run-edge');const risk=edgeWarning();
  if(!host){host=document.createElement('span');host.id='run-edge';host.className='run-edge';host.hidden=true;const text=document.createElement('span');text.id='run-edge-text';text.className='run-edge-text';host.append(text);$('run-plan').after(host);}
  host.hidden=!risk;$('run-options').classList.toggle('edge-warning',!!risk);if(!risk){host.dataset.key='';return;}
- const text=edgeSlabWarningText(risk),key=text+'\n'+defaultTarget(state.shapes);if(host.dataset.key===key)return;host.dataset.key=key;
- $('run-edge-text').textContent=text;$('run-edge-text').title=text;host.querySelectorAll('button').forEach(b=>b.remove());host.append(...edgeWarningButtons('run-edge'));
+ const text=edgeSlabShortText(risk),key=text+'\n'+defaultTarget(state.shapes);if(host.dataset.key===key)return;host.dataset.key=key;
+ $('run-edge-text').textContent=text;$('run-edge-text').title=edgeSlabWarningText(risk);host.querySelectorAll('button').forEach(b=>b.remove());host.append(...edgeWarningButtons('run-edge'));
 }
 const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
 // round 20 (Z6): the scope names both boundaries, as the Open boundary choice sits beside it
