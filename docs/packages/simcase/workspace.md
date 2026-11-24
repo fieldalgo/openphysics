@@ -230,7 +230,14 @@ Library's per-card **Restore from this browser**) replaces that one model inside
 the restored record was the same as the project file it was saved to (its card read *same as file
 …json*), the project names that file and its name again: the header reads *untitled-project ·
 untitled-project.json · saved 2:24 PM* and File › Save writes or suggests that file. With another
-model of the tab beside it, the header reads *changed since*. A File › Save of the project relinks
+model of the tab beside it, the header reads *changed since*. Since round 19 a record changed since
+the project file it was saved to brings back the name and file too: *y3-saved · y3-saved.json ·
+changed since saved 06:15 AM · kept for recovery in this browser*. A record of a file that was
+opened, not saved, holds the file's name but not the project's, so no name is guessed: the header
+names the source, *Untitled project · recovered from a copy of both-models.json · not saved to a
+file · kept for recovery in this browser*, as the status bar does (*Recovered from this browser
+(opened from both-models.json; changed since)*). Keeping the opened project's name in the record
+is a recovery-record format change, left for a later version. A File › Save of the project relinks
 the browser recovery record of every model it wrote, shown or not, so each card names the newest
 project file.
 

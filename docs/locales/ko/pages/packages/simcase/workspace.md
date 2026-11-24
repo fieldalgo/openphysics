@@ -201,7 +201,13 @@ file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open
 쓰지 않습니다. 이 브라우저에서 복원(Library 카드의 **Restore from this browser**)하면 프로젝트 안의 그 모델만
 바뀝니다. 복원한 기록이 저장했던 프로젝트 파일과 같았으면(카드에 *same as file …json*) 프로젝트가 그 파일과
 이름을 다시 가리킵니다: 헤더는 *untitled-project · untitled-project.json · saved 2:24 PM*이 되고 File › Save는 그
-파일에 쓰거나 그 이름을 제안합니다. 탭에 다른 모델이 함께 있으면 헤더는 *changed since*로 읽힙니다. 프로젝트를
+파일에 쓰거나 그 이름을 제안합니다. 탭에 다른 모델이 함께 있으면 헤더는 *changed since*로 읽힙니다. round 19부터
+저장했던 프로젝트 파일 이후로 바뀐 기록도 이름과 파일을 되살립니다: *y3-saved · y3-saved.json · changed since saved
+06:15 AM · kept for recovery in this browser*. 저장하지 않고 연 파일의 기록은 파일 이름만 담고 프로젝트 이름은 담지
+않으므로 이름을 짐작하지 않습니다: 헤더가 출처를 밝힙니다, *Untitled project · recovered from a copy of both-models.json ·
+not saved to a file · kept for recovery in this browser*. 상태 표시줄(*Recovered from this browser (opened from
+both-models.json; changed since)*)과 같은 말입니다. 연 프로젝트의 이름을 기록에 담는 일은 복구 기록 형식의 변경이라
+다음 버전으로 남깁니다. 프로젝트를
 File › Save하면 저장한 모든 모델의 브라우저 복구 기록이, 보이는 모델이든 아니든, 그 프로젝트 파일을 가리키므로
 카드마다 가장 새 프로젝트 파일을 말합니다.
 

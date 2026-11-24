@@ -102,11 +102,14 @@ function titleOf({invalid=false,clean=true,fresh=false,runsUnsaved=false,saved=n
 export const UNTITLED_PROJECT='Untitled project';
 // recovered (round 16): a browser restore of a record that matched its project file, saved at that time
 const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'opened',recovered:'saved'});
-export function projectTitle({name=null,models=0,file=null,current=false,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// Round 19 (Y3): copyOf, the file a browser-restored record was opened from when the record names
+// no project file or name: "Untitled project · recovered from a copy of both-models.json · not
+// saved to a file · kept for recovery in this browser" (the name is not guessed from the file).
+export function projectTitle({name=null,models=0,file=null,current=false,recovery=null,copyOf=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  const title=name||UNTITLED_PROJECT;
  if(!models)return `${title} · no model chosen`;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
- if(!file)return `${title} · not saved to a file · ${browser}`;
+ if(!file)return `${title} · ${copyOf?`recovered from a copy of ${copyOf} · `:''}not saved to a file · ${browser}`;
  const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
  if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');
  return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
