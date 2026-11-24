@@ -1630,7 +1630,9 @@ IndexedDB에 보관합니다. 현재 입력, 최대 여섯 완료 실행, 이름
 까닭을 알 때 까닭과 할 일을 밝힙니다: 고른 실행과 고정한 실행이 장과 함께 16 MiB를 넘으면(기판 위 스트립의 고정한 열린 실행 둘은
 각각 약 7.5 MB로 넘습니다) *browser recovery unavailable: session over 16 MiB · File › Save keeps your work*,
 브라우저가 공간 부족으로 쓰기를 거부하면 *browser recovery unavailable: this browser’s storage is full · File ›
-Save keeps your work*입니다. 빈 새 탭은 기존 노트북을
+Save keeps your work*입니다. round 18부터 Messages도 복구가 꺼질 때마다 한 번 알립니다: *Browser recovery is off: this
+session is over 16 MiB. File › Save keeps your work.* 또는 *Browser recovery is off: this browser’s storage is full.
+File › Save keeps your work.*(실행 결과 메시지가 있으면 같은 줄 뒤에). 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
 새로고침 후 모델 카드(Optical waveguide 또는 Heated silicon waveguide 아래 **Restore from this browser**),

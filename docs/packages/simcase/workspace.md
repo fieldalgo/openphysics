@@ -1927,7 +1927,10 @@ what to do when the reason is known: *browser recovery unavailable: session over
 Save keeps your work* when the selected and pinned runs with their fields are over 16 MiB (two
 pinned open runs of a strip over a substrate are, at about 7.5 MB each), and *browser recovery
 unavailable: this browser’s storage is full · File › Save keeps your work* when the browser refuses
-the write for space. An empty new tab does not erase the prior notebook.
+the write for space. Since round 18, Messages says it too, once each time recovery turns off: *Browser
+recovery is off: this session is over 16 MiB. File › Save keeps your work.* or *Browser recovery is
+off: this browser’s storage is full. File › Save keeps your work.* (after a run's result message, on
+the same line). An empty new tab does not erase the prior notebook.
 
 After reload, choose the last session on its model's card (**Restore from this browser** under
 Optical waveguide or Heated silicon waveguide), on the start page's **Continue where you left
