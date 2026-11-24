@@ -6,21 +6,40 @@
   "edge_current_gram",
   "grouped_current_gram"
  ],
- "generated_utc": "2026-11-24T17:05:05+00:00",
- "product_commit": "93fbb301c8d1399c346a374256fc401ec46c013d",
- "study_source": "pending: the first panel-studies run fills each study outcome",
+ "generated_utc": "2026-11-24T18:47:24+00:00",
+ "product_commit": "14480e71de93fd2c71c6ec4ca1ce209fd4288853",
+ "study_source": "Validate packages run 45450152478 (6c745a31), panel-studies jobs on ubuntu-24.04, Python 3.12.14, all four passed",
  "environment": {
   "python": "3.13.18",
   "numpy": "2.5.5",
   "os": "Linux-6.18.44-fc-v819-x86_64-with-glibc2.39"
  },
- "command": "python tests/galerkin/two_ground/evidence/generate_corner_field_studies.py --source <study run>",
+ "command": "python tests/galerkin/two_ground/evidence/generate_corner_field_studies.py --junit <study JUnit XML> --source <study run>",
  "modules": {
   "test_laplace_corner_harmonic_field": {
    "cases": [
     {
      "case": "three-unequal-tapered",
-     "study": null,
+     "study": {
+      "panel_changes": [
+       3.5398926826480475e-08,
+       0.000534087654746384,
+       0.0011433366132176882
+      ],
+      "outer_changes": [
+       [
+        1.821210311191301e-05,
+        0.0002612760419826264,
+        0.0004121507981996427
+       ],
+       [
+        6.351673610251066e-11,
+        9.096414470016146e-10,
+        2.528440837307865e-09
+       ]
+      ],
+      "seconds": 3006.923
+     },
      "panels_per_edge": 32,
      "width_m": 0.008,
      "capacitance_per_permittivity": [
@@ -323,7 +342,26 @@
    "cases": [
     {
      "case": "three-unequal-tapered",
-     "study": null,
+     "study": {
+      "panel_changes": [
+       3.5398926826480475e-08,
+       0.0002737186688477327,
+       0.0010798410909774168
+      ],
+      "outer_changes": [
+       [
+        1.1148051822461528e-05,
+        6.552371911583069e-05,
+        0.0017300297120165405
+       ],
+       [
+        3.887762626227351e-11,
+        2.2822651261339625e-10,
+        6.027229113728379e-09
+       ]
+      ],
+      "seconds": 3040.914
+     },
      "panels_per_edge": 32,
      "width_m": 0.008,
      "capacitance_per_permittivity": [
@@ -507,7 +545,26 @@
    "cases": [
     {
      "case": "three-unequal-tapered",
-     "study": null,
+     "study": {
+      "panel_changes": [
+       1.4966811256936195e-08,
+       0.000653495055982753,
+       2.9734299452546768e-05
+      ],
+      "outer_changes": [
+       [
+        3.980484951424079e-07,
+        8.283062919230055e-05,
+        3.352366296620384e-05
+       ],
+       [
+        1.3863604700481045e-12,
+        2.8955031234048954e-10,
+        1.1691093792617266e-10
+       ]
+      ],
+      "seconds": 3001.785
+     },
      "panels_per_edge": 32,
      "width_m": 0.008,
      "capacitance_per_permittivity": [
@@ -606,7 +663,26 @@
    "cases": [
     {
      "case": "single-rectangle",
-     "study": null,
+     "study": {
+      "panel_changes": [
+       2.0250262364799306e-08,
+       0.00048464870506956633,
+       3.274928746370585e-05
+      ],
+      "outer_changes": [
+       [
+        8.476265691432224e-06,
+        1.3071426706664337e-05,
+        0.0001959993075220467
+       ],
+       [
+        2.95580967152806e-11,
+        4.560468575751798e-11,
+        1.384013478403875e-09
+       ]
+      ],
+      "seconds": 585.461
+     },
      "panels_per_edge": 64,
      "width_m": 0.008,
      "capacitance_per_permittivity": [
@@ -651,7 +727,26 @@
     },
     {
      "case": "unequal-pair",
-     "study": null,
+     "study": {
+      "panel_changes": [
+       3.927534282856319e-08,
+       0.0038137819411350232,
+       0.0026405724287250727
+      ],
+      "outer_changes": [
+       [
+        1.4449430825316518e-05,
+        4.5646481523398076e-05,
+        0.0009548193175669389
+       ],
+       [
+        5.03899449460628e-11,
+        1.590994862339858e-10,
+        3.328254473204877e-09
+       ]
+      ],
+      "seconds": 2304.109
+     },
      "panels_per_edge": 64,
      "width_m": 0.008,
      "capacitance_per_permittivity": [
