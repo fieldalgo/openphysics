@@ -29,7 +29,12 @@ separately installed packages, without Studio or the runner testing type strings
      (lowercase letters, digits, `.`, `_` and `-`), and `version` (a non-empty string);
    - `protocol`: the protocol version it implements, `1`;
    - `kinds()`: the `registry.PhysicsKind` objects it adds (the dataclass as it is, no
-     new fields);
+     new fields). A kind whose runner takes `simcase.run`'s progress callback sets
+     `accepts_on_event=True` and is then called as `run(doc, verbose, on_event=...)`; with
+     the default `False` (every kind made before the field existed) the runner is called
+     exactly as before and gets no callback. `run` checks the field; it never tries a call
+     and catches a `TypeError`. The events are described in the
+     [simcase overview](overview.md#from-python);
    - `manifest()`: JSON data describing each kind for Studio and the checker (below).
 2. **Built-in provider.** The built-in kinds are the provider `openphysics-fem`,
    registered by simcase's own distribution

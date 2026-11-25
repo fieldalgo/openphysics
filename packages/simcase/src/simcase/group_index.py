@@ -38,13 +38,15 @@ def check_lossless(model, wavelengths: list[float]) -> None:
                                 path="results.group_index")
 
 
-def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, say) -> dict:
+def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, say, on_search=None) -> dict:
     """``{"values": (1, M), "tracking": name, "reasons": [M]}`` in the kernel frame.
 
     ``physics`` is the kernel's entry, ``wavelengths`` the kernel wavelengths (um)
     ``[lambda0 - step, lambda0, lambda0 + step]``, ``neff0`` and ``field0`` the lambda0 solve
-    (the run's own result, unchanged)."""
-    from .runner import _kernel_solve
+    (the run's own result, unchanged). ``on_search(solve)`` (internal: the progress events of
+    ``simcase.run``) gives the search hook of the run's solve 2 (lambda0 - step) and 3
+    (lambda0 + step), or None."""
+    from .runner import _searched_solve
 
     vector = physics["formulation"] == "vector"
     requested = len(neff0)
@@ -77,7 +79,8 @@ def single_point(model, physics: dict, wavelengths: list[float], neff0, field0, 
         wavelength = wavelengths[row]
         location = f"vacuum_wavelength {wavelength:g} um"
         try:
-            res = _kernel_solve(model, dict(physics, wavelength=wavelength, num_modes=settings["search_modes"]))
+            res = _searched_solve(model, dict(physics, wavelength=wavelength, num_modes=settings["search_modes"]),
+                                  None if on_search is None else on_search(2 if row == 0 else 3))
         except (ValueError, RuntimeError) as exc:
             columns, side = np.full(requested, -1), [f"{location}: the solve failed ({exc})"] * requested
         else:

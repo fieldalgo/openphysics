@@ -26,7 +26,7 @@ import time
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 import physmat
@@ -238,9 +238,10 @@ def solve_point(model: MeshedModel, physics: dict) -> dict:
     return _to_public(None, model, res, point=True)
 
 
-def _kernel_solve(model: MeshedModel, physics: dict) -> dict:
+def _kernel_solve(model: MeshedModel, physics: dict, on_search=None) -> dict:
     """One kernel solve: ``physics`` in the kernel's keys and micrometres (the hand-off's entry,
-    or ``modes_document.stage_point``), on the micrometre mesh. Kernel frame in and out."""
+    or ``modes_document.stage_point``), on the micrometre mesh. Kernel frame in and out.
+    ``on_search``: called as ``on_search(k, n)`` before search ``k`` of ``n`` (``_search_events``)."""
     eps = model._permittivity(physics["wavelength"])
     mesh = model.mesh if model.solver_mesh is None else model.solver_mesh
     point = views.modes_inputs(physics)
@@ -248,7 +249,8 @@ def _kernel_solve(model: MeshedModel, physics: dict) -> dict:
     try:
         return physics_em_modes2d.solve(mesh, _to_kernel(eps), point.wavelength, point.boundary,
                                         point.num_modes, point.formulation, point.n_cladding,
-                                        n_target=point.n_target, pml=point.pml, bend=point.bend)
+                                        n_target=point.n_target, pml=point.pml, bend=point.bend,
+                                        on_search=on_search)
     except ValueError as exc:                    # the kernel's message under the document's names
         raise ValueError(modes_document.public_kernel_message(str(exc))) from exc
 
@@ -608,7 +610,7 @@ def _gaussian_echo(doc) -> dict | None:
 
 
 def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, max_triangles: int | None = None,
-        max_input_vertices: int | None = None
+        max_input_vertices: int | None = None, on_event: Callable[[dict], Any] | None = None
         ) -> (RunResult | SubspaceSweepResult | CavityRunResult | ThermalRunResult | TransientThermalRunResult
               | ElectricJouleRunResult | MechanicsRunResult):
     """Run a document with the runner of its physics kind (``registry``).
@@ -622,26 +624,75 @@ def run(doc: Document, verbose: bool = True, *, max_nodes: int | None = None, ma
     The limits reach the kind's runner as ``mesh_limits`` only when its
     ``accepts_mesh_limits`` claims the document; without a limit every runner is called
     as ``run(doc, verbose=verbose)``.
+
+    ``on_event``, when given, is a callable that ``run`` calls with one JSON-data dict per step, in
+    order, so that a caller can show progress. It is called synchronously, in the calling thread;
+    each call gets a new dict, which ``run`` does not keep, and its return value is ignored. An
+    exception it raises ends the run with that exception. It reaches the kind's runner only when
+    the kind's ``accepts_on_event`` is true (``em.modes2d``); any other kind runs exactly as
+    without it and ``on_event`` is never called. ``em.modes2d`` sends ``{"event":
+    "search_started", "point": p, "points": P, "solve": s, "solves": S, "solve_kind": kind,
+    "search": k, "searches": K}`` right before each eigensolve search: study point ``p`` of
+    ``P``; solve ``s`` of ``S`` at that point (``S`` is 3 with ``results.group_index``, whose
+    solves 2 and 3 have ``solve_kind`` ``"group_index"``; the study point's solve is
+    ``"study_point"``); search ``k`` of the ``K`` searches of that solve (with a PML, the vector
+    formulation searches once plus once per additional search). Events tell the progress only;
+    nothing computed changes with or without them. The list of events can grow; the meaning of
+    an event never changes.
     """
+    if on_event is not None and not callable(on_event):
+        raise TypeError("on_event must be a callable or None")
     limits = _mesh_limits(max_nodes=max_nodes, max_triangles=max_triangles, max_input_vertices=max_input_vertices)
     doc.validate()
     kind = kind_of(doc.data)
-    if limits is None:
-        return kind.run(doc, verbose=verbose)
-    if not _is_region_document(doc.data):
+    extra = {"on_event": on_event} if on_event is not None and kind.accepts_on_event else {}
+    if limits is not None and not _is_region_document(doc.data):
         raise ValueError("mesh limits apply only to region documents (heat, electric conduction, steady "
                          "Joule heating and mechanics)")
-    return kind.run(doc, verbose=verbose, mesh_limits=limits)
+    if limits is not None:
+        extra["mesh_limits"] = limits
+    try:
+        return kind.run(doc, verbose=verbose, **extra)
+    except _EventError as exc:
+        raise exc.__cause__.with_traceback(exc.__cause__.__traceback__) from None
 
 
-def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel | None = None
-                    ) -> RunResult | SubspaceSweepResult:
+def _searched_solve(model: MeshedModel, physics: dict, on_search) -> dict:
+    """``_kernel_solve``, called exactly as without progress events when ``on_search`` is None."""
+    return _kernel_solve(model, physics) if on_search is None else _kernel_solve(model, physics, on_search=on_search)
+
+
+class _EventError(Exception):
+    """An exception of ``run``'s ``on_event``, carried past the solves' own handlers to ``run``,
+    which raises the callback's exception itself."""
+
+
+def _search_events(on_event, points: int, solves: int):
+    """``hook(point, solve, solve_kind)``: the ``on_search(k, n)`` of one solve, which sends the
+    ``search_started`` event of ``run``; None for every solve without ``on_event``."""
+    if on_event is None:
+        return lambda point, solve, solve_kind: None
+
+    def hook(point, solve, solve_kind):
+        def on_search(search, searches):
+            event = {"event": "search_started", "point": point, "points": points, "solve": solve,
+                     "solves": solves, "solve_kind": solve_kind, "search": search, "searches": searches}
+            try:
+                on_event(event)
+            except Exception as exc:
+                raise _EventError() from exc
+        return on_search
+    return hook
+
+
+def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel | None = None,
+                    on_event=None) -> RunResult | SubspaceSweepResult:
     """The 2D mode pipeline: ``build_mesh``, then the kernel over the study, then ``_to_public``.
 
     The study runs on the micrometre kernel hand-off (``MeshedModel.kernel_doc``) in the
     kernel's frame, exactly as format 0.2 micrometre documents ran; nothing is converted until
     the result is complete. ``model`` is a model ``build_mesh(doc)`` built already (a coupled
-    run's, with its ``index_shift``)."""
+    run's, with its ``index_shift``). ``on_event``: the progress events of ``run``."""
     log: list[str] = []
 
     def say(msg):
@@ -661,6 +712,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
     modes_document.plausibility(doc, model, kp["wavelength"], say)
 
     parameter, values = _kernel_points(k)
+    hook = _search_events(on_event, len(values), 3 if "group_index" in k["results"] else 1)
     neffs, fields = [], []
     open_diagnostics = [] if "pml" in kp else None
     # Power, confinement, overlaps and Gaussian coupling of every saved mode, in the kernel
@@ -684,7 +736,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
         requested = int(kp["num_modes"])
         settings = tracking_settings(requested, k["study"].get("tracking"))
         if settings.get("method") == SUBSPACE_METHOD:
-            return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh)
+            return _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh, hook)
         weights = 1.0
         if open_diagnostics is not None:
             from .physics_pml_modes import coordinates
@@ -700,7 +752,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
         from .group_index import check_lossless
         check_lossless(model, k["results"]["group_index"]["wavelengths"])
     t0 = time.time()
-    for v in values:
+    for number, v in enumerate(values, start=1):
         d = k.copy()
         if parameter is not None:
             d.set_path(parameter, v)
@@ -709,7 +761,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
         if tracker is not None:
             physics = dict(physics, num_modes=tracker.settings["search_modes"])
             try:
-                res = _kernel_solve(model, physics)
+                res = _searched_solve(model, physics, hook(number, 1, "study_point"))
             except (ValueError, RuntimeError) as exc:
                 raise ModeTrackingError(f"{'scalar' if scalar_tracking else 'vector'} sweep at {location}: {exc}") from exc
             key = "fields" if scalar_tracking else "vector_field"
@@ -726,7 +778,7 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
                         candidate.update(selected=False, reasons=["not_selected_by_tracking"])
             tracking["points"].append(evidence)
         else:
-            res = _kernel_solve(model, physics)
+            res = _searched_solve(model, physics, hook(number, 1, "study_point"))
         if open_diagnostics is not None:
             open_diagnostics.append(res["open_boundary"])
         neffs.append(res["neff"])
@@ -756,7 +808,8 @@ def _run_em_modes2d(doc: Document, verbose: bool = True, *, model: MeshedModel |
     if "group_index" in k["results"]:
         from .group_index import single_point
         group = single_point(model, kp, k["results"]["group_index"]["wavelengths"], neffs[0],
-                             fields[0] if vector_fields is None else vector_fields[0], say)
+                             fields[0] if vector_fields is None else vector_fields[0], say,
+                             on_search=lambda solve: hook(1, solve, "group_index"))
     t_solve = time.time() - t0
     say(f"solved {len(values)} point(s) in {t_solve:.2f} s")
     kernel = dict(parameter=parameter, values=values, wavelength=kp["wavelength"], neff=np.array(neffs),
@@ -783,7 +836,8 @@ def _location(doc: Document, parameter: str | None, value) -> str:
     return f"{doc.si['study']['parameter']} = {value}"
 
 
-def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> "SubspaceSweepResult":
+def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh,
+                  hook=lambda point, solve, solve_kind: None) -> "SubspaceSweepResult":
     """Opt-in electric-l2-subspace-v1 sweep: all points succeed or nothing is returned."""
     k = model.kernel_doc
     requested = int(k.sole_physics()[1]["num_modes"])
@@ -793,13 +847,13 @@ def _run_subspace(doc, model, parameter, values, settings, say, log, t_mesh) -> 
         "(electric-l2-subspace-v1); check wavelength-step, mesh and search_mode_count convergence")
     neffs, fields, transforms, offsets = [], [], [], None
     t0 = time.time()
-    for v in values:
+    for number, v in enumerate(values, start=1):
         d = k.copy()
         d.set_path(parameter, v)
         physics = dict(d.sole_physics()[1], num_modes=settings["search_modes"])
         location = _location(doc, parameter, v)
         try:
-            res = _kernel_solve(model, physics)
+            res = _searched_solve(model, physics, hook(number, 1, "study_point"))
         except (ValueError, RuntimeError) as exc:
             raise ModeTrackingError(f"vector subspace sweep at {location}: {exc}") from exc
         if np.iscomplexobj(res["neff"]):
@@ -1109,4 +1163,4 @@ KIND = register(PhysicsKind(
     name="em.modes2d", types=frozenset({"em.modes2d"}), precedence=100,
     validate=modes_document.validate, run=_run_em_modes2d, summary=modes_document.summary,
     result_types=(RunResult,), fallback=True, slots=modes_document.modes_slots(),
-    refuse_03=modes_document.refuse_03, coupling=_coupling()))
+    refuse_03=modes_document.refuse_03, coupling=_coupling(), accepts_on_event=True))

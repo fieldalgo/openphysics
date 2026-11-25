@@ -45,6 +45,10 @@ returns it when the document asks for it:
   A sweep fails as a whole in the same case. The single-point option reports the mode it
   cannot identify and keeps the others. The fiber's degenerate HE11 pair is the common
   example.
+- **Progress.** With `run(doc, on_event=...)` the λ0 point is solve 1 of 3 (`solve_kind`
+  `"study_point"`) and the side solves at λ0 − Δλ and λ0 + Δλ are solves 2 and 3
+  (`"group_index"`), each with its own searches (see the
+  [simcase overview](overview.md#from-python)).
 
 ## Document
 

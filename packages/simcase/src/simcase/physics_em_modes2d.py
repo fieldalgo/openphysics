@@ -43,8 +43,13 @@ def _arpack_rng(name):
 
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
           num_modes: int = 1, formulation: str = "scalar", n_cladding: float | None = None,
-          *, n_target: float | None = None, pml: dict | None = None, bend: dict | None = None, motion=None):
+          *, n_target: float | None = None, pml: dict | None = None, bend: dict | None = None, motion=None,
+          on_search=None):
     """Relative fields and n_eff; wavelength and mesh use the same length unit.
+
+    ``on_search`` (internal: the progress events of ``simcase.run``), when given, is called as
+    ``on_search(k, n)`` right before search ``k`` of the ``n`` searches of this solve. It changes
+    nothing that is computed.
 
     eps_tri uses the modal time convention (negative imaginary part for loss).
     Document materials are converted from physmat n+ik by the runner. Scalar
@@ -67,9 +72,11 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     if pml is not None:
         from .physics_pml_modes import solve as solve_open
         return solve_open(mesh, eps_tri, wavelength, boundary, num_modes, formulation, n_target, pml, bend,
-                          motion=motion)
+                          motion=motion, on_search=on_search)
     if motion is not None and (formulation != "vector" or pml is not None):
         raise ValueError("a mesh motion takes the vector formulation with closed boundaries")
+    if on_search is not None:
+        on_search(1, 1)                       # a closed window: one eigensolve
     if formulation == "vector":
         return _solve_vector(mesh, eps_tri, wavelength, boundary, num_modes, n_cladding, n_target, motion=motion)
     k0 = 2 * np.pi / wavelength
