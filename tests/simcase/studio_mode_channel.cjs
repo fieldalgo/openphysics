@@ -177,8 +177,12 @@ test('modeChannel and channelNotes on runs: a closed run gives [], a run without
  // a mode without its candidate record: the engine's floor 1e-10 max(1, |Re|)
  const bare={...template,open_boundary:undefined};
  assert.deepEqual(C.modeChannel(bare).map(m=>m.bound),[1e-10*2.4429,1e-10*1.77]);
+ // the page's form of a run (effective_index Re, effective_index_im; input.model.wavelength) reads the same
+ const page={...run,settings:{...run.settings,vacuum_wavelength:undefined},input:{model:{shapes:run.input.model.shapes,wavelength:1550}},effective_index:run.effective_index.re,effective_index_im:run.effective_index.im};
+ assert.deepEqual(C.modeChannel(page),C.modeChannel(run));
  // a wavelength Studio cannot read: no category
  assert.deepEqual(C.modeChannel({...run,settings:{...run.settings,vacuum_wavelength:'1.55 um'}}),[]);
+ assert.deepEqual(C.modeChannel({...page,input:{model:{shapes:run.input.model.shapes,wavelength:1400.5}}}).map(c=>c.kind),['leaky','leaky','leaky']);
  assert.deepEqual(C.modeChannel(openRun([strip],ALL,[2.44],[0],{nm:1800})),[]);
 });
 

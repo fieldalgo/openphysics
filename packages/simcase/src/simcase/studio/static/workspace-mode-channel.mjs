@@ -108,12 +108,14 @@ const WAVELENGTH=/^(\d+(?:\.\d+)?) nm$/;
  * [] for a closed run, or a run whose wavelength or materials are not in the index table. */
 export function modeChannel(run){
  if(!isOpenRun(run))return [];
- const m=WAVELENGTH.exec(String(run.settings.vacuum_wavelength??'')),shapes=run.input?.model?.shapes,ei=run.effective_index;
- if(!m||!Array.isArray(shapes)||!ei||!Array.isArray(ei.re))return [];
- const profiles=edgeProfiles(shapes,run.settings.pml?.open_edges??[],Number(m[1]));
+ // the page's run keeps effective_index (Re) and effective_index_im; a file writes {re, im}
+ const e=run.effective_index,re=Array.isArray(e)?e:e?.re,im=(Array.isArray(e)?run.effective_index_im:e?.im)??[];
+ const m=WAVELENGTH.exec(String(run.settings.vacuum_wavelength??'')),nm=m?Number(m[1]):run.input?.model?.wavelength,shapes=run.input?.model?.shapes;
+ if(typeof nm!=='number'||!Array.isArray(shapes)||!Array.isArray(re))return [];
+ const profiles=edgeProfiles(shapes,run.settings.pml?.open_edges??[],nm);
  if(!profiles||!Object.keys(profiles).length)return [];
- const im=ei.im??[],record=run.open_boundary,picks=record&&Array.isArray(record.candidates)?modeCandidates(record,ei.re,im):[];
- return ei.re.map((x,mode)=>{
+ const record=run.open_boundary,picks=record&&Array.isArray(record.candidates)?modeCandidates(record,re,im):[];
+ return re.map((x,mode)=>{
   const c=picks[mode],f=Number.isFinite(c?.pml_l2_fraction)?c.pml_l2_fraction:Number.isFinite(c?.physical_l2_fraction)?1-c.physical_l2_fraction:Number.NaN;
   const bound=gainBound(x,f),i=im[mode];
   return {mode,...classifyIndex(x,profiles),x,im:i,bound,resolved:Number.isFinite(i)&&i>bound};
@@ -146,3 +148,17 @@ export function channelNotes(run){
 }
 /** A region note (core or edge) with the channel text of the same mode after it. */
 export const combinedNote=(regionText,mode,c)=>`${regionText} ${channelText(mode,c,{resolved:c.resolved,follows:true})}`;
+/** Slice S3: the notes of the modes table. `edge` and `core` are the table's maps (mode → text) of
+ * the region notes; a mode with one of them gets the channel text after it, in the same note (the
+ * maps are updated in place). The others' channel texts are returned: a Map mode → {kind, text}, a
+ * note row of their own. A closed run leaves both maps as they are and returns an empty Map. */
+export function placeChannelNotes(run,edge,core){
+ const alone=new Map();
+ for(const c of modeChannel(run)){
+  if(c.kind==='guided'&&c.resolved)continue;
+  const map=edge.has(c.mode)?edge:core.has(c.mode)?core:null;
+  if(map)map.set(c.mode,combinedNote(map.get(c.mode),c.mode,c));
+  else alone.set(c.mode,{kind:c.kind,text:channelText(c.mode,c,{resolved:c.resolved})});
+ }
+ return alone;
+}
