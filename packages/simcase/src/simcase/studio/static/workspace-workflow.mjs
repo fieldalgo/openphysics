@@ -4,7 +4,7 @@ import {designSummary,shapesBlock,geometryWords} from './workspace-shapes.mjs';
 import {inputChanges} from './workspace-inputs.mjs';
 import {originText} from './workspace-multiphysics.mjs';
 import {studySignature,RUN_LIMIT as OPTICAL_RUN_LIMIT} from './workspace-notebook.mjs';
-import {shortTarget,closedPlanText} from './workspace-closed-target.mjs';
+import {shortTarget,closedPlanText,SHORTCUT_MODE_COUNT} from './workspace-closed-target.mjs';
 import {boundaryTag,studyTag} from './workspace-compare.mjs';
 
 // The words for a result whose inputs are not the current ones (optical, heat, Joule heating):
@@ -107,6 +107,11 @@ export function durationText(ms){
 export function lastComparableRun(runs,{open,groupIndex},{isOpen,hasGroup}){
  return runs.findLast(r=>Number.isFinite(r.duration)&&isOpen(r)===!!open&&hasGroup(r)===!!groupIndex)||null;
 }
+// Round 28 (G3): the newest run that already has the results of the slab shortcut's inputs (a closed
+// window, Nearest to n_eff t, Modes to find 4, the other inputs the current ones: input and the group
+// index option), by the rule of the panel's "No need to run" (a run whose study signature is that of
+// the inputs); null without one.
+export const shortcutRun=(runs,input,groupIndex,t)=>{const sig=studySignature(input,SHORTCUT_MODE_COUNT,groupIndex,null,t);return runs.findLast(r=>r.signature===sig)??null;};
 // Readiness describes the current editor and retained artifacts, not accuracy.
 // viewed: the run Results shows (the selected run); the Results step describes that run, so the
 // step bar, the result and its settings agree. Without it, the newest run of these inputs.

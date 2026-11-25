@@ -1368,7 +1368,7 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   boundary를 고르면 경고가 사라집니다. 경고가 보이는 동안 **Run study**는 실행 전에 한 번 묻습니다(round 27, D2). 대화상자
   *Slab modes first*: *Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the
   core instead?*와 **Set search near 2.46 · 4 modes and run**(경고의 바로 가기를 정한 뒤 실행), **Run as set**(묻지 않았을 때와
-  같은 실행: 같은 문서, 값, 기록), **Cancel**(Escape도 같음, 아무것도 실행하지 않음). 초점은 첫 버튼에서 시작합니다. 형상, 경계,
+  같은 실행: 같은 문서, 값, 기록), **Cancel**(Escape도 같음, 아무것도 실행하지 않음). round 28(G3)부터, 바로 가기의 결과를 이미 가진 실행이 있으면(Nearest to n_eff 2.46, Modes to find 4와 나머지 현재 입력: 패널 버튼의 *No need to run*과 같은 규칙) 첫 버튼은 **Set search near 2.46 · 4 modes · show Run 6**입니다: 바로 가기의 입력을 패널 버튼의 메시지와 함께 정하고, 사본을 실행하지 않고 Results에 Run 6을 보여 줍니다. Run as set과 Cancel은 그대로입니다. 초점은 첫 버튼에서 시작합니다. 형상, 경계,
   Modes to return이 바뀐 뒤에만 다시 묻고(바꿨다 되돌린 것도 바뀐 것), 그 밖에는 Run study가 곧바로 그대로 실행합니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
   가장자리에 닿는 형상 중 굴절률이 가장 높은 것과 닿지 않는 형상 중 가장 높은 것(같으면 앞의 것)이며, 가장자리에 닿는 형상이 없거나
   모든 형상이 닿으면 경고하지 않습니다. 결과 쪽 가장자리 안내는 그대로이고, 닫힌 탐색의 기본값은 계속 Highest입니다. 한계:

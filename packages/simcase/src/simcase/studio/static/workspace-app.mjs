@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -2389,10 +2389,14 @@ const slabDialog=document.createElement('dialog');slabDialog.id='slab-question';
 slabDialog.innerHTML='<h2 id="slab-question-title">Slab modes first</h2><p id="slab-question-text"></p><div class="leave-actions"><button type="button" id="slab-question-search" class="primary"></button> <button type="button" id="slab-question-run"></button> <button type="button" id="slab-question-cancel"></button></div>';
 document.body.append(slabDialog);
 // Resolves 'search', 'run' or null (Cancel or Escape).
+// Round 28 (G3): when a run already has the shortcut's results (shortcutRun: the panel's "No need to
+// run" rule), the first button reads "… · show Run N": it sets the shortcut as the panel button does
+// (with its message and Show Run N), shows that run under Results and resolves null, so nothing runs.
+function showShortcutRun(t,run){useClosedSearch(t);if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();}
 function askSlabQuestion(risk,t){
  return new Promise(resolve=>{
-  const opener=document.activeElement,[search,run,cancel]=slabQuestionButtons(t);
-  slabAnswer=value=>{slabAnswer=null;if(slabDialog.open)slabDialog.close();restoreDialogFocus(opener);resolve(value);};
+  const opener=document.activeElement,shown=shortcutRun(runs,current(),state.groupIndex,t),[search,run,cancel]=slabQuestionButtons(t,shown?runNumber(shown):null);
+  slabAnswer=value=>{slabAnswer=null;if(slabDialog.open)slabDialog.close();restoreDialogFocus(opener);if(value==='search'&&shown){showShortcutRun(t,shown);resolve(null);return;}resolve(value);};
   $('slab-question-text').textContent=slabQuestionText(risk);$('slab-question-search').textContent=search;$('slab-question-run').textContent=run;$('slab-question-cancel').textContent=cancel;
   slabDialog.showModal();$('slab-question-search').focus();
  });

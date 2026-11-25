@@ -24,3 +24,44 @@ test('G2: the Compute label names the mode count, as the job label does',async()
  const app=read('workspace-app.mjs');
  assert.ok(app.includes('pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};'));
 });
+
+// the T18 strip on a substrate, as studio_round27.cjs builds it
+const input=model=>({model,setup:{materials:{Oxide:'Silica'}}});
+test('G3: the run that already has the shortcut\'s results, by the panel\'s No need to run rule',async()=>{
+ const W=await import(STATIC+'workspace-workflow.mjs'),N=await import(STATIC+'workspace-notebook.mjs');
+ const now=input({wavelength:1550,coreMesh:30,shapes:[{type:'rect',name:'Core'}]}),other=input({wavelength:1310,coreMesh:30,shapes:[{type:'rect',name:'Core'}]});
+ const run=(number,inp,modes,group,t)=>({number,signature:N.studySignature(inp,modes,group,null,t)});
+ const highest=run(5,now,2,false,null),near=run(6,now,4,false,2.46),nearOther=run(7,other,4,false,2.46),nearTwo=run(8,now,2,false,2.46),nearGroup=run(9,now,4,true,2.46);
+ // a run of the current inputs with Nearest to n_eff 2.46 and Modes to find 4: the newest such run
+ assert.equal(W.shortcutRun([highest,near,nearOther,nearTwo],now,false,2.46),near);
+ assert.equal(W.shortcutRun([near,run(10,now,4,false,2.46)],now,false,2.46).number,10);
+ // other inputs, another mode count, another target or another group-index state: none
+ assert.equal(W.shortcutRun([highest,nearOther,nearTwo],now,false,2.46),null);
+ assert.equal(W.shortcutRun([near],now,false,2.5),null);
+ assert.equal(W.shortcutRun([near],now,true,2.46),null);assert.equal(W.shortcutRun([nearGroup],now,true,2.46),nearGroup);
+ assert.equal(W.shortcutRun([],now,false,2.46),null);
+});
+
+test('G3: the question\'s first button reads "… · show Run N" only with such a run',async()=>{
+ const C=await import(STATIC+'workspace-closed-target.mjs');
+ assert.deepEqual(C.slabQuestionButtons(2.46,6),['Set search near 2.46 · 4 modes · show Run 6','Run as set','Cancel']);
+ assert.deepEqual(C.slabQuestionButtons(2.46,6)[0],C.shortcutText(2.46)+' · show Run 6');
+ // without one: exactly as in round 27
+ assert.deepEqual(C.slabQuestionButtons(2.46),['Set search near 2.46 · 4 modes and run','Run as set','Cancel']);
+ assert.deepEqual(C.slabQuestionButtons(2.46,null),C.slabQuestionButtons(2.46));
+});
+
+test('G3: the page shows that run without running; Run as set, Cancel and the dialog are unchanged',()=>{
+ const app=read('workspace-app.mjs');
+ // the question looks for the run with the shortcut's inputs and names it on the first button
+ assert.ok(app.includes('const opener=document.activeElement,shown=shortcutRun(runs,current(),state.groupIndex,t),[search,run,cancel]=slabQuestionButtons(t,shown?runNumber(shown):null);'));
+ // with it, the first button sets the shortcut (useClosedSearch), shows the run and resolves null,
+ // so the Run study handler returns before anything of the run
+ assert.ok(app.includes("slabAnswer=value=>{slabAnswer=null;if(slabDialog.open)slabDialog.close();restoreDialogFocus(opener);if(value==='search'&&shown){showShortcutRun(t,shown);resolve(null);return;}resolve(value);};"));
+ assert.ok(app.includes('function showShortcutRun(t,run){useClosedSearch(t);if(!runs.includes(run))return;solverRun=run;ui.page=\'Results\';render();}'));
+ // the dialog, its focus and Escape, and the Run study handler are those of round 27
+ assert.ok(app.includes("slabDialog.showModal();$('slab-question-search').focus();"));
+ assert.ok(app.includes("slabDialog.oncancel=event=>{event.preventDefault();slabAnswer?.(null);};"));
+ assert.ok(app.includes("$('slab-question-run').onclick=()=>slabAnswer?.('run');"));
+ assert.ok(app.includes("$('slab-question-cancel').onclick=()=>slabAnswer?.(null);"));
+});

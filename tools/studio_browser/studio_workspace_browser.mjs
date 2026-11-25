@@ -3198,6 +3198,28 @@ try {
     assert.equal(d2.after.core.length, 1, JSON.stringify(d2.after.core)); assert.equal(d2.after.core[0][0], '3'); assert.ok(d2.after.core[0][1].startsWith('Mode 3 is the core mode: '), d2.after.core[0][1]);
     assert.deepEqual(d2.after.edge.map(n => n[0]), ['1', '2', '4'], JSON.stringify(d2.after.edge)); assert.ok(d2.after.edge.every(n => n[1].includes('is mostly in Substrate')), JSON.stringify(d2.after.edge));
     assert.ok(Math.abs(Number(d2.after.neff[2]) - 2.43931663) <= 1e-4, JSON.stringify(d2.after.neff));
+    // round 28 (G3): Run 3 has the shortcut's results. Run 1 shown, Highest n_eff and Modes to find 2
+    // again (P02's T22): asked again, the first button names Run 3; it sets the shortcut and shows
+    // Run 3 under Results, running nothing (the panel button's "No need to run"); the dialog's role,
+    // focus and buttons otherwise as before; no overflow with the longer button
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'G3 Results');
+    await r.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 1 · /.test(b.textContent)).click();return true}', '.run-item'); await sleep(400);
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    await r.click('#closed-search-highest'); await sleep(400); await r.type('#mode-count-number', 2); await sleep(400);
+    const g3 = {before: await runItems(), shownBefore: await r.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null")};
+    g3.dialog = await asked('G3 with Run 3'); await overflow('G3 show Run 3');
+    await r.click('#slab-question-search'); await noRun(g3.before, 'G3 show Run 3');
+    g3.after = {shown: await r.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null"),
+      table: await r.eval("!!document.getElementById('modes-table')"), plan: await rText('#run-plan'), message: await rText('#file-status'), focus: await r.eval('document.activeElement?.id??null')};
+    await rTree('Optical modes', "!!document.getElementById('closed-search-nearest')");
+    g3.after.nearest = await r.eval("document.getElementById('closed-search-nearest').checked"); g3.after.modes = await r.eval("document.getElementById('mode-count-number').value");
+    stage('R28 G3 slab question shows Run 3', g3);
+    assert.ok(/^Run 1 · /.test(g3.shownBefore), g3.shownBefore);
+    assert.deepEqual(g3.dialog, {dialogs: 1, modal: true, text: QUESTION, buttons: ['Set search near 2.46 · 4 modes · show Run 3', 'Run as set', 'Cancel'], focus: 'slab-question-search', described: 'slab-question-text'});
+    assert.ok(/^Run 3 · /.test(g3.after.shown), g3.after.shown); assert.equal(g3.after.table, true);
+    assert.match(g3.after.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/);
+    assert.ok(g3.after.message.includes('No need to run: Run 3 already has these results.'), g3.after.message);
+    assert.equal(g3.after.nearest, true); assert.equal(g3.after.modes, '4');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
