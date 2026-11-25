@@ -23,7 +23,10 @@ export const FIELD_BUDGET_BYTES=MAX_SESSION_BYTES-FIELD_HEADROOM_BYTES;
 export const mbText=bytes=>`${(bytes/1e6).toFixed(1)} MB`;
 // The run limit and the field budget, from RUN_LIMIT and FIELD_BUDGET_BYTES themselves, so the run
 // list's note and the model tree's "Runs · N of M" never disagree (round 14); in digits.
-export const RUNS_KEPT_TEXT=`Up to ${RUN_LIMIT} runs are kept with their values. Fields are kept up to ${mbText(FIELD_BUDGET_BYTES)}: the selected and pinned runs' first, then the newest. A run without its fields can recompute them.`;
+// Round 25 (A1): the words say when fields move (only when a result or a recompute arrives) and that
+// selecting a run does not bring its fields back (FIELDS_MOVE_TEXT, also in Results).
+export const FIELDS_MOVE_TEXT=`Fields are kept up to ${mbText(FIELD_BUDGET_BYTES)}. When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.`;
+export const RUNS_KEPT_TEXT=`Up to ${RUN_LIMIT} runs are kept with their values. ${FIELDS_MOVE_TEXT}`;
 export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 // Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
 // unchanged, and a version 6 session is read with its input as a version 6 project. Format 6

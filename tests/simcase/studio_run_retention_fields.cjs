@@ -193,9 +193,9 @@ test('K9: the words of section 5 and 4.1, exactly',()=>{
  assert.equal(W.dropWarningText(three),'If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
  assert.equal(N.runsNodeLabel(9),'Runs · 9 of 20');
  assert.equal(X.VALUES_ONLY,' · values only');
- assert.equal(N.RUNS_KEPT_TEXT,"Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB: the selected and pinned runs' first, then the newest. A run without its fields can recompute them.");
+ assert.equal(N.RUNS_KEPT_TEXT,"Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.");
  // Results (4.1), its export title, and Compare (4.2)
- assert.equal(X.fieldsNotKeptResultsText(run(4)),"Run 4's fields are not kept: up to 16.8 MB of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.");
+ assert.equal(X.fieldsNotKeptResultsText(run(4)),"Run 4's fields are not kept; its n_eff, TE fractions and effective areas are kept. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.");
  assert.equal(X.fieldsNotKeptResultsText(run(4),true),"Run 4's fields were not kept in the session file. Its n_eff, TE fractions and effective areas are kept.");
  assert.equal(X.recomputeLabel(run(4)),"Recompute Run 4's fields");
  assert.equal(X.recomputeEstimate(run(4,{duration:118000})),' · about 2 min');assert.equal(X.recomputeEstimate(run(4)),'');

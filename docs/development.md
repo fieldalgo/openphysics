@@ -621,7 +621,9 @@ runs (closed 2 and 4 modes, closed near 2.46, open with n_g): after each result 
 is within 16 MiB and is File › Export's text byte for byte (no question), and its fields are exactly
 the runs the list does not mark *values only*; a run without fields shows its Results block, the
 field export waits with *Recompute Run N's fields first*, Compare lists its modes by number, each
-whole and wrapped at 1440 × 900 and 390 × 844; and **Recompute Run N's fields** shows *Recomputing
+whole and wrapped at 1440 × 900 and 390 × 844 (since round 25, A1, the block and the run list's note
+read *… When a result or a recompute arrives, Studio keeps the selected run's fields first, then
+pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.*); and **Recompute Run N's fields** shows *Recomputing
 Run N's fields* in the job panel, matches, attaches the field to the same run (no run added), the
 field view draws again and the record equals Save's text. The K1 (sizes at 20 runs of the T18 mix)
 and K5 (a recomputed field equals the original) measurements are `tools/studio_run_retention.mjs`

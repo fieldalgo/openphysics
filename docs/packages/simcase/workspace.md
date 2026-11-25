@@ -2098,7 +2098,9 @@ values, and a tab over 16 MiB showed fields that Save asked about and recovery l
   shows how large the new field will be, the line beside **Run study** names the runs that would keep
   their values only: *If you run: Run 3 (closed · 4 modes · 700 × 300 nm) keeps its values, not its
   fields* with **Pin Run 3** (two or more: *… and Run 5 (…) keep their values, not their fields*);
-  with no such run it says nothing. While the run computes: *When this run finishes, Run 3 (…) keeps
+  with no such run it says *If you run: older runs' fields may not be kept (16.8 MB limit) · pin a
+  run to keep its fields first* (round 25, A1; no Pin button, it names no run) when the room left in
+  the 16.8 MB is less than the smallest field kept now, and otherwise nothing. While the run computes: *When this run finishes, Run 3 (…) keeps
   its values, not its fields*. At 20 runs the line keeps the drop words above. After the result,
   Messages says *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).* with
   **Recompute Run 3's fields** and, when another unpinned, unselected run has a field at least as
@@ -2107,14 +2109,16 @@ values, and a tab over 16 MiB showed fields that Save asked about and recovery l
   its fields were not kept: the selected and pinned runs' fields are 17.4 MB, over the 16.8 MB limit.
   Unpin a run to keep the newer fields first.* The run list marks such a run *· values only*; the
   tree reads *Runs · 9 of 20*; the note under the run list reads *Up to 20 runs are kept with their
-  values. Fields are kept up to 16.8 MB: the selected and pinned runs' first, then the newest. A run
-  without its fields can recompute them. Pinned runs stay; when a 21st run arrives, the oldest
-  unpinned run is replaced. …*. The header reads *… kept for recovery in this browser*: recovery
+  values. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the
+  selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring
+  its fields back; Recompute does. Pinned runs stay; when a 21st run arrives, the oldest unpinned
+  run is replaced. …* (round 25, A1: fields move only when a field arrives). The header reads *… kept for recovery in this browser*: recovery
   holds the tab.
 - **A run without its fields.** Results shows its modes table, its candidates and its inputs line,
-  and in place of the field view *Run 4's fields are not kept: up to 16.8 MB of fields are kept, for
-  the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas
-  are kept.* (a run read from a file without fields: *Run 4's fields were not kept in the session
+  and in place of the field view *Run 4's fields are not kept; its n_eff, TE fractions and effective
+  areas are kept. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps
+  the selected run's fields first, then pinned runs', then the newest. Selecting a run does not
+  bring its fields back; Recompute does.* (a run read from a file without fields: *Run 4's fields were not kept in the session
   file. …*) with **Recompute Run 4's fields** and, for a run computed in this tab, *· about 2 min*
   (its wall time; a run opened or restored has none). The field PNG export waits, titled *Recompute
   Run 4's fields first*; the run table CSV works. Compare shows the inputs that differ and the values

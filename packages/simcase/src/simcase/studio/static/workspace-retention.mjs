@@ -16,7 +16,7 @@
 // a field that does not fit is skipped and the next older one is tried. Selecting, pinning,
 // unpinning, naming or comparing runs removes no field. A run without its field keeps n_eff, the
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
-import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget} from './workspace-notebook.mjs';
+import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,FIELDS_MOVE_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget} from './workspace-notebook.mjs';
 import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
 import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
@@ -129,10 +129,12 @@ export function pinnedFieldsText(list,bytes){
  const names=listWords(list.map(r=>`${runTitle(r.number,r.label||'')} (pinned)`));
  return `${names} ${list.length>1?'keep their values; their fields were not kept':'keeps its values; its fields were not kept'}: the selected and pinned runs' fields are ${mbText(bytes)}, over the ${BUDGET_TEXT} limit. Unpin a run to keep the newer fields first.`;
 }
-/** Results, a run without its fields (section 4.1). fromFile: read from a session file without them. */
+/** Results, a run without its fields (section 4.1). fromFile: read from a session file without them.
+ * Round 25 (A1): a field let go in this tab says when fields move and that selecting the run does not
+ * bring them back (FIELDS_MOVE_TEXT, the run list's note). */
 export const fieldsNotKeptResultsText=(run,fromFile=false)=>{const t=runTitle(run.number,run.label||'');
  return fromFile?`${t}'s fields were not kept in the session file. Its n_eff, TE fractions and effective areas are kept.`
-  :`${t}'s fields are not kept: up to ${BUDGET_TEXT} of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.`;};
+  :`${t}'s fields are not kept; its n_eff, TE fractions and effective areas are kept. ${FIELDS_MOVE_TEXT}`;};
 /** The button that recomputes a run's fields (R3) and its estimate: " · about 2 min" from the run's
  * wall time in this tab; none for a run opened or restored (it has no time). */
 export const recomputeLabel=run=>`Recompute ${runTitle(run.number,run.label||'')}'s fields`;
@@ -164,6 +166,20 @@ export function predictedLetGo(input,runs,selected,comparison,view,next,{budget=
  // (the view's mode is the next result's first: the selected run then has at least one mode)
  const {letGo}=chooseFields(input,after,phantom.job,comparison,{...view,mode:0},{budget,bytes:size});
  return letGo.filter(r=>r!==phantom);
+}
+
+/** Round 25 (A1): before the run, with no run of the same geometry, boundary and Modes to find (no
+ * estimate, predictedLetGo gives []), the box beside Run study says that older fields may go when the
+ * room left in the budget is less than the smallest field kept now. It names no run. */
+export const FIELDS_MAY_GO_TEXT=`If you run: older runs' fields may not be kept (${BUDGET_TEXT} limit) · pin a run to keep its fields first`;
+/** Whether that line is shown: no run of the next run's key (next: fieldSizeKey) has a field, some
+ * field is kept, and budget less the session bytes with the kept fields (chooseFields' total) is less
+ * than the smallest kept field's bytes. */
+export function unestimatedFieldRisk(input,runs,selected,comparison,view,next,{budget=FIELD_BUDGET_BYTES,bytes=runFieldBytes}={}){
+ if(runs.some(r=>r.field&&runFieldSizeKey(r)===next))return false;
+ const {kept,total}=chooseFields(input,runs,selected,comparison,view,{budget,bytes});
+ if(!kept.length)return false;
+ return budget-total<Math.min(...kept.map(bytes));
 }
 
 // ---- Recompute Run N's fields (section 4.4) ---------------------------------------------------

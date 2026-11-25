@@ -30,7 +30,7 @@ import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
-import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
+import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -1395,14 +1395,18 @@ function refreshDropWarning(){
 // Modes to find; nothing without such a run (the after-result words then say what happened). While a
 // run computes, the run's captured inputs are the next result's. Pin Run N puts the run's fields
 // ahead of the unpinned runs'. Kept per state of the runs and inputs, since a render calls it often.
-let fieldWarning={key:null,list:[]};
+let fieldWarning={key:null,list:[],risk:false};
 function refreshFieldWarning(running,matched){
  if(matched||(running&&!pendingJob))return;
  const job=running?pendingJob:null,model=(job?job.input:current()).model,ob=job?(job.openBoundary?{edges:job.openBoundary.edges}:null):state.openBoundary;
  const next=fieldSizeKey({shapes:model.shapes,coreMesh:model.coreMesh,boundary:signaturePml(ob,model.shapes)?.open_edges??null,modeCount:job?job.modeCount:state.modeCount});
- const key=next+'|'+runs.map(r=>[r.job,r.number,r.pinned,r.label,!!r.field].join()).join(';')+'|'+(solverRun?.job||'')+'|'+compareIds.join();
- if(fieldWarning.key!==key){let list=[];try{list=predictedLetGo(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);}catch{}fieldWarning={key,list};}
- const list=fieldWarning.list.filter(r=>runs.includes(r)&&r.field);if(!list.length)return;
+ const key=next+'|'+runs.map(r=>[r.job,r.number,r.pinned,r.label,!!r.field].join()).join(';')+'|'+(solverRun?.job||'')+'|'+compareIds.join()+'|'+running;
+ if(fieldWarning.key!==key){let list=[],risk=false;try{list=predictedLetGo(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);
+  // round 25 (A1): no estimate (no run of this key), yet the room left is less than the smallest field kept
+  if(!running)risk=unestimatedFieldRisk(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);}catch{}fieldWarning={key,list,risk};}
+ const list=fieldWarning.list.filter(r=>runs.includes(r)&&r.field);
+ if(!list.length&&fieldWarning.risk&&!running){$('run-drop').hidden=false;$('run-options').classList.add('dropping');$('run-drop-text').textContent=FIELDS_MAY_GO_TEXT;$('run-drop-text').title=FIELDS_MAY_GO_TEXT;$('run-drop-pin').hidden=true;return;}
+ if(!list.length)return;
  $('run-drop').hidden=false;$('run-options').classList.add('dropping');
  const text=running?keepsValuesWhileRunningText(list):keepsValuesText(list);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
  const run=list.find(r=>!r.pinned),pin=$('run-drop-pin');pin.hidden=!run;if(!run)return;pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);pin.disabled=false;
