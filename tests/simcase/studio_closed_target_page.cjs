@@ -55,9 +55,9 @@ test('K12: the words: the shortcut, the edge note (C0), the plan, the run tag an
  // no text promises that more modes reach the core mode (Q8)
  for(const name of ['workspace-app.mjs','workspace-modes.mjs','workspace-closed-target.mjs','workspace-workflow.mjs'])
   assert.ok(!fs.readFileSync(path.join(__dirname,STATIC,name),'utf8').includes('reach the core mode'),name);
- assert.equal(W.runPlanText({searchTarget:2.46}),'Closed window · near n_eff 2.46');
- assert.equal(W.runPlanText({searchTarget:2.46,groupIndex:true}),'Closed window · near n_eff 2.46 · group index on (3 solves)');
- assert.equal(W.runPlanText({}),'Closed window');assert.equal(W.runPlanText({open:true,searches:2,searchTarget:2.46}),'Open boundary · 2 searches');
+ assert.equal(W.runPlanText({searchTarget:2.46}),'Closed window · near n_eff 2.46 · 2 modes');
+ assert.equal(W.runPlanText({searchTarget:2.46,groupIndex:true}),'Closed window · near n_eff 2.46 · 2 modes · group index on (3 solves)');
+ assert.equal(W.runPlanText({}),'Closed window · 2 modes');assert.equal(W.runPlanText({open:true,searches:2,searchTarget:2.46}),'Open boundary · 2 modes · 2 searches');
  assert.equal(W.nextRunText(input(),4,false,null,2.46),'Next run uses '+W.opticalInputParts(input()).join(' · ')+' · Modes to find 4 · search near 2.46');
  const run=N.validateRun(targetedRun('0000000a',[2.48623178,2.43931663],2,2.46));
  assert.equal(X.boundaryTag(run),'closed near 2.46');assert.ok(X.runHeading(run,1).startsWith('Run 1 · closed near 2.46 · '),X.runHeading(run,1));

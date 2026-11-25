@@ -325,21 +325,22 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    300 nm · Silicon · λ 1550 nm · core mesh 30 nm · Modes to find 2*, with *· group index on* when
    **Also compute group index** is ticked, whatever run Results shows. Beside **Run study** the
    ribbon says what the next run does and, when this tab has one, how long the last comparable run
-   took (round 18; round 17 named the slow options only): *Open boundary · 2 searches · group index
-   on (3 solves) · last such run 3:40*. It names the boundary (*Closed window* or *Open boundary*),
-   an open boundary's searches (*1 search* or *2 searches*), the options that add solves with the
+   took (round 18; round 17 named the slow options only): *Open boundary · 2 modes · 2 searches ·
+   group index on (3 solves) · last such run 3:40*. It names the boundary (*Closed window* or *Open
+   boundary*), **Modes to find** (*4 modes*, *1 mode*; since round 28, G2, as the job line names it,
+   so a count the slab shortcut set to 4 is seen before the next run), an open boundary's searches (*1 search* or *2 searches*), the options that add solves with the
    solve count after the last of them (*group index on*, an open boundary's *PML check on*: one more
    solve per mode at most; both *group index on · PML check on (5 solves)*), then *last such run
    m:ss* when the tab has a comparable run with a time. Since round 20 the line has no timing part
-   without one (*Closed window*): round 19's *no timed run in this tab yet* (before it, *no earlier
+   without one (*Closed window · 2 modes*): round 19's *no timed run in this tab yet* (before it, *no earlier
    run*) raised the question what a timed run is and read wrong beside runs computed in the tab with
    another boundary or group-index state. A comparable run has the same boundary kind and group-index state; its
    time is the wall time from the job's start to its result in this tab, kept with the run in this
    tab only: opened and recovered runs have none, and no file holds it. Since round 23 (E3), with
    the group index on, the time part is an estimate from the newest run of this tab with the same
    boundary kind, whatever its group-index state: its time when it computed the group index too,
-   three times its time when it did not (the group index adds two solves), *Open boundary · 2
-   searches · group index on (3 solves) · about 3 min* (*about 20 s* under a minute and a half). With
+   three times its time when it did not (the group index adds two solves), *Open boundary · 2 modes ·
+   2 searches · group index on (3 solves) · about 3 min* (*about 20 s* under a minute and a half). With
    no such run there is no estimate (the round-20 rule). Round 24 (B5) checked the case of P04, whose
    only comparable open run had been opened from a file: a session file and a browser-recovery record
    store each run's completion time but not its wall time (the session format is unchanged), so such
@@ -1716,7 +1717,8 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   window edge.* (the strip over a substrate @2.46 with 2 modes; with 4 modes it is mode 3). The
   share is Studio's unweighted |E|² share; the engine's energy fraction (confinement factor) of the
   same mode is 0.91.
-- **Words.** The plan line beside Run study reads *Closed window · near n_eff 2.46*; the next-run
+- **Words.** The plan line beside Run study reads *Closed window · near n_eff 2.46 · 2 modes* (since
+  round 28, G2, with Modes to find); the next-run
   inputs end *· search near 2.46*; the run list, the Compare pickers and headings and the status line
   tag the run *closed near 2.46* where an untargeted closed run reads *closed*.
 - **Runs and files.** A run's settings keep the target: adapter `optical-shapes-v10`, with

@@ -279,14 +279,15 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    실행을 보여 주든 다음 실행이 쓸 입력도 밝힙니다: *Next run uses 700 × 300 nm · Silicon · λ 1550 nm ·
    core mesh 30 nm · Modes to find 2*. **Also compute group index**를 켜면 *· group index on*이 붙습니다.
    리본은 **Run study** 옆에 다음 실행이 무엇을 하는지, 그리고 이 탭에 있으면 마지막 비교 가능한 실행이 얼마나 걸렸는지
-   밝힙니다(round 18; round 17은 느리게 하는 선택만 밝힘): *Open boundary · 2 searches · group index on (3 solves) · last
-   such run 3:40*. 경계(*Closed window* 또는 *Open boundary*), 열린 경계의 검색 수(*1 search* 또는 *2 searches*), 풀이를
+   밝힙니다(round 18; round 17은 느리게 하는 선택만 밝힘): *Open boundary · 2 modes · 2 searches · group index on (3 solves) ·
+   last such run 3:40*. 경계(*Closed window* 또는 *Open boundary*), **Modes to find**(*4 modes*, *1 mode*; round 28 G2부터, 작업 줄이
+   밝히는 것처럼 밝혀서 슬래브 바로 가기가 4로 정한 개수가 다음 실행 전에 보임), 열린 경계의 검색 수(*1 search* 또는 *2 searches*), 풀이를
    늘리는 선택과 그 마지막 뒤의 풀이 수(*group index on*, 열린 경계의 *PML check on*: 모드마다 많아야 한 번 더 풂; 둘 다면
-   *group index on · PML check on (5 solves)*), 탭에 시간이 있는 비교 가능한 실행이 있으면 그다음 *last such run m:ss*입니다. round 20부터 그런 실행이 없으면 시간 부분이 없습니다(*Closed window*): round 19의 *no timed run in this tab yet*(그 전에는 *no earlier run*)은 시간을 잰 실행이 무엇이냐는 물음을 낳았고, 탭에서 다른 경계나 군굴절률 상태로 계산한 실행 옆에서 맞지 않았습니다. 비교 가능한
+   *group index on · PML check on (5 solves)*), 탭에 시간이 있는 비교 가능한 실행이 있으면 그다음 *last such run m:ss*입니다. round 20부터 그런 실행이 없으면 시간 부분이 없습니다(*Closed window · 2 modes*): round 19의 *no timed run in this tab yet*(그 전에는 *no earlier run*)은 시간을 잰 실행이 무엇이냐는 물음을 낳았고, 탭에서 다른 경계나 군굴절률 상태로 계산한 실행 옆에서 맞지 않았습니다. 비교 가능한
    실행은 경계 종류와 군굴절률 상태가 같은 실행이며, 그 시간은 이 탭에서 작업 시작부터 결과까지의 실제 시간으로 이 탭의
    실행에만 보존됩니다: 연 실행과 복원한 실행에는 없고 어떤 파일에도 담기지 않습니다. round 23(E3)부터 군굴절률이 켜져 있으면
    시간 부분은 이 탭에서 경계 종류가 같은 가장 새 실행(군굴절률 상태와 무관)으로 낸 어림값입니다: 그 실행도 군굴절률을 계산했으면
-   그 시간, 아니면 그 시간의 세 배(군굴절률은 풀이 두 번을 더함), *Open boundary · 2 searches · group index on (3 solves) ·
+   그 시간, 아니면 그 시간의 세 배(군굴절률은 풀이 두 번을 더함), *Open boundary · 2 modes · 2 searches · group index on (3 solves) ·
    about 3 min*(1분 30초 미만이면 *about 20 s*). 그런 실행이 없으면 어림값도 없습니다(round 20 규칙). round 24(B5)는 비교할 열린
    실행이 파일에서 연 것뿐이던 P04의 경우를 확인했습니다: 세션 파일과 브라우저 복구 기록은 실행마다 완료 시각을 담지만 실제
    시간은 담지 않으므로(세션 형식은 그대로) 그런 실행에는 시간이 없습니다. 어림값은 그 실행을 건너뛰고 이 탭에서 시간이 있는
@@ -1382,7 +1383,7 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   안내의 몫)이 0.5보다 큰 모드에는 안내 행 *Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window
   edge.*가 붙습니다(기판 위 스트립 @2.46, 모드 2개; 모드 4개면 3번째). 이 몫은 Studio의 가중치 없는 |E|² 몫이고, 같은 모드의
   엔진 에너지 비율(가둠 인자)은 0.91입니다.
-- **문구.** Run study 옆 계획 줄은 *Closed window · near n_eff 2.46*, 다음 실행 입력은 *· search near 2.46*으로 끝나며, 실행
+- **문구.** Run study 옆 계획 줄은 *Closed window · near n_eff 2.46 · 2 modes*(round 28 G2부터 Modes to find와 함께), 다음 실행 입력은 *· search near 2.46*으로 끝나며, 실행
   목록, Compare 선택 목록과 제목, 상태 표시줄은 목표 없는 닫힌 실행의 *closed* 자리에 *closed near 2.46*을 씁니다.
 - **실행과 파일.** 실행 설정에 목표가 남습니다: adapter `optical-shapes-v10`, `mode_count` 뒤의 `search_target`. 세션(그리고
   프로젝트 파일의 작업 공간 항목)은 그런 실행이 보관되어 있을 때만 **버전 11**로, 아니면 버전 10, 9, 7로 바이트까지 같게
