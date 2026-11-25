@@ -927,8 +927,8 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-13보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 14, newer than this Studio reads
-(versions 6–13). Open it in a newer Studio.”. 버전 9~13은 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
+14보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 15, newer than this Studio reads
+(versions 6–14). Open it in a newer Studio.”. 버전 9~14는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
@@ -1654,7 +1654,8 @@ Studio는 스스로 거부할 파일을 쓰지 않습니다. 버전 6·7 파일�
 보존합니다: T16 실행은 3.9 MB(PML 포함 13.4 MB), 모드 3개와 군굴절률을 더한 T16은 5.6 MB(19.0 MB)입니다. 측정은
 `tools/studio_open_field_size.mjs`입니다. 2026-11-24에 T18(실리콘 기판 위 스트립, 코어 메시 30 nm)로 잰 크기: 모드 2개 닫힌
 실행 2.10 MB, 모드 4개 3.78 MB, 모드 4개 closed near 2.46 3.75 MB, 모드 2개 열린 실행은 n_g와 상관없이 3.94 MB(장이 각각의
-99 %, 장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로 만들었습니다. [실행 보관](#실행-보관-값과-필드)부터
+99 %, 장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로 만들었습니다. [단정밀도](#압축-필드단정밀도)로는 같은
+장이 1.02, 1.74, 1.74, 1.11 MB입니다. [실행 보관](#실행-보관-값과-필드)부터
 광학 모델은 장을 하나의 예산 안에서 보관하므로 세션이 한도를 넘지 않고, Save는 묻지 않으며, 브라우저 복구는 Save와 같은
 텍스트를 씁니다. 아래의 질문, 거부, 복구 규칙은 탭이 파일보다 많이 담는 두 경우(그 절에서 설명)에만 남습니다.
 
@@ -1777,11 +1778,53 @@ Run 1 and Run 2; their n_eff, TE fractions and effective areas were.*가 붙습�
   보관합니다. 그리고 마지막으로 필드가 들어온 뒤 세션이 입력용 16 KiB보다 더 커졌을 때입니다. 입력에는 한도가 있으므로(광학 형상
   8개, Joule 형상 8개, 재료 6개) 두 번째 경우는 드물며, 다음에 필드가 들어오면 예산 안에서 다시 고릅니다.
 - **측정**(2026-11-25, `tools/studio_run_retention.mjs`): T18 혼합 결과 20개(닫힌 모드 2개, 닫힌 모드 4개, closed near 2.46,
-  n_g가 있는 열린 실행; Run 2 고정)는 필드 4개를 보관합니다. 세션은 결과마다 최대 16.6 MB이고, 필드 없는 기록 20개는 0.15 MB입니다.
+  n_g가 있는 열린 실행; Run 2 고정)는 텍스트로 필드 4개를 보관합니다. 세션은 결과마다 최대 16.6 MB이고, 필드 없는 기록 20개는
+  0.15 MB입니다. [압축 필드](#압축-필드단정밀도)로는 같은 결과 20개가 필드 11개(Run 2와 11~20)를 보관합니다.
 
 검사는 `tests/simcase/studio_run_retention_fields.cjs`(순서, 문구, 번호에 대한 2000단계의 시드 고정 순서열, 파일·복구와 탭의
 비교, 위 두 경우), `tests/simcase/studio_run_retention_recompute.cjs`, 도구의 `k1`과 `k5` 명령,
 `tools/studio_browser/studio_workspace_browser.mjs`의 RT 단계(실행 보관)입니다.
+
+### 압축 필드(단정밀도)
+
+설계 *Compact field encoding*(라운드 25 A1)부터 필드를 단정밀도로 보관할 수 있어, [16.8 MB 예산](#실행-보관-값과-필드)에 더 많은
+필드가 들어갑니다.
+
+- **필요할 때만.** 탭의 모든 필드가 텍스트로 들어가는 동안에는 아무것도 바뀌지 않으며 파일도 전처럼 씁니다. 필드를 모두 텍스트로
+  담을 수 없게 되는 첫 도착(결과, 재계산한 필드, Add runs from file, 또는 실행을 되돌리는 **Keep Run N, drop … instead**) 때 탭의
+  모든 필드를 단정밀도로 보관하고, 줄어든 크기로 실행 보관의 순서를 적용합니다. Messages는 한 번 이렇게 알립니다: *Fields are now
+  kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged.
+  Files saved from now on need this Studio or later (session version 14).* 그 뒤 들어오는 필드도 모두 같은 방식으로 보관하며, 탭은
+  되돌아가지 않습니다. File › Open과 Restore는 필드를 모두 텍스트로 담을 수 있는 한 파일에 담긴 그대로 보관하므로, 열어서 바꾸지
+  않고 다시 저장한 파일은 원래 바이트와 같습니다.
+- **바뀌는 것.** 장 표본을 float32로 반올림합니다(유효숫자 약 7자리, 상대 오차 최대 2^-24, 약 6e-8). 노드 좌표와 삼각형은 그대로
+  보관하므로 창, 잘라내기, 물리 창은 바뀌지 않습니다. n_eff, TE 비율, 유효 면적, n_g, 열린 실행의 후보는 실행이 전에 보여 준 값을
+  실행과 함께 저장합니다. 장 보기, 탐침, 단면, Compare, PNG 내보내기는 float32 표본을 읽으므로, 복구하거나 연 파일은 탭이 보여 준
+  것과 똑같이 보여 줍니다. T18 결과로 측정하면, 압축 필드에서 계산한 TE 비율과 면적은 최대 상대 7e-9, 정규화한 장 보기는 6e-8
+  차이가 나며, 탐침의 6자리 표시는 삼각형의 약 1 %에서 마지막 자리가 1 다릅니다.
+- **문구.** 압축 실행의 장 보기 아래 Results: *Field at single precision (float32). The values above are the engine's.* Export this
+  run: *… with the run's inputs and fields (fields at single precision) …*(버전 14 파일). 탭에 압축 필드가 생기면 실행 목록 아래
+  안내에 *When fields would not all fit, they are kept at single precision.*이 붙습니다. 단면 CSV의 머리글과 열은 그대로이며,
+  relative_amplitude [1]은 정규화한 float32 표본입니다.
+- **단정밀도로 담을 수 없는 필드**(±3.4e38를 넘는 표본, 또는 0이 되거나 1.2e-38 아래 비정규 수가 될 0이 아닌 표본)는 텍스트로
+  남습니다. 엔진 장은 최대 1로 정규화되므로 합성하거나 고친 파일만 그런 필드를 담습니다.
+- **전체 정밀도.** 탭이 압축되면 float64 필드는 남지 않습니다. **Recompute Run N's fields**는 내보낸 필드를 되찾고 모든 값을
+  1e-12까지 검사한 뒤 다른 필드처럼 단정밀도로 보관합니다. float64 표본이 필요하면 **Use this run's inputs** 다음 Export solver
+  JSON으로 문서를 내보내 simcase로 실행하십시오.
+- **한계.** 버전 6이나 7 파일에서 처음 연 실행의 저장된 TE 비율과 유효 면적은 Studio가 그 파일의 장에서 계산한 값입니다. 저장한
+  뒤에는 Studio가 이를 저장된 값으로 표시합니다. TE 비율이나 유효 면적이 수가 아닌 실행(프로젝트 고정 파일 `project-v1.json`의
+  실행처럼 합성 파일에만 있음)이 있으면 압축 필드 전과 같이 탭에 필드 예산이 없고, 그 필드는 그대로 남습니다.
+- **크기**(2026-11-25, 실리콘 기판 위 T18 스트립, 코어 메시 30 nm; 텍스트 → 단정밀도): 닫힌 모드 2개 2.25 → 1.02 MB, 닫힌 모드
+  4개 4.10 → 1.74 MB, closed near 2.46 모드 4개 4.08 → 1.74 MB, 열린 모드 2개(n_g 유무와 관계없음) 3.92 → 1.11 MB(노드 6,263개,
+  삼각형 12,253개). 압축 필드의 크기는 개수에서 정해집니다: 32·k·T + 4⌈16N/3⌉ + 4⌈12T/3⌉ 문자와 키(모드 k개, 노드 N개, 삼각형
+  T개). T18 필드 여섯 개(텍스트 16.6 MB)인 탭의 변환은 Node에서 112 ms, 필드 11개(텍스트 13.6 MB)인 탭은 Chrome에서 68 ms였습니다. 브라우저에서
+  닫힌 T18 실행 셋의 장 보기, 단면, 장 PNG는 변환 전후에 같았고, 31개 보기 중 하나에서 4픽셀이 색 1단계 달랐을 뿐입니다. Deflate는 측정했으나 쓰지 않습니다: 열린 필드에서
+  1.05배, 닫힌 필드의 허수부에서 최대 2.8배(닫힌 필드 표본의 절반이 정확히 0).
+
+검사는 `tests/simcase/studio_field_encoding_format.cjs`(형식, F1, F3, F4, F10), `tests/simcase/studio_field_encoding_tab.cjs`(F2:
+필드가 들어가는 동안 변환 없음, main 499a0d3과 같은 텍스트; F11: 변환이 있는 2000단계의 시드 고정 순서열; F6과 F8: 압축 필드에서
+Studio가 계산하는 것), `tests/simcase/test_studio_field_encoding.py`(F5: NumPy와 같은 문자열), `tools/studio_field_encoding.mjs`
+(`f9`, `f14`, `f16`, `sizes`)입니다.
 
 ### 광학 세션 파일(버전 13)
 
@@ -1800,6 +1843,42 @@ digest)과 최상위 키가 같습니다. 버전 6~12는 실행을 최대 여섯
 
 검사는 `tests/simcase/studio_run_retention_format.cjs`입니다(K2: 이전 고정 파일을 모두 바이트 그대로 다시 씀; K3: 실행 2와
 4~11의 고정 파일 `optical-v13-nine-runs.json`; K4: main 3f16709가 읽는 것, `refusals-v13-3f16709.json`).
+
+### 광학 세션 파일(버전 14)
+
+버전 14는 실행이 압축 필드([압축 필드](#압축-필드단정밀도))를 담을 수 있는 [버전 13](#광학-세션-파일버전-13)입니다: 최상위 키, 실행
+0~20개, 버전 13의 실행 기록과 digest가 같습니다. 필드는 버전 13의 중첩 숫자이거나, 다음 키를 이 순서로만 갖는 압축 필드입니다:
+
+```json
+"field": {
+  "encoding": "f32-base64-v1",
+  "counts": {"modes": 2, "nodes": 6263, "triangles": 12253},
+  "node_coordinates": "<base64: nodes × 2 float64, little-endian, metres>",
+  "triangles": "<base64: triangles × 3 uint32, little-endian>",
+  "real": "<base64: modes × triangles × 3 float32, little-endian>",
+  "imag": "<base64: the same for the imaginary parts>"
+}
+```
+
+- **배치.** 각 배열은 지금의 중첩을 펼친 것입니다: 모드, 삼각형, x·y·z; 노드, x·y; 삼각형, 세 인덱스. Base64는 RFC 4648의 표준
+  알파벳에 패딩을 붙이고 줄바꿈은 없습니다. NumPy의 `astype('<f4')`, `'<f8'`, `'<u4'`와 표준 라이브러리 base64는 같은 문자열을
+  씁니다.
+- **저장된 값.** 압축 필드를 가진 실행은 TE 비율과 유효 면적도 저장합니다.
+- **언제 쓰는가.** 압축 필드를 가진 채 보관된 실행이 있을 때만 씁니다. 그 밖에는 버전 13, 12, 11, 10, 9, 7로 바이트 그대로
+  씁니다. 압축 필드가 없는 버전 14 파일도 읽습니다. 압축 필드는 읽은 문자열 그대로 다시 쓰므로, 읽고 다시 쓴 버전 14 파일은 원래
+  바이트와 같습니다.
+- **거부**(각각 실행을 밝힘): *Run 5's field is encoded as "…", which this Studio does not read.*; *Run 5's compact field must
+  hold encoding, counts, node_coordinates, triangles, real, imag in this order, and nothing else.*; *Run 5's compact field counts
+  must be whole numbers: modes 1 to 8, nodes 3 to 250000, triangles 1 to 500000.*; *Run 5's compact field holds 1 modes; the run
+  has 2.*; *Run 5's compact field real is not canonical base64.*; *Run 5's compact field triangles holds 36 bytes; its counts give
+  24.*; *Run 5's compact field imag holds a value that is not a finite number.*; *Run 5's compact field triangle 2 names node 5,
+  outside 0–4.*; *Run 5's compact field triangle 1 repeats a node.*; *Run 5 has a compact field and no saved TE fractions and
+  effective areas.*; 버전 13 이하 파일에서는 *Run 3: a compact field is read from a version 14 session file only.* 해독한 필드는
+  그 뒤 중첩 숫자 필드의 모든 검사를 거칩니다.
+- **이전 Studio.** 버전 13까지 읽는 Studio(main 499a0d3)는 버전 14 파일을 이름을 들어 거부합니다: *This session file is version
+  14, newer than this Studio reads (versions 6–13). Open it in a newer Studio.*(프로젝트 파일의 항목은 앞에 *Optical waveguide: *).
+  그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다. 프로젝트 파일은 버전 1 그대로이며(광학 항목은 버전 14를 읽음), 복구
+  기록도 버전 1 그대로입니다. 광학 문서, 어댑터, 서버 응답, 결과, 다중물리 세션(버전 8)은 바뀌지 않습니다.
 
 ### Compare의 모드 짝짓기
 
