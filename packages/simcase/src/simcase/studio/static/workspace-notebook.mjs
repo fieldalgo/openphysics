@@ -9,11 +9,15 @@ import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
-export const RUN_LIMIT=6;
-// The run limit in words, from RUN_LIMIT itself, so the run list's note and the model tree's
-// "Runs · N of M" never disagree (round 14).
-const NUMBER_WORDS=Object.freeze(['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve']);
-export const RUNS_KEPT_TEXT=`Up to ${NUMBER_WORDS[RUN_LIMIT]} runs are kept.`;
+// Run retention (design "Keeping more runs"): up to 20 runs keep their values in the tab, in files and
+// in browser recovery; their fields are kept within the 16 MiB session (workspace-retention.mjs).
+// A session file of versions 6 to 12 holds at most six runs (PREVIOUS_RUN_LIMIT): a session of more
+// runs is written as version 13, which the previous Studio refuses by name.
+export const RUN_LIMIT=20;
+export const PREVIOUS_RUN_LIMIT=6;
+// The run limit, from RUN_LIMIT itself, so the run list's note and the model tree's "Runs · N of M"
+// never disagree (round 14); written in digits, as the limit's other words are.
+export const RUNS_KEPT_TEXT=`Up to ${RUN_LIMIT} runs are kept.`;
 export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 // Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
 // unchanged, and a version 6 session is read with its input as a version 6 project. Format 6
@@ -41,6 +45,13 @@ export const CLOSED_TARGET_SESSION_VERSION=11;
 // otherwise version 11, 10, 9 or 7, byte for byte. A file of an earlier version is numbered from 1
 // in file order, as before.
 export const NUMBERED_SESSION_VERSION=12;
+// Format 13 (run retention): format 12 with 0 to 20 runs (versions 6 to 12 hold at most six). The run
+// records are those of version 12 (the number, the same keys, the same digest). Written only when the
+// session has more than six runs; otherwise version 12, 11, 10, 9 or 7, byte for byte. The previous
+// Studio reads versions 6 to 12 and refuses a version 13 file by name before it counts the runs.
+export const RUNS_SESSION_VERSION=13;
+/** Whether a version writes and reads the run number (versions 12 and 13). */
+const numbered=version=>version===NUMBERED_SESSION_VERSION||version===RUNS_SESSION_VERSION;
 // The adapter of this Studio: optical-shapes-v8 builds the document of optical-shapes-v7 with the
 // mode count asked for (1 to 8). A version 7 run is a v8 run of two modes: its document is the same.
 export const OPTICAL_ADAPTER='optical-shapes-v8';
@@ -261,7 +272,7 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
  const fields=field&&{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag};
  if(version===SESSION_VERSION)return {...record,settings:v7Settings(record.settings),field:fields};
  const settings=record.settings.adapter===V7_ADAPTER?{...record.settings,adapter:OPTICAL_ADAPTER}:record.settings;
- const out={job:record.job,...(version===NUMBERED_SESSION_VERSION?{number}:{}),completedAt:record.completedAt,label:record.label,pinned:record.pinned,origin:record.origin,serverVersion:record.serverVersion,settings,input:record.input,
+ const out={job:record.job,...(numbered(version)?{number}:{}),completedAt:record.completedAt,label:record.label,pinned:record.pinned,origin:record.origin,serverVersion:record.serverVersion,settings,input:record.input,
   effective_index:effective_index_im?{re:record.effective_index,im:effective_index_im}:record.effective_index};
  const shown=keepField&&fields?null:modeValues(run);
  if(keepField&&fields)out.field=fields;
@@ -294,10 +305,12 @@ export function withPmlCheck(runs,selected,job,check){
  const checked=validateRun({...run,pml_check:check});if(Number.isInteger(run.inputRevision))checked.inputRevision=run.inputRevision;if(Number.isInteger(run.number))checked.number=run.number;
  return {runs:runs.map(r=>r===run?checked:r),selected:selected===run?checked:selected};
 }
-export function appendRun(runs,run){
+/** The runs with a new result: a run of a job already kept replaces it (its name and pin kept); above
+ * the limit (RUN_LIMIT unless given) the oldest unpinned run other than the new one is dropped. */
+export function appendRun(runs,run,limit=RUN_LIMIT){
  const previous=runs.find(r=>r.job===run.job);
  const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];
- while(next.length>RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All notebook slots are pinned. Unpin a run before retaining another result.');next.splice(oldest,1);}
+ while(next.length>limit){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All notebook slots are pinned. Unpin a run before retaining another result.');next.splice(oldest,1);}
  return next;
 }
 /** The field view in the page's micrometres (probe x, y and profile coordinate as numbers). */
@@ -325,12 +338,14 @@ function readView(view){
   if(!inWindow(c.m,p?.axis==='x'?WINDOW_UM.ymax:WINDOW_UM.xmax))throw new Error('Invalid saved profile line.');out.profile={axis:p.axis,coordinate:c.um,open:p.open};}
  return validateView(out);
 }
-/** The version a session of these runs is written as: 12 when a run's number is not its place in
- * the list; else 11 when a run is a closed-window search run; else 10 when a run has an open boundary or the
+/** The version a session of these runs is written as: 13 when it has more than six runs; 12 when a
+ * run's number is not its place in the list; else 11 when a run is a closed-window search run; else 10 when a run has an open boundary or the
  * input chooses Open (version 9); else 7 when every run fits version 7 (and every field is kept)
  * and the input is of version 6 or 7, else 9 (an input of version 8, with study settings, is
  * held by version 9 only). */
 export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ // version 13 only above six runs: a session of six or fewer is written as before
+ if(runs.length>PREVIOUS_RUN_LIMIT)return RUNS_SESSION_VERSION;
  // version 12 when a run's number is not its place in the list; a run without one is at its place
  if(runs.some((run,i)=>runNumberAt(run,i)!==i+1))return NUMBERED_SESSION_VERSION;
  if(runs.some(isClosedTargetRun))return CLOSED_TARGET_SESSION_VERSION;
@@ -347,9 +362,9 @@ export function createSession(input,runs,selected,comparison,view={mode:0,compon
  // are not ranked above the threshold, or a view of a mode the selected run does not have
  runs.forEach((run,i)=>{const e=run.effective_index,re=Array.isArray(e)?e:e?.re??[];if(re.some((x,j)=>!(x>GUIDED_THRESHOLD)||(j>0&&x>re[j-1])))throw new Error(`Run ${i+1}: its effective indices are not ranked by Re n_eff above n = ${GUIDED_THRESHOLD}, so a version 9 session cannot hold it${checked.version===STUDY_PROJECT_VERSION&&sessionVersion(runs,view,keep)===SESSION_VERSION?' (the current Modes to find or group index option is saved in version 9 only; set 2 modes and the option off to save as version 7)':''}. Remove the run or save it in a session of its own.`);});
  const shown=runs.find(run=>run.job===selected);if(shown&&validateView(view).mode>=shown.effective_index.length)throw new Error('Unsupported saved field view.');
- // version 12: the numbers a version 12 reader refuses are not written (strictly increasing safe integers)
+ // versions 12 and 13: the numbers a version 12 reader refuses are not written (strictly increasing safe integers)
  const numbers=runs.map(runNumberAt);
- if(version===NUMBERED_SESSION_VERSION&&numbers.some((n,i)=>!isRunNumber(n)||(i>0&&n<=numbers[i-1])))throw new Error('Run numbers must be whole numbers of at least 1, increasing in list order.');
+ if(numbered(version)&&numbers.some((n,i)=>!isRunNumber(n)||(i>0&&n<=numbers[i-1])))throw new Error('Run numbers must be whole numbers of at least 1, increasing in list order.');
  return {format:'openphysics-studio-session',version,application:'optical',input:checked,runs:runs.map((run,i)=>sessionRun(run,version,!keep||keep.has(run.job),numbers[i])),selected,comparison:[...comparison],view:sessionView(view)};
 }
 /** The file text of a session: version 7 as JSON.stringify writes it (as before), version 9 with
@@ -473,7 +488,9 @@ export const newerVersionText=(version,highest)=>`This session file is version $
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
 /** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
  * accepts these, so a later version is added here only (workspace-project-file.mjs). */
-export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION]);
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION,RUNS_SESSION_VERSION]);
+/** The most runs a session file of this version holds: 20 in version 13, six in versions 6 to 12. */
+export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION?RUN_LIMIT:PREVIOUS_RUN_LIMIT;
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
@@ -485,10 +502,10 @@ export function parseSession(text,{recovered=false}={}){
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
   if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>NUMBERED_SESSION_VERSION)throw new Error(newerVersionText(doc.version,NUMBERED_SESSION_VERSION));
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>RUNS_SESSION_VERSION)throw new Error(newerVersionText(doc.version,RUNS_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
- const twelve=doc?.version===NUMBERED_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
- if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>RUN_LIMIT)throw new Error('Unsupported session format or run count.');
+ const twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
+ if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>sessionRunLimit(doc.version))throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
   if(doc.application!=='optical')throw new Error(`A version ${doc.version} session file holds an optical model (application "optical").`);
@@ -540,7 +557,9 @@ export function parseSession(text,{recovered=false}={}){
 }
 
 
-export function mergeRuns(existing,incoming){
+/** Add runs from file: the runs with the incoming ones added; above the limit (RUN_LIMIT unless given)
+ * the oldest unpinned runs not among the incoming ones are dropped (evicted). */
+export function mergeRuns(existing,incoming,limit=RUN_LIMIT){
  if(!incoming.length)throw new Error('The session contains no completed runs.');
  const result=[...existing],incomingIds=new Set(),added=[],reused=[];
  const identity=run=>JSON.stringify({input:run.input,settings:{...run.settings,adapter:OPTICAL_ADAPTER},effective_index:run.effective_index,effective_index_im:run.effective_index_im??null,serverVersion:run.serverVersion??null});
@@ -558,6 +577,6 @@ export function mergeRuns(existing,incoming){
   else{result.push(run);added.push(run.job);}
  }
  const evicted=[];
- while(result.length>RUN_LIMIT){const index=result.findIndex(run=>!run.pinned&&!incomingIds.has(run.job));if(index<0)throw new Error('Imported runs and pinned references exceed six slots. Unpin a reference or import a selected-run file.');evicted.push(result[index].job);result.splice(index,1);}
+ while(result.length>limit){const index=result.findIndex(run=>!run.pinned&&!incomingIds.has(run.job));if(index<0)throw new Error(`Imported runs and pinned references exceed ${limit} slots. Unpin a reference or import a selected-run file.`);evicted.push(result[index].job);result.splice(index,1);}
  return {runs:result,added,reused,evicted};
 }

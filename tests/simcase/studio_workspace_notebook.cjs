@@ -17,7 +17,7 @@ const run=(job='12345678')=>({job,completedAt:'2026-10-26T00:00:00.000Z',setting
 const stored=field=>({node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag});
 test('session round trip preserves fields, comparison and immutable inputs; imports never become local calculations',()=>{const a=run(),b=run('abcdef12');b.input.model.shapes=[{...b.input.model.shapes[0],x:-350,w:700}];const d=createSession(input(),[a,b],b.job,[a.job,b.job]);const restored=parseSession(JSON.stringify(d));assert.equal(restored.runs[1].input.model.shapes[0].w,700);assert.equal(restored.runs[0].origin,'imported');assert.deepEqual(restored.comparison,[a.job,b.job]);assert.deepEqual(stored(restored.runs[0].field),a.field);assert.deepEqual(restored.runs[0].field.nodes,[[0,0],[1,0],[0,1]]);restored.runs[0].input.model.shapes[0].w=900;assert.equal(a.input.model.shapes[0].w,500);
  assert.equal(d.version,7);assert.deepEqual(d.runs[0].field,a.field);assert.equal('nodes' in d.runs[0].field,false);assert.deepEqual(d.runs[0].effective_index,[2.4,1.7]);});
-test('bounded retention and replacing repeated job keeps unique latest six',()=>{let runs=[];for(let i=0;i<8;i++)runs=appendRun(runs,run(i.toString(16).padStart(8,'0')));assert.equal(runs.length,6);assert.equal(runs[0].job,'00000002');runs=appendRun(runs,run('00000004'));assert.equal(runs.length,6);assert.equal(runs.at(-1).job,'00000004');});
+test('bounded retention and replacing repeated job keeps unique latest 20',()=>{let runs=[];for(let i=0;i<22;i++)runs=appendRun(runs,run(i.toString(16).padStart(8,'0')));assert.equal(runs.length,20);assert.equal(runs[0].job,'00000002');runs=appendRun(runs,run('00000004'));assert.equal(runs.length,20);assert.equal(runs.at(-1).job,'00000004');});
 test('corrupted results, references, metadata and versions are rejected atomically',()=>{for(const change of [d=>d.version=8,d=>d.version=5,d=>d.runs[0].field.triangles[0][0]=99,d=>d.runs[0].effective_index[0]=null,d=>{d.runs[0].neff=d.runs[0].effective_index;delete d.runs[0].effective_index;},d=>d.runs[0].settings.height_nm=400,d=>d.runs[0].settings.vacuum_wavelength=1550,d=>d.runs[0].field.node_coordinates[0][0]='0 m',d=>d.selected='deadbeef',d=>d.runs[0].input.model.heat=true,d=>d.comparison=['bad',null]]){const d=JSON.parse(JSON.stringify(createSession(input(),[run()],'12345678',['12345678',null])));change(d);assert.throws(()=>parseSession(JSON.stringify(d)));}});
 test('empty and oversized session handling',()=>{const d=createSession(input(),[],null,[null,null]);assert.equal(parseSession(JSON.stringify(d)).runs.length,0);assert.throws(()=>parseSession('x'.repeat(16*1024*1024+1)));});
 
@@ -37,9 +37,9 @@ test('optional run names survive sessions; unsafe names are rejected and CSV quo
 
 
 test('pinned references survive retention and a fully pinned notebook rejects a new result atomically',()=>{
- const original=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));original[0].pinned=true;
- const next=appendRun(original,run('abcdef12'));assert.equal(next.length,6);assert.ok(next.some(r=>r.job==='00000000'));assert.ok(!next.some(r=>r.job==='00000001'));assert.equal(original.length,6);
- const pinned=original.map(r=>({...r,pinned:true}));assert.throws(()=>appendRun(pinned,run('abcdef12')),/pinned/);assert.equal(pinned.length,6);assert.equal(pinned[0].job,'00000000');
+ const original=Array.from({length:20},(_,i)=>run(i.toString(16).padStart(8,'0')));original[0].pinned=true;
+ const next=appendRun(original,run('abcdef12'));assert.equal(next.length,20);assert.ok(next.some(r=>r.job==='00000000'));assert.ok(!next.some(r=>r.job==='00000001'));assert.equal(original.length,20);
+ const pinned=original.map(r=>({...r,pinned:true}));assert.throws(()=>appendRun(pinned,run('abcdef12')),/pinned/);assert.equal(pinned.length,20);assert.equal(pinned[0].job,'00000000');
 });
 test('resuming an existing run preserves its name and pin, and session pin metadata is validated',()=>{
  const first={...run(),label:'Reference',pinned:true};const again=appendRun([first],run());assert.equal(again.length,1);assert.equal(again[0].label,'Reference');assert.equal(again[0].pinned,true);
@@ -49,8 +49,8 @@ test('resuming an existing run preserves its name and pin, and session pin metad
 
 
 test('run import protects pinned and incoming runs while reporting evicted prior unpinned runs',()=>{
- const existing=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));existing[0].pinned=true;
- const merged=mergeRuns(existing,[run('abcdef12'),run('abcdef13')]);assert.equal(merged.runs.length,6);assert.deepEqual(merged.evicted,['00000001','00000002']);assert.deepEqual(merged.added,['abcdef12','abcdef13']);assert.equal(merged.runs.at(-1).origin,'imported');assert.equal(existing.length,6);assert.equal(existing[1].job,'00000001');
+ const existing=Array.from({length:20},(_,i)=>run(i.toString(16).padStart(8,'0')));existing[0].pinned=true;
+ const merged=mergeRuns(existing,[run('abcdef12'),run('abcdef13')]);assert.equal(merged.runs.length,20);assert.deepEqual(merged.evicted,['00000001','00000002']);assert.deepEqual(merged.added,['abcdef12','abcdef13']);assert.equal(merged.runs.at(-1).origin,'imported');assert.equal(existing.length,20);assert.equal(existing[1].job,'00000001');
 });
 test('matching imports retain local metadata and conflicting payloads reject atomically',()=>{
  const saved={...run(),label:'Reference',pinned:true};const existing=createSession(input(),[saved],saved.job,[saved.job,saved.job]).runs;
@@ -58,8 +58,8 @@ test('matching imports retain local metadata and conflicting payloads reject ato
  const conflict=run();conflict.effective_index[0]=2.5;assert.throws(()=>mergeRuns(existing,[run('abcdef12'),conflict]),/Conflicting/);assert.equal(existing.length,1);assert.equal(existing[0].effective_index[0],2.4);
 });
 test('imports cannot silently drop an incoming run or a pinned reference when slots are exhausted',()=>{
- const existing=[{...run('deadbeef'),pinned:true}];const incoming=Array.from({length:6},(_,i)=>run(i.toString(16).padStart(8,'0')));
- assert.throws(()=>mergeRuns(existing,incoming),/exceed six/);assert.equal(existing[0].job,'deadbeef');assert.throws(()=>mergeRuns(existing,[]),/no completed/);assert.throws(()=>mergeRuns([], [run(),run()]),/Duplicate/);
+ const existing=[{...run('deadbeef'),pinned:true}];const incoming=Array.from({length:20},(_,i)=>run(i.toString(16).padStart(8,'0')));
+ assert.throws(()=>mergeRuns(existing,incoming),/exceed 20/);assert.equal(existing[0].job,'deadbeef');assert.throws(()=>mergeRuns(existing,[]),/no completed/);assert.throws(()=>mergeRuns([], [run(),run()]),/Duplicate/);
 });
 
 

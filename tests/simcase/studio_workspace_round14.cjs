@@ -16,9 +16,9 @@ const items=html=>[...html.matchAll(/<button type="button"([^>]*)>(.*?)<\/button
 test('Q9: the Results group exists only with runs; Compare only with two',()=>{
  assert.equal(T.resultsGroup({runs:0,page:'Model',runsLabel:N.runsNodeLabel(0)}),'');
  const one=items(T.resultsGroup({runs:1,shownRun:1,page:'Model',runsLabel:N.runsNodeLabel(1)}));
- assert.deepEqual(one.map(i=>[i.role,i.level,i.name]),[['treeitem',1,'Results · run 1'],['treeitem',2,'Runs · 1 of 6']]);
+ assert.deepEqual(one.map(i=>[i.role,i.level,i.name]),[['treeitem',1,'Results · run 1'],['treeitem',2,'Runs · 1 of 20']]);
  const two=items(T.resultsGroup({runs:2,shownRun:1,page:'Model',runsLabel:N.runsNodeLabel(2)}));
- assert.deepEqual(two.map(i=>[i.role,i.level,i.name,i.node||i.group]),[['treeitem',1,'Results · run 1','Results'],['treeitem',2,'Runs · 2 of 6','results:runs'],['treeitem',2,'Compare','results:compare']]);
+ assert.deepEqual(two.map(i=>[i.role,i.level,i.name,i.node||i.group]),[['treeitem',1,'Results · run 1','Results'],['treeitem',2,'Runs · 2 of 20','results:runs'],['treeitem',2,'Compare','results:compare']]);
  // roving tabindex: every item starts at -1, bindTree sets the one tab stop
  assert.ok(two.every(i=>i.tabindex==='-1'));
  assert.equal(two[0].expanded,'true');
@@ -31,8 +31,8 @@ test('Q9: the node of the page shown is the selected one',()=>{
  assert.match(T.resultsGroup({runs:3,shownRun:2,page:'Results',runsLabel:'r'}),/Results · run 2/);
 });
 test('Q9: "Runs · N of M" and "Up to six runs are kept" both come from RUN_LIMIT',()=>{
- const words=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
- assert.equal(N.RUNS_KEPT_TEXT,`Up to ${words[N.RUN_LIMIT]} runs are kept.`);
+ // run retention: the limit is 20, written in digits
+ assert.equal(N.RUN_LIMIT,20);assert.equal(N.RUNS_KEPT_TEXT,'Up to 20 runs are kept.');
  assert.equal(N.runsNodeLabel(2),`Runs · 2 of ${N.RUN_LIMIT}`);
  const app=read('workspace-app.mjs');
  assert.match(app,/limit\.textContent=RUNS_KEPT_TEXT\+' Pinned runs stay;/);
