@@ -3020,6 +3020,14 @@ try {
     assert.equal(p5.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
     assert.equal(p5.plan, 'Closed window · near n_eff 2.46'); assert.equal(p5.items, items0); assert.equal(p5.run, 'Run study'); assert.equal(p5.job || '', '');
     assert.equal(p5.modes, '4'); noWarning(p5.after, 'after the shortcut');
+    // round 27 (D1): a long Messages line (this one, 150 characters) wraps whole at 390 × 844; R23 P2
+    // checked that with the conversion sentence, which D1 removed
+    await rSize(390, 844, true);
+    p5.phone = await r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12,b=m.getBoundingClientRect();return {text:m.textContent,over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(b.height/line),right:b.right<=innerWidth}})()");
+    await rSize(1440, 900);
+    stage('R22 P5 long message at 390', p5.phone);
+    assert.equal(p5.phone.text, p5.message);
+    assert.ok(p5.phone.lines > 1 && p5.phone.over <= 0 && p5.phone.lineOver <= 0 && p5.phone.right, JSON.stringify(p5.phone));
     // P3 (V3): T18 closed with Highest (2 modes) against T18 open
     await r.click('#closed-search-highest'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
     await rRun();
@@ -3316,7 +3324,8 @@ try {
     // every field is kept, at single precision (version 14)
     assert.equal(p2.record.version, 14); assert.ok(p2.record.fields.every(([, f]) => f), JSON.stringify(p2.record.fields));
     // round 27 (D1): the message no longer holds the conversion sentence, so it may fit one line on a
-    // phone (it did with the runner's fonts); it stays whole and inside the line at both sizes
+    // phone (it did with the runner's fonts); it stays whole and inside the line at both sizes. A long
+    // Messages line wrapping whole at 390 px is checked at R22 P5 (the shortcut's message).
     for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
     await rOverflow('P2 session size');
     // P4 (E4): the fourteen values-only runs (Runs 6 to 19), then Run 20, then an edit: the drop line,
