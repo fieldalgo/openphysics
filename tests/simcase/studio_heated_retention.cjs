@@ -4,8 +4,9 @@
 // the pre-registration that need no engine run. HK2 (version 8 written byte for byte), HK3 (version
 // 15 read and written), HK4 (what main ddb09a1 reads of it), HK6 to HK8 (a seeded sequence of 2000
 // steps: no run number reused, the tab equal to the file and recovery, maps let go only when maps
-// arrive, in the order of 3.2), HK9 (the words), HK13 (recovery fills newest first) and HK14 (Open
-// and Restore are arrivals). HK1 needs engine results: tests/simcase/studio_heated_retention_engine.cjs.
+// arrive, in the order of 3.2), HK9 (the words), HK12 (a recompute that does not match), HK13
+// (recovery fills newest first) and HK14 (Open and Restore are arrivals). HK1 and HK5 need engine
+// results: tests/simcase/studio_heated_retention_engine.cjs.
 const {before}=require('node:test');const test=require('node:test');const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');const {join}=require('node:path');
 const S='../../packages/simcase/src/simcase/studio/static/';
@@ -127,7 +128,7 @@ test('HK6–HK8: 2000 seeded steps: no number reused, the tab equal to the file 
   if(!(out.kept.length===1&&out.kept[0].job===selected&&out.total>budget))assert.ok(bytesOf(text)<=budget,`step ${steps}: within the budget`);
   return out;};
  for(steps=0;steps<2000;steps++){
-  const before=JSON.stringify(withMaps(runs)),op=pick(runs.length?['result','result','result','pin','unpin','rename','select','reopen','show']:['result']);kinds[op]=(kinds[op]||0)+1;
+  const before=JSON.stringify(withMaps(runs)),op=pick(runs.length?['result','result','result','pin','unpin','rename','select','recompute','mismatch','reopen','show']:['result']);kinds[op]=(kinds[op]||0)+1;
   let arrival=true;
   if(op==='result'){
    const n=pick([3,10,40,120,400]),run=runOf(++top,n,{seed:top});
@@ -138,7 +139,15 @@ test('HK6–HK8: 2000 seeded steps: no number reused, the tab equal to the file 
   else if(op==='unpin'){pick(runs).pinned=false;arrival=false;}
   else if(op==='rename'){const r=pick(runs);r.label=random()<0.5?'':'name '+steps;if(r.label)r.pinned=true;arrival=false;}
   else if(op==='select'||op==='show'){selected=pick(runs).job;arrival=false;}
-  else if(op==='reopen'){
+  else if(op==='recompute'){
+   const r=runs.find(x=>x.maps==='not kept');
+   if(!r)arrival=false;
+   else{const fresh=resultOf(r.counts.nodes/2,r.number);assert.equal(M.recomputeMapsMismatch(r,fresh),null,`step ${steps}: the same result matches`);M.attachMaps(r,fresh);arrive(r.job===selected?[]:[r.job]);}
+  }else if(op==='mismatch'){
+   const r=runs.find(x=>x.maps==='not kept');arrival=false;
+   if(r){const text=M.sessionJson(M.sessionRun(r)),fresh=resultOf(r.counts.nodes/2,r.number);fresh.physics.modes1.effective_index.values[0][0]+=1e-6;
+    assert.match(M.recomputeMapsMismatch(r,fresh),/^Modes 1 mode 1 n_eff came out /);assert.equal(M.sessionJson(M.sessionRun(r)),text);}
+  }else if(op==='reopen'){
    // Save, then Open: the file's runs replace the tab's, an arrival
    const text=M.writeMultiphysicsSession(state()).text,session=N.parseSession(text);
    runs=session.runs;selected=session.selected;arrive();
@@ -154,7 +163,7 @@ test('HK6–HK8: 2000 seeded steps: no number reused, the tab equal to the file 
   assert.deepEqual(rec.runs.map(r=>r.maps),runs.map(r=>r.maps),`step ${steps}: tab and recovery`);
   assert.equal(file.version,runs.length>6?15:8);
  }
- assert.ok(arrivals>600&&letGo>100&&kinds.reopen>50,JSON.stringify({arrivals,letGo,kinds}));
+ assert.ok(arrivals>600&&letGo>100&&kinds.reopen>50&&kinds.recompute>50,JSON.stringify({arrivals,letGo,kinds}));
  assert.ok(top>=20);
 });
 
@@ -179,6 +188,7 @@ test('HK9: the words (S1–S14)',()=>{
  assert.equal(W.mapsKeepValuesWhileRunningText([r3,r5],name),'When this run finishes, Run 3 (run at 14:03) and Run 5 (run at 14:05) keep their values, not their maps');
  assert.equal(W.mapsNotKeptAfterText([r3],name),'Run 3 (run at 14:03) keeps its values; its maps were not kept (16.8 MB limit).');
  assert.equal(W.mapsNotKeptAfterText([r3,r5],name),'Run 3 (run at 14:03) and Run 5 (run at 14:05) keep their values; their maps were not kept (16.8 MB limit).');
+ assert.equal(W.recomputeMapsLabel(r3),"Recompute Run 3's maps");
  assert.equal(W.keepMapsInsteadLabel(r3,r4,()=>'14:05'),"Keep Run 3's maps, not Run 4's (run at 14:05)");
  assert.equal(W.mapsBackText(r3,r4,()=>'Run 4 (run at 14:05)'),"Run 3's maps are back; Run 4 (run at 14:05) keeps its values, not its maps.");
  assert.equal(W.pinnedMapsText([r2],17.4e6),"Run 2 (pinned) keeps its values; its maps were not kept: the selected and pinned runs' maps are 17.4 MB, over the 16.8 MB limit. Unpin a run to keep the newer maps first.");
@@ -188,15 +198,53 @@ test('HK9: the words (S1–S14)',()=>{
  assert.equal(W.UNPINNED_TEXT,'Run unpinned: once 20 runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.');
  assert.equal(W.mapsNotKeptResultsText(r4),"Run 4's maps are not kept; its n_eff, coupling check and iteration history are kept. Maps are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected run's maps first, then pinned runs', then the newest. Selecting a run does not bring its maps back; Recompute does.");
  assert.equal(M.MAPS_NOT_KEPT,'Maps not kept in this file: n_eff, the coupling check and the iteration history are.');
+ assert.equal(W.recomputeMapsEstimate({...r4,duration:12000}),' · about 10 s');assert.equal(W.recomputeMapsEstimate(r4),'');
+ assert.equal(W.recomputingMapsText({...r4,duration:12000}),"Recomputing Run 4's maps · about 10 s");assert.equal(W.recomputingMapsText(r4),"Recomputing Run 4's maps");
+ assert.equal(W.recomputeStoppedText(r4),"Recompute of Run 4's maps stopped; Run 4 is unchanged.");
+ assert.equal(W.recomputedMapsText(r4),"Run 4's maps recomputed from its stored model; its values match.");
+ assert.equal(W.notRecomputedMapsText(r4,'Modes 1 mode 1 n_eff came out 2.44565014, stored 2.44565013'),"Run 4's maps were not recomputed: Modes 1 mode 1 n_eff came out 2.44565014, stored 2.44565013. Run 4 is unchanged; Run study makes a new run from the current model.");
+ assert.equal(W.notRecomputedMapsText(r4,'x',{stored:'0.9.3',current:'0.9.4'}),"Run 4's maps were not recomputed: x (stored by Studio 0.9.3; this is 0.9.4). Run 4 is unchanged; Run study makes a new run from the current model.");
+ assert.equal(W.cannotRecomputeMapsText(r4,'the mesh is too large.'),"Run 4's maps cannot be recomputed: the mesh is too large.");
+ assert.equal(W.mapsValuesAgainText(r4),'No need to run: Run 4 already has these values; its maps are not kept. Run study adds a copy with the same values');
  assert.equal(M.multiphysicsRunName({number:2,label:'',pinned:false}),'Run 2');
  // the view uses them (and keeps no literal copy of the old six-run note)
  const view=read('workspace-multiphysics-view.mjs');
  for(const name of ['MP_RUNS_KEPT_TEXT','mpRunsNodeLabel(runs.length)','ALL_PINNED_TEXT','UNPINNED_TEXT','mapsKeepValuesText(list,dropName)','mapsKeepValuesWhileRunningText(list,dropName)','MAPS_MAY_GO_TEXT','mapsNotKeptAfterText(plain,dropName)','pinnedMapsText(pinned,pinnedBytes)',
-  'keepMapsInsteadLabel(maps.back,maps.other,runTime)','mapsBackText(offer.back,offer.other,dropName)','mapsNotKeptResultsText(run)'])
+  'keepMapsInsteadLabel(maps.back,maps.other,runTime)','mapsBackText(offer.back,offer.other,dropName)','mapsNotKeptResultsText(run)','recomputingMapsText(job.recompute)','recomputeStoppedText(r)','recomputedMapsText(r)','notRecomputedMapsText(r,what,','cannotRecomputeMapsText(','mapsValuesAgainText(lastRun)'])
   assert.ok(view.includes(name),name);
  assert.doesNotMatch(view,/Up to six runs are kept|All six runs|once six runs/);
  // an open or restore is an arrival: its words follow the open notice (HK14)
  assert.ok(view.includes("+(mapWords?' '+mapWords:''),'',swapAction());"));
+});
+
+test('HK12: a recompute that does not match attaches nothing, leaves the record as it was and names the value',()=>{
+ const run=runOf(4,30),original=structuredClone(run.result);M.letGoMaps(run);
+ const text=M.sessionJson(M.sessionRun(run)),cases=[
+  [f=>{f.physics.modes1.effective_index.values[0][0]*=1+1e-10;},/^Modes 1 mode 1 n_eff came out 2\.4400040002\d*, stored 2\.44000400\d*$/],
+  [f=>{f.mesh.node_coordinates.push([0,2e-7]);},'the mesh came out 61 nodes and 58 triangles, stored 60 nodes and 58 triangles'],
+  [f=>{f.physics.heat1.range.max+=1e-6;},/^Heat 1 maximum temperature came out \d+\.\d+, stored \d+\.\d+$/],
+  [f=>{f.couplings.heat1_to_modes1.mesh_signature='differ';},'coupling Heat 1 temperature → Modes 1 temperature mesh check came out "differ", stored "match"'],
+  [f=>{f.couplings.heat1_to_modes1.max_abs_difference.value=1e-9;},'coupling Heat 1 temperature → Modes 1 temperature max |received − sent| came out 1.00000000e-9, stored 0.00000000'],
+  [f=>{delete f.physics.modes1.effective_index.values;f.physics.modes1.effective_index.re=[[1]];},'Modes 1 mode 1 n_eff is not in the recomputed result'],
+ ];
+ for(const [change,message] of cases){
+  const fresh=structuredClone(original);change(fresh);const what=M.recomputeMapsMismatch(run,fresh);
+  if(typeof message==='string')assert.equal(what,message);else assert.match(what,message);
+  assert.equal(M.sessionJson(M.sessionRun(run)),text,'the run is unchanged');assert.equal(run.maps,'not kept');
+ }
+ // the iteration history: a stored step, its count exactly and its residuals to the tolerance
+ const looped=runOf(5,10);looped.result.loops=[{physics:['heat1','modes1'],converged:true,iterations:7,residuals:[1,0.1,0.01,1e-3,1e-4,1e-5].map(value=>({value,unit:'K'}))}];
+ const first=structuredClone(looped.result);M.letGoMaps(looped);
+ const more=structuredClone(first);more.loops[0].iterations=8;
+ assert.equal(M.recomputeMapsMismatch(looped,more),'iteration step Heat 1 ⇄ Modes 1 came out 8 iterations, stored 7');
+ const residual=structuredClone(first);residual.loops[0].residuals[2].value=0.0101;
+ assert.equal(M.recomputeMapsMismatch(looped,residual),'iteration step Heat 1 ⇄ Modes 1 residual 3 came out 0.0101000000, stored 0.0100000000');
+ assert.equal(M.recomputeMapsMismatch(looped,structuredClone(first)),null);
+ // a match: the maps come back and the record is the original's
+ const before=runOf(4,30);assert.equal(M.recomputeMapsMismatch(run,structuredClone(original)),null);M.attachMaps(run,structuredClone(original));
+ assert.equal(M.sessionJson(M.sessionRun(run)),M.sessionJson(M.sessionRun(before)));
+ // the previous Studio's tolerance (1e-12 relative, 1e-15 absolute below 1e-3) is the optical one
+ assert.equal(X.sameValue,B.sameValue);assert.equal(X.RECOMPUTE_RELATIVE,1e-12);
 });
 
 test('HK13: recovery of a session over the limit keeps maps newest first, not only the selected and pinned runs\'',()=>{

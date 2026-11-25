@@ -14,8 +14,8 @@
 // infinities are refused. Each run and each without-heater result carries a SHA-256 digest of
 // itself without the digest, as sorted-key JSON with the same number rules. The digest detects a
 // damaged or hand-edited file; it is not an authentication: whoever edits a file can recompute it.
-import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses} from './workspace-multiphysics.mjs';
-import {FIELD_BUDGET_BYTES,budgetOrder,budgetChoose} from './workspace-budget.mjs';
+import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses,couplingTitle} from './workspace-multiphysics.mjs';
+import {FIELD_BUDGET_BYTES,budgetOrder,budgetChoose,sameValue,valuePair} from './workspace-budget.mjs';
 import {validateRunLabel} from './workspace-notebook.mjs';
 
 export const SESSION_FORMAT='openphysics-studio-session';
@@ -246,6 +246,80 @@ export function mapSwapCandidate(runs,letGo,selected){
  if(letGo.length!==1||letGo[0].pinned||!heldMaps(letGo[0]))return null;
  const need=letGo[0][HELD].bytes;
  return runs.find(r=>r!==letGo[0]&&r.maps!=='not kept'&&!r.pinned&&r.job!==selected&&mapBytes(r)>=need)||null;
+}
+
+// ---- Recompute Run N's maps (section 7) ---------------------------------------------------------
+const nodesText=n=>n.toLocaleString('en-US');
+const countsOf=run=>run.maps==='not kept'?run.counts:meshCounts(run.result);
+// the values a run stores and a recompute checks, in the order the refusal names them: each item
+// {name, stored, fresh, exact}
+function checkedValues(run,fresh){
+ const out=[],s=run.result,f=fresh||{},doc=run.doc||{};
+ const value=(name,a,b,exact=false)=>out.push({name,stored:a,fresh:b,exact});
+ for(const [name,p] of Object.entries(s.physics||{})){
+  const q=f.physics?.[name],label=physicsLabel(name);
+  if(p.type==='em.modes2d'){
+   const series=p.effective_index||{},other=q?.effective_index||{},complex=Array.isArray(series.re),rows=complex?series.re:series.values||[];
+   rows.forEach((row,i)=>row.forEach((v,m)=>{
+    const where=`${label}${rows.length>1?` point ${i+1}`:''} mode ${m+1}`;
+    value(`${where} n_eff`,v,(complex?other.re:other.values)?.[i]?.[m]);
+    if(complex)value(`${where} Im n_eff`,series.im[i][m],other.im?.[i]?.[m]);}));
+  }else if(p.type==='thermal.steady2d'&&p.range){value(`${label} minimum temperature`,p.range.min,q?.range?.min);value(`${label} maximum temperature`,p.range.max,q?.range?.max);}
+ }
+ for(const [name,c] of Object.entries(s.couplings||{})){
+  const k=f.couplings?.[name],title=`coupling ${couplingTitle(doc,name)}`;
+  value(`${title} mesh check`,c.mesh_signature,k?.mesh_signature,true);
+  value(`${title} max |received − sent|`,c.max_abs_difference?.value??null,k?k.max_abs_difference?.value??null:undefined);
+  value(`${title} conservation residual`,c.conservation_residual??null,k?k.conservation_residual??null:undefined);
+ }
+ (s.loops||[]).forEach((l,i)=>{
+  const k=(f.loops||[])[i],title=`iteration step ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`;
+  value(`${title} iterations`,l.iterations,k?.iterations,true);
+  (l.residuals||[]).forEach((r,j)=>value(`${title} residual ${j+1}`,r?.value,k?.residuals?.[j]?.value));
+ });
+ return out;
+}
+/** The first value the recomputed result does not reproduce, as the refusal says it ("Modes 1 mode
+ * 1 n_eff came out 2.44565014, stored 2.44565013"), or null when every checked value matches: the
+ * counts exactly, then n_eff (real and imaginary) of every physics, point and mode, each heat
+ * physics' temperature range, each coupling's mesh check (exactly), max |received − sent| and
+ * conservation residual, and each iteration step's count (exactly) and residuals, each value to 1e-12
+ * relative (1e-15 absolute below 1e-3). */
+export function recomputeMapsMismatch(run,fresh){
+ const a=countsOf(run);let b=null;try{b=fresh?.mesh?meshCounts(fresh):null;}catch{}
+ if(!b)return 'the mesh is not in the recomputed result';
+ if(a.nodes!==b.nodes||a.triangles!==b.triangles)return `the mesh came out ${nodesText(b.nodes)} nodes and ${nodesText(b.triangles)} triangles, stored ${nodesText(a.nodes)} nodes and ${nodesText(a.triangles)} triangles`;
+ for(const v of checkedValues(run,fresh)){
+  if(v.fresh===undefined)return `${v.name} is not in the recomputed result`;
+  if(v.exact){if(v.stored!==v.fresh){if(/ iterations$/.test(v.name))return `${v.name.replace(/ iterations$/,'')} came out ${v.fresh} iterations, stored ${v.stored}`;return `${v.name} came out ${JSON.stringify(v.fresh)}, stored ${JSON.stringify(v.stored)}`;}continue;}
+  if(typeof v.stored!=='number'&&v.stored!==null)continue;
+  if(!sameValue(v.stored,typeof v.fresh==='number'||v.fresh===null?v.fresh:NaN)){const [came,was]=valuePair(v.name,v.fresh,v.stored);return `${v.name} came out ${came}, stored ${was}`;}
+ }
+ // the recomputed result has the arrays of the run's physics
+ for(const [name,p] of Object.entries(run.result.physics||{})){
+  const q=fresh.physics?.[name];
+  if(p.type==='thermal.steady2d'&&!Array.isArray(q?.temperature?.values))return `${physicsLabel(name)} temperature map is not in the recomputed result`;
+  if(p.type==='em.modes2d'&&p.coupled&&!q?.coupled)return `${physicsLabel(name)} coupled input map is not in the recomputed result`;
+ }
+ return null;
+}
+/** The recomputed maps attached to their run (after recomputeMapsMismatch gave null): the run keeps
+ * its stored result and gains the mesh, the heat temperatures with their range (the minimum and
+ * maximum of those temperatures) and the coupled input maps, in the layout of the server's reply; its
+ * job, number, name, pin, time, document and events stay. Returns true. */
+export function attachMaps(run,fresh){
+ const stored=run.result,result={};
+ for(const k of Object.keys(fresh)){
+  if(k==='mesh')result.mesh=fresh.mesh;
+  else if(k==='physics'){result.physics={};for(const [name,q] of Object.entries(fresh.physics)){const p=stored.physics[name],out={};
+   for(const key of Object.keys(q))out[key]=(p.type==='thermal.steady2d'&&(key==='temperature'||key==='range'))||(p.type==='em.modes2d'&&key==='coupled')?q[key]:p[key];
+   for(const key of Object.keys(p))if(!(key in out))out[key]=p[key];
+   result.physics[name]=out;}}
+  else result[k]=stored[k];
+ }
+ for(const k of Object.keys(stored))if(!(k in result))result[k]=stored[k];
+ run.result=result;run.maps='kept';delete run.counts;delete run[HELD];delete run[LET_GO];
+ return true;
 }
 
 // ---- reading (§3) -----------------------------------------------------------------------------

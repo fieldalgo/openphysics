@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Engine results for the heated model's run-retention checks (design "Keeping more runs", section 7,
-// slice H1): HK1 (sizes at 20 runs). Each case is a
+// slice H1): HK1 (sizes at 20 runs) and HK5 (recomputed maps equal the original). Each case is a
 // multiphysics document solved by the Studio server's own job (simcase.studio.multiphysics_api.Jobs),
 // whose reply body is what /api/multiphysics/jobs/<id>/result sends.
 //
 //   node tools/studio_heated_retention.mjs engine <dir> <tag> [--python python] [--only a,b]
 //   node tools/studio_heated_retention.mjs hk1 <dir> <out>
+//   node tools/studio_heated_retention.mjs hk5 <dir> <out>          (one-b against one-a)
 //
 // writes <dir>/<case>.document.json ({document, events}) and <dir>/<case>.<tag>.result.json, and
 // appends one line per case to <dir>/<tag>.times.json. The solve is single threaded (OMP, OpenBLAS
@@ -132,9 +133,42 @@ export async function hk1(dir, out = null) {
   return report;
 }
 
+// HK5 (measured): a recompute equals the original. Each case's run of the first solve (one-a) has its
+// maps let go; the second solve of the same document (one-b, a separate process) is the recomputed
+// result: every checked value within 1e-12 relative (1e-15 absolute below 1e-3), counts exact, the
+// mesh identical, each map's max |Δ| / max |x| recorded.
+export async function hk5(dir, out = null) {
+  const M = await page('workspace-multiphysics-session.mjs');
+  const report = {check: 'HK5', cases: {}, failures: []};
+  for (const name of ['tpl-p2', 'tpl4-p2', 'v012', 'slab']) {
+    const run = await runOf(dir, name, {number: 4, job: 'mp-00000000a004', completedAt: '2026-11-25T04:00:00.000Z', pinned: true, label: 'Design ' + name});
+    const original = structuredClone(run.result), fresh = JSON.parse(await readFile(join(dir, `${name}.one-b.result.json`), 'utf8'));
+    M.letGoMaps(run);
+    const before = M.sessionJson(M.sessionRun(run)), mismatch = M.recomputeMapsMismatch(run, fresh);
+    const sameMesh = ['node_coordinates', 'triangles', 'regions'].every(k => JSON.stringify(original.mesh[k]) === JSON.stringify(fresh.mesh[k]));
+    const maps = {};
+    for (const [label, get] of [['heat temperature', r => r.physics.heat1.temperature.values], ['coupled temperature', r => r.physics.modes1.coupled.temperature.values],
+      ['n', r => r.physics.modes1.coupled.refractive_index.n], ['index_change', r => r.physics.modes1.coupled.index_change]]) {
+      const a = get(original), b = get(fresh); if (!a || !b) {maps[label] = null; continue;}
+      let max = 0, d = 0; a.forEach((v, i) => {max = Math.max(max, Math.abs(v)); d = Math.max(d, Math.abs(v - b[i]));}); maps[label] = d / max;
+    }
+    const attached = mismatch === null && M.attachMaps(run, fresh);
+    const entry = {match: mismatch === null, mismatch, sameMesh, maps, attached, identity: [run.job, run.number, run.label, run.pinned, run.completedAt].join(' '),
+      recordUnchangedOnRefusal: mismatch === null ? null : before === M.sessionJson(M.sessionRun(run))};
+    report.cases[name] = entry; console.log(name, JSON.stringify(entry));
+    if (!entry.match) report.failures.push(name + ': ' + JSON.stringify(mismatch));
+    if (!entry.sameMesh) report.failures.push(name + ': node_coordinates, triangles or regions differ');
+    if (entry.match && !attached) report.failures.push(name + ': the maps were not attached');
+  }
+  if (out) {await mkdir(out, {recursive: true}); await writeFile(join(out, 'hk5.json'), JSON.stringify(report, null, 1) + '\n');}
+  console.log(JSON.stringify({failures: report.failures}));
+  return report;
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [command, dir, arg, ...rest] = process.argv.slice(2);
   if (command === 'engine') await engine(resolve(dir), arg, rest);
   else if (command === 'hk1') {if ((await hk1(resolve(dir), resolve(arg))).failures.length) process.exitCode = 1;}
-  else throw new Error('usage: engine <dir> <tag> | hk1 <dir> <out>');
+  else if (command === 'hk5') {if ((await hk5(resolve(dir), resolve(arg))).failures.length) process.exitCode = 1;}
+  else throw new Error('usage: engine <dir> <tag> | hk1 <dir> <out> | hk5 <dir> <out>');
 }

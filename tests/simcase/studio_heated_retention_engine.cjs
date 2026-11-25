@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-// HK1 of the heated model's run retention (design "Keeping more runs", section 7) on engine
+// HK1 and HK5 of the heated model's run retention (design "Keeping more runs", section 7) on engine
 // results: defined only when STUDIO_HEATED_RETENTION_RESULTS names a folder written by
 //   node tools/studio_heated_retention.mjs engine <dir> one-a
 //   node tools/studio_heated_retention.mjs engine <dir> one-b --only tpl-p2,tpl4-p2,v012,slab
@@ -18,5 +18,11 @@ if(RESULTS){
   const report=await T.hk1(RESULTS);
   assert.deepEqual(report.failures,[]);
   for(const [kind,s] of Object.entries(report.sequences))console.log(kind,'maps kept at 20:',s.mapsKeptAt20,'prediction:',s.prediction,'largest session:',s.maxBytes,'20 values-only records:',s.valuesOnlyRecords20);
+ });
+ test('HK5: a recomputed heated run matches its stored values and gets its maps back',async()=>{
+  const T=await import(path.join(__dirname,'../../tools/studio_heated_retention.mjs'));
+  const report=await T.hk5(RESULTS);
+  assert.deepEqual(report.failures,[]);
+  for(const [name,c] of Object.entries(report.cases))console.log(name,JSON.stringify(c.maps));
  });
 }

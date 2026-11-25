@@ -7,6 +7,7 @@
 import {FIELD_BUDGET_BYTES,mbText} from './workspace-budget.mjs';
 import {MULTIPHYSICS_RUN_LIMIT,chooseMaps,mapBytes,appendMultiphysicsRun} from './workspace-multiphysics-session.mjs';
 import {canonicalJson} from './workspace-multiphysics.mjs';
+import {aboutText} from './workspace-workflow.mjs';
 
 export const MAP_BUDGET_TEXT=mbText(FIELD_BUDGET_BYTES);
 const listWords=words=>words.length<3?words.join(' and '):words.slice(0,-1).join(', ')+' and '+words.at(-1);
@@ -37,6 +38,20 @@ export function pinnedMapsText(list,bytes){
 }
 /** Results, a run whose maps this tab let go (a run read without maps says MAPS_NOT_KEPT). */
 export const mapsNotKeptResultsText=run=>`${title(run)}'s maps are not kept; its n_eff, coupling check and iteration history are kept. ${MAPS_MOVE_TEXT}`;
+export const recomputeMapsLabel=run=>`Recompute ${title(run)}'s maps`;
+export const recomputeMapsEstimate=run=>Number.isFinite(run.duration)?` · about ${aboutText(run.duration)}`:'';
+export const recomputingMapsText=run=>`Recomputing ${title(run)}'s maps${recomputeMapsEstimate(run)}`;
+export const recomputeStoppedText=run=>`Recompute of ${title(run)}'s maps stopped; ${title(run)} is unchanged.`;
+export const recomputedMapsText=run=>`${title(run)}'s maps recomputed from its stored model; its values match.`;
+/** "Run 4's maps were not recomputed: <what>. Run 4 is unchanged; Run study makes a new run from the
+ * current model.", with "(stored by Studio 0.9.3; this is 0.9.4)" after <what> when they differ. */
+export function notRecomputedMapsText(run,what,{stored=null,current=null}={}){
+ const t=title(run),versions=stored&&current&&stored!==current?` (stored by Studio ${stored}; this is ${current})`:'';
+ return `${t}'s maps were not recomputed: ${what}${versions}. ${t} is unchanged; Run study makes a new run from the current model.`;
+}
+export const cannotRecomputeMapsText=(run,words)=>`${title(run)}'s maps cannot be recomputed: ${words}`;
+/** "No need to run" for a run of the current model without its maps. */
+export const mapsValuesAgainText=run=>`No need to run: ${title(run)} already has these values; its maps are not kept. Run study adds a copy with the same values`;
 
 // ---- before the run: the estimate ---------------------------------------------------------------
 /** What a run's map size depends on: the geometry, the mesh, the materials, the physics (names and
