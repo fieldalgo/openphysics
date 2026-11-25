@@ -6,7 +6,8 @@
 // runs, baselines, selected, view}. Optical sessions stay version 7 (workspace-notebook.mjs).
 // Version 15 (run retention, design "Keeping more runs" section 7): version 8 with 0 to 20 runs,
 // written only when the session has more than six runs; a session of six or fewer is version 8, byte
-// for byte.
+// for byte. The maps of the runs are kept within the field budget (workspace-budget.mjs) when a map
+// arrives: a new result, a recompute, or an opened or restored session.
 //
 // Every number is written in its shortest round-trip form, as JSON.stringify writes it, except
 // negative zero, which is written -0.0 so that it reads back as negative zero; NaN and the
@@ -14,6 +15,7 @@
 // itself without the digest, as sorted-key JSON with the same number rules. The digest detects a
 // damaged or hand-edited file; it is not an authentication: whoever edits a file can recompute it.
 import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses} from './workspace-multiphysics.mjs';
+import {FIELD_BUDGET_BYTES,budgetOrder,budgetChoose} from './workspace-budget.mjs';
 import {validateRunLabel} from './workspace-notebook.mjs';
 
 export const SESSION_FORMAT='openphysics-studio-session';
@@ -105,7 +107,7 @@ export const nextRunNumber=runs=>runs.reduce((n,r)=>Math.max(n,r.number),0)+1;
 export function multiphysicsRunName(run){return `Run ${run.number}${run.label?' '+run.label:''}${run.pinned?' (pinned)':''}`;}
 
 // The reply of a run without its arrays: what a run keeps when its maps are not kept.
-function valuesOnly(result){
+export function valuesOnly(result){
  const {mesh,...rest}=result,physics={};
  for(const [name,p] of Object.entries(result.physics||{})){
   if(p.type==='thermal.steady2d'){const {temperature,...kept}=p;physics[name]={...kept,temperature:{unit:temperature?.unit,location:temperature?.location}};}
@@ -178,11 +180,72 @@ export function writeMultiphysicsSession(state,{keepSelected=false,limit=MAX_SES
  return {ok:false,bytes:full.bytes,reduced:null,refusal:`The selected and pinned runs (${kept.map(r=>'Run '+r.number).join(', ')}) are ${sizeText(reduced.bytes)} with their maps, over the 16 MiB session limit. Unpin some of them.`};
 }
 export function overflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the maps of the selected and pinned runs only? The other runs keep n_eff, the coupling check and the iteration history, but not their maps.`;}
-/** Browser recovery (§4): the file, or the selected and pinned maps only, without a dialog. */
+/** Browser recovery (§4): the file, or, over the limit, the maps in the order of run retention
+ * (the selected run's, then pinned newest first, then the others newest first) within the limit,
+ * without a dialog (HK13). Throws when even the selected run's maps alone are over it. */
 export function recoveryText(state,limit=MAX_SESSION_BYTES){
- const out=writeMultiphysicsSession(state,{keepSelected:true,limit,name:false});
- if(!out.ok)throw Object.assign(new Error('browser recovery unavailable: session over 16 MiB'),{code:'recovery-over-limit'});
- return out;
+ const baselines=sessionBaselines(state),full=fileParts(state,null,baselines);
+ if(full.bytes<=limit)return {ok:true,text:full.text(),bytes:full.bytes,notKept:state.runs.filter(r=>r.maps==='not kept').map(r=>r.number),baselines:full.baselines};
+ const withMaps=state.runs.filter(r=>r.maps!=='not kept'),base=fileParts(state,new Set(),baselines).bytes;
+ const {kept}=budgetChoose(budgetOrder(withMaps,state.selected??null),{base,bytes:mapBytes,selected:state.selected??null,budget:limit});
+ const keep=new Set(kept.map(r=>r.job)),out=fileParts(state,keep,baselines);
+ if(out.bytes>limit)throw Object.assign(new Error('browser recovery unavailable: session over 16 MiB'),{code:'recovery-over-limit'});
+ return {ok:true,text:out.text(),bytes:out.bytes,notKept:state.runs.filter(r=>!keep.has(r.job)).map(r=>r.number),baselines:out.baselines};
+}
+
+// ---- run retention: the maps within the budget (design "Keeping more runs", section 7) -----------
+/** The bytes a run's maps add to a session file: its record with its maps less its record without
+ * them (both texts cached while the run is unchanged); 0 for a run without maps. */
+export function mapBytes(run){return run.maps==='not kept'?0:runPiece(run,true).bytes-runPiece(run,false).bytes;}
+/** The session file's bytes with no run's maps (the base of the budget). */
+export const sessionBytesWithoutMaps=state=>fileParts(state,new Set()).bytes;
+/** The session text with the maps of the runs in keep only (for checks; null: every run's). */
+export const sessionText=(state,keep=null)=>fileParts(state,keep).text();
+/** The maps the budget keeps (state: the session state, its selected run): {kept, letGo, total,
+ * base, fits}. kept and letGo: runs with maps; total: the file bytes with the kept maps (null when no
+ * run has maps); fits: every map is kept. first: the jobs whose maps arrived (a recompute, a swap). */
+export function chooseMaps(state,{first=[],budget=FIELD_BUDGET_BYTES,bytes=mapBytes}={}){
+ const withMaps=state.runs.filter(r=>r.maps!=='not kept');
+ if(!withMaps.length)return {kept:[],letGo:[],total:null,base:null,fits:true};
+ const base=sessionBytesWithoutMaps(state),sum=withMaps.reduce((t,r)=>t+bytes(r),base),selected=state.selected??null;
+ if(sum<=budget)return {kept:withMaps,letGo:[],total:sum,base,fits:true};
+ const {kept,letGo,total}=budgetChoose(budgetOrder(withMaps,selected,first),{base,bytes,selected,budget});
+ return {kept,letGo,total,base,fits:false};
+}
+/** chooseMaps, with the maps of letGo let go (in place): what the tab does when a map arrives. */
+export function keepMapsAtArrival(state,options={}){
+ const out=chooseMaps(state,options);for(const r of out.letGo)letGoMaps(r);return out;
+}
+/** The bytes of the session with the maps of the selected and pinned runs only (the words when a
+ * pinned run's maps go). */
+export const selectedAndPinnedMapBytes=(state,base)=>state.runs.filter(r=>r.maps!=='not kept'&&(r.pinned||r.job===state.selected)).reduce((t,r)=>t+mapBytes(r),base);
+const HELD=Symbol('held maps'),LET_GO=Symbol('maps let go in this tab');
+/** A run's maps let go in the tab (in place: the run keeps its job, number, name and pin): the run
+ * becomes what a file writes of it without its maps, "not kept" with its counts and its values. */
+export function letGoMaps(run){
+ if(run.maps==='not kept')return run;
+ Object.defineProperty(run,HELD,{value:{result:run.result,bytes:mapBytes(run)},enumerable:false,configurable:true,writable:true});
+ Object.defineProperty(run,LET_GO,{value:true,enumerable:false,configurable:true,writable:true});
+ run.counts=meshCounts(run.result);run.result=valuesOnly(run.result);run.maps='not kept';
+ return run;
+}
+/** Whether this tab let the run's maps go (else the run came without maps from a file or record). */
+export const mapsLetGoHere=run=>run.maps==='not kept'&&run[LET_GO]===true;
+/** Whether a run's let-go maps are still held for Keep Run N's maps. */
+export const heldMaps=run=>run.maps==='not kept'&&!!run[HELD];
+/** The run's let-go maps back, as they were (Keep Run N's maps). */
+export function takeBackMaps(run){
+ const held=run[HELD];if(!held||run.maps!=='not kept')return false;
+ run.result=held.result;run.maps='kept';delete run.counts;delete run[HELD];delete run[LET_GO];return true;
+}
+/** The held maps are dropped (at the next arrival the swap is stale, and memory is freed). */
+export function forgetHeldMaps(runs){for(const r of runs)if(r[HELD])delete r[HELD];}
+/** The run Keep Run N's maps lets go instead (letGo: one unpinned run): the oldest unpinned,
+ * unselected run with maps at least as large, or null. */
+export function mapSwapCandidate(runs,letGo,selected){
+ if(letGo.length!==1||letGo[0].pinned||!heldMaps(letGo[0]))return null;
+ const need=letGo[0][HELD].bytes;
+ return runs.find(r=>r!==letGo[0]&&r.maps!=='not kept'&&!r.pinned&&r.job!==selected&&mapBytes(r)>=need)||null;
 }
 
 // ---- reading (§3) -----------------------------------------------------------------------------

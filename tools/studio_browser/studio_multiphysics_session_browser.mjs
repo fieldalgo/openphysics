@@ -773,83 +773,77 @@ print(n)`;
   assert.deepEqual(await opticalNeff(), neffBefore);
   stage('R1 resumed', {neff: await opticalNeff()});
 
-  // S5: six runs of the 0.08 µm mesh, about 22 MB with their maps
+  // S5 (run retention of the heated model, H1, pre-registered HK10 a and b; replaces the 16 MiB question,
+  // the pinned loop and the refusal, which a tab within the budget no longer reaches): six runs of the
+  // 0.08 µm mesh (core near 0.01 µm), about 3.7 MB of maps each; the budget (16.8 MB) keeps four.
+  // The expected values were re-registered AFTER THE RESULT (HQ decision 2026-11-25-openphysics-studio-
+  // h1-hk10-after-result): as registered they came from the near-0.015 µm mesh (five maps fit), which
+  // failed; the count is now derived from the measured map bytes below, not from the product's chooser.
   await page.call('Page.reload');
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'reload for S5');
   await openTemplate();
   await openInputs('variant-008.json', variant('0.08 um', '0.01 um'));
-  for (let n = 1; n <= 6; n++) await runAndWait(n);
+  const s5Started = Date.now();
+  let fifthMessage = null;
+  for (let n = 1; n <= 6; n++) {
+    await runAndWait(n);
+    if (n === 5) { await page.until("/Run 1 \\(run at [^)]+\\) keeps its values; its maps were not kept/.test(document.getElementById('file-status').textContent)", 'Run 1 keeps its values', 60000); fifthMessage = await notice(); }
+  }
+  // HK10 a (after the result): the fifth result let Run 1's maps go
+  assert.match(fifthMessage, /^Run 5 complete\. .*Run 1 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\./);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
-  await page.until("/kept for recovery in this browser without the maps of 5 runs · File › Save keeps them$/.test(document.getElementById('autosave-status').textContent)", 'recovery without five maps', 60000);
-  const recoveryPartial = await page.text('#autosave-status');
-  // Export › Model with runs asks; Cancel writes nothing
-  const unchanged = await listed();
-  await clearNotice(); await page.click('#menu-export-session');
-  await page.until("document.getElementById('session-overflow').open", 'overflow question');
-  const question = await page.text('#session-overflow-description');
-  assert.match(question, /^Session is 2\d MB; the limit is 16 MiB\. Keep the maps of the selected and pinned runs only\? The other runs keep n_eff, the coupling check and the iteration history, but not their maps\.$/);
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#session-overflow button')].map(b=>b.textContent)"), ['Cancel', 'Keep maps for selected and pinned runs']);
-  await page.click('#overflow-cancel');
-  assert.equal(await notice(), 'Session not saved: nothing was written.');
-  await sleep(1000); assert.deepEqual([...await listed()].filter(f => !unchanged.has(f)), [], 'Cancel writes nothing');
-  // P3 (V-P6): File › Save of the project asks the same question for this model, naming it
-  await clearNotice(); await page.click('#save-session');
-  await page.until("document.getElementById('session-overflow').open", 'project overflow question');
-  const projectQuestion = await page.text('#session-overflow-description');
-  assert.equal(projectQuestion, 'Heated silicon waveguide: ' + question);
-  await page.click('#overflow-cancel'); assert.equal(await notice(), 'Project not saved: nothing was written.');
-  await sleep(1000); assert.deepEqual([...await listed()].filter(f => !unchanged.has(f)), [], 'Cancel writes nothing');
-  // Keep maps for selected and pinned runs: the file fits and says which runs keep values only
+  // HK10 a (after the result): the sixth result let Run 2's maps go; Messages names Run 2
+  await page.until("/Run 2 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\./.test(document.getElementById('file-status').textContent)", 'Run 2 keeps its values', 60000);
+  const letGoMessage = await notice();
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 a ' + tag); await page.screenshot('hk10a-' + tag); }
+  await size(1440, 900);
+  // the tab is the file: recovery holds it whole, and Export › Model with runs writes without a question
+  await page.until("/kept for recovery in this browser$/.test(document.getElementById('autosave-status').textContent)", 'recovery of the tab', 60000);
+  const recoveryWhole = await page.text('#autosave-status');
   const before5 = await listed(); await clearNotice(); await page.click('#menu-export-session');
-  await page.until("document.getElementById('session-overflow').open", 'overflow question again');
   // round 13 (O1): the model file opened above (variant-008.json) is the current file, which the name dialog offers
-  await page.click('#overflow-keep'); await page.until("document.getElementById('save-name-dialog')?.open", 'six 0.08 runs: name dialog');
+  await page.until("document.getElementById('save-name-dialog')?.open", 'six 0.08 runs: name dialog');
+  assert.equal(await page.eval("document.getElementById('session-overflow').open"), false);
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'variant-008.json'); await page.click('#save-name-download');
   const big = await nextDownload(before5, 'six 0.08 runs'); assert.match(big.name, /^variant-008(?: \(\d\))?\.json$/);
-  await page.until("/keep values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
+  await page.until("/values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
-  assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024);
-  assert.deepEqual(bigSession.runs.map(r => r.maps), ['not kept', 'not kept', 'not kept', 'not kept', 'not kept', 'kept']);
-  assert.match(bigNotice, /^Session file variant-008\.json sent to your browser's Downloads: the model, 6 runs and the without-heater result\. 5 runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) keep values only, without maps\.$/);
+  assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024 - 16 * 1024);
+  assert.deepEqual(bigSession.runs.map(r => r.maps), ['not kept', 'not kept', 'kept', 'kept', 'kept', 'kept']);
+  assert.match(bigNotice, /^Session file variant-008\.json sent to your browser's Downloads: the model, 6 runs and the without-heater result\. 2 runs \(Run 1, Run 2\) keep values only, without maps\.$/);
   await fetchReplies(big.text);
-  const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2, 3, 4, 5]}), python: comparePython(big.path)};
-  // pinned runs: five pinned, with their maps, are over the limit together
-  for (const n of [1, 2, 3, 4, 5]) {
-    await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-    await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list for pins');
-    await page.click(`[data-mp-run]:nth-last-of-type(${n})`);
-    await page.until(`/^Run ${n} shown under Results/.test(document.getElementById('file-status').textContent)`, 'run ' + n + ' shown');
-    await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-    await page.until("!!document.getElementById('mp-run-name-input')", 'run name ' + n);
-    await page.type('#mp-run-name-input', 'kept ' + n); await page.click('#mp-rename-run');
-    await page.until(`/^Run named “kept ${n}” and pinned/.test(document.getElementById('file-status').textContent)`, 'pinned ' + n);
-    // each write lands before the next pin (rapid edits are coalesced into one write)
-    // with runs 1-n pinned and run n shown, the maps of the 6 - n others are left out
-    if (n < 5) await page.until(`/kept for recovery in this browser without the maps of ${6 - n} runs/.test(document.getElementById('autosave-status').textContent)`, 'recovery with ' + n + ' pinned', 60000);
-  }
-  // browser recovery writes nothing new and says so; the record before stays
-  // round 17 (U6): the words add what to do
-  await page.until("/ · browser recovery unavailable: session over 16 MiB · File › Save keeps your work$/.test(document.getElementById('autosave-status').textContent)", 'recovery over the limit', 60000);
-  const recoveryOver = await page.text('#autosave-status');
-  await clearNotice(); await page.click('#menu-export-session');
-  await page.until("/^Session not saved: /.test(document.getElementById('file-status').textContent)", 'refused by name');
-  const refusal = await notice();
-  assert.match(refusal, /^Session not saved: The selected and pinned runs \(Run 1, Run 2, Run 3, Run 4, Run 5\) are 1\d MB with their maps, over the 16 MiB session limit\. Unpin some of them\.$/);
-  await page.call('Page.reload');
-  await page.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'reload after the limit');
-  await clearNotice(); await page.click('#recover-notebook');
-  await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'the record before the limit');
-  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs recovered');
-  const recoveredBig = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
-  // the last record written: four pinned with their maps; runs 5 and 6 values only
-  assert.deepEqual(recoveredBig.map(t => [/^Pinned · /.test(t), / · values only$/.test(t)]), [[false, true], [false, true], [true, false], [true, false], [true, false], [true, false]], JSON.stringify(recoveredBig));
+  const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2]}), python: comparePython(big.path)};
+  // the count, derived independently of the product's chooser: each run's map bytes are its record
+  // with the server's reply less its record without maps (the layout of version 8, written here), the
+  // base is the file less the maps it holds, and the maps are added in the order of 3.2 (the selected
+  // Run 6, then newest first; none pinned) while the total stays within 16,760,832 bytes
+  const utf8 = t => Buffer.byteLength(t, 'utf8'), BUDGET = 16 * 1024 * 1024 - 16 * 1024;
+  const stripMaps = result => {const {mesh, ...rest} = result, physics = {};
+    for (const [n, p] of Object.entries(result.physics)) {
+      if (p.type === 'thermal.steady2d') {const {temperature, ...k} = p; physics[n] = {...k, temperature: {unit: temperature.unit, location: temperature.location}};}
+      else if (p.type === 'em.modes2d' && p.coupled) physics[n] = {...p, coupled: {temperature: {unit: p.coupled.temperature.unit, location: p.coupled.temperature.location}, refractive_index: {location: p.coupled.refractive_index.location}}};
+      else physics[n] = p;}
+    return {...rest, physics};};
+  const recordText = (r, kept) => {const reply = JSON.parse(replies.get(r.job)), {digest, counts, result, maps, ...head} = r;
+    const record = {...head, maps: kept ? 'kept' : 'not kept', ...(kept ? {} : {counts: {nodes: reply.mesh.node_coordinates.length, triangles: reply.mesh.triangles.length}}), result: kept ? reply : stripMaps(reply)};
+    return sessionJson({...record, digest: recordDigest(record)});};
+  const mapBytesMeasured = bigSession.runs.map(r => utf8(recordText(r, true)) - utf8(recordText(r, false)));
+  // the records as the file holds them are those written here (the measurement is of the file's layout)
+  bigSession.runs.forEach(r => assert.equal(sessionJson(r), recordText(r, r.maps === 'kept'), `run ${r.number}: record layout`));
+  const baseMeasured = utf8(big.text) - bigSession.runs.reduce((t, r, i) => t + (r.maps === 'kept' ? mapBytesMeasured[i] : 0), 0);
+  let total = baseMeasured; const fitRuns = [];
+  for (const i of [5, 4, 3, 2, 1, 0]) if (total + mapBytesMeasured[i] <= BUDGET) {total += mapBytesMeasured[i]; fitRuns.push(i + 1);}
+  stage('HK10 a measured map bytes', {mapBytes: mapBytesMeasured, base: baseMeasured, budget: BUDGET, fit: fitRuns});
+  assert.equal(fitRuns.length, 4, 'four maps fit the budget');
+  assert.deepEqual(bigSession.runs.filter(r => r.maps === 'kept').map(r => r.number), [...fitRuns].sort((a, b) => a - b), 'the screen keeps the maps the arithmetic fits');
+  stage('HK10 a', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, s5Seconds: (Date.now() - s5Started) / 1000});
+  assert.match(letGoMessage, /^Run 6 complete\. /);
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs opened');
   const bigList = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
-  assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 5, JSON.stringify(bigList));
+  assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 2, JSON.stringify(bigList));
   await page.click('[data-mp-run]:last-of-type');
   await page.until("!!document.querySelector('[data-mp-values-only]')", 'values-only run shown');
   await page.clickTreeItem('Heat 1');
@@ -863,7 +857,7 @@ print(n)`;
   const counts = bigSession.runs[0].counts, us = n => n.toLocaleString('en-US');
   assert.match(await page.text('.mp-check tbody'), new RegExp(`${us(counts.nodes)} node temperatures, 300\\.0–[0-9.]+ K .*${us(counts.triangles)} triangle means \\(mean of 3 nodes\\) Passed · max \\|received − sent\\| = 0 K`));
   await page.screenshot('s5-values-only');
-  stage('S5', {question, bigNotice, bytes: Buffer.byteLength(big.text), recoveryPartial, recoveryOver, refusal, recovered: recoveredBig, list: bigList, ...s5Arrays});
+  stage('S5', {bigNotice, bytes: Buffer.byteLength(big.text), recoveryWhole, list: bigList, ...s5Arrays});
 
   // R19 (round 19, pre-registered): a real mouse click on the heater-off label ticks and unticks
   // its box (Y6), and the heated model's Run study asks before the six-run limit drops a run (Y4).
