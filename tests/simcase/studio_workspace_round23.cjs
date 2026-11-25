@@ -220,12 +220,12 @@ test('P3 (E3): an estimate from the last run with the same boundary: as is with 
  assert.equal(W.groupIndexEstimate([closed,opened],{open:true},kinds),null);
  assert.equal(W.groupIndexEstimate([],{open:false},kinds),null);
  // the words
- assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:204000}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
- assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:200000}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
- assert.equal(W.runPlanText({open:false,groupIndex:true,estimate:24000}),'Closed window · group index on (3 solves) · about 20 s');
- assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:null}),'Open boundary · 2 searches · group index on (3 solves)');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:204000}),'Open boundary · 2 modes · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:200000}),'Open boundary · 2 modes · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:false,groupIndex:true,estimate:24000}),'Closed window · 2 modes · group index on (3 solves) · about 20 s');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:null}),'Open boundary · 2 modes · 2 searches · group index on (3 solves)');
  // with group index off: the round-18 words, unchanged
- assert.equal(W.runPlanText({open:true,searches:2,last:68000}),'Open boundary · 2 searches · last such run 1:08');
+ assert.equal(W.runPlanText({open:true,searches:2,last:68000}),'Open boundary · 2 modes · 2 searches · last such run 1:08');
  assert.deepEqual([5000,24000,85000,95000,204000,239000].map(W.aboutText),['10 s','20 s','90 s','2 min','3 min','4 min']);
 });
 

@@ -2314,8 +2314,8 @@ try {
     // round 18 (X2): the line is always there and names the whole run; the group index with its solves
     // round 20 (Z5): before any run there is no timing part
     // round 23 (E3): with the Turn off group index button beside it
-    assert.equal(u3.on.hidden, false); assert.equal(u3.on.text, 'Closed window · group index on (3 solves)Turn off group index');
-    assert.equal(u3.off.hidden, false); assert.equal(u3.off.text, 'Closed window');
+    assert.equal(u3.on.hidden, false); assert.equal(u3.on.text, 'Closed window · 2 modes · group index on (3 solves)Turn off group index');
+    assert.equal(u3.off.hidden, false); assert.equal(u3.off.text, 'Closed window · 2 modes');
     // U2: seven runs of the template (core mesh 30, 32, …, 42 nm), the fourteen values-only runs
     // added before the seventh (Runs 7 to 20): the seventh (Run 21) drops Run 1 and renumbers
     // nothing; Messages names it
@@ -2463,19 +2463,19 @@ try {
     x2.warningStyle = await r.eval("(()=>{const w=getComputedStyle(document.querySelector('#file-status .message-warning')),m=getComputedStyle(document.getElementById('file-status'));return [w.color!==m.color,w.backgroundColor!==m.backgroundColor,w.fontWeight]})()");
     x2.help = await rText('#target-help'); sameRibbon(ribbonFresh, await ribbon(), 'X2 open boundary');
     stage('R18 X2 Run study box', x2);
-    assert.equal(x2.shown, true); assert.equal(x2.fresh, 'Closed window');
-    assert.equal(x2.group, 'Closed window · group index on (3 solves)');
-    assert.equal(x2.open, 'Open boundary · 2 searches · group index on (3 solves)');
+    assert.equal(x2.shown, true); assert.equal(x2.fresh, 'Closed window · 2 modes');
+    assert.equal(x2.group, 'Closed window · 2 modes · group index on (3 solves)');
+    assert.equal(x2.open, 'Open boundary · 2 modes · 2 searches · group index on (3 solves)');
     assert.equal(x2.warning, 'Group index is on: open-boundary runs with it take about three times as long.');
     assert.deepEqual(x2.warningStyle.slice(0, 2), [true, true]);
     // X12: the help says where 2.46 comes from
     assert.ok(x2.help.endsWith(' The default is halfway between the core and silica indices: (n_core + 1.444)/2.'), x2.help);
     await rOverflow('X2 open boundary');
     await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(200); await r.click('#group-index-check'); await sleep(200);
-    assert.equal(await plan(), 'Closed window');
+    assert.equal(await plan(), 'Closed window · 2 modes');
     // runs 1 and 2 (core mesh 30 and 32): the box names the last such run's time; X6 tags
     await mesh(30); await rRun(); x2.afterRun = await plan();
-    assert.ok(/^Closed window · last such run \d+:\d\d$/.test(x2.afterRun), x2.afterRun);
+    assert.ok(/^Closed window · 2 modes · last such run \d+:\d\d$/.test(x2.afterRun), x2.afterRun);
     await mesh(32);
     // X1: back to Run 1's inputs: No need to run, with Show Run 1; Run study is not blocked
     await mesh(30);
@@ -2729,7 +2729,7 @@ try {
     z6.open = await scope(); z5.open = await rText('#run-plan');
     await r.click('input[name=outer-boundary][value=closed]'); await sleep(500);
     stage('R20 Z5 Z6', {z5, z6});
-    assert.equal(z5.closed, 'Closed window'); assert.match(z5.open, /^Open boundary · (?:1 search|2 searches)$/);
+    assert.equal(z5.closed, 'Closed window · 2 modes'); assert.match(z5.open, /^Open boundary · 2 modes · (?:1 search|2 searches)$/);
     assert.ok(z6.closed.includes('; 3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones); 1 to 8 modes'), z6.closed);
     assert.equal(z6.open, z6.closed); assert.ok(!z6.closed.includes('PEC outer edges'));
     await rOverflow('Z6 scope');
@@ -2829,9 +2829,9 @@ try {
     stage('CW box', box);
     assert.deepEqual([box.check.count, box.check.checked, box.near.checked, box.field.count, box.field.disabled, box.value], [1, 'true', 'false', 1, false, '2.460']);
     assert.equal(box.help, 'Highest n_eff above 1.45: the modes of highest n_eff. Nearest to n_eff: the modes nearest the index in the field, listed by n_eff, highest first; modes at or below 1.45 are left out. Typing an index selects Nearest to n_eff. Closed and open values differ: refine the mesh before a close comparison.');
-    assert.equal(box.plan, 'Closed window');
+    assert.equal(box.plan, 'Closed window · 2 modes');
     assert.equal(box.on.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it.');
-    assert.equal(box.on.field.disabled, false); assert.equal(box.on.plan, 'Closed window · near n_eff 2.46');
+    assert.equal(box.on.field.disabled, false); assert.equal(box.on.plan, 'Closed window · near n_eff 2.46 · 2 modes');
     await rOverflow('box');
     // K13: the template @2.46 with 4 modes lists 3
     await r.type('#mode-count-number', 4); await sleep(400);
@@ -2862,7 +2862,7 @@ try {
     assert.deepEqual(edge.buttons, ['Use Open boundary', 'Set search near 2.46 · 4 modes']);
     assert.ok(edge.item.includes(' · closed · '), edge.item);
     assert.equal(shortcut.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
-    assert.deepEqual(shortcut.buttons, ['Use Open boundary']); assert.match(shortcut.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
+    assert.deepEqual(shortcut.buttons, ['Use Open boundary']); assert.match(shortcut.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/);
     assert.equal(shortcut.items, items); assert.equal(shortcut.busy, 'Run study');
     await rOverflow('edge note shortcut');
     // @2.46 with 4 modes: the core mode is mode 3 (K7's Studio window); its note
@@ -2905,7 +2905,7 @@ try {
     assert.ok(use.message.startsWith('Current inputs set from Run 4: ') && use.message.includes('Modes to return highest n_eff → nearest to 2.46'), use.message);
     // round 22 (V6): the message does not say that Undo takes the target back
     assert.ok(use.message.endsWith(' Modes to return is set and is not part of Undo.') && !use.message.includes('Undo takes them back'), use.message);
-    assert.equal(use.box.checked, 'true'); assert.equal(use.value, '2.460'); assert.match(use.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/);
+    assert.equal(use.box.checked, 'true'); assert.equal(use.value, '2.460'); assert.match(use.plan, /^Closed window · near n_eff 2\.46 · 2 modes(?: · last such run \d+:\d\d)?$/);
     await rOverflow('use run inputs');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
@@ -2984,9 +2984,9 @@ try {
     assert.equal(p1.legend, 'Modes to return'); assert.equal(p1.old, false);
     assert.equal(p1.typing.checked, 'true');
     assert.equal(p1.taken.message, 'Modes to return: nearest to n_eff 2.500 in the closed window. The next run returns the modes nearest it.');
-    assert.equal(p1.taken.plan, 'Closed window · near n_eff 2.5'); assert.equal(p1.taken.nearest.checked, 'true'); assert.equal(p1.taken.field.disabled, false);
+    assert.equal(p1.taken.plan, 'Closed window · near n_eff 2.5 · 2 modes'); assert.equal(p1.taken.nearest.checked, 'true'); assert.equal(p1.taken.field.disabled, false);
     assert.equal(p1.highest2.message, 'Modes to return: highest n_eff above 1.45. The next run returns the modes of highest n_eff.');
-    assert.equal(p1.highest2.plan, 'Closed window'); assert.equal(p1.highest2.value, '2.500');
+    assert.equal(p1.highest2.plan, 'Closed window · 2 modes'); assert.equal(p1.highest2.value, '2.500');
     await rOverflow('P1 Modes to return');
     // P2 (V2): the core-only template, then a silica slab across the window: no warning
     const p2 = {template: await warning()};
@@ -3009,7 +3009,7 @@ try {
       assert.equal(w.row, SHORT, tag); assert.equal(w.panel, WARNING, tag);
       assert.deepEqual(w.rowButtons, BUTTONS, tag); assert.deepEqual(w.panelButtons, BUTTONS, tag);
     }
-    assert.equal(p2.t18.plan, 'Closed window');
+    assert.equal(p2.t18.plan, 'Closed window · 2 modes');
     noWarning(p2.nearest, 'Nearest to n_eff'); noWarning(p2.open, 'Open boundary');
     // P5 (V5): the warning's shortcut (the edge note's) sets the inputs and runs nothing
     const items0 = (await runItems()).length;
@@ -3018,7 +3018,7 @@ try {
       job: await rText('#job-message'), modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), after: await warning()};
     stage('R22 P5 shortcut', p5);
     assert.equal(p5.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. Press Run study to compute.');
-    assert.equal(p5.plan, 'Closed window · near n_eff 2.46'); assert.equal(p5.items, items0); assert.equal(p5.run, 'Run study'); assert.equal(p5.job || '', '');
+    assert.equal(p5.plan, 'Closed window · near n_eff 2.46 · 4 modes'); assert.equal(p5.items, items0); assert.equal(p5.run, 'Run study'); assert.equal(p5.job || '', '');
     assert.equal(p5.modes, '4'); noWarning(p5.after, 'after the shortcut');
     // round 27 (D1): a long Messages line (this one, 150 characters) wraps whole at 390 × 844; R23 P2
     // checked that with the conversion sentence, which D1 removed
@@ -3188,7 +3188,7 @@ try {
     for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
     assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
     assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
-    assert.match(d2.after.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
+    assert.match(d2.after.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
     // the core mode is mode 3 of 4: TE-like (TE >= 98 %), the core note on mode 3 and the substrate
     // note on modes 1, 2 and 4, and its n_eff within 1e-4 of 2.43931663. The value differs between
     // machines by up to 1.9e-5 (the CPU-dependent mesh: the runners give 2.43929738 on Linux and
@@ -3292,12 +3292,12 @@ try {
     await r.click('#group-index-check'); await sleep(300);
     await rRun(); p3.after = await plan();
     stage('R23 P3 group index estimate', p3);
-    assert.equal(p3.none, 'Closed window · group index on (3 solves)'); assert.equal(p3.noneButton, 'Turn off group index');
-    assert.match(p3.scaled, /^Closed window · group index on \(3 solves\) · about \d+ (?:s|min)$/); assert.equal(p3.button, 'Turn off group index');
-    assert.match(p3.off.plan, /^Closed window · last such run \d+:\d\d$/); assert.equal(p3.off.button, null); assert.equal(p3.off.checked, false);
+    assert.equal(p3.none, 'Closed window · 2 modes · group index on (3 solves)'); assert.equal(p3.noneButton, 'Turn off group index');
+    assert.match(p3.scaled, /^Closed window · 4 modes · group index on \(3 solves\) · about \d+ (?:s|min)$/); assert.equal(p3.button, 'Turn off group index');
+    assert.match(p3.off.plan, /^Closed window · 4 modes · last such run \d+:\d\d$/); assert.equal(p3.off.button, null); assert.equal(p3.off.checked, false);
     // (Messages then adds that Run 1 has these results: the inputs are Run 1's again)
     assert.ok(p3.off.message.startsWith('Group index off: the next run is one solve, without n_g.'), p3.off.message);
-    assert.match(p3.after, /^Closed window · group index on \(3 solves\) · about \d+ (?:s|min)$/);
+    assert.match(p3.after, /^Closed window · 4 modes · group index on \(3 solves\) · about \d+ (?:s|min)$/);
     // Run 3: open (2 modes, n_g off); Run 4: closed near 2.46 (the row's shortcut, 4 modes); Run 5:
     // closed, Highest, 4 modes, core mesh 32 nm: the session goes over 16 MiB
     await modes(); await r.click('#group-index-check'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
@@ -3509,8 +3509,8 @@ try {
     await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await groupIndex(true);
     p4.restored = await plan();
     stage('R24 P4 estimate and runs without wall time', p4);
-    const NONE = /^Open boundary · [12] searche?s? · group index on \(3 solves\)$/, ABOUT = /^Open boundary · [12] searche?s? · group index on \(3 solves\) · about \d+ (?:s|min)$/;
-    assert.match(p4.fromFile, NONE); assert.match(p4.fromFileOff, /^Open boundary · [12] searche?s?$/);
+    const NONE = /^Open boundary · 2 modes · [12] searche?s? · group index on \(3 solves\)$/, ABOUT = /^Open boundary · 2 modes · [12] searche?s? · group index on \(3 solves\) · about \d+ (?:s|min)$/;
+    assert.match(p4.fromFile, NONE); assert.match(p4.fromFileOff, /^Open boundary · 2 modes · [12] searche?s?$/);
     assert.match(p4.measured, ABOUT); assert.equal(p4.added, p4.measured);
     assert.equal(p4.items.length, p4.before + 1, JSON.stringify(p4.items));
     assert.match(p4.restored, NONE);

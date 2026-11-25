@@ -512,8 +512,8 @@ edge; …*, more than 50 %); after a wavelength edit the status line *Run 9 · C
 Substrate 3000 × 700 nm …*; and the template core against the substrate run on Compare with the
 note for B, each unmatched row's *best x (< 0.8, not matched)* and O2's 24 px at 1440 × 900.
 Since round 18 (pre-registered) a further stage in its own browser context checks the box beside
-Run study: *Closed window* (round 20 words; *no timed run in this tab yet* in round 19, *no earlier run* before) before any run, *… · group index on (3 solves)* and
-*Open boundary · 2 searches · group index on (3 solves)*, with the warning *Group
+Run study: *Closed window · 2 modes* (round 28 words, G2; *Closed window* from round 20; *no timed run in this tab yet* in round 19, *no earlier run* before) before any run, *… · group index on (3 solves)* and
+*Open boundary · 2 modes · 2 searches · group index on (3 solves)*, with the warning *Group
 index is on: open-boundary runs with it take about three times as long.* in Messages in its own
 colours, and *last such run m:ss* after a run; the Compute group's height, Run study's box and the
 box's size equal within 0.5 px at 1440 × 900 and 390 × 844 with every text and with the drop line;

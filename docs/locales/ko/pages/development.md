@@ -416,8 +416,8 @@ Optical modes*에서 고른다고 말하는지, 선택을 켜면 Run study 옆�
 Substrate (… % of |E|²), which touches the window edge; …*, 50 % 초과)이 나오는지, 파장 편집 뒤 상태 표시줄이 *Run 9 ·
 Core 500 × 220 + Substrate 3000 × 700 nm …*인지, 템플릿 코어와 기판 실행을 Compare에서 비교하면 B의 안내, 짝이 없는 행마다
 *best x (< 0.8, not matched)*, 1440 × 900에서 O2의 24 px가 나오는지 봅니다.
-18차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 Run study 옆 상자를 확인합니다: 실행 전 *Closed window*(20차 문구; 19차에는 *no timed run in this tab yet*, 그 전에는 *no earlier
-run*), *… · group index on (3 solves)*와 *Open boundary · 2 searches · group index on (3 solves)*, 그때
+18차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 Run study 옆 상자를 확인합니다: 실행 전 *Closed window · 2 modes*(28차 G2 문구; 20차부터 *Closed window*; 19차에는 *no timed run in this tab yet*, 그 전에는 *no earlier
+run*), *… · group index on (3 solves)*와 *Open boundary · 2 modes · 2 searches · group index on (3 solves)*, 그때
 Messages에 자기 색으로 나오는 경고 *Group index is on: open-boundary runs with it take about three times as long.*, 실행 뒤
 *last such run m:ss*; 모든 문구와 내보냄 줄에서 1440 × 900과 390 × 844의 Compute 그룹 높이, Run study 상자, 상자 크기가
 0.5 px 안에서 같은지; Search near n_eff 도움말이 *(n_core + 1.444)/2.*로 끝나는지; 편집으로 Run 1의 입력에 돌아오면

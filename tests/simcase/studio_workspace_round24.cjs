@@ -119,8 +119,8 @@ test('P4 (B5): runs read from a file or browser recovery carry no wall time; the
  assert.equal(W.groupIndexEstimate([fromFile],{open:true},kinds),null);
  assert.equal(W.groupIndexEstimate([closed,fromFile],{open:true},kinds),null);
  assert.equal(W.groupIndexEstimate([older,closed,fromFile],{open:true},kinds),180000);
- assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([older,fromFile],{open:true},kinds)}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
- assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([closed,fromFile],{open:true},kinds)}),'Open boundary · 2 searches · group index on (3 solves)');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([older,fromFile],{open:true},kinds)}),'Open boundary · 2 modes · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([closed,fromFile],{open:true},kinds)}),'Open boundary · 2 modes · 2 searches · group index on (3 solves)');
  // and the "last such run" time of a run without group index likewise
  assert.equal(W.lastComparableRun([older,fromFile],{open:true,groupIndex:false},kinds),older);
  assert.equal(W.lastComparableRun([fromFile],{open:true,groupIndex:false},kinds),null);

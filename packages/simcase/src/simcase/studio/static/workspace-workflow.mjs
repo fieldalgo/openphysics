@@ -66,17 +66,21 @@ export const nextRunText=(input,modeCount,groupIndex=false,pml=null,searchTarget
 // and group-index state). Round 20 (Z5): without such a run the timing part is left out ("no timed
 // run in this tab yet" of round 19 raised "what is a timed run?" and read wrong beside open runs).
 // last: that run's wall time in ms, or null.
-//   "Open boundary · 2 searches · group index on (3 solves) · last such run 3:40"
-//   "Closed window"
-//   "Closed window · near n_eff 2.46" (slice C2: searchTarget, a closed window's Search near n_eff)
+//   "Open boundary · 2 modes · 2 searches · group index on (3 solves) · last such run 3:40"
+//   "Closed window · 2 modes"
+//   "Closed window · near n_eff 2.46 · 2 modes" (slice C2: searchTarget, a closed window's Search near n_eff)
 // Round 23 (E3): with group index on, the time part is an estimate instead (estimate: ms, from
-// groupIndexEstimate, or null for none; the page then passes no last): "Open boundary · 2 searches ·
-// group index on (3 solves) · about 3 min".
+// groupIndexEstimate, or null for none; the page then passes no last): "Open boundary · 2 modes · 2
+// searches · group index on (3 solves) · about 3 min".
+// Round 28 (G2): after the boundary, Modes to find, as the job label names it ("4 modes", "1 mode"),
+// so a mode count a shortcut set is seen before the run: "Open boundary · 4 modes · 2 searches · group
+// index on (3 solves) · about 5 min", "Closed window · 2 modes", "Closed window · near n_eff 2.46 · 4 modes".
 export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=false,modeCount=2,last=null,searchTarget=null,estimate=null}={}){
  const options=[...(groupIndex===true?['group index on']:[]),...(open&&pmlCheck===true?['PML check on']:[])];
  const solves=(groupIndex===true?3:1)+(open&&pmlCheck===true&&Number.isInteger(modeCount)?modeCount:0);
  const time=groupIndex===true&&Number.isFinite(estimate)?[`about ${aboutText(estimate)}`]:Number.isFinite(last)?[`last such run ${durationText(last)}`]:[];
- const parts=[open?'Open boundary':searchTarget!=null?closedPlanText(searchTarget):'Closed window',...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...time];
+ const modes=Number.isInteger(modeCount)?[modeCount===1?'1 mode':`${modeCount} modes`]:[];
+ const parts=[open?'Open boundary':searchTarget!=null?closedPlanText(searchTarget):'Closed window',...modes,...(open?[searches===2?'2 searches':'1 search']:[]),...(options.length?[options.join(' · ')+` (${solves} solves)`]:[]),...time];
  return parts.join(' · ');
 }
 // Round 23 (E3): the time a run with group index on is likely to take, from the newest run of the tab
