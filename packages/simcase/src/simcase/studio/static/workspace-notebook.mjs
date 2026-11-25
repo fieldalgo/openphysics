@@ -5,7 +5,7 @@ import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUD
 import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
 import {CLOSED_TARGET_ADAPTER,checkClosedTarget} from './workspace-closed-target.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA,physicalBounds,windowField} from './workspace-field.mjs';
-import {isCompactRecord,decodeField,encodeField,compactRecord,isCompactField,markCompact,COMPACT_FIELD_KEYS} from './workspace-field-encoding.mjs';
+import {isCompactRecord,decodeField,encodeField,compactRecord,isCompactField,markCompact,singlePrecision,compactFieldBytes,COMPACT_FIELD_KEYS} from './workspace-field-encoding.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
@@ -316,9 +316,13 @@ const modeValues=run=>{const modes=opticalModes(run);return {te:modes.map(m=>m.f
  * unchanged. Returns the run. */
 export function compactRunField(run){
  if(!run.field||isCompactField(run.field))return run;
- const shown=modeValues(run);
- const checked=validateRun({...run,field:encodeField(run.field),te_polarization_fraction:shown.te,effective_area:shown.area});
- run.te_polarization_fraction=shown.te;run.effective_area=shown.area;run.field=checked.field;
+ const shown=modeValues(run),f=run.field,record=encodeField(f);
+ // the field a file of this record reads (validateRun): the same coordinates, nodes and triangles,
+ // the samples rounded to float32 (what the decoder gives), and an open run's physical window
+ const field={node_coordinates:f.node_coordinates,nodes:f.nodes,triangles:f.triangles,real:singlePrecision(f.real),imag:singlePrecision(f.imag)};
+ if(f.physical)Object.defineProperty(field,'physical',{value:f.physical,enumerable:false});
+ markCompact(field,Object.freeze({...record,counts:Object.freeze(record.counts)}));
+ run.te_polarization_fraction=shown.te;run.effective_area=shown.area;run.field=field;
  return run;
 }
 const utf8Bytes=text=>new TextEncoder().encode(text).length;
@@ -330,7 +334,9 @@ const FIELD_BYTES=Symbol('field bytes');
 export function runFieldBytes(run){
  if(!run.field)return 0;
  const cached=run[FIELD_BYTES];if(cached?.field===run.field)return cached.bytes;
- const bytes=utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,true)))-utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,false)));
+ // a compact field: exact from its counts (its record's keys and the four base64 strings)
+ const compact=compactRecord(run.field);
+ const bytes=compact?compactFieldBytes(compact):utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,true)))-utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,false)));
  Object.defineProperty(run,FIELD_BYTES,{value:{field:run.field,bytes},enumerable:false,configurable:true,writable:true});
  return bytes;
 }
@@ -633,7 +639,14 @@ export function mergeRuns(existing,incoming,limit=RUN_LIMIT){
  // two open runs with valid physical bounds compare their samples on the window (C3): a file written
  // before the crop holds the full samples of a job whose new copy holds the window's only
  const windowed=run=>{const b=isOpenRun(run)?physicalBounds(run.open_boundary):null;return b?JSON.stringify(windowField(run.field,b)):null;};
- const sameFields=(a,b)=>{const wa=windowed(a),wb=wa===null?null:windowed(b);return wa!==null&&wb!==null?wa===wb:fields(a)===fields(b);};
+ // a compact field (version 14) is compared by its strings: the other run's field encoded as the tab
+ // would encode it (an open run's on its window)
+ const encoded=run=>{const c=compactRecord(run.field);if(c)return JSON.stringify([c.node_coordinates,c.triangles,c.real,c.imag]);
+  const b=isOpenRun(run)?physicalBounds(run.open_boundary):null;
+  try{const e=encodeField(b?windowField(run.field,b):run.field);return JSON.stringify([e.node_coordinates,e.triangles,e.real,e.imag]);}catch{return null;}};
+ const sameFields=(a,b)=>{
+  if(isCompactField(a.field)||isCompactField(b.field)){const ea=encoded(a);return ea!==null&&ea===encoded(b);}
+  const wa=windowed(a),wb=wa===null?null:windowed(b);return wa!==null&&wb!==null?wa===wb:fields(a)===fields(b);};
  const same=(a,b)=>identity(a)===identity(b)&&(!a.field||!b.field||sameFields(a,b));
  for(const raw of incoming){
   const run=validateRun(raw,true);if(incomingIds.has(run.job))throw new Error('Duplicate imported run identifier.');incomingIds.add(run.job);

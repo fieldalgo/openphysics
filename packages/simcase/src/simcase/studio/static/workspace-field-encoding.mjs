@@ -58,24 +58,33 @@ export function base64ToBytes(text){
  return bytesToBase64(bytes)===text?bytes:null;
 }
 
+// the platform's byte order: typed arrays are written directly on a little-endian platform, else
+// through a DataView (the bytes are little-endian either way)
+const LITTLE=new Uint8Array(new Uint16Array([1]).buffer)[0]===1;
 /** The compact record of a field {node_coordinates (metres), triangles, real, imag} (nested arrays,
  * real/imag[mode][triangle][x, y, z]). Each sample is rounded to the nearest float32; a sample whose
  * float32 is not finite is refused. */
 export function encodeField(field){
  const modes=field.real.length,nodes=field.node_coordinates.length,triangles=field.triangles.length;
- const coordinates=new DataView(new ArrayBuffer(16*nodes));
- field.node_coordinates.forEach((p,i)=>{coordinates.setFloat64(16*i,p[0],true);coordinates.setFloat64(16*i+8,p[1],true);});
- const indices=new DataView(new ArrayBuffer(12*triangles));
- field.triangles.forEach((t,i)=>{for(let c=0;c<3;c++)indices.setUint32(12*i+4*c,t[c],true);});
+ const X=new Float64Array(2*nodes);field.node_coordinates.forEach((p,i)=>{X[2*i]=p[0];X[2*i+1]=p[1];});
+ const T=new Uint32Array(3*triangles);field.triangles.forEach((t,i)=>{T[3*i]=t[0];T[3*i+1]=t[1];T[3*i+2]=t[2];});
  const samples=part=>{
-  const view=new DataView(new ArrayBuffer(12*modes*triangles));let o=0;
-  for(const mode of part)for(const v of mode)for(let c=0;c<3;c++){
-   const x=Math.fround(v[c]);if(!Number.isFinite(x))throw new Error('A field sample is beyond single precision.');
-   view.setFloat32(o,x,true);o+=4;
-  }
-  return bytesToBase64(new Uint8Array(view.buffer));
+  const a=new Float32Array(3*modes*triangles);let o=0;
+  for(const mode of part)for(const v of mode){a[o]=v[0];a[o+1]=v[1];a[o+2]=v[2];o+=3;}
+  for(let i=0;i<a.length;i++)if(!Number.isFinite(a[i]))throw new Error('A field sample is beyond single precision.');
+  return bytesToBase64(LITTLE?new Uint8Array(a.buffer):swap(new Uint8Array(a.buffer),4));
  };
- return {encoding:FIELD_ENCODING,counts:{modes,nodes,triangles},node_coordinates:bytesToBase64(new Uint8Array(coordinates.buffer)),triangles:bytesToBase64(new Uint8Array(indices.buffer)),real:samples(field.real),imag:samples(field.imag)};
+ return {encoding:FIELD_ENCODING,counts:{modes,nodes,triangles},node_coordinates:bytesToBase64(LITTLE?new Uint8Array(X.buffer):swap(new Uint8Array(X.buffer),8)),
+  triangles:bytesToBase64(LITTLE?new Uint8Array(T.buffer):swap(new Uint8Array(T.buffer),4)),real:samples(field.real),imag:samples(field.imag)};
+}
+// the bytes of each value reversed (a big-endian platform's typed array to little-endian bytes)
+function swap(bytes,size){const out=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i+=size)for(let b=0;b<size;b++)out[i+b]=bytes[i+size-1-b];return out;}
+/** The samples a compact field holds for nested samples (each rounded to float32, -0 kept). */
+export const singlePrecision=part=>part.map(mode=>mode.map(v=>[Math.fround(v[0]),Math.fround(v[1]),Math.fround(v[2])]));
+/** The bytes a compact field adds to its run's record in a session ("field":{…}, and the comma). */
+export function compactFieldBytes(record){
+ const c=record.counts;
+ return `"field":{"encoding":"${record.encoding}","counts":{"modes":${c.modes},"nodes":${c.nodes},"triangles":${c.triangles}},"node_coordinates":"","triangles":"","real":"","imag":""},`.length+compactFieldChars(c);
 }
 
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);

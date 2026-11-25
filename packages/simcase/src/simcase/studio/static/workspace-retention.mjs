@@ -16,7 +16,8 @@
 // a field that does not fit is skipped and the next older one is tried. Selecting, pinning,
 // unpinning, naming or comparing runs removes no field. A run without its field keeps n_eff, the
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
-import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget} from './workspace-notebook.mjs';
+import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget,compactRunField,COMPACT_SESSION_VERSION} from './workspace-notebook.mjs';
+import {isCompactField} from './workspace-field-encoding.mjs';
 import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
 import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
@@ -55,6 +56,41 @@ export function chooseFields(input,runs,selected,comparison,view,{first=[],budge
   if(total+b<=budget||(i===0&&r.job===selected)){kept.push(r);total+=b;}else letGo.push(r);});
  return {kept,letGo,total,base,fits:false};
 }
+
+// ---- compact fields (design "Compact field encoding") -----------------------------------------
+// While every field fits as text, nothing changes. At the first arrival where the fields would not
+// all fit as text, every field in the tab is made compact (float32 samples; workspace-notebook.mjs
+// compactRunField) and the order above is applied with the compact sizes. Once the tab holds a
+// compact field, every field that arrives is made compact too; the tab never converts back. A field
+// whose samples are beyond single precision (only a synthetic or hand-edited file holds one) stays
+// as text, at its text size. File › Open and Restore (loaded) bring a whole session: its fields are
+// kept as the file holds them unless they would not all fit as text, so an opened file saved again
+// is its own bytes.
+/** The runs whose fields were made compact now (in place), and whether this was the tab's first
+ * conversion. */
+export function compactFields(input,runs,selected,comparison,view,{budget=FIELD_BUDGET_BYTES,bytes=runFieldBytes,first=[],loaded=false}={}){
+ const text=runs.filter(r=>r.field&&!isCompactField(r.field));
+ if(!text.length)return {converted:[],started:false};
+ const already=runs.some(r=>isCompactField(r.field));
+ if((!already||loaded)&&chooseFields(input,runs,selected,comparison,view,{first,budget,bytes}).fits)return {converted:[],started:false};
+ const converted=[];
+ for(const r of text){try{compactRunField(r);converted.push(r);}catch{/* beyond single precision: kept as text */}}
+ return {converted,started:!already&&converted.length>0};
+}
+/** The fields the budget keeps at an arrival (chooseFields), after compactFields: {...out, converted, started}. */
+export function chooseFieldsAtArrival(input,runs,selected,comparison,view,options={}){
+ const {converted,started}=compactFields(input,runs,selected,comparison,view,options);
+ return {...chooseFields(input,runs,selected,comparison,view,options),converted,started};
+}
+/** Messages, at the tab's first conversion (once per tab). */
+export const COMPACT_TEXT=`Fields are now kept at single precision (float32), so more of them fit in ${mbText(FIELD_BUDGET_BYTES)}. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version ${COMPACT_SESSION_VERSION}).`;
+/** The sentence after the note under the run list. */
+export const COMPACT_NOTE='When fields would not all fit, they are kept at single precision.';
+/** Results, under the field view of a run whose field is compact. */
+export const COMPACT_RESULTS_TEXT='Field at single precision (float32). The values above are the engine\'s.';
+/** Export this run, after "with the run's inputs and fields" for a compact run. */
+export const COMPACT_EXPORT_TEXT=' (fields at single precision)';
+export {isCompactField};
 
 /** The bytes of the session text with the fields of the selected and pinned runs only (the words
  * when a pinned run's field goes, section 3.3). */
