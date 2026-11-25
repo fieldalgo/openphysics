@@ -15,7 +15,8 @@ Not part of the test suite. Two ways in:
   simcase records (candidates and selections), for a document path or ``c2`` (the bent slab with
   pml_search_mode_count 64);
 - ``python tools/static_deflation_check.py summary <log.jsonl> [<tolerance>]``: the rule
-  |d_i| <= max(tolerance, 10 s_i) per root, the branch that decided it, the count checks.
+  |d_i| <= max(tolerance, 10 s_i) per root, the branch that decided it, the count checks. A solve
+  whose forced search reaches the static family is not perturbed and is judged at 1e-8 (P3).
 
 Roots are paired by order, then by nearest value. The tests stay what accepts the product;
 this script only measures.
@@ -115,14 +116,18 @@ def install(log_path=None):
             last.clear(); t = time.time(); ref = real_solve(*args, **kwargs); ref_static = last.get("static")
         seconds.append(round(time.time() - t, 2))
         spread = []
-        for seed in SEEDS:
+        # A forced search that reaches the static family is judged without a spread (check P3):
+        # perturbed, it can take hours, the pathology the deflation removes.
+        for seed in SEEDS if not ref_static else ():
             with _undeflated(seed):
                 t = time.time(); spread.append(_relative(real_solve(*args, **kwargs)[0], ref[0]))
             seconds.append(round(time.time() - t, 2))
         rec["seconds"] = seconds   # deflated, forced, forced with seeds 1, 2, 3
-        s = None if any(x is None for x in spread) else np.max(spread, axis=0)
         d = _relative(out[0], ref[0])
-        rec.update(ref_count=len(ref[0]), ref_static=ref_static,
+        s = None if not spread or any(x is None for x in spread) else np.max(spread, axis=0)
+        if not spread and d is not None:
+            s = np.zeros(len(d))
+        rec.update(cluster=bool(ref_static), ref_count=len(ref[0]), ref_static=ref_static,
                    d=None if d is None else d.tolist(), s=None if s is None else s.tolist())
         log.write(json.dumps(rec) + "\n"); log.flush()
         return out
@@ -157,9 +162,12 @@ def records(out_path, cases):
                 document = json.loads(Path(case).read_text(encoding="utf-8"))
             point, values = _record(document)
             ref_point, ref = _record(document, forced=True)
-            spread = [_relative(_record(document, seed, forced=True)[1], ref) for seed in SEEDS]
-            s = None if any(x is None for x in spread) else np.max(spread, axis=0)
             d = _relative(values, ref)
+            if case == "c2":    # check P2: judged at its own 1e-8, without a spread (a perturbed
+                s = None if d is None else np.zeros(len(d))   # undeflated c2 search can take hours)
+            else:
+                spread = [_relative(_record(document, seed, forced=True)[1], ref) for seed in SEEDS]
+                s = None if any(x is None for x in spread) else np.max(spread, axis=0)
             gain = sum(1 for c in point["candidates"] if c["effective_index"]["im"] < 0 and c["pml_l2_fraction"] >= 0.5)
             log.write(json.dumps(dict(call=case, count=len(values), ref_count=len(ref),
                                       selected=point["selected_candidates"], ref_selected=ref_point["selected_candidates"],
@@ -178,7 +186,7 @@ def summary(path, tolerance=1e-9):
             print("FAIL counts", r["call"], r["count"], r["ref_count"], r.get("selected"), r.get("ref_selected"))
             continue
         d, s = np.asarray(r["d"]), np.asarray(r["s"])
-        bound = np.maximum(tolerance, 10 * s)
+        bound = np.maximum(1e-8 if r.get("cluster") else tolerance, 10 * s)
         ok = bool(np.all(d <= bound))
         branch = "1e-9" if np.all(d <= tolerance) else "spread"
         failed += not ok
