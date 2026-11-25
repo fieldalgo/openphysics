@@ -1975,20 +1975,24 @@ session and browser recovery keep with every field (48.8 MB before, refused). Th
 does: *Keep fields for selected and pinned runs* writes the other runs without `field`, with
 their n_eff, TE fractions and effective areas; Cancel writes nothing; when even the selected
 and pinned runs are over the limit, the save is refused, naming the selected run and the pinned
-runs apart: *The selected run (Run 6) and the pinned runs (Run 4, Run 5) are 46 MB with their fields,
-over the 16 MiB session limit. Unpin some of them.* (*Unpin it.* for one pinned run). Without a
-pinned run among them it says *The selected run (Run 6) is 19 MB with its fields, over the 16 MiB
+runs apart: *The selected run (Run 6) and the pinned runs (Run 4, Run 5) are 46.2 MB with their fields,
+over the 16.8 MB session limit. Unpin some of them.* (*Unpin it.* for one pinned run). Without a
+pinned run among them it says *The selected run (Run 6) is 18.9 MB with its fields, over the 16.8 MB
 session limit. Select a different run before saving, so this one is saved without its fields, or run
 it again with fewer modes.* The recovery error says the same after *Recovery snapshot exceeds 16
 MiB:*. When a new run makes the session go over the limit, its result message adds one line:
-*Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the
-fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions
-and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.* (round 23,
-E2; it read
+*Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the
+field plots of Run 6 are not kept. File › Save will ask whether to keep the field plots of the
+selected and pinned runs only (Runs 1, 2 and 9).* (*Browser recovery keeps every run's values and
+field plots.* when it left nothing out). Round 24 (B3) gave it one unit, MB to one decimal (two
+decimals for a size just over 16.8 MB, which would otherwise read as the limit), and said first what
+was already left out; the Save refusals above use the same unit. Round 23 (E2) had *Session is now 22
+MB, over the 16 MiB (16.8 MB) limit. File › Save will ask … Browser recovery keeps every field but
+those of Run 1 and Run 2.*, whose two units and closing clause testers could not read; before that it read
 *Session is now 18 MB, over the 16 MiB limit: File › Save will ask whether to keep the fields of the
 selected and pinned runs only.*, and testers could not tell what would be lost or whether browser
-recovery still kept everything), or, when Save would refuse, *Session is now 49 MB, over the 16 MiB
-(16.8 MB) limit, and File › Save will refuse:* followed by the refusal and *Browser recovery is off.*
+recovery still kept everything). When Save would refuse it reads *Session is now 48.8 MB, over the
+16.8 MB limit, and File › Save will refuse:* followed by the refusal and *Browser recovery is off.*
 (the round-18 recovery line is then not repeated). The line wraps in Messages. When the full text
 is over the limit, browser recovery keeps, without asking, the fields of the selected and pinned
 runs, then (since round 23, a coordinator decision) the fields of the other runs newest first (the

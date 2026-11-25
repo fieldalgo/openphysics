@@ -183,7 +183,7 @@ test('M4-e: over 16 MiB a session keeps the fields of the selected and pinned ru
   assert.throws(()=>N.parseSession(edit(kept.text,d=>{delete d.runs[0][key];})),{message:'Run 1 has no fields and no saved TE fractions and effective areas.'},key);
  // even the selected and pinned runs over the limit: refused, naming them
  const tight=N.writeOpticalSession(input(),runs,'00000003',['00000001','00000004'],view,{limit:1000,keepSelected:true});
- assert.equal(tight.ok,false);assert.match(tight.refusal,/^The selected run \(Run 3\) and the pinned run \(Run 2\) are [\d.]+ MB with their fields, over the 16 MiB session limit\. Unpin it\.$/);
+ assert.equal(tight.ok,false);assert.match(tight.refusal,/^The selected run \(Run 3\) and the pinned run \(Run 2\) are [\d.]+ MB with their fields, over the 16\.8 MB session limit\. Unpin it\.$/);
  // browser recovery takes the reduced file without asking
  const capture=N.captureSession(input(),runs,'00000003',['00000001','00000004'],view);assert.equal(JSON.parse(capture()).version,9);
 });

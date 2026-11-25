@@ -33,3 +33,23 @@ test('P1 (B2): the page keeps the file a recovered record came from until a new 
  assert.ok(body(app,'function restoreProjectName(','\n}').includes('project.fromFile=next.recovered.opened||next.recovered.changed||null;'));
  assert.ok(body(app,'function projectLine(){','\n}').includes('return projectTitle({name:project.name,fromFile:project.fromFile,models:'));
 });
+
+test('P2 (B3): the size message in one unit (MB, one decimal), what browser recovery left out first, then what Save offers',async()=>{
+ const N=await import(STATIC+'workspace-notebook.mjs');
+ const out={ok:false,bytes:17.04e6,reduced:{bytes:9e6,notKept:[6],kept:[1,2,9]},refusal:null};
+ const text=N.sessionSizeText(out,[6]);
+ assert.equal(text,"Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the field plots of Run 6 are not kept. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Runs 1, 2 and 9).");
+ assert.ok(!text.includes('MiB'));
+ assert.equal(N.sessionSizeText({...out,bytes:24.31e6},[1,2]),"Session is now 24.3 MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the field plots of Run 1 and Run 2 are not kept. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Runs 1, 2 and 9).");
+ assert.equal(N.sessionSizeText(out,[]),"Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every run's values and field plots. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Runs 1, 2 and 9).");
+ // the refusal branch: the same unit in Save's words
+ const refusal=N.keptOverText([{name:'Run 6',selected:true,pinned:false}],18.94e6),off=N.sessionSizeText({ok:false,bytes:48.8e6,reduced:null,refusal});
+ assert.equal(off,'Session is now 48.8 MB, over the 16.8 MB limit, and File › Save will refuse: The selected run (Run 6) is 18.9 MB with its fields, over the 16.8 MB session limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes. Browser recovery is off.');
+ assert.ok(!off.includes('MiB'));
+ // MB to one decimal; a size just over the limit never reads as the limit itself
+ assert.equal(N.megabytes(17e6),'17.0 MB');assert.equal(N.megabytes(9.94e6),'9.9 MB');
+ assert.equal(N.megabytes(16*1024*1024+1),'16.78 MB');assert.equal(N.megabytes(16.7e6),'16.7 MB');
+ // the header keeps its words (fields), as the coordinator allowed
+ const PS=await import(STATIC+'workspace-persistence.mjs');
+ assert.equal(PS.projectTitle({models:1,recovery:'keptFields:6'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of Run 6');
+});

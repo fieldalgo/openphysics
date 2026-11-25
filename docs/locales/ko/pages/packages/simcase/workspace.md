@@ -1634,15 +1634,19 @@ session과 브라우저 복구가 모든 장과 함께 보존합니다(이전에
 한도를 넘는 세션은 다중물리 세션처럼 먼저 묻습니다. *Keep fields for selected and pinned runs*는 나머지
 실행을 `field` 없이 n_eff·TE 비율·유효 면적과 함께 쓰고, Cancel은 아무것도 쓰지 않으며, 선택·고정 실행만으로도
 한도를 넘으면 선택 실행과 고정 실행을 따로 밝혀 저장을 거부합니다: *The selected run (Run 6) and the pinned runs
-(Run 4, Run 5) are 46 MB with their fields, over the 16 MiB session limit. Unpin some of them.*(고정 실행이 하나면
-*Unpin it.*). 그중 고정 실행이 없으면 *The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session
+(Run 4, Run 5) are 46.2 MB with their fields, over the 16.8 MB session limit. Unpin some of them.*(고정 실행이 하나면
+*Unpin it.*). 그중 고정 실행이 없으면 *The selected run (Run 6) is 18.9 MB with its fields, over the 16.8 MB session
 limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer
 modes.*라고 합니다. 복구 오류도 *Recovery snapshot exceeds 16 MiB:* 뒤에 같은 말을 합니다. 새 실행으로 세션이 한도를
-넘으면 그 결과 메시지에 한 줄이 붙습니다: *Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask
-whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.*(round 23, E2; 전에는 *Session is now 18 MB, over the
+넘으면 그 결과 메시지에 한 줄이 붙습니다: *Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every
+run's values; the field plots of Run 6 are not kept. File › Save will ask whether to keep the field plots of the selected
+and pinned runs only (Runs 1, 2 and 9).*(아무것도 빼지 않았으면 *Browser recovery keeps every run's values and field
+plots.*). round 24(B3)는 단위를 MB 소수 한 자리 하나로 맞추고(16.8 MB를 조금 넘는 크기는 한도처럼 읽히지 않게 소수 두 자리),
+이미 빠진 것을 먼저 말하게 했습니다. 위의 저장 거부도 같은 단위입니다. round 23(E2)은 *Session is now 22 MB, over the 16 MiB
+(16.8 MB) limit. File › Save will ask … Browser recovery keeps every field but those of Run 1 and Run 2.*였고 테스터가 두
+단위와 끝 구절을 읽지 못했습니다. 그 전에는 *Session is now 18 MB, over the
 16 MiB limit: File › Save will ask whether to keep the fields of the selected and pinned runs only.*여서 테스터가 무엇을 잃는지,
-브라우저 복구가 여전히 모두 보존하는지 알 수 없었습니다), 저장이 거부될 때는 *Session is now 49 MB, over the 16 MiB (16.8 MB)
+브라우저 복구가 여전히 모두 보존하는지 알 수 없었습니다), 저장이 거부될 때는 *Session is now 48.8 MB, over the 16.8 MB
 limit, and File › Save will refuse:* 뒤에 거부 문구와 *Browser recovery is off.*(이때 round 18의 복구 줄은 되풀이하지
 않습니다). 이 줄은 Messages에서 줄바꿈됩니다. 전체 텍스트가 한도를 넘으면 브라우저 복구는 묻지 않고 선택·고정 실행의
 장을 보존하고, 그다음(round 23부터, 코디네이터 결정) 나머지 실행의 장을 새것부터(실행 번호가 큰 것부터) 기록이 16 MiB 안에
