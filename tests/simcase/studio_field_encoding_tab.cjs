@@ -223,12 +223,13 @@ test('named case: optical-v14-compact.json opened with its text run and saved, u
 });
 
 test('the words of section 5, exactly, and where the page uses them',()=>{
- assert.equal(X.COMPACT_TEXT,'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).');
+ // round 26 (C2): the Messages sentence in the reader's words (HQ decision 2026-11-25)
+ assert.equal(X.COMPACT_TEXT,'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.');
  assert.equal(X.COMPACT_NOTE,'When fields would not all fit, they are kept at single precision.');
  assert.equal(X.COMPACT_RESULTS_TEXT,"Field at single precision (float32). The values above are the engine's.");
  assert.equal(X.COMPACT_EXPORT_TEXT,' (fields at single precision)');
- // "single precision" and "float32" once each in the Messages sentence
- assert.equal(X.COMPACT_TEXT.split('single precision').length,2);assert.equal(X.COMPACT_TEXT.split('float32').length,2);
+ // "single precision" once in the Messages sentence; "float32" is in the Results line only (round 26)
+ assert.equal(X.COMPACT_TEXT.split('single precision').length,2);assert.equal(X.COMPACT_TEXT.split('float32').length,1);
  const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
  assert.ok(app.includes("const compactWords=out.started&&!compactSaid?COMPACT_TEXT:'';"));
  assert.ok(app.includes("line.id='field-precision';line.className='input-hint';line.textContent=COMPACT_RESULTS_TEXT;"));

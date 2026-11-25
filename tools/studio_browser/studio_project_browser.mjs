@@ -867,7 +867,7 @@ try {
     // fine mesh (the field grows with the core's triangles, as R23's substrate does) until a result's
     // fields would not all fit as text (compact fields: they are then kept at single precision, and
     // recovery holds the tab); the header keeps naming both-models.json
-    const r24 = {runs: []}, COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
+    const r24 = {runs: []}, COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
     await width(2800);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
     await page.fill('spinbutton', 'Modes to find', 8);

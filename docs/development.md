@@ -594,8 +594,8 @@ the group index on before any run *Closed window · group index on (3 solves)* w
 index**, after a closed 4-mode run without it *… · about N s* (3 × its time), the button turning the
 option off (*Closed window · last such run m:ss*, the box unchecked, *Group index off: …*), and after
 a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB with every field as text)
-giving, since compact fields, *… Fields are now kept at single precision (float32), so more of them
-fit in 16.8 MB. …* (it was the let-go line *… Run 1 (…) keeps its values; its fields were not kept
+giving, since compact fields, *… More field plots now fit in 16.8 MB: Studio keeps them at single
+precision from now on. …* (it was the let-go line *… Run 1 (…) keeps its values; its fields were not kept
 (16.8 MB limit).* under run retention), wrapped in Messages with no overflow, no size line and no
 *MiB*, the header *… · kept for recovery in this browser* with nothing after it, and the record in
 IndexedDB (version 14) within 16.8 MB holding every run's field, as the run list shows; after the fourteen
@@ -782,7 +782,7 @@ this browser · changed since both-models.json, not saved · kept for recovery i
 session). After the next change it reads *both-models · changed since both-models.json, not saved ·
 kept for recovery in this browser* (round 24, B2; *both-models · not saved to a file · …* before).
 Then (R24, pre-registered P1) finer runs fill the field budget until a result's fields would not all
-fit as text (*… Fields are now kept at single precision (float32), …*; since compact fields, where
+fit as text (*… More field plots now fit in 16.8 MB: …*; since compact fields, where
 run retention let other runs' fields go), Results shows *Field at single precision (float32). The
 values above are the engine's.*, only the fourteen values-only imports are *values only*, and the
 header reads *both-models · changed since both-models.json, not saved · kept for

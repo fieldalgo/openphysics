@@ -16,7 +16,7 @@
 // a field that does not fit is skipped and the next older one is tried. Selecting, pinning,
 // unpinning, naming or comparing runs removes no field. A run without its field keeps n_eff, the
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
-import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,FIELDS_MOVE_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget,compactRunField,COMPACT_SESSION_VERSION} from './workspace-notebook.mjs';
+import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,FIELDS_MOVE_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget,compactRunField} from './workspace-notebook.mjs';
 import {isCompactField,compactBytesOf} from './workspace-field-encoding.mjs';
 import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
 import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
@@ -75,7 +75,9 @@ export function chooseFieldsAtArrival(input,runs,selected,comparison,view,option
  return {...chooseFields(input,runs,selected,comparison,view,options),converted,started};
 }
 /** Messages, at the tab's first conversion (once per tab). */
-export const COMPACT_TEXT=`Fields are now kept at single precision (float32), so more of them fit in ${mbText(FIELD_BUDGET_BYTES)}. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version ${COMPACT_SESSION_VERSION}).`;
+// (round 26: in the words of what the reader gains and what still opens; the session version is in
+// the docs, not here)
+export const COMPACT_TEXT=`More field plots now fit in ${mbText(FIELD_BUDGET_BYTES)}: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.`;
 /** The sentence after the note under the run list. */
 export const COMPACT_NOTE='When fields would not all fit, they are kept at single precision.';
 /** Results, under the field view of a run whose field is compact. */
