@@ -3,7 +3,7 @@
 import {designSummary,shapesBlock,geometryWords} from './workspace-shapes.mjs';
 import {inputChanges} from './workspace-inputs.mjs';
 import {originText} from './workspace-multiphysics.mjs';
-import {studySignature} from './workspace-notebook.mjs';
+import {studySignature,RUN_LIMIT as OPTICAL_RUN_LIMIT} from './workspace-notebook.mjs';
 import {shortTarget,closedPlanText} from './workspace-closed-target.mjs';
 import {boundaryTag,studyTag} from './workspace-compare.mjs';
 
@@ -202,10 +202,10 @@ export function swapDropped(runs,kept,other){
  const next=runs.filter(r=>r!==other),at=next.findIndex(r=>Number.isInteger(r.number)&&r.number>kept.number);
  next.splice(at<0?next.length:at,0,kept);return next;
 }
-/** The message when the run limit dropped a run: "Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up
- * to six runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
+/** The message when the optical run limit dropped a run: "Run 3 (closed · 4 modes · 700 × 300 nm) was
+ * dropped: up to 20 runs are kept; pin a run to keep it." A named run reads "Run 3 · Design A (…)". */
 export function droppedRunText(run){
- return `${dropName(run)} was dropped: up to six runs are kept; pin a run to keep it.`;
+ return `${dropName(run)} was dropped: up to ${OPTICAL_RUN_LIMIT} runs are kept; pin a run to keep it.`;
 }
 // The run state the dock heading and the footer describe, in the words of the multiphysics model.
 // viewed: the run Results shows (the selected run), which both then describe, so they agree with

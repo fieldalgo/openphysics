@@ -31,7 +31,7 @@ function tab(base){
  t.result=i=>{ // a new result (the same job again keeps its number, at its place)
   const completed=result(i),prior=t.runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;
   const used=W.numberRuns([completed],t.used);let appended;
-  try{appended=N.appendRun(t.runs,completed);}catch{return 'all pinned';}
+  try{appended=N.appendRun(t.runs,completed,6);}catch{return 'all pinned';}
   t.used=used;const next=prior?W.inNumberOrder(appended):appended,dropped=t.runs.filter(r=>!next.includes(r)&&r.job!==completed.job);
   t.runs=next;numbered([completed]);
   const other=dropped.length===1?W.swapCandidate(t.runs,completed):null;t.swap=other?{kept:dropped[0],other}:null;
@@ -50,7 +50,7 @@ function tab(base){
  t.import=(ids,numbers)=>{
   const other=ids.map((i,k)=>Object.assign(result(i),{number:numbers[k]}));let text;
   try{text=N.sessionText(N.parseSession(t.text()).input,other,null,[null,null],VIEW);}catch{return 'not written';}
-  const session=N.parseSession(text);let merged;try{merged=N.mergeRuns(t.runs,session.runs);}catch{return 'refused';}
+  const session=N.parseSession(text);let merged;try{merged=N.mergeRuns(t.runs,session.runs,6);}catch{return 'refused';}
   const next=merged.runs;t.used=W.numberRuns(next,Math.max(t.used,...t.runs.map(r=>r.number||0)));t.runs=next;t.swap=null;
   numbered(next.filter(r=>merged.added.includes(r.job)));return 'import';
  };

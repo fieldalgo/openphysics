@@ -1241,7 +1241,7 @@ function refreshNotebook(){
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
  const stamp=notebookStamp();$('replace-notebook').disabled=!runs.length||numericDrafts.invalid;if(runs.length&&!numericDrafts.invalid)scheduleRecovery('optical',autosaveStamp(),captureSession(workspaceInputs(),runs,solverRun?.job||null,compareIds,currentView()),{savedFile:savedFile(),openedFile,openedCurrent:openedCurrent(),page:pageForRecord(),project:recordProjectNow()});const changed=savedNotebookState!==stamp;$('notebook-status').textContent=runs.length?(changed?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',runs.length>0&&changed);}
 const opticalBlock=()=>connection.ready?opticalSupport(state,setup):connection.message;
-const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?'All six runs are pinned. Unpin a run in Results before starting another calculation.':'';
+const retentionBlock=()=>runs.length===RUN_LIMIT&&runs.every(run=>run.pinned)?`All ${RUN_LIMIT} runs are pinned. Unpin a run in Results before starting another calculation.`:'';
 const opticalDocument=()=>buildOpticalDocument({...state,searchTarget:closedTargetNow()},setup);
 // The parts the inputs words compare for a run and the current inputs (round 23, E6: every part of
 // studySignature, workspace-workflow.mjs studyInputParts): [runParts, currentParts]
@@ -1325,7 +1325,7 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 // round 18 (X2; round 17 U3 named the slow options only): what the next optical run does, beside Run
 // study, with how long the last comparable run of this tab took; the options keep their state (a
 // task does not reset them), so a run that is slower than one solve says why first
-// round 18 (X3): before the run, the run the six-run limit would drop, with Pin Run N (the limit is unchanged)
+// round 18 (X3): before the run, the run the run limit (RUN_LIMIT) would drop, with Pin Run N (the limit is unchanged)
 // Round 21 (W2): Run study starts at once; while the run computes (or waits as a pending job) the line
 // says what its result drops, "When this run finishes, Run 3 (…) is dropped", and Pin Run N keeps it
 // (the line then names the next unpinned run). Pin is hidden when pinning would leave the result no
@@ -1693,7 +1693,7 @@ function runDetails(run){
  const rows=[['Job',run.job],['Completed',new Date(run.completedAt).toLocaleString()],['Source',run.origin==='local'?'Computed by this Studio':run.origin==='recovered'?'Browser recovery':'Imported file'],...(run.serverVersion?[['simcase version',run.serverVersion]]:[]),...(Number.isInteger(run.inputRevision)?[['Input change in this tab',String(run.inputRevision)]]:[]),['Polarization (TE fraction)',SOURCE_TEXT[run.te.source]],['Effective area',SOURCE_TEXT[run.area.source]]];
  return '<details class="run-details" id="run-details"'+(ui.runDetailsOpen?' open':'')+'><summary>Run details</summary>'+rows.map(([a,b])=>pair(a,escapeHtml(b))).join('')+'</details>';
 }
-const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. File › Save keeps it in a file.':'Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.';
+const pinNotice=run=>run.pinned?'Run pinned: new runs will not replace it. File › Save keeps it in a file.':`Run unpinned: once ${RUN_LIMIT} runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.`;
 // Naming applies on Enter or when the field is left, and pins the run. Leaving the field
 // updates the panel in place, so a click on another control in it is not lost to a redraw.
 function nameRun(run,value,redraw){

@@ -59,7 +59,7 @@ test('P4 (E4): the drop line, the dropped words, the swap button and the Pin not
  assert.equal(W.dropWarningText(ng),'If you run: drops Run 4 (closed · n_g · 600 × 300 nm) · pin it to keep it');
  assert.equal(W.dropWhileRunningText([open]),'When this run finishes, Run 5 (open (PML 1 µm) · 600 × 300 nm) is dropped');
  assert.equal(W.droppedAfterText([ng]),'Run 4 (closed · n_g · 600 × 300 nm) was dropped');
- assert.equal(W.droppedRunText(near),'Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText(near),'Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) was dropped: up to 20 runs are kept; pin a run to keep it.');
  assert.equal(W.droppedNoSwapText([open]),'Run 5 (open (PML 1 µm) · 600 × 300 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
  assert.equal(W.keepInsteadLabel(ng,open),'Keep Run 4, drop Run 5 (open (PML 1 µm) · 600 × 300 nm) instead');
  assert.equal(W.keptInsteadText(ng,near),'Run 4 (closed · n_g · 600 × 300 nm) is back; Run 6 (closed near 2.46 · 4 modes · Core 500 × 220 + Substrate 3000 × 700 nm) was dropped instead.');
