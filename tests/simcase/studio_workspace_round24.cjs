@@ -53,3 +53,27 @@ test('P2 (B3): the size message in one unit (MB, one decimal), what browser reco
  const PS=await import(STATIC+'workspace-persistence.mjs');
  assert.equal(PS.projectTitle({models:1,recovery:'keptFields:6'}),'Untitled project · not saved to a file · kept for recovery in this browser without the fields of Run 6');
 });
+
+test('P3 (B4): runs newer than a named pair: Compare offers the two newest; a pair picked by hand is kept and keeps its swap',async()=>{
+ const C=await import(STATIC+'workspace-compare.mjs');
+ const runs=[1,2,3,4,5,6,7].map(n=>({job:'j'+n,number:n,...(n<3?{label:'Design '+'AB'[n-1]}:{})}));
+ // T18-like: Run 1 and Run 2 named, so new runs keep them (round 16); five more runs came
+ const named=['j1','j2'];
+ assert.deepEqual(C.comparisonAfterRun(runs,named,false),named);
+ assert.equal(C.newerThanPair(runs,named).job,'j7');
+ assert.deepEqual(C.newestPairOffer(runs,named,false),['j6','j7']);
+ // picked by hand: no offer, the pair stays after a run
+ assert.equal(C.newestPairOffer(runs,named,true),null);
+ assert.deepEqual(C.comparisonAfterRun(runs,named,true),named);
+ // the newest pair shown, or nothing newer: no offer
+ assert.equal(C.newestPairOffer(runs,['j6','j7'],false),null);
+ assert.equal(C.newestPairOffer(runs,['j5','j7'],false),null);
+ assert.equal(C.newestPairOffer(runs.slice(0,1),['j1','j1'],false),null);
+ // a pair read from a file that is not the default reads as picked (pairChosen), so it is kept too
+ assert.equal(C.pairChosen(runs,named),true);
+ // the page: one action for an unpicked pair, which shows the two newest and leaves the pair unpicked
+ const app=read('workspace-app.mjs'),line=body(app,'const newer=newerThanPair(runs,compareIds);','line.append(swap);host.append(line);}');
+ assert.ok(line.includes('const offer=newestPairOffer(runs,compareIds,comparePicked);'));
+ assert.ok(line.includes('swap.textContent=`Compare the two newest: Run ${na} and Run ${nb}`;swap.onclick=()=>{compareIds=[...offer];comparePicked=false;'));
+ assert.ok(line.includes('else{swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;'));
+});

@@ -362,8 +362,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    n_g · Core 500 × 220 + …*. 둘 다 형상 앞에 오므로, 이름보다 좁은 선택 목록이 끝에서 자르더라도(전체 이름은 제목 텍스트)
    보입니다. Compare는 가장 새 실행 두 개로 열리며,
    오래된 쪽이 A, 새 쪽이 B입니다(방금 계산한 실행이 B). Compare에서 고른 쌍이나 두 실행 모두 이름이 있는 쌍은 새
-   실행이 생겨도 유지되며, Compare에 *Run 5 is newer than this pair · Compare Run 5 with B*가 나오고 그 버튼은 가장 새
-   실행(B)을 그 쌍의 B(A로)와 비교합니다. 프로젝트 파일은 그 쌍을 저장하고 열면 그 쌍을 다시 보여 줍니다. 파일에서
+   실행이 생겨도 유지됩니다. 직접 고른 쌍이면 Compare에 *Run 5 is newer than this pair · Compare Run 5 with B*가 나오고
+   그 버튼은 가장 새 실행(B)을 그 쌍의 B(A로)와 비교하며, 그 쌍이 저절로 바뀌는 일은 없습니다. 두 실행에 이름이 있어서만
+   유지된 쌍이면 대신 동작 하나를 제안합니다(round 24, B4): *Run 7 is newer than this pair · Compare the two newest: Run 6
+   and Run 7*. 이 버튼은 새 실행이 생겼을 때처럼 가장 새 두 실행을 보여 줍니다(동작 하나로 가장 새 쌍에 닿으므로 그 옆에
+   *Compare Run 7 with B*는 두지 않습니다). 프로젝트 파일은 그 쌍을 저장하고 열면 그 쌍을 다시 보여 줍니다. 파일에서
    읽은 쌍이 가장 새 두 실행이 아니면 고른 쌍으로 봅니다. 실행 목록은 새 실행이 위에 오므로 Compare에서는
    두 카드 끝에 *Compare A*, *Compare B* 배지가 붙습니다(*· Compare A*, *· Compare B*로 읽힘). 고른 실행이 사라지면 둘 다 그 쌍으로 돌아갑니다.
    고른 것으로 보이는 실행 카드는 정확히

@@ -431,9 +431,13 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    before the geometry; a picker too narrow for the label cuts it at its end (the full label is its
    title text), so they stay in view. Compare opens with
    the two newest runs, the older as A and the newer as B (a run just computed is B). A pair
-   picked on Compare, or a pair of two named runs, stays when new runs come: Compare then
-   reads *Run 5 is newer than this pair · Compare Run 5 with B*, and the button compares the
-   newest run (as B) with the pair's B (as A). The project file stores that pair, and opening
+   picked on Compare, or a pair of two named runs, stays when new runs come. For a pair picked by
+   hand Compare then reads *Run 5 is newer than this pair · Compare Run 5 with B*, and the button
+   compares the newest run (as B) with the pair's B (as A); the pair is never replaced by itself.
+   For a pair kept only because both runs are named it offers one action instead (round 24, B4):
+   *Run 7 is newer than this pair · Compare the two newest: Run 6 and Run 7*, which shows the two
+   newest runs as a new run would (*Compare Run 7 with B* is not offered beside it: one action
+   reaches the newest pair). The project file stores that pair, and opening
    it shows it again; a pair read from a file that is not the two newest runs is kept as
    picked. The run
    list shows the newest first, so on Compare the two cards end with a *Compare A* and a *Compare
