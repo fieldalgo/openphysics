@@ -420,7 +420,7 @@ by role and name, the PML bands of the drawing, the template run all open with t
 (found line, *< 0.01 dB/cm* cells, 30 other candidates, both modes *no leakage resolved*; since
 round 25, A6, while it computes at 1440 × 900 and 390 × 844: the job text announced by Messages
 alone, one live node each for the three footer status lines, no text in two live nodes, and
-**Stop waiting** and **Resume job** by name), a project file whose workspace session is version 10, Compare with a
+**Stop waiting** by name), a project file whose workspace session is version 10, Compare with a
 closed run (matching off, per-side loss headers and note, 24 px to spare at 1440 × 900), and the
 leakage case built in Geometry, whose document is P1's strip over a substrate (*29.15 dB/cm* and
 *1006 dB/cm*, both PML-independent with the per-mode check, a loss change under 2 %; since round 25,

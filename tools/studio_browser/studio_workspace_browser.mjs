@@ -1833,7 +1833,8 @@ try {
         assert.equal(named.count, 1, 'one status node is named by the job text');
         assert.deepEqual(live.ids, [1, 1, 1]); assert.equal(live.jobRole, null);
         assert.equal(new Set(live.texts).size, live.texts.length, 'no text in two live nodes: ' + JSON.stringify(live.texts));
-        assert.deepEqual(buttons, {stop: 1, resume: 1}, 'the job panel controls keep their names');
+        // the job panel's control keeps its name; Resume job is disabled, so not shown (#job-panel button:disabled), while the job runs
+        assert.deepEqual(buttons, {stop: 1, resume: 0}, 'the job panel controls keep their names');
       }
       await obSize(1280, 800);
     };
