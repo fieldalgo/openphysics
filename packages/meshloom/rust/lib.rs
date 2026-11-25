@@ -434,22 +434,23 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     }
     let seeds: Vec<mesh::Seed> = sp.into_iter().zip(sl).map(|(p, label)| mesh::Seed { p, label }).collect();
     let plc = plc::Plc { points, segments, facets };
+    // the PLC check first: a refusal is ValueError(message, witness type, kind, ids) as
+    // check_plc's, so the caller need not run the check again
+    let (plc, checked) = py.detach(move || { let c = plc::check(&plc); (plc, c) });
+    let checked = checked.map_err(invalid_plc)?;
     // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
     let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
         // parity mode: an open surface is refused (witness 6) before recovery, which can fail
         // on it first (an open surface of coplanar points has no tetrahedra)
-        let mut b = if domain == mesh::Domain::Parity && seeds.is_empty() {
-            let c = plc::check(&plc).map_err(|e| ("RecoveryFail", e.msg, vec![]))?;
-            mesh::open_in_check(&c).map_err(|e| match &e {
+        if domain == mesh::Domain::Parity && seeds.is_empty() {
+            mesh::open_in_check(&checked).map_err(|e| match &e {
                 mesh::MeshError::NotClosed { segment, facets } => {
                     ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
                 }
                 _ => ("Internal", e.to_string(), vec![]),
             })?;
-            facetrec::recover_boundary_checked(&plc, c, max_depth)
-        } else {
-            facetrec::recover_boundary(&plc, max_depth)
-        }.map_err(|e| ("RecoveryFail", e, vec![]))?;
+        }
+        let mut b = facetrec::recover_boundary_checked(&plc, checked, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
         let locked = locked.unwrap_or_default();
         // a locked (curved) facet is sampled on its surface by the caller: recovery must find
         // it among the Delaunay faces, with no point added on it or on its edges
@@ -608,6 +609,33 @@ fn triangulate_facet<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, loops: 
     Ok((tris, f.axis))
 }
 
+/// A refused PLC as ValueError(message, witness type or None, detail kind, detail indices).
+fn invalid_plc(e: facet::InputError) -> PyErr {
+    use facet::{At, Detail};
+    let (kind, ids): (&str, Vec<i64>) = match &e.detail {
+        Detail::None => ("", vec![]),
+        Detail::NoFacets => ("no facets", vec![]),
+        Detail::Vertex(i) => ("vertex", vec![*i as i64]),
+        Detail::Facet(f) => ("facet", vec![*f as i64]),
+        Detail::Facets(f, g) => ("facets", vec![*f as i64, *g as i64]),
+        Detail::Point { cells: (f, g), at } => {
+            let (kind, pieces): (&str, Vec<u32>) = match at {
+                At::Centroid(v) => ("centroid", v.clone()),
+                At::SegSeg(a, b) => ("segseg", a.iter().chain(b).copied().collect()),
+                At::SegTri(a, b) => ("segtri", a.iter().chain(b).copied().collect()),
+                At::TriTri(a, b) => ("tritri", a.iter().chain(b).copied().collect()),
+            };
+            // each cell as two numbers: (-1, facet) or a free segment's ends
+            let cell = |c: &facet::CellRef| match c {
+                facet::CellRef::Facet(f) => [-1, *f as i64],
+                facet::CellRef::Segment([u, v]) => [*u as i64, *v as i64],
+            };
+            (kind, cell(f).into_iter().chain(cell(g)).chain(pieces.iter().map(|&x| x as i64)).collect())
+        }
+    };
+    PyValueError::new_err((e.msg, e.witness, kind, ids))
+}
+
 /// Exact validity check of a PLC: `coords` n x 3 doubles, `segments` m x 2 int64 bytes,
 /// `facets` a list of facets, each a list of int64 loop arrays. Raises ValueError naming
 /// the first violation; returns (all segments as int64 bytes, facet triangles as int64
@@ -629,31 +657,7 @@ fn check_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Boun
         .collect::<PyResult<_>>()?;
     let plc = plc::Plc { points, segments, facets };
     // a refusal carries (message, witness type or None, detail kind, detail indices)
-    let c = py.detach(move || plc::check(&plc)).map_err(|e| {
-        use facet::{At, Detail};
-        let (kind, ids): (&str, Vec<i64>) = match &e.detail {
-            Detail::None => ("", vec![]),
-            Detail::NoFacets => ("no facets", vec![]),
-            Detail::Vertex(i) => ("vertex", vec![*i as i64]),
-            Detail::Facet(f) => ("facet", vec![*f as i64]),
-            Detail::Facets(f, g) => ("facets", vec![*f as i64, *g as i64]),
-            Detail::Point { cells: (f, g), at } => {
-                let (kind, pieces): (&str, Vec<u32>) = match at {
-                    At::Centroid(v) => ("centroid", v.clone()),
-                    At::SegSeg(a, b) => ("segseg", a.iter().chain(b).copied().collect()),
-                    At::SegTri(a, b) => ("segtri", a.iter().chain(b).copied().collect()),
-                    At::TriTri(a, b) => ("tritri", a.iter().chain(b).copied().collect()),
-                };
-                // each cell as two numbers: (-1, facet) or a free segment's ends
-                let cell = |c: &facet::CellRef| match c {
-                    facet::CellRef::Facet(f) => [-1, *f as i64],
-                    facet::CellRef::Segment([u, v]) => [*u as i64, *v as i64],
-                };
-                (kind, cell(f).into_iter().chain(cell(g)).chain(pieces.iter().map(|&x| x as i64)).collect())
-            }
-        };
-        PyValueError::new_err((e.msg, e.witness, kind, ids))
-    })?;
+    let c = py.detach(move || plc::check(&plc)).map_err(invalid_plc)?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
             for (chunk, x) in buf.chunks_exact_mut(8).zip(&xs) {
