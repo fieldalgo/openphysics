@@ -4,6 +4,9 @@
 // Session file version 8: a multiphysics model with its runs (docs/packages/simcase/workspace.md,
 // "Session files"). One JSON object {format, version: 8, application: "multiphysics", document,
 // runs, baselines, selected, view}. Optical sessions stay version 7 (workspace-notebook.mjs).
+// Version 15 (run retention, design "Keeping more runs" section 7): version 8 with 0 to 20 runs,
+// written only when the session has more than six runs; a session of six or fewer is version 8, byte
+// for byte.
 //
 // Every number is written in its shortest round-trip form, as JSON.stringify writes it, except
 // negative zero, which is written -0.0 so that it reads back as negative zero; NaN and the
@@ -15,7 +18,14 @@ import {validateRunLabel} from './workspace-notebook.mjs';
 
 export const SESSION_FORMAT='openphysics-studio-session';
 export const MULTIPHYSICS_VERSION=8;
-export const MULTIPHYSICS_RUN_LIMIT=6;
+export const RUNS_MULTIPHYSICS_VERSION=15;
+export const MULTIPHYSICS_RUN_LIMIT=20;
+/** The most runs a version 8 file holds. */
+export const PREVIOUS_MULTIPHYSICS_RUN_LIMIT=6;
+/** The version a session of these runs is written as: 15 above six runs, else 8. */
+export const multiphysicsVersion=runs=>runs.length>PREVIOUS_MULTIPHYSICS_RUN_LIMIT?RUNS_MULTIPHYSICS_VERSION:MULTIPHYSICS_VERSION;
+/** The session versions of a multiphysics model. */
+export const MULTIPHYSICS_VERSIONS=Object.freeze([MULTIPHYSICS_VERSION,RUNS_MULTIPHYSICS_VERSION]);
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const MAX_DOCUMENT_BYTES=1024*1024;
 export const RESULT_FORMAT='multiphysics-run-v1';
@@ -84,11 +94,11 @@ export function sizeText(bytes){const mb=bytes/1e6;return `${mb<10?Number(mb.toF
 
 // ---- runs -------------------------------------------------------------------------------------
 /** The run list: a run of the same job replaces itself (keeping its name and pin); a new run
- * replaces the oldest unpinned one once six are kept. Throws when all six are pinned. */
+ * replaces the oldest unpinned one once 20 are kept. Throws when all 20 are pinned. */
 export function appendMultiphysicsRun(runs,run){
  const previous=runs.find(r=>r.job===run.job);
  const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];
- while(next.length>MULTIPHYSICS_RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All six runs are pinned. Unpin a run before running again.');next.splice(oldest,1);}
+ while(next.length>MULTIPHYSICS_RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error(`All ${MULTIPHYSICS_RUN_LIMIT} runs are pinned. Unpin a run before running again.`);next.splice(oldest,1);}
  return next;
 }
 export const nextRunNumber=runs=>runs.reduce((n,r)=>Math.max(n,r.number),0)+1;
@@ -136,13 +146,13 @@ function sessionBaselines(state){
 /** The session object. state: {document, runs, baselines: {name: {job, completedAt, document,
  * result}}, selected: job or null, view}; keep: the jobs whose maps are kept (default all). */
 export function createMultiphysicsSession(state,keep=null){
- return {format:SESSION_FORMAT,version:MULTIPHYSICS_VERSION,application:'multiphysics',document:state.document,runs:state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true).record),
+ return {format:SESSION_FORMAT,version:multiphysicsVersion(state.runs),application:'multiphysics',document:state.document,runs:state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true).record),
   baselines:sessionBaselines(state),selected:state.selected??null,view:state.view};
 }
 // The file as parts: sessionJson(createMultiphysicsSession(state, keep)) is head + the run texts
 // joined by commas + tail; its size is counted without building the text.
 function fileParts(state,keep,baselines=sessionBaselines(state)){
- const head=`{"format":${sessionJson(SESSION_FORMAT)},"version":${MULTIPHYSICS_VERSION},"application":"multiphysics","document":${sessionJson(state.document)},"runs":[`;
+ const head=`{"format":${sessionJson(SESSION_FORMAT)},"version":${multiphysicsVersion(state.runs)},"application":"multiphysics","document":${sessionJson(state.document)},"runs":[`;
  const pieces=state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true));
  const tail=`],"baselines":${sessionJson(baselines)},"selected":${sessionJson(state.selected??null)},"view":${sessionJson(state.view)}}`;
  const bytes=byteLength(head)+byteLength(tail)+pieces.reduce((n,p)=>n+p.bytes,0)+Math.max(0,pieces.length-1);
@@ -258,7 +268,9 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
  if(doc.application!=='multiphysics')fail(`This session file holds a “${typeof doc.application==='string'?doc.application:'unnamed'}” model, which this Studio does not read.`);
  documentSize(doc.document,'The session');
  if(typeof doc.document.openphysics!=='string')fail('The session model has no "openphysics" version.');
- if(!Array.isArray(doc.runs)||doc.runs.length>MULTIPHYSICS_RUN_LIMIT)fail('Unsupported session format or run count.');
+ // version 8 holds up to six runs, version 15 up to 20
+ const limit=doc.version===RUNS_MULTIPHYSICS_VERSION?MULTIPHYSICS_RUN_LIMIT:PREVIOUS_MULTIPHYSICS_RUN_LIMIT;
+ if(!Array.isArray(doc.runs)||doc.runs.length>limit)fail('Unsupported session format or run count.');
  const jobs=new Set(),numbers=new Set(),runs=[],documents=[{what:'The session model',doc:doc.document,current:true}];
  doc.runs.forEach((raw,i)=>{
   const r=runName(raw,i);

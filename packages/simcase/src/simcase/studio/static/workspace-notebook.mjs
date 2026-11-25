@@ -8,7 +8,7 @@ import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA,physical
 import {isCompactRecord,decodeField,encodeField,compactRecord,isCompactField,markCompact,singlePrecision,compactFieldBytes,COMPACT_FIELD_KEYS} from './workspace-field-encoding.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
-import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
+import {MULTIPHYSICS_VERSION,MULTIPHYSICS_VERSIONS,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
 export const MAX_SESSION_BYTES=16*1024*1024;
 // Run retention (design "Keeping more runs"): up to 20 runs keep their values in the tab, in files and
 // in browser recovery; their fields are kept within the 16 MiB session (workspace-retention.mjs).
@@ -568,16 +568,20 @@ export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION||version===
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
-// version 9 is an optical session with application: 'optical'.
+// version 9 is an optical session with application: 'optical'; versions 10 to 14 are optical and
+// version 15 is a multiphysics model of more than six runs (run retention of the heated model).
+/** The highest session version this Studio reads: 15, RUNS_MULTIPHYSICS_VERSION (the heated model's
+ * run retention), written here as a number since the two modules import each other. */
+export const HIGHEST_SESSION_VERSION=15;
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{
   // a leading byte order mark is removed for version 8 files only: optical files read as before
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
-  if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
+  if(doc?.format!=='openphysics-studio-session'||!MULTIPHYSICS_VERSIONS.includes(doc.version))throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>COMPACT_SESSION_VERSION)throw new Error(newerVersionText(doc.version,COMPACT_SESSION_VERSION));
- if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>HIGHEST_SESSION_VERSION)throw new Error(newerVersionText(doc.version,HIGHEST_SESSION_VERSION));
+ if(doc?.format==='openphysics-studio-session'&&MULTIPHYSICS_VERSIONS.includes(doc.version))return readMultiphysicsSession(doc,{recovered});
  const twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION||doc?.version===COMPACT_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
  if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>sessionRunLimit(doc.version))throw new Error('Unsupported session format or run count.');
  if(nine){

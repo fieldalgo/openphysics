@@ -172,7 +172,7 @@ test('F3: each refusal of a compact field, by its sentence and the run\'s number
  refused(edit(text,d=>{delete d.runs[1].number;}),'Run 2: missing number.');
  refused(edit(text,d=>{run5(d).real=run5(d).imag;},{keepDigest:true}),'Run 2 changed after it was saved (its check value does not match).');
  // a version newer than 14 is refused by name
- refused(edit(text,d=>{d.version=15;}),'This session file is version 15, newer than this Studio reads (versions 6–14). Open it in a newer Studio.');
+ refused(edit(text,d=>{d.version=16;}),'This session file is version 16, newer than this Studio reads (versions 6–15). Open it in a newer Studio.');
  // a version 14 file with no compact field (edited by hand) is read; this Studio writes it as version 13 or earlier
  const plain=N.parseSession(fixture('optical-v13-nine-runs.json'));
  const hand=edit(fixture('optical-v13-nine-runs.json'),d=>{d.version=14;});
