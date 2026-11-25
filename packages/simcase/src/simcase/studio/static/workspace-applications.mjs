@@ -51,7 +51,7 @@ export const CARD_OPEN_TEXT='Open model';
 // Round 20 (Z3): two such cards read alike, so the words name the model: "Return to Optical
 // waveguide (2 runs)", "Return to Heated silicon waveguide (1 run)", "Return to Optical waveguide".
 export const returnToModelText=(runs,title='model')=>Number.isInteger(runs)&&runs>0?`Return to ${title} (${runs} ${runs===1?'run':'runs'})`:`Return to ${title}`;
-export const CARD_STAY_TEXT='Runs stay in this tab until you close it.';
+export const CARD_STAY_TEXT='Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.';
 export const CARD_START_NEW_TEXT='Start new (no runs)';
 export const RESUME_NOT_NOW_TEXT='Not now (choose a model below)';
 // The time an offer names: the time of day for a session saved today, else the date and time.

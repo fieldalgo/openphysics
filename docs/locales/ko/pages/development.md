@@ -399,8 +399,8 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 15차부터 재료 분산에 대한 군굴절률 설명과 Optical modes의 *Material data*도 확인합니다.
 15차부터 단계 막대의 파장이 접근성 트리에서 *Wavelength 1550 nm, edit*라는 이름의 버튼인지도 확인하고, 다중물리
 검사는 트리 경고 배지가 *Modes 1: Temperature input has no source: …*라는 이름의 이미지인지, 세션 검사는 Library
-카드마다의 *Open model*(16차부터, 이전에는 *Open (runs stay in this tab)*), *Runs stay in this tab until you close it.*로
-끝나는 카드 설명, 카드 제안의 *Start new (no runs)*를 읽습니다.
+카드마다의 *Open model*(16차부터, 이전에는 *Open (runs stay in this tab)*), *Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.*로
+끝나는 카드 설명(28차 G4; 그 전에는 *Runs stay in this tab until you close it.*)과 1440 × 900, 390 × 844에서 온전한 카드, 카드 제안의 *Start new (no runs)*를 읽습니다.
 16차부터 Save As 안내 *This browser cannot write to the file, so later saves download again under this name and may add
 “ (1)”.*(15차는 *Chrome and Edge save to the same file.*을 확인했으며 이제 사용 안내에만 있음), 파일 이름에서 온 프로젝트
 이름이 Save As를 따라가는지(*chosen*, 그다음 *design-a-ng*), 누설 사례의 기판을 T16 순서(Left x −1500, Bottom y −1200,

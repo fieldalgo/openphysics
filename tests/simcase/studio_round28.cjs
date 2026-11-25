@@ -65,3 +65,9 @@ test('G3: the page shows that run without running; Run as set, Cancel and the di
  assert.ok(app.includes("$('slab-question-run').onclick=()=>slabAnswer?.('run');"));
  assert.ok(app.includes("$('slab-question-cancel').onclick=()=>slabAnswer?.(null);"));
 });
+
+test('G4: the Library card sentence agrees with browser recovery',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ assert.equal(A.CARD_STAY_TEXT,'Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.');
+ assert.ok(read('workspace-applications.mjs').includes("description.textContent=app.description+' '+CARD_STAY_TEXT;"));
+});

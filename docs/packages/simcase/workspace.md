@@ -570,8 +570,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    in **Return to Optical waveguide (2 runs)** instead (round 18; *Open model* read as if it might reset
    the model), or **Return to Optical waveguide** for a model without runs; since round 20 the words
    name the model (*Return to Heated silicon waveguide (1 run)*), so two such cards never read alike. Its description ends in
-   *Runs stay in this tab until you close it.*: choosing a model keeps the runs this tab holds,
-   and the restore offer brings back the browser's runs. Opening a model of the tab that has
+   *Runs stay in this tab when you switch models; this browser can bring completed runs back after you
+   close it.* (round 28, G4; *Runs stay in this tab until you close it.* before, which browser recovery
+   contradicted): choosing a model keeps the runs this tab holds, and the restore offer brings back the
+   browser's runs. Opening a model of the tab that has
    runs lands on its Results, whatever page it was left on (round 17; round 16 returned to Compare
    too): the optical model with the run last viewed, the heated model with its last result page; a
    model without runs opens on Model. The page starts at its top. The Heated silicon waveguide card does the

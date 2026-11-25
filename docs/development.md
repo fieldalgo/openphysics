@@ -489,7 +489,9 @@ Since round 15 it also checks the step bar's wavelength as a button named *Wavel
 edit* in the accessibility tree; the multiphysics check names the tree's warning badge as an image
 *Modes 1: Temperature input has no source: …*, and the session check reads each Library card's
 *Open model* (round 16; *Open (runs stay in this tab)* before), its description ending in *Runs
-stay in this tab until you close it.*, and the card offer's *Start new (no runs)*.
+stay in this tab when you switch models; this browser can bring completed runs back after you close
+it.* (round 28, G4; *Runs stay in this tab until you close it.* before) with each card whole at
+1440 × 900 and 390 × 844, and the card offer's *Start new (no runs)*.
 Since round 16 it checks the Save As note *This browser cannot write to the file, so later saves
 download again under this name and may add “ (1)”.* (round 15 checked *Chrome and Edge save to the
 same file.*, now in the user guide only), a project name taken from a file name following Save As

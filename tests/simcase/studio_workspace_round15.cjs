@@ -81,7 +81,7 @@ test('R9: the tree warning badge names the physics and the problem as an image',
 
 test('R10: each Library choice says what it does',()=>{
  // round 16 (S10): the button reads Open model; the description line says the runs stay
- assert.equal(A.CARD_OPEN_TEXT,'Open model');assert.equal(A.CARD_STAY_TEXT,'Runs stay in this tab until you close it.');
+ assert.equal(A.CARD_OPEN_TEXT,'Open model');assert.equal(A.CARD_STAY_TEXT,'Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.');
  assert.equal(A.CARD_START_NEW_TEXT,'Start new (no runs)');
  assert.equal(A.RESUME_NOT_NOW_TEXT,'Not now (choose a model below)');
  assert.equal(A.RESTORE_TEXT,'Restore from this browser');

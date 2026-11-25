@@ -754,8 +754,21 @@ print(n)`;
   const offer = await page.eval("({resume:document.getElementById('resume-optical').textContent,next:document.getElementById('resume-optical').nextElementSibling?.textContent,card:document.getElementById('resume-optical').closest('.card-slot')?.querySelector('[data-template]')?.dataset.template})");
   assert.match(offer.resume, /^Restore from this browser · Optical waveguide · Run 1, Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.equal(offer.next, 'Start new (no runs)'); assert.equal(offer.card, 'optical');
   // round 15 (R10): each card says what it does; the card offer keeps its words
-  // round 16 (S10): the button reads Open model; the description line ends in "Runs stay in this tab until you close it."
-  {const cards = await page.eval("[...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action')?.textContent??null,(()=>{const r=b.querySelector('.card-action')?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0})(),b.querySelector('p')?.textContent.endsWith(' Runs stay in this tab until you close it.')??false])");
+  // round 16 (S10): the button reads Open model; the description line ends in the stay sentence,
+  // since round 28 (G4) "Runs stay in this tab when you switch models; this browser can bring
+  // completed runs back after you close it." ("Runs stay in this tab until you close it." before)
+  {const cards = await page.eval("[...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action')?.textContent??null,(()=>{const r=b.querySelector('.card-action')?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0})(),b.querySelector('p')?.textContent.endsWith(' Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.')??false])");
+   // round 28 (G4): the longer sentence keeps each card whole at 1440 × 900 and 390 × 844: its text and
+   // button inside the card, the card on screen, no page overflow
+   const cardLayout = {};
+   for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+     await size(width, height, mobile); await sleep(300);
+     cardLayout[width] = await page.eval(`(()=>{const out=[...document.querySelectorAll('.cards [data-template]')].map(b=>{const c=b.getBoundingClientRect(),inside=e=>{if(!e)return false;const r=e.getBoundingClientRect();return r.left>=c.left-1&&r.right<=c.right+1&&r.top>=c.top-1&&r.bottom<=c.bottom+1;};
+       return [b.dataset.template,inside(b.querySelector('p')),inside(b.querySelector('.card-action')),c.left>=0&&c.right<=innerWidth+0.5,b.scrollWidth<=b.clientWidth];});return {cards:out,page:document.documentElement.scrollWidth-document.documentElement.clientWidth};})()`);
+   }
+   await size(1440, 900); await sleep(300);
+   stage('R28 G4 card layout', cardLayout);
+   for (const width of [1440, 390]) { assert.equal(cardLayout[width].page, 0, `G4 page overflow at ${width}`); for (const c of cardLayout[width].cards) assert.deepEqual(c.slice(1), [true, true, true, true], `G4 card ${c[0]} at ${width}`); }
    stage('R10 card actions', {cards});
    // round 18 (X10): the heated model is in this tab's project (two runs): its card reads Return to model
    assert.deepEqual(cards, ['optical', 'heat', 'joule', 'heated-waveguide'].map(id => [id, id === 'heated-waveguide' ? 'Return to Heated silicon waveguide (2 runs)' : 'Open model', true, true]));}
