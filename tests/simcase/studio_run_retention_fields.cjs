@@ -301,3 +301,18 @@ test('the values-only runs the browser stages add: what this Studio writes, four
  assert.deepEqual(merged.runs.slice(6).map(r=>r.number),Array.from({length:14},(_,i)=>i+7));
  assert.equal(N.runFieldBytes(merged.runs.at(-1)),0);
 });
+
+test('regression (the seeded sequence, step 441): the 20-run swap brings the kept run back with its field, which arrives',()=>{
+ // Run 1 pinned keeps its field ahead of the others; unpinned (no field changes), the 21st result
+ // drops it with its field; Keep Run 1, drop Run 2 instead puts it back, and the budget lets other
+ // fields go (without the arrival the text was over the budget)
+ const t=tab();t.result(700);t.pin(0,true);for(let i=1;i<20;i++)t.result(700+i);
+ assert.equal(t.runs.length,20);assert.ok(t.runs[0].field,'Run 1 kept its field');
+ t.pin(0,false);t.result(720);
+ assert.equal(t.dropSwap?.kept.number,1);assert.ok(t.dropSwap.kept.field);
+ const before=t.runs.filter(r=>r.field).length;
+ assert.equal(t.swapBack(),'swap');
+ assert.ok(t.runs.some(r=>r.number===1&&r.field),'Run 1 back with its field');
+ assert.ok(bytes(t.text())<=LIMIT-16*1024,'within the budget');
+ assert.ok(t.runs.filter(r=>r.field).length<=before+1);
+});
