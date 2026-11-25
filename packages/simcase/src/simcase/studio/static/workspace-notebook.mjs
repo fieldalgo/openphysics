@@ -15,9 +15,15 @@ export const MAX_SESSION_BYTES=16*1024*1024;
 // runs is written as version 13, which the previous Studio refuses by name.
 export const RUN_LIMIT=20;
 export const PREVIOUS_RUN_LIMIT=6;
-// The run limit, from RUN_LIMIT itself, so the run list's note and the model tree's "Runs · N of M"
-// never disagree (round 14); written in digits, as the limit's other words are.
-export const RUNS_KEPT_TEXT=`Up to ${RUN_LIMIT} runs are kept.`;
+// The fields of the runs are kept within the session less 16 KiB kept for the inputs (the field
+// budget, workspace-retention.mjs): 16,760,832 bytes, "16.8 MB".
+export const FIELD_HEADROOM_BYTES=16*1024;
+export const FIELD_BUDGET_BYTES=MAX_SESSION_BYTES-FIELD_HEADROOM_BYTES;
+/** A size in MB with one decimal ("16.8 MB"), as every limit of run retention is said. */
+export const mbText=bytes=>`${(bytes/1e6).toFixed(1)} MB`;
+// The run limit and the field budget, from RUN_LIMIT and FIELD_BUDGET_BYTES themselves, so the run
+// list's note and the model tree's "Runs · N of M" never disagree (round 14); in digits.
+export const RUNS_KEPT_TEXT=`Up to ${RUN_LIMIT} runs are kept with their values. Fields are kept up to ${mbText(FIELD_BUDGET_BYTES)}: the selected and pinned runs' first, then the newest. A run without its fields can recompute them.`;
 export const runsNodeLabel=count=>`Runs · ${count} of ${RUN_LIMIT}`;
 // Session format 7: the input is a project of version 7 (Joule heating inputs added); runs are
 // unchanged, and a version 6 session is read with its input as a version 6 project. Format 6
@@ -286,6 +292,34 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
 }
 // The TE fractions and effective areas a run shows (opticalModes keeps them on the run).
 const modeValues=run=>{const modes=opticalModes(run);return {te:modes.map(m=>m.fte),area:modes.map(m=>m.area)};};
+const utf8Bytes=text=>new TextEncoder().encode(text).length;
+// Run retention (workspace-retention.mjs): the bytes a run's field takes in a session file of version 9
+// or later, the record written with its field less the record written without it (the record text
+// does not depend on the other records, so a session's bytes are the sum of its records' bytes and
+// its envelope). Computed once per field object and kept on the run (not enumerated).
+const FIELD_BYTES=Symbol('field bytes');
+export function runFieldBytes(run){
+ if(!run.field)return 0;
+ const cached=run[FIELD_BYTES];if(cached?.field===run.field)return cached.bytes;
+ const bytes=utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,true)))-utf8Bytes(sessionJson(sessionRun(run,OPTICAL_SESSION_VERSION,false)));
+ Object.defineProperty(run,FIELD_BYTES,{value:{field:run.field,bytes},enumerable:false,configurable:true,writable:true});
+ return bytes;
+}
+/** The run as a session writes it without its field: field null, with the TE fractions and
+ * effective areas it shows (as sessionRun writes them), its number and the tab's own keys kept. A
+ * run of optical-shapes-v7 (read from a version 6 or 7 file) takes the settings of optical-shapes-v8,
+ * as a file of version 9 or later writes them: a version 7 run always has its fields. */
+export function withoutField(run){
+ const shown=modeValues(run),settings=run.settings.adapter===V7_ADAPTER?{...run.settings,adapter:OPTICAL_ADAPTER}:run.settings;
+ const copy={...run,settings,field:null,te_polarization_fraction:shown.te,effective_area:shown.area};
+ if(Number.isInteger(run.number))copy.number=run.number;
+ return copy;
+}
+/** The bytes of the session text of these runs with no field kept: its envelope and every run's
+ * record without its field (a version of 9 or later). */
+export function sessionBytesWithoutFields(input,runs,selected,comparison,view){
+ return utf8Bytes(sessionText(input,runs.map(withoutField),selected,comparison,view,{keep:new Set()}));
+}
 /** A run's part of the save and recovery stamps: what makes a saved file stale. The PML check
  * arrives after its run, so it is part of it. */
 export const runStampEntry=r=>[r.job,r.completedAt,r.label||'',r.pinned===true,...(r.pml_check?['pml check']:[])];

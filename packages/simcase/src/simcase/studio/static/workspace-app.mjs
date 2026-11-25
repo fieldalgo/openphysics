@@ -20,17 +20,19 @@ import {checkWorkspaceCapabilities,connectionFailure,RESTARTED_MESSAGE,UNREACHAB
 import {INPUT_FIELDS,NumericDrafts,editNoticeText,inputChanges,retryShapeDrafts} from './workspace-inputs.mjs';
 import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
-import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,openSettings,isOpenRun,runChoice,signaturePml,parseTarget,openResultValues,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,keptValues,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
+import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,isOpenRun,runChoice,signaturePml,parseTarget,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
-import {CLOSED_TARGET_QUERY,checkClosedTarget,closedResultValues,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
-import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
+import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
+import {runOfResult} from './workspace-result-run.mjs';
+import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,fieldSizeKey} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
-import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -658,22 +660,52 @@ let resultNotice=false;
 // more: optional words shown behind More after the line (one short line, the rest on request).
 // action: {label, data, run}, a button after the text (e.g. Show Run 1), whose data-* attributes are data
 const notice = (text,more='',action=null) => {resultNotice=false;const host=$('file-status');host.textContent = text;
- if(action){const button=document.createElement('button');button.type='button';button.className='message-action';button.textContent=action.label;for(const [k,v] of Object.entries(action.data||{}))button.dataset[k]=v;button.onclick=()=>action.run();host.append(' ',button);}
+ // one action, or a list of them (run retention: the drop swap and Keep Run N's fields after one result)
+ for(const one of [action].flat().filter(Boolean)){const button=document.createElement('button');button.type='button';button.className='message-action';button.textContent=one.label;for(const [k,v] of Object.entries(one.data||{}))button.dataset[k]=v;button.onclick=()=>one.run();host.append(' ',button);}
  if(more){const details=document.createElement('details');details.className='message-more';const summary=document.createElement('summary');summary.textContent='More';const body=document.createElement('span');body.className='message-more-text';body.textContent=more;details.append(summary,body);host.append(' ',details);}};
 function announceResult(text,action=null){notice(text,'',action);resultNotice=true;}
 // Round 21 (W2): after a result dropped Run N, Messages offers [Keep Run N, drop Run M (…) instead]
 // when another unpinned run exists besides the new result (M: the oldest such run). The button works
 // until the next run starts or the run list is replaced; a stale one does nothing and is removed.
+// Run retention: after a result let one unpinned run's field go, Messages also offers [Keep Run N's
+// fields, not Run M's (…)] when another unpinned, unselected run has a field at least as large (M: the
+// oldest such run). Like the drop swap it works until the next arrival or run.
 function swapAction(){
- const offer=dropSwap;if(!offer)return null;
- return {label:keepInsteadLabel(offer.kept,offer.other),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)};
+ const offer=dropSwap,fields=fieldSwap,actions=[];
+ if(offer)actions.push({label:keepInsteadLabel(offer.kept,offer.other),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)});
+ if(fields)actions.push({label:keepFieldsInsteadLabel(fields.back,fields.other),data:{keepFields:String(fields.back.number)},run:()=>keepFieldsInstead(fields)});
+ return actions.length>1?actions:actions[0]||null;
+}
+function keepFieldsInstead(offer){
+ const button=$('file-status').querySelector('[data-keep-fields]');
+ const fresh=offer===fieldSwap&&runs===offer.list&&runs.includes(offer.back)&&runs.includes(offer.other)&&heldField(offer.back)&&!!offer.other.field&&!offer.other.pinned&&offer.other.job!==solverRun?.job&&!solverBusy&&!pendingJob;
+ fieldSwap=null;if(!fresh){button?.remove();return;}
+ letGoField(offer.other);takeBackField(offer.back);forgetHeldFields(runs);
+ render();notice(fieldsBackText(offer.back,offer.other));
+}
+// Run retention (design "Keeping more runs"): when a field arrives (a result, Add runs from file, Open
+// or Restore, a recomputed field) the fields kept are chosen within the field budget, in the order of
+// workspace-retention.mjs; nothing else lets a field go. Returns the Messages words ('' when every
+// field stays). first: the jobs whose fields arrived and are not the selected run's.
+let fieldSwap=null;
+function applyFieldBudget(first=[]){
+ forgetHeldFields(runs);fieldSwap=null;
+ const selected=solverRun?.job||null;let out;
+ try{out=chooseFields(inputsFile(),runs,selected,compareIds,currentView(),{first});}catch{return '';}
+ if(!out.letGo.length)return '';
+ const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedBytes(runs,selected,out.base):0;
+ for(const r of out.letGo)letGoField(r);
+ const other=fieldSwapCandidate(runs,plain,selected);if(other)fieldSwap={back:plain[0],other,list:runs};
+ return [plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
 }
 function keepDroppedRun(offer){
  const button=$('file-status').querySelector('[data-keep-run]');
  const fresh=offer===dropSwap&&runs===offer.list&&runs.includes(offer.newest)&&!runs.includes(offer.kept)&&swapCandidate(runs,offer.newest)===offer.other&&!solverBusy&&!pendingJob;
  dropSwap=null;if(!fresh){button?.remove();return;}
  runs=swapDropped(runs,offer.kept,offer.other);if(solverRun===offer.other)solverRun=offer.newest;
- render();notice(keptInsteadText(offer.kept,offer.other));
+ // run retention: the run kept comes back with its field, which arrives (first after the selected run's)
+ const words=applyFieldBudget([offer.kept.job]);
+ render();notice(keptInsteadText(offer.kept,offer.other)+(words?' '+words:''));
 }
 // current(): the model inputs (version 7), as a run keeps them; inputsFile(): those inputs with
 // Modes to find and the group index option (version 8 when they are not the defaults), as the
@@ -854,6 +886,9 @@ function completeLoad(pending){
   notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.')));
   // round 23 (E2): a browser restore names the runs that came back without fields
   if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}
+  // run retention: the session's fields have arrived (a file or record within 16 MiB may still be over
+  // the field budget, which keeps 16 KiB for the inputs); the words follow the open's
+  {const words=applyFieldBudget();if(words){$('file-status').append(' '+words);render();}}
   pending.then?.();
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
@@ -1341,7 +1376,7 @@ const wavelengthField=()=>`<label>Wavelength [nm]<input id="wavelength-number" t
 function refreshDropWarning(){
  const running=solverBusy||!!pendingJob,list=droppedBy(runs,RUN_LIMIT);
  const matched=!running&&!numericDrafts.invalid&&runs.some(r=>r.signature===signature());
- const host=$('run-drop'),run=matched?null:list[0]||null;host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run)return;
+ const host=$('run-drop'),run=matched?null:list[0]||null;host.hidden=!run;$('run-options').classList.toggle('dropping',!!run);if(!run){refreshFieldWarning(running,matched);return;}
  const text=running?dropWhileRunningText(list):dropWarningText(list.length>1?list:run);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
  const pin=$('run-drop-pin');pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);
  // the finishing result needs a free slot: no pin that would leave fewer unpinned runs than it drops
@@ -1349,6 +1384,24 @@ function refreshDropWarning(){
  pin.onclick=()=>{if(!runs.includes(run)||run.pinned||runs.filter(r=>!r.pinned).length<=droppedBy(runs,RUN_LIMIT).length)return;run.pinned=true;render();
   // round 22 (V4): the drop moves to the next unpinned run: Messages names it
   const next=droppedBy(runs,RUN_LIMIT);notice(next.length?pinnedDropText(run,next,solverBusy||!!pendingJob):pinNotice(run));};
+}
+// Run retention (section 5): below the run limit, the line says which runs the next result would leave
+// with their values only, from the field bytes of the newest run of the same geometry, boundary and
+// Modes to find; nothing without such a run (the after-result words then say what happened). While a
+// run computes, the run's captured inputs are the next result's. Pin Run N puts the run's fields
+// ahead of the unpinned runs'. Kept per state of the runs and inputs, since a render calls it often.
+let fieldWarning={key:null,list:[]};
+function refreshFieldWarning(running,matched){
+ if(matched||(running&&!pendingJob))return;
+ const job=running?pendingJob:null,model=(job?job.input:current()).model,ob=job?(job.openBoundary?{edges:job.openBoundary.edges}:null):state.openBoundary;
+ const next=fieldSizeKey({shapes:model.shapes,coreMesh:model.coreMesh,boundary:signaturePml(ob,model.shapes)?.open_edges??null,modeCount:job?job.modeCount:state.modeCount});
+ const key=next+'|'+runs.map(r=>[r.job,r.number,r.pinned,r.label,!!r.field].join()).join(';')+'|'+(solverRun?.job||'')+'|'+compareIds.join();
+ if(fieldWarning.key!==key){let list=[];try{list=predictedLetGo(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);}catch{}fieldWarning={key,list};}
+ const list=fieldWarning.list.filter(r=>runs.includes(r)&&r.field);if(!list.length)return;
+ $('run-drop').hidden=false;$('run-options').classList.add('dropping');
+ const text=running?keepsValuesWhileRunningText(list):keepsValuesText(list);$('run-drop-text').textContent=text;$('run-drop-text').title=text;
+ const run=list.find(r=>!r.pinned),pin=$('run-drop-pin');pin.hidden=!run;if(!run)return;pin.textContent=`Pin Run ${run.number}`;pin.dataset.pinRun=String(run.number);pin.disabled=false;
+ pin.onclick=()=>{if(!runs.includes(run)||run.pinned)return;run.pinned=true;render();notice(pinNotice(run));};
 }
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
@@ -1402,7 +1455,9 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   if(isOpenRun(solverRun))$('canvas').append(foundLine(solverRun));
   else if(isClosedTargetRun(solverRun)){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=closedFoundText(solverRun.effective_index.length,runModeCount(solverRun),runSearchTarget(solverRun))+'.';$('canvas').append(line);}
   else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
-  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';none.textContent=solverRun.origin==='recovered'?'This run’s fields were not kept in browser recovery (over 16 MiB): n_eff, the TE fractions and the effective areas were.':'This run’s fields were not kept in the session file: n_eff, the TE fractions and the effective areas were.';$('canvas').append(none);}
+  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';
+   // run retention (4.1): the run keeps its values; read from a file without fields, the file says so
+   none.textContent=fieldsNotKeptResultsText(solverRun,solverRun.origin==='imported'&&!fieldLetGoHere(solverRun));$('canvas').append(none);}
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
@@ -1730,7 +1785,7 @@ function syncUnpinButton(){
  if(!pinned){button?.remove();return;}
  if(!button){button=document.createElement('button');button.id='pin-run';button.type='button';button.textContent='Unpin this run';button.onclick=()=>{solverRun.pinned=false;render();$('run-name-input')?.focus();notice(pinNotice(solverRun));};slot.append(button);}
 }
-const runItemText=run=>(run.pinned?'Pinned · ':'')+runLabel(run);
+const runItemText=run=>(run.pinned?'Pinned · ':'')+runLabel(run)+(run.field?'':VALUES_ONLY);
 const runListHeading=()=>`Runs · ${runs.length} of ${RUN_LIMIT} · ${runs.filter(r=>r.pinned).length} pinned`;
 function renderRunList(){
  const panel=$('inspector');if(ui.page==='Compare')panel.innerHTML='<h2>Runs</h2>';
@@ -1768,14 +1823,14 @@ function renderRunList(){
    const why=document.createElement('p');why.id='restore-run-input-hint';why.className='input-hint';why.textContent=`The next run uses the current inputs (${designSummary(current().model)}). This loads ${runNumberTitle(target)}’s inputs instead; Undo takes them back.`;restore.setAttribute('aria-describedby',why.id);
    const slot=$('use-run-slot');if(slot)slot.append(restore,why);else panel.append(restore,why);}
   else if(runInputsNoteFor(solverRun)){const done=document.createElement('p');done.id='restore-run-input-done';done.className='input-hint';done.textContent=runInputsNoteFor(solverRun);const slot=$('use-run-slot');if(slot)slot.append(done);else panel.append(done);}
-  const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results';exportPng.onclick=()=>{
+  const exportPng=document.createElement('button');exportPng.id='export-field';exportPng.textContent='Export field PNG';exportPng.style.marginTop='10px';exportPng.disabled=ui.page!=='Results'||!solverRun.field;if(!solverRun.field)exportPng.title=recomputeFirstText(solverRun);exportPng.onclick=()=>{
    const source=$('optical-field');if(!source)return;const out=document.createElement('canvas');out.width=source.width;out.height=source.height+170;const ctx=out.getContext('2d');ctx.fillStyle='#12202a';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(source,0,0);ctx.fillStyle='#cfdae0';ctx.font='14px Segoe UI';ctx.fillText(`Job ${solverRun.job} | mode ${fieldView.mode+1} | ${fieldView.component} / max|E|`,12,source.height+25);ctx.fillText('Relative amplitude 0–1 per mode; not absolute power.',12,source.height+48);ctx.fillText(`${designSummary(solverRun.input.model)} | wavelength ${solverRun.input.model.wavelength} nm | core mesh ${solverRun.input.model.coreMesh} nm | ${solverRun.origin}`,12,source.height+70);const grad=ctx.createLinearGradient(35,0,out.width-35,0);for(let i=0;i<=3;i++)grad.addColorStop(i/3,fieldColor(i/3));ctx.fillStyle=grad;ctx.fillRect(35,source.height+92,out.width-70,12);ctx.fillStyle='#cfdae0';ctx.fillText('0',12,source.height+104);ctx.fillText('1',out.width-20,source.height+104);ctx.fillText(fieldProbe.active?'Probe ('+formatNm(fieldProbe.x,1).replace('−','-')+', '+formatNm(fieldProbe.y,1).replace('−','-')+') nm; centroid sample, no interpolation.':'No probe point selected.',12,source.height+140);if(profileState.open)ctx.fillText('Profile line: '+(profileState.axis==='x'?'y':'x')+' = '+formatNm(profileState.coordinate,1).replace('−','-')+' nm (amber dashed).',12,source.height+162);out.toBlob(blob=>{if(blob)downloadFile(blob,'studio-field.png');},'image/png');
   };panel.append(exportPng);
   // The image is drawn from the Results plot; Compare shows two runs and has no single plot.
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent=ui.page==='Compare'?'Field images export from Results: Open in Results shows the selected run there.':'Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
 }
 // The n_g hint ("Off · turn on in Study or Optical modes", its help as title) after "n_g: ",
 // for a line above a table whose runs did not compute n_g.
@@ -1808,7 +1863,7 @@ function compareTable(a,b,match){
  const more=cell('p','Scroll sideways for all 14 columns ›',{class:'table-note scroll-hint','data-scroll-hint':''});more.hidden=true;
  const scroll=document.createElement('div');scroll.className='compare-table-scroll';scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-labelledby','compare-neff-caption');
  const table=document.createElement('table');table.id='compare-neff';
- const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent=match.disabled?'Modes of A and B (not matched)':'Modes of A and B matched by field overlap';table.append(caption);
+ const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent=match.byNumber?'Modes of A and B listed by mode number, not matched by overlap':match.disabled?'Modes of A and B (not matched)':'Modes of A and B matched by field overlap';table.append(caption);
  const head=document.createElement('thead'),top=document.createElement('tr'),sides=document.createElement('tr');
  // [short header, full label (one column) or the full label's start (A and B), help]
  const columns=[['Modes','Modes'],['Polarization','Polarization',POLARIZATION_HELP,true],['Overlap','Overlap'],['n_eff','n_eff',null,true],['Δn_eff (B − A)','Δn_eff (B − A)'],['Δ % (of A)','Δ % (of A)'],['A_eff (µm²)','A_eff',AREA_HELP,true,' (µm²)'],['Loss (dB/cm)','Loss',isOpenRun(a)&&isOpenRun(b)?OPEN_LOSS_HELP:isOpenRun(a)||isOpenRun(b)?'Each side follows its run: material absorption only in a closed window, with leakage for an open boundary':ABSORPTION_HELP,true,' (dB/cm)'],['n_g','n_g',groupIndexHelp(),true]];
@@ -1905,9 +1960,13 @@ function renderComparison(){
   else{swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;compareChoice=null;render();notice(`Compare shows Run ${n} with the run that was B, now A.`);};}
   line.append(swap);host.append(line);}
  const a=runs.find(r=>r.job===compareIds[0]),b=runs.find(r=>r.job===compareIds[1]);
- // a run of a file without fields: its modes cannot be matched by overlap or drawn
- const withoutFields=[a,b].filter(r=>!r.field);
- if(withoutFields.length){if(!bar.isConnected)host.append(bar);for(const r of withoutFields)host.append(Object.assign(document.createElement('p'),{className:'compare-no-fields',textContent:`Run ${runNumber(r)} has no saved fields, so its modes cannot be matched by overlap.`}));return;}
+ // a run without its fields (run retention, 4.2): the inputs that differ and the values table, its
+ // modes listed by number and not matched by overlap, and one line per such run; the plots and
+ // Δn_eff by overlap once both runs have fields
+ const withoutFields=[a,b].filter((r,i)=>!r.field&&!(i&&a.job===b.job));
+ if(withoutFields.length){if(!bar.isConnected)host.append(bar);for(const r of withoutFields)host.append(Object.assign(document.createElement('p'),{className:'compare-no-fields',textContent:compareNoFieldsText({...r,number:runNumber(r)})}));
+  const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm.${a.job===b.job?' Same run on both sides.':''}`;
+  host.append(description,compareTable(a,b,{...unmatchedModes(a.effective_index,b.effective_index),disabled:COMPARE_BY_NUMBER,byNumber:true}));compareOpen=true;return;}
  const match=opticalMatch(a,b),choices=match.error?[]:fieldChoices(match,{a,b});
  const chosen=choices.find(c=>compareChoice&&c.a===compareChoice.a&&c.b===compareChoice.b)||choices.find(c=>compareChoice&&c.a===compareChoice.a)||choices[0]||null;
  const shown=chosen?[chosen.a,chosen.b]:[0,0];
@@ -1951,7 +2010,7 @@ $('confirm-run-import').onclick=()=>{
  // tab keeps the tab's number; the message names the numbers that changed
  const dropped=runs.filter(r=>!next.includes(r)),added=next.filter(r=>pending.merged.added.includes(r.job));runNumbersUsed=numberRuns(next,Math.max(runNumbersUsed,...runs.map(r=>r.number||0)));runs=next;
  const renumbered=importNumbersText(added.map(r=>({from:pending.session.runs.find(x=>x.job===r.job).number,to:r.number})),pending.fileName);solverRun=selected||runs.at(-1);const other=runs.find(run=>run.job===previous?.job&&run.job!==solverRun.job)||runs.findLast(run=>run.job!==solverRun.job)||solverRun;
- compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.'+(renumbered?' '+renumbered:'')+dropped.map(r=>' '+droppedRunText(r)).join(''));
+ compareIds=[other.job,solverRun.job];ui.page=runs.length>1?'Compare':'Results';const fieldWords=applyFieldBudget();render();notice('Saved runs imported. Current model inputs and input undo history kept; imported fields were not recomputed.'+(renumbered?' '+renumbered:'')+dropped.map(r=>' '+droppedRunText(r)).join(''));if(fieldWords)$('file-status').append(' '+fieldWords);
 };
 
 // The server's check of a document (/api/multiphysics/validate), as the reader reads it.
@@ -2215,28 +2274,17 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
   if(pool.filter(Boolean).length<pending.checkCount)return;
   checkPools.delete(run.job);({runs,selected:solverRun}=withPmlCheck(runs,solverRun,run.job,pairCheck(run.effective_index,run.effective_index_im,pool)));return;
  }
- // an open boundary: the modes above n = 1.45 with their candidate record, and the engine's TE
- // fractions, effective areas (physical window) and group index of those modes (slice P3)
- const open=pending.openBoundary?(()=>{if(im===null)throw new Error('Unsupported optical result.');return openResultValues(result,re,im,pending.openBoundary.target);})():null;
-  // a closed-window search (slice C2, A1): the modes above n = 1.45, with the engine's values of those modes
- const target=open?null:pending.searchTarget??null,near=target===null?null:closedResultValues(result,re,target);
- const kept=open?open.re:near?near.re:re,keptIm=open?open.im:im;
- const closedSettings=opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
- const settings=open?openSettings(closedSettings,pending.openBoundary,input.model.shapes):near?closedTargetSettings(closedSettings,target):closedSettings;
- const completed=validateRun({job:pending.job,completedAt:new Date().toISOString(),settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:near?near.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
-  ...(open?{open_boundary:open.record,...keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},open.keep)}:near?keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},near.keep):{
-  // the engine's TE fractions and effective areas, kept with the run (a version 9 file keeps them)
-  ...engineRunValues(result.summary,re.length),
-  // the engine's group index with Also compute group index (a version 9 file keeps it)
-  ...engineGroupIndex(result.summary,re.length)})});
+ // the run of the result (workspace-result-run.mjs): the modes found, the open boundary's or the
+ // closed-window search's modes, with the engine's values of those modes
+ const completed=runOfResult(result,pending);
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
- // the reason of each null n_g, in this tab only (a session file does not keep it)
- if(completed.group_index){const reasons=engineGroupIndexReasons(result.summary,re.length);if(reasons)completed.groupIndexReasons=open?open.keep.map(i=>reasons[i]):near?near.keep.map(i=>reasons[i]):reasons;}
  completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const appended=appendRun(runs,completed),next=prior?inNumberOrder(appended):appended,dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);
  {const other=dropped.length===1?swapCandidate(runs,solverRun):null;dropSwap=other?{kept:dropped[0],other,newest:solverRun,list:runs}:null;}
  // round 22 (V4): with every other earlier run pinned there is no swap: the dropped words say why
  droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);
  compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;
+ // run retention: the new result's field has arrived; the words follow the dropped words
+ {const words=applyFieldBudget();if(words)droppedNote=droppedNote?droppedNote+' '+words:words;}
 }});
 function refreshJobControls(){
  if(pendingJob&&connection.ready&&!solverBusy&&pendingJob.serverInstance!==connection.instance){jobResumeBlocked=true;$('job-message').textContent='The server restarted or changed. Detach this job before starting another calculation. Retained results are unchanged.';}
