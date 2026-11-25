@@ -91,9 +91,16 @@ export function asksBeforeDownloadAgain(file, {saveAs = false, picker = false} =
   return !!file && file.how === 'download' && saveRoute(file, {saveAs, picker}) === 'download';
 }
 /** The question: "Download design-a-ng.json again? This browser cannot replace the earlier file and
- * may name the new one design-a-ng (1).json." */
-export function downloadAgainQuestion(name) {
-  return `Download ${name} again? This browser cannot replace the earlier file and may name the new one ${downloadAgainName(name)}.`;
+ * may name the new one design-a-ng (1).json." Round 29 (L3): n, the repeat it asks about ("(2)" for
+ * the second, as the header then says). */
+export function downloadAgainQuestion(name, n = 1) {
+  return `Download ${name} again? This browser cannot replace the earlier file and may name the new one ${downloadAgainName(name, n)}.`;
+}
+/** Round 29 (L3): which repeat of `name` the next Download again of a project file is: 1 after a first
+ * download, else one more than the count its record (target, the file record before it) holds. Save
+ * As and Open keep a new record, so the count starts again. */
+export function nextDownloadAgain(target, name) {
+  return (target?.how === 'download' && target.name === name && Number.isInteger(target.repeat) ? target.repeat : 0) + 1;
 }
 /** The name the question says a browser may give the new download: "design-a-ng (1).json". Round 29
  * (L3): n, the repeat of the same name in this tab (1 for the first Download again): "design-a-ng

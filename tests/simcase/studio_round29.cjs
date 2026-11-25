@@ -69,7 +69,25 @@ test('L3: the n-th Download again of a name says "(n)"; the first says "(1)" as 
  assert.equal(title({}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (1).json)');
  assert.equal(title({repeat:1}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (1).json)');
  assert.equal(title({repeat:2}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (2).json)');
- // the page counts the repeats of the same name on the download path; Save As keeps a new record
+ // the question before each Download again names the same number as the header after it
+ assert.equal(F.downloadAgainQuestion('design-a-ng.json'),'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (1).json.');
+ assert.equal(F.downloadAgainQuestion('design-a-ng.json',2),'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (2).json.');
+ // which repeat comes next: 1 after a first download; one more than the record's count; a new
+ // record (Save As, Open, another name, the picker) starts again
+ const rec=extra=>({...F.rememberFile({name:'design-a-ng.json',how:'download',scope:'s'}),...extra});
+ assert.equal(F.nextDownloadAgain(rec({}),'design-a-ng.json'),1);
+ assert.equal(F.nextDownloadAgain(rec({again:true,repeat:1}),'design-a-ng.json'),2);
+ assert.equal(F.nextDownloadAgain(rec({again:true,repeat:2}),'design-a-ng.json'),3);
+ assert.equal(F.nextDownloadAgain(rec({again:true,repeat:2}),'other.json'),1);
+ assert.equal(F.nextDownloadAgain(F.rememberFile({name:'design-a-ng.json',how:'opened',scope:'s'}),'design-a-ng.json'),1);
+ assert.equal(F.nextDownloadAgain(null,'design-a-ng.json'),1);
+ // the second repeat: "(2)" in the question and in the header after it
+ const second=F.nextDownloadAgain(rec({again:true,repeat:1}),'design-a-ng.json');
+ assert.ok(F.downloadAgainQuestion('design-a-ng.json',second).endsWith('design-a-ng (2).json.'));assert.ok(title({repeat:second}).endsWith('design-a-ng (2).json)'));
+ // the page asks with the count and keeps it on the new record; the session export keeps "(1)"
  const app=read('workspace-app.mjs');
- assert.ok(app.includes("if(project.file?.again===true)project.file.repeat=(target.how==='download'&&target.name===chosen.name&&Number.isInteger(target.repeat)?target.repeat:0)+1;"));
+ assert.ok(app.includes('const chosen=await downloadAgainChoice(result.name,nextDownloadAgain(target,result.name));'));
+ assert.ok(app.includes('if(project.file?.again===true)project.file.repeat=nextDownloadAgain(target,chosen.name);'));
+ assert.ok(app.includes("async function downloadAgainChoice(name,n=1){\n const answer=await askDownloadAgain(name,n);"));
+ assert.ok(app.includes("$('download-again-description').textContent=downloadAgainQuestion(name,n);"));
 });

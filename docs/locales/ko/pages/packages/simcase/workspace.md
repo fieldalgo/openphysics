@@ -117,7 +117,7 @@ earlier file, so your browser may add a number such as “ (1)” to its name.*;
 *<name> (1).json*이라 했음), **Save As…**(그 이름을 채운 이름 대화상자), **Cancel**(*Save cancelled; nothing was written.*).
 **Download again** 뒤에는 다음 Save As나 Open까지 헤더가 그 시각과 브라우저가 붙였을 수 있는 이름을 밝힙니다(round 26, C3):
 *design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (1).json)*, 바꾼
-뒤에는 *… · changed since downloaded again 11:45 AM (…) · …*. round 29(L3)부터 번호는 이 탭에서 그 이름으로 한 Download again의 횟수입니다: 두 번째는 *(your browser may have named it design-a-ng (2).json)*이고 그다음도 마찬가지이며, Save As나 Open 뒤에는 다시 셉니다. Download again 전의 질문은 그대로 *(1)*을 밝힙니다.
+뒤에는 *… · changed since downloaded again 11:45 AM (…) · …*. round 29(L3)부터 번호는 이 탭에서 그 이름으로 한 Download again의 횟수입니다: 두 번째는 *(your browser may have named it design-a-ng (2).json)*이고 그다음도 마찬가지이며, Save As나 Open 뒤에는 다시 셉니다. Download again 전의 질문도 같은 번호를 밝힙니다(*… may name the new one design-a-ng (2).json.*).
 파일이 없는 프로젝트의 첫 Save는 이름 대화상자를 그대로 쓰고, 브라우저의 저장 대화상자(Chrome, Edge)는 바뀌지 않습니다. 프로젝트를 저장할 때마다 이름 대화상자는 파일에 담길 모델과 각 모델의 실행 수도 밝힙니다: *The file will hold
 Optical waveguide (2 runs) and Heated silicon waveguide (1 run).*(round 18; 열 전도나 Joule 가열 모델은 *(no runs)*). 그 파일을 쓰거나 연 뒤로 프로젝트의 모델이 바뀌었으면(광학
 모델을 저장한 뒤 가열 모델을 더한 경우처럼) **Save**는 대신 그 이름을 채운 Save As 이름 대화상자를 열고 까닭을 밝힙니다: *This

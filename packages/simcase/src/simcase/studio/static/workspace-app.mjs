@@ -45,7 +45,7 @@ import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,asksBeforeDownloadAgain,downloadAgainQuestion,DOWNLOAD_AGAIN_BUTTONS,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,asksBeforeDownloadAgain,downloadAgainQuestion,nextDownloadAgain,DOWNLOAD_AGAIN_BUTTONS,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -1694,11 +1694,11 @@ const againDialog=document.createElement('dialog');againDialog.id='download-agai
  againDialog.innerHTML=`<h2 id="download-again-title">Download again?</h2><p id="download-again-description"></p><div class="leave-actions"><button type="button" id="download-again-confirm" class="primary">${again}</button> <button type="button" id="download-again-save-as">${saveAs}</button> <button type="button" id="download-again-cancel">${cancel}</button></div>`;}
 document.body.append(againDialog);
 // Resolves 'again', 'saveAs' or null (Cancel or Escape).
-function askDownloadAgain(name){
+function askDownloadAgain(name,n=1){
  return new Promise(resolve=>{
   const opener=document.activeElement;
   againAnswer=value=>{againAnswer=null;if(againDialog.open)againDialog.close();restoreDialogFocus(opener);resolve(value);};
-  $('download-again-description').textContent=downloadAgainQuestion(name);againDialog.showModal();$('download-again-confirm').focus();
+  $('download-again-description').textContent=downloadAgainQuestion(name,n);againDialog.showModal();$('download-again-confirm').focus();
  });
 }
 $('download-again-confirm').onclick=()=>againAnswer?.('again');
@@ -1707,8 +1707,8 @@ $('download-again-cancel').onclick=()=>againAnswer?.(null);
 againDialog.oncancel=event=>{event.preventDefault();againAnswer?.(null);};
 // The question and its answer: {name} to download under (the same name on Download again, the name
 // chosen on Save As…), or {name: null, saveAs} when nothing is to be written.
-async function downloadAgainChoice(name){
- const answer=await askDownloadAgain(name);
+async function downloadAgainChoice(name,n=1){
+ const answer=await askDownloadAgain(name,n);
  if(answer==='again')return {name,saveAs:false};
  if(answer!=='saveAs')return {name:null,saveAs:false};
  $('save-name-input').defaultValue=name;return {name:await askFileName(name,{saveAs:true}),saveAs:true};
@@ -2199,7 +2199,7 @@ function deliverProject(makeText,{saveAs}){
   }
   // round 25 (A2): a file this tab already downloaded asks first: [Download again] [Save As…] [Cancel]
   if(result.status==='known'&&asksBeforeDownloadAgain(target)){
-   const chosen=await downloadAgainChoice(result.name);
+   const chosen=await downloadAgainChoice(result.name,nextDownloadAgain(target,result.name));
    if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};
    downloadFile(new Blob([makeText(chosen.name)],{type:'application/json'}),chosen.name);keep(chosen.name,'download');
    // round 26 (C3): Download again is said in the header (its time and the name the question gave)
@@ -2207,7 +2207,7 @@ function deliverProject(makeText,{saveAs}){
    if(!chosen.saveAs&&project.file?.scope===scope)project.file.again=true;
    // round 29 (L3): the repeat of this name in this tab (the file record before this download had
    // the count so far); Save As and Open keep a new record, so the count starts again
-   if(project.file?.again===true)project.file.repeat=(target.how==='download'&&target.name===chosen.name&&Number.isInteger(target.repeat)?target.repeat:0)+1;
+   if(project.file?.again===true)project.file.repeat=nextDownloadAgain(target,chosen.name);
    const same=chosen.name===target.name;return {written:true,name:chosen.name,via:'download',again:same,known:same,after:same?' '+downloadAgainNote(chosen.name):''};
   }
   if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');

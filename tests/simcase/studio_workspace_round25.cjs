@@ -93,8 +93,10 @@ test('P2 (A2): on the download path, Save of a file this tab downloaded asks fir
  assert.equal(F.saveRoute(file('download')),'download');
  // the page asks before both deliveries (the project file and the session export), and Cancel writes nothing
  const app=read('workspace-app.mjs');
- const asks="if(result.status==='known'&&asksBeforeDownloadAgain(target)){\n   const chosen=await downloadAgainChoice(result.name);\n   if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};";
- assert.equal(app.split(asks).length-1,2);
+ // round 29 (L3, coordinator ruling): the project file's question names the repeat it asks about
+ const asks=call=>`if(result.status==='known'&&asksBeforeDownloadAgain(target)){\n   const chosen=await ${call};\n   if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};`;
+ assert.equal(app.split(asks('downloadAgainChoice(result.name)')).length-1,1);
+ assert.equal(app.split(asks('downloadAgainChoice(result.name,nextDownloadAgain(target,result.name))')).length-1,1);
  assert.ok(app.includes("againDialog.id='download-again';"));
  assert.ok(app.includes("if(answer!=='saveAs')return {name:null,saveAs:false};\n $('save-name-input').defaultValue=name;return {name:await askFileName(name,{saveAs:true}),saveAs:true};"));
  assert.equal(F.notWrittenNotice({status:'cancelled'},{saveAs:false}),'Save cancelled; nothing was written.');
