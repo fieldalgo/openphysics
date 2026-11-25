@@ -1692,8 +1692,14 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   own when they do not fit beside them, and the box beside Run study grows to hold it (until round 23
   the row was cut to the box, and four of five testers needed the title or the panel to read it;
   checked at 1440 × 900 and 390 × 844). Both places offer **Set search near 2.46 · 4 modes** (the shortcut's target estimate,
-  (n_max + 1.444)/2) and **Use Open boundary**; each sets its inputs and runs nothing. The warning
-  goes with Nearest to n_eff or Open boundary. While it is shown, **Run study** asks once before it
+  (n_max + 1.444)/2) and **Use Open boundary**; each sets its inputs and runs nothing. The
+  shortcut's 4 modes are for the closed window's search (round 29, L1): when the shortcut was the last
+  change of Modes to find and the outer boundary then turns to Open boundary, Modes to find goes back
+  to the count it had before the shortcut, and Messages says so after the boundary's sentence: *Modes
+  to find back to 2: 4 was for the closed window's search near 2.46.* This is an edit of its own, so
+  Undo gives back 4 with Open boundary still chosen. Nothing changes when Modes to find was changed by
+  hand after the shortcut, was 4 already, or after Undo, Redo or new inputs; turning back to the
+  closed window changes nothing either. The warning goes with Nearest to n_eff or Open boundary. While it is shown, **Run study** asks once before it
   runs (round 27, D2), in a dialog *Slab modes first*: *Substrate touches the window edge, so a
   closed-window run returns its slab modes first. Search near the core instead?* with **Set search
   near 2.46 · 4 modes and run** (the warning's shortcut, then the run), **Run as set** (the run as
