@@ -195,6 +195,25 @@ tolerance: `2.2e-10 |sigma|` and `6.8e-9 |sigma|` were measured at relative
 distances `1e-6` and `1e-8` from such a cutoff on a square guide. Those roots are
 returned, with almost no transverse field.
 
+Limitation: a search for many more roots than lie between the shift and the static
+family (a large `num_modes` on a small window, or a low `n_target`) asks ARPACK for
+vectors of that exactly degenerate family. A Krylov space reaches its directions only
+through rounding, so whether, and how fast, they converge depends on the last bits of
+the pencil. On the same mesh, the bent slab of `tests/simcase/test_pml_gain_bound.py`
+with 64 roots (37 of them static) converged in 67 s under one NumPy CPU dispatch and
+had not converged after 30 min under another (2026-11-25). The search therefore stops
+after `SEARCH_RESTARTS` (200) ARPACK restarts; the 63 searches of the PML and
+open-boundary tests converge in at most 14. At the cap the converged pairs are kept
+only when the search has reached the family: at least one static root converged, every
+other converged root is nearer the shift (`|nu| > 1/|sigma|`, `nu = 1/(lambda - sigma)`)
+and has `|A x - lambda B x| / |lambda B x| <= 1e-10` (`PARTIAL_RESIDUAL_TOL`). The
+search then returns those roots with a `PartialSearchWarning` ("the mode search stopped
+after 200 restarts with m of k roots converged; the missing values were static roots").
+That is a converged search's result less roots that are never returned anyway. The
+guard cannot prove that no non-static root is missing: a root that ARPACK did not
+converge, while static roots did, would be absent with no further sign. Otherwise
+ARPACK's `ArpackNoConvergence` is raised, as before.
+
 `A` and `B` are transpose-symmetric. For real `eps_r`, `mu_r` they are real
 symmetric and `B` is indefinite; for complex materials or coordinate factors they
 are complex symmetric, not Hermitian (`_waveguide_kernels.py` docstring).

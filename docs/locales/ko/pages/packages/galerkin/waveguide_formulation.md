@@ -179,6 +179,23 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 `2.2e-10 |sigma|`, `6.8e-9 |sigma|`가 측정되었습니다. 이런 근은 가로 성분이 거의 없는
 채로 반환됩니다.
 
+한계: shift와 정적 무리 사이에 있는 근보다 훨씬 많은 근을 찾는 탐색(작은 창에서 큰
+`num_modes`, 또는 낮은 `n_target`)은 ARPACK에 정확히 겹친 이 무리의 벡터를 요구합니다.
+Krylov 공간은 반올림을 통해서만 그 방향에 닿으므로, 수렴 여부와 속도가 pencil의 마지막
+비트에 달려 있습니다. 같은 메시에서 `tests/simcase/test_pml_gain_bound.py`의 굽은 slab을
+64개 근(그중 37개가 정적)으로 찾으면 NumPy CPU dispatch 하나에서는 67초에 수렴했고 다른
+dispatch에서는 30분 뒤에도 수렴하지 않았습니다(2026-11-25). 그래서 탐색은 ARPACK 재시작
+`SEARCH_RESTARTS`(200)번 뒤에 멈춥니다. PML·열린 경계 테스트의 탐색 63개는 최대 14번에
+수렴합니다. 한도에 닿으면 탐색이 무리에 닿았을 때만 수렴한 쌍을 씁니다. 곧 정적 근이 하나
+이상 수렴했고, 수렴한 다른 근이 모두 shift에 더 가깝고(`|nu| > 1/|sigma|`,
+`nu = 1/(lambda - sigma)`) `|A x - lambda B x| / |lambda B x| <= 1e-10`
+(`PARTIAL_RESIDUAL_TOL`)일 때입니다. 그러면 그 근을 `PartialSearchWarning`("the mode
+search stopped after 200 restarts with m of k roots converged; the missing values were
+static roots")과 함께 반환합니다. 이는 수렴한 탐색의 결과에서 어차피 반환하지 않는 근만
+빠진 것입니다. 이 조건은 정적이 아닌 근이 빠지지 않았음을 증명하지 못합니다. 정적 근은
+수렴했는데 ARPACK이 수렴시키지 못한 근은 다른 표시 없이 빠집니다. 그 밖에는 예전처럼
+ARPACK의 `ArpackNoConvergence`를 냅니다.
+
 `A`와 `B`는 전치대칭입니다. 실수 `eps_r`, `mu_r`에서는 실대칭이고 `B`는
 부정부호(indefinite)이며, 복소 재료나 좌표 인자에서는 복소대칭이고 Hermitian이
 아닙니다(`_waveguide_kernels.py` docstring).

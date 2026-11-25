@@ -104,6 +104,14 @@ stops the low-level solve; it is not silently discarded. Roots of the vector
 formulation's static `beta^2 = 0` family with `|beta^2| <= 1e-10 |sigma|` are not
 candidates, and a search of only such roots is refused like any search without
 an eligible candidate ([waveguide formulation](../galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation)).
+Limitation: a large `pml_search_mode_count` on a small window (or a low target) can ask
+for more roots than lie between the target and that family; the bent-slab example
+searched with 64 has 27 non-static candidates. Such a search stops after 200 ARPACK
+restarts. If only static roots were left unconverged, it gives the candidates a
+converged search gives, with galerkin's `PartialSearchWarning`, and the record is
+unchanged. Otherwise the run stops with ARPACK's `ArpackNoConvergence`. Studio's
+searches (32 near the target, 16 near 1.95) do not reach the family on the template or
+on the strip over a substrate: their smallest `|nu|` is at least 1.44 times the family's.
 
 ### Further searches
 

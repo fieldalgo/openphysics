@@ -93,6 +93,13 @@ exp(+iωt), 커널 고유 이름)는 내부 구현입니다. JSON summary는
 정적 `beta^2 = 0` 근 중 `|beta^2| <= 1e-10 |sigma|`인 것은 후보가 아니며, 그런 근만
 나온 탐색은 적격 후보가 없는 탐색과 똑같이 거부합니다
 ([도파관 정식화](../galerkin/waveguide_formulation.md#3-full-vector-혼합-nédélec절점-정식화)).
+한계: 작은 창에서 큰 `pml_search_mode_count`(또는 낮은 목표)는 목표와 그 무리 사이에 있는
+근보다 많은 근을 요구할 수 있습니다. 굽은 slab 예제를 64로 찾으면 정적이 아닌 후보는
+27개입니다. 이런 탐색은 ARPACK 재시작 200번 뒤에 멈춥니다. 수렴하지 않은 근이 정적 근뿐이면
+수렴한 탐색과 같은 후보를 galerkin의 `PartialSearchWarning`과 함께 주고, 기록은 그대로입니다.
+그 밖에는 ARPACK의 `ArpackNoConvergence`로 실행이 멈춥니다. Studio의 탐색(목표 근처 32개,
+1.95 근처 16개)은 template과 기판 위 strip에서 무리에 닿지 않습니다. 가장 작은 `|nu|`가
+무리의 1.44배 이상입니다.
 
 ### 추가 검색
 
