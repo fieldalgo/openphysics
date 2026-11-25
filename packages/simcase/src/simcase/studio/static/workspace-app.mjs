@@ -30,7 +30,7 @@ import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
-import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,fieldSizeKey} from './workspace-retention.mjs';
+import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -674,6 +674,8 @@ function swapAction(){
  const offer=dropSwap,fields=fieldSwap,actions=[];
  if(offer)actions.push({label:keepInsteadLabel(offer.kept,offer.other),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)});
  if(fields)actions.push({label:keepFieldsInsteadLabel(fields.back,fields.other),data:{keepFields:String(fields.back.number)},run:()=>keepFieldsInstead(fields)});
+ // the runs whose fields the result let go: Recompute Run N's fields (section 5)
+ for(const r of fieldsLetGo)if(runs.includes(r)&&!r.field)actions.push({label:recomputeLabel(r),data:{recomputeRun:String(r.number)},run:()=>startRecompute(r)});
  return actions.length>1?actions:actions[0]||null;
 }
 function keepFieldsInstead(offer){
@@ -687,14 +689,14 @@ function keepFieldsInstead(offer){
 // or Restore, a recomputed field) the fields kept are chosen within the field budget, in the order of
 // workspace-retention.mjs; nothing else lets a field go. Returns the Messages words ('' when every
 // field stays). first: the jobs whose fields arrived and are not the selected run's.
-let fieldSwap=null;
+let fieldSwap=null,fieldsLetGo=[];
 function applyFieldBudget(first=[]){
- forgetHeldFields(runs);fieldSwap=null;
+ forgetHeldFields(runs);fieldSwap=null;fieldsLetGo=[];
  const selected=solverRun?.job||null;let out;
  try{out=chooseFields(inputsFile(),runs,selected,compareIds,currentView(),{first});}catch{return '';}
  if(!out.letGo.length)return '';
  const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedBytes(runs,selected,out.base):0;
- for(const r of out.letGo)letGoField(r);
+ for(const r of out.letGo)letGoField(r);fieldsLetGo=out.letGo;
  const other=fieldSwapCandidate(runs,plain,selected);if(other)fieldSwap={back:plain[0],other,list:runs};
  return [plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
 }
@@ -946,7 +948,10 @@ function offerMatchingRun(){
  // round 20 (Z1): the edit's request to run would contradict it: it is taken off, the edit's own
  // sentence stays (the generic "run again" line, which has none, leaves the offer alone)
  host.textContent=matchingRunMessage(host.textContent);
- offer.append((host.textContent?' ':'')+matchesAgainText(runNumber(run),run.label||'')+'. ',show);host.append(offer);
+ // run retention (4.3): a run of these inputs without its fields has these values, and Recompute
+ // brings its fields back
+ offer.append((host.textContent?' ':'')+(run.field?matchesAgainText(runNumber(run),run.label||''):valuesAgainText({...run,number:runNumber(run)}))+'. ',show);
+ if(!run.field)offer.append(' ',recomputeButton(run,'match-recompute'));host.append(offer);
 }
 const INPUTS_CHANGED_TEXT='Inputs changed since the last result. Run again to compute the new inputs.';
 function inputsChangedSinceResult(){
@@ -1457,7 +1462,8 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
   $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';
    // run retention (4.1): the run keeps its values; read from a file without fields, the file says so
-   none.textContent=fieldsNotKeptResultsText(solverRun,solverRun.origin==='imported'&&!fieldLetGoHere(solverRun));$('canvas').append(none);}
+   none.textContent=fieldsNotKeptResultsText(solverRun,solverRun.origin==='imported'&&!fieldLetGoHere(solverRun));$('canvas').append(none);
+   const again=document.createElement('p');again.id='recompute-line';again.className='recompute-line';again.append(recomputeButton(solverRun,'recompute-fields'),recomputeEstimate(solverRun));$('canvas').append(again);}
   const note=document.createElement('p');note.textContent=(solverRun.origin==='local'?'Actual local solver output. ':solverRun.origin==='recovered'?'Recovered from this browser, not recomputed. ':'Loaded from file, not recomputed. Studio checks that the file is well formed, not who made it. ')+' '+RANKING_TEXT+' '+COMPARE_MATCH_TEXT+' File › Save keeps the results. No thermal or mechanical solve was performed.';$('canvas').append(note);
  }
  if(ui.page==='Results'){if(!solverRun)$('canvas').innerHTML='<h2>No completed runs</h2><p>Choose Library → Optical waveguide, edit the model and run an optical study. A session file can also restore prior results.</p>';renderRunList();}
@@ -1964,7 +1970,7 @@ function renderComparison(){
  // modes listed by number and not matched by overlap, and one line per such run; the plots and
  // Δn_eff by overlap once both runs have fields
  const withoutFields=[a,b].filter((r,i)=>!r.field&&!(i&&a.job===b.job));
- if(withoutFields.length){if(!bar.isConnected)host.append(bar);for(const r of withoutFields)host.append(Object.assign(document.createElement('p'),{className:'compare-no-fields',textContent:compareNoFieldsText({...r,number:runNumber(r)})}));
+ if(withoutFields.length){if(!bar.isConnected)host.append(bar);for(const r of withoutFields){const line=Object.assign(document.createElement('p'),{className:'compare-no-fields-line'});line.append(Object.assign(document.createElement('span'),{className:'compare-no-fields',textContent:compareNoFieldsText({...r,number:runNumber(r)})}),' ',recomputeButton(r,'compare-recompute-'+(r===a?'a':'b')));host.append(line);}
   const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm.${a.job===b.job?' Same run on both sides.':''}`;
   host.append(description,compareTable(a,b,{...unmatchedModes(a.effective_index,b.effective_index),disabled:COMPARE_BY_NUMBER,byNumber:true}));compareOpen=true;return;}
  const match=opticalMatch(a,b),choices=match.error?[]:fieldChoices(match,{a,b});
@@ -2251,6 +2257,11 @@ const DONE_BANNER_MS=6000;let doneBannerTimer=0;
 function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}
 for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
+ // run retention: a recompute's job reads "Recomputing Run N's fields · about …", and when done says
+ // what its result did
+ {const rc=state.pending?.recompute,run=rc?runs.find(r=>r.job===rc.job):null;
+  if(rc&&['running','loading'].includes(state.phase))state={...state,message:run?recomputingText({...run,number:runNumber(run)}):state.message};
+  if(rc&&state.phase==='done'){state={...state,message:recomputeNote||state.message};recomputeNote='';}}
  // the runs this result dropped (the run limit) are named after the run's own message (round 17, U2)
  if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}else if(state.phase==='done')dropSwap=null;
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
@@ -2274,6 +2285,8 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
   if(pool.filter(Boolean).length<pending.checkCount)return;
   checkPools.delete(run.job);({runs,selected:solverRun}=withPmlCheck(runs,solverRun,run.job,pairCheck(run.effective_index,run.effective_index_im,pool)));return;
  }
+ // run retention: a recompute attaches its field to its run and makes no run
+ if(pending.recompute){finishRecompute(result,pending);return;}
  // the run of the result (workspace-result-run.mjs): the modes found, the open boundary's or the
  // closed-window search's modes, with the engine's values of those modes
  const completed=runOfResult(result,pending);
@@ -2333,6 +2346,52 @@ $('run-optical').onclick=async()=>{
  }
  finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
 };
+
+// Run retention (section 4.4): Recompute Run N's fields sends the document the run was computed with,
+// from its stored inputs and settings (recomputeDocument), to the same /api/validate and /api/run. It
+// is not a new run: it takes no number and enters no list; the current inputs, Undo and the selected
+// run stay as they are. Its result is compared with every value the run stores (1e-12 relative); on a
+// match the field is attached to the same run (job, number, name, pin, time, origin) and the budget
+// applies, the run's field having arrived; otherwise nothing changes and Messages says why.
+function recomputeButton(run,id){
+ const b=document.createElement('button');b.type='button';b.id=id;b.className='message-action recompute-fields';b.textContent=recomputeLabel({...run,number:runNumber(run)});b.dataset.recomputeRun=String(runNumber(run));
+ b.disabled=solverBusy||!!pendingJob||!connection.ready||numericDrafts.invalid;b.onclick=()=>startRecompute(run);return b;
+}
+let recomputeNote='';
+async function startRecompute(run){
+ if(solverBusy||pendingJob||!connection.ready||!runs.includes(run)||run.field)return;
+ dropSwap=null;fieldSwap=null;fieldsLetGo=[];
+ let doc;try{doc=recomputeDocument(run);}catch(error){notice(cannotRecomputeText(run,error.message));return;}
+ const operation=++jobOperation,serverVersion=connection.version,serverInstance=connection.instance,words=recomputingText(run);
+ solverBusy=true;jobPhase='validating';render();refreshJobControls();notice(words+'.');$('job-message').textContent=words;
+ try{
+  const em=doc.physics.em1,closedTarget=!em.pml&&em.target_effective_index!==undefined?em.target_effective_index:null,query=closedTarget===null?'':'&'+CLOSED_TARGET_QUERY;
+  const validation=await solverApi('/api/validate?workspace_instance='+encodeURIComponent(serverInstance)+query,{doc});
+  if(!validation.ok){jobPhase='error';const refused=cannotRecomputeText(run,validation.error||'Solver validation failed.');$('job-message').textContent=refused;notice(refused);return;}
+  jobPhase='submitting';
+  const started=await solverApi('/api/run?workspace_instance='+encodeURIComponent(serverInstance)+query,{doc});
+  const choice=runChoice(run),ob=choice?builderBoundary(choice,run.input.model.shapes):null;
+  const record=validatePending({version:1,job:started.job,input:run.input,revision:edits.capture().revision,serverVersion,serverInstance,startedAt:new Date().toISOString(),modeCount:em.mode_count,...(ob?{openBoundary:{edges:ob.edges,target:ob.target}}:{}),...(closedTarget===null?{}:{searchTarget:closedTarget}),recompute:{job:run.job,number:runNumber(run)}});
+  setPending(record);await jobMonitor.follow(record,serverInstance);
+ }catch(error){
+  const kind=connectionFailure(error);jobPhase='error';
+  if(kind==='restarted'){await connectWorkspace();$('job-message').textContent=connection.ready?RESTARTED_MESSAGE:connection.message;}
+  else if(kind==='unreachable'){$('job-message').textContent=UNREACHABLE_MESSAGE;connectionLost();}
+  else $('job-message').textContent=cannotRecomputeText(run,error.message);
+  notice($('job-message').textContent);
+ }
+ finally{if(operation===jobOperation){solverBusy=false;render();refreshJobControls();}}
+}
+// The recompute's result: the values compared, and the field attached on a match (the words are the
+// job's message when it is done)
+function finishRecompute(result,pending){
+ const run=runs.find(r=>r.job===pending.recompute.job);
+ if(!run){recomputeNote=`Run ${pending.recompute.number} is no longer kept; its recomputed fields are not stored.`;return;}
+ const fresh=runOfResult(result,{...pending,job:run.job},{completedAt:run.completedAt}),miss=recomputeMismatch(run,fresh);
+ if(miss){recomputeNote=notRecomputedText({...run,number:runNumber(run)},miss,{stored:run.serverVersion,current:pending.serverVersion});return;}
+ if(!run.field)attachField(run,fresh.field);
+ const words=applyFieldBudget([run.job]);recomputeNote=recomputedText({...run,number:runNumber(run)})+(words?' '+words:'');
+}
 
 // The PML check (slice P2): once the run of `record` is kept, one solve per mode of the same
 // document with PML strength 6, a search of 16 and the target at that mode's Re n_eff, on the same
