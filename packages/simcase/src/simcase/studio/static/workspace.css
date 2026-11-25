@@ -233,6 +233,16 @@ footer{display:flex;align-items:center;gap:20px;flex:none;min-height:26px;paddin
 #job-panel>span{min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}#job-panel>span:empty{display:none}
 #job-panel button{flex:none;min-height:20px;padding:0 8px;font-size:11px;line-height:18px}
 #job-panel button:disabled{display:none}
+/* job progress (round 25 A5): the time and the step never shrink; what the job solves takes the ellipsis */
+#job-panel.has-step>#job-message,#job-panel>#job-step{flex:none;overflow:visible}
+/* where the time and the longest step (about 380 px) cannot share the tab's line (the side panes beside
+   it, or a narrow screen), the job panel takes a line of its own while it names a step and wraps between
+   the time, the step and the rest; the tab grows only while a job runs */
+@media(max-width:660px),(min-width:1001px) and (max-width:1279px){
+ .document-tab:has(#job-panel.has-step){flex-wrap:wrap;height:auto;min-height:34px;row-gap:2px;padding-top:4px;padding-bottom:4px}
+ #job-panel.has-step{flex:1 0 100%;height:auto;min-height:26px;flex-wrap:wrap;row-gap:0;margin:0}
+ #job-panel.has-step>#job-input,#job-panel.has-step>#job-what{flex:1 1 auto}
+}
 #job-input{font-weight:600}
 #job-storage:not(:empty),.validation-warning{color:var(--warning)}
 #input-problems{padding:10px 16px;background:#fff3e7;border-bottom:1px solid #e3c5a2;font-size:12px;max-height:160px;overflow:auto;flex:none}

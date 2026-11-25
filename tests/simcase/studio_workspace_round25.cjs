@@ -147,7 +147,9 @@ test('P6 (A6): the job panel is not a second live region; Messages carries every
  for(const id of ['file-status','status','autosave-status'])assert.equal(html.split(`id="${id}" role="status"`).length-1,1,id);
  // every job state still reaches Messages (the one live region) and the panel's text
  assert.ok(app.includes("$('job-message').textContent=state.message;$('job-message').title=state.title||'';"));
- assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);"));
+  // job progress (round 25 A5): a running state reaches Messages as its live words (without the time),
+ // written only when they change; every other state as its message
+ assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else if(state.live===undefined)notice(state.message);else if($('file-status').textContent!==state.live)notice(state.live);"));
 });
 
 test('a Library re-render keeps a project name being typed, with its focus and selection',async()=>{

@@ -43,8 +43,8 @@ export function storePending(storage,record){if(record===null)storage.removeItem
 export function elapsedText(ms){const s=Math.max(0,Math.floor(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 // What a pending job solves, from the record alone (round 16): "Open boundary · 2 modes · searches
 // near 2.46 and 1.95 · PML check (up to 2 more solves)" (slice T2; "search near 2.460" below a
-// target of 1.466), "PML check · mode 1 of 2", "2 modes". The server reports no stage while a job
-// runs, so none is shown.
+// target of 1.466), "PML check · mode 1 of 2", "2 modes". The step the job is at comes from the
+// server (stepText).
 export function jobWhat(pending){
  if(pending.checkOf)return `PML check · mode ${pending.checkIndex+1} of ${pending.checkCount}`;
  const n=pending.modeCount??DEFAULT_MODE_COUNT,modes=n===1?'1 mode':n+' modes';
@@ -52,24 +52,49 @@ export function jobWhat(pending){
  const t=pending.openBoundary.target,low=lowerTarget(t),searches=low===null?`search near ${t.toFixed(3)}`:`searches near ${searchesText(t,low)}`;
  return `Open boundary · ${modes} · ${searches}`+(pending.pmlCheck?` · PML check (up to ${n===1?'1 more solve':n+' more solves'})`:'');
 }
+// The step of a running job (job progress, round 25 A5): the words of the server's step, the latest
+// search_started event of simcase.run's on_event, "solve 2 of 3 (group index) · search 1 of 2";
+// "solve 1 of 3" with one search per solve, "search 2 of 2" with one solve. '' for a job of one step
+// in all (a closed run without group index, an open run of one search, a PML check job), for no step
+// (an older server) and for a step of another shape. Studio sends single studies, so a point has no
+// words. No percent: the searches of a solve take different times.
+export function stepText(step){
+ if(step===null||typeof step!=='object'||Array.isArray(step)||step.event!=='search_started')return '';
+ const counts=['point','points','solve','solves','search','searches'];
+ if(!counts.every(k=>Number.isSafeInteger(step[k])&&step[k]>=1)||step.point>step.points||step.solve>step.solves||step.search>step.searches)return '';
+ if(!['study_point','group_index'].includes(step.solve_kind))return '';
+ const solve=step.solves>1?`solve ${step.solve} of ${step.solves}`+(step.solve_kind==='group_index'?' (group index)':''):'';
+ const search=step.searches>1?`search ${step.search} of ${step.searches}`:'';
+ return [solve,search].filter(Boolean).join(' · ');
+}
+/** Messages while the server does not answer: the job panel's words without the time. */
+export const NO_ANSWER_LIVE=' · no answer from the server; still checking';
 // Stopping this client detaches polling. It never claims to stop server computation.
 // While the server answers that the job is running, the monitor keeps waiting, however long the
 // job takes (round 16). limitMs bounds only the time without an answer: a status request that
 // fails (no connection, a server error) is tried again every 700 ms, and once no request has been
 // answered for limitMs the monitor detaches; Resume checks the job again. A missing job (404) or a
 // changed server (409) ends at once, as a failed solver does.
+// A running state has message (the job panel's words, with the time: time · step · what), parts
+// ({lead, rest}: the time and what the job solves, with any no-answer words, which the page shows in
+// spans of their own around the step, so the step is never cut), live (Messages, the one live region:
+// "Computing job … · what · step", without the time, so it changes only at the start, when the step
+// changes, when the server stops or starts answering again, and at the end) and step (stepText of the
+// last answer).
 export class OpticalJobMonitor {
  constructor({api,onState=()=>{},onResult=()=>{},wait=ms=>new Promise(r=>setTimeout(r,ms)),now=()=>Date.now(),limitMs=180000}){Object.assign(this,{api,onState,onResult,wait,now,limitMs});this.generation=0;this.busy=false;}
  stop(){this.generation++;this.busy=false;this.onState({phase:'detached',message:'Stopped waiting. Server computation may continue; resume to retrieve its result.'});}
  async follow(record,instance){
   if(this.busy)throw new Error('Already watching a job.');
   const pending=validatePending(record);if(instance!==pending.serverInstance)throw Object.assign(new Error('The server restarted or changed. Detach this job before starting another calculation.'),{status:409});
-  const token=++this.generation;this.busy=true;let answered=this.now(),silent=false;
+  const token=++this.generation;this.busy=true;let answered=this.now(),silent=false,step='';
   const active=()=>token===this.generation,what=jobWhat(pending);
   try{
    while(active()){
-    const quiet=silent?` · no answer from the server for ${elapsedText(this.now()-answered)}; still checking`:'';
-    this.onState({phase:'running',message:'Computing job '+pending.job+' · '+elapsedText(this.now()-Date.parse(pending.startedAt))+' · '+what+quiet,pending});
+    const quiet=silent?` · no answer from the server for ${elapsedText(this.now()-answered)}; still checking`:'',at=step?' · '+step:'';
+    const lead='Computing job '+pending.job+' · '+elapsedText(this.now()-Date.parse(pending.startedAt)),rest=what+quiet;
+    this.onState({phase:'running',message:lead+at+' · '+rest,parts:{lead,rest},
+     live:'Computing job '+pending.job+' · '+what+at+(silent?NO_ANSWER_LIVE:''),step,pending});
     let job;
     try{job=await this.api('/api/jobs/'+pending.job+'?workspace_instance='+pending.serverInstance);}
     catch(error){
@@ -77,7 +102,7 @@ export class OpticalJobMonitor {
      silent=true;if(this.now()-answered>=this.limitMs){this.onState({phase:'detached',message:'The server has not answered for three minutes. Resume to check this job again.',pending});return;}
      await this.wait(700);continue;
     }
-    if(!active())return;answered=this.now();silent=false;
+    if(!active())return;answered=this.now();silent=false;step=stepText(job.step);
     if(job.status==='error')throw Object.assign(new Error(typeof job.error==='string'?job.error:'Solver failed.'),{code:'solver-failed'});
     if(job.status==='done'){
      this.onState({phase:'loading',message:'Loading the result of this run…',title:'Job '+pending.job,pending});

@@ -173,7 +173,7 @@ test('S2: a run that makes the session go over 16 MiB says the size and what Fil
  assert.equal(out.ok,false);assert.ok(N.sessionSizeText(out).endsWith(', over the 16.8 MB limit. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Run 1).'),N.sessionSizeText(out));
  const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
  // posted once after the run's result message, with X4's line not repeated when it says recovery is off
- assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();"));
+ assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else if(state.live===undefined)notice(state.message);else if($('file-status').textContent!==state.live)notice(state.live);if(state.phase==='done'&&sessionSizePending)postSessionSize();"));
  assert.ok(app.includes("compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';sessionSizePending=true;"));
  assert.ok(app.includes("if(!text)return;if(text.endsWith(' Browser recovery is off.'))recoveryOffPosted='overLimit';"));
  assert.ok(app.includes("const host=$('file-status');if(resultNotice&&host.textContent){host.append(' '+text);}else notice(text);\n}"));
