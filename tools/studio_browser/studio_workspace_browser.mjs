@@ -2163,7 +2163,7 @@ try {
     }
     const u2 = {items: await runItems(), message: await rText('#file-status'), status: await rText('#status')};
     stage('R17 U2 seven runs', u2);
-    assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+    assert.deepEqual(u2.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
     // round 21 (W2): the drop words, then the swap Messages offers
     assert.ok(u2.message.endsWith(' Run 1 (closed · 500 × 220 nm) was dropped Keep Run 1, drop Run 2 (closed · 500 × 220 nm) instead'), u2.message);
     assert.ok(u2.status.startsWith('Run 21 · '), u2.status);
