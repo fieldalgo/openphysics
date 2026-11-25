@@ -154,6 +154,10 @@ this name or another.*(round 17). 저장 선택 창에서 기억한 파일은 �
 - 모델이 바뀐 뒤: *Heater study · heater-study.json · changed since saved 13:15 · kept for recovery in this
   browser*
 - 처음 저장하기 전: *Untitled project · not saved to a file · kept for recovery in this browser*
+- File › Open으로 세션·모델 파일(`run-a.json`)을 열어 만든 프로젝트가 바뀐 뒤: *Untitled project · changed since run-a.json,
+  not saved · kept for recovery in this browser*(round 24, B2, 코디네이터의 후속 결정: 전에는 상태 표시줄의 *Changed since
+  session file run-a.json* 옆에서 *not saved to a file*였음). 막 연 때는 여전히 *not saved to a file*이고, 사본의 이름 없는
+  복구 기록도 바뀐 뒤 같은 말을 합니다. 어떤 파일도 없었던 프로젝트만 변경 뒤에도 *not saved to a file*입니다.
 
 "Changed"는 모든 모델의 입력, study 설정, 실행, 이름, 고정, 비교와 프로젝트 이름을 셉니다. 페이지, 보기,
 선택한 실행은 바뀜이 아닙니다. 바닥줄은 전처럼 보이는 모델의 저장 표시를 보여 줍니다. Library도 제목 줄에

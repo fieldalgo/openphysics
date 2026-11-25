@@ -486,7 +486,8 @@ newer than this pair · Compare the two newest: Run 3 and Run 4*가 나오고 �
 Run 1과 Run 2가 다섯 번째 실행 뒤에도 *Run 5 is newer than this pair · Compare Run 5 with B*와 함께 남는지(P3); 군굴절률을 켠
 열린 실행 앞의 계획 줄이, 열린 실행이 세션 파일(P2의 `optical-v10-open-f8ece10.json`)에서 연 것뿐이면 어림값 없이(*Open
 boundary · … · group index on (3 solves)*), 탭에서 열린 실행 뒤에는 *… · about N s*(또는 *min*), `optical-v10-open-full-083e151.json`
-에서 더 새 열린 실행을 더한 뒤에도 같은 말(시간이 없어 건너뜀), 새로고침, **Restore newest from this browser**, 군굴절률 켜기 뒤에는
+에서 더 새 열린 실행을 더한 뒤에도 같은 말(시간이 없어 건너뜀; 그 파일의 이름 없는 프로젝트는 바뀐 뒤 *Untitled project ·
+changed since optical-v10-open-f8ece10.json, not saved · …*, P1), 새로고침, **Restore newest from this browser**, 군굴절률 켜기 뒤에는
 다시 어림값 없이 읽히는지(P4). 세션 파일과 복구 기록에는 실제 시간이 없으므로 파일에서 읽은 실행으로 낸 어림값은 확인하지 않습니다: 형식을
 바꾸지 않고는 생길 수 없습니다. 1440 × 900과 390 × 844에서 가로 넘침이 없는지도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과

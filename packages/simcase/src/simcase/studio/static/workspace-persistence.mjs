@@ -123,12 +123,17 @@ const PROJECT_WORD=Object.freeze({picker:'saved',download:'downloaded',opened:'o
 // project file, every later header reads "both-models · changed since both-models.json, not saved ·
 // updating browser recovery" (it read "not saved to a file" beside the status bar's "Changed since
 // session file both-models.json"). A project no file held keeps "not saved to a file".
-export function projectTitle({name=null,models=0,file=null,current=false,recovery=null,copyOf=null,recovered=null,fromFile=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
+// Round 24 (B2, the coordinator's follow-up): opened, the session or model file the project's content
+// came from by File › Open (or the file a nameless recovered record was a copy of, copyOf), {file,
+// changed}: once changed since, "Untitled project · changed since x.json, not saved · …", as the
+// status bar's "Changed since session file x.json" (it read "not saved to a file").
+export function projectTitle({name=null,models=0,file=null,current=false,recovery=null,copyOf=null,recovered=null,fromFile=null,opened=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  const title=name||UNTITLED_PROJECT;
  if(!models)return `${title} · no model chosen`;
  const browser=recoveryWords(recovery)||'not in browser recovery yet';
  if(!file&&name&&recovered)return `${title} · recovered from this browser · ${recovered.opened?`as opened from ${recovered.opened}`:recovered.changed?`changed since ${recovered.changed}, not saved`:'not saved to a file'} · ${browser}`;
  if(!file&&name&&fromFile)return `${title} · changed since ${fromFile}, not saved · ${browser}`;
+ if(!file&&opened?.file&&opened.changed)return `${title} · changed since ${opened.file}, not saved · ${browser}`;
  if(!file)return `${title} · ${copyOf?`recovered from a copy of ${copyOf} · `:''}not saved to a file · ${browser}`;
  const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
  if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');

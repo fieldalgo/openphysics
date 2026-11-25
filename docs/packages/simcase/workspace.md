@@ -176,6 +176,12 @@ indicator:
 - *Heater study · heater-study.json · changed since saved 13:15 · kept for recovery in this browser*
   once a model changed;
 - *Untitled project · not saved to a file · kept for recovery in this browser* before the first save.
+- *Untitled project · changed since run-a.json, not saved · kept for recovery in this browser* once a
+  project made by File › Open of a session or model file (`run-a.json`) has changed (round 24, B2, the
+  coordinator's follow-up: it read *not saved to a file* beside the status bar's *Changed since session
+  file run-a.json*). Just opened, it still reads *not saved to a file*; a nameless recovered record of a
+  copy reads the same once changed. Only a project that never had any file keeps *not saved to a file*
+  after a change.
 
 "Changed" counts the inputs, study settings, runs, names, pins and comparisons of every model and
 the project name; a page, the view or the selected run is not a change. The footer keeps the
