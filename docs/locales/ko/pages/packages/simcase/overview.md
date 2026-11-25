@@ -218,6 +218,15 @@ result = solve_point(model, point.si["physics"]["em1"])   # effective_index, vec
 
 영역이 있는 열전도 문서, 영역 전기 전도·정상 줄 가열 문서, 영역 기계 문서에서는 `run`이 선택적인 메시 상한(`max_input_vertices`, `max_nodes`, `max_triangles`)도 받고, `check_mesh_limits`는 메시하지 않고 문서가 메시 생성기에 넘기는 루프 꼭짓점 수를 셉니다. 둘 다 `MeshLimitError`를 발생시킵니다. `region_complexity`는 `Document.from_dict` 전에 원시 JSON에서 도형, 원, 다각형 점, 경계 교차를 셉니다. [호출자를 위한 메시 상한](thermal_regions2d.md#호출자를-위한-메시-상한)을 참고하세요.
 
+`run(doc, on_event=callback)`은 광학 모드 실행의 진행을 알립니다. `callback`은 고유값 탐색 직전마다 JSON 데이터 dict 하나를 받습니다.
+
+```python
+{"event": "search_started", "point": 1, "points": 1, "solve": 2, "solves": 3,
+ "solve_kind": "group_index", "search": 1, "searches": 2}
+```
+
+즉 study 점 1/1, 그 점의 풀이 2/3(`results.group_index`가 있으면 점을 λ0에서 풀고 `solve_kind`는 `"study_point"`, λ0 ∓ step에서 풀고 `"group_index"`), 그 풀이의 탐색 2번 중 1번째(열린 경계는 목표 근처에서 한 번, 추가 탐색마다 한 번 더 탐색하고, 닫힌 창은 한 번 탐색)입니다. 합계는 첫 풀이 전에 정해지며, 군굴절률과 두 번째 탐색이 있는 열린 실행은 이벤트 6개를 보냅니다. 콜백은 호출한 스레드에서 동기로, 매번 새 dict로 불립니다. 반환값은 무시하고, 콜백이 던진 예외는 그 예외로 실행을 끝냅니다. 이벤트는 진행만 알립니다. 결과는 이벤트가 있든 없든 비트 단위로 같습니다. `PhysicsKind.accepts_on_event`가 참인 종류만 콜백을 받습니다(이 릴리스에서는 `em.modes2d`). 다른 종류는 콜백 없이와 똑같이 돌고 콜백을 부르지 않습니다([공급자](providers.md) 참조). 호출할 수 없는 값은 `TypeError`입니다. 이벤트 목록은 이후 릴리스에서 늘 수 있지만, 이벤트의 뜻은 바뀌지 않습니다. `multiphysics.run`에는 따로 `on_event`가 있습니다([다중물리 문서](multiphysics_document.md) 참조).
+
 ## 열전도·공진기 문서
 
 정상·과도 열 영역 문서도 마이크로미터로 정규화한 뒤 메시합니다. 같은 수치 환경에서

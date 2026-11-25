@@ -109,13 +109,21 @@ def _merge(records, acceptable, n, gram, origin, num_modes):
     return keep
 
 
-def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion=None):
+def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion=None,
+          on_search=None):
     """With ``motion`` (a galerkin MeshMotion of the nodes in the mesh's unit; internal:
     simcase.shape_derivative), the modes are chosen from the numbers on the moved mesh exactly as
     without it, and the kept modes' ``neff`` is returned live in the library of ``motion.t``: the
     same eigensolve with the layer's factors of the moved mesh held fixed (galerkin requires the
-    motion to leave every stretched element in place)."""
+    motion to leave every stretched element in place).
+
+    ``on_search`` (internal: the progress events of ``simcase.run``), when given, is called as
+    ``on_search(k, n)`` right before search ``k`` of the ``n`` searches: the vector formulation
+    searches once plus once per ``additional_searches`` entry, the scalar one once. It changes
+    nothing that is computed. A mesh motion takes none."""
     if motion is not None:
+        if on_search is not None:
+            raise ValueError("a mesh motion takes no progress events")
         return _solve_moving(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml, bend, motion)
     if n_target is None:
         raise ValueError('PML modes require explicit positive n_target')
@@ -142,12 +150,14 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         free=np.setdiff1d(np.arange(space.num_edges+mesh.num_nodes),np.r_[edges,space.num_edges+fixed])
         search=min(search,len(free)-2)
         if search<1: raise ValueError('mesh has too few free degrees of freedom')
+        if on_search is not None: on_search(1,1+len(extra))
         n,space,et,ez=solve_modes(scaled,eps,k0,n_target,search,pec_nodes=fixed,pec_edges=edges,coordinate_factors=c.factors)
         searches=[dict(search=1,n_target=float(n_target),search_count=int(search),candidate_count=len(n))]
         origin=np.ones(len(n),int)
         for k,further in enumerate(extra,start=2):
             # the same mesh and pencil, one factorization per target; candidates numbered in order
             count=min(int(further['search_count']),len(free)-2)
+            if on_search is not None: on_search(k,1+len(extra))
             nk,_,etk,ezk=solve_modes(scaled,eps,k0,further['n_target'],count,pec_nodes=fixed,pec_edges=edges,
                                      coordinate_factors=c.factors)
             searches.append(dict(search=k,n_target=float(further['n_target']),search_count=count,candidate_count=len(nk)))
@@ -173,6 +183,7 @@ def solve(mesh, eps, wavelength, boundary, num_modes, formulation, n_target, pml
         physical=np.sum(et.conj()*(mp@et.T).T,axis=1).real+np.sum(longitudinal.conj()*(mnp@longitudinal),axis=0).real
         sign=1
     else:
+        if on_search is not None: on_search(1,1)
         n,field=solve_scalar_coordinates(scaled,eps,k0,n_target,c.factors,num_modes=search,fixed_nodes=fixed)
         a,b=scalar_coordinate_system(scaled,eps,k0,c.factors)
         x=field

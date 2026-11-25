@@ -164,6 +164,10 @@ mode near the cladding index (n ≈ 1.486 + 7.9e-3i) that a search of 32 near 2.
   2.0555 + 6.82e-4i; the TM candidate (2.054060 + 6.724e-4i) is the 8th by Re and returned with
   `mode_count` 8.
 
+With `run(doc, on_event=...)` each search is one progress step: the primary search is
+`search` 1 and each further search the next, of `searches` = 1 + the number of entries, in the
+order above (see the [simcase overview](overview.md#from-python)).
+
 ### The gain bound
 
 A lossless guided mode has Im n_eff = 0. On a PML mesh its computed Im n_eff is noise of either

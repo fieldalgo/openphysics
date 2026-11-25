@@ -26,7 +26,11 @@ Studio와 `simcase.run`이 돌릴 수 있는 물리를 모두 찾게 한다. 따
      - `name`(예: `"openphysics-fem"`). entry point 이름과 같아야 한다(소문자·숫자·`.`·`_`·`-`).
        `version`(빈 문자열이 아닌 문자열)
      - `protocol`: 구현한 프로토콜 버전, `1`
-     - `kinds()`: 더하는 `registry.PhysicsKind`들 (지금 dataclass 그대로, 새 필드 없음)
+     - `kinds()`: 더하는 `registry.PhysicsKind`들 (지금 dataclass 그대로, 새 필드 없음).
+       러너가 `simcase.run`의 진행 콜백을 받는 종류는 `accepts_on_event=True`로 두고, 그러면
+       `run(doc, verbose, on_event=...)`로 불린다. 기본값 `False`(이 필드 전에 만든 모든 종류)이면
+       러너는 전과 똑같이 불리고 콜백을 받지 않는다. `run`은 이 필드를 확인하며, 호출해 보고
+       `TypeError`를 잡는 방식은 쓰지 않는다. 이벤트는 [simcase 개요](overview.md#python에서-사용)에 있다.
      - `manifest()`: Studio와 검사기가 쓸, 종류별 설명을 담은 JSON 데이터 (아래 4번)
 2. **내장 공급자**
    - 내장 종류는 simcase 배포판이 직접 등록하는 공급자 `openphysics-fem`이다

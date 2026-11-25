@@ -467,6 +467,28 @@ Both raise `MeshLimitError`. `region_complexity` counts shapes, circles,
 polygon points and boundary crossings on the raw JSON, before
 `Document.from_dict`. See [mesh limits for callers](thermal_regions2d.md#mesh-limits-for-callers).
 
+`run(doc, on_event=callback)` reports the progress of an optical modes run: `callback` gets one
+JSON-data dict right before each eigensolve search,
+
+```python
+{"event": "search_started", "point": 1, "points": 1, "solve": 2, "solves": 3,
+ "solve_kind": "group_index", "search": 1, "searches": 2}
+```
+
+that is study point 1 of 1, solve 2 of 3 at that point (with `results.group_index` the point is
+solved at λ0, `solve_kind` `"study_point"`, and at λ0 ∓ step, `"group_index"`), and search 1 of
+the 2 searches of that solve (an open boundary searches once near its target and once per
+additional search; a closed window searches once). The totals are known before the first solve;
+an open run with the group index and a second search sends 6 events. The callback is called
+synchronously, in the calling thread, with a new dict each time; its return value is ignored, and
+an exception it raises ends the run with that exception. The events report progress only: a
+result is the same with or without them, bit for bit. Only kinds whose
+`PhysicsKind.accepts_on_event` is true take a callback (in this release `em.modes2d`); every
+other kind runs as without one and never calls it (see [providers](providers.md)). A value that is
+not callable is a `TypeError`. The list of events can grow in later releases; the meaning of an
+event never changes. `multiphysics.run` has its own `on_event` (see the
+[multiphysics document](multiphysics_document.md)).
+
 ## Heat and cavity documents
 
 Named-region steady and transient heat documents also mesh in canonical
