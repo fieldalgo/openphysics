@@ -351,7 +351,7 @@ Messages 줄, 다음 실행 입력의 *· group index on*, 보이는 실행이 n
 Search near n_eff, PML 점검 상자, *Close this edge* 스위치를 역할과 이름으로 찾고, 그림의 PML 띠, PML 점검을 켠
 모든 변 열린 템플릿 실행(찾은 개수 줄, *< 0.01 dB/cm* 칸, 다른 후보 30개, 두 모드 모두 *no leakage resolved*), 작업 공간 세션이 버전 10인 프로젝트 파일, 닫힌 실행과의
 Compare(짝짓기 꺼짐, 쪽마다의 손실 머리글과 안내, 1440 × 900에서 24 px 여유), Geometry에서 만든 누설 사례(문서가
-P1의 기판 위 스트립과 같고 *29.15 dB/cm*와 *1006 dB/cm*, 모드별 점검에서 둘 다 손실 변화 2 % 미만으로 PML에 무관, 그 프로젝트 파일을 저장·열기·다시 저장하면 V-P1 (a)와 (b)를 따르고 실행이 같게 읽힘, Search near n_eff 1.600에서 클래딩 굴절률 근처 모드)를
+P1의 기판 위 스트립과 같고 *29.15 dB/cm*와 *1006 dB/cm*, 모드별 점검에서 둘 다 손실 변화 2 % 미만으로 PML에 무관, 25차 A4부터(사전 등록) 모드 1의 안내가 *Mode 1 is the core mode: N % of |E|² in the window (PML excluded) is in Core, which does not touch the window edge.*(N ≥ 51)이고 안내 행마다 저장된 파일이 담은 실행에서 페이지 모듈이 계산한 안내와 같음, 그 프로젝트 파일을 저장·열기·다시 저장하면 V-P1 (a)와 (b)를 따르고 실행이 같게 읽힘, Search near n_eff 1.600에서 클래딩 굴절률 근처 모드)를
 확인하며, 1440 × 900과 390 × 844에서 가로 넘침이 없는지 봅니다
 ([열린 경계](packages/simcase/workspace.md#광학-작업-공간의-열린-경계)).
 File 메뉴가 생긴 뒤로는 접근성 트리에서 역할과 이름으로, 그리고 키보드로(Export와 Browser copy 하위

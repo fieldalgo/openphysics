@@ -397,3 +397,70 @@ export function edgeNotes(run){
  // a run's samples never change: its notes are kept per run object
  edgeCache.set(run,notes);return notes;
 }
+// ---- The region notes of an open-boundary run (round 25, A4) ------------------------------------
+// An open run's results name the core mode and a mode mostly in a shape touching the window edge as
+// a closed window's do (edgePlacement, corePlacement), with the same thresholds (EDGE_SHARE,
+// EDGE_NEAR within EDGE_BAND_NM, CORE_SHARE) and the same shape layering, measured over the physical
+// window only: the triangles whose centroid lies in the 3 × 2.4 µm window, the PML outside it
+// excluded from the share and from its total. The words say only where the |E|² lies and what the
+// shape meets at the window edge (the PML at an open edge, the wall at a closed one); they make no
+// guided or leaky claim.
+const EDGE_ORDER=['left','right','bottom','top'];
+const insideWindow=(x,y)=>x>=WINDOW_NM.xmin&&x<=WINDOW_NM.xmax&&y>=WINDOW_NM.ymin&&y<=WINDOW_NM.ymax;
+/** Per mode of an open run with fields: {edge, core}, each null or
+ *  edge: {shape, share, near, closed (the closed window edges the shape touches, when the share within
+ *        EDGE_BAND_NM of them is at least EDGE_NEAR, else []), named: share > EDGE_SHARE and near >= EDGE_NEAR}
+ *        for the edge-touching shape holding the largest share;
+ *  core: {shape, share, named: share > CORE_SHARE} for the shape not touching the edge holding the
+ *        largest share (only when some shape touches the edge and some does not, as corePlacement).
+ * [] for a closed run, a run without fields, or a run with no shape touching the window edge. */
+export function openRegionPlacement(run){
+ if(!isOpenRun(run)||!run.field)return [];
+ const shapes=run.input.model.shapes,edges=shapes.map(touchedEdges);
+ if(!edges.some(e=>e.length))return [];
+ const withCore=!edges.every(e=>e.length),open=new Set(run.settings.pml?.open_edges??[]);
+ const closedOf=edges.map(list=>list.filter(side=>!open.has(side)));
+ const X=run.field.node_coordinates,w=WINDOW_NM,band=EDGE_BAND_NM,tri=[];
+ run.field.triangles.forEach((t,i)=>{
+  const p0=X[t[0]],p1=X[t[1]],p2=X[t[2]],x=(p0[0]+p1[0]+p2[0])/3*1e9,y=(p0[1]+p1[1]+p2[1])/3*1e9;
+  if(!insideWindow(x,y))return;
+  const area=0.5*Math.abs((p1[0]-p0[0])*(p2[1]-p0[1])-(p1[1]-p0[1])*(p2[0]-p0[0]));
+  let owner=-1;for(let k=shapes.length-1;k>=0;k--)if(insideShape(shapes[k],x,y)){owner=k;break;}
+  tri.push({i,area,owner,near:{left:x-w.xmin<=band,right:w.xmax-x<=band,bottom:y-w.ymin<=band,top:w.ymax-y<=band}});
+ });
+ return run.effective_index.map((_,mode)=>{
+  const re=run.field.real[mode],im=run.field.imag?.[mode]??null,inShape=shapes.map(()=>0),nearShape=shapes.map(()=>0),nearClosed=shapes.map(()=>0);let total=0;
+  for(const t of tri){const r=re[t.i],m=im?im[t.i]:[0,0,0],e=t.area*((r[0]*r[0]+m[0]*m[0])+(r[1]*r[1]+m[1]*m[1])+(r[2]*r[2]+m[2]*m[2]));total+=e;
+   if(t.owner>=0)inShape[t.owner]+=e;
+   edges.forEach((list,k)=>{if(list.some(side=>t.near[side]))nearShape[k]+=e;if(closedOf[k].some(side=>t.near[side]))nearClosed[k]+=e;});}
+  if(!(total>0))return null;
+  let best=-1;edges.forEach((list,k)=>{if(list.length&&(best<0||inShape[k]>inShape[best]))best=k;});
+  const share=inShape[best]/total,near=nearShape[best]/total,closed=closedOf[best].length&&nearClosed[best]/total>=EDGE_NEAR?closedOf[best]:[];
+  const edge={shape:shapes[best].name,share,near,closed,named:share>EDGE_SHARE&&near>=EDGE_NEAR};
+  let core=null;
+  if(withCore){let c=-1;edges.forEach((list,k)=>{if(!list.length&&(c<0||inShape[k]>inShape[c]))c=k;});
+   const cs=inShape[c]/total;core={shape:shapes[c].name,share:cs,named:cs>CORE_SHARE};}
+  return {edge,core};
+ });
+}
+const sideWords=list=>{const s=EDGE_ORDER.filter(e=>list.includes(e));return s.length<3?s.join(' and '):s.slice(0,-1).join(', ')+' and '+s.at(-1);};
+/** "Mode 3 is the core mode: 64 % of |E|² in the window (PML excluded) is in Core, which does not touch the window edge." */
+export function openCoreNoteText(mode,p){
+ return `Mode ${mode+1} is the core mode: ${Math.round(p.share*100)} % of |E|² in the window (PML excluded) is in ${p.shape}, which does not touch the window edge.`;
+}
+/** "Mode 2 is mostly in Substrate (93 % of |E|² in the window, PML excluded), which continues into the
+ * PML at the open window edge." or, at a closed edge of the open run, "…, which touches the closed
+ * bottom edge; its n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open." */
+export function openEdgeNoteText(mode,p){
+ const head=`Mode ${mode+1} is mostly in ${p.shape} (${Math.round(p.share*100)} % of |E|² in the window, PML excluded), which `;
+ if(!p.closed.length)return head+'continues into the PML at the open window edge.';
+ const many=p.closed.length>1;
+ return head+`touches the closed ${sideWords(p.closed)} ${many?'edges':'edge'}; its n_eff depends on ${many?'those closed edges. Open them in Geometry › Boundaries to leave them open.':'that closed edge. Open it in Geometry › Boundaries to leave it open.'}`;
+}
+const openCache=new WeakMap();
+/** The region notes of an open run: [{mode, kind ('edge' or 'core'), text, shape}], one per named mode. */
+export function openRegionNotes(run){
+ if(openCache.has(run))return openCache.get(run);
+ const notes=openRegionPlacement(run).flatMap((p,mode)=>!p?[]:p.edge.named?[{mode,kind:'edge',text:openEdgeNoteText(mode,p.edge),shape:p.edge.shape}]:p.core?.named?[{mode,kind:'core',text:openCoreNoteText(mode,p.core),shape:p.core.shape}]:[]);
+ openCache.set(run,notes);return notes;
+}

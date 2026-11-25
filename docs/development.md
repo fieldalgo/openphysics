@@ -420,7 +420,10 @@ by role and name, the PML bands of the drawing, the template run all open with t
 (found line, *< 0.01 dB/cm* cells, 30 other candidates, both modes *no leakage resolved*), a project file whose workspace session is version 10, Compare with a
 closed run (matching off, per-side loss headers and note, 24 px to spare at 1440 × 900), and the
 leakage case built in Geometry, whose document is P1's strip over a substrate (*29.15 dB/cm* and
-*1006 dB/cm*, both PML-independent with the per-mode check, a loss change under 2 %; its project file
+*1006 dB/cm*, both PML-independent with the per-mode check, a loss change under 2 %; since round 25,
+A4, pre-registered, mode 1's note reading *Mode 1 is the core mode: N % of |E|² in the window (PML
+excluded) is in Core, which does not touch the window edge.* with N ≥ 51 and every note row equal to
+the notes the page's module computes from the run as the saved file holds it; its project file
 saved, opened and saved again following V-P1 (a) and (b), the run reading the same; and the mode near the cladding index at Search near n_eff 1.600), with no
 horizontal overflow at 1440 × 900 and 390 × 844
 ([open boundary](packages/simcase/workspace.md#open-boundary-in-the-optical-workspace)).

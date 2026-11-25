@@ -1478,6 +1478,15 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   잘라 내지 않습니다: 이 변경 전에 쓴 파일은 전체 표본을 그대로 두고 바이트 단위로 같게 다시 씁니다.
   올바른 `physical_bounds`가 없는 실행은 표본을 모두 보존합니다. 한 작업의 두 사본(전체 표본과 잘라 낸
   표본)은 창 위의 표본이 같으면 같은 결과입니다. 파일 버전은 10 그대로이고 키는 더하지 않습니다.
+- **모드가 놓인 곳(round 25, A4).** 열린 실행의 모드 표에도 닫힌 창의 안내 행이 붙습니다. 문턱(몫 0.5 초과, 창
+  가장자리에 닿는 형상이면 닿는 변에서 300 nm 안에 |E|²의 0.01 이상)과 형상의 겹침 순서는 같고, 물리 창 위에서만
+  잽니다: 중심이 3 × 2.4 µm 창 안에 있는 삼각형만 세므로, (예전 파일에서 읽은 실행에 남은) PML은 몫에도 그 합에도
+  들지 않습니다. 코어 모드는 *Mode 3 is the core mode: 64 % of |E|² in the window (PML excluded) is in Core, which does not
+  touch the window edge.*, 열린 변에 닿는 형상에 주로 있는 모드는 *Mode 2 is mostly in Substrate (93 % of |E|² in the window,
+  PML excluded), which continues into the PML at the open window edge.*, 열린 실행의 닫힌 변이면 *…, which touches the closed
+  bottom edge; its n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open.*(둘 이상이면 *… bottom
+  and left edges; … those closed edges. Open them …*)입니다. 안내는 |E|²가 놓인 곳만 말하고 모드가 갇혔는지 새는지는 말하지
+  않습니다. 그것은 손실 열이 말합니다. Compare의 가장자리 안내 줄과 짝 없음 이유는 닫힌 창에만 씁니다.
 - slice P3: 새 열린 실행은 엔진의 `te_polarization_fraction`과 `effective_area`(물리 창)도 보존합니다.
   군굴절률을 켜면 `group_index`를 `{"re", "im"}`로, `group_index_method`와 함께 보존합니다. 닫힌 실행의
   `group_index`는 목록 그대로입니다. slice P2가 쓴 실행에는 이 키들이 없습니다. Studio는 그 실행의 TE
