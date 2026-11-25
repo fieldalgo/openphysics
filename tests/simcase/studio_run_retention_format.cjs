@@ -118,7 +118,7 @@ test('K3: the version 12 reader\'s refusals hold for version 13',()=>{
  const s=N.parseSession(text),back=s.runs.map((r,i)=>Object.assign(N.validateRun(r),{number:i===1?1:r.number}));
  assert.throws(()=>N.sessionText(s.input,back,null,[null,null],VIEW),{message:'Run numbers must be whole numbers of at least 1, increasing in list order.'});
  // a version newer than 13 is refused by name
- refused(edit(text,d=>{d.version=14;}),'This session file is version 14, newer than this Studio reads (versions 6–13). Open it in a newer Studio.');
+ refused(edit(text,d=>{d.version=15;}),'This session file is version 15, newer than this Studio reads (versions 6–14). Open it in a newer Studio.');
 });
 
 test('K4: main 3f16709 refuses version 13 by name, alone, in a project and in a recovery record, and does not adopt the record',()=>{
