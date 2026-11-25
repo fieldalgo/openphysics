@@ -192,12 +192,12 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 | Job | 플랫폼 | 검사 내용 |
 |---|---|---|
 | `linux-py312` | Ubuntu 24.04 | 라이선스·release 버전·변경 기록 조각·meshloom 커널·Markdown 링크 검사; 빠른 사전 검사 묶음; 배포물 아홉 개; Studio Node 검사; 정상·과도·영역 Studio 자원 관측 각 1회 |
-| `linux-py312-tests` | Ubuntu 24.04, job 열두 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 열두 부분으로 동시에 실행 |
-| `installed-tests` | Ubuntu 24.04, job 열두 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 열두 부분으로 동시에 실행 |
+| `linux-py312-tests` | Ubuntu 24.04, job 열여섯 개 | 고정 RII 데이터베이스로 전체 소스 시험을 시간이 고르게 나뉜 열여섯 부분으로 동시에 실행 |
+| `installed-tests` | Ubuntu 24.04, job 열여섯 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 열여섯 부분으로 동시에 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 
-필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 열두 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
+필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 열여섯 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
@@ -208,17 +208,17 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 멈춘 실행을 끊기 위한 것이며, 호스트 러너 속도가 실행마다 다르기 때문에 여유를 둡니다.
 
 **소스 시험** (`linux-py312-tests`). 루트 설정의 `python -m pytest` 전체(`tests/`와
-`tools/tests/`의 모든 시험)를 job 열두 개에서 동시에 돌립니다. 각 job은 전체를 수집한 뒤
+`tools/tests/`의 모든 시험)를 job 열여섯 개에서 동시에 돌립니다. 각 job은 전체를 수집한 뒤
 `tools/shards/openphysics_shard.py`가 자기 부분에 배정한 시험 파일만 남깁니다. 파일은 통째로,
 큰 것부터, 그때까지 시간이 가장 적은 부분에 배정하며, 시간은
 `tools/shards/durations.json`의 파일별 초를 씁니다(표에 없는 파일은 중앙값으로 셉니다).
-모든 부분이 같은 수집 결과에서 같은 배정을 계산하므로, 열두 부분을 합치면 수집한 시험을
+모든 부분이 같은 수집 결과에서 같은 배정을 계산하므로, 열여섯 부분을 합치면 수집한 시험을
 빠짐없이 정확히 한 번씩 돌립니다. 이름으로 고르는 시험은 없습니다. 각 로그 끝에 그 부분의
 파일 수, 시험 수, 예상 시간이 나옵니다. job 하나로 돌리던 때 전체 시험은 2026-11-20에 러너
 CPU에 따라 44~70분, 네 부분으로는 2026-11-21에 10~21분 걸렸습니다. PR #349의 실행
 45409971229(2026-11-24, 수집한 모든 파일이 들어 있음)의 표 기준으로 여덟 부분의 한 부분은 시험 약 21.5분과
-준비 약 3분이었습니다. 경계·코너 패널 시험이 들어온 뒤(2026-11-25) 표 합계가 약 338분이라 CI는 약 28분씩
-열두 부분으로 돌리며, 45분 제한은 멈춘 실행을 끊기 위한 것입니다. 표에 없는 파일은 얼마나 오래 걸리든
+준비 약 3분이었습니다. 경계·코너 패널 시험이 들어온 뒤(2026-11-25) 표 합계가 약 378분이고, 고르게 나눈 열두 부분도
+러너 속도 차이로 시험 21~42분이 걸려 CI는 표 기준 약 24분씩 열여섯 부분으로 돌리며, 45분 제한은 멈춘 실행을 끊기 위한 것입니다. 표에 없는 파일은 얼마나 오래 걸리든
 중앙값(몇 초)으로 세므로, 파일을 더하면 완전한 실행의 `source-tests-*.xml`로 표를 다시 만드십시오(CI에서 약 3분 걸리는
 `test_studio_closed_target.py`가 표에 없이 더해진 뒤 main의 실행 45415835896에서 느린 러너의 5번째 부분이 제한에
 닿았습니다). 파일을
@@ -228,11 +228,11 @@ CPU에 따라 44~70분, 네 부분으로는 2026-11-21에 10~21분 걸렸습니�
 돌리려면:
 
 ```bash
-PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/12
+PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/16
 ```
 
 시험 시간의 균형이 어긋나면, 한 번의 완전한 실행에서 나온 JUnit 파일(artifact
-`source-tests-<k>-of-12` 열두 개를 한 폴더에 푼 것)로 저장소 루트에서 표를 다시 만듭니다.
+`source-tests-<k>-of-16` 열여섯 개를 한 폴더에 푼 것)로 저장소 루트에서 표를 다시 만듭니다.
 
 ```bash
 python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
@@ -280,10 +280,10 @@ sdist에서), 압축본을 배포 검사와 같은 규칙으로 확인합니다.
 `PHYSMAT_RII_PATH`가 필요합니다. 없으면 그 시험이 건너뛰어지고, 건너뛴 시험이 있으면
 실패하기 때문입니다. Linux에서만 확인했습니다. 소스 시험은 `linux-py312-tests`에서 돕니다.
 
-CI에서는 이 job을 `--shard K/12`로 열두 부분, `installed-tests (1/12)`~`(12/12)`로 돌립니다.
+CI에서는 이 job을 `--shard K/16`로 열여섯 부분, `installed-tests (1/16)`~`(16/16)`로 돌립니다.
 각 부분은 자기 wheel을 빌드·설치하고(약 2분), 복사한 시험 파일 전체에서
 `tools/shards/openphysics_shard.py`가 소스 시험과 같은 표로 자기에게 배정한 시험 파일을 pytest에
-넘깁니다. 결과 검사는 그 파일마다 결과가 있는지 확인합니다. 열두 부분을 합치면 모든 시험 파일을
+넘깁니다. 결과 검사는 그 파일마다 결과가 있는지 확인합니다. 열여섯 부분을 합치면 모든 시험 파일을
 한 번씩 돌리며, 각 부분은 자기 파일과 예상 시간을 `shard.json`에 남깁니다. job 하나로 돌리던 때는
 2026-11-20에 러너 CPU에 따라 39~71분 걸렸고, 63분 실행을 여덟으로 나누면 부분마다 7.1~10.9분이며
 가장 긴 부분은 M3 판 세밀화 연구 하나입니다.
@@ -634,9 +634,9 @@ notices, slow 연구.
 
 - Linux: `distributions-and-test-results`. 사전 검사 묶음별 JUnit XML, 배포물 체크섬과 보고서,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
-- 소스 시험: 부분마다 `source-tests-<k>-of-12`. `source-tests-<k>.xml`, 교차 검사 기록,
+- 소스 시험: 부분마다 `source-tests-<k>-of-16`. `source-tests-<k>.xml`, 교차 검사 기록,
   `numeric-runtime.json`이 든 `.validation/` 디렉터리입니다.
-- 설치 시험: 부분마다 `installed-test-results-<k>-of-12`. 빌드한 배포물, `installed-tests.xml`,
+- 설치 시험: 부분마다 `installed-test-results-<k>-of-16`. 빌드한 배포물, `installed-tests.xml`,
   `shard.json`, `installed-origins.json`, `suite-file-hashes.json`, 라이선스 보고서, 교차 검사
   기록이 든 `.validation/` 디렉터리입니다.
 - 설치 플랫폼: `installed-packages-<os>-<run_id>`. 모든 명령의 종료 코드와 로그,
