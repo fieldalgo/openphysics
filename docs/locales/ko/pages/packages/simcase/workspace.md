@@ -1794,9 +1794,10 @@ Run 1 and Run 2; their n_eff, TE fractions and effective areas were.*가 붙습�
 
 - **필요할 때만.** 탭의 모든 필드가 텍스트로 들어가는 동안에는 아무것도 바뀌지 않으며 파일도 전처럼 씁니다. 필드를 모두 텍스트로
   담을 수 없게 되는 첫 도착(결과, 재계산한 필드, Add runs from file, 또는 실행을 되돌리는 **Keep Run N, drop … instead**) 때 탭의
-  모든 필드를 단정밀도로 보관하고, 줄어든 크기로 실행 보관의 순서를 적용합니다. Messages는 한 번 이렇게 알립니다: *Fields are now
-  kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged.
-  Files saved from now on need this Studio or later (session version 14).* 그 뒤 들어오는 필드도 모두 같은 방식으로 보관하며, 탭은
+  모든 필드를 단정밀도로 보관하고, 줄어든 크기로 실행 보관의 순서를 적용합니다. Messages는 한 번 이렇게 알립니다: *More field
+  plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are
+  unchanged. Files saved from now on open in this Studio or later; files you already have still open.* (이 파일은 광학 세션
+  버전 14이며, 이전 Studio는 이름을 들어 거부합니다.) 그 뒤 들어오는 필드도 모두 같은 방식으로 보관하며, 탭은
   되돌아가지 않습니다. File › Open과 Restore는 필드를 모두 텍스트로 담을 수 있는 한 파일에 담긴 그대로 보관하므로, 열어서 바꾸지
   않고 다시 저장한 파일은 원래 바이트와 같습니다.
 - **바뀌는 것.** 장 표본을 float32로 반올림합니다(유효숫자 약 7자리, 상대 오차 최대 2^-24, 약 6e-8). 노드 좌표와 삼각형은 그대로

@@ -1242,7 +1242,7 @@ try {
   // Model with runs and File › Save write at once, asking nothing, and the file holds exactly the
   // fields the tab shows; the file opened again shows a run without fields by its values (4.1),
   // Compare lists its modes by number (4.2), and Recompute Run N's fields brings its field back.
-  const m4eMessages = [], COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
+  const m4eMessages = [], COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
   const LET_GO = /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./;
   const m4eStarted = Date.now();
   for (const wl of [1570, 1580, 1590, 1600, 1610, 1620, 1630, 1640, 1650, 1660, 1670, 1680]) {
@@ -3189,7 +3189,7 @@ try {
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 five runs within the field budget', p2);
-    assert.ok(p2.message.includes('Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).'), p2.message);
+    assert.ok(p2.message.includes('More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.'), p2.message);
     assert.ok(!/fields were not kept/.test(p2.message), p2.message);
     assert.ok(!p2.message.includes('Session is now'), p2.message); assert.ok(!p2.message.includes('MiB'), p2.message);
     assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser$/.test(p2.header), p2.header);
@@ -3529,7 +3529,7 @@ try {
     // result whose fields would not all fit as text (the first written as version 14); from there on
     // version 14; every field kept (no run "values only"); the record is Save's text after each result
     // (above). The let-go words, the Results block of a run without fields and Recompute are in M4-e.
-    const COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
+    const COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
     const said = k10.map((e, i) => e.message.includes(COMPACT_WORDS) ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
     assert.deepEqual(said, [first14], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
     assert.ok(first14 > 0 && k10.slice(first14).every(e => e.version === 14) && k10.slice(0, first14).every(e => e.version !== 14), JSON.stringify(k10.map(e => e.version)));

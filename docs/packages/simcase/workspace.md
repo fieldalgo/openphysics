@@ -2194,9 +2194,10 @@ that more fields fit the [16.8 MB budget](#keeping-runs-values-and-fields).
   written as before. At the first arrival whose fields would not all fit as text (a result, a
   recomputed field, Add runs from file, or **Keep Run N, drop … instead** bringing a run back), every
   field in the tab is kept at single precision, and the order of run retention applies with the
-  smaller sizes. Messages says once: *Fields are now kept at single precision (float32), so more of
-  them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on
-  need this Studio or later (session version 14).* From then on every field that arrives is kept the
+  smaller sizes. Messages says once: *More field plots now fit in 16.8 MB: Studio keeps them at single
+  precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now
+  on open in this Studio or later; files you already have still open.* (Those files are optical
+  session version 14, which an earlier Studio refuses by name.) From then on every field that arrives is kept the
   same way; the tab never converts back. File › Open and Restore keep a file's fields as the file
   holds them unless they would not all fit as text, so a file opened and saved again unchanged is its
   own bytes.
