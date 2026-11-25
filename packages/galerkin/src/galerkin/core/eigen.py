@@ -39,6 +39,11 @@ class DegenerateModeWarning(RuntimeWarning):
     """A returned eigenvalue is multiple (to DEGENERATE_GAP): its derivatives are NaN."""
 
 
+class StaticFamilyNearCutoffWarning(RuntimeWarning):
+    """k0^2 is too near a TM cutoff of the PEC box to deflate the vector search's static family;
+    the search ran undeflated, as before deflation (galerkin._waveguide_kernels)."""
+
+
 #: SciPy's ARPACK drivers as imported, so a test that replaces ``spla.eigs`` does not change
 #: the capability answer.
 _ARPACK = {"eigs": spla.eigs, "eigsh": spla.eigsh}
@@ -62,6 +67,18 @@ def arpack_rng(solver="eigs") -> dict:
     """
     function = _ARPACK[solver] if isinstance(solver, str) else solver
     return {"rng": np.random.default_rng(0)} if _takes_rng(function) else {}
+
+
+def dominant_eigenvalue(operator, tol):
+    """The eigenvalue of largest modulus of ``operator`` (ARPACK, v0 = ones, seeded), or None when
+    ARPACK does not converge. It calls SciPy's eigs as imported, so a test that replaces
+    ``spla.eigs`` to record a mode search sees only that search."""
+    try:
+        values = _ARPACK["eigs"](operator, k=1, which="LM", v0=np.ones(operator.shape[0]), tol=tol,
+                                 return_eigenvectors=False, **arpack_rng())
+    except spla.ArpackError:
+        return None
+    return complex(values[0])
 
 
 def scipy_matrix(matrix):
