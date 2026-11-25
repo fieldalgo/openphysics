@@ -2195,7 +2195,9 @@ that more fields fit the [16.8 MB budget](#keeping-runs-values-and-fields).
   run the document with simcase.
 - **Limitation.** For a run first opened from a version 6 or 7 file, the stored TE fractions and
   effective areas were computed by Studio from that file's field; after saving, Studio labels them as
-  stored values.
+  stored values. A run whose TE fractions or effective areas come out not a number (only a synthetic
+  file holds one, such as the runs of the project fixture `project-v1.json`) leaves the tab without a
+  field budget, as before compact fields: its fields stay as they are.
 - **Sizes** (2026-11-25, T18 strip over a silicon substrate, core mesh 30 nm; text → single
   precision): closed, 2 modes 2.25 → 1.02 MB; closed, 4 modes 4.10 → 1.74 MB; closed near 2.46, 4
   modes 4.08 → 1.74 MB; open, 2 modes (with or without n_g) 3.92 → 1.11 MB (6,263 nodes, 12,253

@@ -582,11 +582,12 @@ clamp and nothing cut, at 1440 × 900 and 390 × 844, and the full sentence in O
 the group index on before any run *Closed window · group index on (3 solves)* with **Turn off group
 index**, after a closed 4-mode run without it *… · about N s* (3 × its time), the button turning the
 option off (*Closed window · last such run m:ss*, the box unchecked, *Group index off: …*), and after
-a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB with every field) giving,
-since run retention, *… Run 1 (…) keeps its values; its fields were not kept (16.8 MB limit).*,
-wrapped in Messages with no overflow, no size line and no *MiB*, the header *… · kept for recovery in this
-browser* with nothing after it, and the record in IndexedDB within 16.8 MB holding Run 5's field and
-the newest others, exactly the runs the run list does not mark *values only*; after the fourteen
+a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB with every field as text)
+giving, since compact fields, *… Fields are now kept at single precision (float32), so more of them
+fit in 16.8 MB. …* (it was the let-go line *… Run 1 (…) keeps its values; its fields were not kept
+(16.8 MB limit).* under run retention), wrapped in Messages with no overflow, no size line and no
+*MiB*, the header *… · kept for recovery in this browser* with nothing after it, and the record in
+IndexedDB (version 14) within 16.8 MB holding every run's field, as the run list shows; after the fourteen
 values-only runs and a sixth real run (Run 20) the record again within the budget with Run 20's
 field and equal to the tab (P2); with 20 runs the
 drop line, **Pin Run 1** to **Pin Run 3**, the dropped words and the swap button naming a closed n_g
@@ -619,11 +620,23 @@ higher than the numbers above (Run 7 is Run 21), and the words read *up to 20 ru
 stage in its own browser context (RT, run retention, pre-registered K10) runs eight template runs and four T18
 runs (closed 2 and 4 modes, closed near 2.46, open with n_g): after each result the IndexedDB record
 is within 16 MiB and is File › Export's text byte for byte (no question), and its fields are exactly
-the runs the list does not mark *values only*; a run without fields shows its Results block, the
-field export waits with *Recompute Run N's fields first*, Compare lists its modes by number, each
-whole and wrapped at 1440 × 900 and 390 × 844; and **Recompute Run N's fields** shows *Recomputing
-Run N's fields* in the job panel, matches, attaches the field to the same run (no run added), the
-field view draws again and the record equals Save's text. The K1 (sizes at 20 runs of the T18 mix)
+the runs the list does not mark *values only*. Since compact fields (design *Compact field encoding*)
+the twelve fields fit: the conversion sentence appears once, at the result whose fields would not
+all fit as text, the files are version 14 from there on, no run is *values only*, and Results shows
+*Field at single precision (float32). The values above are the engine's.* (whole at both sizes) and
+the run-list note its extra sentence. The same stage measures F7 and F12: the field view of the three
+closed T18 runs (every component, mode 1 and the last mode at 1440 × 900, mode 1's magnitude at 390 ×
+844), their line profile and an Export field PNG, before and after the conversion, differ by at most
+one level per channel on at most 0.1 % of the pixels; and in the page, the encode and decode of a field
+of T19's size and the conversion of the tab's own session (read back from the record before the
+conversion) are timed, the conversion within 500 ms. M4-e (the wide 8-mode runs of the 1550 nm
+template) is the browser home of a field let go in the tab: wide runs are added past the conversion
+until a field goes (nine wide runs), with the let-go words, the *values only* marks, a version 14 file
+whose run without fields shows its Results block (whole and wrapped at 1440 × 900 and 390 × 844, the
+field export waiting with *Recompute Run N's fields first*), the 4.1 line once opened and Compare by
+number; then **Recompute Run N's fields** (moved from RT) shows *Recomputing Run N's fields* in the
+job panel, matches, attaches the field to the same run at single precision (no run added) and the
+field view draws again. The K1 (sizes at 20 runs of the T18 mix)
 and K5 (a recomputed field equals the original) measurements are `tools/studio_run_retention.mjs`
 (`engine`, then `k1` and `k5`), which solve the T18 and T16 documents with the server's own job.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
@@ -744,9 +757,11 @@ this browser · changed since both-models.json, not saved · kept for recovery i
 (round 23, E5; *… · not saved to a file · …* before, read once recovery has kept the restored
 session). After the next change it reads *both-models · changed since both-models.json, not saved ·
 kept for recovery in this browser* (round 24, B2; *both-models · not saved to a file · …* before).
-Then (R24, pre-registered P1) finer runs fill the field budget until a result lets other runs'
-fields go (*… keeps its values; its fields were not kept (16.8 MB limit).*, a run marked *values
-only*) and the header reads *both-models · changed since both-models.json, not saved · kept for
+Then (R24, pre-registered P1) finer runs fill the field budget until a result's fields would not all
+fit as text (*… Fields are now kept at single precision (float32), …*; since compact fields, where
+run retention let other runs' fields go), Results shows *Field at single precision (float32). The
+values above are the engine's.*, only the fourteen values-only imports are *values only*, and the
+header reads *both-models · changed since both-models.json, not saved · kept for
 recovery in this browser* (it read *… without the fields of Run N* before run retention). The opened project, changed before its next run, reads *both-models ·
 both-models.json · changed since opened · kept for recovery in this browser*. There is no
 horizontal overflow at 1440 × 900 or 390 × 844. The round-19 restore of the file opened now names the
