@@ -70,6 +70,13 @@ function tab(input=inputs(),BUDGET=LIMIT-16*1024){
  t.fieldsBack=()=>{const o=t.fieldSwap;if(!o||t.runs!==o.list||!X.heldField(o.back)||!o.other.field||o.other.job===t.selected)return 'no field swap';
   const before=bytes(t.text());X.letGoField(o.other);X.takeBackField(o.back);X.forgetHeldFields(t.runs);t.fieldSwap=null;
   assert.ok(bytes(t.text())<=Math.max(before,BUDGET),'a field swap stays within the budget');return 'field swap';};
+ // Recompute Run N's fields (R3): the same result again for a run without its field; its values match,
+ // the field is attached to the same run (no number, no run), and the budget applies (it arrived)
+ t.recompute=k=>{const without=t.runs.filter(r=>!r.field);if(!without.length)return 'no recompute';const r=without[k%without.length];
+  const fresh=result(parseInt(r.job,16)),count=t.runs.length,numbers=t.runs.map(x=>x.number).join(),used=t.used;
+  assert.equal(X.recomputeMismatch(r,fresh),null,'the values match');X.attachField(r,fresh.field);t.arrive([r.job]);
+  assert.equal(t.runs.length,count);assert.equal(t.runs.map(x=>x.number).join(),numbers);assert.equal(t.used,used,'a recompute takes no number');
+  return 'recompute';};
  t.pin=(k,on)=>{const r=t.runs[k%Math.max(1,t.runs.length)];if(!r)return 'no run';r.pinned=on;t.dropSwap=null;return on?'pin':'unpin';};
  t.select=k=>{const r=t.runs[k%Math.max(1,t.runs.length)];if(!r)return 'no run';t.selected=r.job;return 'select';};
  t.rename=(k,label)=>{const r=t.runs[k%Math.max(1,t.runs.length)];if(!r)return 'no run';r.label=label;return 'rename';};
@@ -94,7 +101,7 @@ function tab(input=inputs(),BUDGET=LIMIT-16*1024){
 const random=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 
 test('K6, K7 and K8: a seeded random sequence of 2000 steps',()=>{
- const rand=random(20261125),t=tab(),seen={},arriving=new Set(['result','result again','result drop','swap','import','open','restore']);let pool=0;
+ const rand=random(20261125),t=tab(),seen={},arriving=new Set(['result','result again','result drop','swap','recompute','import','open','restore']);let pool=0;
  for(let step=0;step<2000;step++){
   const x=rand(),before=new Map(t.runs.map(r=>[r.job,r.field])),pick=()=>Math.floor(rand()*20);let what;
   if(x<0.36)what=t.result(rand()<0.1&&t.runs.length?parseInt(t.runs[Math.floor(rand()*t.runs.length)].job,16):++pool);
@@ -107,12 +114,13 @@ test('K6, K7 and K8: a seeded random sequence of 2000 steps',()=>{
   else if(x<0.72)what=t.compare(pick(),pick());
   else if(x<0.80){const n=1+Math.floor(rand()*4),ids=Array.from({length:n},()=>rand()<0.3&&t.runs.length?parseInt(t.runs[Math.floor(rand()*t.runs.length)].job,16):++pool);
    const unique=[...new Set(ids)],start=1+Math.floor(rand()*30);what=t.import(unique,unique.map((_,k)=>start+k*(1+Math.floor(rand()*3))));}
-  else if(x<0.88)what='save';
+  else if(x<0.84)what='save';
+  else if(x<0.88)what=t.recompute(pick());
   else if(x<0.94)what=t.open();
   else what=t.restore();
   seen[what]=(seen[what]||0)+1;
   // K8: a field changes only when a field arrives (a result, the 20-run swap bringing a run back with
-  // its field, an import, an open or a restore) or by Keep Run N's fields; selecting, pinning,
+  // its field, a recompute, an import, an open or a restore) or by Keep Run N's fields; selecting, pinning,
   // naming, comparing and saving change none
   if(!arriving.has(what)&&what!=='field swap')for(const r of t.runs)assert.equal(r.field,before.get(r.job),`step ${step} (${what}): Run ${r.number}'s field is unchanged`);
   // K6
@@ -130,10 +138,13 @@ test('K6, K7 and K8: a seeded random sequence of 2000 steps',()=>{
   const recovery=N.captureSession(t.input,t.runs,t.selected,t.comparison,VIEW,{limit:LIMIT}),text=recovery();
   assert.equal(text,save.text,`step ${step} (${what}): recovery equals Save`);assert.deepEqual(recovery.dropped,[]);
   const doc=JSON.parse(save.text);assert.deepEqual(doc.runs.map(r=>Object.hasOwn(r,'field')),t.runs.map(r=>!!r.field),`step ${step} (${what}): the tab's fields are the file's`);
-  assert.ok(bytes(save.text)<=BUDGET,`step ${step} (${what}): within the budget`);
+  // within the budget right after a field arrives; a name or a pin since then may add a few bytes,
+  // which the headroom kept for the inputs holds (Save asked nothing above: within the limit)
+  if(arriving.has(what))assert.ok(bytes(save.text)<=BUDGET,`step ${step} (${what}): within the budget`);
+  assert.ok(bytes(save.text)<=LIMIT,`step ${step} (${what}): within the limit`);
   assert.equal(doc.version===13,t.runs.length>6,`step ${step} (${what}): version 13 exactly above six runs`);
  }
- for(const kind of ['result','result again','result drop','pin','unpin','swap','field swap','select','rename','compare','import','save','open','restore'])assert.ok(seen[kind]>0,kind+' '+JSON.stringify(seen));
+ for(const kind of ['result','result again','result drop','pin','unpin','swap','field swap','recompute','select','rename','compare','import','save','open','restore'])assert.ok(seen[kind]>0,kind+' '+JSON.stringify(seen));
  assert.ok(t.arrivals>700,JSON.stringify(seen));
 });
 

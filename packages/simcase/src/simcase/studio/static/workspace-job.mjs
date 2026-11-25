@@ -28,6 +28,13 @@ export function validatePending(record){
   if(typeof record.checkOf!=='string'||!/^[a-f0-9]{8}$/.test(record.checkOf)||!extra.openBoundary||extra.pmlCheck||!Number.isInteger(n)||n<1||n>8||!Number.isInteger(i)||i<0||i>=n)throw new Error('Invalid pending PML check.');
   Object.assign(extra,{checkOf:record.checkOf,checkIndex:i,checkCount:n});
  }else if(record.checkIndex!==undefined||record.checkCount!==undefined)throw new Error('Invalid pending PML check.');
+ // run retention (Recompute Run N's fields): this job recomputes the fields of the run of job `job`
+ // and number `number`; its result attaches them to that run and never makes a run
+ if(record.recompute!==undefined){
+  const r=record.recompute;
+  if(r===null||typeof r!=='object'||typeof r.job!=='string'||!/^[a-f0-9]{8}$/.test(r.job)||!Number.isSafeInteger(r.number)||r.number<1||extra.checkOf||extra.pmlCheck)throw new Error('Invalid pending recompute.');
+  extra.recompute={job:r.job,number:r.number};
+ }
  return {version:1,job:record.job,serverInstance:record.serverInstance,serverVersion:record.serverVersion,startedAt:record.startedAt,revision:record.revision,input,...(modeCount===DEFAULT_MODE_COUNT?{}:{modeCount}),...extra};
 }
 export function readPending(storage){const raw=storage.getItem(PENDING_JOB_KEY);if(!raw)return null;if(new TextEncoder().encode(raw).length>70000)throw new Error('Pending record is too large.');return validatePending(JSON.parse(raw));}
