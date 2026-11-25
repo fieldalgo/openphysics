@@ -128,11 +128,11 @@ test('V-P3 an entry whose check values were computed again still meets parseSess
  const changed=PF.sessionWriterText(doc.models[0].session);doc.models[0].bytes=Buffer.byteLength(changed);doc.models[0].digest=sha(changed);
  assert.throws(()=>PF.readProject(S.sessionJson(doc)),{message:'Optical waveguide: Run 2 changed after it was saved (its check value does not match).'});
  // a newer session version inside an entry is refused by its own words (14 since version 13, more than six runs)
- const newer=JSON.parse(text);newer.models[0].session.version=14;const t10=PF.sessionWriterText(newer.models[0].session);newer.models[0].bytes=Buffer.byteLength(t10);newer.models[0].digest=sha(t10);
- assert.throws(()=>PF.readProject(S.sessionJson(newer)),{message:'Optical waveguide: This session file is version 14, newer than this Studio reads (versions 6–13). Open it in a newer Studio.'});
+ const newer=JSON.parse(text);newer.models[0].session.version=15;const t10=PF.sessionWriterText(newer.models[0].session);newer.models[0].bytes=Buffer.byteLength(t10);newer.models[0].digest=sha(t10);
+ assert.throws(()=>PF.readProject(S.sessionJson(newer)),{message:'Optical waveguide: This session file is version 15, newer than this Studio reads (versions 6–14). Open it in a newer Studio.'});
 });
 test('the workspace entry takes the versions parseSession reads, from its own list',()=>{
- assert.deepEqual([...PF.KIND_VERSIONS.workspace],[...N.OPTICAL_SESSION_VERSIONS]);assert.deepEqual([...N.OPTICAL_SESSION_VERSIONS],[6,7,9,10,11,12,13]);  // 10: the optical open boundary (slice P2); 11: the closed-window search (slice C2); 12: the run numbers; 13: more than six runs
+ assert.deepEqual([...PF.KIND_VERSIONS.workspace],[...N.OPTICAL_SESSION_VERSIONS]);assert.deepEqual([...N.OPTICAL_SESSION_VERSIONS],[6,7,9,10,11,12,13,14]);  // 10: the optical open boundary (slice P2); 11: the closed-window search (slice C2); 12: the run numbers; 13: more than six runs
  assert.deepEqual([...PF.KIND_VERSIONS.multiphysics],[8]);
  for(const name of ['optical-v6-one.json','optical-v7-three.json']){const t=fixture(name);
   const text=PF.writeProject(project({active:'m1',entries:[PF.projectEntry({id:'m1',kind:'workspace',title:'Optical waveguide',card:'optical',text:t})]})).text;

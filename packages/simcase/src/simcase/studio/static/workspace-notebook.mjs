@@ -5,6 +5,7 @@ import {validateProject,withoutStudy,withStudy,projectStudy,projectBoundary,STUD
 import {OPEN_ADAPTER,isOpenRun,checkOpenSettings,checkCandidateRecord,checkPmlCheck,modeCandidates} from './workspace-open-run.mjs';
 import {CLOSED_TARGET_ADAPTER,checkClosedTarget} from './workspace-closed-target.mjs';
 import {readOpticalField,fieldScalars,FIELD_METADATA,PML_FIELD_METADATA,physicalBounds,windowField} from './workspace-field.mjs';
+import {isCompactRecord,decodeField,encodeField,compactRecord,isCompactField,markCompact,COMPACT_FIELD_KEYS} from './workspace-field-encoding.mjs';
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
@@ -59,8 +60,14 @@ export const NUMBERED_SESSION_VERSION=12;
 // session has more than six runs; otherwise version 12, 11, 10, 9 or 7, byte for byte. The previous
 // Studio reads versions 6 to 12 and refuses a version 13 file by name before it counts the runs.
 export const RUNS_SESSION_VERSION=13;
-/** Whether a version writes and reads the run number (versions 12 and 13). */
-const numbered=version=>version===NUMBERED_SESSION_VERSION||version===RUNS_SESSION_VERSION;
+// Format 14 (compact fields, design "Compact field encoding"): format 13 whose runs may hold a compact
+// field (workspace-field-encoding.mjs: float32 samples, float64 coordinates and uint32 triangles in
+// base64); a run with a compact field also stores its TE fractions and effective areas. Written only
+// when a run kept with its field holds it compact; otherwise version 13, 12, 11, 10, 9 or 7, byte for
+// byte. The previous Studio reads versions 6 to 13 and refuses a version 14 file by name.
+export const COMPACT_SESSION_VERSION=14;
+/** Whether a version writes and reads the run number (versions 12 to 14). */
+const numbered=version=>version===NUMBERED_SESSION_VERSION||version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION;
 // The adapter of this Studio: optical-shapes-v8 builds the document of optical-shapes-v7 with the
 // mode count asked for (1 to 8). A version 7 run is a v8 run of two modes: its document is the same.
 export const OPTICAL_ADAPTER='optical-shapes-v8';
@@ -156,7 +163,7 @@ const METHOD=/^[^\u0000-\u001f\u007f-\u009f]{1,64}$/;
  * fields, nothing else read), 9 or 10 for a run of a version 9 or 10 file (all its keys checked),
  * absent for a run of this tab (a new result, or one read before). number: the run's place in a
  * file. A run of optical-shapes-v9 (an open boundary) is read from version 10 files only. */
-export function validateRun(record,imported=false,{format=null,number=null}={}){
+export function validateRun(record,imported=false,{format=null,number=null,compact=false}={}){
  const which=number?`Run ${number}`:'This run';
  if(!record||typeof record.job!=='string'||!/^[a-f0-9]{8}$/.test(record.job))throw new Error('Invalid run identifier.');
  if(typeof record.completedAt!=='string'||!Number.isFinite(Date.parse(record.completedAt)))throw new Error('Invalid run timestamp.');
@@ -222,7 +229,15 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
   if(record.pml_check!==undefined)extra.pml_check=checkPmlCheck(record.pml_check,k,which);
  }else if(record.open_boundary!==undefined||record.pml_check!==undefined)throw new Error(`${which}: a closed window has no open boundary record.`);
  else if(extra.group_index_im!==undefined)throw new Error(`${which}: a closed window has a real group index.`);
- const f=record.field;let field=null;
+ let f=record.field,field=null,stored=null;
+ // a compact field: the record of a version 14 file (its strings decoded and checked), or a field of
+ // this tab already compact (its record kept with it); either is then read as nested numbers
+ if(isCompactRecord(f)){
+  if(format!==null&&!compact)throw new Error(`${which}: a compact field is read from a version 14 session file only.`);
+  f=decodeField(f,format===7?2:k,which);
+  stored=Object.freeze({...Object.fromEntries(COMPACT_FIELD_KEYS.map(key=>[key,record.field[key]])),counts:Object.freeze({...record.field.counts})});
+ }else if(isCompactField(f))stored=compactRecord(f);
+ if(stored&&(extra.te_polarization_fraction===undefined||extra.effective_area===undefined))throw new Error(`${which} has a compact field and no saved TE fractions and effective areas.`);
  if(f==null){
   // only a version 9 file leaves fields out (absent there; null on a run read from one)
   if(format===7||settings.adapter===V7_ADAPTER||(format===null&&f===undefined))throw new Error('Missing run fields.');
@@ -230,6 +245,7 @@ export function validateRun(record,imported=false,{format=null,number=null}={}){
  }else{
   field=readOpticalField({node_coordinates:f.node_coordinates,field_units:{node_coordinates:'m'},triangles:f.triangles,vector_fields:[{...(settings.adapter===OPEN_ADAPTER?PML_FIELD_METADATA:FIELD_METADATA),real:f.real,imag:f.imag}]},format===7?2:k,{open:settings.adapter===OPEN_ADAPTER});
   for(let mode=0;mode<k;mode++)fieldScalars(field,mode);
+  if(stored)markCompact(field,stored);
  }
  const run={pinned:record.pinned===true,label:validateRunLabel(record.label),serverVersion:record.serverVersion??null,job:record.job,completedAt:new Date(record.completedAt).toISOString(),settings:JSON.parse(JSON.stringify(settings)),input,signature:studySignature(input,asked,extra.group_index_method!==undefined,settings.pml??null,settings.search_target??null),effective_index:[...re],field,origin:imported?'imported':['imported','recovered'].includes(record.origin)?record.origin:'local'};
  if(im!==null)run.effective_index_im=[...im];
@@ -278,7 +294,8 @@ export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.
  * and the digest of the record. */
 function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
  const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_im,group_index_method,open_boundary,pml_check,...record}=validateRun(run);
- const fields=field&&{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag};
+ // a compact field is written again from its record (the strings it was read from or encoded to)
+ const fields=field&&(compactRecord(field)??{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag});
  if(version===SESSION_VERSION)return {...record,settings:v7Settings(record.settings),field:fields};
  const settings=record.settings.adapter===V7_ADAPTER?{...record.settings,adapter:OPTICAL_ADAPTER}:record.settings;
  const out={job:record.job,...(numbered(version)?{number}:{}),completedAt:record.completedAt,label:record.label,pinned:record.pinned,origin:record.origin,serverVersion:record.serverVersion,settings,input:record.input,
@@ -295,6 +312,18 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
 }
 // The TE fractions and effective areas a run shows (opticalModes keeps them on the run).
 const modeValues=run=>{const modes=opticalModes(run);return {te:modes.map(m=>m.fte),area:modes.map(m=>m.area)};};
+/** A run's field made compact (session version 14), in place: the run stores the TE fractions and
+ * effective areas it showed (the engine's, or those computed from its float64 field for a run of a
+ * version 6 or 7 file), then its field is encoded (workspace-field-encoding.mjs) and read back, so
+ * the run holds the float32 samples a file holds. A run without a field, or already compact, is
+ * unchanged. Returns the run. */
+export function compactRunField(run){
+ if(!run.field||isCompactField(run.field))return run;
+ const shown=modeValues(run);
+ const checked=validateRun({...run,field:encodeField(run.field),te_polarization_fraction:shown.te,effective_area:shown.area});
+ run.te_polarization_fraction=shown.te;run.effective_area=shown.area;run.field=checked.field;
+ return run;
+}
 const utf8Bytes=text=>new TextEncoder().encode(text).length;
 // Run retention (workspace-retention.mjs): the bytes a run's field takes in a session file of version 9
 // or later, the record written with its field less the record written without it (the record text
@@ -381,6 +410,8 @@ function readView(view){
  * and the input is of version 6 or 7, else 9 (an input of version 8, with study settings, is
  * held by version 9 only). */
 export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ // version 14 only when a run is written with a compact field
+ if(runs.some(run=>isCompactField(run.field)&&(!keep||keep.has(run.job))))return COMPACT_SESSION_VERSION;
  // version 13 only above six runs: a session of six or fewer is written as before
  if(runs.length>PREVIOUS_RUN_LIMIT)return RUNS_SESSION_VERSION;
  // version 12 when a run's number is not its place in the list; a run without one is at its place
@@ -525,9 +556,9 @@ export const newerVersionText=(version,highest)=>`This session file is version $
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
 /** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
  * accepts these, so a later version is added here only (workspace-project-file.mjs). */
-export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION,RUNS_SESSION_VERSION]);
-/** The most runs a session file of this version holds: 20 in version 13, six in versions 6 to 12. */
-export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION?RUN_LIMIT:PREVIOUS_RUN_LIMIT;
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION,RUNS_SESSION_VERSION,COMPACT_SESSION_VERSION]);
+/** The most runs a session file of this version holds: 20 in versions 13 and 14, six in versions 6 to 12. */
+export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION?RUN_LIMIT:PREVIOUS_RUN_LIMIT;
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
@@ -539,9 +570,9 @@ export function parseSession(text,{recovered=false}={}){
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
   if(doc?.format!=='openphysics-studio-session'||doc.version!==MULTIPHYSICS_VERSION)throw new Error('Session is not valid JSON.');}
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
- if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>RUNS_SESSION_VERSION)throw new Error(newerVersionText(doc.version,RUNS_SESSION_VERSION));
+ if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>COMPACT_SESSION_VERSION)throw new Error(newerVersionText(doc.version,COMPACT_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&doc.version===MULTIPHYSICS_VERSION)return readMultiphysicsSession(doc,{recovered});
- const twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
+ const twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION||doc?.version===COMPACT_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
  if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>sessionRunLimit(doc.version))throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
@@ -579,7 +610,7 @@ export function parseSession(text,{recovered=false}={}){
    // a version 6 or 7 run: its keys of version 7 only (any other key is not read, as before)
    record={job:r?.job,completedAt:r?.completedAt,label:r?.label,pinned:r?.pinned,origin:r?.origin,serverVersion:r?.serverVersion,settings:r?.settings,input:r?.input,effective_index:r?.effective_index,field:r?.field};
   }
-  const run=validateRun(record,true,{format:eleven?11:ten?10:nine?9:7,number:numbers[i]});if(recovered)run.origin='recovered';Object.defineProperty(run,'number',{value:numbers[i],writable:true,configurable:true,enumerable:false});return run;}),ids=runs.map(r=>r.job);
+  const run=validateRun(record,true,{format:eleven?11:ten?10:nine?9:7,number:numbers[i],compact:doc.version===COMPACT_SESSION_VERSION});if(recovered)run.origin='recovered';Object.defineProperty(run,'number',{value:numbers[i],writable:true,configurable:true,enumerable:false});return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');
  if(doc.selected!==null&&!ids.includes(doc.selected))throw new Error('Selected run is missing.');
  if(!Array.isArray(doc.comparison)||doc.comparison.length!==2||!doc.comparison.every(id=>id===null||ids.includes(id)))throw new Error('Invalid comparison selection.');
