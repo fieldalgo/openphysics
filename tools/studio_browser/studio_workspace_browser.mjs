@@ -1714,7 +1714,8 @@ try {
     await page.click('#download-again-save-as'); await page.until("document.getElementById('save-name-dialog').open", 'A2 Save As… from the question');
     const a2SaveAs = {asked: a2Key, title: await page.eval("document.getElementById('save-name-title').textContent"), name: await page.eval("document.getElementById('save-name-input').value")};
     stage('A2 Ctrl+S asks; Save As…', a2SaveAs);
-    assert.deepEqual(a2Key, AGAIN); assert.equal(a2SaveAs.title, 'Save As'); assert.equal(a2SaveAs.name, 'design-a-ng.json');
+    // round 29 (L3): the second Download again of design-a-ng.json in this tab: the question says (2)
+    assert.deepEqual(a2Key, {...AGAIN, description: 'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (2).json.'}); assert.equal(a2SaveAs.title, 'Save As'); assert.equal(a2SaveAs.name, 'design-a-ng.json');
     await page.click('#save-name-download');
     const o1Third = await newDownload(before); assert.match(o1Third, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Third), 660);
     // Save As is prefilled with the current name; Cancel writes nothing
