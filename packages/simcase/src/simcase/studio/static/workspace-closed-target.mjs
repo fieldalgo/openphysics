@@ -84,6 +84,18 @@ export const slabQuestionText=risk=>`${risk.edge} touches the window edge, so a 
  * workspace-workflow.mjs), the first reads "Set search near 2.46 · 4 modes · show Run 6": it sets the
  * shortcut and shows that run, running nothing. */
 export const slabQuestionButtons=(t,shown=null)=>[shown==null?`${shortcutText(t)} and run`:`${shortcutText(t)} · show Run ${shown}`,'Run as set','Cancel'];
+/** Round 28 follow-up (round 29, L1): the slab shortcut's mode count is for the closed window
+ * only. The memory of the count the shortcut replaced: set(from, to, t) when the shortcut changes
+ * Modes to find (from, to, the target t); clear() on any other change of Modes to find (typed, Undo,
+ * Redo, new inputs); onOpen(count) when the outer boundary turns to Open boundary: {modeCount: from,
+ * text} when the shortcut changed the count and it is still the shortcut's, else null; it then
+ * forgets. "Modes to find back to 2: 4 was for the closed window's search near 2.46." */
+export const shortcutModesBackText=(from,to,t)=>`Modes to find back to ${from}: ${to} was for the closed window's search near ${shortTarget(t)}.`;
+export function shortcutModesMemory(){
+ let memo=null;
+ return {set(from,to,t){memo={from,to,t};},clear(){memo=null;},
+  onOpen(count){const m=memo;memo=null;return m&&m.from!==m.to&&count===m.to?{modeCount:m.from,text:shortcutModesBackText(m.from,m.to,m.t)}:null;}};
+}
 /** What the question is asked for: the geometry (shapes), the boundary and Modes to return. */
 export const slabQuestionKey=({shapes,openBoundary=null,searchTarget=null})=>JSON.stringify([shapes,openBoundary??null,searchTarget??null]);
 /** The question's memory: asked(key) once it is answered (any answer, Escape included); seen(key) on
