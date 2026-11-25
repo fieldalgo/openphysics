@@ -36,6 +36,10 @@ metadata declares Python >=3.12; CI tests Python 3.12 only. The lower bounds
 numpy 1.26, scipy 1.11.2, shapely 2.0.2 and matplotlib 3.8 are the first
 releases with Python 3.12 wheels. The non-slow suite passed on exactly those
 versions once, by hand (2026-10-21, Linux, Python 3.12); CI tests only the pins.
+On SciPy 1.17 and later, galerkin and simcase pass ARPACK a fixed generator
+(`rng=np.random.default_rng(0)`, checked once by signature) for its restart vector; below 1.17
+eigs and eigsh have no `rng`, so a search that reaches a degenerate cluster can differ from run
+to run there.
 
 The optional array libraries for `galerkin[jax]` and `galerkin[torch]` are pinned
 separately. CI installs the CPU build of torch first, because the PyPI Linux
