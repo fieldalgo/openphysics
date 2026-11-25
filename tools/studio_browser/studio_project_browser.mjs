@@ -780,7 +780,11 @@ try {
     await clearRecorded(); k4.heated = await heatedItems('K4'); await recorded('K4 heated record');
     await toOptical('K4 optical again');
     k4.after = await numbersNow('K4 after');
-    await width(660); await clearRecorded(); await runOptical('K4 next run'); await recorded('K4 next run recorded'); await page.press('tab', 'Results'); k4.next = await runItems();
+    // R24 P1 (B2): a project opened from a file, then changed: the header names that file and the change
+    await width(660);
+    await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'R24 P1 opened file changed', 30000);
+    k4.changedTitle = await title();
+    await clearRecorded(); await runOptical('K4 next run'); await recorded('K4 next run recorded'); await page.press('tab', 'Results'); k4.next = await runItems();
     stage('K4 numbers after Open project', k4);
     assert.deepEqual(k4.after, k4.before);
     assert.deepEqual(k4.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
@@ -789,6 +793,7 @@ try {
     assert.deepEqual(k4.before.compare.map(t => t.split(' · ')[0]), ['Run 2', 'Run 3', 'Run 4', 'Run 5', 'Run 6', 'Run 7']);
     assert.doesNotMatch(k4.opened, /numbered from 1/); assert.match(k4.opened, /^Opened project both-models \(both-models\.json\): /);
     assert.equal(k4.next[0].split(' · ')[0], 'Run 8'); assert.equal(k4.next.length, 6);
+    assert.equal(k4.changedTitle, 'both-models · both-models.json · changed since opened · kept for recovery in this browser');
     // K5: the browser closed and started again; Restore newest restores both models with their numbers
     await clearRecorded(); const k5 = {before: await numbersNow('K5 before')}; await recorded('K5 record');
     await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K5 start page');
@@ -819,6 +824,23 @@ try {
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'K5 header kept after a change', 30000);
     k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
     assert.equal(k5.changed, 'both-models · changed since both-models.json, not saved · kept for recovery in this browser');
+    // R24 P1 (B2): the same recovered project, changed, goes over the limit with 8-mode runs of a
+    // 2800 nm wide core on a fine mesh (the field grows with the core's triangles, as R23's substrate
+    // does): browser recovery leaves fields out and the header keeps naming both-models.json, with
+    // those runs
+    const r24 = {runs: []};
+    await width(2800);
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
+    await page.fill('spinbutton', 'Modes to find', 8);
+    for (const nm of [20, 21, 22, 23, 24, 25]) {
+      await page.press('tab', 'Model'); await page.press('treeitem', 'Mesh'); await page.until("!!document.getElementById('core-mesh-number')", 'R24 mesh ' + nm);
+      await page.fill('spinbutton', 'Core mesh size [nm]', nm); await runOptical('R24 run at ' + nm); r24.runs.push(nm);
+      try { await page.until("/ · kept for recovery in this browser without the fields of Run \\d+/.test(document.getElementById('project').textContent)", 'R24 fields left out', 30000); break; } catch {}
+    }
+    r24.title = await title(); r24.message = await status();
+    await noOverflow('R24 P1 fields left out 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 fields left out 390'); await size(1440, 900, false);
+    stage('R24 P1 header with fields left out', r24);
+    assert.match(r24.title, /^both-models · changed since both-models\.json, not saved · kept for recovery in this browser without the fields of Run \d+(?:(?:, | and )Run \d+)*$/);
     await stopBrowser(page);
   }
 
