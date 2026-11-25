@@ -99,3 +99,43 @@ test('P2 (A2): on the download path, Save of a file this tab downloaded asks fir
  assert.ok(app.includes("if(answer!=='saveAs')return {name:null,saveAs:false};\n $('save-name-input').defaultValue=name;return {name:await askFileName(name,{saveAs:true}),saveAs:true};"));
  assert.equal(F.notWrittenNotice({status:'cancelled'},{saveAs:false}),'Save cancelled; nothing was written.');
 });
+
+// ---- P4 (A4): an open run names its core mode and a mode mostly in an edge shape, PML excluded ----
+// a triangle of area 4.5 nm² whose centroid is (x, y) nm, and an open run of these triangles: each
+// mode's |E|² per triangle is given by weight (one component, so e = area * weight)
+function openRun(modes,{openEdges=['left','right','bottom','top'],boundary='PML'}={}){
+ const at={core:[0,110],cladding:[0,800],substrate:[0,-800],substrateEdge:[0,-1100],pml:[0,-1700]},X=[],T=[],keys=Object.keys(at);
+ for(const k of keys){const [x,y]=at[k],d=1,n=X.length;X.push([(x-d)*1e-9,(y-d)*1e-9],[(x+2*d)*1e-9,(y-d)*1e-9],[(x-d)*1e-9,(y+2*d)*1e-9]);T.push([n,n+1,n+2]);}
+ const value=w=>[Math.sqrt(w),0,0];
+ return {settings:{boundary,pml:{thickness:'1000 nm',open_edges:openEdges,target:'2.46'}},
+  input:{model:{shapes:[{type:'rect',name:'Core',material:'Silicon',x:-250,y:0,w:500,h:220},{type:'rect',name:'Substrate',material:'Silica',x:-1500,y:-1200,w:3000,h:700}]}},
+  effective_index:modes.map((_,i)=>2.4-0.1*i),
+  field:{node_coordinates:X,triangles:T,real:modes.map(m=>keys.map(k=>value(m[k]??0))),imag:modes.map(()=>keys.map(()=>[0,0,0]))}};
+}
+test('P4 (A4): open-boundary region notes, measured over the window without the PML, exactly',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ // the closed note's thresholds, unchanged
+ assert.deepEqual([M.EDGE_SHARE,M.EDGE_NEAR,M.EDGE_BAND_NM,M.CORE_SHARE],[0.5,0.01,300,0.5]);
+ const modes=[
+  {core:0.6,substrate:0.2,cladding:0.2,pml:10},        // the core mode; with the PML counted, 0.6 / 11 would not be
+  {substrateEdge:0.7,core:0.1,cladding:0.2,pml:5},      // mostly in Substrate, near its edge
+  {substrate:0.4,core:0.3,cladding:0.3},                // neither share above 50 %
+  {substrate:0.595,substrateEdge:0.005,core:0.1,cladding:0.3}]; // Substrate 60 %, but only 0.5 % near its edges
+ const run=openRun(modes);
+ assert.deepEqual(M.openRegionNotes(run).map(n=>[n.mode,n.kind,n.text]),[
+  [0,'core','Mode 1 is the core mode: 60 % of |E|² in the window (PML excluded) is in Core, which does not touch the window edge.'],
+  [1,'edge','Mode 2 is mostly in Substrate (70 % of |E|² in the window, PML excluded), which continues into the PML at the open window edge.']]);
+ const placed=M.openRegionPlacement(run);
+ assert.ok(Math.abs(placed[0].core.share-0.6)<1e-12&&Math.abs(placed[3].edge.share-0.6)<1e-12&&Math.abs(placed[3].edge.near-0.005)<1e-12);
+ assert.equal(placed[3].edge.named,false);assert.equal(placed[2].edge.named||placed[2].core.named,false);
+ // the bottom edge closed: the closed edge is named, with what to do
+ assert.equal(M.openRegionNotes(openRun(modes,{openEdges:['left','right','top']}))[1].text,'Mode 2 is mostly in Substrate (70 % of |E|² in the window, PML excluded), which touches the closed bottom edge; its n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open.');
+ assert.equal(M.openRegionNotes(openRun(modes,{openEdges:['top']}))[1].text,'Mode 2 is mostly in Substrate (70 % of |E|² in the window, PML excluded), which touches the closed left, right and bottom edges; its n_eff depends on those closed edges. Open them in Geometry › Boundaries to leave them open.');
+ // a closed run, or an open run without fields: nothing here (the closed notes are edgeNotes and coreNotes)
+ assert.deepEqual(M.openRegionNotes(openRun(modes,{boundary:'PEC'})),[]);
+ assert.deepEqual(M.openRegionNotes({...run,field:null}),[]);
+ // no guided or leaky claim in any of the words
+ for(const text of [...M.openRegionNotes(run).map(n=>n.text),M.openEdgeNoteText(0,{shape:'Substrate',share:0.9,closed:['bottom']})])assert.doesNotMatch(text,/\b(?:guided|leaky|bound|radiat\w*)\b/i);
+ // the page puts them in the modes table with the closed window's notes
+ assert.ok(read('workspace-app.mjs').includes("const regions=openRegionNotes(run),edge=new Map([...edgeNotes(run),...regions.filter(n=>n.kind==='edge')].map(n=>[n.mode,n.text])),core=new Map([...coreNotes(run),...regions.filter(n=>n.kind==='core')].map(n=>[n.mode,n.text]))"));
+});

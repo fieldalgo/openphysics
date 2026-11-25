@@ -1809,6 +1809,19 @@ leakage out of the window.
   and is written again byte for byte. A run without valid `physical_bounds` keeps all its samples.
   Two copies of one job, one with full samples and one cropped, are the same result when their
   samples agree on the window. The file version stays 10 and no key is added.
+- **Where each mode lies (round 25, A4).** An open run's modes table gets the closed window's note
+  rows, with the same thresholds (a share above 0.5; for a shape touching the window edge, at least
+  0.01 of |E|² within 300 nm of the edges it touches) and the same shape layering, measured over the
+  physical window only: the triangles whose centroid lies in the 3 × 2.4 µm window, so the PML (kept
+  in runs read from older files) counts in neither the share nor its total. The core mode reads
+  *Mode 3 is the core mode: 64 % of |E|² in the window (PML excluded) is in Core, which does not
+  touch the window edge.* A mode mostly in a shape that meets an open edge reads *Mode 2 is mostly in
+  Substrate (93 % of |E|² in the window, PML excluded), which continues into the PML at the open
+  window edge.*, and at a closed edge of the open run *…, which touches the closed bottom edge; its
+  n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open.* (*…
+  bottom and left edges; … those closed edges. Open them …* for two or more). The notes say where
+  the |E|² lies, not whether a mode is guided or leaks; the loss column says that. Compare's
+  edge-note line and its no-match reason stay closed-window only.
 - Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
   `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
   "im"}` with `group_index_method`. A closed run's `group_index` stays a list. A run written by

@@ -1968,6 +1968,16 @@ try {
     const leakSeconds = await obRun();
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB leakage PML check', 600000);
     const leak = await resultsView(); stage('OB leakage case', {...leak, seconds: leakSeconds});
+    // round 25 (A4, pre-registered P4): the open run names its core mode as a closed window does,
+    // measured over the window without the PML
+    const noteRows = () => ob.eval("[...document.querySelectorAll('#modes-table [data-edge-note],#modes-table [data-core-note]')].map(td=>td.textContent)");
+    const leakNotes = await noteRows(); stage('A4 open region notes, leakage case', {notes: leakNotes});
+    {
+      const mode1 = leakNotes.filter(t => t.startsWith('Mode 1 '));
+      const m = mode1.length === 1 ? /^Mode 1 is the core mode: (\d+) % of \|E\|² in the window \(PML excluded\) is in Core, which does not touch the window edge\.$/.exec(mode1[0]) : null;
+      assert.ok(m && Number(m[1]) >= 51, JSON.stringify(leakNotes));
+      for (const t of leakNotes) assert.doesNotMatch(t, /\b(?:guided|leaky|bound|radiat\w*)\b/i);
+    }
     assert.deepEqual(leak.check.map(([status]) => status), ['independent', 'independent']);
     for (const [, words] of leak.check) { const m = /^PML check: loss changes (\d+(?:\.\d+)?) %$/.exec(words); assert.ok(m && Number(m[1]) < 2, words); }
     // Re-registered after the result (decision 2026-11-23-openphysics-pml-p2-browser-values-per-platform).
@@ -2038,6 +2048,14 @@ try {
     };
     const withoutTime = text => String(text).replace(/"savedAt":"[^"]*"/, '"savedAt":""');
     const first = await obSave('OB V15 save 1');
+    // round 25 (A4, P4): every note row of the leakage run is openRegionNotes of that run, as the file holds it
+    {
+      const leakRun = workspaceSession(first.text).runs.at(-1); // the newest run: the leakage case
+      assert.ok(leakRun.settings.boundary === 'PML' && leakRun.input.model.shapes.length === 2 && !!leakRun.field, 'the leakage run with its field');
+      const regionNotes = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun).map(n => n.text);
+      stage('A4 open region notes from the file', {notes: regionNotes});
+      assert.deepEqual(leakNotes, regionNotes);
+    }
     await obOpen(join(obDownloads, first.name), 'OB V15 open 1');
     const second = await obSave('OB V15 save 2');
     const w = JSON.parse(first.text).models.findIndex(m => m.kind === 'workspace'), runCount = workspaceSession(first.text).runs.length;
