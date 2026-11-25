@@ -29,7 +29,7 @@ import {readOpticalField,fieldScalars,nmTicks,formatNm} from './workspace-field.
 import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,validateRun,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,engineRunValues,engineGroupIndex,engineGroupIndexReasons,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -1632,11 +1632,13 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
 function runNumber(run){return runs.includes(run)&&Number.isInteger(run.number)?run.number:null;}
 function runLabel(run){const n=runNumber(run);return `${n?runTitle(n,run.label)+' · ':run.label?run.label+' · ':''}${runDesign(run)} · λ ${run.input.model.wavelength} nm · ${runTime(run)}${run.origin==='imported'?' · from file':run.origin==='recovered'?' · recovered':''}`;}
 // Where a run came from, kept out of the primary labels and available on request.
-// The modes table of a run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
+// The modes table of a run: | Mode | n_eff | Polarization | Loss (dB/cm) | A_eff (µm²) | n_g |, one merged polarization
 // cell per degenerate pair, and the absorption-loss note once below the table.
 // An open run (slice P2): "Loss (dB/cm)" with the open boundary's cells ("< 0.01 dB/cm" below what it
 // resolves), n_eff with its Im part, and the PML check column when the check ran; polarization and
 // A_eff on the physical window, the PML excluded, and Re n_g (slice P3).
+// a loss column's header: "Loss (dB/cm)" and what it counts on its own line (round 24, B6)
+function lossHead(th,header,qualifier){th.textContent='';th.append(...lossHeaderNodes(document,header,qualifier));return th;}
 function modesTable(run){
  const box=document.createElement('div');box.className='modes-table';
  const open=isOpenRun(run),{rows,loss}=modeTableRows(opticalModes(run),{open,...(open?{areaHelp:OPEN_AREA_HELP,polarizationHelp:OPEN_POLARIZATION_HELP,missing:SOURCE_TEXT.noWindow,areaMissing:SOURCE_TEXT.noWindow}:{})});
@@ -1646,7 +1648,7 @@ function modesTable(run){
  const table=document.createElement('table');table.id='modes-table';
  const caption=document.createElement('caption');caption.textContent=open?openTableTitle():'Computed modes';table.append(caption);
  const cell=(tag,text,attrs={})=>{const el=document.createElement(tag);el.textContent=text;for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el;};
- const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}),cell('th',loss.header,{scope:'col',title:loss.help}),cell('th','A_eff (µm²)',{scope:'col',title:open?OPEN_AREA_HELP:AREA_HELP}),cell('th','n_g',{scope:'col',title:groupIndexHelp()}));
+ const head=document.createElement('tr');head.append(cell('th','Mode',{scope:'col'}),cell('th','n_eff',{scope:'col'}),cell('th','Polarization',{scope:'col',title:open?OPEN_POLARIZATION_HELP:POLARIZATION_HELP}),lossHead(cell('th','',{scope:'col',title:loss.help}),loss.header,loss.qualifier),cell('th','A_eff (µm²)',{scope:'col',title:open?OPEN_AREA_HELP:AREA_HELP}),cell('th','n_g',{scope:'col',title:groupIndexHelp()}));
  if(checks)head.append(cell('th',CHECK_HEADER,{scope:'col',title:CHECK_HELP}));
  const thead=document.createElement('thead');thead.append(head);table.append(thead);
  // the n_g hint, when the run has no n_g: on a line above the table (as Compare has it), the header just "n_g"
@@ -1804,12 +1806,15 @@ function compareTable(a,b,match){
  const caption=document.createElement('caption');caption.id='compare-neff-caption';caption.textContent=match.disabled?'Modes of A and B (not matched)':'Modes of A and B matched by field overlap';table.append(caption);
  const head=document.createElement('thead'),top=document.createElement('tr'),sides=document.createElement('tr');
  // [short header, full label (one column) or the full label's start (A and B), help]
- const columns=[['Modes','Modes'],['Polarization','Polarization',POLARIZATION_HELP,true],['Overlap','Overlap'],['n_eff','n_eff',null,true],['Δn_eff (B − A)','Δn_eff (B − A)'],['Δ % (of A)','Δ % (of A)'],['A_eff (µm²)','A_eff',AREA_HELP,true,' (µm²)'],[isOpenRun(a)||isOpenRun(b)?'Loss (dB/cm)':'Absorption loss (dB/cm)','Absorption loss',isOpenRun(a)&&isOpenRun(b)?OPEN_LOSS_HELP:isOpenRun(a)||isOpenRun(b)?'Each side follows its run: material absorption only in a closed window, with leakage for an open boundary':ABSORPTION_HELP,true,' (dB/cm)'],['n_g','n_g',groupIndexHelp(),true]];
+ const columns=[['Modes','Modes'],['Polarization','Polarization',POLARIZATION_HELP,true],['Overlap','Overlap'],['n_eff','n_eff',null,true],['Δn_eff (B − A)','Δn_eff (B − A)'],['Δ % (of A)','Δ % (of A)'],['A_eff (µm²)','A_eff',AREA_HELP,true,' (µm²)'],['Loss (dB/cm)','Loss',isOpenRun(a)&&isOpenRun(b)?OPEN_LOSS_HELP:isOpenRun(a)||isOpenRun(b)?'Each side follows its run: material absorption only in a closed window, with leakage for an open boundary':ABSORPTION_HELP,true,' (dB/cm)'],['n_g','n_g',groupIndexHelp(),true]];
  for(const [short,full,help,paired,unit=''] of columns){
   if(!paired){top.append(cell('th',short,{scope:'col',rowspan:'2','data-column':full,...(help?{title:help}:{})}));continue;}
   const group=cell('th',short,{scope:'colgroup',colspan:'2',...(help?{title:help}:{})});top.append(group);
-  // the loss of each side follows its own run: "Absorption loss A (dB/cm)" and "Loss B (dB/cm)"
-  for(const [side,run] of [['A',a],['B',b]]){const loss=full==='Absorption loss'&&isOpenRun(run),name=loss?'Loss':full,h=loss?OPEN_LOSS_HELP:help;sides.append(cell('th',side,{scope:'col','data-column':`${name} ${side}${unit}`,title:`${name} ${side}${unit}`+(h?': '+h:''),...(full==='Polarization'?{class:'pol'}:{})}));}
+  // round 24 (B6): "Loss (dB/cm)" with what both sides count on its second line; a closed and an
+  // open run count different things, which the note under the table says (COMPARE_LOSS_NOTE)
+  if(full==='Loss')lossHead(group,short,isOpenRun(a)===isOpenRun(b)?(isOpenRun(a)?PML_LOSS_QUALIFIER:LOSS_QUALIFIER):null);
+  // the loss of each side follows its own run: "Loss A (dB/cm): Absorption (material k) only; …"
+  for(const [side,run] of [['A',a],['B',b]]){const name=full,h=full==='Loss'?(isOpenRun(run)?OPEN_LOSS_HELP:ABSORPTION_HELP):help;sides.append(cell('th',side,{scope:'col','data-column':`${name} ${side}${unit}`,title:`${name} ${side}${unit}`+(h?': '+h:''),...(full==='Polarization'?{class:'pol'}:{})}));}
  }
  // one column group per header of the first row, so its scope=colgroup headers name their two columns
  for(const [,,,paired] of columns){const group=document.createElement('colgroup');if(paired)group.span=2;table.append(group);}

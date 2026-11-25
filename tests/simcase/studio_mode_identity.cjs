@@ -81,25 +81,26 @@ test('loss: dB/cm = propagation_loss / 100 to 4 significant digits; "0 dB/cm" an
  assert.equal(M.modeTableRows([{re:2.4,im:1e-4,fte:1,loss:3749}]).lossless,false);
  assert.equal(M.RANKING_TEXT,'Modes are ranked by effective index.');assert.equal(MP.RANKING_CAVEAT,M.RANKING_TEXT);
 });
-test('round 10: the loss column of a closed window is "Absorption loss (dB/cm)", every cell with the absorption-only help; an open boundary (PML) reads "Loss (dB/cm)"',()=>{
+test('round 10 (round 24, B6): the loss column reads "Loss (dB/cm)", absorption only in a closed window, every cell with the absorption-only help; with an open boundary (PML) absorption + leakage',()=>{
  const tiny=1e-15,lossy=M.propagationLoss(1e-4,1.55e-6);
  // closed, lossless: the header, the help on every cell and the note with the lossless words
  const closed=M.modeTableRows([{re:2.4,im:0,fte:1,loss:null},{re:1.7,im:0,fte:.01,loss:null}]);
- assert.equal(closed.loss.header,'Absorption loss (dB/cm)');
+ // round 24 (B6): one column name, what it counts on the header's second line (it read "Absorption loss (dB/cm)")
+ assert.equal(closed.loss.header,'Loss (dB/cm)');assert.equal(closed.loss.qualifier,'absorption only (closed window)');
  assert.equal(closed.loss.help,'Absorption (material k) only; leakage and radiation are not computed in a closed window');
  assert.ok(closed.rows.every(r=>r.lossTitle===closed.loss.help&&r.loss==='0 dB/cm'));
  assert.equal(closed.loss.note,M.LOSSLESS_NOTE);
  // closed, lossy: the same header and help, digits unchanged, the note without "k = 0"
  const absorbing=M.modeTableRows([{re:2.4,im:1e-4,fte:1,loss:lossy},{re:1.7,im:tiny,fte:.01,loss:M.propagationLoss(tiny,1.55e-6)}]);
  assert.deepEqual(absorbing.rows.map(r=>r.loss),['35.21 dB/cm','3.521e-10 dB/cm']);
- assert.equal(absorbing.loss.header,'Absorption loss (dB/cm)');assert.ok(absorbing.rows.every(r=>r.lossTitle===M.ABSORPTION_HELP));
+ assert.equal(absorbing.loss.header,'Loss (dB/cm)');assert.equal(absorbing.loss.qualifier,'absorption only (closed window)');assert.ok(absorbing.rows.every(r=>r.lossTitle===M.ABSORPTION_HELP));
  assert.equal(absorbing.loss.note,'Absorption loss counts material absorption (k) only. Leakage and radiation are not computed in a closed window.');
  assert.doesNotMatch(absorbing.loss.note,/k = 0/);
  // an open boundary: Im n_eff includes leakage into the PML, so the column does not say absorption only
  const pml=M.physicsModes({effective_index:{unit:'1',re:[[2.4]],im:[[1e-4]]},vacuum_wavelength:{unit:'m',values:[1.55e-6]},summary:{formulation:'vector',open_boundary:true}});
  assert.equal(pml.open,true);
  const open=M.modeTableRows(pml.modes,{open:pml.open});
- assert.equal(open.loss.header,'Loss (dB/cm)');
+ assert.equal(open.loss.header,'Loss (dB/cm)');assert.equal(open.loss.qualifier,'absorption + leakage into the PML');
  assert.equal(open.loss.help,'Material absorption (k) and leakage into the PML of the open boundary');
  assert.equal(open.rows[0].lossTitle,open.loss.help);assert.equal(open.rows[0].loss,'35.21 dB/cm');
  assert.equal(open.loss.note,'Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.');

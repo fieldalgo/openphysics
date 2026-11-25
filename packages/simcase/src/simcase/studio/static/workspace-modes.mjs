@@ -17,18 +17,31 @@ export const POLARIZATION_HELP='TE = share of |E_x|² in |E_x|² + |E_y|², x ho
 // every cell and the note under the table say so; "0 dB/cm" is a lossless run, not a computed leak.
 // A result with an open boundary (PML) has an Im n_eff that includes leakage into the PML: its
 // column is "Loss (dB/cm)", with its own help.
-export const LOSS_HEADER='Absorption loss (dB/cm)';
+// Round 24 (B6, coordinator decision on the round-24 findings): one column name, "Loss (dB/cm)", in
+// every table; the header's second line says what it counts (LOSS_QUALIFIER, PML_LOSS_QUALIFIER).
+// The closed window's column read "Absorption loss (dB/cm)".
+export const LOSS_HEADER='Loss (dB/cm)';
 export const PML_LOSS_HEADER='Loss (dB/cm)';
+export const LOSS_QUALIFIER='absorption only (closed window)';
+export const PML_LOSS_QUALIFIER='absorption + leakage into the PML';
 export const ABSORPTION_HELP='Absorption (material k) only; leakage and radiation are not computed in a closed window';
 export const PML_LOSS_HELP='Material absorption (k) and leakage into the PML of the open boundary';
 export const ABSORPTION_NOTE='Absorption loss counts material absorption (k) only. Leakage and radiation are not computed in a closed window.';
 export const LOSSLESS_NOTE='Absorption loss counts material absorption (k) only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed in a closed window.';
 export const PML_LOSS_NOTE='Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies outside the window: shapes touching an open edge continue through the PML.';
-/** The loss column of a table: {header, help, note}; open: the result has an open boundary (PML);
- * lossless: every mode has Im n_eff exactly 0. */
+/** The loss column of a table: {header, qualifier, help, note}; open: the result has an open
+ * boundary (PML); lossless: every mode has Im n_eff exactly 0. */
 export function lossColumn({open=false,lossless=false}={}){
- if(open)return {header:PML_LOSS_HEADER,help:PML_LOSS_HELP,note:PML_LOSS_NOTE};
- return {header:LOSS_HEADER,help:ABSORPTION_HELP,note:lossless?LOSSLESS_NOTE:ABSORPTION_NOTE};
+ if(open)return {header:PML_LOSS_HEADER,qualifier:PML_LOSS_QUALIFIER,help:PML_LOSS_HELP,note:PML_LOSS_NOTE};
+ return {header:LOSS_HEADER,qualifier:LOSS_QUALIFIER,help:ABSORPTION_HELP,note:lossless?LOSSLESS_NOTE:ABSORPTION_NOTE};
+}
+/** A loss column's header cell content: the name, a space (so the text reads "Loss (dB/cm)
+ * absorption only (closed window)") and the qualifier on a line of its own; qualifier null: the name. */
+export function lossHeaderNodes(doc,header,qualifier){
+ if(!qualifier)return [doc.createTextNode(header)];
+ const name=doc.createElement('span'),sep=doc.createElement('span'),q=doc.createElement('span');
+ name.className='loss-name';name.textContent=header;sep.className='pol-sep';sep.textContent=' ';q.className='loss-qualifier';q.textContent=qualifier;
+ return [name,sep,q];
 }
 // 1e-3, not smaller: the mesh splits a symmetric pair by 1e-4 to 6e-4 at 40-10 nm, below the solver's n_eff
 // error at the same meshes, so two modes closer than 1e-3 cannot be told apart by this solver.

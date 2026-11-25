@@ -396,10 +396,11 @@ try {
   const resultsView = await page.eval("({options:[...document.querySelectorAll('#field-mode option')].map(o=>o.textContent),values:[...document.querySelectorAll('#modes-table [data-neff]')].map(e=>e.textContent),polarization:[...document.querySelectorAll('#modes-table [data-polarization]')].map(e=>e.textContent),loss:[...document.querySelectorAll('#modes-table [data-loss]')].map(e=>e.textContent),area:[...document.querySelectorAll('#modes-table [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue),title:e.title})),areaSource:[...document.querySelectorAll('#run-details .pair')].map(e=>e.textContent).find(t=>/^Effective area/.test(t))||null,head:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.firstChild.textContent),hint:document.querySelector('#modes-table-hint [data-group-index-hint]')?.textContent??null,headText:[...document.querySelectorAll('#modes-table thead th')].map(e=>e.textContent),hintInTable:!!document.querySelector('#modes-table [data-group-index-hint]'),hintAbove:(()=>{const h=document.getElementById('modes-table-hint'),t=document.getElementById('modes-table');return !!h&&!!t&&h.nextElementSibling===t&&h.getBoundingClientRect().bottom<=t.getBoundingClientRect().top})(),lossless:document.getElementById('lossless-note')?.textContent||null,probe:[...document.querySelectorAll('.probe-controls label')].map(l=>l.firstChild.textContent),pin:document.getElementById('pin-run')?.textContent||null,imports:document.getElementById('import-runs')?.textContent})");
   stage('results view', resultsView);
   for (const option of resultsView.options) assert.match(option, /^Mode \d · (TE-like|TM-like|hybrid|pair) · n_eff \d\.\d{8}$/);
-  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
+  // round 24 (B6): one loss column name, what it counts on the header's second line
+  assert.deepEqual(resultsView.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
   assert.equal(resultsView.hint, 'Off · turn on in Study or Optical modes', 'round 12 (N4): the table says how to turn n_g on');
   // round 15 (R3): the header reads just "n_g"; the hint is the line above the table, as on Compare
-  assert.deepEqual(resultsView.headText, ['Mode', 'n_eff', 'Polarization', 'Absorption loss (dB/cm)', 'A_eff (µm²)', 'n_g']);
+  assert.deepEqual(resultsView.headText, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm) absorption only (closed window)', 'A_eff (µm²)', 'n_g']);
   assert.deepEqual([resultsView.hintInTable, resultsView.hintAbove], [false, true], 'R3: the n_g hint is above the table, not in it');
   // A_eff of each mode in µm² from the engine's saved value (a 600 × 300 nm strip: a few tenths of a µm²)
   assert.equal(resultsView.area.length, 2);
@@ -470,7 +471,7 @@ try {
   assert.deepEqual(neffTable.head.slice(0, 4), ['Modes', 'Polarization A', 'Polarization B', 'Overlap']);
   // round 12 (N1): the run names are in the line above the table, the headers short and grouped A | B
   assert.deepEqual(neffTable.head.slice(4, 6), ['n_eff A', 'n_eff B']); assert.deepEqual(neffTable.runs, ['A · Run 1 · design A · closed · 600 × 300 nm · Silicon · λ 1550 nm', 'B · Run 2 · closed · 700 × 300 nm · Silicon · λ 1550 nm']);
-  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Absorption loss A (dB/cm)', 'Absorption loss B (dB/cm)', 'n_g A', 'n_g B']);
+  assert.deepEqual(neffTable.head.slice(8), ['A_eff A (µm²)', 'A_eff B (µm²)', 'Loss A (dB/cm)', 'Loss B (dB/cm)', 'n_g A', 'n_g B']);
   // both sides of a matched row give their A_eff in µm²
   for (const row of neffTable.rows) assert.match(row[8] + ' ' + row[9], /^\d\.\d{4} \d\.\d{4}$/);
   assert.equal(neffTable.rows[0][0], 'A mode 1 ↔ B mode 1'); assert.equal(neffTable.short[0], '1 ↔ 1');
@@ -485,8 +486,10 @@ try {
   const lossCells = await page.eval("[...document.querySelectorAll('#compare-neff tbody tr')].map(r=>[r.querySelector('[data-loss-a]')?.textContent,r.querySelector('[data-loss-b]')?.textContent,r.querySelector('[data-loss-a]')?.title,r.querySelector('[data-loss-b]')?.title])");
   stage('K1 Compare loss', lossCells); assert.equal(lossCells.length, neffTable.rows.length);
   for (const row of lossCells) assert.deepEqual(row, ['0 dB/cm', '0 dB/cm', absorptionHelp, absorptionHelp]);
-  // the two Absorption loss headers (n_g A and n_g B follow them since M5)
-  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].filter(t=>/^Absorption loss /.test(t.dataset.column||t.textContent)).map(t=>t.title)"), [absorptionHelp, 'Absorption loss A (dB/cm): ' + absorptionHelp, 'Absorption loss B (dB/cm): ' + absorptionHelp]);
+  // the loss group and its two headers (n_g A and n_g B follow them since M5); round 24 (B6): "Loss
+  // (dB/cm)" over "absorption only (closed window)" (it read "Absorption loss (dB/cm)")
+  assert.deepEqual(await page.eval("[...document.querySelectorAll('#compare-neff thead th')].filter(t=>/^Loss /.test(t.dataset.column||t.textContent)).map(t=>t.title)"), [absorptionHelp, 'Loss A (dB/cm): ' + absorptionHelp, 'Loss B (dB/cm): ' + absorptionHelp]);
+  assert.equal(await page.eval("[...document.querySelectorAll('#compare-neff thead th[scope=colgroup]')].find(t=>t.querySelector('.loss-qualifier')).textContent"), 'Loss (dB/cm) absorption only (closed window)');
   await noOverflow('Compare with loss columns');
   // round 10 (K5): the plots are framed on the core as Results frames it, and the probe line sits under each plot
   // Compare opened afresh (from Results) at 1440 × 900 and at 1280 × 800
@@ -961,7 +964,7 @@ try {
   for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
     await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
     const fit = await compareFit(); stage('N1 Compare table fit', {width, ...fit});
-    assert.deepEqual(fit.top, ['Modes', 'Polarization', 'Overlap', 'n_eff', 'Δn_eff (B − A)', 'Δ % (of A)', 'A_eff (µm²)', 'Absorption loss (dB/cm)', 'n_g']);
+    assert.deepEqual(fit.top, ['Modes', 'Polarization', 'Overlap', 'n_eff', 'Δn_eff (B − A)', 'Δ % (of A)', 'A_eff (µm²)', 'Loss (dB/cm)', 'n_g']);
     assert.deepEqual(fit.sides, ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']);
     assert.deepEqual(fit.sticky, [], `the first column is sticky at ${width}`); assert.equal(fit.unpinned, 0, 'the A | B headers scroll');
     assert.ok(fit.modesOnTop, `the Modes header is not covered when the box is scrolled at ${width}`);
@@ -1754,7 +1757,7 @@ try {
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
     const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
-    assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm)', 'A_eff (µm²)', 'n_g', 'PML check']);
+    assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm) absorption + leakage into the PML', 'A_eff (µm²)', 'n_g', 'PML check']);
     assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
     assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
     // pre-registered: both modes below what the open boundary resolves
@@ -1836,7 +1839,7 @@ try {
     await ob.click('input[name="outer-boundary"][value="closed"]'); await ob.until("!document.getElementById('target-number')", 'OB Closed chosen');
     await obRun();
     const closedView = await resultsView(); stage('OB template, closed', closedView);
-    assert.equal(closedView.caption, 'Computed modes'); assert.equal(closedView.head[3], 'Absorption loss (dB/cm)');
+    assert.equal(closedView.caption, 'Computed modes'); assert.equal(closedView.head[3], 'Loss (dB/cm) absorption only (closed window)');
     assert.match(closedView.note, / For leakage, choose Open boundary in Physics › Optical modes\.$/);
     // Run 1 is the open run, Run 2 the closed one: A closed, B open
     const jobs = await ob.eval("Object.fromEntries([...document.querySelectorAll('.run-item')].map(e=>[Number(/Run (\\d+)/.exec(e.textContent)?.[1]),e.dataset.run]))");
@@ -1857,7 +1860,9 @@ try {
     assert.deepEqual(compared.matched.map(([id]) => id), ['0:0', '1:1']); assert.equal(compared.unmatched, 0);
     assert.ok(compared.matched.every(([, eta]) => eta >= 0.8), JSON.stringify(compared.matched));
     assert.equal(compared.matchNote, 'Matched by field overlap ≥ 0.8 on a common grid. A low overlap means the mode changed shape between designs.');
-    assert.ok(compared.sides.includes('Absorption loss A (dB/cm)') && compared.sides.includes('Loss B (dB/cm)'), JSON.stringify(compared.sides));
+    assert.ok(compared.sides.includes('Loss A (dB/cm)') && compared.sides.includes('Loss B (dB/cm)'), JSON.stringify(compared.sides));
+    // round 24 (B6): A closed, B open: the group reads "Loss (dB/cm)" alone; the note under the table says what each counts
+    assert.ok(compared.top.includes('Loss (dB/cm)'), JSON.stringify(compared.top));
     assert.equal(compared.lossNote, 'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
     assert.ok(compared.runs[0].includes(' · closed · ') && compared.runs[1].includes(' · open (PML 1 µm) · '), JSON.stringify(compared.runs));
     assert.deepEqual(compared.lossA, ['0 dB/cm', '0 dB/cm']); assert.deepEqual(compared.lossB, ['< 0.01 dB/cm', '< 0.01 dB/cm']);

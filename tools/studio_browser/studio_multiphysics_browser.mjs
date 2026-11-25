@@ -364,7 +364,7 @@ try {
   assert.match(await page.text('#sequence'), /Heat 1 · Done in [0-9.]+ s.*Modes 1 · Done in [0-9.]+ s/);
   // Also solve without heater: the heater-off column follows by itself
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off column', 120000);
-  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Absorption loss (dB/cm) A_eff (µm²) n_eff without heater Δn_eff (coupled − without heater)');
+  assert.equal(await page.text('.mp-neff thead'), 'Mode n_eff (coupled) Polarization Loss (dB/cm) absorption only (closed window) A_eff (µm²) n_eff without heater Δn_eff (coupled − without heater)');
   // A_eff of each mode in µm², the engine's value from this run
   const areas = await page.eval("[...document.querySelectorAll('.mp-neff [data-area]')].map(e=>({text:e.textContent,value:Number(e.dataset.areaValue)}))");
   stage('multiphysics A_eff', {areas}); assert.equal(areas.length, 2);
@@ -381,7 +381,7 @@ try {
   // round 10 (K2): every loss cell and the header give the absorption-only help
   const absorptionHelp = 'Absorption (material k) only; leakage and radiation are not computed in a closed window';
   assert.equal(await page.attr('[data-loss="1"]', 'title'), absorptionHelp); assert.equal(await page.attr('[data-loss="2"]', 'title'), absorptionHelp);
-  assert.equal(await page.eval("[...document.querySelectorAll('.mp-neff thead th')].find(t=>/^Absorption loss/.test(t.textContent)).title"), absorptionHelp);
+  assert.equal(await page.eval("[...document.querySelectorAll('.mp-neff thead th')].find(t=>t.textContent.startsWith('Loss (dB/cm) ')).title"), absorptionHelp);
   assert.doesNotMatch(await page.eval('document.body.innerText'), /not matched between runs|(?:matched|compared) by rank/i);
   assert.equal(await page.text('#mp-candidate-note'), 'Modes are ranked by effective index. This model asks for 2 modes: Modes 1 › Modes to find');
   assert.equal(await page.text('#mp-baseline-note'), 'without heater = Modes 1 alone with no temperature input: every material keeps n₀, its index at T_ref = 300 K.');
