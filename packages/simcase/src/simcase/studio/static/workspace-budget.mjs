@@ -35,3 +35,21 @@ export function budgetChoose(ordered,{base,bytes,selected,budget=FIELD_BUDGET_BY
  return {kept,letGo,total};
 }
 
+// ---- Recompute (section 4.4; the heated model's maps, section 7) -------------------------------
+/** The tolerance a recomputed value must meet: relative 1e-12, or absolute 1e-15 for a value whose
+ * magnitude is below 1e-3 (both the stored and the recomputed value). */
+export const RECOMPUTE_RELATIVE=1e-12,RECOMPUTE_ABSOLUTE=1e-15,RECOMPUTE_SMALL=1e-3;
+export function sameValue(stored,fresh){
+ if(stored===null||fresh===null)return stored===fresh;
+ if(!Number.isFinite(stored)||!Number.isFinite(fresh))return false;
+ const d=Math.abs(fresh-stored);
+ return Math.max(Math.abs(stored),Math.abs(fresh))<RECOMPUTE_SMALL?d<=RECOMPUTE_ABSOLUTE:d<=RECOMPUTE_RELATIVE*Math.abs(stored);
+}
+/** Two values as a refusal writes them: enough digits that they differ (n_eff and n_g to at least 8
+ * decimals, other quantities to at least 9 significant digits). */
+export function valuePair(name,a,b){
+ if(a===null||b===null)return [String(a),String(b)];
+ const fixed=/n_eff|n_g/.test(name)&&Math.abs(a)>=1e-3;
+ for(let d=fixed?8:9;d<=17;d++){const x=fixed?a.toFixed(d):a.toPrecision(d),y=fixed?b.toFixed(d):b.toPrecision(d);if(x!==y||d===17)return [x,y];}
+ return [String(a),String(b)];
+}

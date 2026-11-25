@@ -23,7 +23,7 @@ import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
 import {runChoice} from './workspace-open-run.mjs';
 import {groupIndexStep} from './workspace-modes.mjs';
-import {budgetOrder,budgetChoose} from './workspace-budget.mjs';
+import {budgetOrder,budgetChoose,RECOMPUTE_RELATIVE,RECOMPUTE_ABSOLUTE,RECOMPUTE_SMALL,sameValue,valuePair} from './workspace-budget.mjs';
 
 export {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText};
 export const BUDGET_TEXT=mbText(FIELD_BUDGET_BYTES);
@@ -217,13 +217,7 @@ export function unestimatedFieldRisk(input,runs,selected,comparison,view,next,{b
 // ---- Recompute Run N's fields (section 4.4) ---------------------------------------------------
 /** The tolerance a recomputed value must meet: relative 1e-12, or absolute 1e-15 for a value whose
  * magnitude is below 1e-3 (both the stored and the recomputed value). */
-export const RECOMPUTE_RELATIVE=1e-12,RECOMPUTE_ABSOLUTE=1e-15,RECOMPUTE_SMALL=1e-3;
-export function sameValue(stored,fresh){
- if(stored===null||fresh===null)return stored===fresh;
- if(!Number.isFinite(stored)||!Number.isFinite(fresh))return false;
- const d=Math.abs(fresh-stored);
- return Math.max(Math.abs(stored),Math.abs(fresh))<RECOMPUTE_SMALL?d<=RECOMPUTE_ABSOLUTE:d<=RECOMPUTE_RELATIVE*Math.abs(stored);
-}
+export {RECOMPUTE_RELATIVE,RECOMPUTE_ABSOLUTE,RECOMPUTE_SMALL,sameValue};
 // the values a run stores, by name and mode, in the order the check names them
 function storedValues(run){
  const k=run.effective_index.length,out=[];
@@ -251,14 +245,8 @@ export function recomputeMismatch(run,fresh){
  }
  return null;
 }
-// two values as the refusal writes them: enough digits that they differ (n_eff and n_g to at least 8
-// decimals, other quantities to at least 9 significant digits)
-function twoValues(name,a,b){
- if(a===null||b===null)return [String(a),String(b)];
- const fixed=/n_eff|n_g/.test(name)&&Math.abs(a)>=1e-3;
- for(let d=fixed?8:9;d<=17;d++){const x=fixed?a.toFixed(d):a.toPrecision(d),y=fixed?b.toFixed(d):b.toPrecision(d);if(x!==y||d===17)return [x,y];}
- return [String(a),String(b)];
-}
+// two values as the refusal writes them (workspace-budget.mjs, shared with the heated model's maps)
+const twoValues=valuePair;
 export const recomputingText=run=>`Recomputing ${runTitle(run.number,run.label||'')}'s fields${recomputeEstimate(run)}`;
 export const recomputedText=run=>`${runTitle(run.number,run.label||'')}'s fields recomputed from its stored inputs; its values match.`;
 /** "Run 4's fields were not recomputed: mode 1 n_eff came out 2.43931671, stored 2.43931663. Run 4 is

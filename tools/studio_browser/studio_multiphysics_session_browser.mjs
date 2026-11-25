@@ -789,12 +789,14 @@ print(n)`;
     await runAndWait(n);
     if (n === 5) { await page.until("/Run 1 \\(run at [^)]+\\) keeps its values; its maps were not kept/.test(document.getElementById('file-status').textContent)", 'Run 1 keeps its values', 60000); fifthMessage = await notice(); }
   }
-  // HK10 a (after the result): the fifth result let Run 1's maps go
-  assert.match(fifthMessage, /^Run 5 complete\. .*Run 1 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\./);
+  // HK10 a (after the result): the fifth result let Run 1's maps go, with Recompute Run 1's maps
+  assert.match(fifthMessage, /^Run 5 complete\. .*Run 1 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\. .*Recompute Run 1's maps/);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
-  // HK10 a (after the result): the sixth result let Run 2's maps go; Messages names Run 2
-  await page.until("/Run 2 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\./.test(document.getElementById('file-status').textContent)", 'Run 2 keeps its values', 60000);
-  const letGoMessage = await notice();
+  // HK10 a (after the result): the sixth result let Run 2's maps go; Messages names Run 2 with
+  // Recompute Run 2's maps
+  await page.until("/Run 2 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\./.test(document.getElementById('file-status').textContent)&&!!document.querySelector('#file-status [data-recompute-run=\"2\"]')", 'Run 2 keeps its values', 60000);
+  const letGoMessage = await notice(), recomputeButton = await page.text('#file-status [data-recompute-run="2"]');
+  assert.equal(recomputeButton, "Recompute Run 2's maps");
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 a ' + tag); await page.screenshot('hk10a-' + tag); }
   await size(1440, 900);
   // the tab is the file: recovery holds it whole, and Export › Model with runs writes without a question
@@ -836,8 +838,36 @@ print(n)`;
   stage('HK10 a measured map bytes', {mapBytes: mapBytesMeasured, base: baseMeasured, budget: BUDGET, fit: fitRuns});
   assert.equal(fitRuns.length, 4, 'four maps fit the budget');
   assert.deepEqual(bigSession.runs.filter(r => r.maps === 'kept').map(r => r.number), [...fitRuns].sort((a, b) => a - b), 'the screen keeps the maps the arithmetic fits');
-  stage('HK10 a', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, s5Seconds: (Date.now() - s5Started) / 1000});
+  // HK10 b: Recompute Run 1's maps, its words read while the job's replies are held in the page
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
+  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list for the recompute');
+  await page.click('[data-mp-run]:last-of-type');
+  await page.until("!!document.querySelector('[data-mp-values-only] [data-mp-recompute]')", 'Run 1 without its maps');
+  const valuesOnlyBanner = await page.text('[data-mp-values-only]');
+  await page.eval("(()=>{const f=window.fetch;window.__held=[];window.__hold=true;window.fetch=(u,o)=>{const s=String(u);if(window.__hold&&s.includes('/api/multiphysics/jobs/'))return new Promise(go=>window.__held.push(()=>go(f(u,o))));return f(u,o);};window.__release=()=>{window.__hold=false;const h=window.__held;window.__held=[];h.forEach(x=>x());};})()");
+  await clearNotice(); const recomputeStarted = Date.now(); await page.click('[data-mp-values-only] [data-mp-recompute]'); await page.until("window.__held.length>0", 'recompute started');
+  const during = await page.eval("({heading:document.querySelector('.dock-title>span').textContent,status:document.getElementById('status').textContent,message:document.getElementById('file-status').textContent})");
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 b during ' + tag); }
+  await size(1440, 900);
+  await page.eval('window.__release()');
+  await page.until("/^Run 1's maps recomputed from its stored model; its values match\\./.test(document.getElementById('file-status').textContent)", 'recompute matched', 180000);
+  const recomputeSeconds = (Date.now() - recomputeStarted) / 1000, recomputed = await notice();
+  await runReady();
+  await page.clickTreeItem('Heat 1');
+  await page.until("!!document.querySelector('canvas[data-mp-map=temperature]')", 'Run 1 heat map drawn again');
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 b after ' + tag); await page.screenshot('hk10b-' + tag); }
+  await size(1440, 900);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
+  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list after the recompute');
+  const afterRecompute = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
+  stage('HK10 a b', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, valuesOnlyBanner, during, recomputed, recomputeSeconds, afterRecompute, s5Seconds: (Date.now() - s5Started) / 1000});
   assert.match(letGoMessage, /^Run 6 complete\. /);
+  assert.match(valuesOnlyBanner, /^Run 1's maps are not kept; its n_eff, coupling check and iteration history are kept\. Maps are kept up to 16\.8 MB\. When a result or a recompute arrives, Studio keeps the selected run's maps first, then pinned runs', then the newest\. Selecting a run does not bring its maps back; Recompute does\. Recompute Run 1's maps · about \d+ (?:s|min)$/);
+  assert.match(during.heading, /^Recomputing Run 1's maps · about \d+ (?:s|min)$/); assert.equal(during.status, during.heading); assert.equal(during.message, during.heading);
+  // the order after a recompute (after the result): the selected run (Run 1), then the newest 6, 5, 4:
+  // Run 3's maps go; Run 2 keeps its values only
+  assert.match(recomputed, /^Run 1's maps recomputed from its stored model; its values match\. Run 3 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\./);
+  assert.deepEqual(afterRecompute.map(t => / · values only$/.test(t)), [false, false, false, true, true, false], JSON.stringify(afterRecompute));
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
