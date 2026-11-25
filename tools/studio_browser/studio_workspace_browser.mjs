@@ -3165,16 +3165,20 @@ try {
     const strip = run => { const {job, completedAt, number, digest, label, pinned, ...rest} = run; return JSON.stringify(rest); };
     d2.same = session ? strip(session.runs[0]) === strip(session.runs[1]) : null;
     d2.neff = session ? session.runs.map(x => x.effective_index) : null;
-    // a geometry change: asked again; the first button sets the warning's shortcut and runs it
+    // a geometry change and back (the substrate 690 nm high, then 700 again): asked again; the first
+    // button sets the warning's shortcut and runs it: the core mode is mode 3 of 4 (T18, 2.43931663)
     await rTree('Geometry', "!!document.querySelector('#shape-w')"); await r.click('.shape-item[data-shape="1"]'); await sleep(300);
-    assert.equal(await r.eval("document.getElementById('shape-name').value"), 'Substrate'); await r.type('#shape-h', 690); await sleep(400);
+    assert.equal(await r.eval("document.getElementById('shape-name').value"), 'Substrate');
+    await r.type('#shape-h', 690); await sleep(400); await r.type('#shape-h', 700); await sleep(400);
     before = await runItems(); d2.search = await asked('after the geometry changed'); await r.click('#slab-question-search'); await waitRun(before);
-    d2.after = {plan: await rText('#run-plan'), items: (await runItems()).length, found: await rText('#modes-found'), warning: await r.eval("document.getElementById('run-edge')?.hidden===false")};
+    d2.after = {plan: await rText('#run-plan'), items: (await runItems()).length, found: await rText('#modes-found'), warning: await r.eval("document.getElementById('run-edge')?.hidden===false"),
+      rows: await r.eval("[...document.getElementById('modes-table').tBodies[0].rows].filter(x=>!x.classList.contains('edge-note-row')).map(x=>x.textContent)")};
     stage('R27 D2 slab question', d2);
     for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
     assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
     assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
     assert.equal(d2.after.plan, 'Closed window · near n_eff 2.46'); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
+    assert.equal(d2.after.rows.length, 4, JSON.stringify(d2.after.rows)); assert.ok(d2.after.rows[2].includes('2.43931663'), JSON.stringify(d2.after.rows));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

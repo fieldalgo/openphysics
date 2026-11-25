@@ -1816,7 +1816,8 @@ leakage out of the window.
   Open boundary in Physics › Optical modes.”
 - The found line is always shown: *Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio's second
   search, halfway to the silica index). Move Search near n_eff to find other modes.* (round 27, D3: it
-  names what the second target is). A run of one search (below 1.466, or a run of slice P2) reads as
+  names what the second target is; a result with no mode above 1.45 says *No mode above n = 1.45 was
+  found near n_eff 2.46 and 1.95 (Studio's second search, …). …* in the same words). A run of one search (below 1.466, or a run of slice P2) reads as
   before: *Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to
   find other modes.*
 - Studio keeps the engine's modes with Re n_eff above 1.45.

@@ -215,8 +215,12 @@ export const SECOND_SEARCH_WORDS="(Studio's second search, halfway to the silica
  * searches (/3), the words of P2 for a /2 run. */
 export function runFoundText(found,asked,targetString,record){
  if(!hasSearches(record))return openFoundText(found,asked,targetString)+'. '+MOVE_TARGET_TEXT;
- return openFoundText(found,asked,searchesText(Number(targetString),lowerTarget(Number(targetString))))+' '+SECOND_SEARCH_WORDS+'. '+MOVE_TARGET_TEXT_SEARCHES;
+ return openFoundText(found,asked,secondSearchWhere(Number(targetString)));
 }
+/** Where two searches looked, as every result sentence of a run with the second search writes it:
+ * "2.46 and 1.95 (Studio's second search, halfway to the silica index). Move Search near n_eff to
+ * find other modes." (round 27, D3: the found line and the no-mode error). */
+export const secondSearchWhere=t=>`${searchesText(t,lowerTarget(t))} ${SECOND_SEARCH_WORDS}. ${MOVE_TARGET_TEXT_SEARCHES}`;
 export const openTableTitle=()=>`Modes (open boundary, ${PML_WORDS})`;
 
 // -- the PML check -----------------------------------------------------------------------------
@@ -304,7 +308,7 @@ export function openResultValues(result,re,im,targetValue){
  const target=Number(targetValue),record=checkCandidateRecord(result?.summary?.open_boundary?.[0],'This result',target);
  const keep=shownIndices(re);
  if(!keep.length){
-  const where=hasSearches(record)?`${searchesText(target,lowerTarget(target))}. ${MOVE_TARGET_TEXT_SEARCHES}`:`${targetText(target)}. ${MOVE_TARGET_TEXT}`;
+  const where=hasSearches(record)?secondSearchWhere(target):`${targetText(target)}. ${MOVE_TARGET_TEXT}`;
   throw new Error(`No mode above n = ${SILICA_THRESHOLD} was found near n_eff ${where}`);
  }
  const vf=result.vector_fields?.[0],pick=a=>Array.isArray(a)?keep.map(i=>a[i]):a;
