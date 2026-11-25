@@ -369,8 +369,9 @@ picker listing matched pairs), the number of modes (Modes to find refusing 0, 9 
 Run, accepting 1 and 8, in Optical modes and Study; the template asking for 8 reads *Found 3 of 8
 modes above n = 1.45* with three rows; two 2000 × 400 nm cores of 8 modes matched pair by pair, the
 template against one reading *no match*, the picker listing every pair and fitting at 1440 × 900 and
-390 × 844; a version 9 session saved and opened with the engine's values; six 8-mode runs over
-16 MiB asking first, Cancel writing nothing and the kept file opening a run without fields), then the Joule heating application: the default strip by Picard and by Newton (iteration counts,
+390 × 844; a version 9 session saved and opened with the engine's values; seven 8-mode runs (about
+26 MB with every field) keeping their fields within 16.8 MB, File › Export and File › Save writing at
+once with no question and the file opening a run without fields by its values), then the Joule heating application: the default strip by Picard and by Newton (iteration counts,
 balances, temperature and potential ranges, the two methods agreeing within 1e-6 K; the region
 mesh differs between macOS arm64 and the other platforms, so mesh-dependent values are
 checked within the discretization error), a
@@ -490,7 +491,7 @@ note and the closed Study panel saying the outer boundary is chosen in *Physics 
 the group index named beside Run study while the option is ticked (*Closed window · group index on
 (3 solves) · …*, round 18 words), not once cleared; seven
 template runs (core mesh 30 to 42 nm) listed as Run 7 to Run 2 with *Run 1 (500 × 220 nm · 2 modes)
-was dropped: up to six runs are kept; pin a run to keep it.* and the status line on Run 7; Run 5
+was dropped: up to 20 runs are kept; pin a run to keep it.* and the status line on Run 7; Run 5
 and Run 6 named and compared, an eighth run dropping Run 2 and reading *Run 8 is newer than this
 pair · Compare Run 8 with B*; the Compare pickers named *Run A* and *Run B* in the accessibility
 tree, titled with the full label, the run number and name fitting the visible width at 1440 × 900
@@ -524,8 +525,8 @@ the page until released, the line *When this run finishes, Run 1 (500 × 220 nm 
 with **Pin Run 1**, no horizontal overflow at 1440 × 900 or 390 × 844; Pin during the run moving the
 line to Run 2; the result Run 7 dropping Run 2, Messages *… Run 2 (500 × 220 nm · 2 modes) was dropped*
 with **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead**, which brings Run 2 back and drops
-Run 3 (*Run 2 (…) is back; Run 3 (…) was dropped instead.*, no further button, *Runs · 6 of 6 · 1
-pinned*); a swap button kept from an earlier result and pressed after the next run changing nothing;
+Run 3 (*Run 2 (…) is back; Run 3 (…) was dropped instead.*, no further button, *Runs · 20 of 20 · 15
+pinned* since run retention); a swap button kept from an earlier result and pressed after the next run changing nothing;
 and, after a second session of one run, the Library's box leading with *Restore
 newest from this browser: Optical waveguide · 1 run · Run 1 · saved …* (the record the card offers)
 and the six-run session reading *… · older · saved …*; restoring that older one hides the box, the
@@ -581,14 +582,13 @@ clamp and nothing cut, at 1440 × 900 and 390 × 844, and the full sentence in O
 the group index on before any run *Closed window · group index on (3 solves)* with **Turn off group
 index**, after a closed 4-mode run without it *… · about N s* (3 × its time), the button turning the
 option off (*Closed window · last such run m:ss*, the box unchecked, *Group index off: …*), and after
-a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB) giving *… Session is now
-N.N MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the field plots of Run 1
-are not kept. File › Save will ask whether to keep the field plots of the selected and pinned runs
-only (Run 5).* (round 24, B3: one unit and no *MiB*), wrapped in Messages with no overflow, the
-header *… · kept for recovery in this browser without the fields of Run 1*, and the record in
-IndexedDB within 16 MiB holding Run 5's field and the newest others, exactly the runs not named; after
-a sixth run (about 24 MB) the record again within 16 MiB with Run 6's field and the header naming
-exactly the runs without (P2); with six runs the
+a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB with every field) giving,
+since run retention, *… Run 1 (…) keeps its values; its fields were not kept (16.8 MB limit).*,
+wrapped in Messages with no overflow, no size line and no *MiB*, the header *… · kept for recovery in this
+browser* with nothing after it, and the record in IndexedDB within 16.8 MB holding Run 5's field and
+the newest others, exactly the runs the run list does not mark *values only*; after the fourteen
+values-only runs and a sixth real run (Run 20) the record again within the budget with Run 20's
+field and equal to the tab (P2); with 20 runs the
 drop line, **Pin Run 1** to **Pin Run 3**, the dropped words and the swap button naming a closed n_g
 run (*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), an open run
 (*Run 3 (open (PML 1 µm) · …)*) and a closed-near run (*Run 4 (closed near 2.46 · 4 modes · …)*), each
@@ -609,8 +609,25 @@ optical-v10-open-f8ece10.json, not saved · …* once changed, P1), and none aga
 group index turned on (P4).
 Session files and recovery records hold no wall time, so an estimate from a run read from a file is
 not checked: it cannot occur without a format change. No horizontal overflow at 1440 × 900 or 390 × 844.
+Since run retention (design *Keeping more runs*) the optical model keeps 20 runs, so every stage
+that reached the six-run limit (U2, X3, R21, R22 P4, R23 P4 and the project script's K4) adds
+`tests/simcase/studio_session_fixtures/optical-values-only-14.json` by Add runs from file right
+before the run that reaches the limit: fourteen pinned runs without fields, of a design no stage
+computes (written by `values_only_sessions.mjs`). Every older run is the stage's own, so the 20-run
+drop, Pin and the swap pick the same real runs as before; the stage's later runs are numbered 14
+higher than the numbers above (Run 7 is Run 21), and the words read *up to 20 runs*. A further
+stage in its own browser context (RT, run retention, pre-registered K10) runs eight template runs and four T18
+runs (closed 2 and 4 modes, closed near 2.46, open with n_g): after each result the IndexedDB record
+is within 16 MiB and is File › Export's text byte for byte (no question), and its fields are exactly
+the runs the list does not mark *values only*; a run without fields shows its Results block, the
+field export waits with *Recompute Run N's fields first*, Compare lists its modes by number, each
+whole and wrapped at 1440 × 900 and 390 × 844; and **Recompute Run N's fields** shows *Recomputing
+Run N's fields* in the job panel, matches, attaches the field to the same run (no run added), the
+field view draws again and the record equals Save's text. The K1 (sizes at 20 runs of the T18 mix)
+and K5 (a recomputed field equals the original) measurements are `tools/studio_run_retention.mjs`
+(`engine`, then `k1` and `k5`), which solve the T18 and T16 documents with the server's own job.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
-(*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
+(*Results · run 1* at level 1, *Runs · 2 of 20* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
 opening Results on the run shown), and the round-11 marks now expect exactly Runs selected on
 Results and Compare on Compare.
@@ -715,26 +732,27 @@ the file's save time), and after the restore and that edit the run of Modes to f
 4 modes ·* in the run list and in the Compare pickers, whose tags fit the picker at 1440 and 390 px.
 Since [session version 12](packages/simcase/workspace.md#optical-session-files-version-12)
 (stable run numbers, pre-registered K4 and K5) a further profile opens `heater-study.json`, renames
-the project *both-models*, runs the optical model five more times (seven runs, so Run 1 is dropped)
+the project *both-models*, runs the optical model four more times, adds the fourteen values-only
+runs and runs once more (21 runs, so Run 1 is dropped)
 and saves `both-models.json`; the browser is closed and started again on the same profile, and
 after Open project the run list, the drop line and **Pin Run 2**, *No need to run: Run 5* and the
 Compare picker read the same numbers as before, no numbering sentence is said, and the next run is
-Run 8. The browser is closed again and **Restore newest from this browser** restores both models:
-the same optical and heated numbers, *Restored Optical waveguide (6 runs) and Heated silicon
+Run 22. The browser is closed again and **Restore newest from this browser** restores both models:
+the same optical and heated numbers, *Restored Optical waveguide (20 runs) and Heated silicon
 waveguide (1 run) from this browser, not recomputed.* and the header *both-models · recovered from
 this browser · changed since both-models.json, not saved · kept for recovery in this browser*
 (round 23, E5; *… · not saved to a file · …* before, read once recovery has kept the restored
 session). After the next change it reads *both-models · changed since both-models.json, not saved ·
 kept for recovery in this browser* (round 24, B2; *both-models · not saved to a file · …* before).
-Then (R24, pre-registered P1) finer runs take the session over the limit and the header reads
-*both-models · changed since both-models.json, not saved · kept for recovery in this browser
-without the fields of Run N*. The opened project, changed before its next run, reads *both-models ·
+Then (R24, pre-registered P1) finer runs fill the field budget until a result lets other runs'
+fields go (*… keeps its values; its fields were not kept (16.8 MB limit).*, a run marked *values
+only*) and the header reads *both-models · changed since both-models.json, not saved · kept for
+recovery in this browser* (it read *… without the fields of Run N* before run retention). The opened project, changed before its next run, reads *both-models ·
 both-models.json · changed since opened · kept for recovery in this browser*. There is no
 horizontal overflow at 1440 × 900 or 390 × 844. The round-19 restore of the file opened now names the
 project (*Heater study · recovered from this browser · changed since heater-study.json, not saved ·
-…* since round 23), the workspace script's reduced session
-of six runs after a drop is version 12, and its round-19 restore keeps the run numbers and says
-nothing about numbering. The format's fixtures are
+…* since round 23), the workspace script's 20-run session after a drop is version 13 (version 12 before
+run retention), and its round-19 restore keeps the run numbers and says nothing about numbering. The format's fixtures are
 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json` (written by this Studio with
 `numbered_sessions.mjs write`) and `refusals-v12-fc654fe.json` (what main fc654fe reads, written
 with `numbered_sessions.mjs read` from that commit's static folder in a temporary worktree).
