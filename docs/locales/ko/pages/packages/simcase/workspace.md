@@ -923,8 +923,8 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-12보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 13, newer than this Studio reads
-(versions 6–12). Open it in a newer Studio.”. 버전 9~12는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
+13보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 14, newer than this Studio reads
+(versions 6–13). Open it in a newer Studio.”. 버전 9~13은 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
