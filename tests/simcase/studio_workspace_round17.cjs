@@ -19,16 +19,18 @@ const bigField=()=>{const n=200,X=[],T=[];for(let i=0;i<n;i++){X.push([i*1e-8,0]
 
 test('U2: the limit drops the oldest unpinned run and renumbers nothing; the next number is the largest used + 1',()=>{
  let runs=[],used=0;const dropped=[];
- for(let i=0;i<8;i++){const r=run(job(i));used=W.numberRuns([r],used);const next=N.appendRun(runs,r);dropped.push(...runs.filter(x=>!next.includes(x)));runs=next;}
- assert.deepEqual(runs.map(r=>r.number),[3,4,5,6,7,8]);
+ // the numbers a..b (the optical limit is 20 runs: 22 results drop two)
+ const from=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
+ for(let i=0;i<22;i++){const r=run(job(i));used=W.numberRuns([r],used);const next=N.appendRun(runs,r);dropped.push(...runs.filter(x=>!next.includes(x)));runs=next;}
+ assert.deepEqual(runs.map(r=>r.number),from(3,22));
  assert.deepEqual(dropped.map(r=>r.number),[1,2]);
- assert.equal(used,8);
+ assert.equal(used,22);
  // the same job again keeps its number (appendRun replaces it in place of the old record)
  const again=run(job(5));again.number=runs.find(r=>r.job===job(5)).number;used=W.numberRuns([again],used);runs=N.appendRun(runs,again);
- assert.deepEqual(runs.map(r=>r.number),[3,4,5,7,8,6]);assert.equal(used,8);
+ assert.deepEqual(runs.map(r=>r.number),[3,4,5,...from(7,22),6]);assert.equal(used,22);
  // a run added after a pinned one keeps counting from the largest
- runs[0].pinned=true;const ninth=run(job(9));used=W.numberRuns([ninth],used);const next=N.appendRun(runs,ninth);
- assert.equal(ninth.number,9);assert.deepEqual(runs.filter(x=>!next.includes(x)).map(r=>r.number),[4]);
+ runs[0].pinned=true;const ninth=run(job(23));used=W.numberRuns([ninth],used);const next=N.appendRun(runs,ninth);
+ assert.equal(ninth.number,23);assert.deepEqual(runs.filter(x=>!next.includes(x)).map(r=>r.number),[4]);
 });
 test('U2: a file opened numbers its runs from 1; runs added from a file continue from the largest',()=>{
  const opened=[run(job(1)),run(job(2)),run(job(3))];assert.equal(W.numberRuns(opened),3);assert.deepEqual(opened.map(r=>r.number),[1,2,3]);
@@ -36,8 +38,8 @@ test('U2: a file opened numbers its runs from 1; runs added from a file continue
 });
 test('U2: the message of a dropped run names its number, name, geometry and modes',()=>{
  const r=run(job(3),{number:3});
- assert.equal(W.droppedRunText(r),'Run 3 (closed · 700 × 220 nm) was dropped: up to six runs are kept; pin a run to keep it.');
- assert.equal(W.droppedRunText({...r,label:'Design A'}),'Run 3 · Design A (closed · 700 × 220 nm) was dropped: up to six runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText(r),'Run 3 (closed · 700 × 220 nm) was dropped: up to 20 runs are kept; pin a run to keep it.');
+ assert.equal(W.droppedRunText({...r,label:'Design A'}),'Run 3 · Design A (closed · 700 × 220 nm) was dropped: up to 20 runs are kept; pin a run to keep it.');
 });
 test('U2: the number is written to files once it is not the run\'s place (version 12); the save names a run by its number',()=>{
  const a=run(job(1),{number:4,field:bigField()}),b=run(job(2),{number:7,field:bigField()}),view={mode:0,component:'magnitude',window:'Core region'};

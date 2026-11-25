@@ -16,8 +16,10 @@ test('W2: the runs the next result drops, and the words before, during and after
  assert.deepEqual(W.droppedBy(five),[]);
  const six=[run(1,{pinned:true}),run(2),run(3),run(4),run(5),run(6)];
  assert.deepEqual(W.droppedBy(six).map(r=>r.number),[2]);
- // the run droppedBy names is the one appendRun drops
- const next=N.appendRun(six,run(7));assert.deepEqual(six.filter(r=>!next.includes(r)).map(r=>r.number),[2]);
+ // the run droppedBy names is the one appendRun drops (the optical limit, 20 runs)
+ const twenty=[run(1,{pinned:true}),...Array.from({length:19},(_,i)=>run(i+2))];
+ assert.deepEqual(W.droppedBy(twenty,N.RUN_LIMIT).map(r=>r.number),[2]);
+ const next=N.appendRun(twenty,run(21));assert.deepEqual(twenty.filter(r=>!next.includes(r)).map(r=>r.number),[2]);
  assert.deepEqual(W.droppedBy(six.map(r=>({...r,pinned:true}))),[]);
  // before the run (unchanged), while it computes, after the result
  assert.equal(W.dropWarningText(W.droppedBy(six)[0]),'If you run: drops Run 2 (closed · 4 modes · 700 × 300 nm) · pin it to keep it');
@@ -35,21 +37,22 @@ test('W2: the runs the next result drops, and the words before, during and after
 
 test('W2: Keep Run N swaps with the oldest other unpinned run; none, no button; never seven runs',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs'),N=await import(STATIC+'workspace-notebook.mjs');
- const six=[run(1,{pinned:true}),run(2),run(3,{pinned:true}),run(4),run(5),run(6)],seventh=run(7);
- const next=N.appendRun(six,seventh),dropped=six.filter(r=>!next.includes(r));
+ // the optical limit: 20 runs and a 21st result
+ const twenty=[run(1,{pinned:true}),run(2),run(3,{pinned:true}),...Array.from({length:17},(_,i)=>run(i+4))],seventh=run(7),newest=run(21);
+ const next=N.appendRun(twenty,newest),dropped=twenty.filter(r=>!next.includes(r));
  assert.deepEqual(dropped.map(r=>r.number),[2]);
- const other=W.swapCandidate(next,seventh);assert.equal(other.number,4);
+ const other=W.swapCandidate(next,newest);assert.equal(other.number,4);
  assert.equal(W.keepInsteadLabel(dropped[0],other),'Keep Run 2, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead');
  assert.equal(W.keepInsteadLabel({...dropped[0],label:'Design A'},other),'Keep Run 2 · Design A, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead');
  const swapped=W.swapDropped(next,dropped[0],other);
- assert.deepEqual(swapped.map(r=>r.number),[1,2,3,5,6,7]);assert.equal(swapped.length,6);
+ assert.deepEqual(swapped.map(r=>r.number),[1,2,3,...Array.from({length:17},(_,i)=>i+5)]);assert.equal(swapped.length,20);
  assert.equal(W.keptInsteadText(dropped[0],other),'Run 2 (closed · 4 modes · 700 × 300 nm) is back; Run 4 (closed · 4 modes · 700 × 300 nm) was dropped instead.');
  const heated=r=>`Run ${r.number} (run at 05:31 AM)`;
  assert.equal(W.keepInsteadLabel(dropped[0],other,heated),'Keep Run 2, drop Run 4 (run at 05:31 AM) instead');
  assert.equal(W.keptInsteadText(dropped[0],other,heated),'Run 2 (run at 05:31 AM) is back; Run 4 (run at 05:31 AM) was dropped instead.');
  // no other unpinned run besides the new result: no swap
- const pinned=[run(1),run(2,{pinned:true}),run(3,{pinned:true}),run(4,{pinned:true}),run(5,{pinned:true}),run(6,{pinned:true})];
- const after=N.appendRun(pinned,seventh);assert.equal(W.swapCandidate(after,seventh),null);
+ const pinned=[run(1),...Array.from({length:19},(_,i)=>run(i+2,{pinned:true}))];
+ const after=N.appendRun(pinned,newest);assert.equal(W.swapCandidate(after,newest),null);
  // the heated list keeps six too
  const M=await import(STATIC+'workspace-multiphysics-session.mjs');
  const heatedSix=[1,2,3,4,5,6].map(n=>run(n)),heatedNext=M.appendMultiphysicsRun(heatedSix,seventh);

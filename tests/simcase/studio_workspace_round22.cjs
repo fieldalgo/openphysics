@@ -146,9 +146,12 @@ test('P4 (V4): Pin Run N names the run the next result drops instead (optical an
 test('P4 (V4): a result that drops a run with every other earlier run pinned says why there is no swap',async()=>{
  const W=await import(STATIC+'workspace-workflow.mjs'),N=await import(STATIC+'workspace-notebook.mjs'),M=await import(STATIC+'workspace-multiphysics-session.mjs');
  const six=[listRun(1,{pinned:true}),listRun(2,{pinned:true}),listRun(3),listRun(4,{pinned:true}),listRun(5,{pinned:true}),listRun(6,{pinned:true})],seventh=listRun(7);
- for(const append of [N.appendRun,M.appendMultiphysicsRun]){
-  const next=append(six,seventh),dropped=six.filter(r=>!next.includes(r));
-  assert.deepEqual(dropped.map(r=>r.number),[3]);assert.equal(W.swapCandidate(next,seventh),null);
+ // the optical limit is 20 runs (run retention): its list is twenty runs and a 21st result; the
+ // heated model's is the six runs and the seventh, as before
+ const twenty=[...Array.from({length:20},(_,i)=>listRun(i+1,{pinned:i+1!==3}))],twentyFirst=listRun(21);
+ for(const [append,list,newest] of [[N.appendRun,twenty,twentyFirst],[M.appendMultiphysicsRun,six,seventh]]){
+  const next=append(list,newest),dropped=list.filter(r=>!next.includes(r));
+  assert.deepEqual(dropped.map(r=>r.number),[3]);assert.equal(W.swapCandidate(next,newest),null);
  }
  assert.equal(W.droppedNoSwapText([listRun(3)]),'Run 3 (closed · 4 modes · 700 × 300 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
  assert.equal(W.droppedNoSwapText([listRun(3)],r=>`Run ${r.number} (run at 05:31 AM)`),'Run 3 (run at 05:31 AM) was dropped; every other earlier run is pinned, so no other run can be dropped instead');
