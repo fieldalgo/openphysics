@@ -2088,7 +2088,26 @@ physical pole; the PML check is the test of PML dependence.
 **Validation.** Pre-registered in the design draft (main 2318e5f) before the implementation;
 measured on this branch, Linux:
 
-MEASUREMENTS
+| Gate | Case | Result |
+|---|---|---|
+| G1 | T16: the strip over a substrate, every edge open, the default targets (2.46 and 1.95), 4 modes | 2.44126325 + 8.28e-5i, 1.77279036 + 2.86e-3i, 1.48642654 + 7.92e-3i: leaky into Substrate, each Im n_eff above b (4.8e-6, 4.8e-5, 3.2e-4); the three strings exactly as registered, mode 1's after its core note (64 %): passed |
+| G2 | The template, every edge open, 2 modes; and near 1.600 with 4 modes | 2.44290906, 1.76999578 and 1.49230387 guided, each within b: passed |
+| G3 | The leaky slab, left and right closed, near 2.85 | 2.84472916 and 2.83267892 leaky into Substrate, above b: passed |
+| G4 | The strip over a substrate, only the top edge open, single searches near 2.441, 1.773, 1.49 | 2.44081333, 1.77075412, 1.48502123 guided, within b (the last: Im 2.3e-6, b 1.2e-4): passed |
+| G5 | The strip over a substrate, bottom edge closed, near 2.441 and 1.773 | 2.44110903 and 1.77061893 no claim (a layer, left and right), the registered string: passed. Both leak (7.96e-6 and 1.49e-4, above b), which the bounds cannot certify |
+| G6 | G1 and G2 at core mesh 20 and 60 nm | the same categories; blind: T16's mode 3 at 60 nm, 1.48211701 + 8.22e-3i, leaky into Substrate: passed |
+| G7 (blind) | G1 at 1400 and 1700 nm | 2.60967516 and 1.99870109 (1400 nm), 2.27114152 and 1.62593635 (1700 nm) leaky into Substrate: passed |
+| G8 | Every mode of G1 to G5 | guided within b, leaky above b: passed |
+| G9 | Every closed run of the session fixtures (98 records) | no category text; notes, maps and run records unchanged: passed |
+| G10 | The unit cases (no solve) | passed |
+
+G1 to G8 are slow tests, `tests/simcase/test_studio_mode_channel_gate.py` (G1–G5, G8) and
+`test_studio_mode_channel_mesh.py` (G6, G7), run with the rest of the suite in CI; G9 and G10 are
+`tests/simcase/studio_mode_channel_page.cjs` and `studio_mode_channel.cjs`. The workspace browser
+check compares the T16 notes of its leakage case and of its 8-mode run, and the template's guided
+note, with the page module's texts for the engine run of the same document on the same machine.
+Re n_eff differs between platforms by about 1e-4; the gates compare categories, and strings to 3
+decimals, from the same machine's solve.
 
 ### Mode identity with an open boundary
 
