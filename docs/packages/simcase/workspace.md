@@ -976,10 +976,12 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   is the one of the shown run; otherwise it is marked “(other model)”, Δn_eff is left out, and
   **Run Modes 1 alone** refreshes it. A result names its run and does not change when the model
   is edited.
-- **Runs.** Up to six runs are kept, with the optical rules and words: Results › Runs lists
+- **Runs.** Up to 20 runs are kept with their values, and their maps within the 16.8 MB budget
+  ([keeping heated runs](#keeping-heated-runs-values-and-maps); six runs before H1), with the
+  optical rules and words: Results › Runs lists
   “Run N · name · time”, **Run name** (Enter pins) and **Unpin this run**; pinned runs stay, and
-  when a new run arrives the oldest unpinned run is replaced. Selecting a run shows its result
-  and its freshness line; it does not change the model. With six pinned runs, Run says to unpin
+  when a 21st run arrives the oldest unpinned run is replaced. Selecting a run shows its result
+  and its freshness line; it does not change the model. With 20 pinned runs, Run says to unpin
   one first. Since round 21 Run study starts at once, as in the optical model (round 19's question
   is gone). The line beside it names the run the limit drops: before the run *If you run: drops
   Run 3 (run at 05:31 AM) · pin it to keep it*, while it computes *When this run finishes, Run 3
@@ -1046,7 +1048,8 @@ opening there. This section is the public statement of the format.
 
 - `application` is required and `"multiphysics"` is its only value in version 8. `document` is
   the model as it is now (it may differ from every run), written as File › Export › Model file writes it.
-- `runs` holds up to six runs in completion order. `job` is the server's job identifier
+- `runs` holds up to six runs in completion order (up to 20 in
+  [version 15](#session-files-of-multiphysics-models-version-15)). `job` is the server's job identifier
   (`mp-` and 12 hex digits), `number` the “Run N” shown (the next run is numbered after the
   highest stored), `label` and `pinned` follow the optical rules (at most 80 characters, no
   control characters). `document` is the document the run solved; whether the model changed
@@ -1092,7 +1095,11 @@ opening there. This section is the public statement of the format.
   checks that the file is well formed, not who made it.”
 - **Size.** A file is at most 16 MiB, checked before it is read, and each document in it at
   most 1 MiB. Save session writes every run with its maps when the file fits (six runs of the
-  template mesh are about 2.5 MB). When it does not, it writes nothing and asks, naming the
+  template mesh are about 2.5 MB). Since run retention the tab keeps maps within the 16.8 MB
+  budget ([keeping heated runs](#keeping-heated-runs-values-and-maps)), so Save writes the tab as
+  it is; only a tab that holds more than a file can (the selected run alone over the budget, or
+  inputs grown by more than 16 KiB since the last arrival) still reaches the question. When it
+  does not fit, it writes nothing and asks, naming the
   size: “Session is 22 MB; the limit is 16 MiB. Keep the maps of the selected and pinned runs
   only? …”; **Keep maps for selected and pinned runs** writes the others as `"maps": "not
   kept"`, **Cancel** writes nothing. When even the selected and pinned runs are over the limit,
@@ -1105,7 +1112,8 @@ results were read from the file, not recomputed; input undo starts here.”, run
 replaced; a failure refuses the whole file with a message that names the check, and the model,
 its runs and Undo stay as they were:
 
-- the size and the JSON (a leading byte order mark is removed), at most six runs, unique job
+- the size and the JSON (a leading byte order mark is removed), at most six runs (20 in version
+  15), unique job
   identifiers and run numbers, valid names, pins, times and server versions, `selected` a stored
   run, and the view one the workspace offers;
 - each run's result against its document: the physics names and types, the solve order the
@@ -1124,10 +1132,10 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 14 is refused by name (“This session file is version 15, newer than this Studio
-reads (versions 6–14). Open it in a newer Studio.”; versions 9 to 14 are
-[optical sessions](#optical-session-files-version-9), and a version 8 layout under version 9 is
-refused by its first unknown key), as are another `application` (“This session
+A version above 15 is refused by name (“This session file is version 16, newer than this Studio
+reads (versions 6–15). Open it in a newer Studio.”; versions 9 to 14 are
+[optical sessions](#optical-session-files-version-9), version 15 a multiphysics session of more
+than six runs, and a version 8 layout under version 9 is refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
 result “multiphysics-run-v2”, which this Studio does not read.”) and another document envelope
 (the server reader's refusal, named in the run). Session files of versions 6 and 7 open as
@@ -1138,8 +1146,11 @@ so multiphysics sessions need this Studio or a newer one.
 **Browser recovery** keeps a multiphysics model in the same store as optical sessions, with the
 same limits (one latest and three earlier sessions, each at most 16 MiB, written 0.7 s after a
 change, the cross-tab conflict rule). It writes once the model has a run or was edited since it
-was opened, as the version 8 text Save session would write. Over 16 MiB it keeps the maps of
-the selected and pinned runs only, without a dialog, and the indicator says “kept for recovery in
+was opened, as the text Save session would write (version 8, or 15 above six runs): since run
+retention it holds the tab. Over 16 MiB (a tab that holds more than a file can) it keeps maps in
+the order of run retention, the selected run's, then the pinned runs' and the others' newest
+first, as many as fit, without a dialog (before H1, the selected and pinned runs' only), and the
+indicator says “kept for recovery in
 this browser without the maps of 2 runs · File › Save keeps them”; when even that is over the
 limit it writes nothing new (“browser recovery unavailable: session over 16 MiB · File › Save keeps your work”) and the earlier
 record stays. **Restore last session from this browser**, **Restore earlier session from this
@@ -1162,9 +1173,112 @@ files of versions 6 and 7 written by the Studio before version 8, in
 `tests/simcase/test_studio_multiphysics_session.py` recomputes the digests with Python's
 hashlib and its own writer, and the browser check saves, opens and saves again the template, a
 0.12 µm mesh and a two-run session (the second file byte-identical, every array equal to the
-server's reply as Float64), six runs of a 0.08 µm mesh against the 16 MiB limit, the refusals
-and browser recovery. Not in version 8: a session mixing optical and multiphysics runs, one
+server's reply as Float64), six runs of a 0.08 µm mesh against the 16.8 MB budget with
+Recompute Run 1's maps, 20 runs and the 21st run's drop, the refusals and browser recovery.
+Not in version 8: a session mixing optical and multiphysics runs, one
 mesh shared between runs, adding runs from a file, and mode fields of coupled runs.
+
+### Keeping heated runs: values and maps
+
+Since slice H1 of run retention (design *Keeping more runs*, section 7) the heated model keeps
+the **values** of up to 20 runs and their **maps** within the same budget as the optical model's
+fields ([keeping runs](#keeping-runs-values-and-fields)): the 16 MiB session less 16 KiB kept for
+the inputs, 16,760,832 bytes, said as 16.8 MB. The tab, File › Save, Export › Model with runs,
+the project file's entry and browser recovery hold the same maps.
+
+- **Values.** n_eff, the coupling check, the iteration history and the node and triangle
+  counts. Every run keeps them. A run without its maps is about 20 kB in a file (the template
+  and its finer meshes) and 14 kB for the heated slab example; 20 such runs are about 0.4 MB.
+- **Maps.** The mesh, the heat temperature per node and the coupled input per triangle (the
+  temperature, n, k and n − n₀): what the maps of the heat page and the modes page draw. A run
+  without maps is written as `"maps": "not kept"` with its counts, the record of
+  [version 8](#session-files-of-multiphysics-models-version-8).
+- **When maps go.** Only when maps arrive: a new result, a recompute, File › Open, Open project
+  or Restore, and **Keep Run N, drop … instead** bringing a run back. Selecting, pinning,
+  unpinning, naming a run, the without-heater solves and Show Run N never let maps go.
+- **The order.** The maps kept are those of the selected run, then of the run whose maps just
+  arrived (a recompute, or a run brought back, when it is not the selected one), then of the
+  pinned runs, newest first, then of the other runs, newest first, each while the session stays
+  within the budget; maps that do not fit are skipped and the next older run is tried. The
+  selected run keeps its maps even alone over the budget; Save then refuses as before (*Run 3
+  alone is 18 MB, over the 16 MiB session limit. …*).
+- **The words** are the optical ones with *maps* for *fields* and the heated run names. Beside
+  **Run study**, from the newest run with maps of the same geometry, mesh, materials, physics and
+  couplings: *If you run: Run 3 (run at 14:02) keeps its values, not its maps* with **Pin Run
+  3**; with no such run *If you run: older runs' maps may not be kept (16.8 MB limit) · pin a run
+  to keep its maps first* when the room left is less than the smallest map kept. While the run
+  computes: *When this run finishes, Run 3 (run at 14:02) keeps its values, not its maps*. After
+  the result: *Run 3 (run at 14:02) keeps its values; its maps were not kept (16.8 MB limit).*
+  with **Recompute Run 3's maps** and, when another unpinned, unselected run has maps at least as
+  large, **Keep Run 3's maps, not Run 4's (run at 14:05)** (*Run 3's maps are back; Run 4 (run at
+  14:05) keeps its values, not its maps.*). A pinned run's maps: *Run 2 (pinned) keeps its
+  values; its maps were not kept: the selected and pinned runs' maps are 17.4 MB, over the 16.8
+  MB limit. Unpin a run to keep the newer maps first.* The tree reads *Runs · 9 of 20*, the run
+  list *· values only*, and the note under the run list *Up to 20 runs are kept with their
+  values. Maps are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the
+  selected run's maps first, then pinned runs', then the newest. Selecting a run does not bring
+  its maps back; Recompute does. Pinned runs stay; when a 21st run arrives, the oldest unpinned
+  run is replaced. File › Save keeps every run in one file.*
+- **A run without its maps.** Results shows its n_eff table, the coupling check with the stored
+  counts and range, and in place of the maps *Run 4's maps are not kept; its n_eff, coupling check
+  and iteration history are kept. Maps are kept up to 16.8 MB. …* (a run read from a file
+  without maps: *Maps not kept in this file: n_eff, the coupling check and the iteration history
+  are.*) with **Recompute Run 4's maps** and, for a run computed in this tab, *· about 10 s*. *No
+  need to run* for such a run reads *No need to run: Run 4 already has these values; its maps are
+  not kept. Run study adds a copy with the same values* with **Show Run 4** and **Recompute Run
+  4's maps**.
+- **Recompute Run N's maps** sends the document the run solved to the same run requests. It is
+  not a new run: it takes no number, enters no list and leaves the model, Undo, the selected run
+  and the without-heater results as they are; the dock and the status read *Recomputing Run 4's
+  maps · about 10 s*, and **Stop run** works (*Recompute of Run 4's maps stopped; Run 4 is
+  unchanged.*). The node and triangle counts must be the same, and n_eff (real and imaginary) of
+  every mode, each heat physics' temperature range, each coupling's max |received − sent| and
+  conservation residual, and each iteration step's residuals must match to 1e-12 relative (1e-15
+  absolute below 1e-3); the mesh check and the iteration counts exactly. On a match the maps are
+  attached to the same run, which keeps its job, number, name, pin, time and stored values: *Run
+  4's maps recomputed from its stored model; its values match.*, and the order above applies.
+  Otherwise nothing changes: *Run 4's maps were not recomputed: Modes 1 mode 1 n_eff came out
+  2.44565014, stored 2.44565013. Run 4 is unchanged; Run study makes a new run from the current
+  model.* (with *(stored by Studio 0.9.3; this is 0.9.4)* when the versions differ); a document the
+  server now refuses says *Run 4's maps cannot be recomputed:* and the server's words. The heated
+  solves are bitwise reproducible single-threaded (measured: the template, its 4-mode and 0.12 µm
+  variants and the slab example, each solved twice, gave the same maps to the bit).
+- **Measured** (2026-11-25, `tools/studio_heated_retention.mjs`, single-threaded): maps per run as
+  text are 0.37 MB for the template (1,726 nodes, 3,334 triangles; 2 or 4 modes), 1.49 MB at a
+  0.12 µm mesh, 2.79 MB at 0.08 µm and 2.53 MB for the heated slab example. Of 20 results the
+  budget keeps the maps of all 20 template runs (7.7 MB), 10 at 0.12 µm, 6 of the slab and 5 at
+  0.08 µm, the newest. Compact (single-precision) maps are not part of H1.
+
+The checks are `tests/simcase/studio_heated_retention.cjs` (HK2 to HK4, HK6 to HK9 and HK12 to
+HK14: the formats, a seeded sequence of 2000 steps, the order, the words, recompute refusals and
+recovery), `tests/simcase/studio_heated_retention_engine.cjs` with engine results (HK1 and HK5),
+and the S5 and R21 stages of `tools/studio_browser/studio_multiphysics_session_browser.mjs` (HK10).
+
+### Session files of multiphysics models (version 15)
+
+Version 15 is [version 8](#session-files-of-multiphysics-models-version-8) with up to 20 runs: the
+same top-level keys, the same run records (maps kept, or `"maps": "not kept"` with `counts`), the
+same digest, number rules and checks. Version 8 holds at most six runs.
+
+- **When it is written.** Only when the session has more than six runs. A session of six runs or
+  fewer is written as version 8, byte for byte as before, so an earlier Studio still reads it. A
+  version 15 file of six runs or fewer (edited by hand) is read, and written again as version 8.
+- **Reading.** File › Open, Open project and Restore read up to 20 runs; a file of 21 runs, or a
+  version 8 file of seven, is refused with *Unsupported session format or run count.* A version 15
+  file whose `application` is not `"multiphysics"` is refused as in version 8 (*This session file
+  holds a “optical” model, which this Studio does not read.*).
+- **Earlier Studios.** A Studio that reads up to version 14 (main ddb09a1) refuses a version 15
+  file by name before it counts the runs: *This session file is version 15, newer than this Studio
+  reads (versions 6–14). Open it in a newer Studio.*, after *Heated silicon waveguide: * for a
+  project file's entry, and does not take over a browser-recovery record that holds one. To share
+  runs with such a Studio, save at most six of them. The project file stays version 1 (its
+  multiphysics entry reads version 8 or 15); the optical sessions, documents, server replies and
+  results are unchanged.
+
+The checks are in `tests/simcase/studio_heated_retention.cjs` (HK2: the version 8 sessions of
+main ddb09a1, `multiphysics-v8-ddb09a1.json`, written again byte for byte; HK3: the fixture
+`multiphysics-v15-thirteen-runs.json` of runs 2 and 4 to 15; HK4: what main ddb09a1 reads,
+`refusals-v15-ddb09a1.json`).
 
 ## Results and files
 
