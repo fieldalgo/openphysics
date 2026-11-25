@@ -381,15 +381,15 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    button was until the next input edit. It is one input edit, so **Undo** takes all of it back, Modes
    to find and the group index option included, and **Redo** applies it again; before any run *Nothing is computed until you press Run* and *Optical adapter
    ready · explicit Run required*. A run keeps its number while the tab is open (round 17): a new run takes the largest number used
-   so far + 1, so when the six-run limit drops the oldest unpinned run the others keep theirs, and
-   Messages names the dropped run (*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to six runs are
+   so far + 1, so when the 20-run limit drops the oldest unpinned run the others keep theirs, and
+   Messages names the dropped run (*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to 20 runs are
    kept; pin a run to keep it.*; Add runs from file names its dropped runs the same way). Since round 23
    (E4) every drop word names a run with the parts of its run-list label: the boundary (*closed*,
    *closed near 2.46*, *open (PML 1 µm)*), Modes to find when not 2, *n_g*, then the geometry, so
    *Run 4 (closed · n_g · 600 × 300 nm)* is the run listed as *Run 4 · closed · n_g · 600 × 300 nm ·
    Silicon*; until then it read *Run 4 (600 × 300 nm · 2 modes)*. This holds for the line beside Run
    study, the dropped words, the swap button and the Pin notice; the heated model keeps its own names. Since round
-   18 the box beside **Run study** says it before the run, while six runs are kept and one is not
+   18 the box beside **Run study** says it before the run, while 20 runs are kept and one is not
    pinned: *If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it* (round 20; it read
    *Running drops …* before, as if a run were under way), with **Pin Run 3**,
    which pins that run and moves the line to the next unpinned run, or removes it. Since round 22
@@ -412,11 +412,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    *Run 3 (…) is back; Run 4 (…) was dropped instead.*, with no further button. When every other
    earlier run is pinned no swap can be offered, and since round 22 (V4) the words say why: *Run 3
    (…) was dropped; every other earlier run is pinned, so no other run can be dropped instead*. The tab never holds
-   more than six runs. The button works until the next Run study starts or the run list is replaced
+   more than 20 runs (six before [run retention](#keeping-runs-values-and-fields)). The button works until the next Run study starts or the run list is replaced
    (a file opened, a session restored, runs added from a file, Start new); a stale one does nothing
    and is removed. It is kept in memory only. Add runs from file still names its dropped runs with
-   the sentence above. The limit itself is
-   unchanged. Since [session version 12](#optical-session-files-version-12) files and browser
+   the sentence above. Since run retention the limit is 20
+   runs, and their fields are kept within one budget ([Keeping runs](#keeping-runs-values-and-fields)). Since [session version 12](#optical-session-files-version-12) files and browser
    recovery keep the number whenever it is not the run's place in the list, and File › Open, Open
    project and Restore keep it: after a file whose largest number is 8, the next run is Run 9. A
    file of an earlier version numbers its runs from 1 in file order, and runs added from a file
@@ -1984,52 +1984,38 @@ then `imported`) is written again byte for byte. The digest detects a damaged or
 file; it is not an authentication.
 
 Six runs of 8 modes on the template's mesh (2275 triangles) are about 9.4 MB, about 0.2 MB per
-mode, under the 16 MiB limit. An open run keeps its physical window only: the T16 run is 3.9 MB
-(13.4 MB with the PML), T16 with 3 modes and the group index 5.6 MB (19.0 MB), and six runs (two
-closed strips, the strip over a substrate closed, and three open runs of it) 16.5 MB (15.8 MiB), which Save
-session and browser recovery keep with every field (48.8 MB before, refused). The measurement is
-`tools/studio_open_field_size.mjs`. A session over the limit asks first, as a multiphysics session
-does: *Keep fields for selected and pinned runs* writes the other runs without `field`, with
-their n_eff, TE fractions and effective areas; Cancel writes nothing; when even the selected
-and pinned runs are over the limit, the save is refused, naming the selected run and the pinned
-runs apart: *The selected run (Run 6) and the pinned runs (Run 4, Run 5) are 46.2 MB with their fields,
-over the 16.8 MB session limit. Unpin some of them.* (*Unpin it.* for one pinned run). Without a
-pinned run among them it says *The selected run (Run 6) is 18.9 MB with its fields, over the 16.8 MB
-session limit. Select a different run before saving, so this one is saved without its fields, or run
-it again with fewer modes.* The recovery error says the same after *Recovery snapshot exceeds 16
-MiB:*. When a new run makes the session go over the limit, its result message adds one line:
-*Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the
-field plots of Run 6 are not kept. File › Save will ask whether to keep the field plots of the
-selected and pinned runs only (Runs 1, 2 and 9).* (*Browser recovery keeps every run's values and
-field plots.* when it left nothing out). Round 24 (B3) gave it one unit, MB to one decimal (two
-decimals for a size just over 16.8 MB, which would otherwise read as the limit), and said first what
-was already left out; the Save refusals above use the same unit. Round 23 (E2) had *Session is now 22
-MB, over the 16 MiB (16.8 MB) limit. File › Save will ask … Browser recovery keeps every field but
-those of Run 1 and Run 2.*, whose two units and closing clause testers could not read; before that it read
-*Session is now 18 MB, over the 16 MiB limit: File › Save will ask whether to keep the fields of the
-selected and pinned runs only.*, and testers could not tell what would be lost or whether browser
-recovery still kept everything). When Save would refuse it reads *Session is now 48.8 MB, over the
-16.8 MB limit, and File › Save will refuse:* followed by the refusal and *Browser recovery is off.*
-(the round-18 recovery line is then not repeated). The line wraps in Messages. When the full text
-is over the limit, browser recovery keeps, without asking, the fields of the selected and pinned
-runs, then (since round 23, a coordinator decision) the fields of the other runs newest first (the
-largest run number first) while the record stays within 16 MiB; a field that does not fit is left
-out and the next older one tried. The record format is unchanged: a run without its field is
-written as before, and below the limit the record is byte for byte the one round 22 wrote. Since
-round 23 the header and the save indicator name the runs left out: *… · kept for recovery in this
-browser without the fields of Run 1 and Run 2* (before, they read *kept for recovery in this
-browser* while every field but the selected run's was left out). A restore of such a record adds
-*Fields not kept for Run 1 and Run 2; their n_eff, TE fractions and effective areas were.* to its
-message, and the Results of such a run say its fields were not kept in browser recovery. File ›
-Save still asks about the selected and pinned runs only. Limitation: recovery cannot keep every
-field above 16 MiB, since that needs a larger record or a record of several parts (a format change);
-File › Save of fewer runs, or pinning the runs to keep, keeps the fields. Measured on 2026-11-24 with the T18 strip over a
-silicon substrate (core mesh 30 nm): a closed run with 2 modes is 2.10 MB, with 4 modes 3.78 MB,
-closed near 2.46 with 4 modes 3.75 MB, an open run with 2 modes 3.94 MB with or without n_g (the field
-is 99 % of each; a run without its field is 3 to 21 kB), so the sixth run of T22 brought the session
-to 22 MB and recovery, before the newest-first rule, to 4.0 MB with the field of the selected run
-only. A run without fields shows its
-modes table, but no field view, and Compare says it cannot match its modes by overlap.
+mode. An open run keeps its physical window only: the T16 run is 3.9 MB (13.4 MB with the PML), T16
+with 3 modes and the group index 5.6 MB (19.0 MB). The measurement is
+`tools/studio_open_field_size.mjs`. Measured on 2026-11-24 with the T18 strip over a silicon
+substrate (core mesh 30 nm): a closed run with 2 modes is 2.10 MB, with 4 modes 3.78 MB, closed near
+2.46 with 4 modes 3.75 MB, an open run with 2 modes 3.94 MB with or without n_g (the field is 99 % of
+each; a run without its field is 3 to 21 kB), so the sixth run of T22 brought the session to 22 MB.
+Since [run retention](#keeping-runs-values-and-fields) the optical model keeps its fields within one
+budget, so a session never goes over the limit, Save asks nothing and browser recovery writes Save's
+text. The question, the refusal and the recovery rules below still apply in the two cases where the
+tab holds more than a file can (named in that section).
+
+A session over the limit asks first, as a multiphysics session does: *Keep fields for selected and
+pinned runs* writes the other runs without `field`, with their n_eff, TE fractions and effective
+areas; Cancel writes nothing; when even the selected and pinned runs are over the limit, the save is
+refused, naming the selected run and the pinned runs apart: *The selected run (Run 6) and the pinned
+runs (Run 4, Run 5) are 46.2 MB with their fields, over the 16.8 MB session limit. Unpin some of
+them.* (*Unpin it.* for one pinned run). Without a pinned run among them it says *The selected run
+(Run 6) is 18.9 MB with its fields, over the 16.8 MB session limit. Select a different run before
+saving, so this one is saved without its fields, or run it again with fewer modes.* The recovery error
+says the same after *Recovery snapshot exceeds 16 MiB:*. When a result takes the session over the
+limit its message adds *Session is now 18.9 MB, over the 16.8 MB limit, and File › Save will refuse:*
+with the refusal and *Browser recovery is off.*; when the text grew past the limit with no field
+arriving, the next result's line reads *Session is now 17.0 MB, over the 16.8 MB limit. Browser
+recovery keeps every run's values; the field plots of Run 6 are not kept. File › Save will ask
+whether to keep the field plots of the selected and pinned runs only (Runs 1, 2 and 9).* Round 24
+(B3) gave these lines one unit, MB to one decimal (two decimals for a size just over 16.8 MB). When
+the full text is over the limit, browser
+recovery keeps, without asking, the fields of the selected and pinned runs, then (round 23) the
+fields of the other runs newest first while the record stays within 16 MiB, and the header names the
+runs left out: *… · kept for recovery in this browser without the fields of Run 1 and Run 2*. A
+restore of a record that left fields out adds *Fields not kept for Run 1 and Run 2; their n_eff, TE
+fractions and effective areas were.* to its message.
 
 ### Optical session files (version 12)
 
@@ -2082,6 +2068,115 @@ main fc654fe reads, `refusals-v12-fc654fe.json`), `tests/simcase/studio_session_
 (K6: a seeded sequence of 2400 results, pins, swaps, imports, saves, opens and restores; K7: the
 header lines; K10: no numbering sentence for a version 7, 11 or 12 file) and the K4/K5 stages of
 `tools/studio_browser/studio_project_browser.mjs`.
+
+### Keeping runs: values and fields
+
+Since run retention (design *Keeping more runs*, round 24 B1) the optical model keeps the
+**values** of up to 20 runs and their **fields** within one budget. The budget is shared by the tab,
+File › Save, the project file's optical entry and browser recovery, so what the tab shows is what a
+file or a restore brings back. Before, six runs were kept whole: a seventh dropped a run with its
+values, and a tab over 16 MiB showed fields that Save asked about and recovery left out.
+
+- **Values.** A run's values are n_eff (real and imaginary), the TE fractions, the effective areas,
+  n_g and an open run's candidates. Every run keeps them. A run without its field is 3 to 21 kB in a
+  file; 20 such runs are under 0.5 MB.
+- **The budget.** It is the 16 MiB session less 16 KiB kept for your inputs: 16,760,832 bytes,
+  said as 16.8 MB. The session text also holds the inputs, the comparison and the view, which change
+  between results; the 16 KiB lets a tab filled to the budget stay within 16 MiB after such edits.
+- **When fields go.** Only when a field arrives: a new result, a recomputed field, Add runs from
+  file, File › Open or Restore, and **Keep Run N, drop … instead** bringing a run back. Selecting,
+  pinning, unpinning, naming or comparing runs never lets a field go, so the tab may hold more
+  fields than the order below would choose now, but never more than the budget.
+- **The order.** When a field arrives, the fields kept are those of the selected run, then of the
+  run whose field just arrived (a recompute, or a run brought back, when it is not the selected
+  one), then of the pinned runs, newest first, then of the other runs, newest first (the largest
+  run number first). Each is added while the session stays within the budget; a field that does not
+  fit is skipped and the next older one tried. A pin keeps a run's values against the 20-run drop
+  and puts its fields ahead of the unpinned runs', but does not guarantee them.
+- **The words.** Before a run, when the newest run of the same geometry, boundary and Modes to find
+  shows how large the new field will be, the line beside **Run study** names the runs that would keep
+  their values only: *If you run: Run 3 (closed · 4 modes · 700 × 300 nm) keeps its values, not its
+  fields* with **Pin Run 3** (two or more: *… and Run 5 (…) keep their values, not their fields*);
+  with no such run it says nothing. While the run computes: *When this run finishes, Run 3 (…) keeps
+  its values, not its fields*. At 20 runs the line keeps the drop words above. After the result,
+  Messages says *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).* with
+  **Recompute Run 3's fields** and, when another unpinned, unselected run has a field at least as
+  large, **Keep Run 3's fields, not Run 4's (…)**, which answers *Run 3's fields are back; Run 4 (…)
+  keeps its values, not its fields.* When a pinned run's fields go: *Run 2 (pinned) keeps its values;
+  its fields were not kept: the selected and pinned runs' fields are 17.4 MB, over the 16.8 MB limit.
+  Unpin a run to keep the newer fields first.* The run list marks such a run *· values only*; the
+  tree reads *Runs · 9 of 20*; the note under the run list reads *Up to 20 runs are kept with their
+  values. Fields are kept up to 16.8 MB: the selected and pinned runs' first, then the newest. A run
+  without its fields can recompute them. Pinned runs stay; when a 21st run arrives, the oldest
+  unpinned run is replaced. …*. The header reads *… kept for recovery in this browser*: recovery
+  holds the tab.
+- **A run without its fields.** Results shows its modes table, its candidates and its inputs line,
+  and in place of the field view *Run 4's fields are not kept: up to 16.8 MB of fields are kept, for
+  the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas
+  are kept.* (a run read from a file without fields: *Run 4's fields were not kept in the session
+  file. …*) with **Recompute Run 4's fields** and, for a run computed in this tab, *· about 2 min*
+  (its wall time; a run opened or restored has none). The field PNG export waits, titled *Recompute
+  Run 4's fields first*; the run table CSV works. Compare shows the inputs that differ and the values
+  table with the modes listed by number (*Modes of A and B listed by mode number, not matched by
+  overlap*), and *Run 4's fields are not kept, so its modes are listed by number and not plotted.*
+  with the button; the plots and Δn_eff by overlap come back once both runs have fields. *No need to
+  run* for such a run reads *No need to run: Run 4 already has these values; its fields are not kept.
+  Run study adds a copy with the same values.* with **Show Run 4** and **Recompute Run 4's fields**.
+- **Recompute Run N's fields** sends the document the run was computed with, built from its stored
+  inputs and settings as **Use this run's inputs** sets them (Modes to find, the group index with its
+  step, the outer boundary, Search near n_eff), to the same validation and run requests. It is not a
+  new run: it takes no number, enters no list and leaves the current inputs, Undo and the selected
+  run as they are; the job panel reads *Recomputing Run 4's fields · about 2 min* and **Stop waiting**
+  works as for a run. Every value the run stores is compared with the recomputed result, each to 1e-12
+  relative (1e-15 absolute below 1e-3). On a match the field is attached to the same run, with its
+  job, number, name, pin, time and origin: *Run 4's fields recomputed from its stored inputs; its
+  values match.*, and the order above applies, since a field has arrived. Otherwise nothing changes:
+  *Run 4's fields were not recomputed: mode 1 n_eff came out 2.439316630, stored 2.439316632. Run 4 is
+  unchanged. Use this run's inputs and Run study to make a new run.* (with *(stored by Studio 0.9.3;
+  this is 0.9.4)* after the values when the versions differ). A document the server now refuses says
+  *Run 4's fields cannot be recomputed:* and the server's words. A recompute matches on the same build
+  and the same thread setting: the solves are bitwise reproducible then (measured: single-threaded,
+  and default threads against default threads). A run computed with a different number of threads
+  may not match (an open run differed by up to 5e-11 between one thread and four); Studio then leaves
+  it unchanged.
+- **Where the tab holds more than a file.** Two cases, each reported by Save and recovery with the
+  question, the refusal and the recovery rules of [version 9](#optical-session-files-version-9):
+  the selected run alone over the budget (an 8-mode open run can come close), whose field the tab
+  keeps while it is selected; and a session grown by more than the 16 KiB kept for the inputs since
+  the last arrival. The inputs are bounded (8 optical shapes, 8 Joule shapes, 6 materials), so the
+  second is rare; the next arrival chooses the fields within the budget again.
+- **Measured** (2026-11-25, `tools/studio_run_retention.mjs`): 20 results of the T18 mix (closed 2
+  modes, closed 4 modes, closed near 2.46, open with n_g; Run 2 pinned) keep 4 fields; the session is
+  at most 16.6 MB after every result, and the 20 records without fields are 0.15 MB.
+
+The checks are `tests/simcase/studio_run_retention_fields.cjs` (the order, the words, a seeded
+sequence of 2000 steps for the numbers, the tab against the file and recovery, and the two cases
+above), `tests/simcase/studio_run_retention_recompute.cjs`, the tool's `k1` and `k5` commands, and the
+RT stage (run retention) of `tools/studio_browser/studio_workspace_browser.mjs`.
+
+### Optical session files (version 13)
+
+Version 13 is [version 12](#optical-session-files-version-12) with up to 20 runs: the same run
+records (`number` after `job`, the same keys, the same digest) and top-level keys. Versions 6 to 12
+hold at most six runs.
+
+- **When it is written.** Only when the session has more than six runs. A session of six runs or
+  fewer is written as version 12, 11, 10, 9 or 7, byte for byte as before, so an earlier Studio still
+  reads it. A version 13 file of six runs or fewer (edited by hand) is read.
+- **Reading.** File › Open, Open project, Restore and Add runs from file read up to 20 runs; a file
+  of 21 runs, or a version 12 file of seven, is refused with *Unsupported session format or run
+  count.* The number checks are those of version 12.
+- **Earlier Studios.** A Studio that reads up to version 12 (main 3f16709) refuses a version 13 file
+  by name before it counts the runs: *This session file is version 13, newer than this Studio reads
+  (versions 6–12). Open it in a newer Studio.*, after *Optical waveguide: * for a project file's
+  entry, and does not take over a browser-recovery record that holds one. To share runs with such a
+  Studio, export at most six of them (Export this run, or a session of six). The project file stays
+  version 1; the optical documents, adapters, results, the multiphysics session (version 8) and the
+  run table CSV are unchanged.
+
+The checks are `tests/simcase/studio_run_retention_format.cjs` (K2: every earlier fixture written
+again byte for byte; K3: the fixture `optical-v13-nine-runs.json` of runs 2 and 4 to 11; K4: what main
+3f16709 reads, `refusals-v13-3f16709.json`).
 
 ### Matching modes in Compare
 
