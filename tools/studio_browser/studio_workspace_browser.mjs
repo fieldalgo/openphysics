@@ -3063,7 +3063,7 @@ try {
     await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R23 20 runs');
     for (let i = 0; i < 60; i++) {
       const now = {header: await rText('#project'), record: await record(), tab: await fieldsOf()};
-      if (now.record.fields.length === 20 && now.record.fields.find(([n]) => n === 20)?.[1] && JSON.stringify([...now.record.fields].sort((x, y) => x[0] - y[0])) === JSON.stringify(Object.entries(now.tab).map(([n, f]) => [Number(n), f]).sort((x, y) => x[0] - y[0]))) { p2b = now; break; }
+      if (now.record.fields.length === 20 && now.record.fields.find(([n]) => n === 20)?.[1] && / · kept for recovery in this browser$/.test(now.header) && JSON.stringify([...now.record.fields].sort((x, y) => x[0] - y[0])) === JSON.stringify(Object.entries(now.tab).map(([n, f]) => [Number(n), f]).sort((x, y) => x[0] - y[0]))) { p2b = now; break; }
       await sleep(500);
     }
     stage('R23 P2 20 runs', p2b); assert.ok(p2b, 'R23 20-run record equal to the tab');
