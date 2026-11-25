@@ -385,17 +385,17 @@ export function coreNoteText(mode,p){
 const coreCache=new WeakMap();
 /** The core-mode notes of a run: [{mode, text}] for each mode named by corePlacement. */
 export function coreNotes(run){
- if(coreCache.has(run))return coreCache.get(run);
+ const kept=coreCache.get(run);if(kept&&kept.field===run.field)return kept.notes;
  const notes=corePlacement(run).map((p,mode)=>p?.named?{mode,text:coreNoteText(mode,p)}:null).filter(Boolean);
- coreCache.set(run,notes);return notes;
+ coreCache.set(run,{field:run.field,notes});return notes;
 }
 /** The notes of a run: [{mode, text, shape}] for each mode named by edgePlacement. */
 const edgeCache=new WeakMap();
 export function edgeNotes(run){
- if(edgeCache.has(run))return edgeCache.get(run);
+ const kept=edgeCache.get(run);if(kept&&kept.field===run.field)return kept.notes;
  const notes=edgePlacement(run).map((p,mode)=>p?.named?{mode,text:edgeNoteText(mode,p),shape:p.shape}:null).filter(Boolean);
- // a run's samples never change: its notes are kept per run object
- edgeCache.set(run,notes);return notes;
+ // the notes are kept per run object and field (a field made compact, version 14, is another object)
+ edgeCache.set(run,{field:run.field,notes});return notes;
 }
 // ---- The region notes of an open-boundary run (round 25, A4) ------------------------------------
 // An open run's results name the core mode and a mode mostly in a shape touching the window edge as

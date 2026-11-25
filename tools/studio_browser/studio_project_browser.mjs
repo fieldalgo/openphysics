@@ -865,24 +865,28 @@ try {
     assert.equal(k5.changed, 'both-models · changed since both-models.json, not saved · kept for recovery in this browser');
     // R24 P1 (B2): the same recovered project, changed, with 8-mode runs of a 2800 nm wide core on a
     // fine mesh (the field grows with the core's triangles, as R23's substrate does) until a result's
-    // field takes others' fields (run retention: the fields kept stay within 16.8 MB, and recovery
-    // holds the tab); the header keeps naming both-models.json
-    const r24 = {runs: []};
+    // fields would not all fit as text (compact fields: they are then kept at single precision, and
+    // recovery holds the tab); the header keeps naming both-models.json
+    const r24 = {runs: []}, COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
     await width(2800);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
     await page.fill('spinbutton', 'Modes to find', 8);
     for (const nm of [20, 21, 22, 23, 24, 25]) {
       await page.press('tab', 'Model'); await page.press('treeitem', 'Mesh'); await page.until("!!document.getElementById('core-mesh-number')", 'R24 mesh ' + nm);
       await page.fill('spinbutton', 'Core mesh size [nm]', nm); await runOptical('R24 run at ' + nm); r24.runs.push(nm);
-      if (/keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./.test(await status())) break;
+      if ((await status()).includes(COMPACT_WORDS)) break;
     }
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'R24 header kept', 30000);
     r24.title = await title(); r24.message = await status();
     await page.press('tab', 'Results'); await page.until("!!document.querySelector('.run-item')", 'R24 run list'); r24.items = await runItems();
-    await noOverflow('R24 P1 header after fields went 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 header after fields went 390'); await size(1440, 900, false);
-    stage('R24 P1 header after fields went', r24);
-    assert.match(r24.message, /keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./);
-    assert.ok(r24.items.some(t => t.endsWith(' · values only')), JSON.stringify(r24.items));
+    // the field storage changed: the selected run's field is compact
+    await page.until("!!document.getElementById('field-precision')", 'R24 single-precision line'); r24.precision = await page.eval("document.getElementById('field-precision').textContent");
+    await noOverflow('R24 P1 header after the conversion 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 header after the conversion 390'); await size(1440, 900, false);
+    stage('R24 P1 header after the conversion', r24);
+    assert.ok(r24.message.includes(COMPACT_WORDS), r24.message);
+    assert.equal(r24.precision, "Field at single precision (float32). The values above are the engine's.");
+    // every field is kept: the only runs without fields are the pinned values-only imports (640 × 210 nm)
+    assert.ok(r24.items.filter(t => t.endsWith(' · values only')).every(t => t.includes(' · 640 × 210 nm · ')), JSON.stringify(r24.items));
     assert.match(r24.title, /^both-models · changed since both-models\.json, not saved · kept for recovery in this browser$/);
     await stopBrowser(page);
   }

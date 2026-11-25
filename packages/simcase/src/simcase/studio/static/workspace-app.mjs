@@ -30,7 +30,7 @@ import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
-import {chooseFields,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
+import {chooseFieldsAtArrival,COMPACT_TEXT,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -689,16 +689,19 @@ function keepFieldsInstead(offer){
 // or Restore, a recomputed field) the fields kept are chosen within the field budget, in the order of
 // workspace-retention.mjs; nothing else lets a field go. Returns the Messages words ('' when every
 // field stays). first: the jobs whose fields arrived and are not the selected run's.
-let fieldSwap=null,fieldsLetGo=[];
-function applyFieldBudget(first=[]){
+// Compact fields (design "Compact field encoding"): at the first arrival where the fields would not all
+// fit as text, every field is made compact first (chooseFieldsAtArrival), and Messages says so once.
+let fieldSwap=null,fieldsLetGo=[],compactSaid=false;
+function applyFieldBudget(first=[],{loaded=false}={}){
  forgetHeldFields(runs);fieldSwap=null;fieldsLetGo=[];
  const selected=solverRun?.job||null;let out;
- try{out=chooseFields(inputsFile(),runs,selected,compareIds,currentView(),{first});}catch{return '';}
- if(!out.letGo.length)return '';
+ try{out=chooseFieldsAtArrival(inputsFile(),runs,selected,compareIds,currentView(),{first,loaded});}catch{return '';}
+ const compactWords=out.started&&!compactSaid?COMPACT_TEXT:'';if(compactWords)compactSaid=true;
+ if(!out.letGo.length)return compactWords;
  const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedBytes(runs,selected,out.base):0;
  for(const r of out.letGo)letGoField(r);fieldsLetGo=out.letGo;
  const other=fieldSwapCandidate(runs,plain,selected);if(other)fieldSwap={back:plain[0],other,list:runs};
- return [plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
+ return [compactWords,plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
 }
 function keepDroppedRun(offer){
  const button=$('file-status').querySelector('[data-keep-run]');
@@ -890,7 +893,7 @@ function completeLoad(pending){
   if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}
   // run retention: the session's fields have arrived (a file or record within 16 MiB may still be over
   // the field budget, which keeps 16 KiB for the inputs); the words follow the open's
-  {const words=applyFieldBudget();if(words){$('file-status').append(' '+words);render();}}
+  {const words=applyFieldBudget([],{loaded:true});if(words){$('file-status').append(' '+words);render();}}
   pending.then?.();
  }else{loadedSession=null;newModelInputs=null;applyProject(pending.input,{saved:pending.saved});rememberOpened(pending.fileName);refreshPersistence();notice(`Model inputs restored · ${pending.label}. Results and CAD geometry are not included.`);}
 }
@@ -1464,7 +1467,7 @@ function solverPanel(){document.querySelector('main').classList.toggle('comparin
   if(isOpenRun(solverRun))$('canvas').append(foundLine(solverRun));
   else if(isClosedTargetRun(solverRun)){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=closedFoundText(solverRun.effective_index.length,runModeCount(solverRun),runSearchTarget(solverRun))+'.';$('canvas').append(line);}
   else{const found=foundText(solverRun.effective_index.length,runModeCount(solverRun));if(found){const line=document.createElement('p');line.id='modes-found';line.className='modes-found';line.textContent=found+'.';$('canvas').append(line);}}
-  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field)renderField();else{const none=document.createElement('p');none.id='fields-not-kept';
+  $('canvas').append(modesTable(solverRun));if(isOpenRun(solverRun))$('canvas').append(candidatesDisclosure(solverRun));if(solverRun.field){renderField();if(isCompactField(solverRun.field)){const line=document.createElement('p');line.id='field-precision';line.className='input-hint';line.textContent=COMPACT_RESULTS_TEXT;$('canvas').append(line);}}else{const none=document.createElement('p');none.id='fields-not-kept';
    // run retention (4.1): the run keeps its values; read from a file without fields, the file says so
    none.textContent=fieldsNotKeptResultsText(solverRun,solverRun.origin==='imported'&&!fieldLetGoHere(solverRun));$('canvas').append(none);
    const again=document.createElement('p');again.id='recompute-line';again.className='recompute-line';again.append(recomputeButton(solverRun,'recompute-fields'),recomputeEstimate(solverRun));$('canvas').append(again);}
@@ -1859,7 +1862,9 @@ function renderRunList(){
   const exportRun=document.createElement('button');exportRun.id='export-run';exportRun.textContent='Export this run';exportRun.style.marginTop='10px';exportRun.onclick=()=>{try{
    const text=sessionText(solverRun.input,[solverRun],solverRun.job,[solverRun.job,solverRun.job],currentView());
    if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('This run exceeds the session size limit.');
-   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);notice(`Run file ${name} sent to the browser's downloads, with the run's inputs and fields${isOpenRun(solverRun)?' (on the physical window only, PML excluded)':''}. Add runs from file adds it to a session. The current design is unchanged.`);
+   const name='studio-run-'+solverRun.job+'.json';downloadFile(new Blob([text],{type:'application/json'}),name);const words=`Run file ${name} sent to the browser's downloads, with the run's inputs and fields${isOpenRun(solverRun)?' (on the physical window only, PML excluded)':''}. Add runs from file adds it to a session. The current design is unchanged.`;
+   // a compact field (version 14): "… inputs and fields (fields at single precision) …"
+   notice(isCompactField(solverRun.field)?compactExportNotice(words):words);
   }catch(error){notice(error.message);}};panel.append(exportRun);
   // a viewed run with other inputs than the current ones: its inputs become the current inputs at
   // once (the runs stay as they are, so nothing is asked), and Undo takes them back
@@ -1874,7 +1879,9 @@ function renderRunList(){
   if(ui.page!=='Results'){const why=document.createElement('p');why.id='export-field-hint';why.className='input-hint';why.textContent=ui.page==='Compare'?'Field images export from Results: Open in Results shows the selected run there.':'Field images export from Results: select a run in the list above to open it there.';exportPng.setAttribute('aria-describedby',why.id);panel.append(why);}
  }
  const csv=document.createElement('button');csv.id='export-table';csv.textContent='Export run table CSV';csv.disabled=!runs.length;csv.style.marginTop='10px';csv.onclick=()=>downloadFile(new Blob([runTableCsv(runs)],{type:'text/csv'}),'studio-runs.csv');panel.append(csv);
- const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';panel.append(limit);
+ const limit=document.createElement('p');limit.textContent=RUNS_KEPT_TEXT+' Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.';
+ // a tab with a compact field: the note says that fields that would not all fit are kept at single precision
+ if(runs.some(r=>isCompactField(r.field)))limit.textContent=compactRunListNote(limit.textContent);panel.append(limit);
 }
 // The n_g hint ("Off · turn on in Study or Optical modes", its help as title) after "n_g: ",
 // for a line above a table whose runs did not compute n_g.
