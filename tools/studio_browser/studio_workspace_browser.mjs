@@ -1715,7 +1715,8 @@ try {
       await ob.until(`document.querySelectorAll('.run-item').length>${before}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'OB run', 300000);
       return Math.round((Date.now() - started) / 1000);
     };
-    const resultsView = () => ob.eval(`(()=>{const t=document.getElementById('modes-table');const rows=[...t.tBodies[0].rows];
+    // (the mode rows: an open run's region notes, round 25 A4, are rows of their own)
+    const resultsView = () => ob.eval(`(()=>{const t=document.getElementById('modes-table');const rows=[...t.tBodies[0].rows].filter(r=>!r.classList.contains('edge-note-row'));
       return {caption:t.caption.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.textContent),lossTitle:t.tHead.rows[0].cells[3].title,
        neff:rows.map(r=>r.querySelector('[data-neff]').textContent),loss:rows.map(r=>r.querySelector('[data-loss]').textContent),lossTitles:rows.map(r=>r.querySelector('[data-loss]').title),
        pol:rows.map(r=>[r.querySelector('[data-polarization]')?.textContent,r.querySelector('[data-polarization]')?.title]),area:rows.map(r=>r.querySelector('[data-area]').textContent),areaTitles:rows.map(r=>r.querySelector('[data-area]').title),
