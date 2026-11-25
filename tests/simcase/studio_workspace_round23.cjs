@@ -156,9 +156,9 @@ test('P2 (b) (E2): over the limit recovery keeps the selected and pinned fields,
  assert.equal(save.ok,false);assert.deepEqual(save.reduced.kept,[3]);
  // the Messages line: what Save will offer, what the other runs keep, what recovery leaves out
  assert.equal(N.sessionSizeText({ok:false,bytes:22.0e6,reduced:{bytes:4e6,notKept:[1,2,3,4,5],kept:[6]},refusal:null},[1,2]),
-  'Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.');
+  'Session is now 22.0 MB, over the 16.8 MB limit. Browser recovery keeps every run\'s values; the field plots of Run 1 and Run 2 are not kept. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Run 6).');
  assert.equal(N.sessionSizeText({ok:false,bytes:18.0e6,reduced:{bytes:8e6,notKept:[1,2,3],kept:[4,5,6]},refusal:null},[]),
-  'Session is now 18 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected and pinned runs only (Runs 4, 5 and 6); the other runs keep n_eff, the TE fractions and the effective areas. Browser recovery keeps every field.');
+  'Session is now 18.0 MB, over the 16.8 MB limit. Browser recovery keeps every run\'s values and field plots. File › Save will ask whether to keep the field plots of the selected and pinned runs only (Runs 4, 5 and 6).');
  // the page: the snapshot's numbers, shown while recovery is kept, in the header and the indicator;
  // the line names recovery's runs from the same snapshot
  const app=read('workspace-app.mjs');

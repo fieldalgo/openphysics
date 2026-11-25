@@ -393,7 +393,7 @@ export function writeOpticalSession(input,runs,selected,comparison,view,{keepSel
  * first letter is lowered after the recovery error's "Recovery snapshot exceeds 16 MiB: ". */
 export function keptOverText(kept,bytes){
  const pinned=kept.filter(r=>r.pinned),chosen=kept.find(r=>r.selected&&!r.pinned),list=rs=>rs.map(r=>r.name+(r.selected?' selected':'')).join(', ');
- const size=`${sizeText(bytes)} with ${kept.length>1?'their':'its'} fields, over the 16 MiB session limit.`;
+ const size=`${megabytes(bytes)} with ${kept.length>1?'their':'its'} fields, over the ${LIMIT_WORDS} session limit.`;
  if(!pinned.length)return `The selected run (${chosen?.name??'none'}) is ${size} Select a different run before saving, so this one is saved without its fields, or run it again with fewer modes.`;
  const parts=[...(chosen?[`the selected run (${chosen.name})`]:[]),`the pinned run${pinned.length>1?'s':''} (${list(pinned)})`].join(' and ');
  return `${parts[0].toUpperCase()+parts.slice(1)} ${kept.length>1?'are':'is'} ${size} ${pinned.length>1?'Unpin some of them.':'Unpin it.'}`;
@@ -402,14 +402,21 @@ export function keptOverText(kept,bytes){
  * writeOpticalSession's answer (null when it fits): the size and what File › Save will do. When
  * even the selected and pinned runs are over the limit, Save refuses with keptOverText's words and
  * browser recovery is off too, so the line says both (round 18 X4's line is then not posted).
- * Round 23 (E2): the limit also in MB, as the size is (16 MiB is 16.8 MB), the runs whose fields
- * Save offers to keep, what the other runs keep, and that browser recovery already keeps only those
- * fields, and the runs whose fields browser recovery leaves out (recoveryLeftOut: captureSession's
- * make.dropped; it keeps the selected and pinned fields and as many others as fit, newest first):
- *   "Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the
- *   fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions
- *   and the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2." */
-export const LIMIT_WORDS='16 MiB (16.8 MB)';
+ * Round 23 (E2) named the runs whose fields Save offers to keep and the runs whose fields browser
+ * recovery leaves out (recoveryLeftOut: captureSession's make.dropped; it keeps the selected and
+ * pinned fields and as many others as fit, newest first). Round 24 (B3, coordinator decision on the
+ * round-24 findings): one unit, MB to one decimal (the limit, 16 MiB, is 16.8 MB), what is already
+ * lost first, in plain words:
+ *   "Session is now 17.0 MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the
+ *   field plots of Run 6 are not kept. File › Save will ask whether to keep the field plots of the
+ *   selected and pinned runs only (Runs 1, 2 and 9)." */
+export const LIMIT_WORDS='16.8 MB';
+/** A size in MB to one decimal ("17.0 MB"); two decimals for a size over the limit that would read
+ * as the limit itself ("16.79 MB", not "16.8 MB"). */
+export function megabytes(bytes){
+ const one=(bytes/1e6).toFixed(1);
+ return `${bytes>MAX_SESSION_BYTES&&one===(MAX_SESSION_BYTES/1e6).toFixed(1)?(bytes/1e6).toFixed(2):one} MB`;
+}
 /** "Run 3 and Run 5", "Run 1, Run 2 and Run 4": runs named one by one (round 23, E2). */
 export const runNames=numbers=>{const w=numbers.map(n=>'Run '+n);return w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1);};
 /** The restore's sentence when runs came back without fields (round 23, E2): " Fields not kept for
@@ -418,10 +425,10 @@ export const fieldsNotKeptText=runs=>{const n=runs.filter(r=>!r.field&&Number.is
 const runsWords=numbers=>{const w=numbers.map(String);return (numbers.length>1?'Runs ':'Run ')+(w.length<3?w.join(' and '):w.slice(0,-1).join(', ')+' and '+w.at(-1));};
 export function sessionSizeText(out,recoveryLeftOut=null){
  if(!out||out.ok)return null;
- const over=`Session is now ${sizeText(out.bytes)}, over the ${LIMIT_WORDS} limit`;
+ const over=`Session is now ${megabytes(out.bytes)}, over the ${LIMIT_WORDS} limit`;
  if(out.reduced){const kept=out.reduced.kept?.length?` (${runsWords(out.reduced.kept)})`:'';
-  const left=recoveryLeftOut,browser=!Array.isArray(left)?'':left.length?` Browser recovery keeps every field but those of ${runNames(left)}.`:' Browser recovery keeps every field.';
-  return `${over}. File › Save will ask whether to keep the fields of the selected and pinned runs only${kept}; the other runs keep n_eff, the TE fractions and the effective areas.${browser}`;}
+  const left=recoveryLeftOut,browser=!Array.isArray(left)?'':left.length?` Browser recovery keeps every run's values; the field plots of ${runNames(left)} are not kept.`:" Browser recovery keeps every run's values and field plots.";
+  return `${over}.${browser} File › Save will ask whether to keep the field plots of the selected and pinned runs only${kept}.`;}
  return `${over}, and File › Save will refuse: ${out.refusal} Browser recovery is off.`;
 }
 export function opticalOverflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the fields of the selected and pinned runs only? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields.`;}

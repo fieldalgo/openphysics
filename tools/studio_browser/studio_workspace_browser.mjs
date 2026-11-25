@@ -3001,8 +3001,9 @@ try {
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 session over 16 MiB', p2);
-    const [, msgLeft] = /^.* Session is now (?:1[7-9]|2\d) MB, over the 16 MiB \(16\.8 MB\) limit\. File › Save will ask whether to keep the fields of the selected and pinned runs only \(Run 5\); the other runs keep n_eff, the TE fractions and the effective areas\. Browser recovery keeps every field but those of (Run \d+(?:(?:, | and )Run \d+)*)\.$/.exec(p2.message) || [];
-    assert.ok(msgLeft, p2.message);
+    // round 24 (B3): one unit (MB, one decimal), what browser recovery left out first, "field plots"
+    const [, msgLeft] = /^.* Session is now (?:1[7-9]|2\d)\.\d MB, over the 16\.8 MB limit\. Browser recovery keeps every run's values; the field plots of (Run \d+(?:(?:, | and )Run \d+)*) are not kept\. File › Save will ask whether to keep the field plots of the selected and pinned runs only \(Run 5\)\.$/.exec(p2.message) || [];
+    assert.ok(msgLeft, p2.message); assert.ok(!p2.message.includes('MiB'), p2.message);
     const [, headLeft] = LEFT.exec(p2.header) || []; assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser without the fields of /.test(p2.header) && headLeft, p2.header);
     // the record: within 16 MiB, Run 5 (selected) with its field, the runs named are those without
     assert.ok(p2.record.bytes <= 16 * 1024 * 1024, JSON.stringify(p2.record));
