@@ -502,7 +502,9 @@ runs*입니다. 자체 브라우저 컨텍스트의 단계 하나(RT, 실행 보
 4개, closed near 2.46, n_g가 있는 열린 실행)를 실행합니다: 결과마다 IndexedDB 기록이 16 MiB 안이고 File › Export의 텍스트와
 바이트 그대로 같으며(질문 없음), 그 장이 목록에서 *values only*로 표시되지 않은 실행과 정확히 같은지; 장 없는 실행이 Results
 블록을 보이고, 장 내보내기가 *Recompute Run N's fields first*로 기다리며, Compare가 그 모드를 번호 순으로 나열하고, 각각
-1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈되는지; **Recompute Run N's fields**가 작업 패널에 *Recomputing Run N's fields*를
+1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈되는지(25차 A1부터 그 블록과 실행 목록 안내는 *… When a result or a recompute
+arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its
+fields back; Recompute does.*); **Recompute Run N's fields**가 작업 패널에 *Recomputing Run N's fields*를
 보이고, 일치하며, 장을 같은 실행에 붙이고(실행이 늘지 않음), 장 보기가 다시 그려지고, 기록이 Save의 텍스트와 같은지 봅니다.
 K1(T18 혼합 실행 20개의 크기)과 K5(다시 계산한 장이 원래와 같음) 측정은 서버 자신의 작업으로 T18과 T16 문서를 푸는
 `tools/studio_run_retention.mjs`(`engine`, 그다음 `k1`과 `k5`)입니다.

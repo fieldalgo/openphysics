@@ -1725,18 +1725,22 @@ Run 1 and Run 2; their n_eff, TE fractions and effective areas were.*가 붙습�
   지키고 그 필드를 고정되지 않은 실행보다 앞에 두지만, 필드를 보장하지는 않습니다.
 - **문구.** 실행 전, 같은 형상·경계·Modes to find의 가장 새 실행이 새 필드의 크기를 알려 줄 때 **Run study** 옆 줄이 값만
   남을 실행을 밝힙니다: *If you run: Run 3 (closed · 4 modes · 700 × 300 nm) keeps its values, not its fields*와 **Pin Run 3**
-  (둘 이상이면 *… and Run 5 (…) keep their values, not their fields*). 그런 실행이 없으면 아무 말도 하지 않습니다. 실행이
+  (둘 이상이면 *… and Run 5 (…) keep their values, not their fields*). 그런 실행이 없으면, 16.8 MB에 남은 공간이 지금 유지된
+  가장 작은 필드보다 작을 때만 *If you run: older runs' fields may not be kept (16.8 MB limit) · pin a run to keep its fields first*
+  (round 25, A1. 실행을 밝히지 않으므로 Pin 버튼 없음)를 보이고, 그 밖에는 아무 말도 하지 않습니다. 실행이
   계산하는 동안: *When this run finishes, Run 3 (…) keeps its values, not its fields*. 실행이 20개이면 위의 내보내기 문구가
   그대로입니다. 결과 뒤에는 Messages가 *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).*와
   **Recompute Run 3's fields**를, 고정되지 않고 선택되지 않은 다른 실행의 필드가 그만큼 크면 **Keep Run 3's fields, not Run 4's
   (…)**를 둡니다. 그 버튼은 *Run 3's fields are back; Run 4 (…) keeps its values, not its fields.*로 답합니다. 고정된 실행의
   필드가 빠지면: *Run 2 (pinned) keeps its values; its fields were not kept: the selected and pinned runs' fields are 17.4 MB,
   over the 16.8 MB limit. Unpin a run to keep the newer fields first.* 실행 목록은 그런 실행에 *· values only*를 붙이고, 트리는
-  *Runs · 9 of 20*, 실행 목록 아래 안내는 *Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB: the selected
-  and pinned runs' first, then the newest. A run without its fields can recompute them. Pinned runs stay; when a 21st run arrives,
-  the oldest unpinned run is replaced. …*입니다. 복구가 탭을 그대로 담으므로 헤더는 *… kept for recovery in this browser*입니다.
-- **필드 없는 실행.** Results는 모드 표, 후보, 입력 줄을 보이고, 필드 보기 자리에 *Run 4's fields are not kept: up to 16.8 MB of
-  fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.*
+  *Runs · 9 of 20*, 실행 목록 아래 안내는 *Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB. When a result
+  or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not
+  bring its fields back; Recompute does. Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. …*입니다
+  (round 25, A1: 필드는 필드가 도착할 때만 옮겨 갑니다). 복구가 탭을 그대로 담으므로 헤더는 *… kept for recovery in this browser*입니다.
+- **필드 없는 실행.** Results는 모드 표, 후보, 입력 줄을 보이고, 필드 보기 자리에 *Run 4's fields are not kept; its n_eff, TE
+  fractions and effective areas are kept. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the
+  selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.*
   (필드 없이 파일에서 읽은 실행은 *Run 4's fields were not kept in the session file. …*)와 **Recompute Run 4's fields**,
   이 탭에서 계산한 실행이면 *· about 2 min*(그 실행의 경과 시간. 열거나 복원한 실행에는 없음)을 둡니다. 필드 PNG 내보내기는
   *Recompute Run 4's fields first*라는 제목으로 기다리고, 실행 표 CSV는 동작합니다. Compare는 다른 입력과 모드를 번호 순으로 나열한

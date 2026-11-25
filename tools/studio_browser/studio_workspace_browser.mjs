@@ -3327,10 +3327,15 @@ try {
     for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) { await rSize(width, height, mobile); block[width] = {...await visible('fields-not-kept'), png: await r.eval("({disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title})"), field: await r.eval("!!document.getElementById('optical-field')"), rows: await r.eval("document.querySelectorAll('#modes-table tbody tr').length")}; }
     await rSize(1440, 900); stage('RT K10 Results without fields', block);
     for (const b of Object.values(block)) {
-      assert.equal(b.text, `Run ${bareNumber}'s fields are not kept: up to 16.8 MB of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.`);
+      // round 25 (A1, pre-registered P1): the block says when fields move and that selecting does not bring them back
+      assert.equal(b.text, `Run ${bareNumber}'s fields are not kept; its n_eff, TE fractions and effective areas are kept. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does.`);
       assert.ok(b.whole, JSON.stringify(b)); assert.equal(b.field, false); assert.ok(b.rows >= 2); assert.deepEqual(b.png, {disabled: true, title: `Recompute Run ${bareNumber}'s fields first`});
     }
     assert.ok(block[390].lines > 1, 'the block wraps at 390 px');
+    // round 25 (A1, P1): the run list's note, the same words
+    const runsNote = await r.eval("[...document.querySelectorAll('p')].map(p=>p.textContent).find(t=>t.startsWith('Up to 20 runs are kept'))??null");
+    stage('RT A1 run list note', {runsNote});
+    assert.equal(runsNote, "Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its fields back; Recompute does. Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file; Export this run writes one run to its own file.");
     await rOverflow('K10 Results without fields');
     // Compare with it: the inputs that differ, its modes listed by number, its line
     await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'RT Compare');
