@@ -61,6 +61,7 @@ from ._cavity_common import (C0, DENSE_LIMIT, GRADIENT_LIMIT, RESIDUAL_LIMIT, ca
                              face_edge_ids, gradient_incidence, gradient_potentials,
                              normalized_mesh, refuse_live_mesh_inputs, search_parameters)
 from .core.checks import positive_integer, positive_real, refuse_live, triple
+from .core.eigen import arpack_rng
 from ._conventions import to_kernel, to_public
 from ._public import refuse_text
 
@@ -434,7 +435,7 @@ def _nearest_eigenpairs(stiffness, mass, projector, sigma, count, dense, interio
         transformed, vectors = spla.eigs(
             operator, k=candidates, which="LM",
             v0=np.asarray(start, dtype=complex),
-            ncv=min(stiffness.shape[0], subspace), tol=1e-10, maxiter=50000)
+            ncv=min(stiffness.shape[0], subspace), tol=1e-10, maxiter=50000, **arpack_rng())
         keep = np.abs(transformed) > 1e-12 * np.max(np.abs(transformed))
         values, vectors = sigma + 1 / transformed[keep], vectors[:, keep]
     if not np.isfinite(values).all() or not np.isfinite(vectors).all():

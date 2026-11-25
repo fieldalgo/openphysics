@@ -16,6 +16,8 @@ Vector formulation: mixed edge/nodal guided modes from galerkin. PEC fixes
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import scipy.sparse.linalg as spla
 
@@ -23,6 +25,20 @@ from galerkin import Mesh, EdgeSpace
 from galerkin.kernels import assemble_mass, assemble_stiffness, eval_edge_field, solve_modes
 
 from .fields import VectorField
+
+def _takes_rng(solver) -> bool:
+    """Whether ``solver`` has an ``rng`` parameter (SciPy's eigs and eigsh from 1.17)."""
+    return "rng" in inspect.signature(solver).parameters
+
+
+#: The answer for SciPy's eigs and eigsh as imported, checked once.
+_TAKES_RNG = {name: _takes_rng(getattr(spla, name)) for name in ("eigs", "eigsh")}
+
+
+def _arpack_rng(name):
+    """``{"rng": np.random.default_rng(0)}`` when SciPy's ``name`` takes it, else ``{}``: ARPACK's
+    restart vector after a breakdown is then seeded, so a search is reproducible on one build."""
+    return {"rng": np.random.default_rng(0)} if _TAKES_RNG[name] else {}
 
 
 def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str, str],
@@ -71,7 +87,8 @@ def solve(mesh: Mesh, eps_tri: np.ndarray, wavelength: float, boundary: dict[str
     k = min(num_modes, len(free) - 2)
     eigensolver = spla.eigs if lossy else spla.eigsh
     vals, vecs = eigensolver(A_f, k=k, M=M_f, sigma=sigma, which="LM",
-                            v0=np.ones(len(free)), ncv=min(len(free), max(4 * k, 40)), maxiter=10000)
+                            v0=np.ones(len(free)), ncv=min(len(free), max(4 * k, 40)), maxiter=10000,
+                            **_arpack_rng("eigs" if lossy else "eigsh"))
     order = np.argsort(-np.sqrt(vals.astype(complex)).real) if lossy else np.argsort(-vals)
     vals, vecs = vals[order], vecs[:, order]
     neff = (np.sqrt(vals.astype(complex)) if lossy else np.sqrt(np.maximum(vals, 0.0))) / k0

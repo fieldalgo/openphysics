@@ -103,7 +103,7 @@ from .edge import EdgeSpace
 from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (galerkin.waveguide re-exports them)
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning, arpack_rng  # noqa: F401 (galerkin.waveguide re-exports them)
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
@@ -692,7 +692,7 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     lu = spla.splu((A - sigma * B).tocsc())
     op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
     nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
-                         ncv=min(n, max(4 * num_modes, 40)), maxiter=20000)
+                         ncv=min(n, max(4 * num_modes, 40)), maxiter=20000, **arpack_rng())
 
     beta2 = -(sigma + 1.0 / nu)
     # Roots of the static beta^2 = 0 family are not modes (module docstring).
