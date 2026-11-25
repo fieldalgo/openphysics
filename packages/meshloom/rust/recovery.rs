@@ -244,6 +244,12 @@ pub struct PlcRecovered {
 /// The PLC check, segment recovery on its elementary sub-segments, then the subfacets.
 pub fn recover_plc(plc: &crate::plc::Plc, max_depth: u32) -> Result<PlcRecovered, String> {
     let checked = crate::plc::check(plc).map_err(|e| e.msg)?;
+    recover_checked(plc, checked, max_depth)
+}
+
+/// `recover_plc` after the caller's own PLC check (its result on this PLC).
+pub fn recover_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_depth: u32)
+    -> Result<PlcRecovered, String> {
     let segs = checked.subsegments.clone();
     let rec = recover(&plc.points, &segs, max_depth).map_err(|e| e.to_string())?;
     let (subfacets, missing, plane_n) = {

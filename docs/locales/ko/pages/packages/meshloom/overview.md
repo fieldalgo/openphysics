@@ -135,7 +135,7 @@ mesh["region_names"]           # ['via', 'slab']
   (여러 영역 PLC), `domain="parity"`이면 바깥에서 홀수 개 면 떨어진 성분들이 한 영역입니다(닫힌 표면의
   짝홀 영역. 맞닿은 두 껍질이 함께 쓰는 면은 두 번 셉니다). 오류는 타입이 있으며 모두 `ValueError`입니다.
   입력 검사의 `InvalidPLC`(근거 포함), parity 모드의 `NotClosed`(근거 유형 6: 면 세 개가 붙은 변처럼 홀수 개
-  면의 경계에 놓인 기본 선분), `RecoveryError`, `RoundingError`, `RegionError`(영역 점이 어느 영역에도 없거나 면 위에
+  면의 경계에 놓인 기본 선분. 경계 복원 전에 입력 검사로 판정하므로 한 평면에 놓인 열린 표면도 `NotClosed`), `RecoveryError`, `RoundingError`, `RegionError`(영역 점이 어느 영역에도 없거나 면 위에
   있음, 한 영역에 이름 둘, 점이 없는 영역), 그 밖은 `MeshError`입니다. regions 모드에서 `region_points`는 영역에
   이름을 붙입니다. `(점, 이름)` 쌍이며, 점을 품은 경계로 닫힌 성분이 영역 `이름`이 되고(여러 성분이 한 이름을
   나눌 수 있음) `이름=None`은 메시를 만들지 않는 구멍입니다. 이때 경계로 닫힌 성분마다 점이 하나는 있어야 하고,

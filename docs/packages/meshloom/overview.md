@@ -180,7 +180,8 @@ names may change before the mesher's public API.
   names first appear. Errors are typed, all `ValueError`: `InvalidPLC`
   from the input check with its witness, `NotClosed` in parity mode with witness type 6
   (an elementary segment on the boundary of an odd number of facets, such as an edge
-  with three facets), `RecoveryError`, `RoundingError`, `RegionError` (a region point
+  with three facets; decided from the input check before boundary recovery, so an open
+  surface in one plane is `NotClosed` too), `RecoveryError`, `RoundingError`, `RegionError` (a region point
   outside every region or on a facet, two names in one region, or a region without a
   point), and `MeshError` for anything else. Points on
   segments are rounded once to the nearest double, input points are kept bit for bit,
