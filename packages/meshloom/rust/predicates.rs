@@ -96,6 +96,176 @@ pub fn two_product(a: f64, b: f64) -> (f64, f64) {
 #[derive(Clone, Debug)]
 pub struct Expansion(Vec<f64>);
 
+/// fast_expansion_sum_zeroelim (Shewchuk 1997, Fig. 8 with zero elimination) of two
+/// nonempty expansions into h (at least e.len() + f.len() long); returns h's length.
+fn sum_into(e: &[f64], f: &[f64], h: &mut [f64]) -> usize {
+    let mut n = 0usize;
+    let (mut ei, mut fi) = (0usize, 0usize);
+    let mut enow = e[0];
+    let mut fnow = f[0];
+    let mut q;
+    if (fnow > enow) == (fnow > -enow) {
+        q = enow;
+        ei += 1;
+        enow = if ei < e.len() { e[ei] } else { 0.0 };
+    } else {
+        q = fnow;
+        fi += 1;
+        fnow = if fi < f.len() { f[fi] } else { 0.0 };
+    }
+    if ei < e.len() && fi < f.len() {
+        let (qn, hh) = if (fnow > enow) == (fnow > -enow) {
+            let r = fast_two_sum(enow, q);
+            ei += 1;
+            enow = if ei < e.len() { e[ei] } else { 0.0 };
+            r
+        } else {
+            let r = fast_two_sum(fnow, q);
+            fi += 1;
+            fnow = if fi < f.len() { f[fi] } else { 0.0 };
+            r
+        };
+        q = qn;
+        if hh != 0.0 {
+            h[n] = hh;
+            n += 1;
+        }
+        while ei < e.len() && fi < f.len() {
+            let (qn, hh) = if (fnow > enow) == (fnow > -enow) {
+                let r = two_sum(q, enow);
+                ei += 1;
+                enow = if ei < e.len() { e[ei] } else { 0.0 };
+                r
+            } else {
+                let r = two_sum(q, fnow);
+                fi += 1;
+                fnow = if fi < f.len() { f[fi] } else { 0.0 };
+                r
+            };
+            q = qn;
+            if hh != 0.0 {
+                h[n] = hh;
+                n += 1;
+            }
+        }
+    }
+    while ei < e.len() {
+        let (qn, hh) = two_sum(q, enow);
+        ei += 1;
+        enow = if ei < e.len() { e[ei] } else { 0.0 };
+        q = qn;
+        if hh != 0.0 {
+            h[n] = hh;
+            n += 1;
+        }
+    }
+    while fi < f.len() {
+        let (qn, hh) = two_sum(q, fnow);
+        fi += 1;
+        fnow = if fi < f.len() { f[fi] } else { 0.0 };
+        q = qn;
+        if hh != 0.0 {
+            h[n] = hh;
+            n += 1;
+        }
+    }
+    if q != 0.0 || n == 0 {
+        h[n] = q;
+        n += 1;
+    }
+    n
+}
+
+/// scale_expansion_zeroelim (Shewchuk 1997, Fig. 13 with zero elimination) of a nonempty
+/// expansion into h (at least 2 e.len() long); returns h's length.
+fn scale_into(e: &[f64], b: f64, h: &mut [f64]) -> usize {
+    let mut n = 0usize;
+    let (mut q, hh) = two_product(e[0], b);
+    if hh != 0.0 {
+        h[n] = hh;
+        n += 1;
+    }
+    for &ei in &e[1..] {
+        let (p1, p0) = two_product(ei, b);
+        let (sum, hh) = two_sum(q, p0);
+        if hh != 0.0 {
+            h[n] = hh;
+            n += 1;
+        }
+        let (qn, hh) = fast_two_sum(p1, sum);
+        q = qn;
+        if hh != 0.0 {
+            h[n] = hh;
+            n += 1;
+        }
+    }
+    if q != 0.0 || n == 0 {
+        h[n] = q;
+        n += 1;
+    }
+    n
+}
+
+/// x * y for expansions of at most two components each, into h (8 long).
+fn mul2_into(x: &[f64], y: &[f64], h: &mut [f64; 8]) -> usize {
+    let mut a = [0.0; 4];
+    let na = scale_into(x, y[0], &mut a);
+    if y.len() == 1 {
+        h[..na].copy_from_slice(&a[..na]);
+        return na;
+    }
+    let mut b = [0.0; 4];
+    let nb = scale_into(x, y[1], &mut b);
+    sum_into(&a[..na], &b[..nb], h)
+}
+
+/// Exact orient3d on the stack: the same determinant as det3_exact on the differences,
+/// with every intermediate expansion in a fixed array (at most 192 components).
+fn orient3d_exact_stack(a: &P3, b: &P3, c: &P3, d: &P3) -> i8 {
+    let diff = |p: &P3, k: usize| -> ([f64; 2], usize) {
+        let (x, y) = two_diff(p[k], a[k]);
+        if y != 0.0 { ([y, x], 2) } else { ([x, 0.0], 1) }
+    };
+    let u: [([f64; 2], usize); 3] = std::array::from_fn(|k| diff(b, k));
+    let v: [([f64; 2], usize); 3] = std::array::from_fn(|k| diff(c, k));
+    let w: [([f64; 2], usize); 3] = std::array::from_fn(|k| diff(d, k));
+    // minor (i, j): v_i w_j - v_j w_i
+    let minor = |i: usize, j: usize, h: &mut [f64; 16]| -> usize {
+        let (mut p, mut q) = ([0.0; 8], [0.0; 8]);
+        let np = mul2_into(&v[i].0[..v[i].1], &w[j].0[..w[j].1], &mut p);
+        let nq = mul2_into(&v[j].0[..v[j].1], &w[i].0[..w[i].1], &mut q);
+        for x in &mut q[..nq] {
+            *x = -*x;
+        }
+        sum_into(&p[..np], &q[..nq], h)
+    };
+    // u_k times the minor of the other two rows, k = 0, 1, 2 as in det3_exact
+    let term = |k: usize, h: &mut [f64; 64]| -> usize {
+        let (i, j) = [(1, 2), (2, 0), (0, 1)][k];
+        let mut m = [0.0; 16];
+        let nm = minor(i, j, &mut m);
+        let mut a = [0.0; 32];
+        let na = scale_into(&m[..nm], u[k].0[0], &mut a);
+        if u[k].1 == 1 {
+            h[..na].copy_from_slice(&a[..na]);
+            return na;
+        }
+        let mut b = [0.0; 32];
+        let nb = scale_into(&m[..nm], u[k].0[1], &mut b);
+        sum_into(&a[..na], &b[..nb], h)
+    };
+    let (mut t0, mut t1, mut t2) = ([0.0; 64], [0.0; 64], [0.0; 64]);
+    let n0 = term(0, &mut t0);
+    let n1 = term(1, &mut t1);
+    let n2 = term(2, &mut t2);
+    let mut s01 = [0.0; 128];
+    let n01 = sum_into(&t0[..n0], &t1[..n1], &mut s01);
+    let mut all = [0.0; 192];
+    let n = sum_into(&s01[..n01], &t2[..n2], &mut all);
+    let top = all[n - 1];
+    if top > 0.0 { 1 } else if top < 0.0 { -1 } else { 0 }
+}
+
 impl Expansion {
     fn diff(a: f64, b: f64) -> Self {
         let (x, y) = two_diff(a, b);
@@ -119,77 +289,9 @@ impl Expansion {
 
     /// fast_expansion_sum_zeroelim (Shewchuk 1997, Fig. 8 with zero elimination).
     fn add(&self, f: &Expansion) -> Self {
-        let e = &self.0;
-        let f = &f.0;
-        let mut h = Vec::with_capacity(e.len() + f.len());
-        let (mut ei, mut fi) = (0usize, 0usize);
-        let mut enow = e[0];
-        let mut fnow = f[0];
-        let mut q;
-        if (fnow > enow) == (fnow > -enow) {
-            q = enow;
-            ei += 1;
-            enow = if ei < e.len() { e[ei] } else { 0.0 };
-        } else {
-            q = fnow;
-            fi += 1;
-            fnow = if fi < f.len() { f[fi] } else { 0.0 };
-        }
-        if ei < e.len() && fi < f.len() {
-            let (qn, hh) = if (fnow > enow) == (fnow > -enow) {
-                let r = fast_two_sum(enow, q);
-                ei += 1;
-                enow = if ei < e.len() { e[ei] } else { 0.0 };
-                r
-            } else {
-                let r = fast_two_sum(fnow, q);
-                fi += 1;
-                fnow = if fi < f.len() { f[fi] } else { 0.0 };
-                r
-            };
-            q = qn;
-            if hh != 0.0 {
-                h.push(hh);
-            }
-            while ei < e.len() && fi < f.len() {
-                let (qn, hh) = if (fnow > enow) == (fnow > -enow) {
-                    let r = two_sum(q, enow);
-                    ei += 1;
-                    enow = if ei < e.len() { e[ei] } else { 0.0 };
-                    r
-                } else {
-                    let r = two_sum(q, fnow);
-                    fi += 1;
-                    fnow = if fi < f.len() { f[fi] } else { 0.0 };
-                    r
-                };
-                q = qn;
-                if hh != 0.0 {
-                    h.push(hh);
-                }
-            }
-        }
-        while ei < e.len() {
-            let (qn, hh) = two_sum(q, enow);
-            ei += 1;
-            enow = if ei < e.len() { e[ei] } else { 0.0 };
-            q = qn;
-            if hh != 0.0 {
-                h.push(hh);
-            }
-        }
-        while fi < f.len() {
-            let (qn, hh) = two_sum(q, fnow);
-            fi += 1;
-            fnow = if fi < f.len() { f[fi] } else { 0.0 };
-            q = qn;
-            if hh != 0.0 {
-                h.push(hh);
-            }
-        }
-        if q != 0.0 || h.is_empty() {
-            h.push(q);
-        }
+        let mut h = vec![0.0; self.0.len() + f.0.len()];
+        let n = sum_into(&self.0, &f.0, &mut h);
+        h.truncate(n);
         Expansion(h)
     }
 
@@ -199,27 +301,9 @@ impl Expansion {
 
     /// scale_expansion_zeroelim (Shewchuk 1997, Fig. 13 with zero elimination).
     fn scale(&self, b: f64) -> Self {
-        let e = &self.0;
-        let mut h = Vec::with_capacity(2 * e.len());
-        let (mut q, hh) = two_product(e[0], b);
-        if hh != 0.0 {
-            h.push(hh);
-        }
-        for &ei in &e[1..] {
-            let (p1, p0) = two_product(ei, b);
-            let (sum, hh) = two_sum(q, p0);
-            if hh != 0.0 {
-                h.push(hh);
-            }
-            let (qn, hh) = fast_two_sum(p1, sum);
-            q = qn;
-            if hh != 0.0 {
-                h.push(hh);
-            }
-        }
-        if q != 0.0 || h.is_empty() {
-            h.push(q);
-        }
+        let mut h = vec![0.0; 2 * self.0.len()];
+        let n = scale_into(&self.0, b, &mut h);
+        h.truncate(n);
         Expansion(h)
     }
 
@@ -275,7 +359,7 @@ const O3D_ERRBOUND_A: f64 = (7.0 + 56.0 * EPS) * EPS;
 const ISP_ERRBOUND_A: f64 = (16.0 + 224.0 * EPS) * EPS;
 
 pub fn orient3d_exact(a: &P3, b: &P3, c: &P3, d: &P3) -> i8 {
-    det3_exact(&diff3(b, a), &diff3(c, a), &diff3(d, a)).sign()
+    orient3d_exact_stack(a, b, c, d)
 }
 
 /// Sign of det[b - a, c - a, d - a].
