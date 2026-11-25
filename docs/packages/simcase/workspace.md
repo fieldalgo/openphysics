@@ -2388,8 +2388,13 @@ file* there, as if no file had held the project), or *both-models ·
 recovered from this browser · as opened from both-models.json · kept for recovery in this browser*
 when the record still matched the project file it was opened from; a record that names its
 project file reads as before (*… · both-models.json · saved …*), and an older record without a name
-as before (*Untitled project · …*). After the next change the header is the ordinary one
-(*both-models · not saved to a file · …*). A pair restore whose records name different projects
+as before (*Untitled project · …*). After the next change, a project whose record came from a file
+(matched or not) keeps naming it in every recovery state: *both-models · changed since
+both-models.json, not saved · updating browser recovery*, *… · kept for recovery in this browser*
+or *… · kept for recovery in this browser without the fields of Run 6* (round 24, B2: it read *not
+saved to a file*, beside the status bar's *Changed since session file both-models.json*). A record of
+no file gives the ordinary header (*both-models · not saved to a file · …*), and a project with a
+project file of its own keeps its words (*… · both-models.json · changed since opened · …*). A pair restore whose records name different projects
 takes the newer record's name, with no extra message.
 
 The latest snapshot is a single record for the browser origin, shared across tabs.

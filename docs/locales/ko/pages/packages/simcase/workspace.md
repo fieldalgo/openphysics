@@ -1975,7 +1975,12 @@ recovered from this browser · changed since both-models.json, not saved · kept
 기록이 연 프로젝트 파일과 아직 같았으면 *both-models · recovered
 from this browser · as opened from both-models.json · kept for recovery in this browser*입니다. 프로젝트 파일을 밝힌
 기록은 전과 같고(*… · both-models.json · saved …*), 이름 없는 이전 기록도 전과 같습니다(*Untitled project · …*).
-다음 변경 뒤 헤더는 보통 헤더입니다(*both-models · not saved to a file · …*). 두 기록의 프로젝트 이름이 다른 쌍 복원은
+다음 변경 뒤에도 파일에서 온 기록(같았든 아니든)의 프로젝트는 모든 복구 상태에서 그 파일을 밝힙니다: *both-models ·
+changed since both-models.json, not saved · updating browser recovery*, *… · kept for recovery in this browser*,
+*… · kept for recovery in this browser without the fields of Run 6*(round 24, B2: 전에는 상태 표시줄의 *Changed since
+session file both-models.json* 옆에서 *not saved to a file*였음). 파일 없이 연 기록은 보통 헤더이고(*both-models · not
+saved to a file · …*), 자기 프로젝트 파일이 있는 프로젝트는 그 말을 씁니다(*… · both-models.json · changed since opened ·
+…*). 두 기록의 프로젝트 이름이 다른 쌍 복원은
 추가 메시지 없이 더 새 기록의 이름을 씁니다.
 
 최신 스냅샷은 같은 브라우저 origin의 한 건이며 탭 간 공유됩니다. 저장할 때 같은 데이터베이스

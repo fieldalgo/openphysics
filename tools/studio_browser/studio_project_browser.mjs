@@ -810,11 +810,14 @@ try {
     assert.equal(k5.title, 'both-models · recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser');
     assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
-    // after a change the header is the ordinary one (the drop-line check above ends on the restored
-    // inputs, 560 nm, so the header still reads as recovered there, as loadedSession does)
+    // after a change the header leaves "recovered" (the drop-line check above ends on the restored
+    // inputs, 560 nm, so the header still reads as recovered there, as loadedSession does); round 24
+    // (B2): it keeps naming both-models.json (it read "both-models · not saved to a file · …")
     assert.match(await title(), /^both-models · recovered from this browser · /);
-    await width(600); await sleep(300); k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
-    assert.match(k5.changed, /^both-models · not saved to a file · /);
+    await width(600); await sleep(300);
+    await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'K5 header kept after a change', 30000);
+    k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
+    assert.equal(k5.changed, 'both-models · changed since both-models.json, not saved · kept for recovery in this browser');
     await stopBrowser(page);
   }
 

@@ -224,13 +224,13 @@ const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduct
 // recovered: the project name came back from a browser-recovery record's `project` (no project
 // file): {opened: the file the record still matched, or null; savedAt: that record's time; stamp:
 // the project then}. The header says so until the next change (projectStamp differs).
-const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null};
+const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null,fromFile:null};
 // the page and run the workspace was last shown on (round 16, S9; rememberReturn)
 let workspaceReturn=null;
 function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
 // a file replaced the project: an untitled project of the models now in the tab
 function resetProject({name=null,ids=null,nameFrom=null}={}){
- Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});
+ Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,fromFile:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});
  if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
 }
 // The models a project file holds, as Save compares them (round 17, U8): [{key, title}], keyed by the
@@ -266,7 +266,7 @@ function unsavedModels(){
 function projectLine(){
  const file=project.file&&project.file.scope===project.scope?project.file:null;
  const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened,changed:project.recovered.changed??null}:null;
- return projectTitle({name:project.name,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
+ return projectTitle({name:project.name,fromFile:project.fromFile,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
 }
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
@@ -349,6 +349,8 @@ function restoreProjectName(record,options={}){
  const next=recoveredProjectName(project,record,options);if(!next)return;
  if(next.name!==project.name||next.nameFrom!==project.nameFrom)project.copyOf=null;
  Object.assign(project,next);project.recovered={...next.recovered,stamp:projectStamp()};
+ // round 24 (B2): the file the record came from, named by the header after the next change too
+ project.fromFile=next.recovered.opened||next.recovered.changed||null;
 }
 // the project of a recovery record this tab writes: its name when it has one
 const recordProjectNow=()=>project.name?{name:project.name,from:project.nameFrom||'user'}:null;
