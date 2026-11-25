@@ -1,25 +1,5 @@
 # 변경 기록
 
-- 한 활성 도체와 두 고정 전위 유한 가드의 명시적 장 API를 추가했다. 유도 전류의 부호를 보존하고 독립 원형·유한요소 기준으로 검증한다.
-
-- 두 활성 도체와 고정 전위 유한 가드의 명시적 장 API를 추가했다. 유도 전류의 부호를 보존하고 독립 원형·유한요소 기준으로 검증한다.
-
-- 기존 부분공간을 정확히 보존하는 세 방사형 기저의 원거리 로그 적분과 독립 해석 모멘트 기준을 추가했다. 장 계산법은 바꾸지 않는다.
-
-- 기존 부분공간을 정확히 보존하는 세 방사형 기저의 물리 Gram·자기 로그 적분과 독립 고정밀 기준을 추가했다. 장 계산법은 바꾸지 않는다.
-
-- 세 활성 도체의 정적 코너 조화기저 전계에 compact 물리 분할·유계 수치 검사·독립 유한 비교·불변 면 전류를 추가했다.
-
-- 공개 기하와 장 설정을 유지하면서 유리수 기하 검사를 갖춘 비공개 코너 분할을 추가했습니다.
-
-- 작은 지수 차이를 안정적으로 계산하는 비공개 정적 쐐기 투영·접지 Fourier 모멘트와 닫힌 해석식 검사를 추가했습니다.
-
-- 정적 쐐기 모드의 한도 있는 반공간 Green 조립, 읽기 전용 원시 근거와 원형 선로 해석해 검사를 추가했습니다.
-
-- 물리적 질량 검사와 읽기 전용 세분화 근거를 갖춘 명시적 쐐기 상호작용 블록을 추가하고 적분 기준의 수학적 공유 범위를 기록했다.
-
-- 정적 쐐기 기저의 자기 적분과 Gram을 명시적 API로 추가했다. 균일 모드 근처의 비영 성분과 독립 적분 근거를 검증하며 기존 장 솔버는 그대로 유지한다.
-
 [English](../../../../CHANGELOG.md) | **한국어**
 
 OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmshio`,
@@ -29,10 +9,6 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 `CHANGELOG.md`입니다.
 
 ## 0.x의 안정성
-
-- 해석적 반지름 적분과 미해결 차수의 명시적 거부를 갖는 계층 선형 power 공유 꼭짓점 로그 블록을 추가했습니다.
-
-- 계층 선형 power 패널의 유계 원거리 로그 상호작용에 해석적 영질량 중심화와 구적 비교 기록을 추가했습니다.
 
 0.x 릴리스는 알파입니다.
 
@@ -92,12 +68,30 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 ## [Unreleased]
 
-- `galerkin`: **형상 motion에서 축퇴 모드의 분기 기울기.** `galerkin.waveguide.degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None, target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None, pec_edges=None, motion, relative_tolerance=DEGENERATE_GAP)`는 motion을 준 `solve_waveguide_modes`의 인수를 받아, 서로 `relative_tolerance` 안에 있는 반환 모드 묶음마다 `DegenerateModeBranches(mode_index, effective_index, effective_index_derivative, mode_combination)`를 돌려줍니다. 교차점을 지나는 각 분기의 기울기 d n_eff / dt(묶음에 투영한 motion 미분 V^T (dA/dt - lambda dB/dt) V와 V^T B V의 일반화 고유값, t의 라이브러리에서 계산)와 각 분기가 반환 모드의 어떤 조합인지이며, exp(-i omega t) 기준입니다. 최상위가 아니라 `galerkin.waveguide`에 있습니다(최상위 이름은 50개 그대로). 정렬된 모드는 NaN 미분과 `DegenerateModeWarning`을 그대로 받고(2026-11-11 결정), 이름을 밝혀 거부하는 경우: 반환되지 않은 구성원이 있는 묶음, `relative_tolerance`보다 멀리 이어진 묶음, 1e-3보다 큰 `relative_tolerance`, 실수 문제의 복소 기울기. `ElementInversion`은 그대로 전달합니다. 거의 축퇴인 묶음(간격보다 큰 tolerance)의 기울기는 정확 축퇴 극한의 기울기이며, 반환 모드의 t에서의 미분이 아닙니다. 검사(D1-D9): 대칭 정사각 코어에서 양쪽 한쪽 차분과 3.2e-9 이내(공개 규약의 손실 코어도 같음); 2026-11-11 정사각(형상 엔진 motion, 거의 축퇴인 메시)에서 기울기 µm당 5.696, 2.280이 그날 galerkin 차분과 3 %, modesolverpy와 5 % 이내. 커널의 이동 pencil은 `solve_modes`와 함께 쓰는 `_moving_system`에서 조립하며, `solve_modes`의 수치는 같습니다. [형상 미분](packages/galerkin/shape_derivative.md#도파관-모드).
-- `simcase`: **`shape_derivative.shape_problem`이 vector 도파관 모드를 다룹니다**(`em.modes2d`, `formulation: vector`, 닫힌 경계, 단일 study, 버전 1 `2d` 성분). 메시는 runner의 `build_mesh`, 풀이는 `motion=`을 준 runner의 vector 풀이(풀이 메시가 파장으로 나눈 것이라 노드가 W / 파장으로 움직임)이고, 모드는 runner와 같이 고릅니다. `solve(t)`는 exp(-i omega t) 기준 `{"effective_index": ...}`를 돌려주며, 축퇴 모드의 미분은 galerkin처럼 NaN이고 `DegenerateModeWarning`이 납니다. scalar formulation, PML·bend, sweep, 모드 추적은 이름을 밝혀 거부합니다. 폭 0.5 µm SOI strip에서 검사(Q1–Q5): dn_eff/dw = µm당 1.58로 같은 메시 Richardson 차분과 6.5e-11 이내; t = 0 n_eff가 `run`과 1.8e-15 이내; µm와 nm로 쓴 strip의 메시와 미분이 같음; 손실 코어에서 Im n_eff > 0이 `run`과 같음; 미분과 새로 메시한 `run` 차분이 함께 수렴(0.1 µm에서 4.9 %, 0.05 µm에서 0.65 %). [문서의 형상 미분](packages/simcase/geometry_engine.md#문서의-형상-미분).
-- 시험: 저장 레퍼런스 값의 payload·배열 데이터 한도가 1 MiB입니다(이전 512 KiB, 2026-10-28에 정한 한도). 기록(1 MiB)·저장소(10 MiB) 한도는 그대로입니다. [저장 레퍼런스 값](stored-reference-values.md).
-- `simcase`: **`shape_derivative.shape_problem`이 정상 열 밖에 과도 열·전기 전도·탄성·열탄성도 다룹니다**(버전 1 `2d` 성분의 재료 영역). `thermal.transient2d`(`solve_transient_heat`), `electric.steady2d`(`solve_steady_electric`), `mechanics.elasticity2d`(`solve_elasticity`), `mechanics.thermoelastic2d`(`solve_steady_thermoelasticity`, 움직이는 메시에서 열 단계를 다시 풂)입니다. `ShapeProblem.physics`가 종류를 밝히고 `solve(t)`는 그 풀이기의 결과를 돌려줍니다. 내향 열유속·convection·traction이 있는 열탄성 문서(워크플로가 받지 않음; 열원은 받음), 두 역학 종류의 `gauge_pressure`(simcase가 움직이는 법선의 traction으로 적용), Joule 가열은 이름을 밝혀 거부합니다(도파관 모드도 위 항목 전까지 거부). 두 재료 띠에서 검사했습니다(P1–P6): 전기 전류와 탄성 끝 변위, 그 미분이 약 1e-14로 정확; 열탄성의 열 단계는 정상 열 문제와 같고 끝 변위는 같은 메시 중앙 차분과 맞음(2.2e-9); 과도 열은 1000 s에서 정상 미분에 닿음(2.9e-9); 모든 종류가 t = 0에서 `run`과 같음. [문서의 형상 미분](packages/simcase/geometry_engine.md#문서의-형상-미분).
-- `simcase`: **다중물리 문서(D2)와 첫 결합 열 → n(T) → 광 모드.** `couplings`가 있거나 물리가 둘 이상의 종류에 속하는 문서는 형식 0.3 위에 `"openphysics": "0.3/multiphysics.1"`을 밝힙니다. 이런 모양의 `"0.3"` 문서는 `E-FORMAT`이고, 단일 물리 문서와 결과는 그대로입니다(배포한 예제 33개 모두 validate 출력, 필드, summary, model.json, results.png의 해시가 같음). 물리 항목마다 그 종류가 검증하고, `simcase validate`는 결합(포트, 물리량, 단위, `combine`, `same_mesh`), 유도한 풀이 순서와 그 순환을 `study.loops`에 비춰, 결합된 온도 아래 광학 재료의 열광학 모델을 검사합니다. `em.modes2d`에 입력 포트 `temperature`(K, 요소, `single`)가 생깁니다. 삼각형마다 P1 평균을 구하고 n = n₀(λ) + (dn/dT)(T − T_ref)를 쓰며, 모델은 로컬 기록(`thermo_optic_coefficient`, `reference_temperature`)이나 `physmat:Si`/`physmat:SiO2`(T_ref 300 K)에서 옵니다. 열은 여전히 라이브러리 재료를 읽지 않으므로 열 → 모드 문서는 로컬 기록을 씁니다. 받아들인 반복은 완화 고정점 반복으로 실행하고, `max_iterations`에 닿으면 새 코드 `E-LOOP-DIVERGED`와 잔차 이력으로 실패합니다. 다중물리 sweep은 검증하고 실행하지 않습니다. 결과는 물리마다 폴더가 있는 `multiphysics-run-v1`입니다. 독립 기준으로 검사했습니다. 균일 10 K 상승의 n_eff 변화는 PEC로 둘러싼 슬랩의 정확한 변화와 5.9e-4 이내(h = 0.02 µm), 선형 열 분포는 2.6e-10 K까지 정확, 결합 n_eff는 1D 기준으로 차수 1.86으로 수렴(Richardson 외삽 4.1e-7 이내), dn/dT = 0과 균일한 T_ref는 결합하지 않은 결과와 비트 단위로 같습니다. 결합 훅은 simcase 내부용이라 다른 공급자의 종류는 아직 결합하지 않습니다. [다중물리 문서](packages/simcase/multiphysics_document.md).
-- 시험: 코너 장 패널 수렴 연구(harmonic 코너 장 3모듈과 linear 코너 장; 패널 32→48/64, 바깥 폭 8→16→32 mm, 1% 기준 불변)는 하나하나가 45분 CI 시험 분할보다 길다. `slow`로 표시하고 `OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(입력 `panel_studies=true`)에서 돌린다. 일반 시험은 다른 시험이 푸는 해상도가 기록값(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비 1e-9)을 재현하는지 확인한다. 분할 시간표에 panel 시험 파일을 넣었다. [개발 안내](development.md).
+- 한 활성 도체와 두 고정 전위 유한 가드의 명시적 장 API를 추가했다. 유도 전류의 부호를 보존하고 독립 원형·유한요소 기준으로 검증한다.
+
+- 두 활성 도체와 고정 전위 유한 가드의 명시적 장 API를 추가했다. 유도 전류의 부호를 보존하고 독립 원형·유한요소 기준으로 검증한다.
+
+- 기존 부분공간을 정확히 보존하는 세 방사형 기저의 원거리 로그 적분과 독립 해석 모멘트 기준을 추가했다. 장 계산법은 바꾸지 않는다.
+
+- 기존 부분공간을 정확히 보존하는 세 방사형 기저의 물리 Gram·자기 로그 적분과 독립 고정밀 기준을 추가했다. 장 계산법은 바꾸지 않는다.
+
+- 세 활성 도체의 정적 코너 조화기저 전계에 compact 물리 분할·유계 수치 검사·독립 유한 비교·불변 면 전류를 추가했다.
+
+- 공개 기하와 장 설정을 유지하면서 유리수 기하 검사를 갖춘 비공개 코너 분할을 추가했습니다.
+
+- 작은 지수 차이를 안정적으로 계산하는 비공개 정적 쐐기 투영·접지 Fourier 모멘트와 닫힌 해석식 검사를 추가했습니다.
+
+- 정적 쐐기 모드의 한도 있는 반공간 Green 조립, 읽기 전용 원시 근거와 원형 선로 해석해 검사를 추가했습니다.
+
+- 물리적 질량 검사와 읽기 전용 세분화 근거를 갖춘 명시적 쐐기 상호작용 블록을 추가하고 적분 기준의 수학적 공유 범위를 기록했다.
+
+- 정적 쐐기 기저의 자기 적분과 Gram을 명시적 API로 추가했다. 균일 모드 근처의 비영 성분과 독립 적분 근거를 검증하며 기존 장 솔버는 그대로 유지한다.
+
+- 해석적 반지름 적분과 미해결 차수의 명시적 거부를 갖는 계층 선형 power 공유 꼭짓점 로그 블록을 추가했습니다.
+
+- 계층 선형 power 패널의 유계 원거리 로그 상호작용에 해석적 영질량 중심화와 구적 비교 기록을 추가했습니다.
+
 - 시험: 두 접지 등록 형상 시험이 정전용량을 저장된 panel 값과 비트 단위가 아니라 상대 1e-13으로 비교한다. 마지막 비트는 실행기 CPU·BLAS 커널에 따라 달라진다(관측 상대 1.1e-15–2.5e-15). 전류 Gram(1e-10)과 독립 기준 비교는 그대로다.
 
 - 시험: 코너 장 패널 수렴 연구(harmonic 코너 장 3모듈과 linear 코너 장; 패널 32→48/64, 바깥 폭 8→16→32 mm, 1% 기준 불변)는 하나하나가 45분 CI 시험 분할보다 길다. `slow`로 표시하고 `OPENPHYSICS_PANEL_STUDIES=1`일 때만 validate.yml의 수동 실행 전용 작업 `panel-studies`(입력 `panel_studies=true`)에서 돌린다. 일반 시험은 다른 시험이 푸는 해상도가 기록값(`tests/galerkin/two_ground/evidence/corner-field-studies.json`, 각 행렬 최대 원소 대비 1e-9)을 재현하는지 확인한다. 분할 시간표는 panel 시험 파일을 포함한 완료된 CI 실행으로 다시 만들었고, 전체의 1/8보다 긴 두 파일은 나눴다(반사·크기 변환 시험을 별도 파일로). 설치 wheel 실행은 skip을 실패로 보므로 변수가 없으면 연구 시험을 정의하지 않는다. [개발 안내](development.md).
@@ -133,7 +127,9 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `galerkin`: 정규 power/constant 바닥접지 Green 평균에 해석 상수 moment·고정 구적·위상/해상도/양수성 거부를 추가했습니다. 독립 직접2D 참조와 물리 불변식으로 원시요소를 검증하며 기존 장 솔버는 바꾸지 않습니다.
 
 - `galerkin`: 정규화된 모서리 power-panel 구적, 해석적 self 항, 공통 꼭짓점·분리 패널·power-to-constant 로그 적분을 추가했습니다. 불변 캐시 규칙은 구적 산술과 가중치를 그대로 보존합니다. 독립 고정밀 참조와 기하 불변식으로 명시한 길이·분리 범위를 검사했습니다.
+
 - `galerkin`: 허용된 볼록 도체의 불변 매개변수 모서리 패널 기하와 보정 상대좌표를 사용하는 바닥 접지 반공간 행렬을 추가했습니다. 적분 원시요소이며 위쪽·옆쪽 경계 보정이나 완전한 장 해를 제공하지 않습니다.
+
 - `galerkin`: `bounded_dense_residual`은 보정 곱·합으로 범위가 제한된 binary64 밀집 잔차를 계산하며 정확한 이진 유리수 참조로 검사했습니다. 기존 솔버 기본값은 바꾸지 않습니다. 모서리 원시요소와 잔차 계산기는 Linux 소스·설치 각각 관련 검사 517개를 통과했으며 완전한 장 모델이나 다른 플랫폼을 수락한 것은 아닙니다. [계약과 한계](packages/galerkin/laplace_boundary.md).
 
 - 평면 작은 각도 격자의 스칼라 길이에 `math.hypot`을 사용해 CPU별 BLAS 축약 차이를 피합니다. 메시 설정과 선택 계약은 유지합니다.
@@ -142,6 +138,11 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 
 - `galerkin`: 바닥 접지 직사각형의 균질 Laplace 경계 패널 API 추가. 상호적인 에너지 조립·단위 전류 표면 Gram 인자·명시적 기하/자원/세분 검사. [계약과 검증](packages/galerkin/laplace_boundary.md).
 
+- `galerkin`: **형상 motion에서 축퇴 모드의 분기 기울기.** `galerkin.waveguide.degenerate_branch_derivatives(mesh, *, relative_permittivity, vacuum_wavelength=None, vacuum_angular_wavenumber=None, target_effective_index, search_mode_count, relative_permeability=1.0, pec_nodes=None, pec_edges=None, motion, relative_tolerance=DEGENERATE_GAP)`는 motion을 준 `solve_waveguide_modes`의 인수를 받아, 서로 `relative_tolerance` 안에 있는 반환 모드 묶음마다 `DegenerateModeBranches(mode_index, effective_index, effective_index_derivative, mode_combination)`를 돌려줍니다. 교차점을 지나는 각 분기의 기울기 d n_eff / dt(묶음에 투영한 motion 미분 V^T (dA/dt - lambda dB/dt) V와 V^T B V의 일반화 고유값, t의 라이브러리에서 계산)와 각 분기가 반환 모드의 어떤 조합인지이며, exp(-i omega t) 기준입니다. 최상위가 아니라 `galerkin.waveguide`에 있습니다(최상위 이름은 50개 그대로). 정렬된 모드는 NaN 미분과 `DegenerateModeWarning`을 그대로 받고(2026-11-11 결정), 이름을 밝혀 거부하는 경우: 반환되지 않은 구성원이 있는 묶음, `relative_tolerance`보다 멀리 이어진 묶음, 1e-3보다 큰 `relative_tolerance`, 실수 문제의 복소 기울기. `ElementInversion`은 그대로 전달합니다. 거의 축퇴인 묶음(간격보다 큰 tolerance)의 기울기는 정확 축퇴 극한의 기울기이며, 반환 모드의 t에서의 미분이 아닙니다. 검사(D1-D9): 대칭 정사각 코어에서 양쪽 한쪽 차분과 3.2e-9 이내(공개 규약의 손실 코어도 같음); 2026-11-11 정사각(형상 엔진 motion, 거의 축퇴인 메시)에서 기울기 µm당 5.696, 2.280이 그날 galerkin 차분과 3 %, modesolverpy와 5 % 이내. 커널의 이동 pencil은 `solve_modes`와 함께 쓰는 `_moving_system`에서 조립하며, `solve_modes`의 수치는 같습니다. [형상 미분](packages/galerkin/shape_derivative.md#도파관-모드).
+- `simcase`: **`shape_derivative.shape_problem`이 vector 도파관 모드를 다룹니다**(`em.modes2d`, `formulation: vector`, 닫힌 경계, 단일 study, 버전 1 `2d` 성분). 메시는 runner의 `build_mesh`, 풀이는 `motion=`을 준 runner의 vector 풀이(풀이 메시가 파장으로 나눈 것이라 노드가 W / 파장으로 움직임)이고, 모드는 runner와 같이 고릅니다. `solve(t)`는 exp(-i omega t) 기준 `{"effective_index": ...}`를 돌려주며, 축퇴 모드의 미분은 galerkin처럼 NaN이고 `DegenerateModeWarning`이 납니다. scalar formulation, PML·bend, sweep, 모드 추적은 이름을 밝혀 거부합니다. 폭 0.5 µm SOI strip에서 검사(Q1–Q5): dn_eff/dw = µm당 1.58로 같은 메시 Richardson 차분과 6.5e-11 이내; t = 0 n_eff가 `run`과 1.8e-15 이내; µm와 nm로 쓴 strip의 메시와 미분이 같음; 손실 코어에서 Im n_eff > 0이 `run`과 같음; 미분과 새로 메시한 `run` 차분이 함께 수렴(0.1 µm에서 4.9 %, 0.05 µm에서 0.65 %). [문서의 형상 미분](packages/simcase/geometry_engine.md#문서의-형상-미분).
+- 시험: 저장 레퍼런스 값의 payload·배열 데이터 한도가 1 MiB입니다(이전 512 KiB, 2026-10-28에 정한 한도). 기록(1 MiB)·저장소(10 MiB) 한도는 그대로입니다. [저장 레퍼런스 값](stored-reference-values.md).
+- `simcase`: **`shape_derivative.shape_problem`이 정상 열 밖에 과도 열·전기 전도·탄성·열탄성도 다룹니다**(버전 1 `2d` 성분의 재료 영역). `thermal.transient2d`(`solve_transient_heat`), `electric.steady2d`(`solve_steady_electric`), `mechanics.elasticity2d`(`solve_elasticity`), `mechanics.thermoelastic2d`(`solve_steady_thermoelasticity`, 움직이는 메시에서 열 단계를 다시 풂)입니다. `ShapeProblem.physics`가 종류를 밝히고 `solve(t)`는 그 풀이기의 결과를 돌려줍니다. 내향 열유속·convection·traction이 있는 열탄성 문서(워크플로가 받지 않음; 열원은 받음), 두 역학 종류의 `gauge_pressure`(simcase가 움직이는 법선의 traction으로 적용), Joule 가열은 이름을 밝혀 거부합니다(도파관 모드도 위 항목 전까지 거부). 두 재료 띠에서 검사했습니다(P1–P6): 전기 전류와 탄성 끝 변위, 그 미분이 약 1e-14로 정확; 열탄성의 열 단계는 정상 열 문제와 같고 끝 변위는 같은 메시 중앙 차분과 맞음(2.2e-9); 과도 열은 1000 s에서 정상 미분에 닿음(2.9e-9); 모든 종류가 t = 0에서 `run`과 같음. [문서의 형상 미분](packages/simcase/geometry_engine.md#문서의-형상-미분).
+- `simcase`: **다중물리 문서(D2)와 첫 결합 열 → n(T) → 광 모드.** `couplings`가 있거나 물리가 둘 이상의 종류에 속하는 문서는 형식 0.3 위에 `"openphysics": "0.3/multiphysics.1"`을 밝힙니다. 이런 모양의 `"0.3"` 문서는 `E-FORMAT`이고, 단일 물리 문서와 결과는 그대로입니다(배포한 예제 33개 모두 validate 출력, 필드, summary, model.json, results.png의 해시가 같음). 물리 항목마다 그 종류가 검증하고, `simcase validate`는 결합(포트, 물리량, 단위, `combine`, `same_mesh`), 유도한 풀이 순서와 그 순환을 `study.loops`에 비춰, 결합된 온도 아래 광학 재료의 열광학 모델을 검사합니다. `em.modes2d`에 입력 포트 `temperature`(K, 요소, `single`)가 생깁니다. 삼각형마다 P1 평균을 구하고 n = n₀(λ) + (dn/dT)(T − T_ref)를 쓰며, 모델은 로컬 기록(`thermo_optic_coefficient`, `reference_temperature`)이나 `physmat:Si`/`physmat:SiO2`(T_ref 300 K)에서 옵니다. 열은 여전히 라이브러리 재료를 읽지 않으므로 열 → 모드 문서는 로컬 기록을 씁니다. 받아들인 반복은 완화 고정점 반복으로 실행하고, `max_iterations`에 닿으면 새 코드 `E-LOOP-DIVERGED`와 잔차 이력으로 실패합니다. 다중물리 sweep은 검증하고 실행하지 않습니다. 결과는 물리마다 폴더가 있는 `multiphysics-run-v1`입니다. 독립 기준으로 검사했습니다. 균일 10 K 상승의 n_eff 변화는 PEC로 둘러싼 슬랩의 정확한 변화와 5.9e-4 이내(h = 0.02 µm), 선형 열 분포는 2.6e-10 K까지 정확, 결합 n_eff는 1D 기준으로 차수 1.86으로 수렴(Richardson 외삽 4.1e-7 이내), dn/dT = 0과 균일한 T_ref는 결합하지 않은 결과와 비트 단위로 같습니다. 결합 훅은 simcase 내부용이라 다른 공급자의 종류는 아직 결합하지 않습니다. [다중물리 문서](packages/simcase/multiphysics_document.md).
 - CI: Ubuntu, macOS, Windows의 설치 플랫폼 검사를 차례로가 아니라 동시에 돌립니다. run 44870205876에서 셋을 차례로 돌리는 데 19.6분이 걸려 검증 실행 전체의 길이를 정했습니다. 검사 내용은 그대로입니다. [개발 안내](development.md#ci가-돌리는-것).
 - `simcase`: **에이전트 사용성 라운드에서 나온 Studio 작업 공간 수정**(참가자 다섯 명 모두가 겪은 문제): (1) 사각형의 **Width**를 바꾸면 가로 중심이 유지되고(Left x = 중심 − W/2) **Height**를 바꾸면 아래 변이 유지되므로, 600 → 700 nm 코어가 x = 0에서 벗어나 Δn_eff가 달라지지 않습니다(**Centre on x = 0**을 누르지 않으면 0.06911675, 누르면 0.06879796이었고 이제 기본이 후자). 범위, 계산창 거부, Undo는 그대로이고 저장된 프로젝트는 저장된 좌표를 유지합니다. (2) **Compare**에 캡션이 있는 표가 생겨 후보 순위마다 n_eff A, n_eff B, Δ (B − A), A 대비 Δ %를 보여 주고 머리글에 각 실행(이름, W × H, λ)을 표시합니다. 모드가 짝지어지지 않았다는 주의는 메모로 남습니다. (3) **Save session**은 응용과 현지 날짜·시각으로 파일 이름을 정하고(`optical-waveguide-session-2026-11-21-1305.json`), Messages에 *Session file … sent to the browser's downloads (check your Downloads folder)*를 알리고(Studio는 다운로드가 보관됐는지 알 수 없음), 다음 편집이나 실행 전까지 제목에 *Session file … · 시각*을 표시합니다. 브라우저 복구는 마지막 세션 파일 이름과 시각을 보관해 복구 뒤 *Results not saved* 대신 *Last session file … (시각)*을 보여 줍니다. Width를 홀수 nm만큼 바꾸면 Left x가 0.5 nm 단위가 되며 중심은 정확히 유지됩니다. (4) 기본 입력이고 결과가 없으면 열기·복구가 확인 없이 진행되고(Messages에 무엇을 열었는지 나옴), 그 밖에는 창이 **Open saved session?**(**Recover saved session?**)으로 돌아올 실행·이름·고정·비교와 바뀌는 것을 보여 주며, 버튼 이름은 **Open session**(**Recover session**)이고 실제로 있는 물리만 나열합니다. (5) 응용을 고르기 전에는 상태 표시줄에 *Choose an application to start*가 나오고 Study sequence에 단계가 없습니다. (6) 단계 표시줄의 Study 단계에 파장이 나옵니다(*λ 1550 nm · Ready to run*). 솔버, 문서 형식, 저장 결과, 수치는 바뀌지 않습니다.
 - `simcase`: **두 번째 에이전트 사용성 라운드에서 나온 Studio 작업 공간 수정**(괄호 안은 참가자 다섯 명 중 겪은 수): (1, 5/5) 세션 전체 저장을 한 이름으로 부릅니다. 리본 버튼은 **Save session**, 헤더는 *Results not saved · Save session to keep them*이며, 실행 패널은 **More › Save inputs only**가 결과를 담지 않는다고 알리고 *Save selected run*은 **Export this run**이 됩니다. (2, 4/5와 3/5) 제목이 무엇이 열려 있는지 알립니다. Open session 뒤에는 *Opened …*, 복구 뒤에는 *Recovered from this browser*(세션 파일을 저장한 적이 있으면 *last session file …* 포함), 시작 화면에서는 *No model chosen*이며 revision 번호는 없습니다. (3, 3/5) 낡은 상태 표시가 없습니다. 입력을 바꾸면 완료 메시지가 바뀌고 끝난 작업 패널이 숨겨지며, 현재 입력의 실행이 끝나면 Study 단계가 *Run complete*, Compare에서는 Results 단계를 강조하지 않고, 하단은 *Browser recovery pending* 대신 *Updating browser recovery…*, *Earlier inputs only*는 *Inputs changed since this result*입니다. (4, 4/5) Study에 **Edit wavelength**가 생겨 파장 입력란에 포커스를 둔 채 Optical modes를 엽니다. (5, 4/5) 실행 이름은 Enter를 누르거나 입력란을 벗어나면 적용되고, 안내 문구대로 실행을 고정합니다. (6, 4/5) 실행 목록 이름을 **Runs** 하나로 정했습니다. 실행 표시는 작업 id 대신 이름·크기·λ·시각을 보여 주고, 작업 id는 출처·simcase 버전·입력 변경 번호와 함께 **Run details**로 옮겼습니다. *pinned against automatic notebook eviction*, *physmat indices*, *input snapshot* 같은 내부 용어는 쉬운 말로 바꿨습니다. (7) Study sequence 줄은 일반 텍스트이고, Width 도움말은 한 문장과 **More about width and height**로 줄였으며, 다시 그려도 Settings 스크롤 위치와 포커스된 입력란이 보이게 유지하고, Compare의 Export field PNG는 Results에서 실행을 열라고 안내합니다. 솔버, 문서 형식, 세션 파일 형식, 저장 결과, 수치는 바뀌지 않습니다.
@@ -245,36 +246,6 @@ OpenPhysics 배포판 여덟 개(`galerkin`, `galerkin-refsol`, `meshine`, `gmsh
 - `galerkin`: `solve_modes`는 벡터 정식화의 정적 β² = 0 무리에 속한 근 중 `|β²| ≤ STATIC_ROOT_TOL·|σ|`(`STATIC_ROOT_TOL = 1e-10`, 곧 `|n_eff| ≤ 1e-5·|n_target|`)인 것을 반환하지 않습니다. 모든 `[0, e_z]`가 이 무리의 고유벡터이고, β² = 0보다 목표에 가까운 모드보다 많이 찾는 탐색은 반올림 수준의 근으로 이 무리에 닿았습니다. 실수 탐색은 반올림으로 β² > 0이 된 근을, 손실 탐색은 거의 모든 근을 `n_eff` 약 1e-7인 모드로 반환했고, PML 탐색은 그중 하나가 정확히 0이면 "modal coordinate search returned a nonfinite or zero propagation root"로 멈췄습니다(`tests/simcase/test_pml_contract.py::test_open_sweep_refuses_real_subspace_method`의 간헐 실패). 이제 이런 탐색은 `num_modes`보다 적은 근을 반환하고, 다른 근은 모두 비트 단위로 같으며, 비유한 PML 근은 계속 오류이고, 정적 근만 나온 PML 탐색은 진단과 함께 `ModeSelectionError`로 거부합니다. PEC 상자의 TM 차단 근처에서는 정적 근이 문턱을 넘을 수 있고 그대로 반환됩니다. [문서](packages/galerkin/waveguide_formulation.md#3-full-vector-혼합-nédélec절점-정식화).
 - `simcase`: `studio` extra가 `fastapi>=0.109.1`을 요구합니다(전에는 `>=0.100`). 그보다 이른 판은 PYSEC-2024-38의 영향을 받습니다. 고정된 검증·Studio 환경은 이미 0.143.1을 씁니다.
 - `physmat`: 단위·이름 규칙의 물리량 등록부이자 정확한 단위 변환기인 `physmat.units`를 새로 추가했습니다. 표준 라이브러리만 씁니다. 차원·정식 단위·닫힌 단위 메뉴·종류·허용 범위·타당 범위를 가진 물리량 242개(방향·역할·통계·성분 낱말을 붙인 이름 367개)가 있고, 해당하는 곳에는 부호 문장(`inward_heat_flux`: 양수는 물체로 들어감. `refractive_index`: exp(-i omega t)에서 k >= 0이 손실), 통계 정의, 법선 성분의 계수, 셀마이어 파라미터가 속한 모델이 붙습니다. 출력 전용 역할 낱말(`evaluation_temperature`, `unnormalized_mode_power`)과 `length` 표시 묶음, 정확한 유리수 계수를 가진 닫힌 기호 목록, 작은 문법으로 생성해 `physmat/unit_tables.json`에 고정한 철자표와 알려진 거부 목록(`python -m physmat.units --check` / `--write`)을 담으며, 이 목록은 입력 복합 단위에서 인수 하나의 접두어만 바꾼 철자의 읽는 법도 밝힙니다(`"5 MW/m^3"`, `"10 mW/(m^2 K)"`). 문자 대응표(`µ`, `Ω`, `℃`, `㎚`, 위 첨자, U+2212, 줄바꿈 없는 공백)도 담습니다. `q()`, `q_array()`, `convert()`는 정확한 유리수 값에서 한 번만 반올림하고(`"200 GPa"`, `"200000 MPa"`, `"2e11 Pa"`는 같은 double), 쓴 숫자와 단위를 지키며(`Conversion.number_text`, `unit_text`), 코드가 붙은 진단 66개를 정해진 우선순위로 내고 값을 지키는 fix와 뜻을 바꾸는 suggestion을 나눕니다. `convert_array()`는 예외 대신 항목마다의 진단을 돌려주고, `convert_complex()`는 `{"re", "im"}`와 `{"n", "k"}`를 읽고 이득을 거부하며(`E-GAIN`, exp(+j omega t) 안내 포함), `is_quantity_text()`는 물리량 문자열과 식을 가립니다. `length_to_pm()`은 길이를 1 pm 형상 격자에 올립니다. 내장 재료마다 광학 데이터의 온도를 밝히거나(`Material.datum_temperature`) 가정이라고 표시합니다(`datum_assumed`). 지금은 simcase의 형식 0.3 읽기만 이 모듈을 부르며 아직 어떤 물리 종류도 그 형식을 읽지 않습니다. 문서, simcase 실행기, galerkin, Studio는 이후 단계까지 지금의 단위를 씁니다. `import physmat`은 이제 하위 모듈을 처음 쓸 때 읽으므로 `physmat.units`는 numpy와 scipy 없이 가져올 수 있으며, 공개 이름은 그대로입니다. 검사 R1..R12와 등록부 추가의 `test_p2_*` 검사는 `tests/physmat/test_units.py`에 있습니다. [문서](packages/physmat/units.md).
-- 활성 도체 한두 개의 명시적 두 모드 모서리 장 계산을 추가하고 물리 전류 모멘트 및 수치·패널·외곽·해석식 검사를 구분해 유지했습니다.
-
-- 명시적 분할 혼합 상호작용으로 두 모드 모서리 half-space Green 행렬을 조립하고 원행렬 거절 및 P0·에너지·참조 검사를 유지했습니다.
-
-- 혼합 선형 power 로그 블록에 유한 물리 밀도 분할과 adaptive 참조 출처를 추가하고 기존 비분할 동작을 유지했습니다.
-
-- 자기 로그·제곱 밀도 참조에 재현 가능한 출처를 추가하고 원래의 엄격한 상대·해석적 영값 검사를 유지했습니다.
-
-- 해석적 소스 모멘트·기존 고정 구적 거부·저장 adaptive 참조를 갖춘 명시적 두 모드 power/constant 끝점 상호작용을 추가했습니다.
-
-- 기존 구적 기준·독립 평행 폐형식·고정밀 직접적분 출처를 갖춘 명시적 분리 선형 power 로그 블록을 추가했습니다.
-
-- 기존 선형 로그 참조의 수치값과 판정 기준을 유지하면서 재현 가능한 출처 기록을 추가했습니다.
-
-- `galerkin`: 모든 도체가 활성 기저인 볼록 도체 1~2개의 명시 two-ground corner-power 장 계산을 추가했습니다. 불변 edge/whole current factor·독립 P3 참조·별도 panel/outer/반사 검사를 제공하며 기존 솔버는 그대로입니다. 고정접지 trace 축약은 이 방법의 범위 밖입니다.
-
-- `galerkin`: 정규 power 패널의 두 모드 current Gram·self-log 폐형식을 추가했습니다. 정확한 모드 mass·독립 직접적분 참조·uniform Legendre 한계를 검사하며 장 솔버를 대체하지 않습니다.
-
-- `galerkin`: 정규 power/constant 바닥접지 Green 평균에 해석 상수 moment·고정 구적·위상/해상도/양수성 거부를 추가했습니다. 독립 직접2D 참조와 물리 불변식으로 원시요소를 검증하며 기존 장 솔버는 바꾸지 않습니다.
-
-- `galerkin`: 정규화된 모서리 power-panel 구적, 해석적 self 항, 공통 꼭짓점·분리 패널·power-to-constant 로그 적분을 추가했습니다. 불변 캐시 규칙은 구적 산술과 가중치를 그대로 보존합니다. 독립 고정밀 참조와 기하 불변식으로 명시한 길이·분리 범위를 검사했습니다.
-- `galerkin`: 허용된 볼록 도체의 불변 매개변수 모서리 패널 기하와 보정 상대좌표를 사용하는 바닥 접지 반공간 행렬을 추가했습니다. 적분 원시요소이며 위쪽·옆쪽 경계 보정이나 완전한 장 해를 제공하지 않습니다.
-- `galerkin`: `bounded_dense_residual`은 보정 곱·합으로 범위가 제한된 binary64 밀집 잔차를 계산하며 정확한 이진 유리수 참조로 검사했습니다. 기존 솔버 기본값은 바꾸지 않습니다. 모서리 원시요소와 잔차 계산기는 Linux 소스·설치 각각 관련 검사 517개를 통과했으며 완전한 장 모델이나 다른 플랫폼을 수락한 것은 아닙니다. [계약과 한계](packages/galerkin/laplace_boundary.md).
-
-- 평면 작은 각도 격자의 스칼라 길이에 `math.hypot`을 사용해 CPU별 BLAS 축약 차이를 피합니다. 메시 설정과 선택 계약은 유지합니다.
-
-- `galerkin`: 접지 직사각형 경계 패널에서 보간 차수 10/12/14/16을 명시할 수 있다. 기본 10과 기존 거부 동작을 유지하며 높은 차수에서도 같은 세분 허용값과 외곽 기하를 사용한다.
-
-- `galerkin`: 바닥 접지 직사각형의 균질 Laplace 경계 패널 API 추가. 상호적인 에너지 조립·단위 전류 표면 Gram 인자·명시적 기하/자원/세분 검사. [계약과 검증](packages/galerkin/laplace_boundary.md).
-
 - `simcase`: `units`가 객체가 아닌 버전 1 형상 문서(예: `"units": "um"`)를 이름을 밝혀 거부합니다. 전에는 형상 리더가 AttributeError로 멈춰 Studio 형상 실험 탭이 500을 돌려주고 `simcase geometry`가 traceback을 출력했습니다.
 - `simcase`: `joule.steady2d`가 재료 영역을 받습니다. 영역 전기 전도의 Joule 발열로 영역 정상 열을 한 메시에서 데웁니다. 재료마다 `electrical_conductivity_s_m`과 `conductivity_w_mk`를 주고, 전위·전류는 영역 전기의 경계 이름을, 온도·flux·대류는 영역 열의 이름을 받습니다. 새 결과 형식 `joule.steady2d-regions-result-v1`(layout `electric-joule2d-p1-node-cell-regions-v1`)은 `triangle_regions`와 함께 VTU로 내보냅니다. 직렬 두 재료 띠(Dirichlet·대류 끝, 차수 2.1)와 동축 전극(0.4/0.2/0.1 mm에서 차수 1.9; 미리 등록한 0.8/0.4/0.2 mm 열에서는 1.03으로 실패: 안쪽 전극 옆의 최대 절점 오차가 그 메시에서 아직 점근 영역이 아니며, 정확한 발열로 푼 영역 열도 같이 꺾이고 L2 오차는 고르게 수렴)으로 확인했습니다. 직사각형 Joule 결과는 비트 단위로 그대로입니다. 영역 위의 `joule.temperature2d`, 열원, 스칼라 전도도, 축대칭 구성 요소는 이름을 밝혀 거부합니다.
 - `simcase`: `mechanics.elasticity2d`·`mechanics.thermoelastic2d` 문서가 이름 있는 재료 영역에서 풀립니다. 0.2 `background`/`shapes` 블록이나 버전 1 영역 구성 요소를 받으며, E·ν·α(열 단계는 k)는 공유 `materials` 표(`young_modulus_pa`·`poisson_ratio`·`thermal_expansion_per_k`·`conductivity_w_mk`)에서, `displacement_m`·`traction_pa`·새 `pressure_pa`(traction −p n, n은 바깥 법선: 양수가 물체를 누름)는 영역 열과 같은 경계 이름(영역의 변, `boundary_tags` 이름, `outer`, 외부 경계 선택)에 줍니다. 경계면 선택, 고정되지 않은 연결 부분, 두 번 고정된 공유 절점, 겹친 하중, 축대칭 구성 요소, 빈 공간 배경은 이름을 밝혀 거부합니다. 결과 `mechanics.elasticity2d-regions-result-v1`(`mechanics2d-p1-regions-v1`)·`mechanics.thermoelastic2d-regions-result-v1`(`thermoelastic2d-p1-regions-v1`)은 `triangle_regions`를 더하며, 영역 문서는 메시 상한을 받습니다. 직사각형 문서는 그대로입니다(저장 결과 해시 동일). 새 예제 `elastic_regions`·`thermoelastic_regions`. `thermal_regions`의 영역 도우미가 형상 거부 문구에 물리 이름(`label`)을 넣고, `MATERIAL_KEYS`는 모든 영역 물리 키의 합집합이라 영역 열의 재료 표도 E·ν·α를 받아 검사합니다. `simcase.export`는 영역 기계 배치를 아직 받지 않습니다. 검사 R1..R7(직렬·병렬 층, Lamé 관 수렴, 두 층 열팽창, 거부)은 `tests/simcase/test_mechanics_regions.py`. [문서](packages/simcase/mechanics2d.md#재료-영역과-이름-있는-경계).
