@@ -3315,8 +3315,9 @@ try {
     assert.equal(p2.record.fields.find(([n]) => n === 5)[1], true);
     // every field is kept, at single precision (version 14)
     assert.equal(p2.record.version, 14); assert.ok(p2.record.fields.every(([, f]) => f), JSON.stringify(p2.record.fields));
+    // round 27 (D1): the message no longer holds the conversion sentence, so it may fit one line on a
+    // phone (it did with the runner's fonts); it stays whole and inside the line at both sizes
     for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
-    assert.ok(p2.phone.lines > 1, JSON.stringify(p2.phone));
     await rOverflow('P2 session size');
     // P4 (E4): the fourteen values-only runs (Runs 6 to 19), then Run 20, then an edit: the drop line,
     // Pin three times, a run and its swap; each run named with the run list's parts (its label up to
