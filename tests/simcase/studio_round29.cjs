@@ -40,3 +40,21 @@ test('L1: the page keeps the shortcut\'s count, sets it back on Open boundary as
  // the run handler, its document and Run as set are unchanged (round 27's asserted block)
  assert.ok(app.includes("  if(answer==='search')useClosedSearch(near);\n  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;\n }"));
 });
+
+test('L2: the browser copy\'s time is "kept"; a file\'s save time stays "saved"',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ const at=s=>'2026-11-24T05:'+s+':00Z',w=t=>({[at('46')]:'5:46 AM',[at('38')]:'5:38 AM',[at('30')]:'5:30 AM',S:'9:24 PM'})[t]??t;
+ const latest={runs:5,savedAt:at('38'),model:'Optical waveguide',names:[],file:'optical-and-heated.json',fileCurrent:false};
+ const earlier=[{runs:6,savedAt:at('46'),model:'Optical waveguide',names:[],index:0,file:'optical-and-heated.json',fileCurrent:false},{runs:1,savedAt:at('30'),model:'Heated silicon waveguide',names:['Run 1'],index:1}];
+ assert.deepEqual(A.resumeChoices(latest,earlier,w).map(c=>c.label),[
+  'Restore newest from this browser: Optical waveguide · 6 runs · file optical-and-heated.json, changed since · kept 5:46 AM',
+  'Restore from this browser: Optical waveguide · 5 runs · file optical-and-heated.json, changed since · older · kept 5:38 AM',
+  'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · kept 5:30 AM']);
+ // a record that is the same as its file names the file's save time: that is a file save
+ assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w)[0].label,'Restore newest from this browser: 2 runs · same as file x.json · saved 9:24 PM');
+ // the card offers: an older one says kept; the file's own time keeps saved
+ const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
+ assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:38 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · kept 5:38 AM · file x.json, changed since');
+ assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
+ assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
+});

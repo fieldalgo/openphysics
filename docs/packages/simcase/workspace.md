@@ -533,8 +533,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    every stored session the tab does not hold, newest first, and **Not now (choose a model
    below)**, which only closes the box. Since round 19 the first and most prominent offer is the
    newest stored session with runs, whatever its model, *Restore newest from this browser: Optical
-   waveguide · 6 runs · … · saved 5:46 AM*; each other one says it is older, *Restore from this
-   browser: Optical waveguide · 5 runs · … · older · saved 5:38 AM* (it read *Last session in this
+   waveguide · 6 runs · … · kept 5:46 AM*; each other one says it is older, *Restore from this
+   browser: Optical waveguide · 5 runs · … · older · kept 5:38 AM* (since round 29, L2, *kept*
+   for the browser copy's time, which testers read as a file save when it said *saved*; *saved*
+   stays where the time is a file's save, *same as file x.json · saved 9:24 PM*) (it read *Last session in this
    browser* and *Restore earlier from this browser: Earlier session*, and an older session could
    come first). The box stays hidden while the tab holds optical runs. After a restore, the record
    restored is left out of the lists and the remaining ones stay listed under Workspace tools
@@ -584,7 +586,7 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    it was opened from says which time it shows, *· browser copy 2:25 PM · same as file …json*.
    Since round 19 the box above the cards lists every session, a card's included (it listed only the
    sessions no card offered); a card offering a session that is not the newest with runs says so,
-   *· older · saved 5:30 AM* (*· older · same as file …json, saved …*, *· older · browser copy … ·
+   *· older · kept 5:30 AM* (*saved* until round 29) (*· older · same as file …json, saved …*, *· older · browser copy … ·
    same as file …json*). Since round 20 the box names the same time as the card for one record: a
    record that still matches a file it was saved to gives the file's save time in both (after a
    project save, the record of the model not shown is linked to the file and its save time, while
@@ -602,7 +604,7 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    The button restores its own model. Since round 20 the newest offer in the box above the cards
    restores both while the tab holds runs of neither model: *Restore newest from this browser:
    Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed
-   since · saved 8:44 AM*. It restores the newest record as its own button would, then, once that
+   since · kept 8:44 AM*. It restores the newest record as its own button would, then, once that
    restore has completed (a load question answered with Replace; Cancel stops both), the other
    model's record, found again by its model, time and file, and shows the newest record's model on
    Results; Messages reads *Restored Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)
