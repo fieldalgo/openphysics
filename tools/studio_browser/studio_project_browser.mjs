@@ -868,14 +868,17 @@ try {
     // fine mesh (the field grows with the core's triangles, as R23's substrate does) until a result's
     // fields would not all fit as text (compact fields: they are then kept at single precision, and
     // recovery holds the tab); the header keeps naming both-models.json
-    const r24 = {runs: []}, COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
+    const r24 = {runs: []};
     await width(2800);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
     await page.fill('spinbutton', 'Modes to find', 8);
     for (const nm of [20, 21, 22, 23, 24, 25]) {
       await page.press('tab', 'Model'); await page.press('treeitem', 'Mesh'); await page.until("!!document.getElementById('core-mesh-number')", 'R24 mesh ' + nm);
       await page.fill('spinbutton', 'Core mesh size [nm]', nm); await runOptical('R24 run at ' + nm); r24.runs.push(nm);
-      if ((await status()).includes(COMPACT_WORDS)) break;
+      // round 27 (D1): the conversion has no Messages sentence; the selected run's field shows the
+      // single-precision line in Results once the tab converted
+      await page.press('tab', 'Results'); await page.until("!!document.querySelector('.run-item')", 'R24 Results ' + nm);
+      if (await page.eval("!!document.getElementById('field-precision')")) break;
     }
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'R24 header kept', 30000);
     r24.title = await title(); r24.message = await status();
@@ -884,7 +887,7 @@ try {
     await page.until("!!document.getElementById('field-precision')", 'R24 single-precision line'); r24.precision = await page.eval("document.getElementById('field-precision').textContent");
     await noOverflow('R24 P1 header after the conversion 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 header after the conversion 390'); await size(1440, 900, false);
     stage('R24 P1 header after the conversion', r24);
-    assert.ok(r24.message.includes(COMPACT_WORDS), r24.message);
+    assert.ok(!r24.message.includes('More field plots now fit') && !r24.message.includes('single precision'), r24.message);
     assert.equal(r24.precision, "Field at single precision (float32). The values above are the engine's.");
     // every field is kept: the only runs without fields are the pinned values-only imports (640 × 210 nm)
     assert.ok(r24.items.filter(t => t.endsWith(' · values only')).every(t => t.includes(' · 640 × 210 nm · ')), JSON.stringify(r24.items));
