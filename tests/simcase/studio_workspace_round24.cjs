@@ -77,3 +77,31 @@ test('P3 (B4): runs newer than a named pair: Compare offers the two newest; a pa
  assert.ok(line.includes('swap.textContent=`Compare the two newest: Run ${na} and Run ${nb}`;swap.onclick=()=>{compareIds=[...offer];comparePicked=false;'));
  assert.ok(line.includes('else{swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;'));
 });
+
+test('P4 (B5): runs read from a file or browser recovery carry no wall time; the estimate skips them and uses an older measured run, or none',async()=>{
+ const N=await import(STATIC+'workspace-notebook.mjs'),W=await import(STATIC+'workspace-workflow.mjs');
+ const fixture=name=>fs.readFileSync(path.join(__dirname,'studio_session_fixtures',name),'utf8');
+ // a session file (an open run of version 10) read: no duration on its runs
+ const opened=N.parseSession(fixture('optical-v10-open-full-083e151.json'));
+ assert.ok(opened.runs.length>0&&opened.runs.every(r=>!('duration' in r)));
+ // a run measured in this tab, written and read back as File › Save and browser recovery do: its
+ // wall time is not in the session (no format change; the session stores completedAt only)
+ const timed={...opened.runs[0],duration:68000},out=N.writeOpticalSession(opened.input,[timed],timed.job,[timed.job,timed.job],opened.view);
+ assert.equal(out.ok,true);assert.ok(!out.text.includes('"duration"'));
+ assert.equal('duration' in N.parseSession(out.text).runs[0],false);
+ // the estimate before an open n_g run: the comparable run from a file is skipped
+ const kinds={isOpen:r=>r.open===true,hasGroup:r=>r.ng===true};
+ const fromFile={job:'f',open:true,ng:false},older={job:'o',open:true,ng:false,duration:60000},closed={job:'c',open:false,ng:false,duration:5000};
+ assert.equal(W.groupIndexEstimate([fromFile],{open:true},kinds),null);
+ assert.equal(W.groupIndexEstimate([closed,fromFile],{open:true},kinds),null);
+ assert.equal(W.groupIndexEstimate([older,closed,fromFile],{open:true},kinds),180000);
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([older,fromFile],{open:true},kinds)}),'Open boundary · 2 searches · group index on (3 solves) · about 3 min');
+ assert.equal(W.runPlanText({open:true,searches:2,groupIndex:true,estimate:W.groupIndexEstimate([closed,fromFile],{open:true},kinds)}),'Open boundary · 2 searches · group index on (3 solves)');
+ // and the "last such run" time of a run without group index likewise
+ assert.equal(W.lastComparableRun([older,fromFile],{open:true,groupIndex:false},kinds),older);
+ assert.equal(W.lastComparableRun([fromFile],{open:true,groupIndex:false},kinds),null);
+ // the duration is set only when a run completes in this tab
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes('{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}'));
+ assert.equal(app.split('.duration=').length,2);
+});

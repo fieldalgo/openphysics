@@ -324,7 +324,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    boundary kind, whatever its group-index state: its time when it computed the group index too,
    three times its time when it did not (the group index adds two solves), *Open boundary · 2
    searches · group index on (3 solves) · about 3 min* (*about 20 s* under a minute and a half). With
-   no such run there is no estimate (the round-20 rule). A **Turn off group index** button sits beside
+   no such run there is no estimate (the round-20 rule). Round 24 (B5) checked the case of P04, whose
+   only comparable open run had been opened from a file: a session file and a browser-recovery record
+   store each run's completion time but not its wall time (the session format is unchanged), so such
+   a run has none; the estimate skips it and uses an older run of this tab with a wall time, and with
+   none shows no estimate. A **Turn off group index** button sits beside
    the line while the option is on; it is the option's own edit (Undo takes it back, Messages says
    what the check box says), and the line then reads as for the option off. The group index stays an
    input: no run turns it off. Testers of round 23 kept it on from one run to the next and waited
