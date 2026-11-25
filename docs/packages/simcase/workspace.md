@@ -1690,7 +1690,13 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   the row was cut to the box, and four of five testers needed the title or the panel to read it;
   checked at 1440 × 900 and 390 × 844). Both places offer **Set search near 2.46 · 4 modes** (the shortcut's target estimate,
   (n_max + 1.444)/2) and **Use Open boundary**; each sets its inputs and runs nothing. The warning
-  goes with Nearest to n_eff or Open boundary. It is a geometry and material check with no solve: a
+  goes with Nearest to n_eff or Open boundary. While it is shown, **Run study** asks once before it
+  runs (round 27, D2), in a dialog *Slab modes first*: *Substrate touches the window edge, so a
+  closed-window run returns its slab modes first. Search near the core instead?* with **Set search
+  near 2.46 · 4 modes and run** (the warning's shortcut, then the run), **Run as set** (the run as
+  without the question: the same document, values and record) and **Cancel** (Escape too; nothing is
+  run). Focus starts on the first button. It asks again only after the geometry, the boundary or
+  Modes to return changes (a change and back counts); otherwise Run study runs as set at once. It is a geometry and material check with no solve: a
   shape touches the edge when its bounds reach the window, the shape names are those of the
   highest-index edge shape and the highest-index shape away from it (the first of equal ones), and no
   warning is given when no shape, or every shape, touches the edge. The result-side edge note is

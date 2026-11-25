@@ -68,3 +68,29 @@ export function closedResultValues(result,re,t){
  const data=vf?{...result,vector_fields:[{...vf,real:pick(vf.real),imag:pick(vf.imag)},...result.vector_fields.slice(1)]}:result;
  return {keep,re:keep.map(i=>re[i]),data};
 }
+
+// ---- Before the run: the slab question (round 27, D2) ------------------------------------------
+// HQ decision 2026-11-25-openphysics-studio-round27-choices: when Run study is pressed with a closed
+// window, the slab warning shown (edgeSlabRisk: a shape touching the window edge with an index as
+// high as the core's) and Modes to return "Highest n_eff", Studio asks once before it runs. Its
+// first button sets the warning's own shortcut (shortcutText) and runs; Run as set runs exactly as
+// without the question; Cancel (or Escape) runs nothing. It asks again only after the geometry, the
+// boundary or Modes to return changes.
+/** "Substrate touches the window edge, so a closed-window run returns its slab modes first. Search
+ * near the core instead?" (risk: edgeSlabRisk's {edge, core}). */
+export const slabQuestionText=risk=>`${risk.edge} touches the window edge, so a closed-window run returns its slab modes first. Search near the core instead?`;
+/** Its buttons, in order: "Set search near 2.46 · 4 modes and run", "Run as set", "Cancel". */
+export const slabQuestionButtons=t=>[`${shortcutText(t)} and run`,'Run as set','Cancel'];
+/** What the question is asked for: the geometry (shapes), the boundary and Modes to return. */
+export const slabQuestionKey=({shapes,openBoundary=null,searchTarget=null})=>JSON.stringify([shapes,openBoundary??null,searchTarget??null]);
+/** The question's memory: asked(key) once it is answered (any answer, Escape included); seen(key) on
+ * every render, which forgets the answer once the state changed (a change and back asks again);
+ * due(risk, key) when Run study should ask. */
+export function slabQuestionMemory(){
+ let answered=null;
+ return {
+  seen(key){if(answered!==null&&key!==answered)answered=null;},
+  asked(key){answered=key;},
+  due(risk,key){return !!risk&&key!==answered;},
+ };
+}

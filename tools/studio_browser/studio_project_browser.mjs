@@ -90,6 +90,7 @@ async function addValuesOnlyRuns(p, label) {
   await p.eval("document.getElementById('confirm-run-import').click()");
   await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
 }
+const CLICK = function (selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); };
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url); this.events = [];
@@ -134,7 +135,21 @@ class Page {
   }
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.textContent:null}', selector); }
   texts(selector) { return this.on('function(s){return [...this.querySelectorAll(s)].map(e=>e.textContent)}', selector); }
-  click(selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
+  // once first. The stages written before the question answer Run as set, which runs exactly as
+  // before; each question is checked (its words and buttons) and noted after the last stage name.
+  // A stage that tests the question itself sets slabAsIs = false.
+  async answerSlabQuestion() {
+    if (this.slabAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('slab-question');return d&&d.open?{text:document.getElementById('slab-question-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.slabQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[slab question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
+    assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
+    await CLICK.call(this, '#slab-question-run');
+  }
+
   // The one element with this role and accessible name, as assistive technology finds it (the
   // accessibility tree). match: 'exact', or 'start' for a card whose name begins with its title.
   async role(role, name, match = 'exact') {
@@ -153,7 +168,7 @@ class Page {
     if (result.exceptionDetails) throw new Error('page: ' + (result.exceptionDetails.exception?.description || result.exceptionDetails.text));
     return result.result.value;
   }
-  async press(role, name, match) { await this.act(await this.role(role, name, match), 'function(){this.click();return true}'); await sleep(200); }
+  async press(role, name, match) { await this.act(await this.role(role, name, match), 'function(){this.click();return true}'); if (role === 'button' && name === 'Run study') await this.answerSlabQuestion(); await sleep(200); }
   // typing as a user does: focus, select, insert the text, leave the field
   async fill(role, name, text, match = 'exact') {
     const id = await this.role(role, name, match);
