@@ -369,7 +369,10 @@ Escape) 메뉴를 확인하고, 보이는 단축키와 `aria-keyshortcuts`, 1440
 `navigator.webdriver`를 false로 둡니다. 이름 대화상자에 입력한 이름은 정리됩니다
 (`my run/<x>?`은 `my runx.json`으로 내려받음). 13차부터는 다운로드 경로에서 모델의 현재 파일 이름도
 확인합니다: Save As *design-a-ng*, Width 편집 뒤 Save와 Ctrl+S가 이름 대화상자 없이 `design-a-ng.json`으로
-다시 내려받음(바이트에 새 폭, Messages에 “ (1)” 안내와 함께 *Downloaded design-a-ng.json again*), 파일
+다시 내려받음(바이트에 새 폭, Messages에 “ (1)” 안내와 함께 *Downloaded design-a-ng.json again*. 25차 A2부터(사전 등록)
+각각 먼저 *Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng
+(1).json.*와 **Download again**, **Save As…**, **Cancel**을 묻고, Cancel은 아무것도 내려받지 않고 *Save cancelled; nothing was
+written.*을 보이며, Download again은 파일 하나를 내려받고, Save As…는 `design-a-ng.json`을 채운 Save As 이름 대화상자를 엶), 파일
 이름을 밝히는 헤더(14차부터 *design-a-ng.json · downloaded …*와 *· changed since downloaded*, 그리고 picker
 경로에는 없는 title 텍스트 *Your browser may have added “ (1)” to the file name.*, Save As 대화상자의 줄
 *Later saves download again under this name; your browser may add “ (1)”.*), 그 이름으로 채워진
@@ -530,7 +533,7 @@ results*도 확인합니다.
 가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 Heated silicon
 waveguide 카드가 자기 가장 새 기록을 복원하고(19차부터 위 상자는 가장 새 기록인 그 기록으로 시작) 세션 파일의 저장 시각을 밝히는지,
 복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다. 13차부터는 Save As 이름
-뒤의 Save가 대화상자 없이 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
+뒤의 Save가 이름 대화상자 없이(25차부터 **Download again** 뒤에) 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
 “ (1)” title 텍스트와 함께 *heated-design.json · downloaded …*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
 유지하는지도 확인합니다. 14차부터 두 스크립트는 제목이 *same as file X*인 복원이 X를 현재 파일로 삼는지(Save As가
 X를 제안함) 확인하고, workspace 스크립트는 입력 편집 뒤와 실행 이름을 바꾼 뒤 *X · changed since restored*를 확인하며, session 스크립트는 파일에서 연 실행이 *Loaded from file, not
@@ -538,7 +541,7 @@ recomputed. Results match the file's checksum.*으로 표시되고 출처 주의
 네 번째 스크립트(`tools/studio_browser/studio_project_browser.mjs`)는 [프로젝트
 파일](packages/simcase/workspace.md#프로젝트-파일)을 확인합니다. 1440 × 900과 390 × 844에서, 역할과 접근 가능한
 이름으로, 어느 단계에서도 가로 넘침 없이: 광학 실행 두 번(하나는 Modes to find 4)과 히터 없는 결과가 있는 가열
-실행, 프로젝트 이름 *Heater study*와 제안 이름 `heater-study.json`으로 Save As, 기억한 이름으로 다시 Save, 그다음 서버 재시작과 새 브라우저 프로필, File ›
+실행, 프로젝트 이름 *Heater study*와 제안 이름 `heater-study.json`으로 Save As, 기억한 이름으로 다시 Save(25차 A2부터 질문 *Download heater-study.json again? …*, Cancel은 아무것도 내려받지 않고, 그다음 **Download again**), 그다음 서버 재시작과 새 브라우저 프로필, File ›
 Open, 두 모델이 실행 없이 같은 값 문자열을 다시 읽음. 저장, 열기, 다시 저장(저장 시각과 광학 실행의 출처 말고는
 같고, 그다음은 저장 시각 말고는 바이트까지 같음), 손상되거나 더 새로운 파일을 탭 그대로 거부, 경계에서 바꾼
 `window.showSaveFilePicker`로 Save As, Save, 취소, 실패한 쓰기. `--old-python <python>`을 주면 이전 Studio에서
@@ -554,7 +557,7 @@ Design B를 비교합니다. 17차부터(사전 등록) Compare에 두고 떠난
 아니라 이름 때문에 유지됨), 새 프로필에서 광학 모델만으로 내려받아 저장한 프로젝트에
 가열 모델을 더하면 **Save**가 `u8-optical.json`을 채운 Save As 대화상자와 *This project now holds Optical waveguide and
 Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*를 보이고, Cancel은
-아무것도 내려받지 않으며, 두 모델로 저장한 뒤의 Save는 바로 내려받습니다. 18차부터(사전 등록) 같은 프로필에서 Save As 줄
+아무것도 내려받지 않으며, 두 모델로 저장한 뒤의 Save는 (25차부터 **Download again** 뒤에) 내려받습니다. 18차부터(사전 등록) 같은 프로필에서 Save As 줄
 *The file will hold Optical waveguide (no runs).*와 Save가 물을 때의 *… and Heated silicon waveguide (no runs).*, 가열
 모델이 합류한 뒤 상태 표시줄 *Heated silicon waveguide · in project u8-optical.json · not saved since it joined · …*와 두
 모델로 저장한 뒤의 *… · downloaded …*(제목 표시줄의 말과 함께), 두 카드의 *Return to Optical waveguide*와 *Return to Heated silicon waveguide*(20차 문구)를 확인합니다. 16차의 다시 불러오기

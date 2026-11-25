@@ -76,3 +76,26 @@ test('P1 (A1): with no run of the same key, the line shows only when the room le
  assert.ok(app.includes("if(!running)risk=unestimatedFieldRisk(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);"));
  assert.ok(app.includes("if(!list.length&&fieldWarning.risk&&!running){$('run-drop').hidden=false;$('run-options').classList.add('dropping');$('run-drop-text').textContent=FIELDS_MAY_GO_TEXT;$('run-drop-text').title=FIELDS_MAY_GO_TEXT;$('run-drop-pin').hidden=true;return;}"));
 });
+
+test('P2 (A2): on the download path, Save of a file this tab downloaded asks first, in these words',async()=>{
+ const F=await import(STATIC+'workspace-files.mjs');
+ assert.equal(F.downloadAgainQuestion('design-a-ng.json'),'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (1).json.');
+ assert.deepEqual([...F.DOWNLOAD_AGAIN_BUTTONS],['Download again','Save As…','Cancel']);
+ const file=how=>F.rememberFile({name:'design-a-ng.json',how,handle:how==='picker'?{}:null,scope:'s'});
+ // downloaded in this tab: Save asks; Save As, a picker, or no file: it does not
+ assert.equal(F.asksBeforeDownloadAgain(file('download')),true);
+ assert.equal(F.asksBeforeDownloadAgain(file('download'),{saveAs:true}),false);
+ assert.equal(F.asksBeforeDownloadAgain(file('download'),{picker:true}),false);
+ assert.equal(F.asksBeforeDownloadAgain(null),false);
+ // a file opened or recovered: its first Save downloads at once, as before; a picker file is written again
+ for(const how of ['opened','recovered','picker'])assert.equal(F.asksBeforeDownloadAgain(file(how)),false,how);
+ // the save route itself is unchanged
+ assert.equal(F.saveRoute(file('download')),'download');
+ // the page asks before both deliveries (the project file and the session export), and Cancel writes nothing
+ const app=read('workspace-app.mjs');
+ const asks="if(result.status==='known'&&asksBeforeDownloadAgain(target)){\n   const chosen=await downloadAgainChoice(result.name);\n   if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};";
+ assert.equal(app.split(asks).length-1,2);
+ assert.ok(app.includes("againDialog.id='download-again';"));
+ assert.ok(app.includes("if(answer!=='saveAs')return {name:null,saveAs:false};\n $('save-name-input').defaultValue=name;return {name:await askFileName(name,{saveAs:true}),saveAs:true};"));
+ assert.equal(F.notWrittenNotice({status:'cancelled'},{saveAs:false}),'Save cancelled; nothing was written.');
+});

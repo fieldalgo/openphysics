@@ -443,7 +443,12 @@ would throw is not called and Save As downloads under the typed name); the picke
 name dialog's typed name is sanitised (`my run/<x>?` downloads as `my runx.json`). Since round 13
 it checks the model's current file name on the download path: Save As *design-a-ng*, a Width edit,
 then Save and Ctrl+S downloading under `design-a-ng.json` again with no name dialog (the bytes
-holding the new width, Messages saying *Downloaded design-a-ng.json again* with the “ (1)” note),
+holding the new width, Messages saying *Downloaded design-a-ng.json again* with the “ (1)” note;
+since round 25, A2, pre-registered, each first asks *Download design-a-ng.json again? This browser
+cannot replace the earlier file and may name the new one design-a-ng (1).json.* with **Download
+again**, **Save As…** and **Cancel**: Cancel downloads nothing and reads *Save cancelled; nothing was
+written.*, Download again downloads one file, and Save As… opens the Save As name dialog prefilled
+with `design-a-ng.json`),
 the header naming the file (since round 14 *design-a-ng.json · downloaded …* and *· changed since
 downloaded*, with the title text *Your browser may have added “ (1)” to the file name.*, which the
 picker path does not have, and the Save As dialog's line *Later saves download again under this
@@ -660,7 +665,7 @@ waveguide card restores its own newest record after a reload (since round 19 the
 with that record, the newest),
 naming the session file's save time, the restored title reads *same as file …*, and the
 Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
-name downloading under it again with no dialog (*Downloaded heated-design.json again*, the footer
+name downloading under it again with no name dialog, after **Download again** since round 25 (*Downloaded heated-design.json again*, the footer
 *heated-design.json · downloaded …* with the “ (1)” title text), and Save after an opened model or
 session file keeping that file's name. Since round 14 both scripts check that a restore whose title
 reads *same as file X* makes X the current file: Save As suggests X (the workspace script then
@@ -671,7 +676,8 @@ A fourth script (`tools/studio_browser/studio_project_browser.mjs`) checks [proj
 files](packages/simcase/workspace.md#project-files): at 1440 × 900 and at 390 × 844, by role and
 accessible name and with no horizontal overflow at any step, two optical runs (one with Modes to
 find 4) and a heated run with its without-heater result, the project named *Heater study* and saved as its suggested `heater-study.json`, Save again
-under the remembered name, then the server restarted and a new browser profile, File › Open, and
+under the remembered name (since round 25, A2: the question *Download heater-study.json again? …*,
+Cancel downloading nothing, then **Download again**), then the server restarted and a new browser profile, File › Open, and
 both models reading back the same value strings with no run started; save, open and save again
 (equal but for the save time and the optical runs' provenance, then byte-identical but for the save
 time); damaged and newer files refused with the tab unchanged; and Save As, Save, a cancel and a
@@ -693,7 +699,7 @@ more run after the file was opened reads *Run 4 is newer than this pair · Compa
 download with the optical model alone, then given the heated model, makes **Save** open the Save
 As dialog prefilled with `u8-optical.json` and *This project now holds Optical waveguide and Heated
 silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*;
-Cancel downloads nothing; saved with both models, the next Save downloads at once.
+Cancel downloads nothing; saved with both models, the next Save downloads (after **Download again** since round 25).
 Since round 18 (pre-registered) the same profile checks the Save As line *The file will hold Optical
 waveguide (no runs).* and, when Save asks, *… and Heated silicon waveguide (no runs).*; the heated
 model's status bar *Heated silicon waveguide · in project u8-optical.json · not saved since it joined
