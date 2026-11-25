@@ -3177,7 +3177,7 @@ try {
     for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
     assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
     assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
-    assert.equal(d2.after.plan, 'Closed window · near n_eff 2.46'); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
+    assert.match(d2.after.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
     assert.equal(d2.after.rows.length, 4, JSON.stringify(d2.after.rows)); assert.ok(d2.after.rows[2].includes('2.43931663'), JSON.stringify(d2.after.rows));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }

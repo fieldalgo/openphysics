@@ -54,7 +54,7 @@ test('D2: the page asks before the run, and Run as set runs exactly the same cod
  assert.ok(app.includes("slabDialog.oncancel=event=>{event.preventDefault();slabAnswer?.(null);};"));
  // the question comes after the guards and before anything of the run; Cancel returns, the first
  // button sets the warning's shortcut (useClosedSearch), Run as set changes nothing
- const ask=" const risk=edgeWarning(),key=slabKeyNow();\n if(slabQuestion.due(risk,key)){\n  const near=defaultTarget(state.shapes);slabQuestion.asked(key);\n  const answer=await askSlabQuestion(risk,near);\n  if(!answer)return;\n  if(answer==='search')useClosedSearch(near);\n";
+ const ask=" const risk=edgeWarning(),key=slabKeyNow();\n if(slabQuestion.due(risk,key)){\n  const near=defaultTarget(state.shapes);slabQuestion.asked(key);\n  const answer=await askSlabQuestion(risk,near);\n  if(!answer)return;\n  if(answer==='search')useClosedSearch(near);\n  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;\n }\n try{rejectInvalidInput();}catch(e){notice(e.message);return;}\n // round 21 (W2): no question before the run;";
  assert.equal(app.split(ask).length-1,1);
  const at=app.indexOf(ask),run=app.indexOf('const operation=++jobOperation;',at);
  assert.ok(at>0&&run>at&&app.lastIndexOf("$('run-optical').onclick=async()=>{",at)>0);

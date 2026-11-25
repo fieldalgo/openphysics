@@ -2411,9 +2411,9 @@ $('run-optical').onclick=async()=>{
   if(!answer)return;
   if(answer==='search')useClosedSearch(near);
   if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
-  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  }
- // round 21 (W2): no question before the run but the slab question above; a swap offered after the last drop ends here
+ try{rejectInvalidInput();}catch(e){notice(e.message);return;}
+ // round 21 (W2): no question before the run; a swap offered after the last drop ends here
  dropSwap=null;
  const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
