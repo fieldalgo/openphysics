@@ -1,11 +1,11 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""PML vector search whose roots all belong to the static beta^2 = 0 family.
+"""PML vector search with no root nearer the shift than the static beta^2 = 0 family.
 
-With a small n_target every root nearest the shift is static; galerkin returns
-none of them, and the selection refuses with diagnostics, as before, instead of
-failing while building fields. Kernel lengths in micrometres; the slab of
-tests/galerkin/test_pml_modes.py.
+With a small n_target no root of the pencil other than the static family lies closer to
+the shift than that family; galerkin returns none, and the selection refuses with
+diagnostics, as before, instead of failing while building fields. Kernel lengths in
+micrometres; the slab of tests/galerkin/test_pml_modes.py.
 """
 import pytest
 

@@ -64,8 +64,14 @@ def exact_static_nu():
     raise AssertionError("no float nu gives beta^2 == 0 exactly for this sigma")
 
 
+def undeflated(monkeypatch):
+    """Force the search that is not deflated (as near a TM cutoff): the static family is searched."""
+    monkeypatch.setattr(waveguide, "STATIC_DEFLATION_MIN_CUTOFF_DISTANCE", np.inf)
+
+
 @pytest.mark.parametrize("path", ["real", "pml"])
 def test_static_roots_are_the_nodal_family(monkeypatch, path):
+    undeflated(monkeypatch)    # re-registered (R1 a): the undeflated search reaches the family
     mesh, eps, walls, coords = slab()
     factors = coords.factors if path == "pml" else None
     calls = recorded_eigs(monkeypatch)
@@ -81,6 +87,38 @@ def test_static_roots_are_the_nodal_family(monkeypatch, path):
         assert np.linalg.norm(v[transverse]) <= 1e-6 * np.linalg.norm(v)
     assert len(n) == len(nu) - found.sum()
     assert np.all(np.abs(n) > 1e-5 * N_TARGET)
+
+
+@pytest.mark.parametrize("path", ["real", "pml"])
+def test_the_deflated_search_never_reaches_the_static_family(monkeypatch, path):
+    """R1 (b): on the default path the 24-root search returns no static root, and the modes the
+    undeflated search returns (those nearer the shift than the family), within 1e-9 relative."""
+    mesh, eps, walls, coords = slab()
+    factors = coords.factors if path == "pml" else None
+    calls = recorded_eigs(monkeypatch)
+    n, space, *_ = solve_modes(mesh, eps, K0, N_TARGET, num_modes=24, pec_nodes=walls,
+                               coordinate_factors=factors)
+    nu, _ = calls[0]
+    assert static(nu).sum() == 0
+    # the static family [0; e_z] is in the kernel of A and of the projector
+    A, B, space = waveguide.assemble_mode_system(mesh, eps, K0, coordinate_factors=factors)
+    *_, M = waveguide._assembled(mesh, eps, K0, 1.0, None, factors)
+    free = waveguide._free_dofs(mesh, space, walls, None)
+    A, B = A[free][:, free].tocsc(), B[free][:, free].tocsc()
+    project = waveguide._static_projector(B, free, space.num_edges, K0, M)
+    nodes = free >= space.num_edges
+    rng = np.random.default_rng(3)
+    for _ in range(3):
+        x = np.zeros(len(free), dtype=B.dtype)
+        x[nodes] = rng.standard_normal(nodes.sum())
+        assert np.linalg.norm(A @ x) <= 1e-12 * np.linalg.norm(x)
+        assert np.linalg.norm(project(x)) <= 1e-12 * np.linalg.norm(x)
+    undeflated(monkeypatch)
+    with pytest.warns(waveguide.StaticFamilyNearCutoffWarning):
+        reference, *_ = solve_modes(mesh, eps, K0, N_TARGET, num_modes=24, pec_nodes=walls,
+                                    coordinate_factors=factors)
+    assert len(n) == len(reference) == {"pml": 15, "real": 14}[path]
+    np.testing.assert_allclose(n, reference, rtol=1e-9, atol=0)
 
 
 @pytest.mark.parametrize("path", ["real", "lossy", "pml"])
@@ -100,6 +138,7 @@ def test_large_search_returns_no_static_root(path):
 
 
 def test_exactly_zero_static_root_is_not_an_error(monkeypatch):
+    undeflated(monkeypatch)    # re-registered (R2): the mask it protects stays on both paths
     mesh, eps, walls, coords = slab()
     kwargs = dict(pec_nodes=walls, coordinate_factors=coords.factors)
     first = recorded_eigs(monkeypatch)
