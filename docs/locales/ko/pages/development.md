@@ -435,7 +435,7 @@ Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오�
 내보내고 Messages가 *… Run 2 (500 × 220 nm · 2 modes) was dropped*와 **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes)
 instead**를 보이며, 그 버튼이 Run 2를 되돌리고 Run 3를 내보내는지(*Run 2 (…) is back; Run 3 (…) was dropped instead.*, 버튼은
 더 없음, 실행 보관부터 *Runs · 20 of 20 · 15 pinned*); 이전 결과의 교환 버튼을 다음 실행 뒤에 눌러도 아무것도 바뀌지 않는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
-Optical waveguide · 1 run · Run 1 · saved …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · saved …*인지;
+Optical waveguide · 1 run · Run 1 · kept …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · kept …*(29차 L2 전에는 *saved*)인지;
 그 오래된 세션을 복원하면 상자가 숨고, 더 새 세션은 곧바로 마지막 세션으로, 이 탭의 기록이 쓰인 뒤에는 Workspace tools의
 이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. Library의 첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 보며,
 21차부터 실행 여섯 개를 넘기는 단계는 더는 대화 상자에 답하지 않습니다. 20차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 실행 전 *Closed window*, 어느 경계에서든 범위 안내의 *3 × 2.4 µm window, closed (PEC

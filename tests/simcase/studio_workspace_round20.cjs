@@ -96,7 +96,7 @@ test('Z2: the newest offer of a project with both models restores both',async()=
  const optical={runs:6,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T08:44:00Z',file:'both-models.json',fileCurrent:false,pair:{model:'Heated silicon waveguide',runs:2,savedAt:'2026-11-24T08:30:00Z'}};
  const heated={runs:2,model:'Heated silicon waveguide',names:['Run 1','Run 2'],savedAt:'2026-11-24T08:30:00Z',file:'both-models.json',fileCurrent:false,index:0};
  const choices=A.resumeChoices(optical,[heated],t);
- assert.deepEqual(choices[0],{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T08:44:00Z'});
+ assert.deepEqual(choices[0],{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · kept 2026-11-24T08:44:00Z'});
  // round 21 (W4): the other model's own entry is not listed again (its card still offers it)
  assert.equal(choices.length,1);
  // a pair on an entry that is not the newest is not offered; one run reads "1 run"
