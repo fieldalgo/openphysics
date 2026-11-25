@@ -468,7 +468,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    runs)**. 카드마다 끝에 **Open model**이 있습니다. 이미 프로젝트에 있는 모델의 카드는 보이든 아니든 대신
    **Return to Optical waveguide (2 runs)**로 끝나며(round 18; *Open model*이 모델을 초기화할 것처럼 읽혔음), 실행이 없는 모델은
    **Return to Optical waveguide**입니다. round 20부터 문구가 모델 이름을 담으므로(*Return to Heated silicon waveguide (1 run)*)
-   두 카드가 같게 읽히지 않습니다. 설명 끝에 *Runs stay in this tab until you close it.*이 있습니다:
+   두 카드가 같게 읽히지 않습니다. 설명 끝에 *Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.*이 있습니다(round 28, G4; 그 전에는 브라우저 복구와 어긋나는 *Runs stay in this tab until you close it.*):
    모델을 골라도 이 탭의 실행은 남고, 복원 제안은 브라우저의 실행을 되살립니다. 실행이 있는 탭의 모델을 열면 떠날
    때의 페이지와 상관없이 그 Results로 갑니다(round 17; round 16은 Compare로도 돌아갔습니다): 광학 모델은 마지막으로 본 실행과
    함께, 가열 모델은 마지막 결과 페이지와 함께. 실행이 없는 모델은 Model로 엽니다. 페이지는 맨 위에서 시작합니다. 탭에 다중물리 실행이 없으면 Heated
