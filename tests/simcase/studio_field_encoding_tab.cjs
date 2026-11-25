@@ -223,15 +223,15 @@ test('named case: optical-v14-compact.json opened with its text run and saved, u
 });
 
 test('the words of section 5, exactly, and where the page uses them',()=>{
- // round 26 (C2): the Messages sentence in the reader's words (HQ decision 2026-11-25)
- assert.equal(X.COMPACT_TEXT,'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.');
+ // round 27 (D1, HQ decision 2026-11-25-openphysics-studio-round27-choices): no Messages sentence
+ assert.equal('COMPACT_TEXT' in X,false);
  assert.equal(X.COMPACT_NOTE,'When fields would not all fit, they are kept at single precision.');
  assert.equal(X.COMPACT_RESULTS_TEXT,"Field at single precision (float32). The values above are the engine's.");
  assert.equal(X.COMPACT_EXPORT_TEXT,' (fields at single precision)');
- // "single precision" once in the Messages sentence; "float32" is in the Results line only (round 26)
- assert.equal(X.COMPACT_TEXT.split('single precision').length,2);assert.equal(X.COMPACT_TEXT.split('float32').length,1);
  const app=fs.readFileSync(path.join(__dirname,STATIC,'workspace-app.mjs'),'utf8');
- assert.ok(app.includes("const compactWords=out.started&&!compactSaid?COMPACT_TEXT:'';"));
+ // the field budget's words carry nothing of the conversion: '' when no field goes
+ assert.ok(!app.includes('COMPACT_TEXT')&&!app.includes('compactSaid'));
+ assert.ok(app.includes(" if(!out.letGo.length)return '';\n"));
  assert.ok(app.includes("line.id='field-precision';line.className='input-hint';line.textContent=COMPACT_RESULTS_TEXT;"));
  assert.ok(app.includes('notice(isCompactField(solverRun.field)?compactExportNotice(words):words);'));
  assert.ok(app.includes("if(runs.some(r=>isCompactField(r.field)))limit.textContent=compactRunListNote(limit.textContent);"));

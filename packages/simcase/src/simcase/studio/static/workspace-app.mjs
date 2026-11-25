@@ -22,7 +22,7 @@ import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,isOpenRun,runChoice,signaturePml,parseTarget,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
-import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget} from './workspace-closed-target.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget,slabQuestionText,slabQuestionButtons,slabQuestionKey,slabQuestionMemory} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
@@ -30,7 +30,7 @@ import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
-import {chooseFieldsAtArrival,COMPACT_TEXT,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
+import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -690,18 +690,18 @@ function keepFieldsInstead(offer){
 // workspace-retention.mjs; nothing else lets a field go. Returns the Messages words ('' when every
 // field stays). first: the jobs whose fields arrived and are not the selected run's.
 // Compact fields (design "Compact field encoding"): at the first arrival where the fields would not all
-// fit as text, every field is made compact first (chooseFieldsAtArrival), and Messages says so once.
-let fieldSwap=null,fieldsLetGo=[],compactSaid=false;
+// fit as text, every field is made compact first (chooseFieldsAtArrival). Round 27 (D1): Messages says
+// nothing of it; the run-list note and the Results line under a compact field say it where it applies.
+let fieldSwap=null,fieldsLetGo=[];
 function applyFieldBudget(first=[],{loaded=false}={}){
  forgetHeldFields(runs);fieldSwap=null;fieldsLetGo=[];
  const selected=solverRun?.job||null;let out;
  try{out=chooseFieldsAtArrival(inputsFile(),runs,selected,compareIds,currentView(),{first,loaded});}catch{return '';}
- const compactWords=out.started&&!compactSaid?COMPACT_TEXT:'';if(compactWords)compactSaid=true;
- if(!out.letGo.length)return compactWords;
+ if(!out.letGo.length)return '';
  const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedBytes(runs,selected,out.base):0;
  for(const r of out.letGo)letGoField(r);fieldsLetGo=out.letGo;
  const other=fieldSwapCandidate(runs,plain,selected);if(other)fieldSwap={back:plain[0],other,list:runs};
- return [compactWords,plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
+ return [plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
 }
 function keepDroppedRun(offer){
  const button=$('file-status').querySelector('[data-keep-run]');
@@ -1338,6 +1338,8 @@ const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(u
 // solve): with Highest n_eff above 1.45 and an edge-touching shape whose index is as high as the core's;
 // gone with Nearest to n_eff or Open boundary. The result-side edge note stays as it is.
 const edgeWarning=()=>isOptical()&&applicationChosen()&&!state.openBoundary&&state.searchTarget==null?edgeSlabRisk(state.shapes):null;
+// round 27 (D2): the slab question's memory (asked once per geometry, boundary and Modes to return)
+const slabQuestion=slabQuestionMemory(),slabKeyNow=()=>slabQuestionKey({shapes:state.shapes,openBoundary:state.openBoundary,searchTarget:state.searchTarget});
 // its two buttons, in the plan line and in Physics › Optical modes: the edge note's shortcut (the same
 // target estimate, defaultTarget) and Use Open boundary; each sets the inputs and runs nothing
 function edgeWarningButtons(prefix){
@@ -1438,6 +1440,7 @@ function turnOffGroupIndex(){if(state.groupIndex!==true)return;state.groupIndex=
 // the row wraps, the buttons on a line of their own when the words and the buttons do not fit, and
 // the box grows for it; the full sentence is the title and stays in Physics › Optical modes.
 function refreshEdgeWarning(){
+ slabQuestion.seen(slabKeyNow());
  let host=$('run-edge');const risk=edgeWarning();
  if(!host){host=document.createElement('span');host.id='run-edge';host.className='run-edge';host.hidden=true;const text=document.createElement('span');text.id='run-edge-text';text.className='run-edge-text';host.append(text);$('run-plan').after(host);}
  host.hidden=!risk;$('run-options').classList.toggle('edge-warning',!!risk);if(!risk){host.dataset.key='';return;}
@@ -2377,10 +2380,40 @@ $('resume-job').onclick=async()=>{
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};
+// Round 27 (D2): the slab question before a closed run whose window would list slab modes first
+// (the slab warning shown, Highest n_eff): asked once per geometry, boundary and Modes to return
+// (slabQuestionMemory); its first button is the warning's shortcut, then the run; Run as set runs
+// exactly as without the question; Cancel or Escape runs nothing.
+let slabAnswer=null;
+const slabDialog=document.createElement('dialog');slabDialog.id='slab-question';slabDialog.setAttribute('aria-labelledby','slab-question-title');slabDialog.setAttribute('aria-describedby','slab-question-text');
+slabDialog.innerHTML='<h2 id="slab-question-title">Slab modes first</h2><p id="slab-question-text"></p><div class="leave-actions"><button type="button" id="slab-question-search" class="primary"></button> <button type="button" id="slab-question-run"></button> <button type="button" id="slab-question-cancel"></button></div>';
+document.body.append(slabDialog);
+// Resolves 'search', 'run' or null (Cancel or Escape).
+function askSlabQuestion(risk,t){
+ return new Promise(resolve=>{
+  const opener=document.activeElement,[search,run,cancel]=slabQuestionButtons(t);
+  slabAnswer=value=>{slabAnswer=null;if(slabDialog.open)slabDialog.close();restoreDialogFocus(opener);resolve(value);};
+  $('slab-question-text').textContent=slabQuestionText(risk);$('slab-question-search').textContent=search;$('slab-question-run').textContent=run;$('slab-question-cancel').textContent=cancel;
+  slabDialog.showModal();$('slab-question-search').focus();
+ });
+}
+$('slab-question-search').onclick=()=>slabAnswer?.('search');
+$('slab-question-run').onclick=()=>slabAnswer?.('run');
+$('slab-question-cancel').onclick=()=>slabAnswer?.(null);
+slabDialog.oncancel=event=>{event.preventDefault();slabAnswer?.(null);};
 $('run-optical').onclick=async()=>{
- if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
+ if(solverBusy||pendingJob||opticalBlock()||retentionBlock()||slabDialog.open)return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
- // round 21 (W2): no question before the run; a swap offered after the last drop ends here
+ const risk=edgeWarning(),key=slabKeyNow();
+ if(slabQuestion.due(risk,key)){
+  const near=defaultTarget(state.shapes);slabQuestion.asked(key);
+  const answer=await askSlabQuestion(risk,near);
+  if(!answer)return;
+  if(answer==='search')useClosedSearch(near);
+  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
+  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
+ }
+ // round 21 (W2): no question before the run but the slab question above; a swap offered after the last drop ends here
  dropSwap=null;
  const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{

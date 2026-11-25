@@ -65,6 +65,7 @@ function launch(command, argv, name) {
   return child;
 }
 
+const CLICK = function (selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); };
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url);
@@ -140,7 +141,21 @@ class Page {
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
     return [...await read('tree'), ...await read('treeitem')];
   }
-  click(selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
+  // once first. The stages written before the question answer Run as set, which runs exactly as
+  // before; each question is checked (its words and buttons) and noted after the last stage name.
+  // A stage that tests the question itself sets slabAsIs = false.
+  async answerSlabQuestion() {
+    if (this.slabAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('slab-question');return d&&d.open?{text:document.getElementById('slab-question-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.slabQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[slab question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
+    assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
+    await CLICK.call(this, '#slab-question-run');
+  }
+
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector); }
   attr(selector, name) { return this.on('function(s,n){const e=this.querySelector(s);return e?e.getAttribute(n):null}', selector, name); }
   exists(selector) { return this.on('function(s){return !!this.querySelector(s)}', selector); }

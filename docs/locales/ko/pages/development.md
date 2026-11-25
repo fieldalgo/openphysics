@@ -476,9 +476,9 @@ in a closed window its slab modes come first.*, Optical modes에는 전체 문�
 없는지, 1440 × 900과 390 × 844에서, 그리고 Optical modes에는 전체 문장이 있는지(P1); 실행 전 군굴절률을 켜면 *Closed window ·
 group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모드 4개 닫힌 실행 뒤에는 *… · about N s*(그 시간의 3배),
 버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
-시간인지(P3); 모드 4개 또는 2개 실행 다섯(모든 장을 텍스트로 담으면 약 19 MB)이 압축 필드부터 *… More field plots now
-fit in 16.8 MB: Studio keeps them at single precision from now on. …*(실행 보관에서는 *… Run 1 (…) keeps its values; its fields were not
-kept (16.8 MB limit).*)를 Messages에서 넘침 없이 줄바꿈해 보이고, 크기 줄은 없으며, 헤더가 뒤에 아무것도 없는 *… · kept for
+시간인지(P3); 모드 4개 또는 2개 실행 다섯(모든 장을 텍스트로 담으면 약 19 MB)이 압축 필드부터 내보내는 필드도, Messages 문장도
+없이(round 27, D1. 실행 보관에서는 *… Run 1 (…) keeps its values; its fields were not
+kept (16.8 MB limit).*) Messages가 넘침 없이 줄바꿈되고, 크기 줄은 없으며, 헤더가 뒤에 아무것도 없는 *… · kept for
 recovery in this browser*이고, IndexedDB 기록(버전 14)이 16.8 MB 안에서 실행 목록이 보이는 대로 모든 실행의 장을 담는지, 값만 있는 실행 열네 개와 여섯 번째 실제 실행(Run 20) 뒤에도 기록이 예산
 안에서 Run 20의 장을 담고 탭과 같은지(P2); 실행 20개에서 내보내기 줄, **Pin Run 1**–**Pin Run
 3**, 내보낸 문구, 교환 버튼이 n_g 닫힌 실행(*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), 열린
@@ -610,8 +610,8 @@ Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No nee
 from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · changed since both-models.json, not
 saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
 읽음)입니다. 다음 변경 뒤에는 *both-models · changed since both-models.json, not saved · kept for recovery in this browser*
-(24차 B2; 전에는 *both-models · not saved to a file · …*), 그다음(R24, 사전 등록 P1) 더 촘촘한 실행이 필드 예산을 채워 결과의 장을 모두 텍스트로 담을 수 없게 되면(*… More field plots now
-fit in 16.8 MB: …*; 압축 필드부터, 실행 보관에서는 다른 실행의 필드를 내보냄) Results에 *Field at single
+(24차 B2; 전에는 *both-models · not saved to a file · …*), 그다음(R24, 사전 등록 P1) 더 촘촘한 실행이 필드 예산을 채워 결과의 장을 모두 텍스트로 담을 수 없게 되면(선택한 실행의 장이 압축되며
+Messages 문장은 없음: round 27, D1; 압축 필드부터, 실행 보관에서는 다른 실행의 필드를 내보냄) Results에 *Field at single
 precision (float32). The values above are the engine's.*가 보이고, *values only*는 값만 있는 가져온 실행 열네 개뿐이며, 헤더는 *both-models · changed since both-models.json, not
 saved · kept for recovery in this browser*입니다(실행 보관 전에는 *… without the fields of Run N*). 연 프로젝트를 다음 실행 전에 바꾸면 *both-models · both-models.json · changed since opened · kept for recovery in this
 browser*입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제

@@ -90,6 +90,7 @@ async function addValuesOnlyRuns(p, label) {
   await p.eval("document.getElementById('confirm-run-import').click()");
   await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
 }
+const CLICK = function (selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); };
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url); this.events = [];
@@ -134,7 +135,21 @@ class Page {
   }
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.textContent:null}', selector); }
   texts(selector) { return this.on('function(s){return [...this.querySelectorAll(s)].map(e=>e.textContent)}', selector); }
-  click(selector) { return this.on('function(s){const e=this.querySelector(s);if(!e)throw Error("missing "+s);e.click();return true}', selector); }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
+  // once first. The stages written before the question answer Run as set, which runs exactly as
+  // before; each question is checked (its words and buttons) and noted after the last stage name.
+  // A stage that tests the question itself sets slabAsIs = false.
+  async answerSlabQuestion() {
+    if (this.slabAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('slab-question');return d&&d.open?{text:document.getElementById('slab-question-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.slabQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[slab question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
+    assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
+    await CLICK.call(this, '#slab-question-run');
+  }
+
   // The one element with this role and accessible name, as assistive technology finds it (the
   // accessibility tree). match: 'exact', or 'start' for a card whose name begins with its title.
   async role(role, name, match = 'exact') {
@@ -153,7 +168,7 @@ class Page {
     if (result.exceptionDetails) throw new Error('page: ' + (result.exceptionDetails.exception?.description || result.exceptionDetails.text));
     return result.result.value;
   }
-  async press(role, name, match) { await this.act(await this.role(role, name, match), 'function(){this.click();return true}'); await sleep(200); }
+  async press(role, name, match) { await this.act(await this.role(role, name, match), 'function(){this.click();return true}'); if (role === 'button' && name === 'Run study') await this.answerSlabQuestion(); await sleep(200); }
   // typing as a user does: focus, select, insert the text, leave the field
   async fill(role, name, text, match = 'exact') {
     const id = await this.role(role, name, match);
@@ -868,14 +883,17 @@ try {
     // fine mesh (the field grows with the core's triangles, as R23's substrate does) until a result's
     // fields would not all fit as text (compact fields: they are then kept at single precision, and
     // recovery holds the tab); the header keeps naming both-models.json
-    const r24 = {runs: []}, COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
+    const r24 = {runs: []};
     await width(2800);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
     await page.fill('spinbutton', 'Modes to find', 8);
     for (const nm of [20, 21, 22, 23, 24, 25]) {
       await page.press('tab', 'Model'); await page.press('treeitem', 'Mesh'); await page.until("!!document.getElementById('core-mesh-number')", 'R24 mesh ' + nm);
       await page.fill('spinbutton', 'Core mesh size [nm]', nm); await runOptical('R24 run at ' + nm); r24.runs.push(nm);
-      if ((await status()).includes(COMPACT_WORDS)) break;
+      // round 27 (D1): the conversion has no Messages sentence; the selected run's field shows the
+      // single-precision line in Results once the tab converted
+      await page.press('tab', 'Results'); await page.until("!!document.querySelector('.run-item')", 'R24 Results ' + nm);
+      if (await page.eval("!!document.getElementById('field-precision')")) break;
     }
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'R24 header kept', 30000);
     r24.title = await title(); r24.message = await status();
@@ -884,7 +902,7 @@ try {
     await page.until("!!document.getElementById('field-precision')", 'R24 single-precision line'); r24.precision = await page.eval("document.getElementById('field-precision').textContent");
     await noOverflow('R24 P1 header after the conversion 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 header after the conversion 390'); await size(1440, 900, false);
     stage('R24 P1 header after the conversion', r24);
-    assert.ok(r24.message.includes(COMPACT_WORDS), r24.message);
+    assert.ok(!r24.message.includes('More field plots now fit') && !r24.message.includes('single precision'), r24.message);
     assert.equal(r24.precision, "Field at single precision (float32). The values above are the engine's.");
     // every field is kept: the only runs without fields are the pinned values-only imports (640 × 210 nm)
     assert.ok(r24.items.filter(t => t.endsWith(' · values only')).every(t => t.includes(' · 640 × 210 nm · ')), JSON.stringify(r24.items));

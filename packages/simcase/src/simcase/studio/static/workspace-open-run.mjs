@@ -208,11 +208,14 @@ export const OTHER_CANDIDATES_NOTE='Each was searched and set aside for the reas
 export const openFoundText=(found,asked,target)=>`Found ${found} of ${asked} modes near n_eff ${target}`;
 export const MOVE_TARGET_TEXT='Move Search near n_eff (Physics › Optical modes) to find other modes.';
 export const MOVE_TARGET_TEXT_SEARCHES='Move Search near n_eff to find other modes.';
-/** The found line of an open run: "Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near
- * n_eff to find other modes." with two searches (/3), the words of P2 for a /2 run. */
+/** Round 27 (D3): what the second target is, after the two targets of the found line. */
+export const SECOND_SEARCH_WORDS="(Studio's second search, halfway to the silica index)";
+/** The found line of an open run: "Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio's second
+ * search, halfway to the silica index). Move Search near n_eff to find other modes." with two
+ * searches (/3), the words of P2 for a /2 run. */
 export function runFoundText(found,asked,targetString,record){
  if(!hasSearches(record))return openFoundText(found,asked,targetString)+'. '+MOVE_TARGET_TEXT;
- return openFoundText(found,asked,searchesText(Number(targetString),lowerTarget(Number(targetString))))+'. '+MOVE_TARGET_TEXT_SEARCHES;
+ return openFoundText(found,asked,searchesText(Number(targetString),lowerTarget(Number(targetString))))+' '+SECOND_SEARCH_WORDS+'. '+MOVE_TARGET_TEXT_SEARCHES;
 }
 export const openTableTitle=()=>`Modes (open boundary, ${PML_WORDS})`;
 

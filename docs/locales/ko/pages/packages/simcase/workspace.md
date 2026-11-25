@@ -1364,7 +1364,11 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   Run study 옆 상자가 그만큼 커집니다(round 23 전에는 상자에 맞게 잘려서 테스터 다섯 중 넷이 title이나 패널을 봐야 읽었습니다.
   1440 × 900과 390 × 844에서 확인). 두 곳 모두 **Set search near 2.46 · 4 modes**(바로 가기와 같은 목표 어림값,
   (n_max + 1.444)/2)와 **Use Open boundary**를 둡니다. 둘 다 입력만 정하고 아무것도 실행하지 않습니다. Nearest to n_eff나 Open
-  boundary를 고르면 경고가 사라집니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
+  boundary를 고르면 경고가 사라집니다. 경고가 보이는 동안 **Run study**는 실행 전에 한 번 묻습니다(round 27, D2). 대화상자
+  *Slab modes first*: *Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the
+  core instead?*와 **Set search near 2.46 · 4 modes and run**(경고의 바로 가기를 정한 뒤 실행), **Run as set**(묻지 않았을 때와
+  같은 실행: 같은 문서, 값, 기록), **Cancel**(Escape도 같음, 아무것도 실행하지 않음). 초점은 첫 버튼에서 시작합니다. 형상, 경계,
+  Modes to return이 바뀐 뒤에만 다시 묻고(바꿨다 되돌린 것도 바뀐 것), 그 밖에는 Run study가 곧바로 그대로 실행합니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
   가장자리에 닿는 형상 중 굴절률이 가장 높은 것과 닿지 않는 형상 중 가장 높은 것(같으면 앞의 것)이며, 가장자리에 닿는 형상이 없거나
   모든 형상이 닿으면 경고하지 않습니다. 결과 쪽 가장자리 안내는 그대로이고, 닫힌 탐색의 기본값은 계속 Highest입니다. 한계:
   Studio는 1550 nm 표(physmat)로 비교합니다. 열 가지 재료는 1400–1700 nm의 모든 파장에서 같은 순서이고 같은 값이 없으므로
@@ -1462,8 +1466,8 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
 - 표 아래 안내에 “Leakage depends on what lies outside the window: shapes touching an open edge
   continue through the PML.”이 붙습니다. 닫힌 실행의 안내에는 “For leakage, choose Open boundary in
   Physics › Optical modes.”가 붙습니다.
-- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find
-  other modes.* 검색이 하나인 실행(1.466 미만, 또는 slice P2의 실행)은 이전처럼 *Found 2 of 2 modes near
+- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio's second search, halfway to
+  the silica index). Move Search near n_eff to find other modes.*(round 27, D3: 두 번째 목표가 무엇인지 밝힘). 검색이 하나인 실행(1.466 미만, 또는 slice P2의 실행)은 이전처럼 *Found 2 of 2 modes near
   n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.*로 읽힙니다.
 - Studio는 엔진의 모드 가운데 Re n_eff가 1.45보다 큰 것만 남깁니다.
 - **Other candidates (n) — not shown as modes**는 탐색했지만 보이지 않는 후보마다 n_eff, 물리 비율, 이유를
@@ -1883,10 +1887,9 @@ Run 1 and Run 2; their n_eff, TE fractions and effective areas were.*가 붙습�
 
 - **필요할 때만.** 탭의 모든 필드가 텍스트로 들어가는 동안에는 아무것도 바뀌지 않으며 파일도 전처럼 씁니다. 필드를 모두 텍스트로
   담을 수 없게 되는 첫 도착(결과, 재계산한 필드, Add runs from file, 또는 실행을 되돌리는 **Keep Run N, drop … instead**) 때 탭의
-  모든 필드를 단정밀도로 보관하고, 줄어든 크기로 실행 보관의 순서를 적용합니다. Messages는 한 번 이렇게 알립니다: *More field
-  plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are
-  unchanged. Files saved from now on open in this Studio or later; files you already have still open.* (이 파일은 광학 세션
-  버전 14이며, 이전 Studio는 이름을 들어 거부합니다.) 그 뒤 들어오는 필드도 모두 같은 방식으로 보관하며, 탭은
+  모든 필드를 단정밀도로 보관하고, 줄어든 크기로 실행 보관의 순서를 적용합니다. Messages는 이를 알리지 않습니다(round
+  27, D1. 25·26차에는 문장이 있었음). 실행 목록 아래 안내와 압축 실행의 장 보기 아래 줄이 해당하는 곳에서 알립니다. 그때부터
+  저장한 파일은 광학 세션 버전 14이며, 이전 Studio는 이름을 들어 거부합니다. 그 뒤 들어오는 필드도 모두 같은 방식으로 보관하며, 탭은
   되돌아가지 않습니다. File › Open과 Restore는 필드를 모두 텍스트로 담을 수 있는 한 파일에 담긴 그대로 보관하므로, 열어서 바꾸지
   않고 다시 저장한 파일은 원래 바이트와 같습니다.
 - **바뀌는 것.** 장 표본을 float32로 반올림합니다(유효숫자 약 7자리, 상대 오차 최대 2^-24, 약 6e-8). 노드 좌표와 삼각형은 그대로

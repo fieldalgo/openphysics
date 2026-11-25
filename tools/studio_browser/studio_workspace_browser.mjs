@@ -87,6 +87,7 @@ async function addValuesOnlyRuns(p, label) {
   await p.click('#confirm-run-import');
   await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
 }
+const CLICK = function (selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); };
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url);
@@ -160,7 +161,21 @@ class Page {
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
     return (await Promise.all(roles.map(read))).flat();
   }
-  click(selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
+  // once first. The stages written before the question answer Run as set, which runs exactly as
+  // before; each question is checked (its words and buttons) and noted after the last stage name.
+  // A stage that tests the question itself sets slabAsIs = false.
+  async answerSlabQuestion() {
+    if (this.slabAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('slab-question');return d&&d.open?{text:document.getElementById('slab-question-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.slabQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[slab question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
+    assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
+    await CLICK.call(this, '#slab-question-run');
+  }
+
   // Typing as a user does: focus, select, insert text, leave the field.
   async type(selector, text) {
     await this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.focus();e.select();return true}', selector);
@@ -1242,7 +1257,7 @@ try {
   // Model with runs and File › Save write at once, asking nothing, and the file holds exactly the
   // fields the tab shows; the file opened again shows a run without fields by its values (4.1),
   // Compare lists its modes by number (4.2), and Recompute Run N's fields brings its field back.
-  const m4eMessages = [], COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
+  const m4eMessages = [], COMPACT_WORDS = 'More field plots now fit';
   const LET_GO = /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./;
   const m4eStarted = Date.now();
   for (const wl of [1570, 1580, 1590, 1600, 1610, 1620, 1630, 1640, 1650, 1660, 1670, 1680]) {
@@ -1253,9 +1268,9 @@ try {
   await page.click('nav [data-page=Results]'); await page.until(`document.querySelectorAll('.run-item').length===${m4eCount}`, 'M4-e run list');
   const m4eItems = await page.eval("[...document.querySelectorAll('.run-item')].map(b=>({job:b.dataset.run,text:b.textContent}))");
   stage('M4-e fields kept', {runs: m4eCount, wideRunsAdded: m4eMessages.length, seconds: Math.round((Date.now() - m4eStarted) / 1000), messages: m4eMessages, items: m4eItems.map(i => i.text)});
-  // the conversion sentence once, at an earlier result than the first field let go
-  assert.equal(m4eMessages.filter(m => m.includes(COMPACT_WORDS)).length, 1, JSON.stringify(m4eMessages));
-  assert.ok(m4eMessages.findIndex(m => m.includes(COMPACT_WORDS)) < m4eMessages.findIndex(m => LET_GO.test(m)), 'the conversion comes before a field is let go');
+  // round 27 (D1): the conversion writes no Messages sentence (the record below is version 14, every
+  // field kept compact; the Results line and the run-list note say it)
+  assert.ok(m4eMessages.every(m => !m.includes(COMPACT_WORDS) && !m.includes('single precision')), JSON.stringify(m4eMessages));
   assert.ok(m4eMessages.some(m => LET_GO.test(m)), JSON.stringify(m4eMessages));
   const valuesOnly = m4eItems.filter(i => i.text.endsWith(' · values only'));
   assert.ok(valuesOnly.length >= 1 && valuesOnly.length < m4eCount, JSON.stringify(m4eItems));
@@ -1910,7 +1925,7 @@ try {
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
     assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm) absorption + leakage into the PML', 'A_eff (µm²)', 'n_g', 'PML check']);
     assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
-    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
     // pre-registered: both modes below what the open boundary resolves
     assert.deepEqual(template.loss, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     template.lossTitles.forEach((t, i) => assert.equal(t, template.check[i][0] === 'depends' ? 'This loss changes with the PML; it is not a converged leakage loss.' : 'Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.'));
@@ -2169,7 +2184,7 @@ try {
     assert.equal(withoutTime(third.text), withoutTime(second.text), 'V-P1 (b): byte-identical but for savedAt');
     assert.deepEqual(workspaceSession(third.text).runs.map(r => r.origin), Array(runCount).fill('imported'));
     assert.deepEqual([reopened.neff, reopened.loss, reopened.check], [leak.neff, leak.loss, leak.check], 'the open run reads the same after the open');
-    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
 
     // W1 through the builder (slice T2, pre-registered): the strip over a substrate asking for 8 modes
     // returns all three modes, the one near the cladding index included (1.4864 + 7.92e-3i), with the
@@ -2194,7 +2209,7 @@ try {
     stage('W1 strip over a substrate, 8 modes', {neff: eight.neff, loss: eight.loss, found: eight.found, engine: expectedEight, seconds: eightSeconds});
     assert.deepEqual({neff: eight.neff, loss: eight.loss}, expectedEight, 'the screen strings are the engine run of the same document on this machine');
     assert.equal(eight.neff.length, 3, JSON.stringify(eight.neff));
-    assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
     const cladding = eight.neff.map(t => /^(\d\.\d{8}) ([+−]) (\d\.\d{2}e-\d+)i$/.exec(t)).map(m => ({re: Number(m[1]), im: (m[2] === '−' ? -1 : 1) * Number(m[3])}));
     assert.deepEqual(eight.neff.slice(0, 2), leak.neff, 'TE-like and TM-like first, as with 2 modes');
     assert.ok(Math.abs(cladding[2].re - 1.4864) <= 5e-4 && Math.abs(cladding[2].im / 7.92e-3 - 1) <= 0.05, JSON.stringify(cladding));
@@ -2210,7 +2225,7 @@ try {
     assert.ok(near, 'the near-cladding mode is shown: ' + JSON.stringify(low.neff));
     assert.ok(Math.abs(near.im / 7.92e-3 - 1) <= 0.05, JSON.stringify(near)); assert.ok(Math.abs(Number(near.loss.split(' ')[0]) / 2789 - 1) <= 0.05, JSON.stringify(near));
     // slice T2: the search near 1.600 is paired with one near (1.600 + 1.444) / 2 = 1.52
-    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.60 and 1\.52\. Move Search near n_eff to find other modes\.$/);
+    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.60 and 1\.52 \(Studio's second search, halfway to the silica index\)\. Move Search near n_eff to find other modes\.$/);
     // review: choosing the optical model again clears the PML check option with the open boundary
     await toTree('Study', "!!document.getElementById('pml-check')"); await ob.click('#pml-check'); assert.equal(await ob.eval("document.getElementById('pml-check').checked"), true);
     await ob.click('nav [data-page=Applications]'); await ob.until("!!document.querySelector('[data-template=optical]')", 'OB Library');
@@ -3068,6 +3083,101 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // R27 D2 (round 27, HQ decision 2026-11-25-openphysics-studio-round27-choices), in a browser of its
+  // own: Run study with a closed window, the slab warning shown and Highest n_eff asks once, in a
+  // dialog; Escape and Cancel run nothing; it asks again only after the geometry, the boundary or
+  // Modes to return changes; Run as set gives the run the question did not change (its values and its
+  // record are those of the same inputs run without the question); the first button sets the
+  // warning's shortcut and runs; the warning and its buttons stay; no page overflow.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready; r.slabAsIs = false;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const open = () => r.eval("document.getElementById('slab-question').open");
+    const QUESTION = 'Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the core instead?';
+    const BUTTONS = ['Set search near 2.46 · 4 modes and run', 'Run as set', 'Cancel'];
+    // the dialog as a screen reader finds it: one dialog named by its title, described by the question
+    const dialogView = async () => {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: 'Slab modes first', role: 'dialog'});
+      const found = nodes.filter(n => !n.ignored);
+      return {dialogs: found.length, modal: found[0]?.properties?.find(p => p.name === 'modal')?.value?.value ?? null,
+        text: await rText('#slab-question-text'), buttons: await r.eval("[...document.querySelectorAll('#slab-question button')].map(b=>b.textContent)"),
+        focus: await r.eval('document.activeElement?.id??null'), described: await r.eval("document.getElementById('slab-question').getAttribute('aria-describedby')")};
+    };
+    const pressRun = async () => { await r.until("!document.getElementById('run-optical').disabled", 'D2 Run enabled'); await r.click('#run-optical'); };
+    const waitRun = async before => r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(JSON.stringify(before))}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'D2 run done', 600000);
+    const asked = async tag => { await pressRun(); await r.until("document.getElementById('slab-question').open", 'D2 asks ' + tag); return dialogView(); };
+    const noRun = async (before, tag) => { await sleep(1500); assert.equal(await open(), false, tag); assert.deepEqual(await runItems(), before, tag + ': nothing run'); assert.equal(await r.eval("document.getElementById('run-optical').textContent"), 'Run study', tag); };
+    const overflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const o = await r.eval("(()=>{const d=document.getElementById('slab-question'),b=d.getBoundingClientRect();return {page:document.documentElement.scrollWidth-document.documentElement.clientWidth,dialog:d.scrollWidth-d.clientWidth,left:b.left,right:b.right-innerWidth,buttons:[...d.querySelectorAll('button')].every(x=>{const q=x.getBoundingClientRect();return q.left>=b.left-1&&q.right<=b.right+1;})}})()");
+        stage('R27 D2 overflow ' + tag, {width, height, ...o});
+        assert.ok(o.page <= 0 && o.dialog <= 0 && o.left >= 0 && o.right <= 0 && o.buttons, `${tag} at ${width} × ${height}: ${JSON.stringify(o)}`);
+      }
+      await rSize(1440, 900);
+    };
+    // the T18 strip: the optical template, a 3000 × 700 silicon substrate spanning the window, 2 modes, Highest
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'D2 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'D2 optical model');
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'D2 slab added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')"); await r.type('#mode-count-number', 2); await sleep(400);
+    const d2 = {warning: await r.eval("document.getElementById('run-edge')?.hidden===false?document.getElementById('run-edge-text').textContent:null")};
+    assert.equal(d2.warning, 'Substrate touches the window edge: in a closed window its slab modes come first.');
+    // asked: a modal dialog, focus on its first button; Escape runs nothing
+    let before = await runItems();
+    d2.first = await asked('first'); await overflow('dialog');
+    await r.call('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await r.call('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await noRun(before, 'Escape');
+    assert.deepEqual(d2.first, {dialogs: 1, modal: true, text: QUESTION, buttons: BUTTONS, focus: 'slab-question-search', described: 'slab-question-text'});
+    // the same state: Run study runs without asking (run B, the run without the question)
+    await pressRun(); await sleep(300); d2.again = await open(); await waitRun(before);
+    const runB = (await runItems()).length; assert.equal(d2.again, false, 'asked once'); assert.equal(runB, 1);
+    // Modes to return changes and back: asked again; Cancel runs nothing
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    await r.click('#closed-search-nearest'); await sleep(400); await r.click('#closed-search-highest'); await sleep(400);
+    before = await runItems(); d2.cancel = await asked('after Modes to return changed'); await r.click('#slab-question-cancel'); await noRun(before, 'Cancel');
+    // the boundary changes and back: asked again; Run as set runs the inputs as they are (run A)
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400);
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    if (!(await r.eval("document.getElementById('closed-search-highest').checked"))) { await r.click('#closed-search-highest'); await sleep(400); }
+    before = await runItems(); d2.runAsSet = await asked('after the boundary changed'); await r.click('#slab-question-run'); await waitRun(before);
+    // the warning and its buttons stay after the question
+    d2.warningAfter = await r.eval("document.getElementById('run-edge')?.hidden===false?[...document.querySelectorAll('#run-edge button')].map(b=>b.textContent):null");
+    // Run as set = the run without the question: the same values and the same record but for its job, time and number
+    const latest = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result?.session??null);};})`);
+    let session = null;
+    for (let i = 0; i < 60 && !(session?.runs?.length === 2); i++) { const text = await latest(); session = text ? JSON.parse(text) : null; if (session?.runs?.length !== 2) await sleep(500); }
+    const strip = run => { const {job, completedAt, number, digest, label, pinned, ...rest} = run; return JSON.stringify(rest); };
+    d2.same = session ? strip(session.runs[0]) === strip(session.runs[1]) : null;
+    d2.neff = session ? session.runs.map(x => x.effective_index) : null;
+    // a geometry change: asked again; the first button sets the warning's shortcut and runs it
+    await rTree('Geometry', "!!document.querySelector('#shape-w')"); await r.click('.shape-item[data-shape="1"]'); await sleep(300);
+    assert.equal(await r.eval("document.getElementById('shape-name').value"), 'Substrate'); await r.type('#shape-h', 690); await sleep(400);
+    before = await runItems(); d2.search = await asked('after the geometry changed'); await r.click('#slab-question-search'); await waitRun(before);
+    d2.after = {plan: await rText('#run-plan'), items: (await runItems()).length, found: await rText('#modes-found'), warning: await r.eval("document.getElementById('run-edge')?.hidden===false")};
+    stage('R27 D2 slab question', d2);
+    for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
+    assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
+    assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
+    assert.equal(d2.after.plan, 'Closed window · near n_eff 2.46'); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   // R23 (round 23, pre-registered P1 to P4 and P6; P5 is the project script's K5 stage), in a browser
   // context of its own, with the T18 geometry (a 500 × 220 core over a 3000 × 700 silicon substrate
   // spanning the window): P1 the slab warning's short row, whole, at 1440 × 900 and 390 × 844; P3 the
@@ -3190,7 +3300,8 @@ try {
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 five runs within the field budget', p2);
-    assert.ok(p2.message.includes('More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.'), p2.message);
+    // round 27 (D1): no Messages sentence at the conversion
+    assert.ok(!p2.message.includes('More field plots now fit') && !p2.message.includes('single precision'), p2.message);
     assert.ok(!/fields were not kept/.test(p2.message), p2.message);
     assert.ok(!p2.message.includes('Session is now'), p2.message); assert.ok(!p2.message.includes('MiB'), p2.message);
     assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser$/.test(p2.header), p2.header);
@@ -3530,9 +3641,9 @@ try {
     // result whose fields would not all fit as text (the first written as version 14); from there on
     // version 14; every field kept (no run "values only"); the record is Save's text after each result
     // (above). The let-go words, the Results block of a run without fields and Recompute are in M4-e.
-    const COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
-    const said = k10.map((e, i) => e.message.includes(COMPACT_WORDS) ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
-    assert.deepEqual(said, [first14], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
+    // round 27 (D1): no result's Messages says it
+    const said = k10.map((e, i) => e.message.includes('More field plots now fit') || e.message.includes('single precision') ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
+    assert.deepEqual(said, [], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
     assert.ok(first14 > 0 && k10.slice(first14).every(e => e.version === 14) && k10.slice(0, first14).every(e => e.version !== 14), JSON.stringify(k10.map(e => e.version)));
     assert.equal(last.items.length, 12); assert.equal(last.doc.version, 14);
     assert.ok(k10.every(e => e.valuesOnly === 0), 'no run keeps its values only');
