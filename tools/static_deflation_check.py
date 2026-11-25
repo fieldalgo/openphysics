@@ -28,6 +28,7 @@ import inspect
 import json
 import os
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -106,15 +107,19 @@ def install(log_path=None):
     log = open(log_path, "a", encoding="utf-8")
 
     def solve(*args, **kwargs):
-        last.clear()
+        last.clear(); t = time.time()
         out = real_solve(*args, **kwargs)
         rec = dict(call=os.environ.get("PYTEST_CURRENT_TEST", "?").split(" ")[0], count=len(out[0]), **last)
+        seconds = [round(time.time() - t, 2)]
         with _undeflated():
-            last.clear(); ref = real_solve(*args, **kwargs); ref_static = last.get("static")
+            last.clear(); t = time.time(); ref = real_solve(*args, **kwargs); ref_static = last.get("static")
+        seconds.append(round(time.time() - t, 2))
         spread = []
         for seed in SEEDS:
             with _undeflated(seed):
-                spread.append(_relative(real_solve(*args, **kwargs)[0], ref[0]))
+                t = time.time(); spread.append(_relative(real_solve(*args, **kwargs)[0], ref[0]))
+            seconds.append(round(time.time() - t, 2))
+        rec["seconds"] = seconds   # deflated, forced, forced with seeds 1, 2, 3
         s = None if any(x is None for x in spread) else np.max(spread, axis=0)
         d = _relative(out[0], ref[0])
         rec.update(ref_count=len(ref[0]), ref_static=ref_static,
