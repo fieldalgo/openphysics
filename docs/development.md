@@ -604,7 +604,8 @@ with B* (P3); and the plan line before an open run with group index: none (*Open
 group index on (3 solves)*) when the only open runs were opened from a session file (P2's
 `optical-v10-open-f8ece10.json`), *… · about N s* (or *min*) after an open run in the tab, the same
 words after a newer open run is added from `optical-v10-open-full-083e151.json` (it has no wall
-time and is skipped), and none again after a reload, **Restore newest from this browser** and the
+time and is skipped; that file's untitled project reads *Untitled project · changed since
+optical-v10-open-f8ece10.json, not saved · …* once changed, P1), and none again after a reload, **Restore newest from this browser** and the
 group index turned on (P4).
 Session files and recovery records hold no wall time, so an estimate from a run read from a file is
 not checked: it cannot occur without a format change. No horizontal overflow at 1440 × 900 or 390 × 844.

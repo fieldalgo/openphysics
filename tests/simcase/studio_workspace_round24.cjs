@@ -28,10 +28,34 @@ test('P1 (B2): after a change, a project that came from a file says "changed sin
 
 test('P1 (B2): the page keeps the file a recovered record came from until a new project',()=>{
  const app=read('workspace-app.mjs');
- assert.ok(app.includes('const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null,fromFile:null};'));
- assert.ok(body(app,'function resetProject(','\n}').includes('file:null,fromFile:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});'));
+ assert.ok(app.includes('const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null,fromFile:null,openedFrom:null,openedStamp:null};'));
+ assert.ok(body(app,'function resetProject(','\n}').includes('openedFrom:null,openedStamp:null,file:null,fromFile:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});'));
  assert.ok(body(app,'function restoreProjectName(','\n}').includes('project.fromFile=next.recovered.opened||next.recovered.changed||null;'));
  assert.ok(body(app,'function projectLine(){','\n}').includes('return projectTitle({name:project.name,fromFile:project.fromFile,models:'));
+});
+
+test('P1 (B2, follow-up): an untitled project whose content came from File › Open of a session or model file says "changed since <file>, not saved" once changed',async()=>{
+ const PS=await import(STATIC+'workspace-persistence.mjs'),when=()=>'10:15';
+ const t=(opened,extra={})=>PS.projectTitle({models:1,recovery:'updating',opened,...extra},when);
+ assert.equal(t({file:'run-a.json',changed:true}),'Untitled project · changed since run-a.json, not saved · updating browser recovery');
+ assert.equal(PS.projectTitle({models:1,recovery:'keptFields:6',opened:{file:'run-a.json',changed:true}},when),'Untitled project · changed since run-a.json, not saved · kept for recovery in this browser without the fields of Run 6');
+ // just opened, not changed: as before
+ assert.equal(t({file:'run-a.json',changed:false}),'Untitled project · not saved to a file · updating browser recovery');
+ // renamed after the open: the name, the same words
+ assert.equal(t({file:'run-a.json',changed:true},{name:'Study'}),'Study · changed since run-a.json, not saved · updating browser recovery');
+ // a nameless recovered record of a copy (Y3): its words until a change, then the same words
+ assert.equal(t({file:'both-models.json',changed:false},{copyOf:'both-models.json'}),'Untitled project · recovered from a copy of both-models.json · not saved to a file · updating browser recovery');
+ assert.equal(t({file:'both-models.json',changed:true},{copyOf:'both-models.json'}),'Untitled project · changed since both-models.json, not saved · updating browser recovery');
+ // never any file; a project file of its own
+ assert.equal(t(null),'Untitled project · not saved to a file · updating browser recovery');
+ assert.equal(PS.projectTitle({name:'p',models:1,file:{name:'p.json',how:'opened'},current:false,recovery:'updating',opened:{file:'run-a.json',changed:true}},when),'p · p.json · changed since opened · updating browser recovery');
+ // the page: File › Open of a session or model file, a multiphysics session file, and a copy's restore
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("function markOpenedFrom(name){project.openedFrom=name;project.openedStamp=projectStamp();}"));
+ assert.ok(app.includes("  if(pending.source==='file'&&pending.newProject)markOpenedFrom(pending.label);"));
+ assert.ok(app.includes("{if(source==='file'){multiphysicsProject();markOpenedFrom(label);rememberOpened(label);}"));
+ assert.equal(app.split('if(project.copyOf)markOpenedFrom(project.copyOf);').length,3);
+ assert.ok(app.includes('opened:project.openedFrom?{file:project.openedFrom,changed:project.openedStamp!==projectStamp()}:null,'));
 });
 
 test('P2 (B3): the size message in one unit (MB, one decimal), what browser recovery left out first, then what Save offers',async()=>{

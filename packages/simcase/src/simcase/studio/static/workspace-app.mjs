@@ -224,13 +224,13 @@ const workspaceTitle=()=>({optical:'Optical waveguide',heat:'Steady heat conduct
 // recovered: the project name came back from a browser-recovery record's `project` (no project
 // file): {opened: the file the record still matched, or null; savedAt: that record's time; stamp:
 // the project then}. The header says so until the next change (projectStamp differs).
-const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null,fromFile:null};
+const project={name:null,nameFrom:null,ids:{},next:1,file:null,stamp:null,scope:0,copyOf:null,recovered:null,fromFile:null,openedFrom:null,openedStamp:null};
 // the page and run the workspace was last shown on (round 16, S9; rememberReturn)
 let workspaceReturn=null;
 function projectId(kind){if(!project.ids[kind])project.ids[kind]='m'+project.next++;return project.ids[kind];}
 // a file replaced the project: an untitled project of the models now in the tab
 function resetProject({name=null,ids=null,nameFrom=null}={}){
- Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,file:null,fromFile:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});
+ Object.assign(project,{name,nameFrom:name?nameFrom||'user':null,ids:{},next:1,openedFrom:null,openedStamp:null,file:null,fromFile:null,stamp:null,scope:project.scope+1,copyOf:null,recovered:null});
  if(ids){project.ids={...ids};project.next=Math.max(0,...Object.values(ids).map(id=>+id.slice(1)))+1;}
 }
 // The models a project file holds, as Save compares them (round 17, U8): [{key, title}], keyed by the
@@ -266,7 +266,7 @@ function unsavedModels(){
 function projectLine(){
  const file=project.file&&project.file.scope===project.scope?project.file:null;
  const recovered=!file&&project.recovered&&project.recovered.stamp===projectStamp()?{opened:project.recovered.opened,changed:project.recovered.changed??null}:null;
- return projectTitle({name:project.name,fromFile:project.fromFile,models:projectModels().length,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
+ return projectTitle({name:project.name,fromFile:project.fromFile,models:projectModels().length,opened:project.openedFrom?{file:project.openedFrom,changed:project.openedStamp!==projectStamp()}:null,file,current:!!file&&project.stamp===projectStamp(),recovery:opticalRecoveryShown(),copyOf:project.copyOf,recovered});
 }
 // The workspace leaves the project (a multiphysics file replaced it): no runs, the inputs a new tab
 // starts with and no application chosen.
@@ -335,6 +335,10 @@ function libraryOptions(){
 // the project was recovered from a copy of it; the record holds no project name, so none is guessed.
 // matched (round 20, Z2): the second restore of a pair whose first record also still matched this
 // file: with both models back the project reads as saved.
+// round 24 (B2, the coordinator's follow-up): the session or model file the project's content came
+// from (File › Open, or the file a nameless recovered record was a copy of) and the project then: the
+// header says "changed since <file>, not saved" once it differs
+function markOpenedFrom(name){project.openedFrom=name;project.openedStamp=projectStamp();}
 function restoreProjectFile(file,opened=null,{matched=false}={}){
  if(!file?.projectName){if(!file&&opened&&!project.file&&!project.name)project.copyOf=opened;return;}
  project.name=file.projectName;project.nameFrom=nameSource(file.projectName,file.name);
@@ -842,7 +846,8 @@ function completeLoad(pending){
   // whether the record said it still matched it
   newModelInputs=null;loadedSession={kind:pending.source==='file'?'opened':'recovered',name:pending.source==='file'?pending.label:null,stamp:saveStamp(),file:pending.source==='file'?pending.label:pending.openedFile||null,fileCurrent:pending.source==='file'||openedMatch};
   openedStamp=pending.source==='file'||openedMatch?saveStamp():null;
-  rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});restoreProjectName(pending.recordProject,{savedFile:file,openedFile:pending.openedFile,openedCurrent:pending.openedCurrent,savedAt:pending.recordSavedAt});}refreshPersistence();
+  if(pending.source==='file'&&pending.newProject)markOpenedFrom(pending.label);
+  rememberOpened(pending.fileName);if(pending.source!=='file'){rememberOpened(recoveredFileName(file,pending.openedFile,pending.openedCurrent),'recovered');restoreProjectFile(file,pending.openedFile,{matched:pending.projectMatched===true});restoreProjectName(pending.recordProject,{savedFile:file,openedFile:pending.openedFile,openedCurrent:pending.openedCurrent,savedAt:pending.recordSavedAt});if(project.copyOf)markOpenedFrom(project.copyOf);}refreshPersistence();
   // the runs keep the numbers the session stored (version 12), else are numbered by their place in
   // the file, which Studio writes only when that numbering is exact: nothing is said about numbering
   // (HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended)
@@ -1958,7 +1963,7 @@ function requestMultiphysicsSession(session,{label,source,opener=document.active
  // a file replaces the project (P3); a browser restore replaces the multiphysics model only
  const model=source==='file'?false:'multiphysics',asked=!!leaveText(label,model);
  const go=()=>{
-  const finish=()=>{if(source==='browser'){notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});restoredFrom(recoveryIndex);}fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile,openedFile,{matched:projectMatched===true});restoreProjectName(recordProject,{savedFile,openedFile,openedCurrent,savedAt:recordSavedAt});refreshPersistence();}then?.();}).catch(e=>notice('Session open failed: '+e.message));};
+  const finish=()=>{if(source==='browser'){notebookStore.adopt(recoveryRecord,{kept:keepAsLatest});restoredFrom(recoveryIndex);}fileScope++;multiView.openSession(session,{label,source,savedFile,openedFile,openedCurrent}).then(()=>{if(source==='file'){multiphysicsProject();markOpenedFrom(label);rememberOpened(label);}else{rememberOpened(recoveredFileName(savedFile,openedFile,openedCurrent),'recovered');restoreProjectFile(savedFile,openedFile,{matched:projectMatched===true});restoreProjectName(recordProject,{savedFile,openedFile,openedCurrent,savedAt:recordSavedAt});if(project.copyOf)markOpenedFrom(project.copyOf);refreshPersistence();}then?.();}).catch(e=>notice('Session open failed: '+e.message));};
   // nothing to lose: no multiphysics model open, or one with no runs that was not edited
   if(asked||!multiView.inProject()||(!multiView.projectRuns()&&!multiView.edited())){finish();return;}
   const text=multiphysicsLoadText(session,{runs:multiView.projectRuns(),unsaved:multiView.projectUnsavedRuns()>0,model:'the current model'},source);

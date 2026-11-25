@@ -3156,9 +3156,14 @@ try {
     await r.eval("document.getElementById('file-status').textContent=''");
     await setFile('#session-file', fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v10-open-f8ece10.json', import.meta.url)));
     await answer("/^Opened /.test(document.getElementById('file-status').textContent)", 'R24 P4 file opened');
+    // P1 (B2, the coordinator's follow-up): the untitled project the file opened, before and after a change
+    const opened = {header: await rText('#project')};
     if (await r.eval("!!document.getElementById('restore-run-input')")) { await r.click('#restore-run-input'); await sleep(300); }
     await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
     await groupIndex(true); const p4 = {fromFile: await plan()};
+    opened.changed = await rText('#project'); stage('R24 P1 untitled project opened from a file', opened);
+    assert.match(opened.header, /^Untitled project · not saved to a file · /);
+    assert.match(opened.changed, /^Untitled project · changed since optical-v10-open-f8ece10\.json, not saved · (?:updating browser recovery|kept for recovery in this browser)/);
     await groupIndex(false); p4.fromFileOff = await plan();
     // an open run in this tab, measured; then its estimate with group index on
     await rRun(); await groupIndex(true); p4.measured = await plan();
