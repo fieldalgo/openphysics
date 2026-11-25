@@ -168,16 +168,37 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 요소처럼 스펙트럼 전체에 번지지 않습니다
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
 
-탐색이 이 무리에 닿으면 계산된 근은 보통 `|beta^2|`가 반올림 수준이고
-(`tests/galerkin/test_waveguide_static_roots.py`의 slab에서 최대 `1.2e-14 |sigma|`,
-가끔 정확히 0) `E_t = e_t / beta`가 정의되지 않습니다. `solve_modes`는 어느 경로에서도
-`|beta^2| <= STATIC_ROOT_TOL |sigma|`(`1e-10`, 곧 `|n_eff| <= 1e-5 |n_target|`)인 근을
-반환하지 않으므로, 이런 탐색은 `num_modes`보다 적은 근을 반환합니다. 한계: `B`의 절점
-블록 `K - k0^2 M`이 거의 특이할 때, 곧 `k0^2`가 자유 절점에서 `K e_z = lambda M e_z`의
-고유값(PEC 상자의 TM 차단)에 가까울 때는 무리의 조건이 나빠 계산된 근이 문턱을 넘을 수
-있습니다. 정사각 도파관에서 그런 차단으로부터 상대 거리 `1e-6`, `1e-8`일 때
-`2.2e-10 |sigma|`, `6.8e-9 |sigma|`가 측정되었습니다. 이런 근은 가로 성분이 거의 없는
-채로 반환됩니다.
+이 무리는 정확히 겹쳐 있습니다. 모든 정적 근이 `nu = 1/(lambda - sigma) = -1/sigma`입니다.
+ARPACK에 그 벡터를 요구한 탐색은 반올림을 통해서만 수렴했으므로, 수렴 속도와 수렴 여부가
+pencil의 마지막 비트에 달려 있었습니다. `tests/simcase/test_pml_gain_bound.py`의 굽은
+slab을 64개 근(그중 37개가 정적)으로 찾으면 NumPy CPU dispatch 하나에서는 67초에
+수렴했고 다른 하나에서는 30분 뒤에도 수렴하지 않았습니다. 그래서 탐색은 이 무리를 아예
+요구하지 않습니다. `lambda != 0`이면 `A x = lambda B x`의 절점 행이 자유 절점의
+`N = K - k0^2 M`으로 `G^T x_t + N x_z = 0`을 주므로, 사영
+
+    P [x_t; x_z] = [x_t; -N^-1 G^T x_t]
+
+는 다른 모든 고유벡터를 그대로 두고 모든 `[0, e_z]`를 없애며 shift-invert 연산자와
+교환합니다. 탐색은 `P(ones)`에서 시작해 `P op`로 실행합니다
+(`_waveguide_kernels.py::_static_projector`). 그러면 무리 너머의 근도 찾으므로 원판
+`|nu| |sigma| > 1`, 곧 `|lambda - sigma| < |sigma|`(`beta^2 = 0`보다 shift에 가까운)
+안의 근만 남깁니다. 이는 탐색이 무리에 닿기 전에 찾는 근이므로, 원판에 있는 근보다 많이
+찾는 탐색은 `num_modes`보다 적은 근을 반환하고, PML 탐색의 후보 수는 원판 안의 수입니다.
+`solve_modes`는 어느 경로에서도 `|beta^2| <= STATIC_ROOT_TOL |sigma|`(`1e-10`, 곧
+`|n_eff| <= 1e-5 |n_target|`)인 근도 반환하지 않습니다.
+
+`N`은 `k0^2`가 자유 절점에서 `K e_z = mu M e_z`의 고유값(PEC 상자의 TM 차단)에 가까울 때
+거의 특이합니다. 먼저 상대 거리 `delta = |mu - k0^2| / k0^2`를 `1/|mu_max|`로 추정합니다.
+`mu_max`는 `N^-1 (k0^2 M)`의 가장 큰 고유값입니다(ARPACK, `k = 1`, `tol = 1e-3`, slab에서
+실제 거리 `1e-6`, `1e-8`일 때 `1e-6`, `1e-8`). `STATIC_DEFLATION_MIN_CUTOFF_DISTANCE`(`1e-5`)
+미만이거나, `N`을 분해할 수 없거나, 추정이 수렴하지 않으면 예전처럼 사영 없이 탐색하고
+`StaticFamilyNearCutoffWarning`을 냅니다. 한계: 거기서는 목표에 무리보다 가까운 모드보다 많이
+찾는 탐색이 다시 무리에 닿습니다. 계산된 근은 보통 `|beta^2|`가 반올림 수준이어서
+(`tests/galerkin/test_waveguide_static_roots.py`의 slab에서 최대 `1.2e-14 |sigma|`, 가끔
+정확히 0) 반환하지 않지만, 무리의 조건이 나빠 계산된 근이 문턱을 넘을 수 있습니다. 정사각
+도파관에서 그런 차단으로부터 상대 거리 `1e-6`, `1e-8`일 때 `2.2e-10 |sigma|`,
+`6.8e-9 |sigma|`가 측정되었습니다. 이런 근은 가로 성분이 거의 없는 채로 반환됩니다. 사영
+없는 탐색은 위의 이유로 느리거나 수렴하지 않을 수도 있습니다.
 
 `A`와 `B`는 전치대칭입니다. 실수 `eps_r`, `mu_r`에서는 실대칭이고 `B`는
 부정부호(indefinite)이며, 복소 재료나 좌표 인자에서는 복소대칭이고 Hermitian이
@@ -200,9 +221,10 @@ curl의 핵이 edge 공간에서 정확히 표현되어 `beta^2 = 0`에 모여 �
 고유값 문제로 넘깁니다(`_waveguide_kernels.py::_solve_modes_numpy`).
 
     sigma = -(k0 n_target)^2,    (A - sigma B)의 LU   (scipy.sparse.linalg.splu),
-    op(v) = (A - sigma B)^-1 B v,     eigs(op, k=num_modes, which="LM", v0=ones),
-    lambda = sigma + 1/nu,    beta^2 = -lambda.
+    op(v) = P (A - sigma B)^-1 B v,   eigs(op, k=num_modes, which="LM", v0=P(ones)),
+    lambda = sigma + 1/nu,    beta^2 = -lambda,    |nu| |sigma| > 1일 때 남김,
 
+`P`는 위의 사영입니다(TM 차단 근처에서는 사영 없이 `v0 = ones`).
 `ncv = min(n, max(4 num_modes, 40))`, `maxiter = 20000`, 재현성을 위한 고정 시작
 벡터입니다. 실수 문제에서는 고유값을 실수로 취하고 `beta^2 > 0`만 남겨
 `beta^2` 내림차순으로 정렬하며 `beta = sqrt(beta^2)`입니다. `n_eff`는 float64

@@ -182,18 +182,44 @@ represented exactly by the edge space and parked at `beta^2 = 0`, instead of
 being smeared across the spectrum as nodal vector elements do
 (`examples/galerkin/waveguide_modes.py::solve_nodal`).
 
-When a search does reach the cluster, its computed roots usually have `|beta^2|`
-at rounding level (at most `1.2e-14 |sigma|` on the slabs of
-`tests/galerkin/test_waveguide_static_roots.py`, occasionally exactly 0), and
-`E_t = e_t / beta` is undefined for them. `solve_modes` returns no root with
-`|beta^2| <= STATIC_ROOT_TOL |sigma|` (`1e-10`, that is `|n_eff| <= 1e-5 |n_target|`)
-on any path, so such a search returns fewer roots than `num_modes`. Limitation:
-when the nodal block `K - k0^2 M` of `B` is nearly singular, that is `k0^2` is
-close to an eigenvalue of `K e_z = lambda M e_z` on the free nodes (a TM cutoff of
-the PEC box), the cluster is ill-conditioned and its computed roots can exceed the
-tolerance: `2.2e-10 |sigma|` and `6.8e-9 |sigma|` were measured at relative
-distances `1e-6` and `1e-8` from such a cutoff on a square guide. Those roots are
-returned, with almost no transverse field.
+The cluster is exactly degenerate: every static root has `nu = 1/(lambda - sigma)
+= -1/sigma`. A search that asked ARPACK for its vectors converged them only through
+rounding, so how fast it converged, or whether it did, depended on the last bits of
+the pencil: the bent slab of `tests/simcase/test_pml_gain_bound.py` with 64 roots
+(37 of them static) converged in 67 s under one NumPy CPU dispatch and had not
+converged after 30 min under another. The search therefore never asks for the
+family. For `lambda != 0` the nodal rows of `A x = lambda B x` give
+`G^T x_t + N x_z = 0` with `N = K - k0^2 M` on the free nodes, so the projector
+
+    P [x_t; x_z] = [x_t; -N^-1 G^T x_t]
+
+keeps every other eigenvector, annihilates every `[0, e_z]` and commutes with the
+shift-invert operator. The search runs on `P op` from `P(ones)`
+(`_waveguide_kernels.py::_static_projector`). It then also finds roots beyond the
+family; only the roots inside the disk `|nu| |sigma| > 1`, that is
+`|lambda - sigma| < |sigma|` (nearer the shift than `beta^2 = 0`), are kept. These
+are the roots a search finds before it reaches the family, so a search for more
+roots than the disk holds returns fewer than `num_modes`, and the candidate counts
+of a PML search are the counts inside the disk. `solve_modes` also returns no root
+with `|beta^2| <= STATIC_ROOT_TOL |sigma|` (`1e-10`, that is
+`|n_eff| <= 1e-5 |n_target|`) on any path.
+
+`N` is nearly singular when `k0^2` is close to an eigenvalue of `K e_z = mu M e_z`
+on the free nodes (a TM cutoff of the PEC box). The relative distance
+`delta = |mu - k0^2| / k0^2` is estimated first as `1/|mu_max|`, `mu_max` the
+largest eigenvalue of `N^-1 (k0^2 M)` (ARPACK, `k = 1`, `tol = 1e-3`; it gave
+`1e-6` and `1e-8` at those true distances on the slab). Below
+`STATIC_DEFLATION_MIN_CUTOFF_DISTANCE` (`1e-5`), or when `N` cannot be factored or
+the estimate does not converge, the search is not deflated, as before, and a
+`StaticFamilyNearCutoffWarning` is issued. Limitation: there a search for more
+modes than lie closer to the target than the family reaches it again. Its computed
+roots usually have `|beta^2|` at rounding level (at most `1.2e-14 |sigma|` on the
+slabs of `tests/galerkin/test_waveguide_static_roots.py`, occasionally exactly 0)
+and are not returned, but the cluster is ill-conditioned and its computed roots can
+exceed the tolerance: `2.2e-10 |sigma|` and `6.8e-9 |sigma|` were measured at
+relative distances `1e-6` and `1e-8` from such a cutoff on a square guide. Those
+roots are returned, with almost no transverse field. A search that is not deflated
+can also be slow, or not converge, for the reason above.
 
 `A` and `B` are transpose-symmetric. For real `eps_r`, `mu_r` they are real
 symmetric and `B` is indefinite; for complex materials or coordinate factors they
@@ -219,9 +245,10 @@ operator is formed and handed over as a standard eigenproblem
 (`_waveguide_kernels.py::_solve_modes_numpy`):
 
     sigma = -(k0 n_target)^2,    LU of (A - sigma B)   (scipy.sparse.linalg.splu),
-    op(v) = (A - sigma B)^-1 B v,     eigs(op, k=num_modes, which="LM", v0=ones),
-    lambda = sigma + 1/nu,    beta^2 = -lambda.
+    op(v) = P (A - sigma B)^-1 B v,   eigs(op, k=num_modes, which="LM", v0=P(ones)),
+    lambda = sigma + 1/nu,    beta^2 = -lambda,    kept when |nu| |sigma| > 1,
 
+with `P` the projector above (without it, and with `v0 = ones`, near a TM cutoff).
 `ncv = min(n, max(4 num_modes, 40))`, `maxiter = 20000`, with the fixed start
 vector for reproducibility. For a real problem the eigenvalues are taken real,
 only `beta^2 > 0` is kept, modes are sorted by descending `beta^2` and
