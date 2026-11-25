@@ -2082,7 +2082,9 @@ try {
     const first = await obSave('OB V15 save 1');
     // round 25 (A4, P4): every note row of the leakage run is openRegionNotes of that run, as the file holds it
     {
-      const leakRun = workspaceSession(first.text).runs.at(-1); // the newest run: the leakage case
+      // the file read as the page reads it (readProject, then parseSession): the newest run is the leakage case
+      const projectFile = await import(pathToFileURL(join(engine.static, 'workspace-project-file.mjs')).href);
+      const leakRun = projectFile.readProject(first.text).models.find(m => m.kind === 'workspace').session.runs.at(-1);
       assert.ok(leakRun.settings.boundary === 'PML' && leakRun.input.model.shapes.length === 2 && !!leakRun.field, 'the leakage run with its field');
       const regionNotes = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun).map(n => n.text);
       stage('A4 open region notes from the file', {notes: regionNotes});
