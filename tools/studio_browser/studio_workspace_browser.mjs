@@ -3454,8 +3454,9 @@ try {
     const fePng = async () => { const before = new Set((await readdir(rtDownloads)).filter(n => n.endsWith('.png'))); await r.click('#export-field');
       for (let i = 0; i < 200; i++) { const f = (await readdir(rtDownloads)).find(n => n.endsWith('.png') && !before.has(n)); if (f) { await sleep(500); const png = (await readFile(join(rtDownloads, f))).toString('base64'); await rm(join(rtDownloads, f)); return png; } await sleep(100); }
       throw new Error('F7: no field PNG'); };
-    const feView = (mode, component) => r.eval(`(()=>{const m=document.getElementById('field-mode');m.value='${mode}';m.onchange();const c=document.getElementById('field-component');c.value='${component}';c.onchange();return 1})()`);
-    const feKeep = (key, expression) => r.eval(`(()=>{const c=${expression};(window.__fe??={})[${JSON.stringify(key)}]=c.getContext('2d').getImageData(0,0,c.width,c.height);return 1})()`);
+    // (the values reach the page as arguments of fixed functions: no page code is built from them)
+    const feView = (mode, component) => r.onElement('function(a){const m=this.getElementById("field-mode");m.value=String(a.mode);m.onchange();const c=this.getElementById("field-component");c.value=a.component;c.onchange();return 1}', {mode, component});
+    const feKeep = (key, which) => r.onElement('function(a){const c=a.which==="profile"?this.querySelector("details.line-profile canvas"):this.getElementById("optical-field");(window.__fe??={})[a.key]=c.getContext("2d").getImageData(0,0,c.width,c.height);return 1}', {key, which});
     const feCapture = async (tag, jobs) => {
       const shots = [];
       await r.click('nav [data-page=Results]');
@@ -3468,24 +3469,24 @@ try {
           await rSize(width, height, mobile);
           for (const mode of width === 1440 ? [0, count - 1] : [0]) for (const component of (width === 1440 ? ['magnitude', 'Ex', 'Ey', 'Ez'] : ['magnitude'])) {
             await feView(mode, component); await sleep(250);
-            const key = [job, width, mode + 1, component].join('|'); await feKeep(tag + '|' + key, "document.getElementById('optical-field')"); shots.push(key);
+            const key = [job, width, mode + 1, component].join('|'); await feKeep(tag + '|' + key, 'field'); shots.push(key);
           }
         }
         await rSize(1440, 900);
         // the line profile (its default line) of mode 1's magnitude
         await feView(0, 'magnitude'); await r.eval("(()=>{const d=document.querySelector('details.line-profile');if(!d.open){d.open=true;d.ontoggle();}return 1})()"); await sleep(400);
-        const key = [job, 'profile'].join('|'); await feKeep(tag + '|' + key, "document.querySelector('details.line-profile canvas')"); shots.push(key);
+        const key = [job, 'profile'].join('|'); await feKeep(tag + '|' + key, 'profile'); shots.push(key);
       }
       // the Export field PNG of the last run, mode 1, magnitude
       await feView(0, 'magnitude'); await sleep(300);
       const png = await fePng();
-      await r.eval(`new Promise(res=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');c.width=i.width;c.height=i.height;const g=c.getContext('2d');g.drawImage(i,0,0);(window.__fe??={})[${JSON.stringify(tag + '|png')}]=g.getImageData(0,0,c.width,c.height);res(1)};i.src='data:image/png;base64,${png}';})`);
+      await r.onElement('function(a){return new Promise(res=>{const i=new Image();i.onload=()=>{const c=document.createElement("canvas");c.width=i.width;c.height=i.height;const g=c.getContext("2d");g.drawImage(i,0,0);(window.__fe??={})[a.key]=g.getImageData(0,0,c.width,c.height);res(1)};i.src="data:image/png;base64,"+a.png;})}', {key: tag + '|png', png});
       shots.push('png');
       return shots;
     };
-    const feCompare = keys => r.eval(`(()=>{const out={};for(const k of ${JSON.stringify(keys)}){const a=window.__fe['before|'+k],b=window.__fe['after|'+k];
-      if(!a||!b||a.width!==b.width||a.height!==b.height){out[k]={missing:true};continue;}let max=0,differ=0;for(let i=0;i<a.data.length;i+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a.data[i+c]-b.data[i+c]));if(d){differ++;max=Math.max(max,d);}}
-      out[k]={width:a.width,height:a.height,maxDelta:max,share:differ/(a.width*a.height)};}return out})()`);
+    const feCompare = keys => r.onElement('function(keys){const out={};for(const k of keys){const a=window.__fe["before|"+k],b=window.__fe["after|"+k];'+
+      'if(!a||!b||a.width!==b.width||a.height!==b.height){out[k]={missing:true};continue;}let max=0,differ=0;for(let i=0;i<a.data.length;i+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a.data[i+c]-b.data[i+c]));if(d){differ++;max=Math.max(max,d);}}'+
+      'out[k]={width:a.width,height:a.height,maxDelta:max,share:differ/(a.width*a.height)};}return out}', keys);
     await r.call('Page.navigate', {url: base + '/workspace'});
     await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'RT start page');
     await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'RT optical model');
