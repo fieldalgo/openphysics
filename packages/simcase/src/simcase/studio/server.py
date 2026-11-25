@@ -629,13 +629,18 @@ def _run_job(job_id: str, doc: Document):
         with _jobs_lock:
             _jobs[job_id]["log"] = list(log)
 
+    def step(event):
+        # the latest progress event of run (search_started), which the status route returns
+        with _jobs_lock:
+            _jobs[job_id]["step"] = dict(event)
+
     try:
-        res = run(doc, verbose=False)
+        res = run(doc, verbose=False, on_event=step)
         for line in res.log:
             record(line)
         if isinstance(res, SubspaceSweepResult):
             with _jobs_lock:
-                _jobs[job_id].update(status="done", result=_subspace_payload(res, res.field_representation))
+                _jobs[job_id].update(status="done", result=_subspace_payload(res, res.field_representation), step=None)
             return
         summary = res.summary()
         payload = {**_common_payload(res, summary),
@@ -649,11 +654,11 @@ def _run_job(job_id: str, doc: Document):
         if res.vector_fields is not None:
             payload["vector_fields"] = [f.to_dict() for f in res.vector_fields]
         with _jobs_lock:
-            _jobs[job_id].update(status="done", result=payload)
+            _jobs[job_id].update(status="done", result=payload, step=None)
     except Exception as exc:  # a refusal for users keeps its text; the traceback stays in the server log
         _log.warning("optical job %s failed", job_id, exc_info=True)
         with _jobs_lock:
-            _jobs[job_id].update(status="error",
+            _jobs[job_id].update(status="error", step=None,
                                  error=f"{type(exc).__name__}: {exc}" if isinstance(exc, USER_FACING) else UNEXPECTED)
             diagnostic = getattr(exc, "diagnostics", getattr(exc.__cause__, "diagnostics", None))
             if diagnostic is not None:
@@ -716,7 +721,7 @@ def _start_job(tree: dict, found: list) -> dict:
         finished = [key for key, job in _jobs.items() if job["status"] != "running"]
         for key in finished[:-_MAX_FINISHED_JOBS]:
             del _jobs[key]  # dicts keep insertion order: the oldest finished jobs go first
-        _jobs[job_id] = {"status": "running", "log": [], "result": None, "error": None}
+        _jobs[job_id] = {"status": "running", "log": [], "result": None, "error": None, "step": None}
     threading.Thread(target=_run_job, args=(job_id, doc), daemon=True).start()
     return {"job": job_id}
 
