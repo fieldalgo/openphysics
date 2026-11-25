@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   linux-py312:
-    # Everything on Linux except the source suite, which linux-py312-tests runs in twelve
+    # Everything on Linux except the source suite, which linux-py312-tests runs in sixteen
     # parts at the same time: licenses, release version, meshloom's kernel, links, the
     # preflight groups, all nine distributions, Studio Node checks and the resource
     # observations.
@@ -158,24 +158,25 @@ jobs:
 
   linux-py312-tests:
     # The whole source suite (python -m pytest, every test in tests/ and tools/tests/) in
-    # twelve parts on twelve runners at once. Each part collects the whole suite and keeps the
+    # sixteen parts on sixteen runners at once. Each part collects the whole suite and keeps the
     # test files tools/shards/openphysics_shard.py assigns to it, balanced by the per-file
     # times in tools/shards/durations.json; together the parts run every collected test
     # exactly once. No test is selected by name.
-    name: linux-py312 tests (${{ matrix.shard }}/12)
+    name: linux-py312 tests (${{ matrix.shard }}/16)
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     # About 5.5 min of tests per part by the table, the floor being its largest file
     # (tools/tests/test_examples_smoke.py, 5.7 min); the whole suite took 44-70 min in one
     # job on 2026-11-20 and its four parts 10-21 min on 2026-11-21, depending on the runner
-    # CPU. Plus about 3 min of setup; the limit only stops hung jobs. Twelve parts since the
-    # boundary- and corner-panel tests landed (2026-11-25): with them the suite is about 338 min
-    # by the table, about 42 min per part in eight.
+    # CPU. Plus about 3 min of setup; the limit only stops hung jobs. Sixteen parts since the
+    # boundary- and corner-panel tests landed (2026-11-25): with them the suite is about 378 min
+    # (run 45536602993), and twelve balanced parts still ran 21-42 min of tests because the
+    # runners' speed varies.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
@@ -225,22 +226,22 @@ jobs:
           OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
           OPENPHYSICS_CROSSCHECK_DIR: .validation/crosscheck
           PYTHONPATH: ${{ github.workspace }}/tools/shards
-        run: python -m pytest -q -ra -p openphysics_shard --shard ${{ matrix.shard }}/12 --junitxml=.validation/source-tests-${{ matrix.shard }}.xml
+        run: python -m pytest -q -ra -p openphysics_shard --shard ${{ matrix.shard }}/16 --junitxml=.validation/source-tests-${{ matrix.shard }}.xml
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: source-tests-${{ matrix.shard }}-of-12
+          name: source-tests-${{ matrix.shard }}-of-16
           path: .validation/
           include-hidden-files: true
           if-no-files-found: warn
 
   installed-tests:
     # The whole tests/ folder against wheels built from the sdists and installed
-    # outside the checkout, in twelve parts on twelve runners at once. Each part builds and
+    # outside the checkout, in sixteen parts on sixteen runners at once. Each part builds and
     # installs its own wheels (about 2 min) and runs the test files that
     # tools/shards/openphysics_shard.py assigns to it from every copied test file, so the
     # parts together run every test file once. No test is selected by name.
-    name: installed-tests (${{ matrix.shard }}/12)
+    name: installed-tests (${{ matrix.shard }}/16)
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     # In one job the step took 39-71 min on 2026-11-20, following the runner CPU (EPYC
@@ -251,7 +252,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     env:
       MPLBACKEND: Agg
       OPENBLAS_NUM_THREADS: "1"
@@ -281,11 +282,11 @@ jobs:
           PHYSMAT_RII_PATH: ${{ runner.temp }}/rii/database
           OPENPHYSICS_REQUIRE_CROSSCHECK: "1"
           OPENPHYSICS_CROSSCHECK_DIR: .validation/installed-crosscheck
-        run: python tools/run_installed_tests.py --output .validation/installed --shard ${{ matrix.shard }}/12
+        run: python tools/run_installed_tests.py --output .validation/installed --shard ${{ matrix.shard }}/16
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: installed-test-results-${{ matrix.shard }}-of-12
+          name: installed-test-results-${{ matrix.shard }}-of-16
           path: .validation/
           include-hidden-files: true
           if-no-files-found: warn

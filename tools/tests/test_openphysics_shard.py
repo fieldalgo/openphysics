@@ -69,10 +69,10 @@ def test_the_stored_table_balances_the_parts(parts):
 
 
 def test_no_file_is_much_longer_than_a_part_of_the_suite():
-    # CI runs twelve parts (.github/workflows/validate.yml) and assigns whole files, so a
-    # file far above a twelfth of the suite would set the run's floor; split such a file instead.
+    # CI runs sixteen parts (.github/workflows/validate.yml) and assigns whole files, so a
+    # file far above a sixteenth of the suite would set the run's floor; split such a file instead.
     seconds = shard.load_durations()
-    part = sum(seconds.values()) / 12
+    part = sum(seconds.values()) / 16
     assert max(seconds.values()) <= 1.1 * part, max(seconds, key=seconds.get)
 
 
