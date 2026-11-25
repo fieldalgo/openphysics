@@ -3204,9 +3204,10 @@ try {
     // focus and buttons otherwise as before; no overflow with the longer button
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'G3 Results');
     await r.onElement('function(selector){[...this.querySelectorAll(selector)].find(b=>/^Run 1 · /.test(b.textContent)).click();return true}', '.run-item'); await sleep(400);
+    // the run list is read on Results, where it is shown
+    const g3 = {before: await runItems(), shownBefore: await r.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null")};
     await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
     await r.click('#closed-search-highest'); await sleep(400); await r.type('#mode-count-number', 2); await sleep(400);
-    const g3 = {before: await runItems(), shownBefore: await r.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null")};
     g3.dialog = await asked('G3 with Run 3'); await overflow('G3 show Run 3');
     await r.click('#slab-question-search'); await noRun(g3.before, 'G3 show Run 3');
     g3.after = {shown: await r.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??null"),
