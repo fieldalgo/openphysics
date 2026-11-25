@@ -380,7 +380,7 @@ non-converging Newton run whose refusal is shown with its text, and constant mat
 It also checks the model builder as an ARIA tree with the keyboard alone (Tab to its one tab
 stop, Up, Down, Home, End, Enter, Space, Left and Right) and finds every node of the optical and
 Joule heating trees by role and accessible name in the browser's accessibility tree, and it checks
-Compare's absorption loss columns, plots framed on the core with the probe line under them at
+Compare's loss columns (*Loss (dB/cm)* over *absorption only (closed window)* since round 24), plots framed on the core with the probe line under them at
 1440 × 900 and 1280 × 800, a run clicked on Compare staying on Compare with **Open in Results**,
 one selected run card, the session file still named after a page, run or mode is chosen and after
 a restore, and a restore opening the page that was shown. Since round 11 it also checks no
@@ -582,9 +582,9 @@ the group index on before any run *Closed window · group index on (3 solves)* w
 index**, after a closed 4-mode run without it *… · about N s* (3 × its time), the button turning the
 option off (*Closed window · last such run m:ss*, the box unchecked, *Group index off: …*), and after
 a closed n_g run its own time (P3); five runs of 4 or 2 modes (about 19 MB) giving *… Session is now
-N MB, over the 16 MiB (16.8 MB) limit. File › Save will ask whether to keep the fields of the selected
-and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and the effective areas.
-Browser recovery keeps every field but those of Run 1.*, wrapped in Messages with no overflow, the
+N.N MB, over the 16.8 MB limit. Browser recovery keeps every run's values; the field plots of Run 1
+are not kept. File › Save will ask whether to keep the field plots of the selected and pinned runs
+only (Run 5).* (round 24, B3: one unit and no *MiB*), wrapped in Messages with no overflow, the
 header *… · kept for recovery in this browser without the fields of Run 1*, and the record in
 IndexedDB within 16 MiB holding Run 5's field and the newest others, exactly the runs not named; after
 a sixth run (about 24 MB) the record again within 16 MiB with Run 6's field and the header naming
@@ -595,6 +595,19 @@ run (*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700
 equal to its run-list label up to the material (P4); and the line under an open run and an n_g run
 naming the boundary, the search, Modes to find and n_g with *unchanged:* for the rest (P6); no
 horizontal overflow at 1440 × 900 or 390 × 844.
+Since round 24 (pre-registered P3 and P4; P1 is the project script's R24 stage, P2 the R23 stage's
+message, P5 the loss headers above) a stage in its own browser context (R24) checks, with the
+optical template: Run 1 and Run 2 named and two newer runs giving *Run 4 is newer than this pair ·
+Compare the two newest: Run 3 and Run 4*, whose button shows Run 3 against Run 4, then Run 1 and
+Run 2 picked by hand staying after a fifth run with *Run 5 is newer than this pair · Compare Run 5
+with B* (P3); and the plan line before an open run with group index: none (*Open boundary · … ·
+group index on (3 solves)*) when the only open runs were opened from a session file (P2's
+`optical-v10-open-f8ece10.json`), *… · about N s* (or *min*) after an open run in the tab, the same
+words after a newer open run is added from `optical-v10-open-full-083e151.json` (it has no wall
+time and is skipped), and none again after a reload, **Restore newest from this browser** and the
+group index turned on (P4).
+Session files and recovery records hold no wall time, so an estimate from a run read from a file is
+not checked: it cannot occur without a format change. No horizontal overflow at 1440 × 900 or 390 × 844.
 The optical tree's Results group (pre-registered) is checked by role and name with two runs
 (*Results · run 1* at level 1, *Runs · 2 of 6* selected at level 2, *Compare* at level 2, the tab
 stop on Runs), by keyboard (Up to the group, End to Compare, Enter opening Compare, Enter on Runs
@@ -647,7 +660,8 @@ it also opens the file in an older Studio (by hand; CI does not pass it).
 Since round 16 (pre-registered) it then opens the file in a new profile at 1440 × 900: Library ›
 Heated silicon waveguide lands on its Results and Library › Optical waveguide on Results with the
 run last viewed; Run 1 and Run 2 named *Design A* and *Design B* stay on Compare when a third run
-comes (*Run 3 is newer than this pair · Compare Run 3 with B*); Save As `design-ab.json` keeps the
+comes (*Run 3 is newer than this pair · Compare the two newest: Run 2 and Run 3* since round 24: the
+pair is named, not picked by hand); Save As `design-ab.json` keeps the
 name *Heater study* and the pair; after a reload both cards' offers name *same as file
 design-ab.json* (the heated model was not shown when it was saved); restoring the optical one gives
 the header *Heater study · design-ab.json · saved …* and Save As suggests `design-ab.json`; and the
@@ -709,7 +723,12 @@ the same optical and heated numbers, *Restored Optical waveguide (6 runs) and He
 waveguide (1 run) from this browser, not recomputed.* and the header *both-models · recovered from
 this browser · changed since both-models.json, not saved · kept for recovery in this browser*
 (round 23, E5; *… · not saved to a file · …* before, read once recovery has kept the restored
-session), then the ordinary header after the next change; no
+session). After the next change it reads *both-models · changed since both-models.json, not saved ·
+kept for recovery in this browser* (round 24, B2; *both-models · not saved to a file · …* before).
+Then (R24, pre-registered P1) finer runs take the session over the limit and the header reads
+*both-models · changed since both-models.json, not saved · kept for recovery in this browser
+without the fields of Run N*. The opened project, changed before its next run, reads *both-models ·
+both-models.json · changed since opened · kept for recovery in this browser*. There is no
 horizontal overflow at 1440 × 900 or 390 × 844. The round-19 restore of the file opened now names the
 project (*Heater study · recovered from this browser · changed since heater-study.json, not saved ·
 …* since round 23), the workspace script's reduced session
