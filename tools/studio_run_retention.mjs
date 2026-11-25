@@ -197,7 +197,8 @@ async function k5(dir, out, against = 'one-b', base = 'one-a', only = null) {
   if (report.failures.length) process.exitCode = 1;
 }
 
-const [command, ...rest] = process.argv.slice(2);
+// the commands run when this file is the program (tools/studio_field_encoding.mjs imports its cases)
+const [command, ...rest] = import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href ? process.argv.slice(2) : [];
 if (command === 'engine') await engine(resolve(rest[0]), rest[1], rest.slice(2));
 else if (command === 'k1') await k1(resolve(rest[0]), resolve(rest[1]));
 else if (command === 'k5') await k5(resolve(rest[0]), resolve(rest[1]), rest[2] ?? 'one-b', rest[3] ?? 'one-a', rest[4] ? rest[4].split(',') : null);
