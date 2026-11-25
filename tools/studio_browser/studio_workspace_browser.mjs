@@ -3028,6 +3028,32 @@ try {
     stage('R22 P5 long message at 390', p5.phone);
     assert.equal(p5.phone.text, p5.message);
     assert.ok(p5.phone.lines > 1 && p5.phone.over <= 0 && p5.phone.lineOver <= 0 && p5.phone.right, JSON.stringify(p5.phone));
+    // round 29 (L1): the shortcut's 4 modes are for the closed window. After the shortcut (2 -> 4),
+    // Open boundary sets 2 back with its sentence; Undo gives back 4 with Open boundary still chosen,
+    // a second Undo the closed window; a count typed after the shortcut (3) is kept. Nothing runs.
+    const l1Read = async () => ({modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), open: await r.eval("document.querySelector('input[name=\"outer-boundary\"][value=open]')?.checked??null"),
+      message: await rText('#file-status'), plan: await rText('#run-plan'), items: (await runItems()).length});
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    const l1 = {open: await l1Read()};
+    await r.click('#undo-edit'); await sleep(400); l1.undo = await l1Read();
+    await r.click('#undo-edit'); await sleep(400); l1.undo2 = await l1Read();
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    await r.click('#closed-search-highest'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
+    await r.click('#run-edge-search'); await sleep(400); l1.shortcut = await l1Read();
+    await rTree('Optical modes', "!!document.getElementById('mode-count-number')"); await r.type('#mode-count-number', 3); await sleep(300);
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); l1.typed = await l1Read();
+    await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400); l1.closed = await l1Read();
+    stage('R29 L1 shortcut modes and Open boundary', l1);
+    const L1_OPEN = "Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries. Modes to find back to 2: 4 was for the closed window's search near 2.46.";
+    assert.equal(l1.open.modes, '2'); assert.equal(l1.open.open, true); assert.ok(l1.open.message.startsWith(L1_OPEN), l1.open.message);
+    assert.match(l1.open.plan, /^Open boundary · 2 modes · /);
+    assert.deepEqual([l1.undo.modes, l1.undo.open], ['4', true]); assert.match(l1.undo.plan, /^Open boundary · 4 modes · /);
+    assert.deepEqual([l1.undo2.modes, l1.undo2.open], ['4', false]);
+    assert.equal(l1.shortcut.modes, '4');
+    assert.deepEqual([l1.typed.modes, l1.typed.open], ['3', true]); assert.ok(!l1.typed.message.includes('Modes to find back to'), l1.typed.message);
+    assert.deepEqual([l1.closed.modes, l1.closed.open], ['3', false]); assert.ok(!l1.closed.message.includes('Modes to find back to'), l1.closed.message);
+    for (const v of Object.values(l1)) assert.equal(v.items, items0, 'L1: nothing runs');
     // P3 (V3): T18 closed with Highest (2 modes) against T18 open
     await r.click('#closed-search-highest'); await sleep(300); await r.type('#mode-count-number', 2); await sleep(300);
     await rRun();

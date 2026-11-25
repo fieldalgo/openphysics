@@ -22,7 +22,7 @@ import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,isOpenRun,runChoice,signaturePml,parseTarget,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
-import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget,slabQuestionText,slabQuestionButtons,slabQuestionKey,slabQuestionMemory} from './workspace-closed-target.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget,slabQuestionText,slabQuestionButtons,slabQuestionKey,slabQuestionMemory,shortcutModesMemory} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
@@ -52,6 +52,8 @@ import {setupMenus} from './workspace-file-menu.mjs';
 // A reload always opens the start page, so a restored scroll position would hide its top.
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,searchTarget:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
+// round 29 (L1): the count the slab shortcut replaced (shortcutModesMemory, workspace-closed-target.mjs)
+const shortcutModes=shortcutModesMemory();
 const cameras={Perspective:new SchematicCamera(),Section:new SchematicCamera(),Optical:new SchematicCamera()};cameras.Optical.fitTo(WINDOW_VIEW);
 let refreshViewport=null;let disposeWidthEditor=()=>{};
 const numericDrafts=new NumericDrafts();
@@ -393,7 +395,7 @@ function openTemplateCard(id){
  fileScope++;
  if(id==='heated-waveguide'){multiView.openTemplate({note:multiView.active()?null:opticalRunsNote()});return;}
  if(!leaveMultiphysics())return;projectId('workspace');
- Object.assign(state,templatePhysics(id));state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;state.searchTarget=null;ui.closedNear=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
+ Object.assign(state,templatePhysics(id));shortcutModes.clear();state.modeCount=DEFAULT_MODE_COUNT;state.groupIndex=false;state.openBoundary=null;state.searchTarget=null;ui.closedNear=null;ui.pmlCheck=false;newModelInputs=signature();select('Geometry');notice(isHeat()||isOptical()||isJoule()?'Model ready. Edit settings, review the study, then run explicitly.':'Setup preview ready. Coupled calculation is unavailable.');
 }
 // Where the optical runs of this tab are while another model is open (Messages, on switching).
 // file: the session file that holds these runs (as the leave question decides it), by name;
@@ -554,7 +556,7 @@ function bindNumericInputs(){
     lastKept=fit.kept;const retried=retryShapeDrafts(numericDrafts,fit.shape,key,{index:ui.shape});setShape(ui.shape,retried.shape);
     for(const a of retried.applied)if(!alsoApplied.some(b=>b.key===a.key))alsoApplied.push(a);else alsoApplied.find(b=>b.key===a.key).value=a.value;
     for(const [k,f] of Object.entries(INPUT_FIELDS))if(f.prop&&k!==key&&!numericDrafts.get(k)&&$(f.id))$(f.id).value=selectedShape()[f.prop];}
-   else state[key]=parsed.value;
+   else{if(key==='modeCount')shortcutModes.clear();state[key]=parsed.value;}
    if(key==='width'||key==='height'||field.prop){const slider=$('width');if(slider&&key==='width'){slider.value=parsed.value;slider.previousElementSibling.textContent=parsed.value+' nm';}const svg=$('canvas').querySelector('svg');if(svg){svg.outerHTML=geom();bindPicking();refreshViewport?.();bindWidthEditor();}}
   }refreshInputIssues();};
   // a committed value is said in Messages, with the Left x a Width edit moved (the value at focus)
@@ -804,7 +806,7 @@ function rejectInvalidInput(){
 }
 function applyProject(doc,{saved=true,resetHistory=false,quiet=false}={}){
   fileScope++;
-  doc=edits.replace(doc,{saved,resetHistory});workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.reset();
+  doc=edits.replace(doc,{saved,resetHistory});shortcutModes.clear();workspaceLoads.invalidate();numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.reset();
   pick.boundary=null;pick.mode='Bodies';Object.assign(state,doc.model);setStudy(doc);Object.assign(ui,{page:'Model',selection:'Study',view:'Section'});
   Object.assign(setup,doc.setup);ui.body='Core';
   checkpointRecovery();render();updateHistory();refreshPersistence();
@@ -967,7 +969,7 @@ function inputsChangedSinceResult(){
 function useRunInputs(run){
  if(multiView.active()||!runs.includes(run))return;
  if(numericDrafts.invalid){notice('Correct or restore the highlighted inputs first.');return;}
- const prior=inputsFile(),priorTarget=closedTargetNow(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
+  shortcutModes.clear();const prior=inputsFile(),priorTarget=closedTargetNow(),doc=edits.replace(withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)}));workspaceLoads.invalidate();newModelInputs=null;
  // slice C2: the closed window's Search near n_eff is not in the inputs file; the run's comes back with it (on and its target, or off)
  // round 22 (V1, V6): named as Modes to return; the target is set here and is not part of Undo, so
  // the message does not say that Undo takes it back
@@ -985,7 +987,7 @@ const TARGET_NOT_UNDONE='Modes to return is set and is not part of Undo.';
 const runNumberTitle=run=>runTitle(runNumber(run),run.label||'');
 // label null: no notice (the caller says what happened)
 function restoreEdit(doc,label){
- numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.clearDrafts();
+ shortcutModes.clear(); numericDrafts.clear();heatDrafts.clear();heatController?.invalidate();jouleView.clearDrafts();
  Object.assign(state,doc.model);setStudy(doc);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();if(label!==null)notice(label+' · input changes only; no solver executed.');
 }
@@ -1317,9 +1319,14 @@ const bindBoundaryField=()=>{
 };
 // The outer boundary chosen (the radio in Physics › Optical modes, or Use Open boundary under a
 // closed run's edge note, round 18 X9), with its message; nothing runs.
+// Round 29 (L1): the slab shortcut's Modes to find 4 is for the closed window's search: when the
+// shortcut last changed the count, Open boundary sets back the count it replaced, said in the same
+// message. The boundary change is recorded first, so Undo gives back 4 with Open boundary chosen.
 function setOuterBoundary(open){
   state.openBoundary=open?openChoice():null;
+  const back=open?shortcutModes.onOpen(state.modeCount):null;if(back){trackEdit();edits.endGroup();state.modeCount=back.modeCount;}
   render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');
+  if(back)$('file-status').append(' '+back.text);
   // round 18 (X2): an open run with the group index takes about three times as long: said in a warning style
   if(open&&state.groupIndex===true){const warn=document.createElement('span');warn.className='message-warning';warn.id='group-index-open-warning';warn.textContent=GROUP_INDEX_OPEN_WARNING;$('file-status').append(' ',warn);}
 }
@@ -1331,7 +1338,7 @@ function setOuterBoundary(open){
 // are unchanged. The field's value while Highest is chosen is kept in memory only (ui.closedNear).
 // K10: when a kept run has the new inputs, the message offers it (No need to run: Run N …)
 function setClosedSearch(t){state.searchTarget=t;render();notice(closedSearchNotice(t));offerMatchingRun();}
-function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}. ${SHORTCUT_RUN_TEXT}`);offerMatchingRun();}
+function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;shortcutModes.set(state.modeCount,SHORTCUT_MODE_COUNT,t);state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}. ${SHORTCUT_RUN_TEXT}`);offerMatchingRun();}
 // the field's index while Highest is chosen: the last one typed, if still in this design's range, else the default
 const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(ui.closedNear,state.shapes);}catch{}return defaultTarget(state.shapes);};
 // round 22 (V2): before a run, the closed window's slab warning (a geometry and material check, no

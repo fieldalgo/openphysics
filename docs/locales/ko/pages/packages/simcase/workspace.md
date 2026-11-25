@@ -1364,7 +1364,7 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   23, E1; 전체 문장은 title). 이 행은 잘리지 않습니다: 문구는 줄바꿈되고, 버튼이 옆에 들어가지 않으면 버튼만 다음 줄로 가며,
   Run study 옆 상자가 그만큼 커집니다(round 23 전에는 상자에 맞게 잘려서 테스터 다섯 중 넷이 title이나 패널을 봐야 읽었습니다.
   1440 × 900과 390 × 844에서 확인). 두 곳 모두 **Set search near 2.46 · 4 modes**(바로 가기와 같은 목표 어림값,
-  (n_max + 1.444)/2)와 **Use Open boundary**를 둡니다. 둘 다 입력만 정하고 아무것도 실행하지 않습니다. Nearest to n_eff나 Open
+  (n_max + 1.444)/2)와 **Use Open boundary**를 둡니다. 둘 다 입력만 정하고 아무것도 실행하지 않습니다. 바로 가기의 모드 4개는 닫힌 창의 검색을 위한 것입니다(round 29, L1): Modes to find의 마지막 변경이 바로 가기였고 그다음 바깥 경계를 Open boundary로 바꾸면, Modes to find는 바로 가기 전의 개수로 돌아가고 Messages가 경계 문장 뒤에 *Modes to find back to 2: 4 was for the closed window's search near 2.46.*이라고 알립니다. 이것은 따로 하나의 편집이므로 Undo는 Open boundary를 그대로 둔 채 4를 돌려줍니다. 바로 가기 뒤에 Modes to find를 손으로 바꿨거나, 이미 4였거나, Undo, Redo, 새 입력 뒤에는 아무것도 바뀌지 않으며, 닫힌 창으로 되돌려도 바뀌지 않습니다. Nearest to n_eff나 Open
   boundary를 고르면 경고가 사라집니다. 경고가 보이는 동안 **Run study**는 실행 전에 한 번 묻습니다(round 27, D2). 대화상자
   *Slab modes first*: *Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the
   core instead?*와 **Set search near 2.46 · 4 modes and run**(경고의 바로 가기를 정한 뒤 실행), **Run as set**(묻지 않았을 때와
